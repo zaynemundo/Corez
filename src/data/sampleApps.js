@@ -2,7 +2,7 @@ export const SAMPLE_APPS = [
   {
     id: 'dashboard',
     title: 'Executive Analytics',
-    description: 'Stark high-contrast revenue metrics, minimalist SVG chart, and search-filterable data table.',
+    description: 'High-contrast revenue metrics, minimalist SVG chart, and search-filterable data table.',
     model: 'corez',
     prompt: 'Build an executive analytics dashboard with monochrome styling, stark SVG chart, and live search.',
     code: `<!DOCTYPE html>
@@ -18,26 +18,26 @@ export const SAMPLE_APPS = [
       --border: rgba(255, 255, 255, 0.15);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; }
-    body { background: var(--bg); color: var(--text); padding: 1.5rem; }
+    body { background: var(--bg); color: var(--text); padding: 1.5rem; font-weight: 400; }
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem; }
     .title-box { display: flex; align-items: center; gap: 0.5rem; }
-    .title { font-size: 1.1rem; font-weight: 800; letter-spacing: -0.03em; }
-    .badge { background: #ffffff; color: #000000; padding: 3px 10px; border-radius: 99px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; }
+    .title { font-size: 1.05rem; font-weight: 600; letter-spacing: -0.02em; }
+    .badge { background: #ffffff; color: #000000; padding: 3px 10px; border-radius: 99px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; }
     
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
     .metric-card { background: var(--card); border: 1px solid var(--border); padding: 1.25rem; border-radius: 6px; }
-    .metric-title { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.4rem; font-weight: 700; }
-    .metric-val { font-size: 1.6rem; font-weight: 900; letter-spacing: -0.04em; }
-    .trend { font-size: 0.75rem; color: #aaaaaa; margin-top: 0.4rem; font-weight: 600; }
+    .metric-title { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.4rem; font-weight: 500; }
+    .metric-val { font-size: 1.5rem; font-weight: 600; letter-spacing: -0.03em; }
+    .trend { font-size: 0.75rem; color: #aaaaaa; margin-top: 0.4rem; font-weight: 400; }
     
     .chart-container { background: var(--card); border: 1px solid var(--border); padding: 1.25rem; border-radius: 6px; margin-bottom: 1.5rem; }
     .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
     .svg-chart { width: 100%; height: 140px; overflow: visible; }
     
     table { width: 100%; border-collapse: collapse; margin-top: 0.75rem; }
-    th, td { text-align: left; padding: 0.65rem 0.85rem; border-bottom: 1px solid var(--border); font-size: 0.8rem; }
-    th { color: var(--text-muted); font-weight: 700; text-transform: uppercase; font-size: 0.7rem; }
-    .search-input { background: var(--bg); border: 1px solid var(--border); padding: 0.45rem 0.75rem; border-radius: 4px; color: var(--text); outline: none; font-size: 0.8rem; }
+    th, td { text-align: left; padding: 0.65rem 0.85rem; border-bottom: 1px solid var(--border); font-size: 0.8rem; font-weight: 400; }
+    th { color: var(--text-muted); font-weight: 600; text-transform: uppercase; font-size: 0.7rem; }
+    .search-input { background: var(--bg); border: 1px solid var(--border); padding: 0.45rem 0.75rem; border-radius: 4px; color: var(--text); outline: none; font-size: 0.8rem; font-weight: 400; }
     .search-input:focus { border-color: #ffffff; }
   </style>
 </head>
@@ -75,13 +75,13 @@ export const SAMPLE_APPS = [
 
   <div class="chart-container">
     <div class="chart-header">
-      <h3 style="font-size: 0.85rem; letter-spacing: -0.02em; text-transform: uppercase;">REVENUE GROWTH TREND</h3>
+      <h3 style="font-size: 0.85rem; font-weight: 600; letter-spacing: -0.01em; text-transform: uppercase;">REVENUE GROWTH TREND</h3>
       <input type="text" id="searchInput" class="search-input" placeholder="Filter customer records..." onkeyup="filterTable()">
     </div>
     <svg class="svg-chart" viewBox="0 0 500 140">
       <defs>
         <linearGradient id="grad" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.25"/>
+          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.2"/>
           <stop offset="100%" stop-color="#ffffff" stop-opacity="0.0"/>
         </linearGradient>
       </defs>
@@ -94,7 +94,7 @@ export const SAMPLE_APPS = [
   </div>
 
   <div class="metric-card">
-    <h3 style="font-size: 0.8rem; margin-bottom: 0.5rem; text-transform: uppercase;">CLIENT RECORD SETS</h3>
+    <h3 style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase;">CLIENT RECORD SETS</h3>
     <table id="dataTable">
       <thead>
         <tr>
@@ -138,12 +138,12 @@ export const SAMPLE_APPS = [
   <meta charset="UTF-8">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #000000; color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, system-ui; overflow: hidden; height: 100vh; }
+    body { background: #000000; color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, system-ui; overflow: hidden; height: 100vh; font-weight: 400; }
     canvas { width: 100vw; height: 100vh; display: block; }
     .controls { position: absolute; top: 1rem; left: 1rem; background: rgba(12, 12, 12, 0.95); border: 1px solid rgba(255,255,255,0.15); padding: 0.85rem; border-radius: 6px; display: flex; flex-direction: column; gap: 0.5rem; width: 200px; }
-    .label { font-size: 0.7rem; color: #888; display: flex; justify-content: space-between; font-weight: 700; text-transform: uppercase; }
+    .label { font-size: 0.7rem; color: #888; display: flex; justify-content: space-between; font-weight: 500; text-transform: uppercase; }
     input[type=range] { width: 100%; accent-color: #ffffff; }
-    button { background: #ffffff; border: none; color: #000000; padding: 0.4rem; border-radius: 3px; font-weight: 800; cursor: pointer; font-size: 0.75rem; text-transform: uppercase; }
+    button { background: #ffffff; border: none; color: #000000; padding: 0.4rem; border-radius: 3px; font-weight: 600; cursor: pointer; font-size: 0.75rem; text-transform: uppercase; }
     button:hover { background: #cccccc; }
   </style>
 </head>
@@ -211,8 +211,8 @@ export const SAMPLE_APPS = [
             this.vy += (dy / dist) * force;
           }
         }
-        this.vx *= 0.98;
-        this.vy *= 0.98;
+        this.vx *= 0.97;
+        this.vy *= 0.97;
         this.x += this.vx;
         this.y += this.vy;
 
