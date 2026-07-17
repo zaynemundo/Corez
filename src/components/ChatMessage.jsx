@@ -70,19 +70,19 @@ export default function ChatMessage({ message, onRunInCanvas }) {
           const isShowingSource = showSourceIndex === part.index;
           return (
             <div key={idx} style={{ margin: '0.65rem 0' }}>
-              {/* ChatGPT-style Thinking / Creating App pill */}
+              {/* ChatGPT-style Thinking / Creating App Pill Bar */}
               <div 
                 className="thinking-pill"
                 onClick={() => onRunInCanvas(part.code)}
-                title="Click to open live preview on the right"
+                title="Click to open or focus live app output on the right"
               >
                 <Layers size={14} style={{ color: 'var(--text-primary)' }} />
                 <span>Thinking / Creating App</span>
-                <span className="thinking-pill-badge">Live Canvas</span>
+                <span className="thinking-pill-badge">Live Canvas Output</span>
                 <ChevronRight size={14} style={{ marginLeft: 'auto', color: 'var(--text-secondary)' }} />
               </div>
 
-              {/* Collapsible Source Code Toggle */}
+              {/* Source Toggle */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.25rem' }}>
                 <button 
                   className="source-toggle-btn"
@@ -92,7 +92,7 @@ export default function ChatMessage({ message, onRunInCanvas }) {
                   }}
                 >
                   <Code2 size={12} />
-                  <span>{isShowingSource ? 'Hide Code' : 'View Source'}</span>
+                  <span>{isShowingSource ? 'Hide Source' : 'Inspect Source'}</span>
                   {isShowingSource ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                 </button>
               </div>
@@ -107,7 +107,7 @@ export default function ChatMessage({ message, onRunInCanvas }) {
                         onClick={() => onRunInCanvas(part.code)}
                       >
                         <Play size={11} fill="currentColor" />
-                        <span>Open Canvas</span>
+                        <span>Run in Canvas</span>
                       </button>
                       <button 
                         className="code-btn"
@@ -127,7 +127,6 @@ export default function ChatMessage({ message, onRunInCanvas }) {
           );
         }
 
-        // Standard non-executable code blocks (e.g. JSON, Python, Bash)
         return (
           <div key={idx} className="code-block-container">
             <div className="code-header">
