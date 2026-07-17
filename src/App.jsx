@@ -20,13 +20,11 @@ const INITIAL_SESSIONS = [
       },
       {
         role: 'assistant',
-        content: `Here is your monochrome executive analytics dashboard built for **Corez**. You can run it live in the **Live Canvas Sandbox** on the right!
+        content: `Here is your monochrome executive analytics dashboard built for **Corez**. Click on **Thinking / Creating App** below to open the live preview on the right side!
 
 \`\`\`html
 ${SAMPLE_APPS[0].code}
-\`\`\`
-
-Click **"Run in Canvas"** to inspect the live preview!`
+\`\`\``
       }
     ]
   }
@@ -43,7 +41,7 @@ export default function App() {
   });
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [canvasOpen, setCanvasOpen] = useState(true);
+  const [canvasOpen, setCanvasOpen] = useState(false); // Collapsed by default until clicked
   const [canvasFullScreen, setCanvasFullScreen] = useState(false);
   const [activeCanvasCode, setActiveCanvasCode] = useState(SAMPLE_APPS[0].code);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -93,6 +91,7 @@ export default function App() {
     setSettingsOpen(false);
   };
 
+  // Open canvas on the right side when Thinking / Creating App pill is clicked
   const handleRunInCanvas = (code) => {
     setActiveCanvasCode(code);
     setCanvasOpen(true);
@@ -107,7 +106,7 @@ export default function App() {
         { role: 'user', content: app.prompt },
         {
           role: 'assistant',
-          content: `Here is the monochrome executable code for **${app.title}**. Running live in the canvas!\n\n\`\`\`html\n${app.code}\n\`\`\``
+          content: `Here is the monochrome executable code for **${app.title}**. Click **Thinking / Creating App** below to view live!\n\n\`\`\`html\n${app.code}\n\`\`\``
         }
       ]
     };
@@ -155,7 +154,6 @@ export default function App() {
         const extractedCode = extractCodeFromMessage(partialText);
         if (extractedCode) {
           setActiveCanvasCode(extractedCode);
-          if (!canvasOpen) setCanvasOpen(true);
         }
       }
     );
@@ -197,7 +195,7 @@ export default function App() {
                 </div>
                 <h1 className="welcome-title">Corez</h1>
                 <p className="welcome-sub">
-                  Minimalist monochrome AI assistant with live application sandbox.
+                  Minimalist monochrome AI assistant. Ask to create an app, then click <b>Thinking / Creating App</b> to preview live.
                 </p>
 
                 <div className="sample-prompts-grid">

@@ -4,17 +4,25 @@ import {
   Play, 
   Copy, 
   Check, 
-  Layers 
+  Layers,
+  ChevronRight,
+  Code2,
+  ChevronDown
 } from 'lucide-react';
 
 export default function ChatMessage({ message, onRunInCanvas }) {
   const isUser = message.role === 'user';
   const [copiedIndex, setCopiedIndex] = useState(null);
+  const [showSourceIndex, setShowSourceIndex] = useState(null);
 
   const handleCopy = (text, index) => {
     navigator.clipboard.writeText(text);
     setCopiedIndex(index);
     setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
+  const toggleSource = (index) => {
+    setShowSourceIndex(showSourceIndex === index ? null : index);
   };
 
   const renderFormattedText = (content) => {
@@ -58,25 +66,78 @@ export default function ChatMessage({ message, onRunInCanvas }) {
 
     return parts.map((part, idx) => {
       if (part.type === 'code') {
+        if (part.isExecutable) {
+          const isShowingSource = showSourceIndex === part.index;
+          return (
+            <div key={idx} style={{ margin: '0.65rem 0' }}>
+              {/* ChatGPT-style Thinking / Creating App pill */}
+              <div 
+                className="thinking-pill"
+                onClick={() => onRunInCanvas(part.code)}
+                title="Click to open live preview on the right"
+              >
+                <Layers size={14} style={{ color: 'var(--text-primary)' }} />
+                <span>Thinking / Creating App</span>
+                <span className="thinking-pill-badge">Live Canvas</span>
+                <ChevronRight size={14} style={{ marginLeft: 'auto', color: 'var(--text-secondary)' }} />
+              </div>
+
+              {/* Collapsible Source Code Toggle */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.25rem' }}>
+                <button 
+                  className="source-toggle-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleSource(part.index);
+                  }}
+                >
+                  <Code2 size={12} />
+                  <span>{isShowingSource ? 'Hide Code' : 'View Source'}</span>
+                  {isShowingSource ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                </button>
+              </div>
+
+              {isShowingSource && (
+                <div className="code-block-container" style={{ marginTop: '0.4rem' }}>
+                  <div className="code-header">
+                    <span style={{ textTransform: 'uppercase', fontWeight: 600 }}>{part.lang}</span>
+                    <div className="code-actions">
+                      <button 
+                        className="code-btn run-btn"
+                        onClick={() => onRunInCanvas(part.code)}
+                      >
+                        <Play size={11} fill="currentColor" />
+                        <span>Open Canvas</span>
+                      </button>
+                      <button 
+                        className="code-btn"
+                        onClick={() => handleCopy(part.code, part.index)}
+                      >
+                        {copiedIndex === part.index ? <Check size={11} /> : <Copy size={11} />}
+                        <span>{copiedIndex === part.index ? 'Copied' : 'Copy'}</span>
+                      </button>
+                    </div>
+                  </div>
+                  <pre className="code-content">
+                    <code>{part.code}</code>
+                  </pre>
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        // Standard non-executable code blocks (e.g. JSON, Python, Bash)
         return (
           <div key={idx} className="code-block-container">
             <div className="code-header">
               <span style={{ textTransform: 'uppercase', fontWeight: 600 }}>{part.lang}</span>
               <div className="code-actions">
-                {part.isExecutable && (
-                  <button 
-                    className="code-btn run-btn"
-                    onClick={() => onRunInCanvas(part.code)}
-                  >
-                    <Play size={11} fill="currentColor" />
-                    <span>Run in Canvas</span>
-                  </button>
-                )}
                 <button 
                   className="code-btn"
                   onClick={() => handleCopy(part.code, part.index)}
                 >
-                  {copiedIndex === part.index ? <Check size={11} style={{ color: '#ffffff' }} /> : <Copy size={11} />}
+                  {copiedIndex === part.index ? <Check size={11} /> : <Copy size={11} />}
                   <span>{copiedIndex === part.index ? 'Copied' : 'Copy'}</span>
                 </button>
               </div>

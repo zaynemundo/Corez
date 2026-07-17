@@ -475,6 +475,59 @@ h1, h2, h3, h4, h5, h6 {
   padding-left: 0;
 }
 
+/* ChatGPT-Style Thinking / Creating App Pill */
+.thinking-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.6rem 0.85rem;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  user-select: none;
+}
+
+.thinking-pill:hover {
+  background-color: var(--bg-tertiary);
+  border-color: var(--border-hover);
+}
+
+.thinking-pill-badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-secondary);
+}
+
+.source-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.725rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  border-radius: 3px;
+  transition: var(--transition-fast);
+}
+
+.source-toggle-btn:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-tertiary);
+}
+
 /* Code Block Component */
 .code-block-container {
   margin: 0.85rem 0;
