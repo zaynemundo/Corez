@@ -43,7 +43,6 @@ export default function ChatInput({ onSendMessage, isStreaming }) {
           disabled={isStreaming}
         />
         <div className="input-actions-bar">
-          <div style={{ flex: 1 }} />
           <button
             type="submit"
             className="send-btn"

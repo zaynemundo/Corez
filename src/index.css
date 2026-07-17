@@ -449,7 +449,7 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-muted);
 }
 
-/* Chat Messages - Clean Layout Without Avatars */
+/* Chat Messages */
 .message-wrapper {
   display: flex;
   width: 100%;
@@ -606,7 +606,7 @@ h1, h2, h3, h4, h5, h6 {
   color: #eeeeee;
 }
 
-/* Fully Rounded Input Box */
+/* Single-Line Fully Rounded Input Box */
 .chat-input-container {
   padding: 1rem 1.5rem 1.25rem 1.5rem;
   display: flex;
@@ -619,11 +619,12 @@ h1, h2, h3, h4, h5, h6 {
   max-width: 920px;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: 0.9rem 1.25rem;
+  border-radius: var(--radius-pill);
+  padding: 0.55rem 0.65rem 0.55rem 1.25rem;
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.65rem;
   transition: var(--transition-fast);
 }
 
@@ -633,7 +634,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .chat-textarea {
-  width: 100%;
+  flex: 1;
   background: none;
   border: none;
   outline: none;
@@ -644,41 +645,21 @@ h1, h2, h3, h4, h5, h6 {
   resize: none;
   max-height: 140px;
   min-height: 24px;
+  padding: 0.2rem 0;
+  display: flex;
+  align-items: center;
 }
 
 .input-actions-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-}
-
-.quick-tools { display: flex; align-items: center; gap: 0.4rem; }
-
-.tool-pill {
-  padding: 0.3rem 0.75rem;
-  background-color: transparent;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-pill);
-  font-size: 0.725rem;
-  font-weight: 400;
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  cursor: pointer;
-  transition: var(--transition-fast);
-}
-
-.tool-pill:hover {
-  color: var(--text-primary);
-  border-color: var(--border-hover);
-  background-color: var(--bg-tertiary);
-  transform: translateY(-1px);
+  justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 .send-btn {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: var(--radius-pill);
   background: var(--bg-tertiary);
   border: 1px solid var(--border-color);
@@ -770,7 +751,7 @@ h1, h2, h3, h4, h5, h6 {
   border: 1px solid var(--border-color);
 }
 
-/* Modal Window with Fully Rounded Corners */
+/* Modal Window */
 .modal-overlay {
   position: fixed;
   inset: 0;
