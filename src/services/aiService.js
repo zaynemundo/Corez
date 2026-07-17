@@ -1,4 +1,4 @@
-// Corez AI Service Engine - Personalized & Concisely Conversational Engine
+// Corez AI Service Engine - Universal Public Conversational Engine
 
 export const MODEL = {
   id: 'corez',
@@ -26,30 +26,30 @@ export function extractCodeFromMessage(text) {
   return null;
 }
 
-// Generate concise, natural AI responses personalized for Zayne
+// Generate concise, natural AI responses for any public user
 export async function generateAIResponse(prompt) {
   const cleanPrompt = prompt.trim();
   const lower = cleanPrompt.toLowerCase();
 
-  // Natural short delay (0.6s)
+  // Natural short latency (0.6s)
   await new Promise(r => setTimeout(r, 600));
 
-  // 1. GREETINGS & SMALL TALK (Personalized & Short)
+  // 1. GREETINGS & SMALL TALK (Universal & Natural)
   if (/^(hello|hi|hey|greetings|good morning|good afternoon|good evening|howdy|sup)(\s|\!|\.|\?|$)/i.test(lower)) {
-    return `Hi Zayne! How’s your day going?`;
+    return `Hi there! How’s your day going?`;
   }
 
   if (lower.includes('who are you') || lower.includes('what can you do')) {
-    return `Hey Zayne! I'm **Corez**, your AI assistant. I can answer questions, help you write or debug code, brainstorm ideas, or build live interactive web apps on demand. What are we working on?`;
+    return `Hello! I'm **Corez**, a minimalist AI assistant. I can answer questions, help you write or debug code, brainstorm ideas, or construct live interactive web apps on demand. How can I help you today?`;
   }
 
   if (/^(how are you|how is it going|how's it going)(\s|\!|\.|\?|$)/i.test(lower)) {
-    return `Doing great, Zayne! Ready to help whenever you are. What's on your mind?`;
+    return `Doing great! Ready to help whenever you are. What's on your mind?`;
   }
 
   // 2. GRATITUDE INTENT
   if (/^(thanks|thank you|awesome|great|cool|nice|perfect)(\s|\!|\.|$)/i.test(lower)) {
-    return `Anytime, Zayne! Let me know if you need anything else.`;
+    return `You're very welcome! Let me know if there's anything else I can help with.`;
   }
 
   // 3. EXPLICIT APP / GAME / WIDGET CREATION INTENT
@@ -131,13 +131,13 @@ export async function generateAIResponse(prompt) {
         </script>`;
     }
 
-    return `I've built that for you, Zayne. Click below to open it on the right side.\n\n\`\`\`html\n<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <title>${appTitle}</title>\n  <style>\n    :root { --bg: #000; --card: #0d0d0d; --text: #fff; --border: rgba(255,255,255,0.15); }\n    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, system-ui, sans-serif; }\n    body { background: var(--bg); color: var(--text); padding: 1.5rem; display: flex; align-items: center; justify-content: center; min-height: 100vh; }\n    .app-card { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 1.5rem; width: 100%; max-width: 440px; text-align: center; }\n    h1 { font-size: 1.2rem; font-weight: 800; margin-bottom: 0.5rem; text-transform: uppercase; }\n    .action-btn { background: #fff; color: #000; border: none; padding: 0.5rem 1rem; border-radius: 4px; font-weight: 800; font-size: 0.8rem; cursor: pointer; text-transform: uppercase; }\n    .action-btn:hover { background: #ccc; }\n    .counter { font-size: 2rem; font-weight: 900; margin: 0.75rem 0; color: #fff; }\n  </style>\n</head>\n<body>\n  <div class="app-card">\n    <h1>${appTitle}</h1>\n    ${appBody}\n  </div>\n</body>\n</html>\n\`\`\``;
+    return `I've built that for you. Click below to open it on the right side.\n\n\`\`\`html\n<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <title>${appTitle}</title>\n  <style>\n    :root { --bg: #000; --card: #0d0d0d; --text: #fff; --border: rgba(255,255,255,0.15); }\n    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, system-ui, sans-serif; }\n    body { background: var(--bg); color: var(--text); padding: 1.5rem; display: flex; align-items: center; justify-content: center; min-height: 100vh; }\n    .app-card { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 1.5rem; width: 100%; max-width: 440px; text-align: center; }\n    h1 { font-size: 1.2rem; font-weight: 800; margin-bottom: 0.5rem; text-transform: uppercase; }\n    .action-btn { background: #fff; color: #000; border: none; padding: 0.5rem 1rem; border-radius: 4px; font-weight: 800; font-size: 0.8rem; cursor: pointer; text-transform: uppercase; }\n    .action-btn:hover { background: #ccc; }\n    .counter { font-size: 2rem; font-weight: 900; margin: 0.75rem 0; color: #fff; }\n  </style>\n</head>\n<body>\n  <div class="app-card">\n    <h1>${appTitle}</h1>\n    ${appBody}\n  </div>\n</body>\n</html>\n\`\`\``;
   }
 
-  // 4. SHORT CONVERSATIONAL & PROBLEM SOLVING RESPONSES
+  // 4. CONCISE RESPONSES
   if (lower.includes('code') || lower.includes('python') || lower.includes('javascript') || lower.includes('react')) {
-    return `Got it, Zayne. Share the snippet or problem you're working on, and I'll help you fix or optimize it.`;
+    return `Share the snippet or problem you're working on, and I'll help you fix or optimize it.`;
   }
 
-  return `Here's what you need to know about **"${cleanPrompt}"**:\n\nKeep it simple, focus on the core fundamentals, and iterate quickly. Let me know if you want me to break this down further or write something for you!`;
+  return `Here's what you need to know about **"${cleanPrompt}"**:\n\nKeep it simple, focus on core fundamentals, and iterate quickly. Let me know if you want me to break this down further!`;
 }
