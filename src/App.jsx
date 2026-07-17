@@ -5,9 +5,9 @@ import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
 import CanvasPreview from './components/CanvasPreview';
 import SettingsModal from './components/SettingsModal';
-import { streamAIResponse, extractCodeFromMessage } from './services/aiService';
+import { generateAIResponse, extractCodeFromMessage } from './services/aiService';
 import { SAMPLE_APPS } from './data/sampleApps';
-import { Layers, Code, Gamepad2, BarChart3 } from 'lucide-react';
+import { Layers, Code, Gamepad2, BarChart3, Loader2 } from 'lucide-react';
 
 const INITIAL_SESSIONS = [
   {
@@ -37,11 +37,11 @@ export default function App() {
   });
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [canvasOpen, setCanvasOpen] = useState(false); // Collapsed until user clicks Thinking / Created App
+  const [canvasOpen, setCanvasOpen] = useState(false);
   const [canvasFullScreen, setCanvasFullScreen] = useState(false);
   const [activeCanvasCode, setActiveCanvasCode] = useState(SAMPLE_APPS[0].code);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [isStreaming, setIsStreaming] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem('corez_theme') || 'dark');
 
   const messagesEndRef = useRef(null);
@@ -59,7 +59,7 @@ export default function App() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeSession?.messages, isStreaming]);
+  }, [activeSession?.messages, isThinking]);
 
   const handleNewChat = () => {
     const newId = `session-${Date.now()}`;
@@ -87,7 +87,6 @@ export default function App() {
     setSettingsOpen(false);
   };
 
-  // Open canvas on the right side when Thinking / Created App pill is clicked
   const handleRunInCanvas = (code) => {
     setActiveCanvasCode(code);
     setCanvasOpen(true);
@@ -129,32 +128,24 @@ export default function App() {
       return s;
     }));
 
-    setIsStreaming(true);
+    setIsThinking(true);
 
-    const aiMsgIndex = updatedMessages.length;
-    let currentAiMsg = { role: 'assistant', content: '' };
+    const responseText = await generateAIResponse(promptText);
+    const extractedCode = extractCodeFromMessage(responseText);
+    if (extractedCode) {
+      setActiveCanvasCode(extractedCode);
+    }
 
-    await streamAIResponse(
-      promptText,
-      (partialText) => {
-        currentAiMsg.content = partialText;
-        setSessions(prev => prev.map(s => {
-          if (s.id === activeSessionId) {
-            const msgs = [...s.messages];
-            msgs[aiMsgIndex] = { ...currentAiMsg };
-            return { ...s, messages: msgs };
-          }
-          return s;
-        }));
-
-        const extractedCode = extractCodeFromMessage(partialText);
-        if (extractedCode) {
-          setActiveCanvasCode(extractedCode);
-        }
+    const aiMsg = { role: 'assistant', content: responseText };
+    
+    setSessions(prev => prev.map(s => {
+      if (s.id === activeSessionId) {
+        return { ...s, messages: [...s.messages, aiMsg] };
       }
-    );
+      return s;
+    }));
 
-    setIsStreaming(false);
+    setIsThinking(false);
   };
 
   return (
@@ -191,7 +182,7 @@ export default function App() {
                 </div>
                 <h1 className="welcome-title">Corez</h1>
                 <p className="welcome-sub">
-                  Minimalist monochrome AI assistant. Ask to build any app or game, then click <b>Thinking / Created App</b> to open it on the right side.
+                  Minimalist monochrome AI assistant. Ask to build an app, then click <b>Thinking / Created App</b> to open it on the right side.
                 </p>
 
                 <div className="sample-prompts-grid">
@@ -238,16 +229,15 @@ export default function App() {
                     onRunInCanvas={handleRunInCanvas}
                   />
                 ))}
-                {isStreaming && (
-                  <div className="message-wrapper ai" style={{ opacity: 0.8 }}>
+                {isThinking && (
+                  <div className="message-wrapper ai">
                     <div className="avatar ai">
                       <Layers size={14} />
                     </div>
                     <div className="message-body">
-                      <div className="message-content" style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0.5rem 0.75rem' }}>
-                        <div className="typing-dot" />
-                        <div className="typing-dot" />
-                        <div className="typing-dot" />
+                      <div className="thinking-indicator-box">
+                        <Loader2 size={14} className="spinning-icon" />
+                        <span>Corez is thinking...</span>
                       </div>
                     </div>
                   </div>
@@ -259,7 +249,7 @@ export default function App() {
 
           <ChatInput
             onSendMessage={handleSendMessage}
-            isStreaming={isStreaming}
+            isStreaming={isThinking}
           />
         </div>
 
