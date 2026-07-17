@@ -231,9 +231,6 @@ export default function App() {
                 ))}
                 {isThinking && (
                   <div className="message-wrapper ai">
-                    <div className="avatar ai">
-                      <Layers size={14} />
-                    </div>
                     <div className="message-body">
                       <div className="thinking-indicator-box">
                         <span className="spinning-icon" style={{ display: 'inline-block' }}>•</span>

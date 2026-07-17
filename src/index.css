@@ -449,34 +449,29 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-muted);
 }
 
-/* Chat Messages */
+/* Chat Messages - Clean Layout Without Avatars */
 .message-wrapper {
   display: flex;
-  gap: 1rem;
+  width: 100%;
 }
 
-.message-wrapper.user { flex-direction: row-reverse; }
-
-.avatar {
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  font-size: 0.75rem;
+.message-wrapper.user {
+  justify-content: flex-end;
 }
 
-.avatar.user { background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); }
-.avatar.ai { background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); }
+.message-wrapper.ai {
+  justify-content: flex-start;
+}
 
 .message-body {
-  flex: 1;
-  max-width: calc(100% - 45px);
+  max-width: 80%;
 }
 
-/* Equally Rounded Message Bubbles (All 4 Corners Uniform) */
+.message-wrapper.ai .message-body {
+  max-width: 100%;
+}
+
+/* Equally Rounded Message Bubbles */
 .message-content {
   padding: 0.85rem 1.15rem;
   border-radius: var(--radius-lg);

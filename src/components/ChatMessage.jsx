@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { 
-  User, 
   Layers,
   ChevronRight
 } from 'lucide-react';
@@ -50,8 +49,6 @@ export default function ChatMessage({ message, onRunInCanvas }) {
 
     return parts.map((part, idx) => {
       if (part.type === 'code') {
-        // Hide raw executable code completely from the chat stream
-        // Render ONLY the interactive Thinking / Created App pill
         if (part.isExecutable) {
           return (
             <div key={idx} style={{ margin: '0.65rem 0' }}>
@@ -69,7 +66,6 @@ export default function ChatMessage({ message, onRunInCanvas }) {
           );
         }
 
-        // Hide raw non-executable code unless explicitly requested
         return null;
       }
 
@@ -98,10 +94,6 @@ export default function ChatMessage({ message, onRunInCanvas }) {
 
   return (
     <div className={`message-wrapper ${isUser ? 'user' : 'ai'}`}>
-      <div className={`avatar ${isUser ? 'user' : 'ai'}`}>
-        {isUser ? <User size={15} /> : <Layers size={14} />}
-      </div>
-
       <div className="message-body">
         <div className="message-content">
           {renderFormattedText(message.content)}
