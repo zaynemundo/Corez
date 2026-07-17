@@ -1,0 +1,11 @@
+{
+  "git-superpowers-hook": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "python3 /workspaces/New-Corez/.agents/scripts/auto_commit.py",
+        "timeout": 60
+      }
+    ]
+  }
+}
