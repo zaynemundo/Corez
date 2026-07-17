@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
 import { 
-  Bot, 
   User, 
   Play, 
   Copy, 
   Check, 
-  Code2, 
-  Sparkles 
+  Layers 
 } from 'lucide-react';
 
 export default function ChatMessage({ message, onRunInCanvas }) {
@@ -19,11 +17,9 @@ export default function ChatMessage({ message, onRunInCanvas }) {
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
-  // Basic markdown & code block parser
   const renderFormattedText = (content) => {
     if (!content) return null;
 
-    // Split by code blocks ```lang ... ```
     const codeBlockRegex = /```(\w+)?\s*([\s\S]*?)```/g;
     const parts = [];
     let lastIndex = 0;
@@ -31,7 +27,6 @@ export default function ChatMessage({ message, onRunInCanvas }) {
     let blockCount = 0;
 
     while ((match = codeBlockRegex.exec(content)) !== null) {
-      // Push preceding text
       if (match.index > lastIndex) {
         parts.push({
           type: 'text',
@@ -73,7 +68,7 @@ export default function ChatMessage({ message, onRunInCanvas }) {
                     className="code-btn run-btn"
                     onClick={() => onRunInCanvas(part.code)}
                   >
-                    <Play size={12} fill="currentColor" />
+                    <Play size={11} fill="currentColor" />
                     <span>Run in Canvas</span>
                   </button>
                 )}
@@ -81,7 +76,7 @@ export default function ChatMessage({ message, onRunInCanvas }) {
                   className="code-btn"
                   onClick={() => handleCopy(part.code, part.index)}
                 >
-                  {copiedIndex === part.index ? <Check size={12} style={{ color: '#10b981' }} /> : <Copy size={12} />}
+                  {copiedIndex === part.index ? <Check size={11} style={{ color: '#ffffff' }} /> : <Copy size={11} />}
                   <span>{copiedIndex === part.index ? 'Copied' : 'Copy'}</span>
                 </button>
               </div>
@@ -93,14 +88,12 @@ export default function ChatMessage({ message, onRunInCanvas }) {
         );
       }
 
-      // Render standard paragraphs and inline markdown
       const lines = part.content.split('\n');
       return (
         <div key={idx} className="markdown-body">
           {lines.map((line, lIdx) => {
-            if (!line.trim()) return <div key={lIdx} style={{ height: '0.5rem' }} />;
+            if (!line.trim()) return <div key={lIdx} style={{ height: '0.4rem' }} />;
             
-            // Format inline bold **text**
             const parts = line.split(/(\*\*.*?\*\*)/g);
             return (
               <p key={lIdx}>
@@ -121,7 +114,7 @@ export default function ChatMessage({ message, onRunInCanvas }) {
   return (
     <div className={`message-wrapper ${isUser ? 'user' : 'ai'}`}>
       <div className={`avatar ${isUser ? 'user' : 'ai'}`}>
-        {isUser ? <User size={18} /> : <Sparkles size={18} />}
+        {isUser ? <User size={15} /> : <Layers size={14} />}
       </div>
 
       <div className="message-body">

@@ -29,7 +29,7 @@ export default function Sidebar({
       <div className="sidebar-header">
         <div className="brand-title">
           <div className="brand-icon">
-            <Layers size={16} />
+            <Layers size={14} />
           </div>
           <span>Corez</span>
         </div>
@@ -38,17 +38,17 @@ export default function Sidebar({
           onClick={onCloseSidebar}
           title="Collapse Sidebar"
         >
-          <PanelLeftClose size={18} />
+          <PanelLeftClose size={16} />
         </button>
       </div>
 
       <button className="new-chat-btn" onClick={onNewChat}>
-        <Plus size={18} />
+        <Plus size={16} />
         <span>New Chat Session</span>
       </button>
 
       <div className="chat-history-list">
-        <div style={{ padding: '0.4rem 0.5rem', fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+        <div style={{ padding: '0.4rem 0.5rem', fontSize: '0.675rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>
           Recent Conversations
         </div>
         {sessions.map((session) => (
@@ -57,7 +57,7 @@ export default function Sidebar({
             className={`history-item ${session.id === activeSessionId ? 'active' : ''}`}
             onClick={() => onSelectSession(session.id)}
           >
-            <MessageSquare size={15} />
+            <MessageSquare size={14} />
             <span className="history-title">{session.title}</span>
             <button
               className="delete-chat-btn"
@@ -67,12 +67,12 @@ export default function Sidebar({
               }}
               title="Delete Chat"
             >
-              <Trash2 size={14} />
+              <Trash2 size={13} />
             </button>
           </div>
         ))}
 
-        <div style={{ margin: '1.25rem 0 0.4rem 0.5rem', fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+        <div style={{ margin: '1.25rem 0 0.4rem 0.5rem', fontSize: '0.675rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>
           Executable App Samples
         </div>
         {SAMPLE_APPS.map((app) => (
@@ -80,9 +80,9 @@ export default function Sidebar({
             key={app.id}
             className="history-item"
             onClick={() => onLoadSampleApp(app)}
-            style={{ fontSize: '0.825rem' }}
+            style={{ fontSize: '0.8rem' }}
           >
-            <Play size={13} style={{ flexShrink: 0, color: 'var(--text-primary)' }} />
+            <Play size={12} style={{ flexShrink: 0, color: 'var(--text-primary)' }} />
             <span className="history-title">{app.title}</span>
           </div>
         ))}
@@ -90,11 +90,11 @@ export default function Sidebar({
 
       <div className="sidebar-footer">
         <button className="footer-action-btn" onClick={onToggleTheme}>
-          {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+          {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
           <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
         </button>
         <button className="footer-action-btn" onClick={onOpenSettings}>
-          <Settings size={17} />
+          <Settings size={15} />
           <span>Corez Settings</span>
         </button>
       </div>

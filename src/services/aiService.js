@@ -53,13 +53,13 @@ export async function streamAIResponse(prompt, onChunk) {
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; }
     body { background: var(--bg); color: var(--text); padding: 2rem; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
-    .app-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 2rem; width: 100%; max-width: 480px; text-align: center; }
-    .badge { background: #ffffff; color: #000000; padding: 4px 12px; border-radius: 99px; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; display: inline-block; margin-bottom: 1rem; }
-    h1 { font-size: 1.4rem; font-weight: 900; margin-bottom: 0.5rem; letter-spacing: -0.03em; }
-    p { color: var(--muted); font-size: 0.85rem; margin-bottom: 1.5rem; line-height: 1.5; }
-    .action-btn { background: #ffffff; color: #000000; border: none; padding: 0.75rem 1.5rem; border-radius: 4px; font-weight: 800; font-size: 0.85rem; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; transition: background 0.2s; }
+    .app-card { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 2rem; width: 100%; max-width: 480px; text-align: center; }
+    .badge { background: #ffffff; color: #000000; padding: 3px 10px; border-radius: 99px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; display: inline-block; margin-bottom: 1rem; }
+    h1 { font-size: 1.3rem; font-weight: 900; margin-bottom: 0.5rem; letter-spacing: -0.03em; text-transform: uppercase; }
+    p { color: var(--muted); font-size: 0.825rem; margin-bottom: 1.5rem; line-height: 1.5; }
+    .action-btn { background: #ffffff; color: #000000; border: none; padding: 0.65rem 1.25rem; border-radius: 4px; font-weight: 800; font-size: 0.8rem; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; transition: background 0.2s; }
     .action-btn:hover { background: #cccccc; }
-    .counter { font-size: 2.8rem; font-weight: 900; margin: 1rem 0; color: #ffffff; letter-spacing: -0.04em; }
+    .counter { font-size: 2.5rem; font-weight: 900; margin: 0.85rem 0; color: #ffffff; letter-spacing: -0.04em; }
   </style>
 </head>
 <body>

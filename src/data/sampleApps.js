@@ -1,9 +1,9 @@
 export const SAMPLE_APPS = [
   {
     id: 'dashboard',
-    title: '📊 Monochrome Executive Analytics',
+    title: 'Executive Analytics',
     description: 'Stark high-contrast revenue metrics, minimalist SVG chart, and search-filterable data table.',
-    model: 'chatgpt',
+    model: 'corez',
     prompt: 'Build an executive analytics dashboard with monochrome styling, stark SVG chart, and live search.',
     code: `<!DOCTYPE html>
 <html lang="en">
@@ -12,7 +12,7 @@ export const SAMPLE_APPS = [
   <style>
     :root {
       --bg: #000000;
-      --card: #0e0e0e;
+      --card: #0d0d0d;
       --text: #ffffff;
       --text-muted: #888888;
       --border: rgba(255, 255, 255, 0.15);
@@ -20,30 +20,34 @@ export const SAMPLE_APPS = [
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; }
     body { background: var(--bg); color: var(--text); padding: 1.5rem; }
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem; }
-    .title { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.03em; }
-    .badge { background: #ffffff; color: #000000; padding: 3px 10px; border-radius: 99px; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; }
+    .title-box { display: flex; align-items: center; gap: 0.5rem; }
+    .title { font-size: 1.1rem; font-weight: 800; letter-spacing: -0.03em; }
+    .badge { background: #ffffff; color: #000000; padding: 3px 10px; border-radius: 99px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; }
     
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-    .metric-card { background: var(--card); border: 1px solid var(--border); padding: 1.25rem; border-radius: 8px; }
-    .metric-title { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.4rem; }
-    .metric-val { font-size: 1.7rem; font-weight: 900; letter-spacing: -0.04em; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .metric-card { background: var(--card); border: 1px solid var(--border); padding: 1.25rem; border-radius: 6px; }
+    .metric-title { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.4rem; font-weight: 700; }
+    .metric-val { font-size: 1.6rem; font-weight: 900; letter-spacing: -0.04em; }
     .trend { font-size: 0.75rem; color: #aaaaaa; margin-top: 0.4rem; font-weight: 600; }
     
-    .chart-container { background: var(--card); border: 1px solid var(--border); padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; }
+    .chart-container { background: var(--card); border: 1px solid var(--border); padding: 1.25rem; border-radius: 6px; margin-bottom: 1.5rem; }
     .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-    .svg-chart { width: 100%; height: 150px; overflow: visible; }
+    .svg-chart { width: 100%; height: 140px; overflow: visible; }
     
-    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-    th, td { text-align: left; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
-    th { color: var(--text-muted); font-weight: 700; text-transform: uppercase; font-size: 0.75rem; }
-    .search-input { background: var(--bg); border: 1px solid var(--border); padding: 0.5rem 0.8rem; border-radius: 6px; color: var(--text); outline: none; }
+    table { width: 100%; border-collapse: collapse; margin-top: 0.75rem; }
+    th, td { text-align: left; padding: 0.65rem 0.85rem; border-bottom: 1px solid var(--border); font-size: 0.8rem; }
+    th { color: var(--text-muted); font-weight: 700; text-transform: uppercase; font-size: 0.7rem; }
+    .search-input { background: var(--bg); border: 1px solid var(--border); padding: 0.45rem 0.75rem; border-radius: 4px; color: var(--text); outline: none; font-size: 0.8rem; }
     .search-input:focus { border-color: #ffffff; }
   </style>
 </head>
 <body>
   <div class="header">
-    <div class="title">COREZ // EXECUTIVE DASHBOARD</div>
-    <span class="badge">Monochrome Sync</span>
+    <div class="title-box">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 17v-5"/><path d="M12 17v-8"/><path d="M17 17v-3"/></svg>
+      <div class="title">COREZ ANALYTICS</div>
+    </div>
+    <span class="badge">ACTIVE</span>
   </div>
   
   <div class="grid">
@@ -71,26 +75,26 @@ export const SAMPLE_APPS = [
 
   <div class="chart-container">
     <div class="chart-header">
-      <h3 style="font-size: 0.95rem; letter-spacing: -0.02em;">REVENUE GROWTH TREND</h3>
-      <input type="text" id="searchInput" class="search-input" placeholder="Filter customer logs..." onkeyup="filterTable()">
+      <h3 style="font-size: 0.85rem; letter-spacing: -0.02em; text-transform: uppercase;">REVENUE GROWTH TREND</h3>
+      <input type="text" id="searchInput" class="search-input" placeholder="Filter customer records..." onkeyup="filterTable()">
     </div>
-    <svg class="svg-chart" viewBox="0 0 500 150">
+    <svg class="svg-chart" viewBox="0 0 500 140">
       <defs>
         <linearGradient id="grad" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.3"/>
+          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.25"/>
           <stop offset="100%" stop-color="#ffffff" stop-opacity="0.0"/>
         </linearGradient>
       </defs>
-      <path d="M0,130 Q75,40 150,80 T300,30 T450,70 T500,20 L500,150 L0,150 Z" fill="url(#grad)" />
-      <path d="M0,130 Q75,40 150,80 T300,30 T450,70 T500,20" fill="none" stroke="#ffffff" stroke-width="2.5" />
-      <circle cx="150" cy="80" r="4" fill="#ffffff" />
-      <circle cx="300" cy="30" r="4" fill="#ffffff" />
-      <circle cx="500" cy="20" r="4" fill="#ffffff" />
+      <path d="M0,120 Q75,30 150,70 T300,25 T450,60 T500,15 L500,140 L0,140 Z" fill="url(#grad)" />
+      <path d="M0,120 Q75,30 150,70 T300,25 T450,60 T500,15" fill="none" stroke="#ffffff" stroke-width="2" />
+      <circle cx="150" cy="70" r="3.5" fill="#ffffff" />
+      <circle cx="300" cy="25" r="3.5" fill="#ffffff" />
+      <circle cx="500" cy="15" r="3.5" fill="#ffffff" />
     </svg>
   </div>
 
   <div class="metric-card">
-    <h3 style="font-size: 0.9rem; margin-bottom: 0.5rem; letter-spacing: -0.02em;">CLIENT RECORD SETS</h3>
+    <h3 style="font-size: 0.8rem; margin-bottom: 0.5rem; text-transform: uppercase;">CLIENT RECORD SETS</h3>
     <table id="dataTable">
       <thead>
         <tr>
@@ -124,9 +128,9 @@ export const SAMPLE_APPS = [
   },
   {
     id: 'game',
-    title: '🎮 Monochrome Particle Physics Sandbox',
+    title: 'Particle Physics Sandbox',
     description: 'Black and white particle gravity simulation with interactive mouse attractor.',
-    model: 'claude',
+    model: 'corez',
     prompt: 'Build a monochrome 2D particle physics simulation with interactive mouse gravity attractor.',
     code: `<!DOCTYPE html>
 <html lang="en">
@@ -134,12 +138,12 @@ export const SAMPLE_APPS = [
   <meta charset="UTF-8">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #000000; color: #ffffff; font-family: system-ui; overflow: hidden; height: 100vh; }
+    body { background: #000000; color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, system-ui; overflow: hidden; height: 100vh; }
     canvas { width: 100vw; height: 100vh; display: block; }
-    .controls { position: absolute; top: 1rem; left: 1rem; background: rgba(15, 15, 15, 0.9); border: 1px solid rgba(255,255,255,0.2); padding: 1rem; border-radius: 8px; display: flex; flex-direction: column; gap: 0.6rem; width: 220px; }
-    .label { font-size: 0.75rem; color: #888; display: flex; justify-content: space-between; font-weight: 700; text-transform: uppercase; }
+    .controls { position: absolute; top: 1rem; left: 1rem; background: rgba(12, 12, 12, 0.95); border: 1px solid rgba(255,255,255,0.15); padding: 0.85rem; border-radius: 6px; display: flex; flex-direction: column; gap: 0.5rem; width: 200px; }
+    .label { font-size: 0.7rem; color: #888; display: flex; justify-content: space-between; font-weight: 700; text-transform: uppercase; }
     input[type=range] { width: 100%; accent-color: #ffffff; }
-    button { background: #ffffff; border: none; color: #000000; padding: 0.5rem; border-radius: 4px; font-weight: 800; cursor: pointer; font-size: 0.8rem; text-transform: uppercase; }
+    button { background: #ffffff; border: none; color: #000000; padding: 0.4rem; border-radius: 3px; font-weight: 800; cursor: pointer; font-size: 0.75rem; text-transform: uppercase; }
     button:hover { background: #cccccc; }
   </style>
 </head>
@@ -193,7 +197,7 @@ export const SAMPLE_APPS = [
         this.y = Math.random() * height;
         this.vx = (Math.random() - 0.5) * 2;
         this.vy = (Math.random() - 0.5) * 2;
-        this.radius = Math.random() * 2.5 + 1.5;
+        this.radius = Math.random() * 2 + 1;
         this.alpha = Math.random() * 0.7 + 0.3;
       }
       update() {

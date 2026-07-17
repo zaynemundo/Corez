@@ -12,7 +12,7 @@ import { Layers, Code, Gamepad2, BarChart3 } from 'lucide-react';
 const INITIAL_SESSIONS = [
   {
     id: 'session-default',
-    title: 'Monochrome Analytics',
+    title: 'Executive Analytics',
     messages: [
       {
         role: 'user',
@@ -193,7 +193,7 @@ export default function App() {
             {activeSession?.messages.length === 0 ? (
               <div className="welcome-container">
                 <div className="welcome-logo">
-                  <Layers size={28} />
+                  <Layers size={24} />
                 </div>
                 <h1 className="welcome-title">Corez</h1>
                 <p className="welcome-sub">
@@ -206,7 +206,7 @@ export default function App() {
                     onClick={() => handleSendMessage('Build an executive analytics dashboard with monochrome styling, stark SVG chart, and live search.')}
                   >
                     <div className="prompt-title">
-                      <BarChart3 size={15} style={{ color: 'var(--text-primary)' }} />
+                      <BarChart3 size={14} style={{ color: 'var(--text-primary)' }} />
                       <span>Executive Dashboard</span>
                     </div>
                     <div className="prompt-desc">Monochrome SVG metrics dashboard with search filters.</div>
@@ -217,8 +217,8 @@ export default function App() {
                     onClick={() => handleSendMessage('Build a monochrome 2D particle physics simulation with interactive mouse gravity attractor.')}
                   >
                     <div className="prompt-title">
-                      <Gamepad2 size={15} style={{ color: 'var(--text-primary)' }} />
-                      <span>Particle Physics Game</span>
+                      <Gamepad2 size={14} style={{ color: 'var(--text-primary)' }} />
+                      <span>Particle Physics Sandbox</span>
                     </div>
                     <div className="prompt-desc">Interactive black and white particle simulator.</div>
                   </div>
@@ -228,7 +228,7 @@ export default function App() {
                     onClick={() => handleSendMessage('Build me a custom monochrome web tool with interactive controls.')}
                   >
                     <div className="prompt-title">
-                      <Code size={15} style={{ color: 'var(--text-primary)' }} />
+                      <Code size={14} style={{ color: 'var(--text-primary)' }} />
                       <span>Custom Monochrome Tool</span>
                     </div>
                     <div className="prompt-desc">Generate any HTML/CSS/JS tool on demand.</div>

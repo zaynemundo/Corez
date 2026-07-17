@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Play, 
   Code2, 
   RotateCw, 
   Maximize2, 
@@ -9,8 +8,7 @@ import {
   Copy, 
   Check, 
   X,
-  Sparkles,
-  Terminal
+  Layers
 } from 'lucide-react';
 
 export default function CanvasPreview({ 
@@ -19,7 +17,7 @@ export default function CanvasPreview({
   isFullScreen, 
   onToggleFullScreen 
 }) {
-  const [activeTab, setActiveTab] = useState('preview'); // 'preview' | 'code'
+  const [activeTab, setActiveTab] = useState('preview');
   const [editableCode, setEditableCode] = useState(code || '');
   const [copied, setCopied] = useState(false);
   const [key, setKey] = useState(0);
@@ -40,7 +38,7 @@ export default function CanvasPreview({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'app-preview.html';
+    a.download = 'corez-app.html';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -55,20 +53,20 @@ export default function CanvasPreview({
     <div className={`canvas-pane ${isFullScreen ? 'full-width' : ''}`}>
       <div className="canvas-header">
         <div className="canvas-title">
-          <Sparkles size={16} style={{ color: 'var(--accent-omni)' }} />
-          <span>Live App Canvas</span>
+          <Layers size={15} />
+          <span>Canvas Preview</span>
 
-          <div style={{ display: 'flex', background: 'var(--bg-primary)', padding: '2px', borderRadius: '8px', marginLeft: '0.75rem', border: '1px solid var(--border-color)' }}>
+          <div style={{ display: 'flex', background: 'var(--bg-tertiary)', padding: '2px', borderRadius: '4px', marginLeft: '0.5rem', border: '1px solid var(--border-color)' }}>
             <button
               onClick={() => setActiveTab('preview')}
               style={{
-                padding: '3px 10px',
-                borderRadius: '6px',
+                padding: '2px 8px',
+                borderRadius: '3px',
                 border: 'none',
-                background: activeTab === 'preview' ? 'var(--accent-omni)' : 'transparent',
-                color: activeTab === 'preview' ? 'white' : 'var(--text-secondary)',
-                fontSize: '0.75rem',
-                fontWeight: 600,
+                background: activeTab === 'preview' ? 'var(--text-primary)' : 'transparent',
+                color: activeTab === 'preview' ? 'var(--bg-primary)' : 'var(--text-secondary)',
+                fontSize: '0.725rem',
+                fontWeight: 700,
                 cursor: 'pointer'
               }}
             >
@@ -77,36 +75,36 @@ export default function CanvasPreview({
             <button
               onClick={() => setActiveTab('code')}
               style={{
-                padding: '3px 10px',
-                borderRadius: '6px',
+                padding: '2px 8px',
+                borderRadius: '3px',
                 border: 'none',
-                background: activeTab === 'code' ? 'var(--accent-omni)' : 'transparent',
-                color: activeTab === 'code' ? 'white' : 'var(--text-secondary)',
-                fontSize: '0.75rem',
-                fontWeight: 600,
+                background: activeTab === 'code' ? 'var(--text-primary)' : 'transparent',
+                color: activeTab === 'code' ? 'var(--bg-primary)' : 'var(--text-secondary)',
+                fontSize: '0.725rem',
+                fontWeight: 700,
                 cursor: 'pointer'
               }}
             >
-              Source Code
+              Source
             </button>
           </div>
         </div>
 
         <div className="canvas-controls">
           <button className="icon-btn" onClick={handleRefresh} title="Reload Preview">
-            <RotateCw size={16} />
+            <RotateCw size={14} />
           </button>
           <button className="icon-btn" onClick={handleCopy} title="Copy Source Code">
-            {copied ? <Check size={16} style={{ color: '#10b981' }} /> : <Copy size={16} />}
+            {copied ? <Check size={14} style={{ color: '#ffffff' }} /> : <Copy size={14} />}
           </button>
           <button className="icon-btn" onClick={handleDownload} title="Download .html file">
-            <Download size={16} />
+            <Download size={14} />
           </button>
           <button className="icon-btn" onClick={onToggleFullScreen} title="Toggle Fullscreen">
-            {isFullScreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+            {isFullScreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
           <button className="icon-btn" onClick={onClose} title="Close Canvas">
-            <X size={16} />
+            <X size={14} />
           </button>
         </div>
       </div>
@@ -131,9 +129,9 @@ export default function CanvasPreview({
                 color: '#e2e8f0',
                 border: 'none',
                 outline: 'none',
-                padding: '1.25rem',
+                padding: '1rem',
                 fontFamily: 'var(--font-mono)',
-                fontSize: '0.875rem',
+                fontSize: '0.825rem',
                 resize: 'none'
               }}
               value={editableCode}
@@ -143,11 +141,11 @@ export default function CanvasPreview({
         ) : (
           <div className="canvas-empty-state">
             <div className="canvas-empty-icon">
-              <Code2 size={28} />
+              <Code2 size={22} />
             </div>
-            <h3>No Active App Running</h3>
-            <p style={{ maxWidth: '300px', fontSize: '0.875rem' }}>
-              Ask the AI to build an app, or click <b>"Run in Canvas"</b> on any code block in the chat stream.
+            <h3 style={{ fontSize: '0.95rem' }}>No Active App Running</h3>
+            <p style={{ maxWidth: '280px', fontSize: '0.8rem' }}>
+              Ask Corez to build an application or click <b>"Run in Canvas"</b> on any code block.
             </p>
           </div>
         )}
