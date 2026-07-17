@@ -476,6 +476,7 @@ h1, h2, h3, h4, h5, h6 {
   max-width: calc(100% - 45px);
 }
 
+/* Equally Rounded Message Bubbles (All 4 Corners Uniform) */
 .message-content {
   padding: 0.85rem 1.15rem;
   border-radius: var(--radius-lg);
@@ -488,7 +489,7 @@ h1, h2, h3, h4, h5, h6 {
   background-color: var(--bg-tertiary);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
-  border-bottom-right-radius: var(--radius-xs);
+  border-radius: var(--radius-lg);
 }
 
 .message-wrapper.ai .message-content {
