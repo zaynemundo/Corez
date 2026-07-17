@@ -6,9 +6,9 @@ import {
   Settings, 
   Sun, 
   Moon, 
-  Sparkles, 
   PanelLeftClose,
-  Play
+  Play,
+  Layers
 } from 'lucide-react';
 import { SAMPLE_APPS } from '../data/sampleApps';
 
@@ -29,9 +29,9 @@ export default function Sidebar({
       <div className="sidebar-header">
         <div className="brand-title">
           <div className="brand-icon">
-            <Sparkles size={16} />
+            <Layers size={16} />
           </div>
-          <span>OmniAI Chat</span>
+          <span>Corez</span>
         </div>
         <button 
           className="icon-btn" 
@@ -48,7 +48,7 @@ export default function Sidebar({
       </button>
 
       <div className="chat-history-list">
-        <div style={{ padding: '0.4rem 0.5rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <div style={{ padding: '0.4rem 0.5rem', fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>
           Recent Conversations
         </div>
         {sessions.map((session) => (
@@ -57,7 +57,7 @@ export default function Sidebar({
             className={`history-item ${session.id === activeSessionId ? 'active' : ''}`}
             onClick={() => onSelectSession(session.id)}
           >
-            <MessageSquare size={16} />
+            <MessageSquare size={15} />
             <span className="history-title">{session.title}</span>
             <button
               className="delete-chat-btn"
@@ -72,7 +72,7 @@ export default function Sidebar({
           </div>
         ))}
 
-        <div style={{ margin: '1.25rem 0 0.4rem 0.5rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <div style={{ margin: '1.25rem 0 0.4rem 0.5rem', fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>
           Executable App Samples
         </div>
         {SAMPLE_APPS.map((app) => (
@@ -82,7 +82,7 @@ export default function Sidebar({
             onClick={() => onLoadSampleApp(app)}
             style={{ fontSize: '0.825rem' }}
           >
-            <Play size={14} style={{ color: 'var(--accent-omni)', flexShrink: 0 }} />
+            <Play size={13} style={{ flexShrink: 0, color: 'var(--text-primary)' }} />
             <span className="history-title">{app.title}</span>
           </div>
         ))}
@@ -90,12 +90,12 @@ export default function Sidebar({
 
       <div className="sidebar-footer">
         <button className="footer-action-btn" onClick={onToggleTheme}>
-          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-          <span>{theme === 'dark' ? 'Light Theme' : 'Dark Theme'}</span>
+          {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+          <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
         </button>
         <button className="footer-action-btn" onClick={onOpenSettings}>
-          <Settings size={18} />
-          <span>Settings & Models</span>
+          <Settings size={17} />
+          <span>Corez Settings</span>
         </button>
       </div>
     </aside>

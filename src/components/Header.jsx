@@ -3,9 +3,7 @@ import {
   PanelLeftOpen, 
   ChevronDown, 
   PanelRight, 
-  Settings, 
-  Sparkles,
-  Zap
+  Settings 
 } from 'lucide-react';
 import { MODELS } from '../services/aiService';
 
@@ -48,7 +46,7 @@ export default function Header({
             ))}
           </select>
           <div 
-            className={`model-badge ${currentModel.badgeClass}`}
+            className="model-badge"
             style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
           />
           <ChevronDown 
@@ -63,12 +61,12 @@ export default function Header({
           className="canvas-toggle-btn" 
           onClick={onToggleCanvas}
           title="Toggle Executable Canvas Split-View"
-          style={hasExecutableCode ? { borderColor: 'var(--accent-omni)', background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(139, 92, 246, 0.3))' } : {}}
+          style={hasExecutableCode ? { border: '1px solid var(--text-primary)', background: 'var(--bg-tertiary)' } : {}}
         >
           <PanelRight size={16} />
           <span>{canvasOpen ? 'Hide Canvas' : 'Live Canvas'}</span>
           {hasExecutableCode && (
-            <span style={{ width: '8px', height: '8px', borderRadius: '99px', backgroundColor: '#10b981', boxShadow: '0 0 8px #10b981' }} />
+            <span style={{ width: '6px', height: '6px', borderRadius: '99px', backgroundColor: 'var(--text-primary)', boxShadow: '0 0 8px #ffffff' }} />
           )}
         </button>
 
