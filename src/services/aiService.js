@@ -1,9 +1,9 @@
-// Corez AI Service Engine - Versatile General Intelligence Engine
+// Corez AI Service Engine - Personalized & Concisely Conversational Engine
 
 export const MODEL = {
   id: 'corez',
   name: 'Corez AI',
-  description: 'Versatile minimalist AI assistant for reasoning, writing, problem-solving, and interactive execution.'
+  description: 'Minimalist AI assistant for concise conversation, reasoning, and live app creation.'
 };
 
 // Extract executable code block (HTML/CSS/JS) from AI message if present
@@ -26,37 +26,41 @@ export function extractCodeFromMessage(text) {
   return null;
 }
 
-// Intelligent General Response Generator
+// Generate concise, natural AI responses personalized for Zayne
 export async function generateAIResponse(prompt) {
   const cleanPrompt = prompt.trim();
   const lower = cleanPrompt.toLowerCase();
 
-  // Natural thinking latency (0.8s to 1.3s)
-  await new Promise(r => setTimeout(r, 1000));
+  // Natural short delay (0.6s)
+  await new Promise(r => setTimeout(r, 600));
 
-  // 1. GREETING & GENERAL IDENTITY INTENT
+  // 1. GREETINGS & SMALL TALK (Personalized & Short)
   if (/^(hello|hi|hey|greetings|good morning|good afternoon|good evening|howdy|sup)(\s|\!|\.|\?|$)/i.test(lower)) {
-    return `Hello! How can I help you today? I'm ready to assist you with reasoning, writing, code analysis, creative work, or answering any question you have.`;
+    return `Hi Zayne! How’s your day going?`;
   }
 
   if (lower.includes('who are you') || lower.includes('what can you do')) {
-    return `I am **Corez**, a versatile AI assistant designed for clean conversation, analysis, writing, and problem-solving.\n\nI can help you with a wide range of tasks, including:\n- **Writing & Editing**: Essays, emails, creative writing, and documentation.\n- **Programming & Debugging**: Code explanations, bug fixes, algorithm design, and syntax examples.\n- **Analysis & Reasoning**: Mathematics, logic, science, philosophy, and strategy.\n- **Interactive Tools**: Building web apps, widgets, or visual tools when requested.\n\nWhat would you like to explore or work on?`;
+    return `Hey Zayne! I'm **Corez**, your AI assistant. I can answer questions, help you write or debug code, brainstorm ideas, or build live interactive web apps on demand. What are we working on?`;
+  }
+
+  if (/^(how are you|how is it going|how's it going)(\s|\!|\.|\?|$)/i.test(lower)) {
+    return `Doing great, Zayne! Ready to help whenever you are. What's on your mind?`;
   }
 
   // 2. GRATITUDE INTENT
   if (/^(thanks|thank you|awesome|great|cool|nice|perfect)(\s|\!|\.|$)/i.test(lower)) {
-    return `You're very welcome! Let me know if there's anything else I can help you with.`;
+    return `Anytime, Zayne! Let me know if you need anything else.`;
   }
 
-  // 3. EXPLICIT APPLICATION / GAME / WIDGET CREATION INTENT
+  // 3. EXPLICIT APP / GAME / WIDGET CREATION INTENT
   const isAppRequest = lower.includes('build an app') || lower.includes('create a game') || lower.includes('make a dashboard') || lower.includes('build a widget') || lower.includes('build a calculator') || lower.includes('build a timer') || lower.includes('build a tool') || lower.includes('create a tool') || lower.includes('generate html');
 
   if (isAppRequest) {
-    let appTitle = "Custom Web Tool";
+    let appTitle = "Custom Tool";
     let appBody = "";
 
     if (lower.includes('timer') || lower.includes('stopwatch')) {
-      appTitle = "Digital Stopwatch & Timer";
+      appTitle = "Stopwatch & Timer";
       appBody = `
         <div class="counter" id="timer">00:00.0</div>
         <div style="display:flex; gap:0.5rem; justify-content:center; margin-top:1rem;">
@@ -68,10 +72,8 @@ export async function generateAIResponse(prompt) {
           const timer = document.getElementById('timer');
           const startBtn = document.getElementById('startBtn');
           const resetBtn = document.getElementById('resetBtn');
-          
           startBtn.addEventListener('click', () => {
-            running = !running;
-            startBtn.textContent = running ? 'Pause' : 'Start';
+            running = !running; startBtn.textContent = running ? 'Pause' : 'Start';
             if (running) {
               timerId = setInterval(() => {
                 time += 100;
@@ -88,13 +90,11 @@ export async function generateAIResponse(prompt) {
           });
         </script>`;
     } else if (lower.includes('game')) {
-      appTitle = "Particle Physics Sandbox";
+      appTitle = "Particle Simulator";
       appBody = `
-        <p style="font-size:0.8rem; color:#888;">Move cursor to attract particles.</p>
-        <canvas id="c" style="width:100%; height:200px; background:#050505; border:1px solid #222; border-radius:6px; margin-top:0.75rem;"></canvas>
+        <canvas id="c" style="width:100%; height:200px; background:#050505; border:1px solid #222; border-radius:6px; margin-top:0.5rem;"></canvas>
         <script>
-          const canvas = document.getElementById('c');
-          const ctx = canvas.getContext('2d');
+          const canvas = document.getElementById('c'); const ctx = canvas.getContext('2d');
           canvas.width = canvas.offsetWidth; canvas.height = 200;
           let particles = Array.from({length: 120}, () => ({
             x: Math.random()*canvas.width, y: Math.random()*canvas.height,
@@ -102,8 +102,7 @@ export async function generateAIResponse(prompt) {
           }));
           let m = {x: canvas.width/2, y: canvas.height/2};
           canvas.addEventListener('mousemove', e => {
-            const r = canvas.getBoundingClientRect();
-            m.x = e.clientX - r.left; m.y = e.clientY - r.top;
+            const r = canvas.getBoundingClientRect(); m.x = e.clientX - r.left; m.y = e.clientY - r.top;
           });
           function draw() {
             ctx.fillStyle = 'rgba(5,5,5,0.3)'; ctx.fillRect(0,0,canvas.width,canvas.height);
@@ -120,11 +119,10 @@ export async function generateAIResponse(prompt) {
           draw();
         </script>`;
     } else {
-      appTitle = "Interactive Web Tool";
+      appTitle = "Custom Tool";
       appBody = `
-        <p style="font-size:0.8rem; color:#888;">Custom interactive widget constructed for your request.</p>
         <div class="counter" id="val">0</div>
-        <button class="action-btn" id="actBtn">Execute Action</button>
+        <button class="action-btn" id="actBtn">Execute</button>
         <script>
           let v = 0;
           document.getElementById('actBtn').addEventListener('click', () => {
@@ -133,19 +131,13 @@ export async function generateAIResponse(prompt) {
         </script>`;
     }
 
-    return `I have constructed the application for **${appTitle}**.\n\n\`\`\`html\n<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <title>${appTitle}</title>\n  <style>\n    :root { --bg: #000; --card: #0d0d0d; --text: #fff; --muted: #888; --border: rgba(255,255,255,0.15); }\n    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, system-ui, sans-serif; }\n    body { background: var(--bg); color: var(--text); padding: 1.5rem; display: flex; align-items: center; justify-content: center; min-height: 100vh; }\n    .app-card { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 1.5rem; width: 100%; max-width: 460px; text-align: center; }\n    .badge { background: #fff; color: #000; padding: 3px 10px; border-radius: 99px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; display: inline-block; margin-bottom: 0.75rem; }\n    h1 { font-size: 1.25rem; font-weight: 900; margin-bottom: 0.4rem; letter-spacing: -0.03em; text-transform: uppercase; }\n    .action-btn { background: #fff; color: #000; border: none; padding: 0.6rem 1.2rem; border-radius: 4px; font-weight: 800; font-size: 0.8rem; cursor: pointer; text-transform: uppercase; transition: background 0.2s; }\n    .action-btn:hover { background: #ccc; }\n    .counter { font-size: 2.2rem; font-weight: 900; margin: 0.75rem 0; color: #fff; }\n  </style>\n</head>\n<body>\n  <div class="app-card">\n    <div class="badge">COREZ APP</div>\n    <h1>${appTitle}</h1>\n    ${appBody}\n  </div>\n</body>\n</html>\n\`\`\``;
+    return `I've built that for you, Zayne. Click below to open it on the right side.\n\n\`\`\`html\n<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <title>${appTitle}</title>\n  <style>\n    :root { --bg: #000; --card: #0d0d0d; --text: #fff; --border: rgba(255,255,255,0.15); }\n    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, system-ui, sans-serif; }\n    body { background: var(--bg); color: var(--text); padding: 1.5rem; display: flex; align-items: center; justify-content: center; min-height: 100vh; }\n    .app-card { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 1.5rem; width: 100%; max-width: 440px; text-align: center; }\n    h1 { font-size: 1.2rem; font-weight: 800; margin-bottom: 0.5rem; text-transform: uppercase; }\n    .action-btn { background: #fff; color: #000; border: none; padding: 0.5rem 1rem; border-radius: 4px; font-weight: 800; font-size: 0.8rem; cursor: pointer; text-transform: uppercase; }\n    .action-btn:hover { background: #ccc; }\n    .counter { font-size: 2rem; font-weight: 900; margin: 0.75rem 0; color: #fff; }\n  </style>\n</head>\n<body>\n  <div class="app-card">\n    <h1>${appTitle}</h1>\n    ${appBody}\n  </div>\n</body>\n</html>\n\`\`\``;
   }
 
-  // 4. GENERAL INTELLECTUAL CONVERSATION & PROBLEM SOLVING
-  // Tailored responses for common topics
-  if (lower.includes('code') || lower.includes('python') || lower.includes('javascript') || lower.includes('react') || lower.includes('css') || lower.includes('html')) {
-    return `When writing clean, maintainable code, it's best to follow core principles such as **separation of concerns**, **single responsibility**, and **predictable state management**.\n\nIf you have a specific code snippet you'd like me to review, refactor, or debug, paste it here!`;
+  // 4. SHORT CONVERSATIONAL & PROBLEM SOLVING RESPONSES
+  if (lower.includes('code') || lower.includes('python') || lower.includes('javascript') || lower.includes('react')) {
+    return `Got it, Zayne. Share the snippet or problem you're working on, and I'll help you fix or optimize it.`;
   }
 
-  if (lower.includes('explain') || lower.includes('what is') || lower.includes('how does')) {
-    return `That's an interesting topic! \n\nWhen analyzing **"${cleanPrompt}"**, it helps to look at the foundational concepts first, understand how the key components interact, and evaluate practical real-world applications.\n\nLet me know if you'd like a deep dive into any particular aspect of this topic!`;
-  }
-
-  // Fallback for any general open-ended conversation
-  return `That's a thoughtful question regarding **"${cleanPrompt}"**.\n\nTo approach this effectively, we should focus on clarity, core fundamentals, and practical outcomes.\n\nHow would you like to proceed with this?`;
+  return `Here's what you need to know about **"${cleanPrompt}"**:\n\nKeep it simple, focus on the core fundamentals, and iterate quickly. Let me know if you want me to break this down further or write something for you!`;
 }
