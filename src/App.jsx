@@ -7,7 +7,7 @@ import CanvasPreview from './components/CanvasPreview';
 import SettingsModal from './components/SettingsModal';
 import { generateAIResponse, extractCodeFromMessage } from './services/aiService';
 import { SAMPLE_APPS } from './data/sampleApps';
-import { Layers, Code, Gamepad2, BarChart3, Loader2 } from 'lucide-react';
+import { Layers, Code, Gamepad2, BarChart3 } from 'lucide-react';
 
 const INITIAL_SESSIONS = [
   {
@@ -20,7 +20,7 @@ const INITIAL_SESSIONS = [
       },
       {
         role: 'assistant',
-        content: `I have built your monochrome executive analytics dashboard for **Corez**.\n\n\`\`\`html\n${SAMPLE_APPS[0].code}\n\`\`\``
+        content: `I have constructed your monochrome executive analytics dashboard for **Corez**.\n\n\`\`\`html\n${SAMPLE_APPS[0].code}\n\`\`\``
       }
     ]
   }
@@ -182,7 +182,7 @@ export default function App() {
                 </div>
                 <h1 className="welcome-title">Corez</h1>
                 <p className="welcome-sub">
-                  Minimalist monochrome AI assistant. Ask to build an app, then click <b>Thinking / Created App</b> to open it on the right side.
+                  Versatile minimalist AI assistant for conversation, writing, reasoning, and live application execution.
                 </p>
 
                 <div className="sample-prompts-grid">
@@ -236,7 +236,7 @@ export default function App() {
                     </div>
                     <div className="message-body">
                       <div className="thinking-indicator-box">
-                        <Loader2 size={14} className="spinning-icon" />
+                        <span className="spinning-icon" style={{ display: 'inline-block' }}>•</span>
                         <span>Corez is thinking...</span>
                       </div>
                     </div>
