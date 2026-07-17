@@ -20,7 +20,7 @@ const INITIAL_SESSIONS = [
       },
       {
         role: 'assistant',
-        content: `Here is your monochrome executive analytics dashboard built for **Corez**. The live application is running in the canvas on the right side!\n\n\`\`\`html\n${SAMPLE_APPS[0].code}\n\`\`\``
+        content: `I have built your monochrome executive analytics dashboard for **Corez**.\n\n\`\`\`html\n${SAMPLE_APPS[0].code}\n\`\`\``
       }
     ]
   }
@@ -37,7 +37,7 @@ export default function App() {
   });
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [canvasOpen, setCanvasOpen] = useState(true); // Open by default so output is always visible
+  const [canvasOpen, setCanvasOpen] = useState(false); // Collapsed until user clicks Thinking / Created App
   const [canvasFullScreen, setCanvasFullScreen] = useState(false);
   const [activeCanvasCode, setActiveCanvasCode] = useState(SAMPLE_APPS[0].code);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -87,7 +87,7 @@ export default function App() {
     setSettingsOpen(false);
   };
 
-  // Open canvas and run code on the right side
+  // Open canvas on the right side when Thinking / Created App pill is clicked
   const handleRunInCanvas = (code) => {
     setActiveCanvasCode(code);
     setCanvasOpen(true);
@@ -102,7 +102,7 @@ export default function App() {
         { role: 'user', content: app.prompt },
         {
           role: 'assistant',
-          content: `Here is the monochrome executable code for **${app.title}**. Running live in the canvas!\n\n\`\`\`html\n${app.code}\n\`\`\``
+          content: `I have generated the monochrome application for **${app.title}**.\n\n\`\`\`html\n${app.code}\n\`\`\``
         }
       ]
     };
@@ -150,7 +150,6 @@ export default function App() {
         const extractedCode = extractCodeFromMessage(partialText);
         if (extractedCode) {
           setActiveCanvasCode(extractedCode);
-          setCanvasOpen(true); // Automatically reveal live application output
         }
       }
     );
@@ -192,7 +191,7 @@ export default function App() {
                 </div>
                 <h1 className="welcome-title">Corez</h1>
                 <p className="welcome-sub">
-                  Minimalist monochrome AI assistant. Ask to build any app to render live output in the canvas.
+                  Minimalist monochrome AI assistant. Ask to build any app or game, then click <b>Thinking / Created App</b> to open it on the right side.
                 </p>
 
                 <div className="sample-prompts-grid">
@@ -245,7 +244,7 @@ export default function App() {
                       <Layers size={14} />
                     </div>
                     <div className="message-body">
-                      <div className="message-content" style={{ display: 'flex', items: 'center', gap: '5px', padding: '0.5rem 0.75rem' }}>
+                      <div className="message-content" style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0.5rem 0.75rem' }}>
                         <div className="typing-dot" />
                         <div className="typing-dot" />
                         <div className="typing-dot" />

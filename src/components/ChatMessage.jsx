@@ -1,33 +1,17 @@
 import React, { useState } from 'react';
 import { 
   User, 
-  Play, 
-  Copy, 
-  Check, 
   Layers,
-  ChevronRight,
-  Code2,
-  ChevronDown
+  ChevronRight
 } from 'lucide-react';
 
 export default function ChatMessage({ message, onRunInCanvas }) {
   const isUser = message.role === 'user';
-  const [copiedIndex, setCopiedIndex] = useState(null);
-  const [showSourceIndex, setShowSourceIndex] = useState(null);
-
-  const handleCopy = (text, index) => {
-    navigator.clipboard.writeText(text);
-    setCopiedIndex(index);
-    setTimeout(() => setCopiedIndex(null), 2000);
-  };
-
-  const toggleSource = (index) => {
-    setShowSourceIndex(showSourceIndex === index ? null : index);
-  };
 
   const renderFormattedText = (content) => {
     if (!content) return null;
 
+    // Detect markdown code blocks ```lang ... ```
     const codeBlockRegex = /```(\w+)?\s*([\s\S]*?)```/g;
     const parts = [];
     let lastIndex = 0;
@@ -66,86 +50,27 @@ export default function ChatMessage({ message, onRunInCanvas }) {
 
     return parts.map((part, idx) => {
       if (part.type === 'code') {
+        // Hide raw executable code completely from the chat stream
+        // Render ONLY the interactive Thinking / Created App pill
         if (part.isExecutable) {
-          const isShowingSource = showSourceIndex === part.index;
           return (
             <div key={idx} style={{ margin: '0.65rem 0' }}>
-              {/* ChatGPT-style Thinking / Creating App Pill Bar */}
               <div 
                 className="thinking-pill"
                 onClick={() => onRunInCanvas(part.code)}
-                title="Click to open or focus live app output on the right"
+                title="Click to open app live on the right side"
               >
                 <Layers size={14} style={{ color: 'var(--text-primary)' }} />
-                <span>Thinking / Creating App</span>
-                <span className="thinking-pill-badge">Live Canvas Output</span>
+                <span>Thinking / Created App</span>
+                <span className="thinking-pill-badge">Click to Open</span>
                 <ChevronRight size={14} style={{ marginLeft: 'auto', color: 'var(--text-secondary)' }} />
               </div>
-
-              {/* Source Toggle */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.25rem' }}>
-                <button 
-                  className="source-toggle-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleSource(part.index);
-                  }}
-                >
-                  <Code2 size={12} />
-                  <span>{isShowingSource ? 'Hide Source' : 'Inspect Source'}</span>
-                  {isShowingSource ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                </button>
-              </div>
-
-              {isShowingSource && (
-                <div className="code-block-container" style={{ marginTop: '0.4rem' }}>
-                  <div className="code-header">
-                    <span style={{ textTransform: 'uppercase', fontWeight: 600 }}>{part.lang}</span>
-                    <div className="code-actions">
-                      <button 
-                        className="code-btn run-btn"
-                        onClick={() => onRunInCanvas(part.code)}
-                      >
-                        <Play size={11} fill="currentColor" />
-                        <span>Run in Canvas</span>
-                      </button>
-                      <button 
-                        className="code-btn"
-                        onClick={() => handleCopy(part.code, part.index)}
-                      >
-                        {copiedIndex === part.index ? <Check size={11} /> : <Copy size={11} />}
-                        <span>{copiedIndex === part.index ? 'Copied' : 'Copy'}</span>
-                      </button>
-                    </div>
-                  </div>
-                  <pre className="code-content">
-                    <code>{part.code}</code>
-                  </pre>
-                </div>
-              )}
             </div>
           );
         }
 
-        return (
-          <div key={idx} className="code-block-container">
-            <div className="code-header">
-              <span style={{ textTransform: 'uppercase', fontWeight: 600 }}>{part.lang}</span>
-              <div className="code-actions">
-                <button 
-                  className="code-btn"
-                  onClick={() => handleCopy(part.code, part.index)}
-                >
-                  {copiedIndex === part.index ? <Check size={11} /> : <Copy size={11} />}
-                  <span>{copiedIndex === part.index ? 'Copied' : 'Copy'}</span>
-                </button>
-              </div>
-            </div>
-            <pre className="code-content">
-              <code>{part.code}</code>
-            </pre>
-          </div>
-        );
+        // Hide raw non-executable code unless explicitly requested
+        return null;
       }
 
       const lines = part.content.split('\n');
