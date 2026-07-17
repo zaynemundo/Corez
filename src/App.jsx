@@ -5,7 +5,7 @@ import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
 import CanvasPreview from './components/CanvasPreview';
 import SettingsModal from './components/SettingsModal';
-import { streamAIResponse, extractCodeFromMessage, MODELS } from './services/aiService';
+import { streamAIResponse, extractCodeFromMessage } from './services/aiService';
 import { SAMPLE_APPS } from './data/sampleApps';
 import { Layers, Code, Gamepad2, BarChart3 } from 'lucide-react';
 
@@ -13,7 +13,6 @@ const INITIAL_SESSIONS = [
   {
     id: 'session-default',
     title: 'Monochrome Analytics',
-    model: 'chatgpt',
     messages: [
       {
         role: 'user',
@@ -43,7 +42,6 @@ export default function App() {
     return sessions[0]?.id || 'session-default';
   });
 
-  const [currentModelId, setCurrentModelId] = useState('chatgpt');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [canvasOpen, setCanvasOpen] = useState(true);
   const [canvasFullScreen, setCanvasFullScreen] = useState(false);
@@ -74,7 +72,6 @@ export default function App() {
     const newSession = {
       id: newId,
       title: 'New Conversation',
-      model: currentModelId,
       messages: []
     };
     setSessions([newSession, ...sessions]);
@@ -106,7 +103,6 @@ export default function App() {
     const newSession = {
       id: newId,
       title: app.title,
-      model: app.model,
       messages: [
         { role: 'user', content: app.prompt },
         {
@@ -145,7 +141,6 @@ export default function App() {
 
     await streamAIResponse(
       promptText,
-      currentModelId,
       (partialText) => {
         currentAiMsg.content = partialText;
         setSessions(prev => prev.map(s => {
@@ -168,8 +163,6 @@ export default function App() {
     setIsStreaming(false);
   };
 
-  const currentModel = MODELS[currentModelId] || MODELS.chatgpt;
-
   return (
     <div className="app-container">
       <Sidebar
@@ -190,8 +183,6 @@ export default function App() {
           <Header
             sidebarOpen={sidebarOpen}
             onToggleSidebar={() => setSidebarOpen(prev => !prev)}
-            currentModelId={currentModelId}
-            onSelectModel={setCurrentModelId}
             canvasOpen={canvasOpen}
             onToggleCanvas={() => setCanvasOpen(prev => !prev)}
             onOpenSettings={() => setSettingsOpen(true)}
@@ -202,11 +193,11 @@ export default function App() {
             {activeSession?.messages.length === 0 ? (
               <div className="welcome-container">
                 <div className="welcome-logo">
-                  <Layers size={32} />
+                  <Layers size={28} />
                 </div>
                 <h1 className="welcome-title">Corez</h1>
                 <p className="welcome-sub">
-                  Minimalist monochrome AI chat interface with integrated live application execution sandbox.
+                  Minimalist monochrome AI assistant with live application sandbox.
                 </p>
 
                 <div className="sample-prompts-grid">
@@ -215,7 +206,7 @@ export default function App() {
                     onClick={() => handleSendMessage('Build an executive analytics dashboard with monochrome styling, stark SVG chart, and live search.')}
                   >
                     <div className="prompt-title">
-                      <BarChart3 size={16} style={{ color: 'var(--text-primary)' }} />
+                      <BarChart3 size={15} style={{ color: 'var(--text-primary)' }} />
                       <span>Executive Dashboard</span>
                     </div>
                     <div className="prompt-desc">Monochrome SVG metrics dashboard with search filters.</div>
@@ -226,7 +217,7 @@ export default function App() {
                     onClick={() => handleSendMessage('Build a monochrome 2D particle physics simulation with interactive mouse gravity attractor.')}
                   >
                     <div className="prompt-title">
-                      <Gamepad2 size={16} style={{ color: 'var(--text-primary)' }} />
+                      <Gamepad2 size={15} style={{ color: 'var(--text-primary)' }} />
                       <span>Particle Physics Game</span>
                     </div>
                     <div className="prompt-desc">Interactive black and white particle simulator.</div>
@@ -237,7 +228,7 @@ export default function App() {
                     onClick={() => handleSendMessage('Build me a custom monochrome web tool with interactive controls.')}
                   >
                     <div className="prompt-title">
-                      <Code size={16} style={{ color: 'var(--text-primary)' }} />
+                      <Code size={15} style={{ color: 'var(--text-primary)' }} />
                       <span>Custom Monochrome Tool</span>
                     </div>
                     <div className="prompt-desc">Generate any HTML/CSS/JS tool on demand.</div>
@@ -256,10 +247,10 @@ export default function App() {
                 {isStreaming && (
                   <div className="message-wrapper ai" style={{ opacity: 0.8 }}>
                     <div className="avatar ai">
-                      <Layers size={16} />
+                      <Layers size={14} />
                     </div>
                     <div className="message-body">
-                      <div className="message-content" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.75rem 1rem' }}>
+                      <div className="message-content" style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0.5rem 0.75rem' }}>
                         <div className="typing-dot" />
                         <div className="typing-dot" />
                         <div className="typing-dot" />
@@ -275,7 +266,6 @@ export default function App() {
           <ChatInput
             onSendMessage={handleSendMessage}
             isStreaming={isStreaming}
-            currentModelName={currentModel.name}
           />
         </div>
 

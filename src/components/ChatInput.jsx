@@ -1,14 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, Code, Gamepad2, Calculator, BarChart3 } from 'lucide-react';
+import { Send, Code, Gamepad2, Calculator, BarChart3 } from 'lucide-react';
 
-export default function ChatInput({ onSendMessage, isStreaming, currentModelName }) {
+export default function ChatInput({ onSendMessage, isStreaming }) {
   const [input, setInput] = useState('');
   const textareaRef = useRef(null);
 
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 160)}px`;
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 140)}px`;
     }
   }, [input]);
 
@@ -30,10 +30,9 @@ export default function ChatInput({ onSendMessage, isStreaming, currentModelName
   };
 
   const quickTools = [
-    { label: 'Build Web App', prompt: 'Build an interactive web app widget with live controls and modern UI.', icon: Code },
-    { label: 'Physics Game', prompt: 'Create a 2D canvas particle physics game with interactive gravity.', icon: Gamepad2 },
-    { label: 'ROI Calculator', prompt: 'Build a financial ROI and compound growth investment calculator.', icon: Calculator },
-    { label: 'Analytics Board', prompt: 'Build an executive analytics dashboard with interactive charts and search table.', icon: BarChart3 }
+    { label: 'Web App', prompt: 'Build an interactive web app widget with live controls.', icon: Code },
+    { label: 'Physics Game', prompt: 'Build a monochrome 2D particle physics simulation with interactive mouse gravity attractor.', icon: Gamepad2 },
+    { label: 'Analytics Board', prompt: 'Build an executive analytics dashboard with monochrome styling, stark SVG chart, and live search.', icon: BarChart3 }
   ];
 
   return (
@@ -42,7 +41,7 @@ export default function ChatInput({ onSendMessage, isStreaming, currentModelName
         <textarea
           ref={textareaRef}
           className="chat-textarea"
-          placeholder={`Message ${currentModelName || 'AI'}... (e.g. "Build me an app for...")`}
+          placeholder="Message Corez... (e.g. 'Build an executive analytics app')"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -60,7 +59,7 @@ export default function ChatInput({ onSendMessage, isStreaming, currentModelName
                   className="tool-pill"
                   onClick={() => onSendMessage(t.prompt)}
                 >
-                  <Icon size={12} />
+                  <Icon size={11} />
                   <span>{t.label}</span>
                 </button>
               );
@@ -73,7 +72,7 @@ export default function ChatInput({ onSendMessage, isStreaming, currentModelName
             disabled={!input.trim() || isStreaming}
             title="Send Message"
           >
-            <Send size={16} />
+            <Send size={14} />
           </button>
         </div>
       </form>
