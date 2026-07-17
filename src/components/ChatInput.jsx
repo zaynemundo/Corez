@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Code, Gamepad2, Calculator, BarChart3 } from 'lucide-react';
+import { Send } from 'lucide-react';
 
 export default function ChatInput({ onSendMessage, isStreaming }) {
   const [input, setInput] = useState('');
@@ -29,50 +29,28 @@ export default function ChatInput({ onSendMessage, isStreaming }) {
     }
   };
 
-  const quickTools = [
-    { label: 'Web App', prompt: 'Build an interactive web app widget with live controls.', icon: Code },
-    { label: 'Physics Game', prompt: 'Build a monochrome 2D particle physics simulation with interactive mouse gravity attractor.', icon: Gamepad2 },
-    { label: 'Analytics Board', prompt: 'Build an executive analytics dashboard with monochrome styling, stark SVG chart, and live search.', icon: BarChart3 }
-  ];
-
   return (
     <div className="chat-input-container">
-      <form className="input-box" onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="input-box">
         <textarea
           ref={textareaRef}
           className="chat-textarea"
-          placeholder="Message Corez... (e.g. 'Build an executive analytics app')"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
+          placeholder="Ask Corez..."
           rows={1}
+          disabled={isStreaming}
         />
-
         <div className="input-actions-bar">
-          <div className="quick-tools">
-            {quickTools.map((t, idx) => {
-              const Icon = t.icon;
-              return (
-                <button
-                  key={idx}
-                  type="button"
-                  className="tool-pill"
-                  onClick={() => onSendMessage(t.prompt)}
-                >
-                  <Icon size={11} />
-                  <span>{t.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
+          <div style={{ flex: 1 }} />
           <button
             type="submit"
             className="send-btn"
             disabled={!input.trim() || isStreaming}
             title="Send Message"
           >
-            <Send size={14} />
+            <Send size={15} />
           </button>
         </div>
       </form>
