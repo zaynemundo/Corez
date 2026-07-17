@@ -1,4 +1,4 @@
-/* Corez - Dynamic Monochrome Design System with Rounded Corners */
+/* Corez - Dynamic Monochrome Design System with Fully Rounded Corners */
 
 :root {
   /* Ultra-Minimalist Dark Monochrome Palette */
@@ -24,12 +24,12 @@
   
   --sidebar-width: 250px;
   
-  /* Smooth Rounded Radii System */
-  --radius-xs: 6px;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  /* Fully Rounded System */
+  --radius-xs: 10px;
+  --radius-sm: 16px;
+  --radius-md: 22px;
+  --radius-lg: 28px;
+  --radius-xl: 32px;
   --radius-pill: 9999px;
   
   --transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
@@ -114,7 +114,7 @@ h1, h2, h3, h4, h5, h6 {
   background-color: var(--bg-primary);
 }
 
-/* Dynamic Rounded Sidebar */
+/* Fully Rounded Sidebar Elements */
 .sidebar {
   width: var(--sidebar-width);
   height: 100%;
@@ -152,9 +152,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .brand-icon {
-  width: 26px;
-  height: 26px;
-  border-radius: var(--radius-sm);
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
   background: var(--bg-tertiary);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
@@ -167,10 +167,10 @@ h1, h2, h3, h4, h5, h6 {
 .new-chat-btn {
   width: calc(100% - 2rem);
   margin: 0.85rem 1rem 0.5rem 1rem;
-  padding: 0.6rem 0.85rem;
+  padding: 0.65rem 1rem;
   background: transparent;
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-pill);
   color: var(--text-primary);
   font-weight: 500;
   font-size: 0.825rem;
@@ -197,8 +197,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .history-item {
-  padding: 0.55rem 0.75rem;
-  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.95rem;
+  border-radius: var(--radius-pill);
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -253,10 +253,10 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   gap: 0.6rem;
   width: 100%;
-  padding: 0.55rem 0.75rem;
+  padding: 0.6rem 0.95rem;
   background: none;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-pill);
   color: var(--text-secondary);
   font-size: 0.825rem;
   font-weight: 400;
@@ -286,7 +286,7 @@ h1, h2, h3, h4, h5, h6 {
   min-width: 380px;
 }
 
-/* Minimalist Top Header */
+/* Top Header */
 .top-header {
   height: 52px;
   padding: 0 1.25rem;
@@ -304,9 +304,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .icon-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-sm);
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-pill);
   background: transparent;
   border: 1px solid var(--border-color);
   color: var(--text-secondary);
@@ -321,7 +321,7 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-primary);
   border-color: var(--border-hover);
   background-color: var(--bg-tertiary);
-  transform: scale(1.04);
+  transform: scale(1.06);
 }
 
 .header-right {
@@ -334,10 +334,10 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.4rem 0.85rem;
+  padding: 0.45rem 1rem;
   background: transparent;
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-pill);
   color: var(--text-primary);
   font-weight: 500;
   font-size: 0.785rem;
@@ -382,8 +382,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .welcome-logo {
-  width: 52px;
-  height: 52px;
+  width: 56px;
+  height: 56px;
   border-radius: var(--radius-md);
   background: var(--bg-tertiary);
   border: 1px solid var(--border-color);
@@ -418,7 +418,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .sample-prompt-card {
-  padding: 1rem 1.15rem;
+  padding: 1.1rem 1.25rem;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -471,9 +471,9 @@ h1, h2, h3, h4, h5, h6 {
   max-width: 100%;
 }
 
-/* Equally Rounded Message Bubbles */
+/* Fully Rounded Soft Curved Message Bubbles */
 .message-content {
-  padding: 0.85rem 1.15rem;
+  padding: 0.95rem 1.35rem;
   border-radius: var(--radius-lg);
   font-size: 0.925rem;
   font-weight: 400;
@@ -497,10 +497,10 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.6rem 0.95rem;
+  padding: 0.65rem 1.1rem;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-pill);
   color: var(--text-secondary);
   font-size: 0.825rem;
   font-weight: 400;
@@ -517,15 +517,15 @@ h1, h2, h3, h4, h5, h6 {
   to { transform: rotate(360deg); }
 }
 
-/* Dynamic Rounded Thinking / Creating App Pill */
+/* Dynamic Fully Rounded Thinking / Creating App Pill */
 .thinking-pill {
   display: flex;
   align-items: center;
   gap: 0.65rem;
-  padding: 0.65rem 1rem;
+  padding: 0.7rem 1.15rem;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-pill);
   color: var(--text-primary);
   font-size: 0.85rem;
   font-weight: 500;
@@ -544,7 +544,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 0.675rem;
   font-weight: 500;
   text-transform: uppercase;
-  padding: 2px 8px;
+  padding: 3px 10px;
   background-color: var(--bg-tertiary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-pill);
@@ -561,8 +561,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .code-header {
-  height: 34px;
-  padding: 0 0.85rem;
+  height: 36px;
+  padding: 0 1rem;
   background-color: var(--code-header-bg);
   display: flex;
   align-items: center;
@@ -580,10 +580,10 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  padding: 0.25rem 0.55rem;
+  padding: 0.25rem 0.65rem;
   background: transparent;
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-pill);
   color: var(--text-primary);
   font-size: 0.7rem;
   font-weight: 400;
@@ -597,7 +597,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .code-content {
-  padding: 0.85rem;
+  padding: 0.95rem;
   overflow-x: auto;
   font-family: var(--font-mono);
   font-size: 0.825rem;
@@ -606,7 +606,7 @@ h1, h2, h3, h4, h5, h6 {
   color: #eeeeee;
 }
 
-/* Input Container with Widen Layout */
+/* Fully Rounded Input Box */
 .chat-input-container {
   padding: 1rem 1.5rem 1.25rem 1.5rem;
   display: flex;
@@ -620,7 +620,7 @@ h1, h2, h3, h4, h5, h6 {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
-  padding: 0.85rem 1.15rem;
+  padding: 0.9rem 1.25rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -655,7 +655,7 @@ h1, h2, h3, h4, h5, h6 {
 .quick-tools { display: flex; align-items: center; gap: 0.4rem; }
 
 .tool-pill {
-  padding: 0.25rem 0.65rem;
+  padding: 0.3rem 0.75rem;
   background-color: transparent;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-pill);
@@ -677,9 +677,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .send-btn {
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-sm);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
   background: var(--bg-tertiary);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
@@ -693,12 +693,12 @@ h1, h2, h3, h4, h5, h6 {
 .send-btn:hover:not(:disabled) {
   background: var(--bg-secondary);
   border-color: var(--text-primary);
-  transform: scale(1.05);
+  transform: scale(1.06);
 }
 
 .send-btn:disabled { opacity: 0.2; cursor: not-allowed; }
 
-/* Dynamic Rounded Canvas Pane */
+/* Canvas Pane */
 .canvas-pane {
   width: 50%;
   height: 100%;
@@ -759,8 +759,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .canvas-empty-icon {
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   border-radius: var(--radius-md);
   background: var(--bg-tertiary);
   display: flex;
@@ -770,7 +770,7 @@ h1, h2, h3, h4, h5, h6 {
   border: 1px solid var(--border-color);
 }
 
-/* Modal Window with Rounded Corners */
+/* Modal Window with Fully Rounded Corners */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -787,7 +787,7 @@ h1, h2, h3, h4, h5, h6 {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-xl);
-  padding: 1.35rem;
+  padding: 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -801,10 +801,10 @@ h1, h2, h3, h4, h5, h6 {
 
 .form-input {
   width: 100%;
-  padding: 0.6rem 0.85rem;
+  padding: 0.65rem 0.95rem;
   background-color: var(--bg-primary);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-pill);
   color: var(--text-primary);
   font-size: 0.825rem;
   font-weight: 400;
