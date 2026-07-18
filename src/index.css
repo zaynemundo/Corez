@@ -503,63 +503,70 @@ h1, h2, h3, h4, h5, h6 {
   padding-left: 0;
 }
 
-/* Thinking Indicator Box */
 .thinking-indicator-box {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.65rem 1.1rem;
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-pill);
+  padding: 0.5rem 0;
+  background-color: transparent;
   color: var(--text-secondary);
-  font-size: 0.825rem;
-  font-weight: 400;
   width: fit-content;
 }
 
-.spinning-icon {
-  animation: spin 1s linear infinite;
-  color: var(--text-primary);
+.thinking-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  min-height: 1.25rem;
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+.thinking-dot {
+  width: 0.38rem;
+  height: 0.38rem;
+  border-radius: var(--radius-pill);
+  background: var(--text-secondary);
+  opacity: 0.35;
+  animation: thinkingDotPulse 1.2s ease-in-out infinite;
 }
 
-/* Dynamic Fully Rounded Thinking / Creating App Pill */
-.thinking-pill {
+.thinking-dot:nth-child(2) {
+  animation-delay: 0.16s;
+}
+
+.thinking-dot:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+@keyframes thinkingDotPulse {
+  0%, 80%, 100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+.preview-action {
   display: flex;
   align-items: center;
   gap: 0.65rem;
-  padding: 0.7rem 1.15rem;
+  padding: 0.72rem 1rem;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  font-size: 0.85rem;
+  font-size: 0.825rem;
   font-weight: 500;
   cursor: pointer;
   transition: var(--transition-fast);
   user-select: none;
 }
 
-.thinking-pill:hover {
+.preview-action:hover {
   background-color: var(--bg-tertiary);
   border-color: var(--border-hover);
   transform: translateY(-1px);
-}
-
-.thinking-pill-badge {
-  font-size: 0.675rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  padding: 3px 10px;
-  background-color: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-pill);
-  color: var(--text-secondary);
 }
 
 /* Code Block Component */

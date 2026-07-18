@@ -53,13 +53,12 @@ export default function ChatMessage({ message, onRunInCanvas }) {
           return (
             <div key={idx} style={{ margin: '0.65rem 0' }}>
               <div 
-                className="thinking-pill"
+                className="preview-action"
                 onClick={() => onRunInCanvas(part.code)}
                 title="Click to open app live on the right side"
               >
                 <Layers size={14} style={{ color: 'var(--text-primary)' }} />
-                <span>Thinking / Created App</span>
-                <span className="thinking-pill-badge">Click to Open</span>
+                <span>Open preview</span>
                 <ChevronRight size={14} style={{ marginLeft: 'auto', color: 'var(--text-secondary)' }} />
               </div>
             </div>
