@@ -107,7 +107,7 @@ body {
   width: 100vw;
   -webkit-font-smoothing: antialiased;
   font-weight: 300;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   line-height: 1.6;
   letter-spacing: 0;
 }
@@ -562,11 +562,11 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Fully Rounded Soft Curved Message Bubbles */
 .message-content {
-  padding: 0.95rem 1.35rem;
+  padding: 0.85rem 1.2rem;
   border-radius: var(--radius-md);
-  font-size: 0.925rem;
+  font-size: 0.8125rem;
   font-weight: 400;
-  line-height: 1.65;
+  line-height: 1.6;
 }
 
 .message-wrapper.user .message-content {
@@ -580,12 +580,12 @@ h1, h2, h3, h4, h5, h6 {
   background-color: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
-  padding: 1.15rem 1.4rem;
+  padding: 1rem 1.25rem;
   color: var(--text-primary);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 300;
-  line-height: 1.7;
+  line-height: 1.65;
 }
 
 /* Markdown Elements Styling */
@@ -597,25 +597,27 @@ h1, h2, h3, h4, h5, h6 {
 
 .markdown-body p {
   margin-bottom: 0.25rem;
-  line-height: 1.65;
+  font-size: 0.8125rem;
+  line-height: 1.6;
   color: var(--text-primary);
   font-weight: 300;
 }
 
 .markdown-heading {
-  font-size: 0.95rem;
+  font-size: 0.875rem;
   font-weight: 300;
-  margin: 0.75rem 0 0.35rem 0;
+  margin: 0.65rem 0 0.3rem 0;
   color: var(--text-primary);
   letter-spacing: -0.01em;
-  padding-bottom: 0.25rem;
+  padding-bottom: 0.2rem;
   border-bottom: 1px solid var(--border-color);
 }
 
 .markdown-blockquote {
   border-left: 2px solid var(--border-hover);
-  padding: 0.4rem 0 0.4rem 0.85rem;
-  margin: 0.5rem 0;
+  padding: 0.35rem 0 0.35rem 0.75rem;
+  margin: 0.45rem 0;
+  font-size: 0.8125rem;
   color: var(--text-secondary);
   font-style: italic;
   background: rgba(255, 255, 255, 0.02);
@@ -625,8 +627,9 @@ h1, h2, h3, h4, h5, h6 {
 .markdown-list-item {
   margin-left: 1.25rem;
   list-style-type: disc;
-  margin-bottom: 0.25rem;
-  line-height: 1.6;
+  margin-bottom: 0.2rem;
+  font-size: 0.8125rem;
+  line-height: 1.55;
   color: var(--text-primary);
   font-weight: 300;
 }
@@ -635,9 +638,9 @@ h1, h2, h3, h4, h5, h6 {
   background-color: var(--bg-tertiary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-xs);
-  padding: 0.12rem 0.4rem;
+  padding: 0.1rem 0.35rem;
   font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   color: var(--text-primary);
   font-weight: 400;
 }
@@ -653,7 +656,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .thinking-text {
-  font-size: 0.85rem;
+  font-size: 0.775rem;
   font-weight: 300;
   color: var(--text-secondary);
   letter-spacing: 0.01em;
@@ -698,12 +701,12 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   align-items: center;
   gap: 0.65rem;
-  padding: 0.72rem 1rem;
+  padding: 0.65rem 0.9rem;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  font-size: 0.825rem;
+  font-size: 0.775rem;
   font-weight: 300;
   cursor: pointer;
   transition: var(--transition-fast);
@@ -718,7 +721,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Code Block Component */
 .code-block-container {
-  margin: 0.85rem 0;
+  margin: 0.75rem 0;
   border-radius: var(--radius-md);
   overflow: hidden;
   border: 1px solid var(--border-color);
@@ -726,14 +729,14 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .code-header {
-  height: 36px;
-  padding: 0 1rem;
+  height: 32px;
+  padding: 0 0.85rem;
   background-color: var(--code-header-bg);
   display: flex;
   align-items: center;
   justify-content: space-between;
   font-family: var(--font-mono);
-  font-size: 0.725rem;
+  font-size: 0.675rem;
   font-weight: 300;
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border-color);
@@ -742,7 +745,7 @@ h1, h2, h3, h4, h5, h6 {
 .code-lang {
   text-transform: lowercase;
   letter-spacing: 0.03em;
-  font-size: 0.7rem;
+  font-size: 0.675rem;
   color: var(--text-secondary);
 }
 
@@ -752,12 +755,12 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  padding: 0.25rem 0.65rem;
+  padding: 0.2rem 0.55rem;
   background: transparent;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-pill);
   color: var(--text-primary);
-  font-size: 0.7rem;
+  font-size: 0.675rem;
   font-weight: 300;
   cursor: pointer;
   transition: var(--transition-fast);
@@ -769,10 +772,10 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .code-content {
-  padding: 0.95rem;
+  padding: 0.85rem;
   overflow-x: auto;
   font-family: var(--font-mono);
-  font-size: 0.825rem;
+  font-size: 0.775rem;
   font-weight: 400;
   line-height: 1.5;
   color: #eeeeee;
