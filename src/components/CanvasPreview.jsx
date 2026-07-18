@@ -66,8 +66,7 @@ export default function CanvasPreview({
     <div className={`canvas-pane ${isFullScreen ? 'full-width' : ''}`}>
       <div className="canvas-header">
         <div className="canvas-title">
-          <Layers size={15} />
-          <span>Canvas Preview</span>
+          <span>Preview</span>
 
           {/* View Mode: Preview vs Source */}
           <div style={{ display: 'flex', background: 'var(--bg-tertiary)', padding: '2px', borderRadius: 'var(--radius-pill)', marginLeft: '0.5rem', border: '1px solid var(--border-color)' }}>
@@ -160,7 +159,7 @@ export default function CanvasPreview({
           <button className="icon-btn" onClick={onToggleFullScreen} title="Toggle Fullscreen">
             {isFullScreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
-          <button className="icon-btn" onClick={onClose} title="Close Canvas">
+          <button className="icon-btn" onClick={onClose} title="Close Preview">
             <X size={14} />
           </button>
         </div>
@@ -219,7 +218,7 @@ export default function CanvasPreview({
             </div>
             <h3 style={{ fontSize: '0.95rem' }}>No Active App Running</h3>
             <p style={{ maxWidth: '280px', fontSize: '0.8rem' }}>
-              Ask Corez to build an application or click <b>"Run in Canvas"</b> on any code block.
+              Ask Corez to build an application or click <b>"Run Preview"</b> on any code block.
             </p>
           </div>
         )}

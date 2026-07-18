@@ -39,11 +39,11 @@ export default function Header({
         <button 
           className="canvas-toggle-btn" 
           onClick={onToggleCanvas}
-          title="Toggle Executable Canvas Split-View"
+          title="Toggle Preview Split-View"
           style={hasExecutableCode ? { border: '1px solid var(--text-primary)', background: 'var(--bg-tertiary)' } : {}}
         >
           <PanelRight size={15} />
-          <span>{canvasOpen ? 'Hide Canvas' : 'Live Canvas'}</span>
+          <span>{canvasOpen ? 'Hide Preview' : 'Preview'}</span>
           {hasExecutableCode && (
             <span style={{ width: '5px', height: '5px', borderRadius: '99px', backgroundColor: 'var(--text-primary)' }} />
           )}
