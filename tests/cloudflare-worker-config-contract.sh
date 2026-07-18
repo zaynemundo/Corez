@@ -4,6 +4,7 @@ set -u
 config="wrangler.jsonc"
 package="package.json"
 readme="README.md"
+workflow=".github/workflows/deploy.yml"
 failures=0
 
 check() {
@@ -34,6 +35,8 @@ check 'Wrangler deploy script exists' '"deploy"' "$package"
 check 'README documents Cloudflare deployment' 'Cloudflare Worker' "$readme"
 check 'README documents the build command' 'npm run build' "$readme"
 check 'README documents the deploy command' 'npx wrangler deploy' "$readme"
+check 'GitHub Actions uses the current setup-node action' 'actions/setup-node@v4' "$workflow"
+check 'deployment runs the hosted AI contract suite' 'npm run test:cloudflare' "$workflow"
 
 if (( failures > 0 )); then
   printf '%d Cloudflare Worker configuration contract check(s) failed.\n' "$failures" >&2

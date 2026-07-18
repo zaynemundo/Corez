@@ -118,12 +118,9 @@ async function run() {
     model: MODEL
   });
   assert.equal(invocation.model, MODEL);
-  assert.equal(invocation.input.reasoning_effort, 'high');
-  assert.equal(invocation.input.temperature, 0.72);
-  assert.equal(invocation.input.max_completion_tokens, 3200);
+  assert.deepEqual(Object.keys(invocation.input), ['messages']);
   assert.equal(invocation.input.messages[1].content, 'Build a timer');
   assert.match(invocation.input.messages[0].content, /Build a timer app/);
-  assert.equal('model' in invocation.input, false);
 
   let generalInput;
   const generalResponse = await post(
@@ -140,24 +137,37 @@ async function run() {
     })
   );
   assert.equal(generalResponse.status, 200);
-  assert.equal(generalInput.max_completion_tokens, 1800);
+  assert.deepEqual(Object.keys(generalInput), ['messages']);
+  assert.match(generalInput.messages[0].content, /general/);
 
-  const thrownResponse = await post(
-    JSON.stringify({ prompt: 'Hello' }),
-    env({
-      AI: {
-        async run() {
-          throw new Error('binding failure with sensitive detail');
+  const originalConsoleError = console.error;
+  let loggedError;
+  console.error = (entry) => { loggedError = entry; };
+  let thrownResponse;
+  try {
+    thrownResponse = await post(
+      JSON.stringify({ prompt: 'Hello' }),
+      env({
+        AI: {
+          async run() {
+            throw { message: 'binding failure token=super-secret-value' };
+          }
         }
-      }
-    })
-  );
+      })
+    );
+  } finally {
+    console.error = originalConsoleError;
+  }
   assert.equal(thrownResponse.status, 502);
   const thrownBody = await thrownResponse.text();
   assert.deepEqual(JSON.parse(thrownBody), {
     error: 'Unable to generate AI response.'
   });
-  assert.doesNotMatch(thrownBody, /sensitive detail/);
+  assert.doesNotMatch(thrownBody, /super-secret-value/);
+  assert.deepEqual(JSON.parse(loggedError), {
+    message: 'Workers AI generation failed',
+    error: 'binding failure token=[REDACTED]'
+  });
 
   const emptyResponse = await post(
     JSON.stringify({ prompt: 'Hello' }),
