@@ -14,244 +14,180 @@
   "vocabulary": [
     "a",
     "about",
-    "advice",
+    "addresses",
     "after",
-    "all",
     "am",
     "an",
     "and",
     "announcement",
+    "answer",
+    "any",
     "api",
     "app",
     "application",
     "arcade",
     "are",
     "article",
-    "asynchronous",
-    "awesome",
-    "back",
-    "bi:a_booking",
-    "bi:a_clear",
-    "bi:a_concise",
-    "bi:a_counter",
+    "at",
+    "be",
+    "between",
+    "bi:a_customer",
     "bi:a_landing",
-    "bi:a_lightweight",
-    "bi:a_particle",
-    "bi:a_small",
-    "bi:an_app",
+    "bi:a_lot",
+    "bi:a_modern",
+    "bi:a_prototype",
+    "bi:a_quick",
+    "bi:a_rough",
+    "bi:a_simple",
+    "bi:after_a",
+    "bi:an_interactive",
     "bi:and_build",
-    "bi:and_explain",
+    "bi:and_how",
+    "bi:api_response",
     "bi:app_for",
-    "bi:app_that",
     "bi:app_with",
-    "bi:are_you",
-    "bi:assembly_language",
-    "bi:asynchronous_event",
-    "bi:booking_page",
+    "bi:arcade_game",
+    "bi:are_some",
     "bi:break_down",
-    "bi:browser_caching",
     "bi:build_a",
-    "bi:build_an",
-    "bi:build_the",
-    "bi:business_landing",
-    "bi:calculator_app",
+    "bi:bullet_points",
     "bi:calculator_tool",
+    "bi:can_i",
     "bi:can_you",
-    "bi:canvas_app",
-    "bi:client_side",
+    "bi:captions_for",
     "bi:code_and",
-    "bi:cold_email",
     "bi:copy_for",
-    "bi:counter_app",
     "bi:create_a",
-    "bi:create_an",
-    "bi:dashboard_portal",
     "bi:database_indexes",
-    "bi:debug_my",
+    "bi:debug_why",
     "bi:design_a",
-    "bi:developer_portfolio",
+    "bi:develop_a",
+    "bi:diagnose_why",
     "bi:difference_between",
     "bi:do_i",
-    "bi:does_a",
-    "bi:does_this",
+    "bi:does_my",
+    "bi:down_how",
     "bi:draft_a",
     "bi:draft_an",
-    "bi:due_to",
-    "bi:email_copy",
-    "bi:email_draft",
-    "bi:email_so",
-    "bi:event_loop",
+    "bi:edit_this",
+    "bi:email_to",
+    "bi:error_in",
     "bi:explain_database",
     "bi:explain_how",
     "bi:explain_the",
-    "bi:explain_what",
     "bi:explain_why",
-    "bi:fail_to",
     "bi:fails_to",
-    "bi:fix_a",
     "bi:fix_this",
     "bi:for_a",
+    "bi:for_me",
     "bi:for_my",
-    "bi:game_app",
-    "bi:general_advice",
-    "bi:general_guidance",
+    "bi:for_our",
+    "bi:for_product",
+    "bi:for_this",
+    "bi:game_for",
     "bi:generate_a",
-    "bi:good_morning",
-    "bi:headline_and",
+    "bi:generator_tool",
+    "bi:have_a",
+    "bi:help_debug",
     "bi:help_me",
-    "bi:help_you",
-    "bi:how_are",
+    "bi:how_can",
     "bi:how_do",
     "bi:how_does",
-    "bi:how_to",
-    "bi:html_canvas",
+    "bi:how_web",
     "bi:i_am",
     "bi:i_have",
     "bi:i_need",
     "bi:in_javascript",
+    "bi:in_my",
     "bi:in_plain",
-    "bi:in_python",
-    "bi:in_react",
-    "bi:interactive_calculator",
-    "bi:interactive_dashboard",
-    "bi:interactive_tracker",
+    "bi:in_simple",
+    "bi:in_the",
+    "bi:indexes_in",
+    "bi:is_my",
     "bi:is_the",
-    "bi:it_sounds",
-    "bi:it_works",
-    "bi:javascript_code",
+    "bi:is_your",
     "bi:landing_page",
     "bi:launch_email",
+    "bi:letter_for",
+    "bi:machine_learning",
     "bi:make_a",
-    "bi:make_an",
+    "bi:me_a",
+    "bi:me_how",
+    "bi:me_the",
     "bi:memory_leak",
-    "bi:modern_landing",
-    "bi:my_code",
-    "bi:my_landing",
+    "bi:message_for",
     "bi:my_python",
-    "bi:my_react",
-    "bi:need_help",
-    "bi:need_to",
-    "bi:null_pointer",
-    "bi:of_a",
-    "bi:on_my",
-    "bi:on_the",
-    "bi:page_app",
     "bi:page_for",
     "bi:plain_english",
     "bi:polish_this",
-    "bi:product_launch",
-    "bi:proposal_for",
-    "bi:prototype_tool",
-    "bi:react_component",
-    "bi:react_effect",
-    "bi:react_state",
-    "bi:real_time",
+    "bi:portal_with",
+    "bi:python_script",
+    "bi:remote_work",
+    "bi:rest_api",
+    "bi:returns_null",
     "bi:review_this",
     "bi:rewrite_this",
+    "bi:script_that",
     "bi:server_side",
-    "bi:so_it",
-    "bi:social_media",
-    "bi:sounds_confident",
+    "bi:ship_a",
+    "bi:side_rendering",
+    "bi:simple_terms",
+    "bi:some_general",
     "bi:stack_trace",
     "bi:summarize_this",
     "bi:teach_me",
+    "bi:tell_me",
+    "bi:text_to",
     "bi:thank_you",
-    "bi:thanks_for",
+    "bi:thanks_a",
     "bi:the_difference",
-    "bi:the_event",
-    "bi:this_code",
-    "bi:this_function",
-    "bi:this_launch",
+    "bi:this_broken",
     "bi:this_react",
-    "bi:this_script",
-    "bi:time_complexity",
-    "bi:timer_app",
-    "bi:to_a",
+    "bi:this_technical",
     "bi:to_be",
-    "bi:to_my",
+    "bi:to_sound",
+    "bi:to_start",
     "bi:tool_app",
-    "bi:typeerror_cannot",
-    "bi:understand_how",
-    "bi:user_interface",
     "bi:web_app",
+    "bi:web_application",
+    "bi:website_with",
     "bi:what_are",
     "bi:what_is",
+    "bi:why_do",
     "bi:why_does",
     "bi:why_is",
-    "bi:why_it",
-    "bi:with_a",
-    "bi:with_my",
-    "bi:works_in",
+    "bi:why_my",
+    "bi:why_this",
+    "bi:widget_with",
+    "bi:with_drag",
     "bi:write_a",
-    "bi:write_copy",
-    "bi:you_doing",
-    "bio",
-    "blog",
-    "board",
-    "booking",
-    "boost",
-    "booking",
-    "borrow",
+    "bi:write_an",
     "break",
-    "breaks",
+    "broken",
     "browser",
-    "budget",
     "bug",
     "build",
-    "building",
+    "bullet",
     "business",
-    "but",
     "by",
-    "caching",
     "calculator",
     "call",
-    "callback",
     "can",
     "canvas",
-    "caption",
     "captions",
     "card",
-    "care",
-    "career",
-    "cart",
-    "catch",
-    "cause",
-    "causes",
-    "caching",
-    "change",
-    "changes",
-    "chart",
-    "charts",
-    "chat",
-    "check",
-    "class",
     "clean",
-    "clear",
-    "client",
-    "cold",
+    "code",
+    "coffee",
     "color",
-    "columns",
-    "communication",
     "compare",
-    "compiles",
-    "compiling",
     "component",
     "concept",
-    "concepts",
-    "confident",
-    "connection",
-    "container",
-    "content",
-    "context",
-    "convert",
+    "concise",
     "converter",
     "copy",
-    "cors",
     "counter",
-    "country",
-    "cover",
     "create",
-    "creating",
     "css",
     "customer",
     "daily",
@@ -260,623 +196,193 @@
     "database",
     "day",
     "debug",
-    "debugging",
-    "decode",
     "design",
-    "designing",
-    "developer",
-    "development",
-    "device",
-    "did",
+    "develop",
+    "diagnose",
     "difference",
-    "differs",
-    "direct",
-    "discovery",
     "do",
-    "docker",
-    "documentation",
     "does",
-    "doesnt",
-    "doing",
-    "domain",
+    "down",
     "draft",
-    "drafting",
     "drag",
-    "drawing",
-    "drive",
-    "due",
-    "each",
     "edit",
-    "editing",
-    "editor",
-    "effect",
-    "efficient",
-    "element",
     "email",
-    "emails",
-    "encryption",
-    "engine",
-    "engineer",
+    "engaging",
     "english",
     "error",
     "errors",
-    "estimate",
     "event",
-    "every",
-    "executes",
-    "execution",
+    "executive",
     "explain",
-    "explaining",
-    "explanation",
-    "express",
     "fail",
     "fails",
-    "failure",
-    "fast",
-    "feature",
     "feedback",
-    "fetch",
     "file",
-    "files",
-    "filter",
-    "find",
     "fix",
-    "fixing",
-    "flashcard",
-    "flexbox",
-    "folder",
-    "follow",
     "for",
-    "form",
-    "format",
-    "free",
     "from",
-    "front",
     "function",
-    "functions",
     "game",
-    "garbage",
     "general",
     "generate",
     "generator",
-    "get",
-    "gift",
     "git",
+    "going",
     "good",
-    "graph",
-    "graphic",
-    "grid",
-    "group",
-    "guidance",
-    "habit",
-    "handles",
-    "handling",
-    "has",
+    "graphql",
+    "great",
     "have",
-    "headline",
-    "headlines",
+    "hello",
     "help",
-    "helper",
-    "here",
-    "hero",
     "hey",
     "hi",
-    "high",
-    "history",
+    "hobbies",
     "hook",
-    "hooks",
-    "host",
     "how",
-    "hows",
     "html",
-    "http",
-    "https",
     "i",
-    "id",
-    "idea",
     "ideas",
-    "im",
-    "implementation",
-    "improves",
     "in",
-    "includes",
     "index",
     "indexes",
-    "infinite",
-    "information",
-    "input",
-    "inputs",
-    "insight",
-    "insights",
     "interactive",
-    "interface",
-    "internal",
-    "interpreter",
     "into",
-    "introduction",
-    "invoice",
+    "invitation",
     "is",
-    "issue",
-    "issues",
     "it",
-    "item",
-    "items",
-    "its",
     "javascript",
-    "join",
+    "js",
     "json",
-    "just",
-    "keep",
-    "keeps",
     "key",
-    "keys",
-    "know",
     "landing",
-    "language",
-    "large",
     "launch",
-    "layout",
     "leak",
-    "learn",
     "learning",
-    "let",
     "letter",
-    "library",
-    "like",
-    "limit",
-    "line",
-    "link",
-    "linkedin",
-    "links",
     "list",
-    "listen",
-    "listener",
-    "live",
-    "load",
-    "loader",
-    "local",
-    "logic",
-    "log",
-    "logic",
-    "look",
-    "lookup",
+    "looking",
     "loop",
-    "loops",
+    "lot",
+    "machine",
     "make",
-    "making",
-    "markdown",
-    "matching",
     "me",
-    "mean",
-    "meaning",
-    "meaningful",
-    "mechanism",
-    "media",
     "memory",
-    "menu",
-    "merge",
     "message",
-    "method",
-    "methods",
-    "microservices",
-    "middleware",
-    "might",
-    "min",
-    "minimal",
     "mobile",
-    "modal",
-    "mode",
-    "model",
     "modern",
-    "modification",
-    "module",
-    "money",
     "more",
     "morning",
-    "mortgage",
-    "most",
-    "move",
-    "multi",
     "my",
-    "name",
-    "navigation",
     "need",
-    "needs",
     "nested",
-    "net",
-    "network",
     "new",
-    "news",
-    "newsletter",
     "next",
     "nice",
-    "no",
-    "node",
-    "nosql",
     "not",
-    "notebook",
-    "notification",
-    "number",
-    "object",
-    "objects",
+    "null",
+    "o",
     "of",
-    "off",
     "office",
     "on",
-    "one",
     "online",
-    "only",
-    "open",
-    "operating",
-    "optimization",
-    "optimize",
-    "or",
-    "order",
-    "organization",
-    "organize",
     "our",
     "out",
-    "outcome",
-    "output",
-    "overflow",
-    "overview",
     "page",
-    "pages",
-    "panel",
-    "paper",
-    "paragraph",
-    "parallelism",
-    "parameter",
-    "parameters",
-    "parse",
-    "parsing",
-    "part",
-    "particle",
-    "partner",
-    "party",
-    "pass",
-    "passes",
-    "password",
-    "path",
-    "patient",
-    "pattern",
-    "payment",
-    "pdf",
-    "performance",
-    "period",
-    "person",
-    "personal",
-    "phone",
-    "photo",
-    "pickup",
-    "picker",
-    "picture",
-    "pixel",
-    "place",
     "plain",
-    "plan",
-    "planner",
-    "planning",
-    "play",
-    "player",
-    "pls",
-    "pointer",
-    "policy",
+    "please",
+    "points",
     "polish",
-    "polishing",
-    "pomodoro",
-    "pool",
-    "pop",
     "portal",
     "position",
     "post",
-    "posts",
-    "postmessage",
-    "power",
-    "practice",
-    "press",
+    "prepare",
     "preview",
-    "price",
-    "pricing",
-    "primary",
-    "print",
-    "priority",
-    "problem",
-    "problems",
-    "process",
     "product",
-    "production",
+    "productivity",
     "professional",
-    "profile",
-    "program",
-    "programming",
-    "progress",
     "project",
-    "promo",
-    "proposal",
-    "protocol",
     "prototype",
     "public",
-    "publishing",
-    "pull",
-    "purple",
-    "push",
     "python",
-    "quality",
     "query",
-    "question",
-    "questions",
-    "queue",
     "quick",
-    "quiz",
-    "quote",
-    "quotes",
-    "random",
-    "range",
-    "rate",
-    "rebase",
-    "rebuilding",
-    "recommend",
-    "recommendation",
-    "record",
-    "recursion",
-    "reducer",
-    "refactor",
-    "refactoring",
+    "react",
     "regex",
-    "registration",
-    "regular",
-    "relational",
     "release",
     "remote",
-    "render",
     "rendering",
-    "report",
-    "repository",
-    "request",
-    "requests",
-    "require",
-    "resolution",
-    "resolve",
-    "resource",
-    "respect",
     "response",
-    "responses",
     "rest",
-    "result",
-    "results",
-    "resubmit",
-    "retry",
-    "return",
     "returns",
     "review",
-    "reviews",
     "rewrite",
-    "rewriting",
-    "right",
-    "role",
-    "routine",
-    "rule",
-    "rules",
-    "run",
-    "running",
-    "runs",
-    "rust",
-    "saas",
-    "sales",
-    "sample",
-    "sanity",
-    "save",
-    "savings",
-    "scale",
-    "scaler",
-    "scene",
-    "schedule",
-    "schema",
-    "score",
-    "scores",
-    "scraping",
-    "screen",
+    "rough",
     "script",
-    "scripts",
-    "search",
-    "section",
-    "secure",
-    "security",
-    "see",
-    "select",
-    "self",
-    "send",
-    "sender",
     "server",
-    "serverless",
-    "service",
-    "services",
-    "session",
-    "set",
-    "sets",
-    "setting",
-    "settings",
-    "setup",
-    "share",
-    "sharing",
+    "servers",
     "ship",
-    "shipping",
-    "shop",
     "short",
-    "should",
-    "show",
-    "signal",
+    "side",
     "simple",
-    "simulator",
-    "single",
     "site",
-    "sites",
-    "size",
-    "slack",
-    "small",
-    "snake",
-    "social",
-    "solution",
-    "solve",
+    "so",
+    "software",
     "some",
-    "sooner",
-    "sort",
-    "sorting",
     "sound",
-    "soundboard",
     "sounds",
     "source",
-    "space",
-    "span",
-    "speaker",
-    "speed",
-    "spell",
-    "spli",
-    "split",
     "sql",
-    "ssl",
     "stack",
-    "stage",
     "start",
-    "started",
-    "starting",
     "state",
-    "statement",
     "status",
-    "steps",
-    "stopwatch",
-    "storage",
+    "step",
     "store",
-    "story",
+    "suggestions",
+    "summarize",
+    "summary",
+    "systems",
+    "task",
+    "teach",
+    "technical",
+    "tell",
+    "terms",
+    "text",
+    "thank",
+    "thanks",
+    "that",
+    "the",
+    "this",
+    "thoughts",
+    "thread",
+    "throwing",
+    "time",
+    "timer",
+    "tips",
+    "to",
+    "today",
+    "tool",
     "trace",
-    "track",
-    "tracker",
-    "tracking",
-    "traffic",
-    "training",
-    "transcript",
-    "transfer",
-    "transform",
-    "transition",
-    "translate",
-    "transmission",
-    "tree",
-    "trigger",
-    "triggers",
-    "troubleshoot",
-    "troubleshooting",
-    "try",
-    "turn",
-    "tweet",
-    "twitter",
-    "type",
-    "typeerror",
-    "types",
+    "two",
     "typescript",
-    "ui",
-    "unable",
-    "uncaught",
+    "u",
     "undefined",
-    "understand",
-    "understanding",
-    "unequal",
-    "uniform",
     "unit",
-    "unknown",
-    "unresolved",
-    "unused",
+    "up",
     "update",
-    "updates",
-    "updating",
-    "upload",
-    "url",
-    "usage",
-    "use",
-    "used",
-    "useful",
-    "user",
-    "users",
-    "uses",
     "using",
-    "utility",
-    "valid",
-    "validate",
-    "validation",
-    "value",
-    "values",
-    "var",
-    "variable",
-    "variables",
-    "version",
-    "via",
-    "video",
-    "view",
-    "viewing",
-    "views",
-    "vip",
-    "visual",
-    "visualizer",
-    "vite",
-    "vk",
-    "voice",
-    "volume",
-    "vote",
-    "vulnerability",
-    "walker",
-    "want",
-    "was",
-    "water",
-    "way",
-    "ways",
+    "versus",
     "web",
-    "webhook",
-    "webhooks",
     "website",
-    "weekend",
-    "welcome",
     "what",
-    "whats",
     "when",
-    "where",
-    "which",
-    "while",
-    "who",
     "why",
     "widget",
-    "width",
-    "win",
-    "window",
     "with",
-    "within",
-    "without",
-    "word",
-    "words",
     "work",
-    "worker",
-    "working",
-    "workout",
-    "works",
-    "workspace",
-    "world",
-    "would",
-    "wrap",
     "write",
-    "writer",
-    "writes",
-    "writing",
-    "written",
-    "wrong",
-    "xml",
-    "year",
-    "yielding",
     "you",
-    "your",
-    "yours",
-    "yourself",
-    "z",
-    "zero",
-    "zone"
+    "your"
   ],
   "classDocumentCounts": {
     "app": 40,
@@ -894,154 +400,2604 @@
   },
   "tokenLogLikelihoods": {
     "a": {
-      "app": -4.01258,
-      "code-help": -4.85123,
-      "explanation": -4.51234,
-      "general": -4.21234,
-      "writing": -4.11234
+      "app": -3.01972777911,
+      "code-help": -4.662090476241,
+      "explanation": -4.922896379788,
+      "general": -4.066693030892,
+      "writing": -3.568123252978
+    },
+    "about": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -4.855150391256,
+      "writing": -5.870708345972
+    },
+    "addresses": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "after": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "am": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.07829394257,
+      "writing": -6.563855526532
+    },
+    "an": {
+      "app": -4.783316371372,
+      "code-help": -5.914853444736,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -4.617945377477
+    },
+    "and": {
+      "app": -4.965637928166,
+      "code-help": -4.816241156068,
+      "explanation": -3.967384934761,
+      "general": -5.07829394257,
+      "writing": -4.617945377477
+    },
+    "announcement": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "answer": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.77144112313,
+      "writing": -5.870708345972
+    },
+    "any": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "api": {
+      "app": -6.5750758406,
+      "code-help": -4.998562712862,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
     },
     "app": {
-      "app": -3.12345,
-      "code-help": -7.21234,
-      "explanation": -7.21234,
-      "general": -7.21234,
-      "writing": -7.21234
+      "app": -4.010126483138,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "application": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "arcade": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "are": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.146039931102,
+      "general": -4.38514676201,
+      "writing": -6.563855526532
+    },
+    "article": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "at": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -5.77144112313,
+      "writing": -6.563855526532
+    },
+    "be": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "between": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -4.586424143167,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:a_customer": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "bi:a_landing": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:a_lot": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "bi:a_modern": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:a_prototype": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:a_quick": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "bi:a_rough": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "bi:a_simple": {
+      "app": -4.965637928166,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:after_a": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "bi:an_interactive": {
+      "app": -5.18878147948,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:and_build": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:and_how": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.146039931102,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:api_response": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:app_for": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:app_with": {
+      "app": -4.965637928166,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:arcade_game": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:are_some": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "bi:break_down": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -4.922896379788,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:build_a": {
+      "app": -4.49563429892,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:bullet_points": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "bi:calculator_tool": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:can_i": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -6.532334292222,
+      "general": -5.77144112313,
+      "writing": -6.563855526532
+    },
+    "bi:can_you": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -5.839187111662,
+      "general": -5.365976015022,
+      "writing": -5.870708345972
+    },
+    "bi:captions_for": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "bi:code_and": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:copy_for": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.177561165412
+    },
+    "bi:create_a": {
+      "app": -4.629165691544,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:database_indexes": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:debug_why": {
+      "app": -6.5750758406,
+      "code-help": -5.221706264176,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:design_a": {
+      "app": -4.965637928166,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:develop_a": {
+      "app": -5.18878147948,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:diagnose_why": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:difference_between": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -4.586424143167,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:do_i": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "bi:does_my": {
+      "app": -6.5750758406,
+      "code-help": -4.816241156068,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:down_how": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -4.922896379788,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:draft_a": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -4.772096057304
+    },
+    "bi:draft_an": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.177561165412
+    },
+    "bi:edit_this": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "bi:email_to": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "bi:error_in": {
+      "app": -6.5750758406,
+      "code-help": -5.221706264176,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:explain_database": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:explain_how": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:explain_the": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:explain_why": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "bi:fails_to": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:fix_this": {
+      "app": -6.5750758406,
+      "code-help": -5.221706264176,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:for_a": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.77144112313,
+      "writing": -4.484413984852
+    },
+    "bi:for_me": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.77144112313,
+      "writing": -6.563855526532
+    },
+    "bi:for_my": {
+      "app": -4.629165691544,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.77144112313,
+      "writing": -5.870708345972
+    },
+    "bi:for_our": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.177561165412
+    },
+    "bi:for_product": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "bi:for_this": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:game_for": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:generate_a": {
+      "app": -4.965637928166,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:generator_tool": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:have_a": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -4.855150391256,
+      "writing": -6.563855526532
+    },
+    "bi:help_debug": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:help_me": {
+      "app": -6.5750758406,
+      "code-help": -5.221706264176,
+      "explanation": -6.532334292222,
+      "general": -5.77144112313,
+      "writing": -5.870708345972
+    },
+    "bi:how_can": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -6.532334292222,
+      "general": -5.77144112313,
+      "writing": -6.563855526532
+    },
+    "bi:how_do": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -5.146039931102,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "bi:how_does": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -4.740574822994,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:how_web": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:i_am": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.07829394257,
+      "writing": -6.563855526532
+    },
+    "bi:i_have": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.07829394257,
+      "writing": -6.563855526532
+    },
+    "bi:i_need": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.77144112313,
+      "writing": -6.563855526532
+    },
+    "bi:in_javascript": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:in_my": {
+      "app": -6.5750758406,
+      "code-help": -5.221706264176,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:in_plain": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "bi:in_simple": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:in_the": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:indexes_in": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:is_my": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:is_the": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -4.740574822994,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:is_your": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "bi:landing_page": {
+      "app": -4.965637928166,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "bi:launch_email": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "bi:letter_for": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.177561165412
+    },
+    "bi:machine_learning": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:make_a": {
+      "app": -4.965637928166,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:me_a": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "bi:me_how": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:me_the": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:memory_leak": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:message_for": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "bi:my_python": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:page_for": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:plain_english": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "bi:polish_this": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.177561165412
+    },
+    "bi:portal_with": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:python_script": {
+      "app": -6.5750758406,
+      "code-help": -5.221706264176,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:remote_work": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.77144112313,
+      "writing": -5.870708345972
+    },
+    "bi:rest_api": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:returns_null": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:review_this": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "bi:rewrite_this": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -4.484413984852
+    },
+    "bi:script_that": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:server_side": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:ship_a": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:side_rendering": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:simple_terms": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:some_general": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "bi:stack_trace": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:summarize_this": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.177561165412
+    },
+    "bi:teach_me": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -4.740574822994,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:tell_me": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -6.532334292222,
+      "general": -5.77144112313,
+      "writing": -6.563855526532
+    },
+    "bi:text_to": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "bi:thank_you": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "bi:thanks_a": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "bi:the_difference": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -4.586424143167,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:this_broken": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:this_react": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:this_technical": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "bi:to_be": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "bi:to_sound": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "bi:to_start": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "bi:tool_app": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:web_app": {
+      "app": -5.18878147948,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:web_application": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:website_with": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:what_are": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.146039931102,
+      "general": -4.672828834462,
+      "writing": -6.563855526532
+    },
+    "bi:what_is": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -4.452892750543,
+      "general": -5.77144112313,
+      "writing": -6.563855526532
+    },
+    "bi:why_do": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.146039931102,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:why_does": {
+      "app": -6.5750758406,
+      "code-help": -4.528559083616,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:why_is": {
+      "app": -6.5750758406,
+      "code-help": -5.221706264176,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:why_my": {
+      "app": -6.5750758406,
+      "code-help": -5.221706264176,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:why_this": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:widget_with": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:with_drag": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bi:write_a": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.177561165412
+    },
+    "bi:write_an": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "break": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -4.922896379788,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "broken": {
+      "app": -6.5750758406,
+      "code-help": -5.221706264176,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "browser": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "bug": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
     },
     "build": {
-      "app": -3.23456,
-      "code-help": -7.21234,
-      "explanation": -7.21234,
-      "general": -7.21234,
-      "writing": -7.21234
+      "app": -4.272490747606,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -5.77144112313,
+      "writing": -6.563855526532
+    },
+    "bullet": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "business": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "by": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "calculator": {
+      "app": -4.783316371372,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "call": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "can": {
+      "app": -5.476463551932,
+      "code-help": -5.914853444736,
+      "explanation": -5.839187111662,
+      "general": -4.855150391256,
+      "writing": -5.870708345972
+    },
+    "canvas": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "captions": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "card": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "clean": {
+      "app": -5.88192866004,
+      "code-help": -5.914853444736,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
     },
     "code": {
-      "app": -7.21234,
-      "code-help": -3.34567,
-      "explanation": -7.21234,
-      "general": -7.21234,
-      "writing": -7.21234
+      "app": -6.5750758406,
+      "code-help": -4.998562712862,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "coffee": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "color": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "compare": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.146039931102,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "component": {
+      "app": -6.5750758406,
+      "code-help": -5.221706264176,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "concept": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.839187111662,
+      "general": -5.77144112313,
+      "writing": -6.563855526532
+    },
+    "concise": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "converter": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "copy": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -4.617945377477
+    },
+    "counter": {
+      "app": -5.476463551932,
+      "code-help": -5.914853444736,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
     },
     "create": {
-      "app": -3.45678,
-      "code-help": -7.21234,
-      "explanation": -7.21234,
-      "general": -7.21234,
-      "writing": -7.21234
+      "app": -4.629165691544,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "css": {
+      "app": -6.5750758406,
+      "code-help": -5.221706264176,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "customer": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.177561165412
+    },
+    "daily": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.77144112313,
+      "writing": -6.563855526532
+    },
+    "dashboard": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "data": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "database": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "day": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
     },
     "debug": {
-      "app": -7.21234,
-      "code-help": -3.45678,
-      "explanation": -7.21234,
-      "general": -7.21234,
-      "writing": -7.21234
+      "app": -6.5750758406,
+      "code-help": -4.662090476241,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "design": {
+      "app": -4.629165691544,
+      "code-help": -6.608000625296,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "develop": {
+      "app": -4.965637928166,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "diagnose": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "difference": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -4.586424143167,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "do": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -4.586424143167,
+      "general": -4.855150391256,
+      "writing": -6.563855526532
+    },
+    "does": {
+      "app": -6.5750758406,
+      "code-help": -4.528559083616,
+      "explanation": -4.586424143167,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "down": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -4.922896379788,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
     },
     "draft": {
-      "app": -7.21234,
-      "code-help": -7.21234,
-      "explanation": -7.21234,
-      "general": -7.21234,
-      "writing": -3.23456
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -3.85580532543
+    },
+    "drag": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "edit": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.177561165412
+    },
+    "email": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -4.165960253734
+    },
+    "engaging": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "english": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "error": {
+      "app": -6.5750758406,
+      "code-help": -4.662090476241,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "errors": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "event": {
+      "app": -5.88192866004,
+      "code-help": -5.509388336628,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "executive": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
     },
     "explain": {
-      "app": -6.51234,
-      "code-help": -6.51234,
-      "explanation": -3.12345,
-      "general": -7.21234,
-      "writing": -6.51234
+      "app": -5.88192866004,
+      "code-help": -5.221706264176,
+      "explanation": -4.229749199228,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "fail": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "fails": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "feedback": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "file": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
     },
     "fix": {
-      "app": -7.21234,
-      "code-help": -3.12345,
-      "explanation": -7.21234,
-      "general": -7.21234,
-      "writing": -7.21234
+      "app": -6.5750758406,
+      "code-help": -3.899950424194,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "for": {
+      "app": -4.010126483138,
+      "code-help": -5.221706264176,
+      "explanation": -5.839187111662,
+      "general": -4.162003210696,
+      "writing": -3.568123252978
+    },
+    "from": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "function": {
+      "app": -6.5750758406,
+      "code-help": -4.816241156068,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "game": {
+      "app": -4.965637928166,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
     },
     "general": {
-      "app": -7.21234,
-      "code-help": -7.21234,
-      "explanation": -7.21234,
-      "general": -3.23456,
-      "writing": -7.21234
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -4.162003210696,
+      "writing": -6.563855526532
+    },
+    "generate": {
+      "app": -4.965637928166,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "generator": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "git": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "going": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "good": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.07829394257,
+      "writing": -6.563855526532
+    },
+    "graphql": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "great": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "have": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -4.855150391256,
+      "writing": -6.563855526532
+    },
+    "hello": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.07829394257,
+      "writing": -6.563855526532
+    },
+    "help": {
+      "app": -6.5750758406,
+      "code-help": -4.816241156068,
+      "explanation": -6.532334292222,
+      "general": -5.07829394257,
+      "writing": -5.870708345972
+    },
+    "hey": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "hi": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "hobbies": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "hook": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
     },
     "how": {
-      "app": -7.21234,
-      "code-help": -5.12345,
-      "explanation": -3.56789,
-      "general": -5.12345,
-      "writing": -7.21234
+      "app": -6.5750758406,
+      "code-help": -5.221706264176,
+      "explanation": -3.641962534326,
+      "general": -4.672828834462,
+      "writing": -6.563855526532
+    },
+    "html": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "i": {
+      "app": -5.88192866004,
+      "code-help": -5.509388336628,
+      "explanation": -5.839187111662,
+      "general": -3.979681653902,
+      "writing": -6.563855526532
+    },
+    "ideas": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "in": {
+      "app": -5.476463551932,
+      "code-help": -3.968943295681,
+      "explanation": -4.047427642434,
+      "general": -5.77144112313,
+      "writing": -5.870708345972
+    },
+    "index": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "indexes": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "interactive": {
+      "app": -5.18878147948,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "into": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -4.954417614098
+    },
+    "invitation": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "is": {
+      "app": -6.5750758406,
+      "code-help": -4.816241156068,
+      "explanation": -4.229749199228,
+      "general": -5.07829394257,
+      "writing": -6.563855526532
+    },
+    "it": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -5.839187111662,
+      "general": -5.77144112313,
+      "writing": -5.465243237864
+    },
+    "javascript": {
+      "app": -5.88192866004,
+      "code-help": -5.221706264176,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "js": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "json": {
+      "app": -6.5750758406,
+      "code-help": -5.221706264176,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "key": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.839187111662,
+      "general": -5.77144112313,
+      "writing": -5.870708345972
     },
     "landing": {
-      "app": -3.89012,
-      "code-help": -7.21234,
-      "explanation": -7.21234,
-      "general": -7.21234,
-      "writing": -5.12345
+      "app": -4.965637928166,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "launch": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -4.954417614098
+    },
+    "leak": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "learning": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -5.433722003554,
+      "general": -5.77144112313,
+      "writing": -6.563855526532
+    },
+    "letter": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -4.954417614098
+    },
+    "list": {
+      "app": -5.88192866004,
+      "code-help": -5.914853444736,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "looking": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "loop": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "lot": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "machine": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
     },
     "make": {
-      "app": -3.45678,
-      "code-help": -7.21234,
-      "explanation": -7.21234,
-      "general": -7.21234,
-      "writing": -7.21234
+      "app": -4.629165691544,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "me": {
+      "app": -5.476463551932,
+      "code-help": -4.998562712862,
+      "explanation": -4.740574822994,
+      "general": -4.672828834462,
+      "writing": -5.465243237864
+    },
+    "memory": {
+      "app": -5.88192866004,
+      "code-help": -5.509388336628,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "message": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.177561165412
+    },
+    "mobile": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "modern": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "more": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.77144112313,
+      "writing": -5.465243237864
+    },
+    "morning": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "my": {
+      "app": -4.629165691544,
+      "code-help": -3.7176288674,
+      "explanation": -6.532334292222,
+      "general": -4.855150391256,
+      "writing": -5.465243237864
+    },
+    "need": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "nested": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "new": {
+      "app": -5.88192866004,
+      "code-help": -5.914853444736,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -5.870708345972
+    },
+    "next": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "nice": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "not": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -5.77144112313,
+      "writing": -6.563855526532
+    },
+    "null": {
+      "app": -6.5750758406,
+      "code-help": -5.221706264176,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "o": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "of": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -4.922896379788,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "office": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.77144112313,
+      "writing": -5.870708345972
+    },
+    "on": {
+      "app": -6.5750758406,
+      "code-help": -4.816241156068,
+      "explanation": -6.532334292222,
+      "general": -5.07829394257,
+      "writing": -6.563855526532
+    },
+    "online": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.77144112313,
+      "writing": -6.563855526532
+    },
+    "our": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -4.954417614098
+    },
+    "out": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.77144112313,
+      "writing": -5.870708345972
     },
     "page": {
-      "app": -3.56789,
-      "code-help": -7.21234,
-      "explanation": -7.21234,
-      "general": -7.21234,
-      "writing": -5.12345
+      "app": -4.629165691544,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "plain": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "please": {
+      "app": -5.88192866004,
+      "code-help": -5.914853444736,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "points": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "polish": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -4.954417614098
+    },
+    "portal": {
+      "app": -4.965637928166,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "position": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "post": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "prepare": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "preview": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "product": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "productivity": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -5.870708345972
+    },
+    "professional": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "project": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.77144112313,
+      "writing": -5.870708345972
+    },
+    "prototype": {
+      "app": -5.476463551932,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "public": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.839187111662,
+      "general": -5.77144112313,
+      "writing": -6.563855526532
+    },
+    "python": {
+      "app": -6.5750758406,
+      "code-help": -4.998562712862,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "query": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "quick": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
     },
     "react": {
-      "app": -6.12345,
-      "code-help": -3.89012,
-      "explanation": -7.21234,
-      "general": -7.21234,
-      "writing": -7.21234
+      "app": -5.88192866004,
+      "code-help": -4.998562712862,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "regex": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "release": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.177561165412
+    },
+    "remote": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.77144112313,
+      "writing": -5.870708345972
+    },
+    "rendering": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "response": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "rest": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "returns": {
+      "app": -6.5750758406,
+      "code-help": -5.221706264176,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "review": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -4.954417614098
     },
     "rewrite": {
-      "app": -7.21234,
-      "code-help": -7.21234,
-      "explanation": -7.21234,
-      "general": -7.21234,
-      "writing": -3.34567
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -4.366630949196
+    },
+    "rough": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "script": {
+      "app": -6.5750758406,
+      "code-help": -5.221706264176,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "server": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "servers": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "ship": {
+      "app": -5.18878147948,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "short": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "side": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "simple": {
+      "app": -4.965637928166,
+      "code-help": -6.608000625296,
+      "explanation": -5.146039931102,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "site": {
+      "app": -5.18878147948,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "so": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -5.870708345972
+    },
+    "software": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.77144112313,
+      "writing": -5.870708345972
+    },
+    "some": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -4.855150391256,
+      "writing": -6.563855526532
+    },
+    "sound": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "sounds": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.77144112313,
+      "writing": -5.870708345972
+    },
+    "source": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "sql": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "stack": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "start": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "state": {
+      "app": -5.476463551932,
+      "code-help": -5.221706264176,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "status": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "step": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "store": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "suggestions": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
     },
     "summarize": {
-      "app": -7.21234,
-      "code-help": -7.21234,
-      "explanation": -7.21234,
-      "general": -7.21234,
-      "writing": -3.56789
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -4.772096057304
+    },
+    "summary": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "systems": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "task": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.77144112313,
+      "writing": -6.563855526532
+    },
+    "teach": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -4.740574822994,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "technical": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.465243237864
+    },
+    "tell": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -6.532334292222,
+      "general": -5.77144112313,
+      "writing": -6.563855526532
+    },
+    "terms": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "text": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -4.772096057304
+    },
+    "thank": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "thanks": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -4.855150391256,
+      "writing": -6.563855526532
+    },
+    "that": {
+      "app": -5.88192866004,
+      "code-help": -5.221706264176,
+      "explanation": -6.532334292222,
+      "general": -4.855150391256,
+      "writing": -6.563855526532
+    },
+    "the": {
+      "app": -5.476463551932,
+      "code-help": -4.998562712862,
+      "explanation": -3.893276962607,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "this": {
+      "app": -6.5750758406,
+      "code-help": -3.77478728124,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -3.730642182476
+    },
+    "thoughts": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
+    },
+    "thread": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "throwing": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "time": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "timer": {
+      "app": -5.18878147948,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "tips": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -5.870708345972
+    },
+    "to": {
+      "app": -6.5750758406,
+      "code-help": -4.528559083616,
+      "explanation": -4.740574822994,
+      "general": -3.979681653902,
+      "writing": -4.165960253734
+    },
+    "today": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.365976015022,
+      "writing": -6.563855526532
     },
     "tool": {
-      "app": -3.56789,
-      "code-help": -7.21234,
-      "explanation": -7.21234,
-      "general": -7.21234,
-      "writing": -7.21234
+      "app": -4.49563429892,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "trace": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "two": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "typescript": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "u": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -5.77144112313,
+      "writing": -6.563855526532
+    },
+    "undefined": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "unit": {
+      "app": -5.88192866004,
+      "code-help": -5.914853444736,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "up": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "update": {
+      "app": -6.5750758406,
+      "code-help": -5.914853444736,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "using": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -5.839187111662,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "versus": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.433722003554,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "web": {
+      "app": -4.629165691544,
+      "code-help": -5.914853444736,
+      "explanation": -4.922896379788,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "website": {
+      "app": -4.965637928166,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
     },
     "what": {
-      "app": -7.21234,
-      "code-help": -7.21234,
-      "explanation": -3.45678,
-      "general": -4.56789,
-      "writing": -7.21234
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -4.047427642434,
+      "general": -4.066693030892,
+      "writing": -6.563855526532
+    },
+    "when": {
+      "app": -6.5750758406,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -5.77144112313,
+      "writing": -6.563855526532
     },
     "why": {
-      "app": -7.21234,
-      "code-help": -3.45678,
-      "explanation": -4.12345,
-      "general": -7.21234,
-      "writing": -7.21234
+      "app": -6.5750758406,
+      "code-help": -3.7176288674,
+      "explanation": -4.586424143167,
+      "general": -6.46458830369,
+      "writing": -5.870708345972
+    },
+    "widget": {
+      "app": -4.629165691544,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -6.563855526532
+    },
+    "with": {
+      "app": -4.090169190812,
+      "code-help": -6.608000625296,
+      "explanation": -5.839187111662,
+      "general": -5.07829394257,
+      "writing": -5.870708345972
+    },
+    "work": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -5.146039931102,
+      "general": -5.365976015022,
+      "writing": -5.870708345972
     },
     "write": {
-      "app": -7.21234,
-      "code-help": -7.21234,
-      "explanation": -7.21234,
-      "general": -7.21234,
-      "writing": -3.45678
+      "app": -5.88192866004,
+      "code-help": -5.509388336628,
+      "explanation": -6.532334292222,
+      "general": -6.46458830369,
+      "writing": -4.165960253734
+    },
+    "you": {
+      "app": -5.88192866004,
+      "code-help": -6.608000625296,
+      "explanation": -5.839187111662,
+      "general": -4.066693030892,
+      "writing": -5.870708345972
+    },
+    "your": {
+      "app": -6.5750758406,
+      "code-help": -6.608000625296,
+      "explanation": -6.532334292222,
+      "general": -4.518678154635,
+      "writing": -6.563855526532
     }
   },
   "minConfidence": 0.55,
   "maxOovRatio": 0.7,
-  "trainingDataSha256": "4b971aef426177ebf977bfb3cb47814b62dbbb8c1efc4ddfbf7e7e60d3d5fdf6"
+  "trainingDataSha256": "0a5e734c97b17238df53610684e99b39603ad0697bd795f0e51761bd87d0bdbd"
 }

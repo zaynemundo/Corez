@@ -380,7 +380,9 @@ function runCLI() {
     if (fs.existsSync(tmpPath)) {
       try {
         fs.unlinkSync(tmpPath);
-      } catch {}
+      } catch (cleanupErr) {
+        console.warn(`Failed to clean up temporary file ${tmpPath}:`, cleanupErr);
+      }
     }
     throw err;
   }
