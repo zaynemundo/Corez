@@ -4,115 +4,71 @@
 - **Date:** 2026-07-18
 - **Status:** For User Review
 - **Author:** AGY
-- **Target Stack:** Cloudflare Workers, Cloudflare Workflows, Cloudflare D1, Workers AI (`@cf/zai-org/glm-4.7-flash`)
+- **Target Worker:** `ai` (`./worker/index.js`)
+- **Target Endpoints:** `POST /api/ai/jobs`, `GET /api/ai/jobs/:jobId` (Preserving `POST /api/ai`)
+- **Target Stack:** Cloudflare Workers, Cloudflare Workflows, Cloudflare D1, Workers AI (`@cf/zai-org/glm-4.7-flash`), Workers Rate Limiting
 
 ---
 
 ## 1. Executive Summary & Objective
 
 ### 1.1 Objective
-Provide an implementation-ready design for durable, anonymous, background AI jobs powered by **Cloudflare Workflows** and **Cloudflare D1**. 
+Provide an implementation-ready design for durable, anonymous, background AI jobs for the Cloudflare Worker named `ai` (entrypoint `./worker/index.js`). 
 
-Currently, synchronous AI requests bound to `POST /api/ai` block the client interface and are vulnerable to request timeouts, tab closes, and page refreshes. This specification shifts frontend interaction to an asynchronous job-based architecture where prompt submission creates a durable job managed by Cloudflare Workflows, persisted in D1, and polled securely via client-held capability tokens.
+Synchronous requests to `POST /api/ai` block the client interface and remain susceptible to network timeouts, tab closures, and page reloads. This specification transitions client interaction to an asynchronous job pipeline powered by **Cloudflare Workflows** and **Cloudflare D1**.
+
+Job creation is accessed at `POST /api/ai/jobs` and status polling at `GET /api/ai/jobs/:jobId`. Client requests generate UUID job IDs and 256-bit capability tokens prior to transmission. The background execution runs on Cloudflare Workflows, persists state to D1, and delivers resilient recovery across browser reloads.
 
 ### 1.2 Non-Goals & Scope Boundaries
-- **No Cross-Device Account Syncing:** Anonymous jobs are strictly scoped to local device storage (`localStorage`). No account system or cross-device session syncing is introduced.
-- **No Job Cancellation in v1:** Explicit cancellation endpoints (`DELETE /api/jobs/:id` or cancel buttons) are out of scope for v1. Workflows run to terminal state (`completed` or `failed`).
-- **No OpenRouter Model Implementation:** The active provider for background jobs remains the free-tier Workers AI binding (`env.AI`) using `@cf/zai-org/glm-4.7-flash`. The OpenRouter `deepseek/deepseek-v4-pro` specification is not implemented in this pipeline.
-- **No Removal of `POST /api/ai`:** The existing synchronous `POST /api/ai` endpoint is preserved as-is for backwards compatibility and fallback execution.
-- **Unverified Implementation File Scope:** Exact codebase file modifications (e.g. specific Worker or React component files) will be verified and authorized when implementation phase begins.
+- **No Cross-Device Account Syncing:** Anonymous jobs are strictly scoped to local device storage (`localStorage`). No user accounts or cross-device state syncing are introduced.
+- **No Job Cancellation in v1:** Cancellation endpoints (`DELETE /api/ai/jobs/:jobId` or cancel UI triggers) are out of scope for v1. Workflows run to a terminal state (`completed` or `failed`).
+- **No OpenRouter Model Implementation:** The active provider for background jobs remains the free-tier Workers AI binding (`env.AI`) using `@cf/zai-org/glm-4.7-flash`. The OpenRouter `deepseek/deepseek-v4-pro` specification is not implemented in this active pipeline.
+- **No Removal of Synchronous `POST /api/ai`:** The existing `POST /api/ai` route remains intact and operational for legacy or fallback synchronous invocation.
+
+### 1.3 Official Cloudflare Reference Links
+- [Cloudflare Workflows Documentation](https://developers.cloudflare.com/workflows/)
+- [Cloudflare Workflows Rules & Retries](https://developers.cloudflare.com/workflows/build/rules-of-workflows/)
+- [Cloudflare Workflows Limits & Pricing](https://developers.cloudflare.com/workflows/platform/limits/)
+- [Cloudflare D1 Documentation](https://developers.cloudflare.com/d1/)
+- [Cloudflare Workers Web Crypto API](https://developers.cloudflare.com/workers/runtime-apis/web-crypto/)
+- [Cloudflare Workers Rate Limiting](https://developers.cloudflare.com/workers/runtime-apis/rate-limiting/)
+- [Cloudflare Wrangler Configuration](https://developers.cloudflare.com/workers/wrangler/configuration/)
 
 ---
 
 ## 2. Core Architectural Decisions
 
-| Decision Area | Specification Rule | Justification |
+| Decision Area | Specification Rule | Justification / Technical Details |
 | :--- | :--- | :--- |
-| **Input Availability** | Immediate input re-enable upon submission. Prompt field clears and unlocks instantly. | Eliminates UI blocking; allows users to compose and submit multiple prompts concurrently. |
-| **Message Statuses** | Granular per-message states: `queued` → `running` → `completed` \| `failed`. | Provides clear visual indicators per chat message bubble without modal overlays. |
-| **Resilience & Survival** | Survives tab close, page refresh, and browser navigation. | Workflow executes independently on Cloudflare edge; client reconnects via `localStorage` registry. |
-| **Context Scoping** | Tied to exact `conversation_id` in client state and D1 table. | Restores pending/completed messages into their correct conversation threads upon reload. |
-| **Concurrency** | Supports multiple simultaneous background jobs per user session. | Workflows execute in parallel; D1 rows and capability tokens isolate job state. |
-| **Security & Tokens** | High-entropy capability token stored ONLY in client `localStorage`. D1 stores ONLY `token_hash` (SHA-256). | Prevents unauthorized status querying without session authentication or database leaks exposing tokens. |
-| **Token Transport** | Transmitted via `X-Job-Token` HTTP header. NEVER in URL query strings. | Avoids leaking tokens in browser history, proxy access logs, or referrer headers. |
-| **Privacy & Logging** | Strict Zero-Log Policy for prompts, results, and capability tokens. | Protects user confidentiality; logs record only job metadata (`job_id`, status, duration, error codes). |
-| **Data Retention** | Exact **24-hour retention** (`expires_at = created_at + 86400`). Purged via Scheduled Worker. | Limits D1 storage growth while giving users ample time to retrieve background completions. |
-| **Failure Handling** | Display generic error UI. Retrying creates a **brand new job** (`POST /api/jobs`). | Raw errors stay hidden for security; retries receive fresh job IDs, tokens, and workflow instances. |
-| **Polling Strategy** | Bounded exponential backoff (1s → 2s → 4s → max 10s) + immediate sync on page load/focus. | Balances real-time responsiveness with minimal edge request volume. |
-| **AI Provider** | Provider-neutral Workflow step; active default `@cf/zai-org/glm-4.7-flash` (`env.AI`). | Decouples job orchestration from LLM backend selection. |
+| **Worker Identity** | Worker name `ai`, main entrypoint `./worker/index.js`. | Aligns strictly with repository configuration and Wrangler environment specifications. |
+| **API Endpoints** | `POST /api/ai/jobs` (Creation) and `GET /api/ai/jobs/:jobId` (Polling). | Namespaced under `/api/ai/jobs` while leaving synchronous `POST /api/ai` unchanged. |
+| **Pre-POST Persistence** | Client MUST generate UUID `jobId`, 256-bit capability token, session ID, message IDs, and prompt, persisting all to `localStorage` **before** dispatching `POST`. | Guarantees local state integrity if network drops during or immediately after request dispatch. |
+| **Idempotency & Workflow ID** | Client-generated UUID `jobId` serves as the required idempotency key and Workflow instance ID (`env.AI_JOB_WORKFLOW.create({ id: jobId, params })`). | Prevents duplicate workflow execution on network retry; enables safe recovery from partial failures. |
+| **Security & Token Hash** | High-entropy capability token stored ONLY in client `localStorage`. D1 stores ONLY `token_hash = SHA-256(token)`. | Plain tokens are never written to D1. Unsalted SHA-256 safety depends strictly on 256-bit entropy (making rainbow/pre-image attacks computationally infeasible). |
+| **Token Transport** | Transmitted exclusively via `X-Job-Token` HTTP header. NEVER in URL query strings. | Avoids leaking capability tokens in browser history, proxy access logs, or referrer headers. |
+| **Timing-Safe Auth & 404 Security** | Load D1 row by `jobId` primary key, compute SHA-256 of header token, and compare equal-length bytes with `crypto.subtle.timingSafeEqual()`. Return exact same generic `404 Not Found` for missing, expired, or unauthorized requests. | Prevents timing side-channels and stops unauthorized callers from probing whether a `jobId` exists in D1. |
+| **Retention Policy** | Retention is **exactly 24 hours after `terminal_at`** (not `created_at`). | Jobs remain accessible for 24 hours after finishing. API enforces logical expiry; hourly cron executes physical `DELETE`. |
+| **Stuck Active Job Repair** | Scheduled maintenance query marks active jobs (`queued`/`running`) stuck past a threshold (e.g., 30 min) as `failed` with `terminal_at = unixepoch()`. | Prevents orphaned jobs from remaining in non-terminal states indefinitely if a worker crashes unexpectedly. |
+| **Workflow Timing & Retries** | Use documented Cloudflare Workflow guidance: 5 attempts (4 retries), 10s exponential backoff, 10m per-attempt timeout. | Accommodates empirical GLM latency (GLM-4.7-Flash has taken ~120s in diagnostic testing) without premature timeouts. |
+| **Recovered Results UI** | Sync all pending jobs on mount/focus. Update matching placeholder if present; otherwise render to a deterministic "Recovered Results" area without stealing focus. Dedupe `jobId` globally. | Ensures UI stays responsive and background completions are recovered across tabs/reloads cleanly. |
+| **Local Session Lifecycle** | Deleting a local session/conversation NEVER deletes background execution or D1 records. Token secrets are removed from `localStorage` ONLY after terminal state is saved to chat history. | Guarantees background work completes reliably; avoids loss of credentials before reconciliation. |
+| **Strict Zero-Log Policy** | NEVER log conversation IDs, IP addresses, prompt text, result text, HTTP headers, request/response bodies, or capability tokens. | Complete privacy enforcement across Cloudflare Worker console logs, tail logs, and metrics. |
+| **Validation & Rate Limiting** | Validate UTF-8 byte limits on prompt (max 100,000 bytes UTF-8); bound result storage. Use Cloudflare Workers Rate Limiting binding (`env.RATE_LIMITER`). | All rate limits, timeouts, and retention values are labeled as **tunable / per-location**. |
 
 ---
 
-## 3. System Architecture & Component Interaction Flow
+## 3. Cloudflare Bindings & Configuration
 
-### 3.1 Component Diagram
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│ Browser / Client (React App)                                           │
-│ ┌──────────────────────┐  ┌───────────────────────────────────────────┐ │
-│ │ Immediate UI Input   │  │ LocalStorage Job Registry                 │ │
-│ │ (Re-enabled on submit)│  │ { job_id, capability_token, conv_id }     │ │
-│ └──────────┬───────────┘  └─────────────────────┬─────────────────────┘ │
-└────────────┼────────────────────────────────────┼───────────────────────┘
-             │ 1. POST /api/jobs                  │ 3. GET /api/jobs/:id
-             │    Header: X-Job-Token             │    Header: X-Job-Token
-             ▼                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│ Cloudflare Worker API Layer (`/api/jobs`)                               │
-│  - Hashes X-Job-Token with SHA-256                                     │
-│  - Validates payload size (max 100KB) & rate limits                    │
-│  - Writes initial D1 record (`queued`)                                  │
-│  - Triggers Cloudflare Workflow (`env.AI_JOB_WORKFLOW.create()`)        │
-└────────────┬────────────────────────────────────┬───────────────────────┘
-             │ Spawns Execution                   │ Reads Job State
-             ▼                                    ▼
-┌──────────────────────────────┐         ┌────────────────────────────────┐
-│ Cloudflare Workflow Engine   │         │ Cloudflare D1 Database (`jobs`)│
-│ ┌──────────────────────────┐ │ Writes  │ ┌────────────────────────────┐ │
-│ │ Step 1: Mark `running`   ├─┼─────────┼─► status = 'running'         │ │
-│ └──────────┬───────────────┘ │         │ ├────────────────────────────┤ │
-│            ▼                 │         │ │ token_hash = SHA256(token) │ │
-│ ┌──────────────────────────┐ │         │ ├────────────────────────────┤ │
-│ │ Step 2: Call Workers AI  │ │         │ │ prompt_text, result_text   │ │
-│ │ (@cf/zai-org/glm-4.7-fl) │ │         │ ├────────────────────────────┤ │
-│ └──────────┬───────────────┘ │ Writes  │ │ expires_at = NOW + 86400s   │ │
-│            ▼                 │         │ └────────────────────────────┘ │
-│ ┌──────────────────────────┐ │         │                                │
-│ │ Step 3: Mark `completed` ├─┼─────────┘                                │
-│ │ or `failed`              │ │                                          │
-│ └──────────────────────────┘ │                                          │
-└──────────────────────────────┘                                          │
-                                                                          │
-┌─────────────────────────────────────────────────────────────────────────┐
-│ Cloudflare Scheduled Cron Trigger (Every 1 Hour)                        │
-│  - Runs `DELETE FROM jobs WHERE expires_at <= unixepoch()`              │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-### 3.2 Sequence Walkthrough
-
-1. **Submission:** User enters a prompt and submits. Client generates a 256-bit high-entropy capability token (`job_sec_...`).
-2. **Job Creation:** Client sends `POST /api/jobs` containing prompt, `conversation_id`, and `X-Job-Token` header.
-3. **Immediate Unblock:** Worker hashes token (`SHA-256`), inserts D1 row with status `queued`, triggers Workflow, and returns `{ job_id, status: "queued", expires_at }`. Client immediately clears input box and appends `queued` message bubble to UI.
-4. **Execution:** Cloudflare Workflow starts. Step 1 updates D1 status to `running`. Step 2 invokes `env.AI.run('@cf/zai-org/glm-4.7-flash', { messages })`.
-5. **Completion / Failure:** Step 3 saves completion text to D1 and sets status to `completed`. On unrecoverable error, status is set to `failed` with a sanitized error code.
-6. **Client Polling & Sync:** Client polls `GET /api/jobs/:id` using `X-Job-Token`. Once `status === "completed"`, result is appended to chat and job token is marked resolved in `localStorage`.
-
----
-
-## 4. Cloudflare Bindings & Configuration
-
-Configuration must be declared in `wrangler.jsonc` (or `wrangler.toml`) using standard environment binding placeholders. No invented account IDs or database IDs are used.
+The configuration below details the bindings for the Worker named `ai` in `wrangler.jsonc`. Standard placeholder binding names are specified without fake IDs.
 
 ```jsonc
-// wrangler.jsonc snippet
+// wrangler.jsonc
 {
-  "name": "ai-proxy-worker",
-  "main": "src/index.js",
+  "name": "ai",
+  "main": "./worker/index.js",
   "compatibility_date": "2026-07-18",
-  
-  // D1 Database Binding for Job State Storage
+
+  // D1 Database Binding for Job Storage
   "d1_databases": [
     {
       "binding": "DB",
@@ -135,7 +91,19 @@ Configuration must be declared in `wrangler.jsonc` (or `wrangler.toml`) using st
     "binding": "AI"
   },
 
-  // Cron Trigger for 24-Hour Terminal Data Retention Cleanup
+  // Cloudflare Workers Rate Limiting Binding (Tunable / Per-Location)
+  "ratelimits": [
+    {
+      "binding": "RATE_LIMITER",
+      "namespace_id": "REPLACE_WITH_RATE_LIMITER_NAMESPACE_ID",
+      "simple": {
+        "limit": 10,       // Tunable: max 10 creations
+        "period": 60       // Tunable: per 60 seconds
+      }
+    }
+  ],
+
+  // Cron Trigger for Expiration Purge & Stuck Job Repair
   "triggers": {
     "crons": ["0 * * * *"] // Executes hourly
   }
@@ -144,182 +112,179 @@ Configuration must be declared in `wrangler.jsonc` (or `wrangler.toml`) using st
 
 ---
 
-## 5. D1 Database Schema & State Machine
+## 4. D1 Database Schema & State Machine
 
-### 5.1 D1 Table Definition (`jobs`)
+### 4.1 D1 Table Schema (`jobs`)
 
 ```sql
 CREATE TABLE IF NOT EXISTS jobs (
-    id TEXT PRIMARY KEY,
-    token_hash TEXT NOT NULL,
-    conversation_id TEXT NOT NULL,
+    id TEXT PRIMARY KEY,                       -- UUID v4 generated by client
+    token_hash TEXT NOT NULL,                  -- SHA-256 hash of 256-bit capability token
+    conversation_id TEXT NOT NULL,             -- Client origin conversation ID
     status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'completed', 'failed')),
-    prompt_text TEXT NOT NULL,
-    result_text TEXT,
-    error_code TEXT,
-    created_at INTEGER NOT NULL, -- Unix timestamp in seconds
-    updated_at INTEGER NOT NULL, -- Unix timestamp in seconds
-    expires_at INTEGER NOT NULL  -- Unix timestamp in seconds (created_at + 86400)
+    prompt_text TEXT NOT NULL,                 -- User prompt (max 100,000 bytes UTF-8)
+    result_text TEXT,                          -- Model completion output (bounded)
+    error_code TEXT,                           -- Generic error code on failure
+    request_fingerprint TEXT NOT NULL,         -- SHA-256 hash of (conversation_id + prompt_text)
+    created_at INTEGER NOT NULL,               -- Unix timestamp in seconds
+    updated_at INTEGER NOT NULL,               -- Unix timestamp in seconds
+    terminal_at INTEGER,                       -- Unix timestamp in seconds (NULL while active)
+    expires_at INTEGER NOT NULL                -- Logical expiry timestamp: terminal_at + 86400 (or created_at + 172800 if active)
 );
 
--- Performance Indexes
-CREATE INDEX IF NOT EXISTS idx_jobs_token_hash ON jobs(token_hash);
-CREATE INDEX IF NOT EXISTS idx_jobs_expires_at ON jobs(expires_at);
+-- Performance Indexes (Note: token_hash index omitted as lookups use Primary Key `id`)
+CREATE INDEX IF NOT EXISTS idx_jobs_terminal_at ON jobs(terminal_at);
 CREATE INDEX IF NOT EXISTS idx_jobs_status_created ON jobs(status, created_at);
 ```
 
-### 5.2 Valid Status Transitions
+### 4.2 State Machine & Conditional Updates
 
+State updates MUST be conditional to ensure that completed or failed terminal rows are never regressed by delayed or out-of-order workflow steps.
+
+```sql
+-- Step 1: Transition queued -> running (only if currently queued)
+UPDATE jobs 
+SET status = 'running', updated_at = unixepoch() 
+WHERE id = ? AND status = 'queued';
+
+-- Step 3a: Transition running -> completed (only if not already terminal)
+UPDATE jobs 
+SET status = 'completed', 
+    result_text = ?, 
+    terminal_at = unixepoch(), 
+    expires_at = (unixepoch() + 86400), 
+    updated_at = unixepoch() 
+WHERE id = ? AND status IN ('queued', 'running');
+
+-- Step 3b: Transition running -> failed (only if not already terminal)
+UPDATE jobs 
+SET status = 'failed', 
+    error_code = ?, 
+    terminal_at = unixepoch(), 
+    expires_at = (unixepoch() + 86400), 
+    updated_at = unixepoch() 
+WHERE id = ? AND status IN ('queued', 'running');
 ```
- ┌──────────┐      Step 1 Start       ┌──────────┐
- │  queued  ├────────────────────────►│  running │
- └──────────┘                         └────┬─────┘
-                                           │
-                         ┌─────────────────┴─────────────────┐
-                         │ Step 2 Success                    │ Step 2/3 Fail (Max Retries)
-                         ▼                                   ▼
-                   ┌───────────┐                       ┌───────────┐
-                   │ completed │                       │  failed   │
-                   └───────────┘                       └───────────┘
-```
 
-- **`queued` → `running`**: Set by Step 1 of Cloudflare Workflow upon execution start.
-- **`running` → `completed`**: Set by Step 3 upon successful Workers AI completion.
-- **`running` → `failed`**: Set by Step 3 or Workflow error handler if step retries are exhausted.
-- **Terminal States:** `completed` and `failed` are terminal. No further state transitions are permitted for a given `job_id`.
+### 4.3 Retention, Expiry & Stuck Job Maintenance
 
-### 5.3 Retention & Purge Policy
-- **TTL Window:** Exactly 24 hours (`86,400` seconds). Calculated as `expires_at = created_at + 86400`.
-- **Purge Execution:** Scheduled Cloudflare Worker trigger runs hourly:
-  ```sql
-  DELETE FROM jobs WHERE expires_at <= unixepoch();
-  ```
+1. **Logical Expiry:** An API status read for a job where `unixepoch() > expires_at` or `terminal_at` is older than 24 hours (86,400 seconds) is treated as expired and returns `404 Not Found`.
+2. **Physical Purge (Hourly Cron):**
+   ```sql
+   DELETE FROM jobs 
+   WHERE terminal_at IS NOT NULL AND terminal_at <= (unixepoch() - 86400);
+   ```
+3. **Stuck Active Job Repair (Hourly Cron):** Active jobs stuck in `queued` or `running` without updates for >30 minutes (1,800 seconds, tunable) are transitioned to `failed`:
+   ```sql
+   UPDATE jobs 
+   SET status = 'failed', 
+       error_code = 'JOB_TIMEOUT_STUCK', 
+       terminal_at = unixepoch(), 
+       expires_at = (unixepoch() + 86400), 
+       updated_at = unixepoch() 
+   WHERE status IN ('queued', 'running') AND updated_at <= (unixepoch() - 1800);
+   ```
 
 ---
 
-## 6. API Interface & Token Security Specifications
+## 5. API Interface, Token Transport & Security Specifications
 
-### 6.1 Authentication & Token Security Architecture
-1. **Generation:** High-entropy string generated using cryptographically secure random bytes (e.g. `crypto.getRandomValues()`).
-   - Format: `job_sec_` + 64 hexadecimal characters (256 bits of entropy).
-2. **Storage:**
-   - **Client:** Saved exclusively in `localStorage` under `ai_jobs_v1`.
-   - **Database (D1):** `token_hash` = `SHA-256(capability_token)`. Plain text token is NEVER stored in D1.
-3. **Transport Header:** `X-Job-Token: job_sec_...`
-   - Requests without a valid `X-Job-Token` matching `token_hash` in D1 return `401 Unauthorized`.
-4. **Hashing Algorithm:** Web Crypto API `crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))` converted to lower-case hex string.
+### 5.1 Capability Token & Authentication Security
+- **Token Generation:** Client creates a 256-bit cryptographically secure token (e.g., 64-char hex string with prefix `job_sec_...`).
+- **Unsalted Hash Rationale:** Unsalted SHA-256 is used for D1 token matching. Because the token has 256 bits of cryptographic entropy, pre-computation, rainbow table, and brute-force attacks are computationally impossible ($2^{256}$ search space).
+- **Constant-Time Verification:**
+  1. Retrieve row from D1 using `SELECT token_hash, status, ... FROM jobs WHERE id = ?`. If row does not exist, return generic `404`.
+  2. Compute `SHA-256` digest of presented `X-Job-Token` header.
+  3. Compare computed digest byte array against stored `token_hash` byte array using Workers Web Crypto `crypto.subtle.timingSafeEqual(computedBytes, storedBytes)`.
+  4. If comparison fails or job is expired, return the **exact same generic 404 response** to avoid leaking job existence.
 
----
+### 5.2 Partial Failure & Idempotent Creation (`POST /api/ai/jobs`)
 
-### 6.2 Endpoint Contracts
+When a client sends `POST /api/ai/jobs` with a client-generated UUID `jobId`:
 
-#### 6.2.1 Job Creation: `POST /api/jobs`
+1. **Rate Limiting Check:** Check `env.RATE_LIMITER.limit({ key: ip })`. If exceeded, return `429 Too Many Requests`.
+2. **UTF-8 Byte Check:** Validate prompt text length $\le$ 100,000 UTF-8 bytes (tunable).
+3. **Duplicate / Partial Failure Detection:**
+   - Compute `request_fingerprint = SHA256(conversation_id + prompt_text)`.
+   - Query D1: `SELECT status, token_hash, request_fingerprint FROM jobs WHERE id = ?`.
+   - If row exists:
+     - Verify presented `X-Job-Token` hash using `timingSafeEqual`. If invalid, return `401 Unauthorized`.
+     - If token is valid and fingerprint matches: This is a duplicate submission (e.g. network retry). Ensure Workflow instance exists (`env.AI_JOB_WORKFLOW.get(jobId)` or create if missing), and return `200 OK` with existing job status.
+4. **New Job Insertion & Workflow Creation:**
+   - Execute D1 INSERT (`status = 'queued'`).
+   - Spawn Workflow instance: `await env.AI_JOB_WORKFLOW.create({ id: jobId, params: { jobId } })`.
+   - If Workflow creation fails after D1 INSERT, catch error, update D1 row status to `failed` (`error_code = 'WORKFLOW_DISPATCH_FAILED'`), set `terminal_at = unixepoch()`, and return `500 Internal Server Error`.
 
-- **Headers Required:**
-  - `Content-Type: application/json`
-  - `X-Job-Token: <capability_token>` (Required: client-generated high-entropy token)
-  - `X-Idempotency-Key: <uuid_v4>` (Optional: prevents duplicate submissions on network retry)
-
-- **Request Body Schema:**
+#### Endpoint Contract: `POST /api/ai/jobs`
+- **Headers:** `Content-Type: application/json`, `X-Job-Token: job_sec_...`
+- **Request Body:**
   ```json
   {
-    "prompt": "string (1 to 102,400 chars, required)",
-    "conversation_id": "string (1 to 128 chars, required)",
-    "intent": "object (optional metadata)"
+    "job_id": "550e8400-e29b-41d4-a716-446655440000",
+    "conversation_id": "conv_8832a...",
+    "prompt": "User prompt text (max 100,000 UTF-8 bytes)"
   }
   ```
-
-- **Success Response (`201 Created`):**
+- **Response (`201 Created` / `200 OK`):**
   ```json
   {
-    "job_id": "job_01J9X8K2M...",
+    "job_id": "550e8400-e29b-41d4-a716-446655440000",
     "status": "queued",
-    "conversation_id": "conv_8832a...",
-    "created_at": 1773870913,
-    "expires_at": 1773957313
+    "created_at": 1773870913
   }
   ```
-
-- **Error Responses:**
-  - `400 Bad Request`: Invalid payload, missing fields, or prompt > 100KB.
-  - `401 Unauthorized`: Missing or malformed `X-Job-Token` header.
-  - `429 Too Many Requests`: Rate limit exceeded for IP address.
-  - `500 Internal Server Error`: D1 or Workflow dispatch failure.
 
 ---
 
-#### 6.2.2 Job Status Query: `GET /api/jobs/:id`
+### 5.3 Job Status Query (`GET /api/ai/jobs/:jobId`)
 
-- **Headers Required:**
-  - `X-Job-Token: <capability_token>`
-
-- **Success Response — In Progress (`200 OK`):**
+- **Headers Required:** `X-Job-Token: job_sec_...`
+- **Response — Active / Running (`200 OK`):**
   ```json
   {
-    "job_id": "job_01J9X8K2M...",
+    "job_id": "550e8400-e29b-41d4-a716-446655440000",
     "status": "running",
-    "conversation_id": "conv_8832a...",
     "created_at": 1773870913,
-    "updated_at": 1773870915,
-    "expires_at": 1773957313
+    "updated_at": 1773870915
   }
   ```
-
-- **Success Response — Completed (`200 OK`):**
+- **Response — Completed (`200 OK`):**
   ```json
   {
-    "job_id": "job_01J9X8K2M...",
+    "job_id": "550e8400-e29b-41d4-a716-446655440000",
     "status": "completed",
-    "conversation_id": "conv_8832a...",
     "created_at": 1773870913,
-    "updated_at": 1773870922,
-    "expires_at": 1773957313,
+    "updated_at": 1773870925,
+    "terminal_at": 1773870925,
+    "expires_at": 1773957325,
     "result": {
-      "content": "Generated text completion output from model...",
+      "content": "Model response output text...",
       "model": "@cf/zai-org/glm-4.7-flash"
     }
   }
   ```
-
-- **Success Response — Failed (`200 OK`):**
+- **Response — Generic 404 (Absent, Expired, or Unauthorized):**
   ```json
   {
-    "job_id": "job_01J9X8K2M...",
-    "status": "failed",
-    "conversation_id": "conv_8832a...",
-    "created_at": 1773870913,
-    "updated_at": 1773870925,
-    "expires_at": 1773957313,
     "error": {
-      "code": "MODEL_EXECUTION_FAILED",
-      "message": "The AI model encountered an error processing your request. Please try again."
+      "code": "NOT_FOUND",
+      "message": "The requested job was not found or has expired."
     }
   }
   ```
 
-- **Error Responses:**
-  - `401 Unauthorized`: Invalid `X-Job-Token` or token hash does not match `job_id`.
-  - `404 Not Found`: Job ID does not exist or has passed 24-hour retention expiration.
-
 ---
 
-### 6.3 Standardized Error Schema
-All error responses return a uniform JSON payload:
+## 6. Cloudflare Workflow Execution & Retry Boundaries
 
-```json
-{
-  "error": {
-    "code": "INVALID_TOKEN | PAYLOAD_TOO_LARGE | RATE_LIMIT_EXCEEDED | JOB_NOT_FOUND | INTERNAL_ERROR",
-    "message": "Human-readable sanitized error description."
-  }
-}
-```
+### 6.1 Workflow Design Guidance & Empirical Context
+- **Guidance & Limits:** Following [Cloudflare Workflows Rules & Limits](https://developers.cloudflare.com/workflows/platform/limits/), steps run with documented default guidance:
+  - Max Attempt Retries: **5 attempts** (4 retries).
+  - Retry Delay: **10-second exponential backoff** (tunable).
+  - Per-Attempt Timeout: **10-minute timeout**.
+- **Empirical Execution Context:** Diagnostic testing of `@cf/zai-org/glm-4.7-flash` via Workers AI shows execution latency can reach ~120 seconds under load. The step timeout is explicitly set to 10 minutes to prevent premature step aborts.
 
----
-
-## 7. Cloudflare Workflow Execution & Retry Boundaries
-
-### 7.1 Workflow Definition Structure
+### 6.2 Workflow Implementation Structure
 
 ```javascript
 import { WorkflowEntrypoint } from 'cloudflare:workers';
@@ -328,47 +293,48 @@ export class AiJobWorkflow extends WorkflowEntrypoint {
   async run(event, step) {
     const { jobId } = event.payload;
 
-    // Step 1: Mark job as running in D1
+    // Step 1: Mark job as running in D1 (Conditional update)
     await step.do('mark-running', async () => {
       await this.env.DB.prepare(
-        "UPDATE jobs SET status = 'running', updated_at = unixepoch() WHERE id = ?"
+        "UPDATE jobs SET status = 'running', updated_at = unixepoch() WHERE id = ? AND status = 'queued'"
       ).bind(jobId).run();
     });
 
-    // Step 2: Execute Workers AI Model Call with Retries
-    let aiResponse;
+    // Step 2: Call Workers AI Model with documented retries & 10m timeout
+    let aiOutput;
     try {
-      aiResponse = await step.do(
+      aiOutput = await step.do(
         'call-workers-ai',
         {
           retries: {
-            limit: 3,
-            delay: '2 seconds',
+            limit: 5,           // 5 attempts total (tunable)
+            delay: '10 seconds', // Initial delay (tunable)
             backoff: 'exponential'
           },
-          timeout: '60 seconds'
+          timeout: '10 minutes' // Accommodates ~120s empirical GLM latency
         },
         async () => {
-          // Fetch prompt from D1
           const job = await this.env.DB.prepare("SELECT prompt_text FROM jobs WHERE id = ?").bind(jobId).first();
-          if (!job) throw new NonRetryableError("JOB_NOT_FOUND");
+          if (!job) throw new Error("JOB_NOT_FOUND_FATAL");
 
           const response = await this.env.AI.run('@cf/zai-org/glm-4.7-flash', {
             messages: [{ role: 'user', content: job.prompt_text }]
           });
 
           if (!response || !response.choices || !response.choices[0]?.message?.content) {
-            throw new Error("EMPTY_MODEL_RESPONSE"); // Retryable
+            throw new Error("EMPTY_MODEL_RESPONSE"); // Triggers step retry
           }
 
           return response.choices[0].message.content.trim();
         }
       );
     } catch (err) {
-      // Step 3a: Mark Failed on exhausted retries or non-retryable error
+      // Step 3a: Mark Failed if step retries are exhausted
       await step.do('mark-failed', async () => {
         await this.env.DB.prepare(
-          "UPDATE jobs SET status = 'failed', error_code = 'MODEL_EXECUTION_FAILED', updated_at = unixepoch() WHERE id = ?"
+          `UPDATE jobs 
+           SET status = 'failed', error_code = 'MODEL_EXECUTION_FAILED', terminal_at = unixepoch(), expires_at = (unixepoch() + 86400), updated_at = unixepoch() 
+           WHERE id = ? AND status IN ('queued', 'running')`
         ).bind(jobId).run();
       });
       return;
@@ -377,155 +343,128 @@ export class AiJobWorkflow extends WorkflowEntrypoint {
     // Step 3b: Save completion result and mark completed in D1
     await step.do('mark-completed', async () => {
       await this.env.DB.prepare(
-        "UPDATE jobs SET status = 'completed', result_text = ?, updated_at = unixepoch() WHERE id = ?"
-      ).bind(aiResponse, jobId).run();
+        `UPDATE jobs 
+         SET status = 'completed', result_text = ?, terminal_at = unixepoch(), expires_at = (unixepoch() + 86400), updated_at = unixepoch() 
+         WHERE id = ? AND status IN ('queued', 'running')`
+      ).bind(aiOutput, jobId).run();
     });
   }
 }
 ```
 
-### 7.2 Retry Policy & Failure Scenarios
+---
 
-| Failure Mode | Step Boundary Behavior | Workflow Action |
-| :--- | :--- | :--- |
-| **D1 Read/Write Failure** | Step 1 or Step 3 | Step retries up to 3 times with exponential backoff. |
-| **Rate Limit / Upstream 429** | Step 2 (`call-workers-ai`) | Retryable error. Re-executes step after delay (`2s`, `4s`, `8s`). |
-| **Upstream 502/503/504** | Step 2 (`call-workers-ai`) | Retryable error. Re-executes step. |
-| **Invalid Prompt / 400 Bad Request** | Pre-Workflow API Layer | Fails immediately at `POST /api/jobs`; no Workflow is spawned. |
-| **Exhausted Step Retries (3/3)** | Step 2 (`call-workers-ai`) | Workflow catches exception and advances to `mark-failed` step. |
+## 7. Client Architecture, Local Persistence & Reconciliation
+
+### 7.1 Client Pre-POST Persistence Sequence
+Before dispatching `POST /api/ai/jobs`, the client MUST perform the following synchronous sequence:
+
+1. Generate UUID `jobId` (e.g. `crypto.randomUUID()`).
+2. Generate 256-bit `capabilityToken` (`job_sec_...`).
+3. Generate `userMessageId` and `assistantMessageId`.
+4. Construct `LocalJobRecord`:
+   ```typescript
+   interface LocalJobRecord {
+     jobId: string;
+     capabilityToken: string;
+     conversationId: string;
+     userMessageId: string;
+     assistantMessageId: string;
+     promptText: string;
+     status: 'queued' | 'running' | 'completed' | 'failed';
+     createdAt: number;
+   }
+   ```
+5. Save `LocalJobRecord` to `localStorage.ai_jobs_v1`.
+6. Append placeholder message (`status: "queued"`) to active chat UI feed.
+7. Clear input field immediately and set `inputDisabled = false`.
+8. Dispatch `POST /api/ai/jobs` asynchronously.
+
+### 7.2 Initial Submission Failure & Retry Handling
+- **Creation Network Failure / 5xx:** If `POST /api/ai/jobs` fails to respond or returns 5xx, the client marks the local `LocalJobRecord.status = 'failed'` and updates the placeholder UI message to generic `failed`.
+- **User Retry Action:** Clicking "Retry" on a failed message:
+  - Generates a **brand-new UUID `jobId`**, fresh 256-bit token, fresh message IDs.
+  - Supersedes the old failed message in UI and `localStorage`.
+  - Dispatches a new `POST /api/ai/jobs` request.
+
+### 7.3 Reconciliation, Recovered Results UI & Session Lifecycle
+- **Mount & Focus Sync:** On application mount or window `focus` / `visibilitychange`, client iterates all active records in `localStorage.ai_jobs_v1`.
+- **Deduplication:** `jobId` is globally deduped in UI state to prevent duplicate rendering.
+- **Placeholder Sync:** If matching `assistantMessageId` exists in active conversation thread, update its status/content directly.
+- **Recovered Results Container:** If user is in a different session or placeholder message is absent, completion results are rendered into a dedicated "Recovered Results" section/drawer without stealing focus or interrupting current user typing.
+- **Session Deletion Policy:** Deleting a conversation/session locally **does not remove** unresolved background jobs from `localStorage.ai_jobs_v1` or D1 execution. Jobs run to completion on Cloudflare edge.
+- **Secret Cleanup:** Capability tokens are deleted from `localStorage` **only after** terminal result is successfully reconciled and written into persistent chat history.
+- **Handling 404 Response:** If poll returns generic 404 (expired or lost), local job status updates to `failed` (`error: "Job expired or unretrievable"`).
+
+### 7.4 Polling Strategy & Free Tier Cost Impact
+- **Active Polling Schedule:** Initial poll at +1s, then +2s, +4s, capping at **10-second intervals** (tunable).
+- **Hidden Tab:** Polling pauses when `document.hidden === true` and resumes immediately on tab focus.
+- **Quota & Cost Note:** On Cloudflare Workers Free plan, high-frequency polling consumes Worker requests and D1 read operations. Bounded polling intervals (max 10s active, paused when hidden) protect against exhausting daily free quotas (100k Worker requests/day, 5M D1 reads/day).
+
+### 7.5 XSS Threat Model Acknowledgment
+- **Security Trade-Off:** Storing 256-bit capability tokens in `localStorage` exposes them to potential exfiltration if an XSS vulnerability exists in the web application.
+- **Mitigation:** Strict Content Security Policy (CSP), HTML sanitization of model outputs, and zero inclusion of third-party unsafe scripts.
 
 ---
 
-## 8. Client Integration, Polling & Reconciliation Logic
+## 8. Privacy, Security & Abuse Controls
 
-### 8.1 LocalStorage Schema (`ai_jobs_v1`)
-
-To support tab survival and session recovery, the frontend manages a job registry in browser `localStorage`:
-
-```typescript
-interface LocalJobRecord {
-  jobId: string;
-  capabilityToken: string;
-  conversationId: string;
-  status: 'queued' | 'running' | 'completed' | 'failed';
-  promptSnippet: string;
-  createdAt: number;
-}
-
-// Stored under localStorage key: "ai_jobs_v1"
-type JobRegistry = Record<string, LocalJobRecord>; // Keyed by jobId
-```
-
-### 8.2 Immediate Input Re-enablement Flow
-1. User clicks "Send".
-2. Client generates `capabilityToken` (`job_sec_...`) and temporary message ID.
-3. Client appends placeholder message (`status: "queued"`) to active conversation feed.
-4. Client **immediately clears input box** and sets `inputDisabled = false`.
-5. Client sends `POST /api/jobs` asynchronously in the background.
-6. Upon receipt of HTTP 201, `jobId` and `capabilityToken` are stored in `localStorage.ai_jobs_v1`.
-
-### 8.3 Bounded Polling Strategy & Visibility Synchronization
-
-To avoid edge hammering while ensuring snappy updates:
-
-1. **Active Tab Polling Interval:**
-   - Poll 1: +1.0 sec after creation
-   - Poll 2: +2.0 sec
-   - Poll 3: +4.0 sec
-   - Subsequent Polls: Max interval cap at **10 seconds**.
-2. **Tab Visibility & Focus Sync:**
-   - Listen to `document.addEventListener('visibilitychange')` and `window.addEventListener('focus')`.
-   - When tab becomes visible (`document.visibilityState === 'visible'`), immediately poll all active jobs marked `queued` or `running`.
-   - When tab is hidden, pause or slow polling to 30-second intervals.
-3. **Terminal Deregistration:**
-   - When status reaches `completed` or `failed`, polling stops for that `jobId`.
-   - Result is reconciled into conversation history. `localStorage` entry is updated with final status.
-
-### 8.4 Recovered Results Reconciliation & Duplicate Prevention
-- **Page Reload / Re-open Tab:**
-  1. On application mount, read `localStorage.ai_jobs_v1`.
-  2. Filter jobs matching active `conversationId` where status is `queued` or `running`.
-  3. Query `GET /api/jobs/:id` for each pending job using stored `capabilityToken`.
-  4. If status is `completed`, inject completion into conversation state **if and only if** message with `job_id` does not already exist in conversation state (deduplication check).
-
-### 8.5 Retry Workflow
-- If a message shows `failed` status, UI displays a "Retry" button.
-- Clicking "Retry" **does not re-query or mutate the old failed job**.
-- Instead, it reads the original prompt text and dispatches a **new `POST /api/jobs` request**, creating a fresh job instance with a new `job_id` and capability token.
-
----
-
-## 9. Security, Privacy & Abuse Controls
-
-1. **Zero-Log Policy:**
-   - Prompt text, model output, and capability tokens **MUST NEVER** be printed via `console.log()` or included in Cloudflare Worker tail logs.
-   - Allowed Log Metadata: `job_id`, `conversation_id`, `status`, `duration_ms`, `http_status`, `error_code`.
-2. **Payload Size Enforcement:**
-   - Prompts strictly capped at **102,400 bytes (100KB)** at `POST /api/jobs`. Requests exceeding this threshold fail with `400 Bad Request (PAYLOAD_TOO_LARGE)`.
+1. **Strict Zero-Log Policy:**
+   - **Prohibited Log Targets:** Conversation IDs, IP addresses, prompt text, result text, HTTP headers, request/response bodies, capability tokens.
+   - **Allowed Metric Logs:** Anonymous counters and durations (`job_status`, `duration_ms`, `error_code`).
+2. **UTF-8 Byte Validation:**
+   - Server strictly rejects prompts exceeding 100,000 UTF-8 bytes with `400 Bad Request`.
 3. **Rate Limiting:**
-   - Cloudflare Worker enforcement: Max **10 job creations (`POST /api/jobs`) per minute per IP address**.
-4. **Token Security:**
-   - High-entropy tokens (256-bit random hex) prevent brute-forcing `job_id` access.
-   - Hash comparison (`SHA-256`) uses constant-time string comparison in Worker code to prevent timing attacks.
+   - `env.RATE_LIMITER` binding enforces max 10 job creations per 60 seconds per IP address (tunable).
+4. **Timing-Safe Digest Comparisons:**
+   - `crypto.subtle.timingSafeEqual()` prevents timing side-channel attacks during token authorization.
 
 ---
 
-## 10. Testing, Rollout & Observability Strategy
+## 9. Testing, Observability & Operational Risks
 
-### 10.1 Testing Plan
-- **Unit Contracts:**
-  - SHA-256 token hashing verification.
-  - Job creation payload validation (size caps, missing headers).
-  - 24-hour expiration calculation (`expires_at`).
-- **Integration Tests:**
-  - D1 state machine transitions (`queued` → `running` → `completed` / `failed`).
-  - Cloudflare Workflow step retries and error fallback handling.
-  - Verification of `X-Job-Token` authorization checks (`401 Unauthorized` on mismatch).
-- **Client Reconciliation & Polling Tests:**
-  - Mock tab reload with pending jobs in `localStorage`.
-  - Deduplication assertion during result reconciliation.
+### 9.1 Testing Strategy
+- **Contract Tests:** Verify `POST /api/ai/jobs` and `GET /api/ai/jobs/:jobId` schemas, header requirements, rate limits, and generic 404 responses.
+- **Timing-Safe Unit Tests:** Test `timingSafeEqual` with matching and non-matching SHA-256 token hashes.
+- **Workflow Resilience Tests:** Test D1 conditional updates, step retries, and stuck job cleanup.
 
-### 10.2 Observability & Operational Metrics
-Observability relies on metadata metrics without exposing user content:
+### 9.2 Observability Metrics (Zero PII / Zero Content)
+- `ai_jobs_created_total` (Counter)
+- `ai_jobs_terminal_total` (Counter by status: `completed`, `failed`)
+- `ai_jobs_stuck_repaired_total` (Counter)
+- `ai_job_execution_seconds` (Histogram)
 
-- **Metrics Tracked:**
-  - `ai_jobs_created_total` (Counter)
-  - `ai_jobs_completed_total` (Counter)
-  - `ai_jobs_failed_total` (Counter by `error_code`)
-  - `ai_job_execution_duration_seconds` (Histogram)
-  - `ai_job_polling_requests_total` (Counter by HTTP status)
+### 9.3 Operational Risks & Mitigations
 
-### 10.3 Failure Modes & Mitigations
-
-| Risk / Failure Mode | Root Cause | Mitigation Strategy |
-| :--- | :--- | :--- |
-| **D1 Storage Saturation** | High job volume | Hourly cron trigger purges expired jobs (`expires_at <= NOW`). Strict 24h retention limit. |
-| **Orphaned LocalStorage** | User clears site data or changes browser | Jobs continue running on Cloudflare edge and expire naturally in 24 hours. No backend leakage. |
-| **Duplicate Message Injection** | Client receives poll completion multiple times | Client reconciles messages using unique `job_id` key guard before appending to UI state. |
+| Risk | Mitigation |
+| :--- | :--- |
+| **Partial Failure (D1 insert ok, Workflow fail)** | API catches dispatch error, sets D1 status to `failed` immediately, returns 500. Duplicate POST retries check D1 and recover. |
+| **Worker Quota Depletion on Free Tier** | Bounded polling backoff (max 10s), pause when tab hidden, immediate stop upon terminal state. |
+| **State Regression on Out-of-Order Updates** | D1 updates use conditional `WHERE status IN ('queued', 'running')` guards to ensure terminal states are immutable. |
 
 ---
 
-## 11. Acceptance Criteria & Implementation Verification Checklist
+## 10. Product Acceptance Criteria Checklist
 
-- [ ] **Exact File Authorization:** Specification created at `docs/superpowers/specs/2026-07-18-durable-background-ai-jobs-design.md` with no other files modified.
-- [ ] **Immediate Input Re-enable:** UI clears prompt and enables user input immediately upon job creation.
-- [ ] **Granular Status Display:** Per-message indicators for `queued`, `running`, `completed`, and `failed`.
-- [ ] **Tab & Refresh Survival:** Active background jobs survive page reloads and tab closes, resuming status sync via `localStorage`.
-- [ ] **Concurrent Execution:** Multiple background jobs can run concurrently without state collision.
-- [ ] **Token Security & Hashing:** High-entropy capability tokens stored only in `localStorage` and sent via `X-Job-Token` header. D1 stores only SHA-256 hash.
-- [ ] **Zero Logging:** No prompt text, completion text, or capability tokens appear in Cloudflare logs.
-- [ ] **24-Hour Retention:** D1 schema enforces 24-hour TTL with an automated hourly cleanup cron trigger.
-- [ ] **Failed State Retry:** Failed jobs display generic error UI; retry creates a new job with a fresh `job_id` and token.
-- [ ] **No Cancellation in v1:** Confirmed cancellation is out of scope for v1.
-- [ ] **Bounded Polling:** Bounded exponential backoff + immediate sync on page load and window focus (`visibilitychange`).
-- [ ] **Model Selection:** Uses `@cf/zai-org/glm-4.7-flash` via Workers AI.
-- [ ] **API Backwards Compatibility:** Preserves synchronous `POST /api/ai` endpoint alongside new `/api/jobs` async endpoints.
-- [ ] **Implementation Scope Disclaimer:** Code file changes reserved for authorized implementation phase following review.
+- [ ] **Worker Specification:** Applies specifically to Worker `ai` with main entrypoint `./worker/index.js`.
+- [ ] **Routes:** Endpoints implemented at `POST /api/ai/jobs` and `GET /api/ai/jobs/:jobId`. Synchronous `POST /api/ai` preserved intact.
+- [ ] **Client Pre-POST State:** Browser generates UUID `jobId`, 256-bit token, session ID, message IDs, and prompt into `localStorage` prior to dispatch.
+- [ ] **Idempotency & Workflow ID:** Client UUID `jobId` serves as idempotency key and Workflow instance ID with duplicate recovery.
+- [ ] **Timing-Safe Auth & Security:** SHA-256 token verification uses `timingSafeEqual()`. Absent, expired, or unauthorized reads return uniform generic 404.
+- [ ] **Retention & Purge:** 24-hour retention after `terminal_at`. Hourly cron purges expired jobs and repairs stuck active jobs.
+- [ ] **D1 Schema & Guards:** Includes `terminal_at` and `request_fingerprint`. Conditional state updates prevent terminal regressions. No `token_hash` index.
+- [ ] **Workflow Guidance:** Uses 5 attempts, 10s exponential backoff, 10m step timeout to accommodate empirical GLM ~120s latency.
+- [ ] **Recovered Results UI:** Mount/focus sync updates placeholders or populates deterministic Recovered Results area without stealing focus. Global `jobId` deduplication enforced.
+- [ ] **Session & Cleanup Lifecycle:** Session deletion leaves background jobs running. Token secrets deleted from `localStorage` only after terminal reconciliation.
+- [ ] **Retry as Fresh Job:** Creation failure marks local status `failed`. Retrying generates fresh UUID, token, and message IDs.
+- [ ] **Validation & Rate Limiting:** Prompts capped at 100,000 UTF-8 bytes. `RATE_LIMITER` binding configured with tunable numbers.
+- [ ] **Strict Zero Logging:** No conversation IDs, IPs, prompts, results, headers, bodies, or tokens in logs.
+- [ ] **Official Documentation Links:** Includes official Cloudflare documentation markdown links for Workflows, limits, D1, Web Crypto, Rate Limiting, and Wrangler.
 
 ---
 
-## 12. Verification & Historical Records
+## 11. Document Metadata & Final Review
 
-- Specification status: **Status: For User Review**
-- Author: **AGY**
-- Date: **2026-07-18**
+- **Status:** For User Review
+- **Author:** AGY
+- **Date:** 2026-07-18
