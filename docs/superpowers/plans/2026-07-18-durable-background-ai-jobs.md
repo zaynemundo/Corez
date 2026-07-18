@@ -1943,7 +1943,7 @@ git commit -m "feat(worker): add D1 migration, job store with BLOB token hashes,
 
 ### Task 4: Pure Workflow Runner Implementation & Worker Entrypoint Export
 
-**Goal:** Implement pure Cloudflare Workflow execution runner `worker/jobWorkflow.js` with separate durable steps (`load-job`, `mark-running`, `provider-call`, `mark-completed`, `mark-failed`) using shared `invokeWorkersAi`, documented retry configuration, and export `AiJobWorkflow` class from `worker/index.js`.
+**Goal:** Implement pure Cloudflare Workflow execution runner `worker/jobWorkflow.js` with separate durable steps (`load-job`, `mark-running`, `provider-call`, `mark-completed`, `mark-failed`) using method-level dependency injection, a production runner resolving D1 store plus shared `invokeWorkersAi`, documented provider retry configuration, and export `AiJobWorkflow` class from `worker/index.js`.
 
 **Files:**
 - Create: `tests/ai-job-workflow-contract.mjs`
@@ -1953,7 +1953,8 @@ git commit -m "feat(worker): add D1 migration, job store with BLOB token hashes,
 **Interfaces:**
 - `worker/jobWorkflow.js`:
   ```javascript
-  export async function runAiJobWorkflow(env, event, step) { /* step pipeline */ }
+  export function resolveWorkflowDependencies(env, customDeps = {});
+  export async function runAiJobWorkflow(env, event, step, customDeps = {});
   ```
 - `worker/index.js`:
   ```javascript
@@ -1977,90 +1978,227 @@ git commit -m "feat(worker): add D1 migration, job store with BLOB token hashes,
 import assert from 'node:assert/strict';
 import { runAiJobWorkflow } from '../worker/jobWorkflow.js';
 
-function createFakeWorkflowEnv() {
-  const jobStore = new Map([
-    ['job-1', {
-      id: 'job-1',
-      prompt_text: 'Explain quantum computing',
-      intent_json: JSON.stringify({ mode: 'explain' }),
-      status: 'queued'
-    }]
-  ]);
-
-  return {
-    DB: {
-      prepare(sql) {
-        return {
-          bind(...args) {
-            return {
-              async first() {
-                const id = args[0];
-                return jobStore.get(id) || null;
-              },
-              async run() {
-                if (sql.includes("status = 'running'")) {
-                  const id = args[0];
-                  const job = jobStore.get(id);
-                  if (job && job.status === 'queued') job.status = 'running';
-                }
-                if (sql.includes("status = 'completed'")) {
-                  const [resultText, providerMeta, id] = args;
-                  const job = jobStore.get(id);
-                  if (job) {
-                    job.status = 'completed';
-                    job.result_text = resultText;
-                    job.provider_meta = providerMeta;
-                  }
-                }
-                if (sql.includes("status = 'failed'")) {
-                  const [errorCode, id] = args;
-                  const job = jobStore.get(id);
-                  if (job) {
-                    job.status = 'failed';
-                    job.error_code = errorCode;
-                  }
-                }
-                return { success: true };
-              }
-            };
-          }
-        };
-      }
-    },
-    AI: {
-      async run(model, input) {
-        return {
-          choices: [{ message: { content: 'Quantum computing is fascinating.' } }]
-        };
-      }
-    },
-    _jobStore: jobStore
-  };
-}
-
-function createFakeStep() {
+function createStepTracker() {
   const executedSteps = [];
-  return {
+  const capturedConfigs = {};
+
+  const step = {
     _executedSteps: executedSteps,
+    _capturedConfigs: capturedConfigs,
     async do(name, configOrFn, fn) {
       executedSteps.push(name);
+      if (typeof configOrFn === 'object' && configOrFn !== null) {
+        capturedConfigs[name] = configOrFn;
+      }
       const handler = typeof configOrFn === 'function' ? configOrFn : fn;
       return handler();
     }
   };
+
+  return step;
 }
 
 async function run() {
-  const env = createFakeWorkflowEnv();
-  const step = createFakeStep();
-  const event = { payload: { jobId: 'job-1' } };
+  // Test 1: Happy path and shared invoke arguments, retry config capture, and step order
+  {
+    const step = createStepTracker();
+    let getJobCalled = false;
+    let markRunningCalled = false;
+    let invokeAiArgs = null;
+    let markCompletedArgs = null;
 
-  await runAiJobWorkflow(env, event, step);
+    const customDeps = {
+      async getJob(jobId) {
+        getJobCalled = true;
+        return {
+          id: jobId,
+          prompt_text: 'Explain quantum computing',
+          intent_json: JSON.stringify({ mode: 'explain' }),
+          status: 'queued'
+        };
+      },
+      async markRunning(jobId) {
+        markRunningCalled = true;
+      },
+      async invokeAi(prompt, intent) {
+        invokeAiArgs = { prompt, intent };
+        return { content: 'Quantum computing is fascinating.' };
+      },
+      async markCompleted(jobId, resultText, providerMeta) {
+        markCompletedArgs = { jobId, resultText, providerMeta };
+      },
+      async markFailed(jobId, errorCode) {
+        assert.fail('markFailed should not be called on happy path');
+      }
+    };
 
-  const updatedJob = env._jobStore.get('job-1');
-  assert.equal(updatedJob.status, 'completed');
-  assert.equal(updatedJob.result_text, 'Quantum computing is fascinating.');
-  assert.deepEqual(step._executedSteps, ['load-job', 'mark-running', 'provider-call', 'mark-completed']);
+    const event = { payload: { jobId: 'job-1' } };
+    await runAiJobWorkflow({}, event, step, customDeps);
+
+    assert.equal(getJobCalled, true);
+    assert.equal(markRunningCalled, true);
+    assert.deepEqual(invokeAiArgs, {
+      prompt: 'Explain quantum computing',
+      intent: { mode: 'explain' }
+    });
+    assert.equal(markCompletedArgs.jobId, 'job-1');
+    assert.equal(markCompletedArgs.resultText, 'Quantum computing is fascinating.');
+
+    const metaObj = JSON.parse(markCompletedArgs.providerMeta);
+    assert.equal(metaObj.provider, '@cf/workers-ai');
+    assert.equal(metaObj.model, '@cf/workers-ai/glm-4.7-flash');
+
+    assert.deepEqual(step._executedSteps, ['load-job', 'mark-running', 'provider-call', 'mark-completed']);
+    assert.deepEqual(step._capturedConfigs['provider-call'], {
+      retries: {
+        limit: 5,
+        delay: '10 seconds',
+        backoff: 'exponential'
+      },
+      timeout: '10 minutes'
+    });
+  }
+
+  // Test 2: Already completed/failed terminal no-op
+  {
+    for (const terminalStatus of ['completed', 'failed']) {
+      const step = createStepTracker();
+      let providerCalled = false;
+      let markRunningCalled = false;
+
+      const customDeps = {
+        async getJob(jobId) {
+          return {
+            id: jobId,
+            prompt_text: 'Prompt',
+            intent_json: null,
+            status: terminalStatus
+          };
+        },
+        async markRunning() { markRunningCalled = true; },
+        async invokeAi() { providerCalled = true; },
+        async markCompleted() {},
+        async markFailed() {}
+      };
+
+      await runAiJobWorkflow({}, { payload: { jobId: 'job-terminal' } }, step, customDeps);
+
+      assert.equal(markRunningCalled, false);
+      assert.equal(providerCalled, false);
+      assert.deepEqual(step._executedSteps, ['load-job']);
+    }
+  }
+
+  // Test 3: Missing row fatal
+  {
+    const step = createStepTracker();
+    const customDeps = {
+      async getJob(jobId) {
+        return null;
+      },
+      async markRunning() {},
+      async invokeAi() {},
+      async markCompleted() {},
+      async markFailed() {}
+    };
+
+    await assert.rejects(
+      async () => runAiJobWorkflow({}, { payload: { jobId: 'job-missing' } }, step, customDeps),
+      (err) => err.message === 'JOB_NOT_FOUND_FATAL'
+    );
+    assert.deepEqual(step._executedSteps, ['load-job']);
+  }
+
+  // Test 4: Corrupt intent/prompt handling
+  {
+    const step = createStepTracker();
+    let passedIntent = undefined;
+
+    const customDeps = {
+      async getJob(jobId) {
+        return {
+          id: jobId,
+          prompt_text: 'Valid prompt',
+          intent_json: '{ corrupt json string',
+          status: 'queued'
+        };
+      },
+      async markRunning() {},
+      async invokeAi(prompt, intent) {
+        passedIntent = intent;
+        return { content: 'OK answer' };
+      },
+      async markCompleted() {},
+      async markFailed() {}
+    };
+
+    await runAiJobWorkflow({}, { payload: { jobId: 'job-corrupt-intent' } }, step, customDeps);
+    assert.equal(passedIntent, null);
+    assert.deepEqual(step._executedSteps, ['load-job', 'mark-running', 'provider-call', 'mark-completed']);
+  }
+
+  // Test 5: Provider retry exhaustion marks failed
+  {
+    const step = createStepTracker();
+    let markFailedArgs = null;
+
+    const customDeps = {
+      async getJob(jobId) {
+        return {
+          id: jobId,
+          prompt_text: 'Prompt',
+          intent_json: null,
+          status: 'queued'
+        };
+      },
+      async markRunning() {},
+      async invokeAi() {
+        throw new Error('WORKERS_AI_RETRY_EXHAUSTED');
+      },
+      async markCompleted() {},
+      async markFailed(jobId, errorCode) {
+        markFailedArgs = { jobId, errorCode };
+      }
+    };
+
+    await runAiJobWorkflow({}, { payload: { jobId: 'job-failed' } }, step, customDeps);
+
+    assert.deepEqual(markFailedArgs, { jobId: 'job-failed', errorCode: 'MODEL_EXECUTION_FAILED' });
+    assert.deepEqual(step._executedSteps, ['load-job', 'mark-running', 'provider-call', 'mark-failed']);
+  }
+
+  // Test 6: 500,000-byte safe truncation
+  {
+    const step = createStepTracker();
+    let completedResultText = '';
+
+    const hugeContent = 'A'.repeat(600000);
+    const customDeps = {
+      async getJob(jobId) {
+        return {
+          id: jobId,
+          prompt_text: 'Huge prompt',
+          intent_json: null,
+          status: 'queued'
+        };
+      },
+      async markRunning() {},
+      async invokeAi() {
+        return { content: hugeContent };
+      },
+      async markCompleted(jobId, resultText) {
+        completedResultText = resultText;
+      },
+      async markFailed() {}
+    };
+
+    await runAiJobWorkflow({}, { payload: { jobId: 'job-huge' } }, step, customDeps);
+
+    const byteLen = new TextEncoder().encode(completedResultText).byteLength;
+    assert.ok(byteLen <= 500000, `Truncated byte length ${byteLen} must be <= 500000`);
+    assert.ok(completedResultText.endsWith('\n\n[Output truncated at 500KB bound]'));
+    assert.deepEqual(step._executedSteps, ['load-job', 'mark-running', 'provider-call', 'mark-completed']);
+  }
 
   console.log('AI job workflow contract passed.');
 }
@@ -2068,41 +2206,71 @@ async function run() {
 await run();
 ```
 
-Run test to verify failure (RED):
-```bash
-node tests/ai-job-workflow-contract.mjs
-```
-*Expected Output:* `Error: Cannot find module '../worker/jobWorkflow.js'`
-
 - [ ] **Step 2: Create `worker/jobWorkflow.js`**
 
 ```javascript
 // worker/jobWorkflow.js
 import { WORKERS_AI_MODEL, invokeWorkersAi } from './ai.js';
-import { markJobRunning, markJobCompleted, markJobFailed } from './jobStore.js';
+import { getJobById, markJobRunning, markJobCompleted, markJobFailed } from './jobStore.js';
 import { truncateToUtf8ByteLimit } from './jobUtils.js';
 
-export async function runAiJobWorkflow(env, event, step) {
-  const { jobId } = event.payload || {};
-  if (!jobId) return;
+export function resolveWorkflowDependencies(env, customDeps = {}) {
+  const getJob = 'getJob' in customDeps ? customDeps.getJob : (async (jobId) => {
+    if (!env?.DB) throw new Error('D1_BINDING_MISSING');
+    return getJobById(env.DB, jobId);
+  });
 
-  // Step 1: Load job from D1
+  const markRunning = 'markRunning' in customDeps ? customDeps.markRunning : (async (jobId) => {
+    if (!env?.DB) throw new Error('D1_BINDING_MISSING');
+    return markJobRunning(env.DB, jobId);
+  });
+
+  const markCompleted = 'markCompleted' in customDeps ? customDeps.markCompleted : (async (jobId, resultText, providerMeta) => {
+    if (!env?.DB) throw new Error('D1_BINDING_MISSING');
+    return markJobCompleted(env.DB, jobId, resultText, providerMeta);
+  });
+
+  const markFailed = 'markFailed' in customDeps ? customDeps.markFailed : (async (jobId, errorCode) => {
+    if (!env?.DB) throw new Error('D1_BINDING_MISSING');
+    return markJobFailed(env.DB, jobId, errorCode);
+  });
+
+  const invokeAi = 'invokeAi' in customDeps ? customDeps.invokeAi : (async (prompt, intent) => {
+    return invokeWorkersAi(env, { prompt, intent });
+  });
+
+  return { getJob, markRunning, markCompleted, markFailed, invokeAi };
+}
+
+export async function runAiJobWorkflow(env, event, step, customDeps = {}) {
+  const { jobId } = event?.payload || {};
+  if (!jobId) {
+    throw new Error('MISSING_JOB_ID_FATAL');
+  }
+
+  const { getJob, markRunning, markCompleted, markFailed, invokeAi } = resolveWorkflowDependencies(env, customDeps);
+
+  // Step 1: load-job
   const job = await step.do('load-job', async () => {
-    const row = await env.DB.prepare(
-      'SELECT prompt_text, intent_json, status FROM jobs WHERE id = ?'
-    ).bind(jobId).first();
-    if (!row) throw new Error('JOB_NOT_FOUND_FATAL');
+    const row = await getJob(jobId);
+    if (!row) {
+      throw new Error('JOB_NOT_FOUND_FATAL');
+    }
     return row;
   });
 
   if (!job) return;
 
-  // Step 2: Mark job as running in D1
+  if (job.status === 'completed' || job.status === 'failed') {
+    return;
+  }
+
+  // Step 2: mark-running
   await step.do('mark-running', async () => {
-    await markJobRunning(env.DB, jobId);
+    await markRunning(jobId);
   });
 
-  // Step 3: Call Workers AI with retry configuration and 500,000 byte truncation limit
+  // Step 3: provider-call
   let completionResult;
   try {
     completionResult = await step.do(
@@ -2117,36 +2285,35 @@ export async function runAiJobWorkflow(env, event, step) {
       },
       async () => {
         let intent = null;
-        if (job.intent_json) {
+        if (job.intent_json && typeof job.intent_json === 'string') {
           try {
             intent = JSON.parse(job.intent_json);
-          } catch {}
+          } catch (parseErr) {
+            intent = null;
+          }
         }
 
-        const result = await invokeWorkersAi(env, {
-          prompt: job.prompt_text,
-          intent
-        });
-
-        return truncateToUtf8ByteLimit(result.content, 500000);
+        const result = await invokeAi(job.prompt_text, intent);
+        const rawContent = typeof result?.content === 'string' ? result.content : '';
+        return truncateToUtf8ByteLimit(rawContent, 500000);
       }
     );
   } catch (err) {
-    // Step 4a: Mark Failed if step retries are exhausted
+    // Step 4a: mark-failed
     await step.do('mark-failed', async () => {
-      await markJobFailed(env.DB, jobId, 'MODEL_EXECUTION_FAILED');
+      await markFailed(jobId, 'MODEL_EXECUTION_FAILED');
     });
     return;
   }
 
-  // Step 4b: Mark Completed and save result in D1
+  // Step 4b: mark-completed
   const providerMeta = JSON.stringify({
     provider: '@cf/workers-ai',
     model: WORKERS_AI_MODEL
   });
 
   await step.do('mark-completed', async () => {
-    await markJobCompleted(env.DB, jobId, completionResult, providerMeta);
+    await markCompleted(jobId, completionResult, providerMeta);
   });
 }
 ```
