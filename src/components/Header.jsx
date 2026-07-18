@@ -26,7 +26,7 @@ export default function Header({
           </button>
         )}
 
-        <div className="brand-title" style={{ fontSize: '0.95rem', fontWeight: 800 }}>
+        <div className="brand-title" style={{ fontSize: '0.95rem', fontWeight: 300 }}>
           <div className="brand-icon" style={{ width: '20px', height: '20px' }}>
             <Layers size={13} />
           </div>

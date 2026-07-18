@@ -77,7 +77,7 @@ export default function CanvasPreview({
                 background: activeTab === 'preview' ? 'var(--text-primary)' : 'transparent',
                 color: activeTab === 'preview' ? 'var(--bg-primary)' : 'var(--text-secondary)',
                 fontSize: '0.725rem',
-                fontWeight: 600,
+                fontWeight: 300,
                 cursor: 'pointer',
                 transition: 'var(--transition-fast)'
               }}
@@ -93,7 +93,7 @@ export default function CanvasPreview({
                 background: activeTab === 'code' ? 'var(--text-primary)' : 'transparent',
                 color: activeTab === 'code' ? 'var(--bg-primary)' : 'var(--text-secondary)',
                 fontSize: '0.725rem',
-                fontWeight: 600,
+                fontWeight: 300,
                 cursor: 'pointer',
                 transition: 'var(--transition-fast)'
               }}
