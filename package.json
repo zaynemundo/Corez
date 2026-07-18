@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "train:intents": "node scripts/train-intents.mjs",
+    "evaluate:intents": "node scripts/evaluate-local-intents.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.475.0",

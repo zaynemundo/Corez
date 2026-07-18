@@ -18,6 +18,8 @@ writing help, an explanation, or general guidance. Respond with the likely
 goal, useful next action, and a concise path forward.
 `;
 
+import { classifyIntent } from './intentClassifier.js';
+
 const INTENT_PATTERNS = {
   app: /\b(build|make|create|generate|design|launch|prototype|develop|ship)\b.*\b(app|tool|website|site|landing page|dashboard|portal|widget|calculator|timer|game|simulator|preview|html)\b|\b(app|tool|website|site|landing page|dashboard|portal|widget|calculator|timer|game|simulator)\b.*\b(build|make|create|generate|design|launch|prototype|develop|ship)\b/i,
   code: /\b(code|debug|bug|fix|error|javascript|typescript|python|react|css|html|component|function|api|compile|stack trace)\b/i,
@@ -42,8 +44,7 @@ export function getOpenRouterConfig() {
   };
 }
 
-export function analyzePublicUserIntent(prompt) {
-  const cleanPrompt = prompt.trim();
+function analyzeIntentWithRules(cleanPrompt) {
   const lower = cleanPrompt.toLowerCase();
 
   if (INTENT_PATTERNS.app.test(cleanPrompt)) {
@@ -82,6 +83,80 @@ export function analyzePublicUserIntent(prompt) {
     type: 'general',
     summary: 'Understand the public user goal and give a useful next step.',
     responseStrategy: 'Clarify the likely intent, answer directly, and invite the next concrete detail.'
+  };
+}
+
+export function analyzePublicUserIntent(prompt) {
+  const cleanPrompt = prompt ? prompt.trim() : '';
+
+  if (!cleanPrompt) {
+    return {
+      type: 'general',
+      summary: 'Understand the public user goal and give a useful next step.',
+      responseStrategy: 'Clarify the likely intent, answer directly, and invite the next concrete detail.',
+      confidence: 0,
+      source: 'default'
+    };
+  }
+
+  let modelResult;
+  try {
+    modelResult = classifyIntent(cleanPrompt);
+  } catch {
+    modelResult = { accepted: false, confidence: 0 };
+  }
+
+  if (modelResult && modelResult.accepted) {
+    switch (modelResult.label) {
+      case 'app':
+        return {
+          type: 'app',
+          summary: 'Create a public-facing interactive experience or web tool.',
+          responseStrategy: 'Build a runnable monochrome HTML preview when enough intent is present.',
+          confidence: modelResult.confidence,
+          source: 'model'
+        };
+      case 'code-help':
+        return {
+          type: 'code-help',
+          summary: 'Help the user understand, debug, or improve code.',
+          responseStrategy: 'Ask for the relevant snippet when the code is missing; otherwise explain the fix clearly.',
+          confidence: modelResult.confidence,
+          source: 'model'
+        };
+      case 'writing':
+        return {
+          type: 'writing',
+          summary: 'Help the user shape public-facing words or content.',
+          responseStrategy: 'Offer a concise draft or rewrite with a clear tone.',
+          confidence: modelResult.confidence,
+          source: 'model'
+        };
+      case 'explanation':
+        return {
+          type: 'explanation',
+          summary: 'Explain the topic in plain language.',
+          responseStrategy: 'Give a direct answer with the minimum useful context.',
+          confidence: modelResult.confidence,
+          source: 'model'
+        };
+      case 'general':
+      default:
+        return {
+          type: 'general',
+          summary: 'Understand the public user goal and give a useful next step.',
+          responseStrategy: 'Clarify the likely intent, answer directly, and invite the next concrete detail.',
+          confidence: modelResult.confidence,
+          source: 'model'
+        };
+    }
+  }
+
+  const ruleResult = analyzeIntentWithRules(cleanPrompt);
+  return {
+    ...ruleResult,
+    confidence: modelResult?.confidence ?? 0,
+    source: 'rules'
   };
 }
 
