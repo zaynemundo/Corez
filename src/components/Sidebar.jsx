@@ -6,10 +6,8 @@ import {
   Sun, 
   Moon, 
   PanelLeftClose,
-  Play,
   Layers
 } from 'lucide-react';
-import { SAMPLE_APPS } from '../data/sampleApps';
 
 export default function Sidebar({
   isOpen,
@@ -21,8 +19,7 @@ export default function Sidebar({
   onOpenSettings,
   theme,
   onToggleTheme,
-  onCloseSidebar,
-  onLoadSampleApp
+  onCloseSidebar
 }) {
   return (
     <aside className={`sidebar ${isOpen ? '' : 'collapsed'}`} aria-hidden={!isOpen}>
@@ -69,21 +66,6 @@ export default function Sidebar({
             >
               <Trash2 size={13} />
             </button>
-          </div>
-        ))}
-
-        <div className="sidebar-section-heading">
-          Executable App Samples
-        </div>
-        {SAMPLE_APPS.map((app) => (
-          <div
-            key={app.id}
-            className="history-item"
-            onClick={() => onLoadSampleApp(app)}
-            style={{ fontSize: '0.8rem' }}
-          >
-            <Play size={12} style={{ flexShrink: 0, color: 'var(--text-primary)' }} />
-            <span className="history-title">{app.title}</span>
           </div>
         ))}
       </div>

@@ -6,23 +6,13 @@ import ChatInput from './components/ChatInput';
 import CanvasPreview from './components/CanvasPreview';
 import SettingsModal from './components/SettingsModal';
 import { generateAIResponse, extractCodeFromMessage } from './services/aiService';
-import { SAMPLE_APPS } from './data/sampleApps';
 import { Layers, Code, Gamepad2, BarChart3 } from 'lucide-react';
 
 const INITIAL_SESSIONS = [
   {
     id: 'session-default',
-    title: 'Executive Analytics',
-    messages: [
-      {
-        role: 'user',
-        content: 'Build an executive analytics dashboard with monochrome styling, stark SVG chart, and live search.'
-      },
-      {
-        role: 'assistant',
-        content: `I have constructed your monochrome executive analytics dashboard for **Corez**.\n\n\`\`\`html\n${SAMPLE_APPS[0].code}\n\`\`\``
-      }
-    ]
+    title: 'New Conversation',
+    messages: []
   }
 ];
 
@@ -42,7 +32,7 @@ export default function App() {
   });
   const [canvasOpen, setCanvasOpen] = useState(false);
   const [canvasFullScreen, setCanvasFullScreen] = useState(false);
-  const [activeCanvasCode, setActiveCanvasCode] = useState(SAMPLE_APPS[0].code);
+  const [activeCanvasCode, setActiveCanvasCode] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem('corez_theme') || 'dark');
@@ -115,31 +105,12 @@ export default function App() {
   const handleClearAllHistory = () => {
     setSessions(INITIAL_SESSIONS);
     setActiveSessionId(INITIAL_SESSIONS[0].id);
-    setActiveCanvasCode(SAMPLE_APPS[0].code);
+    setActiveCanvasCode('');
     setSettingsOpen(false);
   };
 
   const handleRunInCanvas = (code) => {
     setActiveCanvasCode(code);
-    setCanvasOpen(true);
-  };
-
-  const handleLoadSampleApp = (app) => {
-    const newId = `session-${Date.now()}`;
-    const newSession = {
-      id: newId,
-      title: app.title,
-      messages: [
-        { role: 'user', content: app.prompt },
-        {
-          role: 'assistant',
-          content: `I have generated the monochrome application for **${app.title}**.\n\n\`\`\`html\n${app.code}\n\`\`\``
-        }
-      ]
-    };
-    setSessions([newSession, ...sessions]);
-    setActiveSessionId(newId);
-    setActiveCanvasCode(app.code);
     setCanvasOpen(true);
   };
 
@@ -193,7 +164,6 @@ export default function App() {
         theme={theme}
         onToggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
         onCloseSidebar={() => setSidebarOpen(false)}
-        onLoadSampleApp={handleLoadSampleApp}
       />
 
       {isMobileViewport && sidebarOpen && (
