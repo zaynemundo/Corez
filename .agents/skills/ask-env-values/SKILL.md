@@ -29,12 +29,14 @@ For Corez public AI routing, ask for:
 
 ```text
 OPENROUTER_API_KEY=<value>
-OPENROUTER_MODEL=open-orca/mistral-7b-openorca
+OPENROUTER_MODEL=deepseek/deepseek-v4-flash
+OPENROUTER_REASONING_EFFORT=xhigh
 ```
 
 `OPENROUTER_API_KEY` is required for public OpenRouter routing.
 `OPENROUTER_MODEL` is optional; Corez defaults to
-`open-orca/mistral-7b-openorca`.
+`deepseek/deepseek-v4-flash`.
+`OPENROUTER_REASONING_EFFORT` is optional; Corez defaults to `xhigh`.
 
 ## Replit wording
 
@@ -42,7 +44,8 @@ When the target is Replit, ask the user to add values in Replit Secrets:
 
 ```text
 OPENROUTER_API_KEY=your_openrouter_key
-OPENROUTER_MODEL=open-orca/mistral-7b-openorca
+OPENROUTER_MODEL=deepseek/deepseek-v4-flash
+OPENROUTER_REASONING_EFFORT=xhigh
 ```
 
 Do not ask the public app user for these secrets. They belong in the deployment

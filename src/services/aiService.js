@@ -7,7 +7,7 @@ export const MODEL = {
 };
 
 export const OPENROUTER_PROXY_ENDPOINT = '/api/openrouter';
-export const DEFAULT_OPENROUTER_MODEL = 'open-orca/mistral-7b-openorca';
+export const DEFAULT_OPENROUTER_MODEL = 'deepseek/deepseek-v4-flash';
 
 export const PUBLIC_USER_INTENT_PROMPT = `
 Corez serves public users who may describe goals casually, incompletely, or
@@ -138,7 +138,7 @@ export async function generateLocalAIResponse(prompt) {
   await new Promise(r => setTimeout(r, 600));
 
   // 1. GREETINGS & SMALL TALK (Universal & Natural)
-  if (/^(hello|hi|hey|greetings|good morning|good afternoon|good evening|howdy|sup)(\s|\!|\.|\?|$)/i.test(lower)) {
+  if (/^(hello|hi|hey|greetings|good morning|good afternoon|good evening|howdy|sup)(\s|!|\.|\?|$)/i.test(lower)) {
     return `Hi there! How’s your day going?`;
   }
 
@@ -146,19 +146,19 @@ export async function generateLocalAIResponse(prompt) {
     return `Hello! I'm **Corez**, a minimalist AI assistant built for public users.\n\nI can help you understand ideas, write clearer content, debug code, plan products, or generate live monochrome web apps that open in the preview canvas. Tell me what you want to make or understand, and I’ll infer the goal, explain the useful context, and give you a practical next step.`;
   }
 
-  if (/^(how are you|how is it going|how's it going)(\s|\!|\.|\?|$)/i.test(lower)) {
+  if (/^(how are you|how is it going|how's it going)(\s|!|\.|\?|$)/i.test(lower)) {
     return `Doing great! Ready to help whenever you are. What's on your mind?`;
   }
 
   // 2. GRATITUDE INTENT
-  if (/^(thanks|thank you|awesome|great|cool|nice|perfect)(\s|\!|\.|$)/i.test(lower)) {
+  if (/^(thanks|thank you|awesome|great|cool|nice|perfect)(\s|!|\.|$)/i.test(lower)) {
     return `You're very welcome! Let me know if there's anything else I can help with.`;
   }
 
   // 3. PUBLIC APP / GAME / WIDGET CREATION INTENT
   if (intent.type === 'app') {
-    let appTitle = "Custom Tool";
-    let appBody = "";
+    let appTitle;
+    let appBody;
 
     if (lower.includes('timer') || lower.includes('stopwatch')) {
       appTitle = "Stopwatch & Timer";

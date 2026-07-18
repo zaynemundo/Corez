@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, Settings, Trash2, KeyRound } from 'lucide-react';
 
-const DEFAULT_OPENROUTER_MODEL = 'open-orca/mistral-7b-openorca';
+const DEFAULT_OPENROUTER_MODEL = 'deepseek/deepseek-v4-flash';
 
 export default function SettingsModal({ isOpen, onClose, onClearAllHistory }) {
   const [openRouterModel, setOpenRouterModel] = useState(DEFAULT_OPENROUTER_MODEL);

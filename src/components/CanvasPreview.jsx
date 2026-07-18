@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Code2, 
   RotateCw, 
@@ -8,7 +8,6 @@ import {
   Copy, 
   Check, 
   X,
-  Layers,
   Monitor,
   Laptop,
   Tablet,

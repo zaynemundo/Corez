@@ -32,7 +32,7 @@ check_absent() {
 check 'server proxy route exists' 'export default async function handler' "$api"
 check 'server proxy reads private OpenRouter key from env' 'process[.]env[.]OPENROUTER_API_KEY' "$api"
 check 'server proxy calls OpenRouter chat completions' 'https://openrouter[.]ai/api/v1/chat/completions' "$api"
-check 'server proxy uses OpenOrca default model' 'open-orca/mistral-7b-openorca' "$api"
+check 'server proxy uses DeepSeek V4 Flash default model' 'deepseek/deepseek-v4-flash' "$api"
 check 'server proxy requests detailed public answers' 'detailed|thorough|structured' "$api"
 check 'server proxy never sends API key to client response' 'sendJson.*response, 200.*content' "$api"
 check 'frontend calls public proxy first' "fetch\\('/api/openrouter'" "$service"

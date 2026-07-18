@@ -9,7 +9,7 @@ from `/api/openrouter` with your private deployment secret.
 By default, Corez uses:
 
 ```text
-open-orca/mistral-7b-openorca
+deepseek/deepseek-v4-flash
 ```
 
 Set these server/deployment environment variables:
@@ -17,8 +17,10 @@ Set these server/deployment environment variables:
 ```text
 OPENROUTER_API_KEY
 OPENROUTER_MODEL
+OPENROUTER_REASONING_EFFORT
 ```
 
-`OPENROUTER_MODEL` is optional. If it is not set, Corez uses the OpenOrca model
-above. Users can still override the model name from Corez Settings, but they are
-not asked for an API key.
+`OPENROUTER_MODEL` is optional. If it is not set, Corez uses DeepSeek V4 Flash.
+`OPENROUTER_REASONING_EFFORT` is optional and defaults to `xhigh` for max
+reasoning on supported OpenRouter models. Users can still override the model
+name from Corez Settings, but they are not asked for an API key.

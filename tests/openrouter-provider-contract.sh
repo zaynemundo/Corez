@@ -29,7 +29,7 @@ check_absent() {
 }
 
 check 'OpenRouter endpoint is configured server-side' 'https://openrouter[.]ai/api/v1/chat/completions' "$api"
-check 'OpenOrca is the default model option' 'open-orca/mistral-7b-openorca' "$service"
+check 'DeepSeek V4 Flash is the default model option' 'deepseek/deepseek-v4-flash' "$service"
 check 'private API key is read server-side' 'process[.]env[.]OPENROUTER_API_KEY' "$api"
 check 'OpenRouter request sends authorization header server-side' 'Authorization.*Bearer' "$api"
 check 'OpenRouter request sends system and user messages server-side' "role: 'system'|role: \"system\"" "$api"

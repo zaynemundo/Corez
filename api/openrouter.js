@@ -1,5 +1,15 @@
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
-const DEFAULT_OPENROUTER_MODEL = 'open-orca/mistral-7b-openorca';
+const DEFAULT_OPENROUTER_MODEL = 'deepseek/deepseek-v4-flash';
+const DEFAULT_OPENROUTER_REASONING_EFFORT = 'xhigh';
+const ALLOWED_REASONING_EFFORTS = new Set(['none', 'minimal', 'low', 'medium', 'high', 'xhigh']);
+
+function getReasoningEffort() {
+  const effort = (process.env.OPENROUTER_REASONING_EFFORT || DEFAULT_OPENROUTER_REASONING_EFFORT)
+    .trim()
+    .toLowerCase();
+
+  return ALLOWED_REASONING_EFFORTS.has(effort) ? effort : DEFAULT_OPENROUTER_REASONING_EFFORT;
+}
 
 function buildSystemPrompt(intent) {
   const intentSummary = intent?.summary || 'Understand the public user goal and give a useful next step.';
@@ -13,6 +23,10 @@ Response style:
 - Be detailed, structured, and practical.
 - Start with the direct answer.
 - Add useful context, steps, examples, or tradeoffs when they help.
+- For plans, include concrete ordered steps and likely risks.
+- For explanations, define the idea plainly, then show a small example.
+- For writing tasks, provide a usable draft and explain the tone or structure briefly.
+- For code help, identify the likely cause, show a corrected snippet when possible, and mention how to verify it.
 - Avoid vague filler.
 - If the user asks to build a website, landing page, dashboard, app, game, widget, or tool, return one complete runnable HTML document inside a fenced html code block.
 - Keep generated apps minimalist, monochrome, responsive, and self-contained.
@@ -47,6 +61,7 @@ export default async function handler(request, response) {
     const model = typeof body.model === 'string' && body.model.trim()
       ? body.model.trim()
       : process.env.OPENROUTER_MODEL || DEFAULT_OPENROUTER_MODEL;
+    const reasoningEffort = getReasoningEffort();
 
     if (!prompt) {
       sendJson(response, 400, { error: 'Prompt is required.' });
@@ -66,6 +81,7 @@ export default async function handler(request, response) {
           { role: 'system', content: buildSystemPrompt(intent) },
           { role: 'user', content: prompt }
         ],
+        reasoning_effort: reasoningEffort,
         temperature: 0.72,
         max_tokens: intent?.type === 'app' ? 3200 : 1800
       })
