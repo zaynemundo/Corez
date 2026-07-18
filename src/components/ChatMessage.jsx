@@ -1,15 +1,63 @@
+import { useState } from 'react';
 import { 
   Layers,
-  ChevronRight
+  ChevronRight,
+  Copy,
+  Check
 } from 'lucide-react';
+
+function CodeSnippetBlock({ code, lang }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <div className="code-block-container">
+      <div className="code-header">
+        <span className="code-lang">{lang || 'code'}</span>
+        <button className="code-btn" onClick={handleCopy} title="Copy code">
+          {copied ? <Check size={12} /> : <Copy size={12} />}
+          <span>{copied ? 'Copied' : 'Copy'}</span>
+        </button>
+      </div>
+      <pre className="code-content">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
 
 export default function ChatMessage({ message, onRunInCanvas }) {
   const isUser = message.role === 'user';
 
+  const renderInlineFormattedText = (text) => {
+    if (!text) return null;
+
+    const tokens = text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g);
+
+    return tokens.map((token, i) => {
+      if (token.startsWith('`') && token.endsWith('`') && token.length > 2) {
+        return <code key={i} className="inline-code">{token.slice(1, -1)}</code>;
+      }
+      if (token.startsWith('**') && token.endsWith('**') && token.length > 4) {
+        return <strong key={i}>{token.slice(2, -2)}</strong>;
+      }
+      if (token.startsWith('*') && token.endsWith('*') && token.length > 2) {
+        return <em key={i}>{token.slice(1, -1)}</em>;
+      }
+      return token;
+    });
+  };
+
   const renderFormattedText = (content) => {
     if (!content) return null;
 
-    // Detect markdown code blocks ```lang ... ```
     const codeBlockRegex = /```(\w+)?\s*([\s\S]*?)```/g;
     const parts = [];
     let lastIndex = 0;
@@ -64,24 +112,46 @@ export default function ChatMessage({ message, onRunInCanvas }) {
           );
         }
 
-        return null;
+        return <CodeSnippetBlock key={idx} code={part.code} lang={part.lang} />;
       }
 
       const lines = part.content.split('\n');
       return (
         <div key={idx} className="markdown-body">
           {lines.map((line, lIdx) => {
-            if (!line.trim()) return <div key={lIdx} style={{ height: '0.4rem' }} />;
-            
-            const parts = line.split(/(\*\*.*?\*\*)/g);
+            const trimmed = line.trim();
+            if (!trimmed) return <div key={lIdx} style={{ height: '0.35rem' }} />;
+
+            if (trimmed.startsWith('# ') || trimmed.startsWith('## ') || trimmed.startsWith('### ')) {
+              const headingText = trimmed.replace(/^#+\s*/, '');
+              return (
+                <h3 key={lIdx} className="markdown-heading">
+                  {renderInlineFormattedText(headingText)}
+                </h3>
+              );
+            }
+
+            if (trimmed.startsWith('> ')) {
+              const quoteText = trimmed.slice(2);
+              return (
+                <blockquote key={lIdx} className="markdown-blockquote">
+                  {renderInlineFormattedText(quoteText)}
+                </blockquote>
+              );
+            }
+
+            if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || /^\d+\.\s/.test(trimmed)) {
+              const listText = trimmed.replace(/^[-*]\s+|\d+\.\s+/, '');
+              return (
+                <li key={lIdx} className="markdown-list-item">
+                  {renderInlineFormattedText(listText)}
+                </li>
+              );
+            }
+
             return (
               <p key={lIdx}>
-                {parts.map((p, pIdx) => {
-                  if (p.startsWith('**') && p.endsWith('**')) {
-                    return <strong key={pIdx}>{p.slice(2, -2)}</strong>;
-                  }
-                  return p;
-                })}
+                {renderInlineFormattedText(line)}
               </p>
             );
           })}

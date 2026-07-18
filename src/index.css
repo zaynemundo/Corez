@@ -577,8 +577,69 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .message-wrapper.ai .message-content {
-  background-color: transparent;
-  padding-left: 0;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 1.15rem 1.4rem;
+  color: var(--text-primary);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+  font-size: 0.875rem;
+  font-weight: 300;
+  line-height: 1.7;
+}
+
+/* Markdown Elements Styling */
+.markdown-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.markdown-body p {
+  margin-bottom: 0.25rem;
+  line-height: 1.65;
+  color: var(--text-primary);
+  font-weight: 300;
+}
+
+.markdown-heading {
+  font-size: 0.95rem;
+  font-weight: 300;
+  margin: 0.75rem 0 0.35rem 0;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.markdown-blockquote {
+  border-left: 2px solid var(--border-hover);
+  padding: 0.4rem 0 0.4rem 0.85rem;
+  margin: 0.5rem 0;
+  color: var(--text-secondary);
+  font-style: italic;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
+}
+
+.markdown-list-item {
+  margin-left: 1.25rem;
+  list-style-type: disc;
+  margin-bottom: 0.25rem;
+  line-height: 1.6;
+  color: var(--text-primary);
+  font-weight: 300;
+}
+
+.inline-code {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xs);
+  padding: 0.12rem 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--text-primary);
+  font-weight: 400;
 }
 
 .thinking-indicator-box {
@@ -643,7 +704,7 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 0.825rem;
-  font-weight: 500;
+  font-weight: 300;
   cursor: pointer;
   transition: var(--transition-fast);
   user-select: none;
@@ -673,9 +734,16 @@ h1, h2, h3, h4, h5, h6 {
   justify-content: space-between;
   font-family: var(--font-mono);
   font-size: 0.725rem;
-  font-weight: 400;
+  font-weight: 300;
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border-color);
+}
+
+.code-lang {
+  text-transform: lowercase;
+  letter-spacing: 0.03em;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
 }
 
 .code-actions { display: flex; align-items: center; gap: 0.4rem; }
@@ -690,7 +758,7 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: var(--radius-pill);
   color: var(--text-primary);
   font-size: 0.7rem;
-  font-weight: 400;
+  font-weight: 300;
   cursor: pointer;
   transition: var(--transition-fast);
 }
