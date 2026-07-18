@@ -2561,7 +2561,7 @@ git commit -m "feat(infra): provision D1, Workflows, Rate Limiter, and CI deploy
 
 ### Task 6: Client Services — Background Job Registry & Polling Sync
 
-**Goal:** Create `src/services/backgroundJobs.js` and `src/services/backgroundJobSync.js` to manage client pre-POST `localStorage` records, capability tokens, exponential polling backoff, cross-session reconciliation, and non-atomic history-first write semantics.
+**Goal:** Implement `src/services/backgroundJobs.js` and `src/services/backgroundJobSync.js` alongside contract tests in `tests/background-jobs-client-contract.mjs`. Manage client job registry records in `localStorage` key `corez_background_ai_jobs_v1`, mandate Web Crypto for non-predictable UUID v4 and capability token generation, enforce pre-POST persistence order (job record and conversation history written before network fetch), preserve identical job identity across ambiguous network/5xx failures, reload fresh sessions from `corez_sessions` on every reconciliation pass using strict chat schema (`role` and `content` only), handle all job statuses (`queued`, `running`, `completed`, `failed`, `expired`, `404`), enforce strict terminal persistence ordering (save history before clearing credentials), recover missing origin sessions into a dedicated recovered session, gate executable preview/canvas callbacks to the active origin session, and surface storage errors without empty catch blocks or sensitive token/prompt logging.
 
 **Files:**
 - Create: `tests/background-jobs-client-contract.mjs`
@@ -2571,87 +2571,373 @@ git commit -m "feat(infra): provision D1, Workflows, Rate Limiter, and CI deploy
 **Interfaces:**
 - `src/services/backgroundJobs.js`:
   ```javascript
-  export function generateJobId() { /* crypto.randomUUID() */ }
-  export function generateCapabilityToken() { /* 64 hex char job_sec_... */ }
-  export function getStoredJobs() { /* LocalJobRecord[] */ }
-  export function saveJobRecord(record) { /* save to localStorage.corez_ai_jobs_v1 */ }
-  export function updateJobRecord(jobId, updates) { /* update record */ }
-  export function removeJobRecord(jobId) { /* remove record */ }
-  export async function postBackgroundJob(payload, capabilityToken) { /* POST /api/ai/jobs */ }
-  export async function fetchJobStatus(jobId, capabilityToken) { /* GET /api/ai/jobs/:jobId */ }
+  export const BACKGROUND_JOBS_STORAGE_KEY = 'corez_background_ai_jobs_v1';
+  export function checkWebCryptoAvailable(cryptoObj);
+  export function generateJobId(cryptoObj);
+  export function generateCapabilityToken(cryptoObj);
+  export function getStoredJobs(deps);
+  export function saveJobRecord(record, deps);
+  export function updateJobRecord(jobId, updates, deps);
+  export function removeJobRecord(jobId, deps);
+  export async function dispatchBackgroundJob(params, deps);
+  export async function fetchJobStatus(jobId, capabilityToken, deps);
   ```
 - `src/services/backgroundJobSync.js`:
   ```javascript
-  export function calculatePollingDelay(attemptCount) { /* 1s -> 2s -> 4s -> max 10s */ }
-  export async function reconcileBackgroundJobs(options) { /* cross-session reconciliation */ }
+  export const SESSIONS_STORAGE_KEY = 'corez_sessions';
+  export function calculatePollingDelay(attemptCount);
+  export function getFreshSessions(deps);
+  export function saveFreshSessions(sessions, deps);
+  export async function reconcileBackgroundJobs(options, deps);
   ```
 
 - [ ] **Step 1: Write failing contract test `tests/background-jobs-client-contract.mjs`**
+
+Create `tests/background-jobs-client-contract.mjs` with comprehensive test coverage:
 
 ```javascript
 // tests/background-jobs-client-contract.mjs
 import assert from 'node:assert/strict';
 import {
+  BACKGROUND_JOBS_STORAGE_KEY,
+  checkWebCryptoAvailable,
   generateJobId,
   generateCapabilityToken,
   getStoredJobs,
   saveJobRecord,
-  updateJobRecord
+  updateJobRecord,
+  removeJobRecord,
+  dispatchBackgroundJob,
+  fetchJobStatus
 } from '../src/services/backgroundJobs.js';
-import { calculatePollingDelay } from '../src/services/backgroundJobSync.js';
+import {
+  SESSIONS_STORAGE_KEY,
+  calculatePollingDelay,
+  getFreshSessions,
+  saveFreshSessions,
+  reconcileBackgroundJobs
+} from '../src/services/backgroundJobSync.js';
 
-// Polyfill localStorage for Node
-if (typeof globalThis.localStorage === 'undefined') {
-  const mockStorage = new Map();
-  globalThis.localStorage = {
-    getItem: (k) => mockStorage.get(k) || null,
-    setItem: (k, v) => mockStorage.set(k, String(v)),
-    removeItem: (k) => mockStorage.delete(k),
-    clear: () => mockStorage.clear()
+function createMockStorage() {
+  const store = new Map();
+  let shouldFailSet = false;
+  let shouldFailGet = false;
+
+  return {
+    _store: store,
+    _setShouldFailSet(val) { shouldFailSet = val; },
+    _setShouldFailGet(val) { shouldFailGet = val; },
+    getItem(key) {
+      if (shouldFailGet) {
+        throw new Error('STORAGE_READ_DENIED: Access control error');
+      }
+      return store.has(key) ? store.get(key) : null;
+    },
+    setItem(key, value) {
+      if (shouldFailSet) {
+        throw new Error('STORAGE_QUOTA_EXCEEDED: LocalStorage quota reached');
+      }
+      store.set(key, String(value));
+    },
+    removeItem(key) {
+      store.delete(key);
+    },
+    clear() {
+      store.clear();
+    }
   };
 }
 
 async function run() {
-  localStorage.clear();
-
-  // Test 1: ID and Token Generators
-  const jobId = generateJobId();
-  assert.match(jobId, /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
-
-  const token = generateCapabilityToken();
-  assert.ok(token.startsWith('job_sec_'));
-
-  // Test 2: Local storage record persistence
-  const record = {
-    jobId,
-    capabilityToken: token,
-    conversationId: 'c-100',
-    userMessageId: 'm-1',
-    assistantMessageId: 'm-2',
-    promptText: 'Build a calculator',
-    status: 'queued',
-    reconciled: false,
-    createdAt: Date.now()
+  // Setup standard test dependencies
+  const storage = createMockStorage();
+  const logs = [];
+  const logger = {
+    error: (msg, meta) => logs.push({ level: 'error', msg, meta }),
+    info: (msg, meta) => logs.push({ level: 'info', msg, meta })
   };
 
-  saveJobRecord(record);
-  const jobs = getStoredJobs();
-  assert.equal(jobs.length, 1);
-  assert.equal(jobs[0].jobId, jobId);
+  let currentTime = 1770000000000;
+  const clock = { now: () => currentTime };
 
-  // Test 3: Update job record
-  updateJobRecord(jobId, { status: 'completed', reconciled: true });
-  const updatedJobs = getStoredJobs();
-  assert.equal(updatedJobs[0].status, 'completed');
-  assert.equal(updatedJobs[0].reconciled, true);
+  // Setup Web Crypto polyfill for Node test environment if needed
+  const cryptoObj = globalThis.crypto;
 
-  // Test 4: Polling delay exponential backoff
+  // ---------------------------------------------------------------------------
+  // Test 1: Mandatory Web Crypto & Exception on Missing Crypto
+  // ---------------------------------------------------------------------------
+  assert.doesNotThrow(() => checkWebCryptoAvailable(cryptoObj));
+  const validUuid = generateJobId(cryptoObj);
+  assert.match(validUuid, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+
+  const validToken = generateCapabilityToken(cryptoObj);
+  assert.equal(validToken.length, 72);
+  assert.ok(validToken.startsWith('job_sec_'));
+
+  assert.throws(
+    () => checkWebCryptoAvailable(null),
+    /CRYPTO_UNAVAILABLE/,
+    'Must throw CRYPTO_UNAVAILABLE if crypto is null'
+  );
+  assert.throws(
+    () => generateJobId({}),
+    /CRYPTO_UNAVAILABLE/,
+    'Must throw CRYPTO_UNAVAILABLE if randomUUID missing'
+  );
+
+  // ---------------------------------------------------------------------------
+  // Test 2: Storage Failures Surfaced & No Empty Catch Blocks
+  // ---------------------------------------------------------------------------
+  storage._setShouldFailSet(true);
+  assert.throws(
+    () => saveJobRecord({ jobId: 'j-1', capabilityToken: validToken, prompt: 'p' }, { storage }),
+    /STORAGE_ERROR/,
+    'saveJobRecord must surface storage errors'
+  );
+  storage._setShouldFailSet(false);
+
+  // ---------------------------------------------------------------------------
+  // Test 3: Pre-POST Persistence Order (Registry + History Saved BEFORE Fetch)
+  // ---------------------------------------------------------------------------
+  const sequence = [];
+  const mockFetchForDispatch = async (url, opts) => {
+    // Assert storage already contains job record when fetch is invoked
+    const inFlightJobs = getStoredJobs({ storage });
+    assert.equal(inFlightJobs.length, 1, 'Registry record must be stored before POST');
+    sequence.push('fetch_post');
+    return new Response(JSON.stringify({ status: 'queued' }), { status: 200 });
+  };
+
+  const saveHistoryCallback = () => {
+    sequence.push('save_history');
+  };
+
+  const dispatchRes = await dispatchBackgroundJob({
+    conversationId: 'conv-100',
+    userMessageId: 'msg-u1',
+    assistantMessageId: 'msg-a1',
+    prompt: 'Write a python script',
+    intent: { type: 'code' },
+    saveConversationHistory: saveHistoryCallback
+  }, {
+    crypto: cryptoObj,
+    storage,
+    fetch: mockFetchForDispatch,
+    clock
+  });
+
+  assert.equal(dispatchRes.status, 'queued');
+  assert.deepEqual(sequence, ['save_history', 'fetch_post'], 'History save must execute before POST fetch');
+
+  // ---------------------------------------------------------------------------
+  // Test 4: Ambiguous Network/5xx Failure Retains Identity for Retry
+  // ---------------------------------------------------------------------------
+  const ambiguousJobId = '550e8400-e29b-41d4-a716-446655440099';
+  const ambiguousToken = generateCapabilityToken(cryptoObj);
+
+  const failingFetch = async () => {
+    throw new TypeError('Failed to fetch (NetworkOffline)');
+  };
+
+  await assert.rejects(
+    () => dispatchBackgroundJob({
+      conversationId: 'conv-100',
+      userMessageId: 'msg-u2',
+      assistantMessageId: 'msg-a2',
+      prompt: 'Retry prompt',
+      existingJobId: ambiguousJobId,
+      existingCapabilityToken: ambiguousToken
+    }, {
+      crypto: cryptoObj,
+      storage,
+      fetch: failingFetch,
+      clock
+    }),
+    /DISPATCH_AMBIGUOUS/
+  );
+
+  // Verify stored record retains original jobId and capabilityToken for subsequent retry
+  const storedJobsAfterFailure = getStoredJobs({ storage });
+  const failedRecord = storedJobsAfterFailure.find(j => j.jobId === ambiguousJobId);
+  assert.ok(failedRecord, 'Ambiguous failed job must remain in registry storage');
+  assert.equal(failedRecord.capabilityToken, ambiguousToken, 'Capability token must be preserved for retry');
+
+  // ---------------------------------------------------------------------------
+  // Test 5: Polling Delay Exponential Backoff
+  // ---------------------------------------------------------------------------
   assert.equal(calculatePollingDelay(1), 1000);
   assert.equal(calculatePollingDelay(2), 2000);
   assert.equal(calculatePollingDelay(3), 4000);
   assert.equal(calculatePollingDelay(4), 8000);
   assert.equal(calculatePollingDelay(5), 10000);
   assert.equal(calculatePollingDelay(10), 10000);
+
+  // ---------------------------------------------------------------------------
+  // Test 6: Cross-Session Reconciliation Reloads Fresh Sessions & Uses Schema (role, content)
+  // ---------------------------------------------------------------------------
+  storage.clear();
+
+  const initialSessions = [
+    {
+      id: 'conv-200',
+      title: 'Session 200',
+      messages: [
+        { id: 'msg-user-1', role: 'user', content: 'Create a button' },
+        { id: 'msg-asst-1', role: 'assistant', content: '...', status: 'queued' }
+      ]
+    }
+  ];
+  saveFreshSessions(initialSessions, { storage });
+
+  const testJobId = generateJobId(cryptoObj);
+  const testJobToken = generateCapabilityToken(cryptoObj);
+
+  saveJobRecord({
+    jobId: testJobId,
+    capabilityToken: testJobToken,
+    conversationId: 'conv-200',
+    userMessageId: 'msg-user-1',
+    assistantMessageId: 'msg-asst-1',
+    prompt: 'Create a button',
+    status: 'queued',
+    attemptCount: 1,
+    createdAt: clock.now(),
+    updatedAt: clock.now()
+  }, { storage });
+
+  let canvasUpdatedContent = null;
+  const mockFetchForSync = async (url) => {
+    assert.ok(url.includes(testJobId));
+    return new Response(JSON.stringify({
+      status: 'completed',
+      result: {
+        content: '<button>Click Me</button>',
+        model: '@cf/zai-org/glm-4.7-flash'
+      }
+    }), { status: 200 });
+  };
+
+  const syncResult = await reconcileBackgroundJobs({
+    activeSessionId: 'conv-200',
+    onActiveSessionResult: (content) => { canvasUpdatedContent = content; }
+  }, {
+    storage,
+    fetch: mockFetchForSync,
+    logger,
+    clock
+  });
+
+  assert.equal(syncResult.reconciledCount, 1);
+  assert.equal(canvasUpdatedContent, '<button>Click Me</button>');
+
+  // Verify conversation history saved first with role and content
+  const freshSessionsAfterSync = getFreshSessions({ storage });
+  const updatedMessage = freshSessionsAfterSync[0].messages.find(m => m.id === 'msg-asst-1');
+  assert.equal(updatedMessage.role, 'assistant');
+  assert.equal(updatedMessage.content, '<button>Click Me</button>');
+  assert.equal(updatedMessage.status, 'completed');
+  assert.equal(updatedMessage.sender, undefined, 'Must not use legacy sender key');
+  assert.equal(updatedMessage.text, undefined, 'Must not use legacy text key');
+
+  // Verify registry entry removed only after history persistence
+  const remainingJobs = getStoredJobs({ storage });
+  assert.equal(remainingJobs.length, 0, 'Completed job record must be removed after successful sync');
+
+  // ---------------------------------------------------------------------------
+  // Test 7: Missing Origin Session (Deleted Session Recovery)
+  // ---------------------------------------------------------------------------
+  storage.clear();
+
+  // Save session list WITHOUT conv-300
+  saveFreshSessions([{ id: 'conv-other', title: 'Other Session', messages: [] }], { storage });
+
+  const orphanJobId = generateJobId(cryptoObj);
+  const orphanToken = generateCapabilityToken(cryptoObj);
+
+  saveJobRecord({
+    jobId: orphanJobId,
+    capabilityToken: orphanToken,
+    conversationId: 'conv-deleted-300',
+    userMessageId: 'msg-u-orphan',
+    assistantMessageId: 'msg-a-orphan',
+    prompt: 'Orphaned prompt',
+    status: 'queued',
+    attemptCount: 1,
+    createdAt: clock.now(),
+    updatedAt: clock.now()
+  }, { storage });
+
+  const orphanFetch = async () => new Response(JSON.stringify({
+    status: 'completed',
+    result: { content: 'Recovered response text' }
+  }), { status: 200 });
+
+  await reconcileBackgroundJobs({}, {
+    storage,
+    fetch: orphanFetch,
+    logger,
+    clock
+  });
+
+  const recoveredSessions = getFreshSessions({ storage });
+  const recoveredSession = recoveredSessions.find(s => s.id === 'session-recovered-results');
+  assert.ok(recoveredSession, 'Must create Recovered Results session when origin session deleted');
+  assert.equal(recoveredSession.messages.length, 2);
+  assert.equal(recoveredSession.messages[0].role, 'user');
+  assert.equal(recoveredSession.messages[0].content, 'Orphaned prompt');
+  assert.equal(recoveredSession.messages[1].role, 'assistant');
+  assert.equal(recoveredSession.messages[1].content, 'Recovered response text');
+
+  // ---------------------------------------------------------------------------
+  // Test 8: History Persistence Failure Retains Capability Credentials
+  // ---------------------------------------------------------------------------
+  storage.clear();
+
+  const failJobId = generateJobId(cryptoObj);
+  const failToken = generateCapabilityToken(cryptoObj);
+
+  saveJobRecord({
+    jobId: failJobId,
+    capabilityToken: failToken,
+    conversationId: 'conv-400',
+    userMessageId: 'u-400',
+    assistantMessageId: 'a-400',
+    prompt: 'Fail prompt',
+    status: 'queued',
+    attemptCount: 1,
+    createdAt: clock.now(),
+    updatedAt: clock.now()
+  }, { storage });
+
+  const customSaveSessionsFails = () => {
+    throw new Error('STORAGE_WRITE_FAILURE: Session storage full');
+  };
+
+  const completedFetch = async () => new Response(JSON.stringify({
+    status: 'completed',
+    result: { content: 'Some output' }
+  }), { status: 200 });
+
+  await reconcileBackgroundJobs({
+    saveSessions: customSaveSessionsFails
+  }, {
+    storage,
+    fetch: completedFetch,
+    logger,
+    clock
+  });
+
+  // Verify registry record and secret capability token remain intact because history save failed
+  const retainedJobs = getStoredJobs({ storage });
+  assert.equal(retainedJobs.length, 1, 'Job record must remain when history persistence fails');
+  assert.equal(retainedJobs[0].capabilityToken, failToken, 'Token credentials must be retained');
+
+  // ---------------------------------------------------------------------------
+  // Test 9: No Sensitive Logs (Token and Prompt Never Logged)
+  // ---------------------------------------------------------------------------
+  const allLogStrings = JSON.stringify(logs);
+  assert.equal(allLogStrings.includes(failToken), false, 'Capability token must never appear in logs');
+  assert.equal(allLogStrings.includes('Orphaned prompt'), false, 'Prompt must never appear in logs');
 
   console.log('Background jobs client contract passed.');
 }
@@ -2667,214 +2953,534 @@ node tests/background-jobs-client-contract.mjs
 
 - [ ] **Step 2: Create `src/services/backgroundJobs.js`**
 
+Create `src/services/backgroundJobs.js` implementing mandatory Web Crypto checks, `localStorage` key `corez_background_ai_jobs_v1`, pre-POST persistence order, surfaced storage errors, ambiguous failure identity retention, and token/prompt privacy:
+
 ```javascript
 // src/services/backgroundJobs.js
-const STORAGE_KEY = 'corez_ai_jobs_v1';
 
-export function generateJobId() {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
+export const BACKGROUND_JOBS_STORAGE_KEY = 'corez_background_ai_jobs_v1';
+
+export function checkWebCryptoAvailable(cryptoObj = globalThis.crypto) {
+  if (!cryptoObj || typeof cryptoObj.randomUUID !== 'function' || typeof cryptoObj.getRandomValues !== 'function') {
+    throw new Error('CRYPTO_UNAVAILABLE: Web Crypto API (randomUUID and getRandomValues) is required');
   }
-  // Fallback UUID v4 generator
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
 }
 
-export function generateCapabilityToken() {
-  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
-    const bytes = new Uint8Array(32);
-    crypto.getRandomValues(bytes);
-    const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-    return `job_sec_${hex}`;
-  }
-  const fallbackHex = Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-  return `job_sec_${fallbackHex}`;
+export function generateJobId(cryptoObj = globalThis.crypto) {
+  checkWebCryptoAvailable(cryptoObj);
+  return cryptoObj.randomUUID();
 }
 
-export function getStoredJobs() {
+export function generateCapabilityToken(cryptoObj = globalThis.crypto) {
+  checkWebCryptoAvailable(cryptoObj);
+  const bytes = new Uint8Array(32);
+  cryptoObj.getRandomValues(bytes);
+  const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  return `job_sec_${hex}`;
+}
+
+export function getStoredJobs(deps = {}) {
+  const storage = deps.storage || globalThis.localStorage;
+  if (!storage) {
+    throw new Error('STORAGE_UNAVAILABLE: Storage dependency is missing');
+  }
+  let raw;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
+    raw = storage.getItem(BACKGROUND_JOBS_STORAGE_KEY);
+  } catch (err) {
+    throw new Error(`STORAGE_ERROR: Failed to read background jobs registry - ${err.message}`);
+  }
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    throw new Error(`STORAGE_ERROR: Corrupted background jobs registry JSON - ${err.message}`);
   }
 }
 
-export function saveJobRecord(record) {
+export function saveJobRecord(record, deps = {}) {
+  const storage = deps.storage || globalThis.localStorage;
+  if (!storage) {
+    throw new Error('STORAGE_UNAVAILABLE: Storage dependency is missing');
+  }
+  const jobs = getStoredJobs(deps);
+  const existingIndex = jobs.findIndex(j => j.jobId === record.jobId);
+  const updatedRecord = {
+    jobId: record.jobId,
+    capabilityToken: record.capabilityToken,
+    conversationId: record.conversationId,
+    userMessageId: record.userMessageId,
+    assistantMessageId: record.assistantMessageId,
+    prompt: record.prompt,
+    intent: record.intent || null,
+    status: record.status || 'queued',
+    attemptCount: typeof record.attemptCount === 'number' ? record.attemptCount : 0,
+    lastAttemptAt: typeof record.lastAttemptAt === 'number' ? record.lastAttemptAt : null,
+    createdAt: typeof record.createdAt === 'number' ? record.createdAt : (deps.clock ? deps.clock.now() : Date.now()),
+    updatedAt: deps.clock ? deps.clock.now() : Date.now(),
+    error: record.error || null
+  };
+
+  if (existingIndex >= 0) {
+    jobs[existingIndex] = { ...jobs[existingIndex], ...updatedRecord };
+  } else {
+    jobs.push(updatedRecord);
+  }
+
   try {
-    const jobs = getStoredJobs();
-    const existingIndex = jobs.findIndex(j => j.jobId === record.jobId);
-    if (existingIndex >= 0) {
-      jobs[existingIndex] = { ...jobs[existingIndex], ...record };
-    } else {
-      jobs.push(record);
+    storage.setItem(BACKGROUND_JOBS_STORAGE_KEY, JSON.stringify(jobs));
+  } catch (err) {
+    throw new Error(`STORAGE_ERROR: Failed to save background job record - ${err.message}`);
+  }
+  return updatedRecord;
+}
+
+export function updateJobRecord(jobId, updates, deps = {}) {
+  const storage = deps.storage || globalThis.localStorage;
+  if (!storage) {
+    throw new Error('STORAGE_UNAVAILABLE: Storage dependency is missing');
+  }
+  const jobs = getStoredJobs(deps);
+  const index = jobs.findIndex(j => j.jobId === jobId);
+  if (index < 0) {
+    throw new Error(`JOB_NOT_FOUND: Job record ${jobId} not found in registry`);
+  }
+  const now = deps.clock ? deps.clock.now() : Date.now();
+  jobs[index] = {
+    ...jobs[index],
+    ...updates,
+    updatedAt: now
+  };
+
+  try {
+    storage.setItem(BACKGROUND_JOBS_STORAGE_KEY, JSON.stringify(jobs));
+  } catch (err) {
+    throw new Error(`STORAGE_ERROR: Failed to update background job record - ${err.message}`);
+  }
+  return jobs[index];
+}
+
+export function removeJobRecord(jobId, deps = {}) {
+  const storage = deps.storage || globalThis.localStorage;
+  if (!storage) {
+    throw new Error('STORAGE_UNAVAILABLE: Storage dependency is missing');
+  }
+  const jobs = getStoredJobs(deps).filter(j => j.jobId !== jobId);
+  try {
+    storage.setItem(BACKGROUND_JOBS_STORAGE_KEY, JSON.stringify(jobs));
+  } catch (err) {
+    throw new Error(`STORAGE_ERROR: Failed to remove background job record - ${err.message}`);
+  }
+}
+
+export async function dispatchBackgroundJob({
+  conversationId,
+  userMessageId,
+  assistantMessageId,
+  prompt,
+  intent = null,
+  existingJobId = null,
+  existingCapabilityToken = null,
+  saveConversationHistory = null
+}, deps = {}) {
+  const cryptoObj = deps.crypto || globalThis.crypto;
+  checkWebCryptoAvailable(cryptoObj);
+
+  const fetchImpl = deps.fetch || globalThis.fetch;
+  if (typeof fetchImpl !== 'function') {
+    throw new Error('FETCH_UNAVAILABLE: Fetch implementation is required');
+  }
+
+  const clock = deps.clock || { now: () => Date.now() };
+  const now = clock.now();
+
+  const jobId = existingJobId || generateJobId(cryptoObj);
+  const capabilityToken = existingCapabilityToken || generateCapabilityToken(cryptoObj);
+
+  const record = {
+    jobId,
+    capabilityToken,
+    conversationId,
+    userMessageId,
+    assistantMessageId,
+    prompt,
+    intent,
+    status: 'queued',
+    attemptCount: 1,
+    lastAttemptAt: now,
+    createdAt: now,
+    updatedAt: now,
+    error: null
+  };
+
+  // Step 1: Persist registry record FIRST
+  saveJobRecord(record, deps);
+
+  // Step 2: Persist conversation history BEFORE sending HTTP POST
+  if (typeof saveConversationHistory === 'function') {
+    try {
+      saveConversationHistory();
+    } catch (err) {
+      throw new Error(`HISTORY_PERSISTENCE_ERROR: Pre-POST history save failed - ${err.message}`);
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(jobs));
-  } catch {}
-}
+  }
 
-export function updateJobRecord(jobId, updates) {
+  // Step 3: Dispatch POST request
+  const payload = {
+    job_id: jobId,
+    conversation_id: conversationId,
+    prompt,
+    intent
+  };
+
+  let response;
   try {
-    const jobs = getStoredJobs();
-    const index = jobs.findIndex(j => j.jobId === jobId);
-    if (index >= 0) {
-      jobs[index] = { ...jobs[index], ...updates };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(jobs));
-    }
-  } catch {}
+    response = await fetchImpl('/api/ai/jobs', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Job-Token': capabilityToken
+      },
+      body: JSON.stringify(payload)
+    });
+  } catch (netErr) {
+    // Ambiguous network failure: retain job ID and token in storage for retry
+    updateJobRecord(jobId, {
+      status: 'queued',
+      attemptCount: record.attemptCount,
+      lastAttemptAt: clock.now(),
+      error: 'NETWORK_ERROR'
+    }, deps);
+    throw new Error(`DISPATCH_AMBIGUOUS: Network fetch failed during dispatch - ${netErr.message}`);
+  }
+
+  if (response.status >= 500) {
+    // 5xx Server error: ambiguous, keep identity for retry
+    updateJobRecord(jobId, {
+      status: 'queued',
+      attemptCount: record.attemptCount,
+      lastAttemptAt: clock.now(),
+      error: `SERVER_ERROR_${response.status}`
+    }, deps);
+    throw new Error(`DISPATCH_AMBIGUOUS: Server returned status ${response.status}`);
+  }
+
+  if (!response.ok) {
+    // 4xx Client error (terminal failure): update status to failed
+    let errBody = {};
+    try { errBody = await response.json(); } catch {}
+    const errMsg = errBody.error || `Client error ${response.status}`;
+    updateJobRecord(jobId, {
+      status: 'failed',
+      error: errMsg
+    }, deps);
+    throw new Error(`DISPATCH_TERMINAL_FAILURE: ${errMsg}`);
+  }
+
+  const responseData = await response.json();
+  updateJobRecord(jobId, {
+    status: responseData.status || 'queued',
+    updatedAt: clock.now()
+  }, deps);
+
+  return {
+    jobId,
+    capabilityToken,
+    status: responseData.status || 'queued'
+  };
 }
 
-export function removeJobRecord(jobId) {
-  try {
-    const jobs = getStoredJobs().filter(j => j.jobId !== jobId);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(jobs));
-  } catch {}
-}
+export async function fetchJobStatus(jobId, capabilityToken, deps = {}) {
+  const fetchImpl = deps.fetch || globalThis.fetch;
+  if (typeof fetchImpl !== 'function') {
+    throw new Error('FETCH_UNAVAILABLE: Fetch implementation is required');
+  }
 
-export async function postBackgroundJob(payload, capabilityToken) {
-  const response = await fetch('/api/ai/jobs', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Job-Token': capabilityToken
-    },
-    body: JSON.stringify(payload)
-  });
-  return response;
-}
-
-export async function fetchJobStatus(jobId, capabilityToken) {
-  const response = await fetch(`/api/ai/jobs/${jobId}`, {
+  const response = await fetchImpl(`/api/ai/jobs/${jobId}`, {
     method: 'GET',
     headers: {
       'X-Job-Token': capabilityToken
     }
   });
+
   return response;
 }
 ```
 
 - [ ] **Step 3: Create `src/services/backgroundJobSync.js`**
 
+Create `src/services/backgroundJobSync.js` implementing exponential polling backoff, fresh session reloads from `corez_sessions`, chat schema compliance (`role` and `content` only), all status handling (`queued`, `running`, `completed`, `failed`, `expired`, `404`), history-first persistence order before credential removal, missing origin recovery, active session callback gating, and global deduplication:
+
 ```javascript
 // src/services/backgroundJobSync.js
-import { getStoredJobs, updateJobRecord, fetchJobStatus } from './backgroundJobs.js';
+import {
+  getStoredJobs,
+  updateJobRecord,
+  removeJobRecord,
+  fetchJobStatus
+} from './backgroundJobs.js';
 
 export function calculatePollingDelay(attemptCount) {
+  const count = typeof attemptCount === 'number' && attemptCount > 0 ? attemptCount : 1;
   const baseDelay = 1000;
-  const calculated = baseDelay * Math.pow(2, Math.max(0, attemptCount - 1));
+  const calculated = baseDelay * Math.pow(2, Math.max(0, count - 1));
   return Math.min(calculated, 10000);
 }
 
-export async function reconcileBackgroundJobs({
-  sessions,
-  saveSessions,
-  activeSessionId,
-  onActiveSessionResult
-}) {
-  if (typeof document !== 'undefined' && document.hidden) {
-    return; // Pause polling when document is hidden
+export const SESSIONS_STORAGE_KEY = 'corez_sessions';
+
+export function getFreshSessions(deps = {}) {
+  const storage = deps.storage || globalThis.localStorage;
+  if (!storage) return [];
+  try {
+    const raw = storage.getItem(SESSIONS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    if (deps.logger && typeof deps.logger.error === 'function') {
+      deps.logger.error('Failed to parse fresh sessions JSON');
+    }
+    return [];
+  }
+}
+
+export function saveFreshSessions(sessions, deps = {}) {
+  const storage = deps.storage || globalThis.localStorage;
+  if (!storage) {
+    throw new Error('STORAGE_UNAVAILABLE: Storage dependency is missing');
+  }
+  try {
+    storage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(sessions));
+  } catch (err) {
+    throw new Error(`STORAGE_ERROR: Failed to save sessions - ${err.message}`);
+  }
+}
+
+export async function reconcileBackgroundJobs(options = {}, deps = {}) {
+  const storage = deps.storage || globalThis.localStorage;
+  const logger = deps.logger || { error: () => {}, info: () => {} };
+  const clock = deps.clock || { now: () => Date.now() };
+
+  // Always reload fresh sessions from corez_sessions storage on every pass
+  let sessions = options.getSessions ? options.getSessions() : getFreshSessions({ storage, logger });
+  const saveSessionsImpl = options.saveSessions || ((updated) => saveFreshSessions(updated, { storage }));
+
+  const pendingJobs = getStoredJobs({ storage }).filter(j => j.status === 'queued' || j.status === 'running');
+  if (pendingJobs.length === 0) {
+    return { reconciledCount: 0, processedJobIds: [] };
   }
 
-  const jobs = getStoredJobs().filter(j => !j.reconciled);
-  if (jobs.length === 0) return;
+  // Global deduplication by jobId across the current reconciliation pass
+  const processedJobIds = new Set();
+  let reconciledCount = 0;
 
-  for (const job of jobs) {
+  for (const job of pendingJobs) {
+    if (processedJobIds.has(job.jobId)) {
+      continue;
+    }
+    processedJobIds.add(job.jobId);
+
+    let response;
     try {
-      const response = await fetchJobStatus(job.jobId, job.capabilityToken);
-      if (!response.ok) continue;
+      response = await fetchJobStatus(job.jobId, job.capabilityToken, deps);
+    } catch (netErr) {
+      // Ambiguous network failure: increment attempt metadata and skip to next job
+      updateJobRecord(job.jobId, {
+        attemptCount: (job.attemptCount || 0) + 1,
+        lastAttemptAt: clock.now()
+      }, { storage, clock });
+      continue;
+    }
 
-      const data = await response.json();
-      if (data.status === 'completed' || data.status === 'failed') {
-        const isSuccess = data.status === 'completed';
-        const resultText = isSuccess ? data.result?.content : null;
-        const errorMessage = !isSuccess ? (data.error?.message || 'Execution failed.') : null;
+    if (response.status === 404 || response.status === 410) {
+      // 404 Not Found or 410 Expired: definitive terminal state on backend
+      const terminalStatus = response.status === 410 ? 'expired' : 'failed';
+      const fallbackContent = response.status === 410
+        ? 'Background job expired after 24 hours.'
+        : 'Background job not found on server.';
 
-        // Step 1: Write terminal completion result to chat history
-        let sessionUpdated = false;
-        const updatedSessions = (sessions || []).map(session => {
-          if (session.id === job.conversationId) {
-            sessionUpdated = true;
-            const updatedMessages = session.messages.map(msg => {
-              if (msg.id === job.assistantMessageId) {
-                return {
-                  ...msg,
-                  status: data.status,
-                  text: isSuccess ? resultText : (errorMessage || 'Job execution failed.'),
-                  model: isSuccess ? data.result?.model : undefined
-                };
-              }
-              return msg;
-            });
-            return { ...session, messages: updatedMessages };
-          }
-          return session;
-        });
+      // Terminal sync: Update conversation history FIRST using current chat schema (role, content)
+      const { updatedSessions } = applyTerminalStateToSessions({
+        sessions,
+        conversationId: job.conversationId,
+        assistantMessageId: job.assistantMessageId,
+        userMessageId: job.userMessageId,
+        prompt: job.prompt,
+        status: terminalStatus,
+        content: fallbackContent,
+        model: undefined
+      });
 
-        // Fallback: If origin session was deleted, insert into "Recovered Results" session
-        let finalSessions = updatedSessions;
-        if (!sessionUpdated) {
-          const RECOVERED_ID = 'session-recovered-results';
-          let recoveredSession = finalSessions.find(s => s.id === RECOVERED_ID);
-
-          const newAssistantMessage = {
-            id: job.assistantMessageId,
-            sender: 'ai',
-            text: isSuccess ? resultText : (errorMessage || 'Job execution failed.'),
-            status: data.status,
-            model: isSuccess ? data.result?.model : undefined
-          };
-
-          const newUserMessage = {
-            id: job.userMessageId,
-            sender: 'user',
-            text: job.promptText
-          };
-
-          if (recoveredSession) {
-            finalSessions = finalSessions.map(s => {
-              if (s.id === RECOVERED_ID) {
-                return {
-                  ...s,
-                  messages: [...s.messages, newUserMessage, newAssistantMessage]
-                };
-              }
-              return s;
-            });
-          } else {
-            recoveredSession = {
-              id: RECOVERED_ID,
-              title: 'Recovered Results',
-              createdAt: Date.now(),
-              messages: [newUserMessage, newAssistantMessage]
-            };
-            finalSessions = [recoveredSession, ...finalSessions];
-          }
-        }
-
-        if (typeof saveSessions === 'function') {
-          saveSessions(finalSessions);
-        }
-
-        // Notify active canvas if completed job belongs to active session
-        if (isSuccess && job.conversationId === activeSessionId && typeof onActiveSessionResult === 'function') {
-          onActiveSessionResult(resultText);
-        }
-
-        // Step 2: Mark reconciled: true in storage and clear secret capabilityToken
-        updateJobRecord(job.jobId, {
-          status: data.status,
-          reconciled: true,
-          capabilityToken: '[RECONCILED]'
-        });
+      // Persist updated history FIRST
+      try {
+        saveSessionsImpl(updatedSessions);
+        sessions = updatedSessions; // Update local reference for subsequent jobs in loop
+      } catch (saveErr) {
+        // If history persistence fails, RETAIN credentials in storage and DO NOT remove job record
+        logger.error('Failed to persist history during 404/410 handling');
+        continue;
       }
-    } catch {
-      // Polling network glitch: ignore and try again next tick
+
+      // ONLY after history persistence succeeds, remove credentials and registry record
+      removeJobRecord(job.jobId, { storage });
+      reconciledCount++;
+      continue;
+    }
+
+    if (!response.ok) {
+      // 5xx or transient status: increment retry metadata and keep identity
+      updateJobRecord(job.jobId, {
+        attemptCount: (job.attemptCount || 0) + 1,
+        lastAttemptAt: clock.now()
+      }, { storage, clock });
+      continue;
+    }
+
+    let data;
+    try {
+      data = await response.json();
+    } catch (parseErr) {
+      continue;
+    }
+
+    const currentStatus = data.status;
+
+    if (currentStatus === 'queued' || currentStatus === 'running') {
+      updateJobRecord(job.jobId, {
+        status: currentStatus,
+        attemptCount: (job.attemptCount || 0) + 1,
+        lastAttemptAt: clock.now()
+      }, { storage, clock });
+      continue;
+    }
+
+    if (currentStatus === 'completed' || currentStatus === 'failed' || currentStatus === 'expired') {
+      const isSuccess = currentStatus === 'completed';
+      const resultContent = isSuccess
+        ? (data.result?.content || '')
+        : (data.error?.message || 'Job execution failed.');
+      const resultModel = isSuccess ? data.result?.model : undefined;
+
+      // Step 1: Update conversation history FIRST
+      const { updatedSessions, isOriginMatch } = applyTerminalStateToSessions({
+        sessions,
+        conversationId: job.conversationId,
+        assistantMessageId: job.assistantMessageId,
+        userMessageId: job.userMessageId,
+        prompt: job.prompt,
+        status: currentStatus,
+        content: resultContent,
+        model: resultModel
+      });
+
+      // Step 2: Persist updated conversation history FIRST to corez_sessions
+      try {
+        saveSessionsImpl(updatedSessions);
+        sessions = updatedSessions; // Update local state for next loop iteration
+      } catch (saveErr) {
+        // If history persistence fails, RETAIN capability credentials/registry record
+        logger.error('Failed to persist history for terminal job completion');
+        continue;
+      }
+
+      // Step 3: Trigger executable preview/canvas update callback IF origin session matches active session
+      if (isSuccess && isOriginMatch && job.conversationId === options.activeSessionId && typeof options.onActiveSessionResult === 'function') {
+        try {
+          options.onActiveSessionResult(resultContent);
+        } catch (cbErr) {
+          logger.error('Active session result callback failed');
+        }
+      }
+
+      // Step 4: ONLY after history persistence succeeds, remove capability token and job record
+      removeJobRecord(job.jobId, { storage });
+      reconciledCount++;
     }
   }
+
+  return {
+    reconciledCount,
+    processedJobIds: Array.from(processedJobIds)
+  };
+}
+
+function applyTerminalStateToSessions({
+  sessions,
+  conversationId,
+  assistantMessageId,
+  userMessageId,
+  prompt,
+  status,
+  content,
+  model
+}) {
+  let originFound = false;
+
+  const updatedSessions = sessions.map(session => {
+    if (session.id === conversationId) {
+      originFound = true;
+      const updatedMessages = (session.messages || []).map(msg => {
+        if (msg.id === assistantMessageId) {
+          return {
+            ...msg,
+            role: 'assistant',
+            content: content,
+            status: status,
+            ...(model ? { model } : {})
+          };
+        }
+        return msg;
+      });
+      return { ...session, messages: updatedMessages };
+    }
+    return session;
+  });
+
+  if (originFound) {
+    return { updatedSessions, isOriginMatch: true };
+  }
+
+  // Origin session deleted: insert into "Recovered Results" session
+  const RECOVERED_SESSION_ID = 'session-recovered-results';
+  let recoveredFound = false;
+
+  const userMsg = {
+    id: userMessageId || `user-recovered-${Date.now()}`,
+    role: 'user',
+    content: prompt
+  };
+
+  const assistantMsg = {
+    id: assistantMessageId || `assistant-recovered-${Date.now()}`,
+    role: 'assistant',
+    content: content,
+    status: status,
+    ...(model ? { model } : {})
+  };
+
+  const finalSessions = updatedSessions.map(session => {
+    if (session.id === RECOVERED_SESSION_ID) {
+      recoveredFound = true;
+      return {
+        ...session,
+        messages: [...(session.messages || []), userMsg, assistantMsg]
+      };
+    }
+    return session;
+  });
+
+  if (!recoveredFound) {
+    finalSessions.unshift({
+      id: RECOVERED_SESSION_ID,
+      title: 'Recovered Results',
+      createdAt: Date.now(),
+      messages: [userMsg, assistantMsg]
+    });
+  }
+
+  return { updatedSessions: finalSessions, isOriginMatch: false };
 }
 ```
 
@@ -2888,7 +3494,7 @@ node tests/background-jobs-client-contract.mjs
 
 - [ ] **Step 5: Review Gate & Bounded Commit**
 
-> **Codex Review Gate:** Codex inspects `src/services/backgroundJobs.js`, `src/services/backgroundJobSync.js`, and `tests/background-jobs-client-contract.mjs` for crash resilience order (history FIRST, then reconciled flag).
+> **Codex Review Gate:** Codex inspects `src/services/backgroundJobs.js`, `src/services/backgroundJobSync.js`, and `tests/background-jobs-client-contract.mjs` for mandatory Web Crypto, pre-POST and terminal persistence ordering, chat schema compliance, error surfacing, and absence of token/prompt logging.
 
 Commit changes:
 ```bash
