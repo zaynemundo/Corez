@@ -57,7 +57,7 @@ Job creation is accessed at `POST /api/ai/jobs` and status polling at `GET /api/
 | **D1 Expiration & Purge** | `expires_at` is **NULL while active** (`queued`/`running`), and set to `terminal_at + 86400` (24h) upon reaching terminal state (`completed`/`failed`). Logical expiry and physical purge queries align strictly on `expires_at IS NOT NULL AND expires_at <= unixepoch()`. | Guarantees consistent 24h retention and purge boundaries. |
 | **Stuck Active Job Repair** | `active_deadline_at` is set at creation to `created_at + 7200` (at least 2 hours). Hourly cron marks active jobs past `active_deadline_at` as `failed`. | Accommodates long queue times while ensuring orphaned active jobs are eventually repaired. |
 | **Workflow Retries & Model Logic** | 5 attempts, 10s exponential backoff, 10m per-attempt timeout (accommodates GLM ~120s latency). Provider calls may run at-least-once within step retries, but atomic D1 update commits exactly one terminal result. | Preserves existing `buildSystemPrompt(intent)` and `choices[0].message.content` response extraction. Stores provider/model metadata (`@cf/workers-ai` / `@cf/zai-org/glm-4.7-flash`). |
-| **UTF-8 Byte-Safe Truncation** | Result text truncation uses byte-array encoding (`TextEncoder`/`TextDecoder`) ensuring content plus `"\n\n[Output truncated at 500KB bound]"` is strictly $\le$ **500,000 bytes UTF-8**. | Replaces character slicing with exact byte-bounded encoding to prevent D1 storage overflow. |
+| **UTF-8 Byte-Safe Truncation** | Result text truncation uses a byte endpoint reduction loop (`TextEncoder`/`TextDecoder`) ensuring content plus `"\n\n[Output truncated at 500KB bound]"` is strictly $\le$ **500,000 bytes UTF-8**, even across multibyte boundaries. | Prevents invalid UTF-8 replacement characters (`U+FFFD`) from exceeding the content budget. |
 | **Creation Failure Ambiguity** | Network drop / 5xx on creation keeps the same `jobId` and `capabilityToken`, reconciling via `GET` poll and same idempotent `POST`. Definitive failure (400, 409, or terminal failed status) offers fresh "Retry" (generating new UUID/token). | Prevents state divergence or duplicate job creation when network issues obscure creation outcomes. |
 | **Reconciliation Search Scope** | Reconciliation searches **every persisted session in storage**, updating origin session placeholders in background storage even when another chat is active, without stealing UI focus. | Ensures completions update their true origin session silently regardless of current user navigation. |
 | **Non-Atomic LocalStorage Writes** | Write sequence: 1) Save terminal result into chat history; 2) Set `reconciled: true` and remove capability token from `localStorage`. | Protects against browser crash data loss. Global `jobId` deduplication on mount handles repeat fetches safely. |
@@ -327,19 +327,26 @@ WHERE id = ? AND status IN ('queued', 'running');
 // Byte-Safe Truncation Utility Function
 function truncateToUtf8ByteLimit(str, maxBytes = 500000) {
   const encoder = new TextEncoder();
-  const decoder = new TextDecoder('utf-8', { fatal: false });
-  const encoded = encoder.encode(str);
-  
-  if (encoded.byteLength <= maxBytes) return str;
+  const fullEncoded = encoder.encode(str);
+  if (fullEncoded.byteLength <= maxBytes) return str;
 
-  const marker = encoder.encode("\n\n[Output truncated at 500KB bound]");
-  const maxContentBytes = maxBytes - marker.byteLength;
-  
-  // Slice byte array at safe boundary and decode
-  const slicedBytes = encoded.subarray(0, maxContentBytes);
-  const truncatedStr = decoder.decode(slicedBytes);
-  
-  return truncatedStr + "\n\n[Output truncated at 500KB bound]";
+  const marker = "\n\n[Output truncated at 500KB bound]";
+  const markerBytes = encoder.encode(marker).byteLength;
+  const maxContentBytes = maxBytes - markerBytes;
+
+  let cutoff = maxContentBytes;
+  const decoder = new TextDecoder('utf-8', { fatal: false });
+
+  while (cutoff > 0) {
+    const sliceBytes = fullEncoded.subarray(0, cutoff);
+    const decodedSlice = decoder.decode(sliceBytes);
+    if (encoder.encode(decodedSlice).byteLength <= maxContentBytes) {
+      return decodedSlice + marker;
+    }
+    cutoff--;
+  }
+
+  return marker;
 }
 ```
 
@@ -491,7 +498,7 @@ interface LocalJobRecord {
 
 ### 9.1 Testing Strategy
 - **Contract Tests:** Validate `POST /api/ai/jobs` and `GET /api/ai/jobs/:jobId` schemas, header validation, rate limits, 409 conflict responses, and 503 dispatch failure retries.
-- **Byte Truncation Unit Tests:** Verify `truncateToUtf8ByteLimit` with multi-byte UTF-8 sequences (e.g. emojis, non-Latin scripts) to ensure valid UTF-8 strings $\le$ 500,000 bytes.
+- **Byte Truncation Unit Tests:** Verify `truncateToUtf8ByteLimit` with multi-byte UTF-8 sequences (e.g., emojis and boundary-split multibyte characters) to ensure the decoded output plus marker is provably valid UTF-8 with TextEncoder byte length $\le$ 500,000 bytes.
 - **Reconciliation & Non-Atomic Recovery:** Simulate crash between chat history write and `reconciled` flag update; verify `jobId` deduplication prevents double rendering.
 
 ### 9.2 Observability Metrics (Zero PII / Zero Content)
@@ -506,7 +513,7 @@ interface LocalJobRecord {
 | :--- | :--- |
 | **Workflow Dispatch Failure** | D1 row stays `queued`, endpoint returns 503. Client retries identical idempotent `POST`. |
 | **Browser Crash Mid-Reconciliation** | Save to chat history before setting `reconciled: true`. Global `jobId` dedupe prevents duplicates on remount. |
-| **Multi-byte UTF-8 Overflow** | `TextEncoder`/`TextDecoder` byte subarray truncation guarantees strict 500,000 byte limit. |
+| **Multi-byte UTF-8 Overflow** | `TextEncoder`/`TextDecoder` byte endpoint reduction loop guarantees strict 500,000 byte limit across multibyte boundaries. |
 
 ---
 
@@ -518,7 +525,7 @@ interface LocalJobRecord {
 - [ ] **Canonical Fingerprinting:** Uses canonical JSON or length-prefixed fields for request fingerprinting.
 - [ ] **Duplicate POST Error:** Mismatched fingerprint or invalid token on duplicate `POST` returns generic `409 Conflict` (not 401). `401` reserved for pre-lookup header issues.
 - [ ] **Retention & Purge:** Logical expiry and hourly physical purge queries align on `expires_at IS NOT NULL AND expires_at <= unixepoch()`.
-- [ ] **Byte-Safe Truncation:** Uses `TextEncoder`/`TextDecoder` ensuring final result text is $\le$ 500,000 bytes UTF-8 total.
+- [ ] **Byte-Safe Truncation:** Uses `TextEncoder`/`TextDecoder` byte endpoint reduction loop ensuring final result text is $\le$ 500,000 bytes UTF-8 total across multibyte boundaries.
 - [ ] **Plaintext Storage Disclosure:** Explicitly notes D1 stores plaintext prompt and result text during execution and retention.
 - [ ] **Reconciliation Search & Non-Atomic Writes:** Reconciliation searches all stored sessions and updates origin session placeholders in storage without focus stealing. Writes terminal chat history FIRST before setting `reconciled: true`. Fallback to Recovered Results used only when origin/placeholder is missing.
 - [ ] **Validation & Rate Limiting:** Prompts capped at 100,000 UTF-8 bytes. `RATE_LIMITER` binding configured with tunable numbers.
