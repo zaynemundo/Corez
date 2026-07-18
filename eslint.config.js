@@ -24,5 +24,20 @@ export default [
     rules: {
       'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }]
     }
+  },
+  {
+    files: ['worker/**/*.js'],
+    languageOptions: {
+      globals: globals.serviceworker
+    }
+  },
+  {
+    files: ['tests/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        ...globals.serviceworker
+      }
+    }
   }
 ];

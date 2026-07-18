@@ -54,3 +54,20 @@ Every prompt is classified into one of five deliverable-driven labels:
 
 `analyzePublicUserIntent(prompt)` uses the trained model when confidence $\ge 0.55$ and OOV (Out of Vocabulary) ratio $\le 0.70$. If confidence or OOV constraints are not met, Corez falls back to low-confidence regex pattern rules, ensuring resilient routing for novel or ambiguous prompts.
 
+## Cloudflare Worker deployment
+
+Corez deploys the Vite SPA and `/api/openrouter` together as the `new-corez`
+Cloudflare Worker. Configure the connected Worker build with:
+
+Local Wrangler commands require Node.js 22+; Cloudflare Workers Builds currently defaults to Node.js 22.
+
+```text
+Build command: npm run build
+Deploy command: npx wrangler deploy
+Root directory: /
+Production branch: main
+```
+
+Add `OPENROUTER_API_KEY` as an encrypted runtime secret under **Settings →
+Variables & Secrets**. `OPENROUTER_MODEL` and `OPENROUTER_REASONING_EFFORT` are
+optional runtime variables. Do not add the API key to `wrangler.jsonc`.
