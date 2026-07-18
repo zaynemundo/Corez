@@ -47,9 +47,19 @@ jobs:
         run: |
           set -euo pipefail
           tail_file="$(mktemp)"
-          timeout 30s npx --yes wrangler@4.112.0 tail ai --format json >"$tail_file" 2>&1 &
+          timeout 90s npx --yes wrangler@4.112.0 tail ai --format json >"$tail_file" 2>&1 &
           tail_pid=$!
-          sleep 10
+          for attempt in $(seq 1 30); do
+            if grep -q 'Successfully created tail' "$tail_file"; then
+              break
+            fi
+            if ! kill -0 "$tail_pid" 2>/dev/null; then
+              sed -n '1,240p' "$tail_file"
+              exit 1
+            fi
+            sleep 2
+          done
+          grep -q 'Successfully created tail' "$tail_file"
           curl --silent --show-error \
             --request POST \
             'https://ai.zayne-mayo.workers.dev/api/ai' \
