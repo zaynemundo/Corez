@@ -1,8 +1,3 @@
-import handler from '../api/openrouter.js';
-
-const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash';
-const DEFAULT_REASONING_EFFORT = 'xhigh';
-const _REASONING_EFFORT_ENV = 'OPENROUTER_REASONING_EFFORT defaults to xhigh';
 const minimumScore = 4;
 
 const cases = [
@@ -53,50 +48,39 @@ const cases = [
   }
 ];
 
-function requireEnvironment() {
-  if (!process.env.OPENROUTER_API_KEY) {
-    throw new Error('Live AI eval requires OPENROUTER_API_KEY in the environment.');
+function requireBaseUrl() {
+  const value = process.argv[2]?.trim();
+  if (!value) {
+    throw new Error('Live AI eval requires an explicit deployed base URL argument.');
   }
-
-  process.env.OPENROUTER_MODEL ||= DEFAULT_MODEL;
-  process.env.OPENROUTER_REASONING_EFFORT ||= DEFAULT_REASONING_EFFORT;
+  return value.replace(/\/$/, '');
 }
 
-function createResponse() {
-  return {
-    statusCode: 200,
-    headers: {},
-    body: '',
-    setHeader(name, value) {
-      this.headers[name] = value;
-    },
-    end(value) {
-      this.body = value;
-    }
-  };
-}
+async function callCorezAi(baseUrl, testCase) {
+  const response = await fetch(`${baseUrl}/api/ai`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      prompt: testCase.prompt,
+      intent: testCase.intent
+    })
+  });
 
-async function callCorezAi(testCase) {
-  const response = createResponse();
-
-  await handler(
-    {
-      method: 'POST',
-      body: {
-        prompt: testCase.prompt,
-        model: process.env.OPENROUTER_MODEL || DEFAULT_MODEL,
-        intent: testCase.intent
+  if (!response.ok) {
+    const responseText = await response.text();
+    let detail = responseText.trim() || 'unknown error';
+    try {
+      const errorBody = JSON.parse(responseText);
+      if (typeof errorBody?.error === 'string' && errorBody.error.trim()) {
+        detail = errorBody.error.trim();
       }
-    },
-    response
-  );
-
-  const body = response.body ? JSON.parse(response.body) : {};
-
-  if (response.statusCode !== 200) {
-    throw new Error(`${testCase.id} failed with HTTP ${response.statusCode}: ${body.error || 'unknown error'}`);
+    } catch {
+      // Preserve the bounded text response when the upstream error is not JSON.
+    }
+    throw new Error(`${testCase.id} failed with HTTP ${response.status}: ${detail.slice(0, 500)}`);
   }
 
+  const body = await response.json();
   return body.content || '';
 }
 
@@ -118,12 +102,11 @@ function snippet(answer) {
 }
 
 async function main() {
-  requireEnvironment();
-
+  const baseUrl = requireBaseUrl();
   const results = [];
 
   for (const testCase of cases) {
-    const answer = await callCorezAi(testCase);
+    const answer = await callCorezAi(baseUrl, testCase);
     const score = scoreAnswer(answer, testCase);
 
     results.push({

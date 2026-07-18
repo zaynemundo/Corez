@@ -32,8 +32,11 @@ check 'skill forbids guessing secret values' 'never guess|do not guess'
 check 'skill forbids committing secret values' 'never commit|do not commit'
 check 'skill says to identify variable names first' 'variable names|required variables'
 check 'skill asks where to place values' 'where.*set|target environment|deployment'
-check 'skill handles OPENROUTER_API_KEY' 'OPENROUTER_API_KEY'
+check 'skill explains Corez Workers AI configuration' 'Corez Workers AI'
+check 'skill says native inference needs no runtime API key' 'no (runtime )?API key|requires no (runtime )?API key'
+check 'skill says native inference needs no model variable' 'no .*model (environment )?variable|requires no .*model (environment )?variable'
 check 'skill uses placeholders in docs/examples' 'placeholder|<value>|your_'
+check_absent 'skill has no active OpenRouter variable guidance' 'OPENROUTER_'
 check_absent 'skill does not contain a real OpenRouter key' 'sk-or-v1-'
 
 if (( failures > 0 )); then

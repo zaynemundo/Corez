@@ -1,29 +1,34 @@
 # New-Corez
 
-## OpenRouter AI setup
+## Cloudflare Workers AI setup
 
-Corez uses a server-side OpenRouter proxy for real AI responses. Public users
-do not need an API key; they send prompts to Corez, and Corez calls OpenRouter
-from `/api/openrouter` with your private deployment secret.
+Corez uses the native Cloudflare Workers AI binding for hosted text responses.
+Public users send prompts to `/api/ai`; the Worker runs the fixed GLM-5.2 model
+directly on Cloudflare and returns normalized response text.
 
-By default, Corez uses:
-
-```text
-deepseek/deepseek-v4-flash
-```
-
-Set these server/deployment environment variables:
+Corez uses:
 
 ```text
-OPENROUTER_API_KEY
-OPENROUTER_MODEL
-OPENROUTER_REASONING_EFFORT
+@cf/zai-org/glm-5.2
 ```
 
-`OPENROUTER_MODEL` is optional. If it is not set, Corez uses DeepSeek V4 Flash.
-`OPENROUTER_REASONING_EFFORT` is optional and defaults to `xhigh` for max
-reasoning on supported OpenRouter models. Users can still override the model
-name from Corez Settings, but they are not asked for an API key.
+The binding is declared in `wrangler.jsonc` as:
+
+```jsonc
+"ai": {
+  "binding": "AI"
+}
+```
+
+Native inference requires no provider API key, account ID, model variable, or
+provider URL. The model is fixed server-side and cannot be overridden by public
+users.
+
+To run the optional quality evaluation against an existing deployment:
+
+```bash
+npm run evaluate:ai -- https://<deployed-worker-host>
+```
 
 ## Local Intent Training & Classification
 
@@ -56,7 +61,7 @@ Every prompt is classified into one of five deliverable-driven labels:
 
 ## Cloudflare Worker deployment
 
-Corez deploys the Vite SPA and `/api/openrouter` together as the `ai`
+Corez deploys the Vite SPA and `/api/ai` together as the `ai`
 Cloudflare Worker. Configure the connected Worker build with:
 
 Local Wrangler commands require Node.js 22+; Cloudflare Workers Builds currently defaults to Node.js 22.
@@ -68,6 +73,5 @@ Root directory: /
 Production branch: main
 ```
 
-Add `OPENROUTER_API_KEY` as an encrypted runtime secret under **Settings →
-Variables & Secrets**. `OPENROUTER_MODEL` and `OPENROUTER_REASONING_EFFORT` are
-optional runtime variables. Do not add the API key to `wrangler.jsonc`.
+The native `AI` binding is configured by `wrangler.jsonc`; hosted inference does
+not require a runtime provider secret.

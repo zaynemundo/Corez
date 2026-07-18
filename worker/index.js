@@ -1,21 +1,7 @@
-const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
-const DEFAULT_OPENROUTER_MODEL = 'deepseek/deepseek-v4-flash';
-const DEFAULT_OPENROUTER_REASONING_EFFORT = 'xhigh';
-const ALLOWED_REASONING_EFFORTS = new Set([
-  'none', 'minimal', 'low', 'medium', 'high', 'xhigh'
-]);
+const WORKERS_AI_MODEL = '@cf/zai-org/glm-5.2';
 
 function jsonResponse(status, body) {
   return Response.json(body, { status });
-}
-
-function getReasoningEffort(env) {
-  const effort = (
-    env.OPENROUTER_REASONING_EFFORT || DEFAULT_OPENROUTER_REASONING_EFFORT
-  ).trim().toLowerCase();
-  return ALLOWED_REASONING_EFFORTS.has(effort)
-    ? effort
-    : DEFAULT_OPENROUTER_REASONING_EFFORT;
 }
 
 function buildSystemPrompt(intent) {
@@ -42,12 +28,12 @@ Response style:
 Inferred intent: ${intentType} - ${intentSummary}`;
 }
 
-async function handleOpenRouter(request, env) {
+async function handleAi(request, env) {
   if (request.method !== 'POST') {
     return jsonResponse(405, { error: 'Method not allowed.' });
   }
-  if (!env.OPENROUTER_API_KEY) {
-    return jsonResponse(503, { error: 'OpenRouter is not configured.' });
+  if (!env.AI || typeof env.AI.run !== 'function') {
+    return jsonResponse(503, { error: 'Workers AI is not configured.' });
   }
 
   let body;
@@ -66,59 +52,43 @@ async function handleOpenRouter(request, env) {
     return jsonResponse(400, { error: 'Prompt is required.' });
   }
 
-  const intent = body.intent && typeof body.intent === 'object'
+  const intent = body.intent
+    && typeof body.intent === 'object'
+    && !Array.isArray(body.intent)
     ? body.intent
     : null;
-  const model = typeof body.model === 'string' && body.model.trim()
-    ? body.model.trim()
-    : env.OPENROUTER_MODEL || DEFAULT_OPENROUTER_MODEL;
 
   try {
-    const upstream = await fetch(OPENROUTER_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-        'X-Title': 'Corez'
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: buildSystemPrompt(intent) },
-          { role: 'user', content: prompt }
-        ],
-        reasoning_effort: getReasoningEffort(env),
-        temperature: 0.72,
-        max_tokens: intent?.type === 'app' ? 3200 : 1800
-      })
+    const result = await env.AI.run(WORKERS_AI_MODEL, {
+      messages: [
+        { role: 'system', content: buildSystemPrompt(intent) },
+        { role: 'user', content: prompt }
+      ],
+      reasoning_effort: 'high',
+      temperature: 0.72,
+      max_completion_tokens: intent?.type === 'app' ? 3200 : 1800
     });
 
-    if (!upstream.ok) {
-      const detail = (await upstream.text()).slice(0, 500);
-      return jsonResponse(502, {
-        error: 'OpenRouter request failed.',
-        status: upstream.status,
-        detail
-      });
+    const content = result?.choices?.[0]?.message?.content;
+    const normalizedContent = typeof content === 'string' ? content.trim() : '';
+    if (!normalizedContent) {
+      return jsonResponse(502, { error: 'Workers AI returned an empty response.' });
     }
 
-    const data = await upstream.json();
-    const content = data?.choices?.[0]?.message?.content?.trim();
-    if (!content) {
-      return jsonResponse(502, { error: 'OpenRouter returned an empty response.' });
-    }
-
-    return jsonResponse(200, { content, model });
+    return jsonResponse(200, {
+      content: normalizedContent,
+      model: WORKERS_AI_MODEL
+    });
   } catch {
-    return jsonResponse(500, { error: 'Unable to generate AI response.' });
+    return jsonResponse(502, { error: 'Unable to generate AI response.' });
   }
 }
 
 export default {
   async fetch(request, env) {
     const pathname = new URL(request.url).pathname;
-    if (pathname === '/api/openrouter') {
-      return handleOpenRouter(request, env);
+    if (pathname === '/api/ai') {
+      return handleAi(request, env);
     }
     if (pathname.startsWith('/api/')) {
       return jsonResponse(404, { error: 'API route not found.' });

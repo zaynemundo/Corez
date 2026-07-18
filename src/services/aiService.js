@@ -6,8 +6,7 @@ export const MODEL = {
   description: 'Minimalist AI assistant for concise conversation, reasoning, and live app creation.'
 };
 
-export const OPENROUTER_PROXY_ENDPOINT = '/api/openrouter';
-export const DEFAULT_OPENROUTER_MODEL = 'deepseek/deepseek-v4-flash';
+export const AI_PROXY_ENDPOINT = '/api/ai';
 
 export const PUBLIC_USER_INTENT_PROMPT = `
 Corez serves public users who may describe goals casually, incompletely, or
@@ -26,23 +25,6 @@ const INTENT_PATTERNS = {
   writing: /\b(write|rewrite|copy|caption|email|post|bio|headline|script|summarize|summary|proposal|description|landing copy)\b/i,
   explanation: /\b(explain|what is|what are|how does|why does|teach me|break down|understand|compare)\b/i
 };
-
-function readBrowserSetting(key) {
-  try {
-    if (typeof localStorage === 'undefined') return '';
-    return localStorage.getItem(key)?.trim() || '';
-  } catch {
-    return '';
-  }
-}
-
-export function getOpenRouterConfig() {
-  const model = readBrowserSetting('corez_openrouter_model') || import.meta.env?.VITE_OPENROUTER_MODEL || DEFAULT_OPENROUTER_MODEL;
-
-  return {
-    model: model.trim() || DEFAULT_OPENROUTER_MODEL
-  };
-}
 
 function analyzeIntentWithRules(cleanPrompt) {
   const lower = cleanPrompt.toLowerCase();
@@ -160,23 +142,20 @@ export function analyzePublicUserIntent(prompt) {
   };
 }
 
-export async function generateOpenRouterResponse(prompt, intent = analyzePublicUserIntent(prompt)) {
-  const { model } = getOpenRouterConfig();
-
-  const response = await fetch('/api/openrouter', {
+export async function generateHostedAIResponse(
+  prompt,
+  intent = analyzePublicUserIntent(prompt)
+) {
+  const response = await fetch(AI_PROXY_ENDPOINT, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      prompt,
-      model,
-      intent
-    })
+    body: JSON.stringify({ prompt, intent })
   });
 
   if (!response.ok) {
-    throw new Error(`OpenRouter proxy request failed with status ${response.status}`);
+    throw new Error(`Hosted AI request failed with status ${response.status}`);
   }
 
   const data = await response.json();
@@ -186,7 +165,7 @@ export async function generateOpenRouterResponse(prompt, intent = analyzePublicU
 // Extract executable code block (HTML/CSS/JS) from AI message if present
 export function extractCodeFromMessage(text) {
   if (!text) return null;
-  
+
   const htmlMatch = text.match(/```(?:html|xml|jsx|tsx)?\s*([\s\S]*?)```/i);
   if (htmlMatch && htmlMatch[1].trim()) {
     const code = htmlMatch[1].trim();
@@ -194,7 +173,7 @@ export function extractCodeFromMessage(text) {
       return code;
     }
   }
-  
+
   const matchAny = text.match(/```\s*([\s\S]*?)```/);
   if (matchAny && matchAny[1].includes('<')) {
     return matchAny[1].trim();
@@ -331,12 +310,12 @@ export async function generateAIResponse(prompt) {
   const intent = analyzePublicUserIntent(cleanPrompt);
 
   try {
-    const openRouterResponse = await generateOpenRouterResponse(cleanPrompt, intent);
-    if (openRouterResponse) {
-      return openRouterResponse;
+    const hostedAiResponse = await generateHostedAIResponse(cleanPrompt, intent);
+    if (hostedAiResponse) {
+      return hostedAiResponse;
     }
-  } catch (openRouterError) {
-    console.warn('OpenRouter unavailable; using local Corez fallback.', openRouterError);
+  } catch (hostedAiError) {
+    console.warn('Hosted AI unavailable; using local Corez fallback.', hostedAiError);
   }
 
   return generateLocalAIResponse(cleanPrompt);

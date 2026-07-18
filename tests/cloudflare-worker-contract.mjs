@@ -1,11 +1,17 @@
 import assert from 'node:assert/strict';
 import worker from '../worker/index.js';
 
-const originalFetch = globalThis.fetch;
+const MODEL = '@cf/zai-org/glm-5.2';
 
 function env(overrides = {}) {
   return {
-    OPENROUTER_API_KEY: 'test-secret',
+    AI: {
+      async run() {
+        return {
+          choices: [{ message: { content: '  Worker response  ' } }]
+        };
+      }
+    },
     ASSETS: {
       async fetch(request) {
         return new Response(`asset:${new URL(request.url).pathname}`, {
@@ -22,6 +28,17 @@ async function json(response) {
   return response.json();
 }
 
+async function post(body, environment = env()) {
+  return worker.fetch(
+    new Request('https://corez.test/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body
+    }),
+    environment
+  );
+}
+
 async function run() {
   const assetResponse = await worker.fetch(
     new Request('https://corez.test/dashboard'),
@@ -34,197 +51,130 @@ async function run() {
     env()
   );
   assert.equal(unknownApiResponse.status, 404);
-  assert.equal(
-    unknownApiResponse.headers.get('content-type'),
-    'application/json'
-  );
+  assert.equal(unknownApiResponse.headers.get('content-type'), 'application/json');
   assert.deepEqual(await json(unknownApiResponse), {
     error: 'API route not found.'
   });
 
-  const methodResponse = await worker.fetch(
+  const legacyRouteResponse = await worker.fetch(
     new Request('https://corez.test/api/openrouter'),
+    env()
+  );
+  assert.equal(legacyRouteResponse.status, 404);
+
+  const methodResponse = await worker.fetch(
+    new Request('https://corez.test/api/ai'),
     env()
   );
   assert.equal(methodResponse.status, 405);
   assert.equal(methodResponse.headers.get('content-type'), 'application/json');
 
-  const missingKeyResponse = await worker.fetch(
-    new Request('https://corez.test/api/openrouter', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: 'Hello' })
-    }),
-    env({ OPENROUTER_API_KEY: '' })
+  const missingBindingResponse = await post(
+    JSON.stringify({ prompt: 'Hello' }),
+    env({ AI: undefined })
   );
-  assert.equal(missingKeyResponse.status, 503);
+  assert.equal(missingBindingResponse.status, 503);
+  assert.deepEqual(await json(missingBindingResponse), {
+    error: 'Workers AI is not configured.'
+  });
 
-  const missingPromptResponse = await worker.fetch(
-    new Request('https://corez.test/api/openrouter', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: '   ' })
-    }),
-    env()
-  );
+  const missingPromptResponse = await post(JSON.stringify({ prompt: '   ' }));
   assert.equal(missingPromptResponse.status, 400);
 
-  const malformedResponse = await worker.fetch(
-    new Request('https://corez.test/api/openrouter', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: '{'
-    }),
-    env()
-  );
+  const malformedResponse = await post('{');
   assert.equal(malformedResponse.status, 400);
+  assert.deepEqual(await json(malformedResponse), {
+    error: 'Request body must be valid JSON.'
+  });
 
-  const nullBodyResponse = await worker.fetch(
-    new Request('https://corez.test/api/openrouter', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(null)
-    }),
-    env()
-  );
+  const nullBodyResponse = await post(JSON.stringify(null));
   assert.equal(nullBodyResponse.status, 400);
   assert.deepEqual(await json(nullBodyResponse), {
     error: 'Prompt is required.'
   });
 
-  let upstreamRequest;
-  globalThis.fetch = async (request, init) => {
-    upstreamRequest = { request, init };
-    return Response.json({
-      choices: [{ message: { content: '  Worker response  ' } }]
-    });
-  };
-
-  const successResponse = await worker.fetch(
-    new Request('https://corez.test/api/openrouter', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        prompt: 'Build a timer',
-        intent: { type: 'app', summary: 'Build a timer app.' }
-      })
+  let invocation;
+  const successResponse = await post(
+    JSON.stringify({
+      prompt: 'Build a timer',
+      model: 'client/model-must-be-ignored',
+      intent: { type: 'app', summary: 'Build a timer app.' }
     }),
     env({
-      OPENROUTER_MODEL: 'test/model',
-      OPENROUTER_REASONING_EFFORT: 'invalid'
+      AI: {
+        async run(model, input) {
+          invocation = { model, input };
+          return {
+            choices: [{ message: { content: '  Worker response  ' } }]
+          };
+        }
+      }
     })
   );
 
   assert.equal(successResponse.status, 200);
   assert.deepEqual(await json(successResponse), {
     content: 'Worker response',
-    model: 'test/model'
+    model: MODEL
   });
-  assert.equal(
-    upstreamRequest.init.headers.Authorization,
-    'Bearer test-secret'
-  );
-  const upstreamBody = JSON.parse(upstreamRequest.init.body);
-  assert.equal(upstreamBody.model, 'test/model');
-  assert.equal(upstreamBody.reasoning_effort, 'xhigh');
-  assert.equal(upstreamBody.max_tokens, 3200);
-  assert.match(upstreamBody.messages[0].content, /Build a timer app/);
+  assert.equal(invocation.model, MODEL);
+  assert.equal(invocation.input.reasoning_effort, 'high');
+  assert.equal(invocation.input.temperature, 0.72);
+  assert.equal(invocation.input.max_completion_tokens, 3200);
+  assert.equal(invocation.input.messages[1].content, 'Build a timer');
+  assert.match(invocation.input.messages[0].content, /Build a timer app/);
+  assert.equal('model' in invocation.input, false);
 
-  let defaultModelBody;
-  globalThis.fetch = async (_request, init) => {
-    defaultModelBody = JSON.parse(init.body);
-    return Response.json({
-      choices: [{ message: { content: 'Default model response' } }]
-    });
-  };
-  const defaultModelResponse = await worker.fetch(
-    new Request('https://corez.test/api/openrouter', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: 'Use the default model' })
-    }),
-    env()
+  let generalInput;
+  const generalResponse = await post(
+    JSON.stringify({ prompt: 'Explain edge computing' }),
+    env({
+      AI: {
+        async run(_model, input) {
+          generalInput = input;
+          return {
+            choices: [{ message: { content: 'General response' } }]
+          };
+        }
+      }
+    })
   );
-  assert.equal(defaultModelResponse.status, 200);
-  assert.equal(defaultModelBody.model, 'deepseek/deepseek-v4-flash');
-  assert.equal(
-    (await json(defaultModelResponse)).model,
-    'deepseek/deepseek-v4-flash'
-  );
+  assert.equal(generalResponse.status, 200);
+  assert.equal(generalInput.max_completion_tokens, 1800);
 
-  let requestModelBody;
-  globalThis.fetch = async (_request, init) => {
-    requestModelBody = JSON.parse(init.body);
-    return Response.json({
-      choices: [{ message: { content: 'Request model response' } }]
-    });
-  };
-  const requestModelResponse = await worker.fetch(
-    new Request('https://corez.test/api/openrouter', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        prompt: 'Use the request model',
-        model: 'request/model'
-      })
-    }),
-    env({ OPENROUTER_MODEL: 'environment/model' })
+  const thrownResponse = await post(
+    JSON.stringify({ prompt: 'Hello' }),
+    env({
+      AI: {
+        async run() {
+          throw new Error('binding failure with sensitive detail');
+        }
+      }
+    })
   );
-  assert.equal(requestModelResponse.status, 200);
-  assert.equal(requestModelBody.model, 'request/model');
-  assert.equal((await json(requestModelResponse)).model, 'request/model');
-
-  globalThis.fetch = async () => new Response('rate limited', { status: 429 });
-  const upstreamFailureResponse = await worker.fetch(
-    new Request('https://corez.test/api/openrouter', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: 'Hello' })
-    }),
-    env()
-  );
-  assert.equal(upstreamFailureResponse.status, 502);
-  assert.equal((await json(upstreamFailureResponse)).status, 429);
-
-  globalThis.fetch = async () => {
-    throw new Error('network unavailable: test-secret');
-  };
-  const thrownFetchResponse = await worker.fetch(
-    new Request('https://corez.test/api/openrouter', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: 'Hello' })
-    }),
-    env()
-  );
-  assert.equal(thrownFetchResponse.status, 500);
-  assert.equal(thrownFetchResponse.headers.get('content-type'), 'application/json');
-  const thrownFetchBody = await thrownFetchResponse.text();
-  assert.deepEqual(JSON.parse(thrownFetchBody), {
+  assert.equal(thrownResponse.status, 502);
+  const thrownBody = await thrownResponse.text();
+  assert.deepEqual(JSON.parse(thrownBody), {
     error: 'Unable to generate AI response.'
   });
-  assert.doesNotMatch(thrownFetchBody, /test-secret/);
+  assert.doesNotMatch(thrownBody, /sensitive detail/);
 
-  globalThis.fetch = async () => Response.json({ choices: [] });
-  const emptyChoicesResponse = await worker.fetch(
-    new Request('https://corez.test/api/openrouter', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: 'Hello' })
-    }),
-    env()
+  const emptyResponse = await post(
+    JSON.stringify({ prompt: 'Hello' }),
+    env({
+      AI: {
+        async run() {
+          return { choices: [] };
+        }
+      }
+    })
   );
-  assert.equal(emptyChoicesResponse.status, 502);
-  assert.equal(emptyChoicesResponse.headers.get('content-type'), 'application/json');
-  assert.deepEqual(await json(emptyChoicesResponse), {
-    error: 'OpenRouter returned an empty response.'
+  assert.equal(emptyResponse.status, 502);
+  assert.deepEqual(await json(emptyResponse), {
+    error: 'Workers AI returned an empty response.'
   });
 
   console.log('Cloudflare Worker behavior contract passed.');
 }
 
-try {
-  await run();
-} finally {
-  globalThis.fetch = originalFetch;
-}
+await run();

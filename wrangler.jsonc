@@ -3,6 +3,9 @@
   "name": "ai",
   "main": "./worker/index.js",
   "compatibility_date": "2026-07-18",
+  "ai": {
+    "binding": "AI"
+  },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
