@@ -22,62 +22,67 @@ export default function Sidebar({
   onCloseSidebar
 }) {
   return (
-    <aside className={`sidebar ${isOpen ? '' : 'collapsed'}`} aria-hidden={!isOpen}>
-      <div className="sidebar-header">
-        <div className="brand-title">
-          <div className="brand-icon">
-            <Layers size={14} />
-          </div>
-          <span>Corez</span>
+    <aside className={`sidebar icon-only ${isOpen ? '' : 'collapsed'}`} aria-hidden={!isOpen}>
+      <div className="sidebar-header icon-only-header">
+        <div className="brand-icon" title="Corez AI">
+          <Layers size={16} />
         </div>
         <button 
-          className="icon-btn" 
+          className="icon-btn close-sidebar-btn" 
           onClick={onCloseSidebar}
           title="Collapse Sidebar"
         >
-          <PanelLeftClose size={16} />
+          <PanelLeftClose size={15} />
         </button>
       </div>
 
-      <button className="new-chat-btn" onClick={onNewChat}>
-        <Plus size={16} />
-        <span>New Chat Session</span>
-      </button>
+      <div className="sidebar-action-box">
+        <button 
+          className="new-chat-btn icon-only-btn" 
+          onClick={onNewChat}
+          title="New Chat Session"
+        >
+          <Plus size={18} />
+        </button>
+      </div>
 
-      <div className="chat-history-list">
-        <div className="sidebar-section-heading">
-          Recent Conversations
-        </div>
+      <div className="chat-history-list icon-only-list">
         {sessions.map((session) => (
           <div
             key={session.id}
-            className={`history-item ${session.id === activeSessionId ? 'active' : ''}`}
+            className={`history-item icon-only-item ${session.id === activeSessionId ? 'active' : ''}`}
             onClick={() => onSelectSession(session.id)}
+            title={session.title}
           >
-            <MessageSquare size={14} />
-            <span className="history-title">{session.title}</span>
+            <MessageSquare size={16} />
             <button
-              className="delete-chat-btn"
+              className="delete-chat-btn icon-only-delete"
               onClick={(e) => {
                 e.stopPropagation();
                 onDeleteSession(session.id);
               }}
-              title="Delete Chat"
+              title={`Delete ${session.title}`}
             >
-              <Trash2 size={13} />
+              <Trash2 size={11} />
             </button>
           </div>
         ))}
       </div>
 
-      <div className="sidebar-footer">
-        <button className="footer-action-btn" onClick={onToggleTheme}>
-          {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
-          <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+      <div className="sidebar-footer icon-only-footer">
+        <button 
+          className="footer-action-btn icon-only-btn" 
+          onClick={onToggleTheme}
+          title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+        >
+          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
         </button>
-        <button className="footer-action-btn" onClick={onOpenSettings}>
-          <Settings size={15} />
-          <span>Corez Settings</span>
+        <button 
+          className="footer-action-btn icon-only-btn" 
+          onClick={onOpenSettings}
+          title="Corez Settings"
+        >
+          <Settings size={16} />
         </button>
       </div>
     </aside>
