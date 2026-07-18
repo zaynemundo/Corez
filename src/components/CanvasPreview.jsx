@@ -105,43 +105,39 @@ export default function CanvasPreview({
           </div>
         </div>
 
-        {/* Device Viewport Selector (Desktop vs Laptop vs Tablet vs Mobile) */}
+        {/* Device Viewport Selector (Desktop vs Laptop vs Tablet vs Mobile Icon-only) */}
         {activeTab === 'preview' && (
-          <div className="device-mode-bar" style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-tertiary)', padding: '2px', borderRadius: 'var(--radius-pill)', border: '1px solid var(--border-color)', gap: '2px' }}>
+          <div className="device-mode-bar">
             <button
               onClick={() => setDeviceMode('desktop')}
               title="Desktop Screen View"
               className={`device-btn ${deviceMode === 'desktop' ? 'active' : ''}`}
             >
-              <Monitor size={13} />
-              <span className="device-label">Desktop</span>
+              <Monitor size={15} />
             </button>
 
             <button
               onClick={() => setDeviceMode('laptop')}
-              title="Laptop Screen View (1366x768)"
+              title="Laptop View (1366 × 768)"
               className={`device-btn ${deviceMode === 'laptop' ? 'active' : ''}`}
             >
-              <Laptop size={13} />
-              <span className="device-label">Laptop</span>
+              <Laptop size={15} />
             </button>
 
             <button
               onClick={() => setDeviceMode('tablet')}
-              title="Tablet Screen View (768x1024)"
+              title="Tablet View (768 × 1024)"
               className={`device-btn ${deviceMode === 'tablet' ? 'active' : ''}`}
             >
-              <Tablet size={13} />
-              <span className="device-label">Tablet</span>
+              <Tablet size={15} />
             </button>
 
             <button
               onClick={() => setDeviceMode('mobile')}
-              title="Mobile Screen View (375x812)"
+              title="Mobile View (375 × 812)"
               className={`device-btn ${deviceMode === 'mobile' ? 'active' : ''}`}
             >
-              <Smartphone size={13} />
-              <span className="device-label">Mobile</span>
+              <Smartphone size={15} />
             </button>
           </div>
         )}
@@ -176,7 +172,7 @@ export default function CanvasPreview({
                 </div>
               )}
               <iframe
-                key={`${key}-${deviceMode}`}
+                key={key}
                 title={`Live Application Preview (${deviceSpecs[deviceMode].label})`}
                 srcDoc={editableCode}
                 className="preview-iframe"
