@@ -46,7 +46,7 @@ Job creation is accessed at `POST /api/ai/jobs` and status polling at `GET /api/
 | **Worker Identity** | Worker name `ai`, main entrypoint `./worker/index.js`. | Aligns strictly with repository configuration and Wrangler environment specifications. |
 | **API Endpoints** | `POST /api/ai/jobs` (Creation) and `GET /api/ai/jobs/:jobId` (Polling). | Namespaced under `/api/ai/jobs` while leaving synchronous `POST /api/ai` unchanged. |
 | **Pre-POST Persistence** | Client MUST generate UUID `jobId`, 256-bit capability token, session ID, message IDs, prompt, and optional intent, persisting all to `localStorage` **before** dispatching `POST`. | Guarantees local state integrity if network drops during or immediately after request dispatch. |
-| **Idempotency & Workflow ID** | Client-generated UUID `jobId` serves as idempotency key and Workflow instance ID (`env.AI_JOB_WORKFLOW.get(jobId)` or `.create({ id: jobId, params })`). | Identical `jobId` gets or creates deterministic Workflow, never duplicating execution. |
+| **Idempotency & Workflow ID** | Client-generated UUID `jobId` serves as idempotency key and Workflow instance ID dispatched via `env.AI_JOB_WORKFLOW.createBatch([{ id: jobId, params: { jobId }, retention: { successRetention: "1 day", errorRetention: "1 day" } }])`. | A one-item `createBatch` skips an existing retained instance ID instead of throwing an instance ID collision error, closing the retry race and guaranteeing deterministic execution. |
 | **Canonical Fingerprinting** | Fingerprint is calculated as `SHA256(canonical_json({ conversation_id, prompt, intent }))`. | Uses unambiguous canonical JSON (sorted keys) or length-prefixed fields. Never raw concatenation. |
 | **Duplicate POST Error Mapping** | `401 Unauthorized` is reserved ONLY for missing or malformed header tokens **prior** to row lookup. Duplicate `POST` with invalid token or mismatched fingerprint returns generic `409 Conflict`. | Standardizes idempotency violation responses without leaking state details. |
 | **Dispatch Failure Behavior** | If Workflow creation fails after D1 INSERT, job remains `queued` in D1 and API returns `503 Service Unavailable`. | Allows client to retry the identical idempotent `POST /api/ai/jobs` request safely without creating duplicate jobs. |
@@ -81,7 +81,7 @@ The configuration below details the bindings for the Worker named `ai` in `wrang
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "ai-jobs-db",
+      "database_name": "cloud-service",
       "database_id": "REPLACE_WITH_D1_DATABASE_ID"
     }
   ],
@@ -100,11 +100,11 @@ The configuration below details the bindings for the Worker named `ai` in `wrang
     "binding": "AI"
   },
 
-  // Cloudflare Workers Rate Limiting Binding (Tunable / Per-Location)
+  // Cloudflare Workers Rate Limiting Binding (Wrangler 4.112.0 schema; Tunable / Per-Location)
   "ratelimits": [
     {
-      "binding": "RATE_LIMITER",
-      "namespace_id": "REPLACE_WITH_RATE_LIMITER_NAMESPACE_ID",
+      "name": "RATE_LIMITER",
+      "namespace_id": "1000",
       "simple": {
         "limit": 10,       // Tunable: max 10 creations
         "period": 60       // Tunable: per 60 seconds
@@ -240,10 +240,10 @@ WHERE id = ? AND status IN ('queued', 'running');
      - Query D1 for existing row `WHERE id = job_id`.
      - If row exists:
        - Verify presented `X-Job-Token` hash using `timingSafeEqual`. If token is invalid OR if `request_fingerprint` does not match, return generic **`409 Conflict`** (`IDEMPOTENCY_CONFLICT`). (Note: `401` is NOT returned post-lookup on duplicate POST).
-       - If token and fingerprint match: Ensure Workflow instance exists (`env.AI_JOB_WORKFLOW.get(job_id)` or `.create({ id: job_id })`), and return `200 OK` with current status.
+       - If token and fingerprint match: Dispatch workflow via `await env.AI_JOB_WORKFLOW.createBatch([{ id: job_id, params: { jobId: job_id }, retention: { successRetention: "1 day", errorRetention: "1 day" } }])` (which safely skips existing retained instances), and return `200 OK` with current status.
   5. **New Job Processing:**
      - Execute D1 INSERT (`status = 'queued'`, `active_deadline_at = created_at + 7200`, `expires_at = NULL`).
-     - Spawn Workflow instance: `await env.AI_JOB_WORKFLOW.create({ id: job_id, params: { jobId: job_id } })`.
+     - Spawn Workflow instance: `await env.AI_JOB_WORKFLOW.createBatch([{ id: job_id, params: { jobId: job_id }, retention: { successRetention: "1 day", errorRetention: "1 day" } }])`. A one-item `createBatch` skips an existing retained instance ID instead of throwing an error, closing the retry race.
      - **Dispatch Failure Handling:** If Workflow creation throws an error after D1 INSERT, **do not set status to failed**. Keep the row `queued` in D1 and return `503 Service Unavailable`. The client will retry the same idempotent `POST` request to spawn/get the Workflow.
 
 - **Success Response (`201 Created` / `200 OK`):**
