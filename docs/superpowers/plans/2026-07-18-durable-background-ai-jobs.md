@@ -647,7 +647,7 @@ git commit -m "feat(worker): add Web Crypto utilities, canonical JSON, timingSaf
 
 ### Task 3: D1 Database Migration, Job Store, Jobs API Endpoints & App Routing
 
-**Goal:** Build D1 database migration SQL script `migrations/0001_create_ai_jobs.sql`, prepared statement D1 job store `worker/jobStore.js`, jobs API handlers `worker/jobs.js` (`POST /api/ai/jobs` and `GET /api/ai/jobs/:jobId`), and update pure fetch router `worker/app.js` with dependency-injected store/workflow/rate fakes and comprehensive contract tests `tests/ai-jobs-api-contract.mjs`.
+**Goal:** Build D1 database migration SQL script `migrations/0001_create_ai_jobs.sql`, prepared statement D1 job store `worker/jobStore.js` with BLOB normalization for raw 32-byte SHA-256 token hashes, jobs API handlers `worker/jobs.js` (`POST /api/ai/jobs` and `GET /api/ai/jobs/:jobId`) built with method-level dependency injection (`store`, `dispatch`, `limiter`, `clock`, `logger`), update pure fetch router `worker/app.js` to route jobs API endpoints with dependency-injected parameters, and write comprehensive contract/unit tests `tests/ai-jobs-api-contract.mjs` using pure in-memory store methods without inspecting SQL strings.
 
 **Files:**
 - Create: `migrations/0001_create_ai_jobs.sql`
@@ -657,87 +657,114 @@ git commit -m "feat(worker): add Web Crypto utilities, canonical JSON, timingSaf
 - Create: `tests/ai-jobs-api-contract.mjs`
 
 **Interfaces & Requirements:**
-- `migrations/0001_create_ai_jobs.sql`: Table `jobs` and indices (`idx_jobs_expires_at`, `idx_jobs_status_created`, `idx_jobs_active_deadline`).
-- `worker/jobStore.js`: `insertJob`, `getJobById`, `markJobRunning`, `markJobCompleted`, `markJobFailed`, `repairStuckJobs`, `purgeExpiredJobs`.
-- `worker/jobs.js`: `handleCreateJob`, `handleGetJob`.
-- `worker/app.js`: Routes `/api/ai/jobs` (POST) and `/api/ai/jobs/:jobId` (GET).
-- Auth & Security: Strict UUIDv4 (`job_id`) and `job_sec_` token header shape (`X-Job-Token`). 401 returns ONLY on missing or malformed `X-Job-Token` header prior to DB lookup. Identical generic 404 (`{ error: 'Job not found.', code: 'NOT_FOUND' }`) for absent job, expired job, or wrong token. No secrets, tokens, or raw prompts in responses or logs.
-- Validation: 400 validation on body payload: `job_id` must be valid UUIDv4; `conversation_id` must be non-empty string <= 256 characters; `prompt` must be non-empty string <= 100,000 UTF-8 bytes; `intent` must be optional plain JSON object or null.
-- Idempotency & Rate Limiting: Canonical request fingerprint using SHA-256 over `canonicalJson({ conversation_id, prompt, intent })`. Rate limiting check (`RATE_LIMITER.limit({ key: clientIp })`) runs ONLY for new job submissions; idempotent retries bypass rate limiting. If existing `job_id` has token or fingerprint mismatch, return generic 409 Conflict (`{ error: 'Idempotency conflict for submitted job_id.', code: 'IDEMPOTENCY_CONFLICT' }`).
-- Workflow Dispatch: Dispatches via one-item `AI_JOB_WORKFLOW.createBatch([{ id: jobId, params: { jobId }, retention: { successRetention: '1 day', errorRetention: '1 day' } }])`. If dispatch fails or binding is missing, returns queued status with 503 (`{ error: 'Workflow dispatch failed. Please retry.', code: 'SERVICE_UNAVAILABLE' }`).
-- Insert-Race Recovery: If `insertJob` fails due to primary key race condition, re-read existing job from DB and handle as idempotent request.
-- DB Failures: DB or binding query errors return 503 (`SERVICE_UNAVAILABLE`).
+- `migrations/0001_create_ai_jobs.sql`: Table `jobs` with `token_hash BLOB NOT NULL` storing raw 32-byte `sha256Bytes` output, plus indices (`idx_jobs_expires_at`, `idx_jobs_status_created`, `idx_jobs_active_deadline`).
+- `worker/jobStore.js`: `normalizeBlob` helper converting ArrayBuffer/View/Array to `Uint8Array`, `createD1Store(db)` returning store methods (`getJob`, `insertJob`, `markJobRunning`, `markJobCompleted`, `markJobFailed`, `repairStuckJobs`, `purgeExpiredJobs`) and exported standalone functions.
+- `worker/jobs.js`: `resolveDependencies(env, customDeps)`, `handleCreateJob(request, env, customDeps)`, `handleGetJob(request, env, jobId, customDeps)`. Method-level injected dependencies default to D1/Workflow/RateLimiter production adapters when custom dependencies are unprovided.
+- `worker/app.js`: pure fetch router passing `customDeps` to `handleCreateJob` and `handleGetJob`.
+- Auth & Security: Strict 72-char `job_sec_` token header shape (`X-Job-Token`) and UUIDv4 `job_id`. 401 returns ONLY on missing or malformed `X-Job-Token` prior to DB lookup. Identical generic 404 (`{ error: 'Job not found.', code: 'NOT_FOUND' }`) for absent job, expired job, wrong token, or malformed GET `job_id`. Zero secrets, tokens, raw prompts, or provider error secrets returned in responses or logged. Fail-closed error handling with no silent catches swallowing errors.
+- Validation: 400 validation on body payload: non-object/array body; `job_id` must be valid UUIDv4; `conversation_id` non-empty string <= 256 chars; `prompt` non-empty string <= 100,000 UTF-8 bytes; `intent` optional plain JSON object or null.
+- Retention & Idempotency: `AI_JOB_WORKFLOW.createBatch([{ id: jobId, params: { jobId }, retention: { successRetention: '1 day', errorRetention: '1 day' } }])`. Canonical SHA-256 request fingerprint over `canonicalJson({ conversation_id, prompt, intent })`. Rate limiting check (`limiter(clientIp)`) runs ONLY for new jobs; idempotent retries bypass rate limiter. Existing `job_id` with token or fingerprint mismatch returns 409 Conflict (`{ error: 'Idempotency conflict for submitted job_id.', code: 'IDEMPOTENCY_CONFLICT' }`).
+- Insert-Race Recovery: Primary key collision during `insertJob` re-reads job from store, authenticates token & fingerprint, dispatches workflow, and surfaces dispatch failure if workflow creation throws.
+- Database & Limiter & Workflow Failures:
+  - Missing/failing database or crypto error returns 503 (`SERVICE_UNAVAILABLE`).
+  - Missing/failing rate limiter for new job returns 503 (`SERVICE_UNAVAILABLE`).
+  - Workflow dispatch error for new or existing job returns queued status with 503 (`SERVICE_UNAVAILABLE`).
+  - GET request database failure returns 503 (`SERVICE_UNAVAILABLE`).
+- Method Handling: Unsupported HTTP methods return 405 (`Method not allowed.`).
 
 - [ ] **Step 1: Write failing contract test `tests/ai-jobs-api-contract.mjs`**
 
-Create `tests/ai-jobs-api-contract.mjs` using dependency-injected fakes:
+Create `tests/ai-jobs-api-contract.mjs` using pure in-memory store and method-level dependency injection:
 
 ```javascript
 // tests/ai-jobs-api-contract.mjs
 import assert from 'node:assert/strict';
 import app from '../worker/app.js';
-import { sha256Hex, computeRequestFingerprint } from '../worker/jobUtils.js';
+import { sha256Bytes, computeRequestFingerprint } from '../worker/jobUtils.js';
 
-function createFakeDb() {
-  const store = new Map();
-  let insertShouldFail = false;
+function createInMemoryStore() {
+  const jobs = new Map();
+  let insertShouldFailWithRace = false;
+  let queryShouldFailWithDbError = false;
+
   return {
-    _store: store,
-    _setInsertShouldFail(fail) { insertShouldFail = fail; },
-    prepare(sql) {
-      return {
-        bind(...args) {
-          return {
-            async first() {
-              if (sql.includes('SELECT')) {
-                const id = args[0];
-                return store.get(id) || null;
-              }
-              return null;
-            },
-            async run() {
-              if (sql.includes('INSERT INTO jobs')) {
-                if (insertShouldFail) {
-                  throw new Error('D1 INSERT ERROR: UNIQUE constraint failed: jobs.id');
-                }
-                const [id, token_hash, conversation_id, status, prompt_text, intent_json, result_text, provider_meta, error_code, request_fingerprint, created_at, updated_at, terminal_at, active_deadline_at, expires_at] = args;
-                store.set(id, { id, token_hash, conversation_id, status, prompt_text, intent_json, result_text, provider_meta, error_code, request_fingerprint, created_at, updated_at, terminal_at, active_deadline_at, expires_at });
-              }
-              return { success: true };
-            }
-          };
-        }
-      };
+    _jobs: jobs,
+    _setInsertShouldFailWithRace(val) { insertShouldFailWithRace = val; },
+    _setQueryShouldFailWithDbError(val) { queryShouldFailWithDbError = val; },
+    async getJob(jobId) {
+      if (queryShouldFailWithDbError) {
+        throw new Error('D1 DATABASE_ERROR: Connection failed');
+      }
+      const job = jobs.get(jobId);
+      return job ? { ...job } : null;
+    },
+    async insertJob(job) {
+      if (queryShouldFailWithDbError) {
+        throw new Error('D1 DATABASE_ERROR: Connection failed');
+      }
+      if (insertShouldFailWithRace || jobs.has(job.id)) {
+        throw new Error('D1 UNIQUE_CONSTRAINT: Primary key collision on jobs.id');
+      }
+      jobs.set(job.id, { ...job });
     }
   };
 }
 
-function createFakeEnv(overrides = {}) {
-  const db = createFakeDb();
+function createFakeDeps(overrides = {}) {
+  const store = createInMemoryStore();
   let limitCalledCount = 0;
-  let createBatchCalledCount = 0;
+  let dispatchCalls = [];
+  let limiterShouldFail = false;
+  let limiterExceeded = false;
+  let dispatchShouldFail = false;
+  let loggedErrors = [];
+
+  const defaultDispatch = async (jobId) => {
+    if (dispatchShouldFail) {
+      throw new Error('WORKFLOW_DISPATCH_ERROR: Cluster timeout');
+    }
+    dispatchCalls.push({ jobId, retention: { successRetention: '1 day', errorRetention: '1 day' } });
+  };
+
+  const defaultLimiter = async (ip) => {
+    limitCalledCount++;
+    if (limiterShouldFail) {
+      throw new Error('RATE_LIMITER_ERROR: Service unavailable');
+    }
+    if (limiterExceeded) {
+      return { success: false };
+    }
+    return { success: true };
+  };
+
+  const defaultClock = {
+    now: () => 1770000000
+  };
+
+  const defaultLogger = {
+    error: (msg, meta = {}) => {
+      loggedErrors.push({ msg, meta });
+    }
+  };
+
   return {
-    DB: db,
-    AI_JOB_WORKFLOW: {
-      async createBatch(batch) {
-        createBatchCalledCount++;
-        return batch.map(b => ({ id: b.id }));
-      }
-    },
-    RATE_LIMITER: {
-      async limit() {
-        limitCalledCount++;
-        return { success: true };
-      }
-    },
-    get _limitCalledCount() { return limitCalledCount; },
-    get _createBatchCalledCount() { return createBatchCalledCount; },
-    ...overrides
+    store: overrides.store !== undefined ? overrides.store : store,
+    dispatch: overrides.dispatch || defaultDispatch,
+    limiter: overrides.limiter || defaultLimiter,
+    clock: overrides.clock || defaultClock,
+    logger: overrides.logger || defaultLogger,
+    _store: store,
+    _dispatchCalls: dispatchCalls,
+    _loggedErrors: loggedErrors,
+    _getLimitCalledCount: () => limitCalledCount,
+    _setLimiterShouldFail: (val) => { limiterShouldFail = val; },
+    _setLimiterExceeded: (val) => { limiterExceeded = val; },
+    _setDispatchShouldFail: (val) => { dispatchShouldFail = val; }
   };
 }
 
 async function run() {
-  const env = createFakeEnv();
+  const deps = createFakeDeps();
   const token = 'job_sec_1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef';
   const jobId = '550e8400-e29b-41d4-a716-446655440000';
 
@@ -748,22 +775,68 @@ async function run() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ job_id: jobId, conversation_id: 'c1', prompt: 'test' })
     }),
-    env
+    {},
+    deps
   );
   assert.equal(noTokenRes.status, 401);
 
-  // Test 2: Invalid body payload returns 400
+  const malformedTokenRes = await app.fetch(
+    new Request('https://corez.test/api/ai/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Job-Token': 'bad_prefix_1234567890abcdef1234567890abcdef1234567890abcdef1234' },
+      body: JSON.stringify({ job_id: jobId, conversation_id: 'c1', prompt: 'test' })
+    }),
+    {},
+    deps
+  );
+  assert.equal(malformedTokenRes.status, 401);
+
+  // Test 2: All body 400 cases
   const badUuidRes = await app.fetch(
     new Request('https://corez.test/api/ai/jobs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Job-Token': token },
       body: JSON.stringify({ job_id: 'not-a-uuid', conversation_id: 'c1', prompt: 'test' })
     }),
-    env
+    {},
+    deps
   );
   assert.equal(badUuidRes.status, 400);
 
-  // Test 3: POST /api/ai/jobs successful creation (201)
+  const missingConvRes = await app.fetch(
+    new Request('https://corez.test/api/ai/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Job-Token': token },
+      body: JSON.stringify({ job_id: jobId, conversation_id: '', prompt: 'test' })
+    }),
+    {},
+    deps
+  );
+  assert.equal(missingConvRes.status, 400);
+
+  const hugePromptRes = await app.fetch(
+    new Request('https://corez.test/api/ai/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Job-Token': token },
+      body: JSON.stringify({ job_id: jobId, conversation_id: 'c1', prompt: 'a'.repeat(100001) })
+    }),
+    {},
+    deps
+  );
+  assert.equal(hugePromptRes.status, 400);
+
+  const badIntentRes = await app.fetch(
+    new Request('https://corez.test/api/ai/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Job-Token': token },
+      body: JSON.stringify({ job_id: jobId, conversation_id: 'c1', prompt: 'test', intent: 'not-an-object' })
+    }),
+    {},
+    deps
+  );
+  assert.equal(badIntentRes.status, 400);
+
+  // Test 3: POST 201 creation and exact createBatch retention
   const createRes = await app.fetch(
     new Request('https://corez.test/api/ai/jobs', {
       method: 'POST',
@@ -775,16 +848,20 @@ async function run() {
         intent: { mode: 'code' }
       })
     }),
-    env
+    {},
+    deps
   );
   assert.equal(createRes.status, 201);
   const createBody = await createRes.json();
   assert.equal(createBody.job_id, jobId);
   assert.equal(createBody.status, 'queued');
-  assert.equal(env._limitCalledCount, 1, 'Rate limiter must be called for new job creation');
+  assert.equal(createBody.created_at, 1770000000);
+  assert.equal(deps._getLimitCalledCount(), 1);
+  assert.equal(deps._dispatchCalls.length, 1);
+  assert.deepEqual(deps._dispatchCalls[0].retention, { successRetention: '1 day', errorRetention: '1 day' });
 
-  // Test 4: Idempotent retry returns 200 and bypasses rate limiter
-  const initialLimitCount = env._limitCalledCount;
+  // Test 4: Idempotent 200 retry bypasses rate limiter
+  const initialLimitCount = deps._getLimitCalledCount();
   const retryRes = await app.fetch(
     new Request('https://corez.test/api/ai/jobs', {
       method: 'POST',
@@ -796,16 +873,19 @@ async function run() {
         intent: { mode: 'code' }
       })
     }),
-    env
+    {},
+    deps
   );
   assert.equal(retryRes.status, 200);
-  assert.equal(env._limitCalledCount, initialLimitCount, 'Rate limiter must NOT be called for idempotent retry');
+  assert.equal(deps._getLimitCalledCount(), initialLimitCount, 'Rate limiter must NOT be called for idempotent retry');
+  assert.equal(deps._dispatchCalls.length, 2, 'Workflow dispatch must be called again on retry');
 
-  // Test 5: Duplicate POST with wrong token or altered payload returns 409 Conflict
-  const conflictRes = await app.fetch(
+  // Test 5: Duplicate POST with valid-shaped wrong token or changed fingerprint returns 409
+  const diffToken = 'job_sec_9999997890abcdef1234567890abcdef1234567890abcdef1234567890abcdef';
+  const conflictTokenRes = await app.fetch(
     new Request('https://corez.test/api/ai/jobs', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Job-Token': 'job_sec_wrongtoken1234567890abcdef1234567890abcdef123456' },
+      headers: { 'Content-Type': 'application/json', 'X-Job-Token': diffToken },
       body: JSON.stringify({
         job_id: jobId,
         conversation_id: 'c1',
@@ -813,41 +893,228 @@ async function run() {
         intent: { mode: 'code' }
       })
     }),
-    env
+    {},
+    deps
   );
-  assert.equal(conflictRes.status, 409);
+  assert.equal(conflictTokenRes.status, 409);
 
-  // Test 6: GET /api/ai/jobs/:jobId returns queued state (200)
-  const getRes = await app.fetch(
-    new Request(`https://corez.test/api/ai/jobs/${jobId}`, {
+  const conflictFingerprintRes = await app.fetch(
+    new Request('https://corez.test/api/ai/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Job-Token': token },
+      body: JSON.stringify({
+        job_id: jobId,
+        conversation_id: 'c1',
+        prompt: 'different prompt',
+        intent: { mode: 'code' }
+      })
+    }),
+    {},
+    deps
+  );
+  assert.equal(conflictFingerprintRes.status, 409);
+
+  // Test 6: 429 new job only when rate limit exceeded
+  const newJobIdFor429 = '660e8400-e29b-41d4-a716-446655440000';
+  deps._setLimiterExceeded(true);
+  const rateLimitedRes = await app.fetch(
+    new Request('https://corez.test/api/ai/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Job-Token': token },
+      body: JSON.stringify({ job_id: newJobIdFor429, conversation_id: 'c1', prompt: 'test' })
+    }),
+    {},
+    deps
+  );
+  assert.equal(rateLimitedRes.status, 429);
+  deps._setLimiterExceeded(false);
+
+  // Test 7: Missing/failing limiter returns 503 for new job
+  const newJobIdForLimiterFail = '770e8400-e29b-41d4-a716-446655440000';
+  deps._setLimiterShouldFail(true);
+  const limiterFailRes = await app.fetch(
+    new Request('https://corez.test/api/ai/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Job-Token': token },
+      body: JSON.stringify({ job_id: newJobIdForLimiterFail, conversation_id: 'c1', prompt: 'test' })
+    }),
+    {},
+    deps
+  );
+  assert.equal(limiterFailRes.status, 503);
+  deps._setLimiterShouldFail(false);
+
+  // Test 8: Insert race rereads, authenticates, dispatches, and surfaces dispatch failure
+  const raceJobId = '880e8400-e29b-41d4-a716-446655440000';
+  const tokenHashBytes = await sha256Bytes(token);
+  const fingerprint = await computeRequestFingerprint('c1', 'race prompt', null);
+  deps.store._jobs.set(raceJobId, {
+    id: raceJobId,
+    token_hash: tokenHashBytes,
+    conversation_id: 'c1',
+    status: 'queued',
+    prompt_text: 'race prompt',
+    intent_json: null,
+    request_fingerprint: fingerprint,
+    created_at: 1770000000
+  });
+  deps.store._setInsertShouldFailWithRace(true);
+
+  const raceRes = await app.fetch(
+    new Request('https://corez.test/api/ai/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Job-Token': token },
+      body: JSON.stringify({ job_id: raceJobId, conversation_id: 'c1', prompt: 'race prompt' })
+    }),
+    {},
+    deps
+  );
+  assert.equal(raceRes.status, 200);
+
+  // Test 9: Workflow dispatch failure for new or existing job surfaces queued+503
+  deps.store._setInsertShouldFailWithRace(false);
+  deps._setDispatchShouldFail(true);
+  const newJobIdForDispatchFail = '990e8400-e29b-41d4-a716-446655440000';
+  const dispatchFailRes = await app.fetch(
+    new Request('https://corez.test/api/ai/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Job-Token': token },
+      body: JSON.stringify({ job_id: newJobIdForDispatchFail, conversation_id: 'c1', prompt: 'test' })
+    }),
+    {},
+    deps
+  );
+  assert.equal(dispatchFailRes.status, 503);
+  const dispatchFailBody = await dispatchFailRes.json();
+  assert.equal(dispatchFailBody.status, 'queued');
+  deps._setDispatchShouldFail(false);
+
+  // Test 10: DB failure returns 503
+  deps.store._setQueryShouldFailWithDbError(true);
+  const dbFailRes = await app.fetch(
+    new Request('https://corez.test/api/ai/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Job-Token': token },
+      body: JSON.stringify({ job_id: 'aa0e8400-e29b-41d4-a716-446655440000', conversation_id: 'c1', prompt: 'test' })
+    }),
+    {},
+    deps
+  );
+  assert.equal(dbFailRes.status, 503);
+  deps.store._setQueryShouldFailWithDbError(false);
+
+  // Test 11: GET queued, running, completed, and failed status responses
+  const statusJobId = 'bb0e8400-e29b-41d4-a716-446655440000';
+  deps.store._jobs.set(statusJobId, {
+    id: statusJobId,
+    token_hash: tokenHashBytes,
+    conversation_id: 'c1',
+    status: 'completed',
+    prompt_text: 'test',
+    result_text: 'AI response text',
+    provider_meta: JSON.stringify({ model: '@cf/zai-org/glm-4.7-flash', provider: '@cf/workers-ai' }),
+    created_at: 1770000000,
+    updated_at: 1770000010,
+    terminal_at: 1770000010,
+    expires_at: 1770086410
+  });
+
+  const getCompletedRes = await app.fetch(
+    new Request(`https://corez.test/api/ai/jobs/${statusJobId}`, {
       method: 'GET',
       headers: { 'X-Job-Token': token }
     }),
-    env
+    {},
+    deps
   );
-  assert.equal(getRes.status, 200);
-  const getBody = await getRes.json();
-  assert.equal(getBody.status, 'queued');
+  assert.equal(getCompletedRes.status, 200);
+  const completedBody = await getCompletedRes.json();
+  assert.equal(completedBody.status, 'completed');
+  assert.equal(completedBody.result.content, 'AI response text');
 
-  // Test 7: GET with invalid token or non-existent jobId returns generic 404
-  const badTokenRes = await app.fetch(
-    new Request(`https://corez.test/api/ai/jobs/${jobId}`, {
+  // Test 12: GET returns identical 404 for absent, expired, wrong valid token, or invalid UUID
+  const getAbsentRes = await app.fetch(
+    new Request('https://corez.test/api/ai/jobs/cc0e8400-e29b-41d4-a716-446655440000', {
       method: 'GET',
-      headers: { 'X-Job-Token': 'job_sec_invalidtoken1234567890abcdef1234567890abcdef1234' }
+      headers: { 'X-Job-Token': token }
     }),
-    env
+    {},
+    deps
   );
-  assert.equal(badTokenRes.status, 404);
+  assert.equal(getAbsentRes.status, 404);
 
-  // Test 8: Method handling (405)
-  const wrongMethodRes = await app.fetch(
+  const getWrongTokenRes = await app.fetch(
+    new Request(`https://corez.test/api/ai/jobs/${statusJobId}`, {
+      method: 'GET',
+      headers: { 'X-Job-Token': diffToken }
+    }),
+    {},
+    deps
+  );
+  assert.equal(getWrongTokenRes.status, 404);
+
+  const expiredJobId = 'dd0e8400-e29b-41d4-a716-446655440000';
+  deps.store._jobs.set(expiredJobId, {
+    id: expiredJobId,
+    token_hash: tokenHashBytes,
+    conversation_id: 'c1',
+    status: 'completed',
+    result_text: 'expired',
+    created_at: 1770000000,
+    updated_at: 1770000010,
+    terminal_at: 1770000010,
+    expires_at: 1769999999 // expired in past
+  });
+
+  const getExpiredRes = await app.fetch(
+    new Request(`https://corez.test/api/ai/jobs/${expiredJobId}`, {
+      method: 'GET',
+      headers: { 'X-Job-Token': token }
+    }),
+    {},
+    deps
+  );
+  assert.equal(getExpiredRes.status, 404);
+
+  // Test 13: GET DB error returns 503
+  deps.store._setQueryShouldFailWithDbError(true);
+  const getDbErrorRes = await app.fetch(
+    new Request(`https://corez.test/api/ai/jobs/${statusJobId}`, {
+      method: 'GET',
+      headers: { 'X-Job-Token': token }
+    }),
+    {},
+    deps
+  );
+  assert.equal(getDbErrorRes.status, 503);
+  deps.store._setQueryShouldFailWithDbError(false);
+
+  // Test 14: Method handling 405
+  const postGetEndpoint = await app.fetch(
+    new Request(`https://corez.test/api/ai/jobs/${statusJobId}`, {
+      method: 'POST',
+      headers: { 'X-Job-Token': token }
+    }),
+    {},
+    deps
+  );
+  assert.equal(postGetEndpoint.status, 405);
+
+  const getPostEndpoint = await app.fetch(
     new Request('https://corez.test/api/ai/jobs', {
       method: 'GET',
       headers: { 'X-Job-Token': token }
     }),
-    env
+    {},
+    deps
   );
-  assert.equal(wrongMethodRes.status, 405);
+  assert.equal(getPostEndpoint.status, 405);
+
+  // Test 15: No token or secret leak in logged errors or responses
+  for (const log of deps._loggedErrors) {
+    const serialized = JSON.stringify(log);
+    assert.equal(serialized.includes(token), false, 'Token must never be logged');
+  }
 
   console.log('AI jobs API contract passed.');
 }
@@ -859,7 +1126,7 @@ Run test to verify failure (RED):
 ```bash
 node tests/ai-jobs-api-contract.mjs
 ```
-*Expected Output:* `AssertionError or 404 response`
+*Expected Output:* `Error: Cannot find module` or assertion failure until implementation is created.
 
 - [ ] **Step 2: Create `migrations/0001_create_ai_jobs.sql`**
 
@@ -867,7 +1134,7 @@ node tests/ai-jobs-api-contract.mjs
 -- migrations/0001_create_ai_jobs.sql
 CREATE TABLE IF NOT EXISTS jobs (
     id TEXT PRIMARY KEY,                       -- UUID v4 generated by client
-    token_hash TEXT NOT NULL,                  -- SHA-256 hash of capability token
+    token_hash BLOB NOT NULL,                  -- Raw 32-byte SHA-256 hash of capability token
     conversation_id TEXT NOT NULL,             -- Client origin conversation ID
     status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'completed', 'failed')),
     prompt_text TEXT NOT NULL,                 -- User prompt (max 100,000 bytes UTF-8)
@@ -892,73 +1159,130 @@ CREATE INDEX IF NOT EXISTS idx_jobs_active_deadline ON jobs(active_deadline_at);
 
 ```javascript
 // worker/jobStore.js
+export function normalizeBlob(blob) {
+  if (!blob) return null;
+  if (blob instanceof Uint8Array) return blob;
+  if (blob instanceof ArrayBuffer) return new Uint8Array(blob);
+  if (ArrayBuffer.isView(blob)) return new Uint8Array(blob.buffer, blob.byteOffset, blob.byteLength);
+  if (Array.isArray(blob)) return Uint8Array.from(blob);
+  return null;
+}
+
+export function createD1Store(db) {
+  if (!db || typeof db.prepare !== 'function') {
+    throw new Error('D1_BINDING_MISSING');
+  }
+
+  return {
+    async getJob(jobId) {
+      const sql = `SELECT * FROM jobs WHERE id = ?`;
+      const row = await db.prepare(sql).bind(jobId).first();
+      if (!row) return null;
+      return {
+        ...row,
+        token_hash: normalizeBlob(row.token_hash)
+      };
+    },
+
+    async insertJob(job) {
+      const sql = `
+        INSERT INTO jobs (
+          id, token_hash, conversation_id, status, prompt_text, intent_json,
+          result_text, provider_meta, error_code, request_fingerprint,
+          created_at, updated_at, terminal_at, active_deadline_at, expires_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      await db.prepare(sql).bind(
+        job.id,
+        job.token_hash,
+        job.conversation_id,
+        job.status,
+        job.prompt_text,
+        job.intent_json,
+        job.result_text || null,
+        job.provider_meta || null,
+        job.error_code || null,
+        job.request_fingerprint,
+        job.created_at,
+        job.updated_at,
+        job.terminal_at || null,
+        job.active_deadline_at,
+        job.expires_at || null
+      ).run();
+    },
+
+    async markJobRunning(jobId) {
+      const sql = `UPDATE jobs SET status = 'running', updated_at = unixepoch() WHERE id = ? AND status = 'queued'`;
+      return db.prepare(sql).bind(jobId).run();
+    },
+
+    async markJobCompleted(jobId, resultText, providerMeta) {
+      const sql = `
+        UPDATE jobs 
+        SET status = 'completed', result_text = ?, provider_meta = ?, terminal_at = unixepoch(), expires_at = (unixepoch() + 86400), updated_at = unixepoch() 
+        WHERE id = ? AND status IN ('queued', 'running')
+      `;
+      return db.prepare(sql).bind(resultText, providerMeta, jobId).run();
+    },
+
+    async markJobFailed(jobId, errorCode) {
+      const sql = `
+        UPDATE jobs 
+        SET status = 'failed', error_code = ?, terminal_at = unixepoch(), expires_at = (unixepoch() + 86400), updated_at = unixepoch() 
+        WHERE id = ? AND status IN ('queued', 'running')
+      `;
+      return db.prepare(sql).bind(errorCode, jobId).run();
+    },
+
+    async repairStuckJobs() {
+      const sql = `
+        UPDATE jobs 
+        SET status = 'failed', error_code = 'ACTIVE_DEADLINE_EXCEEDED', terminal_at = unixepoch(), expires_at = (unixepoch() + 86400), updated_at = unixepoch() 
+        WHERE status IN ('queued', 'running') AND active_deadline_at <= unixepoch()
+      `;
+      return db.prepare(sql).run();
+    },
+
+    async purgeExpiredJobs() {
+      const sql = `DELETE FROM jobs WHERE expires_at IS NOT NULL AND expires_at <= unixepoch()`;
+      return db.prepare(sql).run();
+    }
+  };
+}
+
 export async function insertJob(db, job) {
-  const sql = `
-    INSERT INTO jobs (
-      id, token_hash, conversation_id, status, prompt_text, intent_json,
-      result_text, provider_meta, error_code, request_fingerprint,
-      created_at, updated_at, terminal_at, active_deadline_at, expires_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `;
-  await db.prepare(sql).bind(
-    job.id,
-    job.token_hash,
-    job.conversation_id,
-    job.status,
-    job.prompt_text,
-    job.intent_json,
-    job.result_text || null,
-    job.provider_meta || null,
-    job.error_code || null,
-    job.request_fingerprint,
-    job.created_at,
-    job.updated_at,
-    job.terminal_at || null,
-    job.active_deadline_at,
-    job.expires_at || null
-  ).run();
+  const store = createD1Store(db);
+  return store.insertJob(job);
 }
 
 export async function getJobById(db, jobId) {
-  const sql = `SELECT * FROM jobs WHERE id = ?`;
-  return db.prepare(sql).bind(jobId).first();
+  const store = createD1Store(db);
+  return store.getJob(jobId);
 }
 
 export async function markJobRunning(db, jobId) {
-  const sql = `UPDATE jobs SET status = 'running', updated_at = unixepoch() WHERE id = ? AND status = 'queued'`;
-  return db.prepare(sql).bind(jobId).run();
+  const store = createD1Store(db);
+  return store.markJobRunning(jobId);
 }
 
 export async function markJobCompleted(db, jobId, resultText, providerMeta) {
-  const sql = `
-    UPDATE jobs 
-    SET status = 'completed', result_text = ?, provider_meta = ?, terminal_at = unixepoch(), expires_at = (unixepoch() + 86400), updated_at = unixepoch() 
-    WHERE id = ? AND status IN ('queued', 'running')
-  `;
-  return db.prepare(sql).bind(resultText, providerMeta, jobId).run();
+  const store = createD1Store(db);
+  return store.markJobCompleted(jobId, resultText, providerMeta);
 }
 
 export async function markJobFailed(db, jobId, errorCode) {
-  const sql = `
-    UPDATE jobs 
-    SET status = 'failed', error_code = ?, terminal_at = unixepoch(), expires_at = (unixepoch() + 86400), updated_at = unixepoch() 
-    WHERE id = ? AND status IN ('queued', 'running')
-  `;
-  return db.prepare(sql).bind(errorCode, jobId).run();
+  const store = createD1Store(db);
+  return store.markJobFailed(jobId, errorCode);
 }
 
 export async function repairStuckJobs(db) {
-  const sql = `
-    UPDATE jobs 
-    SET status = 'failed', error_code = 'ACTIVE_DEADLINE_EXCEEDED', terminal_at = unixepoch(), expires_at = (unixepoch() + 86400), updated_at = unixepoch() 
-    WHERE status IN ('queued', 'running') AND active_deadline_at <= unixepoch()
-  `;
-  return db.prepare(sql).run();
+  const store = createD1Store(db);
+  return store.repairStuckJobs();
 }
 
 export async function purgeExpiredJobs(db) {
-  const sql = `DELETE FROM jobs WHERE expires_at IS NOT NULL AND expires_at <= unixepoch()`;
-  return db.prepare(sql).run();
+  const store = createD1Store(db);
+  return store.purgeExpiredJobs();
 }
 ```
 
@@ -968,7 +1292,6 @@ export async function purgeExpiredJobs(db) {
 // worker/jobs.js
 import { jsonResponse, safeErrorDetail } from './ai.js';
 import {
-  sha256Hex,
   sha256Bytes,
   computeRequestFingerprint,
   timingSafeEqualBytes,
@@ -977,9 +1300,43 @@ import {
   getUtf8ByteLength,
   canonicalJson
 } from './jobUtils.js';
-import { insertJob, getJobById } from './jobStore.js';
+import { createD1Store, normalizeBlob } from './jobStore.js';
 
-export async function handleCreateJob(request, env) {
+export function resolveDependencies(env, customDeps = {}) {
+  const store = customDeps.store || (env?.DB ? createD1Store(env.DB) : null);
+
+  const dispatch = customDeps.dispatch || (async (jobId) => {
+    if (!env?.AI_JOB_WORKFLOW || typeof env.AI_JOB_WORKFLOW.createBatch !== 'function') {
+      throw new Error('WORKFLOW_BINDING_MISSING');
+    }
+    return env.AI_JOB_WORKFLOW.createBatch([{
+      id: jobId,
+      params: { jobId },
+      retention: { successRetention: '1 day', errorRetention: '1 day' }
+    }]);
+  });
+
+  const limiter = customDeps.limiter || (async (ip) => {
+    if (!env?.RATE_LIMITER || typeof env.RATE_LIMITER.limit !== 'function') {
+      throw new Error('LIMITER_BINDING_MISSING');
+    }
+    return env.RATE_LIMITER.limit({ key: ip });
+  });
+
+  const clock = customDeps.clock || {
+    now: () => Math.floor(Date.now() / 1000)
+  };
+
+  const logger = customDeps.logger || {
+    error: (message, meta = {}) => {
+      console.error(JSON.stringify({ message, ...meta }));
+    }
+  };
+
+  return { store, dispatch, limiter, clock, logger };
+}
+
+export async function handleCreateJob(request, env, customDeps = {}) {
   if (request.method !== 'POST') {
     return jsonResponse(405, { error: 'Method not allowed.' });
   }
@@ -1024,42 +1381,44 @@ export async function handleCreateJob(request, env) {
     return jsonResponse(400, { error: 'Prompt exceeds maximum 100,000 UTF-8 bytes limit.', code: 'INVALID_PAYLOAD' });
   }
 
-  const requestFingerprint = await computeRequestFingerprint(conversationId, prompt, intent);
-  const tokenHash = await sha256Hex(tokenHeader);
+  let requestFingerprint;
+  let presentedTokenHash;
+  try {
+    requestFingerprint = await computeRequestFingerprint(conversationId, prompt, intent);
+    presentedTokenHash = await sha256Bytes(tokenHeader);
+  } catch (err) {
+    return jsonResponse(503, { error: 'Service unavailable.', code: 'SERVICE_UNAVAILABLE' });
+  }
 
-  // Check if job already exists in D1
+  const { store, dispatch, limiter, clock, logger } = resolveDependencies(env, customDeps);
+
+  if (!store || typeof store.getJob !== 'function' || typeof store.insertJob !== 'function') {
+    logger.error('Job store service missing or unconfigured');
+    return jsonResponse(503, { error: 'Database service unavailable.', code: 'SERVICE_UNAVAILABLE' });
+  }
+
   let existingJob = null;
   try {
-    existingJob = await getJobById(env.DB, jobId);
+    existingJob = await store.getJob(jobId);
   } catch (err) {
-    console.error(JSON.stringify({ message: 'D1 query failed', error: safeErrorDetail(err) }));
+    logger.error('Database query failed', { error: safeErrorDetail(err) });
     return jsonResponse(503, { error: 'Database service unavailable.', code: 'SERVICE_UNAVAILABLE' });
   }
 
   if (existingJob) {
-    const storedTokenHashBytes = new TextEncoder().encode(existingJob.token_hash);
-    const presentedTokenHashBytes = new TextEncoder().encode(tokenHash);
-
-    const tokenMatch = timingSafeEqualBytes(storedTokenHashBytes, presentedTokenHashBytes);
+    const storedTokenHash = normalizeBlob(existingJob.token_hash);
+    const tokenMatch = storedTokenHash ? timingSafeEqualBytes(storedTokenHash, presentedTokenHash) : false;
     const fingerprintMatch = existingJob.request_fingerprint === requestFingerprint;
 
     if (!tokenMatch || !fingerprintMatch) {
       return jsonResponse(409, { error: 'Idempotency conflict for submitted job_id.', code: 'IDEMPOTENCY_CONFLICT' });
     }
 
-    // Idempotent retry: skip rate limiter, dispatch workflow instance again via createBatch
     let dispatchFailed = false;
     try {
-      if (!env.AI_JOB_WORKFLOW || typeof env.AI_JOB_WORKFLOW.createBatch !== 'function') {
-        throw new Error('WORKFLOW_BINDING_MISSING');
-      }
-      await env.AI_JOB_WORKFLOW.createBatch([{
-        id: jobId,
-        params: { jobId },
-        retention: { successRetention: '1 day', errorRetention: '1 day' }
-      }]);
+      await dispatch(jobId);
     } catch (err) {
-      console.error(JSON.stringify({ message: 'Workflow dispatch failed on idempotent retry', error: safeErrorDetail(err) }));
+      logger.error('Workflow dispatch failed on idempotent retry', { error: safeErrorDetail(err) });
       dispatchFailed = true;
     }
 
@@ -1079,23 +1438,21 @@ export async function handleCreateJob(request, env) {
     });
   }
 
-  // Rate Limiting Check (ONLY for new jobs)
-  if (env.RATE_LIMITER && typeof env.RATE_LIMITER.limit === 'function') {
-    try {
-      const clientIp = request.headers.get('CF-Connecting-IP') || '127.0.0.1';
-      const limitResult = await env.RATE_LIMITER.limit({ key: clientIp });
-      if (limitResult && limitResult.success === false) {
-        return jsonResponse(429, { error: 'Rate limit exceeded. Try again later.', code: 'RATE_LIMIT_EXCEEDED' });
-      }
-    } catch (err) {
-      console.error(JSON.stringify({ message: 'Rate limiter check failed', error: safeErrorDetail(err) }));
+  try {
+    const clientIp = request.headers.get('CF-Connecting-IP') || '127.0.0.1';
+    const limitResult = await limiter(clientIp);
+    if (limitResult && limitResult.success === false) {
+      return jsonResponse(429, { error: 'Rate limit exceeded. Try again later.', code: 'RATE_LIMIT_EXCEEDED' });
     }
+  } catch (err) {
+    logger.error('Rate limiter check failed for new job', { error: safeErrorDetail(err) });
+    return jsonResponse(503, { error: 'Rate limiting service unavailable.', code: 'SERVICE_UNAVAILABLE' });
   }
 
-  const now = Math.floor(Date.now() / 1000);
+  const now = clock.now();
   const newJob = {
     id: jobId,
-    token_hash: tokenHash,
+    token_hash: presentedTokenHash,
     conversation_id: conversationId,
     status: 'queued',
     prompt_text: prompt,
@@ -1112,20 +1469,34 @@ export async function handleCreateJob(request, env) {
   };
 
   try {
-    await insertJob(env.DB, newJob);
+    await store.insertJob(newJob);
   } catch (err) {
-    // Insert-race re-read recovery: if primary key collision occurred, try re-reading
     try {
-      const raceJob = await getJobById(env.DB, jobId);
+      const raceJob = await store.getJob(jobId);
       if (raceJob) {
-        const storedTokenHashBytes = new TextEncoder().encode(raceJob.token_hash);
-        const presentedTokenHashBytes = new TextEncoder().encode(tokenHash);
-
-        const tokenMatch = timingSafeEqualBytes(storedTokenHashBytes, presentedTokenHashBytes);
+        const storedTokenHash = normalizeBlob(raceJob.token_hash);
+        const tokenMatch = storedTokenHash ? timingSafeEqualBytes(storedTokenHash, presentedTokenHash) : false;
         const fingerprintMatch = raceJob.request_fingerprint === requestFingerprint;
 
         if (!tokenMatch || !fingerprintMatch) {
           return jsonResponse(409, { error: 'Idempotency conflict for submitted job_id.', code: 'IDEMPOTENCY_CONFLICT' });
+        }
+
+        let raceDispatchFailed = false;
+        try {
+          await dispatch(jobId);
+        } catch (dispatchErr) {
+          logger.error('Workflow dispatch failed on insert-race recovery', { error: safeErrorDetail(dispatchErr) });
+          raceDispatchFailed = true;
+        }
+
+        if (raceDispatchFailed) {
+          return jsonResponse(503, {
+            error: 'Workflow dispatch failed. Please retry.',
+            code: 'SERVICE_UNAVAILABLE',
+            job_id: raceJob.id,
+            status: raceJob.status
+          });
         }
 
         return jsonResponse(200, {
@@ -1134,24 +1505,18 @@ export async function handleCreateJob(request, env) {
           created_at: raceJob.created_at
         });
       }
-    } catch {}
+    } catch (raceErr) {
+      logger.error('Insert-race re-read failed', { error: safeErrorDetail(raceErr) });
+    }
 
-    console.error(JSON.stringify({ message: 'Database insert failed', error: safeErrorDetail(err) }));
+    logger.error('Database insert failed', { error: safeErrorDetail(err) });
     return jsonResponse(503, { error: 'Database service unavailable.', code: 'SERVICE_UNAVAILABLE' });
   }
 
-  // Dispatch Workflow instance via createBatch
   try {
-    if (!env.AI_JOB_WORKFLOW || typeof env.AI_JOB_WORKFLOW.createBatch !== 'function') {
-      throw new Error('WORKFLOW_BINDING_MISSING');
-    }
-    await env.AI_JOB_WORKFLOW.createBatch([{
-      id: jobId,
-      params: { jobId },
-      retention: { successRetention: '1 day', errorRetention: '1 day' }
-    }]);
+    await dispatch(jobId);
   } catch (err) {
-    console.error(JSON.stringify({ message: 'Workflow dispatch failed', error: safeErrorDetail(err) }));
+    logger.error('Workflow dispatch failed for new job', { error: safeErrorDetail(err) });
     return jsonResponse(503, {
       error: 'Workflow dispatch failed. Please retry.',
       code: 'SERVICE_UNAVAILABLE',
@@ -1167,7 +1532,7 @@ export async function handleCreateJob(request, env) {
   });
 }
 
-export async function handleGetJob(request, env, jobId) {
+export async function handleGetJob(request, env, jobId, customDeps = {}) {
   if (request.method !== 'GET') {
     return jsonResponse(405, { error: 'Method not allowed.' });
   }
@@ -1177,28 +1542,38 @@ export async function handleGetJob(request, env, jobId) {
     return jsonResponse(404, { error: 'Job not found.', code: 'NOT_FOUND' });
   }
 
+  const { store, clock, logger } = resolveDependencies(env, customDeps);
+
+  if (!store || typeof store.getJob !== 'function') {
+    logger.error('Job store service missing or unconfigured');
+    return jsonResponse(503, { error: 'Database service unavailable.', code: 'SERVICE_UNAVAILABLE' });
+  }
+
   let job = null;
   try {
-    job = await getJobById(env.DB, jobId);
+    job = await store.getJob(jobId);
   } catch (err) {
-    console.error(JSON.stringify({ message: 'D1 query failed in handleGetJob', error: safeErrorDetail(err) }));
-    return jsonResponse(404, { error: 'Job not found.', code: 'NOT_FOUND' });
+    logger.error('Database query failed in handleGetJob', { error: safeErrorDetail(err) });
+    return jsonResponse(503, { error: 'Database service unavailable.', code: 'SERVICE_UNAVAILABLE' });
   }
 
   if (!job) {
     return jsonResponse(404, { error: 'Job not found.', code: 'NOT_FOUND' });
   }
 
-  const tokenHash = await sha256Hex(tokenHeader);
-  const storedTokenHashBytes = new TextEncoder().encode(job.token_hash);
-  const presentedTokenHashBytes = new TextEncoder().encode(tokenHash);
+  let presentedTokenHash;
+  try {
+    presentedTokenHash = await sha256Bytes(tokenHeader);
+  } catch (err) {
+    return jsonResponse(503, { error: 'Service unavailable.', code: 'SERVICE_UNAVAILABLE' });
+  }
 
-  const tokenMatch = timingSafeEqualBytes(storedTokenHashBytes, presentedTokenHashBytes);
-  const now = Math.floor(Date.now() / 1000);
+  const storedTokenHash = normalizeBlob(job.token_hash);
+  const tokenMatch = storedTokenHash ? timingSafeEqualBytes(storedTokenHash, presentedTokenHash) : false;
+  const now = clock.now();
   const isExpired = job.expires_at !== null && job.expires_at <= now;
 
   if (!tokenMatch || isExpired) {
-    // Identical generic 404 to prevent unauthorized probing
     return jsonResponse(404, { error: 'Job not found.', code: 'NOT_FOUND' });
   }
 
@@ -1251,7 +1626,7 @@ export async function handleGetJob(request, env, jobId) {
 }
 ```
 
-- [ ] **Step 5: Update `worker/app.js` to route `/api/ai/jobs`**
+- [ ] **Step 5: Update `worker/app.js` to route `/api/ai/jobs` with customDeps support**
 
 ```javascript
 // worker/app.js
@@ -1259,7 +1634,7 @@ import { handleAi, jsonResponse } from './ai.js';
 import { handleCreateJob, handleGetJob } from './jobs.js';
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, customDeps = {}) {
     const url = new URL(request.url);
     const pathname = url.pathname;
 
@@ -1267,11 +1642,11 @@ export default {
       return handleAi(request, env);
     }
     if (pathname === '/api/ai/jobs') {
-      return handleCreateJob(request, env);
+      return handleCreateJob(request, env, customDeps);
     }
     if (pathname.startsWith('/api/ai/jobs/')) {
       const jobId = pathname.slice('/api/ai/jobs/'.length);
-      return handleGetJob(request, env, jobId);
+      return handleGetJob(request, env, jobId, customDeps);
     }
     if (pathname.startsWith('/api/')) {
       return jsonResponse(404, { error: 'API route not found.' });
@@ -1291,12 +1666,12 @@ node tests/ai-jobs-api-contract.mjs
 
 - [ ] **Step 7: Review Gate & Bounded Commit**
 
-> **Codex Review Gate:** Codex inspects `worker/jobStore.js`, `worker/jobs.js`, `worker/app.js`, and `tests/ai-jobs-api-contract.mjs` for routing precision, rate limit bypass on retries, and timing-safe auth logic.
+> **Codex Review Gate:** Codex inspects `worker/jobStore.js`, `worker/jobs.js`, `worker/app.js`, and `tests/ai-jobs-api-contract.mjs` for routing precision, BLOB normalization, dependency injection, rate limit bypass on retries, and timing-safe auth logic.
 
 Commit changes:
 ```bash
 git add migrations/0001_create_ai_jobs.sql worker/jobStore.js worker/jobs.js worker/app.js tests/ai-jobs-api-contract.mjs
-git commit -m "feat(worker): add D1 migration, job store, and jobs API endpoints"
+git commit -m "feat(worker): add D1 migration, job store with BLOB token hashes, and jobs API endpoints"
 ```
 
 ---
