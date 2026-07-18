@@ -6,6 +6,65 @@ export const MODEL = {
   description: 'Minimalist AI assistant for concise conversation, reasoning, and live app creation.'
 };
 
+export const PUBLIC_USER_INTENT_PROMPT = `
+Corez serves public users who may describe goals casually, incompletely, or
+without technical vocabulary. Understand public user intent and infer the goal behind the words, not by matching only exact keywords. Identify whether
+the user wants to create a public-facing website, landing page, dashboard,
+portal, app, game, widget, calculator, timer, prototype, tool, code help,
+writing help, an explanation, or general guidance. Respond with the likely
+goal, useful next action, and a concise path forward.
+`;
+
+const INTENT_PATTERNS = {
+  app: /\b(build|make|create|generate|design|launch|prototype|develop|ship)\b.*\b(app|tool|website|site|landing page|dashboard|portal|widget|calculator|timer|game|simulator|preview|html)\b|\b(app|tool|website|site|landing page|dashboard|portal|widget|calculator|timer|game|simulator)\b.*\b(build|make|create|generate|design|launch|prototype|develop|ship)\b/i,
+  code: /\b(code|debug|bug|fix|error|javascript|typescript|python|react|css|html|component|function|api|compile|stack trace)\b/i,
+  writing: /\b(write|rewrite|copy|caption|email|post|bio|headline|script|summarize|summary|proposal|description|landing copy)\b/i,
+  explanation: /\b(explain|what is|what are|how does|why does|teach me|break down|understand|compare)\b/i
+};
+
+export function analyzePublicUserIntent(prompt) {
+  const cleanPrompt = prompt.trim();
+  const lower = cleanPrompt.toLowerCase();
+
+  if (INTENT_PATTERNS.app.test(cleanPrompt)) {
+    return {
+      type: 'app',
+      summary: 'Create a public-facing interactive experience or web tool.',
+      responseStrategy: 'Build a runnable monochrome HTML preview when enough intent is present.'
+    };
+  }
+
+  if (INTENT_PATTERNS.code.test(cleanPrompt)) {
+    return {
+      type: 'code-help',
+      summary: 'Help the user understand, debug, or improve code.',
+      responseStrategy: 'Ask for the relevant snippet when the code is missing; otherwise explain the fix clearly.'
+    };
+  }
+
+  if (INTENT_PATTERNS.writing.test(cleanPrompt)) {
+    return {
+      type: 'writing',
+      summary: 'Help the user shape public-facing words or content.',
+      responseStrategy: 'Offer a concise draft or rewrite with a clear tone.'
+    };
+  }
+
+  if (INTENT_PATTERNS.explanation.test(lower)) {
+    return {
+      type: 'explanation',
+      summary: 'Explain the topic in plain language.',
+      responseStrategy: 'Give a direct answer with the minimum useful context.'
+    };
+  }
+
+  return {
+    type: 'general',
+    summary: 'Understand the public user goal and give a useful next step.',
+    responseStrategy: 'Clarify the likely intent, answer directly, and invite the next concrete detail.'
+  };
+}
+
 // Extract executable code block (HTML/CSS/JS) from AI message if present
 export function extractCodeFromMessage(text) {
   if (!text) return null;
@@ -30,6 +89,7 @@ export function extractCodeFromMessage(text) {
 export async function generateAIResponse(prompt) {
   const cleanPrompt = prompt.trim();
   const lower = cleanPrompt.toLowerCase();
+  const intent = analyzePublicUserIntent(cleanPrompt);
 
   // Natural short latency (0.6s)
   await new Promise(r => setTimeout(r, 600));
@@ -52,10 +112,8 @@ export async function generateAIResponse(prompt) {
     return `You're very welcome! Let me know if there's anything else I can help with.`;
   }
 
-  // 3. EXPLICIT APP / GAME / WIDGET CREATION INTENT
-  const isAppRequest = lower.includes('build an app') || lower.includes('create a game') || lower.includes('make a dashboard') || lower.includes('build a widget') || lower.includes('build a calculator') || lower.includes('build a timer') || lower.includes('build a tool') || lower.includes('create a tool') || lower.includes('generate html');
-
-  if (isAppRequest) {
+  // 3. PUBLIC APP / GAME / WIDGET CREATION INTENT
+  if (intent.type === 'app') {
     let appTitle = "Custom Tool";
     let appBody = "";
 
@@ -134,10 +192,18 @@ export async function generateAIResponse(prompt) {
     return `I've built that for you. Click below to open it on the right side.\n\n\`\`\`html\n<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <title>${appTitle}</title>\n  <style>\n    :root { --bg: #000; --card: #0d0d0d; --text: #fff; --border: rgba(255,255,255,0.15); }\n    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, system-ui, sans-serif; }\n    body { background: var(--bg); color: var(--text); padding: 1.5rem; display: flex; align-items: center; justify-content: center; min-height: 100vh; }\n    .app-card { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 1.5rem; width: 100%; max-width: 440px; text-align: center; }\n    h1 { font-size: 1.2rem; font-weight: 800; margin-bottom: 0.5rem; text-transform: uppercase; }\n    .action-btn { background: #fff; color: #000; border: none; padding: 0.5rem 1rem; border-radius: 4px; font-weight: 800; font-size: 0.8rem; cursor: pointer; text-transform: uppercase; }\n    .action-btn:hover { background: #ccc; }\n    .counter { font-size: 2rem; font-weight: 900; margin: 0.75rem 0; color: #fff; }\n  </style>\n</head>\n<body>\n  <div class="app-card">\n    <h1>${appTitle}</h1>\n    ${appBody}\n  </div>\n</body>\n</html>\n\`\`\``;
   }
 
-  // 4. CONCISE RESPONSES
-  if (lower.includes('code') || lower.includes('python') || lower.includes('javascript') || lower.includes('react')) {
+  // 4. PUBLIC USER INTENT RESPONSES
+  if (intent.type === 'code-help') {
     return `Share the snippet or problem you're working on, and I'll help you fix or optimize it.`;
   }
 
-  return `Here's what you need to know about **"${cleanPrompt}"**:\n\nKeep it simple, focus on core fundamentals, and iterate quickly. Let me know if you want me to break this down further!`;
+  if (intent.type === 'writing') {
+    return `I understand the goal: ${intent.summary}\n\nSend me the rough text or the audience you're writing for, and I'll turn it into clear public-facing copy.`;
+  }
+
+  if (intent.type === 'explanation') {
+    return `I understand the goal: ${intent.summary}\n\nHere's the short version: **${cleanPrompt}** is best approached by identifying the main idea, the audience, and the action you want someone to take. I can break it down further if you want more detail.`;
+  }
+
+  return `I understand the goal: ${intent.summary}\n\nFor **"${cleanPrompt}"**, I’ll focus on what the public user is trying to accomplish, then give the simplest useful next step. Add a little more context and I can make it specific.`;
 }
