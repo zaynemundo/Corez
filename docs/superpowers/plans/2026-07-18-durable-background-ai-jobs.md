@@ -2367,7 +2367,7 @@ git commit -m "feat(worker): implement pure Cloudflare Workflow execution logic 
 **Interfaces & Requirements:**
 - Provisioning Order: Resource creation and binding configuration happen strictly after `AiJobWorkflow` exists in `worker/index.js`.
 - D1 Database Name: `cloud-service`.
-- D1 Database ID: Must be captured from stdout of `npx wrangler d1 create cloud-service` during execution and inserted into `wrangler.jsonc` before commit. The plan contains no D1 UUID literal or placeholder token.
+- D1 Database ID: RED must run before provisioning and config update. After `npx wrangler d1 create cloud-service` returns, the implementer must add a literal `database_id` property containing the actual returned value directly after `database_name` without echoing the value into logs or artifacts. GREEN runs only after the actual property is inserted. Codex must validate UUID shape and exact provisioned-versus-configured match before commit. The plan contains no empty database ID, no sample UUID, no placeholder token, no template interpolation, and no fake value.
 - Workflows Binding: `binding: "AI_JOB_WORKFLOW"`, `class_name: "AiJobWorkflow"`.
 - Rate Limiter Binding: `name: "RATE_LIMITER"`, `namespace_id: "1000"`, `simple: { limit: 10, period: 60 }`.
 - Config Contract Test: Retain every existing assertion in `tests/cloudflare-worker-config-contract.sh` and append assertions for D1 binding `DB`, `cloud-service`, `database_id` UUID shape (inspecting actual configured value via regex without embedding any value), `AI_JOB_WORKFLOW`, `AiJobWorkflow`, `RATE_LIMITER`, `1000`, `10`, and `60`.
@@ -2435,7 +2435,7 @@ fi
 printf 'Cloudflare Worker configuration contract passed.\n'
 ```
 
-Run contract test to verify RED failure status before updating `wrangler.jsonc`:
+Run contract test to verify RED failure status before provisioning and config update:
 ```bash
 bash tests/cloudflare-worker-config-contract.sh
 ```
@@ -2448,7 +2448,7 @@ Run D1 creation command in shell:
 npx wrangler d1 create cloud-service
 ```
 
-Capture the returned database ID string from command stdout without printing secrets or creating planning artifacts containing the UUID. During execution, insert the exact captured ID string into `wrangler.jsonc` as the `database_id` property value.
+After the real `npx wrangler d1 create cloud-service` command returns, instruct the implementer to add a literal `database_id` property containing the actual returned value directly after `database_name` in `wrangler.jsonc`, without echoing the value into logs or artifacts.
 
 - [ ] **Step 3: Update `wrangler.jsonc`**
 
@@ -2466,8 +2466,7 @@ Edit `wrangler.jsonc` to preserve all existing fields (`$schema`, `name`, `main`
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "cloud-service",
-      "database_id": ""
+      "database_name": "cloud-service"
     }
   ],
   "workflows": [
@@ -2495,7 +2494,7 @@ Edit `wrangler.jsonc` to preserve all existing fields (`$schema`, `name`, `main`
   }
 }
 ```
-*(At execution time, `database_id` string value is populated with the exact returned UUID captured from `npx wrangler d1 create cloud-service` prior to contract verification).*
+*(After `npx wrangler d1 create cloud-service` returns, add a literal `database_id` property containing the actual returned value directly after `database_name` prior to contract verification).*
 
 - [ ] **Step 4: Update `.github/workflows/deploy.yml`**
 
@@ -2541,7 +2540,7 @@ jobs:
 
 - [ ] **Step 5: Verify GREEN test status**
 
-Run configuration contract check:
+Run configuration contract check (GREEN runs only after the actual `database_id` property is inserted):
 ```bash
 bash tests/cloudflare-worker-config-contract.sh
 ```
@@ -2549,7 +2548,7 @@ bash tests/cloudflare-worker-config-contract.sh
 
 - [ ] **Step 6: Review Gate & Bounded Commit**
 
-> **Codex Review Gate:** Codex verifies `wrangler.jsonc` contains authentic captured D1 database ID, Workflows binding `AI_JOB_WORKFLOW` with class `AiJobWorkflow`, Rate Limiter binding `RATE_LIMITER` with namespace `1000` (limit 10, period 60), `tests/cloudflare-worker-config-contract.sh` retains all original checks plus new checks, and `.github/workflows/deploy.yml` configures `preCommands` on `cloudflare/wrangler-action@v3`. Codex must validate before any commit.
+> **Codex Review Gate:** Codex validates UUID shape and exact provisioned-versus-configured match before commit. Codex verifies `wrangler.jsonc` contains authentic captured D1 database ID, Workflows binding `AI_JOB_WORKFLOW` with class `AiJobWorkflow`, Rate Limiter binding `RATE_LIMITER` with namespace `1000` (limit 10, period 60), `tests/cloudflare-worker-config-contract.sh` retains all original checks plus new checks, and `.github/workflows/deploy.yml` configures `preCommands` on `cloudflare/wrangler-action@v3`. Codex must validate before any commit.
 
 Commit changes:
 ```bash
