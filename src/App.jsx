@@ -164,7 +164,7 @@ export default function App() {
       />
 
       <main className="main-content">
-        <div className="chat-pane">
+        <div className={`chat-pane ${canvasOpen ? 'canvas-active' : ''}`}>
           <Header
             sidebarOpen={sidebarOpen}
             onToggleSidebar={() => setSidebarOpen(prev => !prev)}

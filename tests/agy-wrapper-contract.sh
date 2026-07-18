@@ -34,6 +34,8 @@ check 'sandboxing is enabled' "'--sandbox'"
 check 'native exit code is captured' '\$LASTEXITCODE'
 check 'failure throws an error' 'throw'
 check 'output is preserved' 'Tee-Object'
+check 'empty output is treated as failure' 'IsNullOrWhiteSpace'
+check 'permission-denied no-output response is treated as failure' 'no output produced'
 check 'git diff review is read-only' 'git diff'
 check_absent 'dangerous permission bypass is forbidden' 'dangerously-skip-permissions'
 

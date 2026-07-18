@@ -364,10 +364,11 @@ h1, h2, h3, h4, h5, h6 {
 /* Spacious Message Inner Container */
 .messages-inner {
   width: 100%;
-  max-width: 920px;
+  max-width: 760px;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  transition: max-width 0.4s cubic-bezier(0.16, 1, 0.3, 1), width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .welcome-container {
@@ -616,7 +617,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .input-box {
   width: 100%;
-  max-width: 920px;
+  max-width: 760px;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-pill);
@@ -625,7 +626,12 @@ h1, h2, h3, h4, h5, h6 {
   flex-direction: row;
   align-items: center;
   gap: 0.65rem;
-  transition: var(--transition-fast);
+  transition: max-width 0.4s cubic-bezier(0.16, 1, 0.3, 1), width 0.4s cubic-bezier(0.16, 1, 0.3, 1), border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.chat-pane.canvas-active .messages-inner,
+.chat-pane.canvas-active .input-box {
+  max-width: 680px;
 }
 
 .input-box:focus-within {
@@ -916,8 +922,13 @@ h1, h2, h3, h4, h5, h6 {
   :root {
     --sidebar-width: 260px;
   }
-  .messages-inner {
-    max-width: 980px;
+  .messages-inner,
+  .input-box {
+    max-width: 800px;
+  }
+  .chat-pane.canvas-active .messages-inner,
+  .chat-pane.canvas-active .input-box {
+    max-width: 720px;
   }
   .canvas-pane {
     width: 52%;
@@ -929,9 +940,13 @@ h1, h2, h3, h4, h5, h6 {
   :root {
     --sidebar-width: 230px;
   }
-  .messages-inner {
-    max-width: 780px;
-    padding: 0 0.5rem;
+  .messages-inner,
+  .input-box {
+    max-width: 720px;
+  }
+  .chat-pane.canvas-active .messages-inner,
+  .chat-pane.canvas-active .input-box {
+    max-width: 620px;
   }
   .sample-prompts-grid {
     grid-template-columns: repeat(3, 1fr);
@@ -940,9 +955,6 @@ h1, h2, h3, h4, h5, h6 {
   .canvas-pane {
     width: 50%;
   }
-  .device-label {
-    display: inline;
-  }
 }
 
 /* 3. Small Laptop / Compact Screens (768px to 1023px) */
@@ -950,11 +962,16 @@ h1, h2, h3, h4, h5, h6 {
   :root {
     --sidebar-width: 210px;
   }
+  .messages-inner,
+  .input-box {
+    max-width: 640px;
+  }
+  .chat-pane.canvas-active .messages-inner,
+  .chat-pane.canvas-active .input-box {
+    max-width: 580px;
+  }
   .sample-prompts-grid {
     grid-template-columns: 1fr;
-  }
-  .device-label {
-    display: none;
   }
   .canvas-pane {
     width: 55%;
@@ -969,7 +986,8 @@ h1, h2, h3, h4, h5, h6 {
   .device-mode-bar {
     display: none !important;
   }
-  .messages-inner {
+  .messages-inner,
+  .input-box {
     max-width: 100%;
   }
 }
