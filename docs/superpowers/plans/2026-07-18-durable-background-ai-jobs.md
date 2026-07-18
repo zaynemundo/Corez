@@ -2543,25 +2543,9 @@ jobs:
 Run configuration contract check (GREEN runs only after the actual `database_id` property is inserted):
 ```bash
 bash tests/cloudflare-worker-config-contract.sh
-```
-*Expected Output:* `Cloudflare Worker configuration contract passed.`
-
-- [ ] **Step 6: Review Gate & Bounded Commit**
-
-> **Codex Review Gate:** Codex validates UUID shape and exact provisioned-versus-configured match before commit. Codex verifies `wrangler.jsonc` contains authentic captured D1 database ID, Workflows binding `AI_JOB_WORKFLOW` with class `AiJobWorkflow`, Rate Limiter binding `RATE_LIMITER` with namespace `1000` (limit 10, period 60), `tests/cloudflare-worker-config-contract.sh` retains all original checks plus new checks, and `.github/workflows/deploy.yml` configures `preCommands` on `cloudflare/wrangler-action@v3`. Codex must validate before any commit.
-
-Commit changes:
-```bash
-git add wrangler.jsonc tests/cloudflare-worker-config-contract.sh .github/workflows/deploy.yml
-git commit -m "feat(infra): provision D1, Workflows, Rate Limiter, and CI deployment pipeline"
-```
-
-
----
-
 ### Task 6: Client Services — Background Job Registry & Polling Sync
 
-**Goal:** Implement `src/services/backgroundJobs.js` and `src/services/backgroundJobSync.js` alongside contract tests in `tests/background-jobs-client-contract.mjs`. Manage client job registry records in `localStorage` key `corez_background_ai_jobs_v1`, mandate Web Crypto for non-predictable UUID v4 and capability token generation, enforce pre-POST persistence order (job record and conversation history written before network fetch), preserve identical job identity across ambiguous network/5xx failures, reload fresh sessions from `corez_sessions` on every reconciliation pass using strict chat schema (`role` and `content` only), handle all job statuses (`queued`, `running`, `completed`, `failed`, `expired`, `404`), enforce strict terminal persistence ordering (save history before clearing credentials), recover missing origin sessions into a dedicated recovered session, gate executable preview/canvas callbacks to the active origin session, and surface storage errors without empty catch blocks or sensitive token/prompt logging.
+**Goal:** Implement `src/services/backgroundJobs.js` and `src/services/backgroundJobSync.js` alongside comprehensive contract tests in `tests/background-jobs-client-contract.mjs`. Manage client job registry records in `localStorage` key `corez_background_ai_jobs_v1`, mandate Web Crypto for non-predictable UUID v4 and capability token generation, enforce pre-POST persistence order (job record and conversation history written before network fetch), preserve identical job identity and increment attempt count across retries and ambiguous network/5xx failures, reload fresh sessions from `corez_sessions` on every reconciliation pass using strict chat schema (`role` and `content` only), handle all job statuses (`queued`, `running`, `completed`, `failed`, `expired`, `404`, `410`), enforce strict terminal persistence ordering (save history before clearing credentials), retain credentials if storage read or history write fails, recover missing origin sessions into a dedicated recovered session with deterministic clock timestamps, gate executable preview/canvas callbacks to the active origin session, global duplicate job ID deduplication per pass, and surface storage errors without empty catch blocks or sensitive token/prompt logging.
 
 **Files:**
 - Create: `tests/background-jobs-client-contract.mjs`
@@ -2588,12 +2572,13 @@ git commit -m "feat(infra): provision D1, Workflows, Rate Limiter, and CI deploy
   export function calculatePollingDelay(attemptCount);
   export function getFreshSessions(deps);
   export function saveFreshSessions(sessions, deps);
+  export function applyTerminalStateToSessions(params);
   export async function reconcileBackgroundJobs(options, deps);
   ```
 
 - [ ] **Step 1: Write failing contract test `tests/background-jobs-client-contract.mjs`**
 
-Create `tests/background-jobs-client-contract.mjs` with comprehensive test coverage:
+Create `tests/background-jobs-client-contract.mjs` with comprehensive executable test coverage:
 
 ```javascript
 // tests/background-jobs-client-contract.mjs
@@ -2615,7 +2600,8 @@ import {
   calculatePollingDelay,
   getFreshSessions,
   saveFreshSessions,
-  reconcileBackgroundJobs
+  reconcileBackgroundJobs,
+  applyTerminalStateToSessions
 } from '../src/services/backgroundJobSync.js';
 
 function createMockStorage() {
@@ -2649,7 +2635,6 @@ function createMockStorage() {
 }
 
 async function run() {
-  // Setup standard test dependencies
   const storage = createMockStorage();
   const logs = [];
   const logger = {
@@ -2659,8 +2644,6 @@ async function run() {
 
   let currentTime = 1770000000000;
   const clock = { now: () => currentTime };
-
-  // Setup Web Crypto polyfill for Node test environment if needed
   const cryptoObj = globalThis.crypto;
 
   // ---------------------------------------------------------------------------
@@ -2686,7 +2669,7 @@ async function run() {
   );
 
   // ---------------------------------------------------------------------------
-  // Test 2: Storage Failures Surfaced & No Empty Catch Blocks
+  // Test 2: Storage Failures Surfaced & Strict getFreshSessions Error Handling
   // ---------------------------------------------------------------------------
   storage._setShouldFailSet(true);
   assert.throws(
@@ -2694,14 +2677,57 @@ async function run() {
     /STORAGE_ERROR/,
     'saveJobRecord must surface storage errors'
   );
+  assert.throws(
+    () => saveFreshSessions([{ id: 's1', messages: [] }], { storage }),
+    /STORAGE_ERROR/,
+    'saveFreshSessions must surface storage errors'
+  );
   storage._setShouldFailSet(false);
 
+  assert.throws(
+    () => getFreshSessions({ storage: null }),
+    /STORAGE_UNAVAILABLE/,
+    'getFreshSessions must throw on missing storage'
+  );
+
+  storage._setShouldFailGet(true);
+  assert.throws(
+    () => getFreshSessions({ storage }),
+    /STORAGE_ERROR/,
+    'getFreshSessions must throw on read failure'
+  );
+  storage._setShouldFailGet(false);
+
+  storage.setItem(SESSIONS_STORAGE_KEY, 'invalid-json-{');
+  assert.throws(
+    () => getFreshSessions({ storage }),
+    /STORAGE_ERROR/,
+    'getFreshSessions must throw on malformed JSON'
+  );
+
+  storage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify({ not: 'an array' }));
+  assert.throws(
+    () => getFreshSessions({ storage }),
+    /STORAGE_ERROR/,
+    'getFreshSessions must throw on non-array data'
+  );
+
+  storage.removeItem(SESSIONS_STORAGE_KEY);
+  assert.deepEqual(
+    getFreshSessions({ storage }),
+    [],
+    'getFreshSessions must return [] when key is genuinely absent'
+  );
+
   // ---------------------------------------------------------------------------
-  // Test 3: Pre-POST Persistence Order (Registry + History Saved BEFORE Fetch)
+  // Test 3: Pre-POST Persistence Order & Pre-POST History Failure Handling
   // ---------------------------------------------------------------------------
+  storage.clear();
   const sequence = [];
-  const mockFetchForDispatch = async (url, opts) => {
-    // Assert storage already contains job record when fetch is invoked
+  let fetchCalled = false;
+
+  const mockFetchForDispatch = async () => {
+    fetchCalled = true;
     const inFlightJobs = getStoredJobs({ storage });
     assert.equal(inFlightJobs.length, 1, 'Registry record must be stored before POST');
     sequence.push('fetch_post');
@@ -2717,7 +2743,6 @@ async function run() {
     userMessageId: 'msg-u1',
     assistantMessageId: 'msg-a1',
     prompt: 'Write a python script',
-    intent: { type: 'code' },
     saveConversationHistory: saveHistoryCallback
   }, {
     crypto: cryptoObj,
@@ -2729,9 +2754,37 @@ async function run() {
   assert.equal(dispatchRes.status, 'queued');
   assert.deepEqual(sequence, ['save_history', 'fetch_post'], 'History save must execute before POST fetch');
 
+  storage.clear();
+  fetchCalled = false;
+
+  const failingHistoryCallback = () => {
+    throw new Error('HISTORY_WRITE_FAILED: Disk full');
+  };
+
+  await assert.rejects(
+    () => dispatchBackgroundJob({
+      conversationId: 'conv-101',
+      userMessageId: 'msg-u101',
+      assistantMessageId: 'msg-a101',
+      prompt: 'Test prompt history failure',
+      saveConversationHistory: failingHistoryCallback
+    }, {
+      crypto: cryptoObj,
+      storage,
+      fetch: () => { fetchCalled = true; return new Response('{}', { status: 200 }); },
+      clock
+    }),
+    /HISTORY_PERSISTENCE_ERROR/
+  );
+
+  assert.equal(fetchCalled, false, 'Fetch must never be called when history persistence fails');
+  const storedJobsAfterHistoryFail = getStoredJobs({ storage });
+  assert.equal(storedJobsAfterHistoryFail.length, 1, 'Registry identity must be retained when history persistence fails');
+
   // ---------------------------------------------------------------------------
-  // Test 4: Ambiguous Network/5xx Failure Retains Identity for Retry
+  // Test 4: Ambiguous Network / 5xx Failure Identity Retention & Retry Attempt Count Increment
   // ---------------------------------------------------------------------------
+  storage.clear();
   const ambiguousJobId = '550e8400-e29b-41d4-a716-446655440099';
   const ambiguousToken = generateCapabilityToken(cryptoObj);
 
@@ -2756,11 +2809,31 @@ async function run() {
     /DISPATCH_AMBIGUOUS/
   );
 
-  // Verify stored record retains original jobId and capabilityToken for subsequent retry
   const storedJobsAfterFailure = getStoredJobs({ storage });
   const failedRecord = storedJobsAfterFailure.find(j => j.jobId === ambiguousJobId);
   assert.ok(failedRecord, 'Ambiguous failed job must remain in registry storage');
   assert.equal(failedRecord.capabilityToken, ambiguousToken, 'Capability token must be preserved for retry');
+  assert.equal(failedRecord.attemptCount, 1, 'Initial dispatch attemptCount is 1');
+
+  const successfulFetchForRetry = async () => new Response(JSON.stringify({ status: 'queued' }), { status: 200 });
+
+  const retryRes = await dispatchBackgroundJob({
+    conversationId: 'conv-100',
+    userMessageId: 'msg-u2',
+    assistantMessageId: 'msg-a2',
+    prompt: 'Retry prompt',
+    existingJobId: ambiguousJobId,
+    existingCapabilityToken: ambiguousToken
+  }, {
+    crypto: cryptoObj,
+    storage,
+    fetch: successfulFetchForRetry,
+    clock
+  });
+
+  assert.equal(retryRes.jobId, ambiguousJobId);
+  const retriedRecord = getStoredJobs({ storage }).find(j => j.jobId === ambiguousJobId);
+  assert.equal(retriedRecord.attemptCount, 2, 'Attempt count must increment to 2 on re-dispatching existing identity');
 
   // ---------------------------------------------------------------------------
   // Test 5: Polling Delay Exponential Backoff
@@ -2773,82 +2846,253 @@ async function run() {
   assert.equal(calculatePollingDelay(10), 10000);
 
   // ---------------------------------------------------------------------------
-  // Test 6: Cross-Session Reconciliation Reloads Fresh Sessions & Uses Schema (role, content)
+  // Test 6: Separate Status Handling in Reconciliation (Queued, Running, Completed, Failed, Expired)
   // ---------------------------------------------------------------------------
   storage.clear();
 
-  const initialSessions = [
+  saveFreshSessions([
     {
-      id: 'conv-200',
-      title: 'Session 200',
+      id: 'conv-statuses',
+      title: 'Status Test Session',
       messages: [
-        { id: 'msg-user-1', role: 'user', content: 'Create a button' },
-        { id: 'msg-asst-1', role: 'assistant', content: '...', status: 'queued' }
+        { id: 'm-u1', role: 'user', content: 'Job 1' },
+        { id: 'm-a1', role: 'assistant', content: '...', status: 'queued' },
+        { id: 'm-u2', role: 'user', content: 'Job 2' },
+        { id: 'm-a2', role: 'assistant', content: '...', status: 'queued' },
+        { id: 'm-u3', role: 'user', content: 'Job 3' },
+        { id: 'm-a3', role: 'assistant', content: '...', status: 'queued' },
+        { id: 'm-u4', role: 'user', content: 'Job 4' },
+        { id: 'm-a4', role: 'assistant', content: '...', status: 'queued' },
+        { id: 'm-u5', role: 'user', content: 'Job 5' },
+        { id: 'm-a5', role: 'assistant', content: '...', status: 'queued' }
       ]
     }
-  ];
-  saveFreshSessions(initialSessions, { storage });
+  ], { storage });
 
-  const testJobId = generateJobId(cryptoObj);
-  const testJobToken = generateCapabilityToken(cryptoObj);
+  const j1 = generateJobId(cryptoObj);
+  const j2 = generateJobId(cryptoObj);
+  const j3 = generateJobId(cryptoObj);
+  const j4 = generateJobId(cryptoObj);
+  const j5 = generateJobId(cryptoObj);
 
-  saveJobRecord({
-    jobId: testJobId,
-    capabilityToken: testJobToken,
-    conversationId: 'conv-200',
-    userMessageId: 'msg-user-1',
-    assistantMessageId: 'msg-asst-1',
-    prompt: 'Create a button',
-    status: 'queued',
-    attemptCount: 1,
-    createdAt: clock.now(),
-    updatedAt: clock.now()
-  }, { storage });
+  const token1 = generateCapabilityToken(cryptoObj);
+  const token2 = generateCapabilityToken(cryptoObj);
+  const token3 = generateCapabilityToken(cryptoObj);
+  const token4 = generateCapabilityToken(cryptoObj);
+  const token5 = generateCapabilityToken(cryptoObj);
+
+  saveJobRecord({ jobId: j1, capabilityToken: token1, conversationId: 'conv-statuses', assistantMessageId: 'm-a1', userMessageId: 'm-u1', prompt: 'Job 1', status: 'queued', attemptCount: 1 }, { storage, clock });
+  saveJobRecord({ jobId: j2, capabilityToken: token2, conversationId: 'conv-statuses', assistantMessageId: 'm-a2', userMessageId: 'm-u2', prompt: 'Job 2', status: 'queued', attemptCount: 1 }, { storage, clock });
+  saveJobRecord({ jobId: j3, capabilityToken: token3, conversationId: 'conv-statuses', assistantMessageId: 'm-a3', userMessageId: 'm-u3', prompt: 'Job 3', status: 'queued', attemptCount: 1 }, { storage, clock });
+  saveJobRecord({ jobId: j4, capabilityToken: token4, conversationId: 'conv-statuses', assistantMessageId: 'm-a4', userMessageId: 'm-u4', prompt: 'Job 4', status: 'queued', attemptCount: 1 }, { storage, clock });
+  saveJobRecord({ jobId: j5, capabilityToken: token5, conversationId: 'conv-statuses', assistantMessageId: 'm-a5', userMessageId: 'm-u5', prompt: 'Job 5', status: 'queued', attemptCount: 1 }, { storage, clock });
 
   let canvasUpdatedContent = null;
-  const mockFetchForSync = async (url) => {
-    assert.ok(url.includes(testJobId));
-    return new Response(JSON.stringify({
-      status: 'completed',
-      result: {
-        content: '<button>Click Me</button>',
-        model: '@cf/zai-org/glm-4.7-flash'
-      }
-    }), { status: 200 });
+
+  const mockMultiStatusFetch = async (url) => {
+    if (url.includes(j1)) return new Response(JSON.stringify({ status: 'queued' }), { status: 200 });
+    if (url.includes(j2)) return new Response(JSON.stringify({ status: 'running' }), { status: 200 });
+    if (url.includes(j3)) return new Response(JSON.stringify({ status: 'completed', result: { content: 'Result 3', model: 'm3' } }), { status: 200 });
+    if (url.includes(j4)) return new Response(JSON.stringify({ status: 'failed', error: { message: 'Failed 4' } }), { status: 200 });
+    if (url.includes(j5)) return new Response(JSON.stringify({ status: 'expired' }), { status: 200 });
+    return new Response('{}', { status: 404 });
   };
 
-  const syncResult = await reconcileBackgroundJobs({
-    activeSessionId: 'conv-200',
-    onActiveSessionResult: (content) => { canvasUpdatedContent = content; }
+  const statusSyncRes = await reconcileBackgroundJobs({
+    activeSessionId: 'conv-statuses',
+    onActiveSessionResult: (c) => { canvasUpdatedContent = c; }
   }, {
     storage,
-    fetch: mockFetchForSync,
+    fetch: mockMultiStatusFetch,
     logger,
     clock
   });
 
-  assert.equal(syncResult.reconciledCount, 1);
-  assert.equal(canvasUpdatedContent, '<button>Click Me</button>');
+  assert.equal(statusSyncRes.reconciledCount, 3, 'Completed, failed, and expired jobs reconciled');
+  assert.equal(canvasUpdatedContent, 'Result 3', 'Active session result callback updated with completed output');
 
-  // Verify conversation history saved first with role and content
-  const freshSessionsAfterSync = getFreshSessions({ storage });
-  const updatedMessage = freshSessionsAfterSync[0].messages.find(m => m.id === 'msg-asst-1');
-  assert.equal(updatedMessage.role, 'assistant');
-  assert.equal(updatedMessage.content, '<button>Click Me</button>');
-  assert.equal(updatedMessage.status, 'completed');
-  assert.equal(updatedMessage.sender, undefined, 'Must not use legacy sender key');
-  assert.equal(updatedMessage.text, undefined, 'Must not use legacy text key');
-
-  // Verify registry entry removed only after history persistence
   const remainingJobs = getStoredJobs({ storage });
-  assert.equal(remainingJobs.length, 0, 'Completed job record must be removed after successful sync');
+  assert.equal(remainingJobs.length, 2, 'Queued and running jobs remain in registry storage');
+  assert.ok(remainingJobs.some(j => j.jobId === j1 && j.status === 'queued'));
+  assert.ok(remainingJobs.some(j => j.jobId === j2 && j.status === 'running'));
+
+  const sessionsAfterStatusSync = getFreshSessions({ storage });
+  const msgs = sessionsAfterStatusSync[0].messages;
+
+  const m1 = msgs.find(m => m.id === 'm-a1');
+  const m2 = msgs.find(m => m.id === 'm-a2');
+  const m3 = msgs.find(m => m.id === 'm-a3');
+  const m4 = msgs.find(m => m.id === 'm-a4');
+  const m5 = msgs.find(m => m.id === 'm-a5');
+
+  assert.equal(m1.status, 'queued');
+  assert.equal(m2.status, 'running');
+  assert.equal(m3.status, 'completed');
+  assert.equal(m3.content, 'Result 3');
+  assert.equal(m3.model, 'm3');
+  assert.equal(m4.status, 'failed');
+  assert.equal(m4.content, 'Failed 4');
+  assert.equal(m5.status, 'expired');
+
+  for (const m of msgs) {
+    assert.equal(m.sender, undefined, 'Must not introduce legacy sender key');
+    assert.equal(m.text, undefined, 'Must not introduce legacy text key');
+  }
 
   // ---------------------------------------------------------------------------
-  // Test 7: Missing Origin Session (Deleted Session Recovery)
+  // Test 7: HTTP 404 & HTTP 410 Handling in Reconciliation
   // ---------------------------------------------------------------------------
   storage.clear();
 
-  // Save session list WITHOUT conv-300
+  saveFreshSessions([
+    {
+      id: 'conv-http-err',
+      title: 'HTTP Errors Session',
+      messages: [
+        { id: 'm-a404', role: 'assistant', content: '...', status: 'queued' },
+        { id: 'm-a410', role: 'assistant', content: '...', status: 'queued' }
+      ]
+    }
+  ], { storage });
+
+  const j404 = generateJobId(cryptoObj);
+  const j410 = generateJobId(cryptoObj);
+  const t404 = generateCapabilityToken(cryptoObj);
+  const t410 = generateCapabilityToken(cryptoObj);
+
+  saveJobRecord({ jobId: j404, capabilityToken: t404, conversationId: 'conv-http-err', assistantMessageId: 'm-a404', status: 'queued' }, { storage, clock });
+  saveJobRecord({ jobId: j410, capabilityToken: t410, conversationId: 'conv-http-err', assistantMessageId: 'm-a410', status: 'queued' }, { storage, clock });
+
+  const httpErrFetch = async (url) => {
+    if (url.includes(j404)) return new Response('Not Found', { status: 404 });
+    if (url.includes(j410)) return new Response('Gone', { status: 410 });
+    return new Response('{}', { status: 200 });
+  };
+
+  const httpErrRes = await reconcileBackgroundJobs({}, {
+    storage,
+    fetch: httpErrFetch,
+    logger,
+    clock
+  });
+
+  assert.equal(httpErrRes.reconciledCount, 2);
+  assert.equal(getStoredJobs({ storage }).length, 0, '404 and 410 job records removed from storage after terminal history save');
+
+  const httpSessions = getFreshSessions({ storage });
+  const m404Res = httpSessions[0].messages.find(m => m.id === 'm-a404');
+  const m410Res = httpSessions[0].messages.find(m => m.id === 'm-a410');
+
+  assert.equal(m404Res.status, 'failed');
+  assert.ok(m404Res.content.includes('not found'));
+  assert.equal(m410Res.status, 'expired');
+  assert.ok(m410Res.content.includes('24 hours'));
+
+  // ---------------------------------------------------------------------------
+  // Test 8: Global Duplicate Job ID Handling
+  // ---------------------------------------------------------------------------
+  storage.clear();
+
+  saveFreshSessions([{ id: 'conv-dup', messages: [{ id: 'm-adup', role: 'assistant', content: '...', status: 'queued' }] }], { storage });
+
+  const dupJobId = generateJobId(cryptoObj);
+  const dupToken = generateCapabilityToken(cryptoObj);
+
+  const dupRecord = { jobId: dupJobId, capabilityToken: dupToken, conversationId: 'conv-dup', assistantMessageId: 'm-adup', status: 'queued' };
+  saveJobRecord(dupRecord, { storage, clock });
+  const rawJobs = getStoredJobs({ storage });
+  rawJobs.push({ ...dupRecord });
+  storage.setItem(BACKGROUND_JOBS_STORAGE_KEY, JSON.stringify(rawJobs));
+
+  let dupFetchCount = 0;
+  const dupFetch = async () => {
+    dupFetchCount++;
+    return new Response(JSON.stringify({ status: 'completed', result: { content: 'Dup done' } }), { status: 200 });
+  };
+
+  const dupRes = await reconcileBackgroundJobs({}, { storage, fetch: dupFetch, logger, clock });
+  assert.equal(dupFetchCount, 1, 'Duplicate job ID must trigger fetch exactly ONCE per reconciliation pass');
+  assert.deepEqual(dupRes.processedJobIds, [dupJobId]);
+
+  // ---------------------------------------------------------------------------
+  // Test 9: Fresh corez_sessions Reload Changed Between Reconciliation Passes
+  // ---------------------------------------------------------------------------
+  storage.clear();
+
+  saveFreshSessions([{ id: 'conv-pass', messages: [{ id: 'm-apass', role: 'assistant', content: '...', status: 'queued' }] }], { storage });
+  const passJobId = generateJobId(cryptoObj);
+  const passToken = generateCapabilityToken(cryptoObj);
+  saveJobRecord({ jobId: passJobId, capabilityToken: passToken, conversationId: 'conv-pass', assistantMessageId: 'm-apass', status: 'queued' }, { storage, clock });
+
+  await reconcileBackgroundJobs({}, {
+    storage,
+    fetch: async () => new Response(JSON.stringify({ status: 'queued' }), { status: 200 }),
+    logger,
+    clock
+  });
+
+  const sessionsBeforePass2 = getFreshSessions({ storage });
+  sessionsBeforePass2[0].messages.unshift({ id: 'm-ext', role: 'user', content: 'External message added' });
+  saveFreshSessions(sessionsBeforePass2, { storage });
+
+  await reconcileBackgroundJobs({}, {
+    storage,
+    fetch: async () => new Response(JSON.stringify({ status: 'completed', result: { content: 'Pass 2 done' } }), { status: 200 }),
+    logger,
+    clock
+  });
+
+  const sessionsAfterPass2 = getFreshSessions({ storage });
+  assert.equal(sessionsAfterPass2[0].messages.length, 2, 'Reconciliation must preserve externally added message');
+  assert.equal(sessionsAfterPass2[0].messages[0].id, 'm-ext');
+  assert.equal(sessionsAfterPass2[0].messages[1].content, 'Pass 2 done');
+
+  // ---------------------------------------------------------------------------
+  // Test 10: Credentials Retained on Fresh Read Failure & History Write Failure
+  // ---------------------------------------------------------------------------
+  storage.clear();
+
+  const errJobId = generateJobId(cryptoObj);
+  const errToken = generateCapabilityToken(cryptoObj);
+  saveJobRecord({ jobId: errJobId, capabilityToken: errToken, conversationId: 'conv-err', assistantMessageId: 'm-err', status: 'queued' }, { storage, clock });
+
+  saveFreshSessions([{ id: 'conv-err', messages: [] }], { storage });
+  storage._setShouldFailGet(true);
+
+  const readFailRes = await reconcileBackgroundJobs({}, {
+    storage,
+    fetch: async () => new Response(JSON.stringify({ status: 'completed', result: { content: 'Done' } }), { status: 200 }),
+    logger,
+    clock
+  });
+
+  assert.equal(readFailRes.reconciledCount, 0, 'Reconciliation must return early when fresh sessions read fails');
+  storage._setShouldFailGet(false);
+  const retainedJobsAfterReadFail = getStoredJobs({ storage });
+  assert.equal(retainedJobsAfterReadFail.length, 1, 'Job record must be retained when fresh sessions read fails');
+  assert.equal(retainedJobsAfterReadFail[0].capabilityToken, errToken);
+
+  const historyWriteFailSave = () => {
+    throw new Error('STORAGE_WRITE_DENIED: Disk quota exceeded');
+  };
+
+  await reconcileBackgroundJobs({
+    saveSessions: historyWriteFailSave
+  }, {
+    storage,
+    fetch: async () => new Response(JSON.stringify({ status: 'completed', result: { content: 'Done' } }), { status: 200 }),
+    logger,
+    clock
+  });
+
+  const retainedJobsAfterWriteFail = getStoredJobs({ storage });
+  assert.equal(retainedJobsAfterWriteFail.length, 1, 'Job record must be retained when history persistence fails');
+  assert.equal(retainedJobsAfterWriteFail[0].capabilityToken, errToken);
+
+  // ---------------------------------------------------------------------------
+  // Test 11: Missing Origin Session (Deleted Session Recovery)
+  // ---------------------------------------------------------------------------
+  storage.clear();
   saveFreshSessions([{ id: 'conv-other', title: 'Other Session', messages: [] }], { storage });
 
   const orphanJobId = generateJobId(cryptoObj);
@@ -2862,19 +3106,12 @@ async function run() {
     assistantMessageId: 'msg-a-orphan',
     prompt: 'Orphaned prompt',
     status: 'queued',
-    attemptCount: 1,
-    createdAt: clock.now(),
-    updatedAt: clock.now()
-  }, { storage });
-
-  const orphanFetch = async () => new Response(JSON.stringify({
-    status: 'completed',
-    result: { content: 'Recovered response text' }
-  }), { status: 200 });
+    attemptCount: 1
+  }, { storage, clock });
 
   await reconcileBackgroundJobs({}, {
     storage,
-    fetch: orphanFetch,
+    fetch: async () => new Response(JSON.stringify({ status: 'completed', result: { content: 'Recovered text' } }), { status: 200 }),
     logger,
     clock
   });
@@ -2882,61 +3119,55 @@ async function run() {
   const recoveredSessions = getFreshSessions({ storage });
   const recoveredSession = recoveredSessions.find(s => s.id === 'session-recovered-results');
   assert.ok(recoveredSession, 'Must create Recovered Results session when origin session deleted');
-  assert.equal(recoveredSession.messages.length, 2);
+  assert.equal(recoveredSession.createdAt, currentTime, 'Recovered session createdAt must use clock.now');
+  assert.equal(recoveredSession.messages[0].id, 'msg-u-orphan');
   assert.equal(recoveredSession.messages[0].role, 'user');
   assert.equal(recoveredSession.messages[0].content, 'Orphaned prompt');
+  assert.equal(recoveredSession.messages[1].id, 'msg-a-orphan');
   assert.equal(recoveredSession.messages[1].role, 'assistant');
-  assert.equal(recoveredSession.messages[1].content, 'Recovered response text');
+  assert.equal(recoveredSession.messages[1].content, 'Recovered text');
+
+  const termRes = applyTerminalStateToSessions({
+    sessions: [],
+    conversationId: 'missing-conv',
+    prompt: 'Det prompt',
+    status: 'completed',
+    content: 'Det content',
+    clock
+  });
+  const detSession = termRes.updatedSessions[0];
+  assert.equal(detSession.createdAt, currentTime);
+  assert.equal(detSession.messages[0].id, `user-recovered-${currentTime}`);
+  assert.equal(detSession.messages[1].id, `assistant-recovered-${currentTime}`);
 
   // ---------------------------------------------------------------------------
-  // Test 8: History Persistence Failure Retains Capability Credentials
+  // Test 12: Active Session Result Callback Gating
   // ---------------------------------------------------------------------------
   storage.clear();
+  saveFreshSessions([{ id: 'conv-inactive', messages: [{ id: 'm-ainact', role: 'assistant', content: '...', status: 'queued' }] }], { storage });
 
-  const failJobId = generateJobId(cryptoObj);
-  const failToken = generateCapabilityToken(cryptoObj);
+  const inactJobId = generateJobId(cryptoObj);
+  const inactToken = generateCapabilityToken(cryptoObj);
+  saveJobRecord({ jobId: inactJobId, capabilityToken: inactToken, conversationId: 'conv-inactive', assistantMessageId: 'm-ainact', status: 'queued' }, { storage, clock });
 
-  saveJobRecord({
-    jobId: failJobId,
-    capabilityToken: failToken,
-    conversationId: 'conv-400',
-    userMessageId: 'u-400',
-    assistantMessageId: 'a-400',
-    prompt: 'Fail prompt',
-    status: 'queued',
-    attemptCount: 1,
-    createdAt: clock.now(),
-    updatedAt: clock.now()
-  }, { storage });
-
-  const customSaveSessionsFails = () => {
-    throw new Error('STORAGE_WRITE_FAILURE: Session storage full');
-  };
-
-  const completedFetch = async () => new Response(JSON.stringify({
-    status: 'completed',
-    result: { content: 'Some output' }
-  }), { status: 200 });
-
+  let gatedCallbackCalled = false;
   await reconcileBackgroundJobs({
-    saveSessions: customSaveSessionsFails
+    activeSessionId: 'conv-active-different',
+    onActiveSessionResult: () => { gatedCallbackCalled = true; }
   }, {
     storage,
-    fetch: completedFetch,
+    fetch: async () => new Response(JSON.stringify({ status: 'completed', result: { content: 'Inactive res' } }), { status: 200 }),
     logger,
     clock
   });
 
-  // Verify registry record and secret capability token remain intact because history save failed
-  const retainedJobs = getStoredJobs({ storage });
-  assert.equal(retainedJobs.length, 1, 'Job record must remain when history persistence fails');
-  assert.equal(retainedJobs[0].capabilityToken, failToken, 'Token credentials must be retained');
+  assert.equal(gatedCallbackCalled, false, 'onActiveSessionResult must NOT be called when job conversationId does not match activeSessionId');
 
   // ---------------------------------------------------------------------------
-  // Test 9: No Sensitive Logs (Token and Prompt Never Logged)
+  // Test 13: Privacy & No Sensitive Logs
   // ---------------------------------------------------------------------------
   const allLogStrings = JSON.stringify(logs);
-  assert.equal(allLogStrings.includes(failToken), false, 'Capability token must never appear in logs');
+  assert.equal(allLogStrings.includes(errToken), false, 'Capability token must never appear in logs');
   assert.equal(allLogStrings.includes('Orphaned prompt'), false, 'Prompt must never appear in logs');
 
   console.log('Background jobs client contract passed.');
@@ -2945,15 +3176,7 @@ async function run() {
 await run();
 ```
 
-Run test to verify failure (RED):
-```bash
-node tests/background-jobs-client-contract.mjs
-```
-*Expected Output:* `Error: Cannot find module '../src/services/backgroundJobs.js'`
-
 - [ ] **Step 2: Create `src/services/backgroundJobs.js`**
-
-Create `src/services/backgroundJobs.js` implementing mandatory Web Crypto checks, `localStorage` key `corez_background_ai_jobs_v1`, pre-POST persistence order, surfaced storage errors, ambiguous failure identity retention, and token/prompt privacy:
 
 ```javascript
 // src/services/backgroundJobs.js
@@ -3006,6 +3229,7 @@ export function saveJobRecord(record, deps = {}) {
   }
   const jobs = getStoredJobs(deps);
   const existingIndex = jobs.findIndex(j => j.jobId === record.jobId);
+  const now = deps.clock ? deps.clock.now() : Date.now();
   const updatedRecord = {
     jobId: record.jobId,
     capabilityToken: record.capabilityToken,
@@ -3015,10 +3239,10 @@ export function saveJobRecord(record, deps = {}) {
     prompt: record.prompt,
     intent: record.intent || null,
     status: record.status || 'queued',
-    attemptCount: typeof record.attemptCount === 'number' ? record.attemptCount : 0,
-    lastAttemptAt: typeof record.lastAttemptAt === 'number' ? record.lastAttemptAt : null,
-    createdAt: typeof record.createdAt === 'number' ? record.createdAt : (deps.clock ? deps.clock.now() : Date.now()),
-    updatedAt: deps.clock ? deps.clock.now() : Date.now(),
+    attemptCount: typeof record.attemptCount === 'number' ? record.attemptCount : 1,
+    lastAttemptAt: typeof record.lastAttemptAt === 'number' ? record.lastAttemptAt : now,
+    createdAt: typeof record.createdAt === 'number' ? record.createdAt : now,
+    updatedAt: now,
     error: record.error || null
   };
 
@@ -3098,6 +3322,16 @@ export async function dispatchBackgroundJob({
   const jobId = existingJobId || generateJobId(cryptoObj);
   const capabilityToken = existingCapabilityToken || generateCapabilityToken(cryptoObj);
 
+  let existingRecord = null;
+  if (existingJobId) {
+    const existingJobs = getStoredJobs(deps);
+    existingRecord = existingJobs.find(j => j.jobId === existingJobId) || null;
+  }
+
+  const attemptCount = existingRecord && typeof existingRecord.attemptCount === 'number'
+    ? existingRecord.attemptCount + 1
+    : 1;
+
   const record = {
     jobId,
     capabilityToken,
@@ -3107,17 +3341,15 @@ export async function dispatchBackgroundJob({
     prompt,
     intent,
     status: 'queued',
-    attemptCount: 1,
+    attemptCount,
     lastAttemptAt: now,
-    createdAt: now,
+    createdAt: existingRecord && typeof existingRecord.createdAt === 'number' ? existingRecord.createdAt : now,
     updatedAt: now,
     error: null
   };
 
-  // Step 1: Persist registry record FIRST
   saveJobRecord(record, deps);
 
-  // Step 2: Persist conversation history BEFORE sending HTTP POST
   if (typeof saveConversationHistory === 'function') {
     try {
       saveConversationHistory();
@@ -3126,7 +3358,6 @@ export async function dispatchBackgroundJob({
     }
   }
 
-  // Step 3: Dispatch POST request
   const payload = {
     job_id: jobId,
     conversation_id: conversationId,
@@ -3145,10 +3376,9 @@ export async function dispatchBackgroundJob({
       body: JSON.stringify(payload)
     });
   } catch (netErr) {
-    // Ambiguous network failure: retain job ID and token in storage for retry
     updateJobRecord(jobId, {
       status: 'queued',
-      attemptCount: record.attemptCount,
+      attemptCount,
       lastAttemptAt: clock.now(),
       error: 'NETWORK_ERROR'
     }, deps);
@@ -3156,10 +3386,9 @@ export async function dispatchBackgroundJob({
   }
 
   if (response.status >= 500) {
-    // 5xx Server error: ambiguous, keep identity for retry
     updateJobRecord(jobId, {
       status: 'queued',
-      attemptCount: record.attemptCount,
+      attemptCount,
       lastAttemptAt: clock.now(),
       error: `SERVER_ERROR_${response.status}`
     }, deps);
@@ -3167,10 +3396,13 @@ export async function dispatchBackgroundJob({
   }
 
   if (!response.ok) {
-    // 4xx Client error (terminal failure): update status to failed
-    let errBody = {};
-    try { errBody = await response.json(); } catch {}
-    const errMsg = errBody.error || `Client error ${response.status}`;
+    let errBody = null;
+    try {
+      errBody = await response.json();
+    } catch (parseErr) {
+      errBody = { error: 'PARSE_ERROR: Unable to parse error response JSON.' };
+    }
+    const errMsg = (errBody && typeof errBody.error === 'string') ? errBody.error : `Client error ${response.status}`;
     updateJobRecord(jobId, {
       status: 'failed',
       error: errMsg
@@ -3178,7 +3410,13 @@ export async function dispatchBackgroundJob({
     throw new Error(`DISPATCH_TERMINAL_FAILURE: ${errMsg}`);
   }
 
-  const responseData = await response.json();
+  let responseData;
+  try {
+    responseData = await response.json();
+  } catch (parseErr) {
+    responseData = { status: 'queued' };
+  }
+
   updateJobRecord(jobId, {
     status: responseData.status || 'queued',
     updatedAt: clock.now()
@@ -3210,8 +3448,6 @@ export async function fetchJobStatus(jobId, capabilityToken, deps = {}) {
 
 - [ ] **Step 3: Create `src/services/backgroundJobSync.js`**
 
-Create `src/services/backgroundJobSync.js` implementing exponential polling backoff, fresh session reloads from `corez_sessions`, chat schema compliance (`role` and `content` only), all status handling (`queued`, `running`, `completed`, `failed`, `expired`, `404`), history-first persistence order before credential removal, missing origin recovery, active session callback gating, and global deduplication:
-
 ```javascript
 // src/services/backgroundJobSync.js
 import {
@@ -3232,18 +3468,28 @@ export const SESSIONS_STORAGE_KEY = 'corez_sessions';
 
 export function getFreshSessions(deps = {}) {
   const storage = deps.storage || globalThis.localStorage;
-  if (!storage) return [];
+  if (!storage) {
+    throw new Error('STORAGE_UNAVAILABLE: Storage dependency is missing');
+  }
+  let raw;
   try {
-    const raw = storage.getItem(SESSIONS_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    raw = storage.getItem(SESSIONS_STORAGE_KEY);
   } catch (err) {
-    if (deps.logger && typeof deps.logger.error === 'function') {
-      deps.logger.error('Failed to parse fresh sessions JSON');
-    }
+    throw new Error(`STORAGE_ERROR: Failed to read sessions - ${err.message}`);
+  }
+  if (raw === null || raw === undefined) {
     return [];
   }
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`STORAGE_ERROR: Corrupted sessions JSON - ${err.message}`);
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error('STORAGE_ERROR: Sessions storage data is not an array');
+  }
+  return parsed;
 }
 
 export function saveFreshSessions(sessions, deps = {}) {
@@ -3263,8 +3509,14 @@ export async function reconcileBackgroundJobs(options = {}, deps = {}) {
   const logger = deps.logger || { error: () => {}, info: () => {} };
   const clock = deps.clock || { now: () => Date.now() };
 
-  // Always reload fresh sessions from corez_sessions storage on every pass
-  let sessions = options.getSessions ? options.getSessions() : getFreshSessions({ storage, logger });
+  let sessions;
+  try {
+    sessions = options.getSessions ? options.getSessions() : getFreshSessions({ storage, logger });
+  } catch (err) {
+    logger.error('Failed to load fresh sessions during reconciliation');
+    return { reconciledCount: 0, processedJobIds: [] };
+  }
+
   const saveSessionsImpl = options.saveSessions || ((updated) => saveFreshSessions(updated, { storage }));
 
   const pendingJobs = getStoredJobs({ storage }).filter(j => j.status === 'queued' || j.status === 'running');
@@ -3272,7 +3524,6 @@ export async function reconcileBackgroundJobs(options = {}, deps = {}) {
     return { reconciledCount: 0, processedJobIds: [] };
   }
 
-  // Global deduplication by jobId across the current reconciliation pass
   const processedJobIds = new Set();
   let reconciledCount = 0;
 
@@ -3286,7 +3537,6 @@ export async function reconcileBackgroundJobs(options = {}, deps = {}) {
     try {
       response = await fetchJobStatus(job.jobId, job.capabilityToken, deps);
     } catch (netErr) {
-      // Ambiguous network failure: increment attempt metadata and skip to next job
       updateJobRecord(job.jobId, {
         attemptCount: (job.attemptCount || 0) + 1,
         lastAttemptAt: clock.now()
@@ -3295,13 +3545,11 @@ export async function reconcileBackgroundJobs(options = {}, deps = {}) {
     }
 
     if (response.status === 404 || response.status === 410) {
-      // 404 Not Found or 410 Expired: definitive terminal state on backend
       const terminalStatus = response.status === 410 ? 'expired' : 'failed';
       const fallbackContent = response.status === 410
         ? 'Background job expired after 24 hours.'
         : 'Background job not found on server.';
 
-      // Terminal sync: Update conversation history FIRST using current chat schema (role, content)
       const { updatedSessions } = applyTerminalStateToSessions({
         sessions,
         conversationId: job.conversationId,
@@ -3310,27 +3558,24 @@ export async function reconcileBackgroundJobs(options = {}, deps = {}) {
         prompt: job.prompt,
         status: terminalStatus,
         content: fallbackContent,
-        model: undefined
+        model: undefined,
+        clock
       });
 
-      // Persist updated history FIRST
       try {
         saveSessionsImpl(updatedSessions);
-        sessions = updatedSessions; // Update local reference for subsequent jobs in loop
+        sessions = updatedSessions;
       } catch (saveErr) {
-        // If history persistence fails, RETAIN credentials in storage and DO NOT remove job record
         logger.error('Failed to persist history during 404/410 handling');
         continue;
       }
 
-      // ONLY after history persistence succeeds, remove credentials and registry record
       removeJobRecord(job.jobId, { storage });
       reconciledCount++;
       continue;
     }
 
     if (!response.ok) {
-      // 5xx or transient status: increment retry metadata and keep identity
       updateJobRecord(job.jobId, {
         attemptCount: (job.attemptCount || 0) + 1,
         lastAttemptAt: clock.now()
@@ -3342,6 +3587,11 @@ export async function reconcileBackgroundJobs(options = {}, deps = {}) {
     try {
       data = await response.json();
     } catch (parseErr) {
+      updateJobRecord(job.jobId, {
+        attemptCount: (job.attemptCount || 0) + 1,
+        lastAttemptAt: clock.now(),
+        error: 'PARSE_ERROR: Unable to parse status response JSON.'
+      }, { storage, clock });
       continue;
     }
 
@@ -3363,7 +3613,6 @@ export async function reconcileBackgroundJobs(options = {}, deps = {}) {
         : (data.error?.message || 'Job execution failed.');
       const resultModel = isSuccess ? data.result?.model : undefined;
 
-      // Step 1: Update conversation history FIRST
       const { updatedSessions, isOriginMatch } = applyTerminalStateToSessions({
         sessions,
         conversationId: job.conversationId,
@@ -3372,20 +3621,18 @@ export async function reconcileBackgroundJobs(options = {}, deps = {}) {
         prompt: job.prompt,
         status: currentStatus,
         content: resultContent,
-        model: resultModel
+        model: resultModel,
+        clock
       });
 
-      // Step 2: Persist updated conversation history FIRST to corez_sessions
       try {
         saveSessionsImpl(updatedSessions);
-        sessions = updatedSessions; // Update local state for next loop iteration
+        sessions = updatedSessions;
       } catch (saveErr) {
-        // If history persistence fails, RETAIN capability credentials/registry record
         logger.error('Failed to persist history for terminal job completion');
         continue;
       }
 
-      // Step 3: Trigger executable preview/canvas update callback IF origin session matches active session
       if (isSuccess && isOriginMatch && job.conversationId === options.activeSessionId && typeof options.onActiveSessionResult === 'function') {
         try {
           options.onActiveSessionResult(resultContent);
@@ -3394,7 +3641,6 @@ export async function reconcileBackgroundJobs(options = {}, deps = {}) {
         }
       }
 
-      // Step 4: ONLY after history persistence succeeds, remove capability token and job record
       removeJobRecord(job.jobId, { storage });
       reconciledCount++;
     }
@@ -3406,7 +3652,7 @@ export async function reconcileBackgroundJobs(options = {}, deps = {}) {
   };
 }
 
-function applyTerminalStateToSessions({
+export function applyTerminalStateToSessions({
   sessions,
   conversationId,
   assistantMessageId,
@@ -3414,8 +3660,10 @@ function applyTerminalStateToSessions({
   prompt,
   status,
   content,
-  model
+  model,
+  clock
 }) {
+  const now = clock && typeof clock.now === 'function' ? clock.now() : Date.now();
   let originFound = false;
 
   const updatedSessions = sessions.map(session => {
@@ -3442,18 +3690,17 @@ function applyTerminalStateToSessions({
     return { updatedSessions, isOriginMatch: true };
   }
 
-  // Origin session deleted: insert into "Recovered Results" session
   const RECOVERED_SESSION_ID = 'session-recovered-results';
   let recoveredFound = false;
 
   const userMsg = {
-    id: userMessageId || `user-recovered-${Date.now()}`,
+    id: userMessageId || `user-recovered-${now}`,
     role: 'user',
     content: prompt
   };
 
   const assistantMsg = {
-    id: assistantMessageId || `assistant-recovered-${Date.now()}`,
+    id: assistantMessageId || `assistant-recovered-${now}`,
     role: 'assistant',
     content: content,
     status: status,
@@ -3475,7 +3722,7 @@ function applyTerminalStateToSessions({
     finalSessions.unshift({
       id: RECOVERED_SESSION_ID,
       title: 'Recovered Results',
-      createdAt: Date.now(),
+      createdAt: now,
       messages: [userMsg, assistantMsg]
     });
   }
@@ -3494,7 +3741,7 @@ node tests/background-jobs-client-contract.mjs
 
 - [ ] **Step 5: Review Gate & Bounded Commit**
 
-> **Codex Review Gate:** Codex inspects `src/services/backgroundJobs.js`, `src/services/backgroundJobSync.js`, and `tests/background-jobs-client-contract.mjs` for mandatory Web Crypto, pre-POST and terminal persistence ordering, chat schema compliance, error surfacing, and absence of token/prompt logging.
+> **Codex Review Gate:** Codex inspects `src/services/backgroundJobs.js`, `src/services/backgroundJobSync.js`, and `tests/background-jobs-client-contract.mjs` for mandatory Web Crypto, pre-POST and terminal persistence ordering, chat schema compliance, error surfacing without empty catch blocks, deterministic terminal session recovery with injected clock, and absence of token/prompt logging.
 
 Commit changes:
 ```bash
