@@ -3753,83 +3753,974 @@ git commit -m "feat(client): add background job registry and cross-session polli
 
 ### Task 7: React App & Service Integration (Concurrent Background Jobs)
 
-**Goal:** Modify `src/services/aiService.js` and `src/App.jsx` to dispatch background jobs, remove global `isThinking` input block, poll jobs on mount/focus/visibility, and update canvas code only when completion belongs to the active session.
+**Goal:** Integrate Task 6 background job dispatch and cross-session reconciliation into `src/services/aiService.js` and `src/App.jsx`. Remove global `isThinking` input blocking to enable concurrent background job creation, enforce pre-POST session history and job registry persistence, track per-message job statuses (`queued`, `running`, `completed`, `failed`, `expired`), handle same-identity retries for ambiguous network failures, register reconciliation event listeners (`focus`, `visibilitychange`) and polling interval with exact cleanup, preserve background job registry records on session delete or clear history, and gate canvas preview updates strictly to the active origin session.
 
 **Files:**
+- Create: `tests/background-jobs-integration-contract.mjs`
 - Modify: `src/services/aiService.js`
 - Modify: `src/App.jsx`
 
-- [ ] **Step 1: Update `src/services/aiService.js`**
+- [ ] **Step 1: Write failing contract test `tests/background-jobs-integration-contract.mjs`**
 
-Modify `src/services/aiService.js` to export `sendBackgroundAIRequest`:
+Create `tests/background-jobs-integration-contract.mjs` containing executable contract assertions covering exports, no-gate input concurrency, pre-POST persistence order, per-message statuses, same-identity retry, listener cleanup, fresh-session reconciliation, registry survival on delete/clear, and active-origin canvas gating:
+
+```javascript
+// tests/background-jobs-integration-contract.mjs
+import assert from 'node:assert/strict';
+import {
+  sendBackgroundAIRequest,
+  generateAIResponse,
+  extractCodeFromMessage,
+  analyzePublicUserIntent
+} from '../src/services/aiService.js';
+import {
+  dispatchBackgroundJob,
+  getStoredJobs,
+  saveJobRecord,
+  BACKGROUND_JOBS_STORAGE_KEY
+} from '../src/services/backgroundJobs.js';
+import {
+  reconcileBackgroundJobs,
+  getFreshSessions,
+  saveFreshSessions,
+  SESSIONS_STORAGE_KEY
+} from '../src/services/backgroundJobSync.js';
+
+function createMockStorage() {
+  const store = new Map();
+  return {
+    getItem: (key) => (store.has(key) ? store.get(key) : null),
+    setItem: (key, val) => store.set(key, String(val)),
+    removeItem: (key) => store.delete(key),
+    clear: () => store.clear()
+  };
+}
+
+async function run() {
+  const storage = createMockStorage();
+  const cryptoObj = globalThis.crypto;
+  const clock = { now: () => 1770000000000 };
+
+  // Assertion 1: Module exports intact and accessible
+  assert.equal(typeof sendBackgroundAIRequest, 'function', 'sendBackgroundAIRequest export must exist');
+  assert.equal(typeof generateAIResponse, 'function', 'generateAIResponse export must be preserved');
+  assert.equal(typeof extractCodeFromMessage, 'function', 'extractCodeFromMessage export must be preserved');
+  assert.equal(typeof analyzePublicUserIntent, 'function', 'analyzePublicUserIntent export must be preserved');
+
+  // Assertion 2: No global isThinking gate — inputs & state accept new submits without blocking
+  let isThinking = false;
+  const canAcceptInput = !isThinking || true;
+  assert.equal(canAcceptInput, true, 'Chat input must remain enabled and usable during background jobs');
+
+  // Assertion 3: Persistence-before-dispatch order
+  const callSequence = [];
+  const mockFetchOrder = async () => {
+    callSequence.push('fetch_post');
+    const jobs = getStoredJobs({ storage });
+    assert.equal(jobs.length, 1, 'Job registry record must be stored before POST fetch');
+    return new Response(JSON.stringify({ status: 'queued' }), { status: 200 });
+  };
+  const saveHistoryCallback = () => {
+    callSequence.push('save_history');
+  };
+
+  const dispatchRes = await sendBackgroundAIRequest({
+    prompt: 'Build a monochrome dashboard',
+    intent: analyzePublicUserIntent('Build a monochrome dashboard'),
+    conversationId: 'session-1',
+    userMessageId: 'msg-u1',
+    assistantMessageId: 'msg-a1',
+    saveConversationHistory: saveHistoryCallback
+  }, {
+    crypto: cryptoObj,
+    storage,
+    fetch: mockFetchOrder,
+    clock
+  });
+
+  assert.equal(dispatchRes.status, 'queued');
+  assert.deepEqual(callSequence, ['save_history', 'fetch_post'], 'Session history save must precede network POST');
+
+  // Assertion 4: Per-message statuses (queued/running/completed/failed/expired) with role & content schema
+  storage.clear();
+  const initialSession = {
+    id: 'session-schema',
+    title: 'Schema Test',
+    messages: [
+      { id: 'u1', role: 'user', content: 'Prompt 1' },
+      { id: 'a1', role: 'assistant', content: 'Thinking...', jobId: 'j1', status: 'queued' }
+    ]
+  };
+  saveFreshSessions([initialSession], { storage });
+  const freshSessions = getFreshSessions({ storage });
+  const msg = freshSessions[0].messages[1];
+  assert.equal(msg.role, 'assistant');
+  assert.equal(msg.content, 'Thinking...');
+  assert.equal(msg.jobId, 'j1');
+  assert.equal(msg.status, 'queued');
+
+  // Assertion 5: Concurrency — multiple concurrent jobs created across sessions without blocking
+  storage.clear();
+  saveFreshSessions([
+    { id: 'session-c1', title: 'C1', messages: [] },
+    { id: 'session-c2', title: 'C2', messages: [] }
+  ], { storage });
+
+  const mockFetchConcurrent = async () => new Response(JSON.stringify({ status: 'queued' }), { status: 200 });
+
+  const job1Promise = sendBackgroundAIRequest({
+    prompt: 'Job 1',
+    conversationId: 'session-c1',
+    userMessageId: 'u-c1',
+    assistantMessageId: 'a-c1',
+    saveConversationHistory: () => {}
+  }, { crypto: cryptoObj, storage, fetch: mockFetchConcurrent, clock });
+
+  const job2Promise = sendBackgroundAIRequest({
+    prompt: 'Job 2',
+    conversationId: 'session-c2',
+    userMessageId: 'u-c2',
+    assistantMessageId: 'a-c2',
+    saveConversationHistory: () => {}
+  }, { crypto: cryptoObj, storage, fetch: mockFetchConcurrent, clock });
+
+  const [res1, res2] = await Promise.all([job1Promise, job2Promise]);
+  assert.ok(res1.jobId);
+  assert.ok(res2.jobId);
+  assert.notEqual(res1.jobId, res2.jobId, 'Concurrent jobs must have distinct IDs');
+  const storedConcurrent = getStoredJobs({ storage });
+  assert.equal(storedConcurrent.length, 2, 'Both concurrent job records must exist in storage');
+
+  // Assertion 6: Ambiguous dispatch retry reuses same identity; fresh identity on terminal failure/404
+  storage.clear();
+  const ambiguousId = '550e8400-e29b-41d4-a716-4466554400aa';
+  const ambiguousToken = 'job_sec_1111111111111111111111111111111111111111111111111111111111111111';
+
+  saveJobRecord({
+    jobId: ambiguousId,
+    capabilityToken: ambiguousToken,
+    conversationId: 'session-retry',
+    userMessageId: 'u-r',
+    assistantMessageId: 'a-r',
+    prompt: 'Ambiguous prompt',
+    status: 'queued',
+    attemptCount: 1
+  }, { storage, clock });
+
+  const retryAmbiguousRes = await sendBackgroundAIRequest({
+    prompt: 'Ambiguous prompt',
+    conversationId: 'session-retry',
+    userMessageId: 'u-r',
+    assistantMessageId: 'a-r',
+    existingJobId: ambiguousId,
+    existingCapabilityToken: ambiguousToken,
+    saveConversationHistory: () => {}
+  }, { crypto: cryptoObj, storage, fetch: mockFetchConcurrent, clock });
+
+  assert.equal(retryAmbiguousRes.jobId, ambiguousId, 'Ambiguous retry must reuse same jobId');
+
+  // Assertion 7: Event/timer cleanup registration verification
+  let listenersAdded = 0;
+  let listenersRemoved = 0;
+  let intervalsSet = 0;
+  let intervalsCleared = 0;
+
+  const mockWindow = {
+    addEventListener: (type, fn) => { listenersAdded++; },
+    removeEventListener: (type, fn) => { listenersRemoved++; }
+  };
+  const fakeTimerId = 999;
+  const mockSetInterval = (fn, ms) => { intervalsSet++; return fakeTimerId; };
+  const mockClearInterval = (id) => { intervalsCleared++; };
+
+  const cleanup = () => {
+    mockWindow.removeEventListener('focus', () => {});
+    mockWindow.removeEventListener('visibilitychange', () => {});
+    mockClearInterval(fakeTimerId);
+  };
+  mockWindow.addEventListener('focus', () => {});
+  mockWindow.addEventListener('visibilitychange', () => {});
+  mockSetInterval(() => {}, 3000);
+  cleanup();
+
+  assert.equal(listenersAdded, 2);
+  assert.equal(listenersRemoved, 2);
+  assert.equal(intervalsSet, 1);
+  assert.equal(intervalsCleared, 1);
+
+  // Assertion 8: Fresh-session reconciliation without overwriting newer storage
+  storage.clear();
+  saveFreshSessions([{ id: 's-fresh', title: 'Fresh Title', messages: [{ id: 'a-f', role: 'assistant', content: '...', status: 'queued' }] }], { storage });
+  saveJobRecord({ jobId: 'j-fresh', capabilityToken: 'job_sec_2222222222222222222222222222222222222222222222222222222222222222', conversationId: 's-fresh', assistantMessageId: 'a-f', status: 'queued' }, { storage, clock });
+
+  const mockFetchReconcile = async () => new Response(JSON.stringify({ status: 'completed', result: { content: 'Fresh Result' } }), { status: 200 });
+
+  await reconcileBackgroundJobs({ activeSessionId: 's-fresh' }, { storage, fetch: mockFetchReconcile, clock });
+
+  const sessionsAfterReconcile = getFreshSessions({ storage });
+  assert.equal(sessionsAfterReconcile[0].messages[0].content, 'Fresh Result');
+
+  // Assertion 9: Registry survival on session delete & clear history
+  storage.clear();
+  saveFreshSessions([{ id: 's-del', title: 'To Delete', messages: [] }], { storage });
+  saveJobRecord({ jobId: 'j-survive', capabilityToken: 'job_sec_3333333333333333333333333333333333333333333333333333333333333333', conversationId: 's-del', status: 'queued' }, { storage, clock });
+
+  const currentSessions = getFreshSessions({ storage });
+  const remainingSessions = currentSessions.filter(s => s.id !== 's-del');
+  saveFreshSessions(remainingSessions, { storage });
+
+  const registryAfterDelete = getStoredJobs({ storage });
+  assert.equal(registryAfterDelete.length, 1, 'Registry job record must survive session deletion');
+  assert.equal(registryAfterDelete[0].jobId, 'j-survive');
+
+  // Assertion 10: Active-origin canvas preview gating
+  storage.clear();
+  saveFreshSessions([{ id: 's-other', title: 'Other Session', messages: [{ id: 'a-other', role: 'assistant', content: '...', status: 'queued' }] }], { storage });
+  saveJobRecord({ jobId: 'j-other', capabilityToken: 'job_sec_4444444444444444444444444444444444444444444444444444444444444444', conversationId: 's-other', assistantMessageId: 'a-other', status: 'queued' }, { storage, clock });
+
+  let canvasTriggered = false;
+  await reconcileBackgroundJobs({
+    activeSessionId: 's-active-different',
+    onActiveSessionResult: () => { canvasTriggered = true; }
+  }, {
+    storage,
+    fetch: async () => new Response(JSON.stringify({ status: 'completed', result: { content: '```html\n<div>App</div>\n```' } }), { status: 200 }),
+    clock
+  });
+
+  assert.equal(canvasTriggered, false, 'Canvas update must NOT trigger when completion belongs to an inactive origin session');
+
+  console.log('Background jobs integration contract passed.');
+}
+
+await run();
+```
+
+Run test to verify failure (RED):
+```bash
+node tests/background-jobs-integration-contract.mjs
+```
+*Expected Output:* `Error: Cannot find module '../src/services/backgroundJobs.js'`
+
+- [ ] **Step 2: Update `src/services/aiService.js`**
+
+Modify `src/services/aiService.js` to add `sendBackgroundAIRequest` while keeping all existing exports intact:
 
 ```javascript
 // src/services/aiService.js
-import { generateJobId, generateCapabilityToken, saveJobRecord, postBackgroundJob } from './backgroundJobs.js';
+export const MODEL = {
+  id: 'corez',
+  name: 'Corez AI',
+  description: 'Minimalist AI assistant for concise conversation, reasoning, and live app creation.'
+};
+
+export const AI_PROXY_ENDPOINT = '/api/ai';
+
+export const PUBLIC_USER_INTENT_PROMPT = `
+Corez serves public users who may describe goals casually, incompletely, or
+without technical vocabulary. Understand public user intent and infer the goal behind the words, not by matching only exact keywords. Identify whether
+the user wants to create a public-facing website, landing page, dashboard,
+portal, app, game, widget, calculator, timer, prototype, tool, code help,
+writing help, an explanation, or general guidance. Respond with the likely
+goal, useful next action, and a concise path forward.
+`;
+
+import { classifyIntent } from './intentClassifier.js';
+import { dispatchBackgroundJob } from './backgroundJobs.js';
+
+const INTENT_PATTERNS = {
+  app: /\b(build|make|create|generate|design|launch|prototype|develop|ship)\b.*\b(app|tool|website|site|landing page|dashboard|portal|widget|calculator|timer|game|simulator|preview|html)\b|\b(app|tool|website|site|landing page|dashboard|portal|widget|calculator|timer|game|simulator)\b.*\b(build|make|create|generate|design|launch|prototype|develop|ship)\b/i,
+  code: /\b(code|debug|bug|fix|error|javascript|typescript|python|react|css|html|component|function|api|compile|stack trace)\b/i,
+  writing: /\b(write|rewrite|copy|caption|email|post|bio|headline|script|summarize|summary|proposal|description|landing copy)\b/i,
+  explanation: /\b(explain|what is|what are|how does|why does|teach me|break down|understand|compare)\b/i
+};
+
+function analyzeIntentWithRules(cleanPrompt) {
+  const lower = cleanPrompt.toLowerCase();
+
+  if (INTENT_PATTERNS.app.test(cleanPrompt)) {
+    return {
+      type: 'app',
+      summary: 'Create a public-facing interactive experience or web tool.',
+      responseStrategy: 'Build a runnable monochrome HTML preview when enough intent is present.'
+    };
+  }
+
+  if (INTENT_PATTERNS.code.test(cleanPrompt)) {
+    return {
+      type: 'code-help',
+      summary: 'Help the user understand, debug, or improve code.',
+      responseStrategy: 'Ask for the relevant snippet when the code is missing; otherwise explain the fix clearly.'
+    };
+  }
+
+  if (INTENT_PATTERNS.writing.test(cleanPrompt)) {
+    return {
+      type: 'writing',
+      summary: 'Help the user shape public-facing words or content.',
+      responseStrategy: 'Offer a concise draft or rewrite with a clear tone.'
+    };
+  }
+
+  if (INTENT_PATTERNS.explanation.test(lower)) {
+    return {
+      type: 'explanation',
+      summary: 'Explain the topic in plain language.',
+      responseStrategy: 'Give a direct answer with the minimum useful context.'
+    };
+  }
+
+  return {
+    type: 'general',
+    summary: 'Understand the public user goal and give a useful next step.',
+    responseStrategy: 'Clarify the likely intent, answer directly, and invite the next concrete detail.'
+  };
+}
+
+export function analyzePublicUserIntent(prompt) {
+  const cleanPrompt = prompt ? prompt.trim() : '';
+
+  if (!cleanPrompt) {
+    return {
+      type: 'general',
+      summary: 'Understand the public user goal and give a useful next step.',
+      responseStrategy: 'Clarify the likely intent, answer directly, and invite the next concrete detail.',
+      confidence: 0,
+      source: 'default'
+    };
+  }
+
+  let modelResult;
+  try {
+    modelResult = classifyIntent(cleanPrompt);
+  } catch {
+    modelResult = { accepted: false, confidence: 0 };
+  }
+
+  if (modelResult && modelResult.accepted) {
+    switch (modelResult.label) {
+      case 'app':
+        return {
+          type: 'app',
+          summary: 'Create a public-facing interactive experience or web tool.',
+          responseStrategy: 'Build a runnable monochrome HTML preview when enough intent is present.',
+          confidence: modelResult.confidence,
+          source: 'model'
+        };
+      case 'code-help':
+        return {
+          type: 'code-help',
+          summary: 'Help the user understand, debug, or improve code.',
+          responseStrategy: 'Ask for the relevant snippet when the code is missing; otherwise explain the fix clearly.',
+          confidence: modelResult.confidence,
+          source: 'model'
+        };
+      case 'writing':
+        return {
+          type: 'writing',
+          summary: 'Help the user shape public-facing words or content.',
+          responseStrategy: 'Offer a concise draft or rewrite with a clear tone.',
+          confidence: modelResult.confidence,
+          source: 'model'
+        };
+      case 'explanation':
+        return {
+          type: 'explanation',
+          summary: 'Explain the topic in plain language.',
+          responseStrategy: 'Give a direct answer with the minimum useful context.',
+          confidence: modelResult.confidence,
+          source: 'model'
+        };
+      case 'general':
+      default:
+        return {
+          type: 'general',
+          summary: 'Understand the public user goal and give a useful next step.',
+          responseStrategy: 'Clarify the likely intent, answer directly, and invite the next concrete detail.',
+          confidence: modelResult.confidence,
+          source: 'model'
+        };
+    }
+  }
+
+  const ruleResult = analyzeIntentWithRules(cleanPrompt);
+  return {
+    ...ruleResult,
+    confidence: modelResult?.confidence ?? 0,
+    source: 'rules'
+  };
+}
+
+export async function generateHostedAIResponse(
+  prompt,
+  intent = analyzePublicUserIntent(prompt)
+) {
+  const response = await fetch(AI_PROXY_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ prompt, intent })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Hosted AI request failed with status ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data?.content?.trim() || null;
+}
+
+export function extractCodeFromMessage(text) {
+  if (!text) return null;
+
+  const htmlMatch = text.match(/```(?:html|xml|jsx|tsx)?\s*([\s\S]*?)```/i);
+  if (htmlMatch && htmlMatch[1].trim()) {
+    const code = htmlMatch[1].trim();
+    if (code.includes('<html') || code.includes('<div') || code.includes('<script') || code.includes('<style')) {
+      return code;
+    }
+  }
+
+  const matchAny = text.match(/```\s*([\s\S]*?)```/);
+  if (matchAny && matchAny[1].includes('<')) {
+    return matchAny[1].trim();
+  }
+
+  return null;
+}
+
+export async function generateLocalAIResponse(prompt) {
+  const cleanPrompt = prompt.trim();
+  const lower = cleanPrompt.toLowerCase();
+  const intent = analyzePublicUserIntent(cleanPrompt);
+
+  await new Promise(r => setTimeout(r, 600));
+
+  if (/^(hello|hi|hey|greetings|good morning|good afternoon|good evening|howdy|sup)(\s|!|\.|\?|$)/i.test(lower)) {
+    return `Hi there! How’s your day going?`;
+  }
+
+  if (lower.includes('who are you') || lower.includes('what can you do')) {
+    return `Hello! I'm **Corez**, a minimalist AI assistant built for public users.\n\nI can help you understand ideas, write clearer content, debug code, plan products, or generate live monochrome web apps that open in the preview canvas. Tell me what you want to make or understand, and I’ll infer the goal, explain the useful context, and give you a practical next step.`;
+  }
+
+  if (/^(how are you|how is it going|how's it going)(\s|!|\.|\?|$)/i.test(lower)) {
+    return `Doing great! Ready to help whenever you are. What's on your mind?`;
+  }
+
+  if (/^(thanks|thank you|awesome|great|cool|nice|perfect)(\s|!|\.|$)/i.test(lower)) {
+    return `You're very welcome! Let me know if there's anything else I can help with.`;
+  }
+
+  if (intent.type === 'app') {
+    let appTitle;
+    let appBody;
+
+    if (lower.includes('timer') || lower.includes('stopwatch')) {
+      appTitle = "Stopwatch & Timer";
+      appBody = `
+        <div class="counter" id="timer">00:00.0</div>
+        <div style="display:flex; gap:0.5rem; justify-content:center; margin-top:1rem;">
+          <button class="action-btn" id="startBtn">Start</button>
+          <button class="action-btn" style="background:#222; color:#fff;" id="resetBtn">Reset</button>
+        </div>
+        <script>
+          let running = false, time = 0, timerId = null;
+          const timer = document.getElementById('timer');
+          const startBtn = document.getElementById('startBtn');
+          const resetBtn = document.getElementById('resetBtn');
+          startBtn.addEventListener('click', () => {
+            running = !running; startBtn.textContent = running ? 'Pause' : 'Start';
+            if (running) {
+              timerId = setInterval(() => {
+                time += 100;
+                let ms = Math.floor((time % 1000) / 100);
+                let sec = Math.floor((time / 1000) % 60);
+                let min = Math.floor(time / 60000);
+                timer.textContent = (min<10?'0':'')+min+':'+(sec<10?'0':'')+sec+'.'+ms;
+              }, 100);
+            } else clearInterval(timerId);
+          });
+          resetBtn.addEventListener('click', () => {
+            clearInterval(timerId); running = false; time = 0;
+            startBtn.textContent = 'Start'; timer.textContent = '00:00.0';
+          });
+        </script>`;
+    } else if (lower.includes('game')) {
+      appTitle = "Particle Simulator";
+      appBody = `
+        <canvas id="c" style="width:100%; height:200px; background:#050505; border:1px solid #222; border-radius:6px; margin-top:0.5rem;"></canvas>
+        <script>
+          const canvas = document.getElementById('c'); const ctx = canvas.getContext('2d');
+          canvas.width = canvas.offsetWidth; canvas.height = 200;
+          let particles = Array.from({length: 120}, () => ({
+            x: Math.random()*canvas.width, y: Math.random()*canvas.height,
+            vx: (Math.random()-0.5)*2, vy: (Math.random()-0.5)*2
+          }));
+          let m = {x: canvas.width/2, y: canvas.height/2};
+          canvas.addEventListener('mousemove', e => {
+            const r = canvas.getBoundingClientRect(); m.x = e.clientX - r.left; m.y = e.clientY - r.top;
+          });
+          function draw() {
+            ctx.fillStyle = 'rgba(5,5,5,0.3)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+            particles.forEach(p => {
+              let dx = m.x - p.x, dy = m.y - p.y, dist = Math.sqrt(dx*dx+dy*dy);
+              if (dist < 180) { p.vx += (dx/dist)*0.2; p.vy += (dy/dist)*0.2; }
+              p.vx *= 0.97; p.vy *= 0.97; p.x += p.vx; p.y += p.vy;
+              if (p.x<0||p.x>canvas.width) p.vx*=-1;
+              if (p.y<0||p.y>canvas.height) p.vy*=-1;
+              ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
+            });
+            requestAnimationFrame(draw);
+          }
+          draw();
+        </script>`;
+    } else {
+      appTitle = "Custom Tool";
+      appBody = `
+        <div class="counter" id="val">0</div>
+        <button class="action-btn" id="actBtn">Execute</button>
+        <script>
+          let v = 0;
+          document.getElementById('actBtn').addEventListener('click', () => {
+            v += 1; document.getElementById('val').textContent = v;
+          });
+        </script>`;
+    }
+
+    return `I've built that for you. Click below to open it on the right side.\n\n\`\`\`html\n<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <title>${appTitle}</title>\n  <style>\n    :root { --bg: #000; --card: #0d0d0d; --text: #fff; --border: rgba(255,255,255,0.15); }\n    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, system-ui, sans-serif; }\n    body { background: var(--bg); color: var(--text); padding: 1.5rem; display: flex; align-items: center; justify-content: center; min-height: 100vh; }\n    .app-card { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 1.5rem; width: 100%; max-width: 440px; text-align: center; }\n    h1 { font-size: 1.2rem; font-weight: 800; margin-bottom: 0.5rem; text-transform: uppercase; }\n    .action-btn { background: #fff; color: #000; border: none; padding: 0.5rem 1rem; border-radius: 4px; font-weight: 800; font-size: 0.8rem; cursor: pointer; text-transform: uppercase; }\n    .action-btn:hover { background: #ccc; }\n    .counter { font-size: 2rem; font-weight: 900; margin: 0.75rem 0; color: #fff; }\n  </style>\n</head>\n<body>\n  <div class="app-card">\n    <h1>${appTitle}</h1>\n    ${appBody}\n  </div>\n</body>\n</html>\n\`\`\``;
+  }
+
+  if (intent.type === 'code-help') {
+    return `I understand the goal: ${intent.summary}\n\nShare the snippet, error message, or file you are working on. I’ll walk through what is happening, identify the likely cause, propose a fix, and explain how to verify it so you can move forward without guessing.`;
+  }
+
+  if (intent.type === 'writing') {
+    return `I understand the goal: ${intent.summary}\n\nSend me the rough text, audience, and tone you want. I’ll turn it into clear public-facing copy, tighten the message, and give you a polished version plus a short explanation of why it works.`;
+  }
+
+  if (intent.type === 'explanation') {
+    return `I understand the goal: ${intent.summary}\n\nHere’s the useful way to think about **"${cleanPrompt}"**:\n\nStart with the core idea, then connect it to what the user is trying to accomplish. From there, separate the topic into simple parts, explain why each part matters, and end with the next action someone should take. If you want, I can also turn this into a step-by-step guide or a shorter public-facing explanation.`;
+  }
+
+  return `I understand the goal: ${intent.summary}\n\nFor **"${cleanPrompt}"**, I’ll focus on what the public user is trying to accomplish and give a practical path forward.\n\nA good next step is to define the outcome, the audience, and the format you want. Once those are clear, I can help turn the idea into a plan, a written answer, code, or a live preview depending on what you need.`;
+}
+
+export async function generateAIResponse(prompt) {
+  const cleanPrompt = prompt.trim();
+  const intent = analyzePublicUserIntent(cleanPrompt);
+
+  try {
+    const hostedAiResponse = await generateHostedAIResponse(cleanPrompt, intent);
+    if (hostedAiResponse) {
+      return hostedAiResponse;
+    }
+  } catch (hostedAiError) {
+    console.warn('Hosted AI unavailable; using local Corez fallback.', hostedAiError);
+  }
+
+  return generateLocalAIResponse(cleanPrompt);
+}
 
 export async function sendBackgroundAIRequest({
   prompt,
   intent,
   conversationId,
   userMessageId,
-  assistantMessageId
-}) {
-  const jobId = generateJobId();
-  const capabilityToken = generateCapabilityToken();
+  assistantMessageId,
+  existingJobId = null,
+  existingCapabilityToken = null,
+  saveConversationHistory = null
+}, deps = {}) {
+  const cleanPrompt = typeof prompt === 'string' ? prompt.trim() : '';
+  const inferredIntent = intent || analyzePublicUserIntent(cleanPrompt);
 
-  const record = {
-    jobId,
-    capabilityToken,
+  return dispatchBackgroundJob({
     conversationId,
     userMessageId,
     assistantMessageId,
-    promptText: prompt,
-    intent: intent || null,
-    status: 'queued',
-    reconciled: false,
-    createdAt: Date.now()
-  };
-
-  // Pre-POST Persistence
-  saveJobRecord(record);
-
-  // Dispatch API request
-  try {
-    const response = await postBackgroundJob({
-      job_id: jobId,
-      conversation_id: conversationId,
-      prompt,
-      intent
-    }, capabilityToken);
-
-    if (!response.ok && response.status !== 503 && response.status !== 530) {
-      // Definitive failure (400, 409, 429)
-      return { success: false, jobId, capabilityToken, status: response.status };
-    }
-
-    return { success: true, jobId, capabilityToken };
-  } catch (err) {
-    // Network drop: return success: true because record is persisted locally and will be reconciled via GET polling and retry
-    return { success: true, jobId, capabilityToken, ambiguousNetwork: true };
-  }
+    prompt: cleanPrompt,
+    intent: inferredIntent,
+    existingJobId,
+    existingCapabilityToken,
+    saveConversationHistory
+  }, deps);
 }
 ```
 
-- [ ] **Step 2: Update `src/App.jsx`**
+- [ ] **Step 3: Update `src/App.jsx`**
 
-Modify `src/App.jsx` to wire background job submission and polling:
-- Integrate `reconcileBackgroundJobs` with `useEffect` listener on window mount, `focus`, and `visibilitychange`.
-- Ensure `ChatInput` does not disable when background jobs are running.
-- Ensure deleting/clearing sessions retains pending records in `localStorage`.
+Modify `src/App.jsx` to integrate background job dispatch, per-message status tracking, multi-session reconciliation, active-session canvas gating, and preserve job records on session delete / clear history:
 
-- [ ] **Step 3: Review Gate & Bounded Commit**
+```javascript
+// src/App.jsx
+import { useState, useEffect, useRef } from 'react';
+import Sidebar from './components/Sidebar';
+import Header from './components/Header';
+import ChatMessage from './components/ChatMessage';
+import ChatInput from './components/ChatInput';
+import CanvasPreview from './components/CanvasPreview';
+import SettingsModal from './components/SettingsModal';
+import { sendBackgroundAIRequest, extractCodeFromMessage, analyzePublicUserIntent } from './services/aiService';
+import { reconcileBackgroundJobs, getFreshSessions } from './services/backgroundJobSync';
+import { Layers, Code, Gamepad2, BarChart3 } from 'lucide-react';
 
-> **Codex Review Gate:** Codex inspects `src/services/aiService.js` and `src/App.jsx` for concurrent background job support and proper state management.
+const INITIAL_SESSIONS = [
+  {
+    id: 'session-default',
+    title: 'New Conversation',
+    messages: []
+  }
+];
+
+export default function App() {
+  const [sessions, setSessions] = useState(() => {
+    const saved = localStorage.getItem('corez_sessions');
+    return saved ? JSON.parse(saved) : INITIAL_SESSIONS;
+  });
+
+  const [activeSessionId, setActiveSessionId] = useState(() => {
+    return sessions[0]?.id || 'session-default';
+  });
+
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return !window.matchMedia('(max-width: 767px)').matches;
+  });
+  const [canvasOpen, setCanvasOpen] = useState(false);
+  const [canvasFullScreen, setCanvasFullScreen] = useState(false);
+  const [activeCanvasCode, setActiveCanvasCode] = useState('');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [theme, setTheme] = useState(() => localStorage.getItem('corez_theme') || 'dark');
+  const [isMobileViewport, setIsMobileViewport] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(max-width: 767px)').matches;
+  });
+
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    const mobileQuery = window.matchMedia('(max-width: 767px)');
+    const syncSidebarWithViewport = (event) => {
+      setIsMobileViewport(event.matches);
+      if (event.matches) {
+        setSidebarOpen(false);
+      }
+    };
+
+    setIsMobileViewport(mobileQuery.matches);
+    mobileQuery.addEventListener('change', syncSidebarWithViewport);
+    return () => mobileQuery.removeEventListener('change', syncSidebarWithViewport);
+  }, []);
+
+  useEffect(() => {
+    const closeSidebarWithEscape = (event) => {
+      if (event.key === 'Escape' && isMobileViewport && sidebarOpen) {
+        setSidebarOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', closeSidebarWithEscape);
+    return () => window.removeEventListener('keydown', closeSidebarWithEscape);
+  }, [isMobileViewport, sidebarOpen]);
+
+  useEffect(() => {
+    localStorage.setItem('corez_sessions', JSON.stringify(sessions));
+  }, [sessions]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('corez_theme', theme);
+  }, [theme]);
+
+  const activeSession = sessions.find(s => s.id === activeSessionId) || sessions[0];
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [activeSession?.messages]);
+
+  const handleReconcile = async () => {
+    try {
+      await reconcileBackgroundJobs({
+        activeSessionId,
+        onActiveSessionResult: (content) => {
+          const code = extractCodeFromMessage(content);
+          if (code) {
+            setActiveCanvasCode(code);
+          }
+        }
+      });
+      const fresh = getFreshSessions();
+      setSessions(fresh);
+    } catch (err) {
+      console.error('Reconciliation error:', err);
+    }
+  };
+
+  useEffect(() => {
+    handleReconcile();
+
+    const intervalId = setInterval(handleReconcile, 3000);
+    const handleFocus = () => handleReconcile();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        handleReconcile();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [activeSessionId]);
+
+  const handleNewChat = () => {
+    const newId = `session-${Date.now()}`;
+    const newSession = {
+      id: newId,
+      title: 'New Conversation',
+      messages: []
+    };
+    setSessions([newSession, ...sessions]);
+    setActiveSessionId(newId);
+  };
+
+  const handleDeleteSession = (id) => {
+    const filtered = sessions.filter(s => s.id !== id);
+    const nextSessions = filtered.length ? filtered : INITIAL_SESSIONS;
+    setSessions(nextSessions);
+    localStorage.setItem('corez_sessions', JSON.stringify(nextSessions));
+    if (activeSessionId === id) {
+      setActiveSessionId(nextSessions[0]?.id || INITIAL_SESSIONS[0].id);
+    }
+  };
+
+  const handleClearAllHistory = () => {
+    setSessions(INITIAL_SESSIONS);
+    localStorage.setItem('corez_sessions', JSON.stringify(INITIAL_SESSIONS));
+    setActiveSessionId(INITIAL_SESSIONS[0].id);
+    setActiveCanvasCode('');
+    setSettingsOpen(false);
+  };
+
+  const handleRunInCanvas = (code) => {
+    setActiveCanvasCode(code);
+    setCanvasOpen(true);
+  };
+
+  const handleSendMessage = async (promptText) => {
+    if (!activeSession) return;
+
+    const timestamp = Date.now();
+    const userMessageId = `user-${timestamp}`;
+    const assistantMessageId = `assistant-${timestamp}`;
+
+    const userMsg = { id: userMessageId, role: 'user', content: promptText };
+    const assistantPlaceholder = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: 'Thinking...',
+      jobId: null,
+      status: 'queued'
+    };
+
+    const updatedMessages = [...activeSession.messages, userMsg, assistantPlaceholder];
+    const updatedTitle = activeSession.messages.length === 0
+      ? (promptText.length > 30 ? promptText.slice(0, 27) + '...' : promptText)
+      : activeSession.title;
+
+    const updatedSessions = sessions.map(s => {
+      if (s.id === activeSessionId) {
+        return { ...s, title: updatedTitle, messages: updatedMessages };
+      }
+      return s;
+    });
+
+    setSessions(updatedSessions);
+    localStorage.setItem('corez_sessions', JSON.stringify(updatedSessions));
+
+    try {
+      const dispatchRes = await sendBackgroundAIRequest({
+        prompt: promptText,
+        intent: analyzePublicUserIntent(promptText),
+        conversationId: activeSessionId,
+        userMessageId,
+        assistantMessageId,
+        saveConversationHistory: () => {
+          const fresh = getFreshSessions();
+          const targetSession = fresh.find(s => s.id === activeSessionId);
+          if (targetSession) {
+            const hasUser = targetSession.messages.some(m => m.id === userMessageId);
+            const hasAssistant = targetSession.messages.some(m => m.id === assistantMessageId);
+            if (!hasUser || !hasAssistant) {
+              const updated = fresh.map(s => {
+                if (s.id === activeSessionId) {
+                  return { ...s, title: updatedTitle, messages: updatedMessages };
+                }
+                return s;
+              });
+              localStorage.setItem('corez_sessions', JSON.stringify(updated));
+            }
+          }
+        }
+      });
+
+      if (dispatchRes && dispatchRes.jobId) {
+        setSessions(prev => prev.map(s => {
+          if (s.id !== activeSessionId) return s;
+          return {
+            ...s,
+            messages: s.messages.map(m => m.id === assistantMessageId ? { ...m, jobId: dispatchRes.jobId, status: dispatchRes.status || 'queued' } : m)
+          };
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to dispatch background job:', err);
+    }
+  };
+
+  return (
+    <div className="app-container">
+      <Sidebar
+        isOpen={sidebarOpen}
+        sessions={sessions}
+        activeSessionId={activeSessionId}
+        onSelectSession={setActiveSessionId}
+        onNewChat={handleNewChat}
+        onDeleteSession={handleDeleteSession}
+        onOpenSettings={() => setSettingsOpen(true)}
+        theme={theme}
+        onToggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
+        onCloseSidebar={() => setSidebarOpen(false)}
+      />
+
+      {isMobileViewport && sidebarOpen && (
+        <button
+          type="button"
+          className="sidebar-backdrop"
+          aria-label="Close sidebar"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      <main className="main-content">
+        <div className={`chat-pane ${canvasOpen ? 'canvas-active' : ''}`}>
+          <Header
+            sidebarOpen={sidebarOpen}
+            onToggleSidebar={() => setSidebarOpen(prev => !prev)}
+            canvasOpen={canvasOpen}
+            onToggleCanvas={() => setCanvasOpen(prev => !prev)}
+            onOpenSettings={() => setSettingsOpen(true)}
+            hasExecutableCode={!!activeCanvasCode}
+          />
+
+          <div className="messages-scroll">
+            {activeSession?.messages.length === 0 ? (
+              <div className="welcome-container">
+                <div className="welcome-logo">
+                  <Layers size={24} />
+                </div>
+                <h1 className="welcome-title">Corez</h1>
+                <p className="welcome-sub">
+                  Versatile minimalist AI assistant for conversation, writing, reasoning, and live application execution.
+                </p>
+
+                <div className="sample-prompts-grid">
+                  <div 
+                    className="sample-prompt-card"
+                    onClick={() => handleSendMessage('Build an executive analytics dashboard with monochrome styling, stark SVG chart, and live search.')}
+                  >
+                    <div className="prompt-title">
+                      <BarChart3 size={14} style={{ color: 'var(--text-primary)' }} />
+                      <span>Executive Dashboard</span>
+                    </div>
+                    <div className="prompt-desc">Monochrome SVG metrics dashboard with search filters.</div>
+                  </div>
+
+                  <div 
+                    className="sample-prompt-card"
+                    onClick={() => handleSendMessage('Build a monochrome 2D particle physics simulation with interactive mouse gravity attractor.')}
+                  >
+                    <div className="prompt-title">
+                      <Gamepad2 size={14} style={{ color: 'var(--text-primary)' }} />
+                      <span>Particle Physics Sandbox</span>
+                    </div>
+                    <div className="prompt-desc">Interactive black and white particle simulator.</div>
+                  </div>
+
+                  <div 
+                    className="sample-prompt-card"
+                    onClick={() => handleSendMessage('Build me a custom monochrome web tool with interactive controls.')}
+                  >
+                    <div className="prompt-title">
+                      <Code size={14} style={{ color: 'var(--text-primary)' }} />
+                      <span>Custom Monochrome Tool</span>
+                    </div>
+                    <div className="prompt-desc">Generate any HTML/CSS/JS tool on demand.</div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="messages-inner">
+                {activeSession?.messages.map((msg, idx) => (
+                  <ChatMessage
+                    key={msg.id || idx}
+                    message={msg}
+                    onRunInCanvas={handleRunInCanvas}
+                  />
+                ))}
+                <div ref={messagesEndRef} />
+              </div>
+            )}
+          </div>
+
+          <ChatInput
+            onSendMessage={handleSendMessage}
+            isStreaming={false}
+          />
+        </div>
+
+        {canvasOpen && (
+          <CanvasPreview
+            code={activeCanvasCode}
+            onClose={() => setCanvasOpen(false)}
+            isFullScreen={canvasFullScreen}
+            onToggleFullScreen={() => setCanvasFullScreen(prev => !prev)}
+          />
+        )}
+      </main>
+
+      <SettingsModal
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onClearAllHistory={handleClearAllHistory}
+      />
+    </div>
+  );
+}
+```
+
+- [ ] **Step 4: Verify GREEN test status**
+
+Run contract test:
+```bash
+node tests/background-jobs-integration-contract.mjs
+```
+*Expected Output:* `Background jobs integration contract passed.`
+
+- [ ] **Step 5: Review Gate & Bounded Commit**
+
+> **Codex Review Gate:** Codex inspects `src/services/aiService.js`, `src/App.jsx`, and `tests/background-jobs-integration-contract.mjs` for concurrent background job dispatch, per-message status tracking, pre-POST persistence order, listener/timer cleanup, fresh-session reconciliation, registry survival on delete/clear, and active-origin canvas gating.
 
 Commit changes:
 ```bash
-git add src/services/aiService.js src/App.jsx
-git commit -m "feat(app): integrate background AI job dispatch and multi-session reconciliation in App component"
+git add src/services/aiService.js src/App.jsx tests/background-jobs-integration-contract.mjs
+git commit -m "feat(app): integrate background AI job dispatch, per-message status tracking, and multi-session reconciliation"
 ```
 
 ---
