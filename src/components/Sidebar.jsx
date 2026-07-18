@@ -25,14 +25,14 @@ export default function Sidebar({
     <aside className={`sidebar icon-only ${isOpen ? '' : 'collapsed'}`} aria-hidden={!isOpen}>
       <div className="sidebar-header icon-only-header">
         <div className="brand-icon" title="Corez AI">
-          <Layers size={16} />
+          <Layers size={13} />
         </div>
         <button 
           className="icon-btn close-sidebar-btn" 
           onClick={onCloseSidebar}
           title="Collapse Sidebar"
         >
-          <PanelLeftClose size={15} />
+          <PanelLeftClose size={13} />
         </button>
       </div>
 
@@ -42,7 +42,7 @@ export default function Sidebar({
           onClick={onNewChat}
           title="New Chat Session"
         >
-          <Plus size={18} />
+          <Plus size={14} />
         </button>
       </div>
 
@@ -54,7 +54,7 @@ export default function Sidebar({
             onClick={() => onSelectSession(session.id)}
             title={session.title}
           >
-            <MessageSquare size={16} />
+            <MessageSquare size={13} />
             <button
               className="delete-chat-btn icon-only-delete"
               onClick={(e) => {
@@ -63,7 +63,7 @@ export default function Sidebar({
               }}
               title={`Delete ${session.title}`}
             >
-              <Trash2 size={11} />
+              <Trash2 size={10} />
             </button>
           </div>
         ))}
@@ -75,14 +75,14 @@ export default function Sidebar({
           onClick={onToggleTheme}
           title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
         >
-          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
         </button>
         <button 
           className="footer-action-btn icon-only-btn" 
           onClick={onOpenSettings}
           title="Corez Settings"
         >
-          <Settings size={16} />
+          <Settings size={14} />
         </button>
       </div>
     </aside>
