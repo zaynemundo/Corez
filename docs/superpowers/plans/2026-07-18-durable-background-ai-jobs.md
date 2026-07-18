@@ -2357,7 +2357,7 @@ git commit -m "feat(worker): implement pure Cloudflare Workflow execution logic 
 
 ### Task 5: Cloudflare Resource Provisioning, D1 Binding & CI Deployment Pipeline
 
-**Goal:** Configure `wrangler.jsonc` with D1 database `cloud-service`, Workflows binding `AI_JOB_WORKFLOW` with class `AiJobWorkflow`, Rate Limiter `RATE_LIMITER` namespace `1000`, update `tests/cloudflare-worker-config-contract.sh`, and update `.github/workflows/deploy.yml` to apply remote D1 migrations before deployment (only after the class exists).
+**Goal:** Configure `wrangler.jsonc` with D1 database `cloud-service`, Workflows binding `AI_JOB_WORKFLOW` with class `AiJobWorkflow`, Rate Limiter binding `RATE_LIMITER` with namespace `1000` (limit 10, period 60), update `tests/cloudflare-worker-config-contract.sh`, and update `.github/workflows/deploy.yml` to apply remote D1 migrations before deployment using `preCommands`. Resource provisioning and configuration occur strictly after `AiJobWorkflow` entrypoint export exists in `worker/index.js` (completed in Task 4).
 
 **Files:**
 - Modify: `tests/cloudflare-worker-config-contract.sh`
@@ -2365,53 +2365,81 @@ git commit -m "feat(worker): implement pure Cloudflare Workflow execution logic 
 - Modify: `.github/workflows/deploy.yml`
 
 **Interfaces & Requirements:**
+- Provisioning Order: Resource creation and binding configuration happen strictly after `AiJobWorkflow` exists in `worker/index.js`.
 - D1 Database Name: `cloud-service`.
-- D1 Database ID: Must be captured from the actual stdout of `npx wrangler d1 create cloud-service` during execution and inserted into `wrangler.jsonc` before commit; never use placeholder tokens.
+- D1 Database ID: Must be captured from stdout of `npx wrangler d1 create cloud-service` during execution and inserted into `wrangler.jsonc` before commit. The plan contains no D1 UUID literal or placeholder token.
 - Workflows Binding: `binding: "AI_JOB_WORKFLOW"`, `class_name: "AiJobWorkflow"`.
 - Rate Limiter Binding: `name: "RATE_LIMITER"`, `namespace_id: "1000"`, `simple: { limit: 10, period: 60 }`.
-- CI Pipeline: Run `npx wrangler d1 migrations apply DB --remote` before `npx wrangler deploy`.
+- Config Contract Test: Retain every existing assertion in `tests/cloudflare-worker-config-contract.sh` and append assertions for D1 binding `DB`, `cloud-service`, `database_id` UUID shape (inspecting actual configured value via regex without embedding any value), `AI_JOB_WORKFLOW`, `AiJobWorkflow`, `RATE_LIMITER`, `1000`, `10`, and `60`.
+- CI Pipeline: Minimal edit to `.github/workflows/deploy.yml` preserving `checkout`, `setup-node`, `npm ci`, `test:cloudflare`, `build`, and existing `cloudflare/wrangler-action@v3` secret mappings (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`). Add `preCommands: npx wrangler d1 migrations apply DB --remote` to the existing action. No separate deploy step or cron/scheduled handler.
 
 - [ ] **Step 1: Update `tests/cloudflare-worker-config-contract.sh` and verify RED status**
 
-Edit `tests/cloudflare-worker-config-contract.sh` to include assertions for `DB`, `cloud-service`, `AI_JOB_WORKFLOW`, `AiJobWorkflow`, `RATE_LIMITER`, `1000`:
+Edit `tests/cloudflare-worker-config-contract.sh` to retain all existing checks and append checks for D1, Workflows, and Rate Limiter:
 
 ```bash
 #!/usr/bin/env bash
 set -u
 
-wrangler_file="wrangler.jsonc"
+config="wrangler.jsonc"
+package="package.json"
+readme="README.md"
+workflow=".github/workflows/deploy.yml"
 failures=0
 
 check() {
   local description="$1"
   local pattern="$2"
-
-  if ! grep -Eq -- "$pattern" "$wrangler_file" 2>/dev/null; then
+  local file="$3"
+  if ! grep -Eq -- "$pattern" "$file" 2>/dev/null; then
     printf 'FAIL: %s\n' "$description" >&2
     failures=$((failures + 1))
   fi
 }
 
-check 'D1 binding DB exists' '"binding": "DB"'
-check 'D1 database_name is cloud-service' '"database_name": "cloud-service"'
-check 'Workflows binding AI_JOB_WORKFLOW exists' '"binding": "AI_JOB_WORKFLOW"'
-check 'Workflows class AiJobWorkflow exists' '"class_name": "AiJobWorkflow"'
-check 'Rate limiter name is RATE_LIMITER' '"name": "RATE_LIMITER"'
-check 'Rate limiter namespace_id is 1000' '"namespace_id": "1000"'
+check 'Worker name matches the deployed Worker' '"name"[[:space:]]*:[[:space:]]*"ai"' "$config"
+check 'Worker entrypoint is configured' '"main"[[:space:]]*:[[:space:]]*"[.]/worker/index[.]js"' "$config"
+check 'Vite dist is the asset directory' '"directory"[[:space:]]*:[[:space:]]*"[.]/dist"' "$config"
+check 'ASSETS binding is configured' '"binding"[[:space:]]*:[[:space:]]*"ASSETS"' "$config"
+check 'SPA fallback is configured' '"not_found_handling"[[:space:]]*:[[:space:]]*"single-page-application"' "$config"
+check 'API routes run Worker-first' '"run_worker_first"[[:space:]]*:[[:space:]]*\[[[:space:]]*"/api/[*]"' "$config"
+check 'Workers AI binding is configured' '"ai"[[:space:]]*:[[:space:]]*\{' "$config"
+check 'Workers AI binding is named AI' '"binding"[[:space:]]*:[[:space:]]*"AI"' "$config"
+check 'Cloudflare contract script exists' 'cloudflare-worker-contract[.]mjs' "$package"
+check 'Workers AI provider contract runs in the standard suite' 'workers-ai-provider-contract[.]sh' "$package"
+check 'public AI proxy contract runs in the standard suite' 'public-ai-proxy-contract[.]sh' "$package"
+check 'live AI contracts run in the standard suite' 'ai-live-intent-eval-contract[.]sh.*ai-live-intent-eval-response-contract[.]mjs' "$package"
+check 'environment skill contract runs in the standard suite' 'env-question-skill-contract[.]sh' "$package"
+check 'Wrangler local development script exists' '"dev:worker"' "$package"
+check 'Wrangler deploy script exists' '"deploy"' "$package"
+check 'README documents Cloudflare deployment' 'Cloudflare Worker' "$readme"
+check 'README documents the build command' 'npm run build' "$readme"
+check 'README documents the deploy command' 'npx wrangler deploy' "$readme"
+check 'GitHub Actions uses the current setup-node action' 'actions/setup-node@v4' "$workflow"
+check 'deployment runs the hosted AI contract suite' 'npm run test:cloudflare' "$workflow"
+check 'D1 binding DB is configured' '"binding"[[:space:]]*:[[:space:]]*"DB"' "$config"
+check 'D1 database_name cloud-service is configured' '"database_name"[[:space:]]*:[[:space:]]*"cloud-service"' "$config"
+check 'D1 database_id has UUID shape' '"database_id"[[:space:]]*:[[:space:]]*"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"' "$config"
+check 'Workflows binding AI_JOB_WORKFLOW is configured' '"binding"[[:space:]]*:[[:space:]]*"AI_JOB_WORKFLOW"' "$config"
+check 'Workflows class_name AiJobWorkflow is configured' '"class_name"[[:space:]]*:[[:space:]]*"AiJobWorkflow"' "$config"
+check 'Rate Limiter name RATE_LIMITER is configured' '"name"[[:space:]]*:[[:space:]]*"RATE_LIMITER"' "$config"
+check 'Rate Limiter namespace_id 1000 is configured' '"namespace_id"[[:space:]]*:[[:space:]]*"1000"' "$config"
+check 'Rate Limiter limit 10 is configured' '"limit"[[:space:]]*:[[:space:]]*10' "$config"
+check 'Rate Limiter period 60 is configured' '"period"[[:space:]]*:[[:space:]]*60' "$config"
 
 if (( failures > 0 )); then
-  printf '%d worker config check(s) failed.\n' "$failures" >&2
+  printf '%d Cloudflare Worker configuration contract check(s) failed.\n' "$failures" >&2
   exit 1
 fi
 
-printf 'Cloudflare Worker config contract checks passed.\n'
+printf 'Cloudflare Worker configuration contract passed.\n'
 ```
 
-Run test to verify failure before configuration (RED):
+Run contract test to verify RED failure status before updating `wrangler.jsonc`:
 ```bash
 bash tests/cloudflare-worker-config-contract.sh
 ```
-*Expected Output:* `FAIL: D1 binding DB exists...`
+*Expected Output:* `FAIL: D1 binding DB is configured...`
 
 - [ ] **Step 2: D1 Database Provisioning Execution Procedure**
 
@@ -2420,17 +2448,11 @@ Run D1 creation command in shell:
 npx wrangler d1 create cloud-service
 ```
 
-Capture the returned `database_id` string from command output:
-```
-✅ Created new D1 database 'cloud-service'
-database_id = "8f7b3a1d-4e2c-4b5a-9a8f-1234567890ab"
-```
-
-Insert the captured exact `database_id` into `wrangler.jsonc` before committing.
+Capture the returned database ID string from command stdout without printing secrets or creating planning artifacts containing the UUID. During execution, insert the exact captured ID string into `wrangler.jsonc` as the `database_id` property value.
 
 - [ ] **Step 3: Update `wrangler.jsonc`**
 
-Edit `wrangler.jsonc` with captured database ID and bindings:
+Edit `wrangler.jsonc` to preserve all existing fields (`$schema`, `name`, `main`, `compatibility_date`, `ai`, `assets`) and add minimal bindings for D1, Workflows, and Rate Limiter:
 
 ```jsonc
 {
@@ -2445,7 +2467,7 @@ Edit `wrangler.jsonc` with captured database ID and bindings:
     {
       "binding": "DB",
       "database_name": "cloud-service",
-      "database_id": "8f7b3a1d-4e2c-4b5a-9a8f-1234567890ab"
+      "database_id": ""
     }
   ],
   "workflows": [
@@ -2473,24 +2495,48 @@ Edit `wrangler.jsonc` with captured database ID and bindings:
   }
 }
 ```
+*(At execution time, `database_id` string value is populated with the exact returned UUID captured from `npx wrangler d1 create cloud-service` prior to contract verification).*
 
 - [ ] **Step 4: Update `.github/workflows/deploy.yml`**
 
-Ensure `.github/workflows/deploy.yml` runs D1 remote migrations prior to Worker deployment:
+Edit `.github/workflows/deploy.yml` to preserve `checkout`, `setup-node`, `npm ci`, `npm run test:cloudflare`, `npm run build`, and existing `cloudflare/wrangler-action@v3` secret mappings (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`), appending `preCommands: npx wrangler d1 migrations apply DB --remote` to the deployment action:
 
 ```yaml
-# In .github/workflows/deploy.yml deployment step:
-- name: Apply D1 Migrations
-  run: npx wrangler d1 migrations apply DB --remote
-  env:
-    CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-    CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+name: Deploy to Cloudflare Workers
 
-- name: Deploy Worker
-  run: npx wrangler deploy
-  env:
-    CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-    CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run hosted AI contract suite
+        run: npm run test:cloudflare
+
+      - name: Run build
+        run: npm run build
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          preCommands: npx wrangler d1 migrations apply DB --remote
 ```
 
 - [ ] **Step 5: Verify GREEN test status**
@@ -2499,11 +2545,11 @@ Run configuration contract check:
 ```bash
 bash tests/cloudflare-worker-config-contract.sh
 ```
-*Expected Output:* `Cloudflare Worker config contract checks passed.`
+*Expected Output:* `Cloudflare Worker configuration contract passed.`
 
 - [ ] **Step 6: Review Gate & Bounded Commit**
 
-> **Codex Review Gate:** Codex verifies `wrangler.jsonc` contains authentic D1 database ID, Workflows binding, Rate Limiter namespace 1000, and `.github/workflows/deploy.yml` includes remote D1 migration step.
+> **Codex Review Gate:** Codex verifies `wrangler.jsonc` contains authentic captured D1 database ID, Workflows binding `AI_JOB_WORKFLOW` with class `AiJobWorkflow`, Rate Limiter binding `RATE_LIMITER` with namespace `1000` (limit 10, period 60), `tests/cloudflare-worker-config-contract.sh` retains all original checks plus new checks, and `.github/workflows/deploy.yml` configures `preCommands` on `cloudflare/wrangler-action@v3`. Codex must validate before any commit.
 
 Commit changes:
 ```bash
