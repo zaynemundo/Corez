@@ -39,16 +39,24 @@ grep -q '"trainingDataSha256"' "$model" || fail "trainingDataSha256 must be pres
 evaluation_output="$(npm run evaluate:intents 2>&1)" || fail "offline evaluation succeeds"
 grep -q '"passed":true' <<<"$evaluation_output" || fail "metric gates pass"
 
-# Task 4 node inference & invalid dataset test suite
+# Task 4 node inference & dataset validation test suite
 node -e '
 import { classifyIntent, tokenize } from "./src/services/intentClassifier.js";
 import { analyzePublicUserIntent } from "./src/services/aiService.js";
 import { validateDataset } from "./scripts/train-intents.mjs";
+import fs from "node:fs";
 import assert from "node:assert";
+
+// Load dataset for validation tests
+const validEntries = JSON.parse(fs.readFileSync("data/intents-dataset.json", "utf8"));
 
 // Test dataset validation rules
 assert.throws(() => validateDataset([]), /Dataset must contain exactly 250 entries/);
-assert.throws(() => validateDataset([{ id: "1", text: "t", label: "invalid", split: "train" }]), /Invalid label/);
+
+// Test invalid label on a clone of valid dataset (Defect 4 fix)
+const invalidLabelEntries = JSON.parse(JSON.stringify(validEntries));
+invalidLabelEntries[0].label = "invalid-label-type";
+assert.throws(() => validateDataset(invalidLabelEntries), /Invalid label/);
 
 // Representative prompts check
 const testCases = [

@@ -112,12 +112,10 @@ export function trainModel(entries) {
   const docFreq = {};
   const classDocCounts = {};
   const classFeatureCounts = {};
-  const classTotalTokens = {};
 
   for (const label of INTENT_LABELS) {
     classDocCounts[label] = 0;
     classFeatureCounts[label] = {};
-    classTotalTokens[label] = 0;
   }
 
   for (const entry of sortedTrainEntries) {
@@ -132,7 +130,6 @@ export function trainModel(entries) {
 
     for (const token of tokens) {
       classFeatureCounts[label][token] = (classFeatureCounts[label][token] || 0) + 1;
-      classTotalTokens[label]++;
     }
   }
 
@@ -140,6 +137,15 @@ export function trainModel(entries) {
   const vocabulary = Object.keys(docFreq)
     .filter((token) => docFreq[token] >= 2)
     .sort();
+
+  // Recompute class total tokens over retained vocabulary
+  const classTotalTokens = {};
+  for (const label of INTENT_LABELS) {
+    classTotalTokens[label] = 0;
+    for (const token of vocabulary) {
+      classTotalTokens[label] += classFeatureCounts[label][token] || 0;
+    }
+  }
 
   const totalTrainDocs = trainEntries.length;
   const numClasses = INTENT_LABELS.length;
@@ -157,7 +163,7 @@ export function trainModel(entries) {
     tokenLogLikelihoods[token] = {};
     for (const label of INTENT_LABELS) {
       const count = classFeatureCounts[label][token] || 0;
-      // Laplace smoothing alpha = 1
+      // Laplace smoothing alpha = 1 over retained vocabulary totals
       const prob = (count + 1) / (classTotalTokens[label] + vocabSize);
       tokenLogLikelihoods[token][label] = roundToFixed(Math.log(prob));
     }
@@ -364,13 +370,22 @@ function runCLI() {
     process.exit(1);
   }
 
-  // Atomic write
+  // Atomic write with cleanup on failure
   const tmpPath = `${targetModelPath}.tmp`;
-  fs.mkdirSync(path.dirname(targetModelPath), { recursive: true });
-  fs.writeFileSync(tmpPath, json1, 'utf8');
-  fs.renameSync(tmpPath, targetModelPath);
+  try {
+    fs.mkdirSync(path.dirname(targetModelPath), { recursive: true });
+    fs.writeFileSync(tmpPath, json1, 'utf8');
+    fs.renameSync(tmpPath, targetModelPath);
+  } catch (err) {
+    if (fs.existsSync(tmpPath)) {
+      try {
+        fs.unlinkSync(tmpPath);
+      } catch {}
+    }
+    throw err;
+  }
 
-  console.log(`Successfully trained and committed intent classifier model to ${targetModelPath}`);
+  console.log(`Successfully trained and written intent classifier model to ${targetModelPath}`);
   console.log(`Accuracy: ${evalResult.accuracy}, Macro F1: ${evalResult.macroF1}`);
 }
 

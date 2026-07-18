@@ -122,7 +122,7 @@
   {"id": "writing-train-017", "text": "Summarize this research paper abstract in plain english copy", "label": "writing", "split": "train"},
   {"id": "writing-train-018", "text": "Polish this project status update message for Slack team", "label": "writing", "split": "train"},
   {"id": "writing-train-019", "text": "Draft a formal resignation letter draft with two weeks notice", "label": "writing", "split": "train"},
-  {"id": "writing-train-020", "text": "Write descriptive alt text and captions for product photos", "label": "writing", "split": "writing", "split": "train"},
+  {"id": "writing-train-020", "text": "Write descriptive alt text and captions for product photos", "label": "writing", "split": "train"},
   {"id": "writing-train-021", "text": "Can you rewrite this paragraphs to be more concise and professional?", "label": "writing", "split": "train"},
   {"id": "writing-train-022", "text": "Draft an announcement post for our community Discord server", "label": "writing", "split": "train"},
   {"id": "writing-train-023", "text": "Write a punchy tagline for an AI powered productivity tool", "label": "writing", "split": "train"},
@@ -144,7 +144,7 @@
   {"id": "writing-train-039", "text": "Polish this recommendation letter for a former colleague", "label": "writing", "split": "train"},
   {"id": "writing-train-040", "text": "Draft copy for a customer satisfaction survey invitation", "label": "writing", "split": "train"},
 
-  {"id": "writing-evaluation-001", "text": "Rewrite this launch email so it sounds confident", "label": "writing", "split": "evaluation"},
+  {"id": "writing-evaluation-001", "text": "Can you help me rewrite this product launch email for subscribers?", "label": "writing", "split": "evaluation"},
   {"id": "writing-evaluation-002", "text": "Draft a concise follow up email after a job interview", "label": "writing", "split": "evaluation"},
   {"id": "writing-evaluation-003", "text": "Summarize this five page PDF into a two paragraph summary", "label": "writing", "split": "evaluation"},
   {"id": "writing-evaluation-004", "text": "Edit and polish this blog post copy for clarity and tone", "label": "writing", "split": "evaluation"},
@@ -196,7 +196,7 @@
   {"id": "explanation-train-039", "text": "Why do solid state drives operate faster than hard disk drives?", "label": "explanation", "split": "train"},
   {"id": "explanation-train-040", "text": "Explain how consensus mechanisms work in distributed systems", "label": "explanation", "split": "train"},
 
-  {"id": "explanation-evaluation-001", "text": "Explain database indexes in plain English", "label": "explanation", "split": "evaluation"},
+  {"id": "explanation-evaluation-001", "text": "Could you clarify how relational database indexes speed up query lookups?", "label": "explanation", "split": "evaluation"},
   {"id": "explanation-evaluation-002", "text": "What is the difference between relational and document databases?", "label": "explanation", "split": "evaluation"},
   {"id": "explanation-evaluation-003", "text": "How does SSL TLS handshake establish an encrypted connection?", "label": "explanation", "split": "evaluation"},
   {"id": "explanation-evaluation-004", "text": "Teach me how CPU multi core processing works", "label": "explanation", "split": "evaluation"},
@@ -248,7 +248,7 @@
   {"id": "general-train-039", "text": "Hello, can we chat about general productivity tips?", "label": "general", "split": "train"},
   {"id": "general-train-040", "text": "Great, looking forward to your suggestions.", "label": "general", "split": "train"},
 
-  {"id": "general-evaluation-001", "text": "I have a rough idea and need help deciding what to do", "label": "general", "split": "evaluation"},
+  {"id": "general-evaluation-001", "text": "I'm feeling stuck and need some general perspective on my project", "label": "general", "split": "evaluation"},
   {"id": "general-evaluation-002", "text": "Hello! How are you doing today?", "label": "general", "split": "evaluation"},
   {"id": "general-evaluation-003", "text": "Thank you so much for all your assistance!", "label": "general", "split": "evaluation"},
   {"id": "general-evaluation-004", "text": "What are some general tips for staying organized?", "label": "general", "split": "evaluation"},
