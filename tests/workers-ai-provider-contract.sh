@@ -27,7 +27,8 @@ check_absent() {
   fi
 }
 
-check 'Worker uses the GLM-5.2 model' '@cf/zai-org/glm-5[.]2' "$worker"
+check 'Worker uses the GLM-4.7-Flash model' '@cf/zai-org/glm-4[.]7-flash' "$worker"
+check_absent 'Worker does not use the paid-only GLM-5.2 model' '@cf/zai-org/glm-5[.]2' "$worker"
 check 'Worker invokes the native AI binding' 'env[.]AI[.]run' "$worker"
 check 'Worker sends a system message' "role: 'system'" "$worker"
 check 'Worker sends a user message' "role: 'user'" "$worker"

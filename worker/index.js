@@ -1,4 +1,4 @@
-const WORKERS_AI_MODEL = '@cf/zai-org/glm-5.2';
+const WORKERS_AI_MODEL = '@cf/zai-org/glm-4.7-flash';
 
 function jsonResponse(status, body) {
   return Response.json(body, { status });

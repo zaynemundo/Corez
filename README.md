@@ -3,13 +3,13 @@
 ## Cloudflare Workers AI setup
 
 Corez uses the native Cloudflare Workers AI binding for hosted text responses.
-Public users send prompts to `/api/ai`; the Worker runs the fixed GLM-5.2 model
+Public users send prompts to `/api/ai`; the Worker runs the fixed GLM-4.7-Flash model
 directly on Cloudflare and returns normalized response text.
 
 Corez uses:
 
 ```text
-@cf/zai-org/glm-5.2
+@cf/zai-org/glm-4.7-flash
 ```
 
 The binding is declared in `wrangler.jsonc` as:

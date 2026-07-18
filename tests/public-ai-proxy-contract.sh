@@ -33,7 +33,8 @@ check 'frontend sends prompt and intent only' 'JSON[.]stringify\(\{ prompt, inte
 check 'hosted failures use provider-neutral fallback wording' 'Hosted AI unavailable; using local Corez fallback' "$service"
 check 'frontend retains local response fallback' 'generateLocalAIResponse' "$service"
 check 'settings identifies Cloudflare Workers AI' 'Cloudflare Workers AI' "$settings"
-check 'settings identifies GLM-5.2' 'GLM-5[.]2' "$settings"
+check 'settings identifies GLM-4.7-Flash' 'GLM-4[.]7-Flash' "$settings"
+check_absent 'settings does not identify paid-only GLM-5.2' 'GLM-5[.]2' "$settings"
 check_absent 'settings has no OpenRouter model field' 'OpenRouter model|openrouter-model' "$settings"
 check_absent 'settings has no OpenRouter model storage' 'corez_openrouter_model' "$settings"
 

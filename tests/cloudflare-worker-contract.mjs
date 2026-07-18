@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import worker from '../worker/index.js';
 
-const MODEL = '@cf/zai-org/glm-5.2';
+const MODEL = '@cf/zai-org/glm-4.7-flash';
 
 function env(overrides = {}) {
   return {

@@ -17,7 +17,7 @@ export default function SettingsModal({ isOpen, onClose, onClearAllHistory }) {
         </div>
 
         <div style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-          Corez uses Cloudflare Workers AI with GLM-5.2 for hosted text generation.
+          Corez uses Cloudflare Workers AI with GLM-4.7-Flash for hosted text generation.
         </div>
 
         <div style={{ marginTop: '0.5rem' }}>
