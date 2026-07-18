@@ -794,3 +794,153 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .form-input:focus { border-color: var(--border-hover); }
+
+/* Device Viewport Mode Switcher & Device Frame Styling */
+.device-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.725rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.device-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.device-btn.active {
+  background: var(--text-primary);
+  color: var(--bg-primary);
+  font-weight: 600;
+}
+
+.device-wrapper {
+  background-color: var(--bg-tertiary);
+  padding: 1.5rem;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+}
+
+.preview-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-normal);
+}
+
+.preview-container.device-mode-laptop,
+.preview-container.device-mode-tablet,
+.preview-container.device-mode-mobile {
+  background: var(--bg-card);
+  padding: 1.25rem;
+  border-radius: 20px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  max-height: 100%;
+  overflow: hidden;
+}
+
+.device-frame-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  width: 100%;
+  justify-content: center;
+}
+
+.device-camera-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.device-spec-tag {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  letter-spacing: -0.01em;
+  font-family: var(--font-mono);
+}
+
+/* ---------------------------------------------------- */
+/* Screen Separation: Desktop vs Laptop vs Mobile Layouts */
+/* ---------------------------------------------------- */
+
+/* 1. Ultra-Wide & Large Desktop Screens (1440px+) */
+@media (min-width: 1440px) {
+  :root {
+    --sidebar-width: 260px;
+  }
+  .messages-inner {
+    max-width: 980px;
+  }
+  .canvas-pane {
+    width: 52%;
+  }
+}
+
+/* 2. Standard Laptop Screens (1024px to 1439px) */
+@media (min-width: 1024px) and (max-width: 1439px) {
+  :root {
+    --sidebar-width: 230px;
+  }
+  .messages-inner {
+    max-width: 780px;
+    padding: 0 0.5rem;
+  }
+  .sample-prompts-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.65rem;
+  }
+  .canvas-pane {
+    width: 50%;
+  }
+  .device-label {
+    display: inline;
+  }
+}
+
+/* 3. Small Laptop / Compact Screens (768px to 1023px) */
+@media (min-width: 768px) and (max-width: 1023px) {
+  :root {
+    --sidebar-width: 210px;
+  }
+  .sample-prompts-grid {
+    grid-template-columns: 1fr;
+  }
+  .device-label {
+    display: none;
+  }
+  .canvas-pane {
+    width: 55%;
+  }
+}
+
+/* 4. Mobile Screens (< 767px) */
+@media (max-width: 767px) {
+  .sample-prompts-grid {
+    grid-template-columns: 1fr;
+  }
+  .device-mode-bar {
+    display: none !important;
+  }
+  .messages-inner {
+    max-width: 100%;
+  }
+}
+

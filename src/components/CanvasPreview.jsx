@@ -8,7 +8,11 @@ import {
   Copy, 
   Check, 
   X,
-  Layers
+  Layers,
+  Monitor,
+  Laptop,
+  Tablet,
+  Smartphone
 } from 'lucide-react';
 
 export default function CanvasPreview({ 
@@ -18,6 +22,7 @@ export default function CanvasPreview({
   onToggleFullScreen 
 }) {
   const [activeTab, setActiveTab] = useState('preview');
+  const [deviceMode, setDeviceMode] = useState('desktop'); // 'desktop' | 'laptop' | 'tablet' | 'mobile'
   const [editableCode, setEditableCode] = useState(code || '');
   const [copied, setCopied] = useState(false);
   const [key, setKey] = useState(0);
@@ -49,6 +54,14 @@ export default function CanvasPreview({
     setKey(prev => prev + 1);
   };
 
+  // Device dimension map
+  const deviceSpecs = {
+    desktop: { label: 'Desktop', width: '100%', height: '100%', res: 'Fluid / 1920px' },
+    laptop: { label: 'Laptop', width: '1100px', height: '680px', res: '1366 × 768' },
+    tablet: { label: 'Tablet', width: '768px', height: '900px', res: '768 × 1024' },
+    mobile: { label: 'Mobile', width: '375px', height: '720px', res: '375 × 812' }
+  };
+
   return (
     <div className={`canvas-pane ${isFullScreen ? 'full-width' : ''}`}>
       <div className="canvas-header">
@@ -56,18 +69,20 @@ export default function CanvasPreview({
           <Layers size={15} />
           <span>Canvas Preview</span>
 
-          <div style={{ display: 'flex', background: 'var(--bg-tertiary)', padding: '2px', borderRadius: '4px', marginLeft: '0.5rem', border: '1px solid var(--border-color)' }}>
+          {/* View Mode: Preview vs Source */}
+          <div style={{ display: 'flex', background: 'var(--bg-tertiary)', padding: '2px', borderRadius: 'var(--radius-pill)', marginLeft: '0.5rem', border: '1px solid var(--border-color)' }}>
             <button
               onClick={() => setActiveTab('preview')}
               style={{
-                padding: '2px 8px',
-                borderRadius: '3px',
+                padding: '3px 10px',
+                borderRadius: 'var(--radius-pill)',
                 border: 'none',
                 background: activeTab === 'preview' ? 'var(--text-primary)' : 'transparent',
                 color: activeTab === 'preview' ? 'var(--bg-primary)' : 'var(--text-secondary)',
                 fontSize: '0.725rem',
-                fontWeight: 700,
-                cursor: 'pointer'
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'var(--transition-fast)'
               }}
             >
               Preview
@@ -75,20 +90,62 @@ export default function CanvasPreview({
             <button
               onClick={() => setActiveTab('code')}
               style={{
-                padding: '2px 8px',
-                borderRadius: '3px',
+                padding: '3px 10px',
+                borderRadius: 'var(--radius-pill)',
                 border: 'none',
                 background: activeTab === 'code' ? 'var(--text-primary)' : 'transparent',
                 color: activeTab === 'code' ? 'var(--bg-primary)' : 'var(--text-secondary)',
                 fontSize: '0.725rem',
-                fontWeight: 700,
-                cursor: 'pointer'
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'var(--transition-fast)'
               }}
             >
               Source
             </button>
           </div>
         </div>
+
+        {/* Device Viewport Selector (Desktop vs Laptop vs Tablet vs Mobile) */}
+        {activeTab === 'preview' && (
+          <div className="device-mode-bar" style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-tertiary)', padding: '2px', borderRadius: 'var(--radius-pill)', border: '1px solid var(--border-color)', gap: '2px' }}>
+            <button
+              onClick={() => setDeviceMode('desktop')}
+              title="Desktop Screen View"
+              className={`device-btn ${deviceMode === 'desktop' ? 'active' : ''}`}
+            >
+              <Monitor size={13} />
+              <span className="device-label">Desktop</span>
+            </button>
+
+            <button
+              onClick={() => setDeviceMode('laptop')}
+              title="Laptop Screen View (1366x768)"
+              className={`device-btn ${deviceMode === 'laptop' ? 'active' : ''}`}
+            >
+              <Laptop size={13} />
+              <span className="device-label">Laptop</span>
+            </button>
+
+            <button
+              onClick={() => setDeviceMode('tablet')}
+              title="Tablet Screen View (768x1024)"
+              className={`device-btn ${deviceMode === 'tablet' ? 'active' : ''}`}
+            >
+              <Tablet size={13} />
+              <span className="device-label">Tablet</span>
+            </button>
+
+            <button
+              onClick={() => setDeviceMode('mobile')}
+              title="Mobile Screen View (375x812)"
+              className={`device-btn ${deviceMode === 'mobile' ? 'active' : ''}`}
+            >
+              <Smartphone size={13} />
+              <span className="device-label">Mobile</span>
+            </button>
+          </div>
+        )}
 
         <div className="canvas-controls">
           <button className="icon-btn" onClick={handleRefresh} title="Reload Preview">
@@ -109,16 +166,33 @@ export default function CanvasPreview({
         </div>
       </div>
 
-      <div className="canvas-body">
+      <div className={`canvas-body ${deviceMode !== 'desktop' && activeTab === 'preview' ? 'device-wrapper' : ''}`}>
         {editableCode ? (
           activeTab === 'preview' ? (
-            <iframe
-              key={key}
-              title="Live Application Preview"
-              srcDoc={editableCode}
-              className="preview-iframe"
-              sandbox="allow-scripts allow-modals allow-forms allow-same-origin"
-            />
+            <div className={`preview-container device-mode-${deviceMode}`}>
+              {deviceMode !== 'desktop' && (
+                <div className="device-frame-header">
+                  <div className="device-camera-dot" />
+                  <span className="device-spec-tag">{deviceSpecs[deviceMode].label} • {deviceSpecs[deviceMode].res}</span>
+                </div>
+              )}
+              <iframe
+                key={`${key}-${deviceMode}`}
+                title={`Live Application Preview (${deviceSpecs[deviceMode].label})`}
+                srcDoc={editableCode}
+                className="preview-iframe"
+                sandbox="allow-scripts allow-modals allow-forms allow-same-origin"
+                style={
+                  deviceMode !== 'desktop'
+                    ? {
+                        maxWidth: deviceSpecs[deviceMode].width,
+                        maxHeight: deviceSpecs[deviceMode].height,
+                        borderRadius: deviceMode === 'mobile' ? '20px' : '12px'
+                      }
+                    : {}
+                }
+              />
+            </div>
           ) : (
             <textarea
               className="code-content"
@@ -153,3 +227,4 @@ export default function CanvasPreview({
     </div>
   );
 }
+
