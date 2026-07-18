@@ -27,8 +27,8 @@ check 'task parameter is mandatory' '\[Parameter\(Mandatory'
 check 'analysis mode is supported' "'Analysis'"
 check 'implementation mode is supported' "'Implement'"
 check 'diff-review mode is supported' "'ReviewDiff'"
-check 'analysis maps to AGY plan mode' "'--mode'.*'plan'"
-check 'implementation maps to AGY accept-edits mode' "'--mode'.*'accept-edits'"
+check 'analysis maps to AGY plan mode' "\\\$agyMode = 'plan'"
+check 'implementation maps to AGY accept-edits mode' "\\\$agyMode = 'accept-edits'"
 check 'non-interactive print mode is used' "'--print'"
 check 'sandboxing is enabled' "'--sandbox'"
 check 'native exit code is captured' '\$LASTEXITCODE'
