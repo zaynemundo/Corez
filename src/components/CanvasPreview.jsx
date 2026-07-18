@@ -54,12 +54,11 @@ export default function CanvasPreview({
     setKey(prev => prev + 1);
   };
 
-  // Device dimension map
   const deviceSpecs = {
-    desktop: { label: 'Desktop', width: '100%', height: '100%', res: 'Fluid / 1920px' },
-    laptop: { label: 'Laptop', width: '1100px', height: '680px', res: '1366 × 768' },
-    tablet: { label: 'Tablet', width: '768px', height: '900px', res: '768 × 1024' },
-    mobile: { label: 'Mobile', width: '375px', height: '720px', res: '375 × 812' }
+    desktop: { label: 'Desktop', width: '100%', res: 'Fluid / 1920px' },
+    laptop: { label: 'Laptop', width: '1100px', res: '1366 × 768' },
+    tablet: { label: 'Tablet', width: '768px', res: '768 × 1024' },
+    mobile: { label: 'Mobile', width: '375px', res: '375 × 812' }
   };
 
   return (
@@ -180,8 +179,11 @@ export default function CanvasPreview({
                 style={
                   deviceMode !== 'desktop'
                     ? {
+                        width: '100%',
                         maxWidth: deviceSpecs[deviceMode].width,
-                        maxHeight: deviceSpecs[deviceMode].height,
+                        height: '100%',
+                        maxHeight: '100%',
+                        margin: '0 auto',
                         borderRadius: deviceMode === 'mobile' ? '20px' : '12px'
                       }
                     : {}
@@ -190,19 +192,8 @@ export default function CanvasPreview({
             </div>
           ) : (
             <textarea
-              className="code-content"
-              style={{
-                width: '100%',
-                height: '100%',
-                background: 'var(--code-bg)',
-                color: '#e2e8f0',
-                border: 'none',
-                outline: 'none',
-                padding: '1rem',
-                fontFamily: 'var(--font-mono)',
-                fontSize: '0.825rem',
-                resize: 'none'
-              }}
+              className="canvas-source-editor"
+              aria-label="Source code editor"
               value={editableCode}
               onChange={(e) => setEditableCode(e.target.value)}
             />
@@ -222,4 +213,3 @@ export default function CanvasPreview({
     </div>
   );
 }
-

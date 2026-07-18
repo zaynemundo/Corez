@@ -36,15 +36,47 @@ export default function App() {
     return sessions[0]?.id || 'session-default';
   });
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return !window.matchMedia('(max-width: 767px)').matches;
+  });
   const [canvasOpen, setCanvasOpen] = useState(false);
   const [canvasFullScreen, setCanvasFullScreen] = useState(false);
   const [activeCanvasCode, setActiveCanvasCode] = useState(SAMPLE_APPS[0].code);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem('corez_theme') || 'dark');
+  const [isMobileViewport, setIsMobileViewport] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(max-width: 767px)').matches;
+  });
 
   const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    const mobileQuery = window.matchMedia('(max-width: 767px)');
+    const syncSidebarWithViewport = (event) => {
+      setIsMobileViewport(event.matches);
+      if (event.matches) {
+        setSidebarOpen(false);
+      }
+    };
+
+    setIsMobileViewport(mobileQuery.matches);
+    mobileQuery.addEventListener('change', syncSidebarWithViewport);
+    return () => mobileQuery.removeEventListener('change', syncSidebarWithViewport);
+  }, []);
+
+  useEffect(() => {
+    const closeSidebarWithEscape = (event) => {
+      if (event.key === 'Escape' && isMobileViewport && sidebarOpen) {
+        setSidebarOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', closeSidebarWithEscape);
+    return () => window.removeEventListener('keydown', closeSidebarWithEscape);
+  }, [isMobileViewport, sidebarOpen]);
 
   useEffect(() => {
     localStorage.setItem('corez_sessions', JSON.stringify(sessions));
@@ -151,6 +183,7 @@ export default function App() {
   return (
     <div className="app-container">
       <Sidebar
+        isOpen={sidebarOpen}
         sessions={sessions}
         activeSessionId={activeSessionId}
         onSelectSession={setActiveSessionId}
@@ -162,6 +195,15 @@ export default function App() {
         onCloseSidebar={() => setSidebarOpen(false)}
         onLoadSampleApp={handleLoadSampleApp}
       />
+
+      {isMobileViewport && sidebarOpen && (
+        <button
+          type="button"
+          className="sidebar-backdrop"
+          aria-label="Close sidebar"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
       <main className="main-content">
         <div className={`chat-pane ${canvasOpen ? 'canvas-active' : ''}`}>

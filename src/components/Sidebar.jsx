@@ -13,6 +13,7 @@ import {
 import { SAMPLE_APPS } from '../data/sampleApps';
 
 export default function Sidebar({
+  isOpen,
   sessions,
   activeSessionId,
   onSelectSession,
@@ -25,7 +26,7 @@ export default function Sidebar({
   onLoadSampleApp
 }) {
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${isOpen ? '' : 'collapsed'}`} aria-hidden={!isOpen}>
       <div className="sidebar-header">
         <div className="brand-title">
           <div className="brand-icon">

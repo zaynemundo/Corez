@@ -108,6 +108,12 @@ def main():
         current_branch = "main"
 
     log(f"Current branch is {current_branch}")
+    if current_branch != "main":
+        print(json.dumps({
+            "decision": "stop",
+            "reason": f"Refusing to auto-commit because current branch is '{current_branch}', not 'main'. Switch to main and retry."
+        }))
+        return
 
     # Step 5a: Add changes
     res_add = run_cmd(["git", "add", "-A"], cwd=cwd)
@@ -149,7 +155,7 @@ def main():
             return
 
     # Step 5e: Push changes
-    res_push = run_cmd(["git", "push", "origin", f"{current_branch}:main"], cwd=cwd)
+    res_push = run_cmd(["git", "push", "origin", "main:main"], cwd=cwd)
     if res_push.returncode != 0:
         print(json.dumps({
             "decision": "stop",

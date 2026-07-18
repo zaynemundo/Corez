@@ -63,7 +63,7 @@ $Task
             throw 'Git is required for ReviewDiff mode.'
         }
 
-        $changedPaths = @(& git diff --name-only --)
+        $changedPaths = @(& git diff --name-only HEAD --)
         if ($LASTEXITCODE -ne 0) {
             throw "Unable to list the current Git diff (git exit code $LASTEXITCODE)."
         }
@@ -74,12 +74,12 @@ $Task
             throw "Refusing to send a diff containing potentially sensitive paths to AGY: $($sensitivePaths -join ', ')"
         }
 
-        $diff = (& git diff --no-ext-diff -- 2>&1 | Out-String)
+        $diff = (& git diff --no-ext-diff HEAD -- 2>&1 | Out-String)
         if ($LASTEXITCODE -ne 0) {
             throw "Unable to read the current Git diff (git exit code $LASTEXITCODE)."
         }
         if ([string]::IsNullOrWhiteSpace($diff)) {
-            $diff = '[No tracked, unstaged changes are present.]'
+            $diff = '[No tracked staged or unstaged changes are present.]'
         }
 
         $effectiveTask = @"
@@ -106,12 +106,15 @@ $agyArguments = @(
 )
 
 Write-Host "Delegating to AGY in $Mode mode. Output: $OutputPath"
-& agy @agyArguments 2>&1 | Tee-Object -FilePath $OutputPath
+$agyOutput = @(& agy @agyArguments 2>&1 | Tee-Object -FilePath $OutputPath)
 $agyExitCode = $LASTEXITCODE
+$agyOutputText = $agyOutput -join [Environment]::NewLine
 
 if ($agyExitCode -ne 0) {
     throw "AGY failed with exit code $agyExitCode. Partial output was preserved at '$OutputPath'."
 }
+if ([string]::IsNullOrWhiteSpace($agyOutputText) -or $agyOutputText -match 'no output produced') {
+    throw "AGY did not produce a usable response. Output was preserved at '$OutputPath'."
+}
 
 Write-Host "AGY completed. Review its output at: $OutputPath"
-
