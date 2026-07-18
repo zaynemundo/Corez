@@ -4,7 +4,7 @@
 
 **Goal:** Implement durable anonymous background AI jobs in the Cloudflare Worker named `ai` (`worker/index.js`) using Cloudflare Workflows, Cloudflare D1, Workers AI, and Workers Rate Limiting, coupled with client-side pre-POST persistence, active background polling, and cross-session reconciliation.
 
-**Architecture:** Worker backend is refactored into modular components: `worker/ai.js` owns shared Workers AI invocation/prompt building; `worker/app.js` is the pure Worker fetch/scheduled router testable in Node without `cloudflare:workers` imports; `worker/index.js` exports `AiJobWorkflow` extending `WorkflowEntrypoint` from `cloudflare:workers` and default exports `app`. D1 persistence is managed in `worker/jobStore.js`, API routing/validation/idempotency/rate-limiting/one-item `createBatch` dispatch in `worker/jobs.js`, and Workflow execution steps in `worker/jobWorkflow.js`. Frontend services `src/services/backgroundJobs.js` and `src/services/backgroundJobSync.js` manage client job records, pre-POST `localStorage` persistence, exponential polling backoff, and all-session reconciliation. UI components in `src/App.jsx`, `src/components/ChatInput.jsx`, and `src/components/ChatMessage.jsx` render per-message status indicators (`queued`, `running`/`Thinking`, `completed`, `failed`/`expired`) and enable concurrent job creation without disabling input.
+**Architecture:** Worker backend is refactored into modular components: `worker/ai.js` owns shared Workers AI invocation (`invokeWorkersAi`) and prompt building; `worker/app.js` is the pure Worker fetch router testable in Node without `cloudflare:workers` imports; `worker/index.js` exports `AiJobWorkflow` extending `WorkflowEntrypoint` from `cloudflare:workers` and default exports `app`. D1 persistence is managed in `worker/jobStore.js`, API routing/validation/idempotency/rate-limiting/one-item `createBatch` dispatch in `worker/jobs.js`, and Workflow execution steps in `worker/jobWorkflow.js`. Frontend services `src/services/backgroundJobs.js` and `src/services/backgroundJobSync.js` manage client job records, pre-POST `localStorage` persistence, exponential polling backoff, and all-session reconciliation. UI components in `src/App.jsx`, `src/components/ChatInput.jsx`, and `src/components/ChatMessage.jsx` render per-message status indicators (`queued`, `running`/`Thinking`, `completed`, `failed`/`expired`) and enable concurrent job creation without disabling input.
 
 **Tech Stack:** Node.js 22+, JavaScript ES modules, React 18, Vite 6, Cloudflare Workers, Cloudflare Workflows, Cloudflare D1 (`cloud-service`), Workers AI binding (`@cf/zai-org/glm-4.7-flash`), Workers Rate Limiting (`RATE_LIMITER` name, namespace_id `"1000"`), Web Crypto API, Bash contract tests.
 
@@ -15,9 +15,14 @@
 - Modify ONLY authorized target files: `wrangler.jsonc`, `worker/index.js`, `src/App.jsx`, `src/components/ChatInput.jsx`, `src/components/ChatMessage.jsx`, `src/index.css`, `src/services/aiService.js`, `package.json`, `README.md`, `.github/workflows/deploy.yml`, `tests/cloudflare-worker-contract.mjs`, `tests/cloudflare-worker-config-contract.sh`, `tests/thinking-indicator-contract.sh`.
 - Create new files ONLY as specified: `migrations/0001_create_ai_jobs.sql`, `worker/app.js`, `worker/ai.js`, `worker/jobUtils.js`, `worker/jobStore.js`, `worker/jobs.js`, `worker/jobWorkflow.js`, `src/services/backgroundJobs.js`, `src/services/backgroundJobSync.js`, `tests/ai-job-utils-contract.mjs`, `tests/ai-jobs-api-contract.mjs`, `tests/ai-job-workflow-contract.mjs`, `tests/background-jobs-client-contract.mjs`, `tests/background-jobs-ui-contract.sh`.
 - Do not modify application code outside specified boundaries, package files (other than adding `test:cloudflare` script entries in `package.json`), Git configuration, or Cloudflare production resources without explicit authorization.
+- Every main push deploys automatically; all intermediate commits must remain fully deployable and pass tests.
+- Maintain an accurate file map of existing and new files.
+- Strictly eliminate all TODO, TBD, placeholder IDs, or incomplete prose.
 - Never guess or fabricate provider-generated D1 database UUIDs. Show exact `npx wrangler d1 create cloud-service` execution procedure and explicit Codex review checkpoint for inserting the returned UUID without fabricating it.
 - Follow TDD throughout: write failing contract tests before implementation code for each task, observe RED failure output, implement code, verify GREEN output.
 - Perform frequent bounded git commits on local `main` branch.
+- Use Web Crypto API strictly for cryptography and randomness (`crypto.randomUUID()`, `crypto.getRandomValues()`, `crypto.subtle.digest()`). Do not use non-existent `crypto.subtle.timingSafeEqual`; perform constant-time byte comparisons via strict manual 32-byte XOR over `Uint8Array`. Strictly prohibit `Math.random()`.
+- Tokens must be formatted strictly as `job_sec_` plus 64 lowercase hex characters derived from 32 random bytes. Strict validation must reject any malformed or improperly formatted token.
 - Include explicit Codex review gates because AGY performs implementation while Codex independently reviews and verifies.
 - Note explicitly that no generic `npm test` or `npm run typecheck` script exists in `package.json` and do not claim they passed. Master test suite script is `npm run test:cloudflare`.
 - Rate limiting is per Cloudflare location; IP keys can affect shared networks.
@@ -35,12 +40,12 @@
 ├── README.md                             # Architectural, deployment, and operational documentation
 ├── wrangler.jsonc                        # Worker config with D1, Workflow, Rate Limiter, and Cron bindings
 ├── worker/
-│   ├── ai.js                             # Shared Workers AI model invocation and prompt builder
+│   ├── ai.js                             # Shared Workers AI model invocation (invokeWorkersAi) and prompt builder
 │   ├── app.js                            # Pure Worker fetch router (Node-testable, no cloudflare:workers)
 │   ├── index.js                          # Wrangler entrypoint exporting AiJobWorkflow and app default
 │   ├── jobs.js                           # API handlers (POST /api/ai/jobs, GET /api/ai/jobs/:jobId)
 │   ├── jobStore.js                       # D1 persistence prepared statement helpers
-│   ├── jobUtils.js                       # Canonical JSON, SHA-256, timingSafeEqual, UTF-8 byte truncation
+│   ├── jobUtils.js                       # Web Crypto helpers, canonical JSON, SHA-256, timingSafeEqualBytes, UTF-8 byte truncation
 │   └── jobWorkflow.js                    # Pure Workflow step execution logic
 ├── src/
 │   ├── App.jsx                           # Main app integration, background job polling, concurrent job sync
@@ -69,11 +74,10 @@
 
 ### Task 1: Shared Workers AI Architecture & Entrypoint Separation
 
-**Goal:** Refactor `worker/index.js` to extract shared AI logic into `worker/ai.js` and pure HTTP routing into `worker/app.js`, ensuring ordinary Node contract tests can import routing logic without `cloudflare:workers` import failures while maintaining synchronous `POST /api/ai` functionality intact.
+**Goal:** Refactor `worker/index.js` to extract shared Workers AI invocation (`invokeWorkersAi`) into `worker/ai.js` and pure HTTP routing into `worker/app.js`, ensuring ordinary Node contract tests can import routing logic without `cloudflare:workers` import failures while maintaining synchronous `POST /api/ai` functionality and executable preview behavior intact.
 
 **Files:**
 - Modify: `tests/cloudflare-worker-contract.mjs`
-- Modify: `tests/cloudflare-worker-config-contract.sh`
 - Create: `worker/ai.js`
 - Create: `worker/app.js`
 - Modify: `worker/index.js`
@@ -82,35 +86,33 @@
 - `worker/ai.js`:
   ```javascript
   export const WORKERS_AI_MODEL = '@cf/zai-org/glm-4.7-flash';
-  export function buildSystemPrompt(intent) { /* ... */ }
-  export function safeErrorDetail(error) { /* ... */ }
-  export async function handleAi(request, env) { /* ... */ }
+  export function jsonResponse(status, body);
+  export function safeErrorDetail(error);
+  export function buildSystemPrompt(intent);
+  export async function invokeWorkersAi(env, { prompt, intent });
+  export async function handleAi(request, env);
   ```
 - `worker/app.js`:
   ```javascript
-  import { handleAi } from './ai.js';
-  export function jsonResponse(status, body) { /* ... */ }
   export default {
-    async fetch(request, env) { /* routes /api/ai, /api/ai/jobs, ASSETS */ },
-    async scheduled(event, env, ctx) { /* cron tasks */ }
+    async fetch(request, env)
   };
   ```
 - `worker/index.js`:
   ```javascript
-  import app from './app.js';
   export default app;
   ```
 
 - [ ] **Step 1: Write failing contract test expecting `worker/app.js` import**
 
-Edit `tests/cloudflare-worker-contract.mjs` to import `app` from `../worker/app.js` instead of `../worker/index.js`.
+Edit `tests/cloudflare-worker-contract.mjs` to import `app` from `../worker/app.js` instead of `../worker/index.js`:
 
-```javascript
-// tests/cloudflare-worker-contract.mjs
-import assert from 'node:assert/strict';
-import worker from '../worker/app.js';
-// ... rest of test assertions remain identical
+```diff
+-import worker from '../worker/index.js';
++import worker from '../worker/app.js';
 ```
+
+All remaining existing assertions in `tests/cloudflare-worker-contract.mjs` stay unchanged.
 
 Run test to verify failure (RED):
 ```bash
@@ -120,7 +122,7 @@ node tests/cloudflare-worker-contract.mjs
 
 - [ ] **Step 2: Create `worker/ai.js`**
 
-Extract shared model identification, system prompt builder, safe error detail formatter, and synchronous `POST /api/ai` handler into `worker/ai.js`:
+Extract shared model identification, prompt builder, safe error detail formatter, shared Workers AI invocation (`invokeWorkersAi`), and synchronous `POST /api/ai` handler into `worker/ai.js`:
 
 ```javascript
 // worker/ai.js
@@ -167,12 +169,34 @@ Response style:
 Inferred intent: ${intentType} - ${intentSummary}`;
 }
 
+export async function invokeWorkersAi(env, { prompt, intent }) {
+  if (!env.AI || typeof env.AI.run !== 'function') {
+    throw new Error('WORKERS_AI_NOT_CONFIGURED');
+  }
+
+  const systemPrompt = buildSystemPrompt(intent);
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: prompt }
+  ];
+
+  const response = await env.AI.run(WORKERS_AI_MODEL, { messages });
+  const content = response?.choices?.[0]?.message?.content;
+  const normalizedContent = typeof content === 'string' ? content.trim() : '';
+
+  if (!normalizedContent) {
+    throw new Error('EMPTY_MODEL_RESPONSE');
+  }
+
+  return {
+    content: normalizedContent,
+    model: WORKERS_AI_MODEL
+  };
+}
+
 export async function handleAi(request, env) {
   if (request.method !== 'POST') {
     return jsonResponse(405, { error: 'Method not allowed.' });
-  }
-  if (!env.AI || typeof env.AI.run !== 'function') {
-    return jsonResponse(503, { error: 'Workers AI is not configured.' });
   }
 
   let body;
@@ -198,24 +222,15 @@ export async function handleAi(request, env) {
     : null;
 
   try {
-    const result = await env.AI.run(WORKERS_AI_MODEL, {
-      messages: [
-        { role: 'system', content: buildSystemPrompt(intent) },
-        { role: 'user', content: prompt }
-      ]
-    });
-
-    const content = result?.choices?.[0]?.message?.content;
-    const normalizedContent = typeof content === 'string' ? content.trim() : '';
-    if (!normalizedContent) {
+    const result = await invokeWorkersAi(env, { prompt, intent });
+    return jsonResponse(200, result);
+  } catch (error) {
+    if (error?.message === 'WORKERS_AI_NOT_CONFIGURED') {
+      return jsonResponse(503, { error: 'Workers AI is not configured.' });
+    }
+    if (error?.message === 'EMPTY_MODEL_RESPONSE') {
       return jsonResponse(502, { error: 'Workers AI returned an empty response.' });
     }
-
-    return jsonResponse(200, {
-      content: normalizedContent,
-      model: WORKERS_AI_MODEL
-    });
-  } catch (error) {
     console.error(JSON.stringify({
       message: 'Workers AI generation failed',
       error: safeErrorDetail(error)
@@ -227,13 +242,13 @@ export async function handleAi(request, env) {
 
 - [ ] **Step 3: Create `worker/app.js` and update `worker/index.js`**
 
-Create `worker/app.js`:
+Create `worker/app.js` with a pure fetch handler (`fetch(request, env)`):
 ```javascript
 // worker/app.js
 import { handleAi, jsonResponse } from './ai.js';
 
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request, env) {
     const url = new URL(request.url);
     const pathname = url.pathname;
 
@@ -244,10 +259,6 @@ export default {
       return jsonResponse(404, { error: 'API route not found.' });
     }
     return env.ASSETS.fetch(request);
-  },
-
-  async scheduled(event, env, ctx) {
-    // Scheduled cron task placeholder for physical purge & repair
   }
 };
 ```
@@ -282,7 +293,7 @@ git commit -m "refactor(worker): separate shared AI logic and pure router entryp
 
 ### Task 2: Crypto, Canonical JSON & Byte-Safe Truncation Utilities
 
-**Goal:** Create `worker/jobUtils.js` containing cryptographically secure helpers, recursive canonical JSON serialization, timing-safe authentication byte comparison, UUID validation, and multibyte UTF-8 truncation strictly capped at 500,000 bytes.
+**Goal:** Create `worker/jobUtils.js` containing cryptographically secure helpers using Web Crypto API exclusively, UUID v4 generation and strict validation, capability token generation (`job_sec_` + 64 lowercase hex) and strict validation, SHA-256 binary/hex computation, strict manual 32-byte XOR constant-time byte equality comparison (no nonexistent `crypto.subtle.timingSafeEqual`), recursive canonical JSON serialization, and code-point-safe multibyte UTF-8 truncation strictly capped at 500,000 bytes without replacement characters `\uFFFD`. Strictly prohibit `Math.random`.
 
 **Files:**
 - Create: `tests/ai-job-utils-contract.mjs`
@@ -291,15 +302,17 @@ git commit -m "refactor(worker): separate shared AI logic and pure router entryp
 **Interfaces:**
 - `worker/jobUtils.js`:
   ```javascript
-  export function canonicalJson(obj) { /* sorted keys JSON string */ }
-  export async function sha256Hex(str) { /* hex string */ }
-  export async function sha256Bytes(str) { /* Uint8Array */ }
-  export async function computeRequestFingerprint(conversationId, prompt, intent) { /* SHA-256 hex */ }
-  export function timingSafeEqualBytes(a, b) { /* crypto.subtle.timingSafeEqual or byte fallback */ }
-  export function isValidUuid(uuid) { /* boolean */ }
-  export function isValidToken(token) { /* boolean */ }
-  export function getUtf8ByteLength(str) { /* number */ }
-  export function truncateToUtf8ByteLimit(str, maxBytes = 500000) { /* string <= maxBytes UTF-8 */ }
+  export function generateJobId();
+  export function generateCapabilityToken();
+  export function isValidUuid(str);
+  export function isValidToken(str);
+  export function canonicalJson(obj);
+  export async function sha256Bytes(str);
+  export async function sha256Hex(str);
+  export async function computeRequestFingerprint(conversationId, prompt, intent);
+  export function timingSafeEqualBytes(a, b);
+  export function getUtf8ByteLength(str);
+  export function truncateToUtf8ByteLimit(str, maxBytes = 500000);
   ```
 
 - [ ] **Step 1: Write failing contract test `tests/ai-job-utils-contract.mjs`**
@@ -308,51 +321,176 @@ git commit -m "refactor(worker): separate shared AI logic and pure router entryp
 // tests/ai-job-utils-contract.mjs
 import assert from 'node:assert/strict';
 import {
+  generateJobId,
+  generateCapabilityToken,
+  isValidUuid,
+  isValidToken,
   canonicalJson,
+  sha256Bytes,
   sha256Hex,
   computeRequestFingerprint,
   timingSafeEqualBytes,
-  isValidUuid,
-  isValidToken,
   getUtf8ByteLength,
   truncateToUtf8ByteLimit
 } from '../worker/jobUtils.js';
 
 async function run() {
-  // Test 1: Canonical JSON key sorting
+  // Test 1: ID generation & UUID v4 validation with input type rejection
+  const jobId = generateJobId();
+  assert.equal(isValidUuid(jobId), true, `Generated jobId ${jobId} must be valid UUID v4`);
+  assert.equal(isValidUuid('550e8400-e29b-41d4-a716-446655440000'), true);
+  assert.equal(isValidUuid('550e8400-e29b-11d4-a716-446655440000'), false, 'v1 UUID must be rejected');
+  assert.equal(isValidUuid('not-a-uuid'), false);
+  assert.equal(isValidUuid(''), false);
+  assert.equal(isValidUuid('550e8400-e29b-41d4-a716-44665544000'), false, 'Short UUID rejected');
+  assert.equal(isValidUuid('550e8400-e29b-41d4-a716-4466554400000'), false, 'Long UUID rejected');
+  assert.equal(isValidUuid(12345), false);
+  assert.equal(isValidUuid(null), false);
+  assert.equal(isValidUuid(undefined), false);
+  assert.equal(isValidUuid({}), false);
+  assert.equal(isValidUuid([]), false);
+  assert.equal(isValidUuid(true), false);
+  assert.equal(isValidUuid(Symbol('uuid')), false);
+
+  // Test 2: Token generation entropy shape & validation with input type rejection
+  const generatedTokens = new Set();
+  for (let i = 0; i < 100; i++) {
+    const t = generateCapabilityToken();
+    assert.equal(isValidToken(t), true);
+    assert.equal(t.length, 72);
+    assert.ok(t.startsWith('job_sec_'));
+    generatedTokens.add(t);
+  }
+  assert.equal(generatedTokens.size, 100, '100 generated tokens must all be unique');
+
+  const validTokenSample = 'job_sec_1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef';
+  assert.equal(isValidToken(validTokenSample), true);
+  assert.equal(isValidToken('job_sec_1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF'), false, 'Uppercase hex rejected');
+  assert.equal(isValidToken('job_sec_1234567890gabcdef1234567890abcdef1234567890abcdef1234567890abcde'), false, 'Non-hex char rejected');
+  assert.equal(isValidToken('job_sec_12345'), false, 'Short token rejected');
+  assert.equal(isValidToken('wrong_prefix_1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'), false, 'Wrong prefix rejected');
+  assert.equal(isValidToken(null), false);
+  assert.equal(isValidToken(undefined), false);
+  assert.equal(isValidToken(12345), false);
+  assert.equal(isValidToken({}), false);
+  assert.equal(isValidToken([]), false);
+  assert.equal(isValidToken(true), false);
+
+  // Test 3: Canonical JSON key sorting, nested structures, unsupported values & circular rejection
   const obj1 = { z: 1, a: { c: 3, b: 2 } };
   const obj2 = { a: { b: 2, c: 3 }, z: 1 };
   assert.equal(canonicalJson(obj1), '{"a":{"b":2,"c":3},"z":1}');
   assert.equal(canonicalJson(obj1), canonicalJson(obj2));
 
-  // Test 2: SHA256 hex computation
+  const nestedArrObj = { b: [3, 2, { y: 1, x: 2 }], a: 1 };
+  assert.equal(canonicalJson(nestedArrObj), '{"a":1,"b":[3,2,{"x":2,"y":1}]}');
+
+  const unsupportedValObj = { a: 1, b: undefined, c: () => {}, d: Symbol('s'), e: null, f: true };
+  assert.equal(canonicalJson(unsupportedValObj), '{"a":1,"e":null,"f":true}');
+
+  const unsupportedArrayItems = { arr: [1, undefined, () => {}, Symbol('s'), null] };
+  assert.equal(canonicalJson(unsupportedArrayItems), '{"arr":[1,null,null,null,null]}');
+
+  assert.equal(canonicalJson(null), 'null');
+  assert.equal(canonicalJson(123), '123');
+  assert.equal(canonicalJson('hello'), '"hello"');
+  assert.equal(canonicalJson(true), 'true');
+
+  const circularObj = { a: 1 };
+  circularObj.self = circularObj;
+  assert.throws(() => canonicalJson(circularObj), TypeError, 'Circular reference must throw TypeError');
+
+  // Test 4: SHA256 bytes binary shape & hex computation
+  const bytes = await sha256Bytes('hello world');
+  assert.ok(bytes instanceof Uint8Array);
+  assert.equal(bytes.length, 32);
+
   const hash = await sha256Hex('hello world');
   assert.equal(hash, 'b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9');
 
-  // Test 3: Request fingerprint equality
+  // Test 5: Request fingerprint field separation, determinism & safety
   const fp1 = await computeRequestFingerprint('conv_1', 'Hello prompt', { mode: 'code' });
   const fp2 = await computeRequestFingerprint('conv_1', 'Hello prompt', { mode: 'code' });
+  const fp3 = await computeRequestFingerprint('conv_1', 'Hello prompt', { mode: 'other' });
+  const fp4 = await computeRequestFingerprint('conv_1H', 'ello prompt', { mode: 'code' });
+  const fpKeyOrder = await computeRequestFingerprint('conv_1', 'Hello prompt', { b: 2, a: 1 });
+  const fpKeyOrder2 = await computeRequestFingerprint('conv_1', 'Hello prompt', { a: 1, b: 2 });
+
   assert.equal(fp1, fp2);
+  assert.equal(fpKeyOrder, fpKeyOrder2, 'Fingerprint must be deterministic regardless of intent object key order');
+  assert.notEqual(fp1, fp3, 'Fingerprint must differ when intent changes');
+  assert.notEqual(fp1, fp4, 'Fingerprint must separate field boundaries cleanly');
 
-  // Test 4: Timing-safe byte equality
-  const bytes1 = new Uint8Array([1, 2, 3, 4]);
-  const bytes2 = new Uint8Array([1, 2, 3, 4]);
-  const bytes3 = new Uint8Array([1, 2, 3, 5]);
-  assert.equal(timingSafeEqualBytes(bytes1, bytes2), true);
-  assert.equal(timingSafeEqualBytes(bytes1, bytes3), false);
+  const fpNullArgs = await computeRequestFingerprint(null, undefined, null);
+  assert.equal(typeof fpNullArgs, 'string');
+  assert.equal(fpNullArgs.length, 64);
 
-  // Test 5: UUID and Token validation
-  assert.equal(isValidUuid('550e8400-e29b-41d4-a716-446655440000'), true);
-  assert.equal(isValidUuid('invalid-uuid'), false);
-  assert.equal(isValidToken('job_sec_1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'), true);
-  assert.equal(isValidToken('short'), false);
+  // Test 6: 32-byte XOR compare type, length & byte difference rejection
+  const hashA = await sha256Bytes('token_a');
+  const hashA2 = await sha256Bytes('token_a');
+  const hashB = await sha256Bytes('token_b');
 
-  // Test 6: Multibyte UTF-8 truncation boundary test
+  assert.equal(timingSafeEqualBytes(hashA, hashA2), true);
+  assert.equal(timingSafeEqualBytes(hashA, hashB), false);
+
+  const hashAOneDiff = new Uint8Array(hashA);
+  hashAOneDiff[31] ^= 1;
+  assert.equal(timingSafeEqualBytes(hashA, hashAOneDiff), false, 'Single bit difference must fail');
+
+  assert.equal(timingSafeEqualBytes(new Uint8Array([1, 2]), new Uint8Array([1, 2])), false, 'Reject length !== 32');
+  assert.equal(timingSafeEqualBytes(new Uint8Array(31), new Uint8Array(31)), false, 'Reject length 31');
+  assert.equal(timingSafeEqualBytes(new Uint8Array(33), new Uint8Array(33)), false, 'Reject length 33');
+  assert.equal(timingSafeEqualBytes([1, 2, 3], [1, 2, 3]), false, 'Reject standard Array');
+  assert.equal(timingSafeEqualBytes('not-bytes', hashA), false);
+  assert.equal(timingSafeEqualBytes(null, hashA), false);
+  assert.equal(timingSafeEqualBytes(undefined, undefined), false);
+  assert.equal(timingSafeEqualBytes(12345, hashA), false);
+  assert.equal(timingSafeEqualBytes({}, hashA), false);
+
+  // Test 7: Multibyte UTF-8 byte truncation safety, boundary behavior, and emoji integrity
   const emojiStr = '🚀'.repeat(200000); // 800,000 bytes (4 bytes per emoji)
   const truncated = truncateToUtf8ByteLimit(emojiStr, 500000);
   const truncatedBytes = getUtf8ByteLength(truncated);
   assert.ok(truncatedBytes <= 500000, `Truncated byte length ${truncatedBytes} exceeds 500000`);
   assert.ok(truncated.endsWith('\n\n[Output truncated at 500KB bound]'));
+  assert.equal(truncated.includes('\uFFFD'), false, 'Must not contain U+FFFD replacement characters');
+
+  // Negative, zero, and invalid maxBytes validation
+  assert.equal(truncateToUtf8ByteLimit('hello', -10), '');
+  assert.equal(truncateToUtf8ByteLimit('hello', 0), '');
+  assert.equal(truncateToUtf8ByteLimit('hello', NaN), '');
+  assert.equal(truncateToUtf8ByteLimit('hello', '500'), '');
+  assert.equal(truncateToUtf8ByteLimit(null, 500), '');
+  assert.equal(truncateToUtf8ByteLimit(undefined, 500), '');
+  assert.equal(truncateToUtf8ByteLimit(12345, 500), '');
+
+  // Small byte limit without marker fitting
+  assert.equal(truncateToUtf8ByteLimit('hello world', 5), 'hello');
+
+  // Code point integrity: 4-byte emoji cut at 3-byte boundary must drop emoji without replacement character
+  const singleEmoji = '🚀'; // 4 bytes
+  assert.equal(truncateToUtf8ByteLimit(singleEmoji, 3), '', 'Must drop emoji when limit is 3 bytes (cannot fit 4 bytes)');
+  assert.equal(truncateToUtf8ByteLimit(singleEmoji, 4), '🚀');
+
+  // 3-byte CJK character code point integrity
+  const cjkStr = 'こんにちは'; // 5 chars * 3 bytes = 15 bytes
+  assert.equal(truncateToUtf8ByteLimit(cjkStr, 7), 'こん', 'Must fit two 3-byte CJK chars (6 bytes) and drop 3rd');
+
+  // Exact boundary behavior & emoji integrity with marker
+  const marker = '\n\n[Output truncated at 500KB bound]';
+  const markerLen = getUtf8ByteLength(marker);
+  const twoEmojis = '🚀🚀'; // 8 bytes
+  const exactMax = markerLen + 8;
+  const fitTwo = truncateToUtf8ByteLimit(twoEmojis.repeat(10), exactMax);
+  assert.equal(fitTwo, '🚀🚀' + marker);
+  assert.equal(fitTwo.includes('\uFFFD'), false);
+  assert.equal(getUtf8ByteLength(fitTwo), exactMax);
+
+  const tightMax = markerLen + 7; // 1 byte short of 2 emojis
+  const fitOne = truncateToUtf8ByteLimit(twoEmojis.repeat(10), tightMax);
+  assert.equal(fitOne, '🚀' + marker);
+  assert.equal(fitOne.includes('\uFFFD'), false);
+  assert.ok(getUtf8ByteLength(fitOne) <= tightMax);
 
   console.log('AI job utilities contract passed.');
 }
@@ -370,21 +508,55 @@ node tests/ai-job-utils-contract.mjs
 
 ```javascript
 // worker/jobUtils.js
-export function canonicalJson(obj) {
+export function generateJobId() {
+  return crypto.randomUUID();
+}
+
+export function generateCapabilityToken() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  return `job_sec_${hex}`;
+}
+
+export function isValidUuid(str) {
+  if (typeof str !== 'string') return false;
+  const uuidv4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidv4Regex.test(str);
+}
+
+export function isValidToken(str) {
+  if (typeof str !== 'string') return false;
+  return /^job_sec_[0-9a-f]{64}$/.test(str);
+}
+
+export function canonicalJson(obj, seen = new WeakSet()) {
   if (obj === null || typeof obj !== 'object') {
     return JSON.stringify(obj);
   }
-  if (Array.isArray(obj)) {
-    return '[' + obj.map(canonicalJson).join(',') + ']';
+  if (seen.has(obj)) {
+    throw new TypeError('Converting circular structure to JSON');
   }
+  seen.add(obj);
+
+  if (Array.isArray(obj)) {
+    return '[' + obj.map(item => item === undefined || typeof item === 'function' || typeof item === 'symbol' ? 'null' : canonicalJson(item, seen)).join(',') + ']';
+  }
+
   const sortedKeys = Object.keys(obj).sort();
-  const pairs = sortedKeys.map(key => JSON.stringify(key) + ':' + canonicalJson(obj[key]));
-  return '{' + pairs.join(',') + '}';
+  const parts = [];
+  for (const key of sortedKeys) {
+    const val = obj[key];
+    if (val !== undefined && typeof val !== 'function' && typeof val !== 'symbol') {
+      parts.push(JSON.stringify(key) + ':' + canonicalJson(val, seen));
+    }
+  }
+  return '{' + parts.join(',') + '}';
 }
 
 export async function sha256Bytes(str) {
   const encoder = new TextEncoder();
-  const data = encoder.encode(str);
+  const data = encoder.encode(typeof str === 'string' ? str : String(str ?? ''));
   const digestBuffer = await crypto.subtle.digest('SHA-256', data);
   return new Uint8Array(digestBuffer);
 }
@@ -405,30 +577,12 @@ export async function computeRequestFingerprint(conversationId, prompt, intent) 
 
 export function timingSafeEqualBytes(a, b) {
   if (!(a instanceof Uint8Array) || !(b instanceof Uint8Array)) return false;
-  if (a.length !== b.length) return false;
-  if (typeof crypto !== 'undefined' && crypto.subtle && typeof crypto.subtle.timingSafeEqual === 'function') {
-    try {
-      return crypto.subtle.timingSafeEqual(a, b);
-    } catch {
-      // Fallback if platform throws on specific buffer types
-    }
-  }
+  if (a.length !== 32 || b.length !== 32) return false;
   let result = 0;
-  for (let i = 0; i < a.length; i++) {
+  for (let i = 0; i < 32; i++) {
     result |= a[i] ^ b[i];
   }
   return result === 0;
-}
-
-export function isValidUuid(str) {
-  if (typeof str !== 'string') return false;
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(str);
-}
-
-export function isValidToken(str) {
-  if (typeof str !== 'string') return false;
-  return str.startsWith('job_sec_') && str.length >= 32 && str.length <= 128;
 }
 
 export function getUtf8ByteLength(str) {
@@ -436,27 +590,37 @@ export function getUtf8ByteLength(str) {
 }
 
 export function truncateToUtf8ByteLimit(str, maxBytes = 500000) {
+  if (typeof str !== 'string' || typeof maxBytes !== 'number' || isNaN(maxBytes) || maxBytes <= 0) return '';
   const encoder = new TextEncoder();
-  const fullEncoded = encoder.encode(str);
-  if (fullEncoded.byteLength <= maxBytes) return str;
+  const fullBytes = encoder.encode(str);
+  if (fullBytes.byteLength <= maxBytes) return str;
 
   const marker = '\n\n[Output truncated at 500KB bound]';
   const markerBytes = encoder.encode(marker).byteLength;
-  const maxContentBytes = maxBytes - markerBytes;
 
-  let cutoff = maxContentBytes;
-  const decoder = new TextDecoder('utf-8', { fatal: false });
-
-  while (cutoff > 0) {
-    const sliceBytes = fullEncoded.subarray(0, cutoff);
-    const decodedSlice = decoder.decode(sliceBytes);
-    if (encoder.encode(decodedSlice).byteLength <= maxContentBytes) {
-      return decodedSlice + marker;
+  if (maxBytes < markerBytes) {
+    let currentBytes = 0;
+    let res = '';
+    for (const char of str) {
+      const charBytes = encoder.encode(char).byteLength;
+      if (currentBytes + charBytes > maxBytes) break;
+      currentBytes += charBytes;
+      res += char;
     }
-    cutoff--;
+    return res;
   }
 
-  return marker;
+  const maxContentBytes = maxBytes - markerBytes;
+  let currentBytes = 0;
+  let content = '';
+  for (const char of str) {
+    const charBytes = encoder.encode(char).byteLength;
+    if (currentBytes + charBytes > maxContentBytes) break;
+    currentBytes += charBytes;
+    content += char;
+  }
+
+  return content + marker;
 }
 ```
 
@@ -470,15 +634,16 @@ node tests/ai-job-utils-contract.mjs
 
 - [ ] **Step 4: Review Gate & Bounded Commit**
 
-> **Codex Review Gate:** Codex inspects `worker/jobUtils.js` and `tests/ai-job-utils-contract.mjs` for correctness, timing-safety, and multibyte boundary handling.
+> **Codex Review Gate:** Codex inspects `worker/jobUtils.js` and `tests/ai-job-utils-contract.mjs` for correctness, timing-safety, Web Crypto exclusive usage, and multibyte boundary handling.
 
 Commit changes:
 ```bash
 git add worker/jobUtils.js tests/ai-job-utils-contract.mjs
-git commit -m "feat(worker): add crypto, canonical JSON, timingSafeEqual, and byte truncation utilities"
+git commit -m "feat(worker): add Web Crypto utilities, canonical JSON, timingSafeEqualBytes, and byte truncation"
 ```
 
 ---
+
 
 ### Task 3: Cloudflare Resource Provisioning, D1 Migration & CI Deployment Workflow
 

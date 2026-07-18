@@ -68,7 +68,7 @@ Job creation is accessed at `POST /api/ai/jobs` and status polling at `GET /api/
 
 ## 3. Cloudflare Bindings & Configuration
 
-The configuration below details the bindings for the Worker named `ai` in `wrangler.jsonc`. Standard placeholder binding names are specified without fake IDs.
+The configuration below details the bindings for the Worker named `ai` in `wrangler.jsonc`. Standard placeholder binding names are specified without fake IDs. The `database_id` property is intentionally omitted in the design fragment below. During later authorized execution, Codex must run `npx wrangler d1 create cloud-service`, capture the exact returned UUID, insert that exact UUID into `wrangler.jsonc` before any implementation commit, and obtain Codex review.
 
 ```jsonc
 // wrangler.jsonc
@@ -81,8 +81,7 @@ The configuration below details the bindings for the Worker named `ai` in `wrang
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "cloud-service",
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID"
+      "database_name": "cloud-service"
     }
   ],
 
