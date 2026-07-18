@@ -6,6 +6,9 @@ export const MODEL = {
   description: 'Minimalist AI assistant for concise conversation, reasoning, and live app creation.'
 };
 
+export const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
+export const DEFAULT_OPENROUTER_MODEL = 'open-orca/mistral-7b-openorca';
+
 export const PUBLIC_USER_INTENT_PROMPT = `
 Corez serves public users who may describe goals casually, incompletely, or
 without technical vocabulary. Understand public user intent and infer the goal behind the words, not by matching only exact keywords. Identify whether
@@ -21,6 +24,25 @@ const INTENT_PATTERNS = {
   writing: /\b(write|rewrite|copy|caption|email|post|bio|headline|script|summarize|summary|proposal|description|landing copy)\b/i,
   explanation: /\b(explain|what is|what are|how does|why does|teach me|break down|understand|compare)\b/i
 };
+
+function readBrowserSetting(key) {
+  try {
+    if (typeof localStorage === 'undefined') return '';
+    return localStorage.getItem(key)?.trim() || '';
+  } catch {
+    return '';
+  }
+}
+
+export function getOpenRouterConfig() {
+  const apiKey = readBrowserSetting('corez_openrouter_api_key') || import.meta.env?.VITE_OPENROUTER_API_KEY || '';
+  const model = readBrowserSetting('corez_openrouter_model') || import.meta.env?.VITE_OPENROUTER_MODEL || DEFAULT_OPENROUTER_MODEL;
+
+  return {
+    apiKey: apiKey.trim(),
+    model: model.trim() || DEFAULT_OPENROUTER_MODEL
+  };
+}
 
 export function analyzePublicUserIntent(prompt) {
   const cleanPrompt = prompt.trim();
@@ -65,6 +87,49 @@ export function analyzePublicUserIntent(prompt) {
   };
 }
 
+function buildCorezSystemPrompt(intent) {
+  return `${PUBLIC_USER_INTENT_PROMPT}
+
+You are Corez AI inside the Corez public web app. Be concise, useful, and direct.
+Infer the public user's goal, then answer in a way that helps them move forward.
+When the user asks to build a site, app, dashboard, game, widget, or tool, return one runnable HTML document inside a fenced html code block.
+Keep generated apps minimalist, monochrome, responsive, and self-contained.
+Current inferred intent: ${intent.type} - ${intent.summary}`;
+}
+
+export async function generateOpenRouterResponse(prompt, intent = analyzePublicUserIntent(prompt)) {
+  const { apiKey, model } = getOpenRouterConfig();
+
+  if (!apiKey) {
+    return null;
+  }
+
+  const response = await fetch(OPENROUTER_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'X-Title': 'Corez'
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: buildCorezSystemPrompt(intent) },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.7,
+      max_tokens: intent.type === 'app' ? 2200 : 900
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`OpenRouter request failed with status ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data?.choices?.[0]?.message?.content?.trim() || null;
+}
+
 // Extract executable code block (HTML/CSS/JS) from AI message if present
 export function extractCodeFromMessage(text) {
   if (!text) return null;
@@ -86,7 +151,7 @@ export function extractCodeFromMessage(text) {
 }
 
 // Generate concise, natural AI responses for any public user
-export async function generateAIResponse(prompt) {
+export async function generateLocalAIResponse(prompt) {
   const cleanPrompt = prompt.trim();
   const lower = cleanPrompt.toLowerCase();
   const intent = analyzePublicUserIntent(cleanPrompt);
@@ -206,4 +271,20 @@ export async function generateAIResponse(prompt) {
   }
 
   return `I understand the goal: ${intent.summary}\n\nFor **"${cleanPrompt}"**, I’ll focus on what the public user is trying to accomplish, then give the simplest useful next step. Add a little more context and I can make it specific.`;
+}
+
+export async function generateAIResponse(prompt) {
+  const cleanPrompt = prompt.trim();
+  const intent = analyzePublicUserIntent(cleanPrompt);
+
+  try {
+    const openRouterResponse = await generateOpenRouterResponse(cleanPrompt, intent);
+    if (openRouterResponse) {
+      return openRouterResponse;
+    }
+  } catch (openRouterError) {
+    console.warn('OpenRouter unavailable; using local Corez fallback.', openRouterError);
+  }
+
+  return generateLocalAIResponse(cleanPrompt);
 }
