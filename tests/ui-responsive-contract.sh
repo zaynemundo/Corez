@@ -47,6 +47,103 @@ check_block_property() {
   fi
 }
 
+check_block_absent() {
+  local description="$1"
+  local selector="$2"
+  local property="$3"
+  local value="$4"
+  local file="${5:-$css}"
+
+  if [ ! -r "$file" ]; then
+    printf 'FAIL: %s\n' "$description" >&2
+    failures=$((failures + 1))
+    return
+  fi
+
+  if awk -v selector="$selector" -v property="$property" -v value="$value" '
+    BEGIN {
+      found = 0; in_block = 0; depth = 0; block = ""; had_braces = 0
+      pattern = property "[[:space:]]*:([^;]*[,[:space:]])?" value "([,[:space:];]|$)"
+    }
+    !in_block {
+      line = $0
+      sub(/^[ \t]+/, "", line)
+      sub(/[ \t]+$/, "", line)
+      sub(/\{.*$/, "", line)
+      sub(/[ \t]+$/, "", line)
+      if (line == selector) {
+        in_block = 1
+        depth = 0
+        had_braces = 0
+        block = ""
+      }
+    }
+    in_block {
+      block = block "\n" $0
+      c_open = $0; n_open = gsub(/\{/, "{", c_open)
+      c_close = $0; n_close = gsub(/\}/, "}", c_close)
+      depth += n_open - n_close
+      if (n_open > 0) {
+        had_braces = 1
+      }
+      if ((depth <= 0 && had_braces) || (depth <= 0 && n_close > 0)) {
+        if (block ~ pattern) {
+          found = 1
+        }
+        in_block = 0
+        depth = 0
+        had_braces = 0
+        block = ""
+      }
+    }
+    END { exit found ? 0 : 1 }
+  ' "$file" 2>/dev/null; then
+    printf 'FAIL: %s\n' "$description" >&2
+    failures=$((failures + 1))
+  fi
+}
+
+check_top_level_media() {
+  local description="$1"
+  local pattern="$2"
+  local file="${3:-$css}"
+
+  if [ ! -r "$file" ]; then
+    printf 'FAIL: %s\n' "$description" >&2
+    failures=$((failures + 1))
+  else
+    local res count target_depth neg final_depth
+    res=$(PAT="$pattern" awk '
+      BEGIN { count = 0; target_depth = -1; depth = 0; neg = 0 }
+      {
+        if (match($0, ENVIRON["PAT"])) {
+          count++
+          if (target_depth == -1) target_depth = depth
+        }
+        len = length($0)
+        for (i = 1; i <= len; i++) {
+          c = substr($0, i, 1)
+          if (c == "{") depth++
+          else if (c == "}") depth--
+          if (depth < 0) neg = 1
+        }
+      }
+      END {
+        print count, target_depth, neg, depth
+      }
+    ' "$file")
+
+    read -r count target_depth neg final_depth <<< "$res"
+
+    if [ "$count" -eq 1 ] && [ "$target_depth" -eq 0 ] && [ "$neg" -eq 0 ] && [ "$final_depth" -eq 0 ]; then
+      :
+    else
+      printf 'FAIL: %s\n' "$description" >&2
+      failures=$((failures + 1))
+    fi
+  fi
+}
+
 check 'dynamic viewport height is used for mobile browser chrome' '100dvh'
 check 'keyboard focus has a visible monochrome ring' ':focus-visible'
 check_absent 'global outline removal is not forced with important' 'outline: none !important'
@@ -68,6 +165,40 @@ check 'escape key closes the mobile sidebar' 'Escape' "$app"
 check 'collapsed sidebar is hidden from focus flow' 'visibility: hidden'
 check_absent 'viewport resize does not force desktop sidebar open' 'setSidebarOpen\\(!event\\.matches\\)'
 check 'sidebar component can render collapsed state' 'isOpen.*collapsed|collapsed.*isOpen' "$sidebar"
+
+# Polished Glass Sidebar Contract Checks
+check 'sidebar section heading uses reusable class' 'className="sidebar-section-heading"' "$sidebar"
+check_absent 'sidebar section headers do not use inline letterSpacing styles' 'style=\{\{.*letterSpacing' "$sidebar"
+check 'sidebar width token set to 264px' '--sidebar-width: 264px;'
+check 'sidebar margin token set to 12px' '--sidebar-margin: 12px;'
+check 'sidebar radius token set to 16px' '--sidebar-radius: 16px;'
+check 'sidebar heading size token set to 11px' '--sidebar-heading-size: 11px;'
+check 'sidebar body size token set to 13px' '--sidebar-body-size: 13px;'
+check 'sidebar hit target min height set to 38px' '--sidebar-item-min-height: 38px;'
+check_block_property 'sidebar block consumes margin token' '.sidebar' 'margin' 'var(--sidebar-margin)'
+check_block_property 'sidebar block consumes radius token' '.sidebar' 'border-radius' 'var(--sidebar-radius)'
+check_block_property 'sidebar block consumes background glass token' '.sidebar' 'background-color' 'var(--sidebar-bg)'
+check 'sidebar block consumes backdrop filter blur' 'backdrop-filter: blur\(16px\)'
+check_block_property 'light theme overrides sidebar glass background' '[data-theme="light"]' '--sidebar-bg' 'rgba(255, 255, 255'
+check 'sidebar has opaque background fallback using sidebar-bg-opaque' '@supports not \(\(backdrop-filter: blur\(1px\)\)'
+check_block_property 'sidebar fallback block consumes opaque background token' 'aside.sidebar' 'background-color' 'var(--sidebar-bg-opaque)'
+check_block_property 'section heading class sets 11px font size' '.sidebar-section-heading' 'font-size' 'var(--sidebar-heading-size)'
+check_block_property 'active history item applies crisp inset border shadow' '.history-item.active' 'box-shadow' 'inset 0 0 0 1px'
+check_block_property 'delete chat button enforces 38px minimum width' '.delete-chat-btn' 'min-width' '38px'
+check_block_property 'delete chat button enforces 38px minimum height' '.delete-chat-btn' 'min-height' '38px'
+check_block_property 'sidebar header collapse button enforces 38px minimum width' '.sidebar .icon-btn' 'min-width' '38px'
+check_block_property 'sidebar header collapse button enforces 38px minimum height' '.sidebar .icon-btn' 'min-height' '38px'
+check_absent 'no desktop 260px sidebar width override' '--sidebar-width[[:space:]]*:[[:space:]]*260px;?'
+check_absent 'no laptop 230px sidebar width override' '--sidebar-width[[:space:]]*:[[:space:]]*230px;?'
+check_absent 'no small laptop 210px sidebar width override' '--sidebar-width[[:space:]]*:[[:space:]]*210px;?'
+check_block_absent 'sidebar container block does not use transition all' '.sidebar' 'transition' 'all'
+check_block_absent 'new chat button block does not use transition all' '.new-chat-btn' 'transition' 'all'
+check_block_absent 'history item block does not use transition all' '.history-item' 'transition' 'all'
+check_block_absent 'delete chat button block does not use transition all' '.delete-chat-btn' 'transition' 'all'
+check_block_absent 'footer action button block does not use transition all' '.footer-action-btn' 'transition' 'all'
+check 'reduced motion query disables sidebar animation' '@media \(prefers-reduced-motion: reduce\)'
+check_top_level_media 'sidebar prefers-reduced-motion at top level' '@media \(prefers-reduced-motion: reduce\)' "$css"
+check 'mobile sidebar uses safe-area insets' 'env\(safe-area-inset-'
 
 if (( failures > 0 )); then
   printf '%d responsive UI contract check(s) failed.\n' "$failures" >&2

@@ -48,7 +48,7 @@ export default function Sidebar({
       </button>
 
       <div className="chat-history-list">
-        <div style={{ padding: '0.4rem 0.5rem', fontSize: '0.675rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+        <div className="sidebar-section-heading">
           Recent Conversations
         </div>
         {sessions.map((session) => (
@@ -72,7 +72,7 @@ export default function Sidebar({
           </div>
         ))}
 
-        <div style={{ margin: '1.25rem 0 0.4rem 0.5rem', fontSize: '0.675rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+        <div className="sidebar-section-heading">
           Executable App Samples
         </div>
         {SAMPLE_APPS.map((app) => (
