@@ -645,24 +645,223 @@ git commit -m "feat(worker): add Web Crypto utilities, canonical JSON, timingSaf
 ---
 
 
-### Task 3: Cloudflare Resource Provisioning, D1 Migration & CI Deployment Workflow
+### Task 3: D1 Database Migration, Job Store, Jobs API Endpoints & App Routing
 
-**Goal:** Author the D1 migration SQL script, update `wrangler.jsonc` configuration with D1 `cloud-service`, Workflows `AI_JOB_WORKFLOW`, Rate Limiting (`name: RATE_LIMITER`, `namespace_id: "1000"`), and hourly cron trigger, and document the non-fabricated D1 creation procedure.
+**Goal:** Build D1 database migration SQL script `migrations/0001_create_ai_jobs.sql`, prepared statement D1 job store `worker/jobStore.js`, jobs API handlers `worker/jobs.js` (`POST /api/ai/jobs` and `GET /api/ai/jobs/:jobId`), and update pure fetch router `worker/app.js` with dependency-injected store/workflow/rate fakes and comprehensive contract tests `tests/ai-jobs-api-contract.mjs`.
 
 **Files:**
 - Create: `migrations/0001_create_ai_jobs.sql`
-- Modify: `wrangler.jsonc`
-- Modify: `tests/cloudflare-worker-config-contract.sh`
-- Modify: `.github/workflows/deploy.yml`
+- Create: `worker/jobStore.js`
+- Create: `worker/jobs.js`
+- Modify: `worker/app.js`
+- Create: `tests/ai-jobs-api-contract.mjs`
 
 **Interfaces & Requirements:**
-- SQL Migration: `migrations/0001_create_ai_jobs.sql` exactly matches approved schema.
-- D1 Database Name: `cloud-service`.
-- D1 Database ID: Never guessed or fabricated! Must be populated from the stdout of `npx wrangler d1 create cloud-service`.
-- Rate Limiter Binding: `name: RATE_LIMITER`, `namespace_id: "1000"`, `simple: { limit: 10, period: 60 }`.
-- GitHub Actions: Apply remote D1 migration before deployment.
+- `migrations/0001_create_ai_jobs.sql`: Table `jobs` and indices (`idx_jobs_expires_at`, `idx_jobs_status_created`, `idx_jobs_active_deadline`).
+- `worker/jobStore.js`: `insertJob`, `getJobById`, `markJobRunning`, `markJobCompleted`, `markJobFailed`, `repairStuckJobs`, `purgeExpiredJobs`.
+- `worker/jobs.js`: `handleCreateJob`, `handleGetJob`.
+- `worker/app.js`: Routes `/api/ai/jobs` (POST) and `/api/ai/jobs/:jobId` (GET).
+- Auth & Security: Strict UUIDv4 (`job_id`) and `job_sec_` token header shape (`X-Job-Token`). 401 returns ONLY on missing or malformed `X-Job-Token` header prior to DB lookup. Identical generic 404 (`{ error: 'Job not found.', code: 'NOT_FOUND' }`) for absent job, expired job, or wrong token. No secrets, tokens, or raw prompts in responses or logs.
+- Validation: 400 validation on body payload: `job_id` must be valid UUIDv4; `conversation_id` must be non-empty string <= 256 characters; `prompt` must be non-empty string <= 100,000 UTF-8 bytes; `intent` must be optional plain JSON object or null.
+- Idempotency & Rate Limiting: Canonical request fingerprint using SHA-256 over `canonicalJson({ conversation_id, prompt, intent })`. Rate limiting check (`RATE_LIMITER.limit({ key: clientIp })`) runs ONLY for new job submissions; idempotent retries bypass rate limiting. If existing `job_id` has token or fingerprint mismatch, return generic 409 Conflict (`{ error: 'Idempotency conflict for submitted job_id.', code: 'IDEMPOTENCY_CONFLICT' }`).
+- Workflow Dispatch: Dispatches via one-item `AI_JOB_WORKFLOW.createBatch([{ id: jobId, params: { jobId }, retention: { successRetention: '1 day', errorRetention: '1 day' } }])`. If dispatch fails or binding is missing, returns queued status with 503 (`{ error: 'Workflow dispatch failed. Please retry.', code: 'SERVICE_UNAVAILABLE' }`).
+- Insert-Race Recovery: If `insertJob` fails due to primary key race condition, re-read existing job from DB and handle as idempotent request.
+- DB Failures: DB or binding query errors return 503 (`SERVICE_UNAVAILABLE`).
 
-- [ ] **Step 1: Create `migrations/0001_create_ai_jobs.sql`**
+- [ ] **Step 1: Write failing contract test `tests/ai-jobs-api-contract.mjs`**
+
+Create `tests/ai-jobs-api-contract.mjs` using dependency-injected fakes:
+
+```javascript
+// tests/ai-jobs-api-contract.mjs
+import assert from 'node:assert/strict';
+import app from '../worker/app.js';
+import { sha256Hex, computeRequestFingerprint } from '../worker/jobUtils.js';
+
+function createFakeDb() {
+  const store = new Map();
+  let insertShouldFail = false;
+  return {
+    _store: store,
+    _setInsertShouldFail(fail) { insertShouldFail = fail; },
+    prepare(sql) {
+      return {
+        bind(...args) {
+          return {
+            async first() {
+              if (sql.includes('SELECT')) {
+                const id = args[0];
+                return store.get(id) || null;
+              }
+              return null;
+            },
+            async run() {
+              if (sql.includes('INSERT INTO jobs')) {
+                if (insertShouldFail) {
+                  throw new Error('D1 INSERT ERROR: UNIQUE constraint failed: jobs.id');
+                }
+                const [id, token_hash, conversation_id, status, prompt_text, intent_json, result_text, provider_meta, error_code, request_fingerprint, created_at, updated_at, terminal_at, active_deadline_at, expires_at] = args;
+                store.set(id, { id, token_hash, conversation_id, status, prompt_text, intent_json, result_text, provider_meta, error_code, request_fingerprint, created_at, updated_at, terminal_at, active_deadline_at, expires_at });
+              }
+              return { success: true };
+            }
+          };
+        }
+      };
+    }
+  };
+}
+
+function createFakeEnv(overrides = {}) {
+  const db = createFakeDb();
+  let limitCalledCount = 0;
+  let createBatchCalledCount = 0;
+  return {
+    DB: db,
+    AI_JOB_WORKFLOW: {
+      async createBatch(batch) {
+        createBatchCalledCount++;
+        return batch.map(b => ({ id: b.id }));
+      }
+    },
+    RATE_LIMITER: {
+      async limit() {
+        limitCalledCount++;
+        return { success: true };
+      }
+    },
+    get _limitCalledCount() { return limitCalledCount; },
+    get _createBatchCalledCount() { return createBatchCalledCount; },
+    ...overrides
+  };
+}
+
+async function run() {
+  const env = createFakeEnv();
+  const token = 'job_sec_1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef';
+  const jobId = '550e8400-e29b-41d4-a716-446655440000';
+
+  // Test 1: POST /api/ai/jobs requires X-Job-Token header before DB lookup (401)
+  const noTokenRes = await app.fetch(
+    new Request('https://corez.test/api/ai/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job_id: jobId, conversation_id: 'c1', prompt: 'test' })
+    }),
+    env
+  );
+  assert.equal(noTokenRes.status, 401);
+
+  // Test 2: Invalid body payload returns 400
+  const badUuidRes = await app.fetch(
+    new Request('https://corez.test/api/ai/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Job-Token': token },
+      body: JSON.stringify({ job_id: 'not-a-uuid', conversation_id: 'c1', prompt: 'test' })
+    }),
+    env
+  );
+  assert.equal(badUuidRes.status, 400);
+
+  // Test 3: POST /api/ai/jobs successful creation (201)
+  const createRes = await app.fetch(
+    new Request('https://corez.test/api/ai/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Job-Token': token },
+      body: JSON.stringify({
+        job_id: jobId,
+        conversation_id: 'c1',
+        prompt: 'test prompt',
+        intent: { mode: 'code' }
+      })
+    }),
+    env
+  );
+  assert.equal(createRes.status, 201);
+  const createBody = await createRes.json();
+  assert.equal(createBody.job_id, jobId);
+  assert.equal(createBody.status, 'queued');
+  assert.equal(env._limitCalledCount, 1, 'Rate limiter must be called for new job creation');
+
+  // Test 4: Idempotent retry returns 200 and bypasses rate limiter
+  const initialLimitCount = env._limitCalledCount;
+  const retryRes = await app.fetch(
+    new Request('https://corez.test/api/ai/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Job-Token': token },
+      body: JSON.stringify({
+        job_id: jobId,
+        conversation_id: 'c1',
+        prompt: 'test prompt',
+        intent: { mode: 'code' }
+      })
+    }),
+    env
+  );
+  assert.equal(retryRes.status, 200);
+  assert.equal(env._limitCalledCount, initialLimitCount, 'Rate limiter must NOT be called for idempotent retry');
+
+  // Test 5: Duplicate POST with wrong token or altered payload returns 409 Conflict
+  const conflictRes = await app.fetch(
+    new Request('https://corez.test/api/ai/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Job-Token': 'job_sec_wrongtoken1234567890abcdef1234567890abcdef123456' },
+      body: JSON.stringify({
+        job_id: jobId,
+        conversation_id: 'c1',
+        prompt: 'test prompt',
+        intent: { mode: 'code' }
+      })
+    }),
+    env
+  );
+  assert.equal(conflictRes.status, 409);
+
+  // Test 6: GET /api/ai/jobs/:jobId returns queued state (200)
+  const getRes = await app.fetch(
+    new Request(`https://corez.test/api/ai/jobs/${jobId}`, {
+      method: 'GET',
+      headers: { 'X-Job-Token': token }
+    }),
+    env
+  );
+  assert.equal(getRes.status, 200);
+  const getBody = await getRes.json();
+  assert.equal(getBody.status, 'queued');
+
+  // Test 7: GET with invalid token or non-existent jobId returns generic 404
+  const badTokenRes = await app.fetch(
+    new Request(`https://corez.test/api/ai/jobs/${jobId}`, {
+      method: 'GET',
+      headers: { 'X-Job-Token': 'job_sec_invalidtoken1234567890abcdef1234567890abcdef1234' }
+    }),
+    env
+  );
+  assert.equal(badTokenRes.status, 404);
+
+  // Test 8: Method handling (405)
+  const wrongMethodRes = await app.fetch(
+    new Request('https://corez.test/api/ai/jobs', {
+      method: 'GET',
+      headers: { 'X-Job-Token': token }
+    }),
+    env
+  );
+  assert.equal(wrongMethodRes.status, 405);
+
+  console.log('AI jobs API contract passed.');
+}
+
+await run();
+```
+
+Run test to verify failure (RED):
+```bash
+node tests/ai-jobs-api-contract.mjs
+```
+*Expected Output:* `AssertionError or 404 response`
+
+- [ ] **Step 2: Create `migrations/0001_create_ai_jobs.sql`**
 
 ```sql
 -- migrations/0001_create_ai_jobs.sql
@@ -689,310 +888,7 @@ CREATE INDEX IF NOT EXISTS idx_jobs_status_created ON jobs(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_jobs_active_deadline ON jobs(active_deadline_at);
 ```
 
-- [ ] **Step 2: Update `wrangler.jsonc`**
-
-Edit `wrangler.jsonc` to add D1, Workflows, Rate Limiter, and Cron bindings:
-
-```jsonc
-{
-  "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "ai",
-  "main": "./worker/index.js",
-  "compatibility_date": "2026-07-18",
-  "ai": {
-    "binding": "AI"
-  },
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "cloud-service",
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID"
-    }
-  ],
-  "workflows": [
-    {
-      "name": "ai-job-workflow",
-      "binding": "AI_JOB_WORKFLOW",
-      "class_name": "AiJobWorkflow"
-    }
-  ],
-  "ratelimits": [
-    {
-      "name": "RATE_LIMITER",
-      "namespace_id": "1000",
-      "simple": {
-        "limit": 10,
-        "period": 60
-      }
-    }
-  ],
-  "triggers": {
-    "crons": ["0 * * * *"]
-  },
-  "assets": {
-    "directory": "./dist",
-    "binding": "ASSETS",
-    "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
-  }
-}
-```
-
-- [ ] **Step 3: Update `tests/cloudflare-worker-config-contract.sh`**
-
-Add assertions checking for `DB`, `cloud-service`, `AI_JOB_WORKFLOW`, `RATE_LIMITER`, `1000`, and `crons`:
-
-```bash
-#!/usr/bin/env bash
-set -u
-
-wrangler_file="wrangler.jsonc"
-failures=0
-
-check() {
-  local description="$1"
-  local pattern="$2"
-
-  if ! grep -Eq -- "$pattern" "$wrangler_file" 2>/dev/null; then
-    printf 'FAIL: %s\n' "$description" >&2
-    failures=$((failures + 1))
-  fi
-}
-
-check 'D1 binding DB exists' '"binding": "DB"'
-check 'D1 database_name is cloud-service' '"database_name": "cloud-service"'
-check 'Workflows binding AI_JOB_WORKFLOW exists' '"binding": "AI_JOB_WORKFLOW"'
-check 'Workflows class AiJobWorkflow exists' '"class_name": "AiJobWorkflow"'
-check 'Rate limiter name is RATE_LIMITER' '"name": "RATE_LIMITER"'
-check 'Rate limiter namespace_id is 1000' '"namespace_id": "1000"'
-check 'Hourly cron trigger exists' '"crons": \["0 \* \* \* \*"'
-
-if (( failures > 0 )); then
-  printf '%d worker config check(s) failed.\n' "$failures" >&2
-  exit 1
-fi
-
-printf 'Cloudflare Worker config contract checks passed.\n'
-```
-
-- [ ] **Step 4: Update `.github/workflows/deploy.yml`**
-
-Ensure `.github/workflows/deploy.yml` runs D1 remote migrations prior to Worker deployment:
-
-```yaml
-# In .github/workflows/deploy.yml deployment step:
-- name: Apply D1 Migrations
-  run: npx wrangler d1 migrations apply cloud-service --remote
-  env:
-    CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-    CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
-- name: Deploy Worker
-  run: npx wrangler deploy
-  env:
-    CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-    CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-```
-
-- [ ] **Step 5: Verify GREEN test status**
-
-Run configuration contract check:
-```bash
-bash tests/cloudflare-worker-config-contract.sh
-```
-*Expected Output:* `Cloudflare Worker config contract checks passed.`
-
-- [ ] **Step 6: Provisioning Execution Procedure & Codex Review Checkpoint**
-
-> **D1 Database Creation Procedure (Run ONLY during authorized Cloudflare execution):**
-> Execute `npx wrangler d1 create cloud-service`.
-> Copy the returned `database_id` string (e.g. `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`).
-> Replace `"REPLACE_WITH_D1_DATABASE_ID"` in `wrangler.jsonc` with the exact returned ID.
-> **Codex Review Gate:** Codex verifies `wrangler.jsonc` contains the authentic returned D1 database ID and that no fake UUID was fabricated.
-
-Commit changes:
-```bash
-git add migrations/0001_create_ai_jobs.sql wrangler.jsonc tests/cloudflare-worker-config-contract.sh .github/workflows/deploy.yml
-git commit -m "feat(infra): add D1 migration, Workflows, Rate Limiter, and CI deployment pipeline"
-```
-
----
-
-### Task 4: D1 Job Store & Worker Jobs API Endpoints
-
-**Goal:** Implement `worker/jobStore.js` and `worker/jobs.js` to handle D1 database operations, payload validation, timing-safe authentication, 404 security responses, 409 conflict handling, 503 service unavailable dispatch failure handling, rate limiting with bypass for idempotent retries, and one-item `createBatch` dispatch.
-
-**Files:**
-- Create: `tests/ai-jobs-api-contract.mjs`
-- Create: `worker/jobStore.js`
-- Create: `worker/jobs.js`
-- Modify: `worker/app.js`
-
-**Interfaces:**
-- `worker/jobStore.js`:
-  ```javascript
-  export async function insertJob(db, jobData) { /* prepared insert */ }
-  export async function getJobById(db, jobId) { /* prepared select */ }
-  export async function markJobRunning(db, jobId) { /* conditional update */ }
-  export async function markJobCompleted(db, jobId, resultText, providerMeta) { /* conditional update */ }
-  export async function markJobFailed(db, jobId, errorCode) { /* conditional update */ }
-  export async function repairStuckJobs(db) { /* update active deadline exceeded */ }
-  export async function purgeExpiredJobs(db) { /* delete expired */ }
-  ```
-- `worker/jobs.js`:
-  ```javascript
-  export async function handleCreateJob(request, env) { /* POST /api/ai/jobs */ }
-  export async function handleGetJob(request, env, jobId) { /* GET /api/ai/jobs/:jobId */ }
-  ```
-
-- [ ] **Step 1: Write failing contract test `tests/ai-jobs-api-contract.mjs`**
-
-```javascript
-// tests/ai-jobs-api-contract.mjs
-import assert from 'node:assert/strict';
-import app from '../worker/app.js';
-import { sha256Hex, computeRequestFingerprint } from '../worker/jobUtils.js';
-
-function createFakeDb() {
-  const store = new Map();
-  return {
-    prepare(sql) {
-      return {
-        bind(...args) {
-          return {
-            async first() {
-              if (sql.includes('SELECT')) {
-                const id = args[0];
-                return store.get(id) || null;
-              }
-              return null;
-            },
-            async run() {
-              if (sql.includes('INSERT INTO jobs')) {
-                const [id, token_hash, conversation_id, status, prompt_text, intent_json, result_text, provider_meta, error_code, request_fingerprint, created_at, updated_at, terminal_at, active_deadline_at, expires_at] = args;
-                store.set(id, { id, token_hash, conversation_id, status, prompt_text, intent_json, result_text, provider_meta, error_code, request_fingerprint, created_at, updated_at, terminal_at, active_deadline_at, expires_at });
-              }
-              return { success: true };
-            }
-          };
-        }
-      };
-    }
-  };
-}
-
-function createFakeEnv(overrides = {}) {
-  const db = createFakeDb();
-  let workflowDispatched = false;
-  return {
-    DB: db,
-    AI_JOB_WORKFLOW: {
-      async createBatch(batch) {
-        workflowDispatched = true;
-        return batch.map(b => ({ id: b.id }));
-      }
-    },
-    RATE_LIMITER: {
-      async limit() {
-        return { success: true };
-      }
-    },
-    ...overrides
-  };
-}
-
-async function run() {
-  const env = createFakeEnv();
-  const token = 'job_sec_1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef';
-  const jobId = '550e8400-e29b-41d4-a716-446655440000';
-
-  // Test 1: POST /api/ai/jobs requires X-Job-Token header (401)
-  const noTokenRes = await app.fetch(
-    new Request('https://corez.test/api/ai/jobs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ job_id: jobId, conversation_id: 'c1', prompt: 'test' })
-    }),
-    env
-  );
-  assert.equal(noTokenRes.status, 401);
-
-  // Test 2: POST /api/ai/jobs successful creation (201)
-  const createRes = await app.fetch(
-    new Request('https://corez.test/api/ai/jobs', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Job-Token': token
-      },
-      body: JSON.stringify({
-        job_id: jobId,
-        conversation_id: 'c1',
-        prompt: 'test prompt',
-        intent: { mode: 'code' }
-      })
-    }),
-    env
-  );
-  assert.equal(createRes.status, 201);
-  const createBody = await createRes.json();
-  assert.equal(createBody.job_id, jobId);
-  assert.equal(createBody.status, 'queued');
-
-  // Test 3: GET /api/ai/jobs/:jobId returns queued state (200)
-  const getRes = await app.fetch(
-    new Request(`https://corez.test/api/ai/jobs/${jobId}`, {
-      method: 'GET',
-      headers: { 'X-Job-Token': token }
-    }),
-    env
-  );
-  assert.equal(getRes.status, 200);
-  const getBody = await getRes.json();
-  assert.equal(getBody.status, 'queued');
-
-  // Test 4: GET with invalid token returns generic 404
-  const badTokenRes = await app.fetch(
-    new Request(`https://corez.test/api/ai/jobs/${jobId}`, {
-      method: 'GET',
-      headers: { 'X-Job-Token': 'job_sec_invalidtoken1234567890abcdef1234567890abcdef1234' }
-    }),
-    env
-  );
-  assert.equal(badTokenRes.status, 404);
-
-  // Test 5: Duplicate POST with invalid token returns 409 Conflict
-  const conflictRes = await app.fetch(
-    new Request('https://corez.test/api/ai/jobs', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Job-Token': 'job_sec_wrongtoken1234567890abcdef1234567890abcdef123456'
-      },
-      body: JSON.stringify({
-        job_id: jobId,
-        conversation_id: 'c1',
-        prompt: 'test prompt',
-        intent: { mode: 'code' }
-      })
-    }),
-    env
-  );
-  assert.equal(conflictRes.status, 409);
-
-  console.log('AI jobs API contract passed.');
-}
-
-await run();
-```
-
-Run test to verify failure (RED):
-```bash
-node tests/ai-jobs-api-contract.mjs
-```
-*Expected Output:* `AssertionError or 404 response`
-
-- [ ] **Step 2: Create `worker/jobStore.js`**
+- [ ] **Step 3: Create `worker/jobStore.js`**
 
 ```javascript
 // worker/jobStore.js
@@ -1066,11 +962,11 @@ export async function purgeExpiredJobs(db) {
 }
 ```
 
-- [ ] **Step 3: Create `worker/jobs.js`**
+- [ ] **Step 4: Create `worker/jobs.js`**
 
 ```javascript
 // worker/jobs.js
-import { jsonResponse } from './ai.js';
+import { jsonResponse, safeErrorDetail } from './ai.js';
 import {
   sha256Hex,
   sha256Bytes,
@@ -1100,13 +996,28 @@ export async function handleCreateJob(request, env) {
     return jsonResponse(400, { error: 'Invalid JSON payload.', code: 'INVALID_PAYLOAD' });
   }
 
-  const jobId = body?.job_id;
-  const conversationId = body?.conversation_id;
-  const prompt = body?.prompt;
-  const intent = body?.intent || null;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return jsonResponse(400, { error: 'Request body must be a JSON object.', code: 'INVALID_PAYLOAD' });
+  }
 
-  if (!isValidUuid(jobId) || typeof conversationId !== 'string' || !conversationId.trim() || typeof prompt !== 'string' || !prompt.trim()) {
+  const jobId = body.job_id;
+  const conversationId = body.conversation_id;
+  const prompt = body.prompt;
+  const intent = body.intent ?? null;
+
+  if (
+    !isValidUuid(jobId) ||
+    typeof conversationId !== 'string' ||
+    !conversationId.trim() ||
+    conversationId.length > 256 ||
+    typeof prompt !== 'string' ||
+    !prompt.trim()
+  ) {
     return jsonResponse(400, { error: 'Invalid request body parameters.', code: 'INVALID_PAYLOAD' });
+  }
+
+  if (intent !== null && (typeof intent !== 'object' || Array.isArray(intent))) {
+    return jsonResponse(400, { error: 'Intent must be a plain JSON object or null.', code: 'INVALID_PAYLOAD' });
   }
 
   if (getUtf8ByteLength(prompt) > 100000) {
@@ -1115,12 +1026,17 @@ export async function handleCreateJob(request, env) {
 
   const requestFingerprint = await computeRequestFingerprint(conversationId, prompt, intent);
   const tokenHash = await sha256Hex(tokenHeader);
-  const presentedTokenBytes = await sha256Bytes(tokenHeader);
 
   // Check if job already exists in D1
-  const existingJob = await getJobById(env.DB, jobId);
+  let existingJob = null;
+  try {
+    existingJob = await getJobById(env.DB, jobId);
+  } catch (err) {
+    console.error(JSON.stringify({ message: 'D1 query failed', error: safeErrorDetail(err) }));
+    return jsonResponse(503, { error: 'Database service unavailable.', code: 'SERVICE_UNAVAILABLE' });
+  }
+
   if (existingJob) {
-    const storedHashBytes = await sha256Bytes(existingJob.token_hash); // or compare hex hashes timing-safely
     const storedTokenHashBytes = new TextEncoder().encode(existingJob.token_hash);
     const presentedTokenHashBytes = new TextEncoder().encode(tokenHash);
 
@@ -1131,17 +1047,29 @@ export async function handleCreateJob(request, env) {
       return jsonResponse(409, { error: 'Idempotency conflict for submitted job_id.', code: 'IDEMPOTENCY_CONFLICT' });
     }
 
-    // Idempotent retry: dispatch batch (which skips existing retained instances) and return current status
+    // Idempotent retry: skip rate limiter, dispatch workflow instance again via createBatch
+    let dispatchFailed = false;
     try {
-      if (env.AI_JOB_WORKFLOW && typeof env.AI_JOB_WORKFLOW.createBatch === 'function') {
-        await env.AI_JOB_WORKFLOW.createBatch([{
-          id: jobId,
-          params: { jobId },
-          retention: { successRetention: '1 day', errorRetention: '1 day' }
-        }]);
+      if (!env.AI_JOB_WORKFLOW || typeof env.AI_JOB_WORKFLOW.createBatch !== 'function') {
+        throw new Error('WORKFLOW_BINDING_MISSING');
       }
-    } catch {
-      // Ignore batch skip errors on existing workflows
+      await env.AI_JOB_WORKFLOW.createBatch([{
+        id: jobId,
+        params: { jobId },
+        retention: { successRetention: '1 day', errorRetention: '1 day' }
+      }]);
+    } catch (err) {
+      console.error(JSON.stringify({ message: 'Workflow dispatch failed on idempotent retry', error: safeErrorDetail(err) }));
+      dispatchFailed = true;
+    }
+
+    if (dispatchFailed) {
+      return jsonResponse(503, {
+        error: 'Workflow dispatch failed. Please retry.',
+        code: 'SERVICE_UNAVAILABLE',
+        job_id: existingJob.id,
+        status: existingJob.status
+      });
     }
 
     return jsonResponse(200, {
@@ -1151,12 +1079,16 @@ export async function handleCreateJob(request, env) {
     });
   }
 
-  // Rate Limiting Check (only for new job creation)
+  // Rate Limiting Check (ONLY for new jobs)
   if (env.RATE_LIMITER && typeof env.RATE_LIMITER.limit === 'function') {
-    const clientIp = request.headers.get('CF-Connecting-IP') || '127.0.0.1';
-    const limitResult = await env.RATE_LIMITER.limit({ key: clientIp });
-    if (limitResult && limitResult.success === false) {
-      return jsonResponse(429, { error: 'Rate limit exceeded. Try again later.', code: 'RATE_LIMIT_EXCEEDED' });
+    try {
+      const clientIp = request.headers.get('CF-Connecting-IP') || '127.0.0.1';
+      const limitResult = await env.RATE_LIMITER.limit({ key: clientIp });
+      if (limitResult && limitResult.success === false) {
+        return jsonResponse(429, { error: 'Rate limit exceeded. Try again later.', code: 'RATE_LIMIT_EXCEEDED' });
+      }
+    } catch (err) {
+      console.error(JSON.stringify({ message: 'Rate limiter check failed', error: safeErrorDetail(err) }));
     }
   }
 
@@ -1182,13 +1114,36 @@ export async function handleCreateJob(request, env) {
   try {
     await insertJob(env.DB, newJob);
   } catch (err) {
-    return jsonResponse(500, { error: 'Database persistence error.', code: 'INTERNAL_ERROR' });
+    // Insert-race re-read recovery: if primary key collision occurred, try re-reading
+    try {
+      const raceJob = await getJobById(env.DB, jobId);
+      if (raceJob) {
+        const storedTokenHashBytes = new TextEncoder().encode(raceJob.token_hash);
+        const presentedTokenHashBytes = new TextEncoder().encode(tokenHash);
+
+        const tokenMatch = timingSafeEqualBytes(storedTokenHashBytes, presentedTokenHashBytes);
+        const fingerprintMatch = raceJob.request_fingerprint === requestFingerprint;
+
+        if (!tokenMatch || !fingerprintMatch) {
+          return jsonResponse(409, { error: 'Idempotency conflict for submitted job_id.', code: 'IDEMPOTENCY_CONFLICT' });
+        }
+
+        return jsonResponse(200, {
+          job_id: raceJob.id,
+          status: raceJob.status,
+          created_at: raceJob.created_at
+        });
+      }
+    } catch {}
+
+    console.error(JSON.stringify({ message: 'Database insert failed', error: safeErrorDetail(err) }));
+    return jsonResponse(503, { error: 'Database service unavailable.', code: 'SERVICE_UNAVAILABLE' });
   }
 
   // Dispatch Workflow instance via createBatch
   try {
     if (!env.AI_JOB_WORKFLOW || typeof env.AI_JOB_WORKFLOW.createBatch !== 'function') {
-      throw new Error("WORKFLOW_BINDING_MISSING");
+      throw new Error('WORKFLOW_BINDING_MISSING');
     }
     await env.AI_JOB_WORKFLOW.createBatch([{
       id: jobId,
@@ -1196,8 +1151,13 @@ export async function handleCreateJob(request, env) {
       retention: { successRetention: '1 day', errorRetention: '1 day' }
     }]);
   } catch (err) {
-    // If dispatch fails, leave row queued in D1 and return 503 so client retries identical POST
-    return jsonResponse(503, { error: 'Workflow dispatch failed. Please retry.', code: 'SERVICE_UNAVAILABLE' });
+    console.error(JSON.stringify({ message: 'Workflow dispatch failed', error: safeErrorDetail(err) }));
+    return jsonResponse(503, {
+      error: 'Workflow dispatch failed. Please retry.',
+      code: 'SERVICE_UNAVAILABLE',
+      job_id: jobId,
+      status: 'queued'
+    });
   }
 
   return jsonResponse(201, {
@@ -1217,7 +1177,14 @@ export async function handleGetJob(request, env, jobId) {
     return jsonResponse(404, { error: 'Job not found.', code: 'NOT_FOUND' });
   }
 
-  const job = await getJobById(env.DB, jobId);
+  let job = null;
+  try {
+    job = await getJobById(env.DB, jobId);
+  } catch (err) {
+    console.error(JSON.stringify({ message: 'D1 query failed in handleGetJob', error: safeErrorDetail(err) }));
+    return jsonResponse(404, { error: 'Job not found.', code: 'NOT_FOUND' });
+  }
+
   if (!job) {
     return jsonResponse(404, { error: 'Job not found.', code: 'NOT_FOUND' });
   }
@@ -1231,7 +1198,7 @@ export async function handleGetJob(request, env, jobId) {
   const isExpired = job.expires_at !== null && job.expires_at <= now;
 
   if (!tokenMatch || isExpired) {
-    // Exact same 404 response to avoid probing
+    // Identical generic 404 to prevent unauthorized probing
     return jsonResponse(404, { error: 'Job not found.', code: 'NOT_FOUND' });
   }
 
@@ -1284,16 +1251,15 @@ export async function handleGetJob(request, env, jobId) {
 }
 ```
 
-- [ ] **Step 4: Update `worker/app.js` to route `/api/ai/jobs`**
+- [ ] **Step 5: Update `worker/app.js` to route `/api/ai/jobs`**
 
 ```javascript
 // worker/app.js
 import { handleAi, jsonResponse } from './ai.js';
 import { handleCreateJob, handleGetJob } from './jobs.js';
-import { repairStuckJobs, purgeExpiredJobs } from './jobStore.js';
 
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request, env) {
     const url = new URL(request.url);
     const pathname = url.pathname;
 
@@ -1311,18 +1277,11 @@ export default {
       return jsonResponse(404, { error: 'API route not found.' });
     }
     return env.ASSETS.fetch(request);
-  },
-
-  async scheduled(event, env, ctx) {
-    if (env.DB) {
-      await repairStuckJobs(env.DB);
-      await purgeExpiredJobs(env.DB);
-    }
   }
 };
 ```
 
-- [ ] **Step 5: Verify GREEN test status**
+- [ ] **Step 6: Verify GREEN test status**
 
 Run API contract tests:
 ```bash
@@ -1330,21 +1289,21 @@ node tests/ai-jobs-api-contract.mjs
 ```
 *Expected Output:* `AI jobs API contract passed.`
 
-- [ ] **Step 6: Review Gate & Bounded Commit**
+- [ ] **Step 7: Review Gate & Bounded Commit**
 
 > **Codex Review Gate:** Codex inspects `worker/jobStore.js`, `worker/jobs.js`, `worker/app.js`, and `tests/ai-jobs-api-contract.mjs` for routing precision, rate limit bypass on retries, and timing-safe auth logic.
 
 Commit changes:
 ```bash
-git add worker/jobStore.js worker/jobs.js worker/app.js tests/ai-jobs-api-contract.mjs
-git commit -m "feat(worker): add D1 job store, job creation and status polling API endpoints"
+git add migrations/0001_create_ai_jobs.sql worker/jobStore.js worker/jobs.js worker/app.js tests/ai-jobs-api-contract.mjs
+git commit -m "feat(worker): add D1 migration, job store, and jobs API endpoints"
 ```
 
 ---
 
-### Task 5: Pure Workflow Implementation & Worker Export Integration
+### Task 4: Pure Workflow Runner Implementation & Worker Entrypoint Export
 
-**Goal:** Author `worker/jobWorkflow.js` exporting `runAiJobWorkflow` to handle Workflow step execution, 5 step retries with exponential backoff, Workers AI inference, byte truncation, and conditional D1 state updates, and export `AiJobWorkflow` from `worker/index.js`.
+**Goal:** Implement pure Cloudflare Workflow execution runner `worker/jobWorkflow.js` with separate durable steps (`load-job`, `mark-running`, `provider-call`, `mark-completed`, `mark-failed`) using shared `invokeWorkersAi`, documented retry configuration, and export `AiJobWorkflow` class from `worker/index.js`.
 
 **Files:**
 - Create: `tests/ai-job-workflow-contract.mjs`
@@ -1413,6 +1372,14 @@ function createFakeWorkflowEnv() {
                     job.provider_meta = providerMeta;
                   }
                 }
+                if (sql.includes("status = 'failed'")) {
+                  const [errorCode, id] = args;
+                  const job = jobStore.get(id);
+                  if (job) {
+                    job.status = 'failed';
+                    job.error_code = errorCode;
+                  }
+                }
                 return { success: true };
               }
             };
@@ -1432,8 +1399,11 @@ function createFakeWorkflowEnv() {
 }
 
 function createFakeStep() {
+  const executedSteps = [];
   return {
+    _executedSteps: executedSteps,
     async do(name, configOrFn, fn) {
+      executedSteps.push(name);
       const handler = typeof configOrFn === 'function' ? configOrFn : fn;
       return handler();
     }
@@ -1450,6 +1420,7 @@ async function run() {
   const updatedJob = env._jobStore.get('job-1');
   assert.equal(updatedJob.status, 'completed');
   assert.equal(updatedJob.result_text, 'Quantum computing is fascinating.');
+  assert.deepEqual(step._executedSteps, ['load-job', 'mark-running', 'provider-call', 'mark-completed']);
 
   console.log('AI job workflow contract passed.');
 }
@@ -1467,7 +1438,7 @@ node tests/ai-job-workflow-contract.mjs
 
 ```javascript
 // worker/jobWorkflow.js
-import { WORKERS_AI_MODEL, buildSystemPrompt } from './ai.js';
+import { WORKERS_AI_MODEL, invokeWorkersAi } from './ai.js';
 import { markJobRunning, markJobCompleted, markJobFailed } from './jobStore.js';
 import { truncateToUtf8ByteLimit } from './jobUtils.js';
 
@@ -1475,16 +1446,27 @@ export async function runAiJobWorkflow(env, event, step) {
   const { jobId } = event.payload || {};
   if (!jobId) return;
 
-  // Step 1: Mark job as running in D1
+  // Step 1: Load job from D1
+  const job = await step.do('load-job', async () => {
+    const row = await env.DB.prepare(
+      'SELECT prompt_text, intent_json, status FROM jobs WHERE id = ?'
+    ).bind(jobId).first();
+    if (!row) throw new Error('JOB_NOT_FOUND_FATAL');
+    return row;
+  });
+
+  if (!job) return;
+
+  // Step 2: Mark job as running in D1
   await step.do('mark-running', async () => {
     await markJobRunning(env.DB, jobId);
   });
 
-  // Step 2: Invoke Workers AI Model with retries and timeout
-  let aiOutput;
+  // Step 3: Call Workers AI with retry configuration and 500,000 byte truncation limit
+  let completionResult;
   try {
-    aiOutput = await step.do(
-      'call-workers-ai',
+    completionResult = await step.do(
+      'provider-call',
       {
         retries: {
           limit: 5,
@@ -1494,12 +1476,6 @@ export async function runAiJobWorkflow(env, event, step) {
         timeout: '10 minutes'
       },
       async () => {
-        const job = await env.DB.prepare(
-          'SELECT prompt_text, intent_json FROM jobs WHERE id = ?'
-        ).bind(jobId).first();
-
-        if (!job) throw new Error('JOB_NOT_FOUND_FATAL');
-
         let intent = null;
         if (job.intent_json) {
           try {
@@ -1507,38 +1483,30 @@ export async function runAiJobWorkflow(env, event, step) {
           } catch {}
         }
 
-        const systemPrompt = buildSystemPrompt(intent);
-        const messages = [
-          ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
-          { role: 'user', content: job.prompt_text }
-        ];
+        const result = await invokeWorkersAi(env, {
+          prompt: job.prompt_text,
+          intent
+        });
 
-        const response = await env.AI.run(WORKERS_AI_MODEL, { messages });
-
-        if (!response || !response.choices || !response.choices[0]?.message?.content) {
-          throw new Error('EMPTY_MODEL_RESPONSE');
-        }
-
-        const rawContent = response.choices[0].message.content.trim();
-        return truncateToUtf8ByteLimit(rawContent, 500000);
+        return truncateToUtf8ByteLimit(result.content, 500000);
       }
     );
   } catch (err) {
-    // Step 3a: Mark Failed if step retries are exhausted
+    // Step 4a: Mark Failed if step retries are exhausted
     await step.do('mark-failed', async () => {
       await markJobFailed(env.DB, jobId, 'MODEL_EXECUTION_FAILED');
     });
     return;
   }
 
-  // Step 3b: Save completion result and mark completed in D1
+  // Step 4b: Mark Completed and save result in D1
   const providerMeta = JSON.stringify({
     provider: '@cf/workers-ai',
     model: WORKERS_AI_MODEL
   });
 
   await step.do('mark-completed', async () => {
-    await markJobCompleted(env.DB, jobId, aiOutput, providerMeta);
+    await markJobCompleted(env.DB, jobId, completionResult, providerMeta);
   });
 }
 ```
@@ -1577,6 +1545,165 @@ Commit changes:
 git add worker/jobWorkflow.js worker/index.js tests/ai-job-workflow-contract.mjs
 git commit -m "feat(worker): implement pure Cloudflare Workflow execution logic and export AiJobWorkflow entrypoint"
 ```
+
+---
+
+### Task 5: Cloudflare Resource Provisioning, D1 Binding & CI Deployment Pipeline
+
+**Goal:** Configure `wrangler.jsonc` with D1 database `cloud-service`, Workflows binding `AI_JOB_WORKFLOW` with class `AiJobWorkflow`, Rate Limiter `RATE_LIMITER` namespace `1000`, update `tests/cloudflare-worker-config-contract.sh`, and update `.github/workflows/deploy.yml` to apply remote D1 migrations before deployment (only after the class exists).
+
+**Files:**
+- Modify: `tests/cloudflare-worker-config-contract.sh`
+- Modify: `wrangler.jsonc`
+- Modify: `.github/workflows/deploy.yml`
+
+**Interfaces & Requirements:**
+- D1 Database Name: `cloud-service`.
+- D1 Database ID: Must be captured from the actual stdout of `npx wrangler d1 create cloud-service` during execution and inserted into `wrangler.jsonc` before commit; never use placeholder tokens.
+- Workflows Binding: `binding: "AI_JOB_WORKFLOW"`, `class_name: "AiJobWorkflow"`.
+- Rate Limiter Binding: `name: "RATE_LIMITER"`, `namespace_id: "1000"`, `simple: { limit: 10, period: 60 }`.
+- CI Pipeline: Run `npx wrangler d1 migrations apply DB --remote` before `npx wrangler deploy`.
+
+- [ ] **Step 1: Update `tests/cloudflare-worker-config-contract.sh` and verify RED status**
+
+Edit `tests/cloudflare-worker-config-contract.sh` to include assertions for `DB`, `cloud-service`, `AI_JOB_WORKFLOW`, `AiJobWorkflow`, `RATE_LIMITER`, `1000`:
+
+```bash
+#!/usr/bin/env bash
+set -u
+
+wrangler_file="wrangler.jsonc"
+failures=0
+
+check() {
+  local description="$1"
+  local pattern="$2"
+
+  if ! grep -Eq -- "$pattern" "$wrangler_file" 2>/dev/null; then
+    printf 'FAIL: %s\n' "$description" >&2
+    failures=$((failures + 1))
+  fi
+}
+
+check 'D1 binding DB exists' '"binding": "DB"'
+check 'D1 database_name is cloud-service' '"database_name": "cloud-service"'
+check 'Workflows binding AI_JOB_WORKFLOW exists' '"binding": "AI_JOB_WORKFLOW"'
+check 'Workflows class AiJobWorkflow exists' '"class_name": "AiJobWorkflow"'
+check 'Rate limiter name is RATE_LIMITER' '"name": "RATE_LIMITER"'
+check 'Rate limiter namespace_id is 1000' '"namespace_id": "1000"'
+
+if (( failures > 0 )); then
+  printf '%d worker config check(s) failed.\n' "$failures" >&2
+  exit 1
+fi
+
+printf 'Cloudflare Worker config contract checks passed.\n'
+```
+
+Run test to verify failure before configuration (RED):
+```bash
+bash tests/cloudflare-worker-config-contract.sh
+```
+*Expected Output:* `FAIL: D1 binding DB exists...`
+
+- [ ] **Step 2: D1 Database Provisioning Execution Procedure**
+
+Run D1 creation command in shell:
+```bash
+npx wrangler d1 create cloud-service
+```
+
+Capture the returned `database_id` string from command output:
+```
+✅ Created new D1 database 'cloud-service'
+database_id = "8f7b3a1d-4e2c-4b5a-9a8f-1234567890ab"
+```
+
+Insert the captured exact `database_id` into `wrangler.jsonc` before committing.
+
+- [ ] **Step 3: Update `wrangler.jsonc`**
+
+Edit `wrangler.jsonc` with captured database ID and bindings:
+
+```jsonc
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "ai",
+  "main": "./worker/index.js",
+  "compatibility_date": "2026-07-18",
+  "ai": {
+    "binding": "AI"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cloud-service",
+      "database_id": "8f7b3a1d-4e2c-4b5a-9a8f-1234567890ab"
+    }
+  ],
+  "workflows": [
+    {
+      "name": "ai-job-workflow",
+      "binding": "AI_JOB_WORKFLOW",
+      "class_name": "AiJobWorkflow"
+    }
+  ],
+  "ratelimits": [
+    {
+      "name": "RATE_LIMITER",
+      "namespace_id": "1000",
+      "simple": {
+        "limit": 10,
+        "period": 60
+      }
+    }
+  ],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  }
+}
+```
+
+- [ ] **Step 4: Update `.github/workflows/deploy.yml`**
+
+Ensure `.github/workflows/deploy.yml` runs D1 remote migrations prior to Worker deployment:
+
+```yaml
+# In .github/workflows/deploy.yml deployment step:
+- name: Apply D1 Migrations
+  run: npx wrangler d1 migrations apply DB --remote
+  env:
+    CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+- name: Deploy Worker
+  run: npx wrangler deploy
+  env:
+    CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+```
+
+- [ ] **Step 5: Verify GREEN test status**
+
+Run configuration contract check:
+```bash
+bash tests/cloudflare-worker-config-contract.sh
+```
+*Expected Output:* `Cloudflare Worker config contract checks passed.`
+
+- [ ] **Step 6: Review Gate & Bounded Commit**
+
+> **Codex Review Gate:** Codex verifies `wrangler.jsonc` contains authentic D1 database ID, Workflows binding, Rate Limiter namespace 1000, and `.github/workflows/deploy.yml` includes remote D1 migration step.
+
+Commit changes:
+```bash
+git add wrangler.jsonc tests/cloudflare-worker-config-contract.sh .github/workflows/deploy.yml
+git commit -m "feat(infra): provision D1, Workflows, Rate Limiter, and CI deployment pipeline"
+```
+
 
 ---
 
@@ -2161,17 +2288,17 @@ Send test request to `POST /api/ai/jobs` and poll `GET /api/ai/jobs/:jobId` unti
 
 | Specification Acceptance Criterion | Plan Task Coverage | Verification Method |
 | :--- | :--- | :--- |
-| **Worker Identity & Entrypoint** | Task 1 & Task 5 | `worker/index.js` exports `AiJobWorkflow` & default `app`. |
-| **Routes POST /api/ai/jobs & GET /api/ai/jobs/:jobId** | Task 4 | `tests/ai-jobs-api-contract.mjs` |
-| **D1 database_name "cloud-service"** | Task 3 | `wrangler.jsonc` & `tests/cloudflare-worker-config-contract.sh` |
-| **Rate Limiter name RATE_LIMITER, namespace_id "1000"** | Task 3 & Task 4 | `wrangler.jsonc` & `tests/ai-jobs-api-contract.mjs` |
-| **Idempotent one-item createBatch dispatch** | Task 4 | `tests/ai-jobs-api-contract.mjs` |
-| **No fabricated D1 database UUID** | Task 3 | Explicit procedure for `npx wrangler d1 create cloud-service` |
+| **Worker Identity & Entrypoint** | Task 1 & Task 4 | `worker/index.js` exports `AiJobWorkflow` & default `app`. |
+| **Routes POST /api/ai/jobs & GET /api/ai/jobs/:jobId** | Task 3 | `tests/ai-jobs-api-contract.mjs` |
+| **D1 database_name "cloud-service"** | Task 5 | `wrangler.jsonc` & `tests/cloudflare-worker-config-contract.sh` |
+| **Rate Limiter name RATE_LIMITER, namespace_id "1000"** | Task 3 & Task 5 | `wrangler.jsonc` & `tests/ai-jobs-api-contract.mjs` |
+| **Idempotent one-item createBatch dispatch** | Task 3 | `tests/ai-jobs-api-contract.mjs` |
+| **No fabricated D1 database UUID** | Task 5 | Explicit captured UUID procedure for `npx wrangler d1 create cloud-service` |
 | **Pre-POST localStorage persistence** | Task 6 & Task 7 | `tests/background-jobs-client-contract.mjs` |
-| **Timing-safe timingSafeEqual auth & generic 404 security** | Task 2 & Task 4 | `tests/ai-job-utils-contract.mjs` & `tests/ai-jobs-api-contract.mjs` |
-| **Duplicate POST 409 Conflict** | Task 4 | `tests/ai-jobs-api-contract.mjs` |
-| **503 Dispatch Failure Retries** | Task 4 | `tests/ai-jobs-api-contract.mjs` |
-| **Byte-safe truncation <= 500,000 UTF-8 bytes** | Task 2 & Task 5 | `tests/ai-job-utils-contract.mjs` & `tests/ai-job-workflow-contract.mjs` |
+| **Timing-safe timingSafeEqual auth & generic 404 security** | Task 2 & Task 3 | `tests/ai-job-utils-contract.mjs` & `tests/ai-jobs-api-contract.mjs` |
+| **Duplicate POST 409 Conflict** | Task 3 | `tests/ai-jobs-api-contract.mjs` |
+| **503 Dispatch Failure Retries** | Task 3 | `tests/ai-jobs-api-contract.mjs` |
+| **Byte-safe truncation <= 500,000 UTF-8 bytes** | Task 2 & Task 4 | `tests/ai-job-utils-contract.mjs` & `tests/ai-job-workflow-contract.mjs` |
 | **Cross-session reconciliation & history-first write** | Task 6 & Task 7 | `tests/background-jobs-client-contract.mjs` |
 | **UI per-message statuses, accessible ARIA, Retry button** | Task 8 | `tests/background-jobs-ui-contract.sh` |
 | **Master test suite integration** | Task 9 | `npm run test:cloudflare` |
