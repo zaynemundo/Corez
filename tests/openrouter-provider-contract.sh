@@ -3,6 +3,7 @@ set -u
 
 service="src/services/aiService.js"
 settings="src/components/SettingsModal.jsx"
+api="api/openrouter.js"
 failures=0
 
 check() {
@@ -27,18 +28,17 @@ check_absent() {
   fi
 }
 
-check 'OpenRouter endpoint is configured' 'https://openrouter[.]ai/api/v1/chat/completions' "$service"
+check 'OpenRouter endpoint is configured server-side' 'https://openrouter[.]ai/api/v1/chat/completions' "$api"
 check 'OpenOrca is the default model option' 'open-orca/mistral-7b-openorca' "$service"
-check 'API key can come from browser storage' 'corez_openrouter_api_key' "$service"
-check 'API key can come from Vite env fallback' 'VITE_OPENROUTER_API_KEY' "$service"
-check 'OpenRouter request sends authorization header' 'Authorization.*Bearer' "$service"
-check 'OpenRouter request sends system and user messages' "role: 'system'|role: \"system\"" "$service"
-check 'AI response falls back when OpenRouter is not configured' 'generateLocalAIResponse' "$service"
+check 'private API key is read server-side' 'process[.]env[.]OPENROUTER_API_KEY' "$api"
+check 'OpenRouter request sends authorization header server-side' 'Authorization.*Bearer' "$api"
+check 'OpenRouter request sends system and user messages server-side' "role: 'system'|role: \"system\"" "$api"
+check 'frontend calls the public OpenRouter proxy' "fetch\\('/api/openrouter'" "$service"
+check 'AI response falls back locally when proxy is not configured' 'generateLocalAIResponse' "$service"
 check 'OpenRouter failures fall back locally' 'catch.*openRouterError|openRouterError' "$service"
-check_absent 'no real API key is committed' 'sk-or-v1-|OPENROUTER_API_KEY=' "$service"
-check 'settings UI has OpenRouter API key field' 'OpenRouter API key' "$settings"
+check_absent 'frontend does not read API keys' 'corez_openrouter_api_key|VITE_OPENROUTER_API_KEY' "$service"
+check_absent 'settings UI does not ask public users for API key' 'OpenRouter API key' "$settings"
 check 'settings UI has OpenRouter model field' 'OpenRouter model' "$settings"
-check 'settings UI persists OpenRouter API key' 'corez_openrouter_api_key' "$settings"
 check 'settings UI persists OpenRouter model' 'corez_openrouter_model' "$settings"
 
 if (( failures > 0 )); then

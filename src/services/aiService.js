@@ -6,7 +6,7 @@ export const MODEL = {
   description: 'Minimalist AI assistant for concise conversation, reasoning, and live app creation.'
 };
 
-export const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
+export const OPENROUTER_PROXY_ENDPOINT = '/api/openrouter';
 export const DEFAULT_OPENROUTER_MODEL = 'open-orca/mistral-7b-openorca';
 
 export const PUBLIC_USER_INTENT_PROMPT = `
@@ -35,11 +35,9 @@ function readBrowserSetting(key) {
 }
 
 export function getOpenRouterConfig() {
-  const apiKey = readBrowserSetting('corez_openrouter_api_key') || import.meta.env?.VITE_OPENROUTER_API_KEY || '';
   const model = readBrowserSetting('corez_openrouter_model') || import.meta.env?.VITE_OPENROUTER_MODEL || DEFAULT_OPENROUTER_MODEL;
 
   return {
-    apiKey: apiKey.trim(),
     model: model.trim() || DEFAULT_OPENROUTER_MODEL
   };
 }
@@ -87,47 +85,27 @@ export function analyzePublicUserIntent(prompt) {
   };
 }
 
-function buildCorezSystemPrompt(intent) {
-  return `${PUBLIC_USER_INTENT_PROMPT}
-
-You are Corez AI inside the Corez public web app. Be concise, useful, and direct.
-Infer the public user's goal, then answer in a way that helps them move forward.
-When the user asks to build a site, app, dashboard, game, widget, or tool, return one runnable HTML document inside a fenced html code block.
-Keep generated apps minimalist, monochrome, responsive, and self-contained.
-Current inferred intent: ${intent.type} - ${intent.summary}`;
-}
-
 export async function generateOpenRouterResponse(prompt, intent = analyzePublicUserIntent(prompt)) {
-  const { apiKey, model } = getOpenRouterConfig();
+  const { model } = getOpenRouterConfig();
 
-  if (!apiKey) {
-    return null;
-  }
-
-  const response = await fetch(OPENROUTER_ENDPOINT, {
+  const response = await fetch('/api/openrouter', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'X-Title': 'Corez'
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify({
+      prompt,
       model,
-      messages: [
-        { role: 'system', content: buildCorezSystemPrompt(intent) },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.7,
-      max_tokens: intent.type === 'app' ? 2200 : 900
+      intent
     })
   });
 
   if (!response.ok) {
-    throw new Error(`OpenRouter request failed with status ${response.status}`);
+    throw new Error(`OpenRouter proxy request failed with status ${response.status}`);
   }
 
   const data = await response.json();
-  return data?.choices?.[0]?.message?.content?.trim() || null;
+  return data?.content?.trim() || null;
 }
 
 // Extract executable code block (HTML/CSS/JS) from AI message if present
@@ -165,7 +143,7 @@ export async function generateLocalAIResponse(prompt) {
   }
 
   if (lower.includes('who are you') || lower.includes('what can you do')) {
-    return `Hello! I'm **Corez**, a minimalist AI assistant. I can answer questions, help you write or debug code, brainstorm ideas, or construct live interactive web apps on demand. How can I help you today?`;
+    return `Hello! I'm **Corez**, a minimalist AI assistant built for public users.\n\nI can help you understand ideas, write clearer content, debug code, plan products, or generate live monochrome web apps that open in the preview canvas. Tell me what you want to make or understand, and I’ll infer the goal, explain the useful context, and give you a practical next step.`;
   }
 
   if (/^(how are you|how is it going|how's it going)(\s|\!|\.|\?|$)/i.test(lower)) {
@@ -259,18 +237,18 @@ export async function generateLocalAIResponse(prompt) {
 
   // 4. PUBLIC USER INTENT RESPONSES
   if (intent.type === 'code-help') {
-    return `Share the snippet or problem you're working on, and I'll help you fix or optimize it.`;
+    return `I understand the goal: ${intent.summary}\n\nShare the snippet, error message, or file you are working on. I’ll walk through what is happening, identify the likely cause, propose a fix, and explain how to verify it so you can move forward without guessing.`;
   }
 
   if (intent.type === 'writing') {
-    return `I understand the goal: ${intent.summary}\n\nSend me the rough text or the audience you're writing for, and I'll turn it into clear public-facing copy.`;
+    return `I understand the goal: ${intent.summary}\n\nSend me the rough text, audience, and tone you want. I’ll turn it into clear public-facing copy, tighten the message, and give you a polished version plus a short explanation of why it works.`;
   }
 
   if (intent.type === 'explanation') {
-    return `I understand the goal: ${intent.summary}\n\nHere's the short version: **${cleanPrompt}** is best approached by identifying the main idea, the audience, and the action you want someone to take. I can break it down further if you want more detail.`;
+    return `I understand the goal: ${intent.summary}\n\nHere’s the useful way to think about **"${cleanPrompt}"**:\n\nStart with the core idea, then connect it to what the user is trying to accomplish. From there, separate the topic into simple parts, explain why each part matters, and end with the next action someone should take. If you want, I can also turn this into a step-by-step guide or a shorter public-facing explanation.`;
   }
 
-  return `I understand the goal: ${intent.summary}\n\nFor **"${cleanPrompt}"**, I’ll focus on what the public user is trying to accomplish, then give the simplest useful next step. Add a little more context and I can make it specific.`;
+  return `I understand the goal: ${intent.summary}\n\nFor **"${cleanPrompt}"**, I’ll focus on what the public user is trying to accomplish and give a practical path forward.\n\nA good next step is to define the outcome, the audience, and the format you want. Once those are clear, I can help turn the idea into a plan, a written answer, code, or a live preview depending on what you need.`;
 }
 
 export async function generateAIResponse(prompt) {
