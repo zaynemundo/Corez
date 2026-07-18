@@ -584,10 +584,18 @@ h1, h2, h3, h4, h5, h6 {
 .thinking-indicator-box {
   display: flex;
   align-items: center;
+  gap: 0.45rem;
   padding: 0.5rem 0;
   background-color: transparent;
   color: var(--text-secondary);
   width: fit-content;
+}
+
+.thinking-text {
+  font-size: 0.85rem;
+  font-weight: 300;
+  color: var(--text-secondary);
+  letter-spacing: 0.01em;
 }
 
 .thinking-dots {

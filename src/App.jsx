@@ -245,6 +245,7 @@ export default function App() {
                   <div className="message-wrapper ai">
                     <div className="message-body">
                       <div className="thinking-indicator-box" aria-label="Corez is thinking" role="status">
+                        <span className="thinking-text">Thinking</span>
                         <span className="thinking-dots" aria-hidden="true">
                           <span className="thinking-dot" />
                           <span className="thinking-dot" />
