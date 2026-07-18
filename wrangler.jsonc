@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "new-corez",
+  "name": "ai",
   "main": "./worker/index.js",
   "compatibility_date": "2026-07-18",
   "assets": {

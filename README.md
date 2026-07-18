@@ -56,7 +56,7 @@ Every prompt is classified into one of five deliverable-driven labels:
 
 ## Cloudflare Worker deployment
 
-Corez deploys the Vite SPA and `/api/openrouter` together as the `new-corez`
+Corez deploys the Vite SPA and `/api/openrouter` together as the `ai`
 Cloudflare Worker. Configure the connected Worker build with:
 
 Local Wrangler commands require Node.js 22+; Cloudflare Workers Builds currently defaults to Node.js 22.
