@@ -184,18 +184,18 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .sidebar-header.icon-only-header {
-  padding: 1.25rem 0 0.75rem 0;
+  padding: 1.1rem 0 0.65rem 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
   justify-content: center;
   border-bottom: 1px solid var(--sidebar-border);
 }
 
-.brand-icon {
-  width: 32px;
-  height: 32px;
+.brand-icon-toggle {
+  position: relative;
+  width: 34px;
+  height: 34px;
   background: transparent;
   border: none;
   color: var(--text-primary);
@@ -206,18 +206,25 @@ h1, h2, h3, h4, h5, h6 {
   transition: var(--transition-fast);
 }
 
-.brand-icon:hover {
-  transform: scale(1.1);
-  color: var(--text-primary);
+.brand-logo-default {
+  opacity: 1;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
 }
 
-.close-sidebar-btn {
-  min-width: 28px;
-  min-height: 28px;
-  width: 28px;
-  height: 28px;
-  border: none;
-  background: transparent;
+.brand-logo-hover {
+  position: absolute;
+  opacity: 0;
+  color: var(--text-primary);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.brand-icon-toggle:hover .brand-logo-default {
+  opacity: 0;
+}
+
+.brand-icon-toggle:hover .brand-logo-hover {
+  opacity: 1;
+  transform: scale(1.1);
 }
 
 .sidebar-action-box {

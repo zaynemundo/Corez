@@ -24,15 +24,13 @@ export default function Sidebar({
   return (
     <aside className={`sidebar icon-only ${isOpen ? '' : 'collapsed'}`} aria-hidden={!isOpen}>
       <div className="sidebar-header icon-only-header">
-        <div className="brand-icon" title="Corez AI">
-          <Layers size={15} />
-        </div>
         <button 
-          className="icon-btn close-sidebar-btn" 
+          className="brand-icon-toggle" 
           onClick={onCloseSidebar}
           title="Collapse Sidebar"
         >
-          <PanelLeftClose size={14} />
+          <Layers size={15} className="brand-logo-default" />
+          <PanelLeftClose size={15} className="brand-logo-hover" />
         </button>
       </div>
 
