@@ -22,7 +22,7 @@
   --font-heading: var(--font-sans);
   --font-mono: 'JetBrains Mono', monospace;
   
-  --sidebar-width: 50px;
+  --sidebar-width: 40px;
   --sidebar-margin: 16px;
   --sidebar-radius: 16px;
   --sidebar-heading-size: 10px;
@@ -148,7 +148,7 @@ h1, h2, h3, h4, h5, h6 {
   height: calc(100vh - (var(--sidebar-margin) * 2));
   height: calc(100dvh - (var(--sidebar-margin) * 2));
   margin: var(--sidebar-margin) 0 var(--sidebar-margin) var(--sidebar-margin);
-  padding: 5px;
+  padding: 10px;
   background-color: var(--sidebar-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -185,7 +185,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .sidebar-header.icon-only-header {
-  padding: 5px 0;
+  padding: 10px 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -195,9 +195,9 @@ h1, h2, h3, h4, h5, h6 {
 
 .brand-icon-toggle {
   position: relative;
-  width: 34px;
-  height: 34px;
-  padding: 5px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   background: transparent;
   border: none;
   color: var(--text-primary);
@@ -230,18 +230,18 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .sidebar-action-box {
-  padding: 5px 0;
+  padding: 10px 0;
   display: flex;
   justify-content: center;
   border-bottom: 1px solid var(--sidebar-border);
 }
 
 .new-chat-btn.icon-only-btn {
-  width: 36px;
-  height: 36px;
-  min-height: 36px;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
   margin: 0 auto;
-  padding: 5px;
+  padding: 0;
   border: none;
   background: transparent;
   color: var(--text-secondary);
@@ -259,18 +259,18 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .sidebar-tools-section {
-  padding: 5px 0;
+  padding: 10px 0;
   display: flex;
   justify-content: center;
   border-bottom: 1px solid var(--sidebar-border);
 }
 
 .image-creator-btn.icon-only-btn {
-  width: 36px;
-  height: 36px;
-  min-height: 36px;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
   margin: 0 auto;
-  padding: 5px;
+  padding: 0;
   border: none;
   background: transparent;
   color: var(--text-secondary);
@@ -290,7 +290,7 @@ h1, h2, h3, h4, h5, h6 {
 .chat-history-list.icon-only-list {
   flex: 1;
   overflow-y: auto;
-  padding: 5px 0;
+  padding: 10px 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -298,10 +298,10 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .history-item.icon-only-item {
-  width: 36px;
-  height: 36px;
-  min-height: 36px;
-  padding: 5px;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -330,10 +330,10 @@ h1, h2, h3, h4, h5, h6 {
   position: absolute;
   top: -2px;
   right: -2px;
-  width: 15px;
-  height: 15px;
-  min-width: 15px;
-  min-height: 15px;
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  min-height: 14px;
   padding: 0;
   opacity: 0;
   background: transparent;
@@ -355,7 +355,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .sidebar-footer.icon-only-footer {
-  padding: 5px 0;
+  padding: 10px 0;
   border-top: 1px solid var(--sidebar-border);
   display: flex;
   flex-direction: column;
@@ -364,10 +364,10 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .footer-action-btn.icon-only-btn {
-  width: 36px;
-  height: 36px;
-  min-height: 36px;
-  padding: 5px;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
   border: none;
   background: none;
   color: var(--text-muted);
