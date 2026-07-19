@@ -5,116 +5,179 @@ import {
   Download, 
   Loader2,
   Wand2,
-  X
+  X,
+  Copy,
+  Check,
+  Maximize2
 } from 'lucide-react';
 import { generateFluxImage } from '../services/aiService.js';
 
 export default function ImageStudioPage() {
   const [customPrompt, setCustomPrompt] = useState('');
-  const [batchCount, setBatchCount] = useState(4);
   const [generating, setGenerating] = useState(false);
   const [generatedImages, setGeneratedImages] = useState([]);
   const [previewImage, setPreviewImage] = useState(null);
+  const [copiedId, setCopiedId] = useState(null);
 
-  const handleBatchGenerate = async () => {
+  const handleGenerateSingle = async () => {
     if (!customPrompt.trim() || generating) return;
     setGenerating(true);
-    const countToGenerate = Math.min(Math.max(1, batchCount), 50);
+    const promptToUse = customPrompt.trim();
 
-    for (let i = 0; i < countToGenerate; i++) {
-      try {
-        const variationPrompt = countToGenerate > 1 
-          ? `${customPrompt.trim()}, variation ${i + 1}, unique camera angle`
-          : customPrompt.trim();
-        const url = await generateFluxImage(variationPrompt);
-        if (url) {
-          setGeneratedImages(prev => [
-            { id: Date.now() + i, prompt: variationPrompt, url, createdAt: new Date() },
-            ...prev
-          ]);
-        }
-      } catch (err) {
-        console.error(`Image generation item ${i + 1} error:`, err);
+    try {
+      const url = await generateFluxImage(promptToUse);
+      if (url) {
+        setGeneratedImages(prev => [
+          { id: Date.now(), prompt: promptToUse, url, createdAt: new Date() },
+          ...prev
+        ]);
       }
+    } catch (err) {
+      console.error('Image generation error:', err);
+    } finally {
+      setGenerating(false);
     }
-    setGenerating(false);
   };
+
+  const handleCopyPrompt = (id, text) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const currentImage = generatedImages[0];
+  const historyImages = generatedImages.slice(1);
 
   return (
     <div className="image-studio-page">
-      <main className="studio-main">
-        <div className="studio-generator-container">
-          <div className="generator-input-card">
-            <label className="generator-label">Image Prompt:</label>
+      <main className="studio-main single-mode">
+        <div className="single-studio-wrapper">
+          {/* Prompt Creator Box */}
+          <div className="single-prompt-card">
+            <div className="prompt-header-row">
+              <label className="generator-label">
+                <Sparkles size={14} />
+                <span>Image Generator</span>
+              </label>
+            </div>
+
             <textarea 
-              className="generator-textarea"
+              className="generator-textarea single-textarea"
               rows={3}
-              placeholder="Describe any scene, art style, product, architecture, or creative concept you want to generate..."
+              placeholder="Describe the image you want to create (e.g. minimalist architectural render with soft lighting, 8k resolution)..."
               value={customPrompt}
               onChange={e => setCustomPrompt(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleGenerateSingle();
+                }
+              }}
             />
 
-            <div className="generator-controls">
-              <div className="batch-control">
-                <label className="batch-label">Pictures count (1-50):</label>
-                <input 
-                  type="number"
-                  min={1}
-                  max={50}
-                  value={batchCount}
-                  onChange={e => setBatchCount(parseInt(e.target.value) || 1)}
-                  className="batch-input"
-                />
-              </div>
-
+            <div className="single-prompt-actions">
               <button 
-                className="canvas-toggle-btn primary-gen-btn"
-                onClick={handleBatchGenerate}
+                className="primary-gen-btn single-btn"
+                onClick={handleGenerateSingle}
                 disabled={!customPrompt.trim() || generating}
               >
                 {generating ? (
                   <>
                     <Loader2 size={14} className="spin-icon" />
-                    <span>Generating Image(s)...</span>
+                    <span>Generating Image...</span>
                   </>
                 ) : (
                   <>
                     <Wand2 size={14} />
-                    <span>Generate {batchCount > 1 ? `${batchCount} Images` : 'Image'}</span>
+                    <span>Generate Image</span>
                   </>
                 )}
               </button>
             </div>
           </div>
 
-          <div className="generated-gallery-section">
-            <h3 className="gallery-section-title">
-              <ImageIcon size={15} />
-              <span>Generated Pictures ({generatedImages.length})</span>
-            </h3>
-
-            {generatedImages.length === 0 ? (
-              <div className="empty-gallery-state">
-                <Wand2 size={28} style={{ opacity: 0.4 }} />
-                <p>No images generated in this session yet. Enter a prompt above to create up to 50 pictures.</p>
+          {/* Featured Single Image Display Area */}
+          <div className="featured-image-display">
+            {generating && (
+              <div className="image-loading-card">
+                <Loader2 size={32} className="spin-icon loading-spinner" />
+                <p className="loading-text">Creating your image...</p>
               </div>
-            ) : (
-              <div className="generated-images-grid studio-grid">
-                {generatedImages.map(img => (
-                  <div key={img.id} className="generated-img-card">
-                    <img 
-                      src={img.url} 
-                      alt={img.prompt} 
-                      className="generated-img-thumb"
-                      onClick={() => setPreviewImage(img.url)}
-                    />
-                    <div className="img-card-caption">
+            )}
+
+            {!generating && !currentImage && (
+              <div className="empty-single-state">
+                <ImageIcon size={32} style={{ opacity: 0.35 }} />
+                <h3>No Image Created Yet</h3>
+                <p>Type a prompt above and click <strong>Generate Image</strong> to create your visual artwork.</p>
+              </div>
+            )}
+
+            {!generating && currentImage && (
+              <div className="featured-image-card">
+                <div className="featured-img-frame" onClick={() => setPreviewImage(currentImage.url)}>
+                  <img 
+                    src={currentImage.url} 
+                    alt={currentImage.prompt} 
+                    className="featured-img"
+                  />
+                  <div className="featured-img-overlay">
+                    <button 
+                      className="icon-btn overlay-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPreviewImage(currentImage.url);
+                      }}
+                      title="Enlarge Image"
+                    >
+                      <Maximize2 size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="featured-img-meta">
+                  <p className="featured-prompt-text">{currentImage.prompt}</p>
+                  <div className="featured-action-bar">
+                    <button 
+                      className="code-btn"
+                      onClick={() => handleCopyPrompt(currentImage.id, currentImage.prompt)}
+                      title="Copy Prompt"
+                    >
+                      {copiedId === currentImage.id ? <Check size={12} /> : <Copy size={12} />}
+                      <span>{copiedId === currentImage.id ? 'Copied' : 'Copy Prompt'}</span>
+                    </button>
+
+                    <a 
+                      href={currentImage.url} 
+                      download={`generated-image-${currentImage.id}.png`}
+                      className="code-btn primary-preset-btn"
+                      title="Download PNG"
+                    >
+                      <Download size={12} />
+                      <span>Download PNG</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* History Gallery if multiple single generations */}
+          {historyImages.length > 0 && (
+            <div className="history-gallery-section">
+              <h4 className="history-section-title">Previous Creations ({historyImages.length})</h4>
+              <div className="history-images-grid">
+                {historyImages.map(img => (
+                  <div key={img.id} className="history-img-card" onClick={() => setPreviewImage(img.url)}>
+                    <img src={img.url} alt={img.prompt} className="history-img-thumb" />
+                    <div className="history-img-caption">
                       <p className="caption-text">{img.prompt}</p>
                       <a 
                         href={img.url} 
                         download={`generated-image-${img.id}.png`}
                         className="code-btn download-btn"
-                        title="Download Image"
+                        onClick={e => e.stopPropagation()}
+                        title="Download"
                       >
                         <Download size={12} />
                       </a>
@@ -122,11 +185,12 @@ export default function ImageStudioPage() {
                   </div>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </main>
 
+      {/* Lightbox Modal */}
       {previewImage && (
         <div className="image-lightbox-modal" onClick={() => setPreviewImage(null)}>
           <div className="lightbox-content" onClick={e => e.stopPropagation()}>
