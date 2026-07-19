@@ -5,7 +5,7 @@ import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
 import CanvasPreview from './components/CanvasPreview';
 import SettingsModal from './components/SettingsModal';
-import ImageShowcaseModal from './components/ImageShowcaseModal';
+import ImageStudioPage from './components/ImageStudioPage';
 import { generateAIResponse, extractCodeFromMessage } from './services/aiService';
 import { Layers, Code, Gamepad2, BarChart3, Wand2 } from 'lucide-react';
 
@@ -27,6 +27,8 @@ export default function App() {
     return sessions[0]?.id || 'session-default';
   });
 
+  const [activeView, setActiveView] = useState('chat'); // 'chat' | 'image-studio'
+
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     if (typeof window === 'undefined') return true;
     return !window.matchMedia('(max-width: 767px)').matches;
@@ -35,7 +37,6 @@ export default function App() {
   const [canvasFullScreen, setCanvasFullScreen] = useState(false);
   const [activeCanvasCode, setActiveCanvasCode] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [imageShowcaseOpen, setImageShowcaseOpen] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem('corez_theme') || 'dark');
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
@@ -82,8 +83,15 @@ export default function App() {
   const activeSession = sessions.find(s => s.id === activeSessionId) || sessions[0];
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeSession?.messages, isThinking]);
+    if (activeView === 'chat') {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [activeSession?.messages, isThinking, activeView]);
+
+  const handleSelectSession = (id) => {
+    setActiveSessionId(id);
+    setActiveView('chat');
+  };
 
   const handleNewChat = () => {
     const newId = `session-${Date.now()}`;
@@ -94,6 +102,7 @@ export default function App() {
     };
     setSessions([newSession, ...sessions]);
     setActiveSessionId(newId);
+    setActiveView('chat');
   };
 
   const handleDeleteSession = (id) => {
@@ -159,11 +168,12 @@ export default function App() {
         isOpen={sidebarOpen}
         sessions={sessions}
         activeSessionId={activeSessionId}
-        onSelectSession={setActiveSessionId}
+        onSelectSession={handleSelectSession}
         onNewChat={handleNewChat}
         onDeleteSession={handleDeleteSession}
         onOpenSettings={() => setSettingsOpen(true)}
-        onOpenImageShowcase={() => setImageShowcaseOpen(true)}
+        onOpenImageShowcase={() => setActiveView('image-studio')}
+        activeView={activeView}
         theme={theme}
         onToggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
         onCloseSidebar={() => setSidebarOpen(false)}
@@ -179,102 +189,108 @@ export default function App() {
       )}
 
       <main className="main-content">
-        <div className={`chat-pane ${canvasOpen ? 'canvas-active' : ''}`}>
-          <Header
-            sidebarOpen={sidebarOpen}
-            onToggleSidebar={() => setSidebarOpen(prev => !prev)}
-            canvasOpen={canvasOpen}
-            onToggleCanvas={() => setCanvasOpen(prev => !prev)}
-            hasExecutableCode={!!activeCanvasCode}
-          />
+        {activeView === 'image-studio' ? (
+          <ImageStudioPage onBackToChat={() => setActiveView('chat')} />
+        ) : (
+          <>
+            <div className={`chat-pane ${canvasOpen ? 'canvas-active' : ''}`}>
+              <Header
+                sidebarOpen={sidebarOpen}
+                onToggleSidebar={() => setSidebarOpen(prev => !prev)}
+                canvasOpen={canvasOpen}
+                onToggleCanvas={() => setCanvasOpen(prev => !prev)}
+                hasExecutableCode={!!activeCanvasCode}
+              />
 
-          <div className="messages-scroll">
-            {activeSession?.messages.length === 0 ? (
-              <div className="welcome-container">
-                <div className="welcome-logo">
-                  <Layers size={24} />
-                </div>
-                <h1 className="welcome-title">Corez</h1>
-                <p className="welcome-sub">
-                  Versatile minimalist AI assistant for conversation, writing, reasoning, and live application execution.
-                </p>
-
-                <div className="sample-prompts-grid">
-                  <div 
-                    className="sample-prompt-card"
-                    onClick={() => handleSendMessage('Build an executive analytics dashboard with monochrome styling, stark SVG chart, and live search.')}
-                  >
-                    <div className="prompt-title">
-                      <BarChart3 size={14} style={{ color: 'var(--text-primary)' }} />
-                      <span>Executive Dashboard</span>
+              <div className="messages-scroll">
+                {activeSession?.messages.length === 0 ? (
+                  <div className="welcome-container">
+                    <div className="welcome-logo">
+                      <Layers size={24} />
                     </div>
-                    <div className="prompt-desc">Monochrome SVG metrics dashboard with search filters.</div>
-                  </div>
+                    <h1 className="welcome-title">Corez</h1>
+                    <p className="welcome-sub">
+                      Versatile minimalist AI assistant for conversation, writing, reasoning, and live application execution.
+                    </p>
 
-                  <div 
-                    className="sample-prompt-card"
-                    onClick={() => handleSendMessage('Build a monochrome 2D particle physics simulation with interactive mouse gravity attractor.')}
-                  >
-                    <div className="prompt-title">
-                      <Gamepad2 size={14} style={{ color: 'var(--text-primary)' }} />
-                      <span>Particle Physics Sandbox</span>
-                    </div>
-                    <div className="prompt-desc">Interactive black and white particle simulator.</div>
-                  </div>
+                    <div className="sample-prompts-grid">
+                      <div 
+                        className="sample-prompt-card"
+                        onClick={() => handleSendMessage('Build an executive analytics dashboard with monochrome styling, stark SVG chart, and live search.')}
+                      >
+                        <div className="prompt-title">
+                          <BarChart3 size={14} style={{ color: 'var(--text-primary)' }} />
+                          <span>Executive Dashboard</span>
+                        </div>
+                        <div className="prompt-desc">Monochrome SVG metrics dashboard with search filters.</div>
+                      </div>
 
-                  <div 
-                    className="sample-prompt-card"
-                    onClick={() => setImageShowcaseOpen(true)}
-                  >
-                    <div className="prompt-title">
-                      <Wand2 size={14} style={{ color: 'var(--text-primary)' }} />
-                      <span>FLUX Font Showcase</span>
-                    </div>
-                    <div className="prompt-desc">Explore 50 font styles & batch generate FLUX images.</div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="messages-inner">
-                {activeSession?.messages.map((msg, idx) => (
-                  <ChatMessage
-                    key={idx}
-                    message={msg}
-                    onRunInCanvas={handleRunInCanvas}
-                  />
-                ))}
-                {isThinking && (
-                  <div className="message-wrapper ai">
-                    <div className="message-body">
-                      <div className="thinking-indicator-box" aria-label="Corez is thinking" role="status">
-                        <span className="thinking-text">Thinking</span>
-                        <span className="thinking-dots" aria-hidden="true">
-                          <span className="thinking-dot" />
-                          <span className="thinking-dot" />
-                          <span className="thinking-dot" />
-                        </span>
+                      <div 
+                        className="sample-prompt-card"
+                        onClick={() => handleSendMessage('Build a monochrome 2D particle physics simulation with interactive mouse gravity attractor.')}
+                      >
+                        <div className="prompt-title">
+                          <Gamepad2 size={14} style={{ color: 'var(--text-primary)' }} />
+                          <span>Particle Physics Sandbox</span>
+                        </div>
+                        <div className="prompt-desc">Interactive black and white particle simulator.</div>
+                      </div>
+
+                      <div 
+                        className="sample-prompt-card"
+                        onClick={() => setActiveView('image-studio')}
+                      >
+                        <div className="prompt-title">
+                          <Wand2 size={14} style={{ color: 'var(--text-primary)' }} />
+                          <span>FLUX Image Studio</span>
+                        </div>
+                        <div className="prompt-desc">Open full-page FLUX studio & 50 visual style catalog.</div>
                       </div>
                     </div>
                   </div>
+                ) : (
+                  <div className="messages-inner">
+                    {activeSession?.messages.map((msg, idx) => (
+                      <ChatMessage
+                        key={idx}
+                        message={msg}
+                        onRunInCanvas={handleRunInCanvas}
+                      />
+                    ))}
+                    {isThinking && (
+                      <div className="message-wrapper ai">
+                        <div className="message-body">
+                          <div className="thinking-indicator-box" aria-label="Corez is thinking" role="status">
+                            <span className="thinking-text">Thinking</span>
+                            <span className="thinking-dots" aria-hidden="true">
+                              <span className="thinking-dot" />
+                              <span className="thinking-dot" />
+                              <span className="thinking-dot" />
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    <div ref={messagesEndRef} />
+                  </div>
                 )}
-                <div ref={messagesEndRef} />
               </div>
+
+              <ChatInput
+                onSendMessage={handleSendMessage}
+                isStreaming={isThinking}
+              />
+            </div>
+
+            {canvasOpen && (
+              <CanvasPreview
+                code={activeCanvasCode}
+                onClose={() => setCanvasOpen(false)}
+                isFullScreen={canvasFullScreen}
+                onToggleFullScreen={() => setCanvasFullScreen(prev => !prev)}
+              />
             )}
-          </div>
-
-          <ChatInput
-            onSendMessage={handleSendMessage}
-            isStreaming={isThinking}
-          />
-        </div>
-
-        {canvasOpen && (
-          <CanvasPreview
-            code={activeCanvasCode}
-            onClose={() => setCanvasOpen(false)}
-            isFullScreen={canvasFullScreen}
-            onToggleFullScreen={() => setCanvasFullScreen(prev => !prev)}
-          />
+          </>
         )}
       </main>
 
@@ -282,11 +298,6 @@ export default function App() {
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         onClearAllHistory={handleClearAllHistory}
-      />
-
-      <ImageShowcaseModal
-        isOpen={imageShowcaseOpen}
-        onClose={() => setImageShowcaseOpen(false)}
       />
     </div>
   );

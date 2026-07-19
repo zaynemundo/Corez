@@ -19,6 +19,7 @@ export default function Sidebar({
   onDeleteSession,
   onOpenSettings,
   onOpenImageShowcase,
+  activeView,
   theme,
   onToggleTheme,
   onCloseSidebar
@@ -48,9 +49,9 @@ export default function Sidebar({
 
       <div className="sidebar-tools-section">
         <button 
-          className="image-creator-btn icon-only-btn" 
+          className={`image-creator-btn icon-only-btn ${activeView === 'image-studio' ? 'active' : ''}`}
           onClick={onOpenImageShowcase}
-          title="FLUX Image Creator & Prompt Showcase"
+          title="FLUX Image Studio Page"
         >
           <ImageIcon size={14} />
         </button>
@@ -60,7 +61,7 @@ export default function Sidebar({
         {sessions.map((session) => (
           <div
             key={session.id}
-            className={`history-item icon-only-item ${session.id === activeSessionId ? 'active' : ''}`}
+            className={`history-item icon-only-item ${activeView === 'chat' && session.id === activeSessionId ? 'active' : ''}`}
             onClick={() => onSelectSession(session.id)}
             title={session.title}
           >
