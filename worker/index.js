@@ -1,5 +1,5 @@
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
-const DEFAULT_OPENROUTER_MODEL = 'moonshotai/kimi-k2.7';
+const DEFAULT_OPENROUTER_MODEL = 'deepseek/deepseek-r1';
 const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
 const DEEPSEEK_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
 const FLUX_MODEL = '@cf/black-forest-labs/flux-1-schnell';
@@ -93,6 +93,8 @@ async function handleAi(request, env) {
         },
         body: JSON.stringify({
           model: DEFAULT_OPENROUTER_MODEL,
+          reasoning_effort: 'xhigh',
+          reasoning: { effort: 'high' },
           messages: [
             { role: 'system', content: buildSystemPrompt(intent) },
             { role: 'user', content: prompt }
