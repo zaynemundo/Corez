@@ -5,8 +5,9 @@ import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
 import CanvasPreview from './components/CanvasPreview';
 import SettingsModal from './components/SettingsModal';
+import ImageShowcaseModal from './components/ImageShowcaseModal';
 import { generateAIResponse, extractCodeFromMessage } from './services/aiService';
-import { Layers, Code, Gamepad2, BarChart3 } from 'lucide-react';
+import { Layers, Code, Gamepad2, BarChart3, Wand2 } from 'lucide-react';
 
 const INITIAL_SESSIONS = [
   {
@@ -34,6 +35,7 @@ export default function App() {
   const [canvasFullScreen, setCanvasFullScreen] = useState(false);
   const [activeCanvasCode, setActiveCanvasCode] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [imageShowcaseOpen, setImageShowcaseOpen] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem('corez_theme') || 'dark');
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
@@ -161,6 +163,7 @@ export default function App() {
         onNewChat={handleNewChat}
         onDeleteSession={handleDeleteSession}
         onOpenSettings={() => setSettingsOpen(true)}
+        onOpenImageShowcase={() => setImageShowcaseOpen(true)}
         theme={theme}
         onToggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
         onCloseSidebar={() => setSidebarOpen(false)}
@@ -221,13 +224,13 @@ export default function App() {
 
                   <div 
                     className="sample-prompt-card"
-                    onClick={() => handleSendMessage('Build me a custom monochrome web tool with interactive controls.')}
+                    onClick={() => setImageShowcaseOpen(true)}
                   >
                     <div className="prompt-title">
-                      <Code size={14} style={{ color: 'var(--text-primary)' }} />
-                      <span>Custom Monochrome Tool</span>
+                      <Wand2 size={14} style={{ color: 'var(--text-primary)' }} />
+                      <span>FLUX Font Showcase</span>
                     </div>
-                    <div className="prompt-desc">Generate any HTML/CSS/JS tool on demand.</div>
+                    <div className="prompt-desc">Explore 50 font styles & batch generate FLUX images.</div>
                   </div>
                 </div>
               </div>
@@ -279,6 +282,11 @@ export default function App() {
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         onClearAllHistory={handleClearAllHistory}
+      />
+
+      <ImageShowcaseModal
+        isOpen={imageShowcaseOpen}
+        onClose={() => setImageShowcaseOpen(false)}
       />
     </div>
   );

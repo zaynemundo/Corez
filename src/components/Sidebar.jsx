@@ -6,7 +6,8 @@ import {
   Sun, 
   Moon, 
   PanelLeftClose,
-  Layers
+  Layers,
+  Image as ImageIcon
 } from 'lucide-react';
 
 export default function Sidebar({
@@ -17,6 +18,7 @@ export default function Sidebar({
   onNewChat,
   onDeleteSession,
   onOpenSettings,
+  onOpenImageShowcase,
   theme,
   onToggleTheme,
   onCloseSidebar
@@ -41,6 +43,14 @@ export default function Sidebar({
           title="New Chat Session"
         >
           <Plus size={16} />
+        </button>
+        <button 
+          className="footer-action-btn icon-only-btn" 
+          onClick={onOpenImageShowcase}
+          title="FLUX Image & Font Showcase"
+          style={{ marginTop: '0.3rem' }}
+        >
+          <ImageIcon size={15} />
         </button>
       </div>
 
