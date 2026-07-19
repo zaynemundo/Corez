@@ -258,7 +258,9 @@ export async function generateLocalAIResponse(prompt) {
 
   // 3. PUBLIC APP / GAME / WIDGET CREATION INTENT
   if (intent.type === 'app') {
-    if (lower.includes('chess')) {
+    const isRandomGame = lower.includes('random') && lower.includes('game');
+
+    if (lower.includes('chess') || (isRandomGame && Math.random() < 0.25)) {
       const chessHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -479,82 +481,251 @@ export async function generateLocalAIResponse(prompt) {
       return `I've built a playable Chess Game for you. Click below to open it live in the preview canvas on the right.\n\n\`\`\`html\n${chessHtml}\n\`\`\``;
     }
 
-    let appTitle;
-    let appBody;
+    if (lower.includes('snake') || (isRandomGame && Math.random() < 0.5)) {
+      const snakeHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>COREZ Snake Game</title>
+  <style>
+    :root { --bg: #09090b; --card: #121215; --border: #27272a; --text: #f4f4f5; --text-muted: #a1a1aa; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, system-ui, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 1.25rem 1rem; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
+    .game-container { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; width: 100%; max-width: 440px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    h1 { font-size: 1.2rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .status-bar { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem; display: flex; justify-content: space-between; padding: 0.4rem 0.6rem; background: rgba(255,255,255,0.03); border-radius: 4px; border: 1px solid var(--border); }
+    canvas { background: #000; border: 1px solid var(--border); border-radius: 4px; display: block; margin: 0 auto 1rem auto; width: 100%; max-width: 360px; aspect-ratio: 1; }
+    .btn { background: #fff; color: #000; border: none; padding: 0.55rem 1.1rem; border-radius: 4px; font-weight: 700; font-size: 0.75rem; cursor: pointer; text-transform: uppercase; }
+    .btn:hover { background: #ccc; }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <h1>COREZ SNAKE</h1>
+    <div class="status-bar">
+      <span id="scoreText">Score: 0</span>
+      <span id="highScoreText">High Score: 0</span>
+    </div>
+    <canvas id="c" width="300" height="300"></canvas>
+    <button class="btn" id="startBtn">Play / Restart</button>
+  </div>
+  <script>
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    const grid = 15, count = 20;
+    let snake = [{x: 10, y: 10}], food = {x: 15, y: 15};
+    let dx = 1, dy = 0, score = 0, highScore = 0, gameLoop = null;
 
-    if (lower.includes('timer') || lower.includes('stopwatch')) {
-      appTitle = "Stopwatch & Timer";
-      appBody = `
-        <div class="counter" id="timer">00:00.0</div>
-        <div style="display:flex; gap:0.5rem; justify-content:center; margin-top:1rem;">
-          <button class="action-btn" id="startBtn">Start</button>
-          <button class="action-btn" style="background:#222; color:#fff;" id="resetBtn">Reset</button>
-        </div>
-        <script>
-          let running = false, time = 0, timerId = null;
-          const timer = document.getElementById('timer');
-          const startBtn = document.getElementById('startBtn');
-          const resetBtn = document.getElementById('resetBtn');
-          startBtn.addEventListener('click', () => {
-            running = !running; startBtn.textContent = running ? 'Pause' : 'Start';
-            if (running) {
-              timerId = setInterval(() => {
-                time += 100;
-                let ms = Math.floor((time % 1000) / 100);
-                let sec = Math.floor((time / 1000) % 60);
-                let min = Math.floor(time / 60000);
-                timer.textContent = (min<10?'0':'')+min+':'+(sec<10?'0':'')+sec+'.'+ms;
-              }, 100);
-            } else clearInterval(timerId);
-          });
-          resetBtn.addEventListener('click', () => {
-            clearInterval(timerId); running = false; time = 0;
-            startBtn.textContent = 'Start'; timer.textContent = '00:00.0';
-          });
-        </script>`;
-    } else if (lower.includes('particle') || lower.includes('physics')) {
-      appTitle = "Particle Simulator";
-      appBody = `
-        <canvas id="c" style="width:100%; height:200px; background:#050505; border:1px solid #222; border-radius:6px; margin-top:0.5rem;"></canvas>
-        <script>
-          const canvas = document.getElementById('c'); const ctx = canvas.getContext('2d');
-          canvas.width = canvas.offsetWidth; canvas.height = 200;
-          let particles = Array.from({length: 120}, () => ({
-            x: Math.random()*canvas.width, y: Math.random()*canvas.height,
-            vx: (Math.random()-0.5)*2, vy: (Math.random()-0.5)*2
-          }));
-          let m = {x: canvas.width/2, y: canvas.height/2};
-          canvas.addEventListener('mousemove', e => {
-            const r = canvas.getBoundingClientRect(); m.x = e.clientX - r.left; m.y = e.clientY - r.top;
-          });
-          function draw() {
-            ctx.fillStyle = 'rgba(5,5,5,0.3)'; ctx.fillRect(0,0,canvas.width,canvas.height);
-            particles.forEach(p => {
-              let dx = m.x - p.x, dy = m.y - p.y, dist = Math.sqrt(dx*dx+dy*dy);
-              if (dist < 180) { p.vx += (dx/dist)*0.2; p.vy += (dy/dist)*0.2; }
-              p.vx *= 0.97; p.vy *= 0.97; p.x += p.vx; p.y += p.vy;
-              if (p.x<0||p.x>canvas.width) p.vx*=-1;
-              if (p.y<0||p.y>canvas.height) p.vy*=-1;
-              ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
-            });
-            requestAnimationFrame(draw);
-          }
-          draw();
-        </script>`;
-    } else {
-      appTitle = "Custom Interactive Tool";
-      appBody = `
-        <div class="counter" id="val">0</div>
-        <button class="action-btn" id="actBtn">Execute</button>
-        <script>
-          let v = 0;
-          document.getElementById('actBtn').addEventListener('click', () => {
-            v += 1; document.getElementById('val').textContent = v;
-          });
-        </script>`;
+    function reset() {
+      snake = [{x: 10, y: 10}]; dx = 1; dy = 0; score = 0;
+      document.getElementById('scoreText').textContent = 'Score: 0';
+      spawnFood();
+      if (gameLoop) clearInterval(gameLoop);
+      gameLoop = setInterval(update, 100);
     }
 
-    return `I've built that for you. Click below to open it on the right side.\n\n\`\`\`html\n<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <title>${appTitle}</title>\n  <style>\n    :root { --bg: #000; --card: #0d0d0d; --text: #fff; --border: rgba(255,255,255,0.15); }\n    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, system-ui, sans-serif; }\n    body { background: var(--bg); color: var(--text); padding: 1.5rem; display: flex; align-items: center; justify-content: center; min-height: 100vh; }\n    .app-card { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 1.5rem; width: 100%; max-width: 440px; text-align: center; }\n    h1 { font-size: 1.2rem; font-weight: 800; margin-bottom: 0.5rem; text-transform: uppercase; }\n    .action-btn { background: #fff; color: #000; border: none; padding: 0.5rem 1rem; border-radius: 4px; font-weight: 800; font-size: 0.8rem; cursor: pointer; text-transform: uppercase; }\n    .action-btn:hover { background: #ccc; }\n    .counter { font-size: 2rem; font-weight: 900; margin: 0.75rem 0; color: #fff; }\n  </style>\n</head>\n<body>\n  <div class="app-card">\n    <h1>${appTitle}</h1>\n    ${appBody}\n  </div>\n</body>\n</html>\n\`\`\``;
+    function spawnFood() {
+      food.x = Math.floor(Math.random() * count);
+      food.y = Math.floor(Math.random() * count);
+    }
+
+    function update() {
+      const head = {x: snake[0].x + dx, y: snake[0].y + dy};
+      if (head.x < 0 || head.x >= count || head.y < 0 || head.y >= count || snake.some(s => s.x === head.x && s.y === head.y)) {
+        clearInterval(gameLoop);
+        alert('Game Over! Final Score: ' + score);
+        return;
+      }
+      snake.unshift(head);
+      if (head.x === food.x && head.y === food.y) {
+        score += 10;
+        if (score > highScore) { highScore = score; document.getElementById('highScoreText').textContent = 'High Score: ' + highScore; }
+        document.getElementById('scoreText').textContent = 'Score: ' + score;
+        spawnFood();
+      } else {
+        snake.pop();
+      }
+      draw();
+    }
+
+    function draw() {
+      ctx.fillStyle = '#000'; ctx.fillRect(0,0,300,300);
+      ctx.fillStyle = '#fff';
+      snake.forEach(s => ctx.fillRect(s.x*grid, s.y*grid, grid-1, grid-1));
+      ctx.fillStyle = '#a1a1aa';
+      ctx.fillRect(food.x*grid, food.y*grid, grid-1, grid-1);
+    }
+
+    window.addEventListener('keydown', e => {
+      if (e.key === 'ArrowUp' && dy === 0) { dx = 0; dy = -1; }
+      if (e.key === 'ArrowDown' && dy === 0) { dx = 0; dy = 1; }
+      if (e.key === 'ArrowLeft' && dx === 0) { dx = -1; dy = 0; }
+      if (e.key === 'ArrowRight' && dx === 0) { dx = 1; dy = 0; }
+    });
+
+    document.getElementById('startBtn').addEventListener('click', reset);
+    reset();
+  </script>
+</body>
+</html>`;
+
+      return `I've generated a Snake Game for you! Use arrow keys to navigate. Click below to open in preview canvas.\n\n\`\`\`html\n${snakeHtml}\n\`\`\``;
+    }
+
+    if (lower.includes('tic tac toe') || lower.includes('tictactoe') || (isRandomGame && Math.random() < 0.75)) {
+      const ticTacToeHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>COREZ Tic-Tac-Toe</title>
+  <style>
+    :root { --bg: #09090b; --card: #121215; --border: #27272a; --text: #f4f4f5; --text-muted: #a1a1aa; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, system-ui, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 1.25rem 1rem; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
+    .game-container { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; width: 100%; max-width: 380px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    h1 { font-size: 1.2rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .status { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; padding: 0.4rem; background: rgba(255,255,255,0.03); border-radius: 4px; border: 1px solid var(--border); }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 1rem; }
+    .cell { aspect-ratio: 1; background: #18181b; border: 1px solid var(--border); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; font-weight: 800; cursor: pointer; user-select: none; transition: background 0.15s; }
+    .cell:hover { background: #27272a; }
+    .btn { background: #fff; color: #000; border: none; padding: 0.55rem 1.1rem; border-radius: 4px; font-weight: 700; font-size: 0.75rem; cursor: pointer; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <h1>COREZ TIC-TAC-TOE</h1>
+    <div class="status" id="status">Turn: Player X</div>
+    <div class="grid" id="grid"></div>
+    <button class="btn" id="reset">Reset Game</button>
+  </div>
+  <script>
+    let board = Array(9).fill('');
+    let turn = 'X';
+    let active = true;
+
+    function render() {
+      const g = document.getElementById('grid');
+      g.innerHTML = '';
+      board.forEach((v, i) => {
+        const c = document.createElement('div');
+        c.className = 'cell';
+        c.textContent = v;
+        c.onclick = () => move(i);
+        g.appendChild(c);
+      });
+    }
+
+    function move(i) {
+      if (!board[i] && active) {
+        board[i] = turn;
+        if (checkWin()) {
+          document.getElementById('status').textContent = 'Player ' + turn + ' Wins! 🎉';
+          active = false;
+        } else if (board.every(b => b)) {
+          document.getElementById('status').textContent = "It's a Draw! 🤝";
+          active = false;
+        } else {
+          turn = turn === 'X' ? 'O' : 'X';
+          document.getElementById('status').textContent = 'Turn: Player ' + turn;
+        }
+        render();
+      }
+    }
+
+    function checkWin() {
+      const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+      return wins.some(([a,b,c]) => board[a] && board[a] === board[b] && board[a] === board[c]);
+    }
+
+    document.getElementById('reset').onclick = () => {
+      board = Array(9).fill(''); turn = 'X'; active = true;
+      document.getElementById('status').textContent = 'Turn: Player X';
+      render();
+    };
+    render();
+  </script>
+</body>
+</html>`;
+
+      return `I've created a Tic-Tac-Toe Game for you! Click below to open in preview canvas.\n\n\`\`\`html\n${ticTacToeHtml}\n\`\`\``;
+    }
+
+    const memoryHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>COREZ Memory Match</title>
+  <style>
+    :root { --bg: #09090b; --card: #121215; --border: #27272a; --text: #f4f4f5; --text-muted: #a1a1aa; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, system-ui, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 1.25rem 1rem; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
+    .game-container { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; width: 100%; max-width: 420px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    h1 { font-size: 1.2rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .status { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; padding: 0.4rem; background: rgba(255,255,255,0.03); border-radius: 4px; border: 1px solid var(--border); }
+    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 1rem; }
+    .card { aspect-ratio: 1; background: #18181b; border: 1px solid var(--border); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; cursor: pointer; user-select: none; transition: transform 0.2s, background 0.2s; }
+    .card.flipped { background: #3f3f46; color: #fff; }
+    .btn { background: #fff; color: #000; border: none; padding: 0.55rem 1.1rem; border-radius: 4px; font-weight: 700; font-size: 0.75rem; cursor: pointer; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <h1>COREZ MEMORY MATCH</h1>
+    <div class="status" id="status">Pairs Found: 0 / 6</div>
+    <div class="grid" id="grid"></div>
+    <button class="btn" id="reset">Restart Game</button>
+  </div>
+  <script>
+    const icons = ['♔','♕','♖','♗','♘','♙'];
+    let cards = [], flipped = [], matched = 0;
+
+    function init() {
+      cards = [...icons, ...icons].sort(() => Math.random() - 0.5);
+      flipped = []; matched = 0;
+      document.getElementById('status').textContent = 'Pairs Found: 0 / 6';
+      render();
+    }
+
+    function render() {
+      const g = document.getElementById('grid');
+      g.innerHTML = '';
+      cards.forEach((symbol, i) => {
+        const c = document.createElement('div');
+        const isFlipped = flipped.includes(i) || c.dataset.matched === 'true';
+        c.className = 'card' + (isFlipped ? ' flipped' : '');
+        c.textContent = isFlipped ? symbol : '?';
+        c.onclick = () => flip(i, c);
+        g.appendChild(c);
+      });
+    }
+
+    function flip(i, el) {
+      if (flipped.length < 2 && !flipped.includes(i) && el.textContent === '?') {
+        flipped.push(i);
+        render();
+        if (flipped.length === 2) {
+          const [a, b] = flipped;
+          if (cards[a] === cards[b]) {
+            matched++;
+            document.getElementById('status').textContent = 'Pairs Found: ' + matched + ' / 6';
+            flipped = [];
+            if (matched === 6) {
+              setTimeout(() => alert('Congratulations! You matched all pairs! 🎉'), 200);
+            }
+          } else {
+            setTimeout(() => { flipped = []; render(); }, 800);
+          }
+        }
+      }
+    }
+
+    document.getElementById('reset').onclick = init;
+    init();
+  </script>
+</body>
+</html>`;
+
+    return `I've generated a Memory Card Matching Game for you! Click below to open in preview canvas.\n\n\`\`\`html\n${memoryHtml}\n\`\`\``;
   }
 
   // 4. PUBLIC USER INTENT RESPONSES
