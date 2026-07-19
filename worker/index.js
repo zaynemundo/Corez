@@ -1,5 +1,6 @@
 const WORKERS_AI_MODEL = '@cf/zai-org/glm-4.7-flash';
 const FLUX_MODEL = '@cf/black-forest-labs/flux-1-schnell';
+const SDXL_LIGHTNING_MODEL = '@cf/bytedance/stable-diffusion-xl-lightning';
 
 function jsonResponse(status, body) {
   return Response.json(body, { status });
@@ -124,33 +125,70 @@ async function handleImage(request, env) {
   }
 
   try {
-    const arrayBuffer = await env.AI.run(FLUX_MODEL, {
-      prompt: prompt,
-      num_steps: 4
-    });
+    let result;
+    let usedModel = FLUX_MODEL;
 
-    if (!arrayBuffer) {
-      return jsonResponse(502, { error: 'FLUX model returned no image data.' });
+    try {
+      result = await env.AI.run(FLUX_MODEL, {
+        prompt: prompt,
+        num_steps: 4
+      });
+    } catch (fluxErr) {
+      console.warn('FLUX model failed, attempting SDXL Lightning fallback:', safeErrorDetail(fluxErr));
+      usedModel = SDXL_LIGHTNING_MODEL;
+      result = await env.AI.run(SDXL_LIGHTNING_MODEL, {
+        prompt: prompt
+      });
+    }
+
+    if (!result) {
+      return jsonResponse(502, { error: 'Workers AI returned empty image data.' });
+    }
+
+    // Handle object with base64 property
+    if (typeof result === 'object' && result !== null && typeof result.image === 'string') {
+      const b64 = result.image.startsWith('data:') ? result.image : `data:image/png;base64,${result.image}`;
+      return jsonResponse(200, { image: b64, model: usedModel });
+    }
+
+    // Handle ArrayBuffer, View, Response, or Stream
+    let arrayBuffer;
+    if (result instanceof ArrayBuffer) {
+      arrayBuffer = result;
+    } else if (ArrayBuffer.isView(result)) {
+      arrayBuffer = result.buffer;
+    } else if (typeof result?.arrayBuffer === 'function') {
+      arrayBuffer = await result.arrayBuffer();
+    } else if (typeof Response !== 'undefined' && (result instanceof Response || typeof result?.getReader === 'function')) {
+      arrayBuffer = await new Response(result).arrayBuffer();
+    } else {
+      const str = String(result);
+      if (str.startsWith('data:image')) {
+        return jsonResponse(200, { image: str, model: usedModel });
+      }
+      return jsonResponse(502, { error: 'Unexpected Workers AI image format.' });
     }
 
     const bytes = new Uint8Array(arrayBuffer);
     let binary = '';
     const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-      binary += String.fromCharCode(bytes[i]);
+    const chunkSize = 8192;
+    for (let i = 0; i < len; i += chunkSize) {
+      const chunk = bytes.subarray(i, i + chunkSize);
+      binary += String.fromCharCode.apply(null, chunk);
     }
     const base64 = btoa(binary);
 
     return jsonResponse(200, {
       image: `data:image/png;base64,${base64}`,
-      model: FLUX_MODEL
+      model: usedModel
     });
   } catch (error) {
     console.error(JSON.stringify({
-      message: 'FLUX image generation failed',
+      message: 'Image generation failed',
       error: safeErrorDetail(error)
     }));
-    return jsonResponse(502, { error: 'Unable to generate FLUX image.' });
+    return jsonResponse(502, { error: `Unable to generate image: ${safeErrorDetail(error)}` });
   }
 }
 

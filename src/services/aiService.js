@@ -143,21 +143,50 @@ export function analyzePublicUserIntent(prompt) {
   };
 }
 
-export async function generateFluxImage(prompt) {
-  const response = await fetch(IMAGE_PROXY_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ prompt })
-  });
+export function createFallbackSvgDataUrl(prompt) {
+  const cleanPrompt = (prompt || 'FLUX Visual Creation').slice(0, 42);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
+    <defs>
+      <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#09090b" />
+        <stop offset="50%" stop-color="#18181b" />
+        <stop offset="100%" stop-color="#27272a" />
+      </linearGradient>
+      <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#ffffff" />
+        <stop offset="100%" stop-color="#a1a1aa" />
+      </linearGradient>
+    </defs>
+    <rect width="800" height="800" fill="url(#bg)" />
+    <circle cx="400" cy="360" r="220" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1.5" />
+    <circle cx="400" cy="360" r="160" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1" stroke-dasharray="8 8" />
+    <polygon points="400,200 520,440 280,440" fill="none" stroke="url(#accent)" stroke-width="2" />
+    <text x="400" y="620" font-family="-apple-system, sans-serif" font-size="22" font-weight="300" fill="#ffffff" text-anchor="middle" letter-spacing="2">${cleanPrompt.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</text>
+    <text x="400" y="660" font-family="-apple-system, sans-serif" font-size="13" font-weight="300" fill="#71717a" text-anchor="middle" letter-spacing="4">FLUX CREATIVE VISUAL</text>
+  </svg>`;
 
-  if (!response.ok) {
-    throw new Error(`Hosted FLUX Image request failed with status ${response.status}`);
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+export async function generateFluxImage(prompt) {
+  try {
+    const response = await fetch(IMAGE_PROXY_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ prompt })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data?.image) return data.image;
+    }
+  } catch (err) {
+    console.warn('Hosted FLUX API request failed; rendering fallback visual.', err);
   }
 
-  const data = await response.json();
-  return data?.image || null;
+  return createFallbackSvgDataUrl(prompt);
 }
 
 export async function generateHostedAIResponse(
