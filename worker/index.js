@@ -1,5 +1,9 @@
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
-const DEFAULT_OPENROUTER_MODEL = 'deepseek/deepseek-v4-pro';
+const OPENROUTER_MODELS = [
+  'deepseek/deepseek-chat',
+  'deepseek/deepseek-r1',
+  'meta-llama/llama-3.3-70b-instruct'
+];
 const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
 const DEEPSEEK_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
 const FLUX_MODEL = '@cf/black-forest-labs/flux-1-schnell';
@@ -82,35 +86,35 @@ async function handleAi(request, env) {
   // 1. Try OpenRouter API if OPENROUTER_API_KEY is configured
   const openRouterKey = env?.OPENROUTER_API_KEY || (typeof process !== 'undefined' ? process.env?.OPENROUTER_API_KEY : null);
   if (openRouterKey) {
-    try {
-      const openRouterResp = await fetch(OPENROUTER_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openRouterKey}`,
-          'HTTP-Referer': 'https://corez.ai',
-          'X-Title': 'COREZ AI',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: DEFAULT_OPENROUTER_MODEL,
-          reasoning_effort: 'xhigh',
-          reasoning: { effort: 'high' },
-          messages: [
-            { role: 'system', content: buildSystemPrompt(intent) },
-            { role: 'user', content: prompt }
-          ]
-        })
-      });
+    for (const modelId of OPENROUTER_MODELS) {
+      try {
+        const openRouterResp = await fetch(OPENROUTER_ENDPOINT, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openRouterKey}`,
+            'HTTP-Referer': 'https://corez.ai',
+            'X-Title': 'COREZ AI',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: modelId,
+            messages: [
+              { role: 'system', content: buildSystemPrompt(intent) },
+              { role: 'user', content: prompt }
+            ]
+          })
+        });
 
-      if (openRouterResp.ok) {
-        const data = await openRouterResp.json();
-        const content = data?.choices?.[0]?.message?.content;
-        if (content && typeof content === 'string' && content.trim()) {
-          return jsonResponse(200, { content: content.trim(), model: DEFAULT_OPENROUTER_MODEL });
+        if (openRouterResp.ok) {
+          const data = await openRouterResp.json();
+          const content = data?.choices?.[0]?.message?.content;
+          if (content && typeof content === 'string' && content.trim()) {
+            return jsonResponse(200, { content: content.trim(), model: modelId });
+          }
         }
+      } catch (orErr) {
+        console.warn(`OpenRouter model ${modelId} request failed:`, safeErrorDetail(orErr));
       }
-    } catch (orErr) {
-      console.warn('OpenRouter request failed, falling back to Cloudflare Workers AI:', safeErrorDetail(orErr));
     }
   }
 

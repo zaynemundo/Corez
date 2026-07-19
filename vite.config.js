@@ -2,6 +2,12 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
 function apiDevPlugin() {
+  const models = [
+    'deepseek/deepseek-chat',
+    'deepseek/deepseek-r1',
+    'meta-llama/llama-3.3-70b-instruct'
+  ];
+
   return {
     name: 'api-dev-plugin',
     configureServer(server) {
@@ -27,41 +33,50 @@ function apiDevPlugin() {
 
               const systemPrompt = `You are COREZ AI.
 Guidelines:
-- If the user asks for ANY game, application, landing page, dashboard, tool, simulator, widget, or prototype, generate a complete, rich, runnable HTML document with embedded CSS and JavaScript inside a single \`\`\`html ... \`\`\` code block.
-- Always write complete, production-ready, working code.
+- If the user asks for ANY game, application, landing page, dashboard, tool, simulator, widget, website, or prototype, generate a complete, rich, unique, runnable HTML document with embedded CSS and JavaScript inside a single \`\`\`html ... \`\`\` code block.
+- Always write complete, production-ready, working code tailored specifically to the prompt topic. Never output generic fallback code.
 Inferred intent: ${intent?.type || 'app'} - ${intent?.summary || 'Create a public-facing interactive experience'}`;
 
-              const openRouterResp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${openRouterKey}`,
-                  'HTTP-Referer': 'https://corez.ai',
-                  'X-Title': 'COREZ AI',
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  model: 'deepseek/deepseek-v4-pro',
-                  messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: prompt }
-                  ]
-                })
-              });
+              let lastError = null;
+              for (const modelId of models) {
+                try {
+                  const openRouterResp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${openRouterKey}`,
+                      'HTTP-Referer': 'https://corez.ai',
+                      'X-Title': 'COREZ AI',
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                      model: modelId,
+                      messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: prompt }
+                      ]
+                    })
+                  });
 
-              if (!openRouterResp.ok) {
-                const errText = await openRouterResp.text();
-                res.statusCode = openRouterResp.status;
-                res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ error: `OpenRouter error: ${errText}` }));
-                return;
+                  if (openRouterResp.ok) {
+                    const data = await openRouterResp.json();
+                    const content = data?.choices?.[0]?.message?.content || '';
+                    if (content.trim()) {
+                      res.statusCode = 200;
+                      res.setHeader('Content-Type', 'application/json');
+                      res.end(JSON.stringify({ content: content.trim(), model: modelId }));
+                      return;
+                    }
+                  } else {
+                    lastError = await openRouterResp.text();
+                  }
+                } catch (e) {
+                  lastError = e.message;
+                }
               }
 
-              const data = await openRouterResp.json();
-              const content = data?.choices?.[0]?.message?.content || '';
-
-              res.statusCode = 200;
+              res.statusCode = 502;
               res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify({ content: content.trim(), model: 'deepseek/deepseek-v4-pro' }));
+              res.end(JSON.stringify({ error: `OpenRouter error: ${lastError}` }));
             } catch (err) {
               res.statusCode = 500;
               res.setHeader('Content-Type', 'application/json');
