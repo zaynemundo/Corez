@@ -22,8 +22,8 @@
   --font-heading: var(--font-sans);
   --font-mono: 'JetBrains Mono', monospace;
   
-  --sidebar-width: 52px;
-  --sidebar-margin: 12px;
+  --sidebar-width: 60px;
+  --sidebar-margin: 16px;
   --sidebar-radius: 16px;
   --sidebar-heading-size: 10px;
   --sidebar-heading-tracking: 0.08em;
@@ -184,18 +184,18 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .sidebar-header.icon-only-header {
-  padding: 0.65rem 0;
+  padding: 1.25rem 0 0.75rem 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.5rem;
   justify-content: center;
   border-bottom: 1px solid var(--sidebar-border);
 }
 
 .brand-icon {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   background: transparent;
   border: none;
   color: var(--text-primary);
@@ -212,24 +212,24 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .close-sidebar-btn {
-  min-width: 26px;
-  min-height: 26px;
-  width: 26px;
-  height: 26px;
+  min-width: 28px;
+  min-height: 28px;
+  width: 28px;
+  height: 28px;
   border: none;
   background: transparent;
 }
 
 .sidebar-action-box {
-  padding: 0.5rem 0 0.2rem 0;
+  padding: 0.65rem 0 0.25rem 0;
   display: flex;
   justify-content: center;
 }
 
 .new-chat-btn.icon-only-btn {
-  width: 32px;
-  height: 32px;
-  min-height: 32px;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
   margin: 0 auto;
   padding: 0;
   border: none;
@@ -251,17 +251,17 @@ h1, h2, h3, h4, h5, h6 {
 .chat-history-list.icon-only-list {
   flex: 1;
   overflow-y: auto;
-  padding: 0.4rem 0;
+  padding: 0.45rem 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.35rem;
 }
 
 .history-item.icon-only-item {
-  width: 32px;
-  height: 32px;
-  min-height: 32px;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
   padding: 0;
   display: flex;
   align-items: center;
@@ -291,10 +291,10 @@ h1, h2, h3, h4, h5, h6 {
   position: absolute;
   top: -2px;
   right: -2px;
-  width: 14px;
-  height: 14px;
-  min-width: 14px;
-  min-height: 14px;
+  width: 15px;
+  height: 15px;
+  min-width: 15px;
+  min-height: 15px;
   padding: 0;
   opacity: 0;
   background: transparent;
@@ -316,18 +316,18 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .sidebar-footer.icon-only-footer {
-  padding: 0.5rem 0;
+  padding: 0.65rem 0;
   border-top: 1px solid var(--sidebar-border);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.4rem;
 }
 
 .footer-action-btn.icon-only-btn {
-  width: 32px;
-  height: 32px;
-  min-height: 32px;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
   padding: 0;
   border: none;
   background: none;
