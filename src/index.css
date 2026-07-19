@@ -24,7 +24,7 @@
   
   --sidebar-width: 52px;
   --sidebar-margin: 12px;
-  --sidebar-radius: 16px;
+  --sidebar-radius: 28px;
   --sidebar-heading-size: 10px;
   --sidebar-heading-tracking: 0.08em;
   --sidebar-body-size: 12px;
@@ -36,11 +36,11 @@
   --sidebar-item-hover-bg: rgba(255, 255, 255, 0.05);
   --sidebar-item-active-bg: rgba(255, 255, 255, 0.10);
 
-  --radius-xs: 6px;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  --radius-xs: 8px;
+  --radius-sm: 14px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --radius-xl: 30px;
   --radius-pill: 9999px;
   
   --transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
@@ -562,7 +562,7 @@ h1, h2, h3, h4, h5, h6 {
 /* Fully Rounded Soft Curved Message Bubbles */
 .message-content {
   padding: 0.8rem 1.1rem;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xl);
   font-size: 0.75rem;
   font-weight: 400;
   line-height: 1.6;
@@ -572,13 +572,13 @@ h1, h2, h3, h4, h5, h6 {
   background-color: var(--bg-tertiary);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xl);
 }
 
 .message-wrapper.ai .message-content {
   background-color: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   padding: 0.9rem 1.15rem;
   color: var(--text-primary);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
@@ -703,7 +703,7 @@ h1, h2, h3, h4, h5, h6 {
   padding: 0.65rem 0.9rem;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-pill);
   color: var(--text-primary);
   font-size: 0.775rem;
   font-weight: 300;
@@ -721,7 +721,7 @@ h1, h2, h3, h4, h5, h6 {
 /* Code Block Component */
 .code-block-container {
   margin: 0.75rem 0;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   overflow: hidden;
   border: 1px solid var(--border-color);
   background-color: var(--code-bg);
@@ -793,7 +793,7 @@ h1, h2, h3, h4, h5, h6 {
   max-width: 760px;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-pill);
   padding: 0.55rem 0.65rem 0.55rem 1.25rem;
   display: flex;
   flex-direction: row;
