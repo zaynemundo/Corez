@@ -1,8 +1,6 @@
 import { 
   PanelLeftOpen, 
-  PanelRight, 
-  Settings,
-  Layers
+  PanelRight
 } from 'lucide-react';
 
 export default function Header({
@@ -10,7 +8,6 @@ export default function Header({
   onToggleSidebar,
   canvasOpen,
   onToggleCanvas,
-  onOpenSettings,
   hasExecutableCode
 }) {
   return (
@@ -25,13 +22,6 @@ export default function Header({
             <PanelLeftOpen size={16} />
           </button>
         )}
-
-        <div className="brand-title" style={{ fontSize: '0.95rem', fontWeight: 300 }}>
-          <div className="brand-icon" style={{ width: '20px', height: '20px' }}>
-            <Layers size={13} />
-          </div>
-          <span>Corez AI</span>
-        </div>
       </div>
 
       <div className="header-right">
@@ -46,14 +36,6 @@ export default function Header({
           {hasExecutableCode && (
             <span style={{ width: '5px', height: '5px', borderRadius: '99px', backgroundColor: 'var(--text-primary)' }} />
           )}
-        </button>
-
-        <button 
-          className="icon-btn" 
-          onClick={onOpenSettings}
-          title="Corez Settings"
-        >
-          <Settings size={16} />
         </button>
       </div>
     </header>

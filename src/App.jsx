@@ -182,7 +182,6 @@ export default function App() {
             onToggleSidebar={() => setSidebarOpen(prev => !prev)}
             canvasOpen={canvasOpen}
             onToggleCanvas={() => setCanvasOpen(prev => !prev)}
-            onOpenSettings={() => setSettingsOpen(true)}
             hasExecutableCode={!!activeCanvasCode}
           />
 
