@@ -1,3 +1,5 @@
+const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
+const DEFAULT_OPENROUTER_MODEL = 'moonshotai/kimi-k2.7';
 const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
 const DEEPSEEK_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
 const FLUX_MODEL = '@cf/black-forest-labs/flux-1-schnell';
@@ -54,9 +56,6 @@ async function handleAi(request, env) {
   if (request.method !== 'POST') {
     return jsonResponse(405, { error: 'Method not allowed.' });
   }
-  if (!env.AI || typeof env.AI.run !== 'function') {
-    return jsonResponse(503, { error: 'Workers AI is not configured.' });
-  }
 
   let body;
   try {
@@ -79,6 +78,44 @@ async function handleAi(request, env) {
     && !Array.isArray(body.intent)
     ? body.intent
     : null;
+
+  // 1. Try OpenRouter API if OPENROUTER_API_KEY is configured
+  const openRouterKey = env?.OPENROUTER_API_KEY || (typeof process !== 'undefined' ? process.env?.OPENROUTER_API_KEY : null);
+  if (openRouterKey) {
+    try {
+      const openRouterResp = await fetch(OPENROUTER_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openRouterKey}`,
+          'HTTP-Referer': 'https://corez.ai',
+          'X-Title': 'COREZ AI',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: DEFAULT_OPENROUTER_MODEL,
+          messages: [
+            { role: 'system', content: buildSystemPrompt(intent) },
+            { role: 'user', content: prompt }
+          ]
+        })
+      });
+
+      if (openRouterResp.ok) {
+        const data = await openRouterResp.json();
+        const content = data?.choices?.[0]?.message?.content;
+        if (content && typeof content === 'string' && content.trim()) {
+          return jsonResponse(200, { content: content.trim(), model: DEFAULT_OPENROUTER_MODEL });
+        }
+      }
+    } catch (orErr) {
+      console.warn('OpenRouter request failed, falling back to Cloudflare Workers AI:', safeErrorDetail(orErr));
+    }
+  }
+
+  // 2. Cloudflare Workers AI Fallback
+  if (!env.AI || typeof env.AI.run !== 'function') {
+    return jsonResponse(503, { error: 'Workers AI is not configured.' });
+  }
 
   try {
     let result;

@@ -35,8 +35,8 @@ check 'Worker sends a user message' "role: 'user'" "$worker"
 check 'frontend calls the public AI route' "fetch\(AI_PROXY_ENDPOINT" "$service"
 check 'frontend configures the public AI route' "AI_PROXY_ENDPOINT = '/api/ai'" "$service"
 check 'frontend retains local fallback' 'generateLocalAIResponse' "$service"
-check_absent 'Worker has no OpenRouter endpoint' 'openrouter[.]ai' "$worker"
-check_absent 'active Worker has no OpenRouter key' 'OPENROUTER_API_KEY' "$worker"
+check 'Worker supports OpenRouter text endpoint' 'openrouter[.]ai' "$worker"
+check 'Worker supports OPENROUTER_API_KEY environment variable' 'OPENROUTER_API_KEY' "$worker"
 check_absent 'frontend has no model override storage' 'corez_openrouter_model|VITE_OPENROUTER_MODEL' "$service"
 
 if (( failures > 0 )); then
