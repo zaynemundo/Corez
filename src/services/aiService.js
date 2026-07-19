@@ -191,21 +191,14 @@ export async function generateFluxImage(prompt) {
 
 export async function generateHostedAIResponse(
   prompt,
-  intent = analyzePublicUserIntent(prompt),
-  attachedDocs = []
+  intent = analyzePublicUserIntent(prompt)
 ) {
-  let combinedPrompt = prompt;
-  if (attachedDocs && attachedDocs.length > 0) {
-    const docContext = attachedDocs.map(d => `Document "${d.name}" (${d.size}):\n${d.text}`).join('\n\n---\n\n');
-    combinedPrompt = `${prompt}\n\nAttached Documents Context:\n${docContext}`;
-  }
-
   const response = await fetch(AI_PROXY_ENDPOINT, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ prompt: combinedPrompt, intent })
+    body: JSON.stringify({ prompt, intent })
   });
 
   if (!response.ok) {
@@ -237,23 +230,13 @@ export function extractCodeFromMessage(text) {
 }
 
 // Generate concise, natural AI responses for any public user
-export async function generateLocalAIResponse(prompt, attachedDocs = []) {
+export async function generateLocalAIResponse(prompt) {
   const cleanPrompt = prompt.trim();
   const lower = cleanPrompt.toLowerCase();
   const intent = analyzePublicUserIntent(cleanPrompt);
 
   // Natural short latency (0.6s)
   await new Promise(r => setTimeout(r, 600));
-
-  // DOCUMENT ATTACHMENT HANDLER
-  if (attachedDocs && attachedDocs.length > 0) {
-    const docNames = attachedDocs.map(d => `**\`${d.name}\`** (${d.size})`).join(', ');
-    const firstDoc = attachedDocs[0];
-    const previewSnippet = firstDoc.text ? firstDoc.text.slice(0, 300).trim() : '';
-    const lineCount = firstDoc.text ? firstDoc.text.split('\n').length : 0;
-
-    return `I have parsed your attached document${attachedDocs.length > 1 ? 's' : ''}: ${docNames}.\n\n### Document Overview\n- **Primary File:** \`${firstDoc.name}\` (${firstDoc.size})\n- **Type:** \`${firstDoc.type || 'text/plain'}\`\n- **Approx. Lines:** ${lineCount}\n\n**Preview Snippet:**\n\`\`\`\n${previewSnippet}${firstDoc.text && firstDoc.text.length > 300 ? '\n...' : ''}\n\`\`\`\n\n### What would you like Corez to do next with this document?\n- **Summarize** main points & key takeaways\n- **Extract** key structured data, tables, or code\n- **Analyze** logic, errors, or tone\n- **Transform** into a live preview app or formatted guide`;
-  }
 
   // 1. GREETINGS & SMALL TALK (Universal & Natural)
   if (/^(hello|hi|hey|greetings|good morning|good afternoon|good evening|howdy|sup)(\s|!|\.|\?|$)/i.test(lower)) {
@@ -371,7 +354,7 @@ export async function generateLocalAIResponse(prompt, attachedDocs = []) {
 
 const IMAGE_PATTERNS = /\b(generate|create|draw|make|render|show|flux)\b.*\b(image|picture|photo|logo|illustration|artwork|wallpaper|drawing|graphic)\b|\b(image|picture|photo|logo|illustration|artwork|wallpaper|drawing|graphic)\b.*\b(generate|create|draw|make|render|flux)\b/i;
 
-export async function generateAIResponse(prompt, attachedDocs = []) {
+export async function generateAIResponse(prompt) {
   const cleanPrompt = prompt.trim();
 
   if (IMAGE_PATTERNS.test(cleanPrompt) || cleanPrompt.toLowerCase().startsWith('image:') || cleanPrompt.toLowerCase().startsWith('flux:')) {
@@ -388,7 +371,7 @@ export async function generateAIResponse(prompt, attachedDocs = []) {
   const intent = analyzePublicUserIntent(cleanPrompt);
 
   try {
-    const hostedAiResponse = await generateHostedAIResponse(cleanPrompt, intent, attachedDocs);
+    const hostedAiResponse = await generateHostedAIResponse(cleanPrompt, intent);
     if (hostedAiResponse) {
       return hostedAiResponse;
     }
@@ -396,5 +379,5 @@ export async function generateAIResponse(prompt, attachedDocs = []) {
     console.warn('Hosted AI unavailable; using local Corez fallback.', hostedAiError);
   }
 
-  return generateLocalAIResponse(cleanPrompt, attachedDocs);
+  return generateLocalAIResponse(cleanPrompt);
 }

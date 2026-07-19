@@ -2,11 +2,8 @@ import { useState } from 'react';
 import { 
   Layers,
   ChevronRight,
-  ChevronDown,
-  ChevronUp,
   Copy,
-  Check,
-  FileText
+  Check
 } from 'lucide-react';
 
 function CodeSnippetBlock({ code, lang }) {
@@ -36,29 +33,8 @@ function CodeSnippetBlock({ code, lang }) {
   );
 }
 
-function DocumentCardItem({ doc }) {
-  const [expanded, setExpanded] = useState(false);
-
-  return (
-    <div className="chat-doc-card">
-      <div className="chat-doc-header" onClick={() => setExpanded(!expanded)} title="Toggle document content preview">
-        <FileText size={14} className="chat-doc-icon" />
-        <span className="chat-doc-name">{doc.name}</span>
-        <span className="chat-doc-size">{doc.size}</span>
-        {expanded ? <ChevronUp size={14} className="chat-doc-toggle" /> : <ChevronDown size={14} className="chat-doc-toggle" />}
-      </div>
-      {expanded && (
-        <div className="chat-doc-body">
-          <pre>{doc.text || '[Empty or binary document content]'}</pre>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function ChatMessage({ message, onRunInCanvas }) {
   const isUser = message.role === 'user';
-  const hasDocs = message.documents && message.documents.length > 0;
 
   const renderInlineFormattedText = (text) => {
     if (!text) return null;
@@ -187,13 +163,6 @@ export default function ChatMessage({ message, onRunInCanvas }) {
   return (
     <div className={`message-wrapper ${isUser ? 'user' : 'ai'}`}>
       <div className="message-body">
-        {hasDocs && (
-          <div className="chat-documents-grid">
-            {message.documents.map((doc, idx) => (
-              <DocumentCardItem key={doc.id || idx} doc={doc} />
-            ))}
-          </div>
-        )}
         <div className="message-content">
           {renderFormattedText(message.content)}
         </div>

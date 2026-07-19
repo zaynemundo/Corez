@@ -125,10 +125,10 @@ export default function App() {
     setCanvasOpen(true);
   };
 
-  const handleSendMessage = async (promptText, attachedDocs = []) => {
+  const handleSendMessage = async (promptText) => {
     if (!activeSession) return;
 
-    const userMsg = { role: 'user', content: promptText, documents: attachedDocs };
+    const userMsg = { role: 'user', content: promptText };
     const updatedMessages = [...activeSession.messages, userMsg];
 
     const updatedTitle = activeSession.messages.length === 0 
@@ -144,7 +144,7 @@ export default function App() {
 
     setIsThinking(true);
 
-    const responseText = await generateAIResponse(promptText, attachedDocs);
+    const responseText = await generateAIResponse(promptText);
     const extractedCode = extractCodeFromMessage(responseText);
     if (extractedCode) {
       setActiveCanvasCode(extractedCode);
