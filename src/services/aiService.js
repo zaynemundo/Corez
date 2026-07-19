@@ -484,8 +484,148 @@ function synthesizeCustomGame(prompt) {
     };
   }
 
+  // DINO RUNNER / RETRO JUMP GAME
+  if (lower.includes('dino') || lower.includes('dinosaur') || lower.includes('runner') || lower.includes('jump') || lower.includes('t-rex')) {
+    return {
+      title: 'COREZ Retro Dino Runner 🦖',
+      html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>COREZ Retro Dino Runner</title>
+  <style>
+    :root { --bg: #09090b; --card: #121215; --border: #27272a; --text: #f4f4f5; --text-muted: #a1a1aa; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, system-ui, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 1.25rem 1rem; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
+    .game-container { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; width: 100%; max-width: 480px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    h1 { font-size: 1.2rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .status-bar { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem; display: flex; justify-content: space-between; padding: 0.4rem 0.65rem; background: rgba(255,255,255,0.03); border-radius: 4px; border: 1px solid var(--border); }
+    canvas { background: #050505; border: 1px solid var(--border); border-radius: 4px; display: block; margin: 0 auto 0.75rem auto; width: 100%; max-width: 440px; aspect-ratio: 2 / 1; cursor: pointer; }
+    .controls-hint { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.75rem; }
+    .btn { background: #fff; color: #000; border: none; padding: 0.55rem 1.1rem; border-radius: 4px; font-weight: 700; font-size: 0.75rem; cursor: pointer; text-transform: uppercase; }
+    .btn:hover { background: #ccc; }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <h1>COREZ DINO RUNNER 🦖</h1>
+    <div class="status-bar">
+      <span id="scoreText">Score: 0</span>
+      <span id="highScoreText">High Score: 0</span>
+    </div>
+    <canvas id="c" width="400" height="200"></canvas>
+    <div class="controls-hint">Press SPACE, UP ARROW, or TAP CANVAS to Jump</div>
+    <button class="btn" id="startBtn">Play / Restart</button>
+  </div>
+  <script>
+    const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+    let dino = { x: 40, y: 150, w: 20, h: 30, vy: 0, grounded: true };
+    let obstacles = [];
+    let score = 0, highScore = 0, speed = 4, frame = 0, isRunning = false, loop = null;
+
+    function jump() {
+      if (dino.grounded && isRunning) {
+        dino.vy = -10;
+        dino.grounded = false;
+      } else if (!isRunning) {
+        start();
+      }
+    }
+
+    function spawnObstacle() {
+      const h = 20 + Math.random() * 20;
+      obstacles.push({ x: 400, w: 14, h: h, y: 180 - h });
+    }
+
+    function start() {
+      dino = { x: 40, y: 150, w: 20, h: 30, vy: 0, grounded: true };
+      obstacles = [];
+      score = 0; speed = 4; frame = 0; isRunning = true;
+      document.getElementById('scoreText').textContent = 'Score: 0';
+      if (loop) clearInterval(loop);
+      loop = setInterval(update, 1000/60);
+    }
+
+    function update() {
+      frame++;
+      score = Math.floor(frame / 5);
+      if (score > highScore) { highScore = score; document.getElementById('highScoreText').textContent = 'High Score: ' + highScore; }
+      document.getElementById('scoreText').textContent = 'Score: ' + score;
+
+      if (frame % 300 === 0) speed += 0.5;
+
+      dino.vy += 0.5;
+      dino.y += dino.vy;
+      if (dino.y >= 150) {
+        dino.y = 150;
+        dino.vy = 0;
+        dino.grounded = true;
+      }
+
+      if (frame % Math.max(40, Math.floor(100 - speed * 4)) === 0) {
+        spawnObstacle();
+      }
+
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        const o = obstacles[i];
+        o.x -= speed;
+
+        if (dino.x < o.x + o.w && dino.x + dino.w > o.x && dino.y < o.y + o.h && dino.y + dino.h > o.y) {
+          isRunning = false;
+          clearInterval(loop);
+          ctx.fillStyle = 'rgba(0,0,0,0.75)';
+          ctx.fillRect(0, 0, 400, 200);
+          ctx.fillStyle = '#fff';
+          ctx.font = '700 18px -apple-system, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('GAME OVER 🦖', 200, 90);
+          ctx.font = '400 13px -apple-system, sans-serif';
+          ctx.fillText('Final Score: ' + score + ' - Tap to Restart', 200, 120);
+          return;
+        }
+
+        if (o.x + o.w < 0) obstacles.splice(i, 1);
+      }
+
+      draw();
+    }
+
+    function draw() {
+      ctx.fillStyle = '#050505';
+      ctx.fillRect(0, 0, 400, 200);
+
+      ctx.strokeStyle = '#27272a';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, 180);
+      ctx.lineTo(400, 180);
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(dino.x, dino.y, dino.w, dino.h);
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(dino.x + 12, dino.y + 4, 4, 4);
+
+      ctx.fillStyle = '#a1a1aa';
+      obstacles.forEach(o => {
+        ctx.fillRect(o.x, o.y, o.w, o.h);
+      });
+    }
+
+    window.addEventListener('keydown', e => {
+      if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); jump(); }
+    });
+    canvas.addEventListener('click', jump);
+    document.getElementById('startBtn').addEventListener('click', start);
+    start();
+  </script>
+</body>
+</html>`
+    };
+  }
+
   // GENERAL DYNAMIC GAME SYNTHESIZER for ANY user prompt!
-  const gameTitle = clean.replace(/(create|build|make|generate|a|an|the|game|play|app|widget|prototype)/gi, '').trim() || 'Interactive Game';
+  const gameTitle = clean.replace(/(create|build|make|generate|a|an|the|game|play|app|widget|prototype)/gi, '').trim() || 'Arcade Dodge';
   const capitalizedTitle = gameTitle.charAt(0).toUpperCase() + gameTitle.slice(1);
 
   return {
@@ -498,38 +638,52 @@ function synthesizeCustomGame(prompt) {
   <style>
     :root { --bg: #09090b; --card: #121215; --border: #27272a; --text: #f4f4f5; --text-muted: #a1a1aa; }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, system-ui, sans-serif; }
-    body { background: var(--bg); color: var(--text); padding: 1.5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
-    .game-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; width: 100%; max-width: 440px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-    h1 { font-size: 1.25rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.5rem; }
-    p { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem; }
-    .display { font-size: 2.5rem; font-weight: 900; margin: 1rem 0; color: #fff; text-shadow: 0 0 10px rgba(255,255,255,0.2); }
-    .btn-group { display: flex; gap: 0.5rem; justify-content: center; }
-    .action-btn { background: #fff; color: #000; border: none; padding: 0.6rem 1.2rem; border-radius: 4px; font-weight: 800; font-size: 0.8rem; cursor: pointer; text-transform: uppercase; }
-    .action-btn:hover { background: #ccc; }
-    .secondary-btn { background: #222; color: #fff; border: 1px solid var(--border); }
+    body { background: var(--bg); color: var(--text); padding: 1.25rem 1rem; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
+    .game-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; width: 100%; max-width: 440px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    h1 { font-size: 1.2rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .status-bar { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem; display: flex; justify-content: space-between; padding: 0.4rem 0.65rem; background: rgba(255,255,255,0.03); border-radius: 4px; border: 1px solid var(--border); }
+    canvas { background: #000; border: 1px solid var(--border); border-radius: 4px; display: block; margin: 0 auto 0.75rem auto; width: 100%; aspect-ratio: 1.5; cursor: crosshair; }
+    .btn { background: #fff; color: #000; border: none; padding: 0.55rem 1.1rem; border-radius: 4px; font-weight: 700; font-size: 0.75rem; cursor: pointer; text-transform: uppercase; }
   </style>
 </head>
 <body>
   <div class="game-card">
     <h1>COREZ ${capitalizedTitle.toUpperCase()}</h1>
-    <p>Custom AI-generated interactive game engine for "${clean}"</p>
-    <div class="display" id="scoreDisplay">0</div>
-    <div class="btn-group">
-      <button class="action-btn" id="actionBtn">Play / Action</button>
-      <button class="action-btn secondary-btn" id="resetBtn">Reset</button>
+    <div class="status-bar">
+      <span id="scoreText">Score: 0</span>
+      <span id="highScoreText">High Score: 0</span>
     </div>
+    <canvas id="c" width="360" height="240"></canvas>
+    <button class="btn" id="startBtn">Start Game</button>
   </div>
   <script>
-    let score = 0;
-    const scoreEl = document.getElementById('scoreDisplay');
-    document.getElementById('actionBtn').addEventListener('click', () => {
-      score += 1;
-      scoreEl.textContent = score;
-    });
-    document.getElementById('resetBtn').addEventListener('click', () => {
-      score = 0;
-      scoreEl.textContent = 0;
-    });
+    const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+    let pX = 160, pY = 200, score = 0, highScore = 0, enemies = [], loop = null, active = false;
+    canvas.onmousemove = e => { const r = canvas.getBoundingClientRect(); pX = e.clientX - r.left - 15; };
+    function start() {
+      pX = 160; score = 0; enemies = []; active = true;
+      if (loop) clearInterval(loop);
+      loop = setInterval(update, 1000/60);
+    }
+    function update() {
+      score++;
+      if (score > highScore) highScore = score;
+      document.getElementById('scoreText').textContent = 'Score: ' + score;
+      document.getElementById('highScoreText').textContent = 'High Score: ' + highScore;
+      if (score % 20 === 0) enemies.push({ x: Math.random()*330, y: 0, s: 2 + Math.random()*3 });
+      for (let i = enemies.length-1; i >= 0; i--) {
+        const e = enemies[i]; e.y += e.s;
+        if (pX < e.x + 20 && pX + 30 > e.x && pY < e.y + 20 && pY + 20 > e.y) {
+          active = false; clearInterval(loop); alert('Game Over! Final Score: ' + score); return;
+        }
+        if (e.y > 240) enemies.splice(i, 1);
+      }
+      ctx.fillStyle = '#000'; ctx.fillRect(0,0,360,240);
+      ctx.fillStyle = '#fff'; ctx.fillRect(pX, pY, 30, 20);
+      ctx.fillStyle = '#a1a1aa'; enemies.forEach(e => ctx.fillRect(e.x, e.y, 20, 20));
+    }
+    document.getElementById('startBtn').onclick = start;
+    start();
   </script>
 </body>
 </html>`
