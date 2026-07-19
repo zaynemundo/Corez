@@ -373,7 +373,7 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
                         <p className="caption-text">{img.prompt}</p>
                         <a 
                           href={img.url} 
-                          download={`flux-image-${img.id}.png`}
+                          download={`generated-image-${img.id}.png`}
                           className="code-btn download-btn"
                           title="Download Image"
                         >
@@ -392,7 +392,7 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
       {previewImage && (
         <div className="image-lightbox-modal" onClick={() => setPreviewImage(null)}>
           <div className="lightbox-content" onClick={e => e.stopPropagation()}>
-            <img src={previewImage} alt="Preview FLUX Image" className="lightbox-img" />
+            <img src={previewImage} alt="Preview Generated Image" className="lightbox-img" />
             <button className="icon-btn close-lightbox" onClick={() => setPreviewImage(null)}>
               <X size={16} />
             </button>

@@ -579,12 +579,8 @@ export async function generateLocalAIResponse(prompt) {
   await new Promise(r => setTimeout(r, 600));
 
   // 1. GREETINGS & SMALL TALK (Universal & Natural)
-  if (/^(hello|hi|hey|greetings|good morning|good afternoon|good evening|howdy|sup)(\s|!|\.|\?|$)/i.test(lower)) {
-    return `Hi there! How’s your day going?`;
-  }
-
-  if (lower.includes('who are you') || lower.includes('what can you do')) {
-    return `Hello! I'm **COREZ**, a minimalist AI assistant built for public users.\n\nI can help you understand ideas, write clearer content, debug code, analyze documents, plan products, or generate live monochrome web apps and games that open in the preview canvas. Tell me what you want to make or understand, and I’ll infer the goal, explain the useful context, and give you a practical next step.`;
+  if (/^(hello|hi|hey|greetings|good morning|good afternoon|good evening|howdy|sup)(\s|!|\.|\?|$)/i.test(lower) || lower.includes('who are you') || lower.includes('what can you do')) {
+    return `Hello! I'm COREZ AI. How can I help you today?`;
   }
 
   if (/^(how are you|how is it going|how's it going)(\s|!|\.|\?|$)/i.test(lower)) {
