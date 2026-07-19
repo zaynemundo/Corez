@@ -258,6 +258,227 @@ export async function generateLocalAIResponse(prompt) {
 
   // 3. PUBLIC APP / GAME / WIDGET CREATION INTENT
   if (intent.type === 'app') {
+    if (lower.includes('chess')) {
+      const chessHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>COREZ Chess Game</title>
+  <style>
+    :root {
+      --bg: #09090b;
+      --card-bg: #121215;
+      --border: #27272a;
+      --text: #f4f4f5;
+      --text-muted: #a1a1aa;
+      --sq-light: #e4e4e7;
+      --sq-dark: #3f3f46;
+      --sq-selected: #71717a;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, system-ui, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 1.25rem 1rem; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
+    .game-container { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; width: 100%; max-width: 480px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    h1 { font-size: 1.2rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .status-bar { font-size: 0.85rem; font-weight: 500; color: var(--text-muted); margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; padding: 0.45rem 0.75rem; background: rgba(255,255,255,0.03); border-radius: 4px; border: 1px solid var(--border); }
+    .chessboard { display: grid; grid-template-columns: repeat(8, 1fr); width: 100%; aspect-ratio: 1; border: 2px solid var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 1rem; }
+    .square { display: flex; align-items: center; justify-content: center; font-size: 2.2rem; cursor: pointer; user-select: none; transition: background 0.15s ease; position: relative; }
+    .square.light { background: var(--sq-light); color: #000; }
+    .square.dark { background: var(--sq-dark); color: #fff; }
+    .square.selected { background: var(--sq-selected) !important; outline: 2px solid #fff; z-index: 2; }
+    .square.possible::after { content: ''; width: 14px; height: 14px; background: rgba(0,0,0,0.35); border-radius: 50%; position: absolute; }
+    .square.dark.possible::after { background: rgba(255,255,255,0.45); }
+    .square.possible.has-piece::after { width: 100%; height: 100%; border-radius: 0; background: rgba(239,68,68,0.35); }
+    .controls { display: flex; gap: 0.5rem; justify-content: center; }
+    .btn { background: #fff; color: #000; border: none; padding: 0.55rem 1.1rem; border-radius: 4px; font-weight: 700; font-size: 0.75rem; cursor: pointer; text-transform: uppercase; letter-spacing: 0.03em; }
+    .btn:hover { background: #ccc; }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <h1>COREZ CHESS</h1>
+    <div class="status-bar">
+      <span id="turnIndicator">Turn: White ♔</span>
+      <span id="moveCount">Moves: 0</span>
+    </div>
+    <div class="chessboard" id="board"></div>
+    <div class="controls">
+      <button class="btn" id="resetBtn">Restart Game</button>
+    </div>
+  </div>
+
+  <script>
+    const PIECES = {
+      r: '♜', n: '♞', b: '♝', q: '♛', k: '♚', p: '♟',
+      R: '♖', N: '♘', B: '♗', Q: '♕', K: '♔', P: '♙'
+    };
+
+    const initialBoard = [
+      ['r','n','b','q','k','b','n','r'],
+      ['p','p','p','p','p','p','p','p'],
+      ['','','','','','','',''],
+      ['','','','','','','',''],
+      ['','','','','','','',''],
+      ['','','','','','','',''],
+      ['P','P','P','P','P','P','P','P'],
+      ['R','N','B','Q','K','B','N','R']
+    ];
+
+    let boardState = [];
+    let currentTurn = 'white';
+    let selectedSquare = null;
+    let validMoves = [];
+    let moveCount = 0;
+
+    function isWhite(piece) { return piece && piece === piece.toUpperCase(); }
+    function isBlack(piece) { return piece && piece === piece.toLowerCase(); }
+
+    function initBoard() {
+      boardState = JSON.parse(JSON.stringify(initialBoard));
+      currentTurn = 'white';
+      selectedSquare = null;
+      validMoves = [];
+      moveCount = 0;
+      updateStatus();
+      render();
+    }
+
+    function updateStatus() {
+      document.getElementById('turnIndicator').textContent = 'Turn: ' + (currentTurn === 'white' ? 'White ♔' : 'Black ♚');
+      document.getElementById('moveCount').textContent = 'Moves: ' + moveCount;
+    }
+
+    function getPossibleMoves(r, c) {
+      const piece = boardState[r][c];
+      if (!piece) return [];
+      const isW = isWhite(piece);
+      if ((currentTurn === 'white' && !isW) || (currentTurn === 'black' && isW)) return [];
+
+      const moves = [];
+      const type = piece.toLowerCase();
+
+      const addMove = (nr, nc) => {
+        if (nr < 0 || nr > 7 || nc < 0 || nc > 7) return false;
+        const target = boardState[nr][nc];
+        if (!target) {
+          moves.push([nr, nc]);
+          return true;
+        }
+        if ((isW && isBlack(target)) || (!isW && isWhite(target))) {
+          moves.push([nr, nc]);
+        }
+        return false;
+      };
+
+      if (type === 'p') {
+        const dir = isW ? -1 : 1;
+        const startRow = isW ? 6 : 1;
+        if (r + dir >= 0 && r + dir <= 7 && !boardState[r + dir][c]) {
+          moves.push([r + dir, c]);
+          if (r === startRow && !boardState[r + 2 * dir][c]) {
+            moves.push([r + 2 * dir, c]);
+          }
+        }
+        [[r + dir, c - 1], [r + dir, c + 1]].forEach(([nr, nc]) => {
+          if (nr >= 0 && nr <= 7 && nc >= 0 && nc <= 7) {
+            const target = boardState[nr][nc];
+            if (target && ((isW && isBlack(target)) || (!isW && isWhite(target)))) {
+              moves.push([nr, nc]);
+            }
+          }
+        });
+      } else if (type === 'n') {
+        const offsets = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+        offsets.forEach(([dr, dc]) => addMove(r + dr, c + dc));
+      } else if (type === 'r' || type === 'b' || type === 'q') {
+        const dirs = [];
+        if (type === 'r' || type === 'q') dirs.push([-1,0],[1,0],[0,-1],[0,1]);
+        if (type === 'b' || type === 'q') dirs.push([-1,-1],[-1,1],[1,-1],[1,1]);
+        dirs.forEach(([dr, dc]) => {
+          let nr = r + dr, nc = c + dc;
+          while (addMove(nr, nc)) {
+            nr += dr; nc += dc;
+          }
+        });
+      } else if (type === 'k') {
+        const dirs = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+        dirs.forEach(([dr, dc]) => addMove(r + dr, c + dc));
+      }
+
+      return moves;
+    }
+
+    function render() {
+      const boardEl = document.getElementById('board');
+      boardEl.innerHTML = '';
+
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+          const sq = document.createElement('div');
+          const isLight = (r + c) % 2 === 0;
+          sq.className = 'square ' + (isLight ? 'light' : 'dark');
+
+          const piece = boardState[r][c];
+          if (piece) sq.textContent = PIECES[piece] || piece;
+
+          if (selectedSquare && selectedSquare[0] === r && selectedSquare[1] === c) {
+            sq.classList.add('selected');
+          }
+
+          const isPossible = validMoves.some(([mr, mc]) => mr === r && mc === c);
+          if (isPossible) {
+            sq.classList.add('possible');
+            if (piece) sq.classList.add('has-piece');
+          }
+
+          sq.addEventListener('click', () => handleSquareClick(r, c));
+          boardEl.appendChild(sq);
+        }
+      }
+    }
+
+    function handleSquareClick(r, c) {
+      if (selectedSquare) {
+        const [sr, sc] = selectedSquare;
+        const isMoveValid = validMoves.some(([mr, mc]) => mr === r && mc === c);
+
+        if (isMoveValid) {
+          boardState[r][c] = boardState[sr][sc];
+          boardState[sr][sc] = '';
+          currentTurn = currentTurn === 'white' ? 'black' : 'white';
+          moveCount++;
+          selectedSquare = null;
+          validMoves = [];
+          updateStatus();
+          render();
+          return;
+        }
+      }
+
+      const piece = boardState[r][c];
+      if (piece) {
+        const isW = isWhite(piece);
+        if ((currentTurn === 'white' && isW) || (currentTurn === 'black' && !isW)) {
+          selectedSquare = [r, c];
+          validMoves = getPossibleMoves(r, c);
+          render();
+          return;
+        }
+      }
+
+      selectedSquare = null;
+      validMoves = [];
+      render();
+    }
+
+    document.getElementById('resetBtn').addEventListener('click', initBoard);
+    initBoard();
+  </script>
+</body>
+</html>`;
+
+      return `I've built a playable Chess Game for you. Click below to open it live in the preview canvas on the right.\n\n\`\`\`html\n${chessHtml}\n\`\`\``;
+    }
+
     let appTitle;
     let appBody;
 
@@ -291,7 +512,7 @@ export async function generateLocalAIResponse(prompt) {
             startBtn.textContent = 'Start'; timer.textContent = '00:00.0';
           });
         </script>`;
-    } else if (lower.includes('game')) {
+    } else if (lower.includes('particle') || lower.includes('physics')) {
       appTitle = "Particle Simulator";
       appBody = `
         <canvas id="c" style="width:100%; height:200px; background:#050505; border:1px solid #222; border-radius:6px; margin-top:0.5rem;"></canvas>
@@ -321,7 +542,7 @@ export async function generateLocalAIResponse(prompt) {
           draw();
         </script>`;
     } else {
-      appTitle = "Custom Tool";
+      appTitle = "Custom Interactive Tool";
       appBody = `
         <div class="counter" id="val">0</div>
         <button class="action-btn" id="actBtn">Execute</button>
