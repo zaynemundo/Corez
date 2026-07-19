@@ -244,7 +244,7 @@ export default function App() {
                           <Wand2 size={14} style={{ color: 'var(--text-primary)' }} />
                           <span>Image Studio</span>
                         </div>
-                        <div className="prompt-desc">Open full-page image studio & 50 visual style catalog.</div>
+                        <div className="prompt-desc">Create up to 50 pictures with custom prompts.</div>
                       </div>
                     </div>
                   </div>
