@@ -1,41 +1,81 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { 
   Sparkles, 
   Image as ImageIcon, 
   Download, 
-  Loader2,
-  Wand2,
+  Loader2, 
+  Send,
   X,
   Copy,
   Check,
-  Maximize2
+  Maximize2,
+  Trash2
 } from 'lucide-react';
 import { generateFluxImage } from '../services/aiService.js';
 
 export default function ImageStudioPage() {
-  const [customPrompt, setCustomPrompt] = useState('');
+  const [promptInput, setPromptInput] = useState('');
   const [generating, setGenerating] = useState(false);
-  const [generatedImages, setGeneratedImages] = useState([]);
+  const [generatedImages, setGeneratedImages] = useState(() => {
+    try {
+      const saved = localStorage.getItem('corez_generated_images');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [previewImage, setPreviewImage] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
+  const textareaRef = useRef(null);
 
-  const handleGenerateSingle = async () => {
-    if (!customPrompt.trim() || generating) return;
+  useEffect(() => {
+    try {
+      localStorage.setItem('corez_generated_images', JSON.stringify(generatedImages));
+    } catch (err) {
+      console.warn('Failed to save generated images to localStorage', err);
+    }
+  }, [generatedImages]);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 140)}px`;
+    }
+  }, [promptInput]);
+
+  const handleGenerate = async (e) => {
+    e?.preventDefault();
+    const cleanPrompt = promptInput.trim();
+    if (!cleanPrompt || generating) return;
+
     setGenerating(true);
-    const promptToUse = customPrompt.trim();
+    setPromptInput('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
 
     try {
-      const url = await generateFluxImage(promptToUse);
+      const url = await generateFluxImage(cleanPrompt);
       if (url) {
-        setGeneratedImages(prev => [
-          { id: Date.now(), prompt: promptToUse, url, createdAt: new Date() },
-          ...prev
-        ]);
+        const newImg = {
+          id: Date.now(),
+          prompt: cleanPrompt,
+          url,
+          createdAt: new Date().toISOString()
+        };
+        setGeneratedImages(prev => [newImg, ...prev]);
       }
     } catch (err) {
       console.error('Image generation error:', err);
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleGenerate();
     }
   };
 
@@ -45,152 +85,141 @@ export default function ImageStudioPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const currentImage = generatedImages[0];
-  const historyImages = generatedImages.slice(1);
+  const handleDeleteImage = (id, e) => {
+    e?.stopPropagation();
+    setGeneratedImages(prev => prev.filter(img => img.id !== id));
+  };
 
   return (
     <div className="image-studio-page">
-      <main className="studio-main single-mode">
-        <div className="single-studio-wrapper">
-          {/* Prompt Creator Box */}
-          <div className="single-prompt-card">
-            <div className="prompt-header-row">
-              <label className="generator-label">
-                <Sparkles size={14} />
-                <span>Image Generator</span>
-              </label>
+      <main className="studio-main chatbox-mode">
+        <div className="chatbox-studio-container">
+          
+          {/* Showcase Section at the top */}
+          <div className="showcase-gallery-section">
+            <div className="showcase-header">
+              <div className="showcase-title">
+                <ImageIcon size={16} />
+                <span>Image Showcase ({generatedImages.length})</span>
+              </div>
+              {generatedImages.length > 0 && (
+                <button 
+                  className="code-btn clear-all-btn"
+                  onClick={() => setGeneratedImages([])}
+                  title="Clear Showcase"
+                >
+                  <Trash2 size={12} />
+                  <span>Clear All</span>
+                </button>
+              )}
             </div>
 
-            <textarea 
-              className="generator-textarea single-textarea"
-              rows={3}
-              placeholder="Describe the image you want to create (e.g. minimalist architectural render with soft lighting, 8k resolution)..."
-              value={customPrompt}
-              onChange={e => setCustomPrompt(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleGenerateSingle();
-                }
-              }}
-            />
-
-            <div className="single-prompt-actions">
-              <button 
-                className="primary-gen-btn single-btn"
-                onClick={handleGenerateSingle}
-                disabled={!customPrompt.trim() || generating}
-              >
-                {generating ? (
-                  <>
-                    <Loader2 size={14} className="spin-icon" />
-                    <span>Generating Image...</span>
-                  </>
-                ) : (
-                  <>
-                    <Wand2 size={14} />
-                    <span>Generate Image</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* Featured Single Image Display Area */}
-          <div className="featured-image-display">
             {generating && (
               <div className="image-loading-card">
-                <Loader2 size={32} className="spin-icon loading-spinner" />
-                <p className="loading-text">Creating your image...</p>
+                <Loader2 size={28} className="spin-icon loading-spinner" />
+                <p className="loading-text">Generating your image...</p>
               </div>
             )}
 
-            {!generating && !currentImage && (
+            {!generating && generatedImages.length === 0 && (
               <div className="empty-single-state">
                 <ImageIcon size={32} style={{ opacity: 0.35 }} />
-                <h3>No Image Created Yet</h3>
-                <p>Type a prompt above and click <strong>Generate Image</strong> to create your visual artwork.</p>
+                <h3>Your Image Showcase</h3>
+                <p>Generated images will be stored and showcased here once created using the chatbox below.</p>
               </div>
             )}
 
-            {!generating && currentImage && (
-              <div className="featured-image-card">
-                <div className="featured-img-frame" onClick={() => setPreviewImage(currentImage.url)}>
-                  <img 
-                    src={currentImage.url} 
-                    alt={currentImage.prompt} 
-                    className="featured-img"
-                  />
-                  <div className="featured-img-overlay">
-                    <button 
-                      className="icon-btn overlay-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPreviewImage(currentImage.url);
-                      }}
-                      title="Enlarge Image"
-                    >
-                      <Maximize2 size={16} />
-                    </button>
-                  </div>
-                </div>
+            {generatedImages.length > 0 && (
+              <div className="showcase-images-grid">
+                {generatedImages.map((img, index) => (
+                  <div 
+                    key={img.id} 
+                    className={`showcase-img-card ${index === 0 ? 'latest-card' : ''}`}
+                    onClick={() => setPreviewImage(img.url)}
+                  >
+                    <div className="showcase-img-wrapper">
+                      <img src={img.url} alt={img.prompt} className="showcase-img" />
+                      <div className="showcase-img-overlay">
+                        <button 
+                          className="icon-btn overlay-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewImage(img.url);
+                          }}
+                          title="Enlarge Image"
+                        >
+                          <Maximize2 size={15} />
+                        </button>
+                        <button 
+                          className="icon-btn overlay-btn delete-btn"
+                          onClick={(e) => handleDeleteImage(img.id, e)}
+                          title="Delete Image"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
 
-                <div className="featured-img-meta">
-                  <p className="featured-prompt-text">{currentImage.prompt}</p>
-                  <div className="featured-action-bar">
-                    <button 
-                      className="code-btn"
-                      onClick={() => handleCopyPrompt(currentImage.id, currentImage.prompt)}
-                      title="Copy Prompt"
-                    >
-                      {copiedId === currentImage.id ? <Check size={12} /> : <Copy size={12} />}
-                      <span>{copiedId === currentImage.id ? 'Copied' : 'Copy Prompt'}</span>
-                    </button>
-
-                    <a 
-                      href={currentImage.url} 
-                      download={`generated-image-${currentImage.id}.png`}
-                      className="code-btn primary-preset-btn"
-                      title="Download PNG"
-                    >
-                      <Download size={12} />
-                      <span>Download PNG</span>
-                    </a>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* History Gallery if multiple single generations */}
-          {historyImages.length > 0 && (
-            <div className="history-gallery-section">
-              <h4 className="history-section-title">Previous Creations ({historyImages.length})</h4>
-              <div className="history-images-grid">
-                {historyImages.map(img => (
-                  <div key={img.id} className="history-img-card" onClick={() => setPreviewImage(img.url)}>
-                    <img src={img.url} alt={img.prompt} className="history-img-thumb" />
-                    <div className="history-img-caption">
+                    <div className="showcase-card-caption">
                       <p className="caption-text">{img.prompt}</p>
-                      <a 
-                        href={img.url} 
-                        download={`generated-image-${img.id}.png`}
-                        className="code-btn download-btn"
-                        onClick={e => e.stopPropagation()}
-                        title="Download"
-                      >
-                        <Download size={12} />
-                      </a>
+                      <div className="caption-actions">
+                        <button 
+                          className="code-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyPrompt(img.id, img.prompt);
+                          }}
+                          title="Copy Prompt"
+                        >
+                          {copiedId === img.id ? <Check size={12} /> : <Copy size={12} />}
+                        </button>
+                        <a 
+                          href={img.url} 
+                          download={`generated-image-${img.id}.png`}
+                          className="code-btn download-btn"
+                          onClick={e => e.stopPropagation()}
+                          title="Download Image"
+                        >
+                          <Download size={12} />
+                        </a>
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
+
+          {/* Chatbox Input area at the bottom matching ChatInput styling */}
+          <div className="studio-chatbox-wrapper">
+            <form onSubmit={handleGenerate} className="input-box studio-input-box">
+              <textarea
+                ref={textareaRef}
+                className="chat-textarea"
+                value={promptInput}
+                onChange={(e) => setPromptInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Describe an image to generate..."
+                rows={1}
+                disabled={generating}
+              />
+              <div className="input-actions-bar">
+                <button
+                  type="submit"
+                  className="send-btn"
+                  disabled={!promptInput.trim() || generating}
+                  title="Generate Image"
+                >
+                  {generating ? <Loader2 size={15} className="spin-icon" /> : <Send size={15} />}
+                </button>
+              </div>
+            </form>
+          </div>
+
         </div>
       </main>
 
-      {/* Lightbox Modal */}
+      {/* Lightbox Preview Modal */}
       {previewImage && (
         <div className="image-lightbox-modal" onClick={() => setPreviewImage(null)}>
           <div className="lightbox-content" onClick={e => e.stopPropagation()}>
