@@ -51,7 +51,7 @@ export default function Sidebar({
         <button 
           className={`image-creator-btn icon-only-btn ${activeView === 'image-studio' ? 'active' : ''}`}
           onClick={onOpenImageShowcase}
-          title="Image Studio"
+          title="COREZ STUDIO"
         >
           <ImageIcon size={14} />
         </button>

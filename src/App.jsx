@@ -205,48 +205,7 @@ export default function App() {
               <div className="messages-scroll">
                 {activeSession?.messages.length === 0 ? (
                   <div className="welcome-container">
-                    <div className="welcome-logo">
-                      <Layers size={24} />
-                    </div>
-                    <h1 className="welcome-title">Corez</h1>
-                    <p className="welcome-sub">
-                      Versatile minimalist AI assistant for conversation, writing, reasoning, and live application execution.
-                    </p>
-
-                    <div className="sample-prompts-grid">
-                      <div 
-                        className="sample-prompt-card"
-                        onClick={() => handleSendMessage('Build an executive analytics dashboard with monochrome styling, stark SVG chart, and live search.')}
-                      >
-                        <div className="prompt-title">
-                          <BarChart3 size={14} style={{ color: 'var(--text-primary)' }} />
-                          <span>Executive Dashboard</span>
-                        </div>
-                        <div className="prompt-desc">Monochrome SVG metrics dashboard with search filters.</div>
-                      </div>
-
-                      <div 
-                        className="sample-prompt-card"
-                        onClick={() => handleSendMessage('Build a monochrome 2D particle physics simulation with interactive mouse gravity attractor.')}
-                      >
-                        <div className="prompt-title">
-                          <Gamepad2 size={14} style={{ color: 'var(--text-primary)' }} />
-                          <span>Particle Physics Sandbox</span>
-                        </div>
-                        <div className="prompt-desc">Interactive black and white particle simulator.</div>
-                      </div>
-
-                      <div 
-                        className="sample-prompt-card"
-                        onClick={() => setActiveView('image-studio')}
-                      >
-                        <div className="prompt-title">
-                          <Wand2 size={14} style={{ color: 'var(--text-primary)' }} />
-                          <span>Image Studio</span>
-                        </div>
-                        <div className="prompt-desc">Create up to 50 pictures with custom prompts.</div>
-                      </div>
-                    </div>
+                    <h1 className="welcome-title">COREZ</h1>
                   </div>
                 ) : (
                   <div className="messages-inner">

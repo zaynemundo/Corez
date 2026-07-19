@@ -120,29 +120,7 @@ export default function ImageStudioPage() {
       <div className="messages-scroll studio-scroll">
         {generatedImages.length === 0 && !generating ? (
           <div className="welcome-container">
-            <div className="welcome-logo">
-              <ImageIcon size={24} />
-            </div>
-            <h1 className="welcome-title">Image Studio</h1>
-            <p className="welcome-sub">
-              Describe any image to generate high-resolution visual artwork and store it in your showcase.
-            </p>
-
-            <div className="sample-prompts-grid">
-              {SAMPLE_IMAGE_PROMPTS.map((sample, idx) => (
-                <div 
-                  key={idx}
-                  className="sample-prompt-card"
-                  onClick={() => handleGenerate(sample.prompt)}
-                >
-                  <div className="prompt-title">
-                    <Sparkles size={14} style={{ color: 'var(--text-primary)' }} />
-                    <span>{sample.title}</span>
-                  </div>
-                  <div className="prompt-desc">{sample.desc}</div>
-                </div>
-              ))}
-            </div>
+            <h1 className="welcome-title">COREZ STUDIO</h1>
           </div>
         ) : (
           <div className="messages-inner studio-messages-inner">
@@ -250,7 +228,7 @@ export default function ImageStudioPage() {
             value={promptInput}
             onChange={(e) => setPromptInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Describe an image to generate..."
+            placeholder="Imagine with Corez..."
             rows={1}
             disabled={generating}
           />

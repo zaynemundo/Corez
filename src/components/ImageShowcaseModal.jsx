@@ -225,7 +225,7 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
               <textarea 
                 className="generator-textarea"
                 rows={3}
-                placeholder="Describe any scene, art style, product, architecture, or creative concept you want to generate..."
+                placeholder="Imagine with Corez..."
                 value={customPrompt}
                 onChange={e => setCustomPrompt(e.target.value)}
               />
