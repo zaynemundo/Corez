@@ -44,11 +44,13 @@ export default function Sidebar({
         >
           <Plus size={16} />
         </button>
+      </div>
+
+      <div className="sidebar-tools-section">
         <button 
-          className="footer-action-btn icon-only-btn" 
+          className="image-creator-btn icon-only-btn" 
           onClick={onOpenImageShowcase}
-          title="FLUX Image & Font Showcase"
-          style={{ marginTop: '0.3rem' }}
+          title="FLUX Image Creator & Prompt Showcase"
         >
           <ImageIcon size={15} />
         </button>

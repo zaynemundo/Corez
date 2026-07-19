@@ -231,6 +231,7 @@ h1, h2, h3, h4, h5, h6 {
   padding: 0.65rem 0 0.25rem 0;
   display: flex;
   justify-content: center;
+  border-bottom: 1px solid var(--sidebar-border);
 }
 
 .new-chat-btn.icon-only-btn {
@@ -250,6 +251,35 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .new-chat-btn.icon-only-btn:hover {
+  color: var(--text-primary);
+  background: transparent;
+  transform: scale(1.1);
+}
+
+.sidebar-tools-section {
+  padding: 0.45rem 0;
+  display: flex;
+  justify-content: center;
+  border-bottom: 1px solid var(--sidebar-border);
+}
+
+.image-creator-btn.icon-only-btn {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  margin: 0 auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.image-creator-btn.icon-only-btn:hover {
   color: var(--text-primary);
   background: transparent;
   transform: scale(1.1);
