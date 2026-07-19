@@ -219,8 +219,8 @@ export default function App() {
                     {isThinking && (
                       <div className="message-wrapper ai">
                         <div className="message-body">
-                          <div className="thinking-indicator-box" aria-label="Corez is thinking with DeepSeek V4 Pro" role="status">
-                            <span className="thinking-text">Thinking with DeepSeek V4 Pro...</span>
+                          <div className="thinking-indicator-box" aria-label="Corez is thinking" role="status">
+                            <span className="thinking-text">Thinking...</span>
                             <span className="thinking-dots" aria-hidden="true">
                               <span className="thinking-dot" />
                               <span className="thinking-dot" />
