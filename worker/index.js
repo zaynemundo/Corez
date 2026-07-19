@@ -1,4 +1,5 @@
 const WORKERS_AI_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
+const KIMI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
 const FLUX_MODEL = '@cf/black-forest-labs/flux-1-schnell';
 const SDXL_LIGHTNING_MODEL = '@cf/bytedance/stable-diffusion-xl-lightning';
 
@@ -24,7 +25,7 @@ function buildSystemPrompt(intent) {
     || 'Understand the public user goal and give a useful next step.';
   const intentType = intent?.type || 'general';
 
-  return `You are COREZ AI, powered by DeepSeek.
+  return `You are COREZ AI, powered by DeepSeek and Kimi Code.
 
 You have total creative freedom to build, code, write, and create whatever the user inputs.
 
@@ -68,12 +69,26 @@ async function handleAi(request, env) {
     : null;
 
   try {
-    const result = await env.AI.run(WORKERS_AI_MODEL, {
-      messages: [
-        { role: 'system', content: buildSystemPrompt(intent) },
-        { role: 'user', content: prompt }
-      ]
-    });
+    let result;
+    let usedModel = WORKERS_AI_MODEL;
+
+    try {
+      result = await env.AI.run(WORKERS_AI_MODEL, {
+        messages: [
+          { role: 'system', content: buildSystemPrompt(intent) },
+          { role: 'user', content: prompt }
+        ]
+      });
+    } catch (primaryError) {
+      console.warn('Primary Workers AI model failed, attempting Kimi K2.7 Code fallback:', safeErrorDetail(primaryError));
+      usedModel = KIMI_MODEL;
+      result = await env.AI.run(KIMI_MODEL, {
+        messages: [
+          { role: 'system', content: buildSystemPrompt(intent) },
+          { role: 'user', content: prompt }
+        ]
+      });
+    }
 
     const content = result?.choices?.[0]?.message?.content;
     const normalizedContent = typeof content === 'string' ? content.trim() : '';
@@ -83,7 +98,7 @@ async function handleAi(request, env) {
 
     return jsonResponse(200, {
       content: normalizedContent,
-      model: WORKERS_AI_MODEL
+      model: usedModel
     });
   } catch (error) {
     console.error(JSON.stringify({
