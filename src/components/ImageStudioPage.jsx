@@ -9,15 +9,14 @@ import {
   Check,
   Maximize2,
   Trash2,
-  Wand2,
-  Sparkles,
-  Camera,
-  Layers
+  Paperclip,
+  FileText
 } from 'lucide-react';
 import { generateFluxImage } from '../services/aiService.js';
 
 export default function ImageStudioPage() {
   const [promptInput, setPromptInput] = useState('');
+  const [attachments, setAttachments] = useState([]);
   const [generating, setGenerating] = useState(false);
   const [generatedImages, setGeneratedImages] = useState(() => {
     try {
@@ -30,6 +29,7 @@ export default function ImageStudioPage() {
   const [previewImage, setPreviewImage] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const textareaRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     try {
@@ -46,22 +46,89 @@ export default function ImageStudioPage() {
     }
   }, [promptInput]);
 
+  const processFiles = (files) => {
+    if (!files || files.length === 0) return;
+
+    Array.from(files).forEach(file => {
+      const fileId = Date.now() + Math.random();
+      const isImage = file.type.startsWith('image/');
+
+      const reader = new FileReader();
+      if (isImage) {
+        reader.onload = (e) => {
+          setAttachments(prev => [...prev, {
+            id: fileId,
+            name: file.name,
+            type: 'image',
+            dataUrl: e.target.result
+          }]);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        reader.onload = (e) => {
+          setAttachments(prev => [...prev, {
+            id: fileId,
+            name: file.name,
+            type: 'document',
+            text: e.target.result
+          }]);
+        };
+        reader.readAsText(file);
+      }
+    });
+  };
+
+  const handleFileChange = (e) => {
+    processFiles(e.target.files);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer?.files?.length > 0) {
+      processFiles(e.dataTransfer.files);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const removeAttachment = (id) => {
+    setAttachments(prev => prev.filter(att => att.id !== id));
+  };
+
   const handleGenerate = async (cleanPromptText) => {
-    const textToUse = typeof cleanPromptText === 'string' ? cleanPromptText : promptInput.trim();
-    if (!textToUse || generating) return;
+    const rawText = typeof cleanPromptText === 'string' ? cleanPromptText : promptInput.trim();
+    if ((!rawText && attachments.length === 0) || generating) return;
+
+    // Combine user prompt with attached document context & image hints
+    let finalPrompt = rawText;
+    const docTexts = attachments.filter(a => a.type === 'document' && a.text).map(a => a.text.slice(0, 500));
+    if (docTexts.length > 0) {
+      finalPrompt += ` [Document Context: ${docTexts.join('; ')}]`;
+    }
+
+    const imageCount = attachments.filter(a => a.type === 'image').length;
+    if (imageCount > 0) {
+      finalPrompt += ` [Image Reference Attached: ${imageCount} image(s)]`;
+    }
 
     setGenerating(true);
     setPromptInput('');
+    setAttachments([]);
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
 
     try {
-      const url = await generateFluxImage(textToUse);
+      const url = await generateFluxImage(finalPrompt);
       if (url) {
         const newImg = {
           id: Date.now(),
-          prompt: textToUse,
+          prompt: finalPrompt,
           url,
           createdAt: new Date().toISOString()
         };
@@ -96,24 +163,6 @@ export default function ImageStudioPage() {
     e?.stopPropagation();
     setGeneratedImages(prev => prev.filter(img => img.id !== id));
   };
-
-  const SAMPLE_IMAGE_PROMPTS = [
-    {
-      title: 'Minimalist Architecture',
-      desc: 'Monochrome modern concrete villa with glass facade and ambient twilight lighting.',
-      prompt: 'Monochrome modern concrete villa with glass facade, ambient twilight lighting, archdaily architectural photography 8k.'
-    },
-    {
-      title: 'Cyberpunk Neon Street',
-      desc: 'Rain-soaked Tokyo alleyway with reflections, dark cinematic aesthetic.',
-      prompt: 'Rain-soaked Tokyo alleyway with reflections, cyberpunk neon glow, dark cinematic aesthetic, high resolution shot.'
-    },
-    {
-      title: 'Studio Product Render',
-      desc: 'Sleek matte black smartwatch on obsidian pedestal with soft rim light.',
-      prompt: 'Sleek matte black smartwatch on obsidian pedestal, soft rim lighting, industrial product studio photography 3d render.'
-    }
-  ];
 
   return (
     <div className="chat-pane studio-pane">
@@ -219,24 +268,74 @@ export default function ImageStudioPage() {
         )}
       </div>
 
-      {/* ChatInput - Identical structure & positioning as main ChatInput */}
+      {/* Input Form with Image & Document Attachments + Drag & Drop */}
       <div className="chat-input-container">
-        <form onSubmit={handleSubmit} className="input-box">
-          <textarea
-            ref={textareaRef}
-            className="chat-textarea"
-            value={promptInput}
-            onChange={(e) => setPromptInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Imagine with Corez..."
-            rows={1}
-            disabled={generating}
+        <form 
+          onSubmit={handleSubmit} 
+          className="input-box studio-input-box"
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+        >
+          <input 
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            style={{ display: 'none' }}
+            multiple
+            accept="image/*,.pdf,.txt,.md,.csv,.json"
           />
+
+          <button
+            type="button"
+            className="icon-btn attach-file-btn"
+            onClick={() => fileInputRef.current?.click()}
+            title="Attach Document or Image"
+            disabled={generating}
+          >
+            <Paperclip size={16} />
+          </button>
+
+          <div className="input-textarea-wrapper" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            {attachments.length > 0 && (
+              <div className="attachment-chips-bar">
+                {attachments.map(att => (
+                  <div key={att.id} className="attachment-chip">
+                    {att.type === 'image' ? (
+                      <img src={att.dataUrl} alt={att.name} className="attachment-chip-thumb" />
+                    ) : (
+                      <FileText size={13} />
+                    )}
+                    <span className="chip-filename">{att.name}</span>
+                    <button 
+                      type="button" 
+                      className="remove-chip-btn" 
+                      onClick={() => removeAttachment(att.id)}
+                      title="Remove attachment"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <textarea
+              ref={textareaRef}
+              className="chat-textarea"
+              value={promptInput}
+              onChange={(e) => setPromptInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Imagine with Corez..."
+              rows={1}
+              disabled={generating}
+            />
+          </div>
+
           <div className="input-actions-bar">
             <button
               type="submit"
               className="send-btn"
-              disabled={!promptInput.trim() || generating}
+              disabled={(!promptInput.trim() && attachments.length === 0) || generating}
               title="Generate Image"
             >
               {generating ? <Loader2 size={15} className="spin-icon" /> : <Send size={15} />}

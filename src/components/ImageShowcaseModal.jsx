@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { 
   X, 
   Sparkles, 
@@ -8,7 +8,9 @@ import {
   Check, 
   Loader2,
   Layers,
-  Wand2
+  Wand2,
+  Paperclip,
+  FileText
 } from 'lucide-react';
 import { generateFluxImage } from '../services/aiService.js';
 
@@ -69,11 +71,13 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
   const [activeTab, setActiveTab] = useState('gallery'); // 'gallery' | 'generator'
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [customPrompt, setCustomPrompt] = useState('');
+  const [attachments, setAttachments] = useState([]);
   const [batchCount, setBatchCount] = useState(4);
   const [generating, setGenerating] = useState(false);
   const [generatedImages, setGeneratedImages] = useState([]);
   const [copiedPresetId, setCopiedPresetId] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
+  const fileInputRef = useRef(null);
 
   if (!isOpen) return null;
 
@@ -82,6 +86,35 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
   const filteredPresets = selectedCategory === 'All'
     ? SHOWCASE_PRESETS
     : SHOWCASE_PRESETS.filter(p => p.category === selectedCategory);
+
+  const processFiles = (files) => {
+    if (!files || files.length === 0) return;
+    Array.from(files).forEach(file => {
+      const fileId = Date.now() + Math.random();
+      const isImage = file.type.startsWith('image/');
+      const reader = new FileReader();
+      if (isImage) {
+        reader.onload = (e) => {
+          setAttachments(prev => [...prev, { id: fileId, name: file.name, type: 'image', dataUrl: e.target.result }]);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        reader.onload = (e) => {
+          setAttachments(prev => [...prev, { id: fileId, name: file.name, type: 'document', text: e.target.result }]);
+        };
+        reader.readAsText(file);
+      }
+    });
+  };
+
+  const handleFileChange = (e) => {
+    processFiles(e.target.files);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeAttachment = (id) => {
+    setAttachments(prev => prev.filter(att => att.id !== id));
+  };
 
   const handleCopyPrompt = (preset) => {
     navigator.clipboard.writeText(preset.prompt);
@@ -114,15 +147,23 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
   };
 
   const handleBatchGenerate = async () => {
-    if (!customPrompt.trim() || generating) return;
+    const rawPrompt = customPrompt.trim();
+    if ((!rawPrompt && attachments.length === 0) || generating) return;
     setGenerating(true);
+
+    let promptToUse = rawPrompt;
+    const docTexts = attachments.filter(a => a.type === 'document' && a.text).map(a => a.text.slice(0, 500));
+    if (docTexts.length > 0) promptToUse += ` [Document Context: ${docTexts.join('; ')}]`;
+    const imageCount = attachments.filter(a => a.type === 'image').length;
+    if (imageCount > 0) promptToUse += ` [Image Reference Attached: ${imageCount} image(s)]`;
+
     const countToGenerate = Math.min(Math.max(1, batchCount), 50);
 
     for (let i = 0; i < countToGenerate; i++) {
       try {
         const variationPrompt = countToGenerate > 1 
-          ? `${customPrompt.trim()}, variation ${i + 1}, unique camera angle`
-          : customPrompt.trim();
+          ? `${promptToUse}, variation ${i + 1}, unique camera angle`
+          : promptToUse;
         const url = await generateFluxImage(variationPrompt);
         if (url) {
           setGeneratedImages(prev => [
@@ -134,6 +175,7 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
         console.error(`FLUX Image batch generation item ${i + 1} error:`, err);
       }
     }
+    setAttachments([]);
     setGenerating(false);
   };
 
@@ -221,7 +263,50 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
         {activeTab === 'generator' && (
           <div className="showcase-body generator-body">
             <div className="generator-input-card">
-              <label className="generator-label">Image Prompt:</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label className="generator-label">Image Prompt:</label>
+                <button
+                  type="button"
+                  className="icon-btn attach-file-btn"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Attach Image or Document"
+                  disabled={generating}
+                >
+                  <Paperclip size={14} />
+                </button>
+                <input 
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  style={{ display: 'none' }}
+                  multiple
+                  accept="image/*,.pdf,.txt,.md,.csv,.json"
+                />
+              </div>
+
+              {attachments.length > 0 && (
+                <div className="attachment-chips-bar">
+                  {attachments.map(att => (
+                    <div key={att.id} className="attachment-chip">
+                      {att.type === 'image' ? (
+                        <img src={att.dataUrl} alt={att.name} className="attachment-chip-thumb" />
+                      ) : (
+                        <FileText size={12} />
+                      )}
+                      <span className="chip-filename">{att.name}</span>
+                      <button 
+                        type="button" 
+                        className="remove-chip-btn" 
+                        onClick={() => removeAttachment(att.id)}
+                        title="Remove attachment"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <textarea 
                 className="generator-textarea"
                 rows={3}
@@ -246,7 +331,7 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
                 <button 
                   className="canvas-toggle-btn primary-gen-btn"
                   onClick={handleBatchGenerate}
-                  disabled={!customPrompt.trim() || generating}
+                  disabled={(!customPrompt.trim() && attachments.length === 0) || generating}
                 >
                   {generating ? (
                     <>
