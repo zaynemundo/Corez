@@ -242,9 +242,9 @@ export default function App() {
                       >
                         <div className="prompt-title">
                           <Wand2 size={14} style={{ color: 'var(--text-primary)' }} />
-                          <span>FLUX Image Studio</span>
+                          <span>Image Studio</span>
                         </div>
-                        <div className="prompt-desc">Open full-page FLUX studio & 50 visual style catalog.</div>
+                        <div className="prompt-desc">Open full-page image studio & 50 visual style catalog.</div>
                       </div>
                     </div>
                   </div>

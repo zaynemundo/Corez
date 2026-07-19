@@ -144,7 +144,7 @@ export function analyzePublicUserIntent(prompt) {
 }
 
 export function createFallbackSvgDataUrl(prompt) {
-  const cleanPrompt = (prompt || 'FLUX Visual Creation').slice(0, 42);
+  const cleanPrompt = (prompt || 'Visual Creation').slice(0, 42);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
     <defs>
       <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -162,7 +162,7 @@ export function createFallbackSvgDataUrl(prompt) {
     <circle cx="400" cy="360" r="160" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1" stroke-dasharray="8 8" />
     <polygon points="400,200 520,440 280,440" fill="none" stroke="url(#accent)" stroke-width="2" />
     <text x="400" y="620" font-family="-apple-system, sans-serif" font-size="22" font-weight="300" fill="#ffffff" text-anchor="middle" letter-spacing="2">${cleanPrompt.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</text>
-    <text x="400" y="660" font-family="-apple-system, sans-serif" font-size="13" font-weight="300" fill="#71717a" text-anchor="middle" letter-spacing="4">FLUX CREATIVE VISUAL</text>
+    <text x="400" y="660" font-family="-apple-system, sans-serif" font-size="13" font-weight="300" fill="#71717a" text-anchor="middle" letter-spacing="4">CREATIVE VISUAL</text>
   </svg>`;
 
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
@@ -361,7 +361,7 @@ export async function generateAIResponse(prompt) {
     try {
       const imageUrl = await generateFluxImage(cleanPrompt);
       if (imageUrl) {
-        return `Here is your generated image powered by **FLUX.1-schnell**:\n\n![${cleanPrompt}](${imageUrl})`;
+        return `Here is your generated image:\n\n![${cleanPrompt}](${imageUrl})`;
       }
     } catch (imgError) {
       console.warn('FLUX image generation error; falling back to standard text response.', imgError);

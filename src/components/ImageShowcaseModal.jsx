@@ -145,7 +145,7 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
             <div className="brand-icon" style={{ width: '26px', height: '26px' }}>
               <Wand2 size={14} />
             </div>
-            <span>FLUX Creative Prompt Showcase (50 Visual Styles)</span>
+            <span>Creative Prompt Showcase (50 Visual Styles)</span>
           </div>
           <button className="icon-btn close-modal-btn" onClick={onClose} title="Close">
             <X size={15} />
@@ -165,7 +165,7 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
             onClick={() => setActiveTab('generator')}
           >
             <Sparkles size={13} />
-            <span>Batch FLUX Generator</span>
+            <span>Batch Image Generator</span>
           </button>
         </div>
 
@@ -206,10 +206,10 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
                     <button 
                       className="code-btn primary-preset-btn"
                       onClick={() => handleGeneratePreset(preset)}
-                      title="Generate with FLUX"
+                      title="Generate Image"
                     >
                       <Sparkles size={12} />
-                      <span>Generate FLUX</span>
+                      <span>Generate Image</span>
                     </button>
                   </div>
                 </div>
@@ -221,11 +221,11 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
         {activeTab === 'generator' && (
           <div className="showcase-body generator-body">
             <div className="generator-input-card">
-              <label className="generator-label">Prompt for FLUX.1-schnell:</label>
+              <label className="generator-label">Image Prompt:</label>
               <textarea 
                 className="generator-textarea"
                 rows={3}
-                placeholder="Describe any scene, art style, product, architecture, or creative concept you want to generate with FLUX..."
+                placeholder="Describe any scene, art style, product, architecture, or creative concept you want to generate..."
                 value={customPrompt}
                 onChange={e => setCustomPrompt(e.target.value)}
               />
@@ -251,7 +251,7 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
                   {generating ? (
                     <>
                       <Loader2 size={14} className="spin-icon" />
-                      <span>Generating FLUX Image(s)...</span>
+                      <span>Generating Image(s)...</span>
                     </>
                   ) : (
                     <>
@@ -272,7 +272,7 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
               {generatedImages.length === 0 ? (
                 <div className="empty-gallery-state">
                   <Wand2 size={24} style={{ opacity: 0.4 }} />
-                  <p>No images generated in this session yet. Select a prompt preset from the catalog or enter a custom prompt above to create up to 50 FLUX images.</p>
+                  <p>No images generated in this session yet. Select a prompt preset from the catalog or enter a custom prompt above to create up to 50 pictures.</p>
                 </div>
               ) : (
                 <div className="generated-images-grid">

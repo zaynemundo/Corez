@@ -94,7 +94,7 @@ export default function ImageStudioPage({ onBackToChat }) {
           </button>
           <div className="studio-title-box">
             <Wand2 size={16} />
-            <h1 className="studio-title">FLUX Image Studio</h1>
+            <h1 className="studio-title">Image Studio</h1>
           </div>
         </div>
 
@@ -104,7 +104,7 @@ export default function ImageStudioPage({ onBackToChat }) {
             onClick={() => setActiveTab('generator')}
           >
             <Sparkles size={14} />
-            <span>FLUX Generator & Studio</span>
+            <span>Image Generator & Studio</span>
           </button>
           <button 
             className={`showcase-tab-btn ${activeTab === 'catalog' ? 'active' : ''}`}
@@ -120,11 +120,11 @@ export default function ImageStudioPage({ onBackToChat }) {
         {activeTab === 'generator' && (
           <div className="studio-generator-container">
             <div className="generator-input-card">
-              <label className="generator-label">Prompt for FLUX.1-schnell:</label>
+              <label className="generator-label">Image Prompt:</label>
               <textarea 
                 className="generator-textarea"
                 rows={3}
-                placeholder="Describe any scene, art style, product, architecture, or creative concept you want to generate with FLUX..."
+                placeholder="Describe any scene, art style, product, architecture, or creative concept you want to generate..."
                 value={customPrompt}
                 onChange={e => setCustomPrompt(e.target.value)}
               />
@@ -150,7 +150,7 @@ export default function ImageStudioPage({ onBackToChat }) {
                   {generating ? (
                     <>
                       <Loader2 size={14} className="spin-icon" />
-                      <span>Generating FLUX Image(s)...</span>
+                      <span>Generating Image(s)...</span>
                     </>
                   ) : (
                     <>
@@ -171,7 +171,7 @@ export default function ImageStudioPage({ onBackToChat }) {
               {generatedImages.length === 0 ? (
                 <div className="empty-gallery-state">
                   <Wand2 size={28} style={{ opacity: 0.4 }} />
-                  <p>No images generated in this session yet. Type a prompt above or pick a style from the Prompt Catalog to generate up to 50 FLUX images.</p>
+                  <p>No images generated in this session yet. Type a prompt above or pick a style from the Prompt Catalog to generate up to 50 pictures.</p>
                 </div>
               ) : (
                 <div className="generated-images-grid studio-grid">
@@ -187,7 +187,7 @@ export default function ImageStudioPage({ onBackToChat }) {
                         <p className="caption-text">{img.prompt}</p>
                         <a 
                           href={img.url} 
-                          download={`flux-image-${img.id}.png`}
+                          download={`generated-image-${img.id}.png`}
                           className="code-btn download-btn"
                           title="Download Image"
                         >
@@ -239,10 +239,10 @@ export default function ImageStudioPage({ onBackToChat }) {
                     <button 
                       className="code-btn primary-preset-btn"
                       onClick={() => handleGeneratePreset(preset)}
-                      title="Generate with FLUX"
+                      title="Generate Image"
                     >
                       <Sparkles size={12} />
-                      <span>Generate FLUX</span>
+                      <span>Generate Image</span>
                     </button>
                   </div>
                 </div>
@@ -255,7 +255,7 @@ export default function ImageStudioPage({ onBackToChat }) {
       {previewImage && (
         <div className="image-lightbox-modal" onClick={() => setPreviewImage(null)}>
           <div className="lightbox-content" onClick={e => e.stopPropagation()}>
-            <img src={previewImage} alt="Preview FLUX Image" className="lightbox-img" />
+            <img src={previewImage} alt="Preview Image" className="lightbox-img" />
             <button className="icon-btn close-lightbox" onClick={() => setPreviewImage(null)}>
               <X size={16} />
             </button>
