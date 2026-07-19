@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
 import { 
-  Sparkles, 
   Image as ImageIcon, 
   Download, 
   Loader2, 
@@ -9,7 +8,11 @@ import {
   Copy,
   Check,
   Maximize2,
-  Trash2
+  Trash2,
+  Wand2,
+  Sparkles,
+  Camera,
+  Layers
 } from 'lucide-react';
 import { generateFluxImage } from '../services/aiService.js';
 
@@ -43,10 +46,9 @@ export default function ImageStudioPage() {
     }
   }, [promptInput]);
 
-  const handleGenerate = async (e) => {
-    e?.preventDefault();
-    const cleanPrompt = promptInput.trim();
-    if (!cleanPrompt || generating) return;
+  const handleGenerate = async (cleanPromptText) => {
+    const textToUse = typeof cleanPromptText === 'string' ? cleanPromptText : promptInput.trim();
+    if (!textToUse || generating) return;
 
     setGenerating(true);
     setPromptInput('');
@@ -55,11 +57,11 @@ export default function ImageStudioPage() {
     }
 
     try {
-      const url = await generateFluxImage(cleanPrompt);
+      const url = await generateFluxImage(textToUse);
       if (url) {
         const newImg = {
           id: Date.now(),
-          prompt: cleanPrompt,
+          prompt: textToUse,
           url,
           createdAt: new Date().toISOString()
         };
@@ -72,10 +74,15 @@ export default function ImageStudioPage() {
     }
   };
 
+  const handleSubmit = (e) => {
+    e?.preventDefault();
+    handleGenerate(promptInput.trim());
+  };
+
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleGenerate();
+      handleSubmit();
     }
   };
 
@@ -90,14 +97,56 @@ export default function ImageStudioPage() {
     setGeneratedImages(prev => prev.filter(img => img.id !== id));
   };
 
+  const SAMPLE_IMAGE_PROMPTS = [
+    {
+      title: 'Minimalist Architecture',
+      desc: 'Monochrome modern concrete villa with glass facade and ambient twilight lighting.',
+      prompt: 'Monochrome modern concrete villa with glass facade, ambient twilight lighting, archdaily architectural photography 8k.'
+    },
+    {
+      title: 'Cyberpunk Neon Street',
+      desc: 'Rain-soaked Tokyo alleyway with reflections, dark cinematic aesthetic.',
+      prompt: 'Rain-soaked Tokyo alleyway with reflections, cyberpunk neon glow, dark cinematic aesthetic, high resolution shot.'
+    },
+    {
+      title: 'Studio Product Render',
+      desc: 'Sleek matte black smartwatch on obsidian pedestal with soft rim light.',
+      prompt: 'Sleek matte black smartwatch on obsidian pedestal, soft rim lighting, industrial product studio photography 3d render.'
+    }
+  ];
+
   return (
-    <div className="image-studio-page">
-      <main className="studio-main chatbox-mode">
-        <div className="chatbox-studio-container">
-          
-          {/* Showcase Section at the top */}
-          <div className="showcase-gallery-section">
-            <div className="showcase-header">
+    <div className="chat-pane studio-pane">
+      <div className="messages-scroll studio-scroll">
+        {generatedImages.length === 0 && !generating ? (
+          <div className="welcome-container">
+            <div className="welcome-logo">
+              <ImageIcon size={24} />
+            </div>
+            <h1 className="welcome-title">Image Studio</h1>
+            <p className="welcome-sub">
+              Describe any image to generate high-resolution visual artwork and store it in your showcase.
+            </p>
+
+            <div className="sample-prompts-grid">
+              {SAMPLE_IMAGE_PROMPTS.map((sample, idx) => (
+                <div 
+                  key={idx}
+                  className="sample-prompt-card"
+                  onClick={() => handleGenerate(sample.prompt)}
+                >
+                  <div className="prompt-title">
+                    <Sparkles size={14} style={{ color: 'var(--text-primary)' }} />
+                    <span>{sample.title}</span>
+                  </div>
+                  <div className="prompt-desc">{sample.desc}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="messages-inner studio-messages-inner">
+            <div className="showcase-header-row">
               <div className="showcase-title">
                 <ImageIcon size={16} />
                 <span>Image Showcase ({generatedImages.length})</span>
@@ -115,17 +164,17 @@ export default function ImageStudioPage() {
             </div>
 
             {generating && (
-              <div className="image-loading-card">
-                <Loader2 size={28} className="spin-icon loading-spinner" />
-                <p className="loading-text">Generating your image...</p>
-              </div>
-            )}
-
-            {!generating && generatedImages.length === 0 && (
-              <div className="empty-single-state">
-                <ImageIcon size={32} style={{ opacity: 0.35 }} />
-                <h3>Your Image Showcase</h3>
-                <p>Generated images will be stored and showcased here once created using the chatbox below.</p>
+              <div className="message-wrapper ai">
+                <div className="message-body">
+                  <div className="thinking-indicator-box" aria-label="Generating Image" role="status">
+                    <span className="thinking-text">Generating Image</span>
+                    <span className="thinking-dots" aria-hidden="true">
+                      <span className="thinking-dot" />
+                      <span className="thinking-dot" />
+                      <span className="thinking-dot" />
+                    </span>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -189,35 +238,34 @@ export default function ImageStudioPage() {
               </div>
             )}
           </div>
+        )}
+      </div>
 
-          {/* Chatbox Input area at the bottom matching ChatInput styling */}
-          <div className="studio-chatbox-wrapper">
-            <form onSubmit={handleGenerate} className="input-box studio-input-box">
-              <textarea
-                ref={textareaRef}
-                className="chat-textarea"
-                value={promptInput}
-                onChange={(e) => setPromptInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Describe an image to generate..."
-                rows={1}
-                disabled={generating}
-              />
-              <div className="input-actions-bar">
-                <button
-                  type="submit"
-                  className="send-btn"
-                  disabled={!promptInput.trim() || generating}
-                  title="Generate Image"
-                >
-                  {generating ? <Loader2 size={15} className="spin-icon" /> : <Send size={15} />}
-                </button>
-              </div>
-            </form>
+      {/* ChatInput - Identical structure & positioning as main ChatInput */}
+      <div className="chat-input-container">
+        <form onSubmit={handleSubmit} className="input-box">
+          <textarea
+            ref={textareaRef}
+            className="chat-textarea"
+            value={promptInput}
+            onChange={(e) => setPromptInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Describe an image to generate..."
+            rows={1}
+            disabled={generating}
+          />
+          <div className="input-actions-bar">
+            <button
+              type="submit"
+              className="send-btn"
+              disabled={!promptInput.trim() || generating}
+              title="Generate Image"
+            >
+              {generating ? <Loader2 size={15} className="spin-icon" /> : <Send size={15} />}
+            </button>
           </div>
-
-        </div>
-      </main>
+        </form>
+      </div>
 
       {/* Lightbox Preview Modal */}
       {previewImage && (
