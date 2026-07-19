@@ -13,56 +13,56 @@ import {
 import { generateFluxImage } from '../services/aiService.js';
 
 export const SHOWCASE_PRESETS = [
-  { id: 1, name: "Cyberpunk Neon", category: "Neon", prompt: "Cyberpunk glowing neon typography text reading COREZ on a dark rainy alley wall, 8k resolution, octane render" },
-  { id: 2, name: "Brutalist Bold", category: "Brutalist", prompt: "Heavy stark black brutalist typography poster with bold geometric sans-serif lettering, high contrast monochrome" },
-  { id: 3, name: "3D Chrome Metallic", category: "3D", prompt: "Ultra reflective 3D fluid liquid chrome metallic logo lettering COREZ floating on black background, photorealistic 8k" },
-  { id: 4, name: "Calligraphic Liquid Ink", category: "Artistic", prompt: "Dynamic black liquid ink splash calligraphy lettering on textured white watercolor paper, minimal art" },
-  { id: 5, name: "Swiss Minimalist Serif", category: "Serif", prompt: "Elegant high-fashion magazine cover with minimalist serif typography COREZ, editorial layout, subtle grain" },
-  { id: 6, name: "80s Retro Synthwave", category: "Retro", prompt: "Retro 1980s synthwave chrome logo text with grid landscape background and sunset glow, vibrant 80s aesthetic" },
-  { id: 7, name: "Futuristic Hologram", category: "Sci-Fi", prompt: "Futuristic holographic glowing blue wireframe glyph font in dark space, cyberpunk hud display" },
-  { id: 8, name: "Gothic Blackletter", category: "Vintage", prompt: "Intricate ornate medieval gothic blackletter typography engraved in dark oxidized silver plate" },
-  { id: 9, name: "Frosted Glassmorphism", category: "Glass", prompt: "Translucent frosted glass typography COREZ with soft ambient gradient refraction and blur" },
-  { id: 10, name: "Origami Paper Fold", category: "Paper", prompt: "Clean white origami folded paper 3D typography sculpture on soft pastel grey studio backdrop" },
-  { id: 11, name: "Bioluminescent Glow", category: "Nature", prompt: "Bioluminescent glowing deep ocean organism forming organic typography COREZ in pitch dark water" },
-  { id: 12, name: "Vintage Engraved Wood", category: "Vintage", prompt: "Classic 19th-century vintage hand-carved woodblock typography poster print with detailed linework" },
-  { id: 13, name: "Neon Wireframe 3D", category: "3D", prompt: "3D vector neon wireframe geometry creating structural typography letters COREZ on black background" },
-  { id: 14, name: "Carved White Marble", category: "Stone", prompt: "Ancient Roman classical typography carved deeply into pristine white marble stone with shadow" },
-  { id: 15, name: "Abstract Geometric Stencil", category: "Modern", prompt: "Abstract Bauhaus geometric stencil typography design with sharp architectural shapes and minimal lines" },
-  { id: 16, name: "Cybernetic Circuit Board", category: "Sci-Fi", prompt: "Gold electronic circuit board traces forming sharp futuristic typography COREZ on black PCB" },
-  { id: 17, name: "Vapor Smoke Art", category: "Abstract", prompt: "Ethereal wisps of white smoke curling into elegant cursive typography against pitch black darkness" },
-  { id: 18, name: "Golden Luxury Monogram", category: "Luxury", prompt: "Luxury 24k polished gold monogram typography logo embossed on dark matte velvet texture" },
-  { id: 19, name: "Pixel Art Arcade", category: "Retro", prompt: "Retro 16-bit arcade pixel art title text COREZ with 80s video game color palette" },
-  { id: 20, name: "Isometric 3D Blocks", category: "3D", prompt: "Vibrant isometric 3D architectural block letters forming word COREZ in clean studio lighting" },
-  { id: 21, name: "Molten Lava Glow", category: "Elemental", prompt: "Cracked volcanic rock with glowing molten lava burning through letter shapes COREZ" },
-  { id: 22, name: "Monospaced Hacker Code", category: "Minimal", prompt: "Clean monospaced terminal code font in phosphor green CRT screen effect" },
-  { id: 23, name: "Watercolor Brush Script", category: "Artistic", prompt: "Expressive wet watercolor brush script typography with soft ink bleeding on textured canvas" },
-  { id: 24, name: "Industrial Stencil Steel", category: "Industrial", prompt: "Heavy industrial steel stencil typography with weathered paint and rivet details on dark metal" },
-  { id: 25, name: "Holographic Iridescent Foil", category: "Holographic", prompt: "Shimmering rainbow holographic foil stamping typography COREZ on dark textured cardstock" },
-  { id: 26, name: "Pop Art Comic Book", category: "Comic", prompt: "1960s pop art comic book action typography with halftone dots and bold black outlines" },
-  { id: 27, name: "Art Deco Gold Leaf", category: "Art Deco", prompt: "1920s Art Deco geometric typography with gold leaf inlay on black marble background" },
-  { id: 28, name: "Cosmic Nebula Stars", category: "Space", prompt: "Deep space cosmic nebula clouds forming galaxy typography COREZ with twinkling stars" },
-  { id: 29, name: "Kinetic Motion Blur", category: "Modern", prompt: "Modern kinetic typography poster with dynamic high-speed motion blur trails and sharp typography" },
-  { id: 30, name: "Rustic Carved Timber", category: "Wood", prompt: "Rustic hand-carved oak wood timber sign typography with visible wood grain and craft texture" },
-  { id: 31, name: "Liquid Mercury Chrome", category: "Liquid", prompt: "Liquid mercury fluid metal typography ripple effect on dark glossy mirror surface" },
-  { id: 32, name: "Chalkboard Handwritten", category: "Handdrawn", prompt: "Detailed vintage cafe chalkboard typography lettering with chalk dust texture" },
-  { id: 33, name: "Retro Groovy 70s Bubble", category: "Retro", prompt: "1970s psychedelic groovy bubble font typography with warm sunset gradient palette" },
-  { id: 34, name: "Cyber Neon Sign", category: "Neon", prompt: "Realistic glass tube neon sign glowing bright red and cyan on dark brick wall" },
-  { id: 35, name: "Micro Minimalist Type", category: "Minimal", prompt: "Ultra minimalist Swiss typography poster layout with tiny high-precision serif text and wide margin" },
-  { id: 36, name: "Frozen Crystal Ice", category: "Elemental", prompt: "Intricate frozen crystal ice typography COREZ with frost particles and sharp glacial edges" },
-  { id: 37, name: "Steampunk Brass Gears", category: "Steampunk", prompt: "Victorian steampunk brass gear mechanism forming intricate clockwork typography letters" },
-  { id: 38, name: "Digital Glitch Distortion", category: "Glitch", prompt: "Digital RGB glitch displacement distortion typography COREZ on dark noise screen" },
-  { id: 39, name: "Paper Cutout Layers", category: "Paper", prompt: "Layered 3D paper cutout typography creating depth with soft shadow layers in pastel tones" },
-  { id: 40, name: "Desert Sand Dunes", category: "Stone", prompt: "Giant desert sand dune ripple patterns forming ancient typographic letters from aerial view" },
-  { id: 41, name: "Op-Art Optical Illusion", category: "Abstract", prompt: "Black and white optical illusion op-art geometric pattern creating dynamic typographic letterforms" },
-  { id: 42, name: "High Contrast Fashion Serif", category: "Serif", prompt: "High contrast luxury fashion editorial typography with dramatic thin and thick serif stems" },
-  { id: 43, name: "Claymation 3D Plasticine", category: "3D", prompt: "Playful claymation 3D plasticine clay typography sculpture with subtle handmade fingerprints" },
-  { id: 44, name: "Laser Beam Neon", category: "Neon", prompt: "Intense red laser light beams intersecting in dark foggy space to form letter shapes" },
-  { id: 45, name: "Concrete Brutalism", category: "Architecture", prompt: "Raw architectural poured concrete 3D typography COREZ with subtle cement texture and shadows" },
-  { id: 46, name: "Electric Lightning Spark", category: "Elemental", prompt: "High voltage electrical arcs and lightning sparks outlining bold typography in dark atmosphere" },
-  { id: 47, name: "Silkscreen Print Poster", category: "Artistic", prompt: "Minimalist two-tone silkscreen print poster typography with subtle ink registration misalignment" },
-  { id: 48, name: "Floating Foil Balloon 3D", category: "3D", prompt: "Shiny chrome silver 3D foil balloon letters COREZ floating in clean studio lighting" },
-  { id: 49, name: "Matrix Code Rain", category: "Sci-Fi", prompt: "Green digital matrix glyph code rain cascading into letter shapes on dark screen" },
-  { id: 50, name: "Luxury Cursive Signature", category: "Script", prompt: "Fluid luxury gold foil cursive signature script typography on smooth black paper" }
+  { id: 1, name: "Cyberpunk Metropolis", category: "Cyberpunk", prompt: "Cinematic wide shot of a rainy cyberpunk neon metropolis at midnight, volumetric fog, glowing holograms, octane render, 8k resolution" },
+  { id: 2, name: "Japandi Living Room", category: "Architecture", prompt: "Sunlit minimalist Japandi living room with floor-to-ceiling windows overlooking a pine forest, brutalist concrete and warm oak wood, hyperrealistic" },
+  { id: 3, name: "Obsidian Floating Castle", category: "Fantasy", prompt: "Gothic dark fantasy castle built on a floating obsidian island in a stormy crimson sky, ultra detailed, concept art" },
+  { id: 4, name: "Macro Dragonfly Wings", category: "Photorealism", prompt: "Ultra macro photograph of a glowing iridescent dragonfly with dew drops on its wings, soft bokeh background, 100mm lens photorealism" },
+  { id: 5, name: "Orbital Space Station", category: "Sci-Fi", prompt: "Massive sleek white starship docking at an orbital ring station above a blue gas giant planet, sci-fi concept art, highly detailed" },
+  { id: 6, name: "Liquid Iridescent Sculpture", category: "Product & 3D", prompt: "Fluid liquid metallic iridescent mercury sculpture floating in dark studio lighting, glossy reflections, 3D render" },
+  { id: 7, name: "Luxury Perfume Shot", category: "Product & 3D", prompt: "Minimalist luxury perfume glass bottle on dark obsidian stone with water splash droplets, studio softbox lighting, 8k product shot" },
+  { id: 8, name: "Isometric Ramen Shop", category: "Product & 3D", prompt: "Isometric 3D diorama of a cozy Japanese ramen shop at night with warm lantern lights and detailed mini street, tilt-shift effect" },
+  { id: 9, name: "80s Synthwave Highway", category: "Cyberpunk", prompt: "Retro 1980s synthwave neon grid highway driving towards a massive magenta sun, chrome sports car, 80s aesthetic" },
+  { id: 10, name: "Ancient Forest Spirit", category: "Fantasy", prompt: "Ancient mythical forest spirit made of glowing moss and twisted ancient oak branches, dark fantasy concept art" },
+  { id: 11, name: "Weathered Sea Captain", category: "Photorealism", prompt: "Close-up portrait of an elderly sea captain with weathered skin, piercing blue eyes, studio Rembrandt lighting, 85mm photo" },
+  { id: 12, name: "Bioluminescent Cavern", category: "Landscapes", prompt: "Underwater bioluminescent cave with glowing jellyfish, radiant coral reefs, and crystal clear turquoise water, 8k resolution" },
+  { id: 13, name: "Carbon Fiber Cyborg", category: "Sci-Fi", prompt: "Futuristic female cyborg warrior with intricate glowing carbon fiber armor and neon visor, high-tech character portrait" },
+  { id: 14, name: "Impressionist Storm Coast", category: "Anime & Art", prompt: "Vibrant impressionist oil painting of a stormy coastline with heavy impasto brushstrokes and dramatic sunset colors" },
+  { id: 15, name: "Geometric Wolf Logo", category: "Minimalist", prompt: "Sleek geometric minimalist logo of a wolf head made of sharp thin monochrome lines, vector logo design on dark background" },
+  { id: 16, name: "Post-Apocalyptic City", category: "Cyberpunk", prompt: "Overgrown post-apocalyptic city ruins covered in lush green vines under a dramatic cloudy sky, cinematic matte painting" },
+  { id: 17, name: "Steampunk Explorer", category: "Sci-Fi", prompt: "Victorian steampunk brass airship soaring through golden sunset clouds, detailed clockwork mechanisms, 8k art" },
+  { id: 18, name: "Chibi Anime Wizard", category: "Anime & Art", prompt: "Cute anime chibi wizard character holding a glowing crystal orb, soft pastel colors, detailed digital illustration" },
+  { id: 19, name: "Glassmorphism Geometry", category: "Product & 3D", prompt: "Translucent frosted glass floating 3D geometric shapes with pastel ambient light refraction, modern graphic design" },
+  { id: 20, name: "Volcanic Lava River", category: "Landscapes", prompt: "Aerial view of rivers of glowing orange molten lava flowing through dark basalt rock, dramatic smoke, nature photography" },
+  { id: 21, name: "Low Poly Forest Deer", category: "Minimalist", prompt: "Artistic low poly geometric 3D deer in an enchanted forest with sunbeams breaking through canopy" },
+  { id: 22, name: "Film Noir Detective", category: "Photorealism", prompt: "Grainy 35mm vintage film still of a mystery detective standing in atmospheric street lamp fog, noir aesthetic" },
+  { id: 23, name: "Pixel Art RPG Town", category: "Anime & Art", prompt: "16-bit pixel art medieval village square with tavern, fountain, and stone houses, detailed retro game graphics" },
+  { id: 24, name: "Ink & Smoke Explosion", category: "Anime & Art", prompt: "High-speed photograph of colorful liquid ink and smoke exploding in dark water, macro detail" },
+  { id: 25, name: "Cyberpunk Canal Market", category: "Cyberpunk", prompt: "Cyberpunk neon-lit canal market with floating boats, glowing signs, and futuristic street vendors, detailed environment" },
+  { id: 26, name: "Nordic Fjord Aurora", category: "Landscapes", prompt: "Breathtaking Nordic fjord under green northern lights aurora borealis, snow-capped mountains, crystal clear water" },
+  { id: 27, name: "Robotic Factory Plant", category: "Sci-Fi", prompt: "High-tech automated manufacturing plant with robotic arms assembling futuristic electric vehicle, industrial photography" },
+  { id: 28, name: "Layered Paper Mountain", category: "Minimalist", prompt: "Intricate multi-layered paper cutout art of a mountain landscape with deep shadow depth layers" },
+  { id: 29, name: "Gold Foil Art Deco", category: "Product & 3D", prompt: "Intricate 1920s Art Deco gold foil geometric pattern on black velvet texture, luxury graphic design" },
+  { id: 30, name: "Deep Space Nebula", category: "Sci-Fi", prompt: "Hubble telescope view of a vibrant cosmic star nursery nebula with glowing gas clouds and distant galaxies" },
+  { id: 31, name: "Monochrome Staircase", category: "Architecture", prompt: "Stark black and white architectural photograph of curving concrete staircases and shadow play, archdaily style" },
+  { id: 32, name: "Emerald Dragon Peak", category: "Fantasy", prompt: "Majestic emerald dragon perched on top of a mountain peak above a sea of clouds, epic fantasy wallpaper" },
+  { id: 33, name: "Neon Laser Tunnel", category: "Cyberpunk", prompt: "Infinite perspective cyber tunnel with pulsating red and cyan laser grid beams, high-speed visual" },
+  { id: 34, name: "Botanical Orchid Parchment", category: "Anime & Art", prompt: "Detailed 19th-century vintage scientific botanical illustration of exotic orchids on aged parchment" },
+  { id: 35, name: "Claymation Kitchen Scene", category: "Product & 3D", prompt: "Handmade 3D claymation plasticine character sitting in a colorful miniature kitchen, clay stop-motion style" },
+  { id: 36, name: "Urban Street Graffiti", category: "Anime & Art", prompt: "Vibrant multi-layered urban graffiti mural on a rustic brick wall, spray paint textures and drip details" },
+  { id: 37, name: "Vogue Sculptural Dress", category: "Photorealism", prompt: "High fashion avant-garde editorial model wearing dramatic sculptural black dress, studio lighting, Vogue style" },
+  { id: 38, name: "Hover Taxi Skyscraper", category: "Sci-Fi", prompt: "Sleek flying hover car soaring between towering futuristic glass skyscrapers at dusk, sci-fi concept art" },
+  { id: 39, name: "Zen Rock Garden", category: "Architecture", prompt: "Serene Japanese zen rock garden with raked white gravel patterns and mossy stones, soft morning light" },
+  { id: 40, name: "Ocean Lightning Storm", category: "Landscapes", prompt: "Dramatic long-exposure lightning storm striking over a dark ocean, powerful atmospheric photo" },
+  { id: 41, name: "Ukiyo-e Ocean Wave", category: "Anime & Art", prompt: "Traditional Japanese Ukiyo-e woodblock print of stormy sea waves with Mt Fuji in background" },
+  { id: 42, name: "Retro Synth Arcade", category: "Cyberpunk", prompt: "Interior of a retro-futuristic arcade with glowing arcade cabinets, neon floor reflections, and synth atmosphere" },
+  { id: 43, name: "Gold Balloon Dog", category: "Product & 3D", prompt: "Playful glossy metallic gold floating 3D balloon animal sculpture in a clean white gallery space" },
+  { id: 44, name: "Desert Palm Oasis", category: "Landscapes", prompt: "Serene desert sand dunes surrounding a pristine palm tree oasis at golden hour, aerial photograph" },
+  { id: 45, name: "Gothic Stained Glass", category: "Architecture", prompt: "Intricate gothic cathedral interior with sunlight streaming through colorful stained glass windows casting rainbow light" },
+  { id: 46, name: "Floating Sky Islands", category: "Fantasy", prompt: "Surreal fantasy landscape with floating grassy islands connected by rope bridges, waterfalls cascading into clouds" },
+  { id: 47, name: "Silicon Microchip Die", category: "Sci-Fi", prompt: "Macro photo of a glowing microchip silicon die processor under microscope lighting, high-tech hardware" },
+  { id: 48, name: "Pop Art Hero Panel", category: "Anime & Art", prompt: "1960s pop art comic book panel showing a dramatic superhero expression with halftone dots and bold inks" },
+  { id: 49, name: "Curved Glass Tower", category: "Architecture", prompt: "Angle shot looking up at a towering modern glass skyscraper reflecting dramatic sunset sky clouds" },
+  { id: 50, name: "Golden Tomb Hieroglyphs", category: "Fantasy", prompt: "Dark ancient Egyptian tomb chamber filled with golden sarcophagus relics and glowing hieroglyphics" }
 ];
 
 export default function ImageShowcaseModal({ isOpen, onClose }) {
@@ -77,7 +77,7 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
-  const categories = ['All', 'Neon', 'Brutalist', '3D', 'Serif', 'Sci-Fi', 'Retro', 'Vintage', 'Minimal', 'Artistic'];
+  const categories = ['All', 'Photorealism', 'Architecture', 'Cyberpunk', 'Fantasy', 'Sci-Fi', 'Anime & Art', 'Product & 3D', 'Landscapes', 'Minimalist'];
 
   const filteredPresets = selectedCategory === 'All'
     ? SHOWCASE_PRESETS
@@ -145,7 +145,7 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
             <div className="brand-icon" style={{ width: '26px', height: '26px' }}>
               <Wand2 size={14} />
             </div>
-            <span>FLUX Image & Typography Showcase</span>
+            <span>FLUX Creative Prompt Showcase (50 Visual Styles)</span>
           </div>
           <button className="icon-btn close-modal-btn" onClick={onClose} title="Close">
             <X size={15} />
@@ -158,7 +158,7 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
             onClick={() => setActiveTab('gallery')}
           >
             <Layers size={13} />
-            <span>Font Presets Gallery (50 Styles)</span>
+            <span>Prompt Catalog (50 Visual Styles)</span>
           </button>
           <button 
             className={`showcase-tab-btn ${activeTab === 'generator' ? 'active' : ''}`}
@@ -225,7 +225,7 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
               <textarea 
                 className="generator-textarea"
                 rows={3}
-                placeholder="Describe the typography style or picture you want to generate with FLUX..."
+                placeholder="Describe any scene, art style, product, architecture, or creative concept you want to generate with FLUX..."
                 value={customPrompt}
                 onChange={e => setCustomPrompt(e.target.value)}
               />
@@ -272,7 +272,7 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
               {generatedImages.length === 0 ? (
                 <div className="empty-gallery-state">
                   <Wand2 size={24} style={{ opacity: 0.4 }} />
-                  <p>No images generated in this session yet. Select a font preset from the gallery or enter a custom prompt above to create up to 50 FLUX images.</p>
+                  <p>No images generated in this session yet. Select a prompt preset from the catalog or enter a custom prompt above to create up to 50 FLUX images.</p>
                 </div>
               ) : (
                 <div className="generated-images-grid">
