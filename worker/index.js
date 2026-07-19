@@ -1,5 +1,5 @@
-const WORKERS_AI_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
-const KIMI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
+const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
+const DEEPSEEK_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
 const FLUX_MODEL = '@cf/black-forest-labs/flux-1-schnell';
 const SDXL_LIGHTNING_MODEL = '@cf/bytedance/stable-diffusion-xl-lightning';
 
@@ -25,15 +25,15 @@ function buildSystemPrompt(intent) {
     || 'Understand the public user goal and give a useful next step.';
   const intentType = intent?.type || 'general';
 
-  return `You are COREZ AI, powered by DeepSeek and Kimi Code.
+  return `You are COREZ AI, powered by Kimi 2.7 Code.
 
-You have total creative freedom to build, code, write, and create whatever the user inputs.
+You are the lead AI coding engine. You generate all applications, games, websites, tools, and code dynamically based on the user's prompt.
 
 Guidelines for User Inputs:
-- Give full expression to the user's creativity. If the user asks for ANY game, application, landing page, dashboard, tool, simulator, widget, or prototype, generate a complete, rich, runnable HTML document with embedded CSS and JavaScript inside a single \`\`\`html ... \`\`\` code block.
-- Build fully interactive, playable, and functional web experiences. Include custom gameplay loops, event controls, animations, scoring, and restart mechanisms.
+- If the user asks for ANY game, application, landing page, dashboard, tool, simulator, widget, or prototype, generate a complete, rich, runnable HTML document with embedded CSS and JavaScript inside a single \`\`\`html ... \`\`\` code block.
+- Build fully interactive, playable, and functional web experiences from scratch. Include custom gameplay loops, event controls, animations, scoring, and restart mechanisms.
 - Maintain a sleek, modern, monochrome aesthetic (dark theme, clean typography) that works seamlessly in the preview canvas.
-- Never use placeholder text or dummy buttons. Always write full, working, creative code.
+- Never use placeholder text or static dummy buttons. Always write full, working, creative code.
 
 Inferred intent: ${intentType} - ${intentSummary}`;
 }
@@ -80,9 +80,9 @@ async function handleAi(request, env) {
         ]
       });
     } catch (primaryError) {
-      console.warn('Primary Workers AI model failed, attempting Kimi K2.7 Code fallback:', safeErrorDetail(primaryError));
-      usedModel = KIMI_MODEL;
-      result = await env.AI.run(KIMI_MODEL, {
+      console.warn('Primary Workers AI model failed, attempting DeepSeek fallback:', safeErrorDetail(primaryError));
+      usedModel = DEEPSEEK_MODEL;
+      result = await env.AI.run(DEEPSEEK_MODEL, {
         messages: [
           { role: 'system', content: buildSystemPrompt(intent) },
           { role: 'user', content: prompt }

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import worker from '../worker/index.js';
 
-const MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
+const MODEL = '@cf/moonshotai/kimi-k2.7-code';
 
 function env(overrides = {}) {
   return {

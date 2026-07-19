@@ -27,7 +27,7 @@ check_absent() {
   fi
 }
 
-check 'Worker uses the DeepSeek model' '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b' "$worker"
+check 'Worker uses the Kimi 2.7 Code model' '@cf/moonshotai/kimi-k2[.]7-code' "$worker"
 check_absent 'Worker does not use the paid-only GLM-5.2 model' '@cf/zai-org/glm-5[.]2' "$worker"
 check 'Worker invokes the native AI binding' 'env[.]AI[.]run' "$worker"
 check 'Worker sends a system message' "role: 'system'" "$worker"
