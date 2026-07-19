@@ -190,7 +190,7 @@ export default function App() {
 
       <main className="main-content">
         {activeView === 'image-studio' ? (
-          <ImageStudioPage onBackToChat={() => setActiveView('chat')} />
+          <ImageStudioPage />
         ) : (
           <>
             <div className={`chat-pane ${canvasOpen ? 'canvas-active' : ''}`}>

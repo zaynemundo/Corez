@@ -8,13 +8,12 @@ import {
   Loader2,
   Layers,
   Wand2,
-  X,
-  ArrowLeft
+  X
 } from 'lucide-react';
 import { generateFluxImage } from '../services/aiService.js';
 import { SHOWCASE_PRESETS } from './ImageShowcaseModal.jsx';
 
-export default function ImageStudioPage({ onBackToChat }) {
+export default function ImageStudioPage() {
   const [activeTab, setActiveTab] = useState('generator'); // 'generator' | 'catalog'
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [customPrompt, setCustomPrompt] = useState('');
@@ -54,7 +53,7 @@ export default function ImageStudioPage({ onBackToChat }) {
         ]);
       }
     } catch (err) {
-      console.error('FLUX Image generation error:', err);
+      console.error('Image generation error:', err);
     } finally {
       setGenerating(false);
     }
@@ -78,7 +77,7 @@ export default function ImageStudioPage({ onBackToChat }) {
           ]);
         }
       } catch (err) {
-        console.error(`FLUX Image batch generation item ${i + 1} error:`, err);
+        console.error(`Image batch generation item ${i + 1} error:`, err);
       }
     }
     setGenerating(false);
@@ -86,37 +85,26 @@ export default function ImageStudioPage({ onBackToChat }) {
 
   return (
     <div className="image-studio-page">
-      <header className="studio-header">
-        <div className="studio-header-left">
-          <button className="code-btn back-btn" onClick={onBackToChat} title="Back to Chat">
-            <ArrowLeft size={14} />
-            <span>Back to Chat</span>
-          </button>
-          <div className="studio-title-box">
-            <Wand2 size={16} />
-            <h1 className="studio-title">Image Studio</h1>
+      <main className="studio-main">
+        <div className="studio-top-nav">
+          <div className="studio-tabs">
+            <button 
+              className={`showcase-tab-btn ${activeTab === 'generator' ? 'active' : ''}`}
+              onClick={() => setActiveTab('generator')}
+            >
+              <Sparkles size={13} />
+              <span>Image Generator</span>
+            </button>
+            <button 
+              className={`showcase-tab-btn ${activeTab === 'catalog' ? 'active' : ''}`}
+              onClick={() => setActiveTab('catalog')}
+            >
+              <Layers size={13} />
+              <span>Prompt Catalog (50 Styles)</span>
+            </button>
           </div>
         </div>
 
-        <div className="studio-tabs">
-          <button 
-            className={`showcase-tab-btn ${activeTab === 'generator' ? 'active' : ''}`}
-            onClick={() => setActiveTab('generator')}
-          >
-            <Sparkles size={14} />
-            <span>Image Generator & Studio</span>
-          </button>
-          <button 
-            className={`showcase-tab-btn ${activeTab === 'catalog' ? 'active' : ''}`}
-            onClick={() => setActiveTab('catalog')}
-          >
-            <Layers size={14} />
-            <span>Prompt Catalog (50 Styles)</span>
-          </button>
-        </div>
-      </header>
-
-      <main className="studio-main">
         {activeTab === 'generator' && (
           <div className="studio-generator-container">
             <div className="generator-input-card">

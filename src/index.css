@@ -1657,7 +1657,7 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
 }
 
-/* Full-Page FLUX Image Studio */
+/* Full-Page Image Studio */
 .image-studio-page {
   flex: 1;
   display: flex;
@@ -1667,40 +1667,13 @@ h1, h2, h3, h4, h5, h6 {
   overflow: hidden;
 }
 
-.studio-header {
-  height: 54px;
-  padding: 0 1.25rem;
+.studio-top-nav {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--border-color);
-  background-color: var(--bg-primary);
-  flex-shrink: 0;
-}
-
-.studio-header-left {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-}
-
-.back-btn {
-  padding: 0.3rem 0.65rem;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-pill);
-}
-
-.studio-title-box {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: var(--text-primary);
-}
-
-.studio-title {
-  font-size: 0.925rem;
-  font-weight: 400;
+  justify-content: flex-start;
+  max-width: 1080px;
+  width: 100%;
+  margin: 0 auto 1.25rem auto;
 }
 
 .studio-tabs {
