@@ -3,9 +3,9 @@ import react from '@vitejs/plugin-react'
 
 function apiDevPlugin() {
   const models = [
+    'deepseek/deepseek-v4-pro',
     'deepseek/deepseek-chat',
-    'deepseek/deepseek-r1',
-    'meta-llama/llama-3.3-70b-instruct'
+    'deepseek/deepseek-r1'
   ];
 
   return {
@@ -50,6 +50,7 @@ Inferred intent: ${intent?.type || 'app'} - ${intent?.summary || 'Create a publi
                     },
                     body: JSON.stringify({
                       model: modelId,
+                      reasoning: { effort: 'xhigh' },
                       messages: [
                         { role: 'system', content: systemPrompt },
                         { role: 'user', content: prompt }

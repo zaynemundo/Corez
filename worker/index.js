@@ -1,8 +1,8 @@
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 const OPENROUTER_MODELS = [
+  'deepseek/deepseek-v4-pro',
   'deepseek/deepseek-chat',
-  'deepseek/deepseek-r1',
-  'meta-llama/llama-3.3-70b-instruct'
+  'deepseek/deepseek-r1'
 ];
 const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
 const DEEPSEEK_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
@@ -31,7 +31,7 @@ function buildSystemPrompt(intent) {
     || 'Understand the public user goal and give a useful next step.';
   const intentType = intent?.type || 'general';
 
-  return `You are COREZ AI, powered by Kimi 2.7 Code.
+  return `You are COREZ AI, powered by DeepSeek V4 Pro.
 
 You possess 4 core AI engineering skills:
 
@@ -98,6 +98,7 @@ async function handleAi(request, env) {
           },
           body: JSON.stringify({
             model: modelId,
+            reasoning: { effort: 'xhigh' },
             messages: [
               { role: 'system', content: buildSystemPrompt(intent) },
               { role: 'user', content: prompt }
