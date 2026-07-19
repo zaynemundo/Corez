@@ -328,16 +328,17 @@ h1, h2, h3, h4, h5, h6 {
 
 .delete-chat-btn.icon-only-delete {
   position: absolute;
-  top: -2px;
-  right: -2px;
-  width: 14px;
-  height: 14px;
-  min-width: 14px;
-  min-height: 14px;
+  top: -1px;
+  right: -1px;
+  width: 12px;
+  height: 12px;
+  min-width: 12px;
+  min-height: 12px;
   padding: 0;
   opacity: 0;
-  background: transparent;
-  border: none;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
   color: var(--text-muted);
   cursor: pointer;
   display: flex;
@@ -352,6 +353,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .delete-chat-btn.icon-only-delete:hover {
   color: #ff4d4f;
+  border-color: #ff4d4f;
 }
 
 .sidebar-footer.icon-only-footer {

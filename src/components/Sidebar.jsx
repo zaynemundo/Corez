@@ -31,8 +31,8 @@ export default function Sidebar({
           onClick={onCloseSidebar}
           title="Collapse Sidebar"
         >
-          <Layers size={15} className="brand-logo-default" />
-          <PanelLeftClose size={15} className="brand-logo-hover" />
+          <Layers size={14} className="brand-logo-default" />
+          <PanelLeftClose size={14} className="brand-logo-hover" />
         </button>
       </div>
 
@@ -42,7 +42,7 @@ export default function Sidebar({
           onClick={onNewChat}
           title="New Chat Session"
         >
-          <Plus size={16} />
+          <Plus size={15} />
         </button>
       </div>
 
@@ -52,7 +52,7 @@ export default function Sidebar({
           onClick={onOpenImageShowcase}
           title="FLUX Image Creator & Prompt Showcase"
         >
-          <ImageIcon size={15} />
+          <ImageIcon size={14} />
         </button>
       </div>
 
@@ -64,7 +64,7 @@ export default function Sidebar({
             onClick={() => onSelectSession(session.id)}
             title={session.title}
           >
-            <MessageSquare size={15} />
+            <MessageSquare size={14} />
             <button
               className="delete-chat-btn icon-only-delete"
               onClick={(e) => {
@@ -73,7 +73,7 @@ export default function Sidebar({
               }}
               title={`Delete ${session.title}`}
             >
-              <Trash2 size={11} />
+              <Trash2 size={10} />
             </button>
           </div>
         ))}
@@ -85,14 +85,14 @@ export default function Sidebar({
           onClick={onToggleTheme}
           title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
         >
-          {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+          {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
         </button>
         <button 
           className="footer-action-btn icon-only-btn" 
           onClick={onOpenSettings}
           title="Corez Settings"
         >
-          <Settings size={15} />
+          <Settings size={14} />
         </button>
       </div>
     </aside>
