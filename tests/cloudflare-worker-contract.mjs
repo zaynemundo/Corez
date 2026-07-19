@@ -184,6 +184,47 @@ async function run() {
     error: 'Workers AI returned an empty response.'
   });
 
+  // Test /api/image FLUX endpoint
+  const imageMethodResponse = await worker.fetch(
+    new Request('https://corez.test/api/image'),
+    env()
+  );
+  assert.equal(imageMethodResponse.status, 405);
+
+  const imageMissingPromptResponse = await worker.fetch(
+    new Request('https://corez.test/api/image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: '' })
+    }),
+    env()
+  );
+  assert.equal(imageMissingPromptResponse.status, 400);
+
+  let fluxInvocation;
+  const dummyBuffer = new Uint8Array([137, 80, 78, 71]).buffer;
+  const imageSuccessResponse = await worker.fetch(
+    new Request('https://corez.test/api/image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: 'A futuristic city' })
+    }),
+    env({
+      AI: {
+        async run(model, input) {
+          fluxInvocation = { model, input };
+          return dummyBuffer;
+        }
+      }
+    })
+  );
+  assert.equal(imageSuccessResponse.status, 200);
+  const imageJsonData = await json(imageSuccessResponse);
+  assert.equal(fluxInvocation.model, '@cf/black-forest-labs/flux-1-schnell');
+  assert.equal(fluxInvocation.input.prompt, 'A futuristic city');
+  assert.equal(imageJsonData.model, '@cf/black-forest-labs/flux-1-schnell');
+  assert.match(imageJsonData.image, /^data:image\/png;base64,/);
+
   console.log('Cloudflare Worker behavior contract passed.');
 }
 

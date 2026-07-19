@@ -1,4 +1,5 @@
 const WORKERS_AI_MODEL = '@cf/zai-org/glm-4.7-flash';
+const FLUX_MODEL = '@cf/black-forest-labs/flux-1-schnell';
 
 function jsonResponse(status, body) {
   return Response.json(body, { status });
@@ -98,11 +99,69 @@ async function handleAi(request, env) {
   }
 }
 
+async function handleImage(request, env) {
+  if (request.method !== 'POST') {
+    return jsonResponse(405, { error: 'Method not allowed.' });
+  }
+  if (!env.AI || typeof env.AI.run !== 'function') {
+    return jsonResponse(503, { error: 'Workers AI is not configured.' });
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse(400, { error: 'Request body must be valid JSON.' });
+  }
+
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    body = {};
+  }
+
+  const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
+  if (!prompt) {
+    return jsonResponse(400, { error: 'Prompt is required.' });
+  }
+
+  try {
+    const arrayBuffer = await env.AI.run(FLUX_MODEL, {
+      prompt: prompt,
+      num_steps: 4
+    });
+
+    if (!arrayBuffer) {
+      return jsonResponse(502, { error: 'FLUX model returned no image data.' });
+    }
+
+    const bytes = new Uint8Array(arrayBuffer);
+    let binary = '';
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    const base64 = btoa(binary);
+
+    return jsonResponse(200, {
+      image: `data:image/png;base64,${base64}`,
+      model: FLUX_MODEL
+    });
+  } catch (error) {
+    console.error(JSON.stringify({
+      message: 'FLUX image generation failed',
+      error: safeErrorDetail(error)
+    }));
+    return jsonResponse(502, { error: 'Unable to generate FLUX image.' });
+  }
+}
+
 export default {
   async fetch(request, env) {
     const pathname = new URL(request.url).pathname;
     if (pathname === '/api/ai') {
       return handleAi(request, env);
+    }
+    if (pathname === '/api/image') {
+      return handleImage(request, env);
     }
     if (pathname.startsWith('/api/')) {
       return jsonResponse(404, { error: 'API route not found.' });

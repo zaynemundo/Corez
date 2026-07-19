@@ -7,6 +7,7 @@ export const MODEL = {
 };
 
 export const AI_PROXY_ENDPOINT = '/api/ai';
+export const IMAGE_PROXY_ENDPOINT = '/api/image';
 
 export const PUBLIC_USER_INTENT_PROMPT = `
 Corez serves public users who may describe goals casually, incompletely, or
@@ -140,6 +141,23 @@ export function analyzePublicUserIntent(prompt) {
     confidence: modelResult?.confidence ?? 0,
     source: 'rules'
   };
+}
+
+export async function generateFluxImage(prompt) {
+  const response = await fetch(IMAGE_PROXY_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ prompt })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Hosted FLUX Image request failed with status ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data?.image || null;
 }
 
 export async function generateHostedAIResponse(
@@ -305,8 +323,22 @@ export async function generateLocalAIResponse(prompt) {
   return `I understand the goal: ${intent.summary}\n\nFor **"${cleanPrompt}"**, I’ll focus on what the public user is trying to accomplish and give a practical path forward.\n\nA good next step is to define the outcome, the audience, and the format you want. Once those are clear, I can help turn the idea into a plan, a written answer, code, or a live preview depending on what you need.`;
 }
 
+const IMAGE_PATTERNS = /\b(generate|create|draw|make|render|show|flux)\b.*\b(image|picture|photo|logo|illustration|artwork|wallpaper|drawing|graphic)\b|\b(image|picture|photo|logo|illustration|artwork|wallpaper|drawing|graphic)\b.*\b(generate|create|draw|make|render|flux)\b/i;
+
 export async function generateAIResponse(prompt) {
   const cleanPrompt = prompt.trim();
+
+  if (IMAGE_PATTERNS.test(cleanPrompt) || cleanPrompt.toLowerCase().startsWith('image:') || cleanPrompt.toLowerCase().startsWith('flux:')) {
+    try {
+      const imageUrl = await generateFluxImage(cleanPrompt);
+      if (imageUrl) {
+        return `Here is your generated image powered by **FLUX.1-schnell**:\n\n![${cleanPrompt}](${imageUrl})`;
+      }
+    } catch (imgError) {
+      console.warn('FLUX image generation error; falling back to standard text response.', imgError);
+    }
+  }
+
   const intent = analyzePublicUserIntent(cleanPrompt);
 
   try {
