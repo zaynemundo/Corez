@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import worker from '../worker/index.js';
 
-const MODEL = '@cf/zai-org/glm-4.7-flash';
+const MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
 
 function env(overrides = {}) {
   return {
