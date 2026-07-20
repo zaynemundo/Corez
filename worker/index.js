@@ -4,8 +4,8 @@ function getTargetModels(intentType) {
 }
 const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
 const DEEPSEEK_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
-const FLUX_PRIMARY_MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const FLUX_FALLBACK_MODEL = '@cf/black-forest-labs/flux-1-dev';
+const FLUX_PRIMARY_MODEL = '@cf/black-forest-labs/flux-1-dev';
+const FLUX_FALLBACK_MODEL = '@cf/black-forest-labs/flux-1-schnell';
 
 function jsonResponse(status, body) {
   return Response.json(body, { status });
@@ -218,14 +218,14 @@ async function handleImage(request, env) {
 
     try {
       result = await env.AI.run(FLUX_PRIMARY_MODEL, {
-        prompt: prompt,
-        num_steps: 4
+        prompt: prompt
       });
     } catch (mainErr) {
       console.warn('Primary FLUX model failed, attempting fallback FLUX model:', safeErrorDetail(mainErr));
       usedModel = FLUX_FALLBACK_MODEL;
       result = await env.AI.run(FLUX_FALLBACK_MODEL, {
-        prompt: prompt
+        prompt: prompt,
+        num_steps: 4
       });
     }
 
