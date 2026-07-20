@@ -14,7 +14,7 @@ function getTargetModels(intentType) {
 }
 const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
 const DEEPSEEK_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
-const FLUX_MODEL = '@cf/black-forest-labs/flux-2-klein-4b';
+const RECRAFT_MODEL = '@cf/recraft/recraftv4-1';
 const SDXL_LIGHTNING_MODEL = '@cf/bytedance/stable-diffusion-xl-lightning';
 
 function jsonResponse(status, body) {
@@ -224,15 +224,14 @@ async function handleImage(request, env) {
 
   try {
     let result;
-    let usedModel = FLUX_MODEL;
+    let usedModel = RECRAFT_MODEL;
 
     try {
-      result = await env.AI.run(FLUX_MODEL, {
-        prompt: prompt,
-        num_steps: 4
+      result = await env.AI.run(RECRAFT_MODEL, {
+        prompt: prompt
       });
-    } catch (fluxErr) {
-      console.warn('FLUX model failed, attempting SDXL Lightning fallback:', safeErrorDetail(fluxErr));
+    } catch (mainErr) {
+      console.warn('RECRAFT model failed, attempting SDXL Lightning fallback:', safeErrorDetail(mainErr));
       usedModel = SDXL_LIGHTNING_MODEL;
       result = await env.AI.run(SDXL_LIGHTNING_MODEL, {
         prompt: prompt
