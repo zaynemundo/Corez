@@ -4,8 +4,8 @@ function getTargetModels(intentType) {
 }
 const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
 const DEEPSEEK_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
-const RECRAFT_MODEL = '@cf/recraft/recraftv4-1';
-const SDXL_LIGHTNING_MODEL = '@cf/bytedance/stable-diffusion-xl-lightning';
+const FLUX_PRIMARY_MODEL = '@cf/black-forest-labs/flux-2-dev';
+const FLUX_FALLBACK_MODEL = '@cf/black-forest-labs/flux-2-klein-9b';
 
 function jsonResponse(status, body) {
   return Response.json(body, { status });
@@ -214,16 +214,16 @@ async function handleImage(request, env) {
 
   try {
     let result;
-    let usedModel = RECRAFT_MODEL;
+    let usedModel = FLUX_PRIMARY_MODEL;
 
     try {
-      result = await env.AI.run(RECRAFT_MODEL, {
+      result = await env.AI.run(FLUX_PRIMARY_MODEL, {
         prompt: prompt
       });
     } catch (mainErr) {
-      console.warn('RECRAFT model failed, attempting SDXL Lightning fallback:', safeErrorDetail(mainErr));
-      usedModel = SDXL_LIGHTNING_MODEL;
-      result = await env.AI.run(SDXL_LIGHTNING_MODEL, {
+      console.warn('Primary FLUX model failed, attempting fallback FLUX model:', safeErrorDetail(mainErr));
+      usedModel = FLUX_FALLBACK_MODEL;
+      result = await env.AI.run(FLUX_FALLBACK_MODEL, {
         prompt: prompt
       });
     }
