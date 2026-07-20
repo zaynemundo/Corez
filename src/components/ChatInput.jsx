@@ -1,14 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send } from 'lucide-react';
 
-export default function ChatInput({ onSendMessage, isStreaming }) {
-  const [input, setInput] = useState('');
-  const textareaRef = useRef(null);
+export default function ChatInput({ input, setInput, onSendMessage, isStreaming, textareaRef }) {
+  const internalRef = useRef(null);
+  const refToUse = textareaRef || internalRef;
 
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 140)}px`;
+    if (refToUse.current) {
+      refToUse.current.style.height = 'auto';
+      refToUse.current.style.height = `${Math.min(refToUse.current.scrollHeight, 140)}px`;
     }
   }, [input]);
 
@@ -17,8 +17,8 @@ export default function ChatInput({ onSendMessage, isStreaming }) {
     if (!input.trim() || isStreaming) return;
     onSendMessage(input.trim());
     setInput('');
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
+    if (refToUse.current) {
+      refToUse.current.style.height = 'auto';
     }
   };
 
@@ -33,7 +33,7 @@ export default function ChatInput({ onSendMessage, isStreaming }) {
     <div className="chat-input-container">
       <form onSubmit={handleSubmit} className="input-box">
         <textarea
-          ref={textareaRef}
+          ref={refToUse}
           className="chat-textarea"
           value={input}
           onChange={(e) => setInput(e.target.value)}

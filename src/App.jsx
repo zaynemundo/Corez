@@ -45,6 +45,7 @@ export default function App() {
   });
 
   const messagesEndRef = useRef(null);
+  const chatInputRef = useRef(null);
 
   useEffect(() => {
     const mobileQuery = window.matchMedia('(max-width: 767px)');
@@ -162,9 +163,17 @@ export default function App() {
     setIsThinking(false);
   };
 
-  const handleReviseCode = (revision, code) => {
-    const prompt = `Please revise this code:\n\`\`\`\n${code}\n\`\`\`\n\nRevision request: ${revision}`;
-    handleSendMessage(prompt);
+  const [chatInput, setChatInput] = useState('');
+
+  const handleReviseCode = (code) => {
+    const revisionPrompt = `Please revise this code:\n\`\`\`\n${code}\n\`\`\`\n\nRevision request: `;
+    setChatInput(revisionPrompt);
+    if (chatInputRef.current) {
+      setTimeout(() => {
+        chatInputRef.current.focus();
+        chatInputRef.current.setSelectionRange(revisionPrompt.length, revisionPrompt.length);
+      }, 50);
+    }
   };
 
   return (
@@ -242,6 +251,9 @@ export default function App() {
               </div>
 
               <ChatInput
+                input={chatInput}
+                setInput={setChatInput}
+                textareaRef={chatInputRef}
                 onSendMessage={handleSendMessage}
                 isStreaming={isThinking}
               />

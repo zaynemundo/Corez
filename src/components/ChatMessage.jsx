@@ -113,9 +113,8 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
                 className="preview-action"
                 style={{ flex: 1, display: 'flex', justifyContent: 'center', backgroundColor: 'var(--bg-tertiary)' }}
                 onClick={() => {
-                  const revision = window.prompt('What would you like to change in this code?');
-                  if (revision && revision.trim() && onReviseCode) {
-                    onReviseCode(revision.trim(), part.code);
+                  if (onReviseCode) {
+                    onReviseCode(part.code);
                   }
                 }}
                 title="Ask AI to modify this code"
