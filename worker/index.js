@@ -14,7 +14,7 @@ function getTargetModels(intentType) {
 }
 const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
 const DEEPSEEK_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
-const FLUX_MODEL = '@cf/black-forest-labs/flux-1-schnell';
+const FLUX_MODEL = '@cf/black-forest-labs/flux-2-klein-4b';
 const SDXL_LIGHTNING_MODEL = '@cf/bytedance/stable-diffusion-xl-lightning';
 
 function jsonResponse(status, body) {
