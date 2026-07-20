@@ -162,6 +162,11 @@ export default function App() {
     setIsThinking(false);
   };
 
+  const handleReviseCode = (revision, code) => {
+    const prompt = `Please revise this code:\n\`\`\`\n${code}\n\`\`\`\n\nRevision request: ${revision}`;
+    handleSendMessage(prompt);
+  };
+
   return (
     <div className="app-container">
       <Sidebar
@@ -214,6 +219,7 @@ export default function App() {
                         key={idx}
                         message={msg}
                         onRunInCanvas={handleRunInCanvas}
+                        onReviseCode={handleReviseCode}
                       />
                     ))}
                     {isThinking && (

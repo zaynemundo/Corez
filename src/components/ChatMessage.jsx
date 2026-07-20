@@ -3,7 +3,8 @@ import {
   Layers,
   ChevronRight,
   Copy,
-  Check
+  Check,
+  Wand2
 } from 'lucide-react';
 
 function CodeSnippetBlock({ code, lang }) {
@@ -33,7 +34,7 @@ function CodeSnippetBlock({ code, lang }) {
   );
 }
 
-export default function ChatMessage({ message, onRunInCanvas }) {
+export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
   const isUser = message.role === 'user';
 
   const renderInlineFormattedText = (text) => {
@@ -98,15 +99,29 @@ export default function ChatMessage({ message, onRunInCanvas }) {
       if (part.type === 'code') {
         if (part.isExecutable) {
           return (
-            <div key={idx} style={{ margin: '0.65rem 0' }}>
+            <div key={idx} style={{ margin: '0.65rem 0', display: 'flex', gap: '0.5rem' }}>
               <div 
                 className="preview-action"
+                style={{ flex: 1, display: 'flex', justifyContent: 'center' }}
                 onClick={() => onRunInCanvas(part.code)}
                 title="Click to open app live on the right side"
               >
                 <Layers size={14} style={{ color: 'var(--text-primary)' }} />
                 <span>Open preview</span>
-                <ChevronRight size={14} style={{ marginLeft: 'auto', color: 'var(--text-secondary)' }} />
+              </div>
+              <div 
+                className="preview-action"
+                style={{ flex: 1, display: 'flex', justifyContent: 'center', backgroundColor: 'var(--bg-tertiary)' }}
+                onClick={() => {
+                  const revision = window.prompt('What would you like to change in this code?');
+                  if (revision && revision.trim() && onReviseCode) {
+                    onReviseCode(revision.trim(), part.code);
+                  }
+                }}
+                title="Ask AI to modify this code"
+              >
+                <Wand2 size={14} style={{ color: 'var(--text-primary)' }} />
+                <span>Revise</span>
               </div>
             </div>
           );
