@@ -130,7 +130,7 @@ async function handleAi(request, env) {
           },
           body: JSON.stringify({
             model: modelId,
-            reasoning: { effort: 'xhigh' },
+            reasoning: { effort: 'high' },
             messages: apiMessages
           })
         });
