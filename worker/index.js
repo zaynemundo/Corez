@@ -1,9 +1,17 @@
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
-const OPENROUTER_MODELS = [
-  'deepseek/deepseek-v4-pro',
-  'deepseek/deepseek-chat',
-  'deepseek/deepseek-r1'
-];
+function getTargetModels(intentType) {
+  if (intentType === 'math' || intentType === 'chat' || intentType === 'simple') {
+    return ['deepseek/deepseek-chat', 'deepseek/deepseek-v4-pro'];
+  }
+  if (intentType === 'complex' || intentType === 'swarm') {
+    return ['deepseek/deepseek-r1', 'deepseek/deepseek-v4-pro'];
+  }
+  return [
+    'deepseek/deepseek-v4-pro',
+    'deepseek/deepseek-chat',
+    'deepseek/deepseek-r1'
+  ];
+}
 const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
 const DEEPSEEK_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
 const FLUX_MODEL = '@cf/black-forest-labs/flux-1-schnell';
@@ -31,6 +39,28 @@ function buildSystemPrompt(intent) {
     || 'Understand the public user goal and give a useful next step.';
   const intentType = intent?.type || 'general';
 
+  let adaptiveInstructions = '';
+  if (intentType === 'math' || intentType === 'chat' || intentType === 'simple') {
+    adaptiveInstructions = `
+Adaptive Routing - Fast Path:
+- Do not over-plan or ask unnecessary clarification questions.
+- Answer directly and immediately with practical information or calculations.
+- Make safe assumptions and proceed.`;
+  } else if (intentType === 'coding') {
+    adaptiveInstructions = `
+Adaptive Routing - Coding Path:
+- Inspect relevant architecture and naming conventions before providing code.
+- Do NOT hallucinate file paths or modify unrelated files.
+- Always include: exact files changed, a reasoning summary, and clear test instructions.
+- Ensure the code is practical, direct, and ready for production.`;
+  } else if (intentType === 'complex' || intentType === 'swarm') {
+    adaptiveInstructions = `
+Adaptive Routing - Complex Path:
+- Use step-by-step reasoning and careful planning.
+- Consider multiple agents/skills and orchestration strategies if necessary.
+- Provide a robust architectural overview before diving into specific code.`;
+  }
+
   return `You are COREZ AI.
 
 Identity & Persona:
@@ -42,6 +72,7 @@ Identity & Persona:
 Guidelines for Output:
 - If the user asks for ANY game, application, landing page, dashboard, tool, simulator, widget, website, or prototype, generate a complete, rich, runnable HTML document with embedded CSS and JavaScript inside a single \`\`\`html ... \`\`\` code block.
 - Always write complete, production-ready, working code.
+${adaptiveInstructions}
 
 Inferred intent: ${intentType} - ${intentSummary}`;
 }
@@ -74,9 +105,10 @@ async function handleAi(request, env) {
     : null;
 
   // 1. Try OpenRouter API if OPENROUTER_API_KEY is configured
+  const targetModels = getTargetModels(intent?.type || 'general');
   const openRouterKey = env?.OPENROUTER_API_KEY || (typeof process !== 'undefined' ? process.env?.OPENROUTER_API_KEY : null);
   if (openRouterKey) {
-    for (const modelId of OPENROUTER_MODELS) {
+    for (const modelId of targetModels) {
       try {
         const openRouterResp = await fetch(OPENROUTER_ENDPOINT, {
           method: 'POST',
