@@ -1,16 +1,6 @@
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 function getTargetModels(intentType) {
-  if (intentType === 'math' || intentType === 'chat' || intentType === 'simple') {
-    return ['deepseek/deepseek-chat', 'deepseek/deepseek-v4-pro'];
-  }
-  if (intentType === 'complex' || intentType === 'swarm') {
-    return ['deepseek/deepseek-r1', 'deepseek/deepseek-v4-pro'];
-  }
-  return [
-    'deepseek/deepseek-v4-pro',
-    'deepseek/deepseek-chat',
-    'deepseek/deepseek-r1'
-  ];
+  return ['deepseek/deepseek-v4-pro'];
 }
 const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
 const DEEPSEEK_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
