@@ -1,6 +1,6 @@
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 function getTargetModels(intentType) {
-  return ['deepseek/deepseek-v4-pro'];
+  return ['deepseek/deepseek-v4-flash'];
 }
 const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
 const DEEPSEEK_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
