@@ -1209,7 +1209,7 @@ h1, h2, h3, h4, h5, h6 {
     position: fixed;
     top: calc(var(--sidebar-margin) + env(safe-area-inset-top, 0px));
     left: calc(var(--sidebar-margin) + env(safe-area-inset-left, 0px));
-    width: min(86vw, 280px);
+    width: var(--sidebar-width);
     height: calc(100vh - (var(--sidebar-margin) * 2) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
     height: calc(100dvh - (var(--sidebar-margin) * 2) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
     margin: 0;
@@ -1220,7 +1220,7 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .sidebar.collapsed {
-    width: min(86vw, 280px);
+    width: var(--sidebar-width);
     transform: translateX(calc(-100% - var(--sidebar-margin) - env(safe-area-inset-left, 0px)));
     margin: 0;
   }
@@ -1281,6 +1281,7 @@ h1, h2, h3, h4, h5, h6 {
 
   .chat-input-container {
     padding: 0.85rem;
+    padding-bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
   }
 
   .input-box {
