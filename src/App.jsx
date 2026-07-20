@@ -144,7 +144,7 @@ export default function App() {
 
     setIsThinking(true);
 
-    const responseText = await generateAIResponse(promptText);
+    const responseText = await generateAIResponse(promptText, updatedMessages);
     const extractedCode = extractCodeFromMessage(responseText);
     if (extractedCode) {
       setActiveCanvasCode(extractedCode);

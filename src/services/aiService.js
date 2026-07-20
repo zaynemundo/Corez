@@ -191,14 +191,15 @@ export async function generateFluxImage(prompt) {
 
 export async function generateHostedAIResponse(
   prompt,
-  intent = analyzePublicUserIntent(prompt)
+  intent = analyzePublicUserIntent(prompt),
+  history = []
 ) {
   const response = await fetch(AI_PROXY_ENDPOINT, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ prompt, intent })
+    body: JSON.stringify({ prompt, intent, messages: history })
   });
 
   if (!response.ok) {
@@ -616,10 +617,11 @@ export async function generateLocalAIResponse(prompt) {
 
 const IMAGE_PATTERNS = /\b(generate|create|draw|make|render|show|flux)\b.*\b(image|picture|photo|logo|illustration|artwork|wallpaper|drawing|graphic)\b|\b(image|picture|photo|logo|illustration|artwork|wallpaper|drawing|graphic)\b.*\b(generate|create|draw|make|render|flux)\b/i;
 
-export async function generateAIResponse(prompt) {
+export async function generateAIResponse(prompt, history = []) {
   const cleanPrompt = prompt.trim();
 
-  if (IMAGE_PATTERNS.test(cleanPrompt) || cleanPrompt.toLowerCase().startsWith('image:') || cleanPrompt.toLowerCase().startsWith('flux:')) {
+  // If this is the first message and it obviously asks for an image, we can skip the LLM overhead.
+  if (history.length <= 1 && (IMAGE_PATTERNS.test(cleanPrompt) || cleanPrompt.toLowerCase().startsWith('image:') || cleanPrompt.toLowerCase().startsWith('flux:'))) {
     try {
       const imageUrl = await generateFluxImage(cleanPrompt);
       if (imageUrl) {
@@ -633,8 +635,22 @@ export async function generateAIResponse(prompt) {
   const intent = analyzePublicUserIntent(cleanPrompt);
 
   try {
-    const hostedAiResponse = await generateHostedAIResponse(cleanPrompt, intent);
+    const hostedAiResponse = await generateHostedAIResponse(cleanPrompt, intent, history);
     if (hostedAiResponse) {
+      // Check if the AI decided to generate an image
+      const imageMatch = hostedAiResponse.match(/\[IMAGE_PROMPT:\s*(.*?)\]/i);
+      if (imageMatch) {
+        const imagePrompt = imageMatch[1].trim();
+        try {
+          const imageUrl = await generateFluxImage(imagePrompt);
+          if (imageUrl) {
+             // Replace the tag with the actual image markdown
+             return hostedAiResponse.replace(imageMatch[0], `![${imagePrompt}](${imageUrl})`);
+          }
+        } catch (imgError) {
+          console.warn('FLUX image generation error from AI tag.', imgError);
+        }
+      }
       return hostedAiResponse;
     }
   } catch (hostedAiError) {

@@ -72,6 +72,7 @@ Identity & Persona:
 Guidelines for Output:
 - If the user asks for ANY game, application, landing page, dashboard, tool, simulator, widget, website, or prototype, generate a complete, rich, runnable HTML document with embedded CSS and JavaScript inside a single \`\`\`html ... \`\`\` code block.
 - Always write complete, production-ready, working code.
+- If the user asks to generate, create, or modify an image, you MUST output ONLY a tag in the exact format [IMAGE_PROMPT: <full detailed prompt for image generation>] and nothing else. For modifications, incorporate the previous image's context into the new detailed description to ensure the subject stays the same (e.g., if they say "make it green", rewrite the original image prompt replacing the color but keeping everything else identical).
 ${adaptiveInstructions}
 
 Inferred intent: ${intentType} - ${intentSummary}`;
@@ -104,6 +105,25 @@ async function handleAi(request, env) {
     ? body.intent
     : null;
 
+  const messages = Array.isArray(body.messages) ? body.messages : [];
+  const apiMessages = [
+    { role: 'system', content: buildSystemPrompt(intent) }
+  ];
+
+  let hasAppendedPrompt = false;
+  for (const m of messages) {
+    if (m.role && m.content) {
+      apiMessages.push({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content });
+      if (m.content === prompt && m.role === 'user') {
+        hasAppendedPrompt = true;
+      }
+    }
+  }
+  
+  if (!hasAppendedPrompt) {
+    apiMessages.push({ role: 'user', content: prompt });
+  }
+
   // 1. Try OpenRouter API if OPENROUTER_API_KEY is configured
   const targetModels = getTargetModels(intent?.type || 'general');
   const openRouterKey = env?.OPENROUTER_API_KEY || (typeof process !== 'undefined' ? process.env?.OPENROUTER_API_KEY : null);
@@ -121,10 +141,7 @@ async function handleAi(request, env) {
           body: JSON.stringify({
             model: modelId,
             reasoning: { effort: 'xhigh' },
-            messages: [
-              { role: 'system', content: buildSystemPrompt(intent) },
-              { role: 'user', content: prompt }
-            ]
+            messages: apiMessages
           })
         });
 
@@ -152,19 +169,13 @@ async function handleAi(request, env) {
 
     try {
       result = await env.AI.run(WORKERS_AI_MODEL, {
-        messages: [
-          { role: 'system', content: buildSystemPrompt(intent) },
-          { role: 'user', content: prompt }
-        ]
+        messages: apiMessages
       });
     } catch (primaryError) {
       console.warn('Primary Workers AI model failed, attempting DeepSeek fallback:', safeErrorDetail(primaryError));
       usedModel = DEEPSEEK_MODEL;
       result = await env.AI.run(DEEPSEEK_MODEL, {
-        messages: [
-          { role: 'system', content: buildSystemPrompt(intent) },
-          { role: 'user', content: prompt }
-        ]
+        messages: apiMessages
       });
     }
 
