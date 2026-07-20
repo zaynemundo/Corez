@@ -129,8 +129,19 @@ export default function App() {
   const handleSendMessage = async (promptText) => {
     if (!activeSession) return;
 
-    const userMsg = { role: 'user', content: promptText };
-    const updatedMessages = [...activeSession.messages, userMsg];
+    let displayPrompt = promptText;
+    let apiPrompt = promptText;
+
+    if (revisionContextCode) {
+      apiPrompt = `[Context: The user is requesting a revision for the following code block]\n\`\`\`\n${revisionContextCode}\n\`\`\`\n\nUser Request: ${promptText}`;
+      setRevisionContextCode('');
+    }
+
+    const displayMsg = { role: 'user', content: displayPrompt };
+    const apiMsg = { role: 'user', content: apiPrompt };
+
+    const updatedDisplayMessages = [...activeSession.messages, displayMsg];
+    const updatedApiMessages = [...activeSession.messages, apiMsg];
 
     const updatedTitle = activeSession.messages.length === 0 
       ? (promptText.length > 30 ? promptText.slice(0, 27) + '...' : promptText)
@@ -138,14 +149,14 @@ export default function App() {
 
     setSessions(prev => prev.map(s => {
       if (s.id === activeSessionId) {
-        return { ...s, title: updatedTitle, messages: updatedMessages };
+        return { ...s, title: updatedTitle, messages: updatedDisplayMessages };
       }
       return s;
     }));
 
     setIsThinking(true);
 
-    const responseText = await generateAIResponse(promptText, updatedMessages);
+    const responseText = await generateAIResponse(apiPrompt, updatedApiMessages);
     const extractedCode = extractCodeFromMessage(responseText);
     if (extractedCode) {
       setActiveCanvasCode(extractedCode);
@@ -164,9 +175,11 @@ export default function App() {
   };
 
   const [chatInput, setChatInput] = useState('');
+  const [revisionContextCode, setRevisionContextCode] = useState('');
 
   const handleReviseCode = (code) => {
-    const revisionPrompt = `Please revise this code:\n\`\`\`\n${code}\n\`\`\`\n\nRevision request: `;
+    setRevisionContextCode(code);
+    const revisionPrompt = `Revise code: `;
     setChatInput(revisionPrompt);
     if (chatInputRef.current) {
       setTimeout(() => {
