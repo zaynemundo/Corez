@@ -47,6 +47,9 @@ Search through our skill library and pick which skill will be needed to use base
 - awesome-cursor-skills: A directory of specific framework rules (React, Laravel, etc.)
 - agent-skills-standard: Creating portable agent skills across tools
 - obra-superpowers: Advanced workflows and configurations for various agents
+- cursor-security-rules: Enforces strict OWASP security standards for backend code
+- awesome-agent-skills: Enterprise-grade engineering standards from Vercel/Stripe/Anthropic
+- accessibility-expert: Enforces strict WCAG standards, ARIA roles, and inclusive design
 
 Respond with the likely goal, useful next action, the appropriate skill if applicable, and a concise path forward.
 `;
