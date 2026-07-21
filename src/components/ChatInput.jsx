@@ -1,7 +1,14 @@
-import { useState, useRef, useEffect } from 'react';
-import { Send } from 'lucide-react';
+import { useRef, useEffect } from 'react';
+import { Send, Square } from 'lucide-react';
 
-export default function ChatInput({ input, setInput, onSendMessage, isStreaming, textareaRef }) {
+export default function ChatInput({ 
+  input, 
+  setInput, 
+  onSendMessage, 
+  onStopMessage, 
+  isStreaming, 
+  textareaRef 
+}) {
   const internalRef = useRef(null);
   const refToUse = textareaRef || internalRef;
 
@@ -14,7 +21,11 @@ export default function ChatInput({ input, setInput, onSendMessage, isStreaming,
 
   const handleSubmit = (e) => {
     e?.preventDefault();
-    if (!input.trim() || isStreaming) return;
+    if (isStreaming) {
+      if (onStopMessage) onStopMessage();
+      return;
+    }
+    if (!input.trim()) return;
     onSendMessage(input.trim());
     setInput('');
     if (refToUse.current) {
@@ -38,19 +49,29 @@ export default function ChatInput({ input, setInput, onSendMessage, isStreaming,
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask Corez..."
+          placeholder={isStreaming ? "Corez is generating..." : "Ask Corez..."}
           rows={1}
-          disabled={isStreaming}
         />
         <div className="input-actions-bar">
-          <button
-            type="submit"
-            className="send-btn"
-            disabled={!input.trim() || isStreaming}
-            title="Send Message"
-          >
-            <Send size={15} strokeWidth={1.5} />
-          </button>
+          {isStreaming ? (
+            <button
+              type="button"
+              className="send-btn stop-btn"
+              onClick={onStopMessage}
+              title="Stop Generation"
+            >
+              <Square size={13} fill="currentColor" strokeWidth={1.5} />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              className="send-btn"
+              disabled={!input.trim()}
+              title="Send Message"
+            >
+              <Send size={15} strokeWidth={1.5} />
+            </button>
+          )}
         </div>
       </form>
     </div>

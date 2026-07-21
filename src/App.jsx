@@ -67,6 +67,7 @@ export default function App() {
 
   const messagesEndRef = useRef(null);
   const chatInputRef = useRef(null);
+  const abortControllerRef = useRef(null);
 
   useEffect(() => {
     const mobileQuery = window.matchMedia('(max-width: 767px)');
@@ -101,6 +102,59 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('corez_theme', theme);
   }, [theme]);
+
+  // Auto-resume background AI generation across accidental page refreshes
+  useEffect(() => {
+    try {
+      const savedPending = localStorage.getItem('corez_pending_request');
+      if (savedPending) {
+        const pendingData = JSON.parse(savedPending);
+        if (pendingData && pendingData.sessionId && (Date.now() - (pendingData.timestamp || 0) < 300000)) {
+          const targetSession = sessions.find(s => s.id === pendingData.sessionId);
+          if (targetSession) {
+            setIsThinking(true);
+            const controller = new AbortController();
+            abortControllerRef.current = controller;
+
+            generateAIResponse(pendingData.apiPrompt, pendingData.messages, controller.signal)
+              .then(responseText => {
+                if (!responseText) return;
+                const extractedCode = extractCodeFromMessage(responseText);
+                if (extractedCode) {
+                  setActiveCanvasCode(extractedCode);
+                }
+                const aiMsg = { role: 'assistant', content: responseText };
+                setSessions(prev => prev.map(s => {
+                  if (s.id === pendingData.sessionId) {
+                    const last = s.messages[s.messages.length - 1];
+                    if (last?.role === 'assistant' && last?.content === responseText) return s;
+                    return { ...s, messages: [...s.messages, aiMsg] };
+                  }
+                  return s;
+                }));
+              })
+              .catch(err => {
+                if (err?.name !== 'AbortError') {
+                  console.warn('Background AI response recovery error:', err);
+                }
+              })
+              .finally(() => {
+                localStorage.removeItem('corez_pending_request');
+                setIsThinking(false);
+                abortControllerRef.current = null;
+              });
+          } else {
+            localStorage.removeItem('corez_pending_request');
+          }
+        } else {
+          localStorage.removeItem('corez_pending_request');
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to parse corez_pending_request', err);
+      localStorage.removeItem('corez_pending_request');
+    }
+  }, []);
 
   const activeSession = sessions.find(s => s.id === activeSessionId) || sessions[0];
 
@@ -147,6 +201,15 @@ export default function App() {
     setCanvasOpen(true);
   };
 
+  const handleStopMessage = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    localStorage.removeItem('corez_pending_request');
+    setIsThinking(false);
+  };
+
   const handleSendMessage = async (promptText) => {
     if (!activeSession) return;
 
@@ -177,22 +240,45 @@ export default function App() {
 
     setIsThinking(true);
 
-    const responseText = await generateAIResponse(apiPrompt, updatedApiMessages);
-    const extractedCode = extractCodeFromMessage(responseText);
-    if (extractedCode) {
-      setActiveCanvasCode(extractedCode);
-    }
+    // Save pending request to localStorage for background execution across page refresh
+    const pendingData = {
+      sessionId: activeSessionId,
+      apiPrompt,
+      displayPrompt,
+      messages: updatedApiMessages,
+      timestamp: Date.now()
+    };
+    localStorage.setItem('corez_pending_request', JSON.stringify(pendingData));
 
-    const aiMsg = { role: 'assistant', content: responseText };
-    
-    setSessions(prev => prev.map(s => {
-      if (s.id === activeSessionId) {
-        return { ...s, messages: [...s.messages, aiMsg] };
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    try {
+      const responseText = await generateAIResponse(apiPrompt, updatedApiMessages, controller.signal);
+      if (responseText) {
+        const extractedCode = extractCodeFromMessage(responseText);
+        if (extractedCode) {
+          setActiveCanvasCode(extractedCode);
+        }
+
+        const aiMsg = { role: 'assistant', content: responseText };
+        
+        setSessions(prev => prev.map(s => {
+          if (s.id === activeSessionId) {
+            return { ...s, messages: [...s.messages, aiMsg] };
+          }
+          return s;
+        }));
       }
-      return s;
-    }));
-
-    setIsThinking(false);
+    } catch (err) {
+      if (err?.name !== 'AbortError') {
+        console.error('AI generation error:', err);
+      }
+    } finally {
+      localStorage.removeItem('corez_pending_request');
+      setIsThinking(false);
+      abortControllerRef.current = null;
+    }
   };
 
   const [chatInput, setChatInput] = useState('');
@@ -282,6 +368,7 @@ export default function App() {
                 setInput={setChatInput}
                 textareaRef={chatInputRef}
                 onSendMessage={handleSendMessage}
+                onStopMessage={handleStopMessage}
                 isStreaming={isThinking}
               />
             </div>

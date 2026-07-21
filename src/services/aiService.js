@@ -422,21 +422,25 @@ export function createFallbackSvgDataUrl(prompt) {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
-export async function generateFluxImage(prompt) {
+export async function generateFluxImage(prompt, signal = null) {
   try {
-    const response = await fetch(IMAGE_PROXY_ENDPOINT, {
+    const fetchOptions = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ prompt })
-    });
+    };
+    if (signal) fetchOptions.signal = signal;
+
+    const response = await fetch(IMAGE_PROXY_ENDPOINT, fetchOptions);
 
     if (response.ok) {
       const data = await response.json();
       if (data?.image) return data.image;
     }
   } catch (err) {
+    if (err?.name === 'AbortError') throw err;
     console.warn('Hosted FLUX API request failed; rendering fallback visual.', err);
   }
 
@@ -446,15 +450,19 @@ export async function generateFluxImage(prompt) {
 export async function generateHostedAIResponse(
   prompt,
   intent = analyzePublicUserIntent(prompt),
-  history = []
+  history = [],
+  signal = null
 ) {
-  const response = await fetch(AI_PROXY_ENDPOINT, {
+  const fetchOptions = {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({ prompt, intent, messages: history })
-  });
+  };
+  if (signal) fetchOptions.signal = signal;
+
+  const response = await fetch(AI_PROXY_ENDPOINT, fetchOptions);
 
   if (!response.ok) {
     throw new Error(`Hosted AI request failed with status ${response.status}`);
@@ -1547,17 +1555,18 @@ export async function generateLocalAIResponse(prompt) {
 
 const IMAGE_PATTERNS = /\b(generate|create|draw|make|render|show|flux)\b.*\b(image|picture|photo|logo|illustration|artwork|wallpaper|drawing|graphic)\b|\b(image|picture|photo|logo|illustration|artwork|wallpaper|drawing|graphic)\b.*\b(generate|create|draw|make|render|flux)\b/i;
 
-export async function generateAIResponse(prompt, history = []) {
+export async function generateAIResponse(prompt, history = [], signal = null) {
   const cleanPrompt = prompt.trim();
 
   // If this is the first message and it obviously asks for an image, we can skip the LLM overhead.
   if (history.length <= 1 && (IMAGE_PATTERNS.test(cleanPrompt) || cleanPrompt.toLowerCase().startsWith('image:') || cleanPrompt.toLowerCase().startsWith('flux:'))) {
     try {
-      const imageUrl = await generateFluxImage(cleanPrompt);
+      const imageUrl = await generateFluxImage(cleanPrompt, signal);
       if (imageUrl) {
         return `Here is your generated image:\n\n![${cleanPrompt}](${imageUrl})`;
       }
     } catch (imgError) {
+      if (imgError?.name === 'AbortError') throw imgError;
       console.warn('FLUX image generation error; falling back to standard text response.', imgError);
     }
   }
@@ -1565,25 +1574,27 @@ export async function generateAIResponse(prompt, history = []) {
   const intent = analyzePublicUserIntent(cleanPrompt);
 
   try {
-    const hostedAiResponse = await generateHostedAIResponse(cleanPrompt, intent, history);
+    const hostedAiResponse = await generateHostedAIResponse(cleanPrompt, intent, history, signal);
     if (hostedAiResponse) {
       // Check if the AI decided to generate an image
       const imageMatch = hostedAiResponse.match(/\[IMAGE_PROMPT:\s*(.*?)\]/i);
       if (imageMatch) {
         const imagePrompt = imageMatch[1].trim();
         try {
-          const imageUrl = await generateFluxImage(imagePrompt);
+          const imageUrl = await generateFluxImage(imagePrompt, signal);
           if (imageUrl) {
              // Replace the tag with the actual image markdown
              return hostedAiResponse.replace(imageMatch[0], `![${imagePrompt}](${imageUrl})`);
           }
         } catch (imgError) {
+          if (imgError?.name === 'AbortError') throw imgError;
           console.warn('FLUX image generation error from AI tag.', imgError);
         }
       }
       return hostedAiResponse;
     }
   } catch (hostedAiError) {
+    if (hostedAiError?.name === 'AbortError') throw hostedAiError;
     console.warn('Hosted AI unavailable; using local Corez fallback.', hostedAiError);
   }
 
