@@ -60,7 +60,8 @@ const INTENT_PATTERNS = {
   app: /\b(build|make|create|generate|design|launch|prototype|develop|ship)\b.*\b(app|tool|website|site|landing page|dashboard|portal|widget|calculator|timer|game|simulator|preview|html|bot|enemy)\b|\b(app|tool|website|site|landing page|dashboard|portal|widget|calculator|timer|game|simulator|bot|enemy)\b.*\b(build|make|create|generate|design|launch|prototype|develop|ship)\b|\b(game|play|chess|snake|pong|shooter|quiz|puzzle|simulator|canvas|bot|enemy)\b/i,
   code: /\b(code|debug|bug|fix|error|javascript|typescript|python|react|css|html|component|function|api|compile|stack trace)\b/i,
   writing: /\b(write|rewrite|copy|caption|email|post|bio|headline|script|summarize|summary|proposal|description|landing copy)\b/i,
-  explanation: /\b(explain|what is|what are|how does|why does|teach me|break down|understand|compare)\b/i
+  explanation: /\b(explain|what is|what are|how does|why does|teach me|break down|understand|compare)\b/i,
+  swarm: /\b(swarm|multi-agent|agents|orchestrate|orchestration|superpowers|plan|architect|complex)\b/i
 };
 
 function analyzeIntentWithRules(cleanPrompt) {
@@ -95,6 +96,14 @@ function analyzeIntentWithRules(cleanPrompt) {
       type: 'explanation',
       summary: 'Explain the topic in plain language.',
       responseStrategy: 'Give a direct answer with the minimum useful context.'
+    };
+  }
+
+  if (INTENT_PATTERNS.swarm.test(lower)) {
+    return {
+      type: 'swarm',
+      summary: 'Coordinate multiple agents for a complex task.',
+      responseStrategy: 'Provide a robust architectural overview and step-by-step reasoning.'
     };
   }
 
