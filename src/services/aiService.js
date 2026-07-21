@@ -14,8 +14,41 @@ Corez serves public users who may describe goals casually, incompletely, or
 without technical vocabulary. Understand public user intent and infer the goal behind the words, not by matching only exact keywords. Identify whether
 the user wants to create a public-facing website, landing page, dashboard,
 portal, app, game, widget, calculator, timer, prototype, tool, code help,
-writing help, an explanation, or general guidance. Respond with the likely
-goal, useful next action, and a concise path forward.
+writing help, an explanation, or general guidance. 
+
+Search through our skill library and pick which skill will be needed to use based on their specific utility. The available skills are:
+- ai-infrastructure: LLMs, routing, inference, RAG
+- antigravity-guide: Google Antigravity AI configurations
+- ask-env-values: Missing environment variables or secrets
+- auto-debugging: Self-directed stack trace debugging
+- autonomous-execution: YOLO mode / fully autonomous operations
+- backend-architecture: Backend security and functionality
+- business-marketing: Brand positioning, SEO, product launches
+- capability-orchestrator: Routing requests to optimal capabilities
+- code-review-testing: Thorough code reviews and empirical testing
+- data-documents: Data analysis, structured deliverables (PDF, CSV)
+- frontend-design: Aesthetic direction, typography, UX choices
+- frontend-modern-design: Crafting modern, fluid, dark-mode web UI
+- game-development: 2D/3D web games, physics engines
+- git-superpowers: Git workflow completion and pushing
+- live-utilities: Date/time, weather, sports, and financial live data
+- personalisation-context: User preferences and durable memory
+- productivity-connectors: Email, calendar, and collaboration services
+- research-current-information: Live web research and citations
+- scheduling-automation: Timers, cron jobs, and background monitoring
+- software-engineering: General coding, APIs, databases, React
+- superpowers: Advanced multi-agent subagent-driven development
+- verify: Runtime verification end-to-end testing
+- visual-creative: Image generation, layout direction, background removal
+- writing-communication: Translation, professional or creative copywriting
+- ui-ux-pro-max-skill: Use when the user requests a premium frontend redesign or advanced UI audit
+- ruflo: MCP frameworks and tools
+- agent-rules-books: Use when generating architecture, domain-driven design, or writing tests
+- awesome-cursor-skills: A directory of specific framework rules (React, Laravel, etc.)
+- agent-skills-standard: Creating portable agent skills across tools
+- obra-superpowers: Advanced workflows and configurations for various agents
+
+Respond with the likely goal, useful next action, the appropriate skill if applicable, and a concise path forward.
 `;
 
 import { classifyIntent } from './intentClassifier.js';
