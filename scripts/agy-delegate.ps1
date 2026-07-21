@@ -24,8 +24,8 @@ if (-not (Get-Command agy -ErrorAction SilentlyContinue)) {
 
 if (-not $OutputPath) {
     $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-    $outputDirectory = Join-Path $PSScriptRoot '..\artifacts\agy'
-    $OutputPath = Join-Path $outputDirectory "agy-$($Mode.ToLowerInvariant())-$timestamp.txt"
+    $outputDirectory = Join-Path $PSScriptRoot '..\artifacts\mimo'
+    $OutputPath = Join-Path $outputDirectory "mimo-$($Mode.ToLowerInvariant())-$timestamp.txt"
 }
 
 $resolvedOutputDirectory = Split-Path -Parent $OutputPath
@@ -39,9 +39,9 @@ $effectiveTask = $Task
 switch ($Mode) {
     'Analysis' {
         $effectiveTask = @"
-You are a subordinate specialist advising Codex, the lead engineer and final decision-maker.
+You are MiMo V2.5, a subordinate specialist advising DeepSeek V4 Flash, the lead engineer and final decision-maker.
 Analyse the bounded task below without modifying files or running commands that change state.
-Return findings, evidence, risks, and recommendations for Codex to review critically.
+Return findings, evidence, risks, and recommendations for DeepSeek V4 Flash to review critically.
 
 TASK:
 $Task
@@ -50,7 +50,7 @@ $Task
     'Implement' {
         $agyMode = 'accept-edits'
         $effectiveTask = @"
-You are a subordinate specialist working on a task explicitly authorised by Codex.
+You are MiMo V2.5, a subordinate specialist working on a task explicitly authorised by DeepSeek V4 Flash.
 Modify only the files and scope named below. Do not access secrets, environment files, or credentials.
 Report every file changed and every verification command run. Stop if the scope is ambiguous.
 
@@ -83,7 +83,7 @@ $Task
         }
 
         $effectiveTask = @"
-You are an independent code reviewer advising Codex, the lead engineer and final decision-maker.
+You are an independent code reviewer advising DeepSeek V4 Flash, the lead engineer and final decision-maker.
 Review the supplied Git diff only. Do not modify files or run tools. Prioritise correctness, security,
 regressions, missing tests, and maintainability. Cite affected files and explain actionable findings.
 
@@ -100,12 +100,13 @@ $agyLogPath = Join-Path ([System.IO.Path]::GetTempPath()) "agy-cli-$([guid]::New
 $agyArguments = @(
     '--log-file', $agyLogPath,
     '--mode', $agyMode,
+    '--model', 'codex',
     '--sandbox',
     '--print-timeout', "$($TimeoutMinutes)m",
     '--print', $effectiveTask
 )
 
-Write-Host "Delegating to AGY in $Mode mode. Output: $OutputPath"
+Write-Host "Delegating to MiMo V2.5 (via AGY + Codex) in $Mode mode. Output: $OutputPath"
 $agyOutput = @(& agy @agyArguments 2>&1 | Tee-Object -FilePath $OutputPath)
 $agyExitCode = $LASTEXITCODE
 $agyOutputText = $agyOutput -join [Environment]::NewLine
