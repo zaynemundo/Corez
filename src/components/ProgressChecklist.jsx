@@ -120,12 +120,16 @@ export default function ProgressChecklist({ taskType = 'general', customTitle = 
         {/* Chomping Pac-Man Icon */}
         <div 
           className="pacman-head-wrapper" 
-          style={{ left: `calc(${Math.min(progressPercent, 97)}% - 9px)` }}
+          style={{ left: `calc(${Math.min(progressPercent, 96)}% - 10px)` }}
         >
-          <svg width="18" height="18" viewBox="0 0 20 20" className="pacman-svg">
-            <path className="pacman-jaw-top" d="M 10 10 L 20 10 A 10 10 0 1 0 10 0 Z" fill="currentColor" />
-            <path className="pacman-jaw-bottom" d="M 10 10 L 20 10 A 10 10 0 0 1 10 20 Z" fill="currentColor" />
-            <circle cx="8.5" cy="4.5" r="1.5" className="pacman-eye" />
+          <svg width="20" height="20" viewBox="0 0 20 20" className="pacman-svg">
+            <g className="pacman-jaw-top">
+              <path d="M 10 10 L 18 10 A 8 8 0 0 0 2 10 Z" fill="currentColor" />
+              <circle cx="9" cy="5" r="1.3" className="pacman-eye" />
+            </g>
+            <g className="pacman-jaw-bottom">
+              <path d="M 10 10 L 18 10 A 8 8 0 0 1 2 10 Z" fill="currentColor" />
+            </g>
           </svg>
         </div>
       </div>

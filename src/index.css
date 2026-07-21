@@ -940,7 +940,8 @@ h1, h2, h3, h4, h5, h6 {
 /* Pac-Man Head & Jaw Chomping Animation */
 .pacman-head-wrapper {
   position: absolute;
-  top: 1px;
+  top: 0;
+  height: 20px;
   z-index: 3;
   color: var(--text-primary);
   transition: left 0.35s cubic-bezier(0.25, 1, 0.5, 1);
@@ -958,23 +959,25 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .pacman-jaw-top {
+  transform-box: fill-box;
   transform-origin: 10px 10px;
   animation: pacmanChompTop 0.22s infinite alternate ease-in-out;
 }
 
 .pacman-jaw-bottom {
+  transform-box: fill-box;
   transform-origin: 10px 10px;
   animation: pacmanChompBottom 0.22s infinite alternate ease-in-out;
 }
 
 @keyframes pacmanChompTop {
   0% { transform: rotate(0deg); }
-  100% { transform: rotate(-40deg); }
+  100% { transform: rotate(-35deg); }
 }
 
 @keyframes pacmanChompBottom {
   0% { transform: rotate(0deg); }
-  100% { transform: rotate(40deg); }
+  100% { transform: rotate(35deg); }
 }
 
 .active-pulse-dot {
