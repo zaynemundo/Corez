@@ -21,6 +21,13 @@ Use this skill whenever creating, debugging, or enhancing interactive web games,
    - Maintain clear game states: `START`, `PLAYING`, `PAUSED`, and `GAME_OVER`.
    - Provide visible score tracking, high score retention, game-over overlays, and instant restart buttons.
 
-4. **Visual Polish & Feedback**:
+4. **Visual Polish, Art Direction & Backgrounds**:
+   - Route vision, art direction, UI layout, and game sprite/SVG design to **MiMo V2.5**.
+   - Use **FLUX 1** (`@cf/black-forest-labs/flux-1-dev` / `schnell`) for free background image generation and visual game assets.
    - Add visual feedback for hits, score milestones, and collisions.
    - Scale canvas responsively to fit the viewport or container.
+
+5. **Word Games & Dictionaries (Scrabble, Wordle, Crosswords, Boggle)**:
+   - Always embed a comprehensive English word dictionary (at least 300+ valid words in a `Set` or `Array`).
+   - Implement strict word verification logic: check user entries against the embedded dictionary.
+   - Accept valid words, reject invalid entries with clear feedback ("Not in word list!"), and calculate accurate score multipliers (tile points, double/triple word/letter bonuses).

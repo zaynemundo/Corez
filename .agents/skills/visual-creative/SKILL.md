@@ -5,6 +5,10 @@ description: Handles image analysis, generation, editing direction, background r
 
 # Visual & Creative Production
 
+## Model Capabilities & Delegation
+- **MiMo V2.5**: Specialist engine for vision, visual inspection, art direction, UI layout, and game design/SVG creation.
+- **FLUX 1** (`@cf/black-forest-labs/flux-1-dev` / `schnell`): Primary engine for free background image generation and visual artwork rendering.
+
 ## Supported work
 - Analyse uploaded images for composition, style, colour, materials, typography, lighting, and visual hierarchy.
 - Generate or edit images through the configured image capability, including background removal, transparent PNG output, recolouring, object removal or replacement, material changes, and product mock-ups.

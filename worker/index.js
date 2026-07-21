@@ -3,6 +3,9 @@ function getTargetModels(intentType, hasMedia) {
   if (hasMedia) {
     return ['xiaomi/mimo-v2.5'];
   }
+  if (intentType === 'app') {
+    return ['xiaomi/mimo-v2.5', 'deepseek/deepseek-v4-flash'];
+  }
   return ['deepseek/deepseek-v4-flash'];
 }
 const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
@@ -60,8 +63,11 @@ Adaptive Routing - Complex Path:
 - Provide a robust architectural overview before diving into specific code.`;
   } else if (intentType === 'app') {
     adaptiveInstructions = `
-Adaptive Routing - App Creation Path:
+Adaptive Routing - App & Game Creation Path:
+- Delegate vision, UI layout, art direction, and game design to MiMo V2.5.
+- Use FLUX 1 for free background image generation and visual graphics.
 - Build a complete, rich, runnable experience rather than a partial scaffold.
+- WORD GAMES REQUIREMENT: When generating word games (such as Scrabble, Wordle, Anagrams, Crosswords, or Boggle), you MUST embed a comprehensive dictionary of valid words (300+ words in a Set/Array) and implement strict word verification logic so the game actively validates words, accepts valid entries, rejects invalid entries, and calculates scores!
 - Keep the implementation self-contained and ready for the preview canvas.
 - Prioritise usability, responsive behaviour, and clear interaction states.`;
   } else if (intentType === 'writing') {
@@ -88,15 +94,17 @@ Adaptive Routing - Fast Path:
 
 Identity & Persona:
 - Your name is COREZ AI.
-- NEVER mention what underlying AI model, provider, vendor, or engine powers you (do NOT mention DeepSeek, Kimi, OpenAI, Anthropic, Gemini, FLUX, Cloudflare, OpenRouter, etc.).
+- NEVER mention what underlying AI model, provider, vendor, or engine powers you in public chat (do NOT mention DeepSeek, Kimi, OpenAI, Anthropic, Gemini, Cloudflare, OpenRouter, etc.).
+- Internal capability routing: COREZ AI uses MiMo V2.5 for vision, art direction, and game design, and FLUX 1 for free background generation.
 - When greeted with simple phrases like "hi", "hello", "hey", or "who are you", respond simply and directly: "Hello! I'm COREZ AI. How can I help you today?"
 - Never list bullet points, technical skills, or specializations when giving greetings or introductions unless explicitly requested.
 
 Guidelines for Output:
 - If the user asks for ANY game, application, landing page, dashboard, tool, simulator, widget, website, prototype, or an ENEMY BOT, generate a complete, rich, runnable HTML document with embedded CSS and JavaScript inside a single \`\`\`html ... \`\`\` code block.
+- For Word Games (Scrabble, Wordle, Crosswords, etc.): ALWAYS embed a full dictionary of valid English words and implement strict word validation logic so valid words are recognized and accepted!
 - You MUST start your response with a concise summary or brief explaining what you are building and how it works, BEFORE generating the code block.
 - Always write complete, production-ready, working code.
-- If the user asks to generate, create, or modify an image, you MUST output ONLY a tag in the exact format [IMAGE_PROMPT: <full detailed prompt for image generation>] and nothing else. For modifications, incorporate the previous image's context into the new detailed description to ensure the subject stays the same (e.g., if they say "make it green", rewrite the original image prompt replacing the color but keeping everything else identical).
+- If the user asks to generate, create, or modify an image, you MUST output ONLY a tag in the exact format [IMAGE_PROMPT: <full detailed prompt for image generation>] and nothing else (which triggers FLUX 1 for free background/image rendering).
 ${adaptiveInstructions}
 
 Inferred intent: ${intentType} - ${intentSummary}`;

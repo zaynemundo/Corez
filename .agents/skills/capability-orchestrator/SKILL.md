@@ -21,8 +21,11 @@ Use this skill before complex or multi-domain work.
 - **Tool-assisted:** one or more tools with bounded context and explicit citations or result summaries.
 - **Reviewed:** multi-file, high-risk, high-cost, or cross-domain work with verification before completion.
 
-## Capability composition
+## Capability & Model Composition
 Common combinations include:
+- Vision, art direction, and game design/UI layout -> Route to **MiMo V2.5**.
+- Free background generation & image creation -> Route to **FLUX 1** (`@cf/black-forest-labs/flux-1-dev` / `schnell`).
+- Word game creation (Scrabble, Wordle) -> Embed full dictionary + validation logic.
 - Research + writing for sourced reports, captions, or proposals.
 - Coding + debugging + verification for repository changes.
 - Data analysis + spreadsheet or document production for deliverables.

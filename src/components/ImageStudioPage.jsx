@@ -13,6 +13,7 @@ import {
   FileText
 } from 'lucide-react';
 import { generateFluxImage } from '../services/aiService.js';
+import ProgressChecklist from './ProgressChecklist';
 
 export default function ImageStudioPage() {
   const [promptInput, setPromptInput] = useState('');
@@ -193,14 +194,7 @@ export default function ImageStudioPage() {
             {generating && (
               <div className="message-wrapper ai">
                 <div className="message-body">
-                  <div className="thinking-indicator-box" aria-label="Generating Image" role="status">
-                    <span className="thinking-text">Generating Image</span>
-                    <span className="thinking-dots" aria-hidden="true">
-                      <span className="thinking-dot" />
-                      <span className="thinking-dot" />
-                      <span className="thinking-dot" />
-                    </span>
-                  </div>
+                  <ProgressChecklist taskType="image" customTitle="Generating FLUX 1 Image" />
                 </div>
               </div>
             )}

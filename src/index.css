@@ -736,6 +736,129 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+/* Progress Checklist Card */
+.progress-checklist-card {
+  background: var(--bg-secondary, #18181b);
+  border: 1px solid var(--border-color, #27272a);
+  border-radius: 12px;
+  padding: 0.9rem 1.1rem;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  margin: 0.4rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.progress-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.progress-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-primary, #f4f4f5);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.progress-header-icon {
+  width: 1.1rem;
+  height: 1.1rem;
+  color: var(--accent-color, #6366f1);
+}
+
+.progress-percent-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #a855f7;
+  background: rgba(168, 85, 247, 0.12);
+  padding: 0.15rem 0.55rem;
+  border-radius: 20px;
+  font-family: var(--font-mono, monospace);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+}
+
+.progress-bar-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+  border-radius: 4px;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.5);
+}
+
+.progress-checklist-items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.progress-step-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary, #a1a1aa);
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.progress-step-item.active {
+  color: var(--text-primary, #ffffff);
+  font-weight: 500;
+}
+
+.progress-step-item.done {
+  color: var(--text-secondary, #a1a1aa);
+  opacity: 0.85;
+}
+
+.step-icon-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.step-icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.step-icon.done-icon {
+  color: #10b981;
+}
+
+.step-icon.spinner-icon {
+  color: #6366f1;
+  animation: spin 1s linear infinite;
+}
+
+.step-icon.pending-icon {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .preview-action {
   display: flex;
   align-items: center;

@@ -10,10 +10,9 @@ export const AI_PROXY_ENDPOINT = '/api/ai';
 export const IMAGE_PROXY_ENDPOINT = '/api/image';
 
 export const PUBLIC_USER_INTENT_PROMPT = `
-Corez serves public users who may describe goals casually, incompletely, or
-without technical vocabulary. Understand public user intent and infer the goal behind the words, not by matching only exact keywords. Identify whether
-the user wants to create a public-facing website, landing page, dashboard,
-portal, app, game, widget, calculator, timer, prototype, tool, code help,
+Corez delegates vision, art direction, UI layout, and game design/SVG creation to MiMo V2.5, and uses FLUX 1 for free background generation and image rendering.
+Identify whether the user wants to create a public-facing website, landing page, dashboard,
+portal, app, game (with full word dictionaries for word games like Scrabble & Wordle), widget, calculator, timer, prototype, tool, code help,
 writing help, an explanation, or general guidance. 
 
 Search through our skill library and pick which skill will be needed to use based on their specific utility. The available skills are:
@@ -24,12 +23,12 @@ Search through our skill library and pick which skill will be needed to use base
 - autonomous-execution: YOLO mode / fully autonomous operations
 - backend-architecture: Backend security and functionality
 - business-marketing: Brand positioning, SEO, product launches
-- capability-orchestrator: Routing requests to optimal capabilities
+- capability-orchestrator: Routing requests to optimal capabilities (MiMo V2.5 for vision/game design, FLUX 1 for free backgrounds)
 - code-review-testing: Thorough code reviews and empirical testing
 - data-documents: Data analysis, structured deliverables (PDF, CSV)
 - frontend-design: Aesthetic direction, typography, UX choices
 - frontend-modern-design: Crafting modern, fluid, dark-mode web UI
-- game-development: 2D/3D web games, physics engines
+- game-development: 2D/3D web games, word game dictionaries (Scrabble/Wordle), physics engines
 - git-superpowers: Git workflow completion and pushing
 - live-utilities: Date/time, weather, sports, and financial live data
 - personalisation-context: User preferences and durable memory
@@ -39,7 +38,7 @@ Search through our skill library and pick which skill will be needed to use base
 - software-engineering: General coding, APIs, databases, React
 - superpowers: Advanced multi-agent subagent-driven development
 - verify: Runtime verification end-to-end testing
-- visual-creative: Image generation, layout direction, background removal
+- visual-creative: Image generation via FLUX 1, layout direction via MiMo V2.5, background removal
 - writing-communication: Translation, professional or creative copywriting
 - ui-ux-pro-max-skill: Use when the user requests a premium frontend redesign or advanced UI audit
 - ruflo: MCP frameworks and tools
@@ -678,10 +677,587 @@ function synthesizeBotEnemyGame() {
 </html>`;
 }
 
+function synthesizeWordleGame() {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>COREZ Wordle Master</title>
+  <style>
+    :root {
+      --bg: #09090b;
+      --card: #121215;
+      --border: #27272a;
+      --text: #f4f4f5;
+      --text-muted: #a1a1aa;
+      --correct: #10b981;
+      --present: #eab308;
+      --absent: #3f3f46;
+      --tile-border: #3f3f46;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem; }
+    .game-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; width: 100%; max-width: 440px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+    h1 { font-size: 1.25rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.3rem; color: #fff; }
+    .subtitle { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem; }
+    .grid { display: grid; grid-template-rows: repeat(6, 1fr); gap: 6px; margin-bottom: 1.2rem; }
+    .row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+    .tile { aspect-ratio: 1; border: 2px solid var(--tile-border); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 700; text-transform: uppercase; user-select: none; transition: transform 0.15s ease, background-color 0.3s ease; }
+    .tile.filled { border-color: #71717a; animation: pop 0.1s ease; }
+    .tile.correct { background: var(--correct) !important; border-color: var(--correct) !important; color: #fff; }
+    .tile.present { background: var(--present) !important; border-color: var(--present) !important; color: #fff; }
+    .tile.absent { background: var(--absent) !important; border-color: var(--absent) !important; color: #a1a1aa; }
+    .keyboard { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+    .kb-row { display: flex; justify-content: center; gap: 4px; }
+    .key { background: #27272a; color: var(--text); border: none; border-radius: 4px; padding: 0.6rem 0.4rem; font-weight: 700; font-size: 0.8rem; cursor: pointer; text-transform: uppercase; user-select: none; flex: 1; max-width: 36px; transition: background 0.2s; }
+    .key.wide { flex: 1.5; max-width: 58px; font-size: 0.7rem; }
+    .key:hover { background: #3f3f46; }
+    .key.correct { background: var(--correct); color: #fff; }
+    .key.present { background: var(--present); color: #fff; }
+    .key.absent { background: #18181b; color: #52525b; }
+    .toast { position: fixed; top: 1.5rem; left: 50%; transform: translateX(-50%); background: #ef4444; color: #fff; padding: 0.6rem 1.2rem; border-radius: 6px; font-size: 0.85rem; font-weight: 600; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; z-index: 10; }
+    .toast.show { opacity: 1; }
+    .controls { margin-top: 1rem; display: flex; justify-content: center; gap: 0.5rem; }
+    .btn { background: #fff; color: #000; border: none; padding: 0.6rem 1.2rem; border-radius: 6px; font-weight: 700; font-size: 0.75rem; cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em; }
+    .btn:hover { opacity: 0.9; }
+    @keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+  </style>
+</head>
+<body>
+  <div id="toast" class="toast">Not in word list!</div>
+  <div class="game-card">
+    <h1>COREZ WORDLE</h1>
+    <p class="subtitle">Guess the 5-letter hidden word in 6 tries</p>
+    <div class="grid" id="grid"></div>
+    <div class="keyboard" id="keyboard"></div>
+    <div class="controls">
+      <button class="btn" id="resetBtn">New Word</button>
+    </div>
+  </div>
+  <script>
+    const WORDS = [
+      "APPLE","BRAIN","SMART","COREZ","FLASH","REACT","PLANT","TRAIN","WATER","DREAM",
+      "SHINE","CLOCK","FLAME","STORM","CLIMB","SOUND","MUSIC","LIGHT","GREAT","WORLD",
+      "POWER","CLEAN","CLEAR","CLOUDS","SPACE","CRAFT","AGENT","BOARD","CHECK","FRAME",
+      "GUIDE","HOUSE","IMAGE","JUICE","KNIFE","LEMON","MAGIC","NIGHT","OCEAN","PAPER",
+      "QUEEN","RIVER","SOLAR","TABLE","UNION","VALUE","WHITE","YOUTH","ZEBRA","BLOCK",
+      "CANDY","DRIVE","EARTH","FIELD","GLASS","HEART","INDEX","JUDGE","LOGIC","MONEY",
+      "NOBLE","ORDER","PHASE","RADIO","STAGE","TRACK","VOICE","YIELD","APEX","BLINK"
+    ];
+    const DICTIONARY = new Set([
+      ...WORDS,
+      "ABOUT","ABOVE","ABUSE","ACTOR","ACUTE","ADMIT","ADOPT","ADULT","AFTER","AGAIN",
+      "AGENT","AGREE","AHEAD","ALARM","ALBUM","ALERT","ALIKE","ALIVE","ALLOW","ALONE",
+      "ALONG","ALTER","AMONG","ANGER","ANGLE","ANGRY","APART","APPLE","APPLY","ARENA",
+      "ARGUE","ARISE","ARRAY","ASIDE","ASSET","AUDIO","AUDIT","AVOID","AWARD","AWARE",
+      "BADLY","BAKER","BASES","BASIC","BASIS","BEACH","BEGIN","BEING","BELOW","BENCH",
+      "BLACK","BLANK","BLIND","BLOCK","BLOOD","BOARD","BOAST","BOOST","BOUND","BRAIN",
+      "BRAND","BREAD","BREAK","BRICK","BRIEF","BRING","BROAD","BROWN","BUILD","BUILT",
+      "BUYER","CABLE","CALIF","CARRY","CATCH","CAUSE","CHAIN","CHAIR","CHAOS","CHARM",
+      "CHART","CHASE","CHEAP","CHECK","CHEST","CHIEF","CHILD","CHINA","CHOSE","CIVIL",
+      "CLAIM","CLASS","CLEAN","CLEAR","CLICK","CLOCK","CLOSE","COACH","COAST","COLOR",
+      "COUNT","COURT","COVER","CRAFT","CRASH","CREAM","CRIME","CROSS","CROWD","CROWN",
+      "CYCLE","DAILY","DANCE","DATED","DEATH","DEBUT","DELAY","DEPTH","DIRTY","DOUBT",
+      "DRAFT","DRAMA","DREAM","DRESS","DRIVE","EARTH","EIGHT","EMPTY","ENEMY","ENTRY",
+      "EQUAL","ERROR","EVENT","EVERY","EXACT","EXIST","FAITH","FALSE","FAULT","FIBER",
+      "FIELD","FIFTH","FIFTY","FINAL","FIRST","FIXED","FLASH","FLEET","FLOOR","FLUID",
+      "FOCUS","FORCE","FORTH","FORTY","FORUM","FOUND","FRAME","FRANK","FRAUD","FRESH",
+      "FRONT","FRUIT","FULLY","FUNNY","GIANT","GIVEN","GLASS","GLOBE","GOING","GRACE",
+      "GRADE","GRAND","GRANT","GRASS","GREAT","GREEN","GROSS","GROUP","GROWN","GUARD",
+      "GUESS","GUEST","GUIDE","HAPPY","HEART","HEAVY","HELLO","IMAGE","INDEX","INPUT",
+      "ISSUE","JAPAN","JUDGE","KNIFE","LABEL","LABOR","LARGE","LATER","LATIN","LAYER",
+      "LEARN","LEASE","LEAST","LEAVE","LEGAL","LEVEL","LIGHT","LIMIT","LOCAL","LOGIC",
+      "LOOSE","LOWER","LUCKY","MAGIC","MAJOR","MAKER","MARCH","MATCH","MAYBE","MEDAL",
+      "MEDIA","METAL","MICRO","MIGHT","MINOR","MINUS","MODEL","MONEY","MONTH","MORAL",
+      "MOTOR","MOUNT","MOUSE","MOUTH","MOVIE","MUSIC","NEEDS","NEVER","NIGHT","NOISE",
+      "NORTH","NOTED","NOVEL","NURSE","OCCUR","OCEAN","OFFER","OFTEN","ORDER","OTHER",
+      "OUGHT","PAINT","PANEL","PAPER","PARTY","PEACE","PETER","PHASE","PHONE","PHOTO",
+      "PIECE","PILOT","PITCH","PLACE","PLAIN","PLANE","PLANT","PLATE","POINT","POUND",
+      "POWER","PRESS","PRICE","PRIDE","PRIME","PRINT","PRIOR","PROOF","PROUD","PROVE",
+      "QUEEN","QUICK","QUIET","QUITE","RADIO","RAISE","RANGE","RAPID","RATIO","REACH",
+      "READY","REFER","RIGHT","RIVAL","RIVER","ROBIN","ROGER","ROMAN","ROUGH","ROUND",
+      "ROUTE","ROYAL","SCALE","SCENE","SCOPE","SCORE","SENSE","SERVE","SEVEN","SHALL",
+      "SHAPE","SHARE","SHARP","SHEET","SHELF","SHELL","SHIFT","SHINE","SHIRT","SHOCK",
+      "SHOOT","SHORT","SHOWN","SIGHT","SINCE","SIXTH","SIXTY","SIZED","SKILL","SLEEP",
+      "SLIDE","SMALL","SMART","SMILE","SMITH","SMOKE","SOLID","SOLVE","SORRY","SOUND",
+      "SOUTH","SPACE","SPARE","SPEAK","SPEED","SPEND","SPENT","SPLIT","SPOKE","SPORT",
+      "STAFF","STAGE","STAKE","STAND","START","STATE","STEAM","STEEL","STICK","STILL",
+      "STOCK","STONE","STOOD","STORE","STORM","STORY","STRIP","STUCK","STUDY","STUFF",
+      "STYLE","SUGAR","SUITE","SUPER","TABLE","TAKEN","TASTE","TAXES","TEACH","TEETH",
+      "TEXAS","THANK","THEFT","THEIR","THEME","THERE","THESE","THICK","THING","THINK",
+      "THIRD","THOSE","THREE","THREW","THROW","TIGHT","TIMES","TIRED","TITLE","TODAY",
+      "TOPIC","TOTAL","TOUCH","TOUGH","TOWER","TRACK","TRADE","TRAIN","TREAT","TREND",
+      "TRIAL","TRIED","TRIES","TRUCK","TRULY","TRUST","TRUTH","TWICE","UNDER","UNDUE",
+      "UNION","UNITY","UNTIL","UPPER","UPSET","URBAN","USAGE","USUAL","VALID","VALUE",
+      "VIDEO","VIRUS","VISIT","VITAL","VOICE","WASTE","WATCH","WATER","WHEEL","WHERE",
+      "WHICH","WHILE","WHITE","WHOLE","WHOSE","WOMAN","WOMEN","WORLD","WORRY","WORSE",
+      "WORST","WORTH","WOULD","WOUND","WRITE","WRONG","WROTE","YOUTH"
+    ]);
+
+    let target = "", currentRow = 0, currentTile = 0, gameOver = false;
+    let guesses = Array(6).fill("");
+    const keyStates = {};
+
+    function init() {
+      target = WORDS[Math.floor(Math.random() * WORDS.length)];
+      currentRow = 0; currentTile = 0; gameOver = false;
+      guesses = Array(6).fill("");
+      for (let k in keyStates) delete keyStates[k];
+      renderGrid();
+      renderKeyboard();
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2000);
+    }
+
+    function renderGrid() {
+      const g = document.getElementById('grid');
+      g.innerHTML = '';
+      for (let r = 0; r < 6; r++) {
+        const row = document.createElement('div');
+        row.className = 'row';
+        for (let c = 0; c < 5; c++) {
+          const tile = document.createElement('div');
+          tile.className = 'tile';
+          const ch = guesses[r] ? guesses[r][c] || '' : '';
+          tile.textContent = ch;
+          if (ch) tile.classList.add('filled');
+          if (r < currentRow) {
+            const evalState = evaluateTile(guesses[r], c);
+            tile.classList.add(evalState);
+          }
+          row.appendChild(tile);
+        }
+        g.appendChild(row);
+      }
+    }
+
+    function evaluateTile(word, idx) {
+      if (!word) return '';
+      const ch = word[idx];
+      if (target[idx] === ch) return 'correct';
+      if (target.includes(ch)) return 'present';
+      return 'absent';
+    }
+
+    function renderKeyboard() {
+      const kb = document.getElementById('keyboard');
+      kb.innerHTML = '';
+      const layout = [
+        ["Q","W","E","R","T","Y","U","I","O","P"],
+        ["A","S","D","F","G","H","J","K","L"],
+        ["ENTER","Z","X","C","V","B","N","M","BACK"]
+      ];
+
+      layout.forEach(r => {
+        const row = document.createElement('div');
+        row.className = 'kb-row';
+        r.forEach(k => {
+          const btn = document.createElement('button');
+          btn.className = 'key' + (k.length > 1 ? ' wide' : '');
+          btn.textContent = k === 'BACK' ? '⌫' : k;
+          if (keyStates[k]) btn.classList.add(keyStates[k]);
+          btn.onclick = () => handleInput(k);
+          row.appendChild(btn);
+        });
+        kb.appendChild(row);
+      });
+    }
+
+    function handleInput(key) {
+      if (gameOver) return;
+      if (key === 'ENTER') {
+        if (currentTile < 5) {
+          showToast('Not enough letters');
+          return;
+        }
+        const guess = guesses[currentRow];
+        if (!DICTIONARY.has(guess)) {
+          showToast('Not in word list!');
+          return;
+        }
+        
+        for (let i = 0; i < 5; i++) {
+          const ch = guess[i];
+          const st = evaluateTile(guess, i);
+          if (st === 'correct' || (st === 'present' && keyStates[ch] !== 'correct') || (!keyStates[ch] && st === 'absent')) {
+            keyStates[ch] = st;
+          }
+        }
+
+        currentRow++;
+        currentTile = 0;
+        renderGrid();
+        renderKeyboard();
+
+        if (guess === target) {
+          gameOver = true;
+          setTimeout(() => alert('🎉 Outstanding! You solved it in ' + currentRow + ' tries!'), 300);
+        } else if (currentRow === 6) {
+          gameOver = true;
+          setTimeout(() => alert('Game Over! The target word was: ' + target), 300);
+        }
+      } else if (key === 'BACK' || key === 'BACKSPACE') {
+        if (currentTile > 0) {
+          currentTile--;
+          guesses[currentRow] = guesses[currentRow].slice(0, currentTile);
+          renderGrid();
+        }
+      } else if (/^[A-Z]$/.test(key)) {
+        if (currentTile < 5) {
+          guesses[currentRow] += key;
+          currentTile++;
+          renderGrid();
+        }
+      }
+    }
+
+    document.addEventListener('keydown', e => {
+      const k = e.key.toUpperCase();
+      if (k === 'ENTER' || k === 'BACKSPACE' || /^[A-Z]$/.test(k)) {
+        handleInput(k);
+      }
+    });
+
+    document.getElementById('resetBtn').onclick = init;
+    init();
+  </script>
+</body>
+</html>`;
+}
+
+function synthesizeScrabbleGame() {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>COREZ Scrabble Master</title>
+  <style>
+    :root {
+      --bg: #09090b;
+      --card: #121215;
+      --border: #27272a;
+      --text: #f4f4f5;
+      --text-muted: #a1a1aa;
+      --tile-bg: #eab308;
+      --tile-text: #000000;
+      --tw: #ef4444;
+      --dw: #ec4899;
+      --tl: #3b82f6;
+      --dl: #38bdf8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem; }
+    .game-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; width: 100%; max-width: 480px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+    h1 { font-size: 1.25rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.5rem; color: #fff; }
+    .status-bar { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.8rem; background: rgba(255,255,255,0.03); border-radius: 6px; border: 1px solid var(--border); margin-bottom: 0.75rem; font-size: 0.85rem; }
+    .score-badge { font-weight: 700; color: #eab308; }
+    .board { display: grid; grid-template-columns: repeat(11, 1fr); grid-template-rows: repeat(11, 1fr); gap: 2px; aspect-ratio: 1; background: #18181b; border: 2px solid var(--border); border-radius: 6px; padding: 4px; margin-bottom: 0.75rem; }
+    .sq { background: #27272a; border-radius: 2px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; cursor: pointer; user-select: none; position: relative; color: #71717a; text-transform: uppercase; }
+    .sq.tw { background: var(--tw); color: #fff; }
+    .sq.dw { background: var(--dw); color: #fff; }
+    .sq.tl { background: var(--tl); color: #fff; }
+    .sq.dl { background: var(--dl); color: #fff; }
+    .sq.center { background: #eab308; color: #000; }
+    .tile { width: 90%; height: 90%; background: var(--tile-bg); color: var(--tile-text); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight: 800; position: relative; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+    .tile-sub { position: absolute; bottom: 1px; right: 2px; font-size: 0.55rem; font-weight: 700; }
+    .tile.unsubmitted { outline: 2px solid #ffffff; animation: pulse 1s infinite alternate; }
+    .rack-container { background: #18181b; border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem; margin-bottom: 0.75rem; }
+    .rack-label { font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .rack-tiles { display: flex; justify-content: center; gap: 6px; min-height: 42px; }
+    .rack-tile { width: 38px; height: 38px; background: var(--tile-bg); color: var(--tile-text); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 1rem; font-weight: 800; cursor: pointer; user-select: none; position: relative; box-shadow: 0 2px 4px rgba(0,0,0,0.3); transition: transform 0.15s ease; }
+    .rack-tile:hover { transform: translateY(-2px); }
+    .rack-tile.selected { outline: 3px solid #6366f1; transform: translateY(-4px); }
+    .controls { display: flex; gap: 0.4rem; justify-content: center; flex-wrap: wrap; }
+    .btn { background: #fff; color: #000; border: none; padding: 0.55rem 1rem; border-radius: 6px; font-weight: 700; font-size: 0.75rem; cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em; }
+    .btn:hover { opacity: 0.9; }
+    .btn-sec { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    .btn-sec:hover { background: rgba(255,255,255,0.05); }
+    @keyframes pulse { from { opacity: 0.85; } to { opacity: 1; } }
+  </style>
+</head>
+<body>
+  <div class="game-card">
+    <h1>COREZ SCRABBLE</h1>
+    <div class="status-bar">
+      <span>Score: <span id="score" class="score-badge">0</span></span>
+      <span>Tiles Left: <span id="bagCount" class="score-badge">80</span></span>
+    </div>
+    <div class="board" id="board"></div>
+    <div class="rack-container">
+      <div class="rack-label">Your Tile Rack (Click tile to select, then click board square)</div>
+      <div class="rack-tiles" id="rack"></div>
+    </div>
+    <div class="controls">
+      <button class="btn" id="submitBtn">Play Turn</button>
+      <button class="btn btn-sec" id="recallBtn">Recall</button>
+      <button class="btn btn-sec" id="shuffleBtn">Shuffle</button>
+      <button class="btn btn-sec" id="resetBtn">New Game</button>
+    </div>
+  </div>
+  <script>
+    const POINTS = { A:1, B:3, C:3, D:2, E:1, F:4, G:2, H:4, I:1, J:8, K:5, L:1, M:3, N:1, O:1, P:3, Q:10, R:1, S:1, T:1, U:1, V:4, W:4, X:8, Y:4, Z:10 };
+    
+    const DICTIONARY = new Set([
+      "AN","AT","BE","BY","DO","GO","HE","IN","IS","IT","ME","MY","NO","ON","OR","SO","TO","UP","WE",
+      "ACT","ADD","AGE","AIR","AND","ANY","ART","BAD","BAG","BED","BIG","BOX","BOY","BUS","BUT","CAN","CAT","CAR","DAY","DOG","DRY","EAR","EAT","EGG","END","EYE","FAR","FLY","FOR","GET","GOD","GUN","HAT","HOT","ICE","JOB","KEY","KID","LAW","LEG","LET","LOW","MAN","MAP","NEW","NOT","NOW","OFF","OLD","ONE","OUR","OUT","PAY","PEN","PER","PET","PIN","POP","PUT","RED","RUN","SEA","SEE","SET","SIX","SUN","TAX","TEN","THE","TOP","TOY","TRY","TWO","USE","WAR","WAY","WIN","YES","YOU","ZOO",
+      "ABLE","ACID","AGED","ALSO","AREA","ARMY","BABY","BACK","BALL","BAND","BANK","BASE","BATH","BEAR","BEAT","BELL","BEST","BIRD","BLOW","BLUE","BOAT","BODY","BOMB","BOND","BONE","BOOK","BOOM","BORN","BOSS","BOTH","BOWL","BULK","BURN","BUSH","BUSY","CALL","CALM","CAME","CAMP","CARD","CARE","CASE","CASH","CELL","CHAT","CHEF","CITY","CLUB","COAL","COAT","CODE","COLD","CORE","COST","DARK","DATA","DATE","DAWN","DEAD","DEAL","DEAR","DEBT","DEEP","DESK","DIET","DISK","DOOR","DOWN","DRAW","DROP","DUST","DUTY","EACH","EARN","EAST","EASY","EDGE","ELSE","EVEN","EVER","FACE","FACT","FAIR","FALL","FARM","FAST","FEAR","FEED","FEEL","FEET","FILE","FILL","FILM","FIND","FINE","FIRE","FIRM","FISH","FLAT","FLOW","FOOD","FOOT","FORD","FORM","FORT","FREE","FROM","FUEL","FULL","FUND","GAME","GIFT","GIRL","GIVE","GLAD","GOAL","GOLD","GOOD","GROW","GOLF","HALF","HAND","HARD","HARM","HEAD","HEAR","HEAT","HELL","HELP","HIGH","HOLD","HOLE","HOME","HOPE","HUGE","IDEA","INTO","ITEM","JOIN","JUMP","JUST","KEEP","KIND","KING","KNEW","KNOW","LACK","LADY","LAND","LANE","LAST","LATE","LEAD","LEFT","LESS","LIFE","LIFT","LIKE","LINE","LINK","LION","LIST","LIVE","LOAD","LOAN","LOCK","LOGO","LONG","LOOK","LORD","LOSS","LOVE","LUCK","MADE","MAIL","MAIN","MAKE","MALE","MANY","MARK","MASS","MEAL","MEAN","MEAT","MEET","MIND","MINE","MODE","MOON","MORE","MOST","MOVE","MUCH","NAME","NAVY","NEAR","NECK","NEED","NEWS","NEXT","NICE","NIGHT","NODE","NONE","NOSE","NOTE","OKAY","ONCE","ONLY","OPEN","OVER","PACE","PACK","PAGE","PAIN","PAIR","PARK","PART","PASS","PATH","PEAK","PLAN","PLAY","PLUS","POEM","POET","POLE","POOL","POOR","PORT","POST","PULL","PURE","PUSH","RACE","RAIL","RAIN","RANK","RARE","RATE","READ","REAL","RELY","REST","RICE","RICH","RIDE","RING","RISE","RISK","ROAD","ROCK","ROLE","ROLL","ROOF","ROOM","ROOT","ROSE","RULE","RUSH","SAFE","SAID","SAIL","SALE","SAME","SAVE","SEAT","SEED","SEEK","SEEM","SEEN","SELF","SELL","SEND","SHIP","SHOE","SHOP","SHOT","SHOW","SIDE","SIGN","SITE","SIZE","SKIN","SLIP","SLOW","SNOW","SOFT","SOIL","SOLD","SOLE","SOME","SONG","SOON","SORT","SOUL","SPOT","STAR","STAY","STEP","STOP","SUCH","SUIT","SURE","TAKE","TALK","TALL","TASK","TEAM","TEAR","TECH","TELL","TERM","TEST","TEXT","THAT","THEM","THEN","THIS","THUS","TIDE","TIME","TINY","TOLL","TONE","TOOK","TOOL","TOWN","TREE","TRIP","TRUE","TUBE","TURN","TYPE","UNIT","UPON","USER","VARY","VERY","VIEW","VOTE","WAGE","WAIT","WALK","WALL","WANT","WARM","WASH","WAVE","WAYS","WEAR","WEEK","WELL","WEST","WHAT","WHEN","WHICH","WIDE","WIFE","WILD","WILL","WIND","WINE","WING","WIRE","WISH","WITH","WOOD","WORD","WORK","YARD","YEAR","ZERO","ZONE",
+      "ABOUT","ABOVE","ACCEPT","ACTION","ACTIVE","ACTUAL","ADVICE","AFFORD","AFRAID","AGENDA","AGREE","ALMOST","ALWAYS","ANIMAL","ANSWER","ANYONE","APPEAR","AUTHOR","BAKERY","BEAUTY","BEFORE","BEHIND","BETTER","BEYOND","BORDER","BOTTLE","BRANCH","BRIDGE","BRIGHT","BUDGET","CAMERA","CANCEL","CANDLE","CANYON","CAPTAIN","CARBON","CAREER","CASTLE","CEMENT","CENTER","CHANCE","CHANGE","CHARGE","CHEESE","CHOICE","CHURCH","CIRCLE","CLIENT","CHOICE","CLEVER","CLIENT","CLIMATE","COFFEE","COLLEGE","COMMON","CANDLE","COOKIE","COPPER","CORNER","COUSIN","CREDIT","CUSTOM","DAMAGE","DANGER","DEGREE","DESIGN","DESIRE","DETAIL","DEVICE","DIRECT","DOCTOR","DOMAIN","DRAGON","DRIVER","DURING","ENGINE","ENOUGH","ESCAPE","ESTATE","EXPERT","FAMILY","FARMER","FEATHER","FEMALE","FINGER","FLIGHT","FLOWER","FOREST","FORGET","FRIEND","FUTURE","GARDEN","GARLIC","GENIUS","GENTLE","GLOBAL","GOLDEN","HANDLE","HAPPINESS","HARBOR","HEALTH","HEAVEN","HEIGHT","HEROIC","HISTORY","HONEST","HONEY","HUNTER","IMPACT","ISLAND","JACKET","JOURNEY","JUNGLE","JUNIOR","KITCHEN","LADDER","LAWYER","LEADER","LEGEND","LESSON","LETTER","LIQUID","LISTEN","LITTLE","LIVING","LIZARD","LONELY","MAGNET","MAGIC","MANAGEMENT","MANUAL","MARKET","MASTER","MEMORY","MENTOR","METHOD","MIRROR","MODERN","MOMENT","MONKEY","MOTHER","MOUNTAIN","MUSEUM","NATURE","NEIGHBOR","NETWORK","NORMAL","NOTICE","NUMBER","OFFICE","ONLINE","ORANGE","ORIGIN","OXYGEN","PACKET","PALACE","PARNER","PATIENT","PATTERN","PEOPLE","PEPPER","PERSON","PLANET","PLAYER","POLICE","PORTRAIT","POSTAL","POWDER","POWERFUL","PRECIOUS","PREFIX","PRETTY","PRINCE","PRISON","PROFIT","PROMPT","PROPERTY","PROTECT","PUBLIC","PUPIL","PURPLE","PUZZLE","QUALITY","QUARTER","RABBIT","RANDOM","READER","REASON","RECORD","REGION","RESCUE","RESORT","RESULT","REWARD","RIVER","ROCKET","RUNNER","SAFETY","SALAD","SALMON","SAMPLE","SATURN","SAVING","SCHOOL","SCREEN","SEASON","SECOND","SECRET","SECTOR","SENIOR","SHADOW","SILVER","SIMPLE","SINGLE","SISTER","SOCKET","SILENT","SILVER","SKETCH","SLIDER","SMART","SOCKET","SOCKET","SOURCE","SPEAKER","SPIRIT","SPRING","SQUARE","STATION","STATUS","STREAM","STREET","STRONG","STUDENT","SUMMER","SUNDAY","SUPER","SUPPER","SWITCH","SYMBOL","SYSTEM","TARGET","TEMPLE","TENNIS","TERROR","THEORY","THICKET","TICKET","TIMBER","TOGETHER","TOMATO","TONIGHT","TOPIC","TOTAL","TOWARD","TRAVEL","TUNNEL","TURTLE","TWELVE","TWENTY","UNDER","UNIQUE","UPDATE","UPGRADE","VACUUM","VALLEY","VECTOR","VELVET","VICTORY","VILLAGE","VIRTUE","VISION","VOLUME","WALKER","WARNING","WEAPON","WEATHER","WEEKEND","WINNER","WINTER","WISDOM","WORKER","YELLOW"
+    ]);
+
+    const BOARD_SIZE = 11;
+    let board = [], rack = [], bag = [], score = 0, selectedRackIdx = null, unsubmittedTiles = [];
+
+    function getSquareType(r, c) {
+      if (r === 5 && c === 5) return 'center';
+      if ((r === 0 || r === 10) && (c === 0 || c === 10)) return 'tw';
+      if ((r === 2 || r === 8) && (c === 2 || c === 8)) return 'dw';
+      if ((r === 1 || r === 9) && (c === 5 || r === 5 && (c === 1 || c === 9))) return 'tl';
+      if ((r === 3 || r === 7) && (c === 3 || c === 7)) return 'dl';
+      return '';
+    }
+
+    function initBag() {
+      bag = [];
+      const distribution = { A:9, B:2, C:2, D:4, E:12, F:2, G:3, H:2, I:9, J:1, K:1, L:4, M:2, N:6, O:8, P:2, Q:1, R:6, S:4, T:6, U:4, V:2, W:2, X:1, Y:2, Z:1 };
+      for (let char in distribution) {
+        for (let i = 0; i < distribution[char]; i++) bag.push(char);
+      }
+      bag.sort(() => Math.random() - 0.5);
+    }
+
+    function drawTiles(count) {
+      const drawn = [];
+      while (drawn.length < count && bag.length > 0) {
+        drawn.push(bag.pop());
+      }
+      return drawn;
+    }
+
+    function init() {
+      initBag();
+      score = 0;
+      unsubmittedTiles = [];
+      selectedRackIdx = null;
+      board = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
+      rack = drawTiles(7);
+      render();
+    }
+
+    function render() {
+      document.getElementById('score').textContent = score;
+      document.getElementById('bagCount').textContent = bag.length;
+
+      const bEl = document.getElementById('board');
+      bEl.innerHTML = '';
+      for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) {
+          const sq = document.createElement('div');
+          const sqType = getSquareType(r, c);
+          sq.className = 'sq ' + sqType;
+          
+          const cell = board[r][c];
+          if (cell) {
+            const tile = document.createElement('div');
+            tile.className = 'tile' + (cell.unsubmitted ? ' unsubmitted' : '');
+            tile.innerHTML = cell.char + '<span class="tile-sub">' + POINTS[cell.char] + '</span>';
+            sq.appendChild(tile);
+          } else if (sqType) {
+            sq.textContent = sqType.toUpperCase();
+          }
+
+          sq.onclick = () => onSquareClick(r, c);
+          bEl.appendChild(sq);
+        }
+      }
+
+      const rEl = document.getElementById('rack');
+      rEl.innerHTML = '';
+      rack.forEach((char, idx) => {
+        const t = document.createElement('div');
+        t.className = 'rack-tile' + (selectedRackIdx === idx ? ' selected' : '');
+        t.innerHTML = char + '<span class="tile-sub">' + POINTS[char] + '</span>';
+        t.onclick = () => {
+          selectedRackIdx = selectedRackIdx === idx ? null : idx;
+          render();
+        };
+        rEl.appendChild(t);
+      });
+    }
+
+    function onSquareClick(r, c) {
+      const cell = board[r][c];
+      if (cell && cell.unsubmitted) {
+        rack.push(cell.char);
+        board[r][c] = null;
+        unsubmittedTiles = unsubmittedTiles.filter(t => !(t.r === r && t.c === c));
+        render();
+        return;
+      }
+
+      if (!cell && selectedRackIdx !== null) {
+        const char = rack[selectedRackIdx];
+        rack.splice(selectedRackIdx, 1);
+        selectedRackIdx = null;
+        board[r][c] = { char, unsubmitted: true };
+        unsubmittedTiles.push({ r, c, char });
+        render();
+      }
+    }
+
+    function recallUnsubmitted() {
+      unsubmittedTiles.forEach(t => {
+        rack.push(t.char);
+        board[t.r][t.c] = null;
+      });
+      unsubmittedTiles = [];
+      selectedRackIdx = null;
+      render();
+    }
+
+    function submitTurn() {
+      if (unsubmittedTiles.length === 0) {
+        alert('Place at least 1 tile on the board to play your turn.');
+        return;
+      }
+
+      const rows = new Set(unsubmittedTiles.map(t => t.r));
+      const cols = new Set(unsubmittedTiles.map(t => t.c));
+      if (rows.size > 1 && cols.size > 1) {
+        alert('Tiles must be placed in a single straight row or column.');
+        return;
+      }
+
+      const wordsFormed = [];
+      
+      function getHorizontalWord(r, c) {
+        let startC = c;
+        while (startC > 0 && board[r][startC - 1]) startC--;
+        let endC = c;
+        while (endC < BOARD_SIZE - 1 && board[r][endC + 1]) endC++;
+        if (startC === endC) return null;
+        let word = "", scoreMult = 1, wordPoints = 0;
+        for (let i = startC; i <= endC; i++) {
+          const cell = board[r][i];
+          let p = POINTS[cell.char];
+          if (cell.unsubmitted) {
+            const type = getSquareType(r, i);
+            if (type === 'dl') p *= 2;
+            if (type === 'tl') p *= 3;
+            if (type === 'dw') scoreMult *= 2;
+            if (type === 'tw') scoreMult *= 3;
+          }
+          wordPoints += p;
+          word += cell.char;
+        }
+        return { word, points: wordPoints * scoreMult };
+      }
+
+      function getVerticalWord(r, c) {
+        let startR = r;
+        while (startR > 0 && board[startR - 1][c]) startR--;
+        let endR = r;
+        while (endR < BOARD_SIZE - 1 && board[endR + 1][c]) endR++;
+        if (startR === endR) return null;
+        let word = "", scoreMult = 1, wordPoints = 0;
+        for (let i = startR; i <= endR; i++) {
+          const cell = board[i][c];
+          let p = POINTS[cell.char];
+          if (cell.unsubmitted) {
+            const type = getSquareType(i, c);
+            if (type === 'dl') p *= 2;
+            if (type === 'tl') p *= 3;
+            if (type === 'dw') scoreMult *= 2;
+            if (type === 'tw') scoreMult *= 3;
+          }
+          wordPoints += p;
+          word += cell.char;
+        }
+        return { word, points: wordPoints * scoreMult };
+      }
+
+      const testedWords = new Set();
+      let turnScore = 0;
+
+      unsubmittedTiles.forEach(t => {
+        const h = getHorizontalWord(t.r, t.c);
+        if (h && !testedWords.has(h.word)) {
+          testedWords.add(h.word);
+          wordsFormed.push(h);
+        }
+        const v = getVerticalWord(t.r, t.c);
+        if (v && !testedWords.has(v.word)) {
+          testedWords.add(v.word);
+          wordsFormed.push(v);
+        }
+      });
+
+      if (wordsFormed.length === 0) {
+        alert('Your tile must connect with other letters to form a word.');
+        return;
+      }
+
+      const invalid = wordsFormed.filter(w => !DICTIONARY.has(w.word));
+      if (invalid.length > 0) {
+        alert('Invalid word: "' + invalid[0].word + '" is not in the dictionary!');
+        recallUnsubmitted();
+        return;
+      }
+
+      wordsFormed.forEach(w => turnScore += w.points);
+
+      unsubmittedTiles.forEach(t => {
+        if (board[t.r][t.c]) delete board[t.r][t.c].unsubmitted;
+      });
+
+      score += turnScore;
+      unsubmittedTiles = [];
+
+      const needed = 7 - rack.length;
+      if (needed > 0) {
+        const drawn = drawTiles(needed);
+        rack.push(...drawn);
+      }
+
+      render();
+      alert('Success! Word accepted! +' + turnScore + ' points.');
+    }
+
+    document.getElementById('submitBtn').onclick = submitTurn;
+    document.getElementById('recallBtn').onclick = recallUnsubmitted;
+    document.getElementById('shuffleBtn').onclick = () => { rack.sort(() => Math.random() - 0.5); render(); };
+    document.getElementById('resetBtn').onclick = init;
+
+    init();
+  </script>
+</body>
+</html>`;
+}
+
 // DYNAMIC GAME & APP SYNTHESIZER ENGINE (Kimi 2.7 Code Driven)
 function synthesizeCustomGame(prompt) {
   const clean = prompt.trim();
   const lower = clean.toLowerCase();
+
+  if (lower.includes('wordle') || (lower.includes('word') && lower.includes('guess'))) {
+    return {
+      title: 'COREZ Wordle Master',
+      html: synthesizeWordleGame()
+    };
+  }
+
+  if (lower.includes('scrabble') || lower.includes('tile') || lower.includes('anagram') || lower.includes('crossword') || lower.includes('word game')) {
+    return {
+      title: 'COREZ Scrabble Master',
+      html: synthesizeScrabbleGame()
+    };
+  }
 
   if (lower.includes('chess')) {
     const withBot = lower.includes('bot') || lower.includes('enemy');

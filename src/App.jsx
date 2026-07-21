@@ -6,8 +6,29 @@ import ChatInput from './components/ChatInput';
 import CanvasPreview from './components/CanvasPreview';
 import SettingsModal from './components/SettingsModal';
 import ImageStudioPage from './components/ImageStudioPage';
+import ProgressChecklist from './components/ProgressChecklist';
 import { generateAIResponse, extractCodeFromMessage } from './services/aiService';
 import { Layers, Code, Gamepad2, BarChart3, Wand2 } from 'lucide-react';
+
+function getTaskTypeFromMessages(messages) {
+  if (!messages || messages.length === 0) return 'general';
+  const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+  if (!lastUserMsg) return 'general';
+  const prompt = typeof lastUserMsg.content === 'string' ? lastUserMsg.content.toLowerCase() : '';
+  if (prompt.includes('game') || prompt.includes('play') || prompt.includes('chess') || prompt.includes('space') || prompt.includes('scrabble') || prompt.includes('wordle') || prompt.includes('bot') || prompt.includes('enemy')) {
+    return 'game';
+  }
+  if (prompt.includes('image') || prompt.includes('flux') || prompt.includes('picture') || prompt.includes('photo') || prompt.includes('draw')) {
+    return 'image';
+  }
+  if (prompt.includes('build') || prompt.includes('make') || prompt.includes('app') || prompt.includes('website') || prompt.includes('site') || prompt.includes('dashboard') || prompt.includes('landing')) {
+    return 'app';
+  }
+  if (prompt.includes('code') || prompt.includes('fix') || prompt.includes('bug') || prompt.includes('error') || prompt.includes('function')) {
+    return 'code';
+  }
+  return 'general';
+}
 
 const INITIAL_SESSIONS = [
   {
@@ -247,14 +268,7 @@ export default function App() {
                     {isThinking && (
                       <div className="message-wrapper ai">
                         <div className="message-body">
-                          <div className="thinking-indicator-box" aria-label="Corez is thinking" role="status">
-                            <span className="thinking-text">Thinking...</span>
-                            <span className="thinking-dots" aria-hidden="true">
-                              <span className="thinking-dot" />
-                              <span className="thinking-dot" />
-                              <span className="thinking-dot" />
-                            </span>
-                          </div>
+                          <ProgressChecklist taskType={getTaskTypeFromMessages(activeSession?.messages)} />
                         </div>
                       </div>
                     )}

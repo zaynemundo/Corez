@@ -3,8 +3,8 @@
 ## Roles and authority
 
 - **DeepSeek V4 Flash** is the lead engineering agent, handling orchestration, development, and overall implementation strategy.
-- **MiMo V2.5** is the specialist agent for vision, art direction, and SVG creation.
-- **krea/krea-2-medium** is used specifically when background image generation is required.
+- **MiMo V2.5** is the specialist agent for vision, visual inspection, art direction, UI layout, and game design/SVG creation.
+- **FLUX 1** (`@cf/black-forest-labs/flux-1-dev` / `flux-1-schnell`) is used for free background image generation and visual artwork.
 
 ## Safe delegation rules
 
