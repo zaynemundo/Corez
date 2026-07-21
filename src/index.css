@@ -691,7 +691,7 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: 10px;
   border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
   background: var(--bg-secondary, #18181b);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: none;
 }
 
 .markdown-table {
