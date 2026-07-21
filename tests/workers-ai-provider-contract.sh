@@ -27,16 +27,26 @@ check_absent() {
   fi
 }
 
-check 'Worker uses the Kimi 2.7 Code model' '@cf/moonshotai/kimi-k2[.]7-code' "$worker"
-check_absent 'Worker does not use the paid-only GLM-5.2 model' '@cf/zai-org/glm-5[.]2' "$worker"
+check 'Worker routes text through DeepSeek V4 Flash on OpenRouter' 'deepseek/deepseek-v4-flash' "$worker"
+check 'Worker routes media through MiMo V2.5 on OpenRouter' 'xiaomi/mimo-v2[.]5' "$worker"
+check 'Worker uses Kimi 2.7 Code as the primary Workers AI fallback' '@cf/moonshotai/kimi-k2[.]7-code' "$worker"
+check 'Worker uses DeepSeek R1 Distill as the secondary Workers AI fallback' '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b' "$worker"
+check 'Worker uses FLUX dev as the primary image model' '@cf/black-forest-labs/flux-1-dev' "$worker"
+check 'Worker uses FLUX Schnell as the image fallback' '@cf/black-forest-labs/flux-1-schnell' "$worker"
 check 'Worker invokes the native AI binding' 'env[.]AI[.]run' "$worker"
 check 'Worker sends a system message' "role: 'system'" "$worker"
 check 'Worker sends a user message' "role: 'user'" "$worker"
+check 'Worker supports the OpenRouter text endpoint' 'openrouter[.]ai' "$worker"
+check 'Worker supports OPENROUTER_API_KEY' 'OPENROUTER_API_KEY' "$worker"
+check 'Worker recognises canonical code-help intent' "'code-help'" "$worker"
+check 'Worker recognises canonical swarm intent' "'swarm'" "$worker"
+check_absent 'Worker no longer branches on retired coding intent' "intentType === 'coding'" "$worker"
+check_absent 'Worker no longer branches on retired complex intent' "intentType === 'complex'" "$worker"
+check_absent 'Worker no longer branches on retired fast-path labels' "intentType === 'math'|intentType === 'chat'|intentType === 'simple'" "$worker"
+check_absent 'Worker does not use the paid-only GLM-5.2 model' '@cf/zai-org/glm-5[.]2' "$worker"
 check 'frontend calls the public AI route' "fetch\(AI_PROXY_ENDPOINT" "$service"
 check 'frontend configures the public AI route' "AI_PROXY_ENDPOINT = '/api/ai'" "$service"
 check 'frontend retains local fallback' 'generateLocalAIResponse' "$service"
-check 'Worker supports OpenRouter text endpoint' 'openrouter[.]ai' "$worker"
-check 'Worker supports OPENROUTER_API_KEY environment variable' 'OPENROUTER_API_KEY' "$worker"
 check_absent 'frontend has no model override storage' 'corez_openrouter_model|VITE_OPENROUTER_MODEL' "$service"
 
 if (( failures > 0 )); then
