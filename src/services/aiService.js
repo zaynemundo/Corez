@@ -381,19 +381,19 @@ export function createFallbackSvgDataUrl(prompt) {
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 512 512" shape-rendering="crispEdges">
     <defs>
-      <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#0f0e17" />
-        <stop offset="50%" stop-color="#181824" />
-        <stop offset="100%" stop-color="#2a2a3d" />
+      <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#0a0915" />
+        <stop offset="60%" stop-color="#19152b" />
+        <stop offset="100%" stop-color="#2d1b40" />
       </linearGradient>
       <pattern id="pixelGrid" width="16" height="16" patternUnits="userSpaceOnUse">
-        <path d="M 16 0 L 0 0 0 16" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1" />
+        <path d="M 16 0 L 0 0 0 16" fill="none" stroke="rgba(255,255,255,0.02)" stroke-width="1" />
       </pattern>
     </defs>
-    <!-- Background Frame -->
+    <!-- Clean Dark Backdrop with Pixel Grid -->
     <rect width="512" height="512" fill="url(#bg)" />
     <rect width="512" height="512" fill="url(#pixelGrid)" />
-    
+
     <!-- Outer 8-Bit Border Frame -->
     <rect x="24" y="24" width="464" height="464" fill="none" stroke="#6272a4" stroke-width="4" />
     <rect x="32" y="32" width="448" height="448" fill="none" stroke="#ff79c6" stroke-width="2" />
