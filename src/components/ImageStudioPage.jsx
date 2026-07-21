@@ -231,7 +231,7 @@ export default function ImageStudioPage() {
             {generating && (
               <div className="message-wrapper ai">
                 <div className="message-body">
-                  <ProgressChecklist taskType="image" customTitle="Generating FLUX 1 Image" />
+                  <ProgressChecklist taskType="image" customTitle="Generating Visual Artwork" />
                 </div>
               </div>
             )}

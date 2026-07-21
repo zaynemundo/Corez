@@ -4,20 +4,20 @@ import { CheckCircle2, Loader2, Circle, Sparkles, Wand2, Gamepad2, Code2, Messag
 const STEP_PRESETS = {
   game: [
     { id: 1, label: 'Analyzing game rules, layout & mechanics' },
-    { id: 2, label: 'Routing UI & art direction to MiMo V2.5' },
-    { id: 3, label: 'Loading FLUX 1 free backgrounds & dictionary verification' },
+    { id: 2, label: 'Routing UI & 8-bit art direction' },
+    { id: 3, label: 'Rendering 8-bit backgrounds & dictionary verification' },
     { id: 4, label: 'Compiling JavaScript engine & canvas controls' },
     { id: 5, label: 'Launching live canvas preview' }
   ],
   app: [
     { id: 1, label: 'Understanding app architecture & user requirements' },
-    { id: 2, label: 'Delegating visual design & components to MiMo V2.5' },
+    { id: 2, label: 'Synthesizing visual design & components' },
     { id: 3, label: 'Injecting responsive styling & interactivity' },
     { id: 4, label: 'Preparing production-ready HTML experience' }
   ],
   image: [
     { id: 1, label: 'Parsing prompt parameters & composition' },
-    { id: 2, label: 'Delegating to FLUX 1 free background engine' },
+    { id: 2, label: 'Routing to visual artwork engine' },
     { id: 3, label: 'Rendering high-resolution visual art' },
     { id: 4, label: 'Finalizing visual output' }
   ],
@@ -82,7 +82,7 @@ export default function ProgressChecklist({ taskType = 'general', customTitle = 
           </div>
           <div className="progress-header-text">
             <span className="progress-header-title">
-              {customTitle || (taskType === 'game' ? 'Building 8-Bit Game' : taskType === 'image' ? 'Generating FLUX 1 Image' : taskType === 'app' ? 'Building Application' : 'Processing Request')}
+              {customTitle || (taskType === 'game' ? 'Building 8-Bit Game' : taskType === 'image' ? 'Generating Visual Artwork' : taskType === 'app' ? 'Building Application' : 'Processing Request')}
             </span>
             <span className="progress-header-subtitle">
               Step {currentStepIndex + 1} of {steps.length}
