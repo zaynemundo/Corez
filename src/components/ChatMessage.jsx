@@ -23,7 +23,7 @@ function CodeSnippetBlock({ code, lang }) {
       <div className="code-header">
         <span className="code-lang">{lang || 'code'}</span>
         <button className="code-btn" onClick={handleCopy} title="Copy code">
-          {copied ? <Check size={12} /> : <Copy size={12} />}
+          {copied ? <Check size={12} strokeWidth={1.5} /> : <Copy size={12} strokeWidth={1.5} />}
           <span>{copied ? 'Copied' : 'Copy'}</span>
         </button>
       </div>
@@ -106,7 +106,7 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
                 onClick={() => onRunInCanvas(part.code)}
                 title="Click to open app live on the right side"
               >
-                <Layers size={14} style={{ color: 'var(--text-primary)' }} />
+                <Layers size={14} strokeWidth={1.5} style={{ color: 'var(--text-primary)' }} />
                 <span>Open preview</span>
               </div>
               <div 
@@ -119,7 +119,7 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
                 }}
                 title="Ask AI to modify this code"
               >
-                <Wand2 size={14} style={{ color: 'var(--text-primary)' }} />
+                <Wand2 size={14} strokeWidth={1.5} style={{ color: 'var(--text-primary)' }} />
                 <span>Revise</span>
               </div>
             </div>
@@ -140,7 +140,7 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
               color: 'var(--text-secondary)',
               fontSize: '0.75rem'
             }}>
-              <Layers size={14} />
+              <Layers size={14} strokeWidth={1.5} />
               <span>Attached code block ({part.code.split('\n').length} lines)</span>
             </div>
           );

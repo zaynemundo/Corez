@@ -8,11 +8,11 @@ export default function SettingsModal({ isOpen, onClose, onClearAllHistory }) {
       <div className="modal-card" onClick={(event) => event.stopPropagation()}>
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Settings size={18} />
+            <Settings size={18} strokeWidth={1.5} />
             <span className="modal-title">Corez Preferences</span>
           </div>
           <button className="icon-btn" onClick={onClose}>
-            <X size={15} />
+            <X size={15} strokeWidth={1.5} />
           </button>
         </div>
 
@@ -26,7 +26,7 @@ export default function SettingsModal({ isOpen, onClose, onClearAllHistory }) {
             style={{ width: '100%', color: '#ef4444' }}
             onClick={onClearAllHistory}
           >
-            <Trash2 size={15} />
+            <Trash2 size={15} strokeWidth={1.5} />
             <span>Clear Conversation History</span>
           </button>
         </div>

@@ -111,7 +111,7 @@ export default function CanvasPreview({
               title="Desktop Screen View"
               className={`device-btn ${deviceMode === 'desktop' ? 'active' : ''}`}
             >
-              <Monitor size={15} />
+              <Monitor size={15} strokeWidth={1.5} />
             </button>
 
             <button
@@ -119,7 +119,7 @@ export default function CanvasPreview({
               title="Laptop View (1366 × 768)"
               className={`device-btn ${deviceMode === 'laptop' ? 'active' : ''}`}
             >
-              <Laptop size={15} />
+              <Laptop size={15} strokeWidth={1.5} />
             </button>
 
             <button
@@ -127,7 +127,7 @@ export default function CanvasPreview({
               title="Tablet View (768 × 1024)"
               className={`device-btn ${deviceMode === 'tablet' ? 'active' : ''}`}
             >
-              <Tablet size={15} />
+              <Tablet size={15} strokeWidth={1.5} />
             </button>
 
             <button
@@ -135,26 +135,26 @@ export default function CanvasPreview({
               title="Mobile View (375 × 812)"
               className={`device-btn ${deviceMode === 'mobile' ? 'active' : ''}`}
             >
-              <Smartphone size={15} />
+              <Smartphone size={15} strokeWidth={1.5} />
             </button>
           </div>
         )}
 
         <div className="canvas-controls">
           <button className="icon-btn" onClick={handleRefresh} title="Reload Preview">
-            <RotateCw size={14} />
+            <RotateCw size={14} strokeWidth={1.5} />
           </button>
           <button className="icon-btn" onClick={handleCopy} title="Copy Source Code">
-            {copied ? <Check size={14} style={{ color: '#ffffff' }} /> : <Copy size={14} />}
+            {copied ? <Check size={14} strokeWidth={1.5} style={{ color: '#ffffff' }} /> : <Copy size={14} strokeWidth={1.5} />}
           </button>
           <button className="icon-btn" onClick={handleDownload} title="Download .html file">
-            <Download size={14} />
+            <Download size={14} strokeWidth={1.5} />
           </button>
           <button className="icon-btn" onClick={onToggleFullScreen} title="Toggle Fullscreen">
-            {isFullScreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            {isFullScreen ? <Minimize2 size={14} strokeWidth={1.5} /> : <Maximize2 size={14} strokeWidth={1.5} />}
           </button>
           <button className="icon-btn" onClick={onClose} title="Close Preview">
-            <X size={14} />
+            <X size={14} strokeWidth={1.5} />
           </button>
         </div>
       </div>
@@ -200,7 +200,7 @@ export default function CanvasPreview({
         ) : (
           <div className="canvas-empty-state">
             <div className="canvas-empty-icon">
-              <Code2 size={22} />
+              <Code2 size={22} strokeWidth={1.5} />
             </div>
             <h3 style={{ fontSize: '0.95rem' }}>No Active App Running</h3>
             <p style={{ maxWidth: '280px', fontSize: '0.8rem' }}>

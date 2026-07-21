@@ -185,12 +185,12 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
         <div className="modal-header">
           <div className="modal-title" style={{ gap: '0.55rem' }}>
             <div className="brand-icon" style={{ width: '26px', height: '26px' }}>
-              <Wand2 size={14} />
+              <Wand2 size={14} strokeWidth={1.5} />
             </div>
             <span>Creative Prompt Showcase (50 Visual Styles)</span>
           </div>
           <button className="icon-btn close-modal-btn" onClick={onClose} title="Close">
-            <X size={15} />
+            <X size={15} strokeWidth={1.5} />
           </button>
         </div>
 
@@ -199,14 +199,14 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
             className={`showcase-tab-btn ${activeTab === 'gallery' ? 'active' : ''}`}
             onClick={() => setActiveTab('gallery')}
           >
-            <Layers size={13} />
+            <Layers size={13} strokeWidth={1.5} />
             <span>Prompt Catalog (50 Visual Styles)</span>
           </button>
           <button 
             className={`showcase-tab-btn ${activeTab === 'generator' ? 'active' : ''}`}
             onClick={() => setActiveTab('generator')}
           >
-            <Sparkles size={13} />
+            <Sparkles size={13} strokeWidth={1.5} />
             <span>Batch Image Generator</span>
           </button>
         </div>
@@ -241,7 +241,7 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
                       onClick={() => handleCopyPrompt(preset)}
                       title="Copy Prompt"
                     >
-                      {copiedPresetId === preset.id ? <Check size={12} /> : <Copy size={12} />}
+                      {copiedPresetId === preset.id ? <Check size={12} strokeWidth={1.5} /> : <Copy size={12} strokeWidth={1.5} />}
                       <span>{copiedPresetId === preset.id ? 'Copied' : 'Copy Prompt'}</span>
                     </button>
 
@@ -250,7 +250,7 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
                       onClick={() => handleGeneratePreset(preset)}
                       title="Generate Image"
                     >
-                      <Sparkles size={12} />
+                      <Sparkles size={12} strokeWidth={1.5} />
                       <span>Generate Image</span>
                     </button>
                   </div>
@@ -272,7 +272,7 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
                   title="Attach Image or Document"
                   disabled={generating}
                 >
-                  <Paperclip size={14} />
+                  <Paperclip size={14} strokeWidth={1.5} />
                 </button>
                 <input 
                   type="file"
@@ -291,7 +291,7 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
                       {att.type === 'image' ? (
                         <img src={att.dataUrl} alt={att.name} className="attachment-chip-thumb" />
                       ) : (
-                        <FileText size={12} />
+                        <FileText size={12} strokeWidth={1.5} />
                       )}
                       <span className="chip-filename">{att.name}</span>
                       <button 
@@ -300,7 +300,7 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
                         onClick={() => removeAttachment(att.id)}
                         title="Remove attachment"
                       >
-                        <X size={12} />
+                        <X size={12} strokeWidth={1.5} />
                       </button>
                     </div>
                   ))}
@@ -335,12 +335,12 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
                 >
                   {generating ? (
                     <>
-                      <Loader2 size={14} className="spin-icon" />
+                      <Loader2 size={14} strokeWidth={1.5} className="spin-icon" />
                       <span>Generating Image(s)...</span>
                     </>
                   ) : (
                     <>
-                      <Wand2 size={14} />
+                      <Wand2 size={14} strokeWidth={1.5} />
                       <span>Generate {batchCount > 1 ? `${batchCount} Images` : 'Image'}</span>
                     </>
                   )}
@@ -350,13 +350,13 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
 
             <div className="generated-gallery-section">
               <h3 className="gallery-section-title">
-                <ImageIcon size={14} />
+                <ImageIcon size={14} strokeWidth={1.5} />
                 <span>Generated Pictures ({generatedImages.length})</span>
               </h3>
 
               {generatedImages.length === 0 ? (
                 <div className="empty-gallery-state">
-                  <Wand2 size={24} style={{ opacity: 0.4 }} />
+                  <Wand2 size={24} strokeWidth={1.5} style={{ opacity: 0.4 }} />
                   <p>No images generated in this session yet. Select a prompt preset from the catalog or enter a custom prompt above to create up to 50 pictures.</p>
                 </div>
               ) : (
@@ -377,7 +377,7 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
                           className="code-btn download-btn"
                           title="Download Image"
                         >
-                          <Download size={12} />
+                          <Download size={12} strokeWidth={1.5} />
                         </a>
                       </div>
                     </div>
@@ -394,7 +394,7 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
           <div className="lightbox-content" onClick={e => e.stopPropagation()}>
             <img src={previewImage} alt="Preview Generated Image" className="lightbox-img" />
             <button className="icon-btn close-lightbox" onClick={() => setPreviewImage(null)}>
-              <X size={16} />
+              <X size={16} strokeWidth={1.5} />
             </button>
           </div>
         </div>

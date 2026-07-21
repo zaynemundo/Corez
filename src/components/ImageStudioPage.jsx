@@ -175,7 +175,7 @@ export default function ImageStudioPage() {
           <div className="messages-inner studio-messages-inner">
             <div className="showcase-header-row">
               <div className="showcase-title">
-                <ImageIcon size={16} />
+                <ImageIcon size={16} strokeWidth={1.5} />
                 <span>Image Showcase ({generatedImages.length})</span>
               </div>
               {generatedImages.length > 0 && (
@@ -184,7 +184,7 @@ export default function ImageStudioPage() {
                   onClick={() => setGeneratedImages([])}
                   title="Clear Showcase"
                 >
-                  <Trash2 size={12} />
+                  <Trash2 size={12} strokeWidth={1.5} />
                   <span>Clear All</span>
                 </button>
               )}
@@ -224,14 +224,14 @@ export default function ImageStudioPage() {
                           }}
                           title="Enlarge Image"
                         >
-                          <Maximize2 size={15} />
+                          <Maximize2 size={15} strokeWidth={1.5} />
                         </button>
                         <button 
                           className="icon-btn overlay-btn delete-btn"
                           onClick={(e) => handleDeleteImage(img.id, e)}
                           title="Delete Image"
                         >
-                          <Trash2 size={14} />
+                          <Trash2 size={14} strokeWidth={1.5} />
                         </button>
                       </div>
                     </div>
@@ -247,7 +247,7 @@ export default function ImageStudioPage() {
                           }}
                           title="Copy Prompt"
                         >
-                          {copiedId === img.id ? <Check size={12} /> : <Copy size={12} />}
+                          {copiedId === img.id ? <Check size={12} strokeWidth={1.5} /> : <Copy size={12} strokeWidth={1.5} />}
                         </button>
                         <a 
                           href={img.url} 
@@ -256,7 +256,7 @@ export default function ImageStudioPage() {
                           onClick={e => e.stopPropagation()}
                           title="Download Image"
                         >
-                          <Download size={12} />
+                          <Download size={12} strokeWidth={1.5} />
                         </a>
                       </div>
                     </div>
@@ -292,7 +292,7 @@ export default function ImageStudioPage() {
             title="Attach Document or Image"
             disabled={generating}
           >
-            <Paperclip size={16} />
+            <Paperclip size={16} strokeWidth={1.5} />
           </button>
 
           <div className="input-textarea-wrapper" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -303,7 +303,7 @@ export default function ImageStudioPage() {
                     {att.type === 'image' ? (
                       <img src={att.dataUrl} alt={att.name} className="attachment-chip-thumb" />
                     ) : (
-                      <FileText size={13} />
+                      <FileText size={13} strokeWidth={1.5} />
                     )}
                     <span className="chip-filename">{att.name}</span>
                     <button 
@@ -312,7 +312,7 @@ export default function ImageStudioPage() {
                       onClick={() => removeAttachment(att.id)}
                       title="Remove attachment"
                     >
-                      <X size={12} />
+                      <X size={12} strokeWidth={1.5} />
                     </button>
                   </div>
                 ))}
@@ -338,7 +338,7 @@ export default function ImageStudioPage() {
               disabled={(!promptInput.trim() && attachments.length === 0) || generating}
               title="Generate Image"
             >
-              {generating ? <Loader2 size={15} className="spin-icon" /> : <Send size={15} />}
+              {generating ? <Loader2 size={15} strokeWidth={1.5} className="spin-icon" /> : <Send size={15} strokeWidth={1.5} />}
             </button>
           </div>
         </form>
@@ -350,7 +350,7 @@ export default function ImageStudioPage() {
           <div className="lightbox-content" onClick={e => e.stopPropagation()}>
             <img src={previewImage} alt="Preview Image" className="lightbox-img" />
             <button className="icon-btn close-lightbox" onClick={() => setPreviewImage(null)}>
-              <X size={16} />
+              <X size={16} strokeWidth={1.5} />
             </button>
           </div>
         </div>

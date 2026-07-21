@@ -49,7 +49,7 @@ export default function ChatInput({ input, setInput, onSendMessage, isStreaming,
             disabled={!input.trim() || isStreaming}
             title="Send Message"
           >
-            <Send size={15} />
+            <Send size={15} strokeWidth={1.5} />
           </button>
         </div>
       </form>
