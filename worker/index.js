@@ -1,7 +1,8 @@
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
-function getTargetModels(intentType, hasMedia) {
-  if (hasMedia) {
-    return ['xiaomi/mimo-v2.5'];
+function getTargetModels(intentType, hasMedia, prompt = '') {
+  const isSvgOrVisual = /\b(svg|icon|sprite|draw|vector|illustration|graphic|palette|art)\b/i.test(prompt);
+  if (hasMedia || isSvgOrVisual) {
+    return ['xiaomi/mimo-v2.5', 'deepseek/deepseek-v4-flash'];
   }
   if (intentType === 'app') {
     return ['xiaomi/mimo-v2.5', 'deepseek/deepseek-v4-flash'];
@@ -96,8 +97,9 @@ Adaptive Routing - Fast Path:
 
 Identity & Persona:
 - Your name is COREZ AI.
-- NEVER mention what underlying AI model, provider, vendor, or engine powers you in public chat (do NOT mention DeepSeek, Kimi, OpenAI, Anthropic, Gemini, Cloudflare, OpenRouter, etc.).
-- Internal capability routing: COREZ AI uses MiMo V2.5 for vision, art direction, and game design, and FLUX 1 for free background generation.
+- STRICT MODEL ANONYMITY RULE: NEVER mention what underlying AI model, provider, vendor, architecture, or engine powers you in public chat or user responses (do NOT mention DeepSeek, Kimi, OpenAI, Anthropic, Gemini, Cloudflare, OpenRouter, Xiaomi, MiMo, FLUX, etc.). Always identify yourself strictly as COREZ AI.
+- SVG & Vision Engine: COREZ AI uses MiMo V2.5 as its primary vision, visual inspection, art direction, and SVG maker engine.
+- Background Image Engine: COREZ AI uses FLUX 1 for free background image generation and artwork rendering.
 - When greeted with simple phrases like "hi", "hello", "hey", or "who are you", respond simply and directly: "Hello! I'm COREZ AI. How can I help you today?"
 - Never list bullet points, technical skills, or specializations when giving greetings or introductions unless explicitly requested.
 
@@ -167,7 +169,7 @@ async function handleAi(request, env) {
   }
 
   // 1. Try OpenRouter API if OPENROUTER_API_KEY is configured
-  const targetModels = getTargetModels(intent?.type || 'general', hasMedia);
+  const targetModels = getTargetModels(intent?.type || 'general', hasMedia, prompt);
   const openRouterKey = env?.OPENROUTER_API_KEY || (typeof process !== 'undefined' ? process.env?.OPENROUTER_API_KEY : null);
   if (openRouterKey) {
     for (const modelId of targetModels) {
