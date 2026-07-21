@@ -817,56 +817,23 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
-/* Minimalist Long-Line Pac-Man Progress Bar (Theme Adaptive: Light & Dark Mode) */
-.pacman-progress-container {
-  max-width: 480px;
+/* 100% Message Body Width 8-Bit Square Worm Progress Bar */
+.square-worm-progress-container {
   width: 100%;
-  margin: 0.4rem 0;
+  max-width: 100%;
+  margin: 0.45rem 0;
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: 0.35rem;
 }
 
-.pacman-progress-header {
+.square-worm-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
+  justify-content: flex-end;
 }
 
-.pacman-header-left {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.progress-mini-icon {
-  color: var(--text-primary);
-  flex-shrink: 0;
-}
-.progress-mini-icon.game { color: var(--text-primary); }
-.progress-mini-icon.image { color: var(--text-primary); }
-.progress-mini-icon.code { color: var(--text-primary); }
-
-.pacman-status-title {
-  color: var(--text-primary);
-  font-size: 0.825rem;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-
-.pacman-status-step {
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.pacman-percentage-badge {
+.square-worm-percentage {
   font-size: 0.75rem;
   font-weight: 700;
   color: var(--text-primary);
@@ -878,18 +845,18 @@ h1, h2, h3, h4, h5, h6 {
   border: 1px solid var(--border-color);
 }
 
-/* Long Line Track Wrapper */
-.pacman-track-wrapper {
+/* Long Line Track Wrapper (Full Message Body Width) */
+.square-worm-track-wrapper {
   position: relative;
   width: 100%;
-  height: 20px;
+  height: 18px;
   display: flex;
   align-items: center;
 }
 
-.pacman-track-bg {
+.square-worm-track-bg {
   position: absolute;
-  top: 8px;
+  top: 7px;
   left: 0;
   width: 100%;
   height: 4px;
@@ -898,86 +865,76 @@ h1, h2, h3, h4, h5, h6 {
   opacity: 0.8;
 }
 
-.pacman-line-fill {
+.square-worm-line-fill {
   position: absolute;
-  top: 8px;
+  top: 7px;
   left: 0;
   height: 4px;
   background: var(--text-primary);
   border-radius: 9999px;
-  transition: width 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+  transition: width 0.25s linear;
   z-index: 1;
 }
 
-/* Pac-Dots along the track line */
-.pacman-dots-row {
+/* Crawling 8-Bit Square Worm Body & Undulation Animation */
+.square-worm-head-wrapper {
   position: absolute;
-  top: 8px;
-  left: 0;
-  width: 100%;
-  height: 4px;
-  z-index: 2;
-  pointer-events: none;
-}
-
-.pacman-dot {
-  position: absolute;
-  top: -1px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--text-primary);
-  opacity: 0.65;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-  transform: translateX(-50%);
-}
-
-.pacman-dot.eaten {
-  opacity: 0;
-  transform: translateX(-50%) scale(0);
-}
-
-/* Pac-Man Head & Jaw Chomping Animation */
-.pacman-head-wrapper {
-  position: absolute;
-  top: 0;
-  height: 20px;
+  top: 2px;
   z-index: 3;
-  color: var(--text-primary);
-  transition: left 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+  transition: left 0.25s linear;
   display: flex;
   align-items: center;
-  justify-content: center;
 }
 
-.pacman-eye {
-  fill: var(--bg-primary, #000000);
+.square-worm-body {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.5px;
 }
 
-.pacman-svg {
-  overflow: visible;
+.worm-pixel {
+  background: var(--text-primary);
+  display: inline-block;
+  position: relative;
+  box-shadow: none;
 }
 
-.pacman-jaw-top {
-  transform-box: fill-box;
-  transform-origin: 10px 10px;
-  animation: pacmanChompTop 0.22s infinite alternate ease-in-out;
+.worm-pixel.seg-tail {
+  width: 4px;
+  height: 4px;
+  animation: wormCrawling 0.35s infinite ease-in-out;
+  animation-delay: 0.08s;
 }
 
-.pacman-jaw-bottom {
-  transform-box: fill-box;
-  transform-origin: 10px 10px;
-  animation: pacmanChompBottom 0.22s infinite alternate ease-in-out;
+.worm-pixel.seg-mid {
+  width: 5px;
+  height: 5px;
+  animation: wormCrawling 0.35s infinite ease-in-out;
+  animation-delay: 0.04s;
 }
 
-@keyframes pacmanChompTop {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(-35deg); }
+.worm-pixel.seg-head {
+  width: 6px;
+  height: 6px;
+  animation: wormCrawling 0.35s infinite ease-in-out;
 }
 
-@keyframes pacmanChompBottom {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(35deg); }
+.worm-eye {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 2px;
+  height: 2px;
+  background: var(--bg-primary, #000000);
+}
+
+@keyframes wormCrawling {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px) scaleY(1.15) scaleX(0.88);
+  }
 }
 
 .active-pulse-dot {
