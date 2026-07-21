@@ -230,7 +230,7 @@ export function extractCodeFromMessage(text) {
   return null;
 }
 
-function synthesizeChessGame() {
+function synthesizeChessGame(withBot = false) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -271,7 +271,7 @@ function synthesizeChessGame() {
     <h1>COREZ CHESS</h1>
     <div class="status-bar">
       <span id="status">White's Turn</span>
-      <span id="mode">Interactive 2-Player</span>
+      <span id="mode">${withBot ? '1-Player vs Bot' : 'Interactive 2-Player'}</span>
     </div>
     <div class="board" id="board"></div>
     <div class="controls">
@@ -280,6 +280,7 @@ function synthesizeChessGame() {
     </div>
   </div>
   <script>
+    const WITH_BOT = ${withBot};
     const INITIAL_BOARD = [
       ['r','n','b','q','k','b','n','r'],
       ['p','p','p','p','p','p','p','p'],
@@ -345,6 +346,7 @@ function synthesizeChessGame() {
     }
 
     function onClick(r, c) {
+      if (WITH_BOT && turn === 'B') return;
       if (selected) {
         const [sr, sc] = selected;
         const valid = getMoves(sr, sc);
@@ -354,6 +356,9 @@ function synthesizeChessGame() {
           turn = turn === 'W' ? 'B' : 'W';
           selected = null;
           render();
+          if (WITH_BOT && turn === 'B') {
+            setTimeout(botMove, 500);
+          }
           return;
         }
       }
@@ -364,6 +369,26 @@ function synthesizeChessGame() {
         selected = null;
       }
       render();
+    }
+    
+    function botMove() {
+      const allMoves = [];
+      for (let i = 0; i < 8; i++) {
+        for (let j = 0; j < 8; j++) {
+          const p = board[i][j];
+          if (p && isB(p)) {
+            const moves = getMoves(i, j);
+            moves.forEach(([vr, vc]) => allMoves.push({ from: [i, j], to: [vr, vc] }));
+          }
+        }
+      }
+      if (allMoves.length > 0) {
+        const m = allMoves[Math.floor(Math.random() * allMoves.length)];
+        board[m.to[0]][m.to[1]] = board[m.from[0]][m.from[1]];
+        board[m.from[0]][m.from[1]] = '';
+        turn = 'W';
+        render();
+      }
     }
 
     function render() {
@@ -614,9 +639,10 @@ function synthesizeCustomGame(prompt) {
   const lower = clean.toLowerCase();
 
   if (lower.includes('chess')) {
+    const withBot = lower.includes('bot') || lower.includes('enemy');
     return {
-      title: 'COREZ Chess App',
-      html: synthesizeChessGame()
+      title: withBot ? 'COREZ Chess App (vs Bot)' : 'COREZ Chess App',
+      html: synthesizeChessGame(withBot)
     };
   }
 
