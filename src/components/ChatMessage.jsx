@@ -125,6 +125,26 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
             </div>
           );
         }
+        
+        if (isUser) {
+          return (
+            <div key={idx} style={{ 
+              margin: '0.4rem 0', 
+              padding: '0.4rem 0.65rem',
+              backgroundColor: 'rgba(0,0,0,0.15)', 
+              border: '1px solid var(--border-color)', 
+              borderRadius: 'var(--radius-sm)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              color: 'var(--text-secondary)',
+              fontSize: '0.75rem'
+            }}>
+              <Layers size={14} />
+              <span>Attached code block ({part.code.split('\n').length} lines)</span>
+            </div>
+          );
+        }
 
         return <CodeSnippetBlock key={idx} code={part.code} lang={part.lang} />;
       }
