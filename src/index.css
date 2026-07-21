@@ -817,119 +817,156 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
-/* Minimalist Progress Bar Card */
-.simple-progress-card {
-  background: var(--bg-secondary, #18181b);
-  border: 1px solid var(--border-color, #27272a);
-  border-radius: 12px;
-  padding: 0.8rem 1.05rem;
-  max-width: 420px;
+/* Minimalist Long-Line Pac-Man Progress Bar */
+.pacman-progress-container {
+  max-width: 480px;
   width: 100%;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
-  margin: 0.35rem 0;
+  margin: 0.4rem 0;
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
-  transition: all 0.25s ease;
+  gap: 0.45rem;
 }
 
-.simple-progress-card:hover {
-  border-color: rgba(255, 255, 255, 0.16);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
-}
-
-.simple-progress-header {
+.pacman-progress-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.5rem;
 }
 
-.simple-header-title-group {
+.pacman-header-left {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.45rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .progress-mini-icon {
   color: #818cf8;
+  flex-shrink: 0;
 }
 .progress-mini-icon.game { color: #f1fa8c; }
 .progress-mini-icon.image { color: #ff79c6; }
 .progress-mini-icon.code { color: #50fa7b; }
 
-.simple-progress-title {
+.pacman-status-title {
   color: var(--text-primary, #ffffff);
-  font-size: 0.835rem;
+  font-size: 0.825rem;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  flex-shrink: 0;
 }
 
-.simple-progress-percentage {
-  font-size: 0.76rem;
-  font-weight: 700;
-  color: #c084fc;
-  font-family: var(--font-mono, monospace);
-  background: rgba(192, 132, 252, 0.1);
-  padding: 0.1rem 0.5rem;
-  border-radius: 12px;
-  border: 1px solid rgba(192, 132, 252, 0.25);
-}
-
-.simple-progress-track {
-  width: 100%;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
-  overflow: hidden;
-  position: relative;
-}
-
-.simple-progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
-  border-radius: 20px;
-  transition: width 0.4s cubic-bezier(0.25, 1, 0.5, 1);
-  box-shadow: 0 0 10px rgba(168, 85, 247, 0.5);
-}
-
-.simple-progress-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
-.simple-step-status-text {
-  font-size: 0.735rem;
-  color: var(--text-secondary, #a1a1aa);
-  white-space: nowrap;
+.pacman-status-step {
+  color: var(--text-secondary, #71717a);
+  font-size: 0.75rem;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 320px;
+  white-space: nowrap;
 }
 
-.simple-step-dots {
+.pacman-percentage-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #f1fa8c;
+  font-family: var(--font-mono, monospace);
+  flex-shrink: 0;
+}
+
+/* Long Line Track Wrapper */
+.pacman-track-wrapper {
+  position: relative;
+  width: 100%;
+  height: 18px;
   display: flex;
   align-items: center;
-  gap: 0.3rem;
 }
 
-.simple-dot {
+.pacman-track-bg {
+  position: absolute;
+  top: 7px;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+}
+
+.pacman-line-fill {
+  position: absolute;
+  top: 7px;
+  left: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #6366f1 0%, #a855f7 50%, #f1fa8c 100%);
+  border-radius: 4px;
+  box-shadow: 0 0 10px rgba(241, 250, 140, 0.5);
+  transition: width 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+  z-index: 1;
+}
+
+/* Pac-Dots along the track line */
+.pacman-dots-row {
+  position: absolute;
+  top: 7px;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.pacman-dot {
+  position: absolute;
+  top: -1px;
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.16);
-  transition: all 0.3s ease;
+  background: #f1fa8c;
+  box-shadow: 0 0 6px rgba(241, 250, 140, 0.8);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  transform: translateX(-50%);
 }
 
-.simple-dot.done {
-  background: #34d399;
+.pacman-dot.eaten {
+  opacity: 0;
+  transform: translateX(-50%) scale(0);
 }
 
-.simple-dot.active {
-  background: #a855f7;
-  transform: scale(1.3);
-  box-shadow: 0 0 8px #a855f7;
+/* Pac-Man Head & Jaw Chomping Animation */
+.pacman-head-wrapper {
+  position: absolute;
+  top: 0;
+  z-index: 3;
+  transition: left 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 0 8px rgba(241, 250, 140, 0.7));
+}
+
+.pacman-svg {
+  overflow: visible;
+}
+
+.pacman-jaw-top {
+  transform-origin: 10px 10px;
+  animation: pacmanChompTop 0.22s infinite alternate ease-in-out;
+}
+
+.pacman-jaw-bottom {
+  transform-origin: 10px 10px;
+  animation: pacmanChompBottom 0.22s infinite alternate ease-in-out;
+}
+
+@keyframes pacmanChompTop {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(-40deg); }
+}
+
+@keyframes pacmanChompBottom {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(40deg); }
 }
 
 .active-pulse-dot {

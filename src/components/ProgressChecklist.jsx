@@ -36,7 +36,7 @@ const STEP_PRESETS = {
 export default function ProgressChecklist({ taskType = 'general', customTitle = null }) {
   const steps = STEP_PRESETS[taskType] || STEP_PRESETS.general;
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [progressPercent, setProgressPercent] = useState(18);
+  const [progressPercent, setProgressPercent] = useState(15);
 
   useEffect(() => {
     const totalSteps = steps.length;
@@ -63,51 +63,70 @@ export default function ProgressChecklist({ taskType = 'general', customTitle = 
   const getHeaderIcon = () => {
     switch (taskType) {
       case 'game':
-        return <Gamepad2 size={15} className="progress-mini-icon game" />;
+        return <Gamepad2 size={14} className="progress-mini-icon game" />;
       case 'app':
-        return <Wand2 size={15} className="progress-mini-icon app" />;
+        return <Wand2 size={14} className="progress-mini-icon app" />;
       case 'image':
-        return <Sparkles size={15} className="progress-mini-icon image" />;
+        return <Sparkles size={14} className="progress-mini-icon image" />;
       case 'code':
-        return <Code2 size={15} className="progress-mini-icon code" />;
+        return <Code2 size={14} className="progress-mini-icon code" />;
       default:
-        return <MessageSquare size={15} className="progress-mini-icon general" />;
+        return <MessageSquare size={14} className="progress-mini-icon general" />;
     }
   };
 
+  const totalDots = 10;
+
   return (
-    <div className={`simple-progress-card task-${taskType}`} role="status" aria-live="polite">
-      {/* Top Header Row */}
-      <div className="simple-progress-header">
-        <div className="simple-header-title-group">
+    <div className={`pacman-progress-container task-${taskType}`} role="status" aria-live="polite">
+      {/* Top Status Header */}
+      <div className="pacman-progress-header">
+        <div className="pacman-header-left">
           {getHeaderIcon()}
-          <span className="simple-progress-title">
+          <span className="pacman-status-title">
             {customTitle || (taskType === 'game' ? 'Building 8-Bit Game' : taskType === 'image' ? 'Generating Visual Artwork' : taskType === 'app' ? 'Building Application' : 'Processing Request')}
           </span>
+          <span className="pacman-status-step">— {currentStep?.label}</span>
         </div>
-        <span className="simple-progress-percentage">{progressPercent}%</span>
+        <span className="pacman-percentage-badge">{progressPercent}%</span>
       </div>
 
-      {/* Sleek Minimal Progress Track */}
-      <div className="simple-progress-track">
+      {/* Long Line Progress Track with Pac-Man */}
+      <div className="pacman-track-wrapper">
+        {/* Background Line Track */}
+        <div className="pacman-track-bg" />
+
+        {/* Pac-Dots along the line */}
+        <div className="pacman-dots-row">
+          {Array.from({ length: totalDots }).map((_, i) => {
+            const dotPercent = (i / (totalDots - 1)) * 96 + 2;
+            const isEaten = progressPercent >= dotPercent;
+            return (
+              <span
+                key={i}
+                className={`pacman-dot ${isEaten ? 'eaten' : ''}`}
+                style={{ left: `${dotPercent}%` }}
+              />
+            );
+          })}
+        </div>
+
+        {/* Progress Line Fill */}
         <div 
-          className="simple-progress-fill" 
-          style={{ width: `${progressPercent}%` }} 
+          className="pacman-line-fill" 
+          style={{ width: `${Math.min(progressPercent, 100)}%` }} 
         />
-      </div>
 
-      {/* Bottom Status & Step Dots Bar */}
-      <div className="simple-progress-footer">
-        <span className="simple-step-status-text">
-          {currentStep?.label}
-        </span>
-        <div className="simple-step-dots">
-          {steps.map((_, idx) => (
-            <span
-              key={idx}
-              className={`simple-dot ${idx < currentStepIndex ? 'done' : idx === currentStepIndex ? 'active' : ''}`}
-            />
-          ))}
+        {/* Chomping Pac-Man Icon */}
+        <div 
+          className="pacman-head-wrapper" 
+          style={{ left: `calc(${Math.min(progressPercent, 97)}% - 9px)` }}
+        >
+          <svg width="18" height="18" viewBox="0 0 20 20" className="pacman-svg">
+            <path className="pacman-jaw-top" d="M 10 10 L 20 10 A 10 10 0 1 0 10 0 Z" fill="#f1fa8c" />
+            <path className="pacman-jaw-bottom" d="M 10 10 L 20 10 A 10 10 0 0 1 10 20 Z" fill="#f1fa8c" />
+            <circle cx="8.5" cy="4.5" r="1.5" fill="#12121e" />
+          </svg>
         </div>
       </div>
     </div>
