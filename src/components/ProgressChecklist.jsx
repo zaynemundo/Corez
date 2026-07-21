@@ -123,9 +123,9 @@ export default function ProgressChecklist({ taskType = 'general', customTitle = 
           style={{ left: `calc(${Math.min(progressPercent, 97)}% - 9px)` }}
         >
           <svg width="18" height="18" viewBox="0 0 20 20" className="pacman-svg">
-            <path className="pacman-jaw-top" d="M 10 10 L 20 10 A 10 10 0 1 0 10 0 Z" fill="#f1fa8c" />
-            <path className="pacman-jaw-bottom" d="M 10 10 L 20 10 A 10 10 0 0 1 10 20 Z" fill="#f1fa8c" />
-            <circle cx="8.5" cy="4.5" r="1.5" fill="#12121e" />
+            <path className="pacman-jaw-top" d="M 10 10 L 20 10 A 10 10 0 1 0 10 0 Z" fill="#ffffff" />
+            <path className="pacman-jaw-bottom" d="M 10 10 L 20 10 A 10 10 0 0 1 10 20 Z" fill="#ffffff" />
+            <circle cx="8.5" cy="4.5" r="1.5" fill="#09090b" />
           </svg>
         </div>
       </div>
