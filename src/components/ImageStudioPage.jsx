@@ -171,6 +171,43 @@ export default function ImageStudioPage() {
         {generatedImages.length === 0 && !generating ? (
           <div className="welcome-container">
             <h1 className="welcome-title">COREZ STUDIO</h1>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+              Create high-quality 8-bit game assets, pixel art sprites, and visual artwork
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'center', maxWidth: '640px' }}>
+              <button 
+                type="button"
+                className="code-btn"
+                style={{ padding: '6px 12px', fontSize: '0.78rem', borderRadius: 'var(--radius-pill)', backgroundColor: 'var(--bg-tertiary)' }}
+                onClick={() => handleGenerate('8-bit pixel art knight sprite sheet, 16x16 pixel grid, itch.io game asset, PICO-8 retro palette, crisp outline')}
+              >
+                ⚔️ 8-Bit Knight Sprites
+              </button>
+              <button 
+                type="button"
+                className="code-btn"
+                style={{ padding: '6px 12px', fontSize: '0.78rem', borderRadius: 'var(--radius-pill)', backgroundColor: 'var(--bg-tertiary)' }}
+                onClick={() => handleGenerate('8-bit pixel art RPG items set, potion flasks, enchanted swords, shields, treasure chest, itch.io 8-bit game asset style')}
+              >
+                🛡️ 8-Bit Weapons & Potions
+              </button>
+              <button 
+                type="button"
+                className="code-btn"
+                style={{ padding: '6px 12px', fontSize: '0.78rem', borderRadius: 'var(--radius-pill)', backgroundColor: 'var(--bg-tertiary)' }}
+                onClick={() => handleGenerate('8-bit pixel art retro dungeon tileset, stone brick walls, floor tiles, torch, door, lava, itch.io 8-bit game asset pack')}
+              >
+                🏰 8-Bit Dungeon Tileset
+              </button>
+              <button 
+                type="button"
+                className="code-btn"
+                style={{ padding: '6px 12px', fontSize: '0.78rem', borderRadius: 'var(--radius-pill)', backgroundColor: 'var(--bg-tertiary)' }}
+                onClick={() => handleGenerate('8-bit retro arcade monster sprites, slime, goblin, dragon, skull, itch.io 8-bit game asset tag style, vibrant NES palette')}
+              >
+                👾 8-Bit Arcade Monsters
+              </button>
+            </div>
           </div>
         ) : (
           <div className="messages-inner studio-messages-inner">

@@ -67,6 +67,7 @@ Adaptive Routing - App & Game Creation Path:
 - Delegate vision, UI layout, art direction, and game design to MiMo V2.5.
 - Use FLUX 1 for free background image generation and visual graphics.
 - Build a complete, rich, runnable experience rather than a partial scaffold.
+- 8-BIT & SVG GAME ASSETS REQUIREMENT (itch.io Quality): When generating SVG graphics, retro game sprites, icons, tilesets, weapons, items, characters, or 8-bit artwork, build clean, high-quality vector SVGs in authentic 8-bit pixel art style (inspired by itch.io game asset packs). Use shape-rendering="crispEdges", crisp pixel grid alignment (e.g. 16x16, 24x24, 32x32, or 64x64 resolution), vibrant 8-bit color palettes (PICO-8, NES, Game Boy, Fantasy retro), dark 1-pixel outlines, specular highlight pixels, inner shading, drop shadow dithering, and sprite sheet / animation frame layouts!
 - WORD GAMES REQUIREMENT: When generating word games (such as Scrabble, Wordle, Anagrams, Crosswords, or Boggle), you MUST embed a comprehensive dictionary of valid words (300+ words in a Set/Array) and implement strict word verification logic so the game actively validates words, accepts valid entries, rejects invalid entries, and calculates scores!
 - Keep the implementation self-contained and ready for the preview canvas.
 - Prioritise usability, responsive behaviour, and clear interaction states.`;

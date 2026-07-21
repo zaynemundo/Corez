@@ -188,25 +188,235 @@ export function analyzePublicUserIntent(prompt) {
 }
 
 export function createFallbackSvgDataUrl(prompt) {
-  const cleanPrompt = (prompt || 'Visual Creation').slice(0, 42);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
+  const cleanPrompt = (prompt || '8-Bit Asset').slice(0, 40);
+  const lower = cleanPrompt.toLowerCase();
+
+  let spriteType = 'badge';
+  if (lower.includes('sword') || lower.includes('blade') || lower.includes('weapon')) spriteType = 'sword';
+  else if (lower.includes('shield') || lower.includes('armor') || lower.includes('defense')) spriteType = 'shield';
+  else if (lower.includes('potion') || lower.includes('flask') || lower.includes('magic') || lower.includes('elixir')) spriteType = 'potion';
+  else if (lower.includes('chest') || lower.includes('crate') || lower.includes('treasure') || lower.includes('loot')) spriteType = 'chest';
+  else if (lower.includes('knight') || lower.includes('hero') || lower.includes('character') || lower.includes('player')) spriteType = 'hero';
+  else if (lower.includes('monster') || lower.includes('enemy') || lower.includes('skull') || lower.includes('boss')) spriteType = 'monster';
+  else if (lower.includes('gem') || lower.includes('star') || lower.includes('coin') || lower.includes('crystal')) spriteType = 'gem';
+
+  const colorMap = {
+    '.': null,
+    'B': '#12121e', // Dark Outline
+    'W': '#ffffff', // White Highlight
+    'G': '#f1fa8c', // Gold
+    'R': '#ff5555', // Red
+    'C': '#8be9fd', // Cyan
+    'P': '#bd93f9', // Purple
+    'S': '#f8f8f2', // Silver
+    'O': '#ffb86c', // Orange
+    'K': '#6272a4', // Dark Steel
+    'E': '#50fa7b', // Emerald
+    'D': '#44475a', // Dark Wood
+    'M': '#ff79c6'  // Magenta
+  };
+
+  const spriteMatrices = {
+    sword: [
+      '................',
+      '...............W',
+      '..............WS',
+      '.............WSK',
+      '............WSK.',
+      '...........WSK..',
+      '..........WSK...',
+      '.........WSK....',
+      '........WSK.....',
+      '..M...M.SK......',
+      '..MMM.MKK.......',
+      '...MMMMK........',
+      '....MMMD........',
+      '...D..D.........',
+      '..D.............',
+      '................'
+    ],
+    shield: [
+      '................',
+      '.BBBBBBBBBBBBBB.',
+      '.BWWWWWWWWWWWWB.',
+      '.BWGGGGGGGGGGWB.',
+      '.BWGPPBBPPEGGWB.',
+      '.BWGPPPPPEEGGWB.',
+      '.BWGPEEEEEEGGWB.',
+      '.BWGPEEEEEEGGWB.',
+      '..BWGPEEEEGGWB..',
+      '...BWGPEEEGGWB..',
+      '....BWGPEEGGB...',
+      '.....BWGPEGB....',
+      '......BWGPEB....',
+      '.......BWGB.....',
+      '........BBB.....',
+      '................'
+    ],
+    potion: [
+      '................',
+      '......DDDD......',
+      '......DGGGD.....',
+      '......DDDD......',
+      '.......BB.......',
+      '......BCCB......',
+      '.....BCCCCCCB...',
+      '....BCCCCCCB....',
+      '...BCCCCWWCCB...',
+      '...BCCCCWWCCB...',
+      '...BCCCCWWCCB...',
+      '...BCCCCWWCCB...',
+      '...BCCCCWWCCB...',
+      '....BCCCCCCB....',
+      '.....BBBBBB.....',
+      '................'
+    ],
+    chest: [
+      '................',
+      '..BBBBBBBBBBBB..',
+      '.BDDDDDDDDDDDDB.',
+      '.BDDGGGGGGGGDDB.',
+      '.BDDDDDDDDDDDDB.',
+      '.BBBBBBBBBBBBBB.',
+      '.BDDDDDGGDDDDDB.',
+      '.BDDDDDBBDDDDDB.',
+      '.BDDDDDBGDDDDDB.',
+      '.BDDDDDBGDDDDDB.',
+      '.BDDDDDGGDDDDDB.',
+      '.BDDDDDDDDDDDDB.',
+      '.BDDGGGGGGGGDDB.',
+      '..BBBBBBBBBBBB..',
+      '................'
+    ],
+    hero: [
+      '................',
+      '......RRRR......',
+      '.....RRRRRR.....',
+      '......BBBB......',
+      '.....BSSSSB.....',
+      '.....BSWWSB.....',
+      '.....BSSSSB.....',
+      '....BBBBBBBB....',
+      '...BKKKKKKKKB...',
+      '..BKKKSSSSKKKB..',
+      '..BKKKSSSSKKKB..',
+      '..BKKKSSSSKKKB..',
+      '...BKKKKKKKKB...',
+      '....BSSSSSSB....',
+      '....BSS..SSB....',
+      '....BB....BB....'
+    ],
+    monster: [
+      '................',
+      '.....BBBBBB.....',
+      '....BWWWWWWB....',
+      '...BWWWWWWWWB...',
+      '...BWWRRWWRRB...',
+      '...BWWRRWWRRB...',
+      '...BWWWWWWWWB...',
+      '....BWWBBWWB....',
+      '....BWWBBWWB....',
+      '.....BBBBBB.....',
+      '....BWWWWWWB....',
+      '....BWBBBBWB....',
+      '....BWWWWWWB....',
+      '.....BBBBBB.....',
+      '................'
+    ],
+    gem: [
+      '................',
+      '.......WW.......',
+      '......WGGW......',
+      '.....WGGGGW.....',
+      '....WGGGGGGW....',
+      '...WGGGGGGGGW...',
+      '..WGGGGWWGGGGW..',
+      '.WGGGGGWWGGGGGW.',
+      '..WGGGGWWGGGGW..',
+      '...WGGGGGGGGW...',
+      '....WGGGGGGW....',
+      '.....WGGGGW.....',
+      '......WGGW......',
+      '.......WW.......',
+      '................'
+    ],
+    badge: [
+      '................',
+      '..BBBBBBBBBBBB..',
+      '.BGGGGGGGGGGGGB.',
+      '.BGWWWWWWWWWWGB.',
+      '.BGWMMM..MMMWGB.',
+      '.BGWMMMMMMMMWGB.',
+      '.BGWMMMMMMMMWGB.',
+      '.BGW.MMMMMM.WGB.',
+      '.BGW..MMMM..WGB.',
+      '.BGW...MM...WGB.',
+      '.BGWWWWWWWWWWGB.',
+      '.BGGGGGGGGGGGGB.',
+      '..BBBBBBBBBBBB..',
+      '................',
+      '................',
+      '................'
+    ]
+  };
+
+  const selectedMatrix = spriteMatrices[spriteType] || spriteMatrices.badge;
+  const pixelSize = 16;
+  const spriteOffset = 128;
+
+  let pixelRects = '';
+  for (let r = 0; r < 16; r++) {
+    for (let c = 0; c < 16; c++) {
+      const char = selectedMatrix[r]?.[c];
+      const hex = colorMap[char];
+      if (hex) {
+        const px = spriteOffset + c * pixelSize;
+        const py = spriteOffset + r * pixelSize;
+        pixelRects += `<rect x="${px}" y="${py}" width="${pixelSize}" height="${pixelSize}" fill="${hex}" />`;
+      }
+    }
+  }
+
+  const safePrompt = cleanPrompt.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 512 512" shape-rendering="crispEdges">
     <defs>
       <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#09090b" />
-        <stop offset="50%" stop-color="#18181b" />
-        <stop offset="100%" stop-color="#27272a" />
+        <stop offset="0%" stop-color="#0f0e17" />
+        <stop offset="50%" stop-color="#181824" />
+        <stop offset="100%" stop-color="#2a2a3d" />
       </linearGradient>
-      <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" stop-color="#ffffff" />
-        <stop offset="100%" stop-color="#a1a1aa" />
-      </linearGradient>
+      <pattern id="pixelGrid" width="16" height="16" patternUnits="userSpaceOnUse">
+        <path d="M 16 0 L 0 0 0 16" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1" />
+      </pattern>
     </defs>
-    <rect width="800" height="800" fill="url(#bg)" />
-    <circle cx="400" cy="360" r="220" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1.5" />
-    <circle cx="400" cy="360" r="160" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1" stroke-dasharray="8 8" />
-    <polygon points="400,200 520,440 280,440" fill="none" stroke="url(#accent)" stroke-width="2" />
-    <text x="400" y="620" font-family="-apple-system, sans-serif" font-size="22" font-weight="300" fill="#ffffff" text-anchor="middle" letter-spacing="2">${cleanPrompt.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</text>
-    <text x="400" y="660" font-family="-apple-system, sans-serif" font-size="13" font-weight="300" fill="#71717a" text-anchor="middle" letter-spacing="4">CREATIVE VISUAL</text>
+    <!-- Background Frame -->
+    <rect width="512" height="512" fill="url(#bg)" />
+    <rect width="512" height="512" fill="url(#pixelGrid)" />
+    
+    <!-- Outer 8-Bit Border Frame -->
+    <rect x="24" y="24" width="464" height="464" fill="none" stroke="#6272a4" stroke-width="4" />
+    <rect x="32" y="32" width="448" height="448" fill="none" stroke="#ff79c6" stroke-width="2" />
+    
+    <!-- Corner Pixel Accents -->
+    <rect x="20" y="20" width="12" height="12" fill="#ff79c6" />
+    <rect x="480" y="20" width="12" height="12" fill="#ff79c6" />
+    <rect x="20" y="480" width="12" height="12" fill="#ff79c6" />
+    <rect x="480" y="480" width="12" height="12" fill="#ff79c6" />
+
+    <!-- 8-Bit Tag Header -->
+    <rect x="136" y="48" width="240" height="28" fill="#12121e" stroke="#f1fa8c" stroke-width="2" />
+    <text x="256" y="67" font-family="'Courier New', monospace" font-size="13" font-weight="bold" fill="#f1fa8c" text-anchor="middle" letter-spacing="2">ITCH.IO 8-BIT ASSET</text>
+
+    <!-- Sprite Shadow Grid -->
+    <rect x="${spriteOffset + 12}" y="${spriteOffset + 12}" width="256" height="256" fill="rgba(0,0,0,0.4)" />
+
+    <!-- Scaled 16x16 Pixel Sprite -->
+    ${pixelRects}
+
+    <!-- Prompt Footer Badge -->
+    <rect x="56" y="416" width="400" height="44" fill="#12121e" stroke="#bd93f9" stroke-width="2" />
+    <text x="256" y="442" font-family="'Courier New', monospace" font-size="14" font-weight="bold" fill="#50fa7b" text-anchor="middle" letter-spacing="1">${safePrompt.toUpperCase()}</text>
   </svg>`;
 
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
