@@ -9,6 +9,18 @@ const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
 const DEEPSEEK_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
 const FLUX_PRIMARY_MODEL = '@cf/black-forest-labs/flux-1-dev';
 const FLUX_FALLBACK_MODEL = '@cf/black-forest-labs/flux-1-schnell';
+const CANONICAL_INTENT_TYPES = new Set([
+  'app',
+  'code-help',
+  'writing',
+  'explanation',
+  'general',
+  'swarm'
+]);
+
+function normalizeIntentType(intentType) {
+  return CANONICAL_INTENT_TYPES.has(intentType) ? intentType : 'general';
+}
 
 function jsonResponse(status, body) {
   return Response.json(body, { status });
@@ -30,28 +42,46 @@ function safeErrorDetail(error) {
 function buildSystemPrompt(intent) {
   const intentSummary = intent?.summary
     || 'Understand the public user goal and give a useful next step.';
-  const intentType = intent?.type || 'general';
+  const intentType = normalizeIntentType(intent?.type);
 
   let adaptiveInstructions = '';
-  if (intentType === 'math' || intentType === 'chat' || intentType === 'simple') {
-    adaptiveInstructions = `
-Adaptive Routing - Fast Path:
-- Do not over-plan or ask unnecessary clarification questions.
-- Answer directly and immediately with practical information or calculations.
-- Make safe assumptions and proceed.`;
-  } else if (intentType === 'coding') {
+  if (intentType === 'code-help') {
     adaptiveInstructions = `
 Adaptive Routing - Coding Path:
 - Inspect relevant architecture and naming conventions before providing code.
 - Do NOT hallucinate file paths or modify unrelated files.
 - Always include: exact files changed, a reasoning summary, and clear test instructions.
 - Ensure the code is practical, direct, and ready for production.`;
-  } else if (intentType === 'complex' || intentType === 'swarm') {
+  } else if (intentType === 'swarm') {
     adaptiveInstructions = `
 Adaptive Routing - Complex Path:
 - Use step-by-step reasoning and careful planning.
 - Consider multiple agents/skills and orchestration strategies if necessary.
 - Provide a robust architectural overview before diving into specific code.`;
+  } else if (intentType === 'app') {
+    adaptiveInstructions = `
+Adaptive Routing - App Creation Path:
+- Build a complete, rich, runnable experience rather than a partial scaffold.
+- Keep the implementation self-contained and ready for the preview canvas.
+- Prioritise usability, responsive behaviour, and clear interaction states.`;
+  } else if (intentType === 'writing') {
+    adaptiveInstructions = `
+Adaptive Routing - Writing Path:
+- Deliver polished copy in the requested format and tone.
+- Match the audience and purpose without adding unnecessary technical commentary.
+- Keep the result immediately reusable.`;
+  } else if (intentType === 'explanation') {
+    adaptiveInstructions = `
+Adaptive Routing - Explanation Path:
+- Explain the subject directly in plain language.
+- Use a practical example when it improves understanding.
+- End with the most useful next step rather than unnecessary follow-up questions.`;
+  } else {
+    adaptiveInstructions = `
+Adaptive Routing - Fast Path:
+- Do not over-plan or ask unnecessary clarification questions.
+- Answer directly and immediately with practical information or calculations.
+- Make safe assumptions and proceed.`;
   }
 
   return `You are COREZ AI.
