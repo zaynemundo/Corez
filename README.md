@@ -1,34 +1,29 @@
 # New-Corez
 
-## Cloudflare Workers AI setup
+## Hosted AI routing
 
-Corez uses the native Cloudflare Workers AI binding for hosted text responses.
-Public users send prompts to `/api/ai`; the Worker runs the fixed GLM-4.7-Flash model
-directly on Cloudflare and returns normalized response text.
+Corez deploys the Vite application and its AI endpoints together as a Cloudflare Worker. Public users call `/api/ai` for text and multimodal conversations and `/api/image` for image generation. Model selection is controlled server-side and cannot be overridden by the browser.
 
-Corez uses:
+### Text and multimodal requests
 
-```text
-@cf/zai-org/glm-4.7-flash
-```
+When the optional `OPENROUTER_API_KEY` secret is configured, `/api/ai` uses OpenRouter first:
 
-The binding is declared in `wrangler.jsonc` as:
+- Text requests: `deepseek/deepseek-v4-flash`
+- Requests containing image, audio, or video content: `xiaomi/mimo-v2.5`
 
-```jsonc
-"ai": {
-  "binding": "AI"
-}
-```
+If OpenRouter is unavailable, missing, or returns no usable response, Corez uses the native Cloudflare Workers AI binding in this order:
 
-Native inference requires no provider API key, account ID, model variable, or
-provider URL. The model is fixed server-side and cannot be overridden by public
-users.
+1. `@cf/moonshotai/kimi-k2.7-code`
+2. `@cf/deepseek-ai/deepseek-r1-distill-qwen-32b`
 
-To run the optional quality evaluation against an existing deployment:
+### Image generation
 
-```bash
-npm run evaluate:ai -- https://<deployed-worker-host>
-```
+`/api/image` uses the Workers AI binding with this fallback chain:
+
+1. `@cf/black-forest-labs/flux-1-dev`
+2. `@cf/black-forest-labs/flux-1-schnell`
+
+The `AI` binding is declared in `wrangler.jsonc`. Workers AI does not require a provider API key. `OPENROUTER_API_KEY` is optional and should be configured as a Worker secret when OpenRouter routing is required.
 
 ## Local Intent Training & Classification
 
@@ -36,35 +31,33 @@ Corez routes public user prompts using a deterministic local text classifier tra
 
 ### Intent Taxonomy
 
-Every prompt is classified into one of five deliverable-driven labels:
+Corez uses six canonical runtime intent labels:
 
-- `app`: Primary deliverable is an interactive web tool, app, game, calculator, timer, prototype, or dashboard.
-- `code-help`: Primary deliverable is diagnosing, explaining, fixing, or refactoring code or technical errors.
-- `writing`: Primary deliverable is drafting, rewriting, summarizing, or polishing prose.
-- `explanation`: Primary deliverable is understanding or comparing concepts in plain language.
-- `general`: Greetings, gratitude, advice, ambiguity, or requests without a specific deliverable.
+- `app`: Interactive web tools, applications, games, calculators, prototypes, and dashboards.
+- `code-help`: Code diagnosis, explanation, fixing, testing, and refactoring.
+- `writing`: Drafting, rewriting, summarising, and polishing prose.
+- `explanation`: Plain-language explanations and comparisons.
+- `general`: Greetings, advice, ambiguity, and requests without a specialist deliverable.
+- `swarm`: Complex requests that explicitly require multi-agent orchestration or planning.
+
+The trained classifier covers the five deliverable labels (`app`, `code-help`, `writing`, `explanation`, and `general`). The deterministic rule fallback can additionally emit `swarm`. Unsupported or retired client intent values are normalised to `general` by the Worker.
 
 ### Training & Evaluation Commands
 
 - **Train Model**: `npm run train:intents`
-  Validates `data/intents-dataset.json` (250 synthetic examples, 50 per class split 40 train / 10 eval), trains a multinomial Naive Bayes model with Laplace smoothing ($\alpha = 1$), evaluates metric gates, verifies byte-for-byte determinism, and atomically updates `src/data/intent-classifier-model.json`.
+  Validates `data/intents-dataset.json`, trains the deterministic multinomial Naive Bayes classifier, evaluates its metric gates, verifies byte-for-byte determinism, and updates `src/data/intent-classifier-model.json`.
 - **Offline Evaluation**: `npm run evaluate:intents`
-  Evaluates the committed model artifact against the 50 held-out evaluation examples without modifying the artifact, verifying metric gates:
-  - Held-out Accuracy $\ge 0.90$
-  - Macro F1 $\ge 0.88$
-  - `app` Recall $\ge 0.90$
-  - `code-help` Recall $\ge 0.90$
+  Evaluates the committed classifier against its held-out examples without modifying the model artifact.
+- **Hosted Quality Evaluation**: `npm run evaluate:ai -- https://<deployed-worker-host>`
+  Evaluates the public `/api/ai` endpoint against the live intent suite.
 
-### Runtime & Fallback Behavior
+### Runtime and fallback behaviour
 
-`analyzePublicUserIntent(prompt)` uses the trained model when confidence $\ge 0.55$ and OOV (Out of Vocabulary) ratio $\le 0.70$. If confidence or OOV constraints are not met, Corez falls back to low-confidence regex pattern rules, ensuring resilient routing for novel or ambiguous prompts.
+`analyzePublicUserIntent(prompt)` uses the trained model when its confidence and out-of-vocabulary gates are satisfied. Otherwise, Corez uses deterministic pattern rules for novel or ambiguous prompts. The Worker independently validates the supplied intent label before adding adaptive instructions to the system prompt.
 
 ## Cloudflare Worker deployment
 
-Corez deploys the Vite SPA and `/api/ai` together as the `ai`
-Cloudflare Worker. Configure the connected Worker build with:
-
-Local Wrangler commands require Node.js 22+; Cloudflare Workers Builds currently defaults to Node.js 22.
+Corez deploys the Vite SPA, `/api/ai`, and `/api/image` together as the `ai` Cloudflare Worker. Local Wrangler commands require Node.js 22 or later.
 
 ```text
 Build command: npm run build
@@ -72,6 +65,3 @@ Deploy command: npx wrangler deploy
 Root directory: /
 Production branch: main
 ```
-
-The native `AI` binding is configured by `wrangler.jsonc`; hosted inference does
-not require a runtime provider secret.
