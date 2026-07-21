@@ -40,9 +40,33 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
   const renderInlineFormattedText = (text) => {
     if (!text) return null;
 
-    const tokens = text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g);
+    // Tokenize markdown links [text](url), images ![alt](url), code, bold, italic
+    const regex = /(!?\[[^\]]+\]\([^)]+\)|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g;
+    const tokens = text.split(regex);
 
     return tokens.map((token, i) => {
+      if (!token) return null;
+
+      // Image token ![alt](url)
+      const imgMatch = token.match(/^!\[(.*?)\]\((.*?)\)$/);
+      if (imgMatch) {
+        return (
+          <span key={i} className="markdown-inline-img-wrapper">
+            <img src={imgMatch[2]} alt={imgMatch[1]} className="markdown-inline-img" />
+          </span>
+        );
+      }
+
+      // Link token [text](url)
+      const linkMatch = token.match(/^\[(.*?)\]\((.*?)\)$/);
+      if (linkMatch) {
+        return (
+          <a key={i} href={linkMatch[2]} target="_blank" rel="noopener noreferrer" className="markdown-link">
+            {linkMatch[1]}
+          </a>
+        );
+      }
+
       if (token.startsWith('`') && token.endsWith('`') && token.length > 2) {
         return <code key={i} className="inline-code">{token.slice(1, -1)}</code>;
       }
@@ -54,6 +78,127 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
       }
       return token;
     });
+  };
+
+  const parseTableBlock = (tableLines) => {
+    if (tableLines.length < 2) return null;
+    const parseRow = (line) => {
+      const trimmed = line.trim().replace(/^\||\|$/g, '');
+      return trimmed.split('|').map(cell => cell.trim());
+    };
+
+    const headers = parseRow(tableLines[0]);
+    const bodyRows = tableLines.slice(2).map(parseRow);
+
+    return { headers, bodyRows };
+  };
+
+  const renderTextAndTables = (textBlock) => {
+    const lines = textBlock.split('\n');
+    const elements = [];
+    let i = 0;
+
+    while (i < lines.length) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      // Table detection: line starting with | and next line is delimiter |---|
+      if (trimmed.startsWith('|') && i + 1 < lines.length && /^\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?$/.test(lines[i + 1].trim())) {
+        const tableLines = [lines[i], lines[i + 1]];
+        i += 2;
+        while (i < lines.length && lines[i].trim().startsWith('|')) {
+          tableLines.push(lines[i]);
+          i++;
+        }
+        const tableData = parseTableBlock(tableLines);
+        if (tableData) {
+          elements.push(
+            <div key={`table-${i}`} className="markdown-table-wrapper">
+              <table className="markdown-table">
+                <thead>
+                  <tr>
+                    {tableData.headers.map((h, hIdx) => (
+                      <th key={hIdx}>{renderInlineFormattedText(h)}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {tableData.bodyRows.map((row, rIdx) => (
+                    <tr key={rIdx}>
+                      {row.map((cell, cIdx) => (
+                        <td key={cIdx}>{renderInlineFormattedText(cell)}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+          continue;
+        }
+      }
+
+      if (!trimmed) {
+        elements.push(<div key={`blank-${i}`} style={{ height: '0.35rem' }} />);
+        i++;
+        continue;
+      }
+
+      // Standalone Image ![caption](url)
+      const standaloneImgMatch = trimmed.match(/^!\[(.*?)\]\((.*?)\)$/);
+      if (standaloneImgMatch) {
+        elements.push(
+          <div key={`img-${i}`} className="markdown-image-wrapper">
+            <img src={standaloneImgMatch[2]} alt={standaloneImgMatch[1]} className="markdown-image" />
+            {standaloneImgMatch[1] && <span className="markdown-image-caption">{standaloneImgMatch[1]}</span>}
+          </div>
+        );
+        i++;
+        continue;
+      }
+
+      if (trimmed.startsWith('# ') || trimmed.startsWith('## ') || trimmed.startsWith('### ')) {
+        const headingText = trimmed.replace(/^#+\s*/, '');
+        elements.push(
+          <h3 key={`h-${i}`} className="markdown-heading">
+            {renderInlineFormattedText(headingText)}
+          </h3>
+        );
+        i++;
+        continue;
+      }
+
+      if (trimmed.startsWith('> ')) {
+        const quoteText = trimmed.slice(2);
+        elements.push(
+          <blockquote key={`q-${i}`} className="markdown-blockquote">
+            {renderInlineFormattedText(quoteText)}
+          </blockquote>
+        );
+        i++;
+        continue;
+      }
+
+      if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || /^\d+\.\s/.test(trimmed)) {
+        const listText = trimmed.replace(/^[-*]\s+|\d+\.\s+/, '');
+        elements.push(
+          <li key={`li-${i}`} className="markdown-list-item">
+            {renderInlineFormattedText(listText)}
+          </li>
+        );
+        i++;
+        continue;
+      }
+
+      elements.push(
+        <p key={`p-${i}`}>
+          {renderInlineFormattedText(line)}
+        </p>
+      );
+      i++;
+    }
+
+    return elements;
   };
 
   const renderFormattedText = (content) => {
@@ -149,46 +294,9 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
         return <CodeSnippetBlock key={idx} code={part.code} lang={part.lang} />;
       }
 
-      const lines = part.content.split('\n');
       return (
         <div key={idx} className="markdown-body">
-          {lines.map((line, lIdx) => {
-            const trimmed = line.trim();
-            if (!trimmed) return <div key={lIdx} style={{ height: '0.35rem' }} />;
-
-            if (trimmed.startsWith('# ') || trimmed.startsWith('## ') || trimmed.startsWith('### ')) {
-              const headingText = trimmed.replace(/^#+\s*/, '');
-              return (
-                <h3 key={lIdx} className="markdown-heading">
-                  {renderInlineFormattedText(headingText)}
-                </h3>
-              );
-            }
-
-            if (trimmed.startsWith('> ')) {
-              const quoteText = trimmed.slice(2);
-              return (
-                <blockquote key={lIdx} className="markdown-blockquote">
-                  {renderInlineFormattedText(quoteText)}
-                </blockquote>
-              );
-            }
-
-            if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || /^\d+\.\s/.test(trimmed)) {
-              const listText = trimmed.replace(/^[-*]\s+|\d+\.\s+/, '');
-              return (
-                <li key={lIdx} className="markdown-list-item">
-                  {renderInlineFormattedText(listText)}
-                </li>
-              );
-            }
-
-            return (
-              <p key={lIdx}>
-                {renderInlineFormattedText(line)}
-              </p>
-            );
-          })}
+          {renderTextAndTables(part.content)}
         </div>
       );
     });

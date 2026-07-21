@@ -678,10 +678,91 @@ h1, h2, h3, h4, h5, h6 {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-xs);
   padding: 0.1rem 0.3rem;
-  font-family: var(--font-mono);
-  font-size: 0.875rem;
-  color: var(--text-primary);
-  font-weight: 400;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+  color: #f1fa8c;
+}
+
+/* Beautiful Markdown Tables */
+.markdown-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  margin: 0.85rem 0;
+  border-radius: 10px;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+  background: var(--bg-secondary, #18181b);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.markdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.825rem;
+}
+
+.markdown-table th {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary, #ffffff);
+  font-weight: 600;
+  padding: 0.65rem 0.95rem;
+  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+  letter-spacing: 0.4px;
+}
+
+.markdown-table td {
+  padding: 0.6rem 0.95rem;
+  color: var(--text-primary, #e4e4e7);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  line-height: 1.5;
+}
+
+.markdown-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.markdown-table tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.markdown-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.05);
+  transition: background 0.2s ease;
+}
+
+/* Markdown Image & Link Styling */
+.markdown-image-wrapper {
+  margin: 0.85rem 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.markdown-image {
+  max-width: 100%;
+  max-height: 480px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  object-fit: contain;
+}
+
+.markdown-image-caption {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.markdown-link {
+  color: #a855f7;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.2s ease;
+}
+
+.markdown-link:hover {
+  color: #c084fc;
 }
 
 .thinking-indicator-box {
