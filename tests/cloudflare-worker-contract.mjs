@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import worker from '../worker/index.js';
 
 const MODEL = '@cf/moonshotai/kimi-k2.7-code';
+const FLUX_PRIMARY_MODEL = '@cf/black-forest-labs/flux-1-dev';
+const FLUX_FALLBACK_MODEL = '@cf/black-forest-labs/flux-1-schnell';
+delete process.env.OPENROUTER_API_KEY;
 
 function env(overrides = {}) {
   return {
@@ -37,6 +40,27 @@ async function post(body, environment = env()) {
     }),
     environment
   );
+}
+
+async function captureSystemPrompt(intent) {
+  let invocation;
+  const response = await post(
+    JSON.stringify({ prompt: 'Test request', intent }),
+    env({
+      AI: {
+        async run(model, input) {
+          invocation = { model, input };
+          return {
+            choices: [{ message: { content: 'Worker response' } }]
+          };
+        }
+      }
+    })
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(invocation.model, MODEL);
+  return invocation.input.messages[0].content;
 }
 
 async function run() {
@@ -121,6 +145,7 @@ async function run() {
   assert.deepEqual(Object.keys(invocation.input), ['messages']);
   assert.equal(invocation.input.messages[1].content, 'Build a timer');
   assert.match(invocation.input.messages[0].content, /Build a timer app/);
+  assert.match(invocation.input.messages[0].content, /Inferred intent: app/);
 
   let generalInput;
   const generalResponse = await post(
@@ -138,7 +163,58 @@ async function run() {
   );
   assert.equal(generalResponse.status, 200);
   assert.deepEqual(Object.keys(generalInput), ['messages']);
-  assert.match(generalInput.messages[0].content, /general/);
+  assert.match(generalInput.messages[0].content, /Adaptive Routing - Fast Path/);
+  assert.match(generalInput.messages[0].content, /Inferred intent: general/);
+
+  const codeHelpPrompt = await captureSystemPrompt({
+    type: 'code-help',
+    summary: 'Fix a React component.'
+  });
+  assert.match(codeHelpPrompt, /Adaptive Routing - Coding Path/);
+  assert.match(codeHelpPrompt, /Inferred intent: code-help/);
+
+  const swarmPrompt = await captureSystemPrompt({
+    type: 'swarm',
+    summary: 'Coordinate multiple agents.'
+  });
+  assert.match(swarmPrompt, /Adaptive Routing - Complex Path/);
+  assert.match(swarmPrompt, /Inferred intent: swarm/);
+
+  const retiredIntentPrompt = await captureSystemPrompt({
+    type: 'coding',
+    summary: 'Retired client label.'
+  });
+  assert.match(retiredIntentPrompt, /Adaptive Routing - Fast Path/);
+  assert.match(retiredIntentPrompt, /Inferred intent: general/);
+  assert.doesNotMatch(retiredIntentPrompt, /Inferred intent: coding/);
+
+  let historyInput;
+  const historyResponse = await post(
+    JSON.stringify({
+      prompt: 'Current question',
+      intent: { type: 'general', summary: 'Answer directly.' },
+      messages: [
+        { role: 'user', content: 'Earlier question' },
+        { role: 'assistant', content: 'Earlier answer' },
+        { role: 'user', content: 'Current question' }
+      ]
+    }),
+    env({
+      AI: {
+        async run(_model, input) {
+          historyInput = input;
+          return {
+            choices: [{ message: { content: 'History response' } }]
+          };
+        }
+      }
+    })
+  );
+  assert.equal(historyResponse.status, 200);
+  assert.deepEqual(
+    historyInput.messages.slice(1).map((message) => message.content),
+    ['Earlier question', 'Earlier answer', 'Current question']
+  );
 
   const originalConsoleError = console.error;
   let loggedError;
@@ -220,10 +296,43 @@ async function run() {
   );
   assert.equal(imageSuccessResponse.status, 200);
   const imageJsonData = await json(imageSuccessResponse);
-  assert.equal(fluxInvocation.model, '@cf/black-forest-labs/flux-1-schnell');
-  assert.equal(fluxInvocation.input.prompt, 'A futuristic city');
-  assert.equal(imageJsonData.model, '@cf/black-forest-labs/flux-1-schnell');
+  assert.equal(fluxInvocation.model, FLUX_PRIMARY_MODEL);
+  assert.deepEqual(fluxInvocation.input, { prompt: 'A futuristic city' });
+  assert.equal(imageJsonData.model, FLUX_PRIMARY_MODEL);
   assert.match(imageJsonData.image, /^data:image\/png;base64,/);
+
+  const fluxCalls = [];
+  const originalConsoleWarn = console.warn;
+  console.warn = () => {};
+  let imageFallbackResponse;
+  try {
+    imageFallbackResponse = await worker.fetch(
+      new Request('https://corez.test/api/image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: 'Fallback image' })
+      }),
+      env({
+        AI: {
+          async run(model, input) {
+            fluxCalls.push({ model, input });
+            if (model === FLUX_PRIMARY_MODEL) {
+              throw new Error('primary unavailable');
+            }
+            return dummyBuffer;
+          }
+        }
+      })
+    );
+  } finally {
+    console.warn = originalConsoleWarn;
+  }
+  assert.equal(imageFallbackResponse.status, 200);
+  assert.deepEqual(fluxCalls, [
+    { model: FLUX_PRIMARY_MODEL, input: { prompt: 'Fallback image' } },
+    { model: FLUX_FALLBACK_MODEL, input: { prompt: 'Fallback image', num_steps: 4 } }
+  ]);
+  assert.equal((await json(imageFallbackResponse)).model, FLUX_FALLBACK_MODEL);
 
   console.log('Cloudflare Worker behavior contract passed.');
 }
