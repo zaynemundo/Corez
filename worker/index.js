@@ -1,5 +1,8 @@
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
-function getTargetModels(intentType) {
+function getTargetModels(intentType, hasMedia) {
+  if (hasMedia) {
+    return ['xiaomi/mimo-v2.5'];
+  }
   return ['deepseek/deepseek-v4-flash'];
 }
 const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
@@ -102,10 +105,18 @@ async function handleAi(request, env) {
   ];
 
   let hasAppendedPrompt = false;
+  let hasMedia = false;
   for (const m of messages) {
     if (m.role && m.content) {
+      if (Array.isArray(m.content)) {
+        for (const item of m.content) {
+          if (item.type === 'image_url' || item.type === 'audio_url' || item.type === 'video_url') {
+            hasMedia = true;
+          }
+        }
+      }
       apiMessages.push({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content });
-      if (m.content === prompt && m.role === 'user') {
+      if (typeof m.content === 'string' && m.content === prompt && m.role === 'user') {
         hasAppendedPrompt = true;
       }
     }
@@ -116,7 +127,7 @@ async function handleAi(request, env) {
   }
 
   // 1. Try OpenRouter API if OPENROUTER_API_KEY is configured
-  const targetModels = getTargetModels(intent?.type || 'general');
+  const targetModels = getTargetModels(intent?.type || 'general', hasMedia);
   const openRouterKey = env?.OPENROUTER_API_KEY || (typeof process !== 'undefined' ? process.env?.OPENROUTER_API_KEY : null);
   if (openRouterKey) {
     for (const modelId of targetModels) {

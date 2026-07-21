@@ -243,7 +243,7 @@ Below is the exhaustive, structured capability inventory evaluated for Corez as 
 * **Example Request:** *"Turn this dashboard wireframe image into a responsive HTML page."*
 * **Implementation Shape:** Multi-modal Prompt (Base64 Image Payload).
 * **Frontend/Backend Boundary:** Client converts image file to base64 `data:image/...`; proxy sends OpenAI-compatible multi-modal payload.
-* **Required Model/Tool/API:** Vision-capable model on OpenRouter (e.g., `google/gemini-2.5-flash`, `openai/gpt-4o`).
+* **Required Model/Tool/API:** Vision-capable model on OpenRouter (`xiaomi/mimo-v2.5`).
 * **Secret/Permission Needs:** None beyond standard proxy API key.
 * **Privacy/Security Risks:** Low-Moderate (user images sent to model provider).
 * **Offline Feasibility:** No.

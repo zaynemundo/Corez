@@ -58,7 +58,7 @@ Verified as of **July 18, 2026** directly from official OpenRouter API documenta
 * **Official Docs:** [OpenRouter Multimodal Documentation](https://openrouter.ai/docs/multimodal)
 * **Supported Capabilities:** User message content array formatted with image objects:
   `content: [{ type: "text", text: "..." }, { type: "image_url", image_url: { url: "data:image/png;base64,..." } }]`.
-* **Model Qualifications:** Supported by vision-capable models (e.g., `openai/gpt-4o`, `google/gemini-2.5-flash`, `anthropic/claude-3.5-sonnet`, `deepseek/deepseek-vl`). Non-vision models will return a 400 parameter error if passed image content.
+* **Model Qualifications:** Supported by vision-capable models (e.g., `xiaomi/mimo-v2.5`). Non-vision models will return a 400 parameter error if passed image content.
 
 ### 2.6 Media Outputs (Image & Media Generation)
 * **Official Docs:** [OpenRouter Models Documentation](https://openrouter.ai/docs/models)
@@ -303,7 +303,7 @@ Verified as of **July 18, 2026** directly from official OpenRouter API documenta
 * **User Value / Example:** Converts uploaded UI screenshot into runnable monochrome canvas HTML/CSS code.
 * **Execution Shape:** Base64 image payload in user message `content` array.
 * **Required Corez Changes:** Support `image_url` payload array in `api/openrouter.js`; image dropzone in client UI.
-* **Required Model/Tool/API/Dependency:** Vision model via OpenRouter (`openai/gpt-4o`, `google/gemini-2.5-flash`, `anthropic/claude-3.5-sonnet`).
+* **Required Model/Tool/API/Dependency:** Vision model via OpenRouter (`xiaomi/mimo-v2.5`).
 * **Secret/Permission & Data Exposure:** Uploaded image data sent to model provider.
 * **Offline Feasibility:** No.
 * **Complexity:** M
