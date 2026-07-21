@@ -36,21 +36,21 @@ const STEP_PRESETS = {
 export default function ProgressChecklist({ taskType = 'general', customTitle = null }) {
   const steps = STEP_PRESETS[taskType] || STEP_PRESETS.general;
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [progressPercent, setProgressPercent] = useState(12);
+  const [progressPercent, setProgressPercent] = useState(15);
 
   useEffect(() => {
     const totalSteps = steps.length;
-    const intervalTime = Math.max(700, Math.min(1400, 4000 / totalSteps));
+    const intervalTime = Math.max(650, Math.min(1300, 3600 / totalSteps));
 
     const timer = setInterval(() => {
       setCurrentStepIndex(prev => {
         if (prev < totalSteps - 1) {
           const next = prev + 1;
-          const targetPercent = Math.round(((next + 1) / totalSteps) * 90);
+          const targetPercent = Math.round(((next + 1) / totalSteps) * 92);
           setProgressPercent(targetPercent);
           return next;
         }
-        setProgressPercent(96);
+        setProgressPercent(98);
         return prev;
       });
     }, intervalTime);
@@ -61,35 +61,46 @@ export default function ProgressChecklist({ taskType = 'general', customTitle = 
   const getHeaderIcon = () => {
     switch (taskType) {
       case 'game':
-        return <Gamepad2 className="progress-header-icon" />;
+        return <Gamepad2 className="progress-header-icon game-icon" />;
       case 'app':
-        return <Wand2 className="progress-header-icon" />;
+        return <Wand2 className="progress-header-icon app-icon" />;
       case 'image':
-        return <Sparkles className="progress-header-icon" />;
+        return <Sparkles className="progress-header-icon image-icon" />;
       case 'code':
-        return <Code2 className="progress-header-icon" />;
+        return <Code2 className="progress-header-icon code-icon" />;
       default:
-        return <MessageSquare className="progress-header-icon" />;
+        return <MessageSquare className="progress-header-icon general-icon" />;
     }
   };
 
   return (
-    <div className="progress-checklist-card" role="status" aria-live="polite">
+    <div className={`progress-checklist-card task-${taskType}`} role="status" aria-live="polite">
       <div className="progress-card-header">
         <div className="progress-header-left">
-          {getHeaderIcon()}
-          <span className="progress-header-title">
-            {customTitle || (taskType === 'game' ? 'Building Game Experience' : taskType === 'image' ? 'Generating FLUX 1 Image' : 'Processing Request')}
-          </span>
+          <div className="progress-icon-badge">
+            {getHeaderIcon()}
+          </div>
+          <div className="progress-header-text">
+            <span className="progress-header-title">
+              {customTitle || (taskType === 'game' ? 'Building 8-Bit Game' : taskType === 'image' ? 'Generating FLUX 1 Image' : taskType === 'app' ? 'Building Application' : 'Processing Request')}
+            </span>
+            <span className="progress-header-subtitle">
+              Step {currentStepIndex + 1} of {steps.length}
+            </span>
+          </div>
         </div>
-        <span className="progress-percent-badge">{progressPercent}%</span>
+        <div className="progress-badge-wrapper">
+          <span className="progress-percent-badge">{progressPercent}%</span>
+        </div>
       </div>
 
       <div className="progress-bar-track">
         <div 
           className="progress-bar-fill"
           style={{ width: `${progressPercent}%` }}
-        />
+        >
+          <div className="progress-shimmer-glow" />
+        </div>
       </div>
 
       <ul className="progress-checklist-items">
@@ -112,6 +123,7 @@ export default function ProgressChecklist({ taskType = 'general', customTitle = 
                 )}
               </div>
               <span className="step-label">{step.label}</span>
+              {isCurrent && <span className="active-pulse-dot" />}
             </li>
           );
         })}
