@@ -36,7 +36,7 @@ const STEP_PRESETS = {
 export default function ProgressChecklist({ taskType = 'general', customTitle = null }) {
   const steps = STEP_PRESETS[taskType] || STEP_PRESETS.general;
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [progressPercent, setProgressPercent] = useState(15);
+  const [progressPercent, setProgressPercent] = useState(18);
 
   useEffect(() => {
     const totalSteps = steps.length;
@@ -58,76 +58,58 @@ export default function ProgressChecklist({ taskType = 'general', customTitle = 
     return () => clearInterval(timer);
   }, [steps.length]);
 
+  const currentStep = steps[currentStepIndex] || steps[0];
+
   const getHeaderIcon = () => {
     switch (taskType) {
       case 'game':
-        return <Gamepad2 className="progress-header-icon game-icon" />;
+        return <Gamepad2 size={15} className="progress-mini-icon game" />;
       case 'app':
-        return <Wand2 className="progress-header-icon app-icon" />;
+        return <Wand2 size={15} className="progress-mini-icon app" />;
       case 'image':
-        return <Sparkles className="progress-header-icon image-icon" />;
+        return <Sparkles size={15} className="progress-mini-icon image" />;
       case 'code':
-        return <Code2 className="progress-header-icon code-icon" />;
+        return <Code2 size={15} className="progress-mini-icon code" />;
       default:
-        return <MessageSquare className="progress-header-icon general-icon" />;
+        return <MessageSquare size={15} className="progress-mini-icon general" />;
     }
   };
 
   return (
-    <div className={`progress-checklist-card task-${taskType}`} role="status" aria-live="polite">
-      <div className="progress-card-header">
-        <div className="progress-header-left">
-          <div className="progress-icon-badge">
-            {getHeaderIcon()}
-          </div>
-          <div className="progress-header-text">
-            <span className="progress-header-title">
-              {customTitle || (taskType === 'game' ? 'Building 8-Bit Game' : taskType === 'image' ? 'Generating Visual Artwork' : taskType === 'app' ? 'Building Application' : 'Processing Request')}
-            </span>
-            <span className="progress-header-subtitle">
-              Step {currentStepIndex + 1} of {steps.length}
-            </span>
-          </div>
+    <div className={`simple-progress-card task-${taskType}`} role="status" aria-live="polite">
+      {/* Top Header Row */}
+      <div className="simple-progress-header">
+        <div className="simple-header-title-group">
+          {getHeaderIcon()}
+          <span className="simple-progress-title">
+            {customTitle || (taskType === 'game' ? 'Building 8-Bit Game' : taskType === 'image' ? 'Generating Visual Artwork' : taskType === 'app' ? 'Building Application' : 'Processing Request')}
+          </span>
         </div>
-        <div className="progress-badge-wrapper">
-          <span className="progress-percent-badge">{progressPercent}%</span>
-        </div>
+        <span className="simple-progress-percentage">{progressPercent}%</span>
       </div>
 
-      <div className="progress-bar-track">
+      {/* Sleek Minimal Progress Track */}
+      <div className="simple-progress-track">
         <div 
-          className="progress-bar-fill"
-          style={{ width: `${progressPercent}%` }}
-        >
-          <div className="progress-shimmer-glow" />
-        </div>
+          className="simple-progress-fill" 
+          style={{ width: `${progressPercent}%` }} 
+        />
       </div>
 
-      <ul className="progress-checklist-items">
-        {steps.map((step, idx) => {
-          const isDone = idx < currentStepIndex;
-          const isCurrent = idx === currentStepIndex;
-
-          return (
-            <li 
-              key={step.id} 
-              className={`progress-step-item ${isDone ? 'done' : ''} ${isCurrent ? 'active' : ''}`}
-            >
-              <div className="step-icon-container">
-                {isDone ? (
-                  <CheckCircle2 className="step-icon done-icon" />
-                ) : isCurrent ? (
-                  <Loader2 className="step-icon spinner-icon" />
-                ) : (
-                  <Circle className="step-icon pending-icon" />
-                )}
-              </div>
-              <span className="step-label">{step.label}</span>
-              {isCurrent && <span className="active-pulse-dot" />}
-            </li>
-          );
-        })}
-      </ul>
+      {/* Bottom Status & Step Dots Bar */}
+      <div className="simple-progress-footer">
+        <span className="simple-step-status-text">
+          {currentStep?.label}
+        </span>
+        <div className="simple-step-dots">
+          {steps.map((_, idx) => (
+            <span
+              key={idx}
+              className={`simple-dot ${idx < currentStepIndex ? 'done' : idx === currentStepIndex ? 'active' : ''}`}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
