@@ -97,7 +97,7 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
 
     return parts.map((part, idx) => {
       if (part.type === 'code') {
-        if (part.isExecutable) {
+        if (part.isExecutable && !isUser) {
           return (
             <div key={idx} style={{ margin: '0.65rem 0', display: 'flex', gap: '0.5rem' }}>
               <div 
