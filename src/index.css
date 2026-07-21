@@ -32,7 +32,7 @@
   --sidebar-bg: rgba(18, 18, 20, 0.75);
   --sidebar-bg-opaque: #121214;
   --sidebar-border: rgba(255, 255, 255, 0.08);
-  --sidebar-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.36), 0 2px 8px 0 rgba(0, 0, 0, 0.24);
+  --sidebar-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.15), 0 1px 4px 0 rgba(0, 0, 0, 0.10);
   --sidebar-item-hover-bg: rgba(255, 255, 255, 0.05);
   --sidebar-item-active-bg: rgba(255, 255, 255, 0.10);
 
@@ -66,7 +66,7 @@
   --sidebar-bg: rgba(255, 255, 255, 0.75);
   --sidebar-bg-opaque: #fafafa;
   --sidebar-border: rgba(0, 0, 0, 0.08);
-  --sidebar-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.08), 0 2px 8px 0 rgba(0, 0, 0, 0.04);
+  --sidebar-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.05), 0 1px 4px 0 rgba(0, 0, 0, 0.02);
   --sidebar-item-hover-bg: rgba(0, 0, 0, 0.035);
   --sidebar-item-active-bg: rgba(0, 0, 0, 0.07);
 }
@@ -621,6 +621,7 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: var(--radius-lg);
   padding: 0.9rem 1.15rem;
   color: var(--text-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   font-size: 0.875rem;
   font-weight: 300;
   line-height: 1.6;
