@@ -35,9 +35,9 @@ export default function MessageCircleMore({
         .msg-dot-3 { animation: msgDotPulse 1.2s ease-in-out infinite 0.4s; transform-origin: center; }
       `}</style>
       <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
-      <circle cx="8" cy="12" r="1" fill={color} className={animated || isHovered ? "msg-dot-1" : ""} />
-      <circle cx="12" cy="12" r="1" fill={color} className={animated || isHovered ? "msg-dot-2" : ""} />
-      <circle cx="16" cy="12" r="1" fill={color} className={animated || isHovered ? "msg-dot-3" : ""} />
+      <circle cx="8" cy="12" r="1" fill={color} className={isHovered ? "msg-dot-1" : ""} />
+      <circle cx="12" cy="12" r="1" fill={color} className={isHovered ? "msg-dot-2" : ""} />
+      <circle cx="16" cy="12" r="1" fill={color} className={isHovered ? "msg-dot-3" : ""} />
     </svg>
   );
 }

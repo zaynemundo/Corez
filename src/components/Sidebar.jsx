@@ -65,7 +65,7 @@ export default function Sidebar({
             onClick={() => onSelectSession(session.id)}
             title={session.title}
           >
-            <MessageCircleMore size={14} strokeWidth={1.5} animated={activeView === 'chat' && session.id === activeSessionId} />
+            <MessageCircleMore size={14} strokeWidth={1.5} />
             <button
               className="delete-chat-btn icon-only-delete"
               onClick={(e) => {
