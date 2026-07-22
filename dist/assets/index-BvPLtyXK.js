@@ -242,7 +242,7 @@ Error generating stack: `+l.message+`
     <!-- Outer 8-Bit Border Frame -->
     <rect x="24" y="24" width="464" height="464" fill="none" stroke="#6272a4" stroke-width="4" />
     <rect x="32" y="32" width="448" height="448" fill="none" stroke="#ff79c6" stroke-width="2" />
-    
+
     <!-- Corner Pixel Accents -->
     <rect x="20" y="20" width="12" height="12" fill="#ff79c6" />
     <rect x="480" y="20" width="12" height="12" fill="#ff79c6" />
@@ -401,7 +401,7 @@ Error generating stack: `+l.message+`
       }
       render();
     }
-    
+
     function botMove() {
       const allMoves = [];
       for (let i = 0; i < 8; i++) {
@@ -613,17 +613,17 @@ Error generating stack: `+l.message+`
     const player = document.getElementById('player');
     const arena = document.getElementById('arena');
     let px = 185, py = 185;
-    
+
     const bot = document.createElement('div');
     bot.className = 'bot';
     bot.innerText = 'X';
     bot.style.left = '10px';
     bot.style.top = '10px';
     arena.appendChild(bot);
-    
+
     let bx = 10, by = 10;
     let bSpeed = 1.5;
-    
+
     document.addEventListener('keydown', (e) => {
       const speed = 10;
       if (e.key === 'ArrowUp') py = Math.max(0, py - speed);
@@ -633,21 +633,21 @@ Error generating stack: `+l.message+`
       player.style.left = px + 'px';
       player.style.top = py + 'px';
     });
-    
+
     function updateBot() {
       if (bx < px) bx += bSpeed;
       else if (bx > px) bx -= bSpeed;
       if (by < py) by += bSpeed;
       else if (by > py) by -= bSpeed;
-      
+
       bot.style.left = bx + 'px';
       bot.style.top = by + 'px';
-      
+
       if (Math.abs(bx - px) < 30 && Math.abs(by - py) < 30) {
         alert('You were caught by the bot enemy!');
         px = 185; py = 185; bx = 10; by = 10;
       }
-      
+
       requestAnimationFrame(updateBot);
     }
     updateBot();
@@ -856,7 +856,7 @@ Error generating stack: `+l.message+`
           showToast('Not in word list!');
           return;
         }
-        
+
         for (let i = 0; i < 5; i++) {
           const ch = guess[i];
           const st = evaluateTile(guess, i);
@@ -974,7 +974,7 @@ Error generating stack: `+l.message+`
   </div>
   <script>
     const POINTS = { A:1, B:3, C:3, D:2, E:1, F:4, G:2, H:4, I:1, J:8, K:5, L:1, M:3, N:1, O:1, P:3, Q:10, R:1, S:1, T:1, U:1, V:4, W:4, X:8, Y:4, Z:10 };
-    
+
     const DICTIONARY = new Set([
       "AN","AT","BE","BY","DO","GO","HE","IN","IS","IT","ME","MY","NO","ON","OR","SO","TO","UP","WE",
       "ACT","ADD","AGE","AIR","AND","ANY","ART","BAD","BAG","BED","BIG","BOX","BOY","BUS","BUT","CAN","CAT","CAR","DAY","DOG","DRY","EAR","EAT","EGG","END","EYE","FAR","FLY","FOR","GET","GOD","GUN","HAT","HOT","ICE","JOB","KEY","KID","LAW","LEG","LET","LOW","MAN","MAP","NEW","NOT","NOW","OFF","OLD","ONE","OUR","OUT","PAY","PEN","PER","PET","PIN","POP","PUT","RED","RUN","SEA","SEE","SET","SIX","SUN","TAX","TEN","THE","TOP","TOY","TRY","TWO","USE","WAR","WAY","WIN","YES","YOU","ZOO",
@@ -1032,7 +1032,7 @@ Error generating stack: `+l.message+`
           const sq = document.createElement('div');
           const sqType = getSquareType(r, c);
           sq.className = 'sq ' + sqType;
-          
+
           const cell = board[r][c];
           if (cell) {
             const tile = document.createElement('div');
@@ -1106,7 +1106,7 @@ Error generating stack: `+l.message+`
       }
 
       const wordsFormed = [];
-      
+
       function getHorizontalWord(r, c) {
         let startC = c;
         while (startC > 0 && board[r][startC - 1]) startC--;
