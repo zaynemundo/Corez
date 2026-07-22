@@ -28,11 +28,11 @@ check_absent() {
 }
 
 check 'Worker routes text through DeepSeek V4 Flash on OpenRouter' 'deepseek/deepseek-v4-flash' "$worker"
-check 'Worker routes media through MiMo V2.5 on OpenRouter' 'xiaomi/mimo-v2[.]5' "$worker"
+check_absent 'Worker no longer routes through MiMo V2.5' 'xiaomi/mimo-v2[.]5' "$worker"
 check 'Worker uses Kimi 2.7 Code as the primary Workers AI fallback' '@cf/moonshotai/kimi-k2[.]7-code' "$worker"
 check 'Worker uses DeepSeek R1 Distill as the secondary Workers AI fallback' '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b' "$worker"
-check 'Worker uses FLUX dev as the primary image model' '@cf/black-forest-labs/flux-1-dev' "$worker"
-check 'Worker uses FLUX Schnell as the image fallback' '@cf/black-forest-labs/flux-1-schnell' "$worker"
+check 'Worker uses FLUX Schnell as the primary image model' '@cf/black-forest-labs/flux-1-schnell' "$worker"
+check 'Worker uses FLUX Dev as the image fallback' '@cf/black-forest-labs/flux-1-dev' "$worker"
 check 'Worker invokes the native AI binding' 'env[.]AI[.]run' "$worker"
 check 'Worker sends a system message' "role: 'system'" "$worker"
 check 'Worker sends a user message' "role: 'user'" "$worker"

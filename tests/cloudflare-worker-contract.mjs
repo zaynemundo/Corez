@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import worker from '../worker/index.js';
 
 const MODEL = '@cf/moonshotai/kimi-k2.7-code';
-const FLUX_PRIMARY_MODEL = '@cf/black-forest-labs/flux-1-dev';
-const FLUX_FALLBACK_MODEL = '@cf/black-forest-labs/flux-1-schnell';
+const FLUX_PRIMARY_MODEL = '@cf/black-forest-labs/flux-1-schnell';
+const FLUX_FALLBACK_MODEL = '@cf/black-forest-labs/flux-1-dev';
 delete process.env.OPENROUTER_API_KEY;
 
 function env(overrides = {}) {

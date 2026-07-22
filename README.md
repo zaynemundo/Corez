@@ -8,8 +8,7 @@ Corez deploys the Vite application and its AI endpoints together as a Cloudflare
 
 When the optional `OPENROUTER_API_KEY` secret is configured, `/api/ai` uses OpenRouter first:
 
-- Text requests: `deepseek/deepseek-v4-flash`
-- Requests containing image, audio, or video content: `xiaomi/mimo-v2.5`
+- Text and multimodal requests: `deepseek/deepseek-v4-flash`
 
 If OpenRouter is unavailable, missing, or returns no usable response, Corez uses the native Cloudflare Workers AI binding in this order:
 
@@ -20,8 +19,8 @@ If OpenRouter is unavailable, missing, or returns no usable response, Corez uses
 
 `/api/image` uses the Workers AI binding with this fallback chain:
 
-1. `@cf/black-forest-labs/flux-1-dev`
-2. `@cf/black-forest-labs/flux-1-schnell`
+1. `@cf/black-forest-labs/flux-1-schnell`
+2. `@cf/black-forest-labs/flux-1-dev`
 
 The `AI` binding is declared in `wrangler.jsonc`. Workers AI does not require a provider API key. `OPENROUTER_API_KEY` is optional and should be configured as a Worker secret when OpenRouter routing is required.
 

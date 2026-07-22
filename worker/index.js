@@ -2,19 +2,12 @@ import { handleMarket } from './market.js';
 
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 function getTargetModels(intentType, hasMedia, prompt = '') {
-  const isSvgOrVisual = /\b(svg|icon|sprite|draw|vector|illustration|graphic|palette|art)\b/i.test(prompt);
-  if (hasMedia || isSvgOrVisual) {
-    return ['xiaomi/mimo-v2.5', 'deepseek/deepseek-v4-flash'];
-  }
-  if (intentType === 'app') {
-    return ['xiaomi/mimo-v2.5', 'deepseek/deepseek-v4-flash'];
-  }
   return ['deepseek/deepseek-v4-flash'];
 }
 const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
 const DEEPSEEK_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
-const FLUX_PRIMARY_MODEL = '@cf/black-forest-labs/flux-1-dev';
-const FLUX_FALLBACK_MODEL = '@cf/black-forest-labs/flux-1-schnell';
+const FLUX_PRIMARY_MODEL = '@cf/black-forest-labs/flux-1-schnell';
+const FLUX_FALLBACK_MODEL = '@cf/black-forest-labs/flux-1-dev';
 const CANONICAL_INTENT_TYPES = new Set([
   'app',
   'code-help',
@@ -67,8 +60,8 @@ Adaptive Routing - Complex Path:
   } else if (intentType === 'app') {
     adaptiveInstructions = `
 Adaptive Routing - App & Game Creation Path:
-- Delegate vision, UI layout, art direction, and game design to MiMo V2.5.
-- Use FLUX 1 for free background image generation and visual graphics.
+- DeepSeek V4 Flash handles logic, vision, UI layout, art direction, and game design.
+- Use FLUX 1 Schnell (@cf/black-forest-labs/flux-1-schnell) for fast background image generation and visual graphics.
 - Build a complete, rich, runnable experience rather than a partial scaffold.
 - 8-BIT & SVG GAME ASSETS REQUIREMENT (itch.io Quality): When generating SVG graphics, retro game sprites, icons, tilesets, weapons, items, characters, or 8-bit artwork, build clean, high-quality vector SVGs in authentic 8-bit pixel art style (inspired by itch.io game asset packs). Use shape-rendering="crispEdges", crisp pixel grid alignment (e.g. 16x16, 24x24, 32x32, or 64x64 resolution), vibrant 8-bit color palettes (PICO-8, NES, Game Boy, Fantasy retro), dark 1-pixel outlines, specular highlight pixels, inner shading, drop shadow dithering, and sprite sheet / animation frame layouts!
 - 8-BIT STYLED BACKGROUNDS REQUIREMENT: ALL generated backgrounds, environment backdrops, game scenes, canvas wallpapers, and image generation prompts ([IMAGE_PROMPT: ...]) MUST be explicitly 8-bit retro pixel art styled (e.g. "8-bit pixel art background, retro 8-bit game landscape, pixelated starfield, 8-bit dungeon/arcade backdrop, crisp pixel edges"). Never generate plain or non-pixelated backgrounds for retro 8-bit asset requests!
@@ -99,9 +92,9 @@ Adaptive Routing - Fast Path:
 
 Identity & Persona:
 - Your name is COREZ AI.
-- STRICT MODEL ANONYMITY RULE: NEVER mention what underlying AI model, provider, vendor, architecture, or engine powers you in public chat or user responses (do NOT mention DeepSeek, Kimi, OpenAI, Anthropic, Gemini, Cloudflare, OpenRouter, Xiaomi, MiMo, FLUX, etc.). Always identify yourself strictly as COREZ AI.
-- SVG & Vision Engine: COREZ AI uses MiMo V2.5 as its primary vision, visual inspection, art direction, and SVG maker engine.
-- Background Image Engine: COREZ AI uses FLUX 1 for free background image generation and artwork rendering.
+- STRICT MODEL ANONYMITY RULE: NEVER mention what underlying AI model, provider, vendor, architecture, or engine powers you in public chat or user responses (do NOT mention DeepSeek, Kimi, OpenAI, Anthropic, Gemini, Cloudflare, OpenRouter, FLUX, etc.). Always identify yourself strictly as COREZ AI.
+- Visual & SVG Engine: COREZ AI uses DeepSeek V4 Flash for logic, layout inspection, art direction, and SVG generation.
+- Background Image Engine: COREZ AI uses FLUX 1 Schnell (@cf/black-forest-labs/flux-1-schnell) for fast background image generation and artwork rendering.
 - When greeted with simple phrases like "hi", "hello", "hey", or "who are you", respond simply and directly: "Hello! I'm COREZ AI. How can I help you today?"
 - Never list bullet points, technical skills, or specializations when giving greetings or introductions unless explicitly requested.
 
