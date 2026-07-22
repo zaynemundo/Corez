@@ -1842,14 +1842,61 @@ function synthesizeFinancialTerminal() {
     const FX = { USD: 1.0, EUR: 0.8766, GBP: 0.7505, JPY: 148.80 };
     let currentSymbol = 'AAPL';
 
+    async function fetchLiveMarketData() {
+      try {
+        // Fetch Live Crypto from CoinGecko API
+        const cryptoRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true');
+        if (cryptoRes.ok) {
+          const cData = await cryptoRes.json();
+          if (cData.bitcoin) {
+            ASSETS['BTC'].price = cData.bitcoin.usd;
+            ASSETS['BTC'].change = (cData.bitcoin.usd_24h_change >= 0 ? '+' : '') + cData.bitcoin.usd_24h_change.toFixed(2) + '%';
+          }
+          if (cData.ethereum) {
+            ASSETS['ETH'].price = cData.ethereum.usd;
+            ASSETS['ETH'].change = (cData.ethereum.usd_24h_change >= 0 ? '+' : '') + cData.ethereum.usd_24h_change.toFixed(2) + '%';
+          }
+        }
+      } catch (e) {
+        console.warn('Crypto API live fetch fallback active', e);
+      }
+
+      try {
+        // Fetch Live FX rates from Frankfurter (ECB Data API)
+        const fxRes = await fetch('https://api.frankfurter.app/latest?from=USD');
+        if (fxRes.ok) {
+          const fxData = await fxRes.json();
+          if (fxData.rates) {
+            FX.EUR = fxData.rates.EUR || FX.EUR;
+            FX.GBP = fxData.rates.GBP || FX.GBP;
+            FX.JPY = fxData.rates.JPY || FX.JPY;
+            if (fxData.rates.EUR) {
+              ASSETS['EUR/USD'].price = (1 / fxData.rates.EUR).toFixed(4);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('FX API live fetch fallback active', e);
+      }
+
+      renderTickers();
+      selectAsset(currentSymbol);
+      setupConverter();
+    }
+
     function init() {
       renderTickers();
       selectAsset('AAPL');
       setupConverter();
+      fetchLiveMarketData();
+
       document.getElementById('searchInput').addEventListener('input', e => {
         const query = e.target.value.toUpperCase().trim();
         if (ASSETS[query]) selectAsset(query);
       });
+
+      // Periodically refresh live price data every 15 seconds
+      setInterval(fetchLiveMarketData, 15000);
     }
 
     function renderTickers() {
