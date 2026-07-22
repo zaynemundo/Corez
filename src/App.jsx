@@ -5,9 +5,7 @@ import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
 import CanvasPreview from './components/CanvasPreview';
 import SettingsModal from './components/SettingsModal';
-import ImageStudioPage from './components/ImageStudioPage';
-import ProgressChecklist from './components/ProgressChecklist';
-import { generateAIResponse, extractCodeFromMessage, isGameDevIntent } from './services/aiService';
+import { generateAIResponse, extractCodeFromMessage } from './services/aiService';
 import { fetchMarketData, unavailableMarket } from './services/marketService';
 
 function isObject(value) {
@@ -202,7 +200,6 @@ export default function App() {
   const [activeCanvasCode, setActiveCanvasCode] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
-  const [isGameDevThinking, setIsGameDevThinking] = useState(false);
   const [refreshingMarketKeys, setRefreshingMarketKeys] = useState(() => new Set());
   const [theme, setTheme] = useState(() => localStorage.getItem('corez_theme') || 'dark');
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
@@ -412,8 +409,6 @@ export default function App() {
       return s;
     }));
 
-    const isGameDev = isGameDevIntent(promptText);
-    setIsGameDevThinking(isGameDev);
     setIsThinking(true);
 
     // Save pending request to localStorage for background execution across page refresh
@@ -455,7 +450,6 @@ export default function App() {
     } finally {
       localStorage.removeItem('corez_pending_request');
       setIsThinking(false);
-      setIsGameDevThinking(false);
       abortControllerRef.current = null;
     }
   };
@@ -546,15 +540,11 @@ export default function App() {
                       />
                     ))}
                     {isThinking && (
-                      <div className={`message-wrapper ai ${(isGameDevThinking || getTaskTypeFromMessages(activeSession?.messages) === 'game') ? 'game-dev-loading' : ''}`}>
-                        <div className="message-body" style={(isGameDevThinking || getTaskTypeFromMessages(activeSession?.messages) === 'game') ? { width: '100%', maxWidth: '100%' } : undefined}>
-                          {(isGameDevThinking || getTaskTypeFromMessages(activeSession?.messages) === 'game') ? (
-                            <ProgressChecklist />
-                          ) : (
-                            <div className="thinking-indicator-box" aria-label="Corez is thinking" role="status">
-                              <div className="loader" aria-hidden="true" />
-                            </div>
-                          )}
+                      <div className="message-wrapper ai">
+                        <div className="message-body">
+                          <div className="thinking-indicator-box" aria-label="Corez is thinking" role="status">
+                            <div className="loader" aria-hidden="true" />
+                          </div>
                         </div>
                       </div>
                     )}
