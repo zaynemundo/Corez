@@ -162,13 +162,19 @@ const malformedCacheEntries = [
   ['future cachedAt', { cachedAt: semanticCacheNow + 1, payload: validCachePayload }],
   ['wrong payload kind', { cachedAt: semanticCacheNow, payload: { ...validCachePayload, kind: 'other' } }],
   ['unsupported status', { cachedAt: semanticCacheNow, payload: { ...validCachePayload, status: 'unknown' } }],
+  ['missing request', { cachedAt: semanticCacheNow, payload: { ...validCachePayload, request: null } }],
+  ['missing asset', { cachedAt: semanticCacheNow, payload: { ...validCachePayload, asset: null } }],
   ['missing quote', { cachedAt: semanticCacheNow, payload: { ...validCachePayload, quote: null } }],
+  ['quote missing required fields', { cachedAt: semanticCacheNow, payload: { ...validCachePayload, quote: { price: validCachePayload.quote.price, timestamp: validCachePayload.quote.timestamp } } }],
   ['non-finite quote price', { cachedAt: semanticCacheNow, payload: { ...validCachePayload, quote: { ...validCachePayload.quote, price: Infinity } } }],
   ['non-positive quote price', { cachedAt: semanticCacheNow, payload: { ...validCachePayload, quote: { ...validCachePayload.quote, price: 0 } } }],
   ['invalid quote timestamp', { cachedAt: semanticCacheNow, payload: { ...validCachePayload, quote: { ...validCachePayload.quote, timestamp: 'not-a-date' } } }],
   ['invalid series points', { cachedAt: semanticCacheNow, payload: { ...validCachePayload, series: { ...validCachePayload.series, points: null } } }],
+  ['malformed series point', { cachedAt: semanticCacheNow, payload: { ...validCachePayload, series: { ...validCachePayload.series, points: [null] } } }],
   ['missing conversion', { cachedAt: semanticCacheNow, payload: { ...validCachePayload, conversion: null } }],
-  ['missing meta', { cachedAt: semanticCacheNow, payload: { ...validCachePayload, meta: null } }]
+  ['empty conversion', { cachedAt: semanticCacheNow, payload: { ...validCachePayload, conversion: {} } }],
+  ['missing meta', { cachedAt: semanticCacheNow, payload: { ...validCachePayload, meta: null } }],
+  ['empty meta', { cachedAt: semanticCacheNow, payload: { ...validCachePayload, meta: {} } }]
 ];
 for (const [label, entry] of malformedCacheEntries) {
   const response = await post(cacheRequest, marketEnv({

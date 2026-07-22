@@ -102,7 +102,81 @@ function isValidIsoTimestamp(value) {
   return !Number.isNaN(date.valueOf()) && date.toISOString() === value;
 }
 
-function isUsableCacheEntry(entry, now) {
+function isFiniteNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isPositiveNumber(value) {
+  return isFiniteNumber(value) && value > 0;
+}
+
+function hasSameConversion(conversion, expected) {
+  if (expected === null) return conversion === null;
+  return isObject(conversion)
+    && conversion.from === expected.from
+    && conversion.to === expected.to;
+}
+
+function isValidCachedRequest(request, expected) {
+  return isObject(request)
+    && request.assetId === expected.assetId
+    && request.symbol === expected.symbol
+    && request.assetClass === expected.assetClass
+    && request.currency === expected.currency
+    && request.amount === expected.amount
+    && request.unit === expected.unit
+    && request.range === expected.range
+    && hasSameConversion(request.conversion, expected.conversion);
+}
+
+function isValidCachedAsset(asset, expected) {
+  return isObject(asset)
+    && asset.id === expected.id
+    && asset.class === expected.class
+    && asset.symbol === expected.symbol
+    && asset.name === expected.name;
+}
+
+function isValidCachedQuote(quote, expectedCurrency) {
+  return isObject(quote)
+    && isPositiveNumber(quote.price)
+    && quote.currency === expectedCurrency
+    && isFiniteNumber(quote.change)
+    && isFiniteNumber(quote.changePercent)
+    && isPositiveNumber(quote.high)
+    && isPositiveNumber(quote.low)
+    && isPositiveNumber(quote.previousClose)
+    && typeof quote.marketOpen === 'boolean'
+    && isValidIsoTimestamp(quote.timestamp);
+}
+
+function isValidCachedSeries(series, expectedRange) {
+  return isObject(series)
+    && series.range === expectedRange
+    && Array.isArray(series.points)
+    && series.points.length > 0
+    && series.points.every((point) => isObject(point)
+      && isValidIsoTimestamp(point.timestamp)
+      && isPositiveNumber(point.value));
+}
+
+function isValidCachedConversion(conversion, expectedRequest) {
+  return isObject(conversion)
+    && conversion.amount === expectedRequest.amount
+    && conversion.unit === expectedRequest.unit
+    && isPositiveNumber(conversion.value)
+    && conversion.currency === expectedRequest.currency;
+}
+
+function isValidCachedMeta(meta) {
+  return isObject(meta)
+    && meta.source === 'Twelve Data'
+    && meta.cached === false
+    && meta.stale === false
+    && (meta.delayMinutes === undefined || (isFiniteNumber(meta.delayMinutes) && meta.delayMinutes >= 0));
+}
+
+function isUsableCacheEntry(entry, now, expected) {
   if (!isObject(entry) || typeof entry.cachedAt !== 'number' || !Number.isFinite(entry.cachedAt)) {
     return false;
   }
@@ -112,15 +186,12 @@ function isUsableCacheEntry(entry, now) {
     && isObject(payload)
     && payload.kind === 'market'
     && (payload.status === 'live' || payload.status === 'delayed')
-    && isObject(payload.quote)
-    && typeof payload.quote.price === 'number'
-    && Number.isFinite(payload.quote.price)
-    && payload.quote.price > 0
-    && isValidIsoTimestamp(payload.quote.timestamp)
-    && isObject(payload.series)
-    && Array.isArray(payload.series.points)
-    && isObject(payload.conversion)
-    && isObject(payload.meta);
+    && isValidCachedRequest(payload.request, expected.request)
+    && isValidCachedAsset(payload.asset, expected.asset)
+    && isValidCachedQuote(payload.quote, expected.request.currency)
+    && isValidCachedSeries(payload.series, expected.request.range)
+    && isValidCachedConversion(payload.conversion, expected.request)
+    && isValidCachedMeta(payload.meta);
 }
 
 class ProviderError extends Error {
@@ -268,7 +339,7 @@ export async function handleMarket(request, env) {
   try {
     const cachedResponse = await cache?.match(key);
     const parsed = cachedResponse ? await cachedResponse.json() : null;
-    cached = isUsableCacheEntry(parsed, now) ? parsed : null;
+    cached = isUsableCacheEntry(parsed, now, normalized) ? parsed : null;
   } catch {
     // Cache reads are best-effort; continue as a cache miss.
   }
