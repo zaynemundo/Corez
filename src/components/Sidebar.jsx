@@ -1,6 +1,5 @@
 import { 
   Plus, 
-  MessageSquare, 
   Trash2, 
   Settings, 
   Sun, 
@@ -9,6 +8,7 @@ import {
   Layers,
   Image as ImageIcon
 } from 'lucide-react';
+import MessageCircleMore from './icons/MessageCircleMore';
 
 export default function Sidebar({
   isOpen,
@@ -65,7 +65,7 @@ export default function Sidebar({
             onClick={() => onSelectSession(session.id)}
             title={session.title}
           >
-            <MessageSquare size={14} strokeWidth={1.5} />
+            <MessageCircleMore size={14} strokeWidth={1.5} animated={activeView === 'chat' && session.id === activeSessionId} />
             <button
               className="delete-chat-btn icon-only-delete"
               onClick={(e) => {
