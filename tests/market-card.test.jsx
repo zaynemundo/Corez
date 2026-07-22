@@ -1,11 +1,25 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import MarketCard from '../src/components/MarketCard.jsx';
+import ChatMessage from '../src/components/ChatMessage.jsx';
+import App from '../src/App.jsx';
 
-afterEach(cleanup);
+const { fetchMarketDataMock } = vi.hoisted(() => ({ fetchMarketDataMock: vi.fn() }));
+
+vi.mock('../src/services/marketService.js', async (importOriginal) => ({
+  ...await importOriginal(),
+  fetchMarketData: fetchMarketDataMock
+}));
+
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+  fetchMarketDataMock.mockReset();
+  vi.restoreAllMocks();
+});
 
 const request = {
   assetId: 'gold',
@@ -43,6 +57,128 @@ const market = {
   conversion: { amount: 1, unit: 'troy_ounce', value: 2412.5, currency: 'USD' },
   meta: { source: 'Twelve Data', cached: false, stale: false }
 };
+
+describe('ChatMessage market dispatch', () => {
+  it('renders a structured market response through MarketCard', () => {
+    render(
+      <ChatMessage
+        message={{ role: 'assistant', type: 'market', content: '', request, market }}
+        onRunInCanvas={() => {}}
+        onReviseCode={() => {}}
+        onRefreshMarket={() => {}}
+        marketRefreshing={false}
+      />
+    );
+
+    expect(screen.getByRole('region', { name: /Gold Spot market quote/i })).toBeInTheDocument();
+  });
+
+  it('preserves rendering for historical text responses', () => {
+    render(
+      <ChatMessage
+        message={{ role: 'assistant', content: 'Old answer' }}
+        onRunInCanvas={() => {}}
+        onReviseCode={() => {}}
+        onRefreshMarket={() => {}}
+        marketRefreshing={false}
+      />
+    );
+
+    expect(screen.getByText('Old answer')).toBeInTheDocument();
+  });
+
+  it('wires refresh requests and busy state to the market card', async () => {
+    const user = userEvent.setup();
+    const onRefreshMarket = vi.fn();
+    const { rerender } = render(
+      <ChatMessage
+        message={{ role: 'assistant', type: 'market', content: '', request, market }}
+        onRunInCanvas={() => {}}
+        onReviseCode={() => {}}
+        onRefreshMarket={onRefreshMarket}
+        marketRefreshing={false}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /refresh market data/i }));
+    expect(onRefreshMarket).toHaveBeenCalledWith(request);
+
+    rerender(
+      <ChatMessage
+        message={{ role: 'assistant', type: 'market', content: '', request, market }}
+        onRunInCanvas={() => {}}
+        onReviseCode={() => {}}
+        onRefreshMarket={onRefreshMarket}
+        marketRefreshing
+      />
+    );
+    expect(screen.getByRole('button', { name: /refresh market data/i })).toBeDisabled();
+  });
+});
+
+describe('App market message persistence', () => {
+  function stubBrowserLayout() {
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn()
+    }));
+    Element.prototype.scrollIntoView = vi.fn();
+  }
+
+  it('loads legacy text messages from localStorage unchanged', () => {
+    stubBrowserLayout();
+    localStorage.setItem('corez_sessions', JSON.stringify([
+      { id: 'legacy', title: 'Legacy', messages: [{ role: 'assistant', content: 'Persisted old answer' }] }
+    ]));
+
+    render(<App />);
+
+    expect(screen.getByText('Persisted old answer')).toBeInTheDocument();
+  });
+
+  it('refreshes the exact origin message after the active session changes', async () => {
+    stubBrowserLayout();
+    const refreshedMarket = { ...market, quote: { ...market.quote, price: 2500 } };
+    let resolveRefresh;
+    fetchMarketDataMock.mockReturnValue(new Promise((resolve) => { resolveRefresh = resolve; }));
+    localStorage.setItem('corez_sessions', JSON.stringify([
+      {
+        id: 'origin',
+        title: 'Origin',
+        messages: [{ role: 'assistant', type: 'market', content: '', request, market }]
+      },
+      {
+        id: 'other',
+        title: 'Other',
+        messages: [{
+          role: 'assistant',
+          type: 'market',
+          content: '',
+          request: { ...request, assetId: 'bitcoin', symbol: 'BTC/USD', assetClass: 'crypto', unit: 'unit' },
+          market: {
+            ...market,
+            asset: { id: 'bitcoin', class: 'crypto', symbol: 'BTC/USD', name: 'Bitcoin' }
+          }
+        }]
+      }
+    ]));
+
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: /refresh market data/i }));
+    fireEvent.click(document.querySelector('[title="Other"]'));
+    expect(screen.getByRole('region', { name: /Bitcoin market quote/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /refresh market data/i })).toBeEnabled();
+
+    await act(async () => resolveRefresh(refreshedMarket));
+
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem('corez_sessions'));
+      expect(stored.find((session) => session.id === 'origin').messages[0].market.quote.price).toBe(2500);
+      expect(stored.find((session) => session.id === 'other').messages[0].market.asset.name).toBe('Bitcoin');
+    });
+  });
+});
 
 describe('MarketCard', () => {
   it('renders a sourced indicative quote with non-color movement text and exact provider time', () => {

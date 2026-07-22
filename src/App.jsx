@@ -8,7 +8,66 @@ import SettingsModal from './components/SettingsModal';
 import ImageStudioPage from './components/ImageStudioPage';
 import ProgressChecklist from './components/ProgressChecklist';
 import { generateAIResponse, extractCodeFromMessage, isGameDevIntent } from './services/aiService';
-import { Layers, Code, Gamepad2, BarChart3, Wand2 } from 'lucide-react';
+import { fetchMarketData, unavailableMarket } from './services/marketService';
+
+function isObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+export function toAssistantMessage(response) {
+  if (typeof response === 'string') {
+    return { role: 'assistant', content: response };
+  }
+  if (isObject(response)
+    && response.type === 'market'
+    && isObject(response.request)
+    && isObject(response.market)) {
+    return {
+      role: 'assistant',
+      type: 'market',
+      content: '',
+      request: response.request,
+      market: response.market
+    };
+  }
+  return { role: 'assistant', content: '' };
+}
+
+export function replaceMarketMessageInSession(sessions, sessionId, messageIndex, request, market) {
+  return sessions.map((session) => {
+    if (session.id !== sessionId) return session;
+    return {
+      ...session,
+      messages: session.messages.map((message, index) => (
+        index === messageIndex ? { ...message, request, market } : message
+      ))
+    };
+  });
+}
+
+function isDuplicateAssistantMessage(message, candidate) {
+  if (candidate.type !== 'market') {
+    return message?.role === 'assistant' && message?.content === candidate.content;
+  }
+  return message?.role === 'assistant'
+    && message?.type === 'market'
+    && JSON.stringify(message.request) === JSON.stringify(candidate.request)
+    && JSON.stringify(message.market) === JSON.stringify(candidate.market);
+}
+
+function marketRefreshKey(sessionId, messageIndex) {
+  return JSON.stringify([sessionId, messageIndex]);
+}
+
+export function nextMarketRefreshVersion(versions, key) {
+  const version = Symbol(key);
+  versions.set(key, version);
+  return version;
+}
+
+export function isCurrentMarketRefresh(versions, key, version) {
+  return versions.get(key) === version;
+}
 
 function getTaskTypeFromMessages(messages) {
   if (!messages || messages.length === 0) return 'general';
@@ -60,6 +119,7 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [isGameDevThinking, setIsGameDevThinking] = useState(false);
+  const [refreshingMarketKeys, setRefreshingMarketKeys] = useState(() => new Set());
   const [theme, setTheme] = useState(() => localStorage.getItem('corez_theme') || 'dark');
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -69,6 +129,7 @@ export default function App() {
   const messagesEndRef = useRef(null);
   const chatInputRef = useRef(null);
   const abortControllerRef = useRef(null);
+  const marketRefreshVersionsRef = useRef(new Map());
 
   useEffect(() => {
     const mobileQuery = window.matchMedia('(max-width: 767px)');
@@ -118,17 +179,19 @@ export default function App() {
             abortControllerRef.current = controller;
 
             generateAIResponse(pendingData.apiPrompt, pendingData.messages, controller.signal)
-              .then(responseText => {
-                if (!responseText) return;
-                const extractedCode = extractCodeFromMessage(responseText);
-                if (extractedCode) {
-                  setActiveCanvasCode(extractedCode);
+              .then(response => {
+                if (!response) return;
+                const aiMsg = toAssistantMessage(response);
+                if (aiMsg.type !== 'market') {
+                  const extractedCode = extractCodeFromMessage(aiMsg.content);
+                  if (extractedCode) {
+                    setActiveCanvasCode(extractedCode);
+                  }
                 }
-                const aiMsg = { role: 'assistant', content: responseText };
                 setSessions(prev => prev.map(s => {
                   if (s.id === pendingData.sessionId) {
                     const last = s.messages[s.messages.length - 1];
-                    if (last?.role === 'assistant' && last?.content === responseText) return s;
+                    if (isDuplicateAssistantMessage(last, aiMsg)) return s;
                     return { ...s, messages: [...s.messages, aiMsg] };
                   }
                   return s;
@@ -257,14 +320,15 @@ export default function App() {
     abortControllerRef.current = controller;
 
     try {
-      const responseText = await generateAIResponse(apiPrompt, updatedApiMessages, controller.signal);
-      if (responseText) {
-        const extractedCode = extractCodeFromMessage(responseText);
-        if (extractedCode) {
-          setActiveCanvasCode(extractedCode);
+      const response = await generateAIResponse(apiPrompt, updatedApiMessages, controller.signal);
+      if (response) {
+        const aiMsg = toAssistantMessage(response);
+        if (aiMsg.type !== 'market') {
+          const extractedCode = extractCodeFromMessage(aiMsg.content);
+          if (extractedCode) {
+            setActiveCanvasCode(extractedCode);
+          }
         }
-
-        const aiMsg = { role: 'assistant', content: responseText };
         
         setSessions(prev => prev.map(s => {
           if (s.id === activeSessionId) {
@@ -297,6 +361,44 @@ export default function App() {
         chatInputRef.current.focus();
         chatInputRef.current.setSelectionRange(revisionPrompt.length, revisionPrompt.length);
       }, 50);
+    }
+  };
+
+  const handleRefreshMarket = async (messageIndex, nextRequest) => {
+    const sessionId = activeSessionId;
+    const key = marketRefreshKey(sessionId, messageIndex);
+    const version = nextMarketRefreshVersion(marketRefreshVersionsRef.current, key);
+    setRefreshingMarketKeys((previous) => new Set(previous).add(key));
+
+    try {
+      const market = await fetchMarketData(nextRequest);
+      if (!isCurrentMarketRefresh(marketRefreshVersionsRef.current, key, version)) return;
+      setSessions((previous) => replaceMarketMessageInSession(
+        previous,
+        sessionId,
+        messageIndex,
+        nextRequest,
+        market
+      ));
+    } catch (error) {
+      if (error?.name === 'AbortError'
+        || !isCurrentMarketRefresh(marketRefreshVersionsRef.current, key, version)) return;
+      setSessions((previous) => replaceMarketMessageInSession(
+        previous,
+        sessionId,
+        messageIndex,
+        nextRequest,
+        unavailableMarket(error)
+      ));
+    } finally {
+      if (isCurrentMarketRefresh(marketRefreshVersionsRef.current, key, version)) {
+        marketRefreshVersionsRef.current.delete(key);
+        setRefreshingMarketKeys((previous) => {
+          const next = new Set(previous);
+          next.delete(key);
+          return next;
+        });
+      }
     }
   };
 
@@ -353,6 +455,8 @@ export default function App() {
                         message={msg}
                         onRunInCanvas={handleRunInCanvas}
                         onReviseCode={handleReviseCode}
+                        onRefreshMarket={(nextRequest) => handleRefreshMarket(idx, nextRequest)}
+                        marketRefreshing={refreshingMarketKeys.has(marketRefreshKey(activeSession.id, idx))}
                       />
                     ))}
                     {isThinking && (

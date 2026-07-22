@@ -2,11 +2,71 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fetchMarketData } from '../src/services/marketService.js';
 import { generateAIResponse } from '../src/services/aiService.js';
+import {
+  isCurrentMarketRefresh,
+  nextMarketRefreshVersion,
+  replaceMarketMessageInSession,
+  toAssistantMessage
+} from '../src/App.jsx';
 
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+});
+
+describe('assistant market message persistence', () => {
+  it('keeps legacy text responses in the historical message shape', () => {
+    expect(toAssistantMessage('Old answer')).toEqual({ role: 'assistant', content: 'Old answer' });
+  });
+
+  it('normalizes structured market responses for localStorage persistence', () => {
+    expect(toAssistantMessage({
+      type: 'market',
+      request: { assetId: 'gold' },
+      market: { status: 'live' }
+    })).toEqual({
+      role: 'assistant',
+      type: 'market',
+      content: '',
+      request: { assetId: 'gold' },
+      market: { status: 'live' }
+    });
+  });
+
+  it.each([null, undefined, 42, {}, { type: 'market' }])('safely normalizes an invalid response shape: %j', (response) => {
+    expect(toAssistantMessage(response)).toEqual({ role: 'assistant', content: '' });
+  });
+
+  it('updates only the exact originating session and message', () => {
+    const sessions = [
+      { id: 'origin', messages: [{ role: 'assistant', type: 'market', content: '', request: { assetId: 'gold' }, market: { status: 'live' } }] },
+      { id: 'active-now', messages: [{ role: 'assistant', content: 'Old answer' }] }
+    ];
+    const nextRequest = { assetId: 'bitcoin' };
+    const nextMarket = { status: 'live', asset: { id: 'bitcoin' } };
+
+    const updated = replaceMarketMessageInSession(sessions, 'origin', 0, nextRequest, nextMarket);
+
+    expect(updated[0].messages[0]).toEqual(expect.objectContaining({ request: nextRequest, market: nextMarket }));
+    expect(updated[1]).toBe(sessions[1]);
+    expect(sessions[0].messages[0].request).toEqual({ assetId: 'gold' });
+  });
+
+  it('rejects stale refresh completions after a newer refresh starts', () => {
+    const versions = new Map();
+    const key = JSON.stringify(['origin', 0]);
+    const olderVersion = nextMarketRefreshVersion(versions, key);
+    const newerVersion = nextMarketRefreshVersion(versions, key);
+
+    expect(isCurrentMarketRefresh(versions, key, olderVersion)).toBe(false);
+    expect(isCurrentMarketRefresh(versions, key, newerVersion)).toBe(true);
+
+    versions.delete(key);
+    const laterVersion = nextMarketRefreshVersion(versions, key);
+    expect(isCurrentMarketRefresh(versions, key, olderVersion)).toBe(false);
+    expect(isCurrentMarketRefresh(versions, key, laterVersion)).toBe(true);
+  });
 });
 
 describe('fetchMarketData', () => {

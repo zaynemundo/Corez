@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { 
   Layers,
-  ChevronRight,
   Copy,
   Check,
   Wand2
 } from 'lucide-react';
+import MarketCard from './MarketCard';
 
 function CodeSnippetBlock({ code, lang }) {
   const [copied, setCopied] = useState(false);
@@ -34,7 +34,7 @@ function CodeSnippetBlock({ code, lang }) {
   );
 }
 
-export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
+export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onRefreshMarket, marketRefreshing = false }) {
   const isUser = message.role === 'user';
 
   const renderInlineFormattedText = (text) => {
@@ -306,7 +306,16 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
     <div className={`message-wrapper ${isUser ? 'user' : 'ai'}`}>
       <div className="message-body">
         <div className="message-content">
-          {renderFormattedText(message.content)}
+          {message.type === 'market' ? (
+            <MarketCard
+              market={message.market}
+              request={message.request}
+              onRefresh={onRefreshMarket}
+              refreshing={marketRefreshing}
+            />
+          ) : (
+            renderFormattedText(message.content)
+          )}
         </div>
       </div>
     </div>
