@@ -1,0 +1,603 @@
+# Review package: 1c47d6a3..afeb7313
+
+## Commits
+afeb7313 fix: harden market provider cache handling
+4f0fa902 feat: serve validated market data
+
+## Files changed
+ package.json                         |   2 +-
+ tests/cloudflare-worker-contract.mjs |  11 ++
+ tests/market-worker-contract.mjs     | 190 +++++++++++++++++++++++
+ worker/index.js                      |   7 +-
+ worker/market.js                     | 284 +++++++++++++++++++++++++++++++++++
+ 5 files changed, 492 insertions(+), 2 deletions(-)
+
+## Diff
+diff --git a/package.json b/package.json
+index f42b4471..1c1c26fc 100644
+--- a/package.json
++++ b/package.json
+@@ -9,21 +9,21 @@
+   "scripts": {
+     "dev": "vite",
+     "build": "vite build",
+     "lint": "eslint .",
+     "preview": "vite preview",
+     "train:intents": "node scripts/train-intents.mjs",
+     "evaluate:intents": "node scripts/evaluate-local-intents.mjs",
+     "evaluate:ai": "node scripts/evaluate-ai-intents.mjs",
+     "test:market": "vitest run tests/market-intent.test.js tests/market-service.test.js tests/market-card.test.jsx && node tests/market-worker-contract.mjs",
+     "test:market:watch": "vitest tests/market-intent.test.js tests/market-service.test.js tests/market-card.test.jsx",
+-    "test:cloudflare": "node tests/cloudflare-worker-contract.mjs && bash tests/cloudflare-worker-config-contract.sh && bash tests/workers-ai-provider-contract.sh && bash tests/public-ai-proxy-contract.sh && bash tests/ai-live-intent-eval-contract.sh && node tests/ai-live-intent-eval-response-contract.mjs && bash tests/env-question-skill-contract.sh",
++    "test:cloudflare": "node tests/cloudflare-worker-contract.mjs && node tests/market-worker-contract.mjs && bash tests/cloudflare-worker-config-contract.sh && bash tests/workers-ai-provider-contract.sh && bash tests/public-ai-proxy-contract.sh && bash tests/ai-live-intent-eval-contract.sh && node tests/ai-live-intent-eval-response-contract.mjs && bash tests/env-question-skill-contract.sh",
+     "dev:worker": "npm run build && wrangler dev",
+     "deploy": "npm run build && wrangler deploy"
+   },
+   "dependencies": {
+     "lucide-react": "^0.475.0",
+     "react": "^18.3.1",
+     "react-dom": "^18.3.1"
+   },
+   "devDependencies": {
+     "@eslint/js": "^10.0.1",
+diff --git a/tests/cloudflare-worker-contract.mjs b/tests/cloudflare-worker-contract.mjs
+index 866475ad..7c428742 100644
+--- a/tests/cloudflare-worker-contract.mjs
++++ b/tests/cloudflare-worker-contract.mjs
+@@ -73,20 +73,31 @@ async function run() {
+   const unknownApiResponse = await worker.fetch(
+     new Request('https://corez.test/api/unknown'),
+     env()
+   );
+   assert.equal(unknownApiResponse.status, 404);
+   assert.equal(unknownApiResponse.headers.get('content-type'), 'application/json');
+   assert.deepEqual(await json(unknownApiResponse), {
+     error: 'API route not found.'
+   });
+ 
++  const marketRouteResponse = await worker.fetch(
++    new Request('https://corez.test/api/market', {
++      method: 'POST',
++      headers: { 'Content-Type': 'application/json' },
++      body: JSON.stringify({})
++    }),
++    env()
++  );
++  assert.equal(marketRouteResponse.status, 503);
++  assert.equal((await marketRouteResponse.json()).error.code, 'not_configured');
++
+   const legacyRouteResponse = await worker.fetch(
+     new Request('https://corez.test/api/openrouter'),
+     env()
+   );
+   assert.equal(legacyRouteResponse.status, 404);
+ 
+   const methodResponse = await worker.fetch(
+     new Request('https://corez.test/api/ai'),
+     env()
+   );
+diff --git a/tests/market-worker-contract.mjs b/tests/market-worker-contract.mjs
+new file mode 100644
+index 00000000..5d224566
+--- /dev/null
++++ b/tests/market-worker-contract.mjs
+@@ -0,0 +1,190 @@
++import assert from 'node:assert/strict';
++import worker from '../worker/index.js';
++
++function fakeCache() {
++  const values = new Map();
++  return {
++    async match(request) { return values.get(request.url)?.clone(); },
++    async put(request, response) { values.set(request.url, response.clone()); }
++  };
++}
++
++function marketEnv(overrides = {}) {
++  return {
++    TWELVE_DATA_API_KEY: 'test-only-key',
++    __MARKET_CACHE: fakeCache(),
++    __MARKET_FETCH: async (url) => {
++      const parsed = new URL(url);
++      assert.equal(parsed.searchParams.get('apikey'), 'test-only-key');
++      if (parsed.pathname.endsWith('/quote')) return Response.json({ symbol: 'XAU/USD', name: 'Gold Spot', currency: 'USD', close: '2412.50', open: '2400.00', high: '2420.00', low: '2395.00', previous_close: '2390.00', change: '22.50', percent_change: '0.9414', timestamp: 1784703600, is_market_open: true });
++      if (parsed.pathname.endsWith('/time_series')) return Response.json({ values: [{ datetime: '2026-07-22 07:00:00', close: '2400.00' }, { datetime: '2026-07-22 07:05:00', close: '2412.50' }] });
++      if (parsed.pathname.endsWith('/exchange_rate')) return Response.json({ symbol: 'USD/AED', rate: '3.6725', timestamp: 1784703600 });
++      return new Response('not found', { status: 404 });
++    },
++    ...overrides
++  };
++}
++
++async function post(body, env = marketEnv()) {
++  return worker.fetch(new Request('https://corez.test/api/market', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }), env);
++}
++
++const live = await post({ assetId: 'gold', symbol: 'XAU/USD', assetClass: 'metal', currency: 'USD', amount: 1, unit: 'troy_ounce', range: '1D', conversion: null });
++assert.equal(live.status, 200);
++assert.deepEqual(await live.json(), {
++  kind: 'market',
++  status: 'live',
++  request: { assetId: 'gold', symbol: 'XAU/USD', assetClass: 'metal', currency: 'USD', amount: 1, unit: 'troy_ounce', range: '1D', conversion: null },
++  asset: { id: 'gold', class: 'metal', symbol: 'XAU/USD', name: 'Gold Spot' },
++  quote: { price: 2412.5, currency: 'USD', change: 22.5, changePercent: 0.9414, high: 2420, low: 2395, previousClose: 2390, marketOpen: true, timestamp: '2026-07-22T07:00:00.000Z' },
++  series: { range: '1D', points: [{ timestamp: '2026-07-22T07:00:00.000Z', value: 2400 }, { timestamp: '2026-07-22T07:05:00.000Z', value: 2412.5 }] },
++  conversion: { amount: 1, unit: 'troy_ounce', value: 2412.5, currency: 'USD' },
++  meta: { source: 'Twelve Data', cached: false, stale: false }
++});
++
++assert.equal((await post({ symbol: 'https://evil.test' })).status, 400);
++assert.equal((await post({ assetId: 'gold', symbol: 'XAU/USD', assetClass: 'metal', currency: 'USD', amount: '1', unit: 'troy_ounce', range: '1D', conversion: null })).status, 400);
++assert.equal((await post({ assetId: 'gold', symbol: 'XAU/USD', assetClass: 'metal', currency: 'USD', amount: true, unit: 'troy_ounce', range: '1D', conversion: null })).status, 400);
++assert.equal((await post({
++  assetId: 'gold',
++  symbol: 'XAU/USD',
++  assetClass: 'metal',
++  currency: 'USD',
++  amount: 1,
++  unit: 'troy_ounce',
++  range: '1D',
++  conversion: { from: 'https://evil.test', to: 'USD' }
++})).status, 400);
++assert.equal((await post({ assetId: 'gold', symbol: 'XAU/USD', assetClass: 'metal', currency: 'USD', amount: 1, unit: 'troy_ounce', range: '1D', conversion: null }, marketEnv({ TWELVE_DATA_API_KEY: undefined }))).status, 503);
++
++const method = await worker.fetch(new Request('https://corez.test/api/market'), marketEnv());
++assert.equal(method.status, 405);
++
++const malformed = await worker.fetch(new Request('https://corez.test/api/market', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{' }), marketEnv());
++assert.equal(malformed.status, 400);
++assert.equal((await malformed.json()).error.code, 'invalid_json');
++
++const converted = await post({ assetId: 'gold', symbol: 'XAU/USD', assetClass: 'metal', currency: 'AED', amount: 10, unit: 'gram', range: '1D', conversion: null });
++const convertedBody = await converted.json();
++assert.equal(convertedBody.quote.currency, 'AED');
++assert.equal(convertedBody.quote.price, 8859.90625);
++assert.equal(convertedBody.conversion.value, 2848.526004655531);
++
++let providerMode = 'live';
++let now = 1_000_000;
++let providerCalls = 0;
++const cacheEnvironment = marketEnv({
++  __MARKET_NOW: () => now,
++  __MARKET_FETCH: async (url) => {
++    providerCalls += 1;
++    if (providerMode === 'rate-limit') return new Response('', { status: 429, headers: { 'Retry-After': '30' } });
++    if (providerMode === 'malformed') return Response.json({ close: 'not-a-number' });
++    const parsed = new URL(url);
++    if (parsed.pathname.endsWith('/quote')) return Response.json({ symbol: 'XAU/USD', name: 'Gold Spot', currency: 'USD', close: '2412.50', open: '2400.00', high: '2420.00', low: '2395.00', previous_close: '2390.00', change: '22.50', percent_change: '0.9414', timestamp: 1784703600, is_market_open: true });
++    if (parsed.pathname.endsWith('/time_series')) return Response.json({ values: [{ datetime: '2026-07-22 07:00:00', close: '2400.00' }, { datetime: '2026-07-22 07:05:00', close: '2412.50' }] });
++    return Response.json({ symbol: 'USD/AED', rate: '3.6725', timestamp: 1784703600 });
++  }
++});
++const cacheRequest = { assetId: 'gold', symbol: 'XAU/USD', assetClass: 'metal', currency: 'USD', amount: 1, unit: 'troy_ounce', range: '1D', conversion: null };
++assert.equal((await post(cacheRequest, cacheEnvironment)).status, 200);
++const firstCallCount = providerCalls;
++now += 30_000;
++assert.equal((await (await post(cacheRequest, cacheEnvironment)).json()).meta.cached, true);
++assert.equal(providerCalls, firstCallCount);
++
++const beforeDistinctAmount = providerCalls;
++const differentAmount = await (await post({ ...cacheRequest, amount: 2 }, cacheEnvironment)).json();
++assert.equal(differentAmount.conversion.amount, 2);
++assert.ok(providerCalls > beforeDistinctAmount);
++
++providerMode = 'rate-limit';
++now += 90_000;
++const stale = await (await post(cacheRequest, cacheEnvironment)).json();
++assert.equal(stale.status, 'stale');
++assert.equal(stale.meta.stale, true);
++
++now += 16 * 60_000;
++const expired = await post(cacheRequest, cacheEnvironment);
++assert.equal(expired.status, 429);
++assert.deepEqual(await expired.json(), { error: { code: 'rate_limited', message: 'Market data rate limit reached.', retryAfter: 30 } });
++
++providerMode = 'malformed';
++const malformedProvider = await post({ ...cacheRequest, assetId: 'silver', symbol: 'XAG/USD' }, cacheEnvironment);
++assert.equal(malformedProvider.status, 502);
++assert.equal((await malformedProvider.json()).error.code, 'provider_unavailable');
++
++const rateLimitEnvelope = await post(cacheRequest, marketEnv({
++  __MARKET_FETCH: async () => Response.json({ code: 429, message: 'API credits exhausted', status: 'error' })
++}));
++assert.equal(rateLimitEnvelope.status, 429);
++assert.equal((await rateLimitEnvelope.json()).error.code, 'rate_limited');
++
++const providerErrorEnvelope = await post(cacheRequest, marketEnv({
++  __MARKET_FETCH: async () => Response.json({ code: 400, message: 'Invalid symbol', status: 'error' })
++}));
++assert.equal(providerErrorEnvelope.status, 502);
++assert.equal((await providerErrorEnvelope.json()).error.code, 'provider_unavailable');
++
++const cacheMatchFailure = await post(cacheRequest, marketEnv({
++  __MARKET_CACHE: {
++    async match() { throw new Error('cache unavailable'); },
++    async put() {}
++  }
++}));
++assert.equal(cacheMatchFailure.status, 200);
++assert.equal((await cacheMatchFailure.json()).status, 'live');
++
++const corruptCacheEntry = await post(cacheRequest, marketEnv({
++  __MARKET_CACHE: {
++    async match() { return new Response('{'); },
++    async put() {}
++  }
++}));
++assert.equal(corruptCacheEntry.status, 200);
++assert.equal((await corruptCacheEntry.json()).status, 'live');
++
++const cachePutFailure = await post(cacheRequest, marketEnv({
++  __MARKET_CACHE: {
++    async match() { return undefined; },
++    async put() { throw new Error('cache write unavailable'); }
++  }
++}));
++assert.equal(cachePutFailure.status, 200);
++assert.equal((await cachePutFailure.json()).status, 'live');
++
++let boundaryNow = 2_000_000;
++let boundaryMode = 'live';
++let boundaryProviderCalls = 0;
++const boundaryEnvironment = marketEnv({
++  __MARKET_NOW: () => boundaryNow,
++  __MARKET_FETCH: async (url) => {
++    boundaryProviderCalls += 1;
++    if (boundaryMode === 'rate-limit') {
++      return new Response('', { status: 429, headers: { 'Retry-After': '30' } });
++    }
++    const parsed = new URL(url);
++    if (parsed.pathname.endsWith('/quote')) return Response.json({ symbol: 'XAU/USD', name: 'Gold Spot', currency: 'USD', close: '2412.50', open: '2400.00', high: '2420.00', low: '2395.00', previous_close: '2390.00', change: '22.50', percent_change: '0.9414', timestamp: 1784703600, is_market_open: true });
++    if (parsed.pathname.endsWith('/time_series')) return Response.json({ values: [{ datetime: '2026-07-22 07:00:00', close: '2400.00' }] });
++    return Response.json({ symbol: 'USD/AED', rate: '3.6725', timestamp: 1784703600 });
++  }
++});
++assert.equal((await post(cacheRequest, boundaryEnvironment)).status, 200);
++const boundaryInitialCalls = boundaryProviderCalls;
++boundaryNow += 60_000;
++const exactFreshBoundary = await (await post(cacheRequest, boundaryEnvironment)).json();
++assert.equal(exactFreshBoundary.status, 'live');
++assert.equal(exactFreshBoundary.meta.cached, true);
++assert.equal(boundaryProviderCalls, boundaryInitialCalls);
++
++boundaryMode = 'rate-limit';
++boundaryNow = 2_000_000 + 15 * 60_000;
++const exactStaleBoundary = await (await post(cacheRequest, boundaryEnvironment)).json();
++assert.equal(exactStaleBoundary.status, 'stale');
++assert.equal(exactStaleBoundary.meta.stale, true);
++
++boundaryNow += 1;
++const beyondStaleBoundary = await post(cacheRequest, boundaryEnvironment);
++assert.equal(beyondStaleBoundary.status, 429);
++assert.equal((await beyondStaleBoundary.json()).error.code, 'rate_limited');
++
++console.log('Market Worker contract passed.');
+diff --git a/worker/index.js b/worker/index.js
+index d225ecc5..44e600b8 100644
+--- a/worker/index.js
++++ b/worker/index.js
+@@ -1,10 +1,12 @@
++import { handleMarket } from './market.js';
++
+ const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
+ function getTargetModels(intentType, hasMedia, prompt = '') {
+   const isSvgOrVisual = /\b(svg|icon|sprite|draw|vector|illustration|graphic|palette|art)\b/i.test(prompt);
+   if (hasMedia || isSvgOrVisual) {
+     return ['xiaomi/mimo-v2.5', 'deepseek/deepseek-v4-flash'];
+   }
+   if (intentType === 'app') {
+     return ['xiaomi/mimo-v2.5', 'deepseek/deepseek-v4-flash'];
+   }
+   return ['deepseek/deepseek-v4-flash'];
+@@ -336,16 +338,19 @@ async function handleImage(request, env) {
+ 
+ export default {
+   async fetch(request, env) {
+     const pathname = new URL(request.url).pathname;
+     if (pathname === '/api/ai') {
+       return handleAi(request, env);
+     }
+     if (pathname === '/api/image') {
+       return handleImage(request, env);
+     }
++    if (pathname === '/api/market') {
++      return handleMarket(request, env);
++    }
+     if (pathname.startsWith('/api/')) {
+       return jsonResponse(404, { error: 'API route not found.' });
+     }
+     return env.ASSETS.fetch(request);
+   }
+-};
+\ No newline at end of file
++};
+diff --git a/worker/market.js b/worker/market.js
+new file mode 100644
+index 00000000..f72273c1
+--- /dev/null
++++ b/worker/market.js
+@@ -0,0 +1,284 @@
++const API_BASE = 'https://api.twelvedata.com';
++const FRESH_MS = 60_000;
++const STALE_MS = 15 * 60_000;
++const ALLOWED_CURRENCIES = new Set(['USD', 'AED', 'EUR', 'GBP', 'JPY']);
++const ALLOWED_RANGES = new Map([
++  ['1D', { interval: '5min', outputsize: 78 }],
++  ['1W', { interval: '1h', outputsize: 168 }],
++  ['1M', { interval: '4h', outputsize: 180 }]
++]);
++const ASSETS = new Map([
++  ['gold', { id: 'gold', class: 'metal', symbol: 'XAU/USD', name: 'Gold Spot' }],
++  ['silver', { id: 'silver', class: 'metal', symbol: 'XAG/USD', name: 'Silver Spot' }],
++  ['bitcoin', { id: 'bitcoin', class: 'crypto', symbol: 'BTC/USD', name: 'Bitcoin' }],
++  ['ethereum', { id: 'ethereum', class: 'crypto', symbol: 'ETH/USD', name: 'Ethereum' }],
++  ['solana', { id: 'solana', class: 'crypto', symbol: 'SOL/USD', name: 'Solana' }],
++  ['apple', { id: 'apple', class: 'stock', symbol: 'AAPL', name: 'Apple' }],
++  ['nvidia', { id: 'nvidia', class: 'stock', symbol: 'NVDA', name: 'NVIDIA' }],
++  ['tesla', { id: 'tesla', class: 'stock', symbol: 'TSLA', name: 'Tesla' }],
++  ['microsoft', { id: 'microsoft', class: 'stock', symbol: 'MSFT', name: 'Microsoft' }],
++  ['alphabet', { id: 'alphabet', class: 'stock', symbol: 'GOOGL', name: 'Alphabet' }],
++  ['amazon', { id: 'amazon', class: 'stock', symbol: 'AMZN', name: 'Amazon' }],
++  ['fx-usd', { id: 'fx-usd', class: 'forex', symbol: 'USD/USD', name: 'US Dollar' }],
++  ['fx-aed', { id: 'fx-aed', class: 'forex', symbol: 'AED/USD', name: 'UAE Dirham' }],
++  ['fx-eur', { id: 'fx-eur', class: 'forex', symbol: 'EUR/USD', name: 'Euro' }],
++  ['fx-gbp', { id: 'fx-gbp', class: 'forex', symbol: 'GBP/USD', name: 'British Pound' }],
++  ['fx-jpy', { id: 'fx-jpy', class: 'forex', symbol: 'JPY/USD', name: 'Japanese Yen' }]
++]);
++
++function apiError(status, code, message, retryAfter) {
++  return Response.json(
++    { error: { code, message, ...(retryAfter ? { retryAfter } : {}) } },
++    { status }
++  );
++}
++
++function number(value, field) {
++  const parsed = Number(value);
++  if (!Number.isFinite(parsed)) throw new Error(`Invalid provider field: ${field}`);
++  return parsed;
++}
++
++function positiveNumber(value, field) {
++  const parsed = number(value, field);
++  if (parsed <= 0) throw new Error(`Invalid provider field: ${field}`);
++  return parsed;
++}
++
++function validate(body) {
++  const asset = ASSETS.get(body?.assetId);
++  if (!asset || body.symbol !== asset.symbol || body.assetClass !== asset.class) {
++    throw new TypeError('Unsupported asset.');
++  }
++  if (!ALLOWED_CURRENCIES.has(body.currency) || !ALLOWED_RANGES.has(body.range)) {
++    throw new TypeError('Unsupported currency or range.');
++  }
++  const amount = body.amount;
++  if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0 || amount > 1_000_000_000) {
++    throw new TypeError('Invalid amount.');
++  }
++  const units = asset.class === 'metal'
++    ? new Set(['troy_ounce', 'gram', 'kilogram'])
++    : new Set(['unit']);
++  if (!units.has(body.unit)) throw new TypeError('Unsupported unit.');
++
++  if (body.conversion !== null) {
++    const conversion = body.conversion;
++    const isCanonicalConversion = conversion
++      && typeof conversion === 'object'
++      && !Array.isArray(conversion)
++      && ALLOWED_CURRENCIES.has(conversion.from)
++      && ALLOWED_CURRENCIES.has(conversion.to)
++      && asset.class === 'forex'
++      && asset.id === `fx-${conversion.from.toLowerCase()}`
++      && asset.symbol === `${conversion.from}/USD`
++      && body.currency === conversion.to;
++    if (!isCanonicalConversion) throw new TypeError('Unsupported conversion.');
++  }
++
++  return { request: { ...body, amount }, asset };
++}
++
++function cacheKey(request) {
++  const query = new URLSearchParams({
++    assetId: request.assetId,
++    currency: request.currency,
++    range: request.range,
++    amount: String(request.amount),
++    unit: request.unit,
++    from: request.conversion?.from || '',
++    to: request.conversion?.to || ''
++  });
++  return new Request(`https://corez-market-cache.internal/quote?${query}`, { method: 'GET' });
++}
++
++class ProviderError extends Error {
++  constructor(status, retryAfter) {
++    super(`Provider request failed with status ${status}`);
++    this.status = status;
++    this.retryAfter = retryAfter;
++  }
++}
++
++function providerUrl(path, params, apiKey) {
++  const url = new URL(path, API_BASE);
++  for (const [name, value] of Object.entries(params)) {
++    url.searchParams.set(name, String(value));
++  }
++  url.searchParams.set('apikey', apiKey);
++  return url;
++}
++
++async function providerJson(path, params, apiKey, fetchImpl) {
++  const response = await fetchImpl(providerUrl(path, params, apiKey), {
++    signal: AbortSignal.timeout(8_000)
++  });
++  if (!response.ok) {
++    throw new ProviderError(
++      response.status,
++      Number(response.headers.get('Retry-After')) || undefined
++    );
++  }
++  const data = await response.json();
++  if (data?.status === 'error') {
++    const status = Number(data.code);
++    throw new ProviderError(
++      Number.isFinite(status) ? status : 502,
++      Number(data.retry_after) || undefined
++    );
++  }
++  return data;
++}
++
++function isoTimestamp(epochSeconds, datetime) {
++  const date = epochSeconds
++    ? new Date(number(epochSeconds, 'timestamp') * 1000)
++    : new Date(`${datetime}Z`);
++  if (Number.isNaN(date.valueOf())) throw new Error('Invalid provider timestamp.');
++  return date.toISOString();
++}
++
++function unitFactor(assetClass, unit) {
++  if (assetClass !== 'metal') return 1;
++  if (unit === 'gram') return 1 / 31.1034768;
++  if (unit === 'kilogram') return 1000 / 31.1034768;
++  return 1;
++}
++
++export async function fetchAndNormalize({ request, asset }, apiKey, fetchImpl) {
++  const providerSymbol = request.conversion
++    ? `${request.conversion.from}/${request.conversion.to}`
++    : asset.symbol;
++  const range = ALLOWED_RANGES.get(request.range);
++  const quotePromise = providerJson('/quote', { symbol: providerSymbol }, apiKey, fetchImpl);
++  const seriesPromise = providerJson('/time_series', {
++    symbol: providerSymbol,
++    interval: range.interval,
++    outputsize: range.outputsize,
++    order: 'asc'
++  }, apiKey, fetchImpl);
++  const exchangePromise = !request.conversion && request.currency !== 'USD'
++    ? providerJson('/exchange_rate', { symbol: `USD/${request.currency}` }, apiKey, fetchImpl)
++    : Promise.resolve({ rate: 1 });
++  const [quoteData, seriesData, exchangeData] = await Promise.all([
++    quotePromise,
++    seriesPromise,
++    exchangePromise
++  ]);
++  const factor = request.conversion ? 1 : positiveNumber(exchangeData.rate, 'exchange rate');
++  const quote = {
++    price: positiveNumber(quoteData.close, 'close') * factor,
++    currency: request.currency,
++    change: number(quoteData.change, 'change') * factor,
++    changePercent: number(quoteData.percent_change, 'percent_change'),
++    high: positiveNumber(quoteData.high, 'high') * factor,
++    low: positiveNumber(quoteData.low, 'low') * factor,
++    previousClose: positiveNumber(quoteData.previous_close, 'previous_close') * factor,
++    marketOpen: Boolean(quoteData.is_market_open),
++    timestamp: isoTimestamp(quoteData.timestamp, quoteData.datetime)
++  };
++  const points = [...(seriesData.values || [])]
++    .map((point) => ({
++      timestamp: isoTimestamp(null, point.datetime),
++      value: positiveNumber(point.close, 'series close') * factor
++    }))
++    .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
++  if (points.length === 0) throw new Error('Provider returned no series points.');
++  const conversionValue = request.amount * unitFactor(asset.class, request.unit) * quote.price;
++  return {
++    kind: 'market',
++    status: quoteData.is_delayed ? 'delayed' : 'live',
++    request,
++    asset,
++    quote,
++    series: { range: request.range, points },
++    conversion: {
++      amount: request.amount,
++      unit: request.unit,
++      value: conversionValue,
++      currency: request.currency
++    },
++    meta: {
++      source: 'Twelve Data',
++      cached: false,
++      stale: false,
++      ...(quoteData.delay ? { delayMinutes: number(quoteData.delay, 'delay') } : {})
++    }
++  };
++}
++
++export async function handleMarket(request, env) {
++  if (request.method !== 'POST') {
++    return apiError(405, 'method_not_allowed', 'Method not allowed.');
++  }
++  if (!env.TWELVE_DATA_API_KEY) {
++    return apiError(503, 'not_configured', 'Market data is not configured.');
++  }
++
++  let body;
++  try {
++    body = await request.json();
++  } catch {
++    return apiError(400, 'invalid_json', 'Request body must be valid JSON.');
++  }
++
++  let normalized;
++  try {
++    normalized = validate(body);
++  } catch (error) {
++    return apiError(400, 'invalid_request', error.message);
++  }
++
++  const fetchImpl = env.__MARKET_FETCH || fetch;
++  const cache = env.__MARKET_CACHE || globalThis.caches?.default;
++  const now = env.__MARKET_NOW ? env.__MARKET_NOW() : Date.now();
++  const key = cacheKey(normalized.request);
++  let cached;
++  try {
++    const cachedResponse = await cache?.match(key);
++    cached = cachedResponse ? await cachedResponse.json() : null;
++  } catch {
++    // Cache reads are best-effort; continue as a cache miss.
++  }
++  const age = cached ? now - cached.cachedAt : Infinity;
++  if (cached && age <= FRESH_MS) {
++    return Response.json({
++      ...cached.payload,
++      meta: { ...cached.payload.meta, cached: true, stale: false }
++    });
++  }
++
++  try {
++    const payload = await fetchAndNormalize(
++      normalized,
++      env.TWELVE_DATA_API_KEY,
++      fetchImpl
++    );
++    try {
++      await cache?.put(key, Response.json(
++        { cachedAt: now, payload },
++        { headers: { 'Cache-Control': 's-maxage=900' } }
++      ));
++    } catch {
++      // Cache writes are best-effort and must not replace validated live data.
++    }
++    return Response.json(payload);
++  } catch (error) {
++    if (cached && age <= STALE_MS) {
++      return Response.json({
++        ...cached.payload,
++        status: 'stale',
++        meta: { ...cached.payload.meta, cached: true, stale: true }
++      });
++    }
++    if (error.status === 429) {
++      return apiError(
++        429,
++        'rate_limited',
++        'Market data rate limit reached.',
++        error.retryAfter
++      );
++    }
++    return apiError(502, 'provider_unavailable', 'Market data temporarily unavailable.');
++  }
++}

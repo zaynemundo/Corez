@@ -1,0 +1,396 @@
+diff --git a/src/index.css b/src/index.css
+index 6b1eafa3..75268434 100644
+--- a/src/index.css
++++ b/src/index.css
+@@ -13,6 +13,10 @@
+   --text-primary: #ffffff;
+   --text-secondary: #a1a1a6;
+   --text-muted: #8e8e96;
++
++  --market-positive: #4ade80;
++  --market-negative: #f87171;
++  --market-caution: #fbbf24;
+   
+   --code-bg: #080808;
+   --code-header-bg: #101010;
+@@ -59,6 +63,10 @@
+   --text-primary: #000000;
+   --text-secondary: #6e6e73;
+   --text-muted: #98989d;
++
++  --market-positive: #15803d;
++  --market-negative: #b91c1c;
++  --market-caution: #92400e;
+   
+   --code-bg: #f4f4f4;
+   --code-header-bg: #e5e5e5;
+@@ -620,6 +628,8 @@ h1, h2, h3, h4, h5, h6 {
+   border: 1px solid var(--border-color);
+   border-radius: var(--radius-lg);
+   padding: 0.9rem 1.15rem;
++  max-width: 100%;
++  min-width: 0;
+   color: var(--text-primary);
+   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+   font-size: 0.875rem;
+@@ -627,6 +637,258 @@ h1, h2, h3, h4, h5, h6 {
+   line-height: 1.6;
+ }
+ 
++/* Inline Market Instrument */
++.market-card {
++  width: min(100%, 720px);
++  max-width: 100%;
++  min-width: 0;
++  display: grid;
++  gap: 0.9rem;
++  color: var(--text-primary);
++  overflow-wrap: anywhere;
++}
++
++.market-card-header,
++.market-price-row,
++.market-card-footer {
++  display: flex;
++  justify-content: space-between;
++  align-items: center;
++  gap: 0.75rem;
++  flex-wrap: wrap;
++}
++
++.market-card-header {
++  padding-bottom: 0.75rem;
++  border-bottom: 1px solid var(--border-color);
++}
++
++.market-identity,
++.market-quote {
++  min-width: 0;
++}
++
++.market-card-header strong,
++.market-price {
++  display: block;
++}
++
++.market-asset-name {
++  font-weight: 500;
++  letter-spacing: -0.01em;
++}
++
++.market-card-header span,
++.market-card-footer {
++  color: var(--text-secondary);
++  font-size: 0.75rem;
++}
++
++.market-status-group {
++  display: flex;
++  align-items: center;
++  justify-content: flex-end;
++  gap: 0.4rem;
++  flex-wrap: wrap;
++}
++
++.market-refresh-state {
++  color: var(--text-muted);
++}
++
++.market-status {
++  border: 1px solid var(--border-color);
++  border-radius: var(--radius-sm);
++  padding: 0.2rem 0.45rem;
++  color: var(--text-primary);
++  font-size: 0.72rem;
++  line-height: 1.4;
++}
++
++.market-status-stale,
++.market-status-delayed {
++  border-color: var(--market-caution);
++  border-style: dashed;
++}
++
++.market-price {
++  font-size: clamp(1.7rem, 5vw, 2.5rem);
++  font-weight: 600;
++  font-variant-numeric: tabular-nums;
++  letter-spacing: -0.04em;
++  line-height: 1.15;
++}
++
++.market-movement {
++  display: inline-flex;
++  align-items: center;
++  gap: 0.35rem;
++  margin-top: 0.25rem;
++  color: var(--text-secondary);
++  font-weight: 500;
++  font-variant-numeric: tabular-nums;
++}
++
++.market-movement-up {
++  color: var(--market-positive);
++}
++
++.market-movement-down {
++  color: var(--market-negative);
++}
++
++.market-refresh,
++.market-retry,
++.market-ranges button {
++  min-height: 44px;
++  border: 1px solid var(--border-color);
++  border-radius: var(--radius-sm);
++  background: var(--bg-tertiary);
++  color: var(--text-primary);
++  cursor: pointer;
++  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
++}
++
++.market-refresh,
++.market-retry {
++  display: inline-flex;
++  align-items: center;
++  justify-content: center;
++  gap: 0.4rem;
++  padding: 0.55rem 0.75rem;
++}
++
++.market-refresh[aria-busy="true"] svg {
++  animation: market-refresh-spin 0.8s linear infinite;
++}
++
++.market-refresh:disabled,
++.market-retry:disabled,
++.market-ranges button:disabled,
++.market-controls input:disabled,
++.market-controls select:disabled {
++  cursor: not-allowed;
++  opacity: 0.55;
++}
++
++.market-card :focus-visible {
++  outline: 2px solid var(--text-primary);
++  outline-offset: 2px;
++}
++
++.market-chart-block {
++  min-width: 0;
++}
++
++.market-ranges {
++  display: flex;
++  gap: 0.4rem;
++  margin-bottom: 0.5rem;
++}
++
++.market-ranges button {
++  min-width: 44px;
++  padding: 0.45rem 0.65rem;
++}
++
++.market-ranges button[aria-pressed="true"] {
++  border-color: var(--text-primary);
++  box-shadow: inset 0 0 0 1px var(--text-primary);
++}
++
++.market-chart {
++  display: block;
++  width: 100%;
++  max-width: 100%;
++  height: clamp(9rem, 30vw, 11rem);
++  border: 1px solid var(--border-color);
++  border-radius: var(--radius-md);
++  background: var(--bg-secondary);
++  color: var(--text-secondary);
++}
++
++.market-chart polyline {
++  stroke: currentColor;
++  stroke-width: 2;
++}
++
++.market-chart-empty {
++  margin-top: 0.4rem;
++  color: var(--text-muted);
++  font-size: 0.75rem;
++}
++
++.market-controls {
++  display: grid;
++  grid-template-columns: repeat(2, minmax(0, 1fr));
++  gap: 0.65rem;
++  min-width: 0;
++}
++
++.market-controls label {
++  min-width: 0;
++  display: grid;
++  gap: 0.3rem;
++  color: var(--text-secondary);
++  font-size: 0.75rem;
++}
++
++.market-controls input,
++.market-controls select {
++  width: 100%;
++  max-width: 100%;
++  min-width: 0;
++  min-height: 44px;
++  border: 1px solid var(--border-color);
++  border-radius: var(--radius-sm);
++  background: var(--bg-secondary);
++  color: var(--text-primary);
++  padding: 0.5rem 0.65rem;
++}
++
++.market-conversion {
++  min-width: 0;
++  font-size: 1.2rem;
++  font-weight: 600;
++  font-variant-numeric: tabular-nums;
++}
++
++.market-conversion-label {
++  color: var(--text-secondary);
++  font-size: 0.75rem;
++  font-weight: 300;
++}
++
++.market-card-footer {
++  padding-top: 0.75rem;
++  border-top: 1px solid var(--border-color);
++  align-items: flex-start;
++}
++
++.market-card-error {
++  padding-left: 0.75rem;
++  border-left: 2px solid var(--market-caution);
++}
++
++.market-error-message {
++  color: var(--text-secondary);
++}
++
++@media (hover: hover) {
++  .market-refresh:not(:disabled):hover,
++  .market-retry:not(:disabled):hover,
++  .market-ranges button:not(:disabled):hover {
++    background: var(--bg-secondary);
++    border-color: var(--border-hover);
++  }
++}
++
++@keyframes market-refresh-spin {
++  to {
++    transform: rotate(360deg);
++  }
++}
++
+ /* Markdown Elements Styling */
+ .markdown-body {
+   display: flex;
+@@ -1499,6 +1761,23 @@ h1, h2, h3, h4, h5, h6 {
+     padding: 0.85rem 1rem;
+   }
+ 
++  .market-card {
++    gap: 0.75rem;
++  }
++
++  .market-controls {
++    grid-template-columns: 1fr;
++  }
++
++  .market-price-row {
++    align-items: flex-start;
++  }
++
++  .market-refresh,
++  .market-retry {
++    width: 100%;
++  }
++
+   .chat-input-container {
+     padding: 0.85rem;
+     padding-bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
+@@ -1569,9 +1848,14 @@ h1, h2, h3, h4, h5, h6 {
+   .new-chat-btn,
+   .history-item,
+   .message-content,
+-  .input-box {
++  .input-box,
++  .market-refresh svg {
+     transition: none !important;
+   }
++
++  .market-refresh svg {
++    animation: none !important;
++  }
+ }
+ 
+ /* FLUX Image & Typography Showcase Modal */
+diff --git a/tests/market-card.test.jsx b/tests/market-card.test.jsx
+index ad28cacc..5b8dc003 100644
+--- a/tests/market-card.test.jsx
++++ b/tests/market-card.test.jsx
+@@ -203,6 +203,24 @@ describe('App market message persistence', () => {
+ });
+ 
+ describe('MarketCard', () => {
++  it('exposes named controls that work from the keyboard', async () => {
++    const user = userEvent.setup();
++    const onRefresh = vi.fn();
++    render(<MarketCard market={market} request={request} onRefresh={onRefresh} refreshing={false} />);
++
++    expect(screen.getByLabelText('Asset')).toBeInTheDocument();
++    expect(screen.getByLabelText('Display currency')).toBeInTheDocument();
++    expect(screen.getByLabelText('Quantity')).toBeInTheDocument();
++    expect(screen.getByLabelText('Unit')).toBeInTheDocument();
++    expect(screen.getByRole('button', { name: '1D' })).toHaveAttribute('aria-pressed', 'true');
++    expect(screen.getByRole('button', { name: /refresh market data/i })).toBeInTheDocument();
++
++    await user.tab();
++    expect(document.activeElement).not.toBe(document.body);
++    await user.selectOptions(screen.getByLabelText('Display currency'), 'AED');
++    expect(onRefresh).toHaveBeenCalledWith({ ...request, currency: 'AED', conversion: null });
++  });
++
+   it('renders a sourced indicative quote with non-color movement text and exact provider time', () => {
+     render(<MarketCard market={market} request={request} onRefresh={() => {}} refreshing={false} />);
+ 
+diff --git a/tests/ui-responsive-contract.sh b/tests/ui-responsive-contract.sh
+index 4066219a..c49e49bb 100644
+--- a/tests/ui-responsive-contract.sh
++++ b/tests/ui-responsive-contract.sh
+@@ -5,6 +5,7 @@ css="src/index.css"
+ app="src/App.jsx"
+ canvas="src/components/CanvasPreview.jsx"
+ sidebar="src/components/Sidebar.jsx"
++market_card="src/components/MarketCard.jsx"
+ failures=0
+ 
+ check() {
+@@ -200,6 +201,20 @@ check 'reduced motion query disables sidebar animation' '@media \(prefers-reduce
+ check_top_level_media 'sidebar prefers-reduced-motion at top level' '@media \(prefers-reduced-motion: reduce\)' "$css"
+ check 'mobile sidebar uses safe-area insets' 'env\(safe-area-inset-'
+ 
++# Market Card Responsive and Accessibility Contract Checks
++check_block_property 'market card has a responsive grid' '.market-controls' 'grid-template-columns' 'repeat(2, minmax(0, 1fr))' "$css"
++check_block_property 'market card mobile controls collapse to one column' '.market-controls' 'grid-template-columns' '1fr' "$css"
++check_block_property 'market card chart remains width-fluid' '.market-chart' 'width' '100%' "$css"
++check_block_property 'market card stays within its chat message' '.market-card' 'max-width' '100%' "$css"
++check_block_property 'market card controls have touch-sized targets' '.market-refresh,' 'min-height' '44px' "$css"
++check 'market card has explicit focus-visible treatment' '\.market-card[^\{]*:focus-visible' "$css"
++check 'market card has restrained positive theme color' '--market-positive:' "$css"
++check 'market card has restrained negative theme color' '--market-negative:' "$css"
++check_block_property 'market card respects reduced motion' '.market-refresh svg' 'animation' 'none !important' "$css"
++check 'market card exposes a labelled region' 'role="region"' "$market_card"
++check 'market movement includes words in addition to color' "movingUp \? 'Up' : 'Down'" "$market_card"
++check 'market disclosure identifies indicative data' 'Indicative data' "$market_card"
++
+ if (( failures > 0 )); then
+   printf '%d responsive UI contract check(s) failed.\n' "$failures" >&2
+   exit 1

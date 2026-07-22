@@ -1,0 +1,689 @@
+diff --git a/src/App.jsx b/src/App.jsx
+index 48d9caef..2cec0843 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -8,7 +8,150 @@ import SettingsModal from './components/SettingsModal';
+ import ImageStudioPage from './components/ImageStudioPage';
+ import ProgressChecklist from './components/ProgressChecklist';
+ import { generateAIResponse, extractCodeFromMessage, isGameDevIntent } from './services/aiService';
+-import { Layers, Code, Gamepad2, BarChart3, Wand2 } from 'lucide-react';
++import { fetchMarketData, unavailableMarket } from './services/marketService';
++
++function isObject(value) {
++  return value !== null && typeof value === 'object' && !Array.isArray(value);
++}
++
++export function createMarketMessageId() {
++  if (typeof globalThis.crypto?.randomUUID === 'function') {
++    return `market-${globalThis.crypto.randomUUID()}`;
++  }
++  const bytes = new Uint8Array(16);
++  globalThis.crypto.getRandomValues(bytes);
++  return `market-${Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
++}
++
++function nextUniqueMarketMessageId(usedIds, createId) {
++  for (let attempt = 0; attempt < 100; attempt += 1) {
++    const id = createId();
++    if (typeof id === 'string' && id && !usedIds.has(id)) {
++      usedIds.add(id);
++      return id;
++    }
++  }
++  throw new Error('Unable to create a unique market message ID.');
++}
++
++export function toAssistantMessage(response, createId = createMarketMessageId) {
++  if (typeof response === 'string') {
++    return { role: 'assistant', content: response };
++  }
++  if (isObject(response)
++    && response.type === 'market'
++    && isObject(response.request)
++    && isObject(response.market)) {
++    return {
++      id: createId(),
++      role: 'assistant',
++      type: 'market',
++      content: '',
++      request: response.request,
++      market: response.market
++    };
++  }
++  return { role: 'assistant', content: '' };
++}
++
++export function normalizeMarketMessageIds(sessions, createId = createMarketMessageId) {
++  const usedIds = new Set(
++    sessions.flatMap((session) => session.messages)
++      .filter((message) => message?.type === 'market' && typeof message.id === 'string' && message.id)
++      .map((message) => message.id)
++  );
++  const seenExistingIds = new Set();
++  return sessions.map((session) => {
++    let changed = false;
++    const messages = session.messages.map((message) => {
++      if (message?.type !== 'market') return message;
++      if (typeof message.id === 'string' && message.id && !seenExistingIds.has(message.id)) {
++        seenExistingIds.add(message.id);
++        return message;
++      }
++      changed = true;
++      return { ...message, id: nextUniqueMarketMessageId(usedIds, createId) };
++    });
++    return changed ? { ...session, messages } : session;
++  });
++}
++
++export function replaceMarketMessageInSession(sessions, sessionId, messageId, request, market) {
++  return sessions.map((session) => {
++    if (session.id !== sessionId) return session;
++    const messageIndex = session.messages.findIndex((message) => (
++      message?.type === 'market' && message.id === messageId
++    ));
++    if (messageIndex === -1) return session;
++    return {
++      ...session,
++      messages: session.messages.map((message, index) => (
++        index === messageIndex ? { ...message, request, market } : message
++      ))
++    };
++  });
++}
++
++function isDuplicateAssistantMessage(message, candidate) {
++  if (candidate.type !== 'market') {
++    return message?.role === 'assistant' && message?.content === candidate.content;
++  }
++  return message?.role === 'assistant'
++    && message?.type === 'market'
++    && JSON.stringify(message.request) === JSON.stringify(candidate.request)
++    && JSON.stringify(message.market) === JSON.stringify(candidate.market);
++}
++
++export function marketRefreshKey(sessionId, messageId) {
++  return JSON.stringify([sessionId, messageId]);
++}
++
++export async function runMarketRefresh({
++  sessionId,
++  messageId,
++  nextRequest,
++  refreshTokens,
++  tokenSequence,
++  setRefreshingMarketKeys,
++  setSessions,
++  fetchMarket = fetchMarketData,
++  toUnavailable = unavailableMarket
++}) {
++  const key = marketRefreshKey(sessionId, messageId);
++  const token = ++tokenSequence.current;
++  refreshTokens.set(key, token);
++  setRefreshingMarketKeys((previous) => new Set(previous).add(key));
++
++  try {
++    const market = await fetchMarket(nextRequest);
++    if (refreshTokens.get(key) !== token) return;
++    setSessions((previous) => replaceMarketMessageInSession(
++      previous,
++      sessionId,
++      messageId,
++      nextRequest,
++      market
++    ));
++  } catch (error) {
++    if (error?.name === 'AbortError' || refreshTokens.get(key) !== token) return;
++    setSessions((previous) => replaceMarketMessageInSession(
++      previous,
++      sessionId,
++      messageId,
++      nextRequest,
++      toUnavailable(error)
++    ));
++  } finally {
++    if (refreshTokens.get(key) === token) {
++      refreshTokens.delete(key);
++      setRefreshingMarketKeys((previous) => {
++        const next = new Set(previous);
++        next.delete(key);
++        return next;
++      });
++    }
++  }
++}
+ 
+ function getTaskTypeFromMessages(messages) {
+   if (!messages || messages.length === 0) return 'general';
+@@ -41,7 +184,7 @@ const INITIAL_SESSIONS = [
+ export default function App() {
+   const [sessions, setSessions] = useState(() => {
+     const saved = localStorage.getItem('corez_sessions');
+-    return saved ? JSON.parse(saved) : INITIAL_SESSIONS;
++    return saved ? normalizeMarketMessageIds(JSON.parse(saved)) : INITIAL_SESSIONS;
+   });
+ 
+   const [activeSessionId, setActiveSessionId] = useState(() => {
+@@ -60,6 +203,7 @@ export default function App() {
+   const [settingsOpen, setSettingsOpen] = useState(false);
+   const [isThinking, setIsThinking] = useState(false);
+   const [isGameDevThinking, setIsGameDevThinking] = useState(false);
++  const [refreshingMarketKeys, setRefreshingMarketKeys] = useState(() => new Set());
+   const [theme, setTheme] = useState(() => localStorage.getItem('corez_theme') || 'dark');
+   const [isMobileViewport, setIsMobileViewport] = useState(() => {
+     if (typeof window === 'undefined') return false;
+@@ -69,6 +213,8 @@ export default function App() {
+   const messagesEndRef = useRef(null);
+   const chatInputRef = useRef(null);
+   const abortControllerRef = useRef(null);
++  const marketRefreshTokensRef = useRef(new Map());
++  const marketRefreshSequenceRef = useRef(0);
+ 
+   useEffect(() => {
+     const mobileQuery = window.matchMedia('(max-width: 767px)');
+@@ -118,17 +264,19 @@ export default function App() {
+             abortControllerRef.current = controller;
+ 
+             generateAIResponse(pendingData.apiPrompt, pendingData.messages, controller.signal)
+-              .then(responseText => {
+-                if (!responseText) return;
+-                const extractedCode = extractCodeFromMessage(responseText);
+-                if (extractedCode) {
+-                  setActiveCanvasCode(extractedCode);
++              .then(response => {
++                if (!response) return;
++                const aiMsg = toAssistantMessage(response);
++                if (aiMsg.type !== 'market') {
++                  const extractedCode = extractCodeFromMessage(aiMsg.content);
++                  if (extractedCode) {
++                    setActiveCanvasCode(extractedCode);
++                  }
+                 }
+-                const aiMsg = { role: 'assistant', content: responseText };
+                 setSessions(prev => prev.map(s => {
+                   if (s.id === pendingData.sessionId) {
+                     const last = s.messages[s.messages.length - 1];
+-                    if (last?.role === 'assistant' && last?.content === responseText) return s;
++                    if (isDuplicateAssistantMessage(last, aiMsg)) return s;
+                     return { ...s, messages: [...s.messages, aiMsg] };
+                   }
+                   return s;
+@@ -257,14 +405,15 @@ export default function App() {
+     abortControllerRef.current = controller;
+ 
+     try {
+-      const responseText = await generateAIResponse(apiPrompt, updatedApiMessages, controller.signal);
+-      if (responseText) {
+-        const extractedCode = extractCodeFromMessage(responseText);
+-        if (extractedCode) {
+-          setActiveCanvasCode(extractedCode);
++      const response = await generateAIResponse(apiPrompt, updatedApiMessages, controller.signal);
++      if (response) {
++        const aiMsg = toAssistantMessage(response);
++        if (aiMsg.type !== 'market') {
++          const extractedCode = extractCodeFromMessage(aiMsg.content);
++          if (extractedCode) {
++            setActiveCanvasCode(extractedCode);
++          }
+         }
+-
+-        const aiMsg = { role: 'assistant', content: responseText };
+         
+         setSessions(prev => prev.map(s => {
+           if (s.id === activeSessionId) {
+@@ -300,6 +449,19 @@ export default function App() {
+     }
+   };
+ 
++  const handleRefreshMarket = async (messageId, nextRequest) => {
++    const sessionId = activeSessionId;
++    return runMarketRefresh({
++      sessionId,
++      messageId,
++      nextRequest,
++      refreshTokens: marketRefreshTokensRef.current,
++      tokenSequence: marketRefreshSequenceRef,
++      setRefreshingMarketKeys,
++      setSessions
++    });
++  };
++
+   return (
+     <div className="app-container">
+       <Sidebar
+@@ -349,10 +511,12 @@ export default function App() {
+                   <div className="messages-inner">
+                     {activeSession?.messages.map((msg, idx) => (
+                       <ChatMessage
+-                        key={idx}
++                        key={msg.type === 'market' ? msg.id : idx}
+                         message={msg}
+                         onRunInCanvas={handleRunInCanvas}
+                         onReviseCode={handleReviseCode}
++                        onRefreshMarket={(nextRequest) => handleRefreshMarket(msg.id, nextRequest)}
++                        marketRefreshing={refreshingMarketKeys.has(marketRefreshKey(activeSession.id, msg.id))}
+                       />
+                     ))}
+                     {isThinking && (
+diff --git a/src/components/ChatMessage.jsx b/src/components/ChatMessage.jsx
+index 25cc7a61..d0569226 100644
+--- a/src/components/ChatMessage.jsx
++++ b/src/components/ChatMessage.jsx
+@@ -1,11 +1,11 @@
+ import { useState } from 'react';
+ import { 
+   Layers,
+-  ChevronRight,
+   Copy,
+   Check,
+   Wand2
+ } from 'lucide-react';
++import MarketCard from './MarketCard';
+ 
+ function CodeSnippetBlock({ code, lang }) {
+   const [copied, setCopied] = useState(false);
+@@ -34,7 +34,7 @@ function CodeSnippetBlock({ code, lang }) {
+   );
+ }
+ 
+-export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
++export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onRefreshMarket, marketRefreshing = false }) {
+   const isUser = message.role === 'user';
+ 
+   const renderInlineFormattedText = (text) => {
+@@ -306,7 +306,16 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
+     <div className={`message-wrapper ${isUser ? 'user' : 'ai'}`}>
+       <div className="message-body">
+         <div className="message-content">
+-          {renderFormattedText(message.content)}
++          {message.type === 'market' ? (
++            <MarketCard
++              market={message.market}
++              request={message.request}
++              onRefresh={onRefreshMarket}
++              refreshing={marketRefreshing}
++            />
++          ) : (
++            renderFormattedText(message.content)
++          )}
+         </div>
+       </div>
+     </div>
+diff --git a/tests/market-card.test.jsx b/tests/market-card.test.jsx
+index 38c55033..ad28cacc 100644
+--- a/tests/market-card.test.jsx
++++ b/tests/market-card.test.jsx
+@@ -1,11 +1,25 @@
+ // @vitest-environment jsdom
+ import '@testing-library/jest-dom/vitest';
+-import { cleanup, render, screen, within } from '@testing-library/react';
++import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+ import userEvent from '@testing-library/user-event';
+ import { afterEach, describe, expect, it, vi } from 'vitest';
+ import MarketCard from '../src/components/MarketCard.jsx';
++import ChatMessage from '../src/components/ChatMessage.jsx';
++import App from '../src/App.jsx';
+ 
+-afterEach(cleanup);
++const { fetchMarketDataMock } = vi.hoisted(() => ({ fetchMarketDataMock: vi.fn() }));
++
++vi.mock('../src/services/marketService.js', async (importOriginal) => ({
++  ...await importOriginal(),
++  fetchMarketData: fetchMarketDataMock
++}));
++
++afterEach(() => {
++  cleanup();
++  localStorage.clear();
++  fetchMarketDataMock.mockReset();
++  vi.restoreAllMocks();
++});
+ 
+ const request = {
+   assetId: 'gold',
+@@ -44,6 +58,150 @@ const market = {
+   meta: { source: 'Twelve Data', cached: false, stale: false }
+ };
+ 
++describe('ChatMessage market dispatch', () => {
++  it('renders a structured market response through MarketCard', () => {
++    render(
++      <ChatMessage
++        message={{ role: 'assistant', type: 'market', content: '', request, market }}
++        onRunInCanvas={() => {}}
++        onReviseCode={() => {}}
++        onRefreshMarket={() => {}}
++        marketRefreshing={false}
++      />
++    );
++
++    expect(screen.getByRole('region', { name: /Gold Spot market quote/i })).toBeInTheDocument();
++  });
++
++  it('preserves rendering for historical text responses', () => {
++    render(
++      <ChatMessage
++        message={{ role: 'assistant', content: 'Old answer' }}
++        onRunInCanvas={() => {}}
++        onReviseCode={() => {}}
++        onRefreshMarket={() => {}}
++        marketRefreshing={false}
++      />
++    );
++
++    expect(screen.getByText('Old answer')).toBeInTheDocument();
++  });
++
++  it('wires refresh requests and busy state to the market card', async () => {
++    const user = userEvent.setup();
++    const onRefreshMarket = vi.fn();
++    const { rerender } = render(
++      <ChatMessage
++        message={{ role: 'assistant', type: 'market', content: '', request, market }}
++        onRunInCanvas={() => {}}
++        onReviseCode={() => {}}
++        onRefreshMarket={onRefreshMarket}
++        marketRefreshing={false}
++      />
++    );
++
++    await user.click(screen.getByRole('button', { name: /refresh market data/i }));
++    expect(onRefreshMarket).toHaveBeenCalledWith(request);
++
++    rerender(
++      <ChatMessage
++        message={{ role: 'assistant', type: 'market', content: '', request, market }}
++        onRunInCanvas={() => {}}
++        onReviseCode={() => {}}
++        onRefreshMarket={onRefreshMarket}
++        marketRefreshing
++      />
++    );
++    expect(screen.getByRole('button', { name: /refresh market data/i })).toBeDisabled();
++  });
++});
++
++describe('App market message persistence', () => {
++  function stubBrowserLayout() {
++    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({
++      matches: false,
++      addEventListener: vi.fn(),
++      removeEventListener: vi.fn()
++    }));
++    Element.prototype.scrollIntoView = vi.fn();
++  }
++
++  it('loads legacy text unchanged and persists a stable ID migration for legacy market messages', async () => {
++    stubBrowserLayout();
++    localStorage.setItem('corez_sessions', JSON.stringify([
++      {
++        id: 'legacy',
++        title: 'Legacy',
++        messages: [
++          { role: 'assistant', content: 'Persisted old answer' },
++          { role: 'assistant', type: 'market', content: '', request, market }
++        ]
++      }
++    ]));
++
++    render(<App />);
++
++    expect(screen.getByText('Persisted old answer')).toBeInTheDocument();
++    expect(screen.getByRole('region', { name: /Gold Spot market quote/i })).toBeInTheDocument();
++    let migratedId;
++    await waitFor(() => {
++      const stored = JSON.parse(localStorage.getItem('corez_sessions'));
++      migratedId = stored[0].messages[1].id;
++      expect(migratedId).toMatch(/^market-/);
++      expect(stored[0].messages[0]).toEqual({ role: 'assistant', content: 'Persisted old answer' });
++    });
++
++    cleanup();
++    render(<App />);
++    await waitFor(() => {
++      const stored = JSON.parse(localStorage.getItem('corez_sessions'));
++      expect(stored[0].messages[1].id).toBe(migratedId);
++    });
++  });
++
++  it('refreshes the exact origin message after the active session changes', async () => {
++    stubBrowserLayout();
++    const refreshedMarket = { ...market, quote: { ...market.quote, price: 2500 } };
++    let resolveRefresh;
++    fetchMarketDataMock.mockReturnValue(new Promise((resolve) => { resolveRefresh = resolve; }));
++    localStorage.setItem('corez_sessions', JSON.stringify([
++      {
++        id: 'origin',
++        title: 'Origin',
++        messages: [{ role: 'assistant', type: 'market', content: '', request, market }]
++      },
++      {
++        id: 'other',
++        title: 'Other',
++        messages: [{
++          role: 'assistant',
++          type: 'market',
++          content: '',
++          request: { ...request, assetId: 'bitcoin', symbol: 'BTC/USD', assetClass: 'crypto', unit: 'unit' },
++          market: {
++            ...market,
++            asset: { id: 'bitcoin', class: 'crypto', symbol: 'BTC/USD', name: 'Bitcoin' }
++          }
++        }]
++      }
++    ]));
++
++    render(<App />);
++    fireEvent.click(screen.getByRole('button', { name: /refresh market data/i }));
++    fireEvent.click(document.querySelector('[title="Other"]'));
++    expect(screen.getByRole('region', { name: /Bitcoin market quote/i })).toBeInTheDocument();
++    expect(screen.getByRole('button', { name: /refresh market data/i })).toBeEnabled();
++
++    await act(async () => resolveRefresh(refreshedMarket));
++
++    await waitFor(() => {
++      const stored = JSON.parse(localStorage.getItem('corez_sessions'));
++      expect(stored.find((session) => session.id === 'origin').messages[0].market.quote.price).toBe(2500);
++      expect(stored.find((session) => session.id === 'other').messages[0].market.asset.name).toBe('Bitcoin');
++    });
++  });
++});
++
+ describe('MarketCard', () => {
+   it('renders a sourced indicative quote with non-color movement text and exact provider time', () => {
+     render(<MarketCard market={market} request={request} onRefresh={() => {}} refreshing={false} />);
+diff --git a/tests/market-service.test.js b/tests/market-service.test.js
+index 658d1cf5..63e28746 100644
+--- a/tests/market-service.test.js
++++ b/tests/market-service.test.js
+@@ -2,6 +2,13 @@
+ import { afterEach, describe, expect, it, vi } from 'vitest';
+ import { fetchMarketData } from '../src/services/marketService.js';
+ import { generateAIResponse } from '../src/services/aiService.js';
++import {
++  marketRefreshKey,
++  normalizeMarketMessageIds,
++  replaceMarketMessageInSession,
++  runMarketRefresh,
++  toAssistantMessage
++} from '../src/App.jsx';
+ 
+ afterEach(() => {
+   vi.useRealTimers();
+@@ -9,6 +16,177 @@ afterEach(() => {
+   vi.unstubAllGlobals();
+ });
+ 
++describe('assistant market message persistence', () => {
++  it('keeps legacy text responses in the historical message shape', () => {
++    expect(toAssistantMessage('Old answer')).toEqual({ role: 'assistant', content: 'Old answer' });
++  });
++
++  it('normalizes structured market responses for localStorage persistence', () => {
++    expect(toAssistantMessage({
++      type: 'market',
++      request: { assetId: 'gold' },
++      market: { status: 'live' }
++    }, () => 'market-new')).toEqual({
++      id: 'market-new',
++      role: 'assistant',
++      type: 'market',
++      content: '',
++      request: { assetId: 'gold' },
++      market: { status: 'live' }
++    });
++  });
++
++  it.each([null, undefined, 42, {}, { type: 'market' }])('safely normalizes an invalid response shape: %j', (response) => {
++    expect(toAssistantMessage(response)).toEqual({ role: 'assistant', content: '' });
++  });
++
++  it('updates only the exact originating session and message', () => {
++    const sessions = [
++      { id: 'origin', messages: [{ id: 'market-gold', role: 'assistant', type: 'market', content: '', request: { assetId: 'gold' }, market: { status: 'live' } }] },
++      { id: 'active-now', messages: [{ role: 'assistant', content: 'Old answer' }] }
++    ];
++    const nextRequest = { assetId: 'bitcoin' };
++    const nextMarket = { status: 'live', asset: { id: 'bitcoin' } };
++
++    const updated = replaceMarketMessageInSession(sessions, 'origin', 'market-gold', nextRequest, nextMarket);
++
++    expect(updated[0].messages[0]).toEqual(expect.objectContaining({ request: nextRequest, market: nextMarket }));
++    expect(updated[1]).toBe(sessions[1]);
++    expect(sessions[0].messages[0].request).toEqual({ assetId: 'gold' });
++  });
++
++  it('migrates legacy market messages to unique stable IDs without changing text messages', () => {
++    const textMessage = { role: 'assistant', content: 'Old answer' };
++    const generatedIds = ['already-stable', 'market-migrated-1', 'market-migrated-2'][Symbol.iterator]();
++    const sessions = [{
++      id: 'legacy',
++      messages: [
++        textMessage,
++        { role: 'assistant', type: 'market', content: '', request: {}, market: {} },
++        { id: 'already-stable', role: 'assistant', type: 'market', content: '', request: {}, market: {} },
++        { id: 'already-stable', role: 'assistant', type: 'market', content: '', request: {}, market: {} }
++      ]
++    }];
++
++    const migrated = normalizeMarketMessageIds(sessions, () => generatedIds.next().value);
++
++    expect(migrated[0].messages[0]).toBe(textMessage);
++    expect(migrated[0].messages.map((message) => message.id)).toEqual([
++      undefined,
++      'market-migrated-1',
++      'already-stable',
++      'market-migrated-2'
++    ]);
++    expect(normalizeMarketMessageIds(migrated, () => 'must-not-run')).toEqual(migrated);
++  });
++
++  it('updates by stable ID after preceding messages reorder and no-ops after deletion', () => {
++    const target = { id: 'market-target', role: 'assistant', type: 'market', content: '', request: {}, market: { quote: { price: 1 } } };
++    const reordered = [{ id: 'origin', messages: [target, { role: 'assistant', content: 'Earlier text' }] }];
++
++    const updated = replaceMarketMessageInSession(reordered, 'origin', 'market-target', { assetId: 'gold' }, { quote: { price: 2 } });
++    expect(updated[0].messages[0].market.quote.price).toBe(2);
++    expect(replaceMarketMessageInSession([{ id: 'origin', messages: [] }], 'origin', 'market-target', {}, {}))
++      .toEqual([{ id: 'origin', messages: [] }]);
++  });
++
++  it('keeps only the newest out-of-order completion for one card and never reuses tokens', async () => {
++    const pending = [];
++    let sessions = [{ id: 'origin', messages: [{ id: 'market-target', role: 'assistant', type: 'market', content: '', request: {}, market: { quote: { price: 1 } } }] }];
++    let refreshing = new Set();
++    const refreshTokens = new Map();
++    const tokenSequence = { current: 0 };
++    const options = {
++      sessionId: 'origin', messageId: 'market-target', nextRequest: { assetId: 'gold' }, refreshTokens, tokenSequence,
++      setSessions: (update) => { sessions = update(sessions); },
++      setRefreshingMarketKeys: (update) => { refreshing = update(refreshing); },
++      fetchMarket: () => new Promise((resolve) => pending.push(resolve))
++    };
++
++    const older = runMarketRefresh(options);
++    const newer = runMarketRefresh(options);
++    expect(tokenSequence.current).toBe(2);
++    pending[1]({ quote: { price: 3 } });
++    await newer;
++    pending[0]({ quote: { price: 2 } });
++    await older;
++
++    expect(sessions[0].messages[0].market.quote.price).toBe(3);
++    expect(refreshing).toEqual(new Set());
++
++    const later = runMarketRefresh({ ...options, fetchMarket: async () => ({ quote: { price: 4 } }) });
++    await later;
++    expect(tokenSequence.current).toBe(3);
++    expect(sessions[0].messages[0].market.quote.price).toBe(4);
++  });
++
++  it('tracks concurrent cards independently and resolves by message ID after reorder', async () => {
++    const pending = new Map();
++    let sessions = [{ id: 'origin', messages: [
++      { id: 'market-a', role: 'assistant', type: 'market', content: '', request: {}, market: { quote: { price: 1 } } },
++      { id: 'market-b', role: 'assistant', type: 'market', content: '', request: {}, market: { quote: { price: 10 } } }
++    ] }];
++    let refreshing = new Set();
++    const common = {
++      sessionId: 'origin', refreshTokens: new Map(), tokenSequence: { current: 0 },
++      setSessions: (update) => { sessions = update(sessions); },
++      setRefreshingMarketKeys: (update) => { refreshing = update(refreshing); },
++      fetchMarket: (request) => new Promise((resolve) => pending.set(request.assetId, resolve))
++    };
++    const refreshA = runMarketRefresh({ ...common, messageId: 'market-a', nextRequest: { assetId: 'a' } });
++    const refreshB = runMarketRefresh({ ...common, messageId: 'market-b', nextRequest: { assetId: 'b' } });
++    expect(refreshing).toEqual(new Set([
++      marketRefreshKey('origin', 'market-a'),
++      marketRefreshKey('origin', 'market-b')
++    ]));
++
++    sessions = [{ ...sessions[0], messages: [...sessions[0].messages].reverse() }];
++    pending.get('a')({ quote: { price: 2 } });
++    await refreshA;
++    expect(refreshing).toEqual(new Set([marketRefreshKey('origin', 'market-b')]));
++    expect(sessions[0].messages.find((message) => message.id === 'market-a').market.quote.price).toBe(2);
++
++    sessions = [{ ...sessions[0], messages: sessions[0].messages.filter((message) => message.id !== 'market-b') }];
++    pending.get('b')({ quote: { price: 20 } });
++    await refreshB;
++    expect(sessions[0].messages.some((message) => message.id === 'market-b')).toBe(false);
++    expect(refreshing).toEqual(new Set());
++  });
++
++  it('maps current failures safely and leaves prior data intact on abort', async () => {
++    const originalMarket = { quote: { price: 1 } };
++    let sessions = [{ id: 'origin', messages: [{ id: 'market-a', role: 'assistant', type: 'market', content: '', request: {}, market: originalMarket }] }];
++    let refreshing = new Set();
++    const common = {
++      sessionId: 'origin', messageId: 'market-a', nextRequest: { assetId: 'gold' },
++      refreshTokens: new Map(), tokenSequence: { current: 0 },
++      setSessions: (update) => { sessions = update(sessions); },
++      setRefreshingMarketKeys: (update) => { refreshing = update(refreshing); }
++    };
++
++    await runMarketRefresh({
++      ...common,
++      fetchMarket: async () => { throw Object.assign(new Error('Provider unavailable'), { code: 'provider_unavailable' }); },
++      toUnavailable: (error) => ({ status: 'unavailable', error: { code: error.code, message: 'Safe error' } })
++    });
++    expect(sessions[0].messages[0].market).toEqual({
++      status: 'unavailable',
++      error: { code: 'provider_unavailable', message: 'Safe error' }
++    });
++    expect(refreshing).toEqual(new Set());
++
++    sessions = [{ id: 'origin', messages: [{ id: 'market-a', role: 'assistant', type: 'market', content: '', request: {}, market: originalMarket }] }];
++    await runMarketRefresh({
++      ...common,
++      refreshTokens: new Map(),
++      tokenSequence: { current: 0 },
++      fetchMarket: async () => { throw new DOMException('Cancelled', 'AbortError'); }
++    });
++    expect(sessions[0].messages[0].market).toBe(originalMarket);
++    expect(refreshing).toEqual(new Set());
++  });
++});
++
+ describe('fetchMarketData', () => {
+   it('posts a normalized request to the market endpoint', async () => {
+     const fetchMock = vi.fn().mockResolvedValue(Response.json({ kind: 'market', status: 'live', quote: { price: 2412.5 } }));

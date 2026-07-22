@@ -1,0 +1,25 @@
+diff --git a/README.md b/README.md
+index 723bc156..12f33362 100644
+--- a/README.md
++++ b/README.md
+@@ -55,6 +55,20 @@ The trained classifier covers the five deliverable labels (`app`, `code-help`, `
+ 
+ `analyzePublicUserIntent(prompt)` uses the trained model when its confidence and out-of-vocabulary gates are satisfied. Otherwise, Corez uses deterministic pattern rules for novel or ambiguous prompts. The Worker independently validates the supplied intent label before adding adaptive instructions to the system prompt.
+ 
++## Live market data
++
++Supported market-price and currency-conversion prompts are handled before the general AI route and render as structured cards in chat. The same-origin Cloudflare Worker calls Twelve Data through `POST /api/market`; the browser never receives the provider credential.
++
++Configure the production Worker secret interactively:
++
++```text
++npx wrangler secret put TWELVE_DATA_API_KEY
++```
++
++Enter the value only at Wrangler's hidden prompt. Do not add it to `.env`, `wrangler.jsonc`, source files, tests, logs, or GitHub Actions variables exposed to builds. If the secret is absent, the endpoint returns a safe `not_configured` response with no fallback price.
++
++Successful provider responses are cached by canonical request for 60 seconds. If Twelve Data later fails, the Worker may serve the most recent validated quote for up to 15 minutes while retaining its original provider timestamp and clearly marking it as stale; older quotes are not returned as market values. Cards identify Twelve Data as the source, distinguish live, delayed, closed, stale, and unavailable states, and label every price as indicative data rather than an executable quote. If no trustworthy provider or eligible cached value exists, the card shows an unavailable state without a guessed price or a general-AI price fallback.
++
+ ## Cloudflare Worker deployment
+ 
+ Corez deploys the Vite SPA, `/api/ai`, and `/api/image` together as the `ai` Cloudflare Worker. Local Wrangler commands require Node.js 22 or later.
