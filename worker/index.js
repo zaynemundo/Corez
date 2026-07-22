@@ -1,3 +1,5 @@
+import { handleMarket } from './market.js';
+
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 function getTargetModels(intentType, hasMedia, prompt = '') {
   const isSvgOrVisual = /\b(svg|icon|sprite|draw|vector|illustration|graphic|palette|art)\b/i.test(prompt);
@@ -342,6 +344,9 @@ export default {
     }
     if (pathname === '/api/image') {
       return handleImage(request, env);
+    }
+    if (pathname === '/api/market') {
+      return handleMarket(request, env);
     }
     if (pathname.startsWith('/api/')) {
       return jsonResponse(404, { error: 'API route not found.' });
