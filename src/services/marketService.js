@@ -10,6 +10,17 @@ export class MarketApiError extends Error {
   }
 }
 
+function isNormalizedMarketResponse(data) {
+  return data !== null
+    && typeof data === 'object'
+    && data.kind === 'market'
+    && ['live', 'delayed', 'stale'].includes(data.status)
+    && data.quote !== null
+    && typeof data.quote === 'object'
+    && Number.isFinite(data.quote.price)
+    && data.quote.price > 0;
+}
+
 export async function fetchMarketData(request, signal = null) {
   const response = await fetch(MARKET_PROXY_ENDPOINT, {
     method: 'POST',
@@ -17,13 +28,33 @@ export async function fetchMarketData(request, signal = null) {
     body: JSON.stringify(request),
     ...(signal ? { signal } : {})
   });
-  const data = await response.json().catch(() => ({}));
+  let data;
+  try {
+    data = await response.json();
+  } catch (error) {
+    if (error?.name === 'AbortError') throw error;
+    if (response.ok) {
+      throw new MarketApiError(
+        'invalid_market_response',
+        'Market data temporarily unavailable.',
+        response.status
+      );
+    }
+    data = {};
+  }
   if (!response.ok) {
     throw new MarketApiError(
       data?.error?.code || 'market_unavailable',
       data?.error?.message || 'Market data temporarily unavailable.',
       response.status,
       data?.error?.retryAfter
+    );
+  }
+  if (!isNormalizedMarketResponse(data)) {
+    throw new MarketApiError(
+      'invalid_market_response',
+      'Market data temporarily unavailable.',
+      response.status
     );
   }
   return data;

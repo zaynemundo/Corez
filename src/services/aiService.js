@@ -1717,7 +1717,7 @@ function synthesizeFinancialTerminal() {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>COREZ Real-Time Financial Terminal</title>
+  <title>COREZ Financial Demo Terminal</title>
   <style>
     :root {
       --bg: #09090b;
@@ -1769,7 +1769,7 @@ function synthesizeFinancialTerminal() {
   <div class="terminal-container">
     <div class="header-bar">
       <div class="title">
-        <span>COREZ FINANCIAL TERMINAL</span>
+        <span>COREZ FINANCIAL DEMO TERMINAL</span>
         <span class="status-badge">DEMO DATA</span>
       </div>
       <div class="search-box">
@@ -1975,7 +1975,7 @@ function synthesizeCustomGame(prompt) {
 
   if (lower.includes('financial') || lower.includes('finance') || lower.includes('stock') || lower.includes('crypto') || lower.includes('market') || lower.includes('terminal') || lower.includes('forex') || lower.includes('ticker')) {
     return {
-      title: 'COREZ Real-Time Financial Terminal',
+      title: 'COREZ Financial Demo Terminal',
       html: synthesizeFinancialTerminal()
     };
   }
@@ -2081,8 +2081,9 @@ const IMAGE_PATTERNS = /\b(generate|create|draw|make|render|show|flux)\b.*\b(ima
 
 export async function generateAIResponse(prompt, history = [], signal = null) {
   const cleanPrompt = prompt.trim();
+  const intent = analyzePublicUserIntent(cleanPrompt);
 
-  const marketRequest = parseMarketIntent(cleanPrompt);
+  const marketRequest = intent.type === 'app' ? null : parseMarketIntent(cleanPrompt);
   if (marketRequest) {
     try {
       const market = await fetchMarketData(marketRequest, signal);
@@ -2105,8 +2106,6 @@ export async function generateAIResponse(prompt, history = [], signal = null) {
       console.warn('FLUX image generation error; falling back to standard text response.', imgError);
     }
   }
-
-  const intent = analyzePublicUserIntent(cleanPrompt);
 
   try {
     const hostedAiResponse = await generateHostedAIResponse(cleanPrompt, intent, history, signal);
