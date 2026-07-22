@@ -228,6 +228,7 @@ export default function MarketCard({ market = {}, request = {}, onRefresh = () =
         <svg
           className="market-chart"
           viewBox="0 0 100 44"
+          preserveAspectRatio="none"
           role="img"
           aria-label={`${range} price trend${points ? '' : '; no data available'}`}
         >

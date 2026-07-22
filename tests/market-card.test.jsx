@@ -212,13 +212,39 @@ describe('MarketCard', () => {
     expect(screen.getByLabelText('Display currency')).toBeInTheDocument();
     expect(screen.getByLabelText('Quantity')).toBeInTheDocument();
     expect(screen.getByLabelText('Unit')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '1D' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: /refresh market data/i })).toBeInTheDocument();
+    const refresh = screen.getByRole('button', { name: /refresh market data/i });
+    const oneDay = screen.getByRole('button', { name: '1D' });
+    const oneWeek = screen.getByRole('button', { name: '1W' });
+    const oneMonth = screen.getByRole('button', { name: '1M' });
+    const asset = screen.getByLabelText('Asset');
+    const currency = screen.getByLabelText('Display currency');
+    expect(oneDay).toHaveAttribute('aria-pressed', 'true');
 
     await user.tab();
-    expect(document.activeElement).not.toBe(document.body);
-    await user.selectOptions(screen.getByLabelText('Display currency'), 'AED');
+    expect(refresh).toHaveFocus();
+    await user.tab();
+    expect(oneDay).toHaveFocus();
+    await user.tab();
+    expect(oneWeek).toHaveFocus();
+    await user.keyboard('[Enter]');
+    expect(onRefresh).toHaveBeenCalledWith({ ...request, range: '1W' });
+    await user.tab();
+    expect(oneMonth).toHaveFocus();
+    await user.tab();
+    expect(asset).toHaveFocus();
+    await user.tab();
+    expect(currency).toHaveFocus();
+    await user.selectOptions(currency, 'AED');
     expect(onRefresh).toHaveBeenCalledWith({ ...request, currency: 'AED', conversion: null });
+  });
+
+  it('stretches the accessible chart trace across its fluid SVG bounds', () => {
+    render(<MarketCard market={market} request={request} onRefresh={() => {}} refreshing={false} />);
+
+    const chart = screen.getByRole('img', { name: /1D price trend/i });
+    expect(chart).toHaveAttribute('viewBox', '0 0 100 44');
+    expect(chart).toHaveAttribute('preserveAspectRatio', 'none');
+    expect(chart.querySelector('polyline')).toHaveAttribute('vector-effect', 'non-scaling-stroke');
   });
 
   it('renders a sourced indicative quote with non-color movement text and exact provider time', () => {

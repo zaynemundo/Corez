@@ -693,7 +693,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .market-refresh-state {
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .market-status {
@@ -814,7 +814,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .market-chart-empty {
   margin-top: 0.4rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 0.75rem;
 }
 
