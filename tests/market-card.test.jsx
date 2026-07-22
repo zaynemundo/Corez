@@ -203,6 +203,24 @@ describe('App market message persistence', () => {
 });
 
 describe('MarketCard', () => {
+  it('exposes named controls that work from the keyboard', async () => {
+    const user = userEvent.setup();
+    const onRefresh = vi.fn();
+    render(<MarketCard market={market} request={request} onRefresh={onRefresh} refreshing={false} />);
+
+    expect(screen.getByLabelText('Asset')).toBeInTheDocument();
+    expect(screen.getByLabelText('Display currency')).toBeInTheDocument();
+    expect(screen.getByLabelText('Quantity')).toBeInTheDocument();
+    expect(screen.getByLabelText('Unit')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '1D' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /refresh market data/i })).toBeInTheDocument();
+
+    await user.tab();
+    expect(document.activeElement).not.toBe(document.body);
+    await user.selectOptions(screen.getByLabelText('Display currency'), 'AED');
+    expect(onRefresh).toHaveBeenCalledWith({ ...request, currency: 'AED', conversion: null });
+  });
+
   it('renders a sourced indicative quote with non-color movement text and exact provider time', () => {
     render(<MarketCard market={market} request={request} onRefresh={() => {}} refreshing={false} />);
 

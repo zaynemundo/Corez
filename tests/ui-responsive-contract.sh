@@ -5,6 +5,7 @@ css="src/index.css"
 app="src/App.jsx"
 canvas="src/components/CanvasPreview.jsx"
 sidebar="src/components/Sidebar.jsx"
+market_card="src/components/MarketCard.jsx"
 failures=0
 
 check() {
@@ -199,6 +200,20 @@ check_block_absent 'footer action button block does not use transition all' '.fo
 check 'reduced motion query disables sidebar animation' '@media \(prefers-reduced-motion: reduce\)'
 check_top_level_media 'sidebar prefers-reduced-motion at top level' '@media \(prefers-reduced-motion: reduce\)' "$css"
 check 'mobile sidebar uses safe-area insets' 'env\(safe-area-inset-'
+
+# Market Card Responsive and Accessibility Contract Checks
+check_block_property 'market card has a responsive grid' '.market-controls' 'grid-template-columns' 'repeat(2, minmax(0, 1fr))' "$css"
+check_block_property 'market card mobile controls collapse to one column' '.market-controls' 'grid-template-columns' '1fr' "$css"
+check_block_property 'market card chart remains width-fluid' '.market-chart' 'width' '100%' "$css"
+check_block_property 'market card stays within its chat message' '.market-card' 'max-width' '100%' "$css"
+check_block_property 'market card controls have touch-sized targets' '.market-refresh,' 'min-height' '44px' "$css"
+check 'market card has explicit focus-visible treatment' '\.market-card[^\{]*:focus-visible' "$css"
+check 'market card has restrained positive theme color' '--market-positive:' "$css"
+check 'market card has restrained negative theme color' '--market-negative:' "$css"
+check_block_property 'market card respects reduced motion' '.market-refresh svg' 'animation' 'none !important' "$css"
+check 'market card exposes a labelled region' 'role="region"' "$market_card"
+check 'market movement includes words in addition to color' "movingUp \? 'Up' : 'Down'" "$market_card"
+check 'market disclosure identifies indicative data' 'Indicative data' "$market_card"
 
 if (( failures > 0 )); then
   printf '%d responsive UI contract check(s) failed.\n' "$failures" >&2
