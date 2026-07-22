@@ -17,10 +17,7 @@ If OpenRouter is unavailable, missing, or returns no usable response, Corez uses
 
 ### Image generation
 
-`/api/image` uses the Workers AI binding with this fallback chain:
-
-1. `@cf/black-forest-labs/flux-1-schnell`
-2. `@cf/black-forest-labs/flux-1-dev`
+`/api/image` uses the Workers AI binding with `@cf/black-forest-labs/flux-1-schnell`.
 
 The `AI` binding is declared in `wrangler.jsonc`. Workers AI does not require a provider API key. `OPENROUTER_API_KEY` is optional and should be configured as a Worker secret when OpenRouter routing is required.
 

@@ -2,8 +2,7 @@ import assert from 'node:assert/strict';
 import worker from '../worker/index.js';
 
 const MODEL = '@cf/moonshotai/kimi-k2.7-code';
-const FLUX_PRIMARY_MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const FLUX_FALLBACK_MODEL = '@cf/black-forest-labs/flux-1-dev';
+const FLUX_MODEL = '@cf/black-forest-labs/flux-1-schnell';
 delete process.env.OPENROUTER_API_KEY;
 
 function env(overrides = {}) {
@@ -307,43 +306,10 @@ async function run() {
   );
   assert.equal(imageSuccessResponse.status, 200);
   const imageJsonData = await json(imageSuccessResponse);
-  assert.equal(fluxInvocation.model, FLUX_PRIMARY_MODEL);
-  assert.deepEqual(fluxInvocation.input, { prompt: 'A futuristic city' });
-  assert.equal(imageJsonData.model, FLUX_PRIMARY_MODEL);
+  assert.equal(fluxInvocation.model, FLUX_MODEL);
+  assert.deepEqual(fluxInvocation.input, { prompt: 'A futuristic city', num_steps: 4 });
+  assert.equal(imageJsonData.model, FLUX_MODEL);
   assert.match(imageJsonData.image, /^data:image\/png;base64,/);
-
-  const fluxCalls = [];
-  const originalConsoleWarn = console.warn;
-  console.warn = () => {};
-  let imageFallbackResponse;
-  try {
-    imageFallbackResponse = await worker.fetch(
-      new Request('https://corez.test/api/image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: 'Fallback image' })
-      }),
-      env({
-        AI: {
-          async run(model, input) {
-            fluxCalls.push({ model, input });
-            if (model === FLUX_PRIMARY_MODEL) {
-              throw new Error('primary unavailable');
-            }
-            return dummyBuffer;
-          }
-        }
-      })
-    );
-  } finally {
-    console.warn = originalConsoleWarn;
-  }
-  assert.equal(imageFallbackResponse.status, 200);
-  assert.deepEqual(fluxCalls, [
-    { model: FLUX_PRIMARY_MODEL, input: { prompt: 'Fallback image' } },
-    { model: FLUX_FALLBACK_MODEL, input: { prompt: 'Fallback image', num_steps: 4 } }
-  ]);
-  assert.equal((await json(imageFallbackResponse)).model, FLUX_FALLBACK_MODEL);
 
   console.log('Cloudflare Worker behavior contract passed.');
 }
