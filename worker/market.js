@@ -53,8 +53,8 @@ function validate(body) {
   if (!ALLOWED_CURRENCIES.has(body.currency) || !ALLOWED_RANGES.has(body.range)) {
     throw new TypeError('Unsupported currency or range.');
   }
-  const amount = Number(body.amount);
-  if (!Number.isFinite(amount) || amount <= 0 || amount > 1_000_000_000) {
+  const amount = body.amount;
+  if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0 || amount > 1_000_000_000) {
     throw new TypeError('Invalid amount.');
   }
   const units = asset.class === 'metal'
@@ -119,7 +119,15 @@ async function providerJson(path, params, apiKey, fetchImpl) {
       Number(response.headers.get('Retry-After')) || undefined
     );
   }
-  return response.json();
+  const data = await response.json();
+  if (data?.status === 'error') {
+    const status = Number(data.code);
+    throw new ProviderError(
+      Number.isFinite(status) ? status : 502,
+      Number(data.retry_after) || undefined
+    );
+  }
+  return data;
 }
 
 function isoTimestamp(epochSeconds, datetime) {
@@ -225,8 +233,13 @@ export async function handleMarket(request, env) {
   const cache = env.__MARKET_CACHE || globalThis.caches?.default;
   const now = env.__MARKET_NOW ? env.__MARKET_NOW() : Date.now();
   const key = cacheKey(normalized.request);
-  const cachedResponse = await cache?.match(key);
-  const cached = cachedResponse ? await cachedResponse.json() : null;
+  let cached;
+  try {
+    const cachedResponse = await cache?.match(key);
+    cached = cachedResponse ? await cachedResponse.json() : null;
+  } catch {
+    // Cache reads are best-effort; continue as a cache miss.
+  }
   const age = cached ? now - cached.cachedAt : Infinity;
   if (cached && age <= FRESH_MS) {
     return Response.json({
@@ -241,10 +254,14 @@ export async function handleMarket(request, env) {
       env.TWELVE_DATA_API_KEY,
       fetchImpl
     );
-    await cache?.put(key, Response.json(
-      { cachedAt: now, payload },
-      { headers: { 'Cache-Control': 's-maxage=900' } }
-    ));
+    try {
+      await cache?.put(key, Response.json(
+        { cachedAt: now, payload },
+        { headers: { 'Cache-Control': 's-maxage=900' } }
+      ));
+    } catch {
+      // Cache writes are best-effort and must not replace validated live data.
+    }
     return Response.json(payload);
   } catch (error) {
     if (cached && age <= STALE_MS) {

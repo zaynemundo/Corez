@@ -43,6 +43,8 @@ assert.deepEqual(await live.json(), {
 });
 
 assert.equal((await post({ symbol: 'https://evil.test' })).status, 400);
+assert.equal((await post({ assetId: 'gold', symbol: 'XAU/USD', assetClass: 'metal', currency: 'USD', amount: '1', unit: 'troy_ounce', range: '1D', conversion: null })).status, 400);
+assert.equal((await post({ assetId: 'gold', symbol: 'XAU/USD', assetClass: 'metal', currency: 'USD', amount: true, unit: 'troy_ounce', range: '1D', conversion: null })).status, 400);
 assert.equal((await post({
   assetId: 'gold',
   symbol: 'XAU/USD',
@@ -110,5 +112,79 @@ providerMode = 'malformed';
 const malformedProvider = await post({ ...cacheRequest, assetId: 'silver', symbol: 'XAG/USD' }, cacheEnvironment);
 assert.equal(malformedProvider.status, 502);
 assert.equal((await malformedProvider.json()).error.code, 'provider_unavailable');
+
+const rateLimitEnvelope = await post(cacheRequest, marketEnv({
+  __MARKET_FETCH: async () => Response.json({ code: 429, message: 'API credits exhausted', status: 'error' })
+}));
+assert.equal(rateLimitEnvelope.status, 429);
+assert.equal((await rateLimitEnvelope.json()).error.code, 'rate_limited');
+
+const providerErrorEnvelope = await post(cacheRequest, marketEnv({
+  __MARKET_FETCH: async () => Response.json({ code: 400, message: 'Invalid symbol', status: 'error' })
+}));
+assert.equal(providerErrorEnvelope.status, 502);
+assert.equal((await providerErrorEnvelope.json()).error.code, 'provider_unavailable');
+
+const cacheMatchFailure = await post(cacheRequest, marketEnv({
+  __MARKET_CACHE: {
+    async match() { throw new Error('cache unavailable'); },
+    async put() {}
+  }
+}));
+assert.equal(cacheMatchFailure.status, 200);
+assert.equal((await cacheMatchFailure.json()).status, 'live');
+
+const corruptCacheEntry = await post(cacheRequest, marketEnv({
+  __MARKET_CACHE: {
+    async match() { return new Response('{'); },
+    async put() {}
+  }
+}));
+assert.equal(corruptCacheEntry.status, 200);
+assert.equal((await corruptCacheEntry.json()).status, 'live');
+
+const cachePutFailure = await post(cacheRequest, marketEnv({
+  __MARKET_CACHE: {
+    async match() { return undefined; },
+    async put() { throw new Error('cache write unavailable'); }
+  }
+}));
+assert.equal(cachePutFailure.status, 200);
+assert.equal((await cachePutFailure.json()).status, 'live');
+
+let boundaryNow = 2_000_000;
+let boundaryMode = 'live';
+let boundaryProviderCalls = 0;
+const boundaryEnvironment = marketEnv({
+  __MARKET_NOW: () => boundaryNow,
+  __MARKET_FETCH: async (url) => {
+    boundaryProviderCalls += 1;
+    if (boundaryMode === 'rate-limit') {
+      return new Response('', { status: 429, headers: { 'Retry-After': '30' } });
+    }
+    const parsed = new URL(url);
+    if (parsed.pathname.endsWith('/quote')) return Response.json({ symbol: 'XAU/USD', name: 'Gold Spot', currency: 'USD', close: '2412.50', open: '2400.00', high: '2420.00', low: '2395.00', previous_close: '2390.00', change: '22.50', percent_change: '0.9414', timestamp: 1784703600, is_market_open: true });
+    if (parsed.pathname.endsWith('/time_series')) return Response.json({ values: [{ datetime: '2026-07-22 07:00:00', close: '2400.00' }] });
+    return Response.json({ symbol: 'USD/AED', rate: '3.6725', timestamp: 1784703600 });
+  }
+});
+assert.equal((await post(cacheRequest, boundaryEnvironment)).status, 200);
+const boundaryInitialCalls = boundaryProviderCalls;
+boundaryNow += 60_000;
+const exactFreshBoundary = await (await post(cacheRequest, boundaryEnvironment)).json();
+assert.equal(exactFreshBoundary.status, 'live');
+assert.equal(exactFreshBoundary.meta.cached, true);
+assert.equal(boundaryProviderCalls, boundaryInitialCalls);
+
+boundaryMode = 'rate-limit';
+boundaryNow = 2_000_000 + 15 * 60_000;
+const exactStaleBoundary = await (await post(cacheRequest, boundaryEnvironment)).json();
+assert.equal(exactStaleBoundary.status, 'stale');
+assert.equal(exactStaleBoundary.meta.stale, true);
+
+boundaryNow += 1;
+const beyondStaleBoundary = await post(cacheRequest, boundaryEnvironment);
+assert.equal(beyondStaleBoundary.status, 429);
+assert.equal((await beyondStaleBoundary.json()).error.code, 'rate_limited');
 
 console.log('Market Worker contract passed.');
