@@ -817,7 +817,11 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
-/* 100% Message Body Width 8-Bit Square Worm Progress Bar */
+/* 100% Message Body Width 8-Bit Square Worm Progress Bar for Game Development */
+.message-wrapper.ai.game-dev-loading {
+  width: 100%;
+}
+
 .square-worm-progress-container {
   width: 100%;
   max-width: 100%;
@@ -865,38 +869,37 @@ h1, h2, h3, h4, h5, h6 {
   opacity: 0.8;
 }
 
-.square-worm-line-fill {
-  position: absolute;
-  top: 7px;
-  left: 0;
-  height: 4px;
-  background: var(--text-primary);
-  border-radius: 9999px;
-  transition: width 0.25s linear;
-  z-index: 1;
-}
-
-/* Crawling 8-Bit Square Worm Body & Undulation Animation */
+/* Square Worm Head Wrapper getting longer across full width track */
 .square-worm-head-wrapper {
   position: absolute;
   top: 2px;
+  left: 0;
+  height: 14px;
   z-index: 3;
-  transition: left 0.25s linear;
+  transition: width 0.25s linear;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.4) 75%, var(--text-primary) 100%);
+  border-radius: 4px;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.25);
+  overflow: visible;
+  min-width: 14px;
 }
 
 .square-worm-body {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
+  justify-content: flex-end;
   gap: 1.5px;
+  padding-right: 2px;
+  height: 100%;
 }
 
 .worm-pixel {
   background: var(--text-primary);
   display: inline-block;
   position: relative;
-  box-shadow: none;
 }
 
 .worm-pixel.seg-tail {
@@ -914,8 +917,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .worm-pixel.seg-head {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   animation: wormCrawling 0.35s infinite ease-in-out;
 }
 
@@ -933,30 +936,9 @@ h1, h2, h3, h4, h5, h6 {
     transform: translateY(0);
   }
   50% {
-    transform: translateY(-3px) scaleY(1.15) scaleX(0.88);
+    transform: translateY(-2px) scaleY(1.1) scaleX(0.9);
   }
 }
-
-.active-pulse-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #a855f7;
-  box-shadow: 0 0 8px #a855f7;
-  margin-left: auto;
-  animation: pulseDot 1.4s infinite ease-in-out;
-}
-
-@keyframes pulseDot {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.5); opacity: 0.4; }
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
 .preview-action {
   display: flex;
   align-items: center;

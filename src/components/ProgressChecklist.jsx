@@ -29,18 +29,14 @@ export default function ProgressChecklist() {
         <span className="square-worm-percentage">{displayPercent}%</span>
       </div>
 
-      {/* 100% Message Body Width Progress Track with 8-Bit Square Worm */}
+      {/* 100% Message Body Width Progress Track with 8-Bit Square Worm getting longer */}
       <div className="square-worm-track-wrapper">
         <div className="square-worm-track-bg" />
-        <div 
-          className="square-worm-line-fill" 
-          style={{ width: `${Math.min(progressPercent, 100)}%` }} 
-        />
 
-        {/* Crawling 8-Bit Square Worm */}
+        {/* Crawling 8-Bit Square Worm Head Wrapper getting longer */}
         <div 
           className="square-worm-head-wrapper" 
-          style={{ left: `calc(${Math.min(progressPercent, 97)}% - 14px)` }}
+          style={{ width: `${Math.min(progressPercent, 100)}%` }}
         >
           <div className="square-worm-body">
             <span className="worm-pixel seg-tail" />

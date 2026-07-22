@@ -55,6 +55,13 @@ Respond with the likely goal, useful next action, the appropriate skill if appli
 
 import { classifyIntent } from './intentClassifier.js';
 
+const GAME_DEV_PATTERNS = /\b(game|gamedev|game development|play|chess|snake|pong|shooter|arcade|platformer|canvas game|2d game|3d game|simulator|physics sandbox|bot enemy|rpg|enemy|space defender|retro game|interactive game)\b|\b(build|make|create|develop|design)\b.*\b(game|simulator|simulation|sandbox)\b/i;
+
+export function isGameDevIntent(prompt) {
+  if (!prompt) return false;
+  return GAME_DEV_PATTERNS.test(prompt);
+}
+
 const INTENT_PATTERNS = {
   app: /\b(build|make|create|generate|design|launch|prototype|develop|ship)\b.*\b(app|tool|website|site|landing page|dashboard|portal|widget|calculator|timer|game|simulator|preview|html|bot|enemy)\b|\b(app|tool|website|site|landing page|dashboard|portal|widget|calculator|timer|game|simulator|bot|enemy)\b.*\b(build|make|create|generate|design|launch|prototype|develop|ship)\b|\b(game|play|chess|snake|pong|shooter|quiz|puzzle|simulator|canvas|bot|enemy)\b/i,
   code: /\b(code|debug|bug|fix|error|javascript|typescript|python|react|css|html|component|function|api|compile|stack trace)\b/i,
@@ -62,6 +69,8 @@ const INTENT_PATTERNS = {
   explanation: /\b(explain|what is|what are|how does|why does|teach me|break down|understand|compare)\b/i,
   swarm: /\b(swarm|multi-agent|agents|orchestrate|orchestration|superpowers|plan|architect|complex)\b/i
 };
+
+
 
 function analyzeIntentWithRules(cleanPrompt) {
   const lower = cleanPrompt.toLowerCase();
