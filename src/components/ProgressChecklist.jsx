@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 
 const PIPELINE_STEPS = [
-  { min: 0, max: 15, label: '1. Intent Detection' },
-  { min: 15, max: 30, label: '2. Full-Width Game Dev Loading UI' },
-  { min: 30, max: 48, label: '3. Generating Assets via FLUX 1 (Cloudflare AI)' },
-  { min: 48, max: 68, label: '4. Game Synthesizer Engine (Canvas & Physics)' },
-  { min: 68, max: 84, label: '5. MiMo V2.5 Visual Inspection & Layering Audit' },
-  { min: 84, max: 96, label: '6. Final Touches & Fallback Verification' },
-  { min: 96, max: 100, label: '7. Launching Live Canvas' }
+  { min: 0, max: 12, label: '1. Intent & Spec Synthesis (DeepSeek Lead)' },
+  { min: 12, max: 25, label: '2. Full-Width 8-Bit Progress Loading Track' },
+  { min: 25, max: 40, label: '3. Asset Pipeline (FLUX 1 Art + WebAudio Synth)' },
+  { min: 40, max: 58, label: '4. High-Performance Engine & Physics Assembly' },
+  { min: 58, max: 74, label: '5. MiMo V2.5 Visual Inspection & Layering Audit' },
+  { min: 74, max: 88, label: '6. Multi-Input Controls (WASD / Touch / D-Pad)' },
+  { min: 88, max: 96, label: '7. Empirical Runtime & Fallback Verification' },
+  { min: 96, max: 100, label: '8. Launching Live Canvas Sandbox' }
 ];
 
 export default function ProgressChecklist() {
