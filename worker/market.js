@@ -92,6 +92,37 @@ function cacheKey(request) {
   return new Request(`https://corez-market-cache.internal/quote?${query}`, { method: 'GET' });
 }
 
+function isObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isValidIsoTimestamp(value) {
+  if (typeof value !== 'string') return false;
+  const date = new Date(value);
+  return !Number.isNaN(date.valueOf()) && date.toISOString() === value;
+}
+
+function isUsableCacheEntry(entry, now) {
+  if (!isObject(entry) || typeof entry.cachedAt !== 'number' || !Number.isFinite(entry.cachedAt)) {
+    return false;
+  }
+  const age = now - entry.cachedAt;
+  const payload = entry.payload;
+  return age >= 0
+    && isObject(payload)
+    && payload.kind === 'market'
+    && (payload.status === 'live' || payload.status === 'delayed')
+    && isObject(payload.quote)
+    && typeof payload.quote.price === 'number'
+    && Number.isFinite(payload.quote.price)
+    && payload.quote.price > 0
+    && isValidIsoTimestamp(payload.quote.timestamp)
+    && isObject(payload.series)
+    && Array.isArray(payload.series.points)
+    && isObject(payload.conversion)
+    && isObject(payload.meta);
+}
+
 class ProviderError extends Error {
   constructor(status, retryAfter) {
     super(`Provider request failed with status ${status}`);
@@ -236,7 +267,8 @@ export async function handleMarket(request, env) {
   let cached;
   try {
     const cachedResponse = await cache?.match(key);
-    cached = cachedResponse ? await cachedResponse.json() : null;
+    const parsed = cachedResponse ? await cachedResponse.json() : null;
+    cached = isUsableCacheEntry(parsed, now) ? parsed : null;
   } catch {
     // Cache reads are best-effort; continue as a cache miss.
   }

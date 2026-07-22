@@ -152,6 +152,53 @@ const cachePutFailure = await post(cacheRequest, marketEnv({
 assert.equal(cachePutFailure.status, 200);
 assert.equal((await cachePutFailure.json()).status, 'live');
 
+const semanticCacheNow = 1_500_000;
+const validCachePayload = await (await post(cacheRequest)).json();
+const malformedCacheEntries = [
+  ['null payload', { cachedAt: semanticCacheNow, payload: null }],
+  ['empty payload', { cachedAt: semanticCacheNow, payload: {} }],
+  ['missing cachedAt', { payload: validCachePayload }],
+  ['non-finite cachedAt', { cachedAt: Infinity, payload: validCachePayload }],
+  ['future cachedAt', { cachedAt: semanticCacheNow + 1, payload: validCachePayload }],
+  ['wrong payload kind', { cachedAt: semanticCacheNow, payload: { ...validCachePayload, kind: 'other' } }],
+  ['unsupported status', { cachedAt: semanticCacheNow, payload: { ...validCachePayload, status: 'unknown' } }],
+  ['missing quote', { cachedAt: semanticCacheNow, payload: { ...validCachePayload, quote: null } }],
+  ['non-finite quote price', { cachedAt: semanticCacheNow, payload: { ...validCachePayload, quote: { ...validCachePayload.quote, price: Infinity } } }],
+  ['non-positive quote price', { cachedAt: semanticCacheNow, payload: { ...validCachePayload, quote: { ...validCachePayload.quote, price: 0 } } }],
+  ['invalid quote timestamp', { cachedAt: semanticCacheNow, payload: { ...validCachePayload, quote: { ...validCachePayload.quote, timestamp: 'not-a-date' } } }],
+  ['invalid series points', { cachedAt: semanticCacheNow, payload: { ...validCachePayload, series: { ...validCachePayload.series, points: null } } }],
+  ['missing conversion', { cachedAt: semanticCacheNow, payload: { ...validCachePayload, conversion: null } }],
+  ['missing meta', { cachedAt: semanticCacheNow, payload: { ...validCachePayload, meta: null } }]
+];
+for (const [label, entry] of malformedCacheEntries) {
+  const response = await post(cacheRequest, marketEnv({
+    __MARKET_NOW: () => semanticCacheNow,
+    __MARKET_CACHE: {
+      async match() { return { async json() { return entry; } }; },
+      async put() {}
+    }
+  }));
+  assert.equal(response.status, 200, label);
+  const payload = await response.json();
+  assert.equal(payload.status, 'live', label);
+  assert.equal(payload.meta.cached, false, label);
+}
+
+const malformedStaleEntry = {
+  cachedAt: semanticCacheNow - 2 * 60_000,
+  payload: { ...validCachePayload, quote: null }
+};
+const malformedStaleResponse = await post(cacheRequest, marketEnv({
+  __MARKET_NOW: () => semanticCacheNow,
+  __MARKET_CACHE: {
+    async match() { return { async json() { return malformedStaleEntry; } }; },
+    async put() {}
+  },
+  __MARKET_FETCH: async () => new Response('', { status: 429 })
+}));
+assert.equal(malformedStaleResponse.status, 429);
+assert.equal((await malformedStaleResponse.json()).error.code, 'rate_limited');
+
 let boundaryNow = 2_000_000;
 let boundaryMode = 'live';
 let boundaryProviderCalls = 0;
