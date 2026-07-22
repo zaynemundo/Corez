@@ -3,9 +3,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fetchMarketData } from '../src/services/marketService.js';
 import { generateAIResponse } from '../src/services/aiService.js';
 import {
-  isCurrentMarketRefresh,
-  nextMarketRefreshVersion,
+  marketRefreshKey,
+  normalizeMarketMessageIds,
   replaceMarketMessageInSession,
+  runMarketRefresh,
   toAssistantMessage
 } from '../src/App.jsx';
 
@@ -25,7 +26,8 @@ describe('assistant market message persistence', () => {
       type: 'market',
       request: { assetId: 'gold' },
       market: { status: 'live' }
-    })).toEqual({
+    }, () => 'market-new')).toEqual({
+      id: 'market-new',
       role: 'assistant',
       type: 'market',
       content: '',
@@ -40,32 +42,148 @@ describe('assistant market message persistence', () => {
 
   it('updates only the exact originating session and message', () => {
     const sessions = [
-      { id: 'origin', messages: [{ role: 'assistant', type: 'market', content: '', request: { assetId: 'gold' }, market: { status: 'live' } }] },
+      { id: 'origin', messages: [{ id: 'market-gold', role: 'assistant', type: 'market', content: '', request: { assetId: 'gold' }, market: { status: 'live' } }] },
       { id: 'active-now', messages: [{ role: 'assistant', content: 'Old answer' }] }
     ];
     const nextRequest = { assetId: 'bitcoin' };
     const nextMarket = { status: 'live', asset: { id: 'bitcoin' } };
 
-    const updated = replaceMarketMessageInSession(sessions, 'origin', 0, nextRequest, nextMarket);
+    const updated = replaceMarketMessageInSession(sessions, 'origin', 'market-gold', nextRequest, nextMarket);
 
     expect(updated[0].messages[0]).toEqual(expect.objectContaining({ request: nextRequest, market: nextMarket }));
     expect(updated[1]).toBe(sessions[1]);
     expect(sessions[0].messages[0].request).toEqual({ assetId: 'gold' });
   });
 
-  it('rejects stale refresh completions after a newer refresh starts', () => {
-    const versions = new Map();
-    const key = JSON.stringify(['origin', 0]);
-    const olderVersion = nextMarketRefreshVersion(versions, key);
-    const newerVersion = nextMarketRefreshVersion(versions, key);
+  it('migrates legacy market messages to unique stable IDs without changing text messages', () => {
+    const textMessage = { role: 'assistant', content: 'Old answer' };
+    const generatedIds = ['already-stable', 'market-migrated-1', 'market-migrated-2'][Symbol.iterator]();
+    const sessions = [{
+      id: 'legacy',
+      messages: [
+        textMessage,
+        { role: 'assistant', type: 'market', content: '', request: {}, market: {} },
+        { id: 'already-stable', role: 'assistant', type: 'market', content: '', request: {}, market: {} },
+        { id: 'already-stable', role: 'assistant', type: 'market', content: '', request: {}, market: {} }
+      ]
+    }];
 
-    expect(isCurrentMarketRefresh(versions, key, olderVersion)).toBe(false);
-    expect(isCurrentMarketRefresh(versions, key, newerVersion)).toBe(true);
+    const migrated = normalizeMarketMessageIds(sessions, () => generatedIds.next().value);
 
-    versions.delete(key);
-    const laterVersion = nextMarketRefreshVersion(versions, key);
-    expect(isCurrentMarketRefresh(versions, key, olderVersion)).toBe(false);
-    expect(isCurrentMarketRefresh(versions, key, laterVersion)).toBe(true);
+    expect(migrated[0].messages[0]).toBe(textMessage);
+    expect(migrated[0].messages.map((message) => message.id)).toEqual([
+      undefined,
+      'market-migrated-1',
+      'already-stable',
+      'market-migrated-2'
+    ]);
+    expect(normalizeMarketMessageIds(migrated, () => 'must-not-run')).toEqual(migrated);
+  });
+
+  it('updates by stable ID after preceding messages reorder and no-ops after deletion', () => {
+    const target = { id: 'market-target', role: 'assistant', type: 'market', content: '', request: {}, market: { quote: { price: 1 } } };
+    const reordered = [{ id: 'origin', messages: [target, { role: 'assistant', content: 'Earlier text' }] }];
+
+    const updated = replaceMarketMessageInSession(reordered, 'origin', 'market-target', { assetId: 'gold' }, { quote: { price: 2 } });
+    expect(updated[0].messages[0].market.quote.price).toBe(2);
+    expect(replaceMarketMessageInSession([{ id: 'origin', messages: [] }], 'origin', 'market-target', {}, {}))
+      .toEqual([{ id: 'origin', messages: [] }]);
+  });
+
+  it('keeps only the newest out-of-order completion for one card and never reuses tokens', async () => {
+    const pending = [];
+    let sessions = [{ id: 'origin', messages: [{ id: 'market-target', role: 'assistant', type: 'market', content: '', request: {}, market: { quote: { price: 1 } } }] }];
+    let refreshing = new Set();
+    const refreshTokens = new Map();
+    const tokenSequence = { current: 0 };
+    const options = {
+      sessionId: 'origin', messageId: 'market-target', nextRequest: { assetId: 'gold' }, refreshTokens, tokenSequence,
+      setSessions: (update) => { sessions = update(sessions); },
+      setRefreshingMarketKeys: (update) => { refreshing = update(refreshing); },
+      fetchMarket: () => new Promise((resolve) => pending.push(resolve))
+    };
+
+    const older = runMarketRefresh(options);
+    const newer = runMarketRefresh(options);
+    expect(tokenSequence.current).toBe(2);
+    pending[1]({ quote: { price: 3 } });
+    await newer;
+    pending[0]({ quote: { price: 2 } });
+    await older;
+
+    expect(sessions[0].messages[0].market.quote.price).toBe(3);
+    expect(refreshing).toEqual(new Set());
+
+    const later = runMarketRefresh({ ...options, fetchMarket: async () => ({ quote: { price: 4 } }) });
+    await later;
+    expect(tokenSequence.current).toBe(3);
+    expect(sessions[0].messages[0].market.quote.price).toBe(4);
+  });
+
+  it('tracks concurrent cards independently and resolves by message ID after reorder', async () => {
+    const pending = new Map();
+    let sessions = [{ id: 'origin', messages: [
+      { id: 'market-a', role: 'assistant', type: 'market', content: '', request: {}, market: { quote: { price: 1 } } },
+      { id: 'market-b', role: 'assistant', type: 'market', content: '', request: {}, market: { quote: { price: 10 } } }
+    ] }];
+    let refreshing = new Set();
+    const common = {
+      sessionId: 'origin', refreshTokens: new Map(), tokenSequence: { current: 0 },
+      setSessions: (update) => { sessions = update(sessions); },
+      setRefreshingMarketKeys: (update) => { refreshing = update(refreshing); },
+      fetchMarket: (request) => new Promise((resolve) => pending.set(request.assetId, resolve))
+    };
+    const refreshA = runMarketRefresh({ ...common, messageId: 'market-a', nextRequest: { assetId: 'a' } });
+    const refreshB = runMarketRefresh({ ...common, messageId: 'market-b', nextRequest: { assetId: 'b' } });
+    expect(refreshing).toEqual(new Set([
+      marketRefreshKey('origin', 'market-a'),
+      marketRefreshKey('origin', 'market-b')
+    ]));
+
+    sessions = [{ ...sessions[0], messages: [...sessions[0].messages].reverse() }];
+    pending.get('a')({ quote: { price: 2 } });
+    await refreshA;
+    expect(refreshing).toEqual(new Set([marketRefreshKey('origin', 'market-b')]));
+    expect(sessions[0].messages.find((message) => message.id === 'market-a').market.quote.price).toBe(2);
+
+    sessions = [{ ...sessions[0], messages: sessions[0].messages.filter((message) => message.id !== 'market-b') }];
+    pending.get('b')({ quote: { price: 20 } });
+    await refreshB;
+    expect(sessions[0].messages.some((message) => message.id === 'market-b')).toBe(false);
+    expect(refreshing).toEqual(new Set());
+  });
+
+  it('maps current failures safely and leaves prior data intact on abort', async () => {
+    const originalMarket = { quote: { price: 1 } };
+    let sessions = [{ id: 'origin', messages: [{ id: 'market-a', role: 'assistant', type: 'market', content: '', request: {}, market: originalMarket }] }];
+    let refreshing = new Set();
+    const common = {
+      sessionId: 'origin', messageId: 'market-a', nextRequest: { assetId: 'gold' },
+      refreshTokens: new Map(), tokenSequence: { current: 0 },
+      setSessions: (update) => { sessions = update(sessions); },
+      setRefreshingMarketKeys: (update) => { refreshing = update(refreshing); }
+    };
+
+    await runMarketRefresh({
+      ...common,
+      fetchMarket: async () => { throw Object.assign(new Error('Provider unavailable'), { code: 'provider_unavailable' }); },
+      toUnavailable: (error) => ({ status: 'unavailable', error: { code: error.code, message: 'Safe error' } })
+    });
+    expect(sessions[0].messages[0].market).toEqual({
+      status: 'unavailable',
+      error: { code: 'provider_unavailable', message: 'Safe error' }
+    });
+    expect(refreshing).toEqual(new Set());
+
+    sessions = [{ id: 'origin', messages: [{ id: 'market-a', role: 'assistant', type: 'market', content: '', request: {}, market: originalMarket }] }];
+    await runMarketRefresh({
+      ...common,
+      refreshTokens: new Map(),
+      tokenSequence: { current: 0 },
+      fetchMarket: async () => { throw new DOMException('Cancelled', 'AbortError'); }
+    });
+    expect(sessions[0].messages[0].market).toBe(originalMarket);
+    expect(refreshing).toEqual(new Set());
   });
 });
 

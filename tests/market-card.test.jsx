@@ -126,15 +126,37 @@ describe('App market message persistence', () => {
     Element.prototype.scrollIntoView = vi.fn();
   }
 
-  it('loads legacy text messages from localStorage unchanged', () => {
+  it('loads legacy text unchanged and persists a stable ID migration for legacy market messages', async () => {
     stubBrowserLayout();
     localStorage.setItem('corez_sessions', JSON.stringify([
-      { id: 'legacy', title: 'Legacy', messages: [{ role: 'assistant', content: 'Persisted old answer' }] }
+      {
+        id: 'legacy',
+        title: 'Legacy',
+        messages: [
+          { role: 'assistant', content: 'Persisted old answer' },
+          { role: 'assistant', type: 'market', content: '', request, market }
+        ]
+      }
     ]));
 
     render(<App />);
 
     expect(screen.getByText('Persisted old answer')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: /Gold Spot market quote/i })).toBeInTheDocument();
+    let migratedId;
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem('corez_sessions'));
+      migratedId = stored[0].messages[1].id;
+      expect(migratedId).toMatch(/^market-/);
+      expect(stored[0].messages[0]).toEqual({ role: 'assistant', content: 'Persisted old answer' });
+    });
+
+    cleanup();
+    render(<App />);
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem('corez_sessions'));
+      expect(stored[0].messages[1].id).toBe(migratedId);
+    });
   });
 
   it('refreshes the exact origin message after the active session changes', async () => {

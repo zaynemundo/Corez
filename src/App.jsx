@@ -14,7 +14,27 @@ function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-export function toAssistantMessage(response) {
+export function createMarketMessageId() {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return `market-${globalThis.crypto.randomUUID()}`;
+  }
+  const bytes = new Uint8Array(16);
+  globalThis.crypto.getRandomValues(bytes);
+  return `market-${Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+}
+
+function nextUniqueMarketMessageId(usedIds, createId) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const id = createId();
+    if (typeof id === 'string' && id && !usedIds.has(id)) {
+      usedIds.add(id);
+      return id;
+    }
+  }
+  throw new Error('Unable to create a unique market message ID.');
+}
+
+export function toAssistantMessage(response, createId = createMarketMessageId) {
   if (typeof response === 'string') {
     return { role: 'assistant', content: response };
   }
@@ -23,6 +43,7 @@ export function toAssistantMessage(response) {
     && isObject(response.request)
     && isObject(response.market)) {
     return {
+      id: createId(),
       role: 'assistant',
       type: 'market',
       content: '',
@@ -33,9 +54,35 @@ export function toAssistantMessage(response) {
   return { role: 'assistant', content: '' };
 }
 
-export function replaceMarketMessageInSession(sessions, sessionId, messageIndex, request, market) {
+export function normalizeMarketMessageIds(sessions, createId = createMarketMessageId) {
+  const usedIds = new Set(
+    sessions.flatMap((session) => session.messages)
+      .filter((message) => message?.type === 'market' && typeof message.id === 'string' && message.id)
+      .map((message) => message.id)
+  );
+  const seenExistingIds = new Set();
+  return sessions.map((session) => {
+    let changed = false;
+    const messages = session.messages.map((message) => {
+      if (message?.type !== 'market') return message;
+      if (typeof message.id === 'string' && message.id && !seenExistingIds.has(message.id)) {
+        seenExistingIds.add(message.id);
+        return message;
+      }
+      changed = true;
+      return { ...message, id: nextUniqueMarketMessageId(usedIds, createId) };
+    });
+    return changed ? { ...session, messages } : session;
+  });
+}
+
+export function replaceMarketMessageInSession(sessions, sessionId, messageId, request, market) {
   return sessions.map((session) => {
     if (session.id !== sessionId) return session;
+    const messageIndex = session.messages.findIndex((message) => (
+      message?.type === 'market' && message.id === messageId
+    ));
+    if (messageIndex === -1) return session;
     return {
       ...session,
       messages: session.messages.map((message, index) => (
@@ -55,18 +102,55 @@ function isDuplicateAssistantMessage(message, candidate) {
     && JSON.stringify(message.market) === JSON.stringify(candidate.market);
 }
 
-function marketRefreshKey(sessionId, messageIndex) {
-  return JSON.stringify([sessionId, messageIndex]);
+export function marketRefreshKey(sessionId, messageId) {
+  return JSON.stringify([sessionId, messageId]);
 }
 
-export function nextMarketRefreshVersion(versions, key) {
-  const version = Symbol(key);
-  versions.set(key, version);
-  return version;
-}
+export async function runMarketRefresh({
+  sessionId,
+  messageId,
+  nextRequest,
+  refreshTokens,
+  tokenSequence,
+  setRefreshingMarketKeys,
+  setSessions,
+  fetchMarket = fetchMarketData,
+  toUnavailable = unavailableMarket
+}) {
+  const key = marketRefreshKey(sessionId, messageId);
+  const token = ++tokenSequence.current;
+  refreshTokens.set(key, token);
+  setRefreshingMarketKeys((previous) => new Set(previous).add(key));
 
-export function isCurrentMarketRefresh(versions, key, version) {
-  return versions.get(key) === version;
+  try {
+    const market = await fetchMarket(nextRequest);
+    if (refreshTokens.get(key) !== token) return;
+    setSessions((previous) => replaceMarketMessageInSession(
+      previous,
+      sessionId,
+      messageId,
+      nextRequest,
+      market
+    ));
+  } catch (error) {
+    if (error?.name === 'AbortError' || refreshTokens.get(key) !== token) return;
+    setSessions((previous) => replaceMarketMessageInSession(
+      previous,
+      sessionId,
+      messageId,
+      nextRequest,
+      toUnavailable(error)
+    ));
+  } finally {
+    if (refreshTokens.get(key) === token) {
+      refreshTokens.delete(key);
+      setRefreshingMarketKeys((previous) => {
+        const next = new Set(previous);
+        next.delete(key);
+        return next;
+      });
+    }
+  }
 }
 
 function getTaskTypeFromMessages(messages) {
@@ -100,7 +184,7 @@ const INITIAL_SESSIONS = [
 export default function App() {
   const [sessions, setSessions] = useState(() => {
     const saved = localStorage.getItem('corez_sessions');
-    return saved ? JSON.parse(saved) : INITIAL_SESSIONS;
+    return saved ? normalizeMarketMessageIds(JSON.parse(saved)) : INITIAL_SESSIONS;
   });
 
   const [activeSessionId, setActiveSessionId] = useState(() => {
@@ -129,7 +213,8 @@ export default function App() {
   const messagesEndRef = useRef(null);
   const chatInputRef = useRef(null);
   const abortControllerRef = useRef(null);
-  const marketRefreshVersionsRef = useRef(new Map());
+  const marketRefreshTokensRef = useRef(new Map());
+  const marketRefreshSequenceRef = useRef(0);
 
   useEffect(() => {
     const mobileQuery = window.matchMedia('(max-width: 767px)');
@@ -364,42 +449,17 @@ export default function App() {
     }
   };
 
-  const handleRefreshMarket = async (messageIndex, nextRequest) => {
+  const handleRefreshMarket = async (messageId, nextRequest) => {
     const sessionId = activeSessionId;
-    const key = marketRefreshKey(sessionId, messageIndex);
-    const version = nextMarketRefreshVersion(marketRefreshVersionsRef.current, key);
-    setRefreshingMarketKeys((previous) => new Set(previous).add(key));
-
-    try {
-      const market = await fetchMarketData(nextRequest);
-      if (!isCurrentMarketRefresh(marketRefreshVersionsRef.current, key, version)) return;
-      setSessions((previous) => replaceMarketMessageInSession(
-        previous,
-        sessionId,
-        messageIndex,
-        nextRequest,
-        market
-      ));
-    } catch (error) {
-      if (error?.name === 'AbortError'
-        || !isCurrentMarketRefresh(marketRefreshVersionsRef.current, key, version)) return;
-      setSessions((previous) => replaceMarketMessageInSession(
-        previous,
-        sessionId,
-        messageIndex,
-        nextRequest,
-        unavailableMarket(error)
-      ));
-    } finally {
-      if (isCurrentMarketRefresh(marketRefreshVersionsRef.current, key, version)) {
-        marketRefreshVersionsRef.current.delete(key);
-        setRefreshingMarketKeys((previous) => {
-          const next = new Set(previous);
-          next.delete(key);
-          return next;
-        });
-      }
-    }
+    return runMarketRefresh({
+      sessionId,
+      messageId,
+      nextRequest,
+      refreshTokens: marketRefreshTokensRef.current,
+      tokenSequence: marketRefreshSequenceRef,
+      setRefreshingMarketKeys,
+      setSessions
+    });
   };
 
   return (
@@ -451,12 +511,12 @@ export default function App() {
                   <div className="messages-inner">
                     {activeSession?.messages.map((msg, idx) => (
                       <ChatMessage
-                        key={idx}
+                        key={msg.type === 'market' ? msg.id : idx}
                         message={msg}
                         onRunInCanvas={handleRunInCanvas}
                         onReviseCode={handleReviseCode}
-                        onRefreshMarket={(nextRequest) => handleRefreshMarket(idx, nextRequest)}
-                        marketRefreshing={refreshingMarketKeys.has(marketRefreshKey(activeSession.id, idx))}
+                        onRefreshMarket={(nextRequest) => handleRefreshMarket(msg.id, nextRequest)}
+                        marketRefreshing={refreshingMarketKeys.has(marketRefreshKey(activeSession.id, msg.id))}
                       />
                     ))}
                     {isThinking && (
