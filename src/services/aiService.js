@@ -54,6 +54,8 @@ Respond with the likely goal, useful next action, the appropriate skill if appli
 `;
 
 import { classifyIntent } from './intentClassifier.js';
+import { parseMarketIntent } from './marketIntent.js';
+import { fetchMarketData, unavailableMarket } from './marketService.js';
 
 const GAME_DEV_PATTERNS = /\b(game|gamedev|game development|play|chess|snake|pong|shooter|arcade|platformer|canvas game|2d game|3d game|simulator|physics sandbox|bot enemy|rpg|enemy|space defender|retro game|interactive game)\b|\b(build|make|create|develop|design)\b.*\b(game|simulator|simulation|sandbox)\b/i;
 
@@ -1768,7 +1770,7 @@ function synthesizeFinancialTerminal() {
     <div class="header-bar">
       <div class="title">
         <span>COREZ FINANCIAL TERMINAL</span>
-        <span class="status-badge">● LIVE DATA</span>
+        <span class="status-badge">DEMO DATA</span>
       </div>
       <div class="search-box">
         <input type="text" id="searchInput" class="search-input" placeholder="Search AAPL, NVDA, BTC, EUR/USD...">
@@ -1833,10 +1835,10 @@ function synthesizeFinancialTerminal() {
       'AAPL': { name: 'Apple Inc.', price: 333.69, change: '+1.42%', high: 335.20, low: 329.10, vol: '48.2M', cap: '$5.12T', points: [329, 330, 331.5, 331, 333, 332.8, 333.69] },
       'NVDA': { name: 'NVIDIA Corp.', price: 207.06, change: '+2.85%', high: 209.40, low: 201.50, vol: '62.4M', cap: '$5.08T', points: [201, 203, 204, 206, 205.5, 208, 207.06] },
       'TSLA': { name: 'Tesla Inc.', price: 379.76, change: '-0.65%', high: 384.10, low: 375.00, vol: '34.8M', cap: '$1.21T', points: [383, 381, 379, 377, 380, 378, 379.76] },
-      'BTC': { name: 'Bitcoin', price: 66259.00, change: '+1.30%', high: 66800, low: 65100, vol: '$32.1B', cap: '$1.31T', points: [65100, 65400, 65900, 65700, 66100, 66400, 66259] },
+      'BTC': { name: 'Bitcoin', price: 65000.00, change: '+1.30%', high: 65500, low: 64000, vol: '$32.1B', cap: '$1.31T', points: [64000, 64300, 64800, 64600, 65000] },
       'ETH': { name: 'Ethereum', price: 1930.83, change: '+0.40%', high: 1955, low: 1910, vol: '$14.2B', cap: '$232B', points: [1910, 1925, 1920, 1940, 1935, 1930, 1930.83] },
       'EUR/USD': { name: 'Euro / USD', price: 1.1407, change: '+0.07%', high: 1.1425, low: 1.1390, vol: 'Forex', cap: 'N/A', points: [1.139, 1.1398, 1.1402, 1.1412, 1.1405, 1.1407] },
-      'GOLD': { name: 'Gold Spot', price: 3240.50, change: '+0.85%', high: 3255, low: 3220, vol: 'Futures', cap: 'N/A', points: [3220, 3228, 3235, 3230, 3242, 3240.50] }
+      'GOLD': { name: 'Gold Spot', price: 2400.00, change: '+0.85%', high: 2410, low: 2380, vol: 'Futures', cap: 'N/A', points: [2380, 2388, 2395, 2390, 2400] }
     };
 
     const FX = { USD: 1.0, EUR: 0.8766, GBP: 0.7505, JPY: 148.80 };
@@ -2053,23 +2055,7 @@ export async function generateLocalAIResponse(prompt) {
     return `You're very welcome! Let me know if there's anything else I can help with.`;
   }
 
-  // 3. LIVE FINANCIAL & MARKET LOOKUP QUERY INTERCEPTOR
-  const MARKET_PATTERNS = /\b(price of|stock price|gold price|crypto price|current price|live price|how much is|quote for)\b.*\b(gold|silver|bitcoin|btc|ethereum|eth|apple|aapl|nvidia|nvda|tesla|tsla|microsoft|msft|google|googl|amazon|amzn|eur|usd|gbp|jpy)\b|\b(gold|silver|bitcoin|btc|ethereum|eth|aapl|nvda|tsla|msft|googl|amzn)\b.*\b(price|quote|rate|market)\b/i;
-  
-  if (MARKET_PATTERNS.test(lower) || lower.includes('gold price') || lower.includes('price of gold')) {
-    const finResult = synthesizeCustomGame('financial');
-    return `Here is the live market snapshot as of **July 22, 2026**:\n\n` +
-      `* **Gold Spot (XAU/USD)**: **~$3,240.50 / oz** (+0.85% today)\n` +
-      `* **Bitcoin (BTC)**: **$66,259.00** (+1.30% 24h)\n` +
-      `* **Ethereum (ETH)**: **$1,930.83** (+0.40% 24h)\n` +
-      `* **Apple (AAPL)**: **$333.69** (+1.42%)\n` +
-      `* **NVIDIA (NVDA)**: **$207.06** (+2.85%)\n` +
-      `* **Tesla (TSLA)**: **$379.76** (-0.65%)\n` +
-      `* **EUR / USD**: **1.1407** (+0.07%)\n\n` +
-      `I've also loaded the **COREZ Real-Time Financial Terminal** for you! Click **"Run Preview"** or open the canvas pane to view live interactive charts and API updates.\n\n\`\`\`html\n${finResult.html}\n\`\`\``;
-  }
-
-  // 4. PUBLIC APP / GAME / WIDGET CREATION INTENT
+  // 3. PUBLIC APP / GAME / WIDGET CREATION INTENT
   if (intent.type === 'app') {
     const gameResult = synthesizeCustomGame(cleanPrompt);
     return `I've created **${gameResult.title}** for you! Click below to open it live in the preview canvas on the right side.\n\n\`\`\`html\n${gameResult.html}\n\`\`\``;
@@ -2095,6 +2081,17 @@ const IMAGE_PATTERNS = /\b(generate|create|draw|make|render|show|flux)\b.*\b(ima
 
 export async function generateAIResponse(prompt, history = [], signal = null) {
   const cleanPrompt = prompt.trim();
+
+  const marketRequest = parseMarketIntent(cleanPrompt);
+  if (marketRequest) {
+    try {
+      const market = await fetchMarketData(marketRequest, signal);
+      return { type: 'market', request: marketRequest, market };
+    } catch (error) {
+      if (error?.name === 'AbortError') throw error;
+      return { type: 'market', request: marketRequest, market: unavailableMarket(error) };
+    }
+  }
 
   // If this is the first message and it obviously asks for an image, we can skip the LLM overhead.
   if (history.length <= 1 && (IMAGE_PATTERNS.test(cleanPrompt) || cleanPrompt.toLowerCase().startsWith('image:') || cleanPrompt.toLowerCase().startsWith('flux:'))) {
