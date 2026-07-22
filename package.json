@@ -14,6 +14,8 @@
     "train:intents": "node scripts/train-intents.mjs",
     "evaluate:intents": "node scripts/evaluate-local-intents.mjs",
     "evaluate:ai": "node scripts/evaluate-ai-intents.mjs",
+    "test:market": "vitest run tests/market-intent.test.js tests/market-service.test.js tests/market-card.test.jsx && node tests/market-worker-contract.mjs",
+    "test:market:watch": "vitest tests/market-intent.test.js tests/market-service.test.js tests/market-card.test.jsx",
     "test:cloudflare": "node tests/cloudflare-worker-contract.mjs && bash tests/cloudflare-worker-config-contract.sh && bash tests/workers-ai-provider-contract.sh && bash tests/public-ai-proxy-contract.sh && bash tests/ai-live-intent-eval-contract.sh && node tests/ai-live-intent-eval-response-contract.mjs && bash tests/env-question-skill-contract.sh",
     "dev:worker": "npm run build && wrangler dev",
     "deploy": "npm run build && wrangler deploy"
@@ -25,12 +27,17 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
     "eslint": "^10.7.0",
     "globals": "^17.7.0",
+    "jsdom": "^26.1.0",
     "vite": "^6.1.0",
+    "vitest": "^3.2.4",
     "wrangler": "^4.112.0"
   }
 }
