@@ -526,7 +526,6 @@ export default function App() {
                             <ProgressChecklist />
                           ) : (
                             <div className="thinking-indicator-box" aria-label="Corez is thinking" role="status">
-                              <span className="thinking-text">Thinking...</span>
                               <div className="loader" aria-hidden="true" />
                             </div>
                           )}

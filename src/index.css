@@ -1030,23 +1030,15 @@ h1, h2, h3, h4, h5, h6 {
 .thinking-indicator-box {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
-  padding: 0.5rem 0;
+  padding: 0.35rem 0;
   background-color: transparent;
   color: var(--text-secondary);
   width: fit-content;
 }
 
-.thinking-text {
-  font-size: 0.875rem;
-  font-weight: 300;
-  color: var(--text-secondary);
-  letter-spacing: 0.01em;
-}
-
 /* HTML: <div class="loader"></div> */
 .loader {
-  width: 28px;
+  width: 20px;
   aspect-ratio: 1;
   --_g: no-repeat radial-gradient(circle closest-side, var(--text-primary, #ffffff) 90%, #0000);
   background: 
