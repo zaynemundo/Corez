@@ -271,6 +271,7 @@ export default function App() {
                   const extractedCode = extractCodeFromMessage(aiMsg.content);
                   if (extractedCode) {
                     setActiveCanvasCode(extractedCode);
+                    setCanvasOpen(true);
                   }
                 }
                 setSessions(prev => prev.map(s => {
@@ -316,7 +317,31 @@ export default function App() {
   const handleSelectSession = (id) => {
     setActiveSessionId(id);
     setActiveView('chat');
+    const target = sessions.find(s => s.id === id);
+    if (target && target.messages.length > 0) {
+      const lastAssistantMsg = [...target.messages].reverse().find(m => m.role === 'assistant' && m.type !== 'market');
+      if (lastAssistantMsg) {
+        const code = extractCodeFromMessage(lastAssistantMsg.content);
+        if (code) {
+          setActiveCanvasCode(code);
+          setCanvasOpen(true);
+        }
+      }
+    }
   };
+
+  useEffect(() => {
+    if (activeSession && activeSession.messages.length > 0) {
+      const lastAssistantMsg = [...activeSession.messages].reverse().find(m => m.role === 'assistant' && m.type !== 'market');
+      if (lastAssistantMsg) {
+        const code = extractCodeFromMessage(lastAssistantMsg.content);
+        if (code && !activeCanvasCode) {
+          setActiveCanvasCode(code);
+          setCanvasOpen(true);
+        }
+      }
+    }
+  }, [activeSessionId]);
 
   const handleNewChat = () => {
     const newId = `session-${Date.now()}`;
@@ -412,6 +437,7 @@ export default function App() {
           const extractedCode = extractCodeFromMessage(aiMsg.content);
           if (extractedCode) {
             setActiveCanvasCode(extractedCode);
+            setCanvasOpen(true);
           }
         }
         
