@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { RefreshCw, TrendingDown, TrendingUp } from 'lucide-react';
+import { Minus, RefreshCw, TrendingDown, TrendingUp } from 'lucide-react';
 import { DISPLAY_CURRENCIES, MARKET_ASSETS } from '../services/marketCatalog.js';
 
 const GRAMS_PER_TROY_OUNCE = 31.1034768;
@@ -88,9 +88,8 @@ export default function MarketCard({ market = {}, request = {}, onRefresh = () =
   const range = request.range || market.series?.range || '1D';
   const points = chartPoints(market.series?.points);
   const quotePrice = isFiniteNumber(quote.price) ? quote.price : null;
-  const quoteCurrency = typeof quote.currency === 'string' ? quote.currency : request.currency;
+  const quoteCurrency = typeof quote.currency === 'string' ? quote.currency : null;
   const displayedPrice = money(quotePrice, quoteCurrency);
-  const priceParts = displayedPrice?.match(/^(\D*)(.*)$/);
   const numericAmount = amount === '' ? null : Number(amount);
   const validAmount = numericAmount !== null && Number.isFinite(numericAmount) && numericAmount >= 0;
   const unitMultiplier = UNIT_TO_OUNCES[unit];
@@ -98,6 +97,10 @@ export default function MarketCard({ market = {}, request = {}, onRefresh = () =
     if (!validAmount || !isFiniteNumber(quotePrice) || !isFiniteNumber(unitMultiplier)) return null;
     return numericAmount * unitMultiplier * quotePrice;
   }, [numericAmount, quotePrice, unitMultiplier, validAmount]);
+  const convertedMoney = money(converted, quoteCurrency);
+  const conversionText = !validAmount
+    ? 'Enter a valid quantity.'
+    : convertedMoney || 'Conversion unavailable.';
 
   if (market.status === 'unavailable') {
     const unavailableMessage = market.error?.message || 'Market data temporarily unavailable.';
@@ -107,8 +110,13 @@ export default function MarketCard({ market = {}, request = {}, onRefresh = () =
       : '';
 
     return (
-      <section className="market-card market-card-error" role="region" aria-label="Market data unavailable">
-        <p className="market-error-message">{unavailableMessage}{retryMessage}</p>
+      <section
+        className="market-card market-card-error"
+        role="region"
+        aria-label="Market data unavailable"
+        aria-busy={refreshing}
+      >
+        <p className="market-error-message" role="alert">{unavailableMessage}{retryMessage}</p>
         <button
           type="button"
           className="market-retry"
@@ -123,8 +131,12 @@ export default function MarketCard({ market = {}, request = {}, onRefresh = () =
   }
 
   const hasMovement = isFiniteNumber(quote.change) && isFiniteNumber(quote.changePercent);
-  const movingUp = hasMovement && quote.change >= 0;
-  const MovementIcon = movingUp ? TrendingUp : TrendingDown;
+  const unchanged = hasMovement && quote.change === 0;
+  const movingUp = hasMovement && quote.change > 0;
+  const MovementIcon = unchanged ? Minus : movingUp ? TrendingUp : TrendingDown;
+  const movementDirection = unchanged ? 'neutral' : movingUp ? 'up' : 'down';
+  const movementLabel = unchanged ? 'Unchanged' : movingUp ? 'Up' : 'Down';
+  const movementPercent = unchanged ? 0 : Math.abs(quote.changePercent);
   const movementAmount = hasMovement ? money(Math.abs(quote.change), quoteCurrency) : null;
   const units = asset.class === 'metal' ? METAL_UNITS : UNIT_ONLY;
   const statusLabel = quoteStatus(market);
@@ -134,6 +146,9 @@ export default function MarketCard({ market = {}, request = {}, onRefresh = () =
   const timestamp = providerTime(quote.timestamp);
   const assetName = asset.name || 'Market';
   const assetSymbol = asset.symbol || request.symbol || 'Symbol unavailable';
+  const marketUpdate = refreshing
+    ? 'Refreshing market data'
+    : displayedPrice ? 'Market data ready' : 'Quote unavailable';
 
   const requestAsset = (assetId) => {
     const nextAsset = MARKET_ASSETS.find((item) => item.id === assetId);
@@ -156,7 +171,14 @@ export default function MarketCard({ market = {}, request = {}, onRefresh = () =
           <strong className="market-asset-name">{assetName}</strong>
           <span className="market-symbol">{assetSymbol}</span>
         </div>
-        <div className="market-status-group">
+        <div
+          className="market-status-group"
+          role="status"
+          aria-label="Market update"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <span className="market-refresh-state">{marketUpdate}</span>
           <span className={`market-status market-status-${market.status || 'unknown'}`}>{statusLabel}</span>
           {delayMinutes !== null && <span className="market-delay">Delayed by {delayMinutes} minutes</span>}
         </div>
@@ -164,18 +186,13 @@ export default function MarketCard({ market = {}, request = {}, onRefresh = () =
 
       <div className="market-price-row">
         <div className="market-quote">
-          <div className="market-price" aria-label={displayedPrice || 'Quote unavailable'}>
-            {priceParts ? (
-              <>
-                <span className="market-price-currency" aria-hidden="true">{priceParts[1]}</span>
-                <span className="market-price-value" aria-hidden="true">{priceParts[2]}</span>
-              </>
-            ) : 'Quote unavailable'}
-          </div>
+          <data className="market-price" value={displayedPrice ? quotePrice : undefined}>
+            {displayedPrice || 'Quote unavailable'}
+          </data>
           {hasMovement && movementAmount ? (
-            <div className={`market-movement market-movement-${movingUp ? 'up' : 'down'}`}>
+            <div className={`market-movement market-movement-${movementDirection}`}>
               <MovementIcon aria-hidden="true" size={16} />
-              <span>{movingUp ? 'Up' : 'Down'} {Math.abs(quote.changePercent).toFixed(2)}% ({movementAmount})</span>
+              <span>{movementLabel} {movementPercent.toFixed(2)}% ({movementAmount})</span>
             </div>
           ) : (
             <div className="market-movement market-movement-unavailable">Movement unavailable</div>
@@ -262,9 +279,8 @@ export default function MarketCard({ market = {}, request = {}, onRefresh = () =
       </div>
 
       <output className="market-conversion" aria-live="polite">
-        {validAmount && converted !== null && money(converted, quoteCurrency)
-          ? money(converted, quoteCurrency)
-          : 'Enter a valid quantity.'}
+        <span className="market-conversion-label">Converted value: </span>
+        <span className="market-conversion-value">{conversionText}</span>
       </output>
 
       <footer className="market-card-footer">

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import MarketCard from '../src/components/MarketCard.jsx';
@@ -48,12 +48,36 @@ describe('MarketCard', () => {
   it('renders a sourced indicative quote with non-color movement text and exact provider time', () => {
     render(<MarketCard market={market} request={request} onRefresh={() => {}} refreshing={false} />);
 
-    expect(screen.getByRole('region', { name: /gold spot market quote/i })).toBeInTheDocument();
-    expect(screen.getByText('$2,412.50')).toBeInTheDocument();
+    const card = screen.getByRole('region', { name: /gold spot market quote/i });
+    expect(within(card).getByText('$2,412.50', { selector: '.market-price' })).toBeVisible();
     expect(screen.getByText(/up 0.94%/i)).toBeInTheDocument();
     expect(screen.getByText(/Twelve Data/)).toBeInTheDocument();
     expect(screen.getByText(/indicative/i)).toBeInTheDocument();
     expect(screen.getByText(/Jul 22, 2026, 7:00:00 AM UTC/i)).toBeInTheDocument();
+  });
+
+  it('keeps the primary formatted quote as accessible semantic text', () => {
+    render(<MarketCard market={market} request={request} onRefresh={() => {}} refreshing={false} />);
+
+    const price = screen.getByText('$2,412.50', { selector: 'data.market-price' });
+    expect(price).toBeVisible();
+    expect(price).not.toHaveAttribute('aria-label');
+    expect(price.querySelector('[aria-hidden="true"]')).not.toBeInTheDocument();
+  });
+
+  it('announces refresh progress and completion in one scoped market status region', () => {
+    const { rerender } = render(
+      <MarketCard market={market} request={request} onRefresh={() => {}} refreshing />
+    );
+
+    const status = screen.getByRole('status', { name: 'Market update' });
+    expect(status).toHaveAttribute('aria-live', 'polite');
+    expect(status).toHaveAttribute('aria-atomic', 'true');
+    expect(status).toHaveTextContent(/Refreshing market data.*Market open/i);
+
+    rerender(<MarketCard market={market} request={request} onRefresh={() => {}} refreshing={false} />);
+    expect(screen.getByRole('status', { name: 'Market update' })).toHaveTextContent(/Market data ready.*Market open/i);
+    expect(screen.getByRole('region', { name: /gold spot market quote/i })).not.toHaveAttribute('aria-live');
   });
 
   it('converts gold grams from the displayed troy-ounce quote locally', async () => {
@@ -161,9 +185,28 @@ describe('MarketCard', () => {
 
     expect(screen.getByRole('button', { name: /refresh market data/i })).toBeDisabled();
     expect(screen.getByRole('button', { name: /refresh market data/i })).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByLabelText(/^asset$/i)).toBeDisabled();
+    expect(screen.getByLabelText(/display currency/i)).toBeDisabled();
+    expect(screen.getByLabelText(/quantity/i)).toBeEnabled();
+    expect(screen.getByLabelText(/^unit$/i)).toBeEnabled();
     for (const button of screen.getAllByRole('button')) {
       expect(button).toHaveAttribute('type', 'button');
     }
+  });
+
+  it('renders zero movement neutrally without a directional icon', () => {
+    render(
+      <MarketCard
+        market={{ ...market, quote: { ...market.quote, change: 0, changePercent: 0 } }}
+        request={request}
+        onRefresh={() => {}}
+        refreshing={false}
+      />
+    );
+
+    expect(screen.getByText(/Unchanged 0.00%/i)).toBeInTheDocument();
+    expect(document.querySelector('.market-movement-neutral .lucide-minus')).toBeInTheDocument();
+    expect(document.querySelector('.market-movement-up, .market-movement-down')).not.toBeInTheDocument();
   });
 
   it('supports zero quantity, all metal units, and an empty chart', async () => {
@@ -186,6 +229,67 @@ describe('MarketCard', () => {
     await user.clear(screen.getByLabelText(/quantity/i));
     await user.type(screen.getByLabelText(/quantity/i), '0');
     expect(screen.getByText('$0.00')).toBeInTheDocument();
+  });
+
+  it('calculates a kilogram of metal from the troy-ounce quote', async () => {
+    const user = userEvent.setup();
+    render(<MarketCard market={market} request={request} onRefresh={() => {}} refreshing={false} />);
+
+    await user.selectOptions(screen.getByLabelText(/^unit$/i), 'kilogram');
+    expect(screen.getByText('$77,563.68')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['stock', { id: 'apple', class: 'stock', symbol: 'AAPL', name: 'Apple' }],
+    ['crypto', { id: 'bitcoin', class: 'crypto', symbol: 'BTC/USD', name: 'Bitcoin' }]
+  ])('calculates whole %s units directly from the displayed quote', async (assetClass, asset) => {
+    const user = userEvent.setup();
+    const onRefresh = vi.fn();
+    render(
+      <MarketCard
+        market={{ ...market, asset }}
+        request={{ ...request, assetId: asset.id, symbol: asset.symbol, assetClass, amount: 1, unit: 'unit' }}
+        onRefresh={onRefresh}
+        refreshing={false}
+      />
+    );
+
+    await user.clear(screen.getByLabelText(/quantity/i));
+    await user.type(screen.getByLabelText(/quantity/i), '3');
+    expect(screen.getByText('$7,237.50')).toBeInTheDocument();
+    expect(onRefresh).not.toHaveBeenCalled();
+  });
+
+  it('filters non-finite chart values and keeps flat chart geometry finite and stable', () => {
+    const { rerender } = render(
+      <MarketCard
+        market={{
+          ...market,
+          series: {
+            range: '1D',
+            points: [{ value: Number.NaN }, { value: Number.POSITIVE_INFINITY }, { value: 2400 }, { value: 2400 }]
+          }
+        }}
+        request={request}
+        onRefresh={() => {}}
+        refreshing={false}
+      />
+    );
+
+    const line = document.querySelector('.market-chart polyline');
+    expect(line).toHaveAttribute('points', '0,40 100,40');
+    expect(line.getAttribute('points')).not.toMatch(/NaN|Infinity/);
+
+    rerender(
+      <MarketCard
+        market={{ ...market, series: { range: '1D', points: [{ value: Number.NaN }, { value: Number.NEGATIVE_INFINITY }] } }}
+        request={request}
+        onRefresh={() => {}}
+        refreshing={false}
+      />
+    );
+    expect(document.querySelector('.market-chart polyline')).not.toBeInTheDocument();
+    expect(screen.getByText(/No chart data available/i)).toBeInTheDocument();
   });
 
   it('does not format empty or invalid quantities as invented values', async () => {
@@ -236,6 +340,22 @@ describe('MarketCard', () => {
     expect(onRefresh).toHaveBeenCalledWith(request);
   });
 
+  it('announces unavailable errors and exposes retry busy and disabled semantics', () => {
+    render(
+      <MarketCard
+        market={{ kind: 'market', status: 'unavailable', error: { message: 'Market data temporarily unavailable.' } }}
+        request={request}
+        onRefresh={() => {}}
+        refreshing
+      />
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Market data temporarily unavailable.');
+    expect(screen.getByRole('region', { name: /market data unavailable/i })).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('button', { name: 'Retrying' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Retrying' })).toHaveAttribute('aria-busy', 'true');
+  });
+
   it('omits missing optional presentation data without throwing or inventing it', () => {
     render(
       <MarketCard
@@ -251,10 +371,31 @@ describe('MarketCard', () => {
       />
     );
 
-    expect(screen.getByText('$2,412.50')).toBeInTheDocument();
+    expect(screen.getByText('$2,412.50', { selector: '.market-price' })).toBeInTheDocument();
     expect(screen.getByText('Movement unavailable')).toBeInTheDocument();
     expect(screen.getByText('Update time unavailable')).toBeInTheDocument();
     expect(screen.getByText('Source unavailable')).toBeInTheDocument();
     expect(screen.getByText(/No chart data available/i)).toBeInTheDocument();
+  });
+
+  it.each([
+    ['a missing price', { currency: 'USD', marketOpen: true }],
+    ['a non-finite price', { price: Number.POSITIVE_INFINITY, currency: 'USD', marketOpen: true }],
+    ['a missing quote currency', { price: 2412.5, marketOpen: true }],
+    ['an invalid quote currency', { price: 2412.5, currency: 'NOT_A_CURRENCY', marketOpen: true }]
+  ])('uses safe placeholders for %s without fabricating a quote', (_label, quote) => {
+    render(
+      <MarketCard
+        market={{ ...market, quote }}
+        request={request}
+        onRefresh={() => {}}
+        refreshing={false}
+      />
+    );
+
+    expect(screen.getByText('Quote unavailable', { selector: '.market-price' })).toBeInTheDocument();
+    expect(screen.getByText('Conversion unavailable.')).toBeInTheDocument();
+    expect(screen.queryByText('$0.00')).not.toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Market update' })).toHaveTextContent(/Quote unavailable/i);
   });
 });
