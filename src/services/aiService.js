@@ -57,6 +57,19 @@ Respond with the likely goal, useful next action, the appropriate skill if appli
 import { classifyIntent } from './intentClassifier.js';
 import { parseMarketIntent } from './marketIntent.js';
 import { fetchMarketData, unavailableMarket } from './marketService.js';
+import { getEnabledPlugins } from './pluginService.js';
+
+export function buildPluginContextPrompt() {
+  const activePlugins = getEnabledPlugins();
+  if (!activePlugins || activePlugins.length === 0) {
+    return 'ACTIVE PLUGINS: None currently enabled.';
+  }
+  const pluginDescriptions = activePlugins.map(p => 
+    `- [${p.type.toUpperCase()}] ${p.name} (v${p.version}): ${p.description}`
+  ).join('\n');
+  return `ACTIVE PLUGINS & CAPABILITIES:\n${pluginDescriptions}`;
+}
+
 
 const GAME_DEV_PATTERNS = /\b(game|gamedev|game development|play|chess|snake|pong|shooter|arcade|platformer|canvas game|2d game|3d game|simulator|physics sandbox|bot enemy|rpg|enemy|space defender|retro game|interactive game)\b|\b(build|make|create|develop|design)\b.*\b(game|simulator|simulation|sandbox)\b/i;
 
@@ -470,7 +483,7 @@ export async function generateHostedAIResponse(
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ prompt, intent, messages: history })
+    body: JSON.stringify({ prompt, intent, messages: history, plugins: getEnabledPlugins() })
   };
   if (signal) fetchOptions.signal = signal;
 

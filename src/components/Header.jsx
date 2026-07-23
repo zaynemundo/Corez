@@ -1,6 +1,7 @@
 import { 
   PanelLeftOpen, 
-  PanelRight
+  PanelRight,
+  Puzzle
 } from 'lucide-react';
 
 export default function Header({
@@ -8,7 +9,8 @@ export default function Header({
   onToggleSidebar,
   canvasOpen,
   onToggleCanvas,
-  hasExecutableCode
+  hasExecutableCode,
+  onOpenPlugins
 }) {
   return (
     <header className="top-header">
@@ -25,6 +27,16 @@ export default function Header({
       </div>
 
       <div className="header-right">
+        {onOpenPlugins && (
+          <button 
+            className="canvas-toggle-btn"
+            onClick={onOpenPlugins}
+            title="Open Corez Plugin Store"
+          >
+            <Puzzle size={15} strokeWidth={1.5} />
+            <span>Plugins</span>
+          </button>
+        )}
         <button 
           className="canvas-toggle-btn" 
           onClick={onToggleCanvas}

@@ -7,7 +7,7 @@ export default [
   },
   js.configs.recommended,
   {
-    files: ['src/**/*.{js,jsx}', 'api/**/*.js', 'scripts/**/*.mjs', 'vite.config.js'],
+    files: ['src/**/*.{js,jsx}', 'api/**/*.js', 'scripts/**/*.mjs', 'vite.config.js', 'tests/**/*.{js,jsx}', 'scratch/**/*.cjs'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
@@ -28,7 +28,11 @@ export default [
   {
     files: ['worker/**/*.js'],
     languageOptions: {
-      globals: globals.serviceworker
+      globals: {
+        ...globals.serviceworker,
+        ...globals.node,
+        process: 'readonly'
+      }
     }
   },
   {
