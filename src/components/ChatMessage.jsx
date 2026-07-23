@@ -92,25 +92,25 @@ function ExecutableCodeBlock({ code, onRunInCanvas, onReviseCode }) {
           className="code-btn primary-preview-btn"
           style={{ 
             flex: 1,
-            padding: '0.75rem 1.25rem', 
+            padding: '0.75rem 1rem', 
             background: 'var(--text-primary)', 
             color: 'var(--bg-primary)',
             fontWeight: 600,
-            fontSize: '0.9rem',
+            fontSize: '0.875rem',
             borderRadius: 'var(--radius-md, 12px)',
             border: 'none',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justify: 'center',
-            gap: '0.6rem',
+            gap: '0.5rem',
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
             transition: 'var(--transition-fast)'
           }}
           onClick={() => onRunInCanvas(code)}
           title="Run app live in preview canvas"
         >
-          <Layers size={18} strokeWidth={2} />
+          <Layers size={16} strokeWidth={2} />
           <span>Open Canvas Preview</span>
         </button>
       )}
@@ -118,25 +118,26 @@ function ExecutableCodeBlock({ code, onRunInCanvas, onReviseCode }) {
         <button 
           className="code-btn secondary-revise-btn"
           style={{ 
-            padding: '0.75rem 1.1rem', 
+            flex: 1,
+            padding: '0.75rem 1rem', 
             background: 'var(--bg-tertiary)',
             color: 'var(--text-primary)',
             fontWeight: 500,
-            fontSize: '0.85rem',
+            fontSize: '0.875rem',
             borderRadius: 'var(--radius-md, 12px)',
             border: '1px solid var(--border-color)',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justify: 'center',
-            gap: '0.45rem',
+            gap: '0.5rem',
             transition: 'var(--transition-fast)'
           }}
           onClick={() => onReviseCode(code)}
           title="Ask AI to revise this code"
         >
           <Wand2 size={16} strokeWidth={1.5} />
-          <span>Revise</span>
+          <span>Revise Code</span>
         </button>
       )}
     </div>
