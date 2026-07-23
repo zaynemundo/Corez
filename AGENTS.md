@@ -2,7 +2,7 @@
 
 ## Roles and authority
 
-- **DeepSeek V4 Flash** is the lead engineering agent, handling orchestration, development, vision, visual inspection, UI layout, game design, SVG creation, and overall implementation strategy.
+- **Tencent HY3 Preview** (`tencent/hy3-preview`) is the lead engineering agent, handling orchestration, development, vision, visual inspection, UI layout, game design, SVG creation, and overall implementation strategy.
 - **FLUX 1 Schnell** (`@cf/black-forest-labs/flux-1-schnell`) is used for fast, free background image generation and visual artwork.
 
 ## Verification & Git completion policy

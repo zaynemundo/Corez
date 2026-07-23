@@ -8,7 +8,7 @@ Corez deploys the Vite application and its AI endpoints together as a Cloudflare
 
 When the optional `OPENROUTER_API_KEY` secret is configured, `/api/ai` uses OpenRouter first:
 
-- Text and multimodal requests: `deepseek/deepseek-v4-flash`
+- Text and multimodal requests: `tencent/hy3-preview`
 
 If OpenRouter is unavailable, missing, or returns no usable response, Corez uses the native Cloudflare Workers AI binding in this order:
 

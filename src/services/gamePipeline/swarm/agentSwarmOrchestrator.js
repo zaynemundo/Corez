@@ -8,7 +8,7 @@ import { TaskDependencyGraph, AGENT_LIFECYCLE_STATES } from './taskGraph.js';
 import { AdaptiveConcurrencyQueue } from './adaptiveQueue.js';
 
 export const OPENROUTER_SWARM_ROUTING = {
-  model: 'deepseek/deepseek-v4-flash',
+  model: 'tencent/hy3-preview',
   provider: {
     sort: 'throughput',
     allow_fallbacks: true,

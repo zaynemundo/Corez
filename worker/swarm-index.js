@@ -1,7 +1,7 @@
 import baseWorker from './index.js';
 
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
-const SWARM_MODEL = 'deepseek/deepseek-v4-flash';
+const SWARM_MODEL = 'tencent/hy3-preview';
 const SWARM_INTENTS = new Set(['app', 'code-help', 'swarm']);
 
 const CORE_AGENT_TEMPLATES = Object.freeze({
