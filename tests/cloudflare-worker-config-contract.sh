@@ -18,7 +18,7 @@ check() {
 }
 
 check 'Worker name matches the deployed Worker' '"name"[[:space:]]*:[[:space:]]*"ai"' "$config"
-check 'Worker entrypoint is configured' '"main"[[:space:]]*:[[:space:]]*"[.]/worker/index[.]js"' "$config"
+check 'Swarm Worker entrypoint is configured' '"main"[[:space:]]*:[[:space:]]*"[.]/worker/swarm-index[.]js"' "$config"
 check 'Vite dist is the asset directory' '"directory"[[:space:]]*:[[:space:]]*"[.]/dist"' "$config"
 check 'ASSETS binding is configured' '"binding"[[:space:]]*:[[:space:]]*"ASSETS"' "$config"
 check 'SPA fallback is configured' '"not_found_handling"[[:space:]]*:[[:space:]]*"single-page-application"' "$config"
@@ -26,6 +26,7 @@ check 'API routes run Worker-first' '"run_worker_first"[[:space:]]*:[[:space:]]*
 check 'Workers AI binding is configured' '"ai"[[:space:]]*:[[:space:]]*\{' "$config"
 check 'Workers AI binding is named AI' '"binding"[[:space:]]*:[[:space:]]*"AI"' "$config"
 check 'Cloudflare contract script exists' 'cloudflare-worker-contract[.]mjs' "$package"
+check 'live Worker swarm contract runs in the standard suite' 'worker-live-swarm-contract[.]mjs' "$package"
 check 'Workers AI provider contract runs in the standard suite' 'workers-ai-provider-contract[.]sh' "$package"
 check 'public AI proxy contract runs in the standard suite' 'public-ai-proxy-contract[.]sh' "$package"
 check 'live AI contracts run in the standard suite' 'ai-live-intent-eval-contract[.]sh.*ai-live-intent-eval-response-contract[.]mjs' "$package"

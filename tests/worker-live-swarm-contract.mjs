@@ -1,0 +1,171 @@
+import assert from 'node:assert/strict';
+import worker, {
+  buildSwarmAgentSpecs,
+  runAdaptiveAgentPool,
+  shouldUseSwarm
+} from '../worker/swarm-index.js';
+
+const originalOpenRouterKey = process.env.OPENROUTER_API_KEY;
+delete process.env.OPENROUTER_API_KEY;
+
+function environment(overrides = {}) {
+  return {
+    AI: {
+      async run() {
+        return {
+          choices: [{ message: { content: 'Base Worker response' } }]
+        };
+      }
+    },
+    ASSETS: {
+      async fetch(request) {
+        return new Response(`asset:${new URL(request.url).pathname}`);
+      }
+    },
+    ...overrides
+  };
+}
+
+function post(body, env) {
+  return worker.fetch(
+    new Request('https://corez.test/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }),
+    env
+  );
+}
+
+async function run() {
+  assert.equal(shouldUseSwarm('app', 'Build a timer app'), true);
+  assert.equal(shouldUseSwarm('code-help', 'Fix this React issue'), true);
+  assert.equal(shouldUseSwarm('swarm', 'Coordinate several agents'), true);
+  assert.equal(shouldUseSwarm('general', 'Hello'), false);
+  assert.equal(shouldUseSwarm('app', 'Build an image editor', { hasMedia: true }), false);
+
+  const simpleSpecs = buildSwarmAgentSpecs('app', 'Build a timer app');
+  const expandedPrompt = Array.from(
+    { length: 24 },
+    (_, index) => `- Requirement ${index + 1}: implement independent feature ${index + 1}`
+  ).join('\n');
+  const expandedSpecs = buildSwarmAgentSpecs('app', expandedPrompt);
+
+  assert.ok(simpleSpecs.length >= 5);
+  assert.ok(expandedSpecs.length >= 28);
+  assert.ok(expandedSpecs.length > simpleSpecs.length);
+  assert.equal(new Set(expandedSpecs.map((spec) => spec.agentId)).size, expandedSpecs.length);
+
+  const retryAttempts = new Map();
+  const poolResult = await runAdaptiveAgentPool(
+    [
+      { agentId: 'rate-limited-agent' },
+      { agentId: 'healthy-agent' }
+    ],
+    async (spec, attempt) => {
+      retryAttempts.set(spec.agentId, (retryAttempts.get(spec.agentId) || 0) + 1);
+      if (spec.agentId === 'rate-limited-agent' && attempt === 0) {
+        const error = new Error('429 rate limit');
+        error.status = 429;
+        throw error;
+      }
+      return `${spec.agentId}-result`;
+    },
+    { deadlineMs: 2_000 }
+  );
+
+  assert.equal(poolResult.completed.length, 2);
+  assert.equal(poolResult.failed.length, 0);
+  assert.equal(poolResult.skipped.length, 0);
+  assert.equal(retryAttempts.get('rate-limited-agent'), 2);
+
+  const originalFetch = globalThis.fetch;
+  const openRouterRequests = [];
+
+  try {
+    globalThis.fetch = async (url, init) => {
+      assert.equal(url, 'https://openrouter.ai/api/v1/chat/completions');
+      const payload = JSON.parse(init.body);
+      openRouterRequests.push(payload);
+
+      const systemPrompt = payload.messages?.[0]?.content || '';
+      const content = systemPrompt.includes('lead synthesis agent')
+        ? 'Integrated live swarm response'
+        : `Specialist contribution ${openRouterRequests.length}`;
+
+      return new Response(JSON.stringify({
+        choices: [{ message: { content } }]
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    };
+
+    const body = {
+      prompt: 'Build a responsive retro platformer. Add touch controls. Add sound effects.',
+      intent: {
+        type: 'app',
+        summary: 'Build a complete browser game.'
+      },
+      messages: [
+        { role: 'user', content: 'Build a responsive retro platformer. Add touch controls. Add sound effects.' }
+      ]
+    };
+
+    const response = await post(body, environment({
+      OPENROUTER_API_KEY: 'test-openrouter-key',
+      SWARM_AGENT_TIMEOUT_MS: '2000',
+      SWARM_RESPONSE_DEADLINE_MS: '2000',
+      SWARM_SYNTHESIS_TIMEOUT_MS: '2000'
+    }));
+
+    assert.equal(response.status, 200);
+    const data = await response.json();
+    const expectedAgentCount = buildSwarmAgentSpecs('app', body.prompt).length;
+
+    assert.equal(data.content, 'Integrated live swarm response');
+    assert.equal(data.model, 'deepseek/deepseek-v4-flash');
+    assert.equal(data.swarm.enabled, true);
+    assert.equal(data.swarm.created, expectedAgentCount);
+    assert.equal(data.swarm.completed, expectedAgentCount);
+    assert.equal(data.swarm.failed, 0);
+    assert.equal(data.swarm.skipped, 0);
+    assert.equal(openRouterRequests.length, expectedAgentCount + 1);
+
+    for (const payload of openRouterRequests) {
+      assert.equal(payload.model, 'deepseek/deepseek-v4-flash');
+      assert.equal(payload.reasoning.effort, 'high');
+      assert.equal(payload.reasoning.exclude, true);
+      assert.equal(payload.provider.sort, 'throughput');
+      assert.equal(payload.provider.allow_fallbacks, true);
+      assert.equal(payload.provider.require_parameters, true);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  const delegatedResponse = await post(
+    {
+      prompt: 'Explain edge computing',
+      intent: { type: 'general', summary: 'Explain directly.' }
+    },
+    environment()
+  );
+  assert.equal(delegatedResponse.status, 200);
+  assert.deepEqual(await delegatedResponse.json(), {
+    content: 'Base Worker response',
+    model: '@cf/moonshotai/kimi-k2.7-code'
+  });
+
+  console.log('Live Worker swarm contract passed.');
+}
+
+try {
+  await run();
+} finally {
+  if (originalOpenRouterKey === undefined) {
+    delete process.env.OPENROUTER_API_KEY;
+  } else {
+    process.env.OPENROUTER_API_KEY = originalOpenRouterKey;
+  }
+}
