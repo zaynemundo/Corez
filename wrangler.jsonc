@@ -6,6 +6,12 @@
   "ai": {
     "binding": "AI"
   },
+  "r2_buckets": [
+    {
+      "binding": "ASSET_BUCKET",
+      "bucket_name": "corez-assets"
+    }
+  ],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",

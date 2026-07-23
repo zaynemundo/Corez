@@ -318,6 +318,78 @@ async function handleImage(request, env) {
   }
 }
 
+async function handleR2Assets(request, env) {
+  if (!env.ASSET_BUCKET || typeof env.ASSET_BUCKET.put !== 'function') {
+    return jsonResponse(503, { error: 'Cloudflare R2 ASSET_BUCKET is not configured.' });
+  }
+
+  const url = new URL(request.url);
+  const pathname = url.pathname;
+
+  if (pathname === '/api/assets/upload' && request.method === 'POST') {
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return jsonResponse(400, { error: 'Invalid JSON payload.' });
+    }
+
+    const key = typeof body?.key === 'string' ? body.key.replace(/^\/+/, '') : `asset_${Date.now()}`;
+    const dataUrl = typeof body?.dataUrl === 'string' ? body.dataUrl : '';
+    const mimeType = typeof body?.mimeType === 'string' ? body.mimeType : 'image/png';
+
+    if (!dataUrl) {
+      return jsonResponse(400, { error: 'dataUrl is required.' });
+    }
+
+    const parts = dataUrl.split(',');
+    const bstr = atob(parts[1] || parts[0]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+
+    await env.ASSET_BUCKET.put(key, u8arr.buffer, {
+      httpMetadata: { contentType: mimeType }
+    });
+
+    return jsonResponse(200, {
+      success: true,
+      key,
+      url: `/api/assets/${key}`
+    });
+  }
+
+  if (request.method === 'GET' && pathname.startsWith('/api/assets/')) {
+    const key = pathname.replace('/api/assets/', '');
+    if (!key) return jsonResponse(400, { error: 'Asset key is required.' });
+
+    const object = await env.ASSET_BUCKET.get(key);
+    if (!object) {
+      return jsonResponse(404, { error: 'Asset not found in R2 bucket.' });
+    }
+
+    const headers = new Headers();
+    object.writeHttpMetadata(headers);
+    headers.set('etag', object.httpEtag);
+    headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+    headers.set('Access-Control-Allow-Origin', '*');
+
+    return new Response(object.body, { headers });
+  }
+
+  if (request.method === 'DELETE' && pathname.startsWith('/api/assets/')) {
+    const key = pathname.replace('/api/assets/', '');
+    if (!key) return jsonResponse(400, { error: 'Asset key is required.' });
+
+    await env.ASSET_BUCKET.delete(key);
+    return jsonResponse(200, { success: true, deletedKey: key });
+  }
+
+  return jsonResponse(405, { error: 'Method not allowed.' });
+}
+
 export default {
   async fetch(request, env) {
     const pathname = new URL(request.url).pathname;
@@ -329,6 +401,9 @@ export default {
     }
     if (pathname === '/api/market') {
       return handleMarket(request, env);
+    }
+    if (pathname.startsWith('/api/assets')) {
+      return handleR2Assets(request, env);
     }
     if (pathname.startsWith('/api/')) {
       return jsonResponse(404, { error: 'API route not found.' });

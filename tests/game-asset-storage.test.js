@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { MemoryStorageAdapter, AssetStorageService } from '../src/services/gamePipeline/assetStorage.js';
+import { MemoryStorageAdapter, CloudflareR2StorageAdapter, AssetStorageService } from '../src/services/gamePipeline/assetStorage.js';
 import { validateAsset, generateAssetRepairPrompt } from '../src/services/gamePipeline/assetValidator.js';
 
 describe('Asset Storage & Validation Pipeline', () => {
@@ -13,6 +13,17 @@ describe('Asset Storage & Validation Pipeline', () => {
     expect(result.assetId).toBe('player');
     expect(result.permanentUrl).toContain('data:image/png;base64');
     expect(result.sizeBytes).toBeGreaterThan(0);
+  });
+
+  it('handles CloudflareR2StorageAdapter uploads and fallbacks gracefully', async () => {
+    const r2Adapter = new CloudflareR2StorageAdapter('/api/assets');
+    const service = new AssetStorageService(r2Adapter);
+
+    const testDataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    const result = await service.fetchAndPersistAsset('job_r2', 'bg', testDataUrl, 'image/png');
+
+    expect(result.assetId).toBe('bg');
+    expect(result.permanentUrl).toBeDefined();
   });
 
   it('validates asset specifications correctly', () => {

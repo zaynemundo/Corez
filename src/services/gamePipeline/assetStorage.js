@@ -79,8 +79,79 @@ export class LocalStorageAdapter {
   }
 }
 
+export class CloudflareR2StorageAdapter {
+  constructor(endpoint = '/api/assets') {
+    this.endpoint = endpoint;
+    this.fallbackAdapter = new MemoryStorageAdapter();
+  }
+
+  buildUrl(subPath) {
+    const fullPath = `${this.endpoint}${subPath.startsWith('/') ? subPath : '/' + subPath}`;
+    if (fullPath.startsWith('http://') || fullPath.startsWith('https://')) return fullPath;
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      return `${window.location.origin}${fullPath}`;
+    }
+    return `http://localhost${fullPath}`;
+  }
+
+  async put(key, blob, metadata = {}) {
+    let dataUrl;
+    if (typeof FileReader !== 'undefined') {
+      dataUrl = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      });
+    } else {
+      const buffer = Buffer.from(await blob.arrayBuffer());
+      dataUrl = `data:${blob.type || 'image/png'};base64,${buffer.toString('base64')}`;
+    }
+
+    try {
+      if (typeof fetch === 'function') {
+        const response = await fetch(this.buildUrl('/upload'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key, dataUrl, mimeType: blob.type, metadata })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.url) return result.url;
+        }
+      }
+    } catch (err) {
+      console.warn('Cloudflare R2 API upload failed, using memory adapter fallback.', err.message);
+    }
+
+    return this.fallbackAdapter.put(key, blob, metadata);
+  }
+
+  async get(key) {
+    try {
+      if (typeof fetch === 'function') {
+        const response = await fetch(this.buildUrl(`/${key}`));
+        if (response.ok) {
+          const blob = await response.blob();
+          return { dataUrl: this.buildUrl(`/${key}`), type: blob.type };
+        }
+      }
+    } catch (e) {}
+    return this.fallbackAdapter.get(key);
+  }
+
+  async delete(key) {
+    try {
+      if (typeof fetch === 'function') {
+        await fetch(this.buildUrl(`/${key}`), { method: 'DELETE' });
+      }
+    } catch (e) {}
+    this.fallbackAdapter.delete(key);
+  }
+}
+
 export class AssetStorageService {
-  constructor(adapter = new MemoryStorageAdapter()) {
+  constructor(adapter = new CloudflareR2StorageAdapter()) {
     this.adapter = adapter;
   }
 
