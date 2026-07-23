@@ -22,7 +22,7 @@
   --code-header-bg: #101010;
   
   /* Refined Elegant Typography */
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Text', sans-serif;
+  --font-sans: -apple-system-body, ui-sans-serif, -apple-system, "system-ui", "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
   --font-heading: var(--font-sans);
   --font-mono: 'JetBrains Mono', monospace;
   
