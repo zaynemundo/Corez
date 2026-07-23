@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import worker from '../worker/index.js';
 
-const MODEL = '@cf/moonshotai/kimi-k3-code';
+const MODEL = '@cf/moonshotai/kimi-k2.7-code';
 const FLUX_MODEL = '@cf/black-forest-labs/flux-1-schnell';
 delete process.env.OPENROUTER_API_KEY;
 

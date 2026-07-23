@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
 const PIPELINE_STEPS = [
-  { min: 0, max: 12, label: '1. Intent & Spec Synthesis (Tencent HY3 Lead)' },
+  { min: 0, max: 12, label: '1. Intent & Spec Synthesis (DeepSeek Lead)' },
   { min: 12, max: 25, label: '2. Full-Width 8-Bit Progress Loading Track' },
   { min: 25, max: 40, label: '3. Asset Pipeline (FLUX 1 Art + WebAudio Synth)' },
   { min: 40, max: 58, label: '4. High-Performance Engine & Physics Assembly' },
