@@ -2,10 +2,10 @@ import { handleMarket } from './market.js';
 
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 const OPENCODE_DEFAULT_ENDPOINT = 'https://opencode.ai/api/v1/chat/completions';
-const DEEPSEEK_V4_MODEL = 'deepseek/deepseek-v4-flash';
+const KIMI_K3_MODEL = 'moonshotai/kimi-k3-code';
 
 function getTargetModels(intentType, hasMedia, prompt = '') {
-  return [DEEPSEEK_V4_MODEL];
+  return ['moonshotai/kimi-k3-code', 'kimi-k3-code'];
 }
 const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
 const DEEPSEEK_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';

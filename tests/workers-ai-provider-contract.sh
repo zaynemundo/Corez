@@ -27,7 +27,7 @@ check_absent() {
   fi
 }
 
-check 'Worker routes text through DeepSeek V4 Flash' 'deepseek/deepseek-v4-flash' "$worker"
+check 'Worker routes text through Kimi K3 Code' 'moonshotai/kimi-k3-code|kimi-k3-code' "$worker"
 check_absent 'Worker no longer routes through MiMo V2.5' 'xiaomi/mimo-v2[.]5' "$worker"
 check 'Worker uses Kimi 2.7 Code as the primary Workers AI fallback' '@cf/moonshotai/kimi-k2[.]7-code' "$worker"
 check 'Worker uses DeepSeek R1 Distill as the secondary Workers AI fallback' '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b' "$worker"
