@@ -1,7 +1,7 @@
 import baseWorker from './index.js';
 
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
-const SWARM_MODEL = 'moonshotai/kimi-k3-code';
+const SWARM_MODEL = 'kimi-k3';
 const SWARM_INTENTS = new Set(['app', 'code-help', 'swarm']);
 
 const CORE_AGENT_TEMPLATES = Object.freeze({
@@ -213,7 +213,7 @@ async function callOpenRouter(apiKey, messages, options = {}) {
       requestBody.max_tokens = options.maxTokens;
     }
 
-    const endpoint = (options.env && options.env.OPENCODE_ENDPOINT) || (typeof process !== 'undefined' && process.env?.OPENCODE_ENDPOINT) || 'https://opencode.ai/api/v1/chat/completions';
+    const endpoint = (options.env && options.env.OPENCODE_ENDPOINT) || (typeof process !== 'undefined' && process.env?.OPENCODE_ENDPOINT) || 'https://opencode.ai/zen/go/v1/chat/completions';
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {

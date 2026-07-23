@@ -84,7 +84,7 @@ async function run() {
 
   try {
     globalThis.fetch = async (url, init) => {
-      assert.ok(url === 'https://openrouter.ai/api/v1/chat/completions' || url === 'https://opencode.ai/api/v1/chat/completions');
+      assert.ok(url === 'https://openrouter.ai/api/v1/chat/completions' || url === 'https://opencode.ai/api/v1/chat/completions' || url === 'https://opencode.ai/zen/go/v1/chat/completions');
       const payload = JSON.parse(init.body);
       openRouterRequests.push(payload);
 
@@ -124,7 +124,7 @@ async function run() {
     const expectedAgentCount = buildSwarmAgentSpecs('app', body.prompt).length;
 
     assert.equal(data.content, 'Integrated live swarm response');
-    assert.equal(data.model, 'moonshotai/kimi-k3-code');
+    assert.equal(data.model, 'kimi-k3');
     assert.equal(data.swarm.enabled, true);
     assert.equal(data.swarm.created, expectedAgentCount);
     assert.equal(data.swarm.completed, expectedAgentCount);
@@ -133,7 +133,7 @@ async function run() {
     assert.equal(openRouterRequests.length, expectedAgentCount + 1);
 
     for (const payload of openRouterRequests) {
-      assert.equal(payload.model, 'moonshotai/kimi-k3-code');
+      assert.equal(payload.model, 'kimi-k3');
       assert.equal(payload.reasoning.effort, 'high');
       assert.equal(payload.reasoning.exclude, true);
       assert.equal(payload.provider.sort, 'throughput');
