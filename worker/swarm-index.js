@@ -335,7 +335,12 @@ function buildSynthesisMessages(prompt, history, intentType, completedAgents) {
     .join('\n\n');
 
   const appInstructions = intentType === 'app'
-    ? `\n- Produce a complete, rich, runnable HTML document with embedded CSS and JavaScript inside one \`\`\`html code block.\n- Begin with a concise explanation of what was built.\n- Keep games and interactive apps responsive, self-contained, and ready for the preview canvas.`
+    ? `\n- Produce a complete, rich, runnable HTML document with embedded CSS and JavaScript inside one \`\`\`html code block.
+- Begin with a concise explanation of what was built.
+- Keep games and interactive apps responsive, self-contained, and ready for the preview canvas.
+- 8-BIT & SVG GAME ASSETS REQUIREMENT (itch.io Quality): When generating SVG graphics, retro game sprites, icons, tilesets, weapons, items, characters, or 8-bit artwork, build clean, high-quality vector SVGs in authentic 8-bit pixel art style. Use shape-rendering="crispEdges", crisp pixel grid alignment (16x16, 24x24, 32x32, 64x64), vibrant 8-bit palettes (PICO-8, NES), dark 1-pixel outlines, and inner shading!
+- 8-BIT STYLED BACKGROUNDS REQUIREMENT: ALL generated game scenes, canvas wallpapers, and image generation prompts ([IMAGE_PROMPT: ...]) MUST be explicitly 8-bit retro pixel art styled.
+- WORD GAMES REQUIREMENT: When generating word games (Scrabble, Wordle, Anagrams, Crosswords), embed a comprehensive dictionary of valid words (300+ words in a Set/Array) and strict word verification logic!`
     : '';
 
   return [
