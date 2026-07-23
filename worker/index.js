@@ -236,6 +236,20 @@ async function handleAi(request, env) {
   }
 }
 
+async function saveToR2IfAvailable(env, key, buffer, mimeType = 'image/png') {
+  if (env.ASSET_BUCKET && typeof env.ASSET_BUCKET.put === 'function') {
+    try {
+      await env.ASSET_BUCKET.put(key, buffer, {
+        httpMetadata: { contentType: mimeType }
+      });
+      return `/api/assets/${key}`;
+    } catch (err) {
+      console.warn('R2 Bucket save failed, using fallback data URI:', safeErrorDetail(err));
+    }
+  }
+  return null;
+}
+
 async function handleImage(request, env) {
   if (request.method !== 'POST') {
     return jsonResponse(405, { error: 'Method not allowed.' });
@@ -271,10 +285,21 @@ async function handleImage(request, env) {
       return jsonResponse(502, { error: 'Workers AI returned empty image data.' });
     }
 
+    const r2Key = `flux_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.png`;
+
     // Handle object with base64 property
     if (typeof result === 'object' && result !== null && typeof result.image === 'string') {
       const b64 = result.image.startsWith('data:') ? result.image : `data:image/png;base64,${result.image}`;
-      return jsonResponse(200, { image: b64, model: usedModel });
+      const rawB64 = b64.split(',')[1] || b64;
+      const binaryStr = atob(rawB64);
+      let len = binaryStr.length;
+      const u8arr = new Uint8Array(len);
+      while (len--) {
+        u8arr[len] = binaryStr.charCodeAt(len);
+      }
+
+      const r2Url = await saveToR2IfAvailable(env, r2Key, u8arr.buffer, 'image/png');
+      return jsonResponse(200, { image: r2Url || b64, model: usedModel });
     }
 
     // Handle ArrayBuffer, View, Response, or Stream
@@ -293,6 +318,11 @@ async function handleImage(request, env) {
         return jsonResponse(200, { image: str, model: usedModel });
       }
       return jsonResponse(502, { error: 'Unexpected Workers AI image format.' });
+    }
+
+    const r2Url = await saveToR2IfAvailable(env, r2Key, arrayBuffer, 'image/png');
+    if (r2Url) {
+      return jsonResponse(200, { image: r2Url, model: usedModel });
     }
 
     const bytes = new Uint8Array(arrayBuffer);
