@@ -250,12 +250,42 @@ async function saveToR2IfAvailable(env, key, buffer, mimeType = 'image/png') {
   return null;
 }
 
+async function callOpenRouterImage(apiKey, prompt) {
+  try {
+    const response = await fetch(OPENROUTER_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://corez.ai',
+        'X-Title': 'COREZ AI',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'black-forest-labs/flux-1-schnell',
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const message = data?.choices?.[0]?.message;
+      if (Array.isArray(message?.images) && message.images[0]?.url) {
+        return message.images[0].url;
+      }
+      const content = message?.content || '';
+      const urlMatch = content.match(/https?:\/\/[^\s\)"']+\.(?:png|jpg|jpeg|webp)/i) || content.match(/!\[.*?\]\((https?:\/\/[^\s\)]+)\)/);
+      if (urlMatch) return urlMatch[1] || urlMatch[0];
+      if (content.startsWith('data:image')) return content;
+    }
+  } catch (err) {
+    console.warn('OpenRouter image generation attempt failed:', safeErrorDetail(err));
+  }
+  return null;
+}
+
 async function handleImage(request, env) {
   if (request.method !== 'POST') {
     return jsonResponse(405, { error: 'Method not allowed.' });
-  }
-  if (!env.AI || typeof env.AI.run !== 'function') {
-    return jsonResponse(503, { error: 'Workers AI is not configured.' });
   }
 
   let body;
@@ -274,6 +304,48 @@ async function handleImage(request, env) {
     return jsonResponse(400, { error: 'Prompt is required.' });
   }
 
+  const r2Key = `flux_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.png`;
+
+  // 1. Try OpenRouter Image Generation if OPENROUTER_API_KEY is present
+  const openRouterKey = env?.OPENROUTER_API_KEY || (typeof process !== 'undefined' ? process.env?.OPENROUTER_API_KEY : null);
+  if (openRouterKey) {
+    const openRouterImg = await callOpenRouterImage(openRouterKey, prompt);
+    if (openRouterImg) {
+      try {
+        let buffer;
+        let mimeType = 'image/png';
+        if (openRouterImg.startsWith('data:')) {
+          const parts = openRouterImg.split(',');
+          mimeType = parts[0].match(/:(.*?);/)?.[1] || 'image/png';
+          const bstr = atob(parts[1]);
+          let n = bstr.length;
+          const u8arr = new Uint8Array(n);
+          while (n--) u8arr[n] = bstr.charCodeAt(n);
+          buffer = u8arr.buffer;
+        } else {
+          const imgResp = await fetch(openRouterImg);
+          if (imgResp.ok) {
+            mimeType = imgResp.headers.get('content-type') || 'image/png';
+            buffer = await imgResp.arrayBuffer();
+          }
+        }
+
+        if (buffer) {
+          const r2Url = await saveToR2IfAvailable(env, r2Key, buffer, mimeType);
+          return jsonResponse(200, { image: r2Url || openRouterImg, model: 'black-forest-labs/flux-1-schnell' });
+        }
+      } catch (e) {
+        console.warn('Failed to persist OpenRouter image to R2, returning URL:', safeErrorDetail(e));
+      }
+      return jsonResponse(200, { image: openRouterImg, model: 'black-forest-labs/flux-1-schnell' });
+    }
+  }
+
+  // 2. Fallback to Cloudflare Workers AI FLUX model
+  if (!env.AI || typeof env.AI.run !== 'function') {
+    return jsonResponse(503, { error: 'Workers AI is not configured and OpenRouter key is unavailable.' });
+  }
+
   try {
     const usedModel = FLUX_MODEL;
     const result = await env.AI.run(FLUX_MODEL, {
@@ -284,8 +356,6 @@ async function handleImage(request, env) {
     if (!result) {
       return jsonResponse(502, { error: 'Workers AI returned empty image data.' });
     }
-
-    const r2Key = `flux_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.png`;
 
     // Handle object with base64 property
     if (typeof result === 'object' && result !== null && typeof result.image === 'string') {
