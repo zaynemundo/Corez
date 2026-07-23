@@ -15,7 +15,7 @@ import {
   createTaskBrief, 
   validateTaskBriefScope 
 } from '../src/services/gameStudio/taskBriefGenerator.js';
-import { GameStudioOrchestrator } from '../src/services/gameStudio/gameStudioOrchestrator.js';
+import { GameStudioOrchestrator, generateImageWithFlux1 } from '../src/services/gameStudio/gameStudioOrchestrator.js';
 import { WORKFLOW_STAGES } from '../src/orchestration/workflowState.js';
 
 describe('CoreZ AI Game Studio Engine (OpenCode Go Native)', () => {
@@ -122,6 +122,13 @@ describe('CoreZ AI Game Studio Engine (OpenCode Go Native)', () => {
       expect(result.assetManifest.assets.length).toBeGreaterThan(0);
       expect(result.verificationRecord.exitCode).toBe(0);
       expect(result.workflow.currentStage).toBe(WORKFLOW_STAGES.COMPLETE);
+    });
+
+    it('generates game reference background images using generateImageWithFlux1', async () => {
+      const imageUrl = await generateImageWithFlux1('dungeon entrance background');
+      expect(imageUrl).toBeDefined();
+      expect(typeof imageUrl).toBe('string');
+      expect(imageUrl.length).toBeGreaterThan(0);
     });
   });
 
