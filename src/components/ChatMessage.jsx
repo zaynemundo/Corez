@@ -97,7 +97,7 @@ function ExecutableCodeBlock({ code, lang, onRunInCanvas, onReviseCode }) {
             title="Run app live in preview canvas"
           >
             <Layers size={14} strokeWidth={2} />
-            <span>Run Preview</span>
+            <span>Open preview</span>
           </button>
 
           <button 

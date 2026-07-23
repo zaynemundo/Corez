@@ -542,8 +542,10 @@ export default function App() {
                     {isThinking && (
                       <div className="message-wrapper ai">
                         <div className="message-body">
-                          <div className="thinking-indicator-box" aria-label="Corez is thinking" role="status">
-                            <div className="loader" aria-hidden="true" />
+                          <div className="thinking-indicator-box thinking-dots" aria-label="Corez is thinking" role="status">
+                            <span className="thinking-dot" />
+                            <span className="thinking-dot" />
+                            <span className="thinking-dot" />
                           </div>
                         </div>
                       </div>

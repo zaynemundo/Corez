@@ -58,6 +58,7 @@ export default function Sidebar({
       </div>
 
       <div className="chat-history-list icon-only-list">
+        <div className="sidebar-section-heading">Recent Chats</div>
         {sessions.map((session) => (
           <div
             key={session.id}

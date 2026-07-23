@@ -10,10 +10,11 @@ export const AI_PROXY_ENDPOINT = '/api/ai';
 export const IMAGE_PROXY_ENDPOINT = '/api/image';
 
 export const PUBLIC_USER_INTENT_PROMPT = `
-Corez delegates vision, art direction, UI layout, and game design/SVG creation to MiMo V2.5, and uses FLUX 1 for free background generation and image rendering.
+Analyze the public user intent behind the request. Corez delegates vision, art direction, UI layout, and game design/SVG creation to MiMo V2.5, and uses FLUX 1 for free background generation and image rendering.
 Identify whether the user wants to create a public-facing website, landing page, dashboard,
 portal, app, game (with full word dictionaries for word games like Scrabble & Wordle), widget, calculator, timer, prototype, tool, code help,
 writing help, an explanation, or general guidance. 
+Corez will infer goals instead of matching only keywords to understand public user intent.
 
 Search through our skill library and pick which skill will be needed to use based on their specific utility. The available skills are:
 - ai-infrastructure: LLMs, routing, inference, RAG
