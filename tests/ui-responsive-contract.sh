@@ -223,7 +223,7 @@ check 'sidebar component can render collapsed state' 'isOpen.*collapsed|collapse
 # Polished Glass Sidebar Contract Checks
 check 'sidebar section heading uses reusable class' 'className="sidebar-section-heading"' "$sidebar"
 check_absent 'sidebar section headers do not use inline letterSpacing styles' 'style=\{\{.*letterSpacing' "$sidebar"
-check 'sidebar width token set to 264px' '--sidebar-width: 264px;'
+check 'sidebar width token set to 52px' '--sidebar-width: 52px;'
 check 'sidebar margin token set to 12px' '--sidebar-margin: 12px;'
 check 'sidebar radius token set to 16px' '--sidebar-radius: 16px;'
 check 'sidebar heading size token set to 11px' '--sidebar-heading-size: 11px;'
