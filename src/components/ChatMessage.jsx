@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import MarketCard from './MarketCard';
 
-function CodeSnippetBlock({ code, lang }) {
+function CodeSnippetBlock({ code, lang, onRunInCanvas, onReviseCode }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -22,10 +22,54 @@ function CodeSnippetBlock({ code, lang }) {
     <div className="code-block-container">
       <div className="code-header">
         <span className="code-lang">{lang || 'code'}</span>
-        <button className="code-btn" onClick={handleCopy} title="Copy code">
-          {copied ? <Check size={12} strokeWidth={1.5} /> : <Copy size={12} strokeWidth={1.5} />}
-          <span>{copied ? 'Copied' : 'Copy'}</span>
-        </button>
+        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+          {onRunInCanvas && (
+            <button 
+              className="code-btn"
+              style={{ 
+                padding: '0.35rem 0.75rem', 
+                background: 'var(--text-primary)', 
+                color: 'var(--bg-primary)',
+                fontWeight: 600,
+                fontSize: '0.75rem',
+                borderRadius: '5px',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem'
+              }}
+              onClick={() => onRunInCanvas(code)}
+              title="Run app live in preview canvas"
+            >
+              <Layers size={13} strokeWidth={2} />
+              <span>Open preview</span>
+            </button>
+          )}
+          {onReviseCode && (
+            <button 
+              className="code-btn"
+              style={{
+                padding: '0.35rem 0.65rem',
+                fontSize: '0.75rem',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem'
+              }}
+              onClick={() => onReviseCode(code)}
+              title="Ask AI to revise this code"
+            >
+              <Wand2 size={13} strokeWidth={1.5} />
+              <span>Revise</span>
+            </button>
+          )}
+          <button className="code-btn" onClick={handleCopy} title="Copy code">
+            {copied ? <Check size={12} strokeWidth={1.5} /> : <Copy size={12} strokeWidth={1.5} />}
+            <span>{copied ? 'Copied' : 'Copy'}</span>
+          </button>
+        </div>
       </div>
       <pre className="code-content">
         <code>{code}</code>
@@ -35,108 +79,13 @@ function CodeSnippetBlock({ code, lang }) {
 }
 
 function ExecutableCodeBlock({ code, lang, onRunInCanvas, onReviseCode }) {
-  const [showCode, setShowCode] = useState(false);
-
   return (
-    <div className="executable-code-card" style={{
-      margin: '0.75rem 0',
-      border: '1px solid var(--border-color)',
-      borderRadius: 'var(--radius-md, 8px)',
-      background: 'var(--bg-secondary)',
-      overflow: 'hidden'
-    }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justify: 'space-between',
-        padding: '0.65rem 0.85rem',
-        background: 'rgba(255, 255, 255, 0.03)',
-        borderBottom: showCode ? '1px solid var(--border-color)' : 'none',
-        flexWrap: 'wrap',
-        gap: '0.5rem'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-          <div style={{
-            width: '28px',
-            height: '28px',
-            borderRadius: '6px',
-            background: 'var(--bg-tertiary)',
-            display: 'flex',
-            alignItems: 'center',
-            justify: 'center'
-          }}>
-            <Layers size={15} strokeWidth={1.75} style={{ color: 'var(--text-primary)' }} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-              Interactive Web App / Preview
-            </div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-              Ready to run in Canvas Preview ({code.split('\n').length} lines)
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-          <button 
-            className="code-btn"
-            style={{ 
-              padding: '0.4rem 0.85rem', 
-              background: 'var(--text-primary)', 
-              color: 'var(--bg-primary)',
-              fontWeight: 600,
-              fontSize: '0.78rem',
-              borderRadius: '5px',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.35rem'
-            }}
-            onClick={() => onRunInCanvas(code)}
-            title="Run app live in preview canvas"
-          >
-            <Layers size={14} strokeWidth={2} />
-            <span>Open preview</span>
-          </button>
-
-          <button 
-            className="code-btn"
-            style={{ 
-              padding: '0.4rem 0.65rem', 
-              fontSize: '0.75rem',
-              borderRadius: '5px',
-              cursor: 'pointer'
-            }}
-            onClick={() => setShowCode(!showCode)}
-            title="Toggle source code view"
-          >
-            <span>{showCode ? 'Hide Code' : 'View Code'}</span>
-          </button>
-
-          {onReviseCode && (
-            <button 
-              className="code-btn"
-              style={{ 
-                padding: '0.4rem 0.65rem', 
-                fontSize: '0.75rem',
-                borderRadius: '5px',
-                cursor: 'pointer'
-              }}
-              onClick={() => onReviseCode(code)}
-              title="Ask AI to revise this code"
-            >
-              <Wand2 size={13} strokeWidth={1.5} />
-              <span>Revise</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {showCode && (
-        <CodeSnippetBlock code={code} lang={lang} />
-      )}
-    </div>
+    <CodeSnippetBlock 
+      code={code} 
+      lang={lang} 
+      onRunInCanvas={onRunInCanvas} 
+      onReviseCode={onReviseCode} 
+    />
   );
 }
 
