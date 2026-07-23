@@ -157,13 +157,13 @@ h1, h2, h3, h4, h5, h6 {
   height: calc(100vh - (var(--sidebar-margin) * 2));
   height: calc(100dvh - (var(--sidebar-margin) * 2));
   margin: var(--sidebar-margin) 0 var(--sidebar-margin) var(--sidebar-margin);
-  padding: 7.5px;
+  padding: 0;
   background-color: var(--sidebar-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--sidebar-border);
   border-radius: var(--sidebar-radius);
-  box-shadow: var(--sidebar-shadow);
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   transition: transform var(--transition-normal), width var(--transition-normal), margin-left var(--transition-normal);
