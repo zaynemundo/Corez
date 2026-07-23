@@ -221,7 +221,7 @@ check_absent 'viewport resize does not force desktop sidebar open' 'setSidebarOp
 check 'sidebar component can render collapsed state' 'isOpen.*collapsed|collapsed.*isOpen' "$sidebar"
 
 # Polished Glass Sidebar Contract Checks
-check 'sidebar section heading uses reusable class' 'className="sidebar-section-heading"' "$sidebar"
+check_absent 'sidebar section heading is absent' 'className="sidebar-section-heading"' "$sidebar"
 check_absent 'sidebar section headers do not use inline letterSpacing styles' 'style=\{\{.*letterSpacing' "$sidebar"
 check 'sidebar width token set to 52px' '--sidebar-width: 52px;'
 check 'sidebar margin token set to 12px' '--sidebar-margin: 12px;'
