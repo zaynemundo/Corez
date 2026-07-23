@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TaskDependencyGraph, ResourceLockManager, SharedProjectState, AGENT_LIFECYCLE_STATES } from '../src/services/gamePipeline/swarm/taskGraph.js';
+import { TaskDependencyGraph, ResourceLockManager, AGENT_LIFECYCLE_STATES } from '../src/services/gamePipeline/swarm/taskGraph.js';
 
 describe('Unlimited Dynamic Swarm: Task Graph & State Engine', () => {
   it('allows unlimited dynamic logical agents without hardcoded limits', () => {

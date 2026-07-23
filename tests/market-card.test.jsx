@@ -161,19 +161,27 @@ describe('App market message persistence', () => {
 
   it('refreshes the exact origin message after the active session changes', async () => {
     stubBrowserLayout();
-    const refreshedMarket = { ...market, quote: { ...market.quote, price: 2500 } };
+    const refreshedMarket = {
+      ...market,
+      request: { ...request },
+      quote: { ...market.quote, price: 2500, high: 2550, low: 2395 },
+      conversion: { ...market.conversion, value: 2500 },
+      series: { ...market.series, points: [{ timestamp: '2026-07-22T07:00:00.000Z', value: 2500 }] },
+      meta: { ...market.meta, servedAt: '2026-07-22T07:00:00.000Z' }
+    };
     let resolveRefresh;
     fetchMarketDataMock.mockReturnValue(new Promise((resolve) => { resolveRefresh = resolve; }));
     localStorage.setItem('corez_sessions', JSON.stringify([
       {
         id: 'origin',
         title: 'Origin',
-        messages: [{ role: 'assistant', type: 'market', content: '', request, market }]
+        messages: [{ id: 'm-origin', role: 'assistant', type: 'market', content: '', request, market }]
       },
       {
         id: 'other',
         title: 'Other',
         messages: [{
+          id: 'm-other',
           role: 'assistant',
           type: 'market',
           content: '',
@@ -192,7 +200,10 @@ describe('App market message persistence', () => {
     expect(screen.getByRole('region', { name: /Bitcoin market quote/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /refresh market data/i })).toBeEnabled();
 
-    await act(async () => resolveRefresh(refreshedMarket));
+    await act(async () => {
+      resolveRefresh(refreshedMarket);
+    });
+    await new Promise((r) => setTimeout(r, 50));
 
     await waitFor(() => {
       const stored = JSON.parse(localStorage.getItem('corez_sessions'));

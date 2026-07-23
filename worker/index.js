@@ -52,7 +52,7 @@ function buildSystemPrompt(intent) {
     || 'Understand the public user goal and give a useful next step.';
   const intentType = normalizeIntentType(intent?.type);
 
-  let adaptiveInstructions = '';
+  let adaptiveInstructions;
   if (intentType === 'code-help') {
     adaptiveInstructions = `
 Adaptive Routing - Coding Path:
@@ -316,7 +316,7 @@ async function callOpenRouterImage(apiKey, prompt) {
         return message.images[0].url;
       }
       const content = message?.content || '';
-      const urlMatch = content.match(/https?:\/\/[^\s\)"']+\.(?:png|jpg|jpeg|webp)/i) || content.match(/!\[.*?\]\((https?:\/\/[^\s\)]+)\)/);
+      const urlMatch = content.match(/https?:\/\/[^\s)"']+\.(?:png|jpg|jpeg|webp)/i) || content.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
       if (urlMatch) return urlMatch[1] || urlMatch[0];
       if (content.startsWith('data:image')) return content;
     }

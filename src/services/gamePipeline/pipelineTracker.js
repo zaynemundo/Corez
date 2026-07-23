@@ -60,7 +60,9 @@ export class PipelineJobTracker {
   notify() {
     this.job.updatedAt = new Date().toISOString();
     this.listeners.forEach(fn => {
-      try { fn({ ...this.job }); } catch(e) {}
+      try { fn({ ...this.job }); } catch {
+        // Ignored listener error
+      }
     });
   }
 

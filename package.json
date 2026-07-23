@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test": "vitest run",
     "lint": "eslint .",
     "preview": "vite preview",
     "train:intents": "node scripts/train-intents.mjs",

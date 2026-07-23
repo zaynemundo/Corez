@@ -5,7 +5,6 @@ import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
 import CanvasPreview from './components/CanvasPreview';
 import SettingsModal from './components/SettingsModal';
-import PluginStoreModal from './components/PluginStoreModal';
 import ImageStudioPage from './components/ImageStudioPage';
 import { generateAIResponse, extractCodeFromMessage } from './services/aiService';
 import { fetchMarketData, unavailableMarket } from './services/marketService';
@@ -201,7 +200,6 @@ export default function App() {
   const [canvasFullScreen, setCanvasFullScreen] = useState(false);
   const [activeCanvasCode, setActiveCanvasCode] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [pluginStoreOpen, setPluginStoreOpen] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [refreshingMarketKeys, setRefreshingMarketKeys] = useState(() => new Set());
   const [theme, setTheme] = useState(() => localStorage.getItem('corez_theme') || 'dark');
@@ -473,19 +471,6 @@ export default function App() {
     }
   };
 
-  const handleRefreshMarket = async (messageId, nextRequest) => {
-    const sessionId = activeSessionId;
-    return runMarketRefresh({
-      sessionId,
-      messageId,
-      nextRequest,
-      refreshTokens: marketRefreshTokensRef.current,
-      tokenSequence: marketRefreshSequenceRef,
-      setRefreshingMarketKeys,
-      setSessions
-    });
-  };
-
   return (
     <div className="app-container">
       <Sidebar
@@ -497,7 +482,6 @@ export default function App() {
         onDeleteSession={handleDeleteSession}
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenImageShowcase={() => setActiveView('image-studio')}
-        onOpenPlugins={() => setPluginStoreOpen(true)}
         activeView={activeView}
         theme={theme}
         onToggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
@@ -525,7 +509,6 @@ export default function App() {
                 canvasOpen={canvasOpen}
                 onToggleCanvas={() => setCanvasOpen(prev => !prev)}
                 hasExecutableCode={!!activeCanvasCode}
-                onOpenPlugins={() => setPluginStoreOpen(true)}
               />
 
               <div className="messages-scroll">
@@ -541,9 +524,9 @@ export default function App() {
                         message={msg}
                         onRunInCanvas={handleRunInCanvas}
                         onReviseCode={handleReviseCode}
-                        onRefreshMarket={(messageId, nextRequest) => runMarketRefresh({
+                        onRefreshMarket={(nextRequest) => runMarketRefresh({
                           sessionId: activeSession.id,
-                          messageId,
+                          messageId: msg.id,
                           nextRequest,
                           refreshTokens: marketRefreshTokensRef.current,
                           tokenSequence: marketRefreshSequenceRef,
@@ -595,17 +578,6 @@ export default function App() {
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         onClearAllHistory={handleClearAllHistory}
-      />
-
-      <PluginStoreModal
-        isOpen={pluginStoreOpen}
-        onClose={() => setPluginStoreOpen(false)}
-        onLaunchCanvasPlugin={(plugin) => {
-          if (plugin?.code) {
-            setActiveCanvasCode(plugin.code);
-            setCanvasOpen(true);
-          }
-        }}
       />
     </div>
   );

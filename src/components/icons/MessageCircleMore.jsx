@@ -5,7 +5,7 @@ export default function MessageCircleMore({
   color = 'currentColor', 
   strokeWidth = 2,
   className = '',
-  animated = true,
+  _animated = true,
   ...props 
 }) {
   const [isHovered, setIsHovered] = useState(false);

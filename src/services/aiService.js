@@ -9,6 +9,11 @@ export const MODEL = {
 export const AI_PROXY_ENDPOINT = '/api/ai';
 export const IMAGE_PROXY_ENDPOINT = '/api/image';
 
+import { defaultSkillRegistry } from '../skills/registry.js';
+import { classifyIntent } from './intentClassifier.js';
+import { parseMarketIntent } from './marketIntent.js';
+import { fetchMarketData, unavailableMarket } from './marketService.js';
+
 export const PUBLIC_USER_INTENT_PROMPT = `
 Analyze the public user intent behind the request. Corez delegates vision, art direction, UI layout, and game design/SVG creation to MiMo V2.5, and uses FLUX 1 for free background generation and image rendering.
 Identify whether the user wants to create a public-facing website, landing page, dashboard,
@@ -16,59 +21,11 @@ portal, app, game (with full word dictionaries for word games like Scrabble & Wo
 writing help, an explanation, or general guidance. 
 Corez will infer goals instead of matching only keywords to understand public user intent.
 
-Search through our skill library and pick which skill will be needed to use based on their specific utility. The available skills are:
-- ai-infrastructure: LLMs, routing, inference, RAG
-- antigravity-guide: Google Antigravity AI configurations
-- ask-env-values: Missing environment variables or secrets
-- auto-debugging: Self-directed stack trace debugging
-- autonomous-execution: YOLO mode / fully autonomous operations
-- backend-architecture: Backend security and functionality
-- business-marketing: Brand positioning, SEO, product launches
-- capability-orchestrator: Routing requests to optimal capabilities (MiMo V2.5 for vision/game design, FLUX 1 for free backgrounds)
-- code-review-testing: Thorough code reviews and empirical testing
-- data-documents: Data analysis, structured deliverables (PDF, CSV)
-- frontend-design: Aesthetic direction, typography, UX choices
-- frontend-modern-design: Crafting modern, fluid, dark-mode web UI
-- game-development: 2D/3D web games, word game dictionaries (Scrabble/Wordle), physics engines
-- git-superpowers: Git workflow completion and pushing
-- live-utilities: Date/time, weather, sports, and financial live data
-- personalisation-context: User preferences and durable memory
-- productivity-connectors: Email, calendar, and collaboration services
-- research-current-information: Live web research and citations
-- scheduling-automation: Timers, cron jobs, and background monitoring
-- software-engineering: General coding, APIs, databases, React
-- superpowers: Advanced multi-agent subagent-driven development
-- verify: Runtime verification end-to-end testing
-- visual-creative: Image generation via FLUX 1, layout direction via MiMo V2.5, background removal
-- writing-communication: Translation, professional or creative copywriting
-- ui-ux-pro-max-skill: Use when the user requests a premium frontend redesign or advanced UI audit
-- ruflo: MCP frameworks and tools
-- agent-rules-books: Use when generating architecture, domain-driven design, or writing tests
-- awesome-cursor-skills: A directory of specific framework rules (React, Laravel, etc.)
-- agent-skills-standard: Creating portable agent skills across tools
-- obra-superpowers: Advanced workflows and configurations for various agents
-- cursor-security-rules: Enforces strict OWASP security standards for backend code
-- awesome-agent-skills: Enterprise-grade engineering standards from Vercel/Stripe/Anthropic
-- accessibility-expert: Enforces strict WCAG standards, ARIA roles, and inclusive design
+Available skills in the CoreZ Skill Registry:
+${defaultSkillRegistry.getFormattedSkillList()}
 
 Respond with the likely goal, useful next action, the appropriate skill if applicable, and a concise path forward.
 `;
-
-import { classifyIntent } from './intentClassifier.js';
-import { parseMarketIntent } from './marketIntent.js';
-import { fetchMarketData, unavailableMarket } from './marketService.js';
-import { getEnabledPlugins } from './pluginService.js';
-
-export function buildPluginContextPrompt() {
-  const activePlugins = getEnabledPlugins();
-  if (!activePlugins || activePlugins.length === 0) {
-    return 'ACTIVE PLUGINS: None currently enabled.';
-  }
-  const pluginDescriptions = activePlugins.map(p => 
-    `- [${p.type.toUpperCase()}] ${p.name} (v${p.version}): ${p.description}`
-  ).join('\n');
-  return `ACTIVE PLUGINS & CAPABILITIES:\n${pluginDescriptions}`;
-}
 
 
 const GAME_DEV_PATTERNS = /\b(game|gamedev|game development|play|chess|snake|pong|shooter|arcade|platformer|canvas game|2d game|3d game|simulator|physics sandbox|bot enemy|rpg|enemy|space defender|retro game|interactive game)\b|\b(build|make|create|develop|design)\b.*\b(game|simulator|simulation|sandbox)\b/i;
@@ -483,7 +440,7 @@ export async function generateHostedAIResponse(
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ prompt, intent, messages: history, plugins: getEnabledPlugins() })
+    body: JSON.stringify({ prompt, intent, messages: history })
   };
   if (signal) fetchOptions.signal = signal;
 

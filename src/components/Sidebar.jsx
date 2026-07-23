@@ -6,8 +6,7 @@ import {
   Moon, 
   PanelLeftClose,
   Layers,
-  Image as ImageIcon,
-  Puzzle
+  Image as ImageIcon
 } from 'lucide-react';
 import MessageCircleMore from './icons/MessageCircleMore';
 
@@ -20,7 +19,6 @@ export default function Sidebar({
   onDeleteSession,
   onOpenSettings,
   onOpenImageShowcase,
-  onOpenPlugins,
   activeView,
   theme,
   onToggleTheme,
@@ -56,13 +54,6 @@ export default function Sidebar({
           title="COREZ STUDIO"
         >
           <ImageIcon size={20} strokeWidth={1.5} />
-        </button>
-        <button 
-          className="image-creator-btn icon-only-btn"
-          onClick={onOpenPlugins}
-          title="Corez Plugin Ecosystem"
-        >
-          <Puzzle size={20} strokeWidth={1.5} />
         </button>
       </div>
 

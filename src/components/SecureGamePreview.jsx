@@ -5,7 +5,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { 
-  Play, 
   RotateCw, 
   Maximize2, 
   Minimize2, 
@@ -161,7 +160,7 @@ export default function SecureGamePreview({
           title="COREZ Secure Game Sandbox"
           sandbox="allow-scripts"
           referrerPolicy="no-referrer"
-          srcDoc={sanitisedHtml}
+          srcDoc={sanitizedHtml}
           style={{
             width: '100%',
             height: '100%',

@@ -154,7 +154,7 @@ export class TaskDependencyGraph {
 
   getReadyTasks() {
     const ready = [];
-    for (const [taskId, task] of this.tasks.entries()) {
+    for (const [_taskId, task] of this.tasks.entries()) {
       if (
         task.status === AGENT_LIFECYCLE_STATES.CREATED ||
         task.status === AGENT_LIFECYCLE_STATES.QUEUED ||

@@ -8,7 +8,7 @@ import { TaskDependencyGraph, AGENT_LIFECYCLE_STATES } from './taskGraph.js';
 import { AdaptiveConcurrencyQueue } from './adaptiveQueue.js';
 
 export const OPENROUTER_SWARM_ROUTING = {
-  model: 'glm-5.2',
+  model: 'deepseek/deepseek-v4-flash',
   provider: {
     sort: 'throughput',
     allow_fallbacks: true,
@@ -192,7 +192,7 @@ Output your specialized contribution matching the task objective. If this task i
     }
   }
 
-  parseTaskPlan(rawPlan, userPrompt) {
+  parseTaskPlan(rawPlan, _userPrompt) {
     if (rawPlan) {
       try {
         const match = rawPlan.match(/\[\s*\{[\s\S]*\}\s*\]/);

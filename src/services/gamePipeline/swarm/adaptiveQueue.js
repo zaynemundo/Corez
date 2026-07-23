@@ -79,7 +79,7 @@ export class AdaptiveConcurrencyQueue {
     }
   }
 
-  recordFailure(isRateLimit, error) {
+  recordFailure(isRateLimit, _error) {
     this.consecutiveSuccesses = 0;
 
     if (isRateLimit) {

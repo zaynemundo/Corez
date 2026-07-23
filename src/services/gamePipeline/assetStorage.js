@@ -136,7 +136,9 @@ export class CloudflareR2StorageAdapter {
           return { dataUrl: this.buildUrl(`/${key}`), type: blob.type };
         }
       }
-    } catch (e) {}
+    } catch {
+      // Ignored - fallback to memory adapter
+    }
     return this.fallbackAdapter.get(key);
   }
 
@@ -145,7 +147,9 @@ export class CloudflareR2StorageAdapter {
       if (typeof fetch === 'function') {
         await fetch(this.buildUrl(`/${key}`), { method: 'DELETE' });
       }
-    } catch (e) {}
+    } catch {
+      // Ignored - fallback to memory adapter
+    }
     this.fallbackAdapter.delete(key);
   }
 }

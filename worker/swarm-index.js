@@ -1,6 +1,5 @@
 import baseWorker from './index.js';
 
-const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 const SWARM_MODEL = 'glm-5.2';
 const SWARM_INTENTS = new Set(['app', 'code-help', 'swarm']);
 

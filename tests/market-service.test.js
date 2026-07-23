@@ -1,4 +1,3 @@
-/* global AbortController, console, DOMException, Response */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fetchMarketData } from '../src/services/marketService.js';
 import { generateAIResponse } from '../src/services/aiService.js';
