@@ -250,7 +250,7 @@ async function handleAi(request, env) {
 
   // 3. Cloudflare Workers AI Fallback
   if (!env.AI || typeof env.AI.run !== 'function') {
-    return jsonResponse(503, { error: 'AI service is not available.' });
+    return jsonResponse(503, { error: 'Workers AI is not configured.' });
   }
 
   try {
