@@ -14,6 +14,7 @@
     "train:intents": "node scripts/train-intents.mjs",
     "evaluate:intents": "node scripts/evaluate-local-intents.mjs",
     "evaluate:ai": "node scripts/evaluate-ai-intents.mjs",
+    "test:game": "vitest run tests/game-manifest.test.js tests/game-asset-storage.test.js tests/game-pipeline-state.test.js tests/game-iframe-bridge.test.js",
     "test:market": "vitest run tests/market-intent.test.js tests/market-service.test.js tests/market-card.test.jsx && node tests/market-worker-contract.mjs",
     "test:market:watch": "vitest tests/market-intent.test.js tests/market-service.test.js tests/market-card.test.jsx",
     "test:cloudflare": "node tests/cloudflare-worker-contract.mjs && node tests/market-worker-contract.mjs && bash tests/cloudflare-worker-config-contract.sh && bash tests/workers-ai-provider-contract.sh && bash tests/public-ai-proxy-contract.sh && bash tests/ai-live-intent-eval-contract.sh && node tests/ai-live-intent-eval-response-contract.mjs && bash tests/env-question-skill-contract.sh",
