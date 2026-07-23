@@ -46,7 +46,7 @@ check_absent 'hardcoded financial demo does not claim live data' 'LIVE DATA' "$s
 check 'settings explains automatic server-managed routing' 'automatically routes.*managed server-side|managed server-side.*automatically routes' "$settings"
 check_absent 'settings does not expose provider or model names' 'GLM|DeepSeek|Kimi|MiMo|OpenRouter|FLUX|Cloudflare Workers AI|@cf/' "$settings"
 check 'README documents the optional OpenRouter secret' 'OPENROUTER_API_KEY' "$readme"
-check 'README documents primary text routing' 'kimi-k3|deepseek-v4-pro' "$readme"
+check 'README documents primary text routing' 'glm-5.2|deepseek-v4-pro' "$readme"
 check_absent 'README no longer documents MiMo V2.5' 'xiaomi/mimo-v2[.]5' "$readme"
 check 'README documents the primary Workers AI fallback' '@cf/moonshotai/kimi-k2[.]7-code' "$readme"
 check 'README documents the secondary Workers AI fallback' '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b' "$readme"
