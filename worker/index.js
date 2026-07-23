@@ -3,9 +3,16 @@ import { handleMarket } from './market.js';
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 const OPENCODE_DEFAULT_ENDPOINT = 'https://opencode.ai/api/v1/chat/completions';
 const KIMI_K3_MODEL = 'moonshotai/kimi-k3-code';
+const DEEPSEEK_V4_PRO_MODEL = 'deepseek/deepseek-v4-pro';
 
 function getTargetModels(intentType, hasMedia, prompt = '') {
-  return ['moonshotai/kimi-k3-code', 'kimi-k3-code'];
+  const isCoding = intentType === 'code-help' || intentType === 'app' || intentType === 'swarm' || /\b(code|coding|debug|bug|fix|function|react|javascript|typescript|python|html|css|api|component|class|syntax)\b/i.test(prompt);
+
+  if (isCoding) {
+    return [KIMI_K3_MODEL, 'kimi-k3-code'];
+  }
+
+  return [DEEPSEEK_V4_PRO_MODEL, 'deepseek-v4-pro'];
 }
 const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
 const DEEPSEEK_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
