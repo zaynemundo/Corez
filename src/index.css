@@ -449,7 +449,7 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background-color: var(--bg-primary);
+  background-color: rgb(252, 252, 252);
   min-width: 0;
 }
 
@@ -461,7 +461,7 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   justify-content: space-between;
   border-bottom: none;
-  background-color: var(--bg-primary);
+  background-color: rgb(252, 252, 252);
 }
 
 .header-left {
@@ -1325,7 +1325,7 @@ h1, h2, h3, h4, h5, h6 {
   padding: 1rem 1.5rem 1.25rem 1.5rem;
   display: flex;
   justify-content: center;
-  background: var(--bg-primary);
+  background: rgb(252, 252, 252);
 }
 
 .input-box {
