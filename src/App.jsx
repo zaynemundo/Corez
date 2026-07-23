@@ -383,6 +383,7 @@ export default function App() {
 
   const handleSendMessage = async (promptText) => {
     if (!activeSession) return;
+    const targetSessionId = activeSessionId;
 
     let displayPrompt = promptText;
     let apiPrompt = promptText;
@@ -403,7 +404,7 @@ export default function App() {
       : activeSession.title;
 
     setSessions(prev => prev.map(s => {
-      if (s.id === activeSessionId) {
+      if (s.id === targetSessionId) {
         return { ...s, title: updatedTitle, messages: updatedDisplayMessages };
       }
       return s;
@@ -413,7 +414,7 @@ export default function App() {
 
     // Save pending request to localStorage for background execution across page refresh
     const pendingData = {
-      sessionId: activeSessionId,
+      sessionId: targetSessionId,
       apiPrompt,
       displayPrompt,
       messages: updatedApiMessages,
@@ -437,7 +438,7 @@ export default function App() {
         }
         
         setSessions(prev => prev.map(s => {
-          if (s.id === activeSessionId) {
+          if (s.id === targetSessionId) {
             return { ...s, messages: [...s.messages, aiMsg] };
           }
           return s;
