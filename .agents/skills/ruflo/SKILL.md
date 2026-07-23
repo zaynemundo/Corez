@@ -1,3 +1,8 @@
+---
+name: ruflo
+description: Autonomous multi-agent swarm orchestration, adaptive task queuing, memory retention, and real-time execution monitoring engine.
+---
+
 <div align="center">
 
 [![Ruflo Banner](ruflo/assets/ruflo-small.jpeg)](https://cognitum.one/agentic-engineering)

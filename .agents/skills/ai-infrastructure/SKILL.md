@@ -1,26 +1,47 @@
 ---
 name: ai-infrastructure
-description: Evaluates and designs LLM deployments, APIs, model routing, local inference, GPU and server capacity, quantisation, RAG, reranking, agent workflows, and token or cost optimisation.
+description: Evaluates and designs LLM deployments, APIs, model routing, local inference, GPU/server capacity, quantization, RAG, reranking, agent workflows, and token/cost optimization.
 ---
 
-# AI Models & Infrastructure
+# AI Infrastructure Skill
 
-## Supported work
-- Model and provider comparisons, API integration, token and cost analysis, routing, fallbacks, context management, caching, structured outputs, tool use, and observability.
-- Local inference planning across desktop, workstation, server, Apple silicon, Jetson, and other supported hardware.
-- GPU memory estimates, quantisation, concurrency, throughput, latency, storage, networking, and deployment trade-offs.
-- Retrieval-augmented generation, embeddings, chunking, reranking, citations, evaluation, guardrails, and agent orchestration.
+Use this skill when designing, building, or optimizing AI model integrations, LLM API proxies, model routing, Workers AI pipelines, RAG vector retrieval, and prompt token efficiency.
 
-## Workflow
-1. Identify the workload: model size, modality, context, concurrency, latency, privacy, uptime, and budget.
-2. Verify current model names, provider pricing, limits, licences, hardware specifications, and software compatibility when these affect the recommendation.
-3. Estimate memory and cost explicitly, including model weights, KV cache, runtime overhead, input/output tokens, and expected utilisation.
-4. Recommend the smallest architecture that meets quality and reliability requirements.
-5. Include fallback, rate-limit, retry, logging, evaluation, and security strategies.
-6. Distinguish theoretical fit from measured performance and recommend benchmarking with the user's real workload.
+```
+  ┌─────────────────────────────────────────────────────────────┐
+  │  AI INFRASTRUCTURE ARCHITECTURE                             │
+  │  1. Model Router (Primary LLM -> Secondary Failover)        │
+  │  2. Token Budget & Context Manager                          │
+  │  3. RAG Pipeline (Embedding -> Vector DB -> Reranker)       │
+  │  4. Public API Gateway & Response Streaming (SSE)           │
+  └─────────────────────────────────────────────────────────────┘
+```
 
-## Guardrails
-- Do not claim a model fits hardware without accounting for quantisation and runtime overhead.
-- Do not present unofficial benchmarks or community usage reports as guaranteed limits.
-- Never expose API keys or encourage account-limit evasion.
-- Treat provider policies, model catalogues, prices, and limits as current information requiring verification.
+---
+
+## 1. Model Routing & Primary/Secondary Failovers
+
+- **Routing Logic**: Direct fast structured classification tasks to lightweight models (e.g. Workers AI `@cf/meta/llama-3-8b-instruct`), and complex reasoning/art direction to high-capability models (e.g. MiMo V2.5, DeepSeek V4 Flash).
+- **Graceful Failover**: If the primary API endpoint times out (8–12s) or returns 5xx status codes, automatically degrade to secondary backup providers without throwing unhandled UI errors.
+
+---
+
+## 2. Token Budget & Context Window Management
+
+- **Truncation & Summarization**: Keep conversation history bounded by sliding context windows. Summarize older steps when context usage exceeds 70% threshold.
+- **System Prompt Compression**: Strip unnecessary markdown boilerplate in automated agent-to-agent payloads while preserving exact JSON contracts.
+
+---
+
+## 3. RAG & Vector Retrieval Optimization
+
+- **Chunking Strategy**: Chunk documents into 256–512 token segments with 10% overlap to preserve context across boundaries.
+- **Hybrid Search**: Combine vector similarity search (cosine distance) with keyword BM25 search for precise document recall.
+- **Reranking**: Apply cross-encoder reranking on top-N candidates before passing context to the LLM generation prompt.
+
+---
+
+## 4. Response Streaming & SSE Protocols
+
+- Use Server-Sent Events (`text/event-stream`) for real-time model token streaming.
+- Implement robust client-side `AbortController` listeners so users can interrupt generation at any moment.

@@ -1,3 +1,8 @@
+---
+name: awesome-agent-skills
+description: A curated repository of official and community AI agent skills for coding, automation, research, testing, and system integration.
+---
+
 <a href="https://github.com/VoltAgent/voltagent">
      <img width="1500" alt="claude-skills" src="https://github.com/user-attachments/assets/0db54cfc-f3dd-4683-abbb-e4c01d9dfb5d" />
 </a>

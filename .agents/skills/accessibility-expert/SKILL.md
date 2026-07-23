@@ -1,11 +1,32 @@
+---
+name: accessibility-expert
+description: Enforces strict WCAG 2.2 AA accessibility standards across all web interfaces, components, forms, keyboard interactions, screen reader announcements, color contrast, and dynamic focus management.
+---
+
 # Accessibility Expert Skill
 
-This skill enforces strict WCAG accessibility guidelines on all generated UI elements.
+Enforces strict WCAG 2.2 AA accessibility standards on all generated UI elements, React/Vite components, HTML structures, and CSS styles.
 
-## Rules
-- **Color Contrast**: Ensure a minimum contrast ratio of 4.5:1 for normal text and 3:1 for large text.
-- **ARIA Roles**: Use appropriate ARIA roles, states, and properties when semantic HTML elements are insufficient.
-- **Keyboard Navigation**: Ensure all interactive elements are focusable and usable via keyboard (`tabindex="0"`, focus rings, `onKeyDown` handlers).
-- **Alt Text**: Always provide meaningful `alt` text for images or `aria-hidden="true"` for decorative images.
-- **Semantic HTML**: Prefer native HTML elements (`<button>`, `<a>`, `<nav>`, `<main>`) over generic `<div>` wrappers.
-- **Forms**: Always associate `<label>` tags with their respective input elements using `htmlFor` or `for` attributes.
+## Core Accessibility Standards
+
+### 1. Color Contrast & Visual Perception
+- **Contrast Ratios**: Minimum 4.5:1 contrast ratio for normal text (< 18pt / 24px) and 3:1 for large text (>= 18pt bold or >= 24px regular).
+- **Non-Text Contrast**: Ensure UI components, active states, borders, and graphical indicators have at least 3:1 contrast against adjacent backgrounds.
+- **Color Independence**: Never rely solely on color to convey information (e.g., pair error text or icons with red indicators, add clear status labels to chart trends).
+
+### 2. Keyboard Navigation & Focus Management
+- **Logical Tab Order**: All interactive controls must follow DOM order (`tabindex="0"` for custom components; never use `tabindex > 0`).
+- **Visible Focus Rings**: Ensure explicit focus states via `:focus-visible` with high-contrast outlines (e.g., `outline: 2px solid var(--text-primary); outline-offset: 2px;`). Never hide focus outlines without a `:focus-visible` alternative.
+- **Keyboard Traps**: Ensure dialogs and modals implement focus trapping (Tabbing stays inside active modal, `Escape` key closes modal and returns focus to trigger element).
+- **Shortcuts & Handlers**: All custom click handlers must support `Enter` and `Space` key triggers (`onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleAction()}`).
+
+### 3. Screen Readers & ARIA Roles
+- **Semantic HTML First**: Prefer native elements (`<button>`, `<a href>`, `<header>`, `<nav>`, `<main>`, `<aside>`, `<footer>`, `<section>`) over `div` / `span` wrappers with custom click listeners.
+- **ARIA Labeling**: Provide `aria-label` or `aria-labelledby` for icon-only buttons, inputs without visible labels, and custom controls.
+- **Dynamic Live Regions**: Use `role="status"` or `aria-live="polite"` for dynamic updates (loading states, toast notifications, calculation outputs, streaming text).
+- **Decorative Images**: Use `aria-hidden="true"` or empty `alt=""` for purely decorative icons or illustrations.
+
+### 4. Responsive & Motion Adaptation
+- **Touch Target Size**: Interactive elements on touch viewports must have a minimum hit area of 44x44px (`min-width: 44px; min-height: 44px;`).
+- **Reduced Motion**: Respect user OS preferences via `@media (prefers-reduced-motion: reduce)` by disabling non-essential transitions and animations.
+- **Zoom & Text Scaling**: Ensure layouts remain usable and legible at 200% browser text zoom without clipping or horizontal overflow.

@@ -1,3 +1,8 @@
+---
+name: agent-rules-books
+description: Distilled software engineering rules and skills from classic programming books (Refactoring, Clean Code, DDD, Design Patterns, Pragmatic Programmer) for coding agents.
+---
+
 [![Polish Repo badge](https://polish-open-source.pl/en/badges/repositories/github/ciembor/agent-rules-books.svg)](https://polish-open-source.pl/en/latest)
 
 <div align="center">

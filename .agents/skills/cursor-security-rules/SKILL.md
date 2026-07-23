@@ -1,3 +1,8 @@
+---
+name: cursor-security-rules
+description: Essential security rules and safety guardrails for AI coding agents to prevent secret exposure, command injection, and unsafe patterns.
+---
+
 # 🛡️ Cursor Security Rules
 
 This repo provides essential security rules for Cursor.

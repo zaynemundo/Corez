@@ -1,3 +1,8 @@
+---
+name: awesome-cursor-skills
+description: Curated directory of agent skills, plugins, and templates for AI code editors and autonomous agent workflows.
+---
+
 # Awesome Cursor Skills [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)
 
 > A curated list of awesome [skills](https://docs.cursor.com/agent/skills) for [Cursor](https://cursor.com), the AI code editor.

@@ -1,3 +1,8 @@
+---
+name: ui-ux-pro-max-skill
+description: Comprehensive UI/UX design intelligence skill providing 161 reasoning rules, 84 UI styles, color theory, typography scales, accessibility standards, responsive layout strategies, and micro-interactions.
+---
+
 # [UI UX Pro Max](https://uupm.cc)
 
 <p align="center">

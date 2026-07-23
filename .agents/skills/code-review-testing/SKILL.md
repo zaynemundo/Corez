@@ -1,23 +1,69 @@
 ---
 name: code-review-testing
-description: Specialized skill for thorough code review paired with automated testing and empirical runtime verification.
+description: Specialized skill for thorough code review paired with automated unit/contract testing, static analysis, regression prevention, and empirical runtime verification.
 ---
 
-# Code Review & Testing Skill
+# Code Review & Automated Testing Skill
 
-Use this skill whenever analyzing, auditing, reviewing code, or fixing bugs. Code review MUST always go hand-in-hand with testing.
+Use this skill whenever analyzing, auditing, reviewing code changes, debugging, or validating features. Code review MUST always go hand-in-hand with automated testing and empirical verification.
 
-## Core Principles
+```
+  ┌─────────────────────────────────────────────────────────────┐
+  │  CODE REVIEW & VERIFICATION WORKFLOW                        │
+  │  1. Code Inspection & Architectural Review                  │
+  │  2. Static Analysis & Linting Audit                        │
+  │  3. Boundary & Contract Test Suite Execution                 │
+  │  4. Empirical Runtime Verification                           │
+  └─────────────────────────────────────────────────────────────┘
+```
 
-1. **Review & Test Pairing**:
-   - Every code review must be accompanied by relevant unit or contract tests.
-   - Never accept code changes or claim a bug is fixed without running verification commands (e.g. build scripts, contract tests).
+---
 
-2. **Code Quality Checklist**:
-   - **Correctness & Contract Compliance**: Verify logic matches API contracts and input requirements.
-   - **Edge Cases & Error Handling**: Test boundary inputs (null, undefined, empty strings, rapid triggers, timeouts).
-   - **Performance**: Audit loop complexity, memory leaks, unhandled event listeners, and wasteful re-renders.
-   - **Security**: Inspect for secret exposure, unescaped user input, injection vulnerabilities, and safe error messages.
+## 1. Code Inspection & Architectural Review
 
-3. **No Superficial Fixes**:
-   - Never swallowing exceptions, masking symptoms, or returning dummy fallbacks without fixing the root cause.
+- **Contract Integrity**: Verify function signatures, prop types, and return values match callers across all invocation sites.
+- **Root Cause Resolution**: NEVER resolve errors by masking symptoms, swallowing exceptions, returning dummy fallbacks, or disabling broken test assertions. Trace upstream data sources to resolve underlying bugs.
+- **Code Cleanliness & SOLID**: Ensure single responsibility, modular component separation, reusable utility functions, and clean variable naming.
+
+---
+
+## 2. Code Quality & Security Audit Checklist
+
+### Security & Privacy
+- [ ] No API keys, credentials, or environment secrets exposed in public code, client bundles, or response logs.
+- [ ] User inputs sanitized before database queries, shell execution, or DOM insertion (`dangerouslySetInnerHTML`).
+- [ ] Public error payloads sanitized (`safeErrorMessage`) to prevent stack trace disclosures.
+
+### Logic & Performance
+- [ ] Asynchronous operations properly handled (`async/await`, `try/catch`, `AbortController` cancellation).
+- [ ] Event listeners, timers, and subscriptions cleaned up on unmount (`useEffect` cleanup functions).
+- [ ] Minimal re-renders in React via memoization (`useMemo`, `useCallback`) where computationally significant.
+
+---
+
+## 3. Automated Testing Guidelines
+
+### Unit & Integration Tests (Vitest / Jest)
+- Write tests that cover happy paths, edge cases, zero-values, null/undefined properties, and error states.
+- Mock network APIs cleanly without altering component integration contracts.
+- Ensure test suites are fast, deterministic, and isolated (no state leaks between tests).
+
+### Contract Tests & Bash Verification Scripts
+- Maintain repository contract scripts (e.g. `tests/ui-responsive-contract.sh`, `tests/cloudflare-worker-contract.mjs`).
+- Verify CSS design tokens, DOM classes, ARIA attributes, responsive layout breakpoints, and API status codes against explicit contract specs.
+
+---
+
+## 4. Verification Protocol (Empirical Proof Required)
+
+- **Rule**: NEVER declare a task resolved, a bug fixed, or a code review complete until empirical execution commands (build scripts, test scripts, linters) have been run and returned clean exit codes (`0`).
+- **Commands**:
+  ```bash
+  # Run applicable tests and contract checks
+  npm test
+  bash tests/ui-responsive-contract.sh
+  
+  # Validate build compilation and linting
+  npm run build
+  npm run lint
+  ```

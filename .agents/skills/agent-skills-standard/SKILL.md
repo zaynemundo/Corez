@@ -1,3 +1,8 @@
+---
+name: agent-skills-standard
+description: Portable SDLC standards layer for AI coding agents providing 280 ready-to-use coding, framework, database, and security standards.
+---
+
 # Agent Skills Standard
 
 [![NPM Version](https://img.shields.io/npm/v/agent-skills-standard.svg?style=flat-square)](https://www.npmjs.com/package/agent-skills-standard)
