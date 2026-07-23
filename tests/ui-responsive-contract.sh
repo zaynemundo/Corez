@@ -224,8 +224,8 @@ check 'sidebar component can render collapsed state' 'isOpen.*collapsed|collapse
 check_absent 'sidebar section heading is absent' 'className="sidebar-section-heading"' "$sidebar"
 check_absent 'sidebar section headers do not use inline letterSpacing styles' 'style=\{\{.*letterSpacing' "$sidebar"
 check 'sidebar width token set to 52px' '--sidebar-width: 52px;'
-check 'sidebar margin token set to 12px' '--sidebar-margin: 12px;'
-check 'sidebar radius token set to 16px' '--sidebar-radius: 16px;'
+check 'sidebar margin token set to 0px' '--sidebar-margin: 0px;'
+check 'sidebar radius token set to 0px' '--sidebar-radius: 0px;'
 check 'sidebar heading size token set to 11px' '--sidebar-heading-size: 11px;'
 check 'sidebar body size token set to 13px' '--sidebar-body-size: 13px;'
 check 'sidebar hit target min height set to 38px' '--sidebar-item-min-height: 38px;'

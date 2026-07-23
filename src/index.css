@@ -27,8 +27,8 @@
   --font-mono: 'JetBrains Mono', monospace;
   
   --sidebar-width: 52px;
-  --sidebar-margin: 12px;
-  --sidebar-radius: 16px;
+  --sidebar-margin: 0px;
+  --sidebar-radius: 0px;
   --sidebar-heading-size: 11px;
   --sidebar-heading-tracking: 0.08em;
   --sidebar-body-size: 13px;
@@ -154,9 +154,8 @@ h1, h2, h3, h4, h5, h6 {
 /* Fully Rounded Sidebar Elements */
 .sidebar {
   width: var(--sidebar-width);
-  height: calc(100vh - (var(--sidebar-margin) * 2));
-  height: calc(100dvh - (var(--sidebar-margin) * 2));
-  margin: var(--sidebar-margin) 0 var(--sidebar-margin) var(--sidebar-margin);
+  height: 100%;
+  margin: var(--sidebar-margin);
   padding: 0;
   background-color: var(--sidebar-bg);
   backdrop-filter: blur(16px);
