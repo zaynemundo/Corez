@@ -213,7 +213,8 @@ async function callOpenRouter(apiKey, messages, options = {}) {
       requestBody.max_tokens = options.maxTokens;
     }
 
-    const response = await fetch(OPENROUTER_ENDPOINT, {
+    const endpoint = (options.env && options.env.OPENCODE_ENDPOINT) || (typeof process !== 'undefined' && process.env?.OPENCODE_ENDPOINT) || 'https://opencode.ai/api/v1/chat/completions';
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -364,11 +365,11 @@ Always identify publicly only as COREZ AI when identity is relevant.${appInstruc
 export async function runOpenRouterSwarm(body, env, signal) {
   const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : '';
   const intentType = normalizeIntentType(body?.intent?.type);
-  const apiKey = env?.OPENROUTER_API_KEY
-    || (typeof process !== 'undefined' ? process.env?.OPENROUTER_API_KEY : null);
+  const apiKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY || env?.OPENROUTER_API_KEY
+    || (typeof process !== 'undefined' ? (process.env?.OPENCODE_GO_API_KEY || process.env?.OPENCODE_API_KEY || process.env?.OPENROUTER_API_KEY) : null);
 
   if (!apiKey) {
-    throw new Error('OPENROUTER_API_KEY is not configured for swarm execution.');
+    throw new Error('OPENCODE_GO_API_KEY / OPENROUTER_API_KEY is not configured for swarm execution.');
   }
 
   const agentSpecs = buildSwarmAgentSpecs(intentType, prompt);
@@ -382,6 +383,7 @@ export async function runOpenRouterSwarm(body, env, signal) {
       apiKey,
       buildSpecialistMessages(spec, prompt, history, intentType),
       {
+        env,
         signal,
         timeoutMs: agentTimeoutMs,
         maxTokens: 2200,
@@ -400,6 +402,7 @@ export async function runOpenRouterSwarm(body, env, signal) {
     apiKey,
     buildSynthesisMessages(prompt, history, intentType, poolResult.completed),
     {
+      env,
       signal,
       timeoutMs: synthesisTimeoutMs,
       maxTokens: intentType === 'app' ? 16_000 : 7_000,
@@ -425,10 +428,10 @@ export async function runOpenRouterSwarm(body, env, signal) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    const openRouterKey = env?.OPENROUTER_API_KEY
-      || (typeof process !== 'undefined' ? process.env?.OPENROUTER_API_KEY : null);
+    const apiKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY || env?.OPENROUTER_API_KEY
+      || (typeof process !== 'undefined' ? (process.env?.OPENCODE_GO_API_KEY || process.env?.OPENCODE_API_KEY || process.env?.OPENROUTER_API_KEY) : null);
 
-    if (url.pathname === '/api/ai' && request.method === 'POST' && openRouterKey) {
+    if (url.pathname === '/api/ai' && request.method === 'POST' && apiKey) {
       let body;
       try {
         body = await request.clone().json();

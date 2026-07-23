@@ -84,7 +84,7 @@ async function run() {
 
   try {
     globalThis.fetch = async (url, init) => {
-      assert.equal(url, 'https://openrouter.ai/api/v1/chat/completions');
+      assert.ok(url === 'https://openrouter.ai/api/v1/chat/completions' || url === 'https://opencode.ai/api/v1/chat/completions');
       const payload = JSON.parse(init.body);
       openRouterRequests.push(payload);
 
