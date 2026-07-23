@@ -2,10 +2,16 @@ import { handleMarket } from './market.js';
 
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 const OPENCODE_DEFAULT_ENDPOINT = 'https://opencode.ai/api/v1/chat/completions';
+const HY3_MODEL = 'tencent/hy3-preview';
+const KIMI_K3_MODEL = 'moonshotai/kimi-k3-code';
+
 function getTargetModels(intentType, hasMedia, prompt = '') {
-  return ['tencent/hy3-preview'];
+  if (intentType === 'code-help' || intentType === 'app' || intentType === 'swarm' || /\b(code|coding|debug|bug|fix|function|react|javascript|typescript|python|html|css|api|component|class|syntax)\b/i.test(prompt)) {
+    return [KIMI_K3_MODEL, HY3_MODEL];
+  }
+  return [HY3_MODEL];
 }
-const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
+const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k3-code';
 const DEEPSEEK_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
 const FLUX_MODEL = '@cf/black-forest-labs/flux-1-schnell';
 const CANONICAL_INTENT_TYPES = new Set([
