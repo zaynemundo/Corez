@@ -92,13 +92,14 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
     Array.from(files).forEach(file => {
       const fileId = Date.now() + Math.random();
       const isImage = file.type.startsWith('image/');
+      const isTextFile = ['text/plain', 'text/csv', 'text/markdown', 'application/json', 'text/html', 'text/xml'].includes(file.type) || file.name.match(/\.(txt|md|csv|json|xml|html|js|ts|jsx|tsx|css|py|java|rs|go|sh)$/i);
       const reader = new FileReader();
       if (isImage) {
         reader.onload = (e) => {
           setAttachments(prev => [...prev, { id: fileId, name: file.name, type: 'image', dataUrl: e.target.result }]);
         };
         reader.readAsDataURL(file);
-      } else {
+      } else if (isTextFile) {
         reader.onload = (e) => {
           setAttachments(prev => [...prev, { id: fileId, name: file.name, type: 'document', text: e.target.result }]);
         };

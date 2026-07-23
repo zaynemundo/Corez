@@ -174,7 +174,7 @@ export default function CanvasPreview({
                 title={`Live Application Preview (${deviceSpecs[deviceMode].label})`}
                 srcDoc={editableCode}
                 className="preview-iframe"
-                sandbox="allow-scripts allow-modals allow-forms allow-same-origin"
+                sandbox="allow-scripts allow-modals allow-forms"
                 style={
                   deviceMode !== 'desktop'
                     ? {

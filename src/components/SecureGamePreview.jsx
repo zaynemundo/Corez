@@ -158,9 +158,9 @@ export default function SecureGamePreview({
         <iframe
           ref={iframeRef}
           title="COREZ Secure Game Sandbox"
-          sandbox="allow-scripts"
           referrerPolicy="no-referrer"
           srcDoc={sanitizedHtml}
+          sandbox="allow-scripts"
           style={{
             width: '100%',
             height: '100%',

@@ -458,11 +458,16 @@ export async function generateHostedAIResponse(
 export function extractCodeFromMessage(text) {
   if (!text) return null;
 
-  const htmlMatch = text.match(/```(?:html|xml|jsx|tsx)?\s*([\s\S]*?)```/i);
-  if (htmlMatch && htmlMatch[1].trim()) {
-    const code = htmlMatch[1].trim();
-    if (code.includes('<html') || code.includes('<div') || code.includes('<script') || code.includes('<style')) {
-      return code;
+  const codeBlocks = text.match(/```(?:html|xml|jsx|tsx)?\s*([\s\S]*?)```/gi);
+  if (codeBlocks) {
+    for (const block of codeBlocks) {
+      const match = block.match(/```(?:html|xml|jsx|tsx)?\s*([\s\S]*?)```/i);
+      if (match && match[1].trim()) {
+        const code = match[1].trim();
+        if (code.includes('<html') || code.includes('<div') || code.includes('<script') || code.includes('<style')) {
+          return code;
+        }
+      }
     }
   }
 

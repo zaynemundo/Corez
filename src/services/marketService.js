@@ -276,7 +276,7 @@ export async function fetchMarketData(request, signal = null) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
-    ...(signal ? { signal } : {})
+    signal: signal || undefined
   });
   let data;
   try {

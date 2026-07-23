@@ -145,7 +145,7 @@ function createTimedSignal(parentSignal, timeoutMs) {
   }
 
   const timer = setTimeout(() => {
-    controller.abort(new Error(`OpenRouter request exceeded ${timeoutMs}ms.`));
+    controller.abort(new Error(`AI Gateway request exceeded ${timeoutMs}ms.`));
   }, timeoutMs);
 
   return {
@@ -188,7 +188,7 @@ export function buildSwarmAgentSpecs(intentType, prompt) {
   return specs;
 }
 
-async function callOpenRouter(apiKey, messages, options = {}) {
+async function callAIGateway(apiKey, messages, options = {}) {
   const timeoutMs = readPositiveNumber(options.timeoutMs, 20_000);
   const timedSignal = createTimedSignal(options.signal, timeoutMs);
 
@@ -227,7 +227,7 @@ async function callOpenRouter(apiKey, messages, options = {}) {
 
     if (!response.ok) {
       const detail = (await response.text()).slice(0, 300);
-      const error = new Error(`OpenRouter ${response.status}: ${detail || response.statusText}`);
+      const error = new Error(`AI Gateway ${response.status}: ${detail || response.statusText}`);
       error.status = response.status;
       throw error;
     }
@@ -235,7 +235,7 @@ async function callOpenRouter(apiKey, messages, options = {}) {
     const data = await response.json();
     const content = data?.choices?.[0]?.message?.content;
     if (typeof content !== 'string' || !content.trim()) {
-      throw new Error('OpenRouter returned an empty swarm response.');
+      throw new Error('AI Gateway returned an empty swarm response.');
     }
 
     return content.trim();
@@ -379,7 +379,7 @@ export async function runOpenRouterSwarm(body, env, signal) {
 
   const poolResult = await runAdaptiveAgentPool(
     agentSpecs,
-    (spec) => callOpenRouter(
+    (spec) => callAIGateway(
       apiKey,
       buildSpecialistMessages(spec, prompt, history, intentType),
       {
@@ -398,7 +398,7 @@ export async function runOpenRouterSwarm(body, env, signal) {
   }
 
   const synthesisTimeoutMs = readPositiveNumber(env?.SWARM_SYNTHESIS_TIMEOUT_MS, 35_000);
-  const finalContent = await callOpenRouter(
+  const finalContent = await callAIGateway(
     apiKey,
     buildSynthesisMessages(prompt, history, intentType, poolResult.completed),
     {

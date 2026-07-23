@@ -31,7 +31,16 @@ function normalizeIntentType(intentType) {
 }
 
 function jsonResponse(status, body) {
-  return Response.json(body, { status });
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' data:; frame-src 'none'; object-src 'none'",
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      'Referrer-Policy': 'no-referrer'
+    }
+  });
 }
 
 function safeErrorDetail(error) {
@@ -239,9 +248,9 @@ async function handleAi(request, env) {
     }
   }
 
-  // 2. Cloudflare Workers AI Fallback
+  // 3. Cloudflare Workers AI Fallback
   if (!env.AI || typeof env.AI.run !== 'function') {
-    return jsonResponse(503, { error: 'Workers AI is not configured.' });
+    return jsonResponse(503, { error: 'AI service is not available.' });
   }
 
   try {
@@ -518,6 +527,9 @@ async function handleR2Assets(request, env) {
     headers.set('etag', object.httpEtag);
     headers.set('Cache-Control', 'public, max-age=31536000, immutable');
     headers.set('Access-Control-Allow-Origin', '*');
+    headers.set('X-Content-Type-Options', 'nosniff');
+    headers.set('X-Frame-Options', 'DENY');
+    headers.set('Referrer-Policy', 'no-referrer');
 
     return new Response(object.body, { headers });
   }
