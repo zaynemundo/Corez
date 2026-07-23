@@ -160,7 +160,8 @@ h1, h2, h3, h4, h5, h6 {
   background-color: var(--sidebar-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--sidebar-border);
+  border: none;
+  border-right: 1px solid var(--sidebar-border);
   border-radius: var(--sidebar-radius);
   box-shadow: none;
   display: flex;
@@ -1729,7 +1730,8 @@ h1, h2, h3, h4, h5, h6 {
     height: calc(100vh - (var(--sidebar-margin) * 2) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
     height: calc(100dvh - (var(--sidebar-margin) * 2) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
     margin: 0;
-    border: 1px solid var(--sidebar-border);
+    border: none;
+    border-right: 1px solid var(--sidebar-border);
     border-radius: var(--sidebar-radius);
     overflow-x: hidden;
     z-index: 80;
