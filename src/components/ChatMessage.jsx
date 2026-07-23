@@ -81,51 +81,61 @@ function CodeSnippetBlock({ code, lang, onRunInCanvas, onReviseCode }) {
 function ExecutableCodeBlock({ code, onRunInCanvas, onReviseCode }) {
   return (
     <div className="executable-code-action-bar" style={{
-      margin: '0.5rem 0',
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '0.4rem',
-      flexWrap: 'wrap'
+      margin: '0.75rem 0',
+      width: '100%',
+      display: 'flex',
+      gap: '0.6rem',
+      alignItems: 'stretch'
     }}>
       {onRunInCanvas && (
         <button 
-          className="code-btn"
+          className="code-btn primary-preview-btn"
           style={{ 
-            padding: '0.4rem 0.85rem', 
+            flex: 1,
+            padding: '0.75rem 1.25rem', 
             background: 'var(--text-primary)', 
             color: 'var(--bg-primary)',
             fontWeight: 600,
-            fontSize: '0.78rem',
-            borderRadius: 'var(--radius-pill, 9999px)',
+            fontSize: '0.9rem',
+            borderRadius: 'var(--radius-md, 12px)',
             border: 'none',
             cursor: 'pointer',
-            display: 'inline-flex',
+            display: 'flex',
             alignItems: 'center',
-            gap: '0.4rem'
+            justify: 'center',
+            gap: '0.6rem',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+            transition: 'var(--transition-fast)'
           }}
           onClick={() => onRunInCanvas(code)}
           title="Run app live in preview canvas"
         >
-          <Layers size={14} strokeWidth={2} />
-          <span>Open preview</span>
+          <Layers size={18} strokeWidth={2} />
+          <span>Open Canvas Preview</span>
         </button>
       )}
       {onReviseCode && (
         <button 
-          className="code-btn"
+          className="code-btn secondary-revise-btn"
           style={{ 
-            padding: '0.4rem 0.75rem', 
-            fontSize: '0.75rem',
-            borderRadius: 'var(--radius-pill, 9999px)',
+            padding: '0.75rem 1.1rem', 
+            background: 'var(--bg-tertiary)',
+            color: 'var(--text-primary)',
+            fontWeight: 500,
+            fontSize: '0.85rem',
+            borderRadius: 'var(--radius-md, 12px)',
+            border: '1px solid var(--border-color)',
             cursor: 'pointer',
-            display: 'inline-flex',
+            display: 'flex',
             alignItems: 'center',
-            gap: '0.35rem'
+            justify: 'center',
+            gap: '0.45rem',
+            transition: 'var(--transition-fast)'
           }}
           onClick={() => onReviseCode(code)}
           title="Ask AI to revise this code"
         >
-          <Wand2 size={13} strokeWidth={1.5} />
+          <Wand2 size={16} strokeWidth={1.5} />
           <span>Revise</span>
         </button>
       )}
