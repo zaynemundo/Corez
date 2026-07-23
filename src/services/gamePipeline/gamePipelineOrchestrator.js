@@ -11,12 +11,22 @@ import { buildAssetRegistry, generatePreloaderScript } from './assetRegistry.js'
 import { generateEngineSkeleton } from './engineSkeleton.js';
 import { testGameHtml, generateRepairPrompt } from './gameTester.js';
 import { PipelineJobTracker, PIPELINE_STAGES } from './pipelineTracker.js';
+import { AgentSwarmOrchestrator } from './swarm/agentSwarmOrchestrator.js';
 
 export class GamePipelineOrchestrator {
   constructor(options = {}) {
     this.aiClient = options.aiClient; // function (prompt, options) => Promise<string>
     this.fluxClient = options.fluxClient; // function (prompt) => Promise<string url>
     this.storage = options.storage || defaultAssetStorage;
+    this.swarmOrchestrator = new AgentSwarmOrchestrator({
+      aiClient: this.aiClient,
+      fluxClient: this.fluxClient,
+      storage: this.storage
+    });
+  }
+
+  async runSwarmPipeline(userPrompt, options = {}) {
+    return this.swarmOrchestrator.executeSwarmJob(userPrompt, options);
   }
 
   async runPipeline(userPrompt, options = {}) {
