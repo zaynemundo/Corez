@@ -6,11 +6,13 @@ Corez deploys the Vite application and its AI endpoints together as a Cloudflare
 
 ### Text and multimodal requests
 
-When the optional `OPENROUTER_API_KEY` secret is configured, `/api/ai` uses OpenRouter first:
+When `OPENCODE_GO_API_KEY` (or `OPENCODE_API_KEY`) is configured, `/api/ai` uses the OpenCode Go API provider endpoint first:
 
 - Text and multimodal requests: `tencent/hy3-preview`
 
-If OpenRouter is unavailable, missing, or returns no usable response, Corez uses the native Cloudflare Workers AI binding in this order:
+When `OPENROUTER_API_KEY` is configured, `/api/ai` uses OpenRouter next.
+
+If configured API keys are unavailable, missing, or return no usable response, Corez uses the native Cloudflare Workers AI binding in this order:
 
 1. `@cf/moonshotai/kimi-k2.7-code`
 2. `@cf/deepseek-ai/deepseek-r1-distill-qwen-32b`

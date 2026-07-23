@@ -1,6 +1,7 @@
 import { handleMarket } from './market.js';
 
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
+const OPENCODE_DEFAULT_ENDPOINT = 'https://opencode.ai/api/v1/chat/completions';
 function getTargetModels(intentType, hasMedia, prompt = '') {
   return ['tencent/hy3-preview'];
 }
@@ -162,8 +163,41 @@ async function handleAi(request, env) {
     apiMessages.push({ role: 'user', content: prompt });
   }
 
-  // 1. Try OpenRouter API if OPENROUTER_API_KEY is configured
+  // 1. Try OpenCode Go API if OPENCODE_GO_API_KEY / OPENCODE_API_KEY is configured
   const targetModels = getTargetModels(intent?.type || 'general', hasMedia, prompt);
+  const opencodeKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY || (typeof process !== 'undefined' ? (process.env?.OPENCODE_GO_API_KEY || process.env?.OPENCODE_API_KEY) : null);
+  const opencodeEndpoint = env?.OPENCODE_ENDPOINT || OPENCODE_DEFAULT_ENDPOINT;
+  if (opencodeKey) {
+    for (const modelId of targetModels) {
+      try {
+        const opencodeResp = await fetch(opencodeEndpoint, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${opencodeKey}`,
+            'HTTP-Referer': 'https://corez.ai',
+            'X-Title': 'COREZ AI',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: modelId,
+            messages: apiMessages
+          })
+        });
+
+        if (opencodeResp.ok) {
+          const data = await opencodeResp.json();
+          const content = data?.choices?.[0]?.message?.content;
+          if (content && typeof content === 'string' && content.trim()) {
+            return jsonResponse(200, { content: content.trim(), model: `opencode:${modelId}` });
+          }
+        }
+      } catch (opencodeErr) {
+        console.warn(`OpenCode Go model ${modelId} request failed:`, safeErrorDetail(opencodeErr));
+      }
+    }
+  }
+
+  // 2. Try OpenRouter API if OPENROUTER_API_KEY is configured
   const openRouterKey = env?.OPENROUTER_API_KEY || (typeof process !== 'undefined' ? process.env?.OPENROUTER_API_KEY : null);
   if (openRouterKey) {
     for (const modelId of targetModels) {
