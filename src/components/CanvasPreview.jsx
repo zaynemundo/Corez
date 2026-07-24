@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   Code2, 
   RotateCw, 
@@ -13,6 +13,7 @@ import {
   Tablet,
   Smartphone
 } from 'lucide-react';
+import { formatCodeForPreview } from '../utils/previewTransformer';
 
 export default function CanvasPreview({ 
   code, 
@@ -25,6 +26,10 @@ export default function CanvasPreview({
   const [editableCode, setEditableCode] = useState(code || '');
   const [copied, setCopied] = useState(false);
   const [key, setKey] = useState(0);
+
+  const formattedSrcDoc = useMemo(() => {
+    return formatCodeForPreview(editableCode);
+  }, [editableCode]);
 
   useEffect(() => {
     setEditableCode(code || '');
@@ -172,7 +177,7 @@ export default function CanvasPreview({
               <iframe
                 key={key}
                 title={`Live Application Preview (${deviceSpecs[deviceMode].label})`}
-                srcDoc={editableCode}
+                srcDoc={formattedSrcDoc}
                 className="preview-iframe"
                 sandbox="allow-scripts allow-modals allow-forms"
                 style={

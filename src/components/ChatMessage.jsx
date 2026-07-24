@@ -330,7 +330,7 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onRe
 
       const lang = match[1] || 'code';
       const code = match[2].trim();
-      const isExecutable = lang.toLowerCase() === 'html' || lang.toLowerCase() === 'xml' || code.includes('<html') || code.includes('<div') || code.includes('<script');
+      const isExecutable = ['html', 'xml', 'jsx', 'tsx', 'js', 'javascript', 'react'].includes(lang.toLowerCase()) || code.includes('<') || code.includes('export default') || code.includes('function ') || code.includes('import ');
 
       parts.push({
         type: 'code',
