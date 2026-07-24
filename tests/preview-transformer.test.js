@@ -89,4 +89,22 @@ export default function Navbar() {
     expect(formatted).not.toContain('import Navbar from');
     expect(formatted).toContain('data-presets="react,typescript"');
   });
+
+  it('strips generic hook parameters and type assertions that cause Babel TSX syntax errors', () => {
+    const tsxCode = `
+      import React, { useRef, useState } from 'react';
+      export default function App() {
+        const ref = useRef<HTMLDivElement>(null);
+        const [open, setOpen] = useState<boolean>(false);
+        const style = { position: 'relative' as const };
+        return <div ref={ref} style={style}>App</div>;
+      }
+    `;
+
+    const formatted = formatCodeForPreview(tsxCode);
+    expect(formatted).toContain('useRef(null)');
+    expect(formatted).toContain('useState(false)');
+    expect(formatted).not.toContain('useRef<HTMLDivElement>');
+    expect(formatted).not.toContain('as const');
+  });
 });

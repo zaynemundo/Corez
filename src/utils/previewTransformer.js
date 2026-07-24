@@ -35,6 +35,12 @@ export function formatCodeForPreview(rawCode) {
   processed = processed.replace(/export\s+type\s+[A-Za-z0-9_]+\s*=[\s\S]*?;/g, '');
   processed = processed.replace(/type\s+[A-Za-z0-9_]+\s*=[\s\S]*?;/g, '');
 
+  // Strip generic type arguments on hooks (e.g. useRef<HTMLDivElement>(null) -> useRef(null))
+  processed = processed.replace(/(useRef|useState|useMemo|useCallback|useContext|useReducer|createRef|forwardRef)\s*<[\s\S]*?>/g, '$1');
+
+  // Strip TypeScript type assertions (e.g. `as const`, `as any`, `as HTMLDivElement`, `as const satisfies ...`)
+  processed = processed.replace(/\s+as\s+(?:const|any|unknown|boolean|number|string|React\.[A-Za-z0-9_]+|[A-Za-z0-9_]+)/g, '');
+
   // 4. Clean up export statements
   // Strip named exports like `export const X = ...` -> `const X = ...`
   processed = processed.replace(/export\s+(const|let|var|function|class)\s+/g, '$1 ');
@@ -93,6 +99,18 @@ export function formatCodeForPreview(rawCode) {
     body { margin: 0; padding: 0; background: #09090b; color: #f4f4f5; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; min-height: 100vh; }
     #root { min-height: 100vh; display: flex; flex-direction: column; }
   </style>
+  <script>
+    window.onerror = function(msg, url, lineNo, columnNo, error) {
+      var root = document.getElementById('root');
+      if (root && (!root.innerHTML || root.innerHTML.trim() === '')) {
+        root.innerHTML = '<div style="padding: 2rem; background: #18181b; color: #f87171; font-family: monospace; border-radius: 12px; margin: 2rem; border: 1px solid #ef444433;">' +
+          '<h3 style="margin-top:0; color:#ef4444; font-size:1.1rem;">Preview Compilation Error</h3>' +
+          '<p style="color:#e4e4e7; font-size:0.9rem; white-space:pre-wrap;">' + String(msg || error) + '</p>' +
+          '</div>';
+      }
+      return false;
+    };
+  </script>
 </head>
 <body>
   <div id="root"></div>
