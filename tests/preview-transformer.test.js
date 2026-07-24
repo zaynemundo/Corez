@@ -66,4 +66,27 @@ export default function Dashboard() {
     const formatted = formatCodeForPreview(rawTag);
     expect(formatted).toContain('function App()');
   });
+
+  it('handles multi-file code blocks with // App.tsx and // components/Navbar.tsx headers', () => {
+    const multiFile = `// App.tsx
+import React from 'react';
+import Navbar from './components/layout/Navbar';
+
+export default function App() {
+  return <div><Navbar /></div>;
+}
+
+// components/layout/Navbar.tsx
+import React from 'react';
+export default function Navbar() {
+  return <nav>Navbar</nav>;
+}`;
+
+    const formatted = formatCodeForPreview(multiFile);
+    expect(formatted).toContain('function App()');
+    expect(formatted).toContain('function Navbar()');
+    expect(formatted).not.toContain('// App.tsx');
+    expect(formatted).not.toContain('import Navbar from');
+    expect(formatted).toContain('data-presets="react,typescript"');
+  });
 });

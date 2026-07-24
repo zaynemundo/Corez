@@ -13,6 +13,7 @@ import { defaultSkillRegistry } from '../skills/registry.js';
 import { classifyIntent } from './intentClassifier.js';
 import { parseMarketIntent } from './marketIntent.js';
 import { fetchMarketData, unavailableMarket } from './marketService.js';
+import { process as processPromptIntelligence, toLegacyIntentType, classifyIntent as classifyIntentNew } from './promptIntelligence/index.js';
 
 export const PUBLIC_USER_INTENT_PROMPT = `
 Analyze the public user intent behind the request. Corez delegates vision, art direction, UI layout, and game design/SVG creation to MiMo V2.5, and uses FLUX 1 for free background generation and image rendering.
@@ -105,6 +106,49 @@ export function analyzePublicUserIntent(prompt) {
       responseStrategy: 'Clarify the likely intent, answer directly, and invite the next concrete detail.',
       confidence: 0,
       source: 'default'
+    };
+  }
+
+  // Try the new Prompt Intelligence intent engine first
+  let newIntent;
+  try {
+    newIntent = classifyIntentNew(cleanPrompt);
+  } catch {
+    newIntent = null;
+  }
+
+  // If the new engine has a high-confidence classification, map it to legacy types
+  if (newIntent && newIntent.confidence >= 0.5 && newIntent.type !== 'unknown') {
+    const legacyType = toLegacyIntentType(newIntent.type);
+    const summaries = {
+      'app': 'Create a public-facing interactive experience or web tool.',
+      'code-help': 'Help the user understand, debug, or improve code.',
+      'writing': 'Help the user shape public-facing words or content.',
+      'explanation': 'Explain the topic in plain language.',
+      'swarm': 'Coordinate multiple agents for a complex task.',
+      'general': 'Understand the public user goal and give a useful next step.',
+    };
+    const strategies = {
+      'app': 'Build a runnable monochrome HTML preview when enough intent is present.',
+      'code-help': 'Ask for the relevant snippet when the code is missing; otherwise explain the fix clearly.',
+      'writing': 'Offer a concise draft or rewrite with a clear tone.',
+      'explanation': 'Give a direct answer with the minimum useful context.',
+      'swarm': 'Provide a robust architectural overview and step-by-step reasoning.',
+      'general': 'Clarify the likely intent, answer directly, and invite the next concrete detail.',
+    };
+
+    return {
+      type: legacyType,
+      summary: summaries[legacyType] || summaries.general,
+      responseStrategy: strategies[legacyType] || strategies.general,
+      confidence: newIntent.confidence,
+      source: 'prompt-intelligence',
+      enriched: {
+        fineType: newIntent.type,
+        goal: newIntent.goal,
+        domain: newIntent.domain,
+        complexity: newIntent.complexity,
+      },
     };
   }
 
@@ -444,19 +488,19 @@ export function improveCodingPrompt(prompt, intent = null) {
   if (intentType === 'app' || INTENT_PATTERNS.app.test(cleanPrompt)) {
     return `${cleanPrompt}
 
-[ENHANCED CODING & APP SPECIFICATION]:
-- Architecture & Functionality: Build a complete, production-ready, fully interactive web application with zero placeholders, missing methods, or incomplete code blocks.
-- Design System & UX: Apply luxury dark-mode glassmorphism (background: #090A0F, surface: rgba(18, 20, 29, 0.75), backdrop blur: 16px, subtle glowing borders, modern Google Fonts like Inter/Outfit, crisp responsive flex/grid layouts, and smooth micro-interactions).
-- State & Interaction: Implement robust state management, full event listener handling, input validation, and clear interaction states.
-- Canvas Preview Ready: Ensure the output is clean, self-contained, and ready for execution in the live preview canvas.`;
+[SINGLE-FILE APPLICATION SPECIFICATION]:
+- Output all code as ONE SINGLE, self-contained HTML document (or single React file) inside ONE SINGLE \`\`\`html ... \`\`\` code block.
+- Do NOT split your output into multiple separate code blocks, file headers (// App.tsx, // components/Navbar.tsx), or relative file imports (import Navbar from './components/Navbar').
+- Define all child components (Navbar, Hero, Footer, etc.) inline within the SAME file BEFORE the main App component!
+- Include complete state management, modern dark glassmorphism styling, and responsive layout controls.`;
   }
 
   return `${cleanPrompt}
 
-[ENHANCED CODE DIAGNOSIS & REFACTOR SPECIFICATION]:
-- Root Cause Analysis: Systematically analyze the code snippet, stack trace, or architectural issue before proposing fixes.
-- Safe Implementation: Produce modern, clean, production-ready JavaScript/TypeScript/React code that fixes the bug while preserving existing contracts and API signatures.
-- Execution & Verification: Include a clear explanation of why the issue occurred, the exact lines changed, and concrete test verification steps.`;
+[CODE DIAGNOSIS & FIX SPECIFICATION]:
+- Systematically inspect the root cause before writing code.
+- Produce clean, modern, production-ready code preserving existing API signatures and component props.
+- Include a concise explanation of the changes and test verification steps.`;
 }
 
 export async function generateHostedAIResponse(
@@ -488,20 +532,23 @@ export async function generateHostedAIResponse(
   return data?.content?.trim() || null;
 }
 
-// Extract executable code block (HTML/CSS/JS) from AI message if present
 export function extractCodeFromMessage(text) {
   if (!text) return null;
 
   const codeBlocks = text.match(/```(?:html|xml|jsx|tsx|js|javascript|react)?\s*([\s\S]*?)```/gi);
   if (codeBlocks) {
+    const validCodes = [];
     for (const block of codeBlocks) {
       const match = block.match(/```(?:html|xml|jsx|tsx|js|javascript|react)?\s*([\s\S]*?)```/i);
       if (match && match[1].trim()) {
         const code = match[1].trim();
-        if (code.includes('<') || code.includes('export default') || code.includes('function ') || code.includes('import ')) {
-          return code;
+        if (code.includes('<') || code.includes('export default') || code.includes('function ') || code.includes('import ') || code.includes('const ')) {
+          validCodes.push(code);
         }
       }
+    }
+    if (validCodes.length > 0) {
+      return validCodes.join('\n\n');
     }
   }
 

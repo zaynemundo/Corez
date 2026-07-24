@@ -7,9 +7,8 @@ describe('Coding Prompt Enhancer', () => {
     const enhanced = improveCodingPrompt(raw, { type: 'app' });
 
     expect(enhanced).toContain(raw);
-    expect(enhanced).toContain('[ENHANCED CODING & APP SPECIFICATION]');
-    expect(enhanced).toContain('Architecture & Functionality');
-    expect(enhanced).toContain('Design System & UX');
+    expect(enhanced).toContain('[SINGLE-FILE APPLICATION SPECIFICATION]');
+    expect(enhanced).toContain('Output all code as ONE SINGLE');
   });
 
   it('enhances code fix and debug prompts with root-cause and safe fix specifications', () => {
@@ -17,9 +16,8 @@ describe('Coding Prompt Enhancer', () => {
     const enhanced = improveCodingPrompt(raw, { type: 'code-help' });
 
     expect(enhanced).toContain(raw);
-    expect(enhanced).toContain('[ENHANCED CODE DIAGNOSIS & REFACTOR SPECIFICATION]');
-    expect(enhanced).toContain('Root Cause Analysis');
-    expect(enhanced).toContain('Safe Implementation');
+    expect(enhanced).toContain('[CODE DIAGNOSIS & FIX SPECIFICATION]');
+    expect(enhanced).toContain('Systematically inspect the root cause');
   });
 
   it('leaves non-coding prompts (writing/explanation/general) intact', () => {

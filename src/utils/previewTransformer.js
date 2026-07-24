@@ -14,7 +14,10 @@ export function formatCodeForPreview(rawCode) {
   // 2. Prepare JSX / React code for browser standalone Babel compilation
   let processed = rawCode;
 
-  // 3. Convert or comment out multi-line and single-line ESM import statements
+  // Clean file comment headers like `// App.tsx` or `// components/layout/Navbar.tsx`
+  processed = processed.replace(/^\/\/\s*[\w./-]+\.(?:tsx|jsx|ts|js)\s*$/gm, '');
+
+  // 3. Convert or remove ESM import statements
   processed = processed.replace(/import\s+[\s\S]*?(?:from\s+['"].*?['"]|['"].*?['"])\s*;?/g, (match) => {
     if (match.includes('lucide-react')) {
       const iconMatches = match.match(/\{([\s\S]*?)\}/);
@@ -23,8 +26,14 @@ export function formatCodeForPreview(rawCode) {
         return icons.map(icon => `const ${icon} = LucideStub;`).join('\n');
       }
     }
-    return match.split('\n').map(line => `// ${line}`).join('\n');
+    return '';
   });
+
+  // Clean TypeScript interfaces and type declarations
+  processed = processed.replace(/export\s+interface\s+[A-Za-z0-9_]+\s*\{[\s\S]*?\}/g, '');
+  processed = processed.replace(/interface\s+[A-Za-z0-9_]+\s*\{[\s\S]*?\}/g, '');
+  processed = processed.replace(/export\s+type\s+[A-Za-z0-9_]+\s*=[\s\S]*?;/g, '');
+  processed = processed.replace(/type\s+[A-Za-z0-9_]+\s*=[\s\S]*?;/g, '');
 
   // 4. Clean up export statements
   // Strip named exports like `export const X = ...` -> `const X = ...`
@@ -87,15 +96,48 @@ export function formatCodeForPreview(rawCode) {
 </head>
 <body>
   <div id="root"></div>
-  <script type="text/babel">
+  <script type="text/babel" data-presets="react,typescript">
     const { useState, useEffect, useRef, useMemo, useCallback, useReducer, useContext, createContext } = React;
 
     // Fallback Icon Component for lucide-react imports
-    const LucideStub = ({ size = 20, className = '', ...props }) => (
+    const LucideStub = ({ size = 20, className = '', children, ...props }) => (
       <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
         <circle cx="12" cy="12" r="10" />
       </svg>
     );
+
+    // Fallback stubs for common UI layout primitives & hooks if omitted
+    const Container = ({ children, className = '', ...props }) => (
+      <div className={\`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 \${className}\`} {...props}>{children}</div>
+    );
+
+    const Button = ({ children, variant = 'primary', size = 'md', className = '', icon, href, ...props }) => {
+      const base = "inline-flex items-center justify-center font-semibold rounded-xl transition-all duration-200";
+      const styles = variant === 'secondary'
+        ? "bg-white/10 text-white hover:bg-white/20 border border-white/10"
+        : "bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg shadow-indigo-600/25";
+      const sizes = size === 'xl' ? "px-6 py-3.5 text-base" : "px-4 py-2 text-sm";
+      const content = (
+        <>
+          {icon && <span className="mr-2">{icon}</span>}
+          {children}
+        </>
+      );
+      if (href) return <a href={href} className={\`\${base} \${styles} \${sizes} \${className}\`} {...props}>{content}</a>;
+      return <button className={\`\${base} \${styles} \${sizes} \${className}\`} {...props}>{content}</button>;
+    };
+
+    const useScrollPosition = () => {
+      const [pos, setPos] = useState(0);
+      useEffect(() => {
+        const handle = () => setPos(window.scrollY);
+        window.addEventListener('scroll', handle);
+        return () => window.removeEventListener('scroll', handle);
+      }, []);
+      return pos;
+    };
+
+    const useReducedMotion = () => false;
 
     try {
       ${processed}
