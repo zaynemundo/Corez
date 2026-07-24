@@ -503,11 +503,12 @@ export function improveCodingPrompt(prompt, intent = null) {
     return `${cleanPrompt}
 
 [SINGLE-FILE REACT SPECIFICATION]:
+- ALWAYS begin your response with a clear, detailed overview explaining the features, architecture, styling decisions, and layout choices!
 - Output clean, modern React/JSX code inside ONE SINGLE \`\`\`jsx ... \`\`\` code block starting with \`export default function App()\`.
 - DO NOT wrap React code inside HTML boilerplate (\`<!DOCTYPE html>\`, \`<head>\`, \`<script type="text/babel">\`, or \`ReactDOM.createRoot()\`) because the preview canvas automatically compiles and renders React/JSX code!
 - Do NOT split your output into multiple separate code blocks, file headers (// App.tsx, // components/Navbar.tsx), or relative file imports (import Navbar from './components/Navbar').
 - Define all child components (Navbar, Hero, Footer, etc.) inline within the SAME file BEFORE the main App component!
-- Include complete state management, modern dark glassmorphism styling, and responsive layout controls.`;
+- ALWAYS end your response with a step-by-step user guide and feature summary after the code block! Never output ONLY a bare code block.`;
   }
 
   return `${cleanPrompt}

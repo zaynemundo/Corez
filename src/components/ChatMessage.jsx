@@ -3,7 +3,10 @@ import {
   Layers,
   Copy,
   Check,
-  Wand2
+  Wand2,
+  Code2,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import MarketCard from './MarketCard';
 
@@ -78,67 +81,97 @@ function CodeSnippetBlock({ code, lang, onRunInCanvas, onReviseCode }) {
   );
 }
 
-function ExecutableCodeBlock({ code, onRunInCanvas, onReviseCode }) {
+function ExecutableCodeBlock({ code, lang, onRunInCanvas, onReviseCode }) {
+  const [showCode, setShowCode] = useState(false);
+
   return (
-    <div className="executable-code-action-bar" style={{
-      margin: '0.75rem 0',
-      width: '100%',
-      display: 'flex',
-      gap: '0.6rem',
-      alignItems: 'stretch'
-    }}>
-      {onRunInCanvas && (
+    <div className="executable-code-block-wrapper" style={{ margin: '0.85rem 0', width: '100%' }}>
+      <div className="executable-code-action-bar" style={{
+        display: 'flex',
+        gap: '0.6rem',
+        alignItems: 'stretch'
+      }}>
+        {onRunInCanvas && (
+          <button 
+            className="code-btn primary-preview-btn"
+            style={{ 
+              flex: 1,
+              padding: '0.65rem 1rem', 
+              background: 'var(--text-primary)', 
+              color: 'var(--bg-primary)',
+              fontWeight: 600,
+              fontSize: '0.825rem',
+              borderRadius: 'var(--radius-md, 12px)',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+              transition: 'var(--transition-fast)'
+            }}
+            onClick={() => onRunInCanvas(code)}
+            title="Run app live in preview canvas"
+          >
+            <Layers size={15} strokeWidth={2} />
+            <span>Open Canvas Preview</span>
+          </button>
+        )}
         <button 
-          className="code-btn primary-preview-btn"
+          className="code-btn secondary-toggle-btn"
           style={{ 
-            flex: 1,
-            padding: '0.75rem 1rem', 
-            background: 'var(--text-primary)', 
-            color: 'var(--bg-primary)',
-            fontWeight: 600,
-            fontSize: '0.875rem',
-            borderRadius: 'var(--radius-md, 12px)',
-            border: 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justify: 'center',
-            gap: '0.5rem',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-            transition: 'var(--transition-fast)'
-          }}
-          onClick={() => onRunInCanvas(code)}
-          title="Run app live in preview canvas"
-        >
-          <Layers size={16} strokeWidth={2} />
-          <span>Open Canvas Preview</span>
-        </button>
-      )}
-      {onReviseCode && (
-        <button 
-          className="code-btn secondary-revise-btn"
-          style={{ 
-            flex: 1,
-            padding: '0.75rem 1rem', 
+            padding: '0.65rem 0.9rem', 
             background: 'var(--bg-tertiary)',
             color: 'var(--text-primary)',
             fontWeight: 500,
-            fontSize: '0.875rem',
+            fontSize: '0.825rem',
             borderRadius: 'var(--radius-md, 12px)',
             border: '1px solid var(--border-color)',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            justify: 'center',
-            gap: '0.5rem',
+            justifyContent: 'center',
+            gap: '0.4rem',
             transition: 'var(--transition-fast)'
           }}
-          onClick={() => onReviseCode(code)}
-          title="Ask AI to revise this code"
+          onClick={() => setShowCode(prev => !prev)}
+          title="Toggle source code view"
         >
-          <Wand2 size={16} strokeWidth={1.5} />
-          <span>Revise Code</span>
+          <Code2 size={15} strokeWidth={1.5} />
+          <span>{showCode ? 'Hide Code' : 'View Code'}</span>
+          {showCode ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </button>
+        {onReviseCode && (
+          <button 
+            className="code-btn secondary-revise-btn"
+            style={{ 
+              padding: '0.65rem 0.9rem', 
+              background: 'var(--bg-tertiary)',
+              color: 'var(--text-primary)',
+              fontWeight: 500,
+              fontSize: '0.825rem',
+              borderRadius: 'var(--radius-md, 12px)',
+              border: '1px solid var(--border-color)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.4rem',
+              transition: 'var(--transition-fast)'
+            }}
+            onClick={() => onReviseCode(code)}
+            title="Ask AI to revise this code"
+          >
+            <Wand2 size={15} strokeWidth={1.5} />
+            <span>Revise</span>
+          </button>
+        )}
+      </div>
+      {showCode && (
+        <div style={{ marginTop: '0.6rem' }}>
+          <CodeSnippetBlock code={code} lang={lang} onRunInCanvas={onRunInCanvas} onReviseCode={onReviseCode} />
+        </div>
       )}
     </div>
   );
