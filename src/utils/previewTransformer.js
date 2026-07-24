@@ -110,6 +110,7 @@ export function formatCodeForPreview(rawCode) {
       }
       return false;
     };
+    window.addEventListener('mousedown', function() { window.focus(); });
   </script>
 </head>
 <body>

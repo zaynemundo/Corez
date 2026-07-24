@@ -57,11 +57,27 @@ export function generateEngineSkeleton(gameSpec = {}) {
     // 2. Input Manager
     const Input = {
       keys: {},
+      mouse: { down: false, x: 0, y: 0 },
       touch: { left: false, right: false, up: false, action: false },
       init() {
+        window.addEventListener('focus', () => {});
         window.addEventListener('keydown', e => { Input.keys[e.code] = true; });
         window.addEventListener('keyup', e => { Input.keys[e.code] = false; });
         
+        window.addEventListener('mousedown', e => {
+          window.focus();
+          Input.mouse.down = true;
+          Input.mouse.x = e.clientX;
+          Input.mouse.y = e.clientY;
+        });
+        window.addEventListener('mouseup', e => {
+          Input.mouse.down = false;
+        });
+        window.addEventListener('mousemove', e => {
+          Input.mouse.x = e.clientX;
+          Input.mouse.y = e.clientY;
+        });
+
         // Touch support
         if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
           const controlsEl = document.getElementById('touchControls');
