@@ -443,5 +443,32 @@ export class ToolRegistry {
         }
       }
     });
+
+    // 14. embed_text
+    this.registerTool({
+      name: 'embed_text',
+      category: PERMISSION_CATEGORIES.READ,
+      description: 'Generate vector embeddings for input text using nvidia/nemotron-3-embed-1b:free model.',
+      parameters: {
+        type: 'object',
+        properties: {
+          text: { type: 'string', description: 'Text or code snippet to embed' },
+          model: { type: 'string', description: 'Embedding model (defaults to nvidia/nemotron-3-embed-1b:free)' }
+        },
+        required: ['text']
+      },
+      async execute({ text, model = 'nvidia/nemotron-3-embed-1b:free' }) {
+        const { ModelProviderRouter } = await import('../providers/index.js');
+        const router = new ModelProviderRouter();
+        const result = await router.generateEmbeddings({ input: text, model });
+        return {
+          model: result.model,
+          dimensions: result.embeddings[0]?.length || 0,
+          embedding: result.embeddings[0],
+          offline: result.offline || false
+        };
+      }
+    });
   }
 }
+

@@ -100,4 +100,70 @@ export class ModelProviderRouter {
       toolCalls: []
     };
   }
+
+  async generateEmbeddings({ input, model = 'nvidia/nemotron-3-embed-1b:free', signal }) {
+    const inputs = Array.isArray(input) ? input : [input];
+
+    if (this.openrouterApiKey) {
+      try {
+        const res = await fetch('https://openrouter.ai/api/v1/embeddings', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.openrouterApiKey}`
+          },
+          body: JSON.stringify({ model, input: inputs }),
+          signal
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const embeddings = (data.data || []).map(item => item.embedding);
+          return {
+            embeddings,
+            model: data.model || model,
+            raw: data
+          };
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') throw err;
+        console.warn(`[ModelProviderRouter] Embeddings request failed: ${err.message}. Activating local fallback.`);
+      }
+    }
+
+    // Local deterministic embedding fallback (Offline Mode)
+    const simulatedEmbeddings = inputs.map(str => {
+      const vec = new Float32Array(1024);
+      for (let i = 0; i < str.length; i++) {
+        const code = str.charCodeAt(i);
+        vec[i % 1024] += (code / 255) - 0.5;
+      }
+      // Normalize vector
+      let norm = 0;
+      for (let i = 0; i < 1024; i++) norm += vec[i] * vec[i];
+      norm = Math.sqrt(norm) || 1;
+      return Array.from(vec.map(v => v / norm));
+    });
+
+    return {
+      embeddings: simulatedEmbeddings,
+      model,
+      offline: true
+    };
+  }
 }
+
+export function cosineSimilarity(vecA, vecB) {
+  if (!vecA || !vecB || vecA.length !== vecB.length) return 0;
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < vecA.length; i++) {
+    dotProduct += vecA[i] * vecB[i];
+    normA += vecA[i] * vecA[i];
+    normB += vecB[i] * vecB[i];
+  }
+  const magnitude = Math.sqrt(normA) * Math.sqrt(normB);
+  return magnitude ? dotProduct / magnitude : 0;
+}
+
