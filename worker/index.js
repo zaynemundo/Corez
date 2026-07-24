@@ -188,7 +188,11 @@ async function handleAi(request, env) {
   }
 
   // 1. Try OpenCode Go API if OPENCODE_GO_API_KEY / OPENCODE_API_KEY is configured
-  const targetModels = getTargetModels(intent?.type || 'general', hasMedia, prompt);
+  let targetModels = getTargetModels(intent?.type || 'general', hasMedia, prompt);
+  if (body.model && typeof body.model === 'string' && body.model.trim()) {
+    const customModel = body.model.trim();
+    targetModels = [customModel, ...targetModels.filter(m => m !== customModel)];
+  }
   const opencodeKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY || (typeof process !== 'undefined' ? (process.env?.OPENCODE_GO_API_KEY || process.env?.OPENCODE_API_KEY) : null);
   const opencodeEndpoint = env?.OPENCODE_ENDPOINT || OPENCODE_DEFAULT_ENDPOINT;
   if (opencodeKey) {
