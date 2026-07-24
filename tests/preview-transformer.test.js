@@ -26,6 +26,23 @@ export default function App() {
     expect(formatted).toContain('@babel/standalone');
     expect(formatted).toContain('const Play = LucideStub;');
     expect(formatted).toContain('ReactDOM.createRoot');
-    expect(formatted).toContain('TargetComponent = App');
+  });
+
+  it('registers custom component names with window.__COREZ_APP__ on default export', () => {
+    const jsx = `const Dashboard = () => <div>Dashboard</div>; export default Dashboard;`;
+    const formatted = formatCodeForPreview(jsx);
+    expect(formatted).toContain('window.__COREZ_APP__ = Dashboard');
+  });
+
+  it('auto-detects un-exported capital letter components', () => {
+    const jsx = `function Counter() { return <div>Count</div>; }`;
+    const formatted = formatCodeForPreview(jsx);
+    expect(formatted).toContain('"Counter"');
+  });
+
+  it('wraps raw bare JSX tags automatically in App component', () => {
+    const rawTag = `<div className="card">Hello World</div>`;
+    const formatted = formatCodeForPreview(rawTag);
+    expect(formatted).toContain('function App()');
   });
 });

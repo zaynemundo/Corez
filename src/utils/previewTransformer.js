@@ -14,7 +14,7 @@ export function formatCodeForPreview(rawCode) {
   // 2. Prepare JSX / React code for browser standalone Babel compilation
   let processed = rawCode;
 
-  // Comment out / convert ESM import statements
+  // 3. Comment out / convert ESM import statements
   processed = processed.replace(/^import\s+.*?from\s+['"].*?['"];?/gm, (match) => {
     if (match.includes('lucide-react')) {
       const iconMatches = match.match(/\{([^}]+)\}/);
@@ -26,17 +26,45 @@ export function formatCodeForPreview(rawCode) {
     return `// ${match}`;
   });
 
-  // Handle export default syntax
-  processed = processed.replace(/export\s+default\s+function\s+([A-Za-z0-9_]+)/g, 'function $1');
-  processed = processed.replace(/export\s+default\s+class\s+([A-Za-z0-9_]+)/g, 'class $1');
-  processed = processed.replace(/export\s+default\s+([A-Za-z0-9_]+);?/g, '// export default $1;');
+  // 4. Handle default export patterns cleanly
+  // export default function FunctionName
+  processed = processed.replace(/export\s+default\s+function\s+([A-Za-z0-9_]+)/g, (_, name) => {
+    return `function ${name}`;
+  });
 
-  // If anonymous export default, assign to App
+  // export default class ClassName
+  processed = processed.replace(/export\s+default\s+class\s+([A-Za-z0-9_]+)/g, (_, name) => {
+    return `class ${name}`;
+  });
+
+  // export default const/let/var Name = ...
+  processed = processed.replace(/export\s+default\s+(?:const|let|var)\s+([A-Za-z0-9_]+)\s*=/g, (_, name) => {
+    return `const ${name} = `;
+  });
+
+  // export default Identifier;
+  processed = processed.replace(/export\s+default\s+([A-Za-z0-9_]+)\s*;?/g, (_, name) => {
+    return `window.__COREZ_APP__ = ${name};`;
+  });
+
+  // Anonymous default export: export default () => ... or export default function() ...
   if (/export\s+default\s+function\s*\(/.test(processed)) {
     processed = processed.replace(/export\s+default\s+function\s*\(/, 'function App(');
-  } else if (/export\s+default\s*\(/ .test(processed) || /export\s+default\s*\(?props\)?\s*=>/.test(processed)) {
+  } else if (/export\s+default\s*/.test(processed)) {
     processed = processed.replace(/export\s+default\s*/, 'const App = ');
   }
+
+  // 5. If code starts directly with a JSX tag (e.g. <div ...>), wrap it in function App
+  if (/^\s*<[A-Za-z0-9_.]+/i.test(processed.trim())) {
+    processed = `function App() {\n  return (\n${processed}\n  );\n}`;
+  }
+
+  // Extract all capital letter function/const component names defined in code for fallback detection
+  const componentMatches = Array.from(
+    new Set(
+      [...processed.matchAll(/(?:function|class|const|let|var)\s+([A-Z][A-Za-z0-9_]*)/g)].map(m => m[1])
+    )
+  );
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -70,14 +98,38 @@ export function formatCodeForPreview(rawCode) {
 
     try {
       let TargetComponent = null;
-      if (typeof App !== 'undefined') TargetComponent = App;
+
+      // 1. Check window.__COREZ_APP__ explicitly registered by default export
+      if (typeof window.__COREZ_APP__ !== 'undefined' && window.__COREZ_APP__) {
+        TargetComponent = window.__COREZ_APP__;
+      }
+      // 2. Check standard names
+      else if (typeof App !== 'undefined') TargetComponent = App;
       else if (typeof Main !== 'undefined') TargetComponent = Main;
+      else if (typeof Dashboard !== 'undefined') TargetComponent = Dashboard;
+      else if (typeof Widget !== 'undefined') TargetComponent = Widget;
+      else if (typeof Game !== 'undefined') TargetComponent = Game;
       else if (typeof Component !== 'undefined') TargetComponent = Component;
+
+      // 3. Fallback: Check declared capital letter components
+      if (!TargetComponent) {
+        const candidateNames = ${JSON.stringify(componentMatches)};
+        for (let i = candidateNames.length - 1; i >= 0; i--) {
+          const compName = candidateNames[i];
+          try {
+            const candidate = eval(compName);
+            if (typeof candidate === 'function' || (typeof candidate === 'object' && candidate !== null)) {
+              TargetComponent = candidate;
+              break;
+            }
+          } catch (e) {}
+        }
+      }
 
       if (TargetComponent) {
         ReactDOM.createRoot(document.getElementById('root')).render(<TargetComponent />);
       } else {
-        document.getElementById('root').innerHTML = '<div style="padding: 2rem; color: #ef4444; font-family: sans-serif;"><h3>Preview Warning</h3><p>Could not auto-detect a React component (e.g. function App). Please ensure your code exports or defines an App component.</p></div>';
+        document.getElementById('root').innerHTML = '<div style="padding: 2rem; color: #ef4444; font-family: sans-serif;"><h3>Preview Warning</h3><p>Could not auto-detect a React component. Please ensure your code exports or defines a React component.</p></div>';
       }
     } catch (err) {
       document.getElementById('root').innerHTML = '<div style="padding: 2rem; color: #ef4444; font-family: sans-serif;"><h3>Runtime Error</h3><pre>' + err.message + '</pre></div>';
