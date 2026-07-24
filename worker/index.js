@@ -2,21 +2,25 @@ import { handleMarket } from './market.js';
 
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 const OPENCODE_DEFAULT_ENDPOINT = 'https://opencode.ai/zen/go/v1/chat/completions';
-const GLM_5_2_MODEL = 'glm-5.2';
+const DEEPSEEK_V4_FLASH_MODEL = 'deepseek-v4-flash';
 const DEEPSEEK_V4_PRO_MODEL = 'deepseek-v4-pro';
+const KIMI_K3_MODEL = 'kimi-k3';
+const FLUX_MODEL = '@cf/black-forest-labs/flux-1-schnell';
 
 function getTargetModels(intentType, hasMedia, prompt = '') {
-  const isCoding = intentType === 'code-help' || intentType === 'app' || intentType === 'swarm' || /\b(code|coding|debug|bug|fix|function|react|javascript|typescript|python|html|css|api|component|class|syntax)\b/i.test(prompt);
-
-  if (isCoding) {
-    return [GLM_5_2_MODEL];
+  const isPhysics = /\b(physics|canvas|60fps|spatial|game loop|engine|collision|vector math)\b/i.test(prompt);
+  if (isPhysics) {
+    return [KIMI_K3_MODEL, DEEPSEEK_V4_FLASH_MODEL];
   }
 
-  return [DEEPSEEK_V4_PRO_MODEL];
+  const isComplexArch = intentType === 'swarm' || /\b(architecture|schema|complex|system design|refactor|database)\b/i.test(prompt);
+  if (isComplexArch) {
+    return [DEEPSEEK_V4_PRO_MODEL, DEEPSEEK_V4_FLASH_MODEL];
+  }
+
+  return [DEEPSEEK_V4_FLASH_MODEL];
 }
-const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
-const DEEPSEEK_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
-const FLUX_MODEL = '@cf/black-forest-labs/flux-1-schnell';
+
 const CANONICAL_INTENT_TYPES = new Set([
   'app',
   'code-help',
@@ -77,9 +81,11 @@ Adaptive Routing - Complex Path:
 - Provide a robust architectural overview before diving into specific code.`;
   } else if (intentType === 'app') {
     adaptiveInstructions = `
-Adaptive Routing - App & Game Creation Path:
+Adaptive Routing - App & Game Creation Path (Awwwards Site of the Day Quality):
 - DeepSeek V4 Flash handles logic, vision, UI layout, art direction, and game design.
 - Use FLUX 1 Schnell (@cf/black-forest-labs/flux-1-schnell) for fast background image generation and visual graphics.
+- AWWWARDS VISUAL DESIGN PRINCIPLES: Build websites, dashboards, and apps with luxury dark mode glassmorphism (background: #090A0F, surface: rgba(18, 20, 29, 0.75), backdrop-filter: blur(16px), glowing borders: box-shadow 0 0 25px rgba(99,102,241,0.25)), Google Fonts (Outfit, Syne, Inter, Space Grotesk), smooth cubic-bezier transitions, and interactive micro-interactions.
+- AWWWARDS CATEGORY ROUTING: Automatically tailor UI layouts based on intent category (e.g. e-commerce product hero & cart drawer, portfolio project grid & cursor reveal, gaming neon glow canvas & leaderboard, saas metrics cards & charting, editorial masonry grid, etc.).
 - Build a complete, rich, runnable experience rather than a partial scaffold.
 - 8-BIT & SVG GAME ASSETS REQUIREMENT (itch.io Quality): When generating SVG graphics, retro game sprites, icons, tilesets, weapons, items, characters, or 8-bit artwork, build clean, high-quality vector SVGs in authentic 8-bit pixel art style (inspired by itch.io game asset packs). Use shape-rendering="crispEdges", crisp pixel grid alignment (e.g. 16x16, 24x24, 32x32, or 64x64 resolution), vibrant 8-bit color palettes (PICO-8, NES, Game Boy, Fantasy retro), dark 1-pixel outlines, specular highlight pixels, inner shading, drop shadow dithering, and sprite sheet / animation frame layouts!
 - 8-BIT STYLED BACKGROUNDS REQUIREMENT: ALL generated backgrounds, environment backdrops, game scenes, canvas wallpapers, and image generation prompts ([IMAGE_PROMPT: ...]) MUST be explicitly 8-bit retro pixel art styled (e.g. "8-bit pixel art background, retro 8-bit game landscape, pixelated starfield, 8-bit dungeon/arcade backdrop, crisp pixel edges"). Never generate plain or non-pixelated backgrounds for retro 8-bit asset requests!
