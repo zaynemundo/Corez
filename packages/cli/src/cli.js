@@ -15,18 +15,26 @@ export function parseCliArgs(rawArgs = []) {
   const flags = {
     help: false,
     version: false,
-    verbose: false
+    verbose: false,
+    autoApprove: false,
+    model: null
   };
 
   const positional = [];
-
-  for (const arg of rawArgs) {
+  for (let i = 0; i < rawArgs.length; i++) {
+    const arg = rawArgs[i];
     if (arg === '--help' || arg === '-h') {
       flags.help = true;
     } else if (arg === '--version' || arg === '-v') {
       flags.version = true;
     } else if (arg === '--verbose') {
       flags.verbose = true;
+    } else if (arg === '--auto-approve' || arg === '-y' || arg === '--yolo') {
+      flags.autoApprove = true;
+    } else if (arg === '--model' || arg === '-m') {
+      if (i + 1 < rawArgs.length && !rawArgs[i + 1].startsWith('-')) {
+        flags.model = rawArgs[++i];
+      }
     } else if (!arg.startsWith('-')) {
       positional.push(arg);
     }
@@ -38,23 +46,33 @@ export function parseCliArgs(rawArgs = []) {
 export function printHelp(ui) {
   ui.banner();
   console.log(`Usage:
-  corez-code                      Start interactive coding session
-  corez-code "<task description>"  Run task against current workspace
-  corez-code chat                 Interactive coding agent mode
-  corez-code plan "<task>"        Analyse codebase & return plan (read-only)
-  corez-code build "<task>"       Autonomous implementation mode
-  corez-code fix                  Find & resolve failing tests/build/lint errors
-  corez-code review               Review Git diff for bugs and security risks
-  corez-code swarm "<task>"       Run multi-agent swarm architecture
-  corez-code models               Show available/configured AI models
-  corez-code model [model-id]     View active model or switch to a new model
-  /model [model-id]               Interactive slash command to switch active model
-  corez-code agents               Show configured CoreZ agent roles
-  corez-code status               Show workspace and configuration status
+  corez                           Start interactive coding REPL session (AGY style)
+  corez "<task description>"       Run task prompt against current workspace
+  corez chat                      Interactive coding agent REPL mode
+  corez plan "<task>"             Analyse codebase & return architectural plan (read-only)
+  corez build "<task>"            Autonomous implementation mode
+  corez fix                       Find & resolve failing tests/build/lint errors
+  corez review                    Review staged & unstaged Git diff
+  corez swarm "<task>"            Run multi-agent DAG task decomposition
+  corez models                    Show available/configured AI models
+  corez model [model-id]          View active model or switch to a new model
+  corez agents                    Show configured CoreZ agent roles
+  corez status                    Show workspace, git branch, and model configuration status
 
-Note: 'corez' is also available as an alias for 'corez-code'.
+Interactive Slash Commands (inside REPL):
+  /model [model-id]               View or switch active AI model
+  /plan <task>                    Build read-only architectural plan
+  /build <task>                   Run autonomous implementation
+  /fix                            Find and repair build/test/lint errors
+  /review                         Audit Git diff for bugs and security risks
+  /swarm <task>                   Run multi-agent swarm architecture
+  /clear                          Clear terminal screen
+  /help                           Print interactive help menu
+  /exit, /quit                    Exit interactive session
 
 Options:
+  --auto-approve, -y, --yolo      Auto-approve execution without confirmation prompts
+  --model <model-id>, -m <model>  Override active AI model for this invocation
   --help, -h                      Show this help message
   --version, -v                   Show CLI version
   --verbose                       Enable debug verbose logging
@@ -64,6 +82,7 @@ Options:
 export async function runCli(argv = process.argv.slice(2), options = {}) {
   const { flags, positional } = parseCliArgs(argv);
   const ui = new TerminalUI({ verbose: flags.verbose });
+  const execOptions = { ...options, modelOverride: flags.model, autoApprove: flags.autoApprove };
 
   if (flags.help) {
     printHelp(ui);
@@ -71,7 +90,7 @@ export async function runCli(argv = process.argv.slice(2), options = {}) {
   }
 
   if (flags.version) {
-    console.log('corez-cli v0.1.0');
+    console.log('corez-code v0.1.0 (AGY-style AI coding engine)');
     return 0;
   }
 
