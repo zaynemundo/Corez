@@ -429,12 +429,46 @@ export async function generateFluxImage(prompt, signal = null) {
   return createFallbackSvgDataUrl(prompt);
 }
 
+export function improveCodingPrompt(prompt, intent = null) {
+  const cleanPrompt = typeof prompt === 'string' ? prompt.trim() : '';
+  if (!cleanPrompt) return cleanPrompt;
+
+  const currentIntent = intent || analyzePublicUserIntent(cleanPrompt);
+  const intentType = currentIntent?.type || 'general';
+
+  const isCoding = intentType === 'code-help' || intentType === 'app' || INTENT_PATTERNS.code.test(cleanPrompt) || INTENT_PATTERNS.app.test(cleanPrompt);
+  if (!isCoding) {
+    return cleanPrompt;
+  }
+
+  if (intentType === 'app' || INTENT_PATTERNS.app.test(cleanPrompt)) {
+    return `${cleanPrompt}
+
+[ENHANCED CODING & APP SPECIFICATION]:
+- Architecture & Functionality: Build a complete, production-ready, fully interactive web application with zero placeholders, missing methods, or incomplete code blocks.
+- Design System & UX: Apply luxury dark-mode glassmorphism (background: #090A0F, surface: rgba(18, 20, 29, 0.75), backdrop blur: 16px, subtle glowing borders, modern Google Fonts like Inter/Outfit, crisp responsive flex/grid layouts, and smooth micro-interactions).
+- State & Interaction: Implement robust state management, full event listener handling, input validation, and clear interaction states.
+- Canvas Preview Ready: Ensure the output is clean, self-contained, and ready for execution in the live preview canvas.`;
+  }
+
+  return `${cleanPrompt}
+
+[ENHANCED CODE DIAGNOSIS & REFACTOR SPECIFICATION]:
+- Root Cause Analysis: Systematically analyze the code snippet, stack trace, or architectural issue before proposing fixes.
+- Safe Implementation: Produce modern, clean, production-ready JavaScript/TypeScript/React code that fixes the bug while preserving existing contracts and API signatures.
+- Execution & Verification: Include a clear explanation of why the issue occurred, the exact lines changed, and concrete test verification steps.`;
+}
+
 export async function generateHostedAIResponse(
   prompt,
   intent = analyzePublicUserIntent(prompt),
   history = [],
   signal = null
 ) {
+  if (intent?.type === 'code-help' || intent?.type === 'app' || INTENT_PATTERNS.code.test(prompt)) {
+    prompt = improveCodingPrompt(prompt, intent);
+  }
+
   const fetchOptions = {
     method: 'POST',
     headers: {
