@@ -15,8 +15,11 @@ import {
 } from 'lucide-react';
 import { formatCodeForPreview } from '../utils/previewTransformer';
 
+import { listSessionAppsInR2, getAppFromR2 } from '../services/appStorageService';
+
 export default function CanvasPreview({ 
   code, 
+  sessionId,
   onClose, 
   isFullScreen, 
   onToggleFullScreen 
@@ -26,6 +29,8 @@ export default function CanvasPreview({
   const [editableCode, setEditableCode] = useState(code || '');
   const [copied, setCopied] = useState(false);
   const [key, setKey] = useState(0);
+  const [sessionApps, setSessionApps] = useState([]);
+  const [selectedAppId, setSelectedAppId] = useState('');
 
   const formattedSrcDoc = useMemo(() => {
     return formatCodeForPreview(editableCode);
@@ -35,6 +40,24 @@ export default function CanvasPreview({
     setEditableCode(code || '');
     setKey(prev => prev + 1);
   }, [code]);
+
+  useEffect(() => {
+    if (sessionId) {
+      listSessionAppsInR2(sessionId).then(apps => {
+        if (Array.isArray(apps)) setSessionApps(apps);
+      }).catch(() => {});
+    }
+  }, [sessionId, code]);
+
+  const handleSelectApp = async (appId) => {
+    setSelectedAppId(appId);
+    if (!appId) return;
+    const app = await getAppFromR2(sessionId, appId);
+    if (app && (app.code || app.html)) {
+      setEditableCode(app.code || app.html);
+      setKey(prev => prev + 1);
+    }
+  };
 
   const handleCopy = () => {
     navigator.clipboard.writeText(editableCode);
@@ -106,6 +129,31 @@ export default function CanvasPreview({
               Source
             </button>
           </div>
+
+          {/* Multi-App Selector if multiple apps exist in session */}
+          {sessionApps.length > 1 && (
+            <select
+              value={selectedAppId}
+              onChange={(e) => handleSelectApp(e.target.value)}
+              style={{
+                marginLeft: '0.5rem',
+                background: 'var(--bg-tertiary)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-pill)',
+                padding: '2px 8px',
+                fontSize: '0.725rem',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="">Switch App ({sessionApps.length} stored)...</option>
+              {sessionApps.map((a, idx) => (
+                <option key={a.appId} value={a.appId}>
+                  App {idx + 1}: {a.title.slice(0, 20)}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* Device Viewport Selector (Desktop vs Laptop vs Tablet vs Mobile Icon-only) */}

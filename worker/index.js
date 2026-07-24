@@ -558,6 +558,152 @@ async function handleR2Assets(request, env) {
   return jsonResponse(405, { error: 'Method not allowed.' });
 }
 
+async function handleR2Apps(request, env) {
+  if (!env?.ASSET_BUCKET) {
+    return jsonResponse(530, { error: 'R2 storage (ASSET_BUCKET) is not configured.' });
+  }
+
+  const url = new URL(request.url);
+  const pathname = url.pathname;
+
+  // 1. POST /api/apps/store - Store or update an app under a session
+  if (pathname === '/api/apps/store' && request.method === 'POST') {
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return jsonResponse(400, { error: 'Invalid JSON payload.' });
+    }
+
+    const sessionId = typeof body?.sessionId === 'string' ? body.sessionId.trim() : '';
+    const appId = typeof body?.appId === 'string' ? body.appId.trim() : `app_${Date.now()}`;
+    const title = typeof body?.title === 'string' ? body.title : 'Untitled Application';
+    const code = typeof body?.code === 'string' ? body.code : '';
+    const html = typeof body?.html === 'string' ? body.html : '';
+
+    if (!sessionId) {
+      return jsonResponse(400, { error: 'sessionId is required.' });
+    }
+    if (!code && !html) {
+      return jsonResponse(400, { error: 'code or html content is required.' });
+    }
+
+    const appRecord = {
+      sessionId,
+      appId,
+      title,
+      code,
+      html,
+      updatedAt: new Date().toISOString(),
+      metadata: body?.metadata || {}
+    };
+
+    const key = `apps/${sessionId}/${appId}.json`;
+    await env.ASSET_BUCKET.put(key, JSON.stringify(appRecord), {
+      httpMetadata: { contentType: 'application/json' }
+    });
+
+    return jsonResponse(200, {
+      success: true,
+      sessionId,
+      appId,
+      key,
+      url: `/api/apps/${sessionId}/${appId}`
+    });
+  }
+
+  // 2. GET /api/apps/:sessionId/:appId - Fetch a specific app
+  if (request.method === 'GET' && pathname.match(/^\/api\/apps\/[^/]+\/[^/]+$/)) {
+    const parts = pathname.replace('/api/apps/', '').split('/');
+    const sessionId = parts[0];
+    const appId = parts[1];
+
+    const key = `apps/${sessionId}/${appId}.json`;
+    const object = await env.ASSET_BUCKET.get(key);
+    if (!object) {
+      return jsonResponse(404, { error: 'App not found in R2 storage.' });
+    }
+
+    const text = await object.text();
+    let appData;
+    try {
+      appData = JSON.parse(text);
+    } catch {
+      return jsonResponse(500, { error: 'Failed to parse stored app payload.' });
+    }
+
+    if (url.searchParams.get('format') === 'html') {
+      return new Response(appData.html || appData.code, {
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-cache'
+        }
+      });
+    }
+
+    return jsonResponse(200, appData);
+  }
+
+  // 3. GET /api/apps/:sessionId - List all apps stored for a chat session
+  if (request.method === 'GET' && pathname.match(/^\/api\/apps\/[^/]+$/)) {
+    const sessionId = pathname.replace('/api/apps/', '');
+    const prefix = `apps/${sessionId}/`;
+    const list = await env.ASSET_BUCKET.list({ prefix });
+
+    const apps = [];
+    if (list && Array.isArray(list.objects)) {
+      for (const obj of list.objects) {
+        if (obj.key.endsWith('.json')) {
+          const item = await env.ASSET_BUCKET.get(obj.key);
+          if (item) {
+            try {
+              const data = JSON.parse(await item.text());
+              apps.push({
+                appId: data.appId,
+                title: data.title,
+                updatedAt: data.updatedAt,
+                url: `/api/apps/${sessionId}/${data.appId}`
+              });
+            } catch {}
+          }
+        }
+      }
+    }
+
+    return jsonResponse(200, { sessionId, apps });
+  }
+
+  // 4. DELETE /api/apps/:sessionId/:appId - Delete a specific app
+  if (request.method === 'DELETE' && pathname.match(/^\/api\/apps\/[^/]+\/[^/]+$/)) {
+    const parts = pathname.replace('/api/apps/', '').split('/');
+    const sessionId = parts[0];
+    const appId = parts[1];
+
+    const key = `apps/${sessionId}/${appId}.json`;
+    await env.ASSET_BUCKET.delete(key);
+    return jsonResponse(200, { success: true, sessionId, appId });
+  }
+
+  // 5. DELETE /api/apps/:sessionId - Delete ALL apps associated with a chat session
+  if (request.method === 'DELETE' && pathname.match(/^\/api\/apps\/[^/]+$/)) {
+    const sessionId = pathname.replace('/api/apps/', '');
+    const prefix = `apps/${sessionId}/`;
+    const list = await env.ASSET_BUCKET.list({ prefix });
+
+    let count = 0;
+    if (list && Array.isArray(list.objects)) {
+      for (const obj of list.objects) {
+        await env.ASSET_BUCKET.delete(obj.key);
+        count++;
+      }
+    }
+
+    return jsonResponse(200, { success: true, sessionId, deletedCount: count });
+  }
+
+  return jsonResponse(405, { error: 'Method not allowed.' });
+}
+
 export default {
   async fetch(request, env) {
     const pathname = new URL(request.url).pathname;
@@ -572,6 +718,9 @@ export default {
     }
     if (pathname.startsWith('/api/assets')) {
       return handleR2Assets(request, env);
+    }
+    if (pathname.startsWith('/api/apps')) {
+      return handleR2Apps(request, env);
     }
     if (pathname.startsWith('/api/')) {
       return jsonResponse(404, { error: 'API route not found.' });

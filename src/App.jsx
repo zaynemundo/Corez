@@ -8,6 +8,7 @@ import SettingsModal from './components/SettingsModal';
 import ImageStudioPage from './components/ImageStudioPage';
 import { generateAIResponse, extractCodeFromMessage } from './services/aiService';
 import { fetchMarketData, unavailableMarket } from './services/marketService';
+import { storeAppInR2, deleteSessionAppsInR2 } from './services/appStorageService';
 
 function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -359,9 +360,12 @@ export default function App() {
     if (activeSessionId === id) {
       setActiveSessionId(filtered[0]?.id || INITIAL_SESSIONS[0].id);
     }
+    // Asynchronously remove associated R2 app storage for this session
+    deleteSessionAppsInR2(id).catch(err => console.warn('Failed to clean up session R2 apps:', err));
   };
 
   const handleClearAllHistory = () => {
+    sessions.forEach(s => deleteSessionAppsInR2(s.id).catch(() => {}));
     setSessions(INITIAL_SESSIONS);
     setActiveSessionId(INITIAL_SESSIONS[0].id);
     setActiveCanvasCode('');
@@ -371,6 +375,14 @@ export default function App() {
   const handleRunInCanvas = (code) => {
     setActiveCanvasCode(code);
     setCanvasOpen(true);
+    if (activeSessionId && code) {
+      storeAppInR2({
+        sessionId: activeSessionId,
+        appId: `app_${Date.now()}`,
+        title: activeSession?.title || 'Canvas Application',
+        code
+      }).catch(err => console.warn('R2 background store notification:', err));
+    }
   };
 
   const handleStopMessage = () => {
@@ -565,6 +577,7 @@ export default function App() {
             {canvasOpen && (
               <CanvasPreview
                 code={activeCanvasCode}
+                sessionId={activeSessionId}
                 onClose={() => setCanvasOpen(false)}
                 isFullScreen={canvasFullScreen}
                 onToggleFullScreen={() => setCanvasFullScreen(prev => !prev)}
