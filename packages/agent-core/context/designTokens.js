@@ -33,9 +33,64 @@ export const AWWWARDS_DESIGN_SYSTEM = Object.freeze({
   ]
 });
 
-export function buildAwwwardsDesignPrompt() {
+export const AWWWARDS_CATEGORIES = Object.freeze({
+  'e-commerce': {
+    url: 'https://www.awwwards.com/websites/e-commerce/',
+    name: 'E-Commerce & Product Showcase',
+    keywords: ['product', 'shop', 'store', 'buy', 'cart', 'checkout', 'e-commerce', 'ecommerce', 'sell', 'merch'],
+    designPattern: 'Hero 3D/glassmorphic product showcase, interactive product grid, sticky floating cart drawer, interactive variant selector, and high-impact typography.'
+  },
+  'portfolio': {
+    url: 'https://www.awwwards.com/websites/portfolio/',
+    name: 'Portfolio & Personal Showcase',
+    keywords: ['portfolio', 'personal', 'resume', 'cv', 'bio', 'developer', 'designer', 'work'],
+    designPattern: 'Interactive project grid, full-screen display hero text (Syne/Outfit), smooth cursor reveal animations, interactive skill badges, and contact modal.'
+  },
+  'agency': {
+    url: 'https://www.awwwards.com/websites/agency/',
+    name: 'Agency & Studio Landing',
+    keywords: ['agency', 'studio', 'company', 'consulting', 'services', 'firm', 'agency-landing'],
+    designPattern: 'Bold marquee banner, interactive case studies grid, client testimonial carousel, pricing/services calculator, and sleek dark mode glassmorphism.'
+  },
+  'gaming': {
+    url: 'https://www.awwwards.com/websites/gaming/',
+    name: 'Gaming & Interactive Arcade',
+    keywords: ['game', 'gaming', 'arcade', 'play', 'player', 'esports', 'quest', 'rpg', 'boss'],
+    designPattern: 'Neon glow accents (#00F2FE, #A855F7), particle canvas backgrounds, dynamic leaderboard widget, sound toggle UI, character card hover flips.'
+  },
+  'saas': {
+    url: 'https://www.awwwards.com/websites/tech/',
+    name: 'SaaS Platform & Tech Dashboard',
+    keywords: ['saas', 'dashboard', 'analytics', 'app', 'tool', 'software', 'platform', 'metrics', 'data'],
+    designPattern: 'Glassmorphism metrics cards, interactive charting widgets, live status pills, pricing tier toggle, and sleek dark mode command bar.'
+  },
+  'editorial': {
+    url: 'https://www.awwwards.com/websites/editorial/',
+    name: 'Editorial & Magazine',
+    keywords: ['blog', 'news', 'magazine', 'editorial', 'article', 'publication', 'content'],
+    designPattern: 'Masonry article grid, marquee ticker, reader view toggle, category filter tags, and high-contrast typography.'
+  }
+});
+
+export function detectAwwwardsCategory(userPrompt = '') {
+  const lower = userPrompt.toLowerCase();
+  for (const [key, category] of Object.entries(AWWWARDS_CATEGORIES)) {
+    if (category.keywords.some(kw => lower.includes(kw))) {
+      return { categoryKey: key, ...category };
+    }
+  }
+  return null;
+}
+
+export function buildAwwwardsDesignPrompt(userPrompt = '') {
+  const matchedCategory = detectAwwwardsCategory(userPrompt);
+
   let prompt = `\n--- Awwwards Visual Design Principles ---\n`;
   prompt += `Style Target: ${AWWWARDS_DESIGN_SYSTEM.aesthetic}\n`;
+  if (matchedCategory) {
+    prompt += `Detected Category: ${matchedCategory.name} (${matchedCategory.url})\n`;
+    prompt += `Category Design Pattern: ${matchedCategory.designPattern}\n`;
+  }
   prompt += `Typography: Google Fonts (${AWWWARDS_DESIGN_SYSTEM.typography.fontFamilies.display})\n`;
   prompt += `Color System: Background ${AWWWARDS_DESIGN_SYSTEM.colorPalette.background}, Accents: ${AWWWARDS_DESIGN_SYSTEM.colorPalette.accentPrimary}\n`;
   prompt += `Glassmorphism: ${AWWWARDS_DESIGN_SYSTEM.effects.glassmorphism}\n`;
@@ -45,3 +100,4 @@ export function buildAwwwardsDesignPrompt() {
   });
   return prompt;
 }
+
