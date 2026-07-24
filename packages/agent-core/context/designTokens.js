@@ -61,7 +61,7 @@ export const AWWWARDS_CATEGORIES = Object.freeze({
   'saas': {
     url: 'https://www.awwwards.com/websites/tech/',
     name: 'SaaS Platform & Tech Dashboard',
-    keywords: ['saas', 'dashboard', 'analytics', 'app', 'tool', 'software', 'platform', 'metrics', 'data'],
+    keywords: ['saas', 'dashboard', 'analytics', 'software', 'platform', 'metrics'],
     designPattern: 'Glassmorphism metrics cards, interactive charting widgets, live status pills, pricing tier toggle, and sleek dark mode command bar.'
   },
   'editorial': {
@@ -69,13 +69,79 @@ export const AWWWARDS_CATEGORIES = Object.freeze({
     name: 'Editorial & Magazine',
     keywords: ['blog', 'news', 'magazine', 'editorial', 'article', 'publication', 'content'],
     designPattern: 'Masonry article grid, marquee ticker, reader view toggle, category filter tags, and high-contrast typography.'
+  },
+  'architecture': {
+    url: 'https://www.awwwards.com/websites/architecture/',
+    name: 'Architecture & Spatial Design',
+    keywords: ['architecture', 'building', 'interior', 'construction', 'spatial', 'structure', 'house', 'home'],
+    designPattern: 'Minimalist high-contrast grid, large structural imagery frames, monochrome dark aesthetic, floorplan viewer, and smooth parallax scrolling.'
+  },
+  'art-illustration': {
+    url: 'https://www.awwwards.com/websites/art-illustration/',
+    name: 'Art & Interactive Illustration',
+    keywords: ['art', 'artist', 'illustration', 'draw', 'gallery', 'exhibition', 'canvas', 'creative'],
+    designPattern: 'Interactive Canvas/SVG shaders, hand-drawn vector accents, dynamic theme palette switcher, and full-screen artwork modal.'
+  },
+  'fashion': {
+    url: 'https://www.awwwards.com/websites/fashion/',
+    name: 'Fashion & Apparel Lookbook',
+    keywords: ['fashion', 'apparel', 'clothing', 'brand', 'lookbook', 'model', 'wear', 'style'],
+    designPattern: 'Editorial lookbook layout, oversized serif display typography, hover-zoom product inspection, video background hero, and sticky shop bar.'
+  },
+  'food-drink': {
+    url: 'https://www.awwwards.com/websites/food-drink/',
+    name: 'Food & Culinary Experience',
+    keywords: ['food', 'drink', 'restaurant', 'cafe', 'coffee', 'dining', 'recipe', 'bar', 'baking'],
+    designPattern: 'Rich appetizing color tones, interactive menu card deck, online reservation modal, photo gallery grid, and chef showcase.'
+  },
+  'hotel-travel': {
+    url: 'https://www.awwwards.com/websites/hotel-restaurant/',
+    name: 'Hotel, Hospitality & Travel',
+    keywords: ['hotel', 'resort', 'travel', 'vacation', 'hospitality', 'booking', 'destination', 'tour'],
+    designPattern: 'Full-bleed imagery hero, interactive room booking bar, interactive map widget, amenity tab navigator, and guest reviews.'
+  },
+  'music': {
+    url: 'https://www.awwwards.com/websites/music/',
+    name: 'Music & Audio Visualizer',
+    keywords: ['music', 'audio', 'song', 'album', 'band', 'artist', 'track', 'playlist', 'dj', 'concert'],
+    designPattern: 'Interactive audio visualizer canvas, dark cyber neon theme (#FF007A, #00F2FE), tour dates ticker, embedded music player bar.'
+  },
+  'mobile-apps': {
+    url: 'https://www.awwwards.com/websites/mobile-apps/',
+    name: 'Mobile App Showcase',
+    keywords: ['mobile', 'ios', 'android', 'phone-app', 'mobile-app', 'download', 'app-landing'],
+    designPattern: 'Floating 3D phone mockup showcase, app store badge pills, feature swipe carousel, and QR code instant download modal.'
+  },
+  'web3-crypto': {
+    url: 'https://www.awwwards.com/websites/web3/',
+    name: 'Web3, Crypto & Fintech',
+    keywords: ['web3', 'crypto', 'nft', 'blockchain', 'token', 'wallet', 'fintech', 'defi', 'solana', 'eth'],
+    designPattern: 'Dark cybernetic glassmorphic aesthetic, wallet connect modal, live price ticker, transaction status card, and neon glowing borders.'
+  },
+  'education': {
+    url: 'https://www.awwwards.com/websites/education/',
+    name: 'Education & E-Learning',
+    keywords: ['education', 'course', 'learn', 'academy', 'school', 'university', 'student', 'tutorial'],
+    designPattern: 'Clean course card grid, interactive progress bars, instructor bio drawer, video lesson player, and certificate modal.'
+  },
+  'events': {
+    url: 'https://www.awwwards.com/websites/events/',
+    name: 'Events, Summit & Conference',
+    keywords: ['event', 'conference', 'summit', 'meetup', 'festival', 'keynote', 'speaker', 'schedule'],
+    designPattern: 'Live countdown timer, speaker card grid with hover bios, interactive schedule timeline tabs, and ticket purchasing drawer.'
+  },
+  'health-wellness': {
+    url: 'https://www.awwwards.com/websites/health-wellness/',
+    name: 'Health, Medical & Wellness',
+    keywords: ['health', 'medical', 'wellness', 'clinic', 'fitness', 'yoga', 'care', 'doctor', 'therapy'],
+    designPattern: 'Soft calming gradients, clean medical/wellness cards, appointment booking widget, and interactive health self-assessment quiz.'
   }
 });
 
 export function detectAwwwardsCategory(userPrompt = '') {
   const lower = userPrompt.toLowerCase();
   for (const [key, category] of Object.entries(AWWWARDS_CATEGORIES)) {
-    if (category.keywords.some(kw => lower.includes(kw))) {
+    if (category.keywords.some(kw => new RegExp(`\\b${kw}\\b`, 'i').test(lower))) {
       return { categoryKey: key, ...category };
     }
   }

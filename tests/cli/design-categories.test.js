@@ -21,6 +21,24 @@ describe('Awwwards Category-Aware Design Router', () => {
     expect(matched.categoryKey).toBe('saas');
   });
 
+  it('detects fashion category from prompt', () => {
+    const matched = detectAwwwardsCategory('build a fashion apparel lookbook website');
+    expect(matched).toBeDefined();
+    expect(matched.categoryKey).toBe('fashion');
+  });
+
+  it('detects mobile-apps category from prompt', () => {
+    const matched = detectAwwwardsCategory('create an iOS phone-app landing page');
+    expect(matched).toBeDefined();
+    expect(matched.categoryKey).toBe('mobile-apps');
+  });
+
+  it('detects web3-crypto category from prompt', () => {
+    const matched = detectAwwwardsCategory('build a crypto wallet NFT app');
+    expect(matched).toBeDefined();
+    expect(matched.categoryKey).toBe('web3-crypto');
+  });
+
   it('injects category design pattern into system prompt', () => {
     const prompt = buildAwwwardsDesignPrompt('create a product store e-commerce page');
     expect(prompt).toContain('E-Commerce & Product Showcase');
