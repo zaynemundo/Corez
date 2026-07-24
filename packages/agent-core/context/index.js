@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
+import { buildAwwwardsDesignPrompt } from './designTokens.js';
 
 export class ContextEngine {
   constructor(cwd = process.cwd()) {
@@ -114,6 +115,7 @@ export class ContextEngine {
       }
     }
 
+    prompt += buildAwwwardsDesignPrompt();
     return prompt;
   }
 }
