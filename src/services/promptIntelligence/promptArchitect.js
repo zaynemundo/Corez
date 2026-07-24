@@ -71,7 +71,7 @@ export function architectPrompt({ intent, requirements, context, rawPrompt }) {
  * Refinement pass — called when Critic determines the prompt needs improvement.
  * Adds structure and clarity without changing the underlying goal.
  */
-export function refinePrompt(failedPrompt, criticResult, { intent, requirements, context, rawPrompt }) {
+export function refinePrompt(failedPrompt, criticResult, { intent: _intent, requirements: _requirements, context: _context, rawPrompt: _rawPrompt }) {
   if (!criticResult || !criticResult.recommendedImprovements || !criticResult.recommendedImprovements.length) {
     return failedPrompt;
   }
@@ -94,7 +94,7 @@ export function refinePrompt(failedPrompt, criticResult, { intent, requirements,
     }
 
     if (lower.includes('context') || lower.includes('reuse') || lower.includes('existing')) {
-      const ctx = context;
+      const ctx = _context;
       if (ctx && ctx.framework) {
         if (!refined.toLowerCase().includes(ctx.framework.toLowerCase())) {
           refined += `\n\nUse the existing ${ctx.framework} project structure and conventions.`;
@@ -136,7 +136,7 @@ function buildQuestionPrompt(rawPrompt, intent, requirements, context) {
 
 function buildWebsitePrompt(rawPrompt, intent, requirements, context) {
   const explicit = requirements?.explicit || [];
-  const inferred = requirements?.inferred || [];
+  const _inferred = requirements?.inferred || [];
   const forbidden = requirements?.forbidden || [];
   const domain = intent?.domain || 'general';
 
@@ -188,8 +188,8 @@ function buildWebsitePrompt(rawPrompt, intent, requirements, context) {
   return result;
 }
 
-function buildGamePrompt(rawPrompt, intent, requirements, context) {
-  const explicit = requirements?.explicit || [];
+function buildGamePrompt(rawPrompt, _intent, requirements, _context) {
+  const _explicit = requirements?.explicit || [];
   const forbidden = requirements?.forbidden || [];
 
   let result = `${rawPrompt}\n\n`;
@@ -220,7 +220,7 @@ function buildGamePrompt(rawPrompt, intent, requirements, context) {
   return result;
 }
 
-function buildFeaturePrompt(rawPrompt, intent, requirements, context) {
+function buildFeaturePrompt(rawPrompt, _intent, requirements, context) {
   let result = `${rawPrompt}\n\n`;
 
   if (context?.framework) {
@@ -248,7 +248,7 @@ function buildFeaturePrompt(rawPrompt, intent, requirements, context) {
   return result;
 }
 
-function buildFixPrompt(rawPrompt, intent, requirements, context) {
+function buildFixPrompt(rawPrompt, _intent, _requirements, _context) {
   let result = `${rawPrompt}\n\n`;
 
   result += `Diagnose and fix the issue.\n\n`;
@@ -263,7 +263,7 @@ function buildFixPrompt(rawPrompt, intent, requirements, context) {
   return result;
 }
 
-function buildDesignPrompt(rawPrompt, intent, requirements, context) {
+function buildDesignPrompt(rawPrompt, _intent, _requirements, _context) {
   let result = `${rawPrompt}\n\n`;
 
   result += `Create the requested visual output.\n\n`;
@@ -274,7 +274,7 @@ function buildDesignPrompt(rawPrompt, intent, requirements, context) {
   return result;
 }
 
-function buildContentPrompt(rawPrompt, intent, requirements, context) {
+function buildContentPrompt(rawPrompt, _intent, _requirements, _context) {
   let result = `${rawPrompt}\n\n`;
 
   result += `Create the requested content.\n\n`;
@@ -288,7 +288,7 @@ function buildContentPrompt(rawPrompt, intent, requirements, context) {
 function buildGenericPrompt(rawPrompt, intent, requirements, context) {
   const type = intent?.type || 'general';
   const explicit = requirements?.explicit || [];
-  const inferred = requirements?.inferred || [];
+  const _inferred2 = requirements?.inferred || [];
   const forbidden = requirements?.forbidden || [];
 
   let result = `${rawPrompt}\n\n`;

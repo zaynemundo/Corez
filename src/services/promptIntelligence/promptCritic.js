@@ -22,7 +22,6 @@ import { createCriticResult } from './schemas.js';
  */
 export function critiquePrompt(rawPrompt, enrichedPrompt, intent, requirements) {
   const result = createCriticResult();
-  let totalScore = 0;
   const dimensions = [];
 
   // 1. Intent preservation (max 2.5 points)
@@ -50,7 +49,7 @@ export function critiquePrompt(rawPrompt, enrichedPrompt, intent, requirements) 
   dimensions.push({ name: 'contextUsage', score: contextScore, max: 1.0 });
 
   // Sum and normalize to 0-10
-  totalScore = dimensions.reduce((sum, d) => sum + d.score, 0);
+  const totalScore = dimensions.reduce((sum, d) => sum + d.score, 0);
   result.score = Math.round(totalScore * 10) / 10;
 
   // Detect drift
@@ -87,9 +86,6 @@ function scoreIntentPreservation(raw, enriched, intent) {
   const rawLower = raw.toLowerCase();
   const enrichedLower = enriched.toLowerCase();
 
-  let score = 2.5;
-
-  // Check that the core subject is still present
   const rawWords = new Set(rawLower.match(/[a-z]{4,}/g) || []);
   const enrichedWords = new Set(enrichedLower.match(/[a-z]{4,}/g) || []);
 
@@ -101,42 +97,36 @@ function scoreIntentPreservation(raw, enriched, intent) {
     if (!enrichedWords.has(word)) missingCoreWords += 1;
   }
 
+  let score;
   if (totalCoreWords > 0) {
-    const retentionRatio = 1 - missingCoreWords / totalCoreWords;
-    score = 2.5 * retentionRatio;
+    score = 2.5 * (1 - missingCoreWords / totalCoreWords);
+  } else {
+    score = 2.5;
   }
 
-  // Check for hallucinated domain changes
-  if (intent && intent.domain) {
-    if (!enrichedLower.includes(intent.domain.toLowerCase())) {
-      score *= 0.8;
-    }
+  if (intent && intent.domain && !enrichedLower.includes(intent.domain.toLowerCase())) {
+    score *= 0.8;
   }
 
   return Math.max(0, Math.min(2.5, score));
 }
 
 function scoreClarity(enriched) {
-  let score = 2.0;
+  let score;
 
-  // Has structure (headings, lists, clear sections)
   if (/#{1,3}\s|\*\*|-\s|•|\d\.\s/.test(enriched)) score = 2.0;
   else if (enriched.includes('\n- ') || enriched.includes('\n##')) score = 1.8;
   else if (enriched.split('\n').length >= 3) score = 1.5;
   else score = 1.0;
 
-  // Deduct for excessive length without structure
   if (enriched.length > 2000 && enriched.split('\n').length < 5) score *= 0.7;
-  // Deduct for extremely vague
   if (/do something|somehow|maybe|perhaps|possibly/i.test(enriched)) score *= 0.8;
 
   return Math.max(0, Math.min(2.0, score));
 }
 
 function scoreCompleteness(enriched, requirements) {
-  let score = 1.5;
   const explicit = requirements?.explicit || [];
-
   if (explicit.length === 0) return 1.5;
 
   const enrichedLower = enriched.toLowerCase();
@@ -148,8 +138,7 @@ function scoreCompleteness(enriched, requirements) {
     if (hasMatch) matched += 1;
   }
 
-  score = 1.5 * (matched / explicit.length);
-  return Math.max(0, Math.min(1.5, score));
+  return Math.max(0, Math.min(1.5, 1.5 * (matched / explicit.length)));
 }
 
 function scoreScopeControl(raw, enriched, requirements) {
@@ -177,17 +166,12 @@ function scoreScopeControl(raw, enriched, requirements) {
 }
 
 function scoreFeasibility(enriched) {
-  let score = 1.5;
+  if (enriched.length < 20) return 0.5;
 
-  // Too vague to execute
-  if (enriched.length < 20) score = 0.5;
+  if (/#{1,3}\s|-\s|\d\.\s/.test(enriched) && enriched.length > 50) return 1.5;
+  if (enriched.split('\n').length >= 3 && enriched.length > 50) return 1.2;
 
-  // Has actionable structure
-  if (/#{1,3}\s|-\s|\d\.\s/.test(enriched) && enriched.length > 50) score = 1.5;
-  else if (enriched.split('\n').length >= 3 && enriched.length > 50) score = 1.2;
-  else score = 1.0;
-
-  return Math.max(0, Math.min(1.5, score));
+  return 1.0;
 }
 
 function scoreContextUsage(enriched) {

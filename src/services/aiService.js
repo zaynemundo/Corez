@@ -485,6 +485,20 @@ export function improveCodingPrompt(prompt, intent = null) {
     return cleanPrompt;
   }
 
+  // Use the Prompt Intelligence Engine for structured enrichment
+  try {
+    const pipelineResult = processPromptIntelligence({
+      prompt: cleanPrompt,
+      dryRun: true,
+    });
+
+    if (pipelineResult && pipelineResult.executionPrompt && pipelineResult.executionPrompt !== cleanPrompt) {
+      return pipelineResult.executionPrompt;
+    }
+  } catch {
+    // Fall back to legacy enhancement on pipeline failure
+  }
+
   if (intentType === 'app' || INTENT_PATTERNS.app.test(cleanPrompt)) {
     return `${cleanPrompt}
 

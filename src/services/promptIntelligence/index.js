@@ -30,7 +30,7 @@
  *   8. FINAL EXECUTION PROMPT → CoreZ execution
  */
 
-import { createTask, COMPLEXITY_LEVELS } from './schemas.js';
+import { createTask } from './schemas.js';
 import { classifyIntent, extractRequirements, detectMissingInformation, classifyComplexity } from './intentEngine.js';
 import { createIntentContract } from './intentContract.js';
 import { ContextEngine } from './contextEngine.js';
@@ -49,7 +49,7 @@ export {
   MAX_REFINEMENT_LOOPS,
 };
 
-export { INTENT_TYPES, COMPLEXITY_LEVELS, EXECUTION_MODES, createTask } from './schemas.js';
+export { INTENT_TYPES, EXECUTION_MODES, createTask } from './schemas.js';
 
 /**
  * Process a raw user prompt through the full intelligence pipeline.
@@ -62,7 +62,7 @@ export { INTENT_TYPES, COMPLEXITY_LEVELS, EXECUTION_MODES, createTask } from './
  * @param {boolean} [options.dryRun]        — run pipeline without reaching out to models (optional)
  * @returns {Promise<object>} pipeline result
  */
-export async function process({ prompt, projectContext, signal, verbose, dryRun } = {}) {
+export async function process({ prompt, projectContext, verbose, dryRun } = {}) {
   if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
     return createEmptyResult('No prompt provided');
   }

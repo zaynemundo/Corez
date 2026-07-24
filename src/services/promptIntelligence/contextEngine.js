@@ -108,7 +108,7 @@ export class ContextEngine {
     const config = await this.readJSON('package.json');
 
     // Detect common file patterns to look for
-    const dirs = config && config.workspaces ? [...(Array.isArray(config.workspaces) ? config.workspaces : []), 'src'] : ['src'];
+    const _dirs = config && config.workspaces ? [...(Array.isArray(config.workspaces) ? config.workspaces : []), 'src'] : ['src'];
 
     if (intent.type === 'feature_implementation' || intent.type === 'simple_edit' || intent.type === 'bug_fix') {
       if (/\b(component|react|jsx|tsx|button|modal|form|input)\b/i.test(lower)) {

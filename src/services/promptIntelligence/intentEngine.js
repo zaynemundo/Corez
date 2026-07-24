@@ -13,12 +13,12 @@ import { INTENT_TYPES, COMPLEXITY_LEVELS, createIntentResult } from './schemas.j
 // Intent registry — each entry maps a type to detection + extraction logic
 // ---------------------------------------------------------------------------
 
-/**
- * @typedef {Object} IntentHandler
- * @property {RegExp}  pattern   — primary detection regex
- * @property {string[]} signals  — lowercased keyword signals
- * @property {(prompt: string, lower: string) => Partial<IntentResult>} extract
- */
+  /**
+   * @typedef {Object} IntentHandler
+   * @property {RegExp}  pattern   — primary detection regex
+   * @property {string[]} signals  — lowercased keyword signals
+   * @property {(_prompt: string, _lower: string) => Partial<IntentResult>} extract
+   */
 
 const INTENT_HANDLERS = [
   {
@@ -51,12 +51,11 @@ const INTENT_HANDLERS = [
     type: INTENT_TYPES.FEATURE_IMPLEMENTATION,
     pattern: /\b(add|implement|build|integrate|create)\b.*\b(feature|module|component|page|api|endpoint|route|service|handler|auth|login|authentication|search|filter|pagination|upload|export)\b/i,
     signals: ['add', 'implement', 'integrate', 'feature', 'module', 'component', 'endpoint'],
-    extract(prompt, lower) {
-      const feature = extractFeature(lower) || 'feature';
+    extract(_prompt, _lower) {
       return {
         type: INTENT_TYPES.FEATURE_IMPLEMENTATION,
-        goal: `implement ${feature}`,
-        deliverable: `${feature} implementation`,
+        goal: `implement ${extractFeature(_lower) || 'feature'}`,
+        deliverable: `${extractFeature(_lower) || 'feature'} implementation`,
       };
     },
   },
@@ -64,7 +63,7 @@ const INTENT_HANDLERS = [
     type: INTENT_TYPES.BUG_FIX,
     pattern: /\b(fix|debug|repair|resolve|patch|bug|error|exception|crash|broken|not working|failing|issue)\b/i,
     signals: ['fix', 'debug', 'repair', 'bug', 'error', 'exception', 'crash', 'broken', 'not working'],
-    extract(prompt, lower) {
+    extract(_prompt, _lower) {
       return {
         goal: `fix the reported bug or error`,
         deliverable: 'bug fix',
@@ -75,7 +74,7 @@ const INTENT_HANDLERS = [
     type: INTENT_TYPES.CODE_REFACTOR,
     pattern: /\b(refactor|rewrite|restructure|reorganise|reorganize|clean up|improve|optimise|optimize)\b.*\b(code|function|module|class|component|architecture|service|api|file|dir)\b|\b(refactoring)\b/i,
     signals: ['refactor', 'rewrite', 'restructure', 'reorganise', 'optimise', 'optimize', 'clean up'],
-    extract(prompt, lower) {
+    extract(_prompt, _lower) {
       return {
         goal: `refactor the existing code`,
         deliverable: 'refactored code',
@@ -86,7 +85,7 @@ const INTENT_HANDLERS = [
     type: INTENT_TYPES.CODE_QUESTION,
     pattern: /\b(how|what|why|explain|tell me|show me|help)\b.*\b(code|js|javascript|react|python|css|html|function|component|api|library|framework|syntax|pattern)\b|\b(explain|understand|learn)\b.*\b(code|programming)\b/i,
     signals: ['how', 'what', 'why', 'explain', 'tell me', 'help', 'code', 'syntax'],
-    extract(prompt, lower) {
+    extract(_prompt, _lower) {
       return {
         goal: `answer a code-related question`,
         deliverable: 'explanation',
@@ -97,7 +96,7 @@ const INTENT_HANDLERS = [
     type: INTENT_TYPES.RESEARCH,
     pattern: /\b(research|find|search|look up|investigate|analyse|analyze|compare|what is|what are|how does|definition)\b/i,
     signals: ['research', 'find', 'search', 'investigate', 'analyse', 'compare', 'definition'],
-    extract(prompt, lower) {
+    extract(_prompt, _lower) {
       return {
         goal: `research the requested topic`,
         deliverable: 'research findings',
@@ -108,7 +107,7 @@ const INTENT_HANDLERS = [
     type: INTENT_TYPES.DESIGN_TASK,
     pattern: /\b(design|redesign|layout|wireframe|mockup|ux|ui|style|theme|color scheme|typography)\b.*\b(for|of|page|app)\b|\b(design|redesign)\b.*\b(component|page|screen)\b/i,
     signals: ['design', 'redesign', 'layout', 'wireframe', 'mockup', 'ux', 'ui', 'style', 'theme'],
-    extract(prompt, lower) {
+    extract(_prompt, _lower) {
       return {
         goal: `complete a design task`,
         deliverable: 'design',
@@ -119,7 +118,7 @@ const INTENT_HANDLERS = [
     type: INTENT_TYPES.IMAGE_GENERATION,
     pattern: /\b(generate|create|make|draw|render|produce)\b.*\b(image|picture|photo|artwork|illustration|graphic|icon|sprite|logo|banner|poster)\b|\b(image generation)\b/i,
     signals: ['image', 'picture', 'photo', 'artwork', 'illustration', 'graphic', 'icon', 'sprite'],
-    extract(prompt, lower) {
+    extract(_prompt, _lower) {
       return {
         goal: `generate an image`,
         deliverable: 'image',
@@ -130,7 +129,7 @@ const INTENT_HANDLERS = [
     type: INTENT_TYPES.CONTENT_CREATION,
     pattern: /\b(write|create|compose|draft|generate)\b.*\b(article|blog|post|email|newsletter|copy|content|text|document|report|proposal|summary|description)\b/i,
     signals: ['write', 'create', 'compose', 'article', 'blog', 'email', 'newsletter', 'copy', 'content'],
-    extract(prompt, lower) {
+    extract(_prompt, _lower) {
       return {
         goal: `create written content`,
         deliverable: 'content',
@@ -141,7 +140,7 @@ const INTENT_HANDLERS = [
     type: INTENT_TYPES.SIMPLE_EDIT,
     pattern: /\b(change|update|rename|move|delete|remove|set|color|colour|font|size|width|height|margin|padding)\b.*\b(to|the|this|file|component)\b|\b(tweak|adjust|switch|swap)\b/i,
     signals: ['change', 'update', 'rename', 'delete', 'remove', 'color', 'colour', 'font', 'adjust', 'tweak'],
-    extract(prompt, lower) {
+    extract(_prompt, _lower) {
       return {
         goal: `make a simple edit`,
         deliverable: 'code edit',
@@ -152,7 +151,7 @@ const INTENT_HANDLERS = [
     type: INTENT_TYPES.SWARM,
     pattern: /\b(swarm|multi-agent|agents|orchestrate|orchestration|complex|architect|plan|system design|full stack|complete.*app|production.*app|SaaS|enterprise)\b/i,
     signals: ['swarm', 'multi-agent', 'orchestrate', 'system design', 'full stack', 'saas', 'enterprise'],
-    extract(prompt, lower) {
+    extract(_prompt, _lower) {
       return {
         goal: `coordinate a complex multi-agent task`,
         deliverable: 'orchestrated solution',
@@ -161,11 +160,7 @@ const INTENT_HANDLERS = [
   },
 ];
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-const WORD_MATCH = /[a-z]+(?:'[a-z]+)*/g;
+// ——— Helpers ———
 
 function extractDomain(lower) {
   const patterns = {
@@ -236,14 +231,12 @@ const OPTIONAL_QUESTIONS = [
 // ---------------------------------------------------------------------------
 
 function computeConfidence(handler, lower) {
-  let score = 0;
   const maxSignals = Math.min(handler.signals.length || 1, 8);
   let matchedSignals = 0;
   for (const s of handler.signals) {
     if (lower.includes(s)) matchedSignals += 1;
   }
-  score = Math.min(1, matchedSignals / Math.max(1, maxSignals * 0.4));
-  // Boost for direct regex match
+  let score = Math.min(1, matchedSignals / Math.max(1, maxSignals * 0.4));
   if (handler.pattern.test(lower)) score = Math.min(1, score + 0.2);
   return Math.round(score * 100) / 100;
 }
@@ -303,9 +296,6 @@ export function extractRequirements(prompt, intent) {
   const explicit = [];
   const inferred = [];
   const forbidden = [];
-
-  // Extract explicit from the prompt
-  const words = lower.match(WORD_MATCH) || [];
 
   // Detect explicit keywords
   if (/\b(responsive|mobile|desktop)\b/i.test(prompt)) {

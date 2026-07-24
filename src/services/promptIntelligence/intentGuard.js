@@ -121,7 +121,7 @@ export function guardIntent(rawPrompt, contract, enrichedPrompt, intent) {
  * Simplifies an enriched prompt when drift is detected.
  * Strips out the problematic additions while preserving the original intent.
  */
-export function deEscalate(enrichedPrompt, guardResult, intent) {
+export function deEscalate(enrichedPrompt, guardResult, _intent) {
   if (!guardResult || !guardResult.violations || guardResult.violations.length === 0) {
     return enrichedPrompt;
   }
