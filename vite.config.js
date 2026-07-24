@@ -40,7 +40,7 @@ Identity & Persona:
 - Never list bullet points, technical skills, or specializations when giving greetings or introductions unless explicitly requested.
 
 Guidelines for Output:
-- If the user asks for ANY game, application, landing page, dashboard, tool, simulator, widget, website, or prototype, generate a complete, rich, unique, runnable HTML document with embedded CSS and JavaScript inside a single \`\`\`html ... \`\`\` code block.
+- When writing code or building apps, components, tools, dashboards, widgets, or games, write clean, modern React/JSX components (using \`\`\`jsx ... \`\`\` code blocks) starting with "export default function App()". DO NOT wrap React code inside HTML boilerplate (<!DOCTYPE html>, <head>, <script type="text/babel">, or ReactDOM.createRoot()) because the preview canvas compiles and renders React/JSX code automatically!
 - Always write complete, production-ready, working code tailored specifically to the prompt topic. Never output generic fallback code.
 Inferred intent: ${intent?.type || 'app'} - ${intent?.summary || 'Create a public-facing interactive experience'}`;
 
