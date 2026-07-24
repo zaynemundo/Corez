@@ -2,6 +2,26 @@ import readline from 'node:readline';
 import { AgentRuntime, ContextEngine, loadCorezConfig } from '../../../agent-core/index.js';
 import { handleModelCommand } from './model.js';
 
+export const SLASH_COMMANDS = Object.freeze([
+  { cmd: '/model', desc: 'View or switch active AI model' },
+  { cmd: '/plan', desc: 'Analyse codebase & build architectural plan (read-only)' },
+  { cmd: '/build', desc: 'Execute autonomous implementation' },
+  { cmd: '/fix', desc: 'Find & repair failing tests/build/lint errors' },
+  { cmd: '/review', desc: 'Audit staged & unstaged Git diff' },
+  { cmd: '/swarm', desc: 'Run multi-agent DAG task decomposition' },
+  { cmd: '/clear', desc: 'Clear terminal screen' },
+  { cmd: '/help', desc: 'Print interactive help menu' },
+  { cmd: '/exit', desc: 'Exit interactive session' }
+]);
+
+function slashCompleter(line) {
+  if (line.startsWith('/')) {
+    const matches = SLASH_COMMANDS.filter(c => c.cmd.startsWith(line.toLowerCase()));
+    return [matches.length ? matches.map(c => c.cmd) : SLASH_COMMANDS.map(c => c.cmd), line];
+  }
+  return [[], line];
+}
+
 export async function handleChatCommand(options = {}, ui) {
   const cwd = options.cwd || process.cwd();
   let config = loadCorezConfig(cwd);
@@ -16,13 +36,14 @@ export async function handleChatCommand(options = {}, ui) {
     branch: projectInfo.gitBranch
   });
 
-  console.log('Type your request below (or "/model" to view/switch model, "exit" to quit):\n');
+  console.log('Type your request below (type "/" for command suggestions, or "exit" to quit):\n');
 
   let runtime = new AgentRuntime({ cwd, config, contextEngine: context });
 
   const rl = readline.createInterface({
     input: process.stdin,
-    output: process.stdout
+    output: process.stdout,
+    completer: slashCompleter
   });
 
   const promptUser = () => {
@@ -36,6 +57,17 @@ export async function handleChatCommand(options = {}, ui) {
       if (['exit', 'quit', ':q'].includes(trimmed.toLowerCase())) {
         console.log('\nGoodbye!\n');
         rl.close();
+        return;
+      }
+
+      // Display slash command suggestion list when user types just "/"
+      if (trimmed === '/') {
+        console.log('\n  Available Slash Commands:');
+        SLASH_COMMANDS.forEach(c => {
+          console.log(`  \x1b[36m${c.cmd.padEnd(12)}\x1b[0m ${c.desc}`);
+        });
+        console.log();
+        promptUser();
         return;
       }
 
