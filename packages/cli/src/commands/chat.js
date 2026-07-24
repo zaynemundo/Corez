@@ -1,9 +1,10 @@
 import readline from 'node:readline';
 import { AgentRuntime, ContextEngine, loadCorezConfig } from '../../../agent-core/index.js';
+import { handleModelCommand } from './model.js';
 
 export async function handleChatCommand(options = {}, ui) {
   const cwd = options.cwd || process.cwd();
-  const config = loadCorezConfig(cwd);
+  let config = loadCorezConfig(cwd);
   const context = new ContextEngine(cwd);
   const projectInfo = context.inspectProject();
 
@@ -15,9 +16,9 @@ export async function handleChatCommand(options = {}, ui) {
     branch: projectInfo.gitBranch
   });
 
-  console.log('Type your request below (or "exit" / "quit" to stop):\n');
+  console.log('Type your request below (or "/model" to view/switch model, "exit" to quit):\n');
 
-  const runtime = new AgentRuntime({ cwd, config, contextEngine: context });
+  let runtime = new AgentRuntime({ cwd, config, contextEngine: context });
 
   const rl = readline.createInterface({
     input: process.stdin,
@@ -35,6 +36,19 @@ export async function handleChatCommand(options = {}, ui) {
       if (['exit', 'quit', ':q'].includes(trimmed.toLowerCase())) {
         console.log('\nGoodbye!\n');
         rl.close();
+        return;
+      }
+
+      // Handle slash command /model or /model <model-id>
+      if (trimmed.startsWith('/model') || trimmed.startsWith('/models')) {
+        const modelArg = trimmed.replace(/^\/models?\s*/i, '').trim();
+        await handleModelCommand(modelArg ? [modelArg] : [], { cwd }, ui);
+        
+        // Reload config & recreate agent runtime with new active model
+        config = loadCorezConfig(cwd);
+        runtime = new AgentRuntime({ cwd, config, contextEngine: context });
+        
+        promptUser();
         return;
       }
 

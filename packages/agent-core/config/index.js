@@ -68,3 +68,29 @@ export function loadCorezConfig(cwd = process.cwd()) {
     permissions
   };
 }
+
+export function saveCorezConfig(newConfig = {}, cwd = process.cwd()) {
+  const dir = path.join(cwd, '.corez');
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  const configPath = path.join(dir, 'config.json');
+  let existing = {};
+  if (fs.existsSync(configPath)) {
+    try {
+      existing = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    } catch (_e) {
+      existing = {};
+    }
+  }
+
+  const merged = {
+    ...existing,
+    ...newConfig
+  };
+
+  fs.writeFileSync(configPath, JSON.stringify(merged, null, 2), 'utf8');
+  return merged;
+}
+

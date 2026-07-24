@@ -8,6 +8,7 @@ import { handleFixCommand } from './commands/fix.js';
 import { handleReviewCommand } from './commands/review.js';
 import { handleSwarmCommand } from './commands/swarm.js';
 import { handleChatCommand } from './commands/chat.js';
+import { handleModelCommand } from './commands/model.js';
 import { AgentRuntime } from '../../agent-core/index.js';
 
 export function parseCliArgs(rawArgs = []) {
@@ -46,6 +47,8 @@ export function printHelp(ui) {
   corez-code review               Review Git diff for bugs and security risks
   corez-code swarm "<task>"       Run multi-agent swarm architecture
   corez-code models               Show available/configured AI models
+  corez-code model [model-id]     View active model or switch to a new model
+  /model [model-id]               Interactive slash command to switch active model
   corez-code agents               Show configured CoreZ agent roles
   corez-code status               Show workspace and configuration status
 
@@ -87,6 +90,12 @@ export async function runCli(argv = process.argv.slice(2), options = {}) {
 
     case 'models':
       await handleModelsCommand(positional.slice(1), options, ui);
+      return 0;
+
+    case 'model':
+    case '/model':
+    case '/models':
+      await handleModelCommand(positional.slice(1), options, ui);
       return 0;
 
     case 'agents':
