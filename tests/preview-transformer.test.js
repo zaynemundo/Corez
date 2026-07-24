@@ -28,6 +28,27 @@ export default function App() {
     expect(formatted).toContain('ReactDOM.createRoot');
   });
 
+  it('handles multi-line import statements cleanly without breaking compilation', () => {
+    const multilineJsx = `import {
+  useState,
+  useEffect,
+  useRef
+} from 'react';
+import {
+  Sparkles,
+  Shield
+} from 'lucide-react';
+
+export default function Dashboard() {
+  return <div><Sparkles /><Shield />Dashboard</div>;
+}`;
+
+    const formatted = formatCodeForPreview(multilineJsx);
+    expect(formatted).toContain('const Sparkles = LucideStub;');
+    expect(formatted).toContain('const Shield = LucideStub;');
+    expect(formatted).not.toContain('import {\n  useState');
+  });
+
   it('registers custom component names with window.__COREZ_APP__ on default export', () => {
     const jsx = `const Dashboard = () => <div>Dashboard</div>; export default Dashboard;`;
     const formatted = formatCodeForPreview(jsx);

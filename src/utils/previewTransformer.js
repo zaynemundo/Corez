@@ -14,19 +14,22 @@ export function formatCodeForPreview(rawCode) {
   // 2. Prepare JSX / React code for browser standalone Babel compilation
   let processed = rawCode;
 
-  // 3. Comment out / convert ESM import statements
-  processed = processed.replace(/^import\s+.*?from\s+['"].*?['"];?/gm, (match) => {
+  // 3. Convert or comment out multi-line and single-line ESM import statements
+  processed = processed.replace(/import\s+[\s\S]*?(?:from\s+['"].*?['"]|['"].*?['"])\s*;?/g, (match) => {
     if (match.includes('lucide-react')) {
-      const iconMatches = match.match(/\{([^}]+)\}/);
+      const iconMatches = match.match(/\{([\s\S]*?)\}/);
       if (iconMatches && iconMatches[1]) {
         const icons = iconMatches[1].split(',').map(i => i.trim()).filter(Boolean);
         return icons.map(icon => `const ${icon} = LucideStub;`).join('\n');
       }
     }
-    return `// ${match}`;
+    return match.split('\n').map(line => `// ${line}`).join('\n');
   });
 
-  // 4. Handle default export patterns cleanly
+  // 4. Clean up export statements
+  // Strip named exports like `export const X = ...` -> `const X = ...`
+  processed = processed.replace(/export\s+(const|let|var|function|class)\s+/g, '$1 ');
+
   // export default function FunctionName
   processed = processed.replace(/export\s+default\s+function\s+([A-Za-z0-9_]+)/g, (_, name) => {
     return `function ${name}`;
@@ -94,9 +97,9 @@ export function formatCodeForPreview(rawCode) {
       </svg>
     );
 
-    ${processed}
-
     try {
+      ${processed}
+
       let TargetComponent = null;
 
       // 1. Check window.__COREZ_APP__ explicitly registered by default export
@@ -132,7 +135,7 @@ export function formatCodeForPreview(rawCode) {
         document.getElementById('root').innerHTML = '<div style="padding: 2rem; color: #ef4444; font-family: sans-serif;"><h3>Preview Warning</h3><p>Could not auto-detect a React component. Please ensure your code exports or defines a React component.</p></div>';
       }
     } catch (err) {
-      document.getElementById('root').innerHTML = '<div style="padding: 2rem; color: #ef4444; font-family: sans-serif;"><h3>Runtime Error</h3><pre>' + err.message + '</pre></div>';
+      document.getElementById('root').innerHTML = '<div style="padding: 2rem; color: #ef4444; font-family: sans-serif; white-space: pre-wrap;"><h3>Runtime Error</h3><p>' + err.message + '</p></div>';
     }
   </script>
 </body>
