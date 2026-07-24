@@ -1,9 +1,8 @@
 export const MODEL_CATALOG = Object.freeze([
-  { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', provider: 'opencode-go', role: 'lead-programmer / backend' },
-  { id: 'kimi-k3', name: 'Kimi K3 Code', provider: 'opencode-go', role: 'gameplay-programmer / engine' },
-  { id: 'glm-5.2', name: 'GLM 5.2', provider: 'opencode-go', role: 'creative-director / architect' },
-  { id: 'mimo-v2.5', name: 'MiMo V2.5 Pro', provider: 'opencode-go', role: 'art-director / visual-specialist' },
-  { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', provider: 'openrouter', role: 'producer / fast-path' }
+  { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', provider: 'opencode-go', role: 'lead-programmer / architect / backend / reviewer' },
+  { id: 'kimi-k3', name: 'Kimi K3 Code', provider: 'opencode-go', role: 'gameplay-programmer / engine / physics / ai' },
+  { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', provider: 'openrouter', role: 'producer / ui / level-designer / tester' },
+  { id: 'flux-1-schnell', name: 'FLUX 1 Schnell', provider: 'cloudflare-workers-ai', role: 'art-director / visual-artist' }
 ]);
 
 export class ModelProviderRouter {

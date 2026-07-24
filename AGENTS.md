@@ -25,27 +25,25 @@
 
 When handling browser game requests, CoreZ activates the **AI Game Studio** orchestrator:
 
-### OpenCode Go Model Map
+### CoreZ 4-Model Swarm Architecture Map
 
-| Studio Role | OpenCode Go Model | Mode / Authority | Responsibilities |
-| :--- | :--- | :--- | :--- |
-| `game-studio-producer` | `opencode-go/deepseek-v4-flash` | Coordinator | Workflow state, complexity sizing, task briefs, context isolation |
-| `creative-director` | `opencode-go/glm-5.2` | Read-only | Game vision, player fantasy, genre identity |
-| `technical-director` | `opencode-go/deepseek-v4-pro` | Read-only | Technical feasibility, architecture, 60 FPS performance |
-| `game-designer` | `opencode-go/deepseek-v4-pro` | Spec Lead | Core loops, mechanics, controls, outputs `game-spec.json` |
-| `lead-programmer` | `opencode-go/kimi-k2.7-code` | Tech Lead | Task graph decomposition, module interfaces, code review |
-| `art-director` | `opencode-go/mimo-v2.5-pro` | Read-only | Visual direction, color palettes, outputs `art-direction.json` |
-| `qa-lead` | `opencode-go/deepseek-v4-pro` | Read-only | Acceptance criteria, test matrix, regression checklist |
-| `gameplay-programmer` | `opencode-go/kimi-k2.7-code` | Specialist | Player movement, physics, attacks, collisions, health |
-| `game-ai-programmer` | `opencode-go/kimi-k2.7-code` | Specialist | Enemy AI state machines, boss logic, difficulty scaling |
-| `engine-programmer` | `opencode-go/kimi-k2.7-code` | Specialist | Game loop, delta timing, canvas rendering, spatial hashing |
-| `ui-programmer` | `opencode-go/deepseek-v4-flash` | Specialist | Responsive browser HUD, pause screens, game-over overlays |
-| `level-designer` | `opencode-go/deepseek-v4-flash` | Specialist | Map layouts, tilemaps, platform placement, pacing |
-| `technical-artist` | `opencode-go/mimo-v2.5` | Specialist | 8-bit vector SVG assets, particle effects, background rendering |
-| `visual-specialist` | `opencode-go/mimo-v2.5` | Read-only | Visual inspection of captured game screenshots against art specs |
-| `qa-tester` | `opencode-go/deepseek-v4-flash` | Tester | Rapid smoke tests, control validation, bug reproduction |
-| `code-reviewer` | `opencode-go/deepseek-v4-pro` | Read-only | Specification compliance & code quality audit |
-| `adversarial-reviewer` | `opencode-go/grok-4.5` | Read-only (Optional)| Independent critic for major architectural disputes |
+| Studio Role | AI Model | Provider | Mode / Authority | Responsibilities |
+| :--- | :--- | :--- | :--- | :--- |
+| `game-studio-producer` | `deepseek-v4-flash` | `opencode-go` / `openrouter` | Coordinator | Workflow state, task briefs, context isolation, rapid routing |
+| `creative-director` | `deepseek-v4-flash` | `opencode-go` / `openrouter` | Read-only | Game vision, player fantasy, genre identity, pacing |
+| `technical-director` | `deepseek-v4-pro` | `opencode-go` | Read-only | Technical feasibility, architecture, 60 FPS performance guardrails |
+| `game-designer` | `deepseek-v4-pro` | `opencode-go` | Spec Lead | Core loops, game mechanics, state schema (`game-spec.json`) |
+| `lead-programmer` | `deepseek-v4-pro` | `opencode-go` | Tech Lead | Task graph decomposition, module interfaces, backend endpoints |
+| `art-director` | `flux-1-schnell` | `cloudflare-workers-ai` | Creative Lead | Visual direction, color palettes, background textures, art assets |
+| `qa-lead` | `deepseek-v4-pro` | `opencode-go` | Read-only | Acceptance criteria, test matrix, regression checklist |
+| `gameplay-programmer` | `kimi-k3` | `opencode-go` | Specialist | Player movement, physics simulation, attacks, collisions, health |
+| `game-ai-programmer` | `kimi-k3` | `opencode-go` | Specialist | Enemy AI state machines, boss logic, difficulty scaling |
+| `engine-programmer` | `kimi-k3` | `opencode-go` | Specialist | Game loop, delta timing, canvas rendering, spatial hashing |
+| `ui-programmer` | `deepseek-v4-flash` | `opencode-go` / `openrouter` | Specialist | Responsive browser HUD, pause screens, game-over overlays |
+| `level-designer` | `deepseek-v4-flash` | `opencode-go` / `openrouter` | Specialist | Map layouts, tilemaps, platform placement, level pacing |
+| `technical-artist` | `flux-1-schnell` | `cloudflare-workers-ai` | Specialist | Background rendering, visual assets, particle textures |
+| `qa-tester` | `deepseek-v4-flash` | `opencode-go` / `openrouter` | Tester | Rapid smoke tests, control validation, bug reproduction |
+| `code-reviewer` | `deepseek-v4-pro` | `opencode-go` | Read-only | Specification compliance, safety audit, code quality review |
 
 ### File Ownership & Context Rules
 - **Context Isolation**: Each specialist subagent receives only its specific task brief (`task`, `role`, `goal`, `allowedFiles`, `acceptanceCriteria`). Monolithic conversation history dumps are forbidden.
