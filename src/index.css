@@ -21,6 +21,10 @@
   
   --code-bg: #080808;
   --code-header-bg: #101010;
+
+  --selection-bg: rgba(255, 255, 255, 0.2);
+  --selection-color: #ffffff;
+  --inline-code-color: #f1fa8c;
   
   /* Refined Elegant Typography */
   --font-sans: -apple-system-body, ui-sans-serif, -apple-system, "system-ui", "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
@@ -73,6 +77,10 @@
   --code-bg: #f4f4f4;
   --code-header-bg: #e5e5e5;
 
+  --selection-bg: rgba(0, 100, 220, 0.25);
+  --selection-color: #000000;
+  --inline-code-color: #7c5e10;
+
   --sidebar-bg: rgb(252, 252, 252);
   --sidebar-bg-opaque: rgb(252, 252, 252);
   --sidebar-border: rgba(0, 0, 0, 0.08);
@@ -99,8 +107,8 @@
 }
 
 ::selection {
-  background-color: rgba(255, 255, 255, 0.2);
-  color: #ffffff;
+  background-color: var(--selection-bg);
+  color: var(--selection-color);
 }
 
 body, button, input, textarea, select, h1, h2, h3, h4, h5, h6, th, td, b, strong {
@@ -978,7 +986,7 @@ h1, h2, h3, h4, h5, h6 {
   padding: 0.1rem 0.3rem;
   font-family: var(--font-mono, monospace);
   font-size: 0.8rem;
-  color: #f1fa8c;
+  color: var(--inline-code-color);
 }
 
 /* Beautiful Markdown Tables */
