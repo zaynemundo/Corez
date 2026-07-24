@@ -37,17 +37,19 @@ export function parseCliArgs(rawArgs = []) {
 export function printHelp(ui) {
   ui.banner();
   console.log(`Usage:
-  corez                           Start interactive coding session
-  corez "<task description>"       Run task against current workspace
-  corez chat                      Interactive coding agent mode
-  corez plan "<task description>" Analyse codebase & return plan (read-only)
-  corez build "<task description>" Autonomous implementation mode
-  corez fix                       Find & resolve failing tests/build/lint errors
-  corez review                    Review Git diff for bugs and security risks
-  corez swarm "<task description>" Run multi-agent swarm architecture
-  corez models                    Show available/configured AI models
-  corez agents                    Show configured CoreZ agent roles
-  corez status                    Show workspace and configuration status
+  corez-code                      Start interactive coding session
+  corez-code "<task description>"  Run task against current workspace
+  corez-code chat                 Interactive coding agent mode
+  corez-code plan "<task>"        Analyse codebase & return plan (read-only)
+  corez-code build "<task>"       Autonomous implementation mode
+  corez-code fix                  Find & resolve failing tests/build/lint errors
+  corez-code review               Review Git diff for bugs and security risks
+  corez-code swarm "<task>"       Run multi-agent swarm architecture
+  corez-code models               Show available/configured AI models
+  corez-code agents               Show configured CoreZ agent roles
+  corez-code status               Show workspace and configuration status
+
+Note: 'corez' is also available as an alias for 'corez-code'.
 
 Options:
   --help, -h                      Show this help message

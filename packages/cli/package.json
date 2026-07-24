@@ -1,11 +1,12 @@
 {
-  "name": "@corez_ai/cli",
+  "name": "corez-code",
   "version": "0.1.0",
   "type": "module",
   "publishConfig": {
     "access": "public"
   },
   "bin": {
+    "corez-code": "./bin/corez.mjs",
     "corez": "./bin/corez.mjs"
   },
   "main": "./src/index.js",

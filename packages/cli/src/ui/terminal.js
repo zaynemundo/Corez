@@ -16,7 +16,7 @@ export class TerminalUI {
   }
 
   banner() {
-    console.log(`\n${styles.bold}${styles.cyan}COREZ CLI v0.1${styles.reset} ${styles.dim}— First-Party AI Coding Platform${styles.reset}\n`);
+    console.log(`\n${styles.bold}${styles.cyan}COREZ CODE CLI v0.1${styles.reset} ${styles.dim}— First-Party AI Coding Platform${styles.reset}\n`);
   }
 
   header(info = {}) {
