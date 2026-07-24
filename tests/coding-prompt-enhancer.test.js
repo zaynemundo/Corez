@@ -7,8 +7,8 @@ describe('Coding Prompt Enhancer', () => {
     const enhanced = improveCodingPrompt(raw, { type: 'app' });
 
     expect(enhanced).toContain(raw);
-    expect(enhanced).toContain('[SINGLE-FILE APPLICATION SPECIFICATION]');
-    expect(enhanced).toContain('Output all code as ONE SINGLE');
+    expect(enhanced).toContain('[SINGLE-FILE REACT SPECIFICATION]');
+    expect(enhanced).toContain('Output clean, modern React/JSX code');
   });
 
   it('enhances code fix and debug prompts with root-cause and safe fix specifications', () => {

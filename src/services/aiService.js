@@ -502,8 +502,9 @@ export function improveCodingPrompt(prompt, intent = null) {
   if (intentType === 'app' || INTENT_PATTERNS.app.test(cleanPrompt)) {
     return `${cleanPrompt}
 
-[SINGLE-FILE APPLICATION SPECIFICATION]:
-- Output all code as ONE SINGLE, self-contained HTML document (or single React file) inside ONE SINGLE \`\`\`html ... \`\`\` code block.
+[SINGLE-FILE REACT SPECIFICATION]:
+- Output clean, modern React/JSX code inside ONE SINGLE \`\`\`jsx ... \`\`\` code block starting with \`export default function App()\`.
+- DO NOT wrap React code inside HTML boilerplate (\`<!DOCTYPE html>\`, \`<head>\`, \`<script type="text/babel">\`, or \`ReactDOM.createRoot()\`) because the preview canvas automatically compiles and renders React/JSX code!
 - Do NOT split your output into multiple separate code blocks, file headers (// App.tsx, // components/Navbar.tsx), or relative file imports (import Navbar from './components/Navbar').
 - Define all child components (Navbar, Hero, Footer, etc.) inline within the SAME file BEFORE the main App component!
 - Include complete state management, modern dark glassmorphism styling, and responsive layout controls.`;
