@@ -19,6 +19,7 @@
     "run_worker_first": ["/api/*"]
   },
   "routes": [
-    { "pattern": "ai.corez.pro", "custom_domain": true }
+    { "pattern": "corez.pro", "custom_domain": true },
+    { "pattern": "www.corez.pro", "custom_domain": true }
   ]
 }
