@@ -25,25 +25,21 @@
 
 When handling browser game requests, CoreZ activates the **AI Game Studio** orchestrator:
 
-### CoreZ 4-Model Swarm Architecture Map
+### Cost-Optimized Guidance Architecture Map (Flash Executor + Pro/Kimi Advisors)
+
+> **Cost Optimization Rule**: **DeepSeek V4 Flash** performs ~80-90% of all code execution, component building, UI work, and testing to minimize API token costs. **DeepSeek V4 Pro** and **Kimi K3 Code** operate in lightweight, read-only Spec Lead / Advisor mode.
 
 | Studio Role | AI Model | Provider | Mode / Authority | Responsibilities |
 | :--- | :--- | :--- | :--- | :--- |
+| `primary-executor` | `deepseek-v4-flash` | `opencode-go` / `openrouter` | Coder / Tester | **Primary Executor (80-90% of token work)**: writes code, builds components, edits files, runs tests |
 | `game-studio-producer` | `deepseek-v4-flash` | `opencode-go` / `openrouter` | Coordinator | Workflow state, task briefs, context isolation, rapid routing |
-| `creative-director` | `deepseek-v4-flash` | `opencode-go` / `openrouter` | Read-only | Game vision, player fantasy, genre identity, pacing |
-| `technical-director` | `deepseek-v4-pro` | `opencode-go` | Read-only | Technical feasibility, architecture, 60 FPS performance guardrails |
-| `game-designer` | `deepseek-v4-pro` | `opencode-go` | Spec Lead | Core loops, game mechanics, state schema (`game-spec.json`) |
-| `lead-programmer` | `deepseek-v4-pro` | `opencode-go` | Tech Lead | Task graph decomposition, module interfaces, backend endpoints |
-| `art-director` | `flux-1-schnell` | `cloudflare-workers-ai` | Creative Lead | Visual direction, color palettes, background textures, art assets |
-| `qa-lead` | `deepseek-v4-pro` | `opencode-go` | Read-only | Acceptance criteria, test matrix, regression checklist |
-| `gameplay-programmer` | `kimi-k3` | `opencode-go` | Specialist | Player movement, physics simulation, attacks, collisions, health |
-| `game-ai-programmer` | `kimi-k3` | `opencode-go` | Specialist | Enemy AI state machines, boss logic, difficulty scaling |
-| `engine-programmer` | `kimi-k3` | `opencode-go` | Specialist | Game loop, delta timing, canvas rendering, spatial hashing |
-| `ui-programmer` | `deepseek-v4-flash` | `opencode-go` / `openrouter` | Specialist | Responsive browser HUD, pause screens, game-over overlays |
-| `level-designer` | `deepseek-v4-flash` | `opencode-go` / `openrouter` | Specialist | Map layouts, tilemaps, platform placement, level pacing |
-| `technical-artist` | `flux-1-schnell` | `cloudflare-workers-ai` | Specialist | Background rendering, visual assets, particle textures |
+| `ui-programmer` | `deepseek-v4-flash` | `opencode-go` / `openrouter` | Coder | Responsive browser HUDs, pause screens, game-over overlays, JSX components |
+| `level-designer` | `deepseek-v4-flash` | `opencode-go` / `openrouter` | Coder | Map layouts, tilemaps, platform placement, level pacing |
 | `qa-tester` | `deepseek-v4-flash` | `opencode-go` / `openrouter` | Tester | Rapid smoke tests, control validation, bug reproduction |
-| `code-reviewer` | `deepseek-v4-pro` | `opencode-go` | Read-only | Specification compliance, safety audit, code quality review |
+| `architect-guide` | `deepseek-v4-pro` | `opencode-go` | Read-only Spec Lead | **Guidance & Architecture**: High-level specs, task graph decomposition, code review (low token usage) |
+| `code-reviewer` | `deepseek-v4-pro` | `opencode-go` | Read-only Reviewer | Safety audit, specification compliance, code quality review |
+| `physics-advisor` | `kimi-k3` | `opencode-go` | Read-only Advisor | **Physics & Math Advisor**: High-frequency physics math, spatial hashing formulas, canvas loop algorithms |
+| `art-director` | `flux-1-schnell` | `cloudflare-workers-ai` | Creative Lead | Visual direction, color palettes, background textures, art assets |
 
 ### File Ownership & Context Rules
 - **Context Isolation**: Each specialist subagent receives only its specific task brief (`task`, `role`, `goal`, `allowedFiles`, `acceptanceCriteria`). Monolithic conversation history dumps are forbidden.

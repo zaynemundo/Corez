@@ -1,15 +1,15 @@
 export const MODEL_CATALOG = Object.freeze([
-  { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', provider: 'opencode-go', role: 'lead-programmer / architect / backend / reviewer' },
-  { id: 'kimi-k3', name: 'Kimi K3 Code', provider: 'opencode-go', role: 'gameplay-programmer / engine / physics / ai' },
-  { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', provider: 'openrouter', role: 'producer / ui / level-designer / tester' },
-  { id: 'flux-1-schnell', name: 'FLUX 1 Schnell', provider: 'cloudflare-workers-ai', role: 'art-director / visual-artist' }
+  { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', provider: 'openrouter', role: 'Primary Executor (80-90% work: coding, UI, building, testing)' },
+  { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', provider: 'opencode-go', role: 'Architecture Guide & Code Reviewer (high-level spec & review)' },
+  { id: 'kimi-k3', name: 'Kimi K3 Code', provider: 'opencode-go', role: 'Physics & Engine Advisor (specialized math/physics guidance)' },
+  { id: 'flux-1-schnell', name: 'FLUX 1 Schnell', provider: 'cloudflare-workers-ai', role: 'Visual Asset & Art Director' }
 ]);
 
 export class ModelProviderRouter {
   constructor(options = {}) {
     this.opencodeApiKey = process.env.OPENCODE_GO_API_KEY || process.env.OPENCODE_API_KEY || options.opencodeApiKey;
     this.openrouterApiKey = process.env.OPENROUTER_API_KEY || options.openrouterApiKey;
-    this.defaultModel = options.defaultModel || 'deepseek-v4-pro';
+    this.defaultModel = options.defaultModel || 'deepseek-v4-flash';
   }
 
   getAvailableModels() {
