@@ -1,8 +1,10 @@
 {
-  "name": "@corez/cli",
+  "name": "@corez_ai/cli",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
     "corez": "./bin/corez.mjs"
   },
