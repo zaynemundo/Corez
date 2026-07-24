@@ -1,7 +1,7 @@
 ---
 description: Implements player movement, physics interactions, attacks, abilities, collision detection, health, and player states.
 mode: subagent
-model: opencode-go/kimi-k2.7-code
+model: opencode-go/kimi-k3
 temperature: 0.1
 
 permission:

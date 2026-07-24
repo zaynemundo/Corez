@@ -1,7 +1,7 @@
 ---
 description: Implements enemy behavior trees, finite state machines, pathing, attack patterns, difficulty scaling, and boss AI logic.
 mode: subagent
-model: opencode-go/kimi-k2.7-code
+model: opencode-go/kimi-k3
 temperature: 0.1
 
 permission:

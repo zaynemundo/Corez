@@ -6,6 +6,8 @@ const DEEPSEEK_V4_FLASH_MODEL = 'deepseek-v4-flash';
 const DEEPSEEK_V4_PRO_MODEL = 'deepseek-v4-pro';
 const KIMI_K3_MODEL = 'kimi-k3';
 const FLUX_MODEL = '@cf/black-forest-labs/flux-1-schnell';
+const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
+const DEEPSEEK_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
 
 function getTargetModels(intentType, hasMedia, prompt = '') {
   const isPhysics = /\b(physics|canvas|60fps|spatial|game loop|engine|collision|vector math)\b/i.test(prompt);

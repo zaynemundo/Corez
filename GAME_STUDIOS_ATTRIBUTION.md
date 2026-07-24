@@ -28,7 +28,7 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
 
 1. **Native OpenCode + OpenCode Go Models**:
    - All agents adapted to native `.opencode/agents/*.md`, `.opencode/skills/`, and `.opencode/commands/`.
-   - All AI models mapped strictly to `opencode-go/*` provider endpoints (`deepseek-v4-flash`, `deepseek-v4-pro`, `kimi-k2.7-code`, `mimo-v2.5`, `mimo-v2.5-pro`, `glm-5.2`, `grok-4.5`).
+   - All AI models mapped strictly to `opencode-go/*` provider endpoints (`deepseek-v4-flash`, `deepseek-v4-pro`, `kimi-k3`).
 
 2. **Game Complexity Sizing**:
    - `SMALL` games (Pong, Snake, Clicker): Minimal allocation (Producer, Game Designer, Gameplay Programmer, QA Tester).

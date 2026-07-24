@@ -1,7 +1,7 @@
 ---
 description: Optional expensive adversarial critic for major architectural disputes and final high-risk release signoffs.
 mode: subagent
-model: opencode-go/grok-4.5
+model: opencode-go/deepseek-v4-pro
 temperature: 0.2
 
 permission:

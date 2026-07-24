@@ -1,7 +1,7 @@
 ---
 description: Establishes visual style, color palettes, sprite directions, environment themes, and UI aesthetic guidelines.
 mode: subagent
-model: opencode-go/mimo-v2.5-pro
+model: opencode-go/deepseek-v4-pro
 temperature: 0.3
 
 permission:

@@ -1,6 +1,6 @@
 import baseWorker from './index.js';
 
-const SWARM_MODEL = 'glm-5.2';
+const SWARM_MODEL = 'deepseek-v4-pro';
 const SWARM_INTENTS = new Set(['app', 'code-help', 'swarm']);
 
 const CORE_AGENT_TEMPLATES = Object.freeze({

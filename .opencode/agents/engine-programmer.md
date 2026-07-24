@@ -1,7 +1,7 @@
 ---
 description: Implements core game loop, requestAnimationFrame timing, rendering pipeline, entity management, physics system, and audio systems.
 mode: subagent
-model: opencode-go/kimi-k2.7-code
+model: opencode-go/kimi-k3
 temperature: 0.1
 
 permission:
