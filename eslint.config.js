@@ -7,7 +7,7 @@ export default [
   },
   js.configs.recommended,
   {
-    files: ['src/**/*.{js,jsx}', 'api/**/*.js', 'scripts/**/*.mjs', 'vite.config.js', 'tests/**/*.{js,jsx}', 'scratch/**/*.cjs'],
+    files: ['src/**/*.{js,jsx}', 'packages/**/*.{js,mjs}', 'api/**/*.js', 'scripts/**/*.mjs', 'vite.config.js', 'tests/**/*.{js,jsx,mjs}', 'scratch/**/*.cjs'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
@@ -22,7 +22,7 @@ export default [
       }
     },
     rules: {
-      'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }]
+      'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }]
     }
   },
   {

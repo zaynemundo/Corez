@@ -1,0 +1,13 @@
+{
+  "name": "@corez/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "corez": "./bin/corez.mjs"
+  },
+  "main": "./src/index.js",
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

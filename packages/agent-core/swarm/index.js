@@ -1,0 +1,146 @@
+export { 
+  TaskDependencyGraph, 
+  ResourceLockManager, 
+  SharedProjectState, 
+  AGENT_LIFECYCLE_STATES 
+} from '../../../src/services/gamePipeline/swarm/taskGraph.js';
+
+export { AdaptiveConcurrencyQueue } from '../../../src/services/gamePipeline/swarm/adaptiveQueue.js';
+
+import { TaskDependencyGraph, AGENT_LIFECYCLE_STATES } from '../../../src/services/gamePipeline/swarm/taskGraph.js';
+import { AdaptiveConcurrencyQueue } from '../../../src/services/gamePipeline/swarm/adaptiveQueue.js';
+
+export const SWARM_ROLES = Object.freeze({
+  ORCHESTRATOR: 'orchestrator',
+  EXPLORER: 'explorer',
+  ARCHITECT: 'architect',
+  FRONTEND: 'frontend',
+  BACKEND: 'backend',
+  DEBUGGER: 'debugger',
+  TESTER: 'tester',
+  REVIEWER: 'reviewer',
+  SECURITY: 'security',
+  INTEGRATION: 'integration'
+});
+
+export class GenericSwarmOrchestrator {
+  constructor(options = {}) {
+    this.providerRouter = options.providerRouter;
+    this.contextEngine = options.contextEngine;
+    this.toolRegistry = options.toolRegistry;
+    this.queue = new AdaptiveConcurrencyQueue(options.queueOptions);
+  }
+
+  async executeSwarmJob(userPrompt, options = {}) {
+    const projectId = options.projectId || `swarm_${Date.now()}`;
+    const graph = new TaskDependencyGraph(projectId);
+    const onStatus = options.onStatus || (() => {});
+
+    onStatus({ step: 'decomposing', message: `Decomposing swarm task: "${userPrompt}"` });
+
+    // 1. Initial Orchestrator Step: Decompose task into DAG
+    const defaultTasks = [
+      {
+        taskId: 'task-explore',
+        role: SWARM_ROLES.EXPLORER,
+        objective: 'Inspect workspace structure, files, dependencies, and git state',
+        dependencies: [],
+        ownedResources: ['context/workspace.json']
+      },
+      {
+        taskId: 'task-architect',
+        role: SWARM_ROLES.ARCHITECT,
+        objective: 'Design overall implementation strategy and module interfaces',
+        dependencies: ['task-explore'],
+        ownedResources: ['spec/architecture.json']
+      },
+      {
+        taskId: 'task-frontend',
+        role: SWARM_ROLES.FRONTEND,
+        objective: 'Implement client UI components and responsive views',
+        dependencies: ['task-architect'],
+        ownedResources: ['src/components/']
+      },
+      {
+        taskId: 'task-backend',
+        role: SWARM_ROLES.BACKEND,
+        objective: 'Implement server endpoints, state handling, and backend logic',
+        dependencies: ['task-architect'],
+        ownedResources: ['src/services/']
+      },
+      {
+        taskId: 'task-test',
+        role: SWARM_ROLES.TESTER,
+        objective: 'Verify implementation with automated unit tests and linter',
+        dependencies: ['task-frontend', 'task-backend'],
+        ownedResources: ['tests/']
+      },
+      {
+        taskId: 'task-review',
+        role: SWARM_ROLES.REVIEWER,
+        objective: 'Review diffs for security, correctness, and maintainability',
+        dependencies: ['task-test'],
+        ownedResources: ['artifacts/review.json']
+      }
+    ];
+
+    for (const t of defaultTasks) {
+      graph.addTask(t);
+    }
+
+    const completedResults = [];
+
+    // 2. Process DAG tasks using Adaptive Concurrency Queue
+    while (!graph.isSwarmComplete()) {
+      const readyTasks = graph.getReadyTasks();
+      if (readyTasks.length === 0) {
+        const anyRunningOrQueued = Array.from(graph.tasks.values()).some(
+          t => t.status === AGENT_LIFECYCLE_STATES.RUNNING || t.status === AGENT_LIFECYCLE_STATES.QUEUED
+        );
+        if (!anyRunningOrQueued) break;
+        await new Promise(r => setTimeout(r, 50));
+        continue;
+      }
+
+      const executions = readyTasks.map(task => {
+        task.status = AGENT_LIFECYCLE_STATES.RUNNING;
+        onStatus({ step: 'agent_start', role: task.role, taskId: task.taskId, objective: task.objective });
+
+        return this.queue.enqueue(async () => {
+          const result = await this.runSingleAgentTask(graph, task, userPrompt, options);
+          task.status = AGENT_LIFECYCLE_STATES.COMPLETED;
+          graph.projectState.commitTaskOutput(task.agentId, task.taskId, result);
+          completedResults.push({ task, result });
+          onStatus({ step: 'agent_complete', role: task.role, taskId: task.taskId });
+          return result;
+        }, { taskId: task.taskId, role: task.role });
+      });
+
+      await Promise.allSettled(executions);
+    }
+
+    return {
+      projectId,
+      completed: true,
+      tasksCount: graph.tasks.size,
+      results: completedResults
+    };
+  }
+
+  async runSingleAgentTask(graph, task, userPrompt, options) {
+    if (options.mockExecution) {
+      return { status: 'success', role: task.role, output: `Completed objective: ${task.objective}` };
+    }
+
+    if (this.providerRouter) {
+      const messages = [
+        { role: 'system', content: `You are the CoreZ ${task.role} agent.` },
+        { role: 'user', content: `Task: ${task.objective}\nJob: ${userPrompt}` }
+      ];
+      const res = await this.providerRouter.generate({ messages, signal: options.signal });
+      return { status: 'success', role: task.role, output: res.content };
+    }
+
+    return { status: 'success', role: task.role, output: `Finished ${task.objective}` };
+  }
+}

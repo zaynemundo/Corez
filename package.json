@@ -6,10 +6,15 @@
   "engines": {
     "node": ">=22.0.0"
   },
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "test": "vitest run",
+    "test:cli": "vitest run tests/cli",
+    "dev:cli": "node packages/cli/bin/corez.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "train:intents": "node scripts/train-intents.mjs",
