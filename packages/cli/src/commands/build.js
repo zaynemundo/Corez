@@ -26,10 +26,16 @@ export async function handleBuildCommand(prompt, options = {}, ui) {
       }
     });
 
-    ui.divider();
+    ui.brief({
+      task: prompt,
+      model: runtime.config.model,
+      stepsCount: result.stepsCount,
+      inspectedFiles: result.inspectedFiles,
+      modifiedFiles: result.modifiedFiles
+    });
+
     ui.success('CoreZ Autonomous Build Complete:');
     console.log(`\n${result.response}\n`);
-    ui.status('✓', `Modified Files: ${result.modifiedFiles.length > 0 ? result.modifiedFiles.join(', ') : 'None'}`);
   } catch (err) {
     ui.error(err.message);
   }

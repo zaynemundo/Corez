@@ -63,6 +63,14 @@ export async function handleChatCommand(options = {}, ui) {
           }
         });
 
+        ui.brief({
+          task: trimmed,
+          model: runtime.config.model,
+          stepsCount: result.stepsCount,
+          inspectedFiles: result.inspectedFiles,
+          modifiedFiles: result.modifiedFiles
+        });
+
         console.log(`\n${result.response}\n`);
       } catch (err) {
         ui.error(err.message);

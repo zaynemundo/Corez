@@ -139,8 +139,15 @@ export async function runCli(argv = process.argv.slice(2), options = {}) {
           }
         });
 
-        ui.divider();
-        ui.success('CoreZ Task Result:');
+        ui.brief({
+          task: prompt,
+          model: runtime.config.model,
+          stepsCount: result.stepsCount,
+          inspectedFiles: result.inspectedFiles,
+          modifiedFiles: result.modifiedFiles
+        });
+
+        ui.success('CoreZ Task Execution Result:');
         console.log(`\n${result.response}\n`);
       } catch (err) {
         ui.error(err.message);

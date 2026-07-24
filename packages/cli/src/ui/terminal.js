@@ -57,4 +57,23 @@ export class TerminalUI {
   divider() {
     console.log(`${styles.dim}──────────────────────────────────────────────────${styles.reset}`);
   }
+
+  brief(summary = {}) {
+    console.log(`\n${styles.bold}${styles.cyan}📋 POST-CODING EXECUTIVE BRIEF & SUMMARY${styles.reset}`);
+    this.divider();
+    if (summary.task) console.log(`${styles.dim}Task Prompt   ${styles.reset} : ${styles.bold}${summary.task}${styles.reset}`);
+    if (summary.model) console.log(`${styles.dim}Model Used    ${styles.reset} : ${styles.cyan}${summary.model}${styles.reset}`);
+    if (summary.stepsCount) console.log(`${styles.dim}Steps Executed ${styles.reset}: ${summary.stepsCount}`);
+    if (summary.inspectedFiles && summary.inspectedFiles.length > 0) {
+      console.log(`${styles.dim}Inspected     ${styles.reset} : ${summary.inspectedFiles.length} file(s) (${summary.inspectedFiles.slice(0, 4).join(', ')}${summary.inspectedFiles.length > 4 ? '...' : ''})`);
+    }
+    if (summary.modifiedFiles !== undefined) {
+      const modCount = summary.modifiedFiles.length;
+      const modText = modCount > 0 
+        ? `${styles.green}${modCount} file(s) modified (${summary.modifiedFiles.join(', ')})${styles.reset}` 
+        : `${styles.dim}None (Read-Only / No mutations)${styles.reset}`;
+      console.log(`${styles.dim}Files Modified${styles.reset} : ${modText}`);
+    }
+    this.divider();
+  }
 }
