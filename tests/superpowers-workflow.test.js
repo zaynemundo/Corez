@@ -167,7 +167,7 @@ describe('CoreZ Superpowers Integration', () => {
       
       // Mock runVerificationPass to return syntax error on first pass then exitCode 0
       let attempts = 0;
-      engine.runVerificationPass = async (_prompt, outputs) => {
+      engine.runVerificationPass = async (_prompt, _outputs) => {
         attempts++;
         if (attempts === 1) {
           return { exitCode: 1, passed: 0, failed: 1, syntaxErrors: ['Task task-core-ui: Potential unbalanced braces'] };

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { detectAwwwardsCategory, buildAwwwardsDesignPrompt, AWWWARDS_CATEGORIES } from '../../packages/agent-core/index.js';
+import { detectAwwwardsCategory, buildAwwwardsDesignPrompt } from '../../packages/agent-core/index.js';
 
 describe('Awwwards Category-Aware Design Router', () => {
   it('detects e-commerce category from prompt', () => {

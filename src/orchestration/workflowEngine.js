@@ -253,7 +253,7 @@ Return ONLY JSON: {"passed": true, "findings": []}`;
     return repaired;
   }
 
-  async runVerificationRepairPass(outputs, verificationRecord, options = {}) {
+  async runVerificationRepairPass(outputs, verificationRecord, _options = {}) {
     const repaired = { ...outputs };
     const syntaxLogs = (verificationRecord.syntaxErrors || []).join('\n');
     

@@ -14,7 +14,8 @@ import { classifyIntent } from './intentClassifier.js';
 import { parseMarketIntent } from './marketIntent.js';
 import { fetchMarketData, unavailableMarket } from './marketService.js';
 import { process as processPromptIntelligence, toLegacyIntentType, classifyIntent as classifyIntentNew } from './promptIntelligence/index.js';
-import { buildAwwwardsDesignPrompt } from '../../packages/agent-core/index.js';
+import { buildAwwwardsDesignPrompt } from '../../packages/agent-core/context/designTokens.js';
+import { resolveSkills } from '../skills/resolver.js';
 
 export const PUBLIC_USER_INTENT_PROMPT = `
 Analyze the public user intent behind the request. Corez delegates vision, art direction, UI layout, and game design/SVG creation to MiMo V2.5, and uses FLUX 1 for free background generation and image rendering.
@@ -549,12 +550,18 @@ export async function generateHostedAIResponse(
     prompt = improveCodingPrompt(prompt, intent);
   }
 
+  const resolvedSkills = resolveSkills({
+    intent: intent?.type || 'general',
+    prompt,
+    registry: defaultSkillRegistry
+  });
+
   const fetchOptions = {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ prompt, intent, messages: history })
+    body: JSON.stringify({ prompt, intent, messages: history, skills: resolvedSkills })
   };
   if (signal) fetchOptions.signal = signal;
 

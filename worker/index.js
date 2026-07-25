@@ -3,14 +3,11 @@ import { handleMarket } from './market.js';
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 const OPENCODE_DEFAULT_ENDPOINT = 'https://opencode.ai/zen/go/v1/chat/completions';
 const DEEPSEEK_V4_FLASH_MODEL = 'deepseek-v4-flash';
-const DEEPSEEK_V4_PRO_MODEL = 'deepseek-v4-pro';
-const KIMI_K3_MODEL = 'kimi-k3';
 const FLUX_MODEL = '@cf/black-forest-labs/flux-1-schnell';
 const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
 const DEEPSEEK_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
 
-function getTargetModels(intentType, hasMedia, prompt = '') {
-  // DeepSeek V4 Flash is the primary cost-optimized executor for all requests
+function getTargetModels() {
   return [DEEPSEEK_V4_FLASH_MODEL];
 }
 
@@ -53,7 +50,7 @@ function safeErrorDetail(error) {
     .slice(0, 500);
 }
 
-function buildSystemPrompt(intent) {
+function buildSystemPrompt(intent, skills = []) {
   const intentSummary = intent?.summary
     || 'Understand the public user goal and give a useful next step.';
   const intentType = normalizeIntentType(intent?.type);
@@ -126,6 +123,8 @@ Guidelines for Output:
 - If the user asks to generate, create, or modify an image, you MUST output ONLY a tag in the exact format [IMAGE_PROMPT: <full detailed prompt for image generation>] and nothing else (which triggers FLUX 1 for free background/image rendering).
 ${adaptiveInstructions}
 
+Active Superpowers:${skills.length > 0 ? skills.map(s => `\n- ${s.id}: ${s.description}`).join('') : '\n- (none — direct response suitable)'}
+
 Inferred intent: ${intentType} - ${intentSummary}`;
 }
 
@@ -156,22 +155,17 @@ async function handleAi(request, env) {
     ? body.intent
     : null;
 
+  const skills = Array.isArray(body.skills) ? body.skills : [];
+
   const messages = Array.isArray(body.messages) ? body.messages : [];
+  const systemPrompt = buildSystemPrompt(intent, skills);
   const apiMessages = [
-    { role: 'system', content: buildSystemPrompt(intent) }
+    { role: 'system', content: systemPrompt }
   ];
 
   let hasAppendedPrompt = false;
-  let hasMedia = false;
   for (const m of messages) {
     if (m.role && m.content) {
-      if (Array.isArray(m.content)) {
-        for (const item of m.content) {
-          if (item.type === 'image_url' || item.type === 'audio_url' || item.type === 'video_url') {
-            hasMedia = true;
-          }
-        }
-      }
       apiMessages.push({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content });
       if (typeof m.content === 'string' && m.content === prompt && m.role === 'user') {
         hasAppendedPrompt = true;
@@ -184,7 +178,7 @@ async function handleAi(request, env) {
   }
 
   // 1. Try OpenCode Go API if OPENCODE_GO_API_KEY / OPENCODE_API_KEY is configured
-  let targetModels = getTargetModels(intent?.type || 'general', hasMedia, prompt);
+  let targetModels = getTargetModels();
   if (body.model && typeof body.model === 'string' && body.model.trim()) {
     const customModel = body.model.trim();
     targetModels = [customModel, ...targetModels.filter(m => m !== customModel)];
@@ -657,7 +651,7 @@ async function handleR2Apps(request, env) {
                 updatedAt: data.updatedAt,
                 url: `/api/apps/${sessionId}/${data.appId}`
               });
-            } catch {}
+            } catch { /* ignore invalid cache entries */ }
           }
         }
       }

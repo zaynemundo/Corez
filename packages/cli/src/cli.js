@@ -117,7 +117,6 @@ function printCommands(title, commands) {
   console.log(`\n${styles.bold}${title}${styles.reset}`);
   for (const [name, alias, desc] of commands) {
     const aliasStr = alias ? styles.dim + ` (${alias})` : '';
-    const padded = (name + (alias ? ` (${alias})` : '')).padEnd(24);
     console.log(`  ${styles.cyan}${name}${aliasStr}${styles.reset}  ${desc}`);
   }
 }

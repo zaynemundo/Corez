@@ -240,8 +240,15 @@ export default function App() {
     return () => window.removeEventListener('keydown', closeSidebarWithEscape);
   }, [isMobileViewport, sidebarOpen]);
 
+  const saveTimeoutRef = useRef(null);
   useEffect(() => {
-    localStorage.setItem('corez_sessions', JSON.stringify(sessions));
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      localStorage.setItem('corez_sessions', JSON.stringify(sessions));
+    }, 300);
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
   }, [sessions]);
 
   useEffect(() => {
