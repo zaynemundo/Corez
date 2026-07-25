@@ -128,9 +128,9 @@ export default function Navbar() {
     `;
 
     const formatted = formatCodeForPreview(threeCode);
-    expect(formatted).toContain('const Canvas =');
-    expect(formatted).toContain('const CanvasStub =');
-    expect(formatted).toContain('const useFrame =');
+    expect(formatted).toContain('var Canvas =');
+    expect(formatted).toContain('var CanvasStub =');
+    expect(formatted).toContain('var useFrame =');
     expect(formatted).not.toContain("import { Canvas, useFrame } from '@react-three/fiber'");
   });
 });

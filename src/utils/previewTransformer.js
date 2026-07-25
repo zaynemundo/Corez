@@ -30,7 +30,7 @@ export function formatCodeForPreview(rawCode) {
       const componentMatches = match.match(/\{([\s\S]*?)\}/);
       if (componentMatches && componentMatches[1]) {
         const comps = componentMatches[1].split(',').map(c => c.trim().split(/\s+as\s+/)[0]).filter(Boolean);
-        return comps.map(comp => `const ${comp} = typeof ${comp} !== 'undefined' ? ${comp} : (window.__3D_STUBS__?.['${comp}'] || CanvasStub);`).join('\n');
+        return comps.map(comp => `var ${comp} = window.__3D_STUBS__?.['${comp}'] || CanvasStub;`).join('\n');
       }
     }
     return '';
@@ -126,7 +126,7 @@ export function formatCodeForPreview(rawCode) {
     const { useState, useEffect, useRef, useMemo, useCallback, useReducer, useContext, createContext } = React;
 
     // Fallback Canvas & 3D Graphics Component Stubs
-    const CanvasStub = ({ children, className = '', style = {}, ...props }) => {
+    var CanvasStub = ({ children, className = '', style = {}, ...props }) => {
       const canvasRef = React.useRef(null);
       React.useEffect(() => {
         const canvas = canvasRef.current;
@@ -153,8 +153,8 @@ export function formatCodeForPreview(rawCode) {
       );
     };
 
-    const Canvas = CanvasStub;
-    const useFrame = (cb) => {
+    var Canvas = CanvasStub;
+    var useFrame = (cb) => {
       React.useEffect(() => {
         let id;
         const loop = (t) => {
@@ -165,16 +165,16 @@ export function formatCodeForPreview(rawCode) {
         return () => cancelAnimationFrame(id);
       }, [cb]);
     };
-    const OrbitControls = () => null;
-    const useThree = () => ({ camera: { position: [0, 0, 5] }, scene: {}, gl: {}, size: { width: 800, height: 600 } });
-    const Float = ({ children }) => <div className="animate-pulse">{children}</div>;
-    const Html = ({ children, className = '' }) => <div className="absolute">{children}</div>;
-    const Text = ({ children, fontSize = 16, color = '#fff' }) => <span style={{ fontSize, color }}>{children}</span>;
+    var OrbitControls = () => null;
+    var useThree = () => ({ camera: { position: [0, 0, 5] }, scene: {}, gl: {}, size: { width: 800, height: 600 } });
+    var Float = ({ children }) => <div className="animate-pulse">{children}</div>;
+    var Html = ({ children, className = '' }) => <div className="absolute">{children}</div>;
+    var Text = ({ children, fontSize = 16, color = '#fff' }) => <span style={{ fontSize, color }}>{children}</span>;
 
     window.__3D_STUBS__ = { Canvas: CanvasStub, useFrame, OrbitControls, useThree, Float, Html, Text };
 
     // Fallback Icon Component for lucide-react imports
-    const LucideStub = ({ size = 20, className = '', children, ...props }) => (
+    var LucideStub = ({ size = 20, className = '', children, ...props }) => (
       <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
         <circle cx="12" cy="12" r="10" />
       </svg>
