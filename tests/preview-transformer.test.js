@@ -212,4 +212,28 @@ export default function Navbar() {
     expect(formatted).toContain('mockDomElement');
     expect(formatted).toContain('gl: mockGl');
   });
+
+  it('wraps vanilla HTML, CSS, and JS snippets into a runnable HTML preview document', () => {
+    const vanillaCode = `
+      <style>
+        .box { background: purple; color: white; padding: 20px; }
+      </style>
+      <div class="box">
+        <h1 id="title">Vanilla App</h1>
+        <button id="btn">Click me</button>
+      </div>
+      <script>
+        document.getElementById('btn').addEventListener('click', () => {
+          document.getElementById('title').textContent = 'Clicked!';
+        });
+      </script>
+    `;
+
+    const formatted = formatCodeForPreview(vanillaCode);
+    expect(formatted).toContain('<!DOCTYPE html>');
+    expect(formatted).toContain('tailwindcss.com');
+    expect(formatted).toContain('<div class="box">');
+    expect(formatted).toContain('Clicked!');
+    expect(formatted).not.toContain('react.production.min.js');
+  });
 });

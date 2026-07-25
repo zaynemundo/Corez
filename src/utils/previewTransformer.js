@@ -11,7 +11,42 @@ export function formatCodeForPreview(rawCode) {
     return trimmed;
   }
 
-  // 2. Prepare JSX / React code for browser standalone Babel compilation
+  // 2. If it's pure HTML/CSS/JS without React/JSX syntax, wrap into a clean preview HTML document
+  const isReactJsx = /export\s+default|export\s+(?:const|let|var|function|class)|import\s+React|React\.|className\s*=|useState\s*\(|useEffect\s*\(|useRef\s*\(|useMemo\s*\(|useCallback\s*\(|useReducer\s*\(|useContext\s*\(|createContext\s*\(|onClick\s*=\s*\{|onChange\s*=\s*\{/i.test(trimmed);
+
+  if (!isReactJsx && (/<[a-z0-9-]+[\s>]/i.test(trimmed) || /<style[\s>]/i.test(trimmed) || /<script[\s>]/i.test(trimmed) || /document\.get|document\.query|window\.add/i.test(trimmed))) {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Corez Live Preview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; padding: 0; background: #09090b; color: #f4f4f5; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; min-height: 100vh; }
+  </style>
+  <script>
+    window.onerror = function(msg, url, lineNo, columnNo, error) {
+      var root = document.body;
+      if (root && (!root.innerHTML || root.innerHTML.trim() === '')) {
+        root.innerHTML = '<div style="padding: 2rem; background: #18181b; color: #f87171; font-family: monospace; border-radius: 12px; margin: 2rem; border: 1px solid #ef444433;">' +
+          '<h3 style="margin-top:0; color:#ef4444; font-size:1.1rem;">Preview Execution Error</h3>' +
+          '<p style="color:#e4e4e7; font-size:0.9rem; white-space:pre-wrap;">' + String(msg || error) + '</p>' +
+          '</div>';
+      }
+      return false;
+    };
+    window.addEventListener('mousedown', function() { window.focus(); });
+  </script>
+</head>
+<body>
+  ${trimmed}
+</body>
+</html>`;
+  }
+
+  // 3. Prepare JSX / React code for browser standalone Babel compilation
   let processed = rawCode;
 
   // Clean file comment headers like `// App.tsx` or `// components/layout/Navbar.tsx`

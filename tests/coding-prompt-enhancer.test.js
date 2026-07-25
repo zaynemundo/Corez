@@ -20,6 +20,15 @@ describe('Coding Prompt Enhancer', () => {
     expect(enhanced).toContain('Systematically inspect the root cause');
   });
 
+  it('enhances prompts requesting explicit HTML/CSS/JS with HTML specification', () => {
+    const raw = 'Build a responsive calculator in plain HTML and CSS';
+    const enhanced = improveCodingPrompt(raw, { type: 'app' });
+
+    expect(enhanced).toContain(raw);
+    expect(enhanced).toContain('[SINGLE-FILE HTML/CSS/JS SPECIFICATION]');
+    expect(enhanced).toContain('Output complete, clean HTML/CSS/JS code');
+  });
+
   it('leaves non-coding prompts (writing/explanation/general) intact', () => {
     const raw = 'Explain edge computing in simple words';
     const enhanced = improveCodingPrompt(raw, { type: 'explanation' });

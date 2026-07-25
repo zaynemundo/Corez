@@ -500,6 +500,18 @@ export function improveCodingPrompt(prompt, intent = null) {
   }
 
   if (intentType === 'app' || INTENT_PATTERNS.app.test(cleanPrompt)) {
+    const isExplicitNonJsx = /\b(html\b|css\b|vanilla|plain html|pure html|html\/css|raw html|html\s*\+\s*css|vanilla js)\b/i.test(cleanPrompt);
+
+    if (isExplicitNonJsx) {
+      return `${cleanPrompt}
+
+[SINGLE-FILE HTML/CSS/JS SPECIFICATION]:
+- ALWAYS begin your response with a clear, detailed overview explaining the features, layout, and styling choices!
+- Output complete, clean HTML/CSS/JS code inside ONE SINGLE \`\`\`html ... \`\`\` code block including inline \`<style>\` and \`<script>\` tags.
+- Build a complete, responsive, standalone experience ready for the preview canvas.
+- ALWAYS end your response with a step-by-step user guide and feature summary after the code block! Never output ONLY a bare code block.`;
+    }
+
     return `${cleanPrompt}
 
 [SINGLE-FILE REACT SPECIFICATION]:
