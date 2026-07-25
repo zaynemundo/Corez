@@ -175,4 +175,21 @@ export default function Navbar() {
     expect(formatted).toContain('var Scene =');
     expect(formatted).toContain('var WebGLRenderer =');
   });
+
+  it('handles class constructors invoked both with and without new without throwing TypeError', () => {
+    const code = `
+      import React, { useEffect } from 'react';
+      export default function Game3D() {
+        useEffect(() => {
+          const cam1 = new PerspectiveCamera(75, 1, 0.1, 1000);
+          const cam2 = PerspectiveCamera(75, 1, 0.1, 1000); // without new!
+          return () => {};
+        }, []);
+        return <div>Constructor Test</div>;
+      }
+    `;
+
+    const formatted = formatCodeForPreview(code);
+    expect(formatted).toContain('makeSafeClass');
+  });
 });

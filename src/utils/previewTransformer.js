@@ -166,29 +166,49 @@ export function formatCodeForPreview(rawCode) {
     window.__THREE_STUB__ = ThreeStub;
     var THREE = window.THREE || ThreeStub;
 
-    var PerspectiveCamera = (window.THREE && window.THREE.PerspectiveCamera) || ThreeStub.PerspectiveCamera;
-    var OrthographicCamera = (window.THREE && window.THREE.OrthographicCamera) || ThreeStub.OrthographicCamera;
-    var Scene = (window.THREE && window.THREE.Scene) || ThreeStub.Scene;
-    var WebGLRenderer = (window.THREE && window.THREE.WebGLRenderer) || ThreeStub.WebGLRenderer;
-    var Vector3 = (window.THREE && window.THREE.Vector3) || ThreeStub.Vector3;
-    var Vector2 = (window.THREE && window.THREE.Vector2) || ThreeStub.Vector2;
-    var Color = (window.THREE && window.THREE.Color) || ThreeStub.Color;
-    var Mesh = (window.THREE && window.THREE.Mesh) || ThreeStub.Mesh;
-    var Group = (window.THREE && window.THREE.Group) || ThreeStub.Group;
-    var BoxGeometry = (window.THREE && window.THREE.BoxGeometry) || ThreeStub.BoxGeometry;
-    var PlaneGeometry = (window.THREE && window.THREE.PlaneGeometry) || ThreeStub.PlaneGeometry;
-    var SphereGeometry = (window.THREE && window.THREE.SphereGeometry) || ThreeStub.SphereGeometry;
-    var CylinderGeometry = (window.THREE && window.THREE.CylinderGeometry) || ThreeStub.CylinderGeometry;
-    var MeshStandardMaterial = (window.THREE && window.THREE.MeshStandardMaterial) || ThreeStub.MeshStandardMaterial;
-    var MeshBasicMaterial = (window.THREE && window.THREE.MeshBasicMaterial) || ThreeStub.MeshBasicMaterial;
-    var AmbientLight = (window.THREE && window.THREE.AmbientLight) || ThreeStub.AmbientLight;
-    var DirectionalLight = (window.THREE && window.THREE.DirectionalLight) || ThreeStub.DirectionalLight;
-    var PointLight = (window.THREE && window.THREE.PointLight) || ThreeStub.PointLight;
-    var SpotLight = (window.THREE && window.THREE.SpotLight) || ThreeStub.SpotLight;
-    var Raycaster = (window.THREE && window.THREE.Raycaster) || ThreeStub.Raycaster;
-    var Clock = (window.THREE && window.THREE.Clock) || ThreeStub.Clock;
-    var Fog = (window.THREE && window.THREE.Fog) || ThreeStub.Fog;
-    var FogExp2 = (window.THREE && window.THREE.FogExp2) || ThreeStub.FogExp2;
+    function makeSafeClass(className, fallback) {
+      var RealClass = (window.THREE && window.THREE[className]) || fallback;
+      var SafeWrapper = function() {
+        var args = Array.prototype.slice.call(arguments);
+        try {
+          return Reflect.construct(RealClass, args, new.target || SafeWrapper);
+        } catch (e) {
+          try {
+            return new RealClass(...args);
+          } catch (e2) {
+            return {};
+          }
+        }
+      };
+      if (RealClass && RealClass.prototype) {
+        SafeWrapper.prototype = RealClass.prototype;
+      }
+      return SafeWrapper;
+    }
+
+    var PerspectiveCamera = makeSafeClass('PerspectiveCamera', ThreeStub.PerspectiveCamera);
+    var OrthographicCamera = makeSafeClass('OrthographicCamera', ThreeStub.OrthographicCamera);
+    var Scene = makeSafeClass('Scene', ThreeStub.Scene);
+    var WebGLRenderer = makeSafeClass('WebGLRenderer', ThreeStub.WebGLRenderer);
+    var Vector3 = makeSafeClass('Vector3', ThreeStub.Vector3);
+    var Vector2 = makeSafeClass('Vector2', ThreeStub.Vector2);
+    var Color = makeSafeClass('Color', ThreeStub.Color);
+    var Mesh = makeSafeClass('Mesh', ThreeStub.Mesh);
+    var Group = makeSafeClass('Group', ThreeStub.Group);
+    var BoxGeometry = makeSafeClass('BoxGeometry', ThreeStub.BoxGeometry);
+    var PlaneGeometry = makeSafeClass('PlaneGeometry', ThreeStub.PlaneGeometry);
+    var SphereGeometry = makeSafeClass('SphereGeometry', ThreeStub.SphereGeometry);
+    var CylinderGeometry = makeSafeClass('CylinderGeometry', ThreeStub.CylinderGeometry);
+    var MeshStandardMaterial = makeSafeClass('MeshStandardMaterial', ThreeStub.MeshStandardMaterial);
+    var MeshBasicMaterial = makeSafeClass('MeshBasicMaterial', ThreeStub.MeshBasicMaterial);
+    var AmbientLight = makeSafeClass('AmbientLight', ThreeStub.AmbientLight);
+    var DirectionalLight = makeSafeClass('DirectionalLight', ThreeStub.DirectionalLight);
+    var PointLight = makeSafeClass('PointLight', ThreeStub.PointLight);
+    var SpotLight = makeSafeClass('SpotLight', ThreeStub.SpotLight);
+    var Raycaster = makeSafeClass('Raycaster', ThreeStub.Raycaster);
+    var Clock = makeSafeClass('Clock', ThreeStub.Clock);
+    var Fog = makeSafeClass('Fog', ThreeStub.Fog);
+    var FogExp2 = makeSafeClass('FogExp2', ThreeStub.FogExp2);
 
     // Fallback Canvas & 3D Graphics Component Stubs
     var CanvasStub = ({ children, className = '', style = {}, ...props }) => {
