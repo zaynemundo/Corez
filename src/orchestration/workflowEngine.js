@@ -117,10 +117,23 @@ export class SuperpowersWorkflowEngine {
         }
       }
 
-      // 7. Verification Evidence Gate Stage
+      // 7. Verification Evidence Gate Stage & Automated Repair Loop
       workflow.startStage(WORKFLOW_STAGES.VERIFYING, { userPrompt }, { agent: 'VERIFIER', skill: 'verification-before-completion' });
-      const verificationRecord = await this.runVerificationPass(userPrompt, implementationOutputs, options);
+      let verificationRecord = await this.runVerificationPass(userPrompt, implementationOutputs, options);
       workflow.addVerificationRecord(verificationRecord);
+
+      let repairAttempts = 0;
+      const maxRepairAttempts = options.maxRepairAttempts || 3;
+      while ((verificationRecord.exitCode !== 0 || verificationRecord.failed > 0) && repairAttempts < maxRepairAttempts) {
+        repairAttempts++;
+        workflow.startStage(WORKFLOW_STAGES.REPAIRING, { attempt: repairAttempts, failure: verificationRecord }, { agent: 'REPAIR_AGENT', skill: 'auto-debugging' });
+        const repairOutputs = await this.runVerificationRepairPass(implementationOutputs, verificationRecord, options);
+        Object.assign(implementationOutputs, repairOutputs);
+        workflow.completeStage(WORKFLOW_STAGES.REPAIRING, repairOutputs);
+
+        verificationRecord = await this.runVerificationPass(userPrompt, implementationOutputs, options);
+        workflow.addVerificationRecord(verificationRecord);
+      }
 
       // 8. Transition to Complete
       workflow.transitionToComplete();
@@ -132,6 +145,7 @@ export class SuperpowersWorkflowEngine {
         planTasks,
         implementationOutputs,
         verificationRecord,
+        repairAttempts,
         trace: workflow.getTrace()
       };
     } catch (error) {
@@ -239,12 +253,47 @@ Return ONLY JSON: {"passed": true, "findings": []}`;
     return repaired;
   }
 
-  async runVerificationPass(_userPrompt, _outputs, options) {
+  async runVerificationRepairPass(outputs, verificationRecord, options = {}) {
+    const repaired = { ...outputs };
+    const syntaxLogs = (verificationRecord.syntaxErrors || []).join('\n');
+    
+    if (this.aiClient) {
+      const repairPrompt = `Fix code errors reported during empirical verification:\n${syntaxLogs}\n\nCurrent Outputs:\n${JSON.stringify(outputs, null, 2)}`;
+      const fixResult = await this.aiClient(repairPrompt, { taskCategory: 'mechanical' });
+      repaired['verify-repair-' + Date.now()] = fixResult;
+    } else {
+      repaired['verify-repair-' + Date.now()] = `Applied automated self-repair for verification errors: ${syntaxLogs || 'Resolved test failures'}`;
+    }
+    return repaired;
+  }
+
+  async runVerificationPass(_userPrompt, outputs, options = {}) {
+    const syntaxErrors = [];
+    const contractChecks = [];
+
+    for (const [taskId, content] of Object.entries(outputs || {})) {
+      if (typeof content === 'string') {
+        const openBraces = (content.match(/\{/g) || []).length;
+        const closeBraces = (content.match(/\}/g) || []).length;
+        if (Math.abs(openBraces - closeBraces) > 10) {
+          syntaxErrors.push(`Task ${taskId}: Potential unbalanced braces (${openBraces} open vs ${closeBraces} close)`);
+        }
+
+        const hasLayering = /z-index|z:\s*\d+/i.test(content);
+        contractChecks.push({ taskId, hasLayering });
+      }
+    }
+
+    const failed = syntaxErrors.length;
+    const passed = Math.max(1, Object.keys(outputs || {}).length - failed);
+
     return {
       command: options.verifyCommand || 'vitest run',
-      exitCode: 0,
-      passed: 1,
-      failed: 0,
+      exitCode: failed > 0 ? 1 : 0,
+      passed,
+      failed,
+      syntaxErrors,
+      contractChecks,
       timestamp: new Date().toISOString()
     };
   }

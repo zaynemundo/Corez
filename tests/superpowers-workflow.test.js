@@ -161,6 +161,25 @@ describe('CoreZ Superpowers Integration', () => {
       expect(result.trace.resolvedSkills.length).toBeGreaterThan(0);
       expect(result.trace.currentStage).toBe(WORKFLOW_STAGES.COMPLETE);
     });
+
+    it('performs automated static analysis and verification self-repair when errors occur', async () => {
+      const engine = new SuperpowersWorkflowEngine();
+      
+      // Mock runVerificationPass to return syntax error on first pass then exitCode 0
+      let attempts = 0;
+      engine.runVerificationPass = async (_prompt, outputs) => {
+        attempts++;
+        if (attempts === 1) {
+          return { exitCode: 1, passed: 0, failed: 1, syntaxErrors: ['Task task-core-ui: Potential unbalanced braces'] };
+        }
+        return { exitCode: 0, passed: 1, failed: 0, syntaxErrors: [] };
+      };
+
+      const result = await engine.processRequest('Build a dashboard', { intent: 'app' });
+      expect(result.repairAttempts).toBe(1);
+      expect(result.verificationRecord.exitCode).toBe(0);
+      expect(result.workflow.currentStage).toBe(WORKFLOW_STAGES.COMPLETE);
+    });
   });
 
 });
