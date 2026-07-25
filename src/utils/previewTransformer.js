@@ -12,7 +12,7 @@ export function formatCodeForPreview(rawCode) {
   }
 
   // 2. If it's pure HTML/CSS/JS without React/JSX syntax, wrap into a clean preview HTML document
-  const isReactJsx = /export\s+default|export\s+(?:const|let|var|function|class)|import\s+React|React\.|className\s*=|useState\s*\(|useEffect\s*\(|useRef\s*\(|useMemo\s*\(|useCallback\s*\(|useReducer\s*\(|useContext\s*\(|createContext\s*\(|onClick\s*=\s*\{|onChange\s*=\s*\{/i.test(trimmed);
+  const isReactJsx = /export\s+default|export\s+(?:const|let|var|function|class)|import\s+React|React\.|className\s*=|useState\s*\(|useEffect\s*\(|useRef\s*\(|useMemo\s*\(|useCallback\s*\(|useReducer\s*\(|useContext\s*\(|createContext\s*\(|onClick\s*=\s*\{|onChange\s*=\s*\{|return\s*\(\s*<|return\s*<|function\s+[A-Z]|const\s+[A-Z][A-Za-z0-9_]*\s*=\s*(?:\([^)]*\)|[A-Za-z0-9_]+)\s*=>/i.test(trimmed);
 
   if (!isReactJsx && (/<[a-z0-9-]+[\s>]/i.test(trimmed) || /<style[\s>]/i.test(trimmed) || /<script[\s>]/i.test(trimmed) || /document\.get|document\.query|window\.add/i.test(trimmed))) {
     return `<!DOCTYPE html>
