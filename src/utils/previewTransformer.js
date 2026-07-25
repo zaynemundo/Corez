@@ -137,6 +137,26 @@ export function formatCodeForPreview(rawCode) {
   <script type="text/babel" data-presets="react,typescript">
     const { useState, useEffect, useRef, useMemo, useCallback, useReducer, useContext, createContext } = React;
 
+    // Mock DOM Element with addEventListener & event handlers for 3D renderers & OrbitControls
+    var mockDomElement = (typeof document !== 'undefined' && document.createElement)
+      ? document.createElement('canvas')
+      : {
+          addEventListener: function(){},
+          removeEventListener: function(){},
+          getBoundingClientRect: function(){ return { left:0, top:0, width:800, height:600 }; },
+          style: {},
+          clientWidth: 800,
+          clientHeight: 600
+        };
+
+    var mockGl = {
+      domElement: mockDomElement,
+      setSize: function(){},
+      render: function(){},
+      setPixelRatio: function(){},
+      shadowMap: {}
+    };
+
     // Global THREE Fallback Stub & Top-Level Class Declarations
     var ThreeStub = window.THREE || {
       Vector3: function(x=0,y=0,z=0){ this.x=x; this.y=y; this.z=z; },
@@ -145,7 +165,7 @@ export function formatCodeForPreview(rawCode) {
       Scene: function(){ this.add=function(){}; this.remove=function(){}; },
       PerspectiveCamera: function(){ this.position={set:function(){},x:0,y:0,z:0}; this.lookAt=function(){}; },
       OrthographicCamera: function(){ this.position={set:function(){},x:0,y:0,z:0}; this.lookAt=function(){}; },
-      WebGLRenderer: function(){ this.setSize=function(){}; this.render=function(){}; this.domElement=document.createElement('canvas'); this.shadowMap={}; },
+      WebGLRenderer: function(){ this.setSize=function(){}; this.render=function(){}; this.setPixelRatio=function(){}; this.domElement=mockDomElement; this.shadowMap={}; },
       Mesh: function(){ this.position={set:function(){},x:0,y:0,z:0}; this.rotation={set:function(){},x:0,y:0,z:0}; },
       Group: function(){ this.add=function(){}; this.position={set:function(){},x:0,y:0,z:0}; },
       BoxGeometry: function(){},
@@ -247,11 +267,20 @@ export function formatCodeForPreview(rawCode) {
           id = requestAnimationFrame(loop);
         };
         id = requestAnimationFrame(loop);
-        return () => cancelAnimationFrame(id);
+        return () => cancelAnimationFrame(loop);
       }, [cb]);
     };
-    var OrbitControls = () => null;
-    var useThree = () => ({ camera: { position: [0, 0, 5] }, scene: {}, gl: {}, size: { width: 800, height: 600 } });
+    var OrbitControls = makeSafeClass('OrbitControls', function() {
+      this.update = function(){};
+      this.dispose = function(){};
+      this.enabled = true;
+    });
+    var useThree = () => ({
+      camera: { position: [0, 0, 5], lookAt: function(){} },
+      scene: { add: function(){}, remove: function(){} },
+      gl: mockGl,
+      size: { width: 800, height: 600 }
+    });
     var Float = ({ children }) => <div className="animate-pulse">{children}</div>;
     var Html = ({ children, className = '' }) => <div className="absolute">{children}</div>;
     var Text = ({ children, fontSize = 16, color = '#fff' }) => <span style={{ fontSize, color }}>{children}</span>;

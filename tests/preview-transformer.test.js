@@ -192,4 +192,24 @@ export default function Navbar() {
     const formatted = formatCodeForPreview(code);
     expect(formatted).toContain('makeSafeClass');
   });
+
+  it('provides mockGl.domElement with addEventListener to prevent TypeError: gl.domElement is undefined', () => {
+    const code = `
+      import React, { useEffect } from 'react';
+      import { useThree } from '@react-three/fiber';
+
+      export default function R3FComponent() {
+        const { gl } = useThree();
+        useEffect(() => {
+          gl.domElement.addEventListener('pointerdown', () => {});
+          return () => {};
+        }, [gl]);
+        return <div>R3F Scene</div>;
+      }
+    `;
+
+    const formatted = formatCodeForPreview(code);
+    expect(formatted).toContain('mockDomElement');
+    expect(formatted).toContain('gl: mockGl');
+  });
 });
