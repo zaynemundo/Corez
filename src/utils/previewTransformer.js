@@ -26,7 +26,18 @@ export function formatCodeForPreview(rawCode) {
         return icons.map(icon => `const ${icon} = LucideStub;`).join('\n');
       }
     }
-    if (match.includes('@react-three/fiber') || match.includes('@react-three/drei') || match.includes('three')) {
+    if (match.includes('three')) {
+      if (/import\s+(\*\s+as\s+THREE|THREE)\s+from/i.test(match) || /import\s+THREE\b/i.test(match)) {
+        return `var THREE = window.THREE || window.__THREE_STUB__;`;
+      }
+      const componentMatches = match.match(/\{([\s\S]*?)\}/);
+      if (componentMatches && componentMatches[1]) {
+        const comps = componentMatches[1].split(',').map(c => c.trim().split(/\s+as\s+/)[0]).filter(Boolean);
+        return comps.map(comp => `var ${comp} = (window.THREE && window.THREE['${comp}']) || window.__3D_STUBS__?.['${comp}'] || CanvasStub;`).join('\n');
+      }
+      return `var THREE = window.THREE || window.__THREE_STUB__;`;
+    }
+    if (match.includes('@react-three/fiber') || match.includes('@react-three/drei')) {
       const componentMatches = match.match(/\{([\s\S]*?)\}/);
       if (componentMatches && componentMatches[1]) {
         const comps = componentMatches[1].split(',').map(c => c.trim().split(/\s+as\s+/)[0]).filter(Boolean);
@@ -100,6 +111,7 @@ export function formatCodeForPreview(rawCode) {
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     :root { color-scheme: dark; }
@@ -124,6 +136,20 @@ export function formatCodeForPreview(rawCode) {
   <div id="root"></div>
   <script type="text/babel" data-presets="react,typescript">
     const { useState, useEffect, useRef, useMemo, useCallback, useReducer, useContext, createContext } = React;
+
+    // Global THREE Fallback Stub
+    var ThreeStub = window.THREE || {
+      Vector3: function(x=0,y=0,z=0){ this.x=x; this.y=y; this.z=z; },
+      Color: function(c){ this.c=c; },
+      Scene: function(){ this.add=function(){}; },
+      PerspectiveCamera: function(){},
+      WebGLRenderer: function(){ this.setSize=function(){}; this.render=function(){}; this.domElement=document.createElement('canvas'); },
+      Mesh: function(){},
+      BoxGeometry: function(){},
+      MeshStandardMaterial: function(){}
+    };
+    window.__THREE_STUB__ = ThreeStub;
+    var THREE = window.THREE || ThreeStub;
 
     // Fallback Canvas & 3D Graphics Component Stubs
     var CanvasStub = ({ children, className = '', style = {}, ...props }) => {

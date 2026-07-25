@@ -133,4 +133,26 @@ export default function Navbar() {
     expect(formatted).toContain('var useFrame =');
     expect(formatted).not.toContain("import { Canvas, useFrame } from '@react-three/fiber'");
   });
+
+  it('includes Three.js CDN script and handles import * as THREE from three without ReferenceError: THREE is not defined', () => {
+    const code = `
+      import React, { useEffect, useRef } from 'react';
+      import * as THREE from 'three';
+
+      export default function Game() {
+        const mountRef = useRef(null);
+        useEffect(() => {
+          const scene = new THREE.Scene();
+          const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+          return () => {};
+        }, []);
+        return <div ref={mountRef} />;
+      }
+    `;
+
+    const formatted = formatCodeForPreview(code);
+    expect(formatted).toContain('three.min.js');
+    expect(formatted).toContain('var THREE = window.THREE || window.__THREE_STUB__;');
+    expect(formatted).not.toContain("import * as THREE from 'three'");
+  });
 });
