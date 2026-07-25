@@ -151,12 +151,10 @@ export function detectAwwwardsCategory(userPrompt = '') {
 export function buildAwwwardsDesignPrompt(userPrompt = '') {
   const matchedCategory = detectAwwwardsCategory(userPrompt);
 
-  let prompt = `\n--- Awwwards Visual Design Principles & MiMo V2.5 Inspection ---\n`;
+  let prompt = `\n--- Awwwards Visual Design Principles ---\n`;
   prompt += `Style Target: ${AWWWARDS_DESIGN_SYSTEM.aesthetic}\n`;
   if (matchedCategory) {
-    prompt += `Detected Category: ${matchedCategory.name}\n`;
-    prompt += `Awwwards Reference Review Site: ${matchedCategory.url}\n`;
-    prompt += `MiMo V2.5 Visual Inspection Mandate: MiMo V2.5 (opencode-go/mimo-v2.5) reviews the Awwwards reference target site (${matchedCategory.url}) for visual layout guidance, aesthetic benchmarking, and visual specification matching.\n`;
+    prompt += `Detected Category: ${matchedCategory.name} (${matchedCategory.url})\n`;
     prompt += `Category Design Pattern: ${matchedCategory.designPattern}\n`;
   }
   prompt += `Typography: Google Fonts (${AWWWARDS_DESIGN_SYSTEM.typography.fontFamilies.display})\n`;
