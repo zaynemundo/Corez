@@ -137,19 +137,58 @@ export function formatCodeForPreview(rawCode) {
   <script type="text/babel" data-presets="react,typescript">
     const { useState, useEffect, useRef, useMemo, useCallback, useReducer, useContext, createContext } = React;
 
-    // Global THREE Fallback Stub
+    // Global THREE Fallback Stub & Top-Level Class Declarations
     var ThreeStub = window.THREE || {
       Vector3: function(x=0,y=0,z=0){ this.x=x; this.y=y; this.z=z; },
+      Vector2: function(x=0,y=0){ this.x=x; this.y=y; },
       Color: function(c){ this.c=c; },
-      Scene: function(){ this.add=function(){}; },
-      PerspectiveCamera: function(){},
-      WebGLRenderer: function(){ this.setSize=function(){}; this.render=function(){}; this.domElement=document.createElement('canvas'); },
-      Mesh: function(){},
+      Scene: function(){ this.add=function(){}; this.remove=function(){}; },
+      PerspectiveCamera: function(){ this.position={set:function(){},x:0,y:0,z:0}; this.lookAt=function(){}; },
+      OrthographicCamera: function(){ this.position={set:function(){},x:0,y:0,z:0}; this.lookAt=function(){}; },
+      WebGLRenderer: function(){ this.setSize=function(){}; this.render=function(){}; this.domElement=document.createElement('canvas'); this.shadowMap={}; },
+      Mesh: function(){ this.position={set:function(){},x:0,y:0,z:0}; this.rotation={set:function(){},x:0,y:0,z:0}; },
+      Group: function(){ this.add=function(){}; this.position={set:function(){},x:0,y:0,z:0}; },
       BoxGeometry: function(){},
-      MeshStandardMaterial: function(){}
+      PlaneGeometry: function(){},
+      SphereGeometry: function(){},
+      CylinderGeometry: function(){},
+      MeshStandardMaterial: function(){},
+      MeshBasicMaterial: function(){},
+      AmbientLight: function(){},
+      DirectionalLight: function(){ this.position={set:function(){},x:0,y:0,z:0}; },
+      PointLight: function(){ this.position={set:function(){},x:0,y:0,z:0}; },
+      SpotLight: function(){ this.position={set:function(){},x:0,y:0,z:0}; },
+      Raycaster: function(){ this.setFromCamera=function(){}; this.intersectObjects=function(){ return []; }; },
+      Clock: function(){ this.getDelta = function(){ return 0.016; }; this.getElapsedTime = function(){ return performance.now()/1000; }; },
+      Fog: function(){},
+      FogExp2: function(){}
     };
     window.__THREE_STUB__ = ThreeStub;
     var THREE = window.THREE || ThreeStub;
+
+    var PerspectiveCamera = (window.THREE && window.THREE.PerspectiveCamera) || ThreeStub.PerspectiveCamera;
+    var OrthographicCamera = (window.THREE && window.THREE.OrthographicCamera) || ThreeStub.OrthographicCamera;
+    var Scene = (window.THREE && window.THREE.Scene) || ThreeStub.Scene;
+    var WebGLRenderer = (window.THREE && window.THREE.WebGLRenderer) || ThreeStub.WebGLRenderer;
+    var Vector3 = (window.THREE && window.THREE.Vector3) || ThreeStub.Vector3;
+    var Vector2 = (window.THREE && window.THREE.Vector2) || ThreeStub.Vector2;
+    var Color = (window.THREE && window.THREE.Color) || ThreeStub.Color;
+    var Mesh = (window.THREE && window.THREE.Mesh) || ThreeStub.Mesh;
+    var Group = (window.THREE && window.THREE.Group) || ThreeStub.Group;
+    var BoxGeometry = (window.THREE && window.THREE.BoxGeometry) || ThreeStub.BoxGeometry;
+    var PlaneGeometry = (window.THREE && window.THREE.PlaneGeometry) || ThreeStub.PlaneGeometry;
+    var SphereGeometry = (window.THREE && window.THREE.SphereGeometry) || ThreeStub.SphereGeometry;
+    var CylinderGeometry = (window.THREE && window.THREE.CylinderGeometry) || ThreeStub.CylinderGeometry;
+    var MeshStandardMaterial = (window.THREE && window.THREE.MeshStandardMaterial) || ThreeStub.MeshStandardMaterial;
+    var MeshBasicMaterial = (window.THREE && window.THREE.MeshBasicMaterial) || ThreeStub.MeshBasicMaterial;
+    var AmbientLight = (window.THREE && window.THREE.AmbientLight) || ThreeStub.AmbientLight;
+    var DirectionalLight = (window.THREE && window.THREE.DirectionalLight) || ThreeStub.DirectionalLight;
+    var PointLight = (window.THREE && window.THREE.PointLight) || ThreeStub.PointLight;
+    var SpotLight = (window.THREE && window.THREE.SpotLight) || ThreeStub.SpotLight;
+    var Raycaster = (window.THREE && window.THREE.Raycaster) || ThreeStub.Raycaster;
+    var Clock = (window.THREE && window.THREE.Clock) || ThreeStub.Clock;
+    var Fog = (window.THREE && window.THREE.Fog) || ThreeStub.Fog;
+    var FogExp2 = (window.THREE && window.THREE.FogExp2) || ThreeStub.FogExp2;
 
     // Fallback Canvas & 3D Graphics Component Stubs
     var CanvasStub = ({ children, className = '', style = {}, ...props }) => {

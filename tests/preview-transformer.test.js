@@ -155,4 +155,24 @@ export default function Navbar() {
     expect(formatted).toContain('var THREE = window.THREE || window.__THREE_STUB__;');
     expect(formatted).not.toContain("import * as THREE from 'three'");
   });
+
+  it('provides top-level PerspectiveCamera and Three.js class declarations to prevent ReferenceError: PerspectiveCamera is not defined', () => {
+    const code = `
+      import React, { useEffect } from 'react';
+      export default function Game3D() {
+        useEffect(() => {
+          const camera = new PerspectiveCamera(75, 1, 0.1, 1000);
+          const scene = new Scene();
+          const renderer = new WebGLRenderer();
+          return () => {};
+        }, []);
+        return <div>3D Scene</div>;
+      }
+    `;
+
+    const formatted = formatCodeForPreview(code);
+    expect(formatted).toContain('var PerspectiveCamera =');
+    expect(formatted).toContain('var Scene =');
+    expect(formatted).toContain('var WebGLRenderer =');
+  });
 });
