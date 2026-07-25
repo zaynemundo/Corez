@@ -428,6 +428,11 @@ export async function runOpenRouterSwarm(body, env, signal) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    if (url.protocol === 'http:' && !url.hostname.includes('localhost') && !url.hostname.includes('127.0.0.1')) {
+      url.protocol = 'https:';
+      return Response.redirect(url.toString(), 301);
+    }
+
     const apiKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY || env?.OPENROUTER_API_KEY
       || (typeof process !== 'undefined' ? (process.env?.OPENCODE_GO_API_KEY || process.env?.OPENCODE_API_KEY || process.env?.OPENROUTER_API_KEY) : null);
 
