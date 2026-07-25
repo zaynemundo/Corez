@@ -507,6 +507,7 @@ export function improveCodingPrompt(prompt, intent = null) {
 
 [SINGLE-FILE HTML/CSS/JS SPECIFICATION]:
 - ALWAYS begin your response with a clear, detailed overview explaining the features, layout, and styling choices!
+- Ensure proper visual layering and z-index stacking hierarchy (Background z-index:0 -> Content z-index:10 -> HUD/Toolbars z-index:20-30 -> Modals/Overlays z-index:40-50+) so elements don't obscure interactive controls!
 - Output complete, clean HTML/CSS/JS code inside ONE SINGLE \`\`\`html ... \`\`\` code block including inline \`<style>\` and \`<script>\` tags.
 - Build a complete, responsive, standalone experience ready for the preview canvas.
 - ALWAYS end your response with a step-by-step user guide and feature summary after the code block! Never output ONLY a bare code block.`;
@@ -516,6 +517,7 @@ export function improveCodingPrompt(prompt, intent = null) {
 
 [SINGLE-FILE REACT SPECIFICATION]:
 - ALWAYS begin your response with a clear, detailed overview explaining the features, architecture, styling decisions, and layout choices!
+- Ensure proper visual layering and z-index stacking hierarchy (Background z-index:0 -> Content z-index:10 -> HUD/Toolbars z-index:20-30 -> Modals/Overlays z-index:40-50+) so elements don't obscure interactive controls!
 - Output clean, modern React/JSX code inside ONE SINGLE \`\`\`jsx ... \`\`\` code block starting with \`export default function App()\`.
 - DO NOT wrap React code inside HTML boilerplate (\`<!DOCTYPE html>\`, \`<head>\`, \`<script type="text/babel">\`, or \`ReactDOM.createRoot()\`) because the preview canvas automatically compiles and renders React/JSX code!
 - Do NOT split your output into multiple separate code blocks, file headers (// App.tsx, // components/Navbar.tsx), or relative file imports (import Navbar from './components/Navbar').

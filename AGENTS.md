@@ -48,6 +48,7 @@ When handling browser game requests, CoreZ activates the **AI Game Studio** orch
 - **File Ownership**: No two parallel subagents may edit the same source file concurrently.
 - **Director Privileges**: Directors (`creative-director`, `technical-director`, `art-director`, `qa-lead`, `code-reviewer`, `visual-specialist`) are read-only (`edit: deny`) by default.
 - **Visual Inspection Workflow**: Actual game screenshots are saved in project review directories and passed to `visual-specialist` (`opencode-go/mimo-v2.5`) for visual specification matching.
+- **Visual Layering Mandate**: All UI and canvas components must follow strict z-index stacking context layering (Background `z:0` -> Content `z:10` -> HUD/Controls `z:20-30` -> Overlays/Modals `z:40-50+`) with explicit container positioning before outputting code.
 - **Verification Gate**: No game deliverable is marked `COMPLETE` without empirical test execution evidence (`exitCode === 0`).
 
 ## Commands
