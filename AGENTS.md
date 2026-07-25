@@ -2,7 +2,7 @@
 
 ## Roles and authority
 
-- **DeepSeek V4 Flash** (`deepseek/deepseek-v4-flash`) is the lead engineering agent, handling orchestration, development, vision, visual inspection, UI layout, game design, SVG creation, and overall implementation strategy.
+- **DeepSeek V4 Pro** (`deepseek/deepseek-v4-pro`) is the lead engineering agent, handling orchestration, development, vision, visual inspection, UI layout, game design, SVG creation, and overall implementation strategy.
 - **FLUX 1 Schnell** (`@cf/black-forest-labs/flux-1-schnell`) is used for fast, free background image generation and visual artwork.
 
 ## Verification & Git completion policy
@@ -15,28 +15,28 @@
 
 ## Standard sequence
 
-1. DeepSeek V4 Flash defines a bounded task and identifies files that MiMo V2.5 may inspect or, if explicitly authorised, edit.
-2. DeepSeek V4 Flash delegates with analysis-only mode unless implementation is necessary and authorised.
+1. DeepSeek V4 Pro defines a bounded task and identifies files that MiMo V2.5 may inspect or, if explicitly authorised, edit.
+2. DeepSeek V4 Pro delegates with analysis-only mode unless implementation is necessary and authorised.
 3. MiMo V2.5 returns findings or changes; its output is preserved under `artifacts/mimo/` by default.
-4. DeepSeek V4 Flash critically reviews the response and diff.
-5. DeepSeek V4 Flash makes the final engineering decision and performs independent verification.
+4. DeepSeek V4 Pro critically reviews the response and diff.
+5. DeepSeek V4 Pro makes the final engineering decision and performs independent verification.
 
 ## CoreZ AI Game Studio Hierarchy & OpenCode Go Models
 
 When handling browser game requests, CoreZ activates the **AI Game Studio** orchestrator:
 
-### Cost-Optimized Guidance Architecture Map (Flash Executor + Pro/Kimi Advisors)
+### High-Precision Engineering Architecture Map (DeepSeek V4 Pro Primary Executor)
 
-> **Cost Optimization Rule**: **DeepSeek V4 Flash** performs ~80-90% of all code execution, component building, UI work, and testing to minimize API token costs. **DeepSeek V4 Pro** and **Kimi K3 Code** operate in lightweight, read-only Spec Lead / Advisor mode.
+> **Primary Model Rule**: **DeepSeek V4 Pro** performs all primary code execution, component building, architecture, UI work, and verification. **DeepSeek V4 Flash** operates as a fast secondary executor for rapid UI smoke testing.
 
 | Studio Role | AI Model | Provider | Mode / Authority | Responsibilities |
 | :--- | :--- | :--- | :--- | :--- |
-| `primary-executor` | `deepseek-v4-flash` | `opencode-go` / `openrouter` | Coder / Tester | **Primary Executor (80-90% of token work)**: writes code, builds components, edits files, runs tests |
-| `game-studio-producer` | `deepseek-v4-flash` | `opencode-go` / `openrouter` | Coordinator | Workflow state, task briefs, context isolation, rapid routing |
-| `ui-programmer` | `deepseek-v4-flash` | `opencode-go` / `openrouter` | Coder | Responsive browser HUDs, pause screens, game-over overlays, JSX components |
-| `level-designer` | `deepseek-v4-flash` | `opencode-go` / `openrouter` | Coder | Map layouts, tilemaps, platform placement, level pacing |
-| `qa-tester` | `deepseek-v4-flash` | `opencode-go` / `openrouter` | Tester | Rapid smoke tests, control validation, bug reproduction |
-| `architect-guide` | `deepseek-v4-pro` | `opencode-go` | Read-only Spec Lead | **Guidance & Architecture**: High-level specs, task graph decomposition, code review (low token usage) |
+| `primary-executor` | `deepseek-v4-pro` | `opencode-go` | Coder / Tester | **Primary Executor**: writes code, builds components, edits files, runs tests |
+| `game-studio-producer` | `deepseek-v4-pro` | `opencode-go` | Coordinator | Workflow state, task briefs, context isolation, rapid routing |
+| `ui-programmer` | `deepseek-v4-pro` | `opencode-go` | Coder | Responsive browser HUDs, pause screens, game-over overlays, JSX components |
+| `level-designer` | `deepseek-v4-pro` | `opencode-go` | Coder | Map layouts, tilemaps, platform placement, level pacing |
+| `qa-tester` | `deepseek-v4-flash` | `openrouter` | Tester | Rapid smoke tests, control validation, bug reproduction |
+| `architect-guide` | `deepseek-v4-pro` | `opencode-go` | Spec Lead | **Guidance & Architecture**: High-level specs, task graph decomposition, code review |
 | `code-reviewer` | `deepseek-v4-pro` | `opencode-go` | Read-only Reviewer | Safety audit, specification compliance, code quality review |
 | `physics-advisor` | `kimi-k3` | `opencode-go` | Read-only Advisor | **Physics & Math Advisor**: High-frequency physics math, spatial hashing formulas, canvas loop algorithms |
 | `art-director` | `flux-1-schnell` | `cloudflare-workers-ai` | Creative Lead | Visual direction, color palettes, background textures, art assets |

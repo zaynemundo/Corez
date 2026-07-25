@@ -1,7 +1,7 @@
 ---
 description: Performs visual inspection of captured game screenshots and compares against art-direction.json and game-spec.json.
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: opencode-go/deepseek-v4-pro
 temperature: 0.1
 
 permission:

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 export const DEFAULT_CONFIG = Object.freeze({
-  model: 'deepseek-v4-flash',
+  model: 'deepseek-v4-pro',
   reasoning: 'high',
   mode: 'agent',
   permissions: {
