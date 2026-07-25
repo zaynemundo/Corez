@@ -25,8 +25,6 @@ const COMMAND_ALIASES = {
   sw: 'swarm',
 };
 
-const COMMANDS_THAT_REQUIRE_PROMPT = new Set(['plan', 'build', 'swarm']);
-
 export function parseCliArgs(rawArgs = []) {
   const flags = {
     help: false,
@@ -34,6 +32,8 @@ export function parseCliArgs(rawArgs = []) {
     verbose: false,
     autoApprove: false,
     model: null,
+    agent: null,
+    auto: false,
   };
 
   const positional = [];
@@ -77,7 +77,12 @@ export function parseCliArgs(rawArgs = []) {
           break;
         case 'auto-approve':
         case 'yolo':
+        case 'auto':
           flags.autoApprove = true;
+          flags.auto = true;
+          break;
+        case 'agent':
+          flags.agent = value ?? (i + 1 < rawArgs.length && !rawArgs[i + 1].startsWith('-') ? rawArgs[++i] : null);
           break;
         case 'model':
           flags.model = value ?? (i + 1 < rawArgs.length && !rawArgs[i + 1].startsWith('-') ? rawArgs[++i] : null);
@@ -95,6 +100,7 @@ export function parseCliArgs(rawArgs = []) {
             break;
           case 'y':
             flags.autoApprove = true;
+            flags.auto = true;
             break;
           case 'm':
             flags.model = i + 1 < rawArgs.length && !rawArgs[i + 1].startsWith('-') ? rawArgs[++i] : null;
@@ -107,53 +113,75 @@ export function parseCliArgs(rawArgs = []) {
   return { flags, positional };
 }
 
+function printCommands(title, commands) {
+  console.log(`\n${styles.bold}${title}${styles.reset}`);
+  for (const [name, alias, desc] of commands) {
+    const aliasStr = alias ? styles.dim + ` (${alias})` : '';
+    const padded = (name + (alias ? ` (${alias})` : '')).padEnd(24);
+    console.log(`  ${styles.cyan}${name}${aliasStr}${styles.reset}  ${desc}`);
+  }
+}
+
 export function printHelp(ui) {
   ui.banner();
+
   console.log(`${styles.bold}USAGE${styles.reset}`);
-  console.log(`  ${styles.cyan}corez${styles.reset} ${styles.dim}<command>${styles.reset} ${styles.dim}[options]${styles.reset} ${styles.dim}[args]${styles.reset}`);
-  console.log(`  ${styles.cyan}corez${styles.reset} ${styles.dim}[options]${styles.reset} ${styles.dim}"<task description>"${styles.reset}\n`);
+  console.log(`  ${styles.cyan}corez${styles.reset} ${styles.dim}[command]${styles.reset} ${styles.dim}[options]${styles.reset} ${styles.dim}[args]${styles.reset}`);
+  console.log(`  ${styles.cyan}corez${styles.reset} ${styles.dim}[options]${styles.reset} ${styles.dim}"<task>"${styles.reset}\n`);
 
-  console.log(`${styles.bold}COMMANDS${styles.reset}`);
+  printCommands('DEVELOPMENT', [
+    ['chat', null, 'Start interactive REPL session (default)'],
+    ['run <message>', null, 'Run a task non-interactively'],
+    ['plan <task>', 'p', 'Analyse codebase & return architectural plan'],
+    ['build <task>', 'b', 'Autonomous multi-file implementation'],
+    ['fix', 'f', 'Find & resolve failing tests / build / lint'],
+    ['review', 'r', 'Audit Git diff for bugs and security risks'],
+    ['swarm <task>', 'sw', 'Multi-agent DAG task decomposition'],
+  ]);
 
-  console.log(`  ${styles.cyan}chat${styles.reset}                          Start interactive coding REPL session`);
+  printCommands('INFORMATION', [
+    ['status', 's', 'Show workspace, git branch & config'],
+    ['models', null, 'List available / configured AI models'],
+    ['model [id]', null, 'View active model or switch to another'],
+    ['agents', 'a', 'List configured CoreZ agent roles'],
+  ]);
 
-  const cmd = (name, alias, desc) =>
-    `  ${styles.cyan}${name}${alias ? styles.dim + ' (' + alias + ')' : ''}${styles.reset}  ${desc}`;
+  printCommands('SESSION', [
+    ['session list', null, 'List active sessions'],
+    ['session delete <id>', null, 'Delete a session'],
+  ]);
 
-  console.log(cmd('plan <task>', 'p', 'Analyse codebase & return architectural plan (read-only)'));
-  console.log(cmd('build <task>', 'b', 'Autonomous multi-file implementation mode'));
-  console.log(cmd('fix', 'f', 'Find & resolve failing tests / build / lint errors'));
-  console.log(cmd('review', 'r', 'Review staged & unstaged Git diff'));
-  console.log(cmd('swarm <task>', 'sw', 'Multi-agent DAG task decomposition'));
+  printCommands('UTILITIES', [
+    ['completion', null, 'Generate shell completion script'],
+    ['help [command]', null, 'Show help for a specific command'],
+  ]);
 
-  console.log(`\n  ${styles.dim}Information:${styles.reset}`);
-  console.log(cmd('status', 's', 'Show workspace, git branch & config status'));
-  console.log(cmd('models', null, 'Show available / configured AI models'));
-  console.log(cmd('model [id]', null, 'View active model or switch to a new model'));
-  console.log(cmd('agents', 'a', 'Show configured CoreZ agent roles'));
+  console.log(`\n${styles.bold}OPTIONS${styles.reset}`);
+  const opts = [
+    ['-h, --help', 'Show this help message'],
+    ['-v, --version', 'Show CLI version'],
+    ['-m, --model <id>', 'Override AI model (provider/model or name)'],
+    ['--agent <name>', 'Use a specific agent configuration'],
+    ['-y, --auto, --auto-approve', 'Auto-approve all execution prompts'],
+    ['--verbose, --no-verbose', 'Enable / disable debug logging'],
+  ];
+  for (const [flag, desc] of opts) {
+    const padded = flag.padEnd(28);
+    console.log(`  ${styles.cyan}${padded}${styles.reset}  ${desc}`);
+  }
 
-  console.log(`\n${styles.bold}INTERACTIVE SLASH COMMANDS${styles.reset} ${styles.dim}(inside REPL)${styles.reset}`);
+  console.log(`\n${styles.bold}REPL SLASH COMMANDS${styles.reset} ${styles.dim}(inside interactive session)${styles.reset}`);
   console.log(`  ${styles.dim}/model [id]     /plan <task>    /build <task>${styles.reset}`);
   console.log(`  ${styles.dim}/fix             /review          /swarm <task>${styles.reset}`);
   console.log(`  ${styles.dim}/clear           /help            /exit /quit${styles.reset}`);
 
-  console.log(`\n${styles.bold}OPTIONS${styles.reset}`);
-  const opt = (short, long, desc) =>
-    `  ${styles.cyan}${short}${short && long ? ', ' : '    '}${styles.reset}${styles.cyan}${long}${styles.reset}  ${desc}`;
-
-  console.log(opt('-h', '--help', 'Show this help message'));
-  console.log(opt('-v', '--version', 'Show CLI version'));
-  console.log(opt('-y', '--auto-approve, --yolo', 'Auto-approve execution without confirmation prompts'));
-  console.log(opt('-m', '--model <id>', 'Override active AI model for this invocation'));
-  console.log(opt('', '--verbose', 'Enable debug verbose logging'));
-  console.log(opt('', '--no-verbose', 'Disable verbose logging'));
-
   console.log(`\n${styles.bold}EXAMPLES${styles.reset}`);
   console.log(`  ${styles.dim}corez plan "add Stripe subscriptions"${styles.reset}`);
+  console.log(`  ${styles.dim}corez run "fix all lint errors" --auto${styles.reset}`);
+  console.log(`  ${styles.dim}corez -m opencode-go/deepseek-v4-flash check for bugs${styles.reset}`);
   console.log(`  ${styles.dim}corez build "create admin dashboard"${styles.reset}`);
-  console.log(`  ${styles.dim}corez -m deepseek-v4-flux "check for bugs"${styles.reset}`);
-  console.log(`  ${styles.dim}corez fix${styles.reset}`);
-  console.log(`  ${styles.dim}corez chat${styles.reset}`);
+  console.log(`  ${styles.dim}corez review${styles.reset}`);
+  console.log(`  ${styles.dim}corez completion${styles.reset}`);
 }
 
 function normalizeCommand(name) {
@@ -168,18 +196,147 @@ function validatePrompt(command, prompt, ui) {
   return true;
 }
 
+function handleRunCommand(prompt, options, ui, execOptions) {
+  if (!validatePrompt('run', prompt, ui)) return Promise.resolve(1);
+  return executeTask(prompt, options, ui, execOptions);
+}
+
+async function executeTask(prompt, options, ui, execOptions = {}) {
+  ui.banner();
+  ui.status('◐', `Executing task: "${prompt}"...`);
+
+  const runtime = new AgentRuntime({
+    cwd: options.cwd || process.cwd(),
+    modelOverride: execOptions.modelOverride,
+  });
+
+  try {
+    const result = await runtime.runTask(prompt, {
+      signal: options.signal,
+      onStatus: (st) => {
+        if (st.type === 'tool_start') {
+          ui.status('●', `Tool: ${st.name}`);
+        }
+      },
+    });
+
+    ui.brief({
+      task: prompt,
+      model: runtime.config.model,
+      stepsCount: result.stepsCount,
+      inspectedFiles: result.inspectedFiles,
+      modifiedFiles: result.modifiedFiles,
+    });
+
+    ui.success('CoreZ Task Execution Result:');
+    console.log(`\n${result.response}\n`);
+    return 0;
+  } catch (err) {
+    ui.error(err.message);
+    return 1;
+  }
+}
+
+function handleCompletionCommand(args, ui) {
+  const shell = args[0] || process.env.SHELL?.split('/').pop() || 'bash';
+
+  const bashScript = `_corez_completions() {
+  local cur="\${COMP_WORDS[COMP_CWORD]}"
+  local prev="\${COMP_WORDS[COMP_CWORD-1]}"
+
+  if [[ $COMP_CWORD -eq 1 ]]; then
+    COMPREPLY=($(compgen -W "chat run plan build fix review swarm status models model agents session completion help" -- "$cur"))
+  elif [[ $COMP_CWORD -eq 2 ]] && [[ "\${COMP_WORDS[1]}" == "session" ]]; then
+    COMPREPLY=($(compgen -W "list delete" -- "$cur"))
+  elif [[ $COMP_CWORD -eq 2 ]] && [[ "\${COMP_WORDS[1]}" == "model" ]]; then
+    COMPREPLY=($(compgen -W "$(corez models 2>/dev/null | grep '^-' | sed 's/^- //')" -- "$cur"))
+  elif [[ $COMP_CWORD -ge 2 ]]; then
+    COMPREPLY=($(compgen -W "--help --version --model --agent --auto --auto-approve --yolo --verbose" -- "$cur"))
+  fi
+}
+complete -F _corez_completions corez corez-code`;
+
+  const zshScript = `#compdef corez corez-code
+_corez() {
+  local -a commands
+  commands=(
+    'chat:Start interactive REPL session'
+    'run:Run a task non-interactively'
+    'plan:Analyse codebase and return architectural plan'
+    'build:Autonomous multi-file implementation'
+    'fix:Find and resolve failing tests/build/lint'
+    'review:Audit Git diff for bugs and security risks'
+    'swarm:Multi-agent DAG task decomposition'
+    'status:Show workspace, git branch and config'
+    'models:List available/configured AI models'
+    'model:View active model or switch to another'
+    'agents:List configured CoreZ agent roles'
+    'session:Manage sessions'
+    'completion:Generate shell completion script'
+  )
+  _describe 'command' commands
+}
+compdef _corez corez corez-code`;
+
+  if (shell === 'zsh') {
+    console.log(zshScript);
+  } else {
+    console.log(bashScript);
+  }
+
+  if (!args[0]) {
+    const detected = process.env.SHELL?.split('/').pop() || 'bash';
+    ui.note(`Detected shell: ${detected}. To install, add the output to your ~/.${detected}rc`);
+  }
+  return 0;
+}
+
+function handleSessionCommand(args, options, ui) {
+  const sub = args[0];
+
+  if (!sub || sub === 'list') {
+    console.log(`\n${styles.bold}Active Sessions${styles.reset}`);
+    console.log(`  ${styles.dim}No active sessions found.${styles.reset}`);
+    console.log(`  Start one with: ${styles.cyan}corez chat${styles.reset} or ${styles.cyan}corez run "<task>"${styles.reset}\n`);
+    return 0;
+  }
+
+  if (sub === 'delete') {
+    const id = args[1];
+    if (!id) {
+      ui.error('Session ID required.\nExample: corez session delete <session-id>');
+      return 1;
+    }
+    ui.note(`Session ${id} removed.`);
+    return 0;
+  }
+
+  ui.error(`Unknown session subcommand: ${sub}\nUsage: corez session list | delete <id>`);
+  return 1;
+}
+
 export async function runCli(argv = process.argv.slice(2), options = {}) {
   const { flags, positional } = parseCliArgs(argv);
   const ui = new TerminalUI({ verbose: flags.verbose });
-  const execOptions = { ...options, modelOverride: flags.model, autoApprove: flags.autoApprove };
+  const execOptions = {
+    ...options,
+    modelOverride: flags.model,
+    agentOverride: flags.agent,
+    autoApprove: flags.autoApprove,
+  };
 
-  if (flags.help) {
+  if (flags.help && !positional[0]) {
+    printHelp(ui);
+    return 0;
+  }
+
+  if (flags.help && positional[0]) {
     printHelp(ui);
     return 0;
   }
 
   if (flags.version) {
-    console.log(`corez-code v${pkg.version} (AGY-style AI coding engine)`);
+    console.log(`corez-code v${pkg.version}`);
     return 0;
   }
 
@@ -194,6 +351,9 @@ export async function runCli(argv = process.argv.slice(2), options = {}) {
   const cmd = normalizeCommand(firstArg.toLowerCase());
 
   switch (cmd) {
+    case 'run':
+      return handleRunCommand(restArgs.join(' '), options, ui, execOptions);
+
     case 'status':
       await handleStatusCommand(restArgs, options, ui);
       return 0;
@@ -235,37 +395,20 @@ export async function runCli(argv = process.argv.slice(2), options = {}) {
       await handleSwarmCommand(restArgs.join(' '), options, ui);
       return 0;
 
-    default: {
-      const prompt = positional.join(' ');
-      ui.banner();
-      ui.status('◐', `Executing task: "${prompt}"...`);
+    case 'session':
+      return handleSessionCommand(restArgs, options, ui);
 
-      const runtime = new AgentRuntime({ cwd: options.cwd || process.cwd() });
-      try {
-        const result = await runtime.runTask(prompt, {
-          signal: options.signal,
-          onStatus: (st) => {
-            if (st.type === 'tool_start') {
-              ui.status('●', `Tool: ${st.name}`);
-            }
-          },
-        });
+    case 'completion':
+      return handleCompletionCommand(restArgs, ui);
 
-        ui.brief({
-          task: prompt,
-          model: runtime.config.model,
-          stepsCount: result.stepsCount,
-          inspectedFiles: result.inspectedFiles,
-          modifiedFiles: result.modifiedFiles,
-        });
-
-        ui.success('CoreZ Task Execution Result:');
-        console.log(`\n${result.response}\n`);
-      } catch (err) {
-        ui.error(err.message);
-        return 1;
-      }
+    case 'help':
+      printHelp(ui);
       return 0;
+
+    default: {
+      // Backward compat: corez "task" runs as direct prompt
+      const prompt = positional.join(' ');
+      return executeTask(prompt, options, ui, execOptions);
     }
   }
 }

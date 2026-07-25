@@ -46,4 +46,19 @@ describe('CLI Command Execution & Routing', () => {
     const code = await runCli(['inspect workspace']);
     expect(code).toBe(0);
   });
+
+  it('executes corez run "inspect workspace" without errors', async () => {
+    const code = await runCli(['run', 'inspect workspace']);
+    expect(code).toBe(0);
+  });
+
+  it('executes corez completion without errors', async () => {
+    const code = await runCli(['completion']);
+    expect(code).toBe(0);
+  });
+
+  it('executes corez session list without errors', async () => {
+    const code = await runCli(['session', 'list']);
+    expect(code).toBe(0);
+  });
 });
