@@ -14,6 +14,7 @@ import { classifyIntent } from './intentClassifier.js';
 import { parseMarketIntent } from './marketIntent.js';
 import { fetchMarketData, unavailableMarket } from './marketService.js';
 import { process as processPromptIntelligence, toLegacyIntentType, classifyIntent as classifyIntentNew } from './promptIntelligence/index.js';
+import { buildAwwwardsDesignPrompt } from '../../packages/agent-core/index.js';
 
 export const PUBLIC_USER_INTENT_PROMPT = `
 Analyze the public user intent behind the request. Corez delegates vision, art direction, UI layout, and game design/SVG creation to MiMo V2.5, and uses FLUX 1 for free background generation and image rendering.
@@ -500,10 +501,13 @@ export function improveCodingPrompt(prompt, intent = null) {
   }
 
   if (intentType === 'app' || INTENT_PATTERNS.app.test(cleanPrompt)) {
+    const awwwardsSpec = buildAwwwardsDesignPrompt(cleanPrompt);
     const isExplicitNonJsx = /\b(html\b|css\b|vanilla|plain html|pure html|html\/css|raw html|html\s*\+\s*css|vanilla js)\b/i.test(cleanPrompt);
 
     if (isExplicitNonJsx) {
       return `${cleanPrompt}
+
+${awwwardsSpec}
 
 [SINGLE-FILE HTML/CSS/JS SPECIFICATION]:
 - ALWAYS begin your response with a clear, detailed overview explaining the features, layout, and styling choices!
@@ -514,6 +518,8 @@ export function improveCodingPrompt(prompt, intent = null) {
     }
 
     return `${cleanPrompt}
+
+${awwwardsSpec}
 
 [SINGLE-FILE REACT SPECIFICATION]:
 - ALWAYS begin your response with a clear, detailed overview explaining the features, architecture, styling decisions, and layout choices!
