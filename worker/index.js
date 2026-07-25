@@ -704,6 +704,143 @@ async function handleR2Apps(request, env) {
   return jsonResponse(405, { error: 'Method not allowed.' });
 }
 
+async function handleR2Memory(request, env) {
+  if (!env?.ASSET_BUCKET) {
+    return jsonResponse(530, { error: 'R2 storage (ASSET_BUCKET) is not configured.' });
+  }
+
+  const url = new URL(request.url);
+  const pathname = url.pathname;
+
+  // 1. POST /api/memory/store - Store or update a memory entry
+  if (pathname === '/api/memory/store' && request.method === 'POST') {
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return jsonResponse(400, { error: 'Invalid JSON payload.' });
+    }
+
+    const userId = typeof body?.userId === 'string' ? body.userId.trim() : 'default_user';
+    const keyName = typeof body?.key === 'string' ? body.key.trim() : `mem_${Date.now()}`;
+    const category = typeof body?.category === 'string' ? body.category.trim() : 'general';
+    const text = typeof body?.text === 'string' ? body.text : (typeof body?.value === 'string' ? body.value : '');
+
+    if (!text) {
+      return jsonResponse(400, { error: 'text or value content is required for memory storage.' });
+    }
+
+    const now = new Date().toISOString();
+    const memoryRecord = {
+      userId,
+      key: keyName,
+      category,
+      text,
+      metadata: body?.metadata || {},
+      tags: Array.isArray(body?.tags) ? body.tags : [],
+      updatedAt: now,
+      createdAt: body?.createdAt || now
+    };
+
+    const key = `memory/${userId}/${keyName}.json`;
+    await env.ASSET_BUCKET.put(key, JSON.stringify(memoryRecord), {
+      httpMetadata: { contentType: 'application/json' }
+    });
+
+    return jsonResponse(200, {
+      success: true,
+      userId,
+      key: keyName,
+      r2Key: key,
+      record: memoryRecord
+    });
+  }
+
+  // 2. POST /api/memory/search - Search relevant memories
+  if (pathname === '/api/memory/search' && request.method === 'POST') {
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return jsonResponse(400, { error: 'Invalid JSON payload.' });
+    }
+
+    const userId = typeof body?.userId === 'string' ? body.userId.trim() : 'default_user';
+    const query = typeof body?.query === 'string' ? body.query.trim().toLowerCase() : '';
+    const categoryFilter = typeof body?.category === 'string' ? body.category.trim().toLowerCase() : '';
+
+    const prefix = `memory/${userId}/`;
+    const list = await env.ASSET_BUCKET.list({ prefix });
+
+    const matches = [];
+    if (list && Array.isArray(list.objects)) {
+      for (const obj of list.objects) {
+        if (obj.key.endsWith('.json')) {
+          const item = await env.ASSET_BUCKET.get(obj.key);
+          if (item) {
+            try {
+              const data = JSON.parse(await item.text());
+              const textLower = String(data.text || '').toLowerCase();
+              const catLower = String(data.category || '').toLowerCase();
+              const keyLower = String(data.key || '').toLowerCase();
+
+              const matchesCategory = !categoryFilter || catLower === categoryFilter;
+              const matchesQuery = !query || textLower.includes(query) || keyLower.includes(query) || catLower.includes(query);
+
+              if (matchesCategory && matchesQuery) {
+                matches.push(data);
+              }
+            } catch {
+              /* ignore invalid cache entries */
+            }
+          }
+        }
+      }
+    }
+
+    return jsonResponse(200, { userId, query, matches });
+  }
+
+  // 3. GET /api/memory/:userId - List all memories for a user
+  if (request.method === 'GET' && pathname.match(/^\/api\/memory\/[^/]+$/)) {
+    const userId = pathname.replace('/api/memory/', '');
+    const prefix = `memory/${userId}/`;
+    const list = await env.ASSET_BUCKET.list({ prefix });
+
+    const memories = [];
+    if (list && Array.isArray(list.objects)) {
+      for (const obj of list.objects) {
+        if (obj.key.endsWith('.json')) {
+          const item = await env.ASSET_BUCKET.get(obj.key);
+          if (item) {
+            try {
+              const data = JSON.parse(await item.text());
+              memories.push(data);
+            } catch {
+              /* ignore invalid cache entries */
+            }
+          }
+        }
+      }
+    }
+
+    return jsonResponse(200, { userId, memories });
+  }
+
+  // 4. DELETE /api/memory/:userId/:key - Delete a memory
+  if (request.method === 'DELETE' && pathname.match(/^\/api\/memory\/[^/]+\/[^/]+$/)) {
+    const parts = pathname.replace('/api/memory/', '').split('/');
+    const userId = parts[0];
+    const keyName = parts[1];
+
+    const key = `memory/${userId}/${keyName}.json`;
+    await env.ASSET_BUCKET.delete(key);
+    return jsonResponse(200, { success: true, userId, key: keyName });
+  }
+
+  return jsonResponse(405, { error: 'Method not allowed.' });
+}
+
 export default {
   async fetch(request, env) {
     const pathname = new URL(request.url).pathname;
@@ -721,6 +858,9 @@ export default {
     }
     if (pathname.startsWith('/api/apps')) {
       return handleR2Apps(request, env);
+    }
+    if (pathname.startsWith('/api/memory')) {
+      return handleR2Memory(request, env);
     }
     if (pathname.startsWith('/api/')) {
       return jsonResponse(404, { error: 'API route not found.' });
