@@ -26,6 +26,13 @@ export function formatCodeForPreview(rawCode) {
         return icons.map(icon => `const ${icon} = LucideStub;`).join('\n');
       }
     }
+    if (match.includes('@react-three/fiber') || match.includes('@react-three/drei') || match.includes('three')) {
+      const componentMatches = match.match(/\{([\s\S]*?)\}/);
+      if (componentMatches && componentMatches[1]) {
+        const comps = componentMatches[1].split(',').map(c => c.trim().split(/\s+as\s+/)[0]).filter(Boolean);
+        return comps.map(comp => `const ${comp} = typeof ${comp} !== 'undefined' ? ${comp} : (window.__3D_STUBS__?.['${comp}'] || CanvasStub);`).join('\n');
+      }
+    }
     return '';
   });
 
@@ -117,6 +124,54 @@ export function formatCodeForPreview(rawCode) {
   <div id="root"></div>
   <script type="text/babel" data-presets="react,typescript">
     const { useState, useEffect, useRef, useMemo, useCallback, useReducer, useContext, createContext } = React;
+
+    // Fallback Canvas & 3D Graphics Component Stubs
+    const CanvasStub = ({ children, className = '', style = {}, ...props }) => {
+      const canvasRef = React.useRef(null);
+      React.useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        let animId;
+        const render = () => {
+          canvas.width = canvas.clientWidth || 600;
+          canvas.height = canvas.clientHeight || 400;
+          ctx.fillStyle = '#09090b';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          animId = requestAnimationFrame(render);
+        };
+        render();
+        return () => cancelAnimationFrame(animId);
+      }, []);
+
+      return (
+        <div className="relative w-full h-full min-h-[350px] overflow-hidden rounded-xl border border-white/10" style={{ background: '#09090b', ...style }} {...props}>
+          <canvas ref={canvasRef} className="w-full h-full block" />
+          <div className="absolute inset-0 pointer-events-none">{children}</div>
+        </div>
+      );
+    };
+
+    const Canvas = CanvasStub;
+    const useFrame = (cb) => {
+      React.useEffect(() => {
+        let id;
+        const loop = (t) => {
+          if (cb) cb({ clock: { getElapsedTime: () => t / 1000 } }, 0.016);
+          id = requestAnimationFrame(loop);
+        };
+        id = requestAnimationFrame(loop);
+        return () => cancelAnimationFrame(id);
+      }, [cb]);
+    };
+    const OrbitControls = () => null;
+    const useThree = () => ({ camera: { position: [0, 0, 5] }, scene: {}, gl: {}, size: { width: 800, height: 600 } });
+    const Float = ({ children }) => <div className="animate-pulse">{children}</div>;
+    const Html = ({ children, className = '' }) => <div className="absolute">{children}</div>;
+    const Text = ({ children, fontSize = 16, color = '#fff' }) => <span style={{ fontSize, color }}>{children}</span>;
+
+    window.__3D_STUBS__ = { Canvas: CanvasStub, useFrame, OrbitControls, useThree, Float, Html, Text };
 
     // Fallback Icon Component for lucide-react imports
     const LucideStub = ({ size = 20, className = '', children, ...props }) => (

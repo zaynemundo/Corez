@@ -107,4 +107,30 @@ export default function Navbar() {
     expect(formatted).not.toContain('useRef<HTMLDivElement>');
     expect(formatted).not.toContain('as const');
   });
+
+  it('provides Fallback Canvas and 3D stubs for @react-three/fiber imports to prevent ReferenceError: Canvas is not defined', () => {
+    const threeCode = `
+      import React from 'react';
+      import { Canvas, useFrame } from '@react-three/fiber';
+      import { OrbitControls } from '@react-three/drei';
+
+      export default function App() {
+        return (
+          <Canvas>
+            <OrbitControls />
+            <mesh>
+              <boxGeometry />
+              <meshStandardMaterial color="hotpink" />
+            </mesh>
+          </Canvas>
+        );
+      }
+    `;
+
+    const formatted = formatCodeForPreview(threeCode);
+    expect(formatted).toContain('const Canvas =');
+    expect(formatted).toContain('const CanvasStub =');
+    expect(formatted).toContain('const useFrame =');
+    expect(formatted).not.toContain("import { Canvas, useFrame } from '@react-three/fiber'");
+  });
 });
