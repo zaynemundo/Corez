@@ -3,11 +3,21 @@
 import { runCli } from '../src/cli.js';
 
 const controller = new AbortController();
+let sigintCount = 0;
 
 process.on('SIGINT', () => {
-  console.log('\n[CoreZ CLI] Interrupted by user (SIGINT). Cancelling active tasks...\n');
-  controller.abort();
-  process.exit(130);
+  sigintCount++;
+  if (sigintCount === 1) {
+    console.log('\n[CoreZ CLI] Interrupted (SIGINT). Cancelling active tasks... (press Ctrl+C again to force quit)\n');
+    controller.abort();
+    setTimeout(() => {
+      console.error('\n[CoreZ CLI] Graceful shutdown timed out. Forcing exit.\n');
+      process.exit(130);
+    }, 3000).unref();
+  } else {
+    console.error('\n[CoreZ CLI] Force quitting.\n');
+    process.exit(130);
+  }
 });
 
 runCli(process.argv.slice(2), { signal: controller.signal })

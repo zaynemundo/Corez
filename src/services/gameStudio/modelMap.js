@@ -5,12 +5,12 @@
 
 export const DEFAULT_OPENCODE_GO_MODELS = Object.freeze({
   fast: 'opencode-go/deepseek-v4-flash',
-  coding: 'opencode-go/kimi-k3',
-  reasoning: 'opencode-go/deepseek-v4-pro',
+  coding: 'opencode-go/deepseek-v4-flash',
+  reasoning: 'opencode-go/deepseek-v4-flash',
   creative: 'opencode-go/deepseek-v4-flash',
   vision: 'opencode-go/deepseek-v4-flash',
-  visionPro: 'opencode-go/deepseek-v4-pro',
-  expensiveReviewer: 'opencode-go/deepseek-v4-pro'
+  visionPro: 'opencode-go/deepseek-v4-flash',
+  expensiveReviewer: 'opencode-go/deepseek-v4-flash'
 });
 
 export class GameStudioModelRegistry {

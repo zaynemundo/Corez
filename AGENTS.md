@@ -28,7 +28,7 @@ When handling browser game requests, CoreZ activates the **AI Game Studio** orch
 
 ### High-Precision Engineering Architecture Map (DeepSeek V4 Pro Primary Executor)
 
-> **Primary Model Rule**: **DeepSeek V4 Pro** performs all primary code execution, component building, architecture, UI work, and verification. **DeepSeek V4 Flash** operates as a fast secondary executor for rapid UI smoke testing. **MiMo V2.5** operates as the primary visual testing agent for screenshot inspection and UI layout verification.
+> **Primary Model Rule**: **DeepSeek V4 Flash** operates as the primary cost-optimized executor for all code execution, component building, UI work, fast smoke testing, and empirical verification to minimize API expenses. **MiMo V2.5** operates as the primary visual testing agent for screenshot inspection and UI layout verification. **DeepSeek V4 Pro** is reserved for high-tier architectural escalation.
 
 | Studio Role | AI Model | Provider | Mode / Authority | Responsibilities |
 | :--- | :--- | :--- | :--- | :--- |

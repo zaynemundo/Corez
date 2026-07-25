@@ -10,16 +10,7 @@ const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
 const DEEPSEEK_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
 
 function getTargetModels(intentType, hasMedia, prompt = '') {
-  const isPhysics = /\b(physics|canvas|60fps|spatial|game loop|engine|collision|vector math)\b/i.test(prompt);
-  if (isPhysics) {
-    return [KIMI_K3_MODEL, DEEPSEEK_V4_FLASH_MODEL];
-  }
-
-  const isComplexArch = intentType === 'swarm' || /\b(architecture|schema|complex|system design|refactor|database)\b/i.test(prompt);
-  if (isComplexArch) {
-    return [DEEPSEEK_V4_PRO_MODEL, DEEPSEEK_V4_FLASH_MODEL];
-  }
-
+  // DeepSeek V4 Flash is the primary cost-optimized executor for all requests
   return [DEEPSEEK_V4_FLASH_MODEL];
 }
 

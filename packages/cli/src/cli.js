@@ -1,4 +1,5 @@
-import { TerminalUI } from './ui/terminal.js';
+import { createRequire } from 'module';
+import { TerminalUI, styles } from './ui/terminal.js';
 import { handleStatusCommand } from './commands/status.js';
 import { handleModelsCommand } from './commands/models.js';
 import { handleAgentsCommand } from './commands/agents.js';
@@ -11,32 +12,95 @@ import { handleChatCommand } from './commands/chat.js';
 import { handleModelCommand } from './commands/model.js';
 import { AgentRuntime } from '../../agent-core/index.js';
 
+const require = createRequire(import.meta.url);
+const pkg = require('../package.json');
+
+const COMMAND_ALIASES = {
+  p: 'plan',
+  b: 'build',
+  s: 'status',
+  a: 'agents',
+  f: 'fix',
+  r: 'review',
+  sw: 'swarm',
+};
+
+const COMMANDS_THAT_REQUIRE_PROMPT = new Set(['plan', 'build', 'swarm']);
+
 export function parseCliArgs(rawArgs = []) {
   const flags = {
     help: false,
     version: false,
     verbose: false,
     autoApprove: false,
-    model: null
+    model: null,
   };
 
   const positional = [];
+  let ended = false;
+
   for (let i = 0; i < rawArgs.length; i++) {
     const arg = rawArgs[i];
-    if (arg === '--help' || arg === '-h') {
-      flags.help = true;
-    } else if (arg === '--version' || arg === '-v') {
-      flags.version = true;
-    } else if (arg === '--verbose') {
-      flags.verbose = true;
-    } else if (arg === '--auto-approve' || arg === '-y' || arg === '--yolo') {
-      flags.autoApprove = true;
-    } else if (arg === '--model' || arg === '-m') {
-      if (i + 1 < rawArgs.length && !rawArgs[i + 1].startsWith('-')) {
-        flags.model = rawArgs[++i];
-      }
-    } else if (!arg.startsWith('-')) {
+
+    if (arg === '--') {
+      ended = true;
+      continue;
+    }
+
+    if (ended || !arg.startsWith('-')) {
       positional.push(arg);
+      continue;
+    }
+
+    if (arg.startsWith('--')) {
+      const eqIdx = arg.indexOf('=');
+      let name, value;
+      if (eqIdx !== -1) {
+        name = arg.slice(2, eqIdx);
+        value = arg.slice(eqIdx + 1);
+      } else {
+        name = arg.slice(2);
+      }
+
+      switch (name) {
+        case 'help':
+          flags.help = true;
+          break;
+        case 'version':
+          flags.version = true;
+          break;
+        case 'verbose':
+          flags.verbose = true;
+          break;
+        case 'no-verbose':
+          flags.verbose = false;
+          break;
+        case 'auto-approve':
+        case 'yolo':
+          flags.autoApprove = true;
+          break;
+        case 'model':
+          flags.model = value ?? (i + 1 < rawArgs.length && !rawArgs[i + 1].startsWith('-') ? rawArgs[++i] : null);
+          break;
+      }
+    } else {
+      for (let j = 1; j < arg.length; j++) {
+        const ch = arg[j];
+        switch (ch) {
+          case 'h':
+            flags.help = true;
+            break;
+          case 'v':
+            flags.version = true;
+            break;
+          case 'y':
+            flags.autoApprove = true;
+            break;
+          case 'm':
+            flags.model = i + 1 < rawArgs.length && !rawArgs[i + 1].startsWith('-') ? rawArgs[++i] : null;
+            break;
+        }
+      }
     }
   }
 
@@ -45,38 +109,63 @@ export function parseCliArgs(rawArgs = []) {
 
 export function printHelp(ui) {
   ui.banner();
-  console.log(`Usage:
-  corez                           Start interactive coding REPL session (AGY style)
-  corez "<task description>"       Run task prompt against current workspace
-  corez chat                      Interactive coding agent REPL mode
-  corez plan "<task>"             Analyse codebase & return architectural plan (read-only)
-  corez build "<task>"            Autonomous implementation mode
-  corez fix                       Find & resolve failing tests/build/lint errors
-  corez review                    Review staged & unstaged Git diff
-  corez swarm "<task>"            Run multi-agent DAG task decomposition
-  corez models                    Show available/configured AI models
-  corez model [model-id]          View active model or switch to a new model
-  corez agents                    Show configured CoreZ agent roles
-  corez status                    Show workspace, git branch, and model configuration status
+  console.log(`${styles.bold}USAGE${styles.reset}`);
+  console.log(`  ${styles.cyan}corez${styles.reset} ${styles.dim}<command>${styles.reset} ${styles.dim}[options]${styles.reset} ${styles.dim}[args]${styles.reset}`);
+  console.log(`  ${styles.cyan}corez${styles.reset} ${styles.dim}[options]${styles.reset} ${styles.dim}"<task description>"${styles.reset}\n`);
 
-Interactive Slash Commands (inside REPL):
-  /model [model-id]               View or switch active AI model
-  /plan <task>                    Build read-only architectural plan
-  /build <task>                   Run autonomous implementation
-  /fix                            Find and repair build/test/lint errors
-  /review                         Audit Git diff for bugs and security risks
-  /swarm <task>                   Run multi-agent swarm architecture
-  /clear                          Clear terminal screen
-  /help                           Print interactive help menu
-  /exit, /quit                    Exit interactive session
+  console.log(`${styles.bold}COMMANDS${styles.reset}`);
 
-Options:
-  --auto-approve, -y, --yolo      Auto-approve execution without confirmation prompts
-  --model <model-id>, -m <model>  Override active AI model for this invocation
-  --help, -h                      Show this help message
-  --version, -v                   Show CLI version
-  --verbose                       Enable debug verbose logging
-`);
+  console.log(`  ${styles.cyan}chat${styles.reset}                          Start interactive coding REPL session`);
+
+  const cmd = (name, alias, desc) =>
+    `  ${styles.cyan}${name}${alias ? styles.dim + ' (' + alias + ')' : ''}${styles.reset}  ${desc}`;
+
+  console.log(cmd('plan <task>', 'p', 'Analyse codebase & return architectural plan (read-only)'));
+  console.log(cmd('build <task>', 'b', 'Autonomous multi-file implementation mode'));
+  console.log(cmd('fix', 'f', 'Find & resolve failing tests / build / lint errors'));
+  console.log(cmd('review', 'r', 'Review staged & unstaged Git diff'));
+  console.log(cmd('swarm <task>', 'sw', 'Multi-agent DAG task decomposition'));
+
+  console.log(`\n  ${styles.dim}Information:${styles.reset}`);
+  console.log(cmd('status', 's', 'Show workspace, git branch & config status'));
+  console.log(cmd('models', null, 'Show available / configured AI models'));
+  console.log(cmd('model [id]', null, 'View active model or switch to a new model'));
+  console.log(cmd('agents', 'a', 'Show configured CoreZ agent roles'));
+
+  console.log(`\n${styles.bold}INTERACTIVE SLASH COMMANDS${styles.reset} ${styles.dim}(inside REPL)${styles.reset}`);
+  console.log(`  ${styles.dim}/model [id]     /plan <task>    /build <task>${styles.reset}`);
+  console.log(`  ${styles.dim}/fix             /review          /swarm <task>${styles.reset}`);
+  console.log(`  ${styles.dim}/clear           /help            /exit /quit${styles.reset}`);
+
+  console.log(`\n${styles.bold}OPTIONS${styles.reset}`);
+  const opt = (short, long, desc) =>
+    `  ${styles.cyan}${short}${short && long ? ', ' : '    '}${styles.reset}${styles.cyan}${long}${styles.reset}  ${desc}`;
+
+  console.log(opt('-h', '--help', 'Show this help message'));
+  console.log(opt('-v', '--version', 'Show CLI version'));
+  console.log(opt('-y', '--auto-approve, --yolo', 'Auto-approve execution without confirmation prompts'));
+  console.log(opt('-m', '--model <id>', 'Override active AI model for this invocation'));
+  console.log(opt('', '--verbose', 'Enable debug verbose logging'));
+  console.log(opt('', '--no-verbose', 'Disable verbose logging'));
+
+  console.log(`\n${styles.bold}EXAMPLES${styles.reset}`);
+  console.log(`  ${styles.dim}corez plan "add Stripe subscriptions"${styles.reset}`);
+  console.log(`  ${styles.dim}corez build "create admin dashboard"${styles.reset}`);
+  console.log(`  ${styles.dim}corez -m deepseek-v4-flux "check for bugs"${styles.reset}`);
+  console.log(`  ${styles.dim}corez fix${styles.reset}`);
+  console.log(`  ${styles.dim}corez chat${styles.reset}`);
+}
+
+function normalizeCommand(name) {
+  return COMMAND_ALIASES[name] || name;
+}
+
+function validatePrompt(command, prompt, ui) {
+  if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
+    ui.error(`${command} requires a task description.\nExample: ${styles.cyan}corez ${command} "${command === 'swarm' ? 'build a browser game' : 'add Stripe subscriptions'}"${styles.reset}`);
+    return false;
+  }
+  return true;
 }
 
 export async function runCli(argv = process.argv.slice(2), options = {}) {
@@ -90,43 +179,47 @@ export async function runCli(argv = process.argv.slice(2), options = {}) {
   }
 
   if (flags.version) {
-    console.log('corez-code v0.1.0 (AGY-style AI coding engine)');
+    console.log(`corez-code v${pkg.version} (AGY-style AI coding engine)`);
     return 0;
   }
 
   const firstArg = positional[0];
+  const restArgs = positional.slice(1);
 
-  // Command routing
   if (!firstArg || firstArg === 'chat') {
     await handleChatCommand(options, ui);
     return 0;
   }
 
-  switch (firstArg.toLowerCase()) {
+  const cmd = normalizeCommand(firstArg.toLowerCase());
+
+  switch (cmd) {
     case 'status':
-      await handleStatusCommand(positional.slice(1), options, ui);
+      await handleStatusCommand(restArgs, options, ui);
       return 0;
 
     case 'models':
-      await handleModelsCommand(positional.slice(1), options, ui);
+      await handleModelsCommand(restArgs, options, ui);
       return 0;
 
     case 'model':
     case '/model':
     case '/models':
-      await handleModelCommand(positional.slice(1), options, ui);
+      await handleModelCommand(restArgs, options, ui);
       return 0;
 
     case 'agents':
-      await handleAgentsCommand(positional.slice(1), options, ui);
+      await handleAgentsCommand(restArgs, options, ui);
       return 0;
 
     case 'plan':
-      await handlePlanCommand(positional.slice(1).join(' '), options, ui);
+      if (!validatePrompt('plan', restArgs.join(' '), ui)) return 1;
+      await handlePlanCommand(restArgs.join(' '), options, ui);
       return 0;
 
     case 'build':
-      await handleBuildCommand(positional.slice(1).join(' '), options, ui);
+      if (!validatePrompt('build', restArgs.join(' '), ui)) return 1;
+      await handleBuildCommand(restArgs.join(' '), options, ui);
       return 0;
 
     case 'fix':
@@ -138,11 +231,11 @@ export async function runCli(argv = process.argv.slice(2), options = {}) {
       return 0;
 
     case 'swarm':
-      await handleSwarmCommand(positional.slice(1).join(' '), options, ui);
+      if (!validatePrompt('swarm', restArgs.join(' '), ui)) return 1;
+      await handleSwarmCommand(restArgs.join(' '), options, ui);
       return 0;
 
     default: {
-      // Treat `corez "prompt"` as running a direct task prompt
       const prompt = positional.join(' ');
       ui.banner();
       ui.status('◐', `Executing task: "${prompt}"...`);
@@ -155,7 +248,7 @@ export async function runCli(argv = process.argv.slice(2), options = {}) {
             if (st.type === 'tool_start') {
               ui.status('●', `Tool: ${st.name}`);
             }
-          }
+          },
         });
 
         ui.brief({
@@ -163,7 +256,7 @@ export async function runCli(argv = process.argv.slice(2), options = {}) {
           model: runtime.config.model,
           stepsCount: result.stepsCount,
           inspectedFiles: result.inspectedFiles,
-          modifiedFiles: result.modifiedFiles
+          modifiedFiles: result.modifiedFiles,
         });
 
         ui.success('CoreZ Task Execution Result:');
