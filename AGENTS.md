@@ -2,7 +2,8 @@
 
 ## Roles and authority
 
-- **DeepSeek V4 Pro** (`deepseek/deepseek-v4-pro`) is the lead engineering agent, handling orchestration, development, vision, visual inspection, UI layout, game design, SVG creation, and overall implementation strategy.
+- **DeepSeek V4 Pro** (`deepseek/deepseek-v4-pro`) is the lead engineering agent, handling orchestration, development, vision, UI layout, game design, SVG creation, and overall implementation strategy.
+- **MiMo V2.5** (`xiaomi/mimo-v2.5` / `opencode-go/mimo-v2.5`) is the visual testing and inspection specialist, performing screenshot analysis, visual UI smoke testing, visual specification matching, and regression detection.
 - **FLUX 1 Schnell** (`@cf/black-forest-labs/flux-1-schnell`) is used for fast, free background image generation and visual artwork.
 
 ## Verification & Git completion policy
@@ -27,7 +28,7 @@ When handling browser game requests, CoreZ activates the **AI Game Studio** orch
 
 ### High-Precision Engineering Architecture Map (DeepSeek V4 Pro Primary Executor)
 
-> **Primary Model Rule**: **DeepSeek V4 Pro** performs all primary code execution, component building, architecture, UI work, and verification. **DeepSeek V4 Flash** operates as a fast secondary executor for rapid UI smoke testing.
+> **Primary Model Rule**: **DeepSeek V4 Pro** performs all primary code execution, component building, architecture, UI work, and verification. **DeepSeek V4 Flash** operates as a fast secondary executor for rapid UI smoke testing. **MiMo V2.5** operates as the primary visual testing agent for screenshot inspection and UI layout verification.
 
 | Studio Role | AI Model | Provider | Mode / Authority | Responsibilities |
 | :--- | :--- | :--- | :--- | :--- |
@@ -36,6 +37,7 @@ When handling browser game requests, CoreZ activates the **AI Game Studio** orch
 | `ui-programmer` | `deepseek-v4-pro` | `opencode-go` | Coder | Responsive browser HUDs, pause screens, game-over overlays, JSX components |
 | `level-designer` | `deepseek-v4-pro` | `opencode-go` | Coder | Map layouts, tilemaps, platform placement, level pacing |
 | `qa-tester` | `deepseek-v4-flash` | `openrouter` | Tester | Rapid smoke tests, control validation, bug reproduction |
+| `visual-specialist` | `mimo-v2.5` | `opencode-go` | Visual Tester | **Visual Inspection & Testing**: Screenshot analysis, visual layout verification, pixel/UI spec matching |
 | `architect-guide` | `deepseek-v4-pro` | `opencode-go` | Spec Lead | **Guidance & Architecture**: High-level specs, task graph decomposition, code review |
 | `code-reviewer` | `deepseek-v4-pro` | `opencode-go` | Read-only Reviewer | Safety audit, specification compliance, code quality review |
 | `physics-advisor` | `kimi-k3` | `opencode-go` | Read-only Advisor | **Physics & Math Advisor**: High-frequency physics math, spatial hashing formulas, canvas loop algorithms |
