@@ -4,6 +4,7 @@ set -u
 service="src/services/aiService.js"
 settings="src/components/SettingsModal.jsx"
 readme="README.md"
+terminal="src/games/financial-terminal.js"
 failures=0
 
 check() {
@@ -30,7 +31,7 @@ check_absent() {
 
 check 'frontend exposes a hosted AI response function' 'generateHostedAIResponse' "$service"
 check 'frontend uses the public AI route' '/api/ai' "$service"
-check 'frontend sends prompt, canonical intent, and message history' 'JSON[.]stringify\(\{ prompt, intent, messages: history \}\)' "$service"
+check 'frontend sends prompt, canonical intent, and message history' 'JSON[.]stringify\(\{ prompt, intent, messages: history' "$service"
 check 'hosted failures use provider-neutral fallback wording' 'Hosted AI unavailable; using local Corez fallback' "$service"
 check 'frontend retains local response fallback' 'generateLocalAIResponse' "$service"
 check 'frontend imports the deterministic market parser' 'parseMarketIntent' "$service"
@@ -39,10 +40,10 @@ check 'app intents bypass market interception' "marketRequest[[:space:]]*=[[:spa
 check_absent 'hardcoded gold quote is retired' '3,240[.]50|3240[.]50' "$service"
 check_absent 'hardcoded bitcoin quote is retired' '66,259[.]00|66259[.]00' "$service"
 check_absent 'local fallback does not claim a live snapshot' 'live market snapshot' "$service"
-check 'financial terminal has an explicit demo title' 'COREZ Financial Demo Terminal' "$service"
-check 'financial terminal is labeled as demo data' 'DEMO DATA' "$service"
-check_absent 'hardcoded financial demo does not claim a real-time terminal' 'Real-Time Financial Terminal' "$service"
-check_absent 'hardcoded financial demo does not claim live data' 'LIVE DATA' "$service"
+check 'financial terminal has an explicit demo title' 'COREZ Financial Demo Terminal' "$terminal"
+check 'financial terminal is labeled as demo data' 'DEMO DATA' "$terminal"
+check_absent 'hardcoded financial demo does not claim a real-time terminal' 'Real-Time Financial Terminal' "$terminal"
+check_absent 'hardcoded financial demo does not claim live data' 'LIVE DATA' "$terminal"
 check 'settings explains automatic server-managed routing' 'automatically routes.*managed server-side|managed server-side.*automatically routes' "$settings"
 check_absent 'settings does not expose provider or model names' 'GLM|DeepSeek|Kimi|MiMo|OpenRouter|FLUX|Cloudflare Workers AI|@cf/' "$settings"
 check 'README documents the optional OpenRouter secret' 'OPENROUTER_API_KEY' "$readme"

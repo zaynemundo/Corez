@@ -92,7 +92,7 @@ export default function CanvasPreview({
     <div className={`canvas-pane ${isFullScreen ? 'full-width' : ''}`}>
       <div className="canvas-header">
         <div className="canvas-title">
-          <span>Preview</span>
+
 
           {/* View Mode: Preview vs Source */}
           <div style={{ display: 'flex', background: 'var(--bg-tertiary)', padding: '2px', borderRadius: 'var(--radius-pill)', marginLeft: '0.5rem', border: '1px solid var(--border-color)' }}>
@@ -146,7 +146,7 @@ export default function CanvasPreview({
                 cursor: 'pointer'
               }}
             >
-              <option value="">Switch App ({sessionApps.length} stored)...</option>
+              <option value="">Open in Studio ({sessionApps.length} stored)...</option>
               {sessionApps.map((a, idx) => (
                 <option key={a.appId} value={a.appId}>
                   App {idx + 1}: {a.title.slice(0, 20)}
