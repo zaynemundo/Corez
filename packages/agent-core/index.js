@@ -26,4 +26,5 @@ export {
   OpenRouterProvider
 } from './providers/index.js';
 export { AgentRuntime, DuplicateToolGuard, toolCallFingerprint } from './runtime/index.js';
+export { JsonlSessionStore, SessionService } from './sessions/index.js';
 export { GenericSwarmOrchestrator, SWARM_ROLES, TaskDependencyGraph, AdaptiveConcurrencyQueue, SharedProjectState } from './swarm/index.js';
