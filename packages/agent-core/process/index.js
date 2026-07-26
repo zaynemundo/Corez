@@ -48,7 +48,7 @@ function invalidArgument(message, details, cause) {
   return commandError(ERROR_CODES.TOOL_ARGUMENT_INVALID, message, details, cause);
 }
 
-function validateRunProcessInput({ file, args, cwd, timeoutMs, maxOutputBytes, spawnImpl }) {
+function validateRunProcessInput({ file, args, cwd, timeoutMs, maxOutputBytes }) {
   if (typeof file !== 'string' || file.trim() === '') {
     return invalidArgument('Command file must be a non-empty string.', { file });
   }
@@ -67,9 +67,6 @@ function validateRunProcessInput({ file, args, cwd, timeoutMs, maxOutputBytes, s
       maxOutputBytes
     });
   }
-  if (typeof spawnImpl !== 'function') {
-    return invalidArgument('Command spawn implementation must be a function.', { file });
-  }
   return null;
 }
 
@@ -80,8 +77,7 @@ export function runProcess({
   env = process.env,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   maxOutputBytes = DEFAULT_MAX_OUTPUT_BYTES,
-  signal,
-  spawnImpl = spawn
+  signal
 } = {}) {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
@@ -89,7 +85,7 @@ export function runProcess({
       return;
     }
 
-    const invalidInput = validateRunProcessInput({ file, args, cwd, timeoutMs, maxOutputBytes, spawnImpl });
+    const invalidInput = validateRunProcessInput({ file, args, cwd, timeoutMs, maxOutputBytes });
     if (invalidInput) {
       reject(invalidInput);
       return;
@@ -194,7 +190,7 @@ export function runProcess({
     };
 
     try {
-      child = spawnImpl(file, args, {
+      child = spawn(file, args, {
         cwd,
         env: childEnv,
         shell: false,
@@ -211,7 +207,7 @@ export function runProcess({
 
     child.stdout.on('data', onStdout);
     child.stderr.on('data', onStderr);
-    child.once('error', onError);
+    child.on('error', onError);
     child.once('close', onClose);
     signal?.addEventListener('abort', onAbort, { once: true });
     timeoutTimer = setTimeout(() => terminate('timeout'), timeoutMs);

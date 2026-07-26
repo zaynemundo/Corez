@@ -1,6 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
+
+vi.mock('node:child_process', async importOriginal => {
+  const actual = await importOriginal();
+  return { ...actual, spawn: vi.fn(actual.spawn) };
+});
+
+import { spawn } from 'node:child_process';
 import { buildCommandEnv, runProcess } from '../../packages/agent-core/index.js';
 
 describe('runProcess', () => {
@@ -127,7 +134,19 @@ describe('runProcess', () => {
     expect(result.stdout).toBe('filtered');
   });
 
-  it('continues forced termination after a child emits an error during SIGTERM', async () => {
+  it('does not expose a caller-controlled spawn override', async () => {
+    const result = await runProcess({
+      file: process.execPath,
+      args: ['-e', 'process.stdout.write("bound")'],
+      cwd: process.cwd(),
+      spawnImpl: () => {
+        throw new Error('caller override must not run');
+      }
+    });
+    expect(result.stdout).toBe('bound');
+  });
+
+  it('continues forced termination after child errors during SIGTERM and SIGKILL', async () => {
     const child = new EventEmitter();
     child.stdout = new PassThrough();
     child.stderr = new PassThrough();
@@ -137,17 +156,20 @@ describe('runProcess', () => {
       if (signal === 'SIGTERM') {
         queueMicrotask(() => child.emit('error', new Error('SIGTERM delivery failed')));
       } else {
-        queueMicrotask(() => child.emit('close', null, 'SIGKILL'));
+        queueMicrotask(() => {
+          child.emit('error', new Error('SIGKILL delivery failed'));
+          child.emit('close', null, 'SIGKILL');
+        });
       }
       return true;
     };
+    vi.mocked(spawn).mockImplementationOnce(() => child);
 
     await expect(runProcess({
       file: process.execPath,
       args: ['-e', 'setInterval(() => {}, 1000)'],
       cwd: process.cwd(),
-      timeoutMs: 10,
-      spawnImpl: () => child
+      timeoutMs: 10
     })).rejects.toMatchObject({ code: 'COMMAND_TIMEOUT' });
     expect(signals).toEqual(['SIGTERM', 'SIGKILL']);
   });
