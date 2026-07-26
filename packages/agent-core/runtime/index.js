@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { ContextEngine } from '../context/index.js';
 import { CorezError, ERROR_CODES } from '../contracts/errors.js';
 import { createEvent, isCorezEvent } from '../contracts/events.js';
@@ -103,28 +104,97 @@ function errorData(error) {
   };
 }
 
-function authorizeWithSignal(controller, request, signal) {
-  if (signal?.aborted) return Promise.reject(cancellationError());
-  const authorization = controller.authorize(request);
-  if (!signal) return authorization;
-
-  return new Promise((resolve, reject) => {
-    const onAbort = () => {
-      signal.removeEventListener('abort', onAbort);
-      reject(cancellationError());
+function approvalTransaction(controller) {
+  if (!(controller?.sessionApprovals instanceof Set)) {
+    return {
+      authorize: request => controller.authorize(request),
+      commit: () => {}
     };
-    signal.addEventListener('abort', onAbort, { once: true });
+  }
+
+  const originalApprovals = controller.sessionApprovals;
+  const baselineApprovals = new Set(originalApprovals);
+  const isolatedController = Object.create(controller);
+  isolatedController.sessionApprovals = new Set(baselineApprovals);
+  if (typeof controller.prompt === 'function') {
+    isolatedController.prompt = (...args) => controller.prompt(...args);
+  }
+
+  return {
+    authorize: request => controller.authorize.call(isolatedController, request),
+    commit: () => {
+      for (const scope of isolatedController.sessionApprovals) {
+        if (!baselineApprovals.has(scope)) originalApprovals.add(scope);
+      }
+    }
+  };
+}
+
+function authorizeWithSignal(controller, request, signal) {
+  return new Promise((resolve, reject) => {
+    const transaction = approvalTransaction(controller);
+    let settled = false;
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      signal?.removeEventListener('abort', onAbort);
+      callback(value);
+    };
+    const onAbort = () => {
+      finish(reject, cancellationError());
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+    if (signal?.aborted) {
+      onAbort();
+      return;
+    }
+
+    let authorization;
+    try {
+      authorization = transaction.authorize(request);
+    } catch (error) {
+      finish(reject, error);
+      return;
+    }
+
     Promise.resolve(authorization).then(
       result => {
-        signal.removeEventListener('abort', onAbort);
-        resolve(result);
+        if (settled) return;
+        if (signal?.aborted) {
+          onAbort();
+          return;
+        }
+        transaction.commit();
+        finish(resolve, result);
       },
-      error => {
-        signal.removeEventListener('abort', onAbort);
-        reject(error);
-      }
+      error => finish(reject, error)
     );
   });
+}
+
+function runContext(contextEngine, cwd) {
+  const inspectedFiles = new Set();
+  const modifiedFiles = new Set();
+  const normalizeFile = filePath => (
+    path.isAbsolute(filePath) ? path.relative(cwd, filePath) : filePath
+  );
+  const context = Object.create(contextEngine);
+
+  context.recordInspectedFile = filePath => {
+    if (!filePath) return;
+    inspectedFiles.add(normalizeFile(filePath));
+    contextEngine.recordInspectedFile?.(filePath);
+  };
+  context.recordModifiedFile = filePath => {
+    if (!filePath) return;
+    modifiedFiles.add(normalizeFile(filePath));
+    contextEngine.recordModifiedFile?.(filePath);
+  };
+  context.recordToolExecution = (...args) => {
+    contextEngine.recordToolExecution?.(...args);
+  };
+
+  return { context, inspectedFiles, modifiedFiles };
 }
 
 async function* streamToolExecution(start, state) {
@@ -267,6 +337,7 @@ export class AgentRuntime {
 
       this.contextEngine.inspectProject();
       this.contextEngine.loadInstructions();
+      const currentRun = runContext(this.contextEngine, this.cwd);
       const messages = [
         { role: 'system', content: systemPrompt(this.contextEngine) },
         { role: 'user', content: userPrompt }
@@ -316,8 +387,8 @@ export class AgentRuntime {
           const completed = {
             success: true,
             stepsCount,
-            inspectedFiles: [...this.contextEngine.inspectedFiles],
-            modifiedFiles: [...this.contextEngine.modifiedFiles],
+            inspectedFiles: [...currentRun.inspectedFiles],
+            modifiedFiles: [...currentRun.modifiedFiles],
             executedToolsCount
           };
           yield createEvent('run.completed', completed);
@@ -342,7 +413,7 @@ export class AgentRuntime {
           for await (const approvalEvent of streamToolExecution(authorize => (
             this.toolRegistry.executeTool(call.name, call.arguments || {}, {
               sandbox: this.sandbox,
-              context: this.contextEngine,
+              context: currentRun.context,
               permissionManager: this.permissionManager,
               approvalController: this.approvalController,
               autoApprove: options.autoApprove,

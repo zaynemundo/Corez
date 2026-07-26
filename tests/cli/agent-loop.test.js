@@ -96,4 +96,21 @@ describe('AgentRuntime', () => {
       stepsCount: 1
     });
   });
+
+  it('reports inspected files from only the current execution when reused', async () => {
+    const provider = new MockProvider({ turns: [
+      [{ type: 'tool.requested', data: { id: 'c1', name: 'read_file', arguments: { filePath: 'package.json' } } }],
+      [{ type: 'assistant.completed', data: { finishReason: 'stop' } }],
+      [{ type: 'tool.requested', data: { id: 'c2', name: 'read_file', arguments: { filePath: 'README.md' } } }],
+      [{ type: 'assistant.completed', data: { finishReason: 'stop' } }]
+    ] });
+    const runtime = AgentRuntime.createForWorkspace(process.cwd(), { provider });
+
+    const first = await runtime.execute('inspect package', { policy: 'plan' });
+    const second = await runtime.execute('inspect readme', { policy: 'plan' });
+
+    expect(first.inspectedFiles).toContain('package.json');
+    expect(second.inspectedFiles).toContain('README.md');
+    expect(second.inspectedFiles).not.toContain('package.json');
+  });
 });

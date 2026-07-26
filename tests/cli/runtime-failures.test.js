@@ -31,6 +31,14 @@ async function capture(generator) {
   return { events, error };
 }
 
+function deferred() {
+  let resolve;
+  const promise = new Promise(complete => {
+    resolve = complete;
+  });
+  return { promise, resolve };
+}
+
 describe('AgentRuntime failure states', () => {
   it('creates stable fingerprints by recursively sorting argument keys', () => {
     expect(toolCallFingerprint({
@@ -139,6 +147,55 @@ describe('AgentRuntime failure states', () => {
     });
     await expect(iterator.next()).rejects.toMatchObject({ code: 'COMMAND_CANCELLED' });
     expect(fs.existsSync(path.join(root, 'blocked.txt'))).toBe(false);
+  });
+
+  it('does not persist a late session approval after cancellation', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'corez-runtime-'));
+    roots.push(root);
+    const controller = new AbortController();
+    const promptStarted = deferred();
+    const promptResponse = deferred();
+    const approvalController = new ApprovalController({
+      prompt: async () => {
+        promptStarted.resolve();
+        return promptResponse.promise;
+      }
+    });
+    const provider = new MockProvider({ turns: [[{
+      type: 'tool.requested',
+      data: { id: 'c1', name: 'write_file', arguments: { filePath: 'late.txt', content: 'late' } }
+    }]] });
+    const runtime = AgentRuntime.createForWorkspace(root, {
+      provider,
+      permissionManager: new PermissionManager({ workspaceWrite: 'ask' }),
+      approvalController
+    });
+    const iterator = runtime.runTask('write', {
+      policy: 'run',
+      signal: controller.signal
+    })[Symbol.asyncIterator]();
+    let next;
+    do {
+      next = await iterator.next();
+    } while (next.value?.type !== 'approval.requested');
+
+    const pendingAuthorization = iterator.next();
+    await promptStarted.promise;
+    controller.abort();
+    expect(await pendingAuthorization).toMatchObject({
+      value: {
+        type: 'error',
+        data: { code: 'COMMAND_CANCELLED' }
+      }
+    });
+    await expect(iterator.next()).rejects.toMatchObject({ code: 'COMMAND_CANCELLED' });
+
+    promptResponse.resolve('session');
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(approvalController.sessionApprovals.size).toBe(0);
+    expect(fs.existsSync(path.join(root, 'late.txt'))).toBe(false);
   });
 
   it('rejects policy-disallowed tools before authorization or execution', async () => {
