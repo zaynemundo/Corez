@@ -2,6 +2,7 @@ import { CorezError, ERROR_CODES } from '../contracts/errors.js';
 import { MockProvider } from './mock.js';
 import { OpenCodeGoProvider } from './opencode-go.js';
 import { OpenRouterProvider } from './openrouter.js';
+import { FallbackProvider } from './fallback.js';
 
 export const MODEL_CATALOG = Object.freeze([
   { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', provider: 'opencode-go', role: 'Primary Executor (Orchestration, Coding, UI, Building & Verification)' },
@@ -37,16 +38,32 @@ export class ModelProviderRouter {
     }
 
     if (modelEntry.provider === 'opencode-go') {
-      if (!this.opencodeApiKey) {
-        throw new CorezError(ERROR_CODES.AUTH_MISSING, 'OpenCode Go API credential is required.', {
-          provider: modelEntry.provider,
-          model
+      if (this.opencodeApiKey) {
+        const primary = new OpenCodeGoProvider({
+          apiKey: this.opencodeApiKey,
+          fetchImpl: this.fetchImpl,
+          timeoutMs: this.timeoutMs
+        });
+        if (this.openrouterApiKey) {
+          const fallback = new OpenRouterProvider({
+            apiKey: this.openrouterApiKey,
+            fetchImpl: this.fetchImpl,
+            timeoutMs: this.timeoutMs
+          });
+          return new FallbackProvider(primary, fallback);
+        }
+        return primary;
+      }
+      if (this.openrouterApiKey) {
+        return new OpenRouterProvider({
+          apiKey: this.openrouterApiKey,
+          fetchImpl: this.fetchImpl,
+          timeoutMs: this.timeoutMs
         });
       }
-      return new OpenCodeGoProvider({
-        apiKey: this.opencodeApiKey,
-        fetchImpl: this.fetchImpl,
-        timeoutMs: this.timeoutMs
+      throw new CorezError(ERROR_CODES.AUTH_MISSING, 'OpenCode Go API credential is required.', {
+        provider: modelEntry.provider,
+        model
       });
     }
 

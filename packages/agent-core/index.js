@@ -25,5 +25,5 @@ export {
   OpenCodeGoProvider,
   OpenRouterProvider
 } from './providers/index.js';
-export { AgentRuntime } from './runtime/index.js';
+export { AgentRuntime, DuplicateToolGuard, toolCallFingerprint } from './runtime/index.js';
 export { GenericSwarmOrchestrator, SWARM_ROLES, TaskDependencyGraph, AdaptiveConcurrencyQueue, SharedProjectState } from './swarm/index.js';
