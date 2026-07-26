@@ -1,5 +1,7 @@
 export { loadCorezConfig, saveCorezConfig, DEFAULT_CONFIG } from './config/index.js';
 export { CorezError, ERROR_CODES, exitCodeForError } from './contracts/errors.js';
+export { WorkspaceSandbox } from './sandbox/index.js';
+export { buildCommandEnv, runProcess } from './process/index.js';
 export { createEvent, isCorezEvent } from './contracts/events.js';
 export { getCommandPolicy } from './policies/index.js';
 export { PermissionManager, PERMISSION_CATEGORIES, BLOCKED_DANGEROUS_COMMANDS } from './permissions/index.js';
