@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { formatCodeForPreview } from '../utils/previewTransformer';
 
-import { listSessionAppsInR2, getAppFromR2 } from '../services/appStorageService';
+import { listSessionAppsInR2 } from '../services/appStorageService';
 
 export default function CanvasPreview({ 
   code, 
@@ -30,7 +30,6 @@ export default function CanvasPreview({
   const [copied, setCopied] = useState(false);
   const [key, setKey] = useState(0);
   const [sessionApps, setSessionApps] = useState([]);
-  const [selectedAppId, setSelectedAppId] = useState('');
 
   const formattedSrcDoc = useMemo(() => {
     return formatCodeForPreview(editableCode);
@@ -48,16 +47,6 @@ export default function CanvasPreview({
       }).catch(() => {});
     }
   }, [sessionId, code]);
-
-  const handleSelectApp = async (appId) => {
-    setSelectedAppId(appId);
-    if (!appId) return;
-    const app = await getAppFromR2(sessionId, appId);
-    if (app && (app.code || app.html)) {
-      setEditableCode(app.code || app.html);
-      setKey(prev => prev + 1);
-    }
-  };
 
   const handleCopy = () => {
     navigator.clipboard.writeText(editableCode);
@@ -130,29 +119,29 @@ export default function CanvasPreview({
             </button>
           </div>
 
-          {/* Multi-App Selector if multiple apps exist in session */}
-          {sessionApps.length > 1 && (
-            <select
-              value={selectedAppId}
-              onChange={(e) => handleSelectApp(e.target.value)}
+          {/* Open in Studio button */}
+          {sessionApps.length > 0 && (
+            <button
+              onClick={() => {
+                const currentApp = sessionApps[0];
+                const appName = (currentApp?.title || 'untitled').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+                window.open(`https://corez.pro/studio/${appName}`, '_blank');
+              }}
               style={{
                 marginLeft: '0.5rem',
-                background: 'var(--bg-tertiary)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-color)',
+                background: 'var(--accent-color)',
+                color: '#fff',
+                border: 'none',
                 borderRadius: 'var(--radius-pill)',
-                padding: '2px 8px',
+                padding: '4px 12px',
                 fontSize: '0.725rem',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                fontWeight: 500,
+                whiteSpace: 'nowrap'
               }}
             >
-              <option value="">Open in Studio ({sessionApps.length} stored)...</option>
-              {sessionApps.map((a, idx) => (
-                <option key={a.appId} value={a.appId}>
-                  App {idx + 1}: {a.title.slice(0, 20)}
-                </option>
-              ))}
-            </select>
+              Open in Studio
+            </button>
           )}
         </div>
 
