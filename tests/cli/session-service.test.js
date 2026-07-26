@@ -1,5 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
-import { SessionService } from '../../packages/agent-core/index.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { JsonlSessionStore, SessionService } from '../../packages/agent-core/index.js';
+
+const roots = [];
+afterEach(() => {
+  roots.splice(0).forEach(root => fs.rmSync(root, { recursive: true, force: true }));
+});
 
 function createMemoryStore() {
   const metadata = new Map();
@@ -81,6 +89,65 @@ describe('SessionService', () => {
       .toThrowError(expect.objectContaining({ code: 'SESSION_NOT_FOUND' }));
   });
 
+  it.each(['append', 'show', 'delete', 'list'])(
+    'requires a project scope for %s',
+    operation => {
+      const store = createMemoryStore();
+      const service = new SessionService({ store, realpath: value => value });
+      const session = service.create({
+        projectPath: '/a',
+        model: 'x',
+        policy: 'chat',
+        title: 'scoped'
+      });
+      const event = {
+        type: 'status',
+        timestamp: '2026-07-26T00:00:00.000Z',
+        data: {}
+      };
+      const invoke = {
+        append: () => service.append(session.id, event),
+        show: () => service.show(session.id),
+        delete: () => service.delete(session.id),
+        list: () => service.list()
+      }[operation];
+
+      expect(invoke).toThrow(TypeError);
+      expect(store.get(session.id)).toBeDefined();
+      expect(store.readEvents(session.id)).toEqual([]);
+    }
+  );
+
+  it.each(['append', 'show', 'delete', 'list'])(
+    'validates %s project scope before reading store state',
+    operation => {
+      const unscopedAccess = () => {
+        throw new Error('unscoped store access');
+      };
+      const store = {
+        get: unscopedAccess,
+        list: unscopedAccess,
+        append: unscopedAccess,
+        readEvents: unscopedAccess,
+        delete: unscopedAccess
+      };
+      const service = new SessionService({ store, realpath: value => value });
+      const event = {
+        type: 'status',
+        timestamp: '2026-07-26T00:00:00.000Z',
+        data: {}
+      };
+      const invoke = {
+        append: () => service.append('missing', event),
+        show: () => service.show('missing'),
+        delete: () => service.delete('missing'),
+        list: () => service.list()
+      }[operation];
+
+      expect(invoke).toThrow(TypeError);
+    }
+  );
+
   it('appends and shows session history without exposing another project', () => {
     const store = createMemoryStore();
     const service = new SessionService({ store, realpath: value => value });
@@ -144,6 +211,44 @@ describe('SessionService', () => {
       data: { summary: 'Concise summary' }
     });
     expect(store.readEvents(session.id)).toEqual([original, summaryEvent]);
+  });
+
+  it('preserves prior history when compaction persistence fails after summarization', async () => {
+    const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'corez-compact-'));
+    roots.push(rootDir);
+    let calls = 0;
+    const store = new JsonlSessionStore({
+      rootDir,
+      now: () => {
+        calls += 1;
+        if (calls > 2) throw new Error('index timestamp failed');
+        return new Date(`2026-07-26T00:00:0${calls}.000Z`);
+      }
+    });
+    const service = new SessionService({
+      store,
+      realpath: value => value,
+      now: () => new Date('2026-07-26T00:00:10.000Z')
+    });
+    const session = service.create({
+      projectPath: '/a',
+      model: 'x',
+      policy: 'chat',
+      title: 'compact rollback'
+    });
+    const original = {
+      type: 'status',
+      timestamp: '2026-07-26T00:00:00.000Z',
+      data: { text: 'original' }
+    };
+    service.append(session.id, original, '/a');
+
+    await expect(service.compact(
+      session.id,
+      '/a',
+      async () => 'summary'
+    )).rejects.toThrow('index timestamp failed');
+    expect(store.readEvents(session.id)).toEqual([original]);
   });
 
   it('deletes only a session belonging to the requested canonical project', () => {

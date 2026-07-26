@@ -4,16 +4,12 @@ import {
   File,
   FileJson,
   Globe,
-  ChevronRight,
   ChevronDown,
   X,
   ExternalLink,
   FolderClosed,
   FileText,
-  Search,
-  PanelLeftClose,
-  PanelLeft,
-  Play
+  PanelLeftClose
 } from 'lucide-react';
 
 const FILE_ICONS = {
@@ -30,11 +26,6 @@ const FILE_ICONS = {
 function getFileIcon(name) {
   const ext = name.split('.').pop();
   return FILE_ICONS[ext] || File;
-}
-
-function fileName(name) {
-  const ext = name.split('.').pop();
-  return FILE_ICONS[ext] ? name : name;
 }
 
 const THEME = {
@@ -123,10 +114,6 @@ export default function AppStudioPage({ code, title, onClose }) {
   }, [code, title]);
 
   const currentFile = files.find(f => f.name === selectedFile) || files[0];
-
-  const handleOpenPreview = () => {
-    window.open('https://corez.pro', '_blank');
-  };
 
   const editorLines = useMemo(() => {
     return (currentFile?.content || '').split('\n');

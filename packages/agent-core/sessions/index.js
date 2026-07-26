@@ -34,14 +34,13 @@ export class SessionService {
   }
 
   append(id, event, projectPath) {
-    if (projectPath === undefined) this.#get(id);
-    else this.resume(id, projectPath);
+    this.resume(id, projectPath);
     return this.store.append(id, event);
   }
 
   resume(id, projectPath) {
-    const session = this.#get(id);
     const expectedProject = this.#canonical(projectPath);
+    const session = this.#get(id);
     const sessionProject = this.#canonical(session.projectPath);
     if (sessionProject !== expectedProject) {
       throw new CorezError(
@@ -68,18 +67,15 @@ export class SessionService {
   }
 
   list(projectPath) {
-    const sessions = this.store.list();
-    if (projectPath === undefined) return sessions;
     const canonicalProject = this.#canonical(projectPath);
+    const sessions = this.store.list();
     return sessions.filter(session => (
       this.#canonical(session.projectPath) === canonicalProject
     ));
   }
 
   show(id, projectPath) {
-    const session = projectPath === undefined
-      ? this.#get(id)
-      : this.resume(id, projectPath);
+    const session = this.resume(id, projectPath);
     return {
       ...session,
       events: this.store.readEvents(id)
@@ -103,9 +99,7 @@ export class SessionService {
   }
 
   delete(id, projectPath) {
-    const session = projectPath === undefined
-      ? this.#get(id)
-      : this.resume(id, projectPath);
+    const session = this.resume(id, projectPath);
     this.store.delete(id);
     return session;
   }

@@ -14,7 +14,7 @@ describe('runProcess', () => {
   it('returns structured output and exit code', async () => {
     const result = await runProcess({
       file: process.execPath,
-      args: ['-e', 'process.stdout.write("ok")'],
+      args: ['-e', 'require("node:fs").writeSync(1, "ok")'],
       cwd: process.cwd()
     });
     expect(result).toMatchObject({ exitCode: 0, stdout: 'ok', stderr: '' });
@@ -23,7 +23,7 @@ describe('runProcess', () => {
   it('bounds captured output', async () => {
     const result = await runProcess({
       file: process.execPath,
-      args: ['-e', 'process.stdout.write("x".repeat(100))'],
+      args: ['-e', 'require("node:fs").writeSync(1, "x".repeat(100))'],
       cwd: process.cwd(),
       maxOutputBytes: 16
     });
@@ -119,7 +119,7 @@ describe('runProcess', () => {
 
     const builtResult = await runProcess({
       file: process.execPath,
-      args: ['-e', 'process.stdout.write(process.env.SAFE_FLAG || "missing")'],
+      args: ['-e', 'require("node:fs").writeSync(1, process.env.SAFE_FLAG || "missing")'],
       cwd: process.cwd(),
       env: built
     });
@@ -127,7 +127,7 @@ describe('runProcess', () => {
 
     const result = await runProcess({
       file: process.execPath,
-      args: ['-e', 'process.stdout.write(process.env.OPENROUTER_API_KEY || process.env.SAFE_FLAG || "filtered")'],
+      args: ['-e', 'require("node:fs").writeSync(1, process.env.OPENROUTER_API_KEY || process.env.SAFE_FLAG || "filtered")'],
       cwd: process.cwd(),
       env: { PATH: process.env.PATH, OPENROUTER_API_KEY: 'secret', SAFE_FLAG: 'unapproved' }
     });
@@ -137,7 +137,7 @@ describe('runProcess', () => {
   it('does not expose a caller-controlled spawn override', async () => {
     const result = await runProcess({
       file: process.execPath,
-      args: ['-e', 'process.stdout.write("bound")'],
+      args: ['-e', 'require("node:fs").writeSync(1, "bound")'],
       cwd: process.cwd(),
       spawnImpl: () => {
         throw new Error('caller override must not run');
