@@ -62,10 +62,10 @@ function tokenizeCommand(command) {
 
 function hasExternalOrTraversalPath(value) {
   const source = String(value ?? '');
-  return /(^|[\s'"=:(])\/(?!\/)/.test(source)
+  return /(^|[\s'"=:(])\//.test(source)
     || /(^|[\s'"=:(])[A-Za-z]:[\\/]/.test(source)
     || /(^|[\s'"=:(])\\\\[^\s]/.test(source)
-    || /(^|[\s'"=:(])\.\.(?=$|[\\/\s'"=:)])/.test(source);
+    || /(^|[\\/\s'"=:(])\.\.(?=$|[\\/\s'"=:)])/.test(source);
 }
 
 function commandIsLexicallyContained(command) {

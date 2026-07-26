@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { ToolRegistry, WorkspaceSandbox } from '../../packages/agent-core/index.js';
+import { PermissionManager, ToolRegistry, WorkspaceSandbox } from '../../packages/agent-core/index.js';
 
 const roots = [];
 afterEach(() => roots.splice(0).forEach(root => fs.rmSync(root, { recursive: true, force: true })));
@@ -86,8 +86,24 @@ describe('ToolRegistry', () => {
 
   it('validates run_tests filters before allowing automatic execution', () => {
     const tool = new ToolRegistry().getTool('run_tests');
-    expect(tool.contained({ testFilter: '../outside.test.js' })).toBe(false);
-    expect(tool.contained({ testFilter: '/tmp/outside.test.js' })).toBe(false);
+    const manager = new PermissionManager({ shell: 'ask' });
+    const rejectedFilters = [
+      '../outside.test.js',
+      '/tmp/outside.test.js',
+      'tests/../../outside.test.js',
+      '--config=tests/../../outside.config.js',
+      '//tmp/outside.test.js',
+      '--config=//tmp/outside.config.js'
+    ];
+    for (const testFilter of rejectedFilters) {
+      expect(tool.contained({ testFilter })).toBe(false);
+      expect(manager.resolve({
+        category: 'shell',
+        operation: testFilter,
+        autoApprove: true,
+        contained: tool.contained({ testFilter })
+      })).toMatchObject({ action: 'blocked', allowed: false });
+    }
     expect(tool.contained({ testFilter: 'tests/cli/tools.test.js' })).toBe(true);
   });
 
