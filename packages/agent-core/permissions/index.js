@@ -66,7 +66,7 @@ export class PermissionManager {
     };
   }
 
-  resolve({ category, operation = '', autoApprove = false, contained = false } = {}) {
+  resolve({ category, operation = '', autoApprove = false, autoEligible = true, contained } = {}) {
     const normalizedOperation = typeof operation === 'string' ? operation.trim() : String(operation ?? '');
     const permissionKey = CATEGORY_PERMISSION_KEY[category];
 
@@ -83,10 +83,12 @@ export class PermissionManager {
       return decision('blocked', 'Command matches a blocked dangerous pattern.');
     }
 
+    if (contained === false) return decision('blocked', 'Operation is not contained within the workspace boundary.');
+
     const mode = normalizeMode(this.permissions[permissionKey], 'ask');
-    if (mode === 'deny') return decision('blocked', `${category} operations are disabled by policy.`);
+    if (mode === 'deny') return decision('deny', `${category} operations are disabled by policy.`);
     if (mode === 'allow') return decision('allow', `${category} operations are allowed by policy.`);
-    if (autoApprove && contained) return decision('allow', 'Contained ordinary operation auto-approved.');
+    if (autoApprove && autoEligible && contained === true) return decision('allow', 'Contained ordinary operation auto-approved.');
     return decision('ask', `${category} operation requires approval.`);
   }
 
@@ -101,6 +103,7 @@ export class PermissionManager {
       category,
       operation: detail,
       autoApprove: options.autoApprove,
+      autoEligible: options.autoEligible,
       contained: options.contained
     });
   }

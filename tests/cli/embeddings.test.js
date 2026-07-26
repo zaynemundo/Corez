@@ -31,10 +31,21 @@ describe('Vector Embeddings (nvidia/nemotron-3-embed-1b:free)', () => {
     const registry = new ToolRegistry();
     const result = await registry.executeTool('embed_text', {
       text: 'function gameLoop() { update(); render(); }'
+    }, {
+      authorize: async request => {
+        expect(request.category).toBe('network');
+        return { allowed: true };
+      }
     });
 
     expect(result.model).toContain('nvidia/nemotron-3-embed-1b:free');
     expect(result.dimensions).toBeGreaterThan(0);
     expect(Array.isArray(result.embedding)).toBe(true);
+  });
+
+  it('does not execute embed_text without network approval', async () => {
+    await expect(new ToolRegistry().executeTool('embed_text', {
+      text: 'private source text'
+    })).rejects.toMatchObject({ code: 'TOOL_APPROVAL_REQUIRED' });
   });
 });

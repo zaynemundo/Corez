@@ -20,7 +20,7 @@ export class ApprovalController {
     const permission = request.decision || { action: 'ask', allowed: false };
     const scope = normalizedScope(request);
 
-    if (permission.action === 'blocked') {
+    if (permission.action === 'blocked' || permission.action === 'deny') {
       throw denied('Tool operation is blocked by policy.', { request, permission });
     }
     if (permission.action === 'allow' || permission.allowed === true) {

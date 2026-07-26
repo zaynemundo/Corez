@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { CorezError, ERROR_CODES } from '../contracts/errors.js';
-import { PERMISSION_CATEGORIES } from '../permissions/index.js';
+import { PERMISSION_CATEGORIES, SENSITIVE_FILE_OPERATION } from '../permissions/index.js';
 import { runProcess } from '../process/index.js';
 
 const SEARCHABLE_FILE = /\.(js|jsx|ts|tsx|json|md|html|css|py|sh)$/i;
@@ -60,9 +60,21 @@ function tokenizeCommand(command) {
   return tokens;
 }
 
+function hasExternalOrTraversalPath(value) {
+  const source = String(value ?? '');
+  return /(^|[\s'"=:(])\/(?!\/)/.test(source)
+    || /(^|[\s'"=:(])[A-Za-z]:[\\/]/.test(source)
+    || /(^|[\s'"=:(])\\\\[^\s]/.test(source)
+    || /(^|[\s'"=:(])\.\.(?=$|[\\/\s'"=:)])/.test(source);
+}
+
 function commandIsLexicallyContained(command) {
-  const tokens = tokenizeCommand(command);
-  return tokens.slice(1).every(token => !path.isAbsolute(token) && !token.split(/[\\/]+/).includes('..'));
+  tokenizeCommand(command);
+  return !hasExternalOrTraversalPath(command);
+}
+
+function testFilterIsLexicallyContained(testFilter = '') {
+  return typeof testFilter === 'string' && !hasExternalOrTraversalPath(testFilter);
 }
 
 async function processResult(command, cwd, options = {}) {
@@ -71,8 +83,8 @@ async function processResult(command, cwd, options = {}) {
   return result(execution.exitCode === 0, { command, ...execution });
 }
 
-function schema(name, category, description, parameters, execute, contained = () => true) {
-  return { name, category, description, parameters, execute, contained };
+function schema(name, category, description, parameters, execute, contained = () => true, autoEligible = true) {
+  return { name, category, description, parameters, execute, contained, autoEligible };
 }
 
 export function createCoreTools() {
@@ -167,6 +179,7 @@ export function createCoreTools() {
         const matches = [];
         walkFiles(sandbox, canonicalPath => {
           if (matches.length >= 30 || !SEARCHABLE_FILE.test(canonicalPath)) return;
+          if (SENSITIVE_FILE_OPERATION.test(relativePath(sandbox.root, canonicalPath))) return;
           const content = fs.readFileSync(canonicalPath, 'utf8');
           content.split('\n').forEach((line, index) => {
             if (matches.length < 30 && line.includes(query)) matches.push({ file: relativePath(sandbox.root, canonicalPath), lineNumber: index + 1, content: line.trim() });
@@ -178,7 +191,7 @@ export function createCoreTools() {
 
     schema('run_command', PERMISSION_CATEGORIES.SHELL, 'Execute a command without a shell in the workspace.', {
       type: 'object', properties: { command: { type: 'string', description: 'Command and arguments' } }, required: ['command'], additionalProperties: false
-    }, ({ command }, { sandbox, signal }) => processResult(command, sandbox.root, { signal }), ({ command }) => commandIsLexicallyContained(command)),
+    }, ({ command }, { sandbox, signal }) => processResult(command, sandbox.root, { signal }), ({ command }) => commandIsLexicallyContained(command), false),
 
     schema('git_status', PERMISSION_CATEGORIES.READ, 'Get the current Git status.', { type: 'object', properties: {}, additionalProperties: false },
       (_args, { sandbox, signal }) => processResult('git status --short', sandbox.root, { signal })),
@@ -193,12 +206,12 @@ export function createCoreTools() {
     }),
     schema('run_tests', PERMISSION_CATEGORIES.SHELL, 'Run the project test suite.', {
       type: 'object', properties: { testFilter: { type: 'string', description: 'Optional test filter' } }, additionalProperties: false
-    }, ({ testFilter = '' } = {}, { sandbox, signal }) => processResult(testFilter ? `npm test -- ${testFilter}` : 'npm test', sandbox.root, { signal }), () => true),
+    }, ({ testFilter = '' } = {}, { sandbox, signal }) => processResult(testFilter ? `npm test -- ${testFilter}` : 'npm test', sandbox.root, { signal }), ({ testFilter }) => testFilterIsLexicallyContained(testFilter)),
     schema('run_build', PERMISSION_CATEGORIES.SHELL, 'Run the project build.', { type: 'object', properties: {}, additionalProperties: false },
       (_args, { sandbox, signal }) => processResult('npm run build', sandbox.root, { signal })),
     schema('run_lint', PERMISSION_CATEGORIES.SHELL, 'Run the project linter.', { type: 'object', properties: {}, additionalProperties: false },
       (_args, { sandbox, signal }) => processResult('npm run lint', sandbox.root, { signal })),
-    schema('embed_text', PERMISSION_CATEGORIES.READ, 'Generate an embedding for text.', {
+    schema('embed_text', PERMISSION_CATEGORIES.NETWORK, 'Generate an embedding for text.', {
       type: 'object', properties: {
         text: { type: 'string', description: 'Text to embed' },
         model: { type: 'string', description: 'Optional embedding model' }

@@ -55,6 +55,7 @@ export class ToolRegistry {
       category: tool.category,
       operation,
       autoApprove: executionContext.autoApprove,
+      autoEligible: tool.autoEligible,
       contained: Boolean(tool.contained(args, { sandbox }))
     });
     const request = {
@@ -62,10 +63,11 @@ export class ToolRegistry {
       category: tool.category,
       operation,
       scope: `${tool.category}:${operation}`,
+      autoEligible: tool.autoEligible,
       decision
     };
 
-    if (decision.action === 'blocked') throw denied({ request });
+    if (decision.action === 'blocked' || decision.action === 'deny') throw denied({ request });
     if (typeof executionContext.authorize === 'function') {
       const authorization = await executionContext.authorize(request);
       if (!authorization?.allowed) throw denied({ request, authorization });
