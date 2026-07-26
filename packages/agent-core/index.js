@@ -1,4 +1,7 @@
 export { loadCorezConfig, saveCorezConfig, DEFAULT_CONFIG } from './config/index.js';
+export { CorezError, ERROR_CODES, exitCodeForError } from './contracts/errors.js';
+export { createEvent, isCorezEvent } from './contracts/events.js';
+export { getCommandPolicy } from './policies/index.js';
 export { PermissionManager, PERMISSION_CATEGORIES, BLOCKED_DANGEROUS_COMMANDS } from './permissions/index.js';
 export { ContextEngine } from './context/index.js';
 export { AWWWARDS_DESIGN_SYSTEM, AWWWARDS_CATEGORIES, detectAwwwardsCategory, buildAwwwardsDesignPrompt } from './context/designTokens.js';

@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 export const DEFAULT_CONFIG = Object.freeze({
@@ -18,55 +19,95 @@ export const DEFAULT_CONFIG = Object.freeze({
   }
 });
 
-export function loadCorezConfig(cwd = process.cwd()) {
+function readConfig(configPath) {
+  if (!fs.existsSync(configPath)) return {};
+
+  try {
+    return JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  } catch (err) {
+    console.warn(`[CoreZ Config] Failed to parse ${configPath}:`, err.message);
+    return {};
+  }
+}
+
+function loadProjectConfig(cwd) {
   const possiblePaths = [
     path.join(cwd, '.corez', 'config.json'),
     path.join(cwd, 'corez.config.json'),
     path.join(cwd, '.corez.json')
   ];
 
-  let loaded = {};
   for (const configPath of possiblePaths) {
     if (fs.existsSync(configPath)) {
-      try {
-        const raw = fs.readFileSync(configPath, 'utf8');
-        loaded = JSON.parse(raw);
-        break;
-      } catch (err) {
-        console.warn(`[CoreZ Config] Failed to parse ${configPath}:`, err.message);
-      }
+      const loaded = readConfig(configPath);
+      if (Object.keys(loaded).length > 0) return loaded;
     }
   }
+  return {};
+}
 
-  const model = process.env.COREZ_MODEL || loaded.model || DEFAULT_CONFIG.model;
-  const mode = process.env.COREZ_MODE || loaded.mode || DEFAULT_CONFIG.mode;
-  const reasoning = process.env.COREZ_REASONING || loaded.reasoning || DEFAULT_CONFIG.reasoning;
+function normalizePermission(value, fallback) {
+  if (value === true) return 'allow';
+  if (value === false) return 'deny';
+  if (['allow', 'ask', 'deny'].includes(value)) return value;
+  return fallback;
+}
 
-  const permissions = {
-    ...DEFAULT_CONFIG.permissions,
-    ...(loaded.permissions || {})
-  };
+function definedValues(source) {
+  return Object.fromEntries(Object.entries(source).filter(([, value]) => value !== undefined));
+}
 
-  if (process.env.COREZ_ALLOW_SHELL === 'true') {
-    permissions.shell = true;
-  } else if (process.env.COREZ_ALLOW_SHELL === 'false') {
-    permissions.shell = false;
-  }
+function configFromEnv(env) {
+  const envPermissions = {};
+  if (env.COREZ_ALLOW_SHELL === 'true') envPermissions.shell = true;
+  if (env.COREZ_ALLOW_SHELL === 'false') envPermissions.shell = false;
 
-  if (process.env.COREZ_AUTO_APPROVE === 'true' || process.env.YOLO === 'true') {
-    permissions.workspaceWrite = true;
-    permissions.shell = true;
-    permissions.network = true;
+  if (env.COREZ_AUTO_APPROVE === 'true' || env.YOLO === 'true') {
+    envPermissions.workspaceWrite = true;
+    envPermissions.shell = true;
+    envPermissions.network = true;
   }
 
   return {
-    ...DEFAULT_CONFIG,
-    ...loaded,
-    model,
-    mode,
-    reasoning,
-    permissions
+    ...definedValues({
+      model: env.COREZ_MODEL,
+      mode: env.COREZ_MODE,
+      reasoning: env.COREZ_REASONING
+    }),
+    ...(Object.keys(envPermissions).length > 0 ? { permissions: envPermissions } : {})
   };
+}
+
+export function loadCorezConfig(cwd = process.cwd(), { env = process.env, cli = {}, userConfigPath } = {}) {
+  const userConfig = readConfig(userConfigPath || path.join(os.homedir(), '.corez', 'config.json'));
+  const projectConfig = loadProjectConfig(cwd);
+  const envConfig = configFromEnv(env);
+  const cliConfig = definedValues(cli);
+
+  const merged = {
+    ...DEFAULT_CONFIG,
+    ...userConfig,
+    ...projectConfig,
+    ...envConfig,
+    ...cliConfig
+  };
+
+  const mergedPermissions = {
+    ...DEFAULT_CONFIG.permissions,
+    ...(userConfig.permissions || {}),
+    ...(projectConfig.permissions || {}),
+    ...(envConfig.permissions || {}),
+    ...(cliConfig.permissions || {})
+  };
+
+  const permissions = Object.freeze(Object.fromEntries(
+    Object.entries(DEFAULT_CONFIG.permissions).map(([name, fallback]) => [
+      name,
+      normalizePermission(mergedPermissions[name], normalizePermission(fallback, 'ask'))
+    ])
+  ));
+
+  return Object.freeze({ ...merged, permissions });
 }
 
 export function saveCorezConfig(newConfig = {}, cwd = process.cwd()) {
@@ -93,4 +134,3 @@ export function saveCorezConfig(newConfig = {}, cwd = process.cwd()) {
   fs.writeFileSync(configPath, JSON.stringify(merged, null, 2), 'utf8');
   return merged;
 }
-

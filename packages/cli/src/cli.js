@@ -34,10 +34,24 @@ export function parseCliArgs(rawArgs = []) {
     model: null,
     agent: null,
     auto: false,
+    mock: false,
+    continue: false,
+    json: false,
+    yes: false,
+    session: null,
   };
 
   const positional = [];
+  const errors = [];
   let ended = false;
+
+  const requireValue = (name, value) => {
+    if (value === undefined || value === null || value === '') {
+      errors.push(`Option --${name} requires a value`);
+      return null;
+    }
+    return value;
+  };
 
   for (let i = 0; i < rawArgs.length; i++) {
     const arg = rawArgs[i];
@@ -47,7 +61,7 @@ export function parseCliArgs(rawArgs = []) {
       continue;
     }
 
-    if (ended || !arg.startsWith('-')) {
+    if (ended || arg === '-' || !arg.startsWith('-')) {
       positional.push(arg);
       continue;
     }
@@ -64,29 +78,55 @@ export function parseCliArgs(rawArgs = []) {
 
       switch (name) {
         case 'help':
+          if (value !== undefined) errors.push(`Option --${name} does not take a value`);
           flags.help = true;
           break;
         case 'version':
+          if (value !== undefined) errors.push(`Option --${name} does not take a value`);
           flags.version = true;
           break;
         case 'verbose':
+          if (value !== undefined) errors.push(`Option --${name} does not take a value`);
           flags.verbose = true;
           break;
         case 'no-verbose':
+          if (value !== undefined) errors.push(`Option --${name} does not take a value`);
           flags.verbose = false;
           break;
         case 'auto-approve':
         case 'yolo':
         case 'auto':
+          if (value !== undefined) errors.push(`Option --${name} does not take a value`);
           flags.autoApprove = true;
           flags.auto = true;
           break;
         case 'agent':
-          flags.agent = value ?? (i + 1 < rawArgs.length && !rawArgs[i + 1].startsWith('-') ? rawArgs[++i] : null);
+          flags.agent = requireValue(name, value ?? (i + 1 < rawArgs.length && !rawArgs[i + 1].startsWith('-') ? rawArgs[++i] : null));
           break;
         case 'model':
-          flags.model = value ?? (i + 1 < rawArgs.length && !rawArgs[i + 1].startsWith('-') ? rawArgs[++i] : null);
+          flags.model = requireValue(name, value ?? (i + 1 < rawArgs.length && !rawArgs[i + 1].startsWith('-') ? rawArgs[++i] : null));
           break;
+        case 'mock':
+          if (value !== undefined) errors.push(`Option --${name} does not take a value`);
+          flags.mock = true;
+          break;
+        case 'continue':
+          if (value !== undefined) errors.push(`Option --${name} does not take a value`);
+          flags.continue = true;
+          break;
+        case 'json':
+          if (value !== undefined) errors.push(`Option --${name} does not take a value`);
+          flags.json = true;
+          break;
+        case 'yes':
+          if (value !== undefined) errors.push(`Option --${name} does not take a value`);
+          flags.yes = true;
+          break;
+        case 'session':
+          flags.session = requireValue(name, value ?? (i + 1 < rawArgs.length && !rawArgs[i + 1].startsWith('-') ? rawArgs[++i] : null));
+          break;
+        default:
+          errors.push(`Unknown option: --${name}`);
       }
     } else {
       for (let j = 1; j < arg.length; j++) {
@@ -103,14 +143,20 @@ export function parseCliArgs(rawArgs = []) {
             flags.auto = true;
             break;
           case 'm':
-            flags.model = i + 1 < rawArgs.length && !rawArgs[i + 1].startsWith('-') ? rawArgs[++i] : null;
+            flags.model = requireValue('model', i + 1 < rawArgs.length && !rawArgs[i + 1].startsWith('-') ? rawArgs[++i] : null);
             break;
+          default:
+            errors.push(`Unknown option: -${ch}`);
         }
       }
     }
   }
 
-  return { flags, positional };
+  if (flags.continue && flags.session) {
+    errors.push('Option --continue cannot be used together with --session');
+  }
+
+  return { flags, positional, errors };
 }
 
 function printCommands(title, commands) {
@@ -315,7 +361,7 @@ function handleSessionCommand(args, options, ui) {
 }
 
 export async function runCli(argv = process.argv.slice(2), options = {}) {
-  const { flags, positional } = parseCliArgs(argv);
+  const { flags, positional, errors } = parseCliArgs(argv);
   const ui = new TerminalUI({ verbose: flags.verbose });
   const execOptions = {
     ...options,
@@ -323,6 +369,11 @@ export async function runCli(argv = process.argv.slice(2), options = {}) {
     agentOverride: flags.agent,
     autoApprove: flags.autoApprove,
   };
+
+  if (errors.length > 0) {
+    errors.forEach(error => ui.error(error));
+    return 2;
+  }
 
   if (flags.help && !positional[0]) {
     printHelp(ui);
