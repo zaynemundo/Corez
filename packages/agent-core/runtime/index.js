@@ -11,8 +11,8 @@ import { loadCorezConfig } from '../config/index.js';
 import { DuplicateToolGuard } from './tool-loop.js';
 
 function runtimeError(error, signal) {
-  if (error instanceof CorezError) return error;
   if (signal?.aborted || error?.name === 'AbortError') {
+    if (error?.code === ERROR_CODES.COMMAND_CANCELLED) return error;
     return new CorezError(
       ERROR_CODES.COMMAND_CANCELLED,
       'Command was cancelled.',
@@ -20,6 +20,7 @@ function runtimeError(error, signal) {
       { cause: error }
     );
   }
+  if (error instanceof CorezError) return error;
   return error;
 }
 
@@ -102,6 +103,30 @@ function errorData(error) {
   };
 }
 
+function authorizeWithSignal(controller, request, signal) {
+  if (signal?.aborted) return Promise.reject(cancellationError());
+  const authorization = controller.authorize(request);
+  if (!signal) return authorization;
+
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      signal.removeEventListener('abort', onAbort);
+      reject(cancellationError());
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+    Promise.resolve(authorization).then(
+      result => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(result);
+      },
+      error => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error);
+      }
+    );
+  });
+}
+
 async function* streamToolExecution(start, state) {
   const queuedEvents = [];
   let wake;
@@ -120,17 +145,21 @@ async function* streamToolExecution(start, state) {
   });
   const authorize = async (controller, request) => {
     await waitUntilObserved(createEvent('approval.requested', { request }));
-    if (cancelled) throw cancellationError();
+    if (cancelled || state.signal?.aborted) throw cancellationError();
+    let resolutionEmitted = false;
     try {
-      const authorization = await controller.authorize(request);
+      const authorization = await authorizeWithSignal(controller, request, state.signal);
+      resolutionEmitted = true;
       await waitUntilObserved(createEvent('approval.resolved', {
         request,
         authorization
       }));
-      if (cancelled) throw cancellationError();
+      if (cancelled || state.signal?.aborted) throw cancellationError();
       return authorization;
     } catch (error) {
-      if (!cancelled) {
+      if (!cancelled
+        && !resolutionEmitted
+        && error?.code !== ERROR_CODES.COMMAND_CANCELLED) {
         await waitUntilObserved(createEvent('approval.resolved', {
           request,
           authorization: {
@@ -306,7 +335,10 @@ export class AgentRuntime {
           if (!policyAllows(policy, call.name)) throw deniedByPolicy(policy, call);
           duplicateGuard.observe(call);
 
-          const executionState = { approvalController: this.approvalController };
+          const executionState = {
+            approvalController: this.approvalController,
+            signal
+          };
           for await (const approvalEvent of streamToolExecution(authorize => (
             this.toolRegistry.executeTool(call.name, call.arguments || {}, {
               sandbox: this.sandbox,

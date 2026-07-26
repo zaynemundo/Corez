@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   AgentRuntime,
   ApprovalController,
+  CorezError,
+  ERROR_CODES,
   MockProvider,
   PermissionManager,
   toolCallFingerprint
@@ -77,6 +79,66 @@ describe('AgentRuntime failure states', () => {
     });
     await expect(runtime.execute('cancel', { signal: controller.signal }))
       .rejects.toMatchObject({ code: 'COMMAND_CANCELLED' });
+  });
+
+  it('prioritizes caller cancellation over a provider error raised after abort', async () => {
+    const controller = new AbortController();
+    const provider = {
+      stream() {
+        return {
+          async next() {
+            controller.abort();
+            throw new CorezError(ERROR_CODES.PROVIDER_HTTP_ERROR, 'Transport failed after cancellation.');
+          },
+          [Symbol.asyncIterator]() {
+            return this;
+          }
+        };
+      }
+    };
+    const runtime = AgentRuntime.createForWorkspace(process.cwd(), { provider });
+
+    await expect(runtime.execute('cancel', { signal: controller.signal }))
+      .rejects.toMatchObject({ code: 'COMMAND_CANCELLED' });
+  });
+
+  it('cancels while approval is pending without executing the tool', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'corez-runtime-'));
+    roots.push(root);
+    const controller = new AbortController();
+    const provider = new MockProvider({ turns: [[{
+      type: 'tool.requested',
+      data: { id: 'c1', name: 'write_file', arguments: { filePath: 'blocked.txt', content: 'blocked' } }
+    }]] });
+    const approvalController = new ApprovalController({
+      prompt: async () => {
+        await new Promise(resolve => setTimeout(resolve, 20));
+        return 'once';
+      }
+    });
+    const runtime = AgentRuntime.createForWorkspace(root, {
+      provider,
+      permissionManager: new PermissionManager({ workspaceWrite: 'ask' }),
+      approvalController
+    });
+    const iterator = runtime.runTask('write', {
+      policy: 'run',
+      signal: controller.signal
+    })[Symbol.asyncIterator]();
+    let next;
+    do {
+      next = await iterator.next();
+    } while (next.value?.type !== 'approval.requested');
+
+    controller.abort();
+    const failureEvent = await iterator.next();
+
+    expect(failureEvent.value).toMatchObject({
+      type: 'error',
+      data: { code: 'COMMAND_CANCELLED' }
+    });
+    await expect(iterator.next()).rejects.toMatchObject({ code: 'COMMAND_CANCELLED' });
+    expect(fs.existsSync(path.join(root, 'blocked.txt'))).toBe(false);
   });
 
   it('rejects policy-disallowed tools before authorization or execution', async () => {
