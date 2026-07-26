@@ -51,4 +51,29 @@ describe('OpenAI-compatible streaming', () => {
       }
     }).rejects.toMatchObject({ code: 'PROVIDER_HTTP_ERROR', details: { status: 429 } });
   });
+
+  it('normalizes a stalled response body as a provider timeout', async () => {
+    const fetchImpl = async (_url, { signal }) => new Response(new ReadableStream({
+      start(controller) {
+        signal.addEventListener('abort', () => {
+          controller.error(new DOMException('Body read aborted.', 'AbortError'));
+        }, { once: true });
+      }
+    }), {
+      status: 200,
+      headers: { 'content-type': 'text/event-stream' }
+    });
+    const provider = new OpenAICompatibleProvider({
+      apiKey: 'key',
+      endpoint: 'https://provider.invalid',
+      fetchImpl,
+      timeoutMs: 10
+    });
+
+    await expect(async () => {
+      for await (const _event of provider.stream({ model: 'x', messages: [], tools: [] })) {
+        void _event;
+      }
+    }).rejects.toMatchObject({ code: 'PROVIDER_TIMEOUT', details: { timeoutMs: 10 } });
+  });
 });

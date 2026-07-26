@@ -84,60 +84,70 @@ export class OpenAICompatibleProvider {
 
       const toolCalls = new Map();
       let finishReason;
-      for await (const data of decodeSse(response.body)) {
-        let payload;
-        try {
-          payload = JSON.parse(data);
-        } catch (_error) {
-          throw providerError(ERROR_CODES.PROVIDER_RESPONSE_INVALID, 'Provider stream contained invalid JSON.', { data });
-        }
-
-        const choice = payload?.choices?.[0];
-        if (!choice) continue;
-        const delta = choice.delta || {};
-        if (typeof delta.content === 'string' && delta.content) {
-          yield createEvent('assistant.delta', { text: delta.content });
-        }
-
-        for (const call of delta.tool_calls || []) {
-          if (!Number.isInteger(call.index)) {
-            throw providerError(ERROR_CODES.PROVIDER_RESPONSE_INVALID, 'Tool call was missing its index.', { call });
+      try {
+        for await (const data of decodeSse(response.body)) {
+          let payload;
+          try {
+            payload = JSON.parse(data);
+          } catch (_error) {
+            throw providerError(ERROR_CODES.PROVIDER_RESPONSE_INVALID, 'Provider stream contained invalid JSON.', { data });
           }
-          const assembled = toolCalls.get(call.index) || { id: undefined, name: undefined, arguments: '' };
-          if (call.id) assembled.id = call.id;
-          if (call.function?.name) assembled.name = call.function.name;
-          if (typeof call.function?.arguments === 'string') {
-            assembled.arguments += call.function.arguments;
-          }
-          toolCalls.set(call.index, assembled);
-        }
 
-        if (choice.finish_reason) {
-          finishReason = choice.finish_reason;
-          if (choice.finish_reason === 'tool_calls') {
-            for (const [index, call] of [...toolCalls.entries()].sort(([left], [right]) => left - right)) {
-              if (!call.id || !call.name) {
-                throw providerError(ERROR_CODES.PROVIDER_RESPONSE_INVALID, 'Tool call was incomplete.', { index, call });
-              }
-              let argumentsValue;
-              try {
-                argumentsValue = JSON.parse(call.arguments);
-              } catch (_error) {
-                throw providerError(ERROR_CODES.PROVIDER_RESPONSE_INVALID, 'Tool call arguments were invalid JSON.', {
-                  index,
+          const choice = payload?.choices?.[0];
+          if (!choice) continue;
+          const delta = choice.delta || {};
+          if (typeof delta.content === 'string' && delta.content) {
+            yield createEvent('assistant.delta', { text: delta.content });
+          }
+
+          for (const call of delta.tool_calls || []) {
+            if (!Number.isInteger(call.index)) {
+              throw providerError(ERROR_CODES.PROVIDER_RESPONSE_INVALID, 'Tool call was missing its index.', { call });
+            }
+            const assembled = toolCalls.get(call.index) || { id: undefined, name: undefined, arguments: '' };
+            if (call.id) assembled.id = call.id;
+            if (call.function?.name) assembled.name = call.function.name;
+            if (typeof call.function?.arguments === 'string') {
+              assembled.arguments += call.function.arguments;
+            }
+            toolCalls.set(call.index, assembled);
+          }
+
+          if (choice.finish_reason) {
+            finishReason = choice.finish_reason;
+            if (choice.finish_reason === 'tool_calls') {
+              for (const [index, call] of [...toolCalls.entries()].sort(([left], [right]) => left - right)) {
+                if (!call.id || !call.name) {
+                  throw providerError(ERROR_CODES.PROVIDER_RESPONSE_INVALID, 'Tool call was incomplete.', { index, call });
+                }
+                let argumentsValue;
+                try {
+                  argumentsValue = JSON.parse(call.arguments);
+                } catch (_error) {
+                  throw providerError(ERROR_CODES.PROVIDER_RESPONSE_INVALID, 'Tool call arguments were invalid JSON.', {
+                    index,
+                    id: call.id,
+                    name: call.name
+                  });
+                }
+                yield createEvent('tool.requested', {
                   id: call.id,
-                  name: call.name
+                  name: call.name,
+                  arguments: argumentsValue
                 });
               }
-              yield createEvent('tool.requested', {
-                id: call.id,
-                name: call.name,
-                arguments: argumentsValue
-              });
+              toolCalls.clear();
             }
-            toolCalls.clear();
           }
         }
+      } catch (error) {
+        if (timedOut) {
+          throw providerError(ERROR_CODES.PROVIDER_TIMEOUT, 'Provider request timed out.', {
+            endpoint: this.endpoint,
+            timeoutMs: this.timeoutMs
+          });
+        }
+        throw error;
       }
 
       yield createEvent('assistant.completed', { reason: finishReason });
