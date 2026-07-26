@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
 import { buildCommandEnv, runProcess } from '../../packages/agent-core/index.js';
 
 describe('runProcess', () => {
@@ -101,18 +103,52 @@ describe('runProcess', () => {
     expect(env).toEqual({ PATH: '/usr/bin', HOME: '/home/test' });
   });
 
-  it('filters sensitive additions and raw child-process environments', async () => {
-    expect(buildCommandEnv(
+  it('preserves safe built additions but filters raw child-process environments', async () => {
+    const built = buildCommandEnv(
       { PATH: process.env.PATH },
       { SAFE_FLAG: 'kept', INTERNAL_TOKEN: 'secret' }
-    )).toEqual({ PATH: process.env.PATH, SAFE_FLAG: 'kept' });
+    );
+    expect(built).toEqual({ PATH: process.env.PATH, SAFE_FLAG: 'kept' });
+
+    const builtResult = await runProcess({
+      file: process.execPath,
+      args: ['-e', 'process.stdout.write(process.env.SAFE_FLAG || "missing")'],
+      cwd: process.cwd(),
+      env: built
+    });
+    expect(builtResult.stdout).toBe('kept');
 
     const result = await runProcess({
       file: process.execPath,
-      args: ['-e', 'process.stdout.write(process.env.OPENROUTER_API_KEY || "filtered")'],
+      args: ['-e', 'process.stdout.write(process.env.OPENROUTER_API_KEY || process.env.SAFE_FLAG || "filtered")'],
       cwd: process.cwd(),
-      env: { PATH: process.env.PATH, OPENROUTER_API_KEY: 'secret' }
+      env: { PATH: process.env.PATH, OPENROUTER_API_KEY: 'secret', SAFE_FLAG: 'unapproved' }
     });
     expect(result.stdout).toBe('filtered');
+  });
+
+  it('continues forced termination after a child emits an error during SIGTERM', async () => {
+    const child = new EventEmitter();
+    child.stdout = new PassThrough();
+    child.stderr = new PassThrough();
+    const signals = [];
+    child.kill = signal => {
+      signals.push(signal);
+      if (signal === 'SIGTERM') {
+        queueMicrotask(() => child.emit('error', new Error('SIGTERM delivery failed')));
+      } else {
+        queueMicrotask(() => child.emit('close', null, 'SIGKILL'));
+      }
+      return true;
+    };
+
+    await expect(runProcess({
+      file: process.execPath,
+      args: ['-e', 'setInterval(() => {}, 1000)'],
+      cwd: process.cwd(),
+      timeoutMs: 10,
+      spawnImpl: () => child
+    })).rejects.toMatchObject({ code: 'COMMAND_TIMEOUT' });
+    expect(signals).toEqual(['SIGTERM', 'SIGKILL']);
   });
 });

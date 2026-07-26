@@ -10,6 +10,7 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_OUTPUT_BYTES = 1_048_576;
 const TERMINATION_GRACE_MS = 100;
 const FORCED_TERMINATION_SETTLEMENT_MS = 100;
+const BUILT_COMMAND_ENVIRONMENTS = new WeakSet();
 
 export function buildCommandEnv(source = process.env, additions = {}) {
   const environment = {};
@@ -24,6 +25,8 @@ export function buildCommandEnv(source = process.env, additions = {}) {
     environment[key] = String(value);
   }
 
+  Object.freeze(environment);
+  BUILT_COMMAND_ENVIRONMENTS.add(environment);
   return environment;
 }
 
@@ -45,7 +48,7 @@ function invalidArgument(message, details, cause) {
   return commandError(ERROR_CODES.TOOL_ARGUMENT_INVALID, message, details, cause);
 }
 
-function validateRunProcessInput({ file, args, cwd, timeoutMs, maxOutputBytes }) {
+function validateRunProcessInput({ file, args, cwd, timeoutMs, maxOutputBytes, spawnImpl }) {
   if (typeof file !== 'string' || file.trim() === '') {
     return invalidArgument('Command file must be a non-empty string.', { file });
   }
@@ -64,6 +67,9 @@ function validateRunProcessInput({ file, args, cwd, timeoutMs, maxOutputBytes })
       maxOutputBytes
     });
   }
+  if (typeof spawnImpl !== 'function') {
+    return invalidArgument('Command spawn implementation must be a function.', { file });
+  }
   return null;
 }
 
@@ -74,7 +80,8 @@ export function runProcess({
   env = process.env,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   maxOutputBytes = DEFAULT_MAX_OUTPUT_BYTES,
-  signal
+  signal,
+  spawnImpl = spawn
 } = {}) {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
@@ -82,14 +89,14 @@ export function runProcess({
       return;
     }
 
-    const invalidInput = validateRunProcessInput({ file, args, cwd, timeoutMs, maxOutputBytes });
+    const invalidInput = validateRunProcessInput({ file, args, cwd, timeoutMs, maxOutputBytes, spawnImpl });
     if (invalidInput) {
       reject(invalidInput);
       return;
     }
 
     const outputLimit = Math.floor(maxOutputBytes);
-    const childEnv = buildCommandEnv(env);
+    const childEnv = BUILT_COMMAND_ENVIRONMENTS.has(env) ? env : buildCommandEnv(env);
     let stdout = Buffer.alloc(0);
     let stderr = Buffer.alloc(0);
     let truncated = false;
@@ -167,7 +174,6 @@ export function runProcess({
     const onError = error => {
       if (termination) {
         terminationCause ||= error;
-        settleTerminal();
         return;
       }
       settle(reject, invalidArgument('Unable to start command process.', {
@@ -188,7 +194,7 @@ export function runProcess({
     };
 
     try {
-      child = spawn(file, args, {
+      child = spawnImpl(file, args, {
         cwd,
         env: childEnv,
         shell: false,
