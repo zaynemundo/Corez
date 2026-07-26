@@ -8,6 +8,8 @@ const ENVIRONMENT_ALLOWLIST = new Set([
 const SENSITIVE_ENVIRONMENT_KEY = /KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL/i;
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_OUTPUT_BYTES = 1_048_576;
+const TERMINATION_GRACE_MS = 100;
+const FORCED_TERMINATION_SETTLEMENT_MS = 100;
 
 export function buildCommandEnv(source = process.env, additions = {}) {
   const environment = {};
@@ -35,15 +37,41 @@ function appendBounded(buffer, chunk, maxOutputBytes) {
   };
 }
 
-function commandError(code, message, details) {
-  return new CorezError(code, message, details);
+function commandError(code, message, details, cause) {
+  return new CorezError(code, message, details, cause ? { cause } : undefined);
+}
+
+function invalidArgument(message, details, cause) {
+  return commandError(ERROR_CODES.TOOL_ARGUMENT_INVALID, message, details, cause);
+}
+
+function validateRunProcessInput({ file, args, cwd, timeoutMs, maxOutputBytes }) {
+  if (typeof file !== 'string' || file.trim() === '') {
+    return invalidArgument('Command file must be a non-empty string.', { file });
+  }
+  if (!Array.isArray(args) || args.some(argument => typeof argument !== 'string')) {
+    return invalidArgument('Command arguments must be an array of strings.', { file });
+  }
+  if (typeof cwd !== 'string' || cwd.trim() === '') {
+    return invalidArgument('Command cwd must be a non-empty string.', { file, cwd });
+  }
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    return invalidArgument('Command timeoutMs must be a finite positive number.', { file, timeoutMs });
+  }
+  if (!Number.isFinite(maxOutputBytes) || maxOutputBytes < 0) {
+    return invalidArgument('Command maxOutputBytes must be a finite non-negative number.', {
+      file,
+      maxOutputBytes
+    });
+  }
+  return null;
 }
 
 export function runProcess({
   file,
   args = [],
   cwd,
-  env = buildCommandEnv(),
+  env = process.env,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   maxOutputBytes = DEFAULT_MAX_OUTPUT_BYTES,
   signal
@@ -54,20 +82,29 @@ export function runProcess({
       return;
     }
 
-    const outputLimit = Number.isFinite(maxOutputBytes)
-      ? Math.max(0, Math.floor(maxOutputBytes))
-      : DEFAULT_MAX_OUTPUT_BYTES;
-    const timeout = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : null;
+    const invalidInput = validateRunProcessInput({ file, args, cwd, timeoutMs, maxOutputBytes });
+    if (invalidInput) {
+      reject(invalidInput);
+      return;
+    }
+
+    const outputLimit = Math.floor(maxOutputBytes);
+    const childEnv = buildCommandEnv(env);
     let stdout = Buffer.alloc(0);
     let stderr = Buffer.alloc(0);
     let truncated = false;
     let termination;
+    let terminationCause;
     let settled = false;
     let child;
-    let timer;
+    let timeoutTimer;
+    let forceKillTimer;
+    let forcedSettlementTimer;
 
     const cleanup = () => {
-      if (timer) clearTimeout(timer);
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+      if (forceKillTimer) clearTimeout(forceKillTimer);
+      if (forcedSettlementTimer) clearTimeout(forcedSettlementTimer);
       signal?.removeEventListener('abort', onAbort);
       child?.stdout?.removeListener('data', onStdout);
       child?.stderr?.removeListener('data', onStderr);
@@ -82,10 +119,38 @@ export function runProcess({
       callback(value);
     };
 
+    const settleTerminal = () => {
+      const timeout = termination === 'timeout';
+      settle(reject, commandError(
+        timeout ? ERROR_CODES.COMMAND_TIMEOUT : ERROR_CODES.COMMAND_CANCELLED,
+        timeout ? 'Command timed out.' : 'Command was cancelled.',
+        {
+          file,
+          ...(timeout ? { timeoutMs } : {}),
+          ...(terminationCause ? { cause: terminationCause.message } : {})
+        },
+        terminationCause
+      ));
+    };
+
+    const sendKill = killSignal => {
+      try {
+        if (child?.kill(killSignal) === false) {
+          terminationCause ||= new Error(`Failed to send ${killSignal} to command process.`);
+        }
+      } catch (error) {
+        terminationCause ||= error;
+      }
+    };
+
     const terminate = reason => {
       if (termination || settled) return;
       termination = reason;
-      child?.kill();
+      sendKill('SIGTERM');
+      forceKillTimer = setTimeout(() => {
+        sendKill('SIGKILL');
+        forcedSettlementTimer = setTimeout(settleTerminal, FORCED_TERMINATION_SETTLEMENT_MS);
+      }, TERMINATION_GRACE_MS);
     };
 
     const onStdout = chunk => {
@@ -99,16 +164,20 @@ export function runProcess({
       truncated ||= captured.truncated;
     };
     const onAbort = () => terminate('cancelled');
-    const onError = error => settle(reject, error);
+    const onError = error => {
+      if (termination) {
+        terminationCause ||= error;
+        settleTerminal();
+        return;
+      }
+      settle(reject, invalidArgument('Unable to start command process.', {
+        file,
+        cwd,
+        cause: error?.message
+      }, error));
+    };
     const onClose = (exitCode, exitSignal) => {
-      if (termination === 'timeout') {
-        settle(reject, commandError(ERROR_CODES.COMMAND_TIMEOUT, 'Command timed out.', { file, timeoutMs }));
-        return;
-      }
-      if (termination === 'cancelled') {
-        settle(reject, commandError(ERROR_CODES.COMMAND_CANCELLED, 'Command was cancelled.', { file }));
-        return;
-      }
+      if (termination) return settleTerminal();
       settle(resolve, {
         exitCode,
         signal: exitSignal,
@@ -121,12 +190,16 @@ export function runProcess({
     try {
       child = spawn(file, args, {
         cwd,
-        env,
+        env: childEnv,
         shell: false,
         stdio: ['ignore', 'pipe', 'pipe']
       });
     } catch (error) {
-      settle(reject, error);
+      settle(reject, invalidArgument('Unable to start command process.', {
+        file,
+        cwd,
+        cause: error?.message
+      }, error));
       return;
     }
 
@@ -135,6 +208,6 @@ export function runProcess({
     child.once('error', onError);
     child.once('close', onClose);
     signal?.addEventListener('abort', onAbort, { once: true });
-    if (timeout) timer = setTimeout(() => terminate('timeout'), timeout);
+    timeoutTimer = setTimeout(() => terminate('timeout'), timeoutMs);
   });
 }

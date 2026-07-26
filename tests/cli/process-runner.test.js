@@ -43,6 +43,53 @@ describe('runProcess', () => {
     await expect(result).rejects.toMatchObject({ code: 'COMMAND_CANCELLED' });
   });
 
+  it('returns an ordinary nonzero exit code without rejecting', async () => {
+    const result = await runProcess({
+      file: process.execPath,
+      args: ['-e', 'process.exit(7)'],
+      cwd: process.cwd()
+    });
+    expect(result.exitCode).toBe(7);
+  });
+
+  it('reports cancellation for a pre-aborted signal', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    await expect(runProcess({
+      file: process.execPath,
+      args: ['-e', 'process.exit(0)'],
+      cwd: process.cwd(),
+      signal: controller.signal
+    })).rejects.toMatchObject({ code: 'COMMAND_CANCELLED' });
+  });
+
+  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])('rejects an invalid timeout: %s', async timeoutMs => {
+    await expect(runProcess({
+      file: process.execPath,
+      args: ['-e', 'process.exit(0)'],
+      cwd: process.cwd(),
+      timeoutMs
+    })).rejects.toMatchObject({ code: 'TOOL_ARGUMENT_INVALID' });
+  });
+
+  it('requires an explicit working directory', async () => {
+    await expect(runProcess({
+      file: process.execPath,
+      args: ['-e', 'process.exit(0)']
+    })).rejects.toMatchObject({ code: 'TOOL_ARGUMENT_INVALID' });
+  });
+
+  it.skipIf(process.platform === 'win32')('forces termination when a POSIX child ignores SIGTERM', async () => {
+    const startedAt = Date.now();
+    await expect(runProcess({
+      file: process.execPath,
+      args: ['-e', 'process.on("SIGTERM", () => {}); setInterval(() => {}, 1000)'],
+      cwd: process.cwd(),
+      timeoutMs: 150
+    })).rejects.toMatchObject({ code: 'COMMAND_TIMEOUT' });
+    expect(Date.now() - startedAt).toBeLessThan(2_000);
+  });
+
   it('filters credentials from child-process environments', () => {
     const env = buildCommandEnv({
       PATH: '/usr/bin',
@@ -52,5 +99,20 @@ describe('runProcess', () => {
       SAFE_VALUE: 'not-forwarded'
     });
     expect(env).toEqual({ PATH: '/usr/bin', HOME: '/home/test' });
+  });
+
+  it('filters sensitive additions and raw child-process environments', async () => {
+    expect(buildCommandEnv(
+      { PATH: process.env.PATH },
+      { SAFE_FLAG: 'kept', INTERNAL_TOKEN: 'secret' }
+    )).toEqual({ PATH: process.env.PATH, SAFE_FLAG: 'kept' });
+
+    const result = await runProcess({
+      file: process.execPath,
+      args: ['-e', 'process.stdout.write(process.env.OPENROUTER_API_KEY || "filtered")'],
+      cwd: process.cwd(),
+      env: { PATH: process.env.PATH, OPENROUTER_API_KEY: 'secret' }
+    });
+    expect(result.stdout).toBe('filtered');
   });
 });
