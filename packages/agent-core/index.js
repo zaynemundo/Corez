@@ -6,6 +6,15 @@ export { PermissionManager, PERMISSION_CATEGORIES, BLOCKED_DANGEROUS_COMMANDS } 
 export { ContextEngine } from './context/index.js';
 export { AWWWARDS_DESIGN_SYSTEM, AWWWARDS_CATEGORIES, detectAwwwardsCategory, buildAwwwardsDesignPrompt } from './context/designTokens.js';
 export { ToolRegistry } from './tools/index.js';
-export { ModelProviderRouter, MODEL_CATALOG, cosineSimilarity } from './providers/index.js';
+export {
+  ModelProviderRouter,
+  MODEL_CATALOG,
+  cosineSimilarity,
+  decodeSse,
+  MockProvider,
+  OpenAICompatibleProvider,
+  OpenCodeGoProvider,
+  OpenRouterProvider
+} from './providers/index.js';
 export { AgentRuntime } from './runtime/index.js';
 export { GenericSwarmOrchestrator, SWARM_ROLES, TaskDependencyGraph, AdaptiveConcurrencyQueue, SharedProjectState } from './swarm/index.js';

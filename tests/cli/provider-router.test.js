@@ -1,24 +1,30 @@
-import { describe, it, expect } from 'vitest';
-import { ModelProviderRouter } from '../../packages/agent-core/providers/index.js';
+import { describe, expect, it } from 'vitest';
+import {
+  CorezError,
+  MockProvider,
+  ModelProviderRouter,
+  OpenCodeGoProvider,
+  OpenRouterProvider
+} from '../../packages/agent-core/index.js';
 
 describe('ModelProviderRouter', () => {
-  it('exposes available models catalog', () => {
-    const router = new ModelProviderRouter();
-    const models = router.getAvailableModels();
-
-    expect(Array.isArray(models)).toBe(true);
-    expect(models.length).toBeGreaterThan(0);
-    expect(models.some(m => m.id === 'deepseek-v4-pro')).toBe(true);
+  it('fails closed when a live provider credential is missing', () => {
+    const router = new ModelProviderRouter({ env: {} });
+    expect(() => router.createProvider({ model: 'deepseek-v4-pro' })).toThrowError(CorezError);
+    expect(() => router.createProvider({ model: 'deepseek-v4-pro' }))
+      .toThrowError(expect.objectContaining({ code: 'AUTH_MISSING' }));
   });
 
-  it('runs local agent fallback simulation when no API key is set', async () => {
-    const router = new ModelProviderRouter();
-    const res = await router.generate({
-      messages: [{ role: 'user', content: 'inspect project files' }],
-      tools: [{ name: 'list_directory', description: 'List files' }]
-    });
+  it('selects adapters by catalog provider', () => {
+    expect(new ModelProviderRouter({ env: { OPENCODE_GO_API_KEY: 'x' } })
+      .createProvider({ model: 'deepseek-v4-pro' })).toBeInstanceOf(OpenCodeGoProvider);
+    expect(new ModelProviderRouter({ env: { OPENROUTER_API_KEY: 'x' } })
+      .createProvider({ model: 'deepseek-v4-flash' })).toBeInstanceOf(OpenRouterProvider);
+  });
 
-    expect(res).toBeDefined();
-    expect(Boolean(res.content || res.toolCalls.length > 0)).toBe(true);
+  it('constructs simulation only when mock is explicit', () => {
+    const router = new ModelProviderRouter({ env: {} });
+    expect(router.createProvider({ model: 'deepseek-v4-pro', mock: true }))
+      .toBeInstanceOf(MockProvider);
   });
 });
