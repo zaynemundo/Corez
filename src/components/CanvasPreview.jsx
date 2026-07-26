@@ -22,7 +22,8 @@ export default function CanvasPreview({
   sessionId,
   onClose, 
   isFullScreen, 
-  onToggleFullScreen 
+  onToggleFullScreen,
+  onOpenStudio 
 }) {
   const [activeTab, setActiveTab] = useState('preview');
   const [deviceMode, setDeviceMode] = useState('desktop'); // 'desktop' | 'laptop' | 'tablet' | 'mobile'
@@ -120,29 +121,28 @@ export default function CanvasPreview({
           </div>
 
           {/* Open in Studio button */}
-          {sessionApps.length > 0 && (
-            <button
-              onClick={() => {
-                const currentApp = sessionApps[0];
-                const appName = (currentApp?.title || 'untitled').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-                window.open(`https://corez.pro/studio/${appName}`, '_blank');
-              }}
-              style={{
-                marginLeft: '0.5rem',
-                background: 'var(--accent-color)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 'var(--radius-pill)',
-                padding: '4px 12px',
-                fontSize: '0.725rem',
-                cursor: 'pointer',
-                fontWeight: 500,
-                whiteSpace: 'nowrap'
-              }}
-            >
-              Open in Studio
-            </button>
-          )}
+          <button
+            onClick={() => onOpenStudio?.({
+              code: editableCode,
+              title: sessionApps[0]?.title || 'Untitled App'
+            })}
+            disabled={!editableCode}
+            style={{
+              marginLeft: '0.5rem',
+              background: editableCode ? 'var(--accent-color)' : 'var(--bg-tertiary)',
+              color: editableCode ? '#fff' : 'var(--text-secondary)',
+              border: 'none',
+              borderRadius: 'var(--radius-pill)',
+              padding: '4px 12px',
+              fontSize: '0.725rem',
+              cursor: editableCode ? 'pointer' : 'not-allowed',
+              fontWeight: 500,
+              whiteSpace: 'nowrap',
+              opacity: editableCode ? 1 : 0.5
+            }}
+          >
+            Open in Studio
+          </button>
         </div>
 
         {/* Device Viewport Selector (Desktop vs Laptop vs Tablet vs Mobile Icon-only) */}

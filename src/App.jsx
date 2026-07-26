@@ -6,6 +6,7 @@ import ChatInput from './components/ChatInput';
 import CanvasPreview from './components/CanvasPreview';
 import SettingsModal from './components/SettingsModal';
 import ImageStudioPage from './components/ImageStudioPage';
+import AppStudioPage from './components/AppStudioPage';
 import { generateAIResponse, extractCodeFromMessage } from './services/aiService';
 import { fetchMarketData, unavailableMarket } from './services/marketService';
 import { storeAppInR2, deleteSessionAppsInR2 } from './services/appStorageService';
@@ -191,7 +192,8 @@ export default function App() {
     return sessions[0]?.id || 'session-default';
   });
 
-  const [activeView, setActiveView] = useState('chat'); // 'chat' | 'image-studio'
+  const [activeView, setActiveView] = useState('chat'); // 'chat' | 'image-studio' | 'app-studio'
+  const [studioData, setStudioData] = useState(null);
 
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     if (typeof window === 'undefined') return true;
@@ -478,6 +480,16 @@ export default function App() {
   const [chatInput, setChatInput] = useState('');
   const [revisionContextCode, setRevisionContextCode] = useState('');
 
+  const handleOpenStudio = (data) => {
+    setStudioData(data);
+    setActiveView('app-studio');
+  };
+
+  const handleCloseStudio = () => {
+    setStudioData(null);
+    setActiveView('chat');
+  };
+
   const handleReviseCode = (code) => {
     setRevisionContextCode(code);
     const revisionPrompt = `Revise code: `;
@@ -517,7 +529,13 @@ export default function App() {
       )}
 
       <main className="main-content">
-        {activeView === 'image-studio' ? (
+        {activeView === 'app-studio' && studioData ? (
+          <AppStudioPage
+            code={studioData.code}
+            title={studioData.title}
+            onClose={handleCloseStudio}
+          />
+        ) : activeView === 'image-studio' ? (
           <ImageStudioPage />
         ) : (
           <>
@@ -588,6 +606,7 @@ export default function App() {
                 onClose={() => setCanvasOpen(false)}
                 isFullScreen={canvasFullScreen}
                 onToggleFullScreen={() => setCanvasFullScreen(prev => !prev)}
+                onOpenStudio={handleOpenStudio}
               />
             )}
           </>
