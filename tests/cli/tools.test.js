@@ -1,50 +1,48 @@
-import { describe, it, expect } from 'vitest';
-import { ToolRegistry } from '../../packages/agent-core/tools/index.js';
-import { ContextEngine } from '../../packages/agent-core/context/index.js';
-import { PermissionManager } from '../../packages/agent-core/permissions/index.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
+import { ToolRegistry, WorkspaceSandbox } from '../../packages/agent-core/index.js';
 
-describe('ToolRegistry Core Tools', () => {
-  it('registers core local tools', () => {
-    const registry = new ToolRegistry();
-    const tools = registry.getAllTools();
+const roots = [];
+afterEach(() => roots.splice(0).forEach(root => fs.rmSync(root, { recursive: true, force: true })));
 
-    const toolNames = tools.map(t => t.name);
-    expect(toolNames).toContain('read_file');
-    expect(toolNames).toContain('write_file');
-    expect(toolNames).toContain('edit_file');
-    expect(toolNames).toContain('list_directory');
-    expect(toolNames).toContain('search_files');
-    expect(toolNames).toContain('search_text');
-    expect(toolNames).toContain('run_command');
-    expect(toolNames).toContain('git_status');
-    expect(toolNames).toContain('git_diff');
-    expect(toolNames).toContain('git_log');
-    expect(toolNames).toContain('run_tests');
-    expect(toolNames).toContain('run_build');
-    expect(toolNames).toContain('run_lint');
-  });
-
-  it('executes read_file tool cleanly', async () => {
-    const registry = new ToolRegistry();
-    const context = new ContextEngine(process.cwd());
-    const permissionManager = new PermissionManager();
-
-    const result = await registry.executeTool('read_file', { filePath: 'package.json' }, {
-      context,
-      permissionManager
+describe('ToolRegistry', () => {
+  it('emits OpenAI-compatible function schemas', () => {
+    const schema = new ToolRegistry().getProviderSchemas()[0];
+    expect(schema).toMatchObject({
+      type: 'function',
+      function: {
+        name: expect.any(String),
+        description: expect.any(String),
+        parameters: { type: 'object' }
+      }
     });
-
-    expect(result.error).toBeUndefined();
-    expect(result.content).toContain('"name":');
-    expect(context.inspectedFiles.has('package.json')).toBe(true);
   });
 
-  it('executes list_directory tool cleanly', async () => {
+  it('cannot read outside the workspace', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'corez-tools-'));
+    roots.push(root);
     const registry = new ToolRegistry();
-    const context = new ContextEngine(process.cwd());
+    await expect(registry.executeTool('read_file', { filePath: '/etc/passwd' }, {
+      sandbox: WorkspaceSandbox.create(root),
+      authorize: async () => ({ allowed: true })
+    })).rejects.toMatchObject({ code: 'PATH_OUTSIDE_WORKSPACE' });
+  });
 
-    const result = await registry.executeTool('list_directory', { dirPath: '.' }, { context });
-    expect(result.items).toBeDefined();
-    expect(result.items.some(i => i.name === 'package.json')).toBe(true);
+  it('patches an exact unique string and records the change', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'corez-tools-'));
+    roots.push(root);
+    fs.writeFileSync(path.join(root, 'a.txt'), 'before\n');
+    const result = await new ToolRegistry().executeTool('edit_file', {
+      filePath: 'a.txt',
+      targetContent: 'before',
+      replacementContent: 'after'
+    }, {
+      sandbox: WorkspaceSandbox.create(root),
+      authorize: async () => ({ allowed: true })
+    });
+    expect(result.success).toBe(true);
+    expect(fs.readFileSync(path.join(root, 'a.txt'), 'utf8')).toBe('after\n');
   });
 });

@@ -4,7 +4,14 @@ export { WorkspaceSandbox } from './sandbox/index.js';
 export { buildCommandEnv, runProcess } from './process/index.js';
 export { createEvent, isCorezEvent } from './contracts/events.js';
 export { getCommandPolicy } from './policies/index.js';
-export { PermissionManager, PERMISSION_CATEGORIES, BLOCKED_DANGEROUS_COMMANDS } from './permissions/index.js';
+export {
+  PermissionManager,
+  PERMISSION_CATEGORIES,
+  HARD_BLOCKED_COMMANDS,
+  SENSITIVE_FILE_OPERATION,
+  BLOCKED_DANGEROUS_COMMANDS
+} from './permissions/index.js';
+export { ApprovalController } from './permissions/approval-controller.js';
 export { ContextEngine } from './context/index.js';
 export { AWWWARDS_DESIGN_SYSTEM, AWWWARDS_CATEGORIES, detectAwwwardsCategory, buildAwwwardsDesignPrompt } from './context/designTokens.js';
 export { ToolRegistry } from './tools/index.js';

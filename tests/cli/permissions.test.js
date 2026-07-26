@@ -1,34 +1,60 @@
-import { describe, it, expect } from 'vitest';
-import { PermissionManager, PERMISSION_CATEGORIES } from '../../packages/agent-core/permissions/index.js';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  ApprovalController,
+  PermissionManager
+} from '../../packages/agent-core/index.js';
 
-describe('PermissionManager & Dangerous Command Protection', () => {
-  it('auto-approves read operations', () => {
-    const pm = new PermissionManager();
-    const check = pm.checkPermission(PERMISSION_CATEGORIES.READ, 'read_file');
-    expect(check.allowed).toBe(true);
+describe('CoreZ permissions', () => {
+  it('returns ask without treating it as allowed', () => {
+    const manager = new PermissionManager({ shell: 'ask' });
+    expect(manager.resolve({ category: 'shell', operation: 'npm test' }))
+      .toMatchObject({ action: 'ask', allowed: false });
   });
 
-  it('blocks dangerous commands like rm -rf / or git reset --hard', () => {
-    const pm = new PermissionManager();
-
-    const danger1 = pm.checkPermission(PERMISSION_CATEGORIES.SHELL, 'rm -rf /');
-    expect(danger1.allowed).toBe(false);
-    expect(danger1.blocked).toBe(true);
-
-    const danger2 = pm.checkPermission(PERMISSION_CATEGORIES.SHELL, 'git reset --hard');
-    expect(danger2.allowed).toBe(false);
-    expect(danger2.blocked).toBe(true);
-
-    const danger3 = pm.checkPermission(PERMISSION_CATEGORIES.SHELL, 'sudo rm -rf /etc');
-    expect(danger3.allowed).toBe(false);
-    expect(danger3.blocked).toBe(true);
+  it('auto-approves contained ordinary operations only', () => {
+    const manager = new PermissionManager({ shell: 'ask' });
+    expect(manager.resolve({
+      category: 'shell',
+      operation: 'npm test',
+      autoApprove: true,
+      contained: true
+    }).action).toBe('allow');
+    expect(manager.resolve({
+      category: 'shell',
+      operation: 'git reset --hard',
+      autoApprove: true,
+      contained: true
+    }).action).toBe('blocked');
   });
 
-  it('honors workspaceWrite configuration', () => {
-    const pmAllowed = new PermissionManager({ workspaceWrite: true });
-    expect(pmAllowed.checkPermission(PERMISSION_CATEGORIES.WORKSPACE_WRITE).allowed).toBe(true);
+  it.each(['rm -rf /', 'rm -fr /', 'rm -rf ~', 'rm -rf *'])('blocks destructive removal: %s', operation => {
+    const manager = new PermissionManager({ shell: 'ask' });
+    expect(manager.resolve({ category: 'shell', operation, autoApprove: true, contained: true }))
+      .toMatchObject({ action: 'blocked', allowed: false });
+  });
 
-    const pmDenied = new PermissionManager({ workspaceWrite: false });
-    expect(pmDenied.checkPermission(PERMISSION_CATEGORIES.WORKSPACE_WRITE).allowed).toBe(false);
+  it('never auto-approves a secret or credential file', () => {
+    const manager = new PermissionManager({ read: 'ask' });
+    expect(manager.resolve({
+      category: 'read',
+      operation: '.env',
+      autoApprove: true,
+      contained: true
+    })).toMatchObject({ action: 'blocked', allowed: false });
+    expect(manager.resolve({
+      category: 'read',
+      operation: 'config/credentials.json',
+      autoApprove: true,
+      contained: true
+    })).toMatchObject({ action: 'blocked', allowed: false });
+  });
+
+  it('caches allow-for-session by normalized scope', async () => {
+    const prompt = vi.fn(async () => 'session');
+    const controller = new ApprovalController({ prompt });
+    const request = { tool: 'run_command', category: 'shell', operation: 'npm test', scope: 'shell:npm test' };
+    expect(await controller.authorize(request)).toMatchObject({ allowed: true, persistence: 'session' });
+    expect(await controller.authorize(request)).toMatchObject({ allowed: true, persistence: 'session' });
+    expect(prompt).toHaveBeenCalledTimes(1);
   });
 });
