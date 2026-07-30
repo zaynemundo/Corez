@@ -257,5 +257,5 @@ function createEmptyResult(reason) {
 function log(stage, message, detail) {
   const prefix = '[COREZ PIPELINE]';
   const detailStr = detail ? ` → ${detail}` : '';
-  console.log(`${prefix} ${stage}: ${message}${detailStr}`);
+  console.warn(`${prefix} ${stage}: ${message}${detailStr}`);
 }
