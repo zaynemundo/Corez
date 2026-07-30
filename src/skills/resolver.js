@@ -81,6 +81,7 @@ export function resolveSkills({ intent, prompt = '', availableTools = [], regist
     selectionMap.set('brainstorming', 'High-level multi-agent orchestration architecture');
     selectionMap.set('writing-plans', 'DAG task graph decomposition');
     selectionMap.set('subagent-driven-development', 'Isolated subagent task briefs');
+    selectionMap.set('dispatching-parallel-agents', 'Concurrently execute independent tasks');
     selectionMap.set('verification-before-completion', 'Empirical verification gate');
   } else if (legacyIntent === 'code-help' || ['feature_implementation', 'code_refactor'].includes(primaryIntent)) {
     selectionMap.set('writing-plans', 'Plan targeted implementation changes');
