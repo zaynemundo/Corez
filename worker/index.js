@@ -65,7 +65,7 @@ function buildSystemPrompt(options = {}) {
   let adaptiveInstructions;
   if (intentType === 'code-help' || ['bug_fix', 'code_refactor', 'feature_implementation', 'simple_edit'].includes(primaryIntent)) {
     adaptiveInstructions = `
-Adaptive Routing - Coding & Engineering Path:
+Adaptive Routing - Coding Path:
 - Inspect relevant architecture and naming conventions before providing code.
 - Do NOT hallucinate file paths or modify unrelated files.
 - Preserve existing public API contracts, method signatures, and component props.
@@ -73,7 +73,7 @@ Adaptive Routing - Coding & Engineering Path:
 - Include exact files changed, a reasoning summary, and clear verification steps.`;
   } else if (intentType === 'swarm' || primaryIntent === 'swarm') {
     adaptiveInstructions = `
-Adaptive Routing - Complex Orchestration Path:
+Adaptive Routing - Complex Path:
 - Use step-by-step reasoning and careful task graph planning.
 - Provide a robust architectural overview before diving into specific code.`;
   } else if (intentType === 'app' || ['website_creation', 'game_creation', 'design_task'].includes(primaryIntent)) {
@@ -83,7 +83,7 @@ Adaptive Routing - Complex Orchestration Path:
       : '- VISUAL DESIGN: Follow clean, responsive, user-specified design instructions; preserve user explicit styling preferences.';
 
     adaptiveInstructions = `
-Adaptive Routing - Application & Experience Path:
+Adaptive Routing - App & Game Creation Path (Awwwards Site of the Day Quality):
 - DeepSeek V4 Flash handles logic, vision, UI layout, art direction, and game design.
 - Use FLUX 1 Schnell (@cf/black-forest-labs/flux-1-schnell) for fast background image generation and visual graphics.
 ${designStyle}
@@ -91,16 +91,16 @@ ${designStyle}
 - Word Games Requirement: When generating word games (Scrabble, Wordle, Crosswords, etc.), embed a full dictionary of valid English words and implement strict word validation logic.`;
   } else if (intentType === 'writing') {
     adaptiveInstructions = `
-Adaptive Routing - Content & Writing Path:
+Adaptive Routing - Writing Path:
 - Deliver polished copy in the requested format and tone.
 - Match audience and purpose without technical commentary.`;
   } else if (intentType === 'explanation') {
     adaptiveInstructions = `
-Adaptive Routing - Explanation & Teaching Path:
+Adaptive Routing - Explanation Path:
 - Explain directly in plain language using practical examples.`;
   } else {
     adaptiveInstructions = `
-Adaptive Routing - Direct Response Path:
+Adaptive Routing - Fast Path:
 - Answer directly and immediately with practical information.`;
   }
 
@@ -151,7 +151,9 @@ Target Goal: ${intent?.goal || 'Assist user with requested deliverable'}
 Deliverable: ${intent?.deliverable || 'Response'}
 Complexity: ${intent?.complexity || 'medium'} | Confidence: ${Math.round((intent?.confidence || 0.8) * 100)}%${formattedContract}
 
-Active Skills & Instructions:${formattedSkills}${formattedPlan}`;
+Active Skills & Instructions:${formattedSkills}${formattedPlan}
+
+Inferred intent: ${intentType} - ${intent?.summary || intent?.goal || 'Understand the public user goal and give a useful next step.'}`;
 }
 
 async function handleAi(request, env) {

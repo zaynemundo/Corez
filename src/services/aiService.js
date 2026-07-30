@@ -548,8 +548,6 @@ export async function generateHostedAIResponse(
   history = [],
   signal = null
 ) {
-  const originalPrompt = prompt;
-
   // 1. Fine-grained intent classification & contract generation
   const fineIntent = classifyIntentNew(prompt);
   const legacyIntentType = toLegacyIntentType(fineIntent?.primaryIntent || fineIntent?.type);
@@ -559,14 +557,14 @@ export async function generateHostedAIResponse(
     forbidden: fineIntent?.constraints || [],
   });
 
-  if (intent?.type === 'code-help' || intent?.type === 'app' || INTENT_PATTERNS.code.test(prompt)) {
-    prompt = await improveCodingPrompt(prompt, intent);
-  }
+  const executionPrompt = (intent?.type === 'code-help' || intent?.type === 'app' || INTENT_PATTERNS.code.test(prompt))
+    ? await improveCodingPrompt(prompt, intent)
+    : prompt;
 
   // 2. Skill resolution with fine-grained intent
   const resolvedSkills = resolveSkills({
     intent: fineIntent,
-    prompt,
+    prompt: executionPrompt,
     registry: defaultSkillRegistry,
   });
 
@@ -575,16 +573,7 @@ export async function generateHostedAIResponse(
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      prompt: originalPrompt,
-      executionPrompt: prompt,
-      intent: fineIntent,
-      legacyIntent: legacyIntentType,
-      contract,
-      messages: history,
-      skills: resolvedSkills,
-      executionPlan: resolvedSkills.compactExecutionPlan || null,
-    }),
+    body: JSON.stringify({ prompt, intent, messages: history, fineIntent, executionPrompt, legacyIntent: legacyIntentType, contract, skills: resolvedSkills, executionPlan: resolvedSkills.compactExecutionPlan || null }),
   };
   if (signal) fetchOptions.signal = signal;
 
