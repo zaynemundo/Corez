@@ -14,6 +14,8 @@ import { classifyIntent } from './intentClassifier.js';
 import { parseMarketIntent } from './marketIntent.js';
 import { fetchMarketData, unavailableMarket } from './marketService.js';
 import { process as processPromptIntelligence, toLegacyIntentType, classifyIntent as classifyIntentNew } from './promptIntelligence/index.js';
+import { createIntentContract } from './promptIntelligence/intentContract.js';
+import { evaluateResponse, repairResponse, recordQualitySignal } from './reflectionEngine.js';
 import { buildAwwwardsDesignPrompt } from '../../packages/agent-core/context/designTokens.js';
 import { resolveSkills } from '../skills/resolver.js';
 
@@ -475,7 +477,7 @@ export async function generateFluxImage(prompt, signal = null) {
   return createFallbackSvgDataUrl(prompt);
 }
 
-export function improveCodingPrompt(prompt, intent = null) {
+export async function improveCodingPrompt(prompt, intent = null) {
   const cleanPrompt = typeof prompt === 'string' ? prompt.trim() : '';
   if (!cleanPrompt) return cleanPrompt;
 
@@ -489,7 +491,7 @@ export function improveCodingPrompt(prompt, intent = null) {
 
   // Use the Prompt Intelligence Engine for structured enrichment
   try {
-    const pipelineResult = processPromptIntelligence({
+    const pipelineResult = await processPromptIntelligence({
       prompt: cleanPrompt,
       dryRun: true,
     });
@@ -546,33 +548,80 @@ export async function generateHostedAIResponse(
   history = [],
   signal = null
 ) {
+  const originalPrompt = prompt;
+
+  // 1. Fine-grained intent classification & contract generation
+  const fineIntent = classifyIntentNew(prompt);
+  const legacyIntentType = toLegacyIntentType(fineIntent?.primaryIntent || fineIntent?.type);
+  const contract = createIntentContract(fineIntent, {
+    explicit: fineIntent?.features || [],
+    inferred: [],
+    forbidden: fineIntent?.constraints || [],
+  });
+
   if (intent?.type === 'code-help' || intent?.type === 'app' || INTENT_PATTERNS.code.test(prompt)) {
-    prompt = improveCodingPrompt(prompt, intent);
+    prompt = await improveCodingPrompt(prompt, intent);
   }
 
+  // 2. Skill resolution with fine-grained intent
   const resolvedSkills = resolveSkills({
-    intent: intent?.type || 'general',
+    intent: fineIntent,
     prompt,
-    registry: defaultSkillRegistry
+    registry: defaultSkillRegistry,
   });
 
   const fetchOptions = {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ prompt, intent, messages: history, skills: resolvedSkills })
+    body: JSON.stringify({
+      prompt: originalPrompt,
+      executionPrompt: prompt,
+      intent: fineIntent,
+      legacyIntent: legacyIntentType,
+      contract,
+      messages: history,
+      skills: resolvedSkills,
+      executionPlan: resolvedSkills.compactExecutionPlan || null,
+    }),
   };
   if (signal) fetchOptions.signal = signal;
 
   const response = await fetch(AI_PROXY_ENDPOINT, fetchOptions);
 
   if (!response.ok) {
-    throw new Error(`Hosted AI request failed with status ${response.status}`);
+    const serverMsg = typeof data?.error === 'string' ? data.error : (data?.error?.message || data?.message || `HTTP ${response.status}`);
+    throw new Error(`Hosted AI request failed: ${serverMsg}`);
   }
 
-  const data = await response.json();
-  return data?.content?.trim() || null;
+  const data = await response.json().catch(() => ({}));
+  const rawContent = typeof data?.content === 'string' ? data.content.trim() : null;
+
+  if (!rawContent) return null;
+
+  // 3. Local Reflection & Bounded Repair Loop
+  const initialEval = evaluateResponse(rawContent, contract, fineIntent);
+  let finalContent = rawContent;
+  let repaired = false;
+
+  if (!initialEval.isCompliant) {
+    const repairResult = repairResponse(rawContent, initialEval, contract, 1, 0);
+    finalContent = repairResult.finalContent;
+    repaired = repairResult.repaired;
+  }
+
+  // 4. Record anonymous quality signal
+  recordQualitySignal({
+    intentType: fineIntent?.primaryIntent || fineIntent?.type,
+    confidence: fineIntent?.confidence || 0,
+    selectedSkillsCount: resolvedSkills.length,
+    isCompliant: initialEval.isCompliant,
+    violationsCount: initialEval.violations.length,
+    repaired,
+  });
+
+  return finalContent;
 }
 
 export function extractCodeFromMessage(text) {
@@ -1068,11 +1117,11 @@ function synthesizeWordleGame() {
     const WORDS = [
       "APPLE","BRAIN","SMART","COREZ","FLASH","REACT","PLANT","TRAIN","WATER","DREAM",
       "SHINE","CLOCK","FLAME","STORM","CLIMB","SOUND","MUSIC","LIGHT","GREAT","WORLD",
-      "POWER","CLEAN","CLEAR","CLOUDS","SPACE","CRAFT","AGENT","BOARD","CHECK","FRAME",
+      "POWER","CLEAN","CLEAR","SPACE","CRAFT","AGENT","BOARD","CHECK","FRAME",
       "GUIDE","HOUSE","IMAGE","JUICE","KNIFE","LEMON","MAGIC","NIGHT","OCEAN","PAPER",
       "QUEEN","RIVER","SOLAR","TABLE","UNION","VALUE","WHITE","YOUTH","ZEBRA","BLOCK",
       "CANDY","DRIVE","EARTH","FIELD","GLASS","HEART","INDEX","JUDGE","LOGIC","MONEY",
-      "NOBLE","ORDER","PHASE","RADIO","STAGE","TRACK","VOICE","YIELD","APEX","BLINK"
+      "NOBLE","ORDER","PHASE","RADIO","STAGE","TRACK","VOICE","YIELD","BLINK"
     ];
     const DICTIONARY = new Set([
       ...WORDS,

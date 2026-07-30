@@ -10,7 +10,7 @@ export function createAssetManifest(spec = {}) {
   return {
     gameSpec,
     assetManifest: assetManifest.map(asset => ({
-      id: asset.id || `asset_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      id: asset.id || `asset_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       type: asset.type || 'background', // 'background' | 'character' | 'icon' | 'ui'
       prompt: asset.prompt || 'Cyberpunk dark mode UI background',
       width: asset.width || 1536,

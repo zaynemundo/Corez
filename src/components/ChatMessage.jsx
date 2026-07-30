@@ -7,6 +7,12 @@ import {
 } from 'lucide-react';
 import MarketCard from './MarketCard';
 
+function safeImageUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  if (url.startsWith('https://') || url.startsWith('http://') || url.startsWith('data:image/')) return url;
+  return '';
+}
+
 function CodeSnippetBlock({ code, lang, onRunInCanvas, onReviseCode }) {
   const [copied, setCopied] = useState(false);
 
@@ -162,7 +168,7 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onRe
       if (imgMatch) {
         return (
           <span key={i} className="markdown-inline-img-wrapper">
-            <img src={imgMatch[2]} alt={imgMatch[1]} className="markdown-inline-img" />
+            <img src={safeImageUrl(imgMatch[2])} alt={imgMatch[1]} className="markdown-inline-img" />
           </span>
         );
       }
@@ -259,7 +265,7 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onRe
       if (standaloneImgMatch) {
         elements.push(
           <div key={`img-${i}`} className="markdown-image-wrapper">
-            <img src={standaloneImgMatch[2]} alt={standaloneImgMatch[1]} className="markdown-image" />
+            <img src={safeImageUrl(standaloneImgMatch[2])} alt={standaloneImgMatch[1]} className="markdown-image" />
             {standaloneImgMatch[1] && <span className="markdown-image-caption">{standaloneImgMatch[1]}</span>}
           </div>
         );

@@ -24,7 +24,8 @@ export default function ProgressChecklist() {
         } else if (prev < 98.5) {
           return prev + Math.random() * 0.15 + 0.05;
         }
-        return prev;
+        clearInterval(timer);
+        return Math.min(prev, 100);
       });
     }, 220);
 

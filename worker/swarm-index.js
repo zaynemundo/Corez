@@ -1,6 +1,7 @@
 import baseWorker from './index.js';
+import { safeErrorDetail } from './utils.js';
 
-const SWARM_MODEL = 'deepseek-v4-pro';
+const SWARM_MODEL = 'deepseek/deepseek-v4-pro';
 const SWARM_INTENTS = new Set(['app', 'code-help', 'swarm']);
 
 const CORE_AGENT_TEMPLATES = Object.freeze({
@@ -62,19 +63,6 @@ const CORE_AGENT_TEMPLATES = Object.freeze({
 
 function normalizeIntentType(intentType) {
   return typeof intentType === 'string' ? intentType.trim().toLowerCase() : 'general';
-}
-
-function safeErrorDetail(error) {
-  const raw = error instanceof Error
-    ? error.message
-    : typeof error?.message === 'string'
-      ? error.message
-      : String(error);
-
-  return raw
-    .replace(/(authorization\s*:\s*bearer\s+)[^\s,;]+/gi, '$1[REDACTED]')
-    .replace(/\b(api[_-]?key|token|secret|password)\b(\s*[:=]\s*)([^\s&,;]+)/gi, '$1$2[REDACTED]')
-    .slice(0, 500);
 }
 
 function readPositiveNumber(value, fallback) {

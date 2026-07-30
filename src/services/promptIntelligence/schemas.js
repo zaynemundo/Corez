@@ -93,8 +93,11 @@ export function createTask({ rawPrompt }) {
 }
 
 export function createIntentResult(overrides = {}) {
+  const type = overrides.type || INTENT_TYPES.UNKNOWN;
   return {
-    type: INTENT_TYPES.UNKNOWN,
+    type,
+    primaryIntent: overrides.primaryIntent || type,
+    secondaryIntent: overrides.secondaryIntent || null,
     goal: '',
     domain: '',
     deliverable: '',
@@ -106,6 +109,8 @@ export function createIntentResult(overrides = {}) {
     blockingAmbiguity: false,
     complexity: COMPLEXITY_LEVELS.MEDIUM,
     confidence: 0,
+    isExistingProject: false,
+    outputFormat: 'text',
     ...overrides,
   };
 }

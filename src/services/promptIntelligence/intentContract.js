@@ -12,7 +12,8 @@ import { createIntentContract as _createContract } from './schemas.js';
 
 export function createIntentContract(intent, requirements) {
   const contract = _createContract();
-  const type = intent?.type;
+  const type = intent?.type || intent?.primaryIntent;
+  const isExisting = intent?.isExistingProject || ['bug_fix', 'code_refactor', 'feature_implementation', 'simple_edit'].includes(type);
   const explicit = requirements?.explicit || [];
   const inferred = requirements?.inferred || [];
   const forbidden = requirements?.forbidden || [];
@@ -27,9 +28,20 @@ export function createIntentContract(intent, requirements) {
   contract.mayInfer = [...inferred].filter(Boolean);
   contract.mayInfer = [...new Set(contract.mayInfer)];
 
-  // Forbidden creations
+  // Forbidden creations / changes
   contract.mustNotInvent = [...forbidden].filter(Boolean);
   contract.mustNotInvent = [...new Set(contract.mustNotInvent)];
+
+  // Mandatory preservation rules for repository / code modifications
+  contract.mustPreserve = [];
+  if (isExisting) {
+    contract.mustPreserve.push(
+      'Keep public APIs and exported function signatures stable unless breaking change is explicitly requested',
+      'Do not modify unrelated files or background services',
+      'Do not change usage limits, rate limits, token limits, subscription plans, provider quotas, or billing behavior',
+      'Prefer minimal targeted patch over broad refactor'
+    );
+  }
 
   // Add intent-type defaults
   enrichContactWithDefaults(contract, type);

@@ -385,7 +385,7 @@ export function formatCodeForPreview(rawCode) {
         for (let i = candidateNames.length - 1; i >= 0; i--) {
           const compName = candidateNames[i];
           try {
-            const candidate = eval(compName);
+            const candidate = window[compName];
             if (typeof candidate === 'function' || (typeof candidate === 'object' && candidate !== null)) {
               TargetComponent = candidate;
               break;

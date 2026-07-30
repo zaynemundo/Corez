@@ -237,8 +237,29 @@ function computeConfidence(handler, lower) {
     if (lower.includes(s)) matchedSignals += 1;
   }
   let score = Math.min(1, matchedSignals / Math.max(1, maxSignals * 0.4));
-  if (handler.pattern.test(lower)) score = Math.min(1, score + 0.2);
+  if (handler.pattern.test(lower)) score = Math.min(1, score + 0.25);
   return Math.round(score * 100) / 100;
+}
+
+function detectIsExistingProject(lower, primaryType) {
+  if (['bug_fix', 'code_refactor', 'feature_implementation', 'simple_edit'].includes(primaryType)) {
+    return true;
+  }
+  const existingProjectSignals = /\b(repo|repository|file|files|existing|codebase|src\/|component|function|line|in this project|my app|our app|current code|update|modify|patch|refactor|fix|debug)\b/i;
+  return existingProjectSignals.test(lower);
+}
+
+function detectOutputFormat(lower, primaryType) {
+  if (/\b(html\b|css\b|vanilla|plain html|pure html|html\/css|raw html|html\s*\+\s*css|vanilla js)\b/i.test(lower)) {
+    return 'html';
+  }
+  if (['website_creation', 'game_creation', 'design_task'].includes(primaryType) || /\b(react|jsx|component|app|dashboard|widget)\b/i.test(lower)) {
+    return 'jsx';
+  }
+  if (['content_creation', 'code_question', 'research'].includes(primaryType)) {
+    return 'markdown';
+  }
+  return 'text';
 }
 
 /**
@@ -251,35 +272,55 @@ export function classifyIntent(prompt) {
   }
 
   const lower = prompt.toLowerCase().trim();
-  let best = null;
-  let bestScore = -1;
+  const candidateMatches = [];
 
   for (const handler of INTENT_HANDLERS) {
     const matched = handler.pattern.test(prompt) || handler.signals.some((s) => lower.includes(s));
     if (matched) {
       const confidence = computeConfidence(handler, lower);
-      if (confidence > bestScore) {
-        bestScore = confidence;
-        best = handler;
-      }
+      candidateMatches.push({ handler, confidence });
     }
   }
 
-  if (!best || bestScore < 0.15) {
+  candidateMatches.sort((a, b) => b.confidence - a.confidence);
+
+  if (candidateMatches.length === 0 || candidateMatches[0].confidence < 0.15) {
+    const isExisting = detectIsExistingProject(lower, INTENT_TYPES.GENERAL_QUESTION);
+    const format = detectOutputFormat(lower, INTENT_TYPES.GENERAL_QUESTION);
     return createIntentResult({
       type: INTENT_TYPES.GENERAL_QUESTION,
+      primaryIntent: INTENT_TYPES.GENERAL_QUESTION,
+      secondaryIntent: null,
       goal: lower.slice(0, 80),
-      confidence: Math.round(bestScore * 100) / 100 || 0.1,
+      confidence: candidateMatches[0]?.confidence || 0.1,
+      isExistingProject: isExisting,
+      outputFormat: format,
     });
   }
 
-  const extracted = best.extract(prompt, lower);
+  const topMatch = candidateMatches[0];
+  const secondMatch = candidateMatches.length > 1 ? candidateMatches[1] : null;
+
+  // Confidence margin check: if second match is within 0.15 of top match, preserve secondary intent
+  let secondaryIntent = null;
+  if (secondMatch && (topMatch.confidence - secondMatch.confidence) <= 0.15) {
+    secondaryIntent = secondMatch.handler.type;
+  }
+
+  const extracted = topMatch.handler.extract(prompt, lower);
+  const isExisting = detectIsExistingProject(lower, topMatch.handler.type);
+  const format = detectOutputFormat(lower, topMatch.handler.type);
+
   return createIntentResult({
-    type: best.type,
-    confidence: bestScore,
+    type: topMatch.handler.type,
+    primaryIntent: topMatch.handler.type,
+    secondaryIntent,
+    confidence: topMatch.confidence,
     goal: extracted.goal || lower.slice(0, 80),
     domain: extracted.domain || '',
     deliverable: extracted.deliverable || '',
+    isExistingProject: isExisting,
+    outputFormat: format,
   });
 }
 

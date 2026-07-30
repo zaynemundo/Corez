@@ -48,6 +48,8 @@ export default function SecureGamePreview({
   // postMessage Handshake Listener
   useEffect(() => {
     const handlePostMessage = (event) => {
+      const trustedOrigin = window.location.origin;
+      if (event.origin !== trustedOrigin) return;
       const { type, payload } = event.data || {};
       if (!type || typeof type !== 'string') return;
 
@@ -98,7 +100,7 @@ export default function SecureGamePreview({
 
   const handleRestart = () => {
     if (iframeRef.current) {
-      iframeRef.current.contentWindow?.postMessage({ type: 'COMMAND_RESTART' }, '*');
+      iframeRef.current.contentWindow?.postMessage({ type: 'COMMAND_RESTART' }, window.location.origin);
       // Trigger refresh fallback if needed
       iframeRef.current.srcdoc = sanitizedHtml;
     }
@@ -110,7 +112,7 @@ export default function SecureGamePreview({
       <div className="game-status-bar" style={{
         display: 'flex',
         alignItems: 'center',
-        justify: 'space-between',
+        justifyContent: 'space-between',
         padding: '8px 16px',
         background: 'var(--bg-tertiary, #161824)',
         borderBottom: '1px solid var(--border-color, #2a2d42)',
@@ -160,7 +162,7 @@ export default function SecureGamePreview({
           title="COREZ Secure Game Sandbox"
           referrerPolicy="no-referrer"
           srcDoc={sanitizedHtml}
-          sandbox="allow-scripts allow-pointer-lock allow-same-origin"
+          sandbox="allow-scripts allow-pointer-lock"
           style={{
             width: '100%',
             height: '100%',
@@ -177,7 +179,7 @@ export default function SecureGamePreview({
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            justify: 'center',
+            justifyContent: 'center',
             padding: '24px',
             color: '#e74c3c'
           }}>

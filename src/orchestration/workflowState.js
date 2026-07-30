@@ -21,7 +21,7 @@ export const WORKFLOW_STAGES = {
 
 export class WorkflowState {
   constructor(initialData = {}) {
-    this.id = initialData.id || `wf_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    this.id = initialData.id || `wf_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     this.currentStage = WORKFLOW_STAGES.RECEIVED;
     this.intent = initialData.intent || null;
     this.resolvedSkills = [];

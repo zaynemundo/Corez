@@ -244,7 +244,7 @@ export default function App() {
   useEffect(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
-      localStorage.setItem('corez_sessions', JSON.stringify(sessions));
+      try { localStorage.setItem('corez_sessions', JSON.stringify(sessions)); } catch { /* Ignore storage errors */ }
     }, 300);
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -253,7 +253,7 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('corez_theme', theme);
+    try { localStorage.setItem('corez_theme', theme); } catch { /* Ignore storage errors */ }
   }, [theme]);
 
   // Auto-resume background AI generation across accidental page refreshes
@@ -440,7 +440,7 @@ export default function App() {
       messages: updatedApiMessages,
       timestamp: Date.now()
     };
-    localStorage.setItem('corez_pending_request', JSON.stringify(pendingData));
+    try { localStorage.setItem('corez_pending_request', JSON.stringify(pendingData)); } catch { /* Ignore storage errors */ }
 
     const controller = new AbortController();
     abortControllerRef.current = controller;

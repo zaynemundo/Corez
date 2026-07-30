@@ -1,4 +1,5 @@
 import { handleMarket } from './market.js';
+import { safeErrorDetail } from './utils.js';
 
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 const OPENCODE_DEFAULT_ENDPOINT = 'https://opencode.ai/zen/go/v1/chat/completions';
@@ -6,6 +7,19 @@ const DEEPSEEK_V4_FLASH_MODEL = 'deepseek-v4-flash';
 const FLUX_MODEL = '@cf/black-forest-labs/flux-1-schnell';
 const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
 const DEEPSEEK_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
+const MAX_BODY_BYTES = 256 * 1024;
+
+async function readBoundedJson(request, maxBytes = MAX_BODY_BYTES) {
+  const contentLength = parseInt(request.headers.get('Content-Length') || '0', 10);
+  if (contentLength > maxBytes) {
+    throw new Error(`Request body exceeds ${maxBytes} byte limit.`);
+  }
+  const text = await request.text();
+  if (text.length > maxBytes) {
+    throw new Error(`Request body exceeds ${maxBytes} byte limit.`);
+  }
+  return JSON.parse(text);
+}
 
 function getTargetModels() {
   return [DEEPSEEK_V4_FLASH_MODEL];
@@ -29,7 +43,7 @@ function jsonResponse(status, body) {
     status,
     headers: {
       'Content-Type': 'application/json',
-      'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' data:; frame-src 'none'; object-src 'none'",
+      'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' data:; frame-src 'none'; object-src 'none'",
       'X-Content-Type-Options': 'nosniff',
       'X-Frame-Options': 'DENY',
       'Referrer-Policy': 'no-referrer'
@@ -37,95 +51,107 @@ function jsonResponse(status, body) {
   });
 }
 
-function safeErrorDetail(error) {
-  const raw = error instanceof Error
-    ? error.message
-    : typeof error?.message === 'string'
-      ? error.message
-      : String(error);
+function buildSystemPrompt(options = {}) {
+  const intent = typeof options.intent === 'object' ? options.intent : null;
+  const legacyIntent = options.legacyIntent || (typeof options.intent === 'string' ? options.intent : intent?.type);
+  const skills = Array.isArray(options.skills) ? options.skills : [];
+  const contract = options.contract && typeof options.contract === 'object' ? options.contract : null;
+  const executionPlan = typeof options.executionPlan === 'string' ? options.executionPlan : null;
 
-  return raw
-    .replace(/(authorization\s*:\s*bearer\s+)[^\s,;]+/gi, '$1[REDACTED]')
-    .replace(/\b(api[_-]?key|token|secret|password)\b(\s*[:=]\s*)([^\s&,;]+)/gi, '$1$2[REDACTED]')
-    .slice(0, 500);
-}
-
-function buildSystemPrompt(intent, skills = []) {
-  const intentSummary = intent?.summary
-    || 'Understand the public user goal and give a useful next step.';
-  const intentType = normalizeIntentType(intent?.type);
+  const intentType = normalizeIntentType(legacyIntent || intent?.type);
+  const primaryIntent = intent?.primaryIntent || intent?.type || intentType;
+  const secondaryIntent = intent?.secondaryIntent ? ` (secondary: ${intent.secondaryIntent})` : '';
 
   let adaptiveInstructions;
-  if (intentType === 'code-help') {
+  if (intentType === 'code-help' || ['bug_fix', 'code_refactor', 'feature_implementation', 'simple_edit'].includes(primaryIntent)) {
     adaptiveInstructions = `
-Adaptive Routing - Coding Path:
+Adaptive Routing - Coding & Engineering Path:
 - Inspect relevant architecture and naming conventions before providing code.
 - Do NOT hallucinate file paths or modify unrelated files.
-- Always include: exact files changed, a reasoning summary, and clear test instructions.
-- Ensure the code is practical, direct, and ready for production.`;
-  } else if (intentType === 'swarm') {
+- Preserve existing public API contracts, method signatures, and component props.
+- Do NOT modify usage limits, rate limits, token limits, subscription plans, billing, or provider routing.
+- Include exact files changed, a reasoning summary, and clear verification steps.`;
+  } else if (intentType === 'swarm' || primaryIntent === 'swarm') {
     adaptiveInstructions = `
-Adaptive Routing - Complex Path:
-- Use step-by-step reasoning and careful planning.
-- Consider multiple agents/skills and orchestration strategies if necessary.
+Adaptive Routing - Complex Orchestration Path:
+- Use step-by-step reasoning and careful task graph planning.
 - Provide a robust architectural overview before diving into specific code.`;
-  } else if (intentType === 'app') {
+  } else if (intentType === 'app' || ['website_creation', 'game_creation', 'design_task'].includes(primaryIntent)) {
+    const isExplicitDesignRequest = skills.some(s => s.id === 'frontend-modern-design') || /\b(glassmorphism|dark mode|awwwards|luxury|neon|aesthetic)\b/i.test(intent?.goal || '');
+    const designStyle = isExplicitDesignRequest
+      ? '- VISUAL DESIGN: Build with luxury dark mode glassmorphism (background: #090A0F, surface: rgba(18, 20, 29, 0.75), glowing borders, Outfit/Inter typography).'
+      : '- VISUAL DESIGN: Follow clean, responsive, user-specified design instructions; preserve user explicit styling preferences.';
+
     adaptiveInstructions = `
-Adaptive Routing - App & Game Creation Path (Awwwards Site of the Day Quality):
+Adaptive Routing - Application & Experience Path:
 - DeepSeek V4 Flash handles logic, vision, UI layout, art direction, and game design.
 - Use FLUX 1 Schnell (@cf/black-forest-labs/flux-1-schnell) for fast background image generation and visual graphics.
-- AWWWARDS VISUAL DESIGN PRINCIPLES: Build websites, dashboards, and apps with luxury dark mode glassmorphism (background: #090A0F, surface: rgba(18, 20, 29, 0.75), backdrop-filter: blur(16px), glowing borders: box-shadow 0 0 25px rgba(99,102,241,0.25)), Google Fonts (Outfit, Syne, Inter, Space Grotesk), smooth cubic-bezier transitions, and interactive micro-interactions.
-- AWWWARDS CATEGORY ROUTING: Automatically tailor UI layouts based on intent category (e.g. e-commerce product hero & cart drawer, portfolio project grid & cursor reveal, gaming neon glow canvas & leaderboard, saas metrics cards & charting, editorial masonry grid, etc.).
-- Build a complete, rich, runnable experience rather than a partial scaffold.
-- 8-BIT & SVG GAME ASSETS REQUIREMENT (itch.io Quality): When generating SVG graphics, retro game sprites, icons, tilesets, weapons, items, characters, or 8-bit artwork, build clean, high-quality vector SVGs in authentic 8-bit pixel art style (inspired by itch.io game asset packs). Use shape-rendering="crispEdges", crisp pixel grid alignment (e.g. 16x16, 24x24, 32x32, or 64x64 resolution), vibrant 8-bit color palettes (PICO-8, NES, Game Boy, Fantasy retro), dark 1-pixel outlines, specular highlight pixels, inner shading, drop shadow dithering, and sprite sheet / animation frame layouts!
-- 8-BIT STYLED BACKGROUNDS REQUIREMENT: ALL generated backgrounds, environment backdrops, game scenes, canvas wallpapers, and image generation prompts ([IMAGE_PROMPT: ...]) MUST be explicitly 8-bit retro pixel art styled (e.g. "8-bit pixel art background, retro 8-bit game landscape, pixelated starfield, 8-bit dungeon/arcade backdrop, crisp pixel edges"). Never generate plain or non-pixelated backgrounds for retro 8-bit asset requests!
-- WORD GAMES REQUIREMENT: When generating word games (such as Scrabble, Wordle, Anagrams, Crosswords, or Boggle), you MUST embed a comprehensive dictionary of valid words (300+ words in a Set/Array) and implement strict word verification logic so the game actively validates words, accepts valid entries, rejects invalid entries, and calculates scores!
-- Keep the implementation self-contained and ready for the preview canvas.
-- Prioritise usability, responsive behaviour, and clear interaction states.`;
+${designStyle}
+- Build a complete, rich, runnable experience ready for the preview canvas.
+- Word Games Requirement: When generating word games (Scrabble, Wordle, Crosswords, etc.), embed a full dictionary of valid English words and implement strict word validation logic.`;
   } else if (intentType === 'writing') {
     adaptiveInstructions = `
-Adaptive Routing - Writing Path:
+Adaptive Routing - Content & Writing Path:
 - Deliver polished copy in the requested format and tone.
-- Match the audience and purpose without adding unnecessary technical commentary.
-- Keep the result immediately reusable.`;
+- Match audience and purpose without technical commentary.`;
   } else if (intentType === 'explanation') {
     adaptiveInstructions = `
-Adaptive Routing - Explanation Path:
-- Explain the subject directly in plain language.
-- Use a practical example when it improves understanding.
-- End with the most useful next step rather than unnecessary follow-up questions.`;
+Adaptive Routing - Explanation & Teaching Path:
+- Explain directly in plain language using practical examples.`;
   } else {
     adaptiveInstructions = `
-Adaptive Routing - Fast Path:
-- Do not over-plan or ask unnecessary clarification questions.
-- Answer directly and immediately with practical information or calculations.
-- Make safe assumptions and proceed.`;
+Adaptive Routing - Direct Response Path:
+- Answer directly and immediately with practical information.`;
   }
+
+  // Format full skill instructions
+  let formattedSkills = '(none — direct execution path)';
+  if (skills.length > 0) {
+    formattedSkills = skills.map(s => {
+      const id = typeof s === 'string' ? s : (s.id || s.name);
+      const name = typeof s === 'object' ? (s.name || s.id) : s;
+      const phase = typeof s === 'object' ? (s.phase || 'IMPLEMENTING') : 'EXECUTION';
+      const instructions = typeof s === 'object' && s.instructions ? s.instructions : (s.description || 'Execute skill requirements');
+      const reason = typeof s === 'object' && s.reasonSelected ? `\n    Reason: ${s.reasonSelected}` : '';
+      const constraints = typeof s === 'object' && Array.isArray(s.constraints) && s.constraints.length ? `\n    Constraints: ${s.constraints.join(' | ')}` : '';
+      return `\n- [${phase}] ${name} (${id})${reason}\n    Instructions: ${instructions}${constraints}`;
+    }).join('');
+  }
+
+  // Format intent contract & preservation constraints
+  let formattedContract = '';
+  if (contract) {
+    const mustAchieve = Array.isArray(contract.mustAchieve) && contract.mustAchieve.length ? `\n- Must Achieve: ${contract.mustAchieve.join('; ')}` : '';
+    const mustPreserve = Array.isArray(contract.mustPreserve) && contract.mustPreserve.length ? `\n- Must Preserve: ${contract.mustPreserve.join('; ')}` : '';
+    const mustNotInvent = Array.isArray(contract.mustNotInvent) && contract.mustNotInvent.length ? `\n- Must Not Change / Invent: ${contract.mustNotInvent.join('; ')}` : '';
+    formattedContract = `\n\nIntent Contract & Preservation Rules:${mustAchieve}${mustPreserve}${mustNotInvent}`;
+  }
+
+  // Format Execution Plan
+  const formattedPlan = executionPlan ? `\n\n${executionPlan}` : '';
 
   return `You are COREZ AI.
 
 Identity & Persona:
 - Your name is COREZ AI.
-- STRICT MODEL ANONYMITY RULE: NEVER mention what underlying AI model, provider, vendor, architecture, or engine powers you in public chat or user responses (do NOT mention DeepSeek, Kimi, OpenAI, Anthropic, Gemini, Cloudflare, OpenRouter, FLUX, etc.). Always identify yourself strictly as COREZ AI.
-- Visual & SVG Engine: COREZ AI uses DeepSeek V4 Flash for logic, layout inspection, art direction, and SVG generation.
-- Background Image Engine: COREZ AI uses FLUX 1 Schnell (@cf/black-forest-labs/flux-1-schnell) for fast background image generation and artwork rendering.
-- When greeted with simple phrases like "hi", "hello", "hey", or "who are you", respond simply and directly: "Hello! I'm COREZ AI. How can I help you today?"
-- Never list bullet points, technical skills, or specializations when giving greetings or introductions unless explicitly requested.
+- STRICT MODEL ANONYMITY RULE: NEVER mention what underlying AI model, provider, vendor, architecture, or engine powers you in public chat or user responses. Always identify yourself strictly as COREZ AI.
+- When greeted with simple phrases like "hi", "hello", "hey", or "who are you", respond simply: "Hello! I'm COREZ AI. How can I help you today?"
+- Never list bullet points or technical specializations when giving greetings unless requested.
 
 Guidelines for Output:
-- DEFAULT FORMAT (React/JSX): When writing code or building apps, components, tools, dashboards, widgets, or games without an explicitly requested format, default to clean, modern React/JSX components (using \`\`\`jsx ... \`\`\` code blocks). ALWAYS name your main top-level React component "export default function App()". DO NOT wrap React code inside HTML boilerplate (<!DOCTYPE html>, <head>, <script type="text/babel">, or ReactDOM.createRoot()) because the preview canvas compiles and renders React/JSX code automatically!
-- REQUESTED FORMATS (HTML/CSS/JS): If the user explicitly requests HTML, CSS, vanilla JavaScript, or plain web code (e.g., "build in HTML/CSS", "use vanilla JS"), output complete, self-contained single-file HTML/CSS/JS code inside ONE SINGLE \`\`\`html ... \`\`\` code block with inline <style> and <script> tags.
-- PROPER LAYERING & STACKING CONTEXT MANDATE: Ensure proper visual layering and z-index stacking hierarchy before outputting code (Background/Canvas z-index:0 -> Main Content z-index:10 -> HUD/Toolbars z-index:20-30 -> Modals/Overlays z-index:40-50+). Always set explicit relative/absolute positioning context on containers so elements layer cleanly without obscuring interactive controls.
-- CRITICAL SINGLE-FILE MANDATE: You MUST output all code as ONE SINGLE, self-contained file inside ONE SINGLE code block. NEVER split your output into multiple separate code blocks, multiple file header comments (such as // App.tsx, // components/Navbar.tsx), or relative file imports (such as import Navbar from './components/Navbar'). Define all child components inline within the SAME file BEFORE the main App component!
-- For Word Games (Scrabble, Wordle, Crosswords, etc.): ALWAYS embed a full dictionary of valid English words and implement strict word validation logic so valid words are recognized and accepted!
-- You MUST start your response with a concise summary or brief explaining what you are building, key features, and layout choices BEFORE generating the code block, and end with a brief user guide. NEVER output ONLY a bare code block without explanation text.
-- Always write complete, production-ready, working code.
-- If the user asks to generate, create, or modify an image, you MUST output ONLY a tag in the exact format [IMAGE_PROMPT: <full detailed prompt for image generation>] and nothing else (which triggers FLUX 1 for free background/image rendering).
+- DEFAULT FORMAT (React/JSX): When writing code or building apps, components, tools, dashboards, or games without an explicitly requested format, default to clean, modern React/JSX components (using \`\`\`jsx ... \`\`\` code blocks). ALWAYS name your main top-level component "export default function App()".
+- REQUESTED FORMATS (HTML/CSS/JS): If the user explicitly requests HTML, CSS, vanilla JS, or plain web code, output complete single-file HTML/CSS/JS inside ONE SINGLE \`\`\`html ... \`\`\` code block.
+- PROPER LAYERING: Ensure proper visual layering (Background z-index:0 -> Content z-index:10 -> HUD/Toolbars z-index:20-30 -> Modals z-index:40-50+).
+- CRITICAL SINGLE-FILE MANDATE: Output all code as ONE SINGLE self-contained file in ONE SINGLE code block.
+- Always start your response with a brief summary explaining your implementation choices before the code block.
 ${adaptiveInstructions}
 
-Active Superpowers:${skills.length > 0 ? skills.map(s => `\n- ${s.id}: ${s.description}`).join('') : '\n- (none — direct response suitable)'}
+Fine-Grained Intent: ${primaryIntent}${secondaryIntent}
+Target Goal: ${intent?.goal || 'Assist user with requested deliverable'}
+Deliverable: ${intent?.deliverable || 'Response'}
+Complexity: ${intent?.complexity || 'medium'} | Confidence: ${Math.round((intent?.confidence || 0.8) * 100)}%${formattedContract}
 
-Inferred intent: ${intentType} - ${intentSummary}`;
+Active Skills & Instructions:${formattedSkills}${formattedPlan}`;
 }
 
 async function handleAi(request, env) {
@@ -135,7 +161,7 @@ async function handleAi(request, env) {
 
   let body;
   try {
-    body = await request.json();
+    body = await readBoundedJson(request);
   } catch {
     return jsonResponse(400, { error: 'Request body must be valid JSON.' });
   }
@@ -149,16 +175,14 @@ async function handleAi(request, env) {
     return jsonResponse(400, { error: 'Prompt is required.' });
   }
 
-  const intent = body.intent
-    && typeof body.intent === 'object'
-    && !Array.isArray(body.intent)
-    ? body.intent
-    : null;
-
+  const intent = body.intent && typeof body.intent === 'object' && !Array.isArray(body.intent) ? body.intent : null;
+  const legacyIntent = body.legacyIntent || (typeof intent === 'string' ? intent : intent?.type);
+  const contract = body.contract && typeof body.contract === 'object' ? body.contract : null;
   const skills = Array.isArray(body.skills) ? body.skills : [];
+  const executionPlan = typeof body.executionPlan === 'string' ? body.executionPlan : null;
 
   const messages = Array.isArray(body.messages) ? body.messages : [];
-  const systemPrompt = buildSystemPrompt(intent, skills);
+  const systemPrompt = buildSystemPrompt({ intent, legacyIntent, skills, contract, executionPlan });
   const apiMessages = [
     { role: 'system', content: systemPrompt }
   ];
@@ -342,7 +366,7 @@ async function handleImage(request, env) {
 
   let body;
   try {
-    body = await request.json();
+    body = await readBoundedJson(request);
   } catch {
     return jsonResponse(400, { error: 'Request body must be valid JSON.' });
   }
@@ -481,7 +505,7 @@ async function handleR2Assets(request, env) {
   if (pathname === '/api/assets/upload' && request.method === 'POST') {
     let body;
     try {
-      body = await request.json();
+      body = await readBoundedJson(request);
     } catch {
       return jsonResponse(400, { error: 'Invalid JSON payload.' });
     }
@@ -557,7 +581,7 @@ async function handleR2Apps(request, env) {
   if (pathname === '/api/apps/store' && request.method === 'POST') {
     let body;
     try {
-      body = await request.json();
+      body = await readBoundedJson(request);
     } catch {
       return jsonResponse(400, { error: 'Invalid JSON payload.' });
     }
@@ -703,7 +727,7 @@ async function handleR2Memory(request, env) {
   if (pathname === '/api/memory/store' && request.method === 'POST') {
     let body;
     try {
-      body = await request.json();
+      body = await readBoundedJson(request);
     } catch {
       return jsonResponse(400, { error: 'Invalid JSON payload.' });
     }
@@ -747,7 +771,7 @@ async function handleR2Memory(request, env) {
   if (pathname === '/api/memory/search' && request.method === 'POST') {
     let body;
     try {
-      body = await request.json();
+      body = await readBoundedJson(request);
     } catch {
       return jsonResponse(400, { error: 'Invalid JSON payload.' });
     }
