@@ -20,7 +20,7 @@ export function resolveSkills({ intent, prompt = '', availableTools = [], regist
   let primaryIntent = 'general_question';
   let complexity = 'medium';
   let isExistingProject = false;
-  let explicitRequirements = [];
+  let _explicitRequirements = [];
   let forbiddenChanges = [];
 
   if (typeof intent === 'string') {

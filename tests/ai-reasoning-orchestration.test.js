@@ -22,7 +22,7 @@ import { classifyIntent } from '../src/services/promptIntelligence/intentEngine.
 import { createIntentContract } from '../src/services/promptIntelligence/intentContract.js';
 import { resolveSkills } from '../src/skills/resolver.js';
 import { evaluateResponse, repairResponse, recordQualitySignal, getQualityMetrics } from '../src/services/reflectionEngine.js';
-import { improveCodingPrompt, generateHostedAIResponse } from '../src/services/aiService.js';
+import { improveCodingPrompt } from '../src/services/aiService.js';
 
 describe('CoreZ AI Reasoning & Skill Orchestration Pipeline', () => {
 
