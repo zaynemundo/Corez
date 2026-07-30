@@ -54,7 +54,7 @@ describe('CoreZ AI Reasoning & Skill Orchestration Pipeline', () => {
   // 3. Skill instructions reaching the worker prompt
   it('3. returns full skill objects with detailed instructions and compact execution plan', () => {
     const intent = classifyIntent('Fix crash error in user authentication token handling');
-    const skills = resolveSkills({ intent, prompt: 'Fix crash error in user authentication token handling' });
+    const { skills, compactExecutionPlan } = resolveSkills({ intent, prompt: 'Fix crash error in user authentication token handling' });
 
     expect(Array.isArray(skills)).toBe(true);
     expect(skills.length).toBeGreaterThan(0);
@@ -63,14 +63,14 @@ describe('CoreZ AI Reasoning & Skill Orchestration Pipeline', () => {
     expect(debugSkill).toBeDefined();
     expect(debugSkill.instructions).toContain('7-phase root cause process');
     expect(debugSkill.reasonSelected).toBeTruthy();
-    expect(skills.compactExecutionPlan).toContain('Execution Plan:');
+    expect(compactExecutionPlan).toContain('Execution Plan:');
   });
 
   // 4. Small edits not activating heavy workflows
   it('4. prevents small edits from activating heavy TDD, brainstorming, or subagent workflows', () => {
     const prompt = 'Change button background color to blue';
     const intent = classifyIntent(prompt);
-    const skills = resolveSkills({ intent, prompt });
+    const { skills } = resolveSkills({ intent, prompt });
 
     const skillIds = skills.map(s => s.id);
     expect(skillIds).not.toContain('brainstorming');
@@ -83,7 +83,7 @@ describe('CoreZ AI Reasoning & Skill Orchestration Pipeline', () => {
   it('5. activates systematic-debugging for bug reports and runtime failures', () => {
     const prompt = 'Fix crash in checkout cart when clicking place order button';
     const intent = classifyIntent(prompt);
-    const skills = resolveSkills({ intent, prompt });
+    const { skills } = resolveSkills({ intent, prompt });
 
     const skillIds = skills.map(s => s.id);
     expect(skillIds).toContain('systematic-debugging');
@@ -99,7 +99,7 @@ describe('CoreZ AI Reasoning & Skill Orchestration Pipeline', () => {
       complexity: 'high',
       isExistingProject: false
     };
-    const skills = resolveSkills({ intent, prompt });
+    const { skills } = resolveSkills({ intent, prompt });
 
     const skillIds = skills.map(s => s.id);
     expect(skillIds).toContain('brainstorming');
@@ -126,7 +126,7 @@ describe('CoreZ AI Reasoning & Skill Orchestration Pipeline', () => {
   it('8. does not force dark mode glassmorphism on design requests with plain styling requirements', () => {
     const prompt = 'Create a simple clean white HTML form with black text';
     const intent = classifyIntent(prompt);
-    const skills = resolveSkills({ intent, prompt });
+    const { skills } = resolveSkills({ intent, prompt });
 
     const skillIds = skills.map(s => s.id);
     expect(skillIds).not.toContain('frontend-modern-design');

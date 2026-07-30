@@ -17,6 +17,10 @@ export function expandDependencies(skillIds, registry) {
       const skill = registry.getSkill(id);
       if (skill && Array.isArray(skill.dependencies)) {
         for (const depId of skill.dependencies) {
+          if (!registry.getSkill(depId)) {
+            console.warn(`Skill "${id}" depends on "${depId}" which is not registered.`);
+            continue;
+          }
           visit(depId);
         }
       }

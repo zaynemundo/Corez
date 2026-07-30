@@ -39,7 +39,7 @@ Gotchas:
   {prompt, context:[]}` → poll `GET /api/tasks/:id`; general answers arrive as
   `chat.chunk` events (concatenate their `text`).
 - UI: Playwright is in the repo's node_modules
-  (`import ... from "/workspaces/Relay/node_modules/playwright/index.mjs"`,
+  (`import ... from "/workspaces/New-Corez/node_modules/playwright/index.mjs"`,
   chromium already installed). Artifact previews render in
   `.artifact-iframe`, sandboxed without `allow-same-origin`, so the frame DOM
   is unreachable from the parent — interact by mouse coordinates and verify

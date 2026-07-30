@@ -42,12 +42,13 @@ export class SuperpowersWorkflowEngine {
 
       // 2. Skill Resolution BEFORE generation
       const availableTools = this.capabilityRegistry.getAvailableTools();
-      const resolvedSkills = resolveSkills({
+      const resolved = resolveSkills({
         intent: canonicalIntent,
         prompt: userPrompt,
         availableTools,
         registry: this.skillRegistry
       });
+      const resolvedSkills = resolved.skills;
       workflow.resolvedSkills = resolvedSkills;
       workflow.startStage(WORKFLOW_STAGES.SKILLS_RESOLVED, { resolvedSkillIds: resolvedSkills.map(s => s.id) });
       workflow.completeStage(WORKFLOW_STAGES.SKILLS_RESOLVED, { skills: resolvedSkills.map(s => s.id) });

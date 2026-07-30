@@ -37,7 +37,7 @@ export function resolveSkills({ intent, prompt = '', availableTools = [], regist
 
   // 1. Simple explanation, writing, or trivial requests do not activate heavy Superpowers workflows
   if (['explanation', 'writing'].includes(legacyIntent) || ['code_question', 'content_creation'].includes(primaryIntent)) {
-    return attachExecutionPlan([]);
+    return { skills: [], compactExecutionPlan: 'Direct execution path — no heavy engineering workflow required.' };
   }
 
   const isSmallEdit = complexity === 'trivial' || (complexity === 'low' && isExistingProject) || SMALL_EDIT_PATTERNS.test(cleanPrompt) || primaryIntent === 'simple_edit';
@@ -91,7 +91,7 @@ export function resolveSkills({ intent, prompt = '', availableTools = [], regist
       selectionMap.set('writing-plans', 'Plan application building steps');
       selectionMap.set('verification-before-completion', 'Verify completed implementation');
     } else {
-      return attachExecutionPlan([]);
+      return { skills: [], compactExecutionPlan: 'Direct execution path — no heavy engineering workflow required.' };
     }
   }
 
@@ -127,13 +127,12 @@ export function resolveSkills({ intent, prompt = '', availableTools = [], regist
     requiredCapabilities: skill.requiresTools || [],
   }));
 
-  return attachExecutionPlan(fullSkills);
+  return buildExecutionResult(fullSkills);
 }
 
-function attachExecutionPlan(skills) {
+function buildExecutionResult(skills) {
   if (!skills || skills.length === 0) {
-    skills.compactExecutionPlan = 'Direct execution path — no heavy engineering workflow required.';
-    return skills;
+    return { skills: [], compactExecutionPlan: 'Direct execution path — no heavy engineering workflow required.' };
   }
 
   const phases = [];
@@ -148,6 +147,8 @@ function attachExecutionPlan(skills) {
   }
 
   const planSteps = phases.map((phase, idx) => `${idx + 1}. [${phase}] ${phaseMap.get(phase).join(', ')}`);
-  skills.compactExecutionPlan = `Execution Plan:\n${planSteps.join('\n')}`;
-  return skills;
+  return {
+    skills,
+    compactExecutionPlan: `Execution Plan:\n${planSteps.join('\n')}`
+  };
 }

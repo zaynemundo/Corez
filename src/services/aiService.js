@@ -562,7 +562,7 @@ export async function generateHostedAIResponse(
     : prompt;
 
   // 2. Skill resolution with fine-grained intent
-  const resolvedSkills = resolveSkills({
+  const resolved = resolveSkills({
     intent: fineIntent,
     prompt: executionPrompt,
     registry: defaultSkillRegistry,
@@ -573,7 +573,7 @@ export async function generateHostedAIResponse(
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ prompt, intent, messages: history, fineIntent, executionPrompt, legacyIntent: legacyIntentType, contract, skills: resolvedSkills, executionPlan: resolvedSkills.compactExecutionPlan || null }),
+    body: JSON.stringify({ prompt, intent, messages: history, fineIntent, executionPrompt, legacyIntent: legacyIntentType, contract, skills: resolved.skills, executionPlan: resolved.compactExecutionPlan || null }),
   };
   if (signal) fetchOptions.signal = signal;
 
@@ -605,7 +605,7 @@ export async function generateHostedAIResponse(
   recordQualitySignal({
     intentType: fineIntent?.primaryIntent || fineIntent?.type,
     confidence: fineIntent?.confidence || 0,
-    selectedSkillsCount: resolvedSkills.length,
+    selectedSkillsCount: resolved.skills.length,
     isCompliant: initialEval.isCompliant,
     violationsCount: initialEval.violations.length,
     repaired,

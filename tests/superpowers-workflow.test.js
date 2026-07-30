@@ -10,7 +10,7 @@ describe('CoreZ Superpowers Integration', () => {
 
   describe('1. Skill Resolver & Intent Mapping', () => {
     it('maps bug reports to systematic-debugging, TDD, and verification', () => {
-      const skills = resolveSkills({
+      const { skills } = resolveSkills({
         intent: 'code-help',
         prompt: 'My React component crashes when I click save.'
       });
@@ -21,7 +21,7 @@ describe('CoreZ Superpowers Integration', () => {
     });
 
     it('maps new application requests to brainstorming, plans, TDD, review, and verification', () => {
-      const skills = resolveSkills({
+      const { skills } = resolveSkills({
         intent: 'app',
         prompt: 'Build me a project management dashboard.'
       });
@@ -34,7 +34,7 @@ describe('CoreZ Superpowers Integration', () => {
     });
 
     it('maps swarm intent to subagent workflow', () => {
-      const skills = resolveSkills({
+      const { skills } = resolveSkills({
         intent: 'swarm',
         prompt: 'Build authentication, billing, dashboard and admin panel.'
       });
@@ -44,7 +44,7 @@ describe('CoreZ Superpowers Integration', () => {
     });
 
     it('bypasses heavy Superpowers engineering workflow for simple explanations', () => {
-      const skills = resolveSkills({
+      const { skills } = resolveSkills({
         intent: 'explanation',
         prompt: 'What is React state?'
       });
@@ -61,7 +61,7 @@ describe('CoreZ Superpowers Integration', () => {
     });
 
     it('orders skills correctly: brainstorming -> writing-plans -> implementation -> review -> verification', () => {
-      const skills = resolveSkills({
+      const { skills } = resolveSkills({
         intent: 'app',
         prompt: 'Build a SaaS dashboard'
       });
@@ -116,7 +116,7 @@ describe('CoreZ Superpowers Integration', () => {
       const caps = new CapabilityRegistry({ git: false });
       const availableTools = caps.getAvailableTools();
 
-      const skills = resolveSkills({
+      const { skills } = resolveSkills({
         intent: 'app',
         prompt: 'Build app',
         availableTools,
@@ -132,7 +132,7 @@ describe('CoreZ Superpowers Integration', () => {
       caps.setCapability('git', true);
       const availableTools = caps.getAvailableTools();
 
-      const skills = resolveSkills({
+      const { skills } = resolveSkills({
         intent: 'app',
         prompt: 'Build app',
         availableTools,
