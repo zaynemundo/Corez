@@ -1,7 +1,7 @@
 ---
 description: Bridges art and code by producing vector SVG sprites, 8-bit asset manifests, particle effects, and background graphics.
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/deepseek-v4-flash
 temperature: 0.2
 
 permission:

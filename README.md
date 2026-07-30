@@ -8,8 +8,7 @@ Corez deploys the Vite application and its AI endpoints together as a Cloudflare
 
 When `OPENCODE_GO_API_KEY` (or `OPENCODE_API_KEY`) is configured, `/api/ai` uses the OpenCode Go API provider endpoint first:
 
-- Coding, app & swarm requests: `deepseek-v4-pro`
-- Generic, writing & explanation requests: `deepseek-v4-pro`
+- All chat, coding, app & swarm requests: `deepseek-v4-flash`
 
 When `OPENROUTER_API_KEY` is configured, `/api/ai` uses OpenRouter next.
 

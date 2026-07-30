@@ -1,7 +1,7 @@
 ---
 description: Designs map layouts, tilemaps, platform placements, encounter pacing, checkpoints, and level progression data.
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/deepseek-v4-flash
 temperature: 0.2
 
 permission:

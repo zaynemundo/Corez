@@ -1,7 +1,7 @@
 ---
 description: Formulates structured game design specs, core loops, mechanics, controls, progression, enemies, and win/loss rules.
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/deepseek-v4-flash
 temperature: 0.2
 
 permission:

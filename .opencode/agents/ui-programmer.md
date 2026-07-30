@@ -1,7 +1,7 @@
 ---
 description: Implements browser responsive HUD, start menus, pause screens, game-over overlays, control guides, and victory screens.
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/deepseek-v4-flash
 temperature: 0.2
 
 permission:

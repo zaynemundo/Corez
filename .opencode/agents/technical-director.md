@@ -1,7 +1,7 @@
 ---
 description: Technical Director overseeing game architecture, frame-rate performance, code structure, and module boundaries.
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/deepseek-v4-flash
 temperature: 0.1
 
 permission:
