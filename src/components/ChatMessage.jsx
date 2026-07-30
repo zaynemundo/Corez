@@ -9,7 +9,13 @@ import MarketCard from './MarketCard';
 
 function safeImageUrl(url) {
   if (!url || typeof url !== 'string') return '';
-  if (url.startsWith('https://') || url.startsWith('http://') || url.startsWith('data:image/')) return url;
+  if (url.startsWith('https://') || url.startsWith('http://') || url.startsWith('data:image/png') || url.startsWith('data:image/jpeg') || url.startsWith('data:image/webp')) return url;
+  return '';
+}
+
+function safeHref(url) {
+  if (!url || typeof url !== 'string') return '';
+  if (url.startsWith('https://') || url.startsWith('http://') || url.startsWith('mailto:') || url.startsWith('#')) return url;
   return '';
 }
 
@@ -177,7 +183,7 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onRe
       const linkMatch = token.match(/^\[(.*?)\]\((.*?)\)$/);
       if (linkMatch) {
         return (
-          <a key={i} href={linkMatch[2]} target="_blank" rel="noopener noreferrer" className="markdown-link">
+          <a key={i} href={safeHref(linkMatch[2])} target="_blank" rel="noopener noreferrer" className="markdown-link">
             {linkMatch[1]}
           </a>
         );

@@ -47,7 +47,7 @@ export default function CanvasPreview({
         if (Array.isArray(apps)) setSessionApps(apps);
       }).catch(() => {});
     }
-  }, [sessionId, code]);
+  }, [sessionId]);
 
   const handleSelectApp = async (appId) => {
     setSelectedAppId(appId);

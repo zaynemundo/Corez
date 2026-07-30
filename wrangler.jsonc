@@ -3,6 +3,7 @@
   "name": "ai",
   "main": "./worker/swarm-index.js",
   "compatibility_date": "2026-07-18",
+  "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "ai": {
     "binding": "AI"
@@ -21,6 +22,10 @@
   },
   "routes": [
     { "pattern": "corez.pro", "custom_domain": true },
-    { "pattern": "www.corez.pro", "custom_domain": true }
-  ]
+    { "pattern": "www.corez.pro", "custom_domain": true },
+    { "pattern": "sandbox.corez.pro", "custom_domain": true }
+  ],
+  "observability": {
+    "enabled": true
+  }
 }

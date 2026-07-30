@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import ChatMessage from './components/ChatMessage';
@@ -183,8 +183,14 @@ const INITIAL_SESSIONS = [
 
 export default function App() {
   const [sessions, setSessions] = useState(() => {
-    const saved = localStorage.getItem('corez_sessions');
-    return saved ? normalizeMarketMessageIds(JSON.parse(saved)) : INITIAL_SESSIONS;
+    try {
+      const saved = localStorage.getItem('corez_sessions');
+      if (!saved) return INITIAL_SESSIONS;
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? normalizeMarketMessageIds(parsed) : INITIAL_SESSIONS;
+    } catch {
+      return INITIAL_SESSIONS;
+    }
   });
 
   const [activeSessionId, setActiveSessionId] = useState(() => {
@@ -214,6 +220,10 @@ export default function App() {
   const abortControllerRef = useRef(null);
   const marketRefreshTokensRef = useRef(new Map());
   const marketRefreshSequenceRef = useRef(0);
+  const saveTimeoutRef = useRef(null);
+  const focusTimeoutRef = useRef(null);
+
+  const activeSession = useMemo(() => sessions.find(s => s.id === activeSessionId) || sessions[0], [sessions, activeSessionId]);
 
   useEffect(() => {
     const mobileQuery = window.matchMedia('(max-width: 767px)');
@@ -240,7 +250,6 @@ export default function App() {
     return () => window.removeEventListener('keydown', closeSidebarWithEscape);
   }, [isMobileViewport, sidebarOpen]);
 
-  const saveTimeoutRef = useRef(null);
   useEffect(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
@@ -311,8 +320,6 @@ export default function App() {
       localStorage.removeItem('corez_pending_request');
     }
   }, []);
-
-  const activeSession = sessions.find(s => s.id === activeSessionId) || sessions[0];
 
   useEffect(() => {
     if (activeView === 'chat') {
@@ -483,9 +490,12 @@ export default function App() {
     const revisionPrompt = `Revise code: `;
     setChatInput(revisionPrompt);
     if (chatInputRef.current) {
-      setTimeout(() => {
-        chatInputRef.current.focus();
-        chatInputRef.current.setSelectionRange(revisionPrompt.length, revisionPrompt.length);
+      if (focusTimeoutRef.current) clearTimeout(focusTimeoutRef.current);
+      focusTimeoutRef.current = setTimeout(() => {
+        if (chatInputRef.current) {
+          chatInputRef.current.focus();
+          chatInputRef.current.setSelectionRange(revisionPrompt.length, revisionPrompt.length);
+        }
       }, 50);
     }
   };

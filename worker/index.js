@@ -1,5 +1,5 @@
 import { handleMarket } from './market.js';
-import { safeErrorDetail } from './utils.js';
+import { safeErrorDetail, readBoundedJson } from './utils.js';
 
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 const OPENCODE_DEFAULT_ENDPOINT = 'https://opencode.ai/zen/go/v1/chat/completions';
@@ -7,19 +7,6 @@ const DEEPSEEK_V4_FLASH_MODEL = 'deepseek-v4-flash';
 const FLUX_MODEL = '@cf/black-forest-labs/flux-1-schnell';
 const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
 const DEEPSEEK_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
-const MAX_BODY_BYTES = 256 * 1024;
-
-async function readBoundedJson(request, maxBytes = MAX_BODY_BYTES) {
-  const contentLength = parseInt(request.headers.get('Content-Length') || '0', 10);
-  if (contentLength > maxBytes) {
-    throw new Error(`Request body exceeds ${maxBytes} byte limit.`);
-  }
-  const text = await request.text();
-  if (text.length > maxBytes) {
-    throw new Error(`Request body exceeds ${maxBytes} byte limit.`);
-  }
-  return JSON.parse(text);
-}
 
 function getTargetModels() {
   return [DEEPSEEK_V4_FLASH_MODEL];
@@ -38,15 +25,20 @@ function normalizeIntentType(intentType) {
   return CANONICAL_INTENT_TYPES.has(intentType) ? intentType : 'general';
 }
 
-function jsonResponse(status, body) {
+function jsonResponse(status, body, extraHeaders = {}) {
+  const corsOrigin = '*';
   return new Response(JSON.stringify(body), {
     status,
     headers: {
       'Content-Type': 'application/json',
-      'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' data:; frame-src 'none'; object-src 'none'",
+      'Access-Control-Allow-Origin': corsOrigin,
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Max-Age': '86400',
       'X-Content-Type-Options': 'nosniff',
       'X-Frame-Options': 'DENY',
-      'Referrer-Policy': 'no-referrer'
+      'Referrer-Policy': 'no-referrer',
+      ...extraHeaders
     }
   });
 }
@@ -209,7 +201,7 @@ async function handleAi(request, env) {
     const customModel = body.model.trim();
     targetModels = [customModel, ...targetModels.filter(m => m !== customModel)];
   }
-  const opencodeKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY || (typeof process !== 'undefined' ? (process.env?.OPENCODE_GO_API_KEY || process.env?.OPENCODE_API_KEY) : null);
+  const opencodeKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY;
   const opencodeEndpoint = env?.OPENCODE_ENDPOINT || OPENCODE_DEFAULT_ENDPOINT;
   if (opencodeKey) {
     for (const modelId of targetModels) {
@@ -242,7 +234,7 @@ async function handleAi(request, env) {
   }
 
   // 2. Try OpenRouter API if OPENROUTER_API_KEY is configured
-  const openRouterKey = env?.OPENROUTER_API_KEY || (typeof process !== 'undefined' ? process.env?.OPENROUTER_API_KEY : null);
+  const openRouterKey = env?.OPENROUTER_API_KEY;
   if (openRouterKey) {
     for (const modelId of targetModels) {
       try {
@@ -385,7 +377,7 @@ async function handleImage(request, env) {
   const r2Key = `flux_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.png`;
 
   // 1. Try OpenRouter Image Generation if OPENROUTER_API_KEY is present
-  const openRouterKey = env?.OPENROUTER_API_KEY || (typeof process !== 'undefined' ? process.env?.OPENROUTER_API_KEY : null);
+  const openRouterKey = env?.OPENROUTER_API_KEY;
   if (openRouterKey) {
     const openRouterImg = await callOpenRouterImage(openRouterKey, prompt);
     if (openRouterImg) {
@@ -856,6 +848,18 @@ async function handleR2Memory(request, env) {
 
 export default {
   async fetch(request, env) {
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          'Access-Control-Max-Age': '86400'
+        }
+      });
+    }
+
     const pathname = new URL(request.url).pathname;
     if (pathname === '/api/ai') {
       return handleAi(request, env);
@@ -878,6 +882,6 @@ export default {
     if (pathname.startsWith('/api/')) {
       return jsonResponse(404, { error: 'API route not found.' });
     }
-    return env.ASSETS.fetch(request);
+    return typeof env.ASSETS?.fetch === 'function' ? env.ASSETS.fetch(request) : jsonResponse(503, { error: 'Static assets not configured.' });
   }
 };

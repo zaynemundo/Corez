@@ -1,5 +1,5 @@
 import baseWorker from './index.js';
-import { safeErrorDetail } from './utils.js';
+import { safeErrorDetail, readBoundedJson } from './utils.js';
 
 const SWARM_MODEL = 'deepseek/deepseek-v4-pro';
 const SWARM_INTENTS = new Set(['app', 'code-help', 'swarm']);
@@ -200,7 +200,7 @@ async function callAIGateway(apiKey, messages, options = {}) {
       requestBody.max_tokens = options.maxTokens;
     }
 
-    const endpoint = (options.env && options.env.OPENCODE_ENDPOINT) || (typeof process !== 'undefined' && process.env?.OPENCODE_ENDPOINT) || 'https://opencode.ai/zen/go/v1/chat/completions';
+    const endpoint = (options.env && options.env.OPENCODE_ENDPOINT) || 'https://opencode.ai/zen/go/v1/chat/completions';
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
@@ -353,8 +353,7 @@ Always identify publicly only as COREZ AI when identity is relevant.${appInstruc
 export async function runOpenRouterSwarm(body, env, signal) {
   const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : '';
   const intentType = normalizeIntentType(body?.intent?.type);
-  const apiKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY || env?.OPENROUTER_API_KEY
-    || (typeof process !== 'undefined' ? (process.env?.OPENCODE_GO_API_KEY || process.env?.OPENCODE_API_KEY || process.env?.OPENROUTER_API_KEY) : null);
+  const apiKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY || env?.OPENROUTER_API_KEY;
 
   if (!apiKey) {
     throw new Error('OPENCODE_GO_API_KEY / OPENROUTER_API_KEY is not configured for swarm execution.');
@@ -421,15 +420,15 @@ export default {
       return Response.redirect(url.toString(), 301);
     }
 
-    const apiKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY || env?.OPENROUTER_API_KEY
-      || (typeof process !== 'undefined' ? (process.env?.OPENCODE_GO_API_KEY || process.env?.OPENCODE_API_KEY || process.env?.OPENROUTER_API_KEY) : null);
+    const apiKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY || env?.OPENROUTER_API_KEY;
 
     if (url.pathname === '/api/ai' && request.method === 'POST' && apiKey) {
+      const baseRequest = request.clone();
       let body;
       try {
-        body = await request.clone().json();
+        body = await readBoundedJson(request);
       } catch {
-        return baseWorker.fetch(request, env, ctx);
+        return baseWorker.fetch(baseRequest, env, ctx);
       }
 
       const intentType = normalizeIntentType(body?.intent?.type);
@@ -439,15 +438,28 @@ export default {
       if (shouldUseSwarm(intentType, prompt, { hasMedia })) {
         try {
           const swarmResult = await runOpenRouterSwarm(body, env, request.signal);
-          return Response.json({
+          return new Response(JSON.stringify({
             content: swarmResult.content,
             model: swarmResult.model,
             swarm: swarmResult.telemetry
-          }, { status: 200 });
+          }), {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+              'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+              'X-Content-Type-Options': 'nosniff',
+              'X-Frame-Options': 'DENY',
+              'Referrer-Policy': 'no-referrer'
+            }
+          });
         } catch (error) {
           console.warn('Live swarm unavailable; falling back to the established AI route:', safeErrorDetail(error));
         }
       }
+
+      return baseWorker.fetch(baseRequest, env, ctx);
     }
 
     return baseWorker.fetch(request, env, ctx);

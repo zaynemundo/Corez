@@ -579,12 +579,13 @@ export async function generateHostedAIResponse(
 
   const response = await fetch(AI_PROXY_ENDPOINT, fetchOptions);
 
+  const data = await response.json().catch(() => ({}));
+
   if (!response.ok) {
     const serverMsg = typeof data?.error === 'string' ? data.error : (data?.error?.message || data?.message || `HTTP ${response.status}`);
     throw new Error(`Hosted AI request failed: ${serverMsg}`);
   }
 
-  const data = await response.json().catch(() => ({}));
   const rawContent = typeof data?.content === 'string' ? data.content.trim() : null;
 
   if (!rawContent) return null;
