@@ -2266,7 +2266,7 @@ export async function generateLocalAIResponse(prompt, hostedError = null) {
 
   if (revisionMatch) {
     const reason = hostedError?.message ? ` The hosted AI service is unavailable: ${hostedError.message}` : ' The hosted AI service is currently unavailable.';
-    return `I can see the code you want to revise, but I couldn't apply your revision (${userRequestPart || 'no request captured'}).${reason} Please check that the AI service is reachable (e.g. DEEPSEEK_API_KEY configured for local dev) and try again — your code has not been changed.`;
+    return `I can see the code you want to revise, but I couldn't apply your revision (${userRequestPart || 'no request captured'}).${reason} Please check that an AI provider is configured (e.g. DEEPSEEK_API_KEY set as a secret on the deployed worker or in .dev.vars for local dev) and try again — your code has not been changed.`;
   }
 
   // 1. GREETINGS & SMALL TALK (Universal & Natural)
