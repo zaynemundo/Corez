@@ -241,7 +241,7 @@ async function run() {
   let thrownResponse;
   try {
     thrownResponse = await post(
-      JSON.stringify({ prompt: 'Hello' }),
+      JSON.stringify({ prompt: 'Tell me about black roses' }),
       env({
         AI: {
           async run() {
@@ -265,7 +265,7 @@ async function run() {
   });
 
   const emptyResponse = await post(
-    JSON.stringify({ prompt: 'Hello' }),
+    JSON.stringify({ prompt: 'Tell me about black roses' }),
     env({
       AI: {
         async run() {
