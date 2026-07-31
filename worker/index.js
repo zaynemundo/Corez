@@ -323,7 +323,7 @@ async function handleAi(request, env) {
       // OpenCode Go is the preferred provider: stay on it as hard as
       // possible. A transient gateway failure gets one retry, and a
       // reasoning-only/empty reply gets the continuation nudge; only then
-      // does the request move to DeepSeek / OpenRouter / Workers AI.
+      // does the request move to DeepSeek / OpenRouter.
       let result = await callOpenCodeGo(modelId, apiMessages);
       let lastFailure = result?.failure || null;
       if (result?.failure) {
