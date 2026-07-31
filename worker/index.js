@@ -14,6 +14,11 @@ const WORKERS_AI_MODELS = [WORKERS_AI_MODEL, DEEPSEEK_MODEL, WORKERS_AI_FALLBACK
 const EMBEDDING_MODEL = '@cf/baai/bge-small-en-v1.5';
 const RERANK_MODEL = '@cf/baai/bge-reranker-base';
 
+const CONTINUATION_NUDGE = {
+  role: 'user',
+  content: 'Your previous reply contained only internal reasoning and no final answer. Now respond with the actual complete final answer to the user\'s request (the code, explanation, or text itself). Do not include thinking, reasoning, or <think> blocks.'
+};
+
 function getTargetModels() {
   return [DEEPSEEK_V4_FLASH_MODEL];
 }
@@ -153,16 +158,30 @@ function extractContentText(content) {
   return '';
 }
 
-// DeepSeek V4 Flash runs thinking mode by default: for complex prompts the
-// model can fill the whole output with reasoning_content and return an empty
-// content field. Never treat that as "no response" — surface the reasoning.
-function messageText(message) {
+// Reasoning models can emit their internal thought inline wrapped in
+// <think>/<thinking> blocks. Strip those sections so thinking text is never
+// presented as the answer.
+function stripThinkingBlocks(text) {
+  if (typeof text !== 'string') return '';
+  return text
+    .replace(/<thinking\b[^>]*>[\s\S]*?<\/thinking>/gi, '')
+    .replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, '')
+    .trim();
+}
+
+// The real answer of a chat message is its content field. reasoning_content
+// is internal model thought: it is a retry signal, never the answer (surfacing
+// it previously handed users raw <think> dumps instead of the requested code).
+function answerText(message) {
   if (!message || typeof message !== 'object') return '';
-  const content = extractContentText(message.content);
-  if (content.trim()) return content;
+  return stripThinkingBlocks(extractContentText(message.content));
+}
+
+function hasReasoning(message) {
+  if (!message || typeof message !== 'object') return false;
   const reasoning = extractContentText(message.reasoning_content);
-  if (reasoning.trim()) return reasoning;
-  return '';
+  if (reasoning.trim()) return true;
+  return /<(?:think|thinking)\b/i.test(extractContentText(message.content));
 }
 
 // Workers AI models do not share a single response envelope: OpenAI-compatible
@@ -184,7 +203,7 @@ function extractWorkersAiText(result) {
   if (Array.isArray(result.choices)) {
     for (const choice of result.choices) {
       if (!choice || typeof choice !== 'object') continue;
-      const message = messageText(choice.message);
+      const message = answerText(choice.message);
       if (message) return message.trim();
       if (typeof choice.text === 'string' && choice.text.trim()) return choice.text.trim();
     }
@@ -192,7 +211,7 @@ function extractWorkersAiText(result) {
 
   if (Array.isArray(result.messages)) {
     const joined = result.messages
-      .map(message => messageText(message))
+      .map(message => answerText(message))
       .filter(Boolean)
       .join('');
     if (joined.trim()) return joined.trim();
@@ -283,7 +302,7 @@ async function handleAi(request, env) {
   const opencodeKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY;
   const opencodeEndpoint = env?.OPENCODE_ENDPOINT || OPENCODE_DEFAULT_ENDPOINT;
   if (opencodeKey) {
-    for (const modelId of targetModels) {
+    const callOpenCodeGo = async (modelId, messagesToSend) => {
       try {
         const opencodeResp = await fetch(opencodeEndpoint, {
           method: 'POST',
@@ -295,23 +314,34 @@ async function handleAi(request, env) {
           },
           body: JSON.stringify({
             model: modelId,
-            messages: apiMessages
+            messages: messagesToSend
           }),
-          signal: AbortSignal.timeout(20_000)
+          signal: AbortSignal.timeout(45_000)
         });
 
-        if (opencodeResp.ok) {
-          const data = await opencodeResp.json();
-          const content = messageText(data?.choices?.[0]?.message);
-          if (content && content.trim()) {
-            return jsonResponse(200, { content: content.trim(), model: `opencode:${modelId}` });
-          }
-        } else {
+        if (!opencodeResp.ok) {
           const detail = (await opencodeResp.text().catch(() => '')).slice(0, 200);
           console.warn(`OpenCode Go model ${modelId} returned HTTP ${opencodeResp.status}:`, safeErrorDetail(detail));
+          return null;
         }
+        const data = await opencodeResp.json();
+        const message = data?.choices?.[0]?.message;
+        return { content: answerText(message), reasoning: hasReasoning(message) };
       } catch (opencodeErr) {
         console.warn(`OpenCode Go model ${modelId} request failed:`, safeErrorDetail(opencodeErr));
+        return null;
+      }
+    };
+
+    for (const modelId of targetModels) {
+      let result = await callOpenCodeGo(modelId, apiMessages);
+      if (result && !result.content) {
+        // The model answered with only reasoning (or nothing): nudge it once
+        // to emit the actual final response before falling through.
+        result = await callOpenCodeGo(modelId, [...apiMessages, CONTINUATION_NUDGE]);
+      }
+      if (result && result.content) {
+        return jsonResponse(200, { content: result.content, model: `opencode:${modelId}` });
       }
     }
   }
@@ -338,9 +368,9 @@ async function handleAi(request, env) {
 
       if (deepSeekResp.ok) {
         const data = await deepSeekResp.json();
-        const content = messageText(data?.choices?.[0]?.message);
-        if (content && content.trim()) {
-          return jsonResponse(200, { content: content.trim(), model: `deepseek:${deepSeekModel}` });
+        const content = answerText(data?.choices?.[0]?.message);
+        if (content) {
+          return jsonResponse(200, { content, model: `deepseek:${deepSeekModel}` });
         }
       } else {
         const errText = await deepSeekResp.text().catch(() => '');
@@ -378,9 +408,9 @@ async function handleAi(request, env) {
 
         if (openRouterResp.ok) {
           const data = await openRouterResp.json();
-          const content = messageText(data?.choices?.[0]?.message);
-          if (content && content.trim()) {
-            return jsonResponse(200, { content: content.trim(), model: modelId });
+          const content = answerText(data?.choices?.[0]?.message);
+          if (content) {
+            return jsonResponse(200, { content, model: modelId });
           }
         }
       } catch (orErr) {

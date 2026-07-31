@@ -240,8 +240,10 @@ async function run() {
       assert.equal(deepSeekPayload.model, 'deepseek-chat');
 
       // Thinking-mode responses with empty content but populated
-      // reasoning_content must still produce a reply (DeepSeek default
-      // thinking mode can return content: '' for complex prompts).
+      // reasoning_content are internal thought, never the answer: the worker
+      // falls through to the next provider instead of handing back raw <think>
+      // text (DeepSeek default thinking mode can return content: '' for
+      // complex prompts).
       globalThis.fetch = async () => new Response(JSON.stringify({
         choices: [{ message: { content: '', reasoning_content: 'I thought through the revision steps carefully.' } }]
       }), {
@@ -253,12 +255,74 @@ async function run() {
           prompt: '[Context: The user is requesting a revision for the following code block]\n```html\n<canvas id="g"></canvas>\n```\n\nUser Request: fix movement',
           intent: { type: 'code-help', summary: 'Revise embedded code.' }
         }),
-        env({ AI: undefined, DEEPSEEK_API_KEY: 'sk-deepseek-test' })
+        env({
+          AI: {
+            async run() {
+              return { response: 'Workers AI revision answer' };
+            }
+          },
+          DEEPSEEK_API_KEY: 'sk-deepseek-test'
+        }),
+        '198.51.100.106'
       );
       assert.equal(thinkingResp.status, 200);
       const thinkingData = await thinkingResp.json();
-      assert.equal(thinkingData.content, 'I thought through the revision steps carefully.');
-      assert.equal(thinkingData.model, 'deepseek:deepseek-v4-flash');
+      assert.equal(thinkingData.content, 'Workers AI revision answer');
+      assert.equal(thinkingData.content.includes('reasoning'), false);
+
+      // Inline <think> blocks in the content field are stripped before the
+      // answer is returned.
+      globalThis.fetch = async () => new Response(JSON.stringify({
+        choices: [{ message: { content: '<think>I will plan the code layout.</think>Here is the revised game.' } }]
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const thinkStripResp = await post(
+        JSON.stringify({ prompt: 'Revise my game' }),
+        env({ AI: undefined, DEEPSEEK_API_KEY: 'sk-deepseek-test' }),
+        '198.51.100.107'
+      );
+      assert.equal(thinkStripResp.status, 200);
+      assert.equal((await json(thinkStripResp)).content, 'Here is the revised game.');
+
+      // A thinking-only OpenCode Go reply is retried once with a continuation
+      // nudge so the actual answer is produced instead of raw reasoning.
+      let opencodeGoCalls = 0;
+      globalThis.fetch = async (_url, init) => {
+        const payload = JSON.parse(init.body);
+        opencodeGoCalls += 1;
+        if (opencodeGoCalls === 1) {
+          return new Response(JSON.stringify({
+            choices: [{ message: { content: '', reasoning_content: 'Let me think about the gun model.' } }]
+          }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        assert.equal(payload.model, 'deepseek-v4-flash');
+        const nudge = payload.messages[payload.messages.length - 1];
+        assert.match(nudge.content, /only internal reasoning/i);
+        return new Response(JSON.stringify({
+          choices: [{ message: { content: 'Here is the revised FPS with a gun.' } }]
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      };
+      const opencodeNudgeResp = await post(
+        JSON.stringify({
+          prompt: '[Context: The user is requesting a revision for the following code block]\n```html\n<canvas id="g"></canvas>\n```\n\nUser Request: add a gun',
+          intent: { type: 'app', summary: 'Revise embedded game.' }
+        }),
+        env({ AI: undefined, OPENCODE_GO_API_KEY: 'sk-opencode-test' }),
+        '198.51.100.105'
+      );
+      assert.equal(opencodeNudgeResp.status, 200);
+      const opencodeNudgeData = await opencodeNudgeResp.json();
+      assert.equal(opencodeNudgeData.content, 'Here is the revised FPS with a gun.');
+      assert.equal(opencodeNudgeData.model, 'opencode:deepseek-v4-flash');
+      assert.equal(opencodeGoCalls, 2);
 
       // OpenCode Go wins when BOTH opencode and DeepSeek keys are configured
       globalThis.fetch = async (url, init) => {
