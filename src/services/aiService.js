@@ -2367,6 +2367,16 @@ export async function generateAIResponse(prompt, history = [], signal = null) {
   // conversation length. Previously the history.length <= 1 gate let image requests
   // mid-conversation fall through to the LLM, which answered with raw SVG markup.
   if (isExplicitImageRequest(cleanPrompt)) {
+    // Mixed requests ("what is X and show me an image") answer the question AND
+    // render the image instead of dropping the explanation.
+    if (isMixedQuestionImageRequest(cleanPrompt)) {
+      try {
+        return await handleMixedQuestionImageRequest(cleanPrompt, intent, history, signal);
+      } catch (mixedErr) {
+        if (mixedErr?.name === 'AbortError') throw mixedErr;
+        console.warn('Mixed question+image request failed; falling back to image-only path.', mixedErr);
+      }
+    }
     try {
       const imageUrl = await generateFluxImage(cleanPrompt, signal);
       if (imageUrl) {

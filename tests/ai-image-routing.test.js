@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { isExplicitImageRequest, createImageTitle, generateAIResponse } from '../src/services/aiService.js';
+import {
+  isExplicitImageRequest,
+  isMixedQuestionImageRequest,
+  extractImageSubject,
+  extractQuestionPrompt,
+  createImageTitle,
+  generateAIResponse,
+} from '../src/services/aiService.js';
 
 describe('FLUX image request routing', () => {
   beforeEach(() => {
