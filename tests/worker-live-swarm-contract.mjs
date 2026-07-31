@@ -38,11 +38,18 @@ function post(body, env) {
 }
 
 async function run() {
-  assert.equal(shouldUseSwarm('app', 'Build a timer app'), true);
-  assert.equal(shouldUseSwarm('code-help', 'Fix this React issue'), true);
+  // Swarm gating: only explicit swarm requests, high-complexity app/code-help,
+  // or client opt-in (body.swarm === true) use the swarm; everything else is direct.
+  assert.equal(shouldUseSwarm('app', 'Build a timer app'), false);
+  assert.equal(shouldUseSwarm('app', 'Build a timer app', { complexity: 'high' }), true);
+  assert.equal(shouldUseSwarm('app', 'Build a timer app', { complexity: 'epic' }), true);
+  assert.equal(shouldUseSwarm('app', 'Build a timer app', { explicitSwarm: true }), true);
+  assert.equal(shouldUseSwarm('code-help', 'Fix this React issue'), false);
+  assert.equal(shouldUseSwarm('code-help', 'Fix this React issue', { complexity: 'high' }), true);
   assert.equal(shouldUseSwarm('swarm', 'Coordinate several agents'), true);
   assert.equal(shouldUseSwarm('general', 'Hello'), false);
   assert.equal(shouldUseSwarm('app', 'Build an image editor', { hasMedia: true }), false);
+  assert.equal(shouldUseSwarm('app', 'Build an image editor', { hasMedia: true, complexity: 'high' }), false);
 
   const simpleSpecs = buildSwarmAgentSpecs('app', 'Build a timer app');
   const expandedPrompt = Array.from(
@@ -107,6 +114,7 @@ async function run() {
         type: 'app',
         summary: 'Build a complete browser game.'
       },
+      complexity: 'high',
       messages: [
         { role: 'user', content: 'Build a responsive retro platformer. Add touch controls. Add sound effects.' }
       ]

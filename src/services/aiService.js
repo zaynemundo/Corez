@@ -13,7 +13,7 @@ import { defaultSkillRegistry } from '../skills/registry.js';
 import { classifyIntent } from './intentClassifier.js';
 import { parseMarketIntent } from './marketIntent.js';
 import { fetchMarketData, unavailableMarket } from './marketService.js';
-import { process as processPromptIntelligence, toLegacyIntentType, classifyIntent as classifyIntentNew, extractRequirements } from './promptIntelligence/index.js';
+import { process as processPromptIntelligence, toLegacyIntentType, classifyIntent as classifyIntentNew, extractRequirements, classifyComplexity } from './promptIntelligence/index.js';
 import { createIntentContract } from './promptIntelligence/intentContract.js';
 import { evaluateResponse, repairResponse, recordQualitySignal } from './reflectionEngine.js';
 import { buildAwwwardsDesignPrompt } from '../../packages/agent-core/context/designTokens.js';
@@ -577,12 +577,14 @@ export async function generateHostedAIResponse(
     registry: defaultSkillRegistry,
   });
 
+  const complexity = classifyComplexity(prompt, fineIntent);
+
   const fetchOptions = {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ prompt, intent, messages: history, fineIntent, executionPrompt, legacyIntent: legacyIntentType, contract, skills: resolved.skills, executionPlan: resolved.compactExecutionPlan || null }),
+    body: JSON.stringify({ prompt, intent, messages: history, fineIntent, executionPrompt, legacyIntent: legacyIntentType, contract, skills: resolved.skills, executionPlan: resolved.compactExecutionPlan || null, complexity }),
   };
   if (signal) fetchOptions.signal = signal;
 

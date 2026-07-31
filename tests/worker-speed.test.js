@@ -1,0 +1,130 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import swarmWorker from '../worker/swarm-index.js';
+
+const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/chat/completions';
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+
+function post(worker, env, body) {
+  return worker.fetch(
+    new Request('https://corez.test/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }),
+    env
+  );
+}
+
+describe('AI response speed optimizations', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('answers greetings instantly without calling any LLM provider', async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new Error('LLM should not be called for greetings');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    for (const prompt of ['hi', 'hello', 'hey', 'who are you', 'what is your name', 'good morning']) {
+      const response = await post(swarmWorker, {}, { prompt });
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      expect(data.content).toContain("Hello! I'm COREZ AI");
+      expect(data.model).toBe('corez-greeting');
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('does not fast-path greetings that include real requests', async () => {
+    const fetchMock = vi.fn(async (url) => {
+      expect(url).toBe(OPENCODE_URL);
+      return Response.json({ choices: [{ message: { content: 'real answer' } }] });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await post(swarmWorker, { OPENCODE_GO_API_KEY: 'test' }, { prompt: 'hi, can you build me a timer app?' });
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.content).toBe('real answer');
+    expect(data.model).not.toBe('corez-greeting');
+  });
+
+  it('routes medium-complexity app requests on the fast direct path (single LLM call)', async () => {
+    const fetchMock = vi.fn(async (url) => {
+      expect(url).toBe(OPENCODE_URL);
+      return Response.json({ choices: [{ message: { content: 'direct app answer' } }] });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await post(swarmWorker, { OPENCODE_GO_API_KEY: 'test' }, {
+      prompt: 'Build a timer app',
+      intent: { type: 'app', summary: 'Build a timer' },
+      complexity: 'medium'
+    });
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.content).toBe('direct app answer');
+    expect(data.swarm).toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes high-complexity app requests through the swarm', async () => {
+    const fetchMock = vi.fn(async (url) => {
+      expect(url).toBe(OPENCODE_URL);
+      const payload = JSON.parse(fetchMock.mock.calls[fetchMock.mock.calls.length - 1][1].body);
+      const systemPrompt = payload.messages?.[0]?.content || '';
+      const content = systemPrompt.includes('lead synthesis agent')
+        ? 'synthesized game'
+        : `specialist ${fetchMock.mock.calls.length}`;
+      return Response.json({ choices: [{ message: { content } }] });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await post(swarmWorker, {
+      OPENCODE_GO_API_KEY: 'test',
+      SWARM_AGENT_TIMEOUT_MS: '2000',
+      SWARM_RESPONSE_DEADLINE_MS: '2000',
+      SWARM_SYNTHESIS_TIMEOUT_MS: '2000'
+    }, {
+      prompt: 'Build a complete multiplayer RPG with persistent saves',
+      intent: { type: 'app', summary: 'Complex game' },
+      complexity: 'high'
+    });
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.content).toBe('synthesized game');
+    expect(data.swarm.enabled).toBe(true);
+    expect(fetchMock.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it('uses medium reasoning effort for simple requests and high for complex ones on OpenRouter', async () => {
+    const payloads = [];
+    const fetchMock = vi.fn(async (url, init) => {
+      expect(url).toBe(OPENROUTER_URL);
+      payloads.push(JSON.parse(init.body));
+      return Response.json({ choices: [{ message: { content: 'answer' } }] });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await post(swarmWorker, { OPENROUTER_API_KEY: 'test' }, {
+      prompt: 'Explain black roses',
+      intent: { type: 'explanation' },
+      complexity: 'low'
+    });
+    await post(swarmWorker, { OPENROUTER_API_KEY: 'test' }, {
+      prompt: 'Build a full SaaS platform with auth and billing',
+      intent: { type: 'app' },
+      complexity: 'high'
+    });
+
+    expect(payloads[0].reasoning.effort).toBe('medium');
+    expect(payloads[1].reasoning.effort).toBe('high');
+  });
+});

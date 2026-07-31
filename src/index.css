@@ -1125,12 +1125,12 @@ h1, h2, h3, h4, h5, h6 {
   100% { background-position: 100% 100%, 0 0, 0 100%; }
 }
 
-/* 100% Message Body Width 8-Bit Square Worm Progress Bar for Game Development */
+/* Linear Progress Track for Game Development & Image Loading */
 .message-wrapper.ai.game-dev-loading {
   width: 100%;
 }
 
-.square-worm-progress-container {
+.progress-checklist-container {
   width: 100%;
   max-width: 100%;
   margin: 0.45rem 0;
@@ -1139,13 +1139,13 @@ h1, h2, h3, h4, h5, h6 {
   gap: 0.35rem;
 }
 
-.square-worm-header {
+.progress-checklist-header {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
 }
 
-.square-worm-percentage {
+.progress-checklist-percentage {
   font-size: 0.75rem;
   font-weight: 700;
   color: var(--text-primary);
@@ -1157,95 +1157,35 @@ h1, h2, h3, h4, h5, h6 {
   border: 1px solid var(--border-color);
 }
 
-/* Long Line Track Wrapper (Full Message Body Width) */
-.square-worm-track-wrapper {
+.progress-checklist-track-wrapper {
   position: relative;
   width: 100%;
-  height: 18px;
+  height: 8px;
   display: flex;
   align-items: center;
+  border-radius: 9999px;
+  overflow: hidden;
 }
 
-.square-worm-track-bg {
+.progress-checklist-track-bg {
   position: absolute;
-  top: 7px;
+  top: 0;
   left: 0;
   width: 100%;
-  height: 4px;
+  height: 100%;
   background: var(--border-color);
-  border-radius: 9999px;
   opacity: 0.8;
 }
 
-/* Square Worm Head Wrapper getting longer across full width track */
-.square-worm-head-wrapper {
+.progress-checklist-fill {
   position: absolute;
-  top: 2px;
+  top: 0;
   left: 0;
-  height: 14px;
+  height: 100%;
   z-index: 3;
   transition: width 0.25s linear;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.4) 75%, var(--text-primary) 100%);
-  border-radius: 4px;
-  box-shadow: none;
-  overflow: visible;
-  min-width: 14px;
-}
-
-.square-worm-body {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 1.5px;
-  padding-right: 2px;
-  height: 100%;
-}
-
-.worm-pixel {
   background: var(--text-primary);
-  display: inline-block;
-  position: relative;
-}
-
-.worm-pixel.seg-tail {
-  width: 4px;
-  height: 4px;
-  animation: wormCrawling 0.35s infinite ease-in-out;
-  animation-delay: 0.08s;
-}
-
-.worm-pixel.seg-mid {
-  width: 5px;
-  height: 5px;
-  animation: wormCrawling 0.35s infinite ease-in-out;
-  animation-delay: 0.04s;
-}
-
-.worm-pixel.seg-head {
-  width: 7px;
-  height: 7px;
-  animation: wormCrawling 0.35s infinite ease-in-out;
-}
-
-.worm-eye {
-  position: absolute;
-  top: 1px;
-  right: 1px;
-  width: 2px;
-  height: 2px;
-  background: var(--bg-primary, #000000);
-}
-
-@keyframes wormCrawling {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-2px) scaleY(1.1) scaleX(0.9);
-  }
+  border-radius: 9999px;
 }
 .preview-action {
   display: flex;

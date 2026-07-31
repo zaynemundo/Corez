@@ -104,13 +104,22 @@ async function run() {
   assert.equal(methodResponse.headers.get('content-type'), 'application/json');
 
   const missingBindingResponse = await post(
-    JSON.stringify({ prompt: 'Hello' }),
+    JSON.stringify({ prompt: 'Explain black roses' }),
     env({ AI: undefined })
   );
   assert.equal(missingBindingResponse.status, 503);
   assert.deepEqual(await json(missingBindingResponse), {
     error: 'Workers AI is not configured.'
   });
+
+  // Greeting fast-path: no LLM round-trip is required, so it succeeds even
+  // without any AI provider binding configured.
+  const greetingResponse = await post(
+    JSON.stringify({ prompt: 'Hello' }),
+    env({ AI: undefined })
+  );
+  assert.equal(greetingResponse.status, 200);
+  assert.equal((await json(greetingResponse)).model, 'corez-greeting');
 
   const missingPromptResponse = await post(JSON.stringify({ prompt: '   ' }));
   assert.equal(missingPromptResponse.status, 400);

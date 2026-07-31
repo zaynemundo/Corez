@@ -2,7 +2,6 @@ import baseWorker from './index.js';
 import { safeErrorDetail, readBoundedJson } from './utils.js';
 
 const SWARM_MODEL = 'deepseek/deepseek-v4-pro';
-const SWARM_INTENTS = new Set(['app', 'code-help', 'swarm']);
 
 const CORE_AGENT_TEMPLATES = Object.freeze({
   app: [
@@ -150,7 +149,17 @@ function createTimedSignal(parentSignal, timeoutMs) {
 export function shouldUseSwarm(intentType, prompt, options = {}) {
   if (options.hasMedia) return false;
   if (!String(prompt || '').trim()) return false;
-  return SWARM_INTENTS.has(normalizeIntentType(intentType));
+  const normalized = normalizeIntentType(intentType);
+
+  // Explicit swarm coordination or a client opt-in always uses the swarm
+  if (normalized === 'swarm' || options.explicitSwarm === true) return true;
+
+  // App/code-help requests only swarm for genuinely complex work; everything
+  // else takes the fast direct path (single LLM round-trip).
+  if (!['app', 'code-help'].includes(normalized)) return false;
+
+  const complexity = String(options.complexity || '').toLowerCase();
+  return complexity === 'high' || complexity === 'epic';
 }
 
 export function buildSwarmAgentSpecs(intentType, prompt) {
@@ -436,7 +445,16 @@ export default {
       const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : '';
       const hasMedia = containsMedia(body?.messages);
 
-      if (shouldUseSwarm(intentType, prompt, { hasMedia })) {
+      if (shouldUseSwarm(intentType, prompt, {
+        hasMedia,
+        explicitSwarm: body?.swarm === true
+          || body?.intent?.primaryIntent === 'swarm'
+          || body?.fineIntent?.type === 'swarm'
+          || body?.fineIntent?.primaryIntent === 'swarm',
+        complexity: body?.complexity
+          || body?.fineIntent?.complexity
+          || body?.intent?.enriched?.complexity
+      })) {
         try {
           const swarmResult = await runOpenRouterSwarm(body, env, request.signal);
           return new Response(JSON.stringify({

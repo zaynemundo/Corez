@@ -35,32 +35,22 @@ export default function ProgressChecklist() {
   const currentStep = PIPELINE_STEPS.find(s => displayPercent >= s.min && displayPercent <= s.max) || PIPELINE_STEPS[0];
 
   return (
-    <div className="square-worm-progress-container" role="status" aria-live="polite">
+    <div className="progress-checklist-container" role="status" aria-live="polite">
       {/* Pipeline Step Header */}
-      <div className="square-worm-header" style={{ justifyContent: 'space-between' }}>
-        <span className="square-worm-step-label" style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
+      <div className="progress-checklist-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span className="progress-checklist-step-label" style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
           {currentStep.label}
         </span>
-        <span className="square-worm-percentage">{displayPercent}%</span>
+        <span className="progress-checklist-percentage">{displayPercent}%</span>
       </div>
 
-      {/* 100% Message Body Width Progress Track with 8-Bit Square Worm getting longer */}
-      <div className="square-worm-track-wrapper">
-        <div className="square-worm-track-bg" />
-
-        {/* Crawling 8-Bit Square Worm Head Wrapper getting longer */}
+      {/* Clean Linear Progress Track */}
+      <div className="progress-checklist-track-wrapper">
+        <div className="progress-checklist-track-bg" />
         <div 
-          className="square-worm-head-wrapper" 
+          className="progress-checklist-fill" 
           style={{ width: `${Math.min(progressPercent, 100)}%` }}
-        >
-          <div className="square-worm-body">
-            <span className="worm-pixel seg-tail" />
-            <span className="worm-pixel seg-mid" />
-            <span className="worm-pixel seg-head">
-              <span className="worm-eye" />
-            </span>
-          </div>
-        </div>
+        />
       </div>
     </div>
   );

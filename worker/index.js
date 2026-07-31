@@ -172,6 +172,16 @@ async function handleAi(request, env) {
     return jsonResponse(400, { error: 'Prompt is required.' });
   }
 
+  // Greeting fast-path: common greetings get the mandated persona reply
+  // instantly without paying an LLM round-trip.
+  const GREETING_PATTERN = /^(hi|hello|hey|yo|sup|howdy|greetings|good\s+(morning|afternoon|evening|day)|who\s+(are|r)\s+you|what\s+(are|r)\s+you|whats?\s+(is\s+)?your\s+name)\b[.?!]*$/i;
+  if (prompt.length <= 60 && GREETING_PATTERN.test(prompt)) {
+    return jsonResponse(200, {
+      content: "Hello! I'm COREZ AI. How can I help you today?",
+      model: 'corez-greeting'
+    });
+  }
+
   const intent = body.intent && typeof body.intent === 'object' && !Array.isArray(body.intent) ? body.intent : null;
   const legacyIntent = body.legacyIntent || (typeof intent === 'string' ? intent : intent?.type);
   const contract = body.contract && typeof body.contract === 'object' ? body.contract : null;
@@ -239,6 +249,10 @@ async function handleAi(request, env) {
   // 2. Try OpenRouter API if OPENROUTER_API_KEY is configured
   const openRouterKey = env?.OPENROUTER_API_KEY;
   if (openRouterKey) {
+    const requestComplexity = String(
+      body?.complexity || body?.fineIntent?.complexity || intent?.enriched?.complexity || ''
+    ).toLowerCase();
+    const reasoningEffort = ['high', 'epic'].includes(requestComplexity) ? 'high' : 'medium';
     for (const modelId of targetModels) {
       try {
         const openRouterResp = await fetch(OPENROUTER_ENDPOINT, {
@@ -251,7 +265,7 @@ async function handleAi(request, env) {
           },
           body: JSON.stringify({
             model: modelId,
-            reasoning: { effort: 'high' },
+            reasoning: { effort: reasoningEffort },
             messages: apiMessages
           })
         });
