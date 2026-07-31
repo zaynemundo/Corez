@@ -43,7 +43,7 @@ describe('Secure Iframe & Automated Testing Bridge', () => {
       </body>
     </html>`;
 
-    const result = await testGameHtml(validHtml, { assets: [] });
+    const result = await testGameHtml(validHtml, { assets: [] }, { executeScripts: true });
     expect(result.passed).toBe(true);
     expect(result.errors).toHaveLength(0);
   });

@@ -74,4 +74,13 @@ describe('Game Manifest Schema & Parser', () => {
     expect(prompt).toContain('The previous game manifest response failed schema validation');
     expect(prompt).toContain('gameSpec.title must be a non-empty string.');
   });
+
+  it('generates a correction prompt from a JSON syntax error without crashing', () => {
+    const parseResult = parseAndValidateManifest('{ title: "Unquoted key" }');
+    expect(parseResult.success).toBe(false);
+
+    const prompt = generateCorrectionPrompt(parseResult);
+    expect(prompt).toContain('The previous game manifest response failed schema validation');
+    expect(prompt).toContain('JSON Syntax Error');
+  });
 });

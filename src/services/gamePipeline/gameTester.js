@@ -6,7 +6,7 @@
 
 import { JSDOM } from 'jsdom';
 
-export async function testGameHtml(htmlContent, assetManifest = {}) {
+export async function testGameHtml(htmlContent, assetManifest = {}, options = {}) {
   const errors = [];
   const warnings = [];
 
@@ -25,9 +25,11 @@ export async function testGameHtml(htmlContent, assetManifest = {}) {
 
   let dom;
   try {
+    // Scripts only execute when explicitly enabled (default: static analysis only).
+    // External resources are never fetched by the tester (no SSRF surface).
+    const executeScripts = options.executeScripts === true;
     dom = new JSDOM(htmlContent, {
-      runScripts: 'dangerously',
-      resources: 'usable',
+      runScripts: executeScripts ? 'dangerously' : undefined,
       virtualConsole: new (await import('jsdom')).VirtualConsole()
     });
   } catch (err) {
@@ -61,7 +63,7 @@ export async function testGameHtml(htmlContent, assetManifest = {}) {
   }
 
   // 4. Check for Input Handling
-  const hasKeyboard = scriptTags.includes('keydown') || scriptTags.includes('addEventListener') || scriptTags.includes('keyup');
+  const hasKeyboard = scriptTags.includes('keydown') || scriptTags.includes('keyup');
   if (!hasKeyboard) {
     warnings.push('No keyboard input listeners (keydown/keyup) detected.');
   }

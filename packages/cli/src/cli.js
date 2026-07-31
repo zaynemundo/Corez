@@ -177,7 +177,7 @@ export function printHelp(ui) {
   console.log(`\n${styles.bold}EXAMPLES${styles.reset}`);
   console.log(`  ${styles.dim}corez plan "add Stripe subscriptions"${styles.reset}`);
   console.log(`  ${styles.dim}corez run "fix all lint errors" --auto${styles.reset}`);
-  console.log(`  ${styles.dim}corez -m opencode-go/deepseek-v4-flash check for bugs${styles.reset}`);
+  console.log(`  ${styles.dim}corez -m deepseek-v4-flash check for bugs${styles.reset}`);
   console.log(`  ${styles.dim}corez build "create admin dashboard"${styles.reset}`);
   console.log(`  ${styles.dim}corez review${styles.reset}`);
   console.log(`  ${styles.dim}corez completion${styles.reset}`);
@@ -206,12 +206,14 @@ async function executeTask(prompt, options, ui, execOptions = {}) {
 
   const runtime = new AgentRuntime({
     cwd: options.cwd || process.cwd(),
-    modelOverride: execOptions.modelOverride,
   });
+  const activeModel = execOptions.modelOverride || runtime.config.model;
 
   try {
     const result = await runtime.runTask(prompt, {
       signal: options.signal,
+      model: execOptions.modelOverride || undefined,
+      autoApprove: execOptions.autoApprove,
       onStatus: (st) => {
         if (st.type === 'tool_start') {
           ui.status('●', `Tool: ${st.name}`);
@@ -221,7 +223,7 @@ async function executeTask(prompt, options, ui, execOptions = {}) {
 
     ui.brief({
       task: prompt,
-      model: runtime.config.model,
+      model: activeModel,
       stepsCount: result.stepsCount,
       inspectedFiles: result.inspectedFiles,
       modifiedFiles: result.modifiedFiles,
@@ -320,16 +322,14 @@ export async function runCli(argv = process.argv.slice(2), options = {}) {
   const execOptions = {
     ...options,
     modelOverride: flags.model,
-    agentOverride: flags.agent,
     autoApprove: flags.autoApprove,
   };
 
-  if (flags.help && !positional[0]) {
-    printHelp(ui);
-    return 0;
+  if (flags.agent) {
+    ui.note(`Agent profiles are not implemented yet; ignoring --agent "${flags.agent}".`);
   }
 
-  if (flags.help && positional[0]) {
+  if (flags.help) {
     printHelp(ui);
     return 0;
   }
@@ -363,9 +363,10 @@ export async function runCli(argv = process.argv.slice(2), options = {}) {
 
     case 'model':
     case '/model':
-    case '/models':
-      await handleModelCommand(restArgs, options, ui);
-      return 0;
+    case '/models': {
+      const modelResult = await handleModelCommand(restArgs, options, ui);
+      return modelResult?.success === false ? 1 : 0;
+    }
 
     case 'agents':
       await handleAgentsCommand(restArgs, options, ui);

@@ -107,12 +107,24 @@ export class GenericSwarmOrchestrator {
         onStatus({ step: 'agent_start', role: task.role, taskId: task.taskId, objective: task.objective });
 
         return this.queue.enqueue(async () => {
-          const result = await this.runSingleAgentTask(graph, task, userPrompt, options);
-          task.status = AGENT_LIFECYCLE_STATES.COMPLETED;
-          graph.projectState.commitTaskOutput(task.agentId, task.taskId, result);
-          completedResults.push({ task, result });
-          onStatus({ step: 'agent_complete', role: task.role, taskId: task.taskId });
-          return result;
+          try {
+            const result = await this.runSingleAgentTask(graph, task, userPrompt, options);
+            task.status = AGENT_LIFECYCLE_STATES.VALIDATING;
+            const commitRes = graph.projectState.commitTaskOutput(task.agentId, task.taskId, result);
+            if (!commitRes.success) {
+              task.status = AGENT_LIFECYCLE_STATES.FAILED;
+              onStatus({ step: 'agent_failed', role: task.role, taskId: task.taskId, reason: commitRes.reason });
+              return result;
+            }
+            task.status = AGENT_LIFECYCLE_STATES.COMPLETED;
+            completedResults.push({ task, result });
+            onStatus({ step: 'agent_complete', role: task.role, taskId: task.taskId });
+            return result;
+          } catch (err) {
+            task.status = AGENT_LIFECYCLE_STATES.FAILED;
+            onStatus({ step: 'agent_failed', role: task.role, taskId: task.taskId, reason: err.message });
+            throw err;
+          }
         }, { taskId: task.taskId, role: task.role });
       });
 

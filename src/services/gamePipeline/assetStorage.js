@@ -65,6 +65,7 @@ export class LocalStorageAdapter {
   }
 
   async get(key) {
+    if (typeof localStorage === 'undefined') return null;
     const payload = localStorage.getItem(`${this.prefix}${key}`);
     if (!payload) return null;
     try {
@@ -75,6 +76,7 @@ export class LocalStorageAdapter {
   }
 
   async delete(key) {
+    if (typeof localStorage === 'undefined') return;
     localStorage.removeItem(`${this.prefix}${key}`);
   }
 }
@@ -91,7 +93,7 @@ export class CloudflareR2StorageAdapter {
     if (typeof window !== 'undefined' && window.location?.origin) {
       return `${window.location.origin}${fullPath}`;
     }
-    return `http://localhost${fullPath}`;
+    return fullPath;
   }
 
   async put(key, blob, metadata = {}) {
@@ -167,15 +169,20 @@ export class AssetStorageService {
     let blob;
     // 1. If sourceUrl is already a data URI
     if (sourceUrl.startsWith('data:')) {
-      const parts = sourceUrl.split(',');
-      const mime = parts[0].match(/:(.*?);/)?.[1] || expectedType;
-      const bstr = atob(parts[1]);
-      let n = bstr.length;
-      const u8arr = new Uint8Array(n);
-      while (n--) {
-        u8arr[n] = bstr.charCodeAt(n);
+      let u8arr;
+      try {
+        const parts = sourceUrl.split(',');
+        const mime = parts[0].match(/:(.*?);/)?.[1] || expectedType;
+        const bstr = atob(parts[1]);
+        let n = bstr.length;
+        u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        blob = new Blob([u8arr], { type: mime });
+      } catch (err) {
+        throw new Error(`Invalid data URI payload for asset ${assetId}: ${err.message}`, { cause: err });
       }
-      blob = new Blob([u8arr], { type: mime });
     } else {
       // 2. Download from remote FLUX URL
       const response = await fetch(sourceUrl);

@@ -412,14 +412,17 @@ export function detectMissingInformation(prompt, intent) {
   const lower = prompt.toLowerCase();
   const missing = [];
 
+  // Blocking: user mentions code but gives no file-level target to work on
   for (const q of BLOCKING_QUESTIONS) {
-    if (q.keyword.test(lower)) {
+    if (q.keyword.test(lower) && !/\.[a-z0-9]{1,8}\b|\/[a-z0-9_.-]+/i.test(lower)) {
       missing.push({ ...q });
     }
   }
 
+  // Optional: report only when the topic is NOT mentioned (absence detection),
+  // so "dark theme landing page" never triggers "colour scheme not specified".
   for (const q of OPTIONAL_QUESTIONS) {
-    if (q.keyword.test(lower)) {
+    if (!q.keyword.test(lower)) {
       missing.push({ ...q, blocking: false });
     }
   }
@@ -460,7 +463,7 @@ export function classifyComplexity(prompt, intent) {
 
   if (type === INTENT_TYPES.WEBSITE_CREATION) {
     if (/\b(SaaS|enterprise|production|full-stack|complex|complete|full)\b/i.test(lower)) return COMPLEXITY_LEVELS.HIGH;
-    if (/\b(landing|simple|single page|portfolio)\b/i.test(lower)) return COMPLEXITY_LEVELS.MEDIUM;
+    if (/\b(landing|simple|single page|portfolio)\b/i.test(lower)) return COMPLEXITY_LEVELS.LOW;
     return COMPLEXITY_LEVELS.MEDIUM;
   }
 

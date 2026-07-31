@@ -55,13 +55,15 @@ export function toAssistantMessage(response, createId = createMarketMessageId) {
 }
 
 export function normalizeMarketMessageIds(sessions, createId = createMarketMessageId) {
+  if (!Array.isArray(sessions)) return [];
   const usedIds = new Set(
-    sessions.flatMap((session) => session.messages)
+    sessions.flatMap((session) => Array.isArray(session?.messages) ? session.messages : [])
       .filter((message) => message?.type === 'market' && typeof message.id === 'string' && message.id)
       .map((message) => message.id)
   );
   const seenExistingIds = new Set();
   return sessions.map((session) => {
+    if (!Array.isArray(session?.messages)) return session;
     let changed = false;
     const messages = session.messages.map((message) => {
       if (message?.type !== 'market') return message;
@@ -153,26 +155,6 @@ export async function runMarketRefresh({
   }
 }
 
-function _getTaskTypeFromMessages(messages) {
-  if (!messages || messages.length === 0) return 'general';
-  const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
-  if (!lastUserMsg) return 'general';
-  const prompt = typeof lastUserMsg.content === 'string' ? lastUserMsg.content.toLowerCase() : '';
-  if (prompt.includes('game') || prompt.includes('play') || prompt.includes('chess') || prompt.includes('space') || prompt.includes('scrabble') || prompt.includes('wordle') || prompt.includes('bot') || prompt.includes('enemy')) {
-    return 'game';
-  }
-  if (prompt.includes('image') || prompt.includes('flux') || prompt.includes('picture') || prompt.includes('photo') || prompt.includes('draw')) {
-    return 'image';
-  }
-  if (prompt.includes('build') || prompt.includes('make') || prompt.includes('app') || prompt.includes('website') || prompt.includes('site') || prompt.includes('dashboard') || prompt.includes('landing')) {
-    return 'app';
-  }
-  if (prompt.includes('code') || prompt.includes('fix') || prompt.includes('bug') || prompt.includes('error') || prompt.includes('function')) {
-    return 'code';
-  }
-  return 'general';
-}
-
 const INITIAL_SESSIONS = [
   {
     id: 'session-default',
@@ -187,7 +169,8 @@ export default function App() {
       const saved = localStorage.getItem('corez_sessions');
       if (!saved) return INITIAL_SESSIONS;
       const parsed = JSON.parse(saved);
-      return Array.isArray(parsed) ? normalizeMarketMessageIds(parsed) : INITIAL_SESSIONS;
+      if (!Array.isArray(parsed) || parsed.length === 0) return INITIAL_SESSIONS;
+      return normalizeMarketMessageIds(parsed);
     } catch {
       return INITIAL_SESSIONS;
     }
@@ -222,6 +205,7 @@ export default function App() {
   const marketRefreshSequenceRef = useRef(0);
   const saveTimeoutRef = useRef(null);
   const focusTimeoutRef = useRef(null);
+  const resumeStartedRef = useRef(false);
 
   const activeSession = useMemo(() => sessions.find(s => s.id === activeSessionId) || sessions[0], [sessions, activeSessionId]);
 
@@ -267,6 +251,8 @@ export default function App() {
 
   // Auto-resume background AI generation across accidental page refreshes
   useEffect(() => {
+    if (resumeStartedRef.current) return;
+    resumeStartedRef.current = true;
     try {
       const savedPending = localStorage.getItem('corez_pending_request');
       if (savedPending) {
@@ -306,7 +292,7 @@ export default function App() {
               .finally(() => {
                 localStorage.removeItem('corez_pending_request');
                 setIsThinking(false);
-                abortControllerRef.current = null;
+                if (abortControllerRef.current === controller) abortControllerRef.current = null;
               });
           } else {
             localStorage.removeItem('corez_pending_request');
@@ -330,8 +316,10 @@ export default function App() {
   const handleSelectSession = (id) => {
     setActiveSessionId(id);
     setActiveView('chat');
+    setCanvasOpen(false);
+    setCanvasFullScreen(false);
     const target = sessions.find(s => s.id === id);
-    if (target && target.messages.length > 0) {
+    if (target && Array.isArray(target.messages) && target.messages.length > 0) {
       const lastAssistantMsg = [...target.messages].reverse().find(m => m.role === 'assistant' && m.type !== 'market');
       if (lastAssistantMsg) {
         const code = extractCodeFromMessage(lastAssistantMsg.content);
@@ -344,7 +332,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (activeSession && activeSession.messages.length > 0) {
+    if (activeSession && Array.isArray(activeSession.messages) && activeSession.messages.length > 0) {
       const lastAssistantMsg = [...activeSession.messages].reverse().find(m => m.role === 'assistant' && m.type !== 'market');
       if (lastAssistantMsg) {
         const code = extractCodeFromMessage(lastAssistantMsg.content);
@@ -354,7 +342,7 @@ export default function App() {
         }
       }
     }
-  }, [activeSessionId]);
+  }, [activeSessionId, activeCanvasCode]);
 
   const handleNewChat = () => {
     const newId = `session-${Date.now()}`;
@@ -363,17 +351,23 @@ export default function App() {
       title: 'New Conversation',
       messages: []
     };
-    setSessions([newSession, ...sessions]);
+    setSessions(prev => [newSession, ...prev]);
     setActiveSessionId(newId);
     setActiveView('chat');
+    setCanvasOpen(false);
+    setCanvasFullScreen(false);
   };
 
   const handleDeleteSession = (id) => {
-    const filtered = sessions.filter(s => s.id !== id);
-    setSessions(filtered.length ? filtered : INITIAL_SESSIONS);
-    if (activeSessionId === id) {
-      setActiveSessionId(filtered[0]?.id || INITIAL_SESSIONS[0].id);
-    }
+    setSessions(prev => {
+      const filtered = prev.filter(s => s.id !== id);
+      return filtered.length ? filtered : INITIAL_SESSIONS;
+    });
+    setActiveSessionId(prev => {
+      if (prev !== id) return prev;
+      const remaining = sessions.filter(s => s.id !== id);
+      return remaining[0]?.id || INITIAL_SESSIONS[0].id;
+    });
     // Asynchronously remove associated R2 app storage for this session
     deleteSessionAppsInR2(id).catch(err => console.warn('Failed to clean up session R2 apps:', err));
   };
@@ -409,7 +403,7 @@ export default function App() {
   };
 
   const handleSendMessage = async (promptText) => {
-    if (!activeSession) return;
+    if (isThinking || !activeSession) return;
     const targetSessionId = activeSessionId;
 
     let displayPrompt = promptText;
@@ -423,16 +417,14 @@ export default function App() {
     const displayMsg = { role: 'user', content: displayPrompt };
     const apiMsg = { role: 'user', content: apiPrompt };
 
-    const updatedDisplayMessages = [...activeSession.messages, displayMsg];
     const updatedApiMessages = [...activeSession.messages, apiMsg];
-
-    const updatedTitle = activeSession.messages.length === 0 
-      ? (promptText.length > 30 ? promptText.slice(0, 27) + '...' : promptText)
-      : activeSession.title;
 
     setSessions(prev => prev.map(s => {
       if (s.id === targetSessionId) {
-        return { ...s, title: updatedTitle, messages: updatedDisplayMessages };
+        const updatedTitle = s.messages.length === 0
+          ? (promptText.length > 30 ? promptText.slice(0, 27) + '...' : promptText)
+          : s.title;
+        return { ...s, title: updatedTitle, messages: [...s.messages, displayMsg] };
       }
       return s;
     }));

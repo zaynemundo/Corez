@@ -113,7 +113,7 @@ ${this.contextEngine.buildSystemContextPrompt()}`;
         const result = await this.toolRegistry.executeTool(fnName, fnArgs, {
           context: this.contextEngine,
           permissionManager: this.permissionManager,
-          autoApprove: options.autoApprove || (this.config.permissions.workspaceWrite === true)
+          autoApprove: options.autoApprove === true
         });
 
         onStatus({ type: 'tool_end', name: fnName, result });

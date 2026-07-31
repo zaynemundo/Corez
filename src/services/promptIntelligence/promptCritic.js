@@ -53,8 +53,8 @@ export function critiquePrompt(rawPrompt, enrichedPrompt, intent, requirements) 
   result.score = Math.round(totalScore * 10) / 10;
 
   // Detect drift
-  result.intentDrift = !result.intentPreserved;
   result.intentPreserved = preservationScore >= 2.0;
+  result.intentDrift = !result.intentPreserved;
 
   // Build issues
   for (const dim of dimensions) {
@@ -64,8 +64,10 @@ export function critiquePrompt(rawPrompt, enrichedPrompt, intent, requirements) 
     }
   }
 
-  // Specific issue checks
-  if (enrichedPrompt.length > rawPrompt.length * 8) {
+  // Specific issue checks (word-count based to avoid short-prompt over-penalty)
+  const rawWords = (rawPrompt.match(/\S+/g) || []).length;
+  const enrichedWords = (enrichedPrompt.match(/\S+/g) || []).length;
+  if (rawWords >= 3 && enrichedWords > rawWords * 8) {
     result.issues.push('Enriched prompt is significantly longer than the original — possible over-enrichment');
     result.recommendedImprovements.push('Reduce prompt size by removing redundant elaboration');
   }

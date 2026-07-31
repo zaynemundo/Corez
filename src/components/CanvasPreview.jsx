@@ -149,7 +149,7 @@ export default function CanvasPreview({
               <option value="">Switch App ({sessionApps.length} stored)...</option>
               {sessionApps.map((a, idx) => (
                 <option key={a.appId} value={a.appId}>
-                  App {idx + 1}: {a.title.slice(0, 20)}
+                  App {idx + 1}: {typeof a.title === 'string' ? a.title.slice(0, 20) : 'Untitled'}
                 </option>
               ))}
             </select>

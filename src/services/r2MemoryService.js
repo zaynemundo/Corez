@@ -50,8 +50,12 @@ export async function searchMemoriesInR2(userId, query, category = '') {
 
 export async function deleteMemoryFromR2(userId, key) {
   if (!userId || !key) return false;
-  const response = await fetch(`/api/memory/${encodeURIComponent(userId)}/${encodeURIComponent(key)}`, {
-    method: 'DELETE'
-  });
-  return response.ok;
+  try {
+    const response = await fetch(`/api/memory/${encodeURIComponent(userId)}/${encodeURIComponent(key)}`, {
+      method: 'DELETE'
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
 }

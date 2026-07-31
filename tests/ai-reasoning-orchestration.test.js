@@ -198,4 +198,31 @@ describe('CoreZ AI Reasoning & Skill Orchestration Pipeline', () => {
     expect(latest.confidence).toBe(0.9);
   });
 
+  // 14. Output format checks work for fine-grained intents (game_creation / html)
+  it('14. flags missing JSX code blocks for fine-grained game_creation intents', () => {
+    const evaluation = evaluateResponse(
+      'Here is a description of the game with no code.',
+      { mustAchieve: [], mustNotChange: [] },
+      { type: 'game_creation', primaryIntent: 'game_creation', outputFormat: 'jsx' }
+    );
+    expect(evaluation.isCompliant).toBe(false);
+    expect(evaluation.violations.some(v => v.includes('React/JSX'))).toBe(true);
+  });
+
+  it('15. accepts HTML output when the user explicitly requested plain HTML', () => {
+    const evaluation = evaluateResponse(
+      '<!DOCTYPE html><html><body><h1>Page</h1></body></html>',
+      { mustAchieve: [], mustNotChange: [] },
+      { type: 'website_creation', outputFormat: 'html' }
+    );
+    expect(evaluation.isCompliant).toBe(true);
+  });
+
+  it('16. detects spaced usage limit mutations too', () => {
+    const contract = { mustNotChange: ['Do not change usage limits'], mustAchieve: [] };
+    const evaluation = evaluateResponse('usage limit = 999999', contract, { type: 'bug_fix' });
+    expect(evaluation.isCompliant).toBe(false);
+    expect(evaluation.violations.some(v => v.includes('usage'))).toBe(true);
+  });
+
 });

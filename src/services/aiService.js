@@ -13,7 +13,7 @@ import { defaultSkillRegistry } from '../skills/registry.js';
 import { classifyIntent } from './intentClassifier.js';
 import { parseMarketIntent } from './marketIntent.js';
 import { fetchMarketData, unavailableMarket } from './marketService.js';
-import { process as processPromptIntelligence, toLegacyIntentType, classifyIntent as classifyIntentNew } from './promptIntelligence/index.js';
+import { process as processPromptIntelligence, toLegacyIntentType, classifyIntent as classifyIntentNew, extractRequirements } from './promptIntelligence/index.js';
 import { createIntentContract } from './promptIntelligence/intentContract.js';
 import { evaluateResponse, repairResponse, recordQualitySignal } from './reflectionEngine.js';
 import { buildAwwwardsDesignPrompt } from '../../packages/agent-core/context/designTokens.js';
@@ -121,8 +121,20 @@ export function analyzePublicUserIntent(prompt) {
     newIntent = null;
   }
 
+  // Trained classifier result (higher-confidence signal wins over the
+  // fine-grained engine's loose 0.5 gate on multi-intent prompts)
+  let modelResult;
+  try {
+    modelResult = classifyIntent(cleanPrompt);
+  } catch {
+    modelResult = { accepted: false, confidence: 0 };
+  }
+
+  const modelWins = Boolean(modelResult?.accepted)
+    && (!newIntent || modelResult.confidence >= (newIntent.confidence || 0));
+
   // If the new engine has a high-confidence classification, map it to legacy types
-  if (newIntent && newIntent.confidence >= 0.5 && newIntent.type !== 'unknown') {
+  if (!modelWins && newIntent && newIntent.confidence >= 0.5 && newIntent.type !== 'unknown') {
     const legacyType = toLegacyIntentType(newIntent.type);
     const summaries = {
       'app': 'Create a public-facing interactive experience or web tool.',
@@ -154,13 +166,6 @@ export function analyzePublicUserIntent(prompt) {
         complexity: newIntent.complexity,
       },
     };
-  }
-
-  let modelResult;
-  try {
-    modelResult = classifyIntent(cleanPrompt);
-  } catch {
-    modelResult = { accepted: false, confidence: 0 };
   }
 
   if (modelResult && modelResult.accepted) {
@@ -551,10 +556,11 @@ export async function generateHostedAIResponse(
   // 1. Fine-grained intent classification & contract generation
   const fineIntent = classifyIntentNew(prompt);
   const legacyIntentType = toLegacyIntentType(fineIntent?.primaryIntent || fineIntent?.type);
+  const requirements = extractRequirements(prompt, fineIntent);
   const contract = createIntentContract(fineIntent, {
-    explicit: fineIntent?.features || [],
-    inferred: [],
-    forbidden: fineIntent?.constraints || [],
+    explicit: requirements.explicit || [],
+    inferred: requirements.inferred || [],
+    forbidden: requirements.forbidden || [],
   });
 
   const executionPrompt = (intent?.type === 'code-help' || intent?.type === 'app' || INTENT_PATTERNS.code.test(prompt))
@@ -596,7 +602,7 @@ export async function generateHostedAIResponse(
   let repaired = false;
 
   if (!initialEval.isCompliant) {
-    const repairResult = repairResponse(rawContent, initialEval, contract, 1, 0);
+    const repairResult = repairResponse(rawContent, initialEval, contract, 1, 0, fineIntent);
     finalContent = repairResult.finalContent;
     repaired = repairResult.repaired;
   }

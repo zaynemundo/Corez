@@ -11,7 +11,7 @@ export default function SettingsModal({ isOpen, onClose, onClearAllHistory }) {
             <Settings size={18} strokeWidth={1.5} />
             <span className="modal-title">Corez Preferences</span>
           </div>
-          <button className="icon-btn" onClick={onClose}>
+          <button className="icon-btn" onClick={onClose} aria-label="Close settings">
             <X size={15} strokeWidth={1.5} />
           </button>
         </div>

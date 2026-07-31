@@ -162,7 +162,7 @@ export class TaskDependencyGraph {
       ) {
         const dependenciesMet = task.dependencies.every(depId => {
           const depTask = this.tasks.get(depId);
-          return depTask && depTask.status === AGENT_LIFECYCLE_STATES.COMPLETED;
+          return depTask && (depTask.status === AGENT_LIFECYCLE_STATES.COMPLETED || depTask.status === AGENT_LIFECYCLE_STATES.DECOMPOSED);
         });
 
         if (dependenciesMet) {
@@ -185,11 +185,14 @@ export class TaskDependencyGraph {
 
     const suggested = Array.isArray(decompositionPayload.suggestedTasks) ? decompositionPayload.suggestedTasks : [];
     for (const sub of suggested) {
+      const subDependencies = Array.isArray(sub.dependencies) && sub.dependencies.length > 0
+        ? [...sub.dependencies]
+        : [...(parentTask.dependencies || [])];
       const subTask = this.addTask({
         role: sub.role || parentTask.role,
         taskId: sub.taskId,
         objective: sub.objective || `Subtask of ${parentTaskId}`,
-        dependencies: Array.isArray(sub.dependencies) ? [...sub.dependencies] : [parentTaskId],
+        dependencies: subDependencies,
         ownedResources: sub.ownedResources || [],
         isEssential: parentTask.isEssential
       });
@@ -202,7 +205,9 @@ export class TaskDependencyGraph {
   isSwarmComplete() {
     let allEssentialComplete = true;
     for (const task of this.tasks.values()) {
-      if (task.isEssential && task.status !== AGENT_LIFECYCLE_STATES.COMPLETED) {
+      if (task.isEssential
+        && task.status !== AGENT_LIFECYCLE_STATES.COMPLETED
+        && task.status !== AGENT_LIFECYCLE_STATES.DECOMPOSED) {
         allEssentialComplete = false;
         break;
       }

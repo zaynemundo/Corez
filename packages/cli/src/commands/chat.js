@@ -1,5 +1,5 @@
 import readline from 'node:readline';
-import { AgentRuntime, ContextEngine, loadCorezConfig } from '../../../agent-core/index.js';
+import { AgentRuntime, ContextEngine, PermissionManager, loadCorezConfig } from '../../../agent-core/index.js';
 import { handleModelCommand } from './model.js';
 
 export const SLASH_COMMANDS = Object.freeze([
@@ -110,7 +110,19 @@ export async function handleChatCommand(options = {}, ui) {
         } else {
           ui.status('◐', `Analyzing plan for: "${planTask}"...`);
           try {
-            const planResult = await runtime.runTask(`[READ-ONLY PLAN MODE]: ${planTask}`, {
+            const readOnlyPermissions = new PermissionManager({
+              read: true,
+              workspaceWrite: false,
+              shell: false,
+              network: false,
+              dangerous: false
+            });
+            const planRuntime = new AgentRuntime({
+              cwd,
+              contextEngine: context,
+              permissionManager: readOnlyPermissions
+            });
+            const planResult = await planRuntime.runTask(`[READ-ONLY PLAN MODE]: ${planTask}`, {
               onStatus: (st) => st.type === 'tool_start' && ui.status('●', `Tool: ${st.name}`)
             });
             console.log(`\n${planResult.response}\n`);

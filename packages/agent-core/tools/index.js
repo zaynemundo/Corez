@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync } from 'node:child_process';
+import { execSync, spawnSync } from 'node:child_process';
 import { PERMISSION_CATEGORIES } from '../permissions/index.js';
 
 export class ToolRegistry {
@@ -361,8 +361,12 @@ export class ToolRegistry {
       async execute({ count = 5 } = {}, { context }) {
         const cwd = context?.cwd || process.cwd();
         try {
-          const log = execSync(`git log -n ${count} --oneline`, { cwd, encoding: 'utf8' });
-          return { count, log: log.trim() };
+          const safeCount = Number.isFinite(count) ? Math.min(100, Math.max(1, Math.floor(count))) : 5;
+          const result = spawnSync('git', ['log', '-n', String(safeCount), '--oneline'], { cwd, encoding: 'utf8' });
+          if (result.status !== 0) {
+            return { error: result.stderr?.trim() || `git log failed with exit code ${result.status}` };
+          }
+          return { count: safeCount, log: result.stdout.trim() };
         } catch (err) {
           return { error: err.message };
         }
@@ -382,17 +386,30 @@ export class ToolRegistry {
       },
       async execute({ testFilter = '' } = {}, { context }) {
         const cwd = context?.cwd || process.cwd();
-        const cmd = testFilter ? `npm test -- ${testFilter}` : 'npm test';
+        const safeFilter = typeof testFilter === 'string' && testFilter.trim()
+          ? testFilter.trim().replace(/[;&|`$(){}<>]/g, '').slice(0, 200)
+          : '';
+        const args = safeFilter ? ['test', '--', safeFilter] : ['test'];
+        const cmd = ['npm', ...args].join(' ');
         try {
-          const stdout = execSync(cmd, { cwd, encoding: 'utf8', timeout: 45000 });
-          return { command: cmd, stdout: stdout.trim(), exitCode: 0 };
+          const result = spawnSync('npm', args, { cwd, encoding: 'utf8', timeout: 45000, shell: false });
+          if (result.status !== 0) {
+            return {
+              command: cmd,
+              stdout: result.stdout ? result.stdout.trim() : '',
+              stderr: result.stderr ? result.stderr.trim() : '',
+              error: result.error?.message || `npm test failed with exit code ${result.status}`,
+              exitCode: result.status ?? 1
+            };
+          }
+          return { command: cmd, stdout: result.stdout.trim(), exitCode: 0 };
         } catch (err) {
           return {
             command: cmd,
-            stdout: err.stdout ? err.stdout.trim() : '',
-            stderr: err.stderr ? err.stderr.trim() : '',
+            stdout: '',
+            stderr: '',
             error: err.message,
-            exitCode: err.status || 1
+            exitCode: 1
           };
         }
       }

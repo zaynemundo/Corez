@@ -59,7 +59,7 @@ export function evaluateResponse(responseContent, contract = {}, intent = {}) {
 
     // Guard against modifying usage, rate, token, billing, or provider limits
     if (ruleLower.includes('usage') || ruleLower.includes('rate limit') || ruleLower.includes('token limit') || ruleLower.includes('billing')) {
-      if (/\b(usage_limit|rate_limit|token_limit|monthly_quota|tier_override)\b\s*=\s*/i.test(text)) {
+      if (/\b(usage\s*limit|rate\s*limit|token\s*limit|monthly\s*quota|tier\s*override|usage_limit|rate_limit|token_limit|monthly_quota|tier_override)\b[^=;\n]{0,20}\s*=\s*/i.test(text)) {
         violations.push(`Violation of forbidden change rule: ${rule}`);
       }
     }
@@ -69,12 +69,15 @@ export function evaluateResponse(responseContent, contract = {}, intent = {}) {
   const expectedFormat = intent?.outputFormat || 'text';
   if (expectedFormat === 'jsx') {
     const hasCodeBlock = text.includes('```jsx') || text.includes('```tsx') || text.includes('```react') || text.includes('export default');
-    if (!hasCodeBlock && (intent?.type === 'app' || intent?.primaryIntent === 'website_creation')) {
+    const jsxRequested = ['website_creation', 'game_creation', 'design_task'].includes(intent?.type)
+      || ['website_creation', 'game_creation', 'design_task'].includes(intent?.primaryIntent)
+      || intent?.type === 'app';
+    if (!hasCodeBlock && jsxRequested) {
       violations.push('Expected React/JSX code output block but none was provided');
     }
   } else if (expectedFormat === 'html') {
     const hasHtmlBlock = text.includes('```html') || text.includes('<html') || text.includes('<!DOCTYPE');
-    if (!hasHtmlBlock && intent?.type === 'app') {
+    if (!hasHtmlBlock) {
       violations.push('Expected HTML code block but none was provided');
     }
   }
@@ -106,7 +109,8 @@ export function repairResponse(
   evaluationResult,
   contract = {},
   maxAttempts = MAX_REPAIR_ATTEMPTS,
-  currentAttempt = 0
+  currentAttempt = 0,
+  intent = {}
 ) {
   if (evaluationResult.isCompliant || currentAttempt >= maxAttempts) {
     return {
@@ -131,7 +135,7 @@ export function repairResponse(
     }
   }
 
-  const newEval = evaluateResponse(repairedContent, contract);
+  const newEval = evaluateResponse(repairedContent, contract, intent);
 
   return {
     finalContent: repairedContent,

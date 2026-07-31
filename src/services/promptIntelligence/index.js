@@ -30,7 +30,7 @@
  *   8. FINAL EXECUTION PROMPT → CoreZ execution
  */
 
-import { createTask } from './schemas.js';
+import { createTask, INTENT_TYPES } from './schemas.js';
 import { classifyIntent, extractRequirements, detectMissingInformation, classifyComplexity } from './intentEngine.js';
 import { createIntentContract } from './intentContract.js';
 import { ContextEngine } from './contextEngine.js';
@@ -62,7 +62,7 @@ export { INTENT_TYPES, EXECUTION_MODES, createTask } from './schemas.js';
  * @param {boolean} [options.dryRun]        — run pipeline without reaching out to models (optional)
  * @returns {Promise<object>} pipeline result
  */
-export async function process({ prompt, projectContext, verbose, dryRun } = {}) {
+export async function process({ prompt, projectContext, verbose, dryRun, signal } = {}) {
   if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
     return createEmptyResult('No prompt provided');
   }
@@ -113,15 +113,21 @@ export async function process({ prompt, projectContext, verbose, dryRun } = {}) 
   // ----- 4. Context Engine -----
   let context = {};
   try {
+    if (signal?.aborted) {
+      return createEmptyResult('Task aborted before context gathering');
+    }
     if (projectContext) {
       context = projectContext;
       if (verbose) log('CONTEXT', 'Using supplied project context');
     } else if (!dryRun) {
       const engine = new ContextEngine();
-      context = await engine.gather(rawPrompt, intent);
+      context = await engine.gather(rawPrompt, intent, { signal });
       if (verbose) log('CONTEXT', `framework: ${context.framework || 'none'}, deps: ${context.dependencies?.length || 0}`);
     }
   } catch (err) {
+    if (signal?.aborted) {
+      return createEmptyResult('Task aborted during context gathering');
+    }
     if (verbose) log('CONTEXT', 'Context gathering failed, continuing without', err.message);
   }
   result.context = context;
@@ -243,13 +249,14 @@ function buildOutput(task, contract) {
 function createEmptyResult(reason) {
   return {
     rawPrompt: '',
-    intent: { type: 'unknown', confidence: 0, complexity: 'low' },
+    intent: { type: INTENT_TYPES.UNKNOWN, confidence: 0, complexity: 'low' },
     requirements: { explicit: [], inferred: [], forbidden: [] },
     contract: { mustAchieve: [], mayInfer: [], mustNotInvent: [] },
     context: {},
     executionPrompt: '',
     quality: { score: 0, refinementCount: 0, intentPreserved: true },
-    routing: { mode: 'direct', recommendedAgents: [] },
+    routing: { mode: 'direct', recommendedAgents: [], complexity: 'low', reason },
+    legacyIntentType: toLegacyIntentType(INTENT_TYPES.UNKNOWN),
     error: reason,
   };
 }

@@ -63,6 +63,15 @@ export default function Sidebar({
             key={session.id}
             className={`history-item icon-only-item ${activeView === 'chat' && session.id === activeSessionId ? 'active' : ''}`}
             onClick={() => onSelectSession(session.id)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onSelectSession(session.id);
+              }
+            }}
+            role="button"
+            tabIndex={0}
+            aria-label={`Open conversation ${session.title}`}
             title={session.title}
           >
             <MessageCircleMore size={20} strokeWidth={1.5} />

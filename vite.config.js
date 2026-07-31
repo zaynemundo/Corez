@@ -30,6 +30,7 @@ function apiDevPlugin() {
               const parsed = JSON.parse(body || '{}');
               const prompt = parsed.prompt || '';
               const intent = parsed.intent || null;
+              const history = Array.isArray(parsed.messages) ? parsed.messages : [];
 
               const systemPrompt = `You are COREZ AI.
 
@@ -44,6 +45,18 @@ Guidelines for Output:
 - Always write complete, production-ready, working code tailored specifically to the prompt topic. Never output generic fallback code.
 Inferred intent: ${intent?.type || 'app'} - ${intent?.summary || 'Create a public-facing interactive experience'}`;
 
+              const apiMessages = [
+                { role: 'system', content: systemPrompt }
+              ];
+              for (const m of history) {
+                if (m.role && m.content && typeof m.content === 'string') {
+                  apiMessages.push({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content });
+                }
+              }
+              if (!apiMessages.some(m => m.role === 'user' && m.content === prompt)) {
+                apiMessages.push({ role: 'user', content: prompt });
+              }
+
               let lastError = null;
               for (const modelId of models) {
                 try {
@@ -57,11 +70,8 @@ Inferred intent: ${intent?.type || 'app'} - ${intent?.summary || 'Create a publi
                     },
                     body: JSON.stringify({
                       model: modelId,
-                      reasoning: { effort: 'xhigh' },
-                      messages: [
-                        { role: 'system', content: systemPrompt },
-                        { role: 'user', content: prompt }
-                      ]
+                      reasoning: { effort: 'high' },
+                      messages: apiMessages
                     })
                   });
 

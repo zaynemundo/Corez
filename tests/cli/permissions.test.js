@@ -31,4 +31,26 @@ describe('PermissionManager & Dangerous Command Protection', () => {
     const pmDenied = new PermissionManager({ workspaceWrite: false });
     expect(pmDenied.checkPermission(PERMISSION_CATEGORIES.WORKSPACE_WRITE).allowed).toBe(false);
   });
+
+  it('explicit false configuration wins over auto-approve', () => {
+    const pm = new PermissionManager({ workspaceWrite: false, shell: false, network: false });
+    expect(pm.checkPermission(PERMISSION_CATEGORIES.WORKSPACE_WRITE, '', { autoApprove: true }).allowed).toBe(false);
+    expect(pm.checkPermission(PERMISSION_CATEGORIES.SHELL, 'npm test', { autoApprove: true }).allowed).toBe(false);
+    expect(pm.checkPermission(PERMISSION_CATEGORIES.NETWORK, 'fetch', { autoApprove: true }).allowed).toBe(false);
+  });
+
+  it('auto-approve does not override the dangerous-command blocklist', () => {
+    const pm = new PermissionManager({ shell: true });
+    expect(pm.checkPermission(PERMISSION_CATEGORIES.SHELL, 'rm -rf /', { autoApprove: true }).blocked).toBe(true);
+    expect(pm.checkPermission(PERMISSION_CATEGORIES.SHELL, 'rm -rf --no-preserve-root /', { autoApprove: true }).blocked).toBe(true);
+    expect(pm.checkPermission(PERMISSION_CATEGORIES.SHELL, 'rm -r -f ~', { autoApprove: true }).blocked).toBe(true);
+    expect(pm.checkPermission(PERMISSION_CATEGORIES.SHELL, 'chmod -R 777 /', { autoApprove: true }).blocked).toBe(true);
+    expect(pm.checkPermission(PERMISSION_CATEGORIES.SHELL, 'git checkout -- .', { autoApprove: true }).blocked).toBe(true);
+  });
+
+  it('allows legitimate shell commands when shell is enabled', () => {
+    const pm = new PermissionManager({ shell: true });
+    expect(pm.checkPermission(PERMISSION_CATEGORIES.SHELL, 'npm run lint').allowed).toBe(true);
+    expect(pm.checkPermission(PERMISSION_CATEGORIES.SHELL, 'rm -rf /tmp/scratch-build').allowed).toBe(true);
+  });
 });

@@ -19,6 +19,7 @@ import {
   classifyIntent,
   extractRequirements,
   classifyComplexity,
+  detectMissingInformation,
 } from '../../src/services/promptIntelligence/intentEngine.js';
 
 import {
@@ -294,6 +295,25 @@ describe('Intent Engine — classifyComplexity', () => {
     expect(c).toBe(COMPLEXITY_LEVELS.TRIVIAL);
   });
 
+  it('does not report missing preferences when the prompt specifies them', () => {
+    const intent = classifyIntent('build a dark theme landing page');
+    const missing = detectMissingInformation('build a dark theme landing page', intent);
+    const colorFlags = missing.filter(m => /colour scheme|color scheme/i.test(m.message));
+    expect(colorFlags).toHaveLength(0);
+  });
+
+  it('reports missing preferences only when they were never mentioned', () => {
+    const intent = classifyIntent('build a website');
+    const missing = detectMissingInformation('build a website', intent);
+    expect(missing.some(m => /colour scheme/i.test(m.message))).toBe(true);
+  });
+
+  it('does not flag blocking ambiguity when a file target is provided', () => {
+    const intent = classifyIntent('fix the bug in src/utils/parse.js');
+    const missing = detectMissingInformation('fix the bug in src/utils/parse.js', intent);
+    expect(missing.some(m => m.blocking)).toBe(false);
+  });
+
   it('classifies code_question as trivial', () => {
     const intent = { type: INTENT_TYPES.CODE_QUESTION };
     const c = classifyComplexity('how does useState work', intent);
@@ -312,10 +332,10 @@ describe('Intent Engine — classifyComplexity', () => {
     expect(c).toBe(COMPLEXITY_LEVELS.HIGH);
   });
 
-  it('classifies "make a simple portfolio" as medium', () => {
+  it('classifies "make a simple portfolio" as low', () => {
     const intent = { type: INTENT_TYPES.WEBSITE_CREATION };
     const c = classifyComplexity('make a simple portfolio', intent);
-    expect(c).toBe(COMPLEXITY_LEVELS.MEDIUM);
+    expect(c).toBe(COMPLEXITY_LEVELS.LOW);
   });
 
   it('classifies "build a complete multiplayer browser game" as high', () => {
@@ -690,6 +710,28 @@ describe('Prompt Critic', () => {
     expect(result).toHaveProperty('intentDrift');
     expect(result).toHaveProperty('issues');
     expect(result).toHaveProperty('recommendedImprovements');
+  });
+
+  it('marks intentDrift when core intent words are dropped from the enriched prompt', () => {
+    const result = critiquePrompt(
+      'build a fitness tracker app',
+      'Create a polished marketing website for a gym franchise with pricing plans.',
+      { type: INTENT_TYPES.WEBSITE_CREATION },
+      { explicit: [], inferred: [], forbidden: [] }
+    );
+    expect(result.intentDrift).toBe(true);
+    expect(result.intentPreserved).toBe(false);
+  });
+
+  it('keeps intentDrift false when the enriched prompt preserves the core intent', () => {
+    const result = critiquePrompt(
+      'build a fitness tracker app',
+      'Build a fitness tracker app with workout logging, step counting, and progress charts.',
+      { type: INTENT_TYPES.WEBSITE_CREATION },
+      { explicit: [], inferred: [], forbidden: [] }
+    );
+    expect(result.intentDrift).toBe(false);
+    expect(result.intentPreserved).toBe(true);
   });
 });
 

@@ -7,15 +7,18 @@ export const PERMISSION_CATEGORIES = Object.freeze({
 });
 
 export const BLOCKED_DANGEROUS_COMMANDS = Object.freeze([
-  /rm\s+-rf\s+[/]/i,
-  /rm\s+-rf\s+[*]/i,
-  /rm\s+-rf\s+~\/?/i,
+  /\brm\s+(-{1,2}[a-z]+\s+)*(--no-preserve-root\s+)?(\.|\*|~|\/|\$HOME)(\s|$)/i,
+  /^rm\s+(-{1,2}[a-z]+\s+)*--(recursive|force)/i,
+  /rm\s+-r\s+-f\s+/i,
   /git\s+reset\s+--hard/i,
-  /git\s+clean\s+-fdx?/i,
+  /git\s+clean\s+(-{1,2}[a-z]+)/i,
+  /git\s+checkout\s+--\s+(\.|\/)/i,
   /sudo\s+/i,
   /mkfs/i,
   /dd\s+if=/i,
-  /:()\s*\{\s*:\|:&\s*\};:/i
+  /chmod\s+-R\s+[0-7]{3,4}\s+\//i,
+  /chown\s+-R\s+\S+\s+\//i,
+  /:\(\)\s*\{\s*:\|:&\s*\};:/i
 ]);
 
 export class PermissionManager {
@@ -36,7 +39,7 @@ export class PermissionManager {
   }
 
   checkPermission(category, detail = '', options = {}) {
-    // 1. Dangerous check
+    // 1. Dangerous check (always enforced, never auto-approvable)
     if (category === PERMISSION_CATEGORIES.SHELL || category === PERMISSION_CATEGORIES.DANGEROUS) {
       if (this.isDangerousCommand(detail)) {
         return {
@@ -48,7 +51,7 @@ export class PermissionManager {
       }
     }
 
-    if (category === PERMISSION_CATEGORIES.DANGEROUS && !this.permissions.dangerous && !options.autoApprove) {
+    if (category === PERMISSION_CATEGORIES.DANGEROUS && !this.permissions.dangerous) {
       return {
         allowed: false,
         reason: 'Dangerous operations are disabled by policy',
@@ -61,38 +64,38 @@ export class PermissionManager {
       return { allowed: true, reason: 'Read operations are auto-approved' };
     }
 
-    // 3. Workspace write
+    // 3. Workspace write (explicit false always wins over auto-approve)
     if (category === PERMISSION_CATEGORIES.WORKSPACE_WRITE) {
       const mode = this.permissions.workspaceWrite;
-      if (mode === true || options.autoApprove) {
-        return { allowed: true, reason: 'Workspace write allowed by configuration' };
-      }
       if (mode === false) {
         return { allowed: false, reason: 'Workspace write disabled by configuration' };
+      }
+      if (mode === true || options.autoApprove) {
+        return { allowed: true, reason: 'Workspace write allowed by configuration' };
       }
       return { allowed: true, requiresUserApproval: true, reason: 'Requires workspace write approval' };
     }
 
-    // 4. Shell execution
+    // 4. Shell execution (explicit false always wins over auto-approve)
     if (category === PERMISSION_CATEGORIES.SHELL) {
       const mode = this.permissions.shell;
-      if (mode === true || options.autoApprove) {
-        return { allowed: true, reason: 'Shell execution allowed by configuration' };
-      }
       if (mode === false) {
         return { allowed: false, reason: 'Shell execution disabled by configuration' };
+      }
+      if (mode === true || options.autoApprove) {
+        return { allowed: true, reason: 'Shell execution allowed by configuration' };
       }
       return { allowed: true, requiresUserApproval: true, reason: 'Requires shell approval' };
     }
 
-    // 5. Network access
+    // 5. Network access (explicit false always wins over auto-approve)
     if (category === PERMISSION_CATEGORIES.NETWORK) {
       const mode = this.permissions.network;
-      if (mode === true || options.autoApprove) {
-        return { allowed: true, reason: 'Network operations allowed by configuration' };
-      }
       if (mode === false) {
         return { allowed: false, reason: 'Network operations disabled by configuration' };
+      }
+      if (mode === true || options.autoApprove) {
+        return { allowed: true, reason: 'Network operations allowed by configuration' };
       }
       return { allowed: true, requiresUserApproval: true, reason: 'Requires network approval' };
     }

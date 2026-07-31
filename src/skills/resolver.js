@@ -9,7 +9,7 @@ import { expandDependencies } from './dependencies.js';
 
 const BUG_REPORT_PATTERNS = /\b(crash|crashes|bug|error|exception|fail|failed|fails|stack trace|not working|broken|issue|fix|debug)\b/i;
 const SUBSTANTIAL_APP_PATTERNS = /\b(build|create|make|develop|design|launch)\b.*\b(dashboard|app|saas|portal|system|platform|website|game|service|admin|authentication|billing)\b|\b(dashboard|app|saas|portal|system|platform|website|game|service|admin)\b/i;
-const SMALL_EDIT_PATTERNS = /\b(tweak|minor|small edit|color|colour|font|text|label|typo|fix typo|margin|padding|button text|change text|update link)\b/i;
+const SMALL_EDIT_PATTERNS = /\b(tweak|minor edit|minor change|small edit|typo|fix typo|margin|padding|button text|change text|update link|rename)\b/i;
 const REPO_REVIEW_PATTERNS = /\b(review|audit|inspect|survey|check|analyze|analyse)\b.*\b(repo|repository|codebase|project|architecture|files)\b/i;
 
 export function resolveSkills({ intent, prompt = '', availableTools = [], registry = defaultSkillRegistry }) {
@@ -20,7 +20,6 @@ export function resolveSkills({ intent, prompt = '', availableTools = [], regist
   let primaryIntent = 'general_question';
   let complexity = 'medium';
   let isExistingProject = false;
-  let _explicitRequirements = [];
   let forbiddenChanges = [];
 
   if (typeof intent === 'string') {
@@ -31,7 +30,6 @@ export function resolveSkills({ intent, prompt = '', availableTools = [], regist
     primaryIntent = intent.primaryIntent || intent.type || 'general_question';
     complexity = intent.complexity || 'medium';
     isExistingProject = Boolean(intent.isExistingProject);
-    _explicitRequirements = Array.isArray(intent.explicitRequirements) ? intent.explicitRequirements : [];
     forbiddenChanges = Array.isArray(intent.forbiddenChanges) ? intent.forbiddenChanges : [];
   }
 

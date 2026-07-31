@@ -50,6 +50,7 @@ export default function ChatInput({
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={isStreaming ? "Corez is generating..." : "Ask Corez..."}
+          aria-label={isStreaming ? "Corez is generating" : "Message Corez"}
           rows={1}
         />
         <div className="input-actions-bar">

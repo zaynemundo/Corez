@@ -24,7 +24,6 @@ export default function ProgressChecklist() {
         } else if (prev < 98.5) {
           return prev + Math.random() * 0.15 + 0.05;
         }
-        clearInterval(timer);
         return Math.min(prev, 100);
       });
     }, 220);
@@ -32,7 +31,7 @@ export default function ProgressChecklist() {
     return () => clearInterval(timer);
   }, []);
 
-  const displayPercent = Math.min(Math.round(progressPercent), 99);
+  const displayPercent = Math.min(Math.round(progressPercent), 100);
   const currentStep = PIPELINE_STEPS.find(s => displayPercent >= s.min && displayPercent <= s.max) || PIPELINE_STEPS[0];
 
   return (

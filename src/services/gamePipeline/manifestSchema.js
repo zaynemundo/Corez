@@ -116,6 +116,7 @@ export function parseAndValidateManifest(jsonString) {
     return {
       success: false,
       error: `JSON Syntax Error: ${err.message}`,
+      errors: [`JSON Syntax Error: ${err.message}`],
       raw: jsonString
     };
   }
@@ -137,9 +138,12 @@ export function parseAndValidateManifest(jsonString) {
 }
 
 export function generateCorrectionPrompt(validationResult) {
+  const errors = Array.isArray(validationResult.errors) && validationResult.errors.length > 0
+    ? validationResult.errors
+    : [validationResult.error || 'Unknown manifest validation failure.'];
   return `The previous game manifest response failed schema validation.
 Errors encountered:
-${validationResult.errors.map(err => `- ${err}`).join('\n')}
+${errors.map(err => `- ${err}`).join('\n')}
 
 Please output ONLY a corrected JSON object matching the required schema:
 {

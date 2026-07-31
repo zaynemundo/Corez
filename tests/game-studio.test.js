@@ -124,6 +124,31 @@ describe('CoreZ AI Game Studio Engine (OpenCode Go Native)', () => {
       expect(result.workflow.currentStage).toBe(WORKFLOW_STAGES.COMPLETE);
     });
 
+    it('executes the entire specialist task DAG, not just the first ready task', async () => {
+      const orchestrator = new GameStudioOrchestrator();
+      const result = await orchestrator.buildGame('Build an 8-bit retro platformer with a knight');
+
+      // The 4-task DAG (engine -> gameplay/ai/ui) must ALL be implemented
+      expect(result.implementationOutputs['task-engine']).toBeDefined();
+      expect(result.implementationOutputs['task-gameplay']).toBeDefined();
+      expect(result.implementationOutputs['task-ai']).toBeDefined();
+      expect(result.implementationOutputs['task-ui']).toBeDefined();
+      expect(Object.keys(result.implementationOutputs).length).toBeGreaterThanOrEqual(4);
+    });
+
+    it('returns a structured result instead of throwing when verification fails after repairs', async () => {
+      const orchestrator = new GameStudioOrchestrator({
+        aiClient: async () => `const gameState = ${'{'.repeat(14)}` // unbalanced braces fail static verification
+      });
+      const result = await orchestrator.buildGame('Build a game', {
+        maxRepairAttempts: 0
+      });
+
+      expect(result.completed).toBe(false);
+      expect(result.verificationRecord.exitCode).not.toBe(0);
+      expect(result.trace).toBeDefined();
+    });
+
     it('generates game reference background images using generateImageWithFlux1', async () => {
       const imageUrl = await generateImageWithFlux1('dungeon entrance background');
       expect(imageUrl).toBeDefined();

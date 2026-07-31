@@ -6,7 +6,7 @@
 import { defaultAgentRegistry, STUDIO_ROLES } from './agentRegistry.js';
 import { classifyGameComplexity, provisionStudioTeam } from './gameSizer.js';
 import { createTaskBrief } from './taskBriefGenerator.js';
-import { TaskDependencyGraph } from '../../orchestration/taskGraph.js';
+import { TaskDependencyGraph, AGENT_LIFECYCLE_STATES } from '../../orchestration/taskGraph.js';
 import { WorkflowState, WORKFLOW_STAGES } from '../../orchestration/workflowState.js';
 
 export async function generateImageWithFlux1(prompt, options = {}) {
@@ -69,12 +69,12 @@ export class GameStudioOrchestrator {
     // 3. Task Graph Construction
     workflow.startStage(WORKFLOW_STAGES.PLANNING, { gameSpec }, { agent: STUDIO_ROLES.LEAD_PROGRAMMER });
     const taskGraph = this.buildTaskGraph(userPrompt, gameSpec, activeRoles);
-    const tasks = taskGraph.getReadyTasks();
-    workflow.completeStage(WORKFLOW_STAGES.PLANNING, { taskCount: tasks.length, tasks });
+    const initialTasks = taskGraph.getReadyTasks();
+    workflow.completeStage(WORKFLOW_STAGES.PLANNING, { taskCount: taskGraph.tasks.size, tasks: initialTasks });
 
-    // 4. Specialist Implementation Pass (Fresh task briefs)
-    workflow.startStage(WORKFLOW_STAGES.IMPLEMENTING, { taskCount: tasks.length }, { agent: STUDIO_ROLES.LEAD_PROGRAMMER });
-    const implementationOutputs = await this.runImplementationPass(userPrompt, tasks, options);
+    // 4. Specialist Implementation Pass (fresh task briefs, full DAG execution)
+    workflow.startStage(WORKFLOW_STAGES.IMPLEMENTING, { taskCount: taskGraph.tasks.size }, { agent: STUDIO_ROLES.LEAD_PROGRAMMER });
+    const implementationOutputs = await this.runImplementationPass(userPrompt, taskGraph, options);
     workflow.completeStage(WORKFLOW_STAGES.IMPLEMENTING, implementationOutputs);
 
     // 5. Visual Inspection & Review
@@ -129,7 +129,13 @@ export class GameStudioOrchestrator {
       workflow.addVerificationRecord(verificationRecord);
     }
 
-    workflow.transitionToComplete();
+    let completed = true;
+    try {
+      workflow.transitionToComplete();
+    } catch (gateError) {
+      completed = false;
+      workflow.addReviewFinding({ severity: 'critical', category: 'verification', message: gateError.message });
+    }
 
     return {
       complexity,
@@ -141,6 +147,7 @@ export class GameStudioOrchestrator {
       codeReviewResult,
       verificationRecord,
       repairAttempts,
+      completed,
       workflow,
       trace: workflow.getTrace()
     };
@@ -233,24 +240,46 @@ export class GameStudioOrchestrator {
     return graph;
   }
 
-  async runImplementationPass(userPrompt, tasks, _options) {
+  async runImplementationPass(userPrompt, graph, _options) {
     const outputs = {};
-    for (const task of tasks) {
-      const brief = createTaskBrief({
-        task: task.objective,
-        role: task.role,
-        goal: task.objective,
-        relevantFiles: task.ownedResources,
-        allowedFiles: task.ownedResources
-      });
 
-      if (this.aiClient) {
-        const agent = this.agentRegistry.getAgent(task.role);
-        outputs[task.taskId] = await this.aiClient(`Execute task brief:\n${JSON.stringify(brief, null, 2)}`, agent);
-      } else {
-        outputs[task.taskId] = `Executed subagent task [${task.role}]: ${task.objective}`;
+    // Execute the full task DAG: every ready task is implemented, committed, and
+    // its dependent tasks are released until the graph is complete.
+    while (!graph.isSwarmComplete()) {
+      const readyTasks = graph.getReadyTasks();
+      if (readyTasks.length === 0) {
+        const anyRunningOrQueued = Array.from(graph.tasks.values()).some(
+          t => t.status === AGENT_LIFECYCLE_STATES.RUNNING || t.status === AGENT_LIFECYCLE_STATES.QUEUED
+        );
+        if (!anyRunningOrQueued) break;
+        await new Promise(r => setTimeout(r, 25));
+        continue;
+      }
+
+      for (const task of readyTasks) {
+        const brief = createTaskBrief({
+          task: task.objective,
+          role: task.role,
+          goal: task.objective,
+          relevantFiles: task.ownedResources,
+          allowedFiles: task.ownedResources
+        });
+
+        let content;
+        if (this.aiClient) {
+          const agent = this.agentRegistry.getAgent(task.role);
+          content = await this.aiClient(`Execute task brief:\n${JSON.stringify(brief, null, 2)}`, agent);
+        } else {
+          content = `Executed subagent task [${task.role}]: ${task.objective}`;
+        }
+
+        task.status = AGENT_LIFECYCLE_STATES.VALIDATING;
+        graph.projectState.commitTaskOutput(task.agentId, task.taskId, content);
+        task.status = AGENT_LIFECYCLE_STATES.COMPLETED;
+        outputs[task.taskId] = content;
       }
     }
+
     return outputs;
   }
 
@@ -311,10 +340,10 @@ export class GameStudioOrchestrator {
     }
 
     const failed = syntaxErrors.length;
-    const passed = Math.max(1, Object.keys(outputs || {}).length - failed);
+    const passed = Math.max(0, Object.keys(outputs || {}).length - failed);
 
     return {
-      command: options.verifyCommand || 'npm test',
+      command: options.verifyCommand || 'static code inspection (brace balance)',
       exitCode: failed > 0 ? 1 : 0,
       passed,
       failed,

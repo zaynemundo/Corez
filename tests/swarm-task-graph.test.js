@@ -101,4 +101,39 @@ describe('Unlimited Dynamic Swarm: Task Graph & State Engine', () => {
     ready = graph.getReadyTasks();
     expect(ready.map(t => t.taskId)).toContain('bg-asset');
   });
+
+  it('releases decomposed subtasks immediately instead of deadlocking on the DECOMPOSED parent', () => {
+    const graph = new TaskDependencyGraph('proj_decomp_ready');
+    graph.addTask({ role: 'world-designer', taskId: 'task-world', objective: 'Design entire world' });
+    graph.addTask({ role: 'tester', taskId: 'task-test', objective: 'Test the world', dependencies: ['task-world'] });
+
+    const decomposition = {
+      status: 'requires_decomposition',
+      reason: 'Split into levels',
+      suggestedTasks: [
+        { taskId: 'task-level-1', role: 'level-designer', objective: 'Level 1' },
+        { taskId: 'task-level-2', role: 'level-designer', objective: 'Level 2' }
+      ]
+    };
+
+    graph.handleDecomposition('task-world', decomposition);
+
+    // Subtasks inherit the parent's (empty) dependencies instead of depending on the DECOMPOSED parent
+    const level1 = graph.tasks.get('task-level-1');
+    const level2 = graph.tasks.get('task-level-2');
+    expect(level1.dependencies).toEqual([]);
+    expect(level2.dependencies).toEqual([]);
+
+    const ready = graph.getReadyTasks();
+    expect(ready.map(t => t.taskId)).toEqual(expect.arrayContaining(['task-level-1', 'task-level-2', 'task-test']));
+
+    // A DECOMPOSED essential parent counts as satisfied for completion
+    graph.addTask({ role: 'essential', taskId: 'task-essential', objective: 'Essential work', isEssential: true });
+    graph.tasks.get('task-essential').status = AGENT_LIFECYCLE_STATES.DECOMPOSED;
+    graph.tasks.get('task-world').status = AGENT_LIFECYCLE_STATES.DECOMPOSED;
+    graph.tasks.get('task-level-1').status = AGENT_LIFECYCLE_STATES.COMPLETED;
+    graph.tasks.get('task-level-2').status = AGENT_LIFECYCLE_STATES.COMPLETED;
+    graph.tasks.get('task-test').status = AGENT_LIFECYCLE_STATES.COMPLETED;
+    expect(graph.isSwarmComplete()).toBe(true);
+  });
 });

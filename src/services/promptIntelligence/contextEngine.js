@@ -24,8 +24,12 @@ export class ContextEngine {
     this.cache = new Map();
   }
 
-  async gather(prompt, intent) {
+  async gather(prompt, intent, options = {}) {
     const summary = createContextSummary();
+    const signal = options.signal || null;
+    const ensureAbortable = () => {
+      if (signal?.aborted) throw new Error('AbortError');
+    };
 
     try {
       const pkg = await this.readJSON('package.json');
@@ -36,7 +40,8 @@ export class ContextEngine {
         summary.styling = detectStyling(pkg);
         summary.instructions = [];
       }
-    } catch {
+    } catch (err) {
+      if (err?.message === 'AbortError') throw err;
       // graceful degradation
     }
 
@@ -52,8 +57,10 @@ export class ContextEngine {
     // If an intent needs specific file discovery, try that
     if (intent && intent.type) {
       try {
+        ensureAbortable();
         summary.relevantFiles = await this.findRelevantFiles(prompt, intent);
-      } catch {
+      } catch (err) {
+        if (err?.message === 'AbortError') throw err;
         summary.relevantFiles = [];
       }
 
@@ -105,10 +112,6 @@ export class ContextEngine {
   async findRelevantFiles(prompt, intent) {
     const lower = prompt.toLowerCase();
     const files = [];
-    const config = await this.readJSON('package.json');
-
-    // Detect common file patterns to look for
-    const _dirs = config && config.workspaces ? [...(Array.isArray(config.workspaces) ? config.workspaces : []), 'src'] : ['src'];
 
     if (intent.type === 'feature_implementation' || intent.type === 'simple_edit' || intent.type === 'bug_fix') {
       if (/\b(component|react|jsx|tsx|button|modal|form|input)\b/i.test(lower)) {

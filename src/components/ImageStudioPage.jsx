@@ -358,6 +358,7 @@ export default function ImageStudioPage() {
               onChange={(e) => setPromptInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Imagine with Corez..."
+              aria-label="Describe the image to generate"
               rows={1}
               disabled={generating}
             />
@@ -381,7 +382,7 @@ export default function ImageStudioPage() {
         <div className="image-lightbox-modal" onClick={() => setPreviewImage(null)}>
           <div className="lightbox-content" onClick={e => e.stopPropagation()}>
             <img src={previewImage} alt="Preview Image" className="lightbox-img" />
-            <button className="icon-btn close-lightbox" onClick={() => setPreviewImage(null)}>
+            <button className="icon-btn close-lightbox" onClick={() => setPreviewImage(null)} aria-label="Close preview">
               <X size={16} strokeWidth={1.5} />
             </button>
           </div>
