@@ -166,7 +166,8 @@ async function run() {
   assert.equal(successResponse.status, 200);
   assert.deepEqual(await json(successResponse), {
     content: 'Worker response',
-    model: MODEL
+    model: MODEL,
+    contextWindowTokens: 256_000
   });
   assert.equal(invocation.model, MODEL);
   assert.deepEqual(Object.keys(invocation.input), ['messages']);
@@ -510,7 +511,8 @@ async function run() {
   assert.equal(nativeShapeResponse.status, 200);
   assert.deepEqual(await json(nativeShapeResponse), {
     content: 'Native Workers AI response',
-    model: '@cf/moonshotai/kimi-k2.7-code'
+    model: '@cf/moonshotai/kimi-k2.7-code',
+    contextWindowTokens: 256_000
   });
 
   // A nested envelope ({ result: { response: ... } }) is normalized too.
@@ -545,10 +547,10 @@ async function run() {
     '198.51.100.103'
   );
   assert.equal(emptyPrimaryResponse.status, 200);
-  assert.deepEqual(await json(emptyPrimaryResponse), {
-    content: 'Recovered via secondary Workers AI model',
-    model: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b'
-  });
+  const emptyPrimaryData = await json(emptyPrimaryResponse);
+  assert.equal(emptyPrimaryData.content, 'Recovered via secondary Workers AI model');
+  assert.equal(emptyPrimaryData.model, '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b');
+  assert.equal(emptyPrimaryData.contextWindowTokens, undefined);
 
   // Test /api/image FLUX endpoint
   const imageMethodResponse = await worker.fetch(

@@ -19,6 +19,29 @@ const CONTINUATION_NUDGE = {
   content: 'Your previous reply contained only internal reasoning and no final answer. Now respond with the actual complete final answer to the user\'s request (the code, explanation, or text itself). Do not include thinking, reasoning, or <think> blocks.'
 };
 
+// Reported so the client can compact conversation history to the active
+// model's real context window (256k / 100k tiers) instead of a fixed cap.
+const MODEL_CONTEXT_WINDOWS = Object.freeze({
+  'deepseek-v4-flash': 256_000,
+  'deepseek-v4-pro': 256_000,
+  'kimi-k3': 256_000,
+  '@cf/moonshotai/kimi-k2.7-code': 256_000,
+  '@cf/meta/llama-3.3-70b-instruct-fp8-fast': 100_000
+});
+
+export function contextWindowForModel(model) {
+  if (typeof model !== 'string') return undefined;
+  const entry = Object.entries(MODEL_CONTEXT_WINDOWS).find(([key]) => model.includes(key));
+  return entry ? entry[1] : undefined;
+}
+
+function aiJsonResponse(content, model) {
+  const payload = { content, model };
+  const windowTokens = contextWindowForModel(model);
+  if (windowTokens) payload.contextWindowTokens = windowTokens;
+  return jsonResponse(200, payload);
+}
+
 function getTargetModels() {
   return [DEEPSEEK_V4_FLASH_MODEL];
 }
@@ -260,10 +283,7 @@ async function handleAi(request, env) {
   // instantly without paying an LLM round-trip.
   const GREETING_PATTERN = /^(hi|hello|hey|yo|sup|howdy|greetings|good\s+(morning|afternoon|evening|day)|who\s+(are|r)\s+you|what\s+(are|r)\s+you|whats?\s+(is\s+)?your\s+name)\b[.?!]*$/i;
   if (prompt.length <= 60 && GREETING_PATTERN.test(prompt)) {
-    return jsonResponse(200, {
-      content: "Hello! I'm COREZ AI. How can I help you today?",
-      model: 'corez-greeting'
-    });
+    return aiJsonResponse("Hello! I'm COREZ AI. How can I help you today?", 'corez-greeting');
   }
 
   const intent = body.intent && typeof body.intent === 'object' && !Array.isArray(body.intent) ? body.intent : null;
@@ -341,7 +361,7 @@ async function handleAi(request, env) {
         result = await callOpenCodeGo(modelId, [...apiMessages, CONTINUATION_NUDGE]);
       }
       if (result && result.content) {
-        return jsonResponse(200, { content: result.content, model: `opencode:${modelId}` });
+        return aiJsonResponse(result.content, `opencode:${modelId}`);
       }
     }
   }
@@ -370,7 +390,7 @@ async function handleAi(request, env) {
         const data = await deepSeekResp.json();
         const content = answerText(data?.choices?.[0]?.message);
         if (content) {
-          return jsonResponse(200, { content, model: `deepseek:${deepSeekModel}` });
+          return aiJsonResponse(content, `deepseek:${deepSeekModel}`);
         }
       } else {
         const errText = await deepSeekResp.text().catch(() => '');
@@ -410,7 +430,7 @@ async function handleAi(request, env) {
           const data = await openRouterResp.json();
           const content = answerText(data?.choices?.[0]?.message);
           if (content) {
-            return jsonResponse(200, { content, model: modelId });
+            return aiJsonResponse(content, modelId);
           }
         }
       } catch (orErr) {
@@ -434,7 +454,7 @@ async function handleAi(request, env) {
       });
       const content = extractWorkersAiText(result);
       if (content) {
-        return jsonResponse(200, { content, model: modelId });
+        return aiJsonResponse(content, modelId);
       }
       console.warn(`Workers AI model ${modelId} returned an empty response.`);
     } catch (modelError) {

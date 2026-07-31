@@ -119,6 +119,48 @@ describe('Hosted AI fallback behavior', () => {
     expect(JSON.stringify(single).length).toBeLessThan(60 * 1024);
   });
 
+  it('keeps richer history for a 256k context window model', async () => {
+    const history = Array.from({ length: 30 }, (_, i) => ({
+      role: i % 2 === 0 ? 'user' : 'assistant',
+      content: `message ${i} `.repeat(200)
+    }));
+
+    const trimmed = trimConversationForRequest(history, { contextWindowTokens: 256_000 });
+
+    expect(trimmed.length).toBeGreaterThan(6);
+    expect(trimmed.length).toBeLessThanOrEqual(24);
+    expect(trimmed[trimmed.length - 1]).toEqual(history[history.length - 1]);
+    expect(trimmed[0]).toEqual(history[history.length - trimmed.length]);
+    expect(JSON.stringify(trimmed).length).toBeLessThan(192 * 1024);
+  });
+
+  it('keeps a middle history budget for a 100k context window model', async () => {
+    const history = Array.from({ length: 20 }, (_, i) => ({
+      role: i % 2 === 0 ? 'user' : 'assistant',
+      content: `message ${i} `.repeat(400)
+    }));
+
+    const trimmed = trimConversationForRequest(history, { contextWindowTokens: 100_000 });
+
+    expect(trimmed.length).toBeGreaterThan(6);
+    expect(trimmed.length).toBeLessThanOrEqual(12);
+    expect(trimmed[trimmed.length - 1]).toEqual(history[history.length - 1]);
+    expect(JSON.stringify(trimmed).length).toBeLessThan(96 * 1024);
+  });
+
+  it('applies the compact budget to unknown or missing context windows', async () => {
+    const history = Array.from({ length: 20 }, (_, i) => ({
+      role: i % 2 === 0 ? 'user' : 'assistant',
+      content: `message ${i} `.repeat(400)
+    }));
+
+    const trimmedUnknown = trimConversationForRequest(history, { contextWindowTokens: 32_000 });
+    const trimmedMissing = trimConversationForRequest(history);
+
+    expect(trimmedUnknown.length).toBeLessThanOrEqual(6);
+    expect(trimmedMissing).toEqual(trimmedUnknown);
+  });
+
   it('salvages code from a truncated response with an unterminated code fence', () => {
     const truncated = 'Here is your 3D game:\n\n```html\n<!DOCTYPE html>\n<html>\n<body>\n<canvas id="game"></canvas>\n<script>\nconst scene = new THREE.Scene();\nscene.add(new THREE.BoxGeometry());';
 

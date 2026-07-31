@@ -557,25 +557,40 @@ const MAX_HISTORY_MESSAGES = 6;
 const MAX_HISTORY_MESSAGE_CHARS = 3000;
 const MAX_TRIMMED_BYTES = 60 * 1024;
 
+// Context-window-aware tiers: models with large windows (256k / 100k, reported
+// by the worker as contextWindowTokens) keep more conversation history; the
+// tight compact mode remains the default for unknown or small windows.
+const CONTEXT_TIERS = [
+  { minTokens: 200_000, maxMessages: 24, maxChars: 12_000, maxBytes: 192 * 1024 },
+  { minTokens: 80_000, maxMessages: 12, maxChars: 6_000, maxBytes: 96 * 1024 },
+  { minTokens: 0, maxMessages: MAX_HISTORY_MESSAGES, maxChars: MAX_HISTORY_MESSAGE_CHARS, maxBytes: MAX_TRIMMED_BYTES }
+];
+
 /**
  * Trim conversation history before sending it to the hosted AI so long
  * code-heavy chats stay under the worker's 256 KB request-body limit.
  * Keeps the most recent messages, truncates oversized entries, and caps the
- * total serialized size — without ever dropping the latest user turn.
+ * total serialized size — without ever dropping the latest user turn. The
+ * caps scale to the active model's context window when it is known
+ * (options.contextWindowTokens), so 256k/100k models receive richer history.
  */
-export function trimConversationForRequest(messages) {
+export function trimConversationForRequest(messages, options = {}) {
   if (!Array.isArray(messages) || messages.length === 0) return messages;
-  const trimmed = messages.slice(-MAX_HISTORY_MESSAGES).map(m => {
+  const tokens = Number.isFinite(options?.contextWindowTokens) ? options.contextWindowTokens : 0;
+  const tier = CONTEXT_TIERS.find(t => tokens >= t.minTokens) || CONTEXT_TIERS[CONTEXT_TIERS.length - 1];
+  const { maxMessages, maxChars, maxBytes } = tier;
+
+  const trimmed = messages.slice(-maxMessages).map(m => {
     if (typeof m?.content !== 'string') {
       // Bound non-string payloads (e.g. market cards) that could blow the cap
       const serialized = JSON.stringify(m);
-      if (serialized && serialized.length > MAX_HISTORY_MESSAGE_CHARS) {
+      if (serialized && serialized.length > maxChars) {
         return { ...m, content: `[truncated payload (${serialized.length} chars)]` };
       }
       return m;
     }
-    const content = m.content.length > MAX_HISTORY_MESSAGE_CHARS
-      ? `${m.content.slice(0, MAX_HISTORY_MESSAGE_CHARS)}\n[truncated]`
+    const content = m.content.length > maxChars
+      ? `${m.content.slice(0, maxChars)}\n[truncated]`
       : m.content;
     return { ...m, content };
   });
@@ -583,15 +598,15 @@ export function trimConversationForRequest(messages) {
   // Estimate size cheaply, then drop oldest messages until it fits.
   const entrySize = m => (typeof m?.content === 'string' ? m.content.length : JSON.stringify(m).length) + 64;
   let estimated = trimmed.reduce((sum, m) => sum + entrySize(m), 0);
-  while (trimmed.length > 1 && estimated > MAX_TRIMMED_BYTES) {
+  while (trimmed.length > 1 && estimated > maxBytes) {
     estimated -= entrySize(trimmed.shift());
   }
 
   // Verify exactly once; hard-cap the last entry if the estimate was off.
   const serialized = JSON.stringify(trimmed);
-  if (serialized.length > MAX_TRIMMED_BYTES) {
+  if (serialized.length > maxBytes) {
     const last = trimmed[trimmed.length - 1];
-    const budget = Math.max(512, MAX_TRIMMED_BYTES - 256);
+    const budget = Math.max(512, maxBytes - 256);
     const content = String(last?.content || '');
     trimmed[trimmed.length - 1] = {
       ...last,
@@ -600,6 +615,10 @@ export function trimConversationForRequest(messages) {
   }
   return trimmed;
 }
+
+// The worker reports the active model's context window (contextWindowTokens)
+// with each reply; history compaction scales to it. Unknown -> compact mode.
+let activeContextWindowTokens = null;
 
 export async function generateHostedAIResponse(
   prompt,
@@ -635,7 +654,7 @@ export async function generateHostedAIResponse(
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ prompt, intent, messages: trimConversationForRequest(history), fineIntent, executionPrompt, legacyIntent: legacyIntentType, contract, skills: resolved.skills, executionPlan: resolved.compactExecutionPlan || null, complexity }),
+    body: JSON.stringify({ prompt, intent, messages: trimConversationForRequest(history, { contextWindowTokens: activeContextWindowTokens }), fineIntent, executionPrompt, legacyIntent: legacyIntentType, contract, skills: resolved.skills, executionPlan: resolved.compactExecutionPlan || null, complexity }),
   };
   if (signal) fetchOptions.signal = signal;
 
@@ -654,6 +673,10 @@ export async function generateHostedAIResponse(
   if (!response.ok) {
     const serverMsg = typeof data?.error === 'string' ? data.error : (data?.error?.message || data?.message || `HTTP ${response.status}`);
     throw new Error(`Hosted AI request failed: ${serverMsg}`);
+  }
+
+  if (Number.isFinite(data?.contextWindowTokens) && data.contextWindowTokens > 0) {
+    activeContextWindowTokens = data.contextWindowTokens;
   }
 
   const rawContent = typeof data?.content === 'string' ? data.content.trim() : null;
@@ -2402,7 +2425,7 @@ export async function handleMixedQuestionImageRequest(prompt, intent, history, s
   // image in parallel from the extracted subject.
   const questionPrompt = extractQuestionPrompt(prompt) || prompt;
   const questionHistory = Array.isArray(history) && history.length > 0
-    ? [...trimConversationForRequest(history).slice(0, -1), { role: 'user', content: questionPrompt }]
+    ? [...trimConversationForRequest(history, { contextWindowTokens: activeContextWindowTokens }).slice(0, -1), { role: 'user', content: questionPrompt }]
     : [];
 
   const [hostedResult, imageResult] = await Promise.allSettled([

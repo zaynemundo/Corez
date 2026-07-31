@@ -24,6 +24,8 @@ If configured API keys are unavailable, missing, or return no usable response, C
 
 Each model is tried until one returns usable text: a thrown error, an empty result, or a response in a different envelope shape on one model falls through to the next instead of failing the request.
 
+The worker reports the active model's context window (`contextWindowTokens`) with each reply, and the client compacts conversation history to match: 256k-window models keep up to 24 recent messages (~192 KB), 100k-window models keep up to 12 (~96 KB), and unknown/small windows keep the tight 6-message compact mode (~60 KB) — all well under the 256 KB worker body limit.
+
 ### Image generation
 
 `/api/image` uses the Workers AI binding with `@cf/black-forest-labs/flux-1-schnell`.
