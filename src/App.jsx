@@ -189,11 +189,6 @@ export default function App() {
   const [canvasOpen, setCanvasOpen] = useState(false);
   const [canvasFullScreen, setCanvasFullScreen] = useState(false);
   const [activeCanvasCode, setActiveCanvasCode] = useState('');
-  // Canvas app lineage: a revision keeps the lineage (same published link);
-  // a genuinely new app bumps it (fresh published link).
-  const canvasLineageRef = useRef(0);
-  const pendingRevisionRef = useRef(false);
-  const [activeCanvasLineage, setActiveCanvasLineage] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [refreshingMarketKeys, setRefreshingMarketKeys] = useState(() => new Set());
@@ -339,8 +334,6 @@ export default function App() {
       if (lastAssistantMsg) {
         const code = extractCodeFromMessage(lastAssistantMsg.content);
         if (code) {
-          canvasLineageRef.current += 1;
-          setActiveCanvasLineage(canvasLineageRef.current);
           setActiveCanvasCode(code);
           setCanvasOpen(true);
         }
@@ -354,8 +347,6 @@ export default function App() {
       if (lastAssistantMsg) {
         const code = extractCodeFromMessage(lastAssistantMsg.content);
         if (code && !activeCanvasCode) {
-          canvasLineageRef.current += 1;
-          setActiveCanvasLineage(canvasLineageRef.current);
           setActiveCanvasCode(code);
           setCanvasOpen(true);
         }
@@ -377,8 +368,6 @@ export default function App() {
     setCanvasFullScreen(false);
     setRevisionContextCode('');
     setActiveCanvasCode(null);
-    canvasLineageRef.current = 0;
-    setActiveCanvasLineage(0);
   };
 
   const handleDeleteSession = (id) => {
@@ -400,14 +389,10 @@ export default function App() {
     setSessions(INITIAL_SESSIONS);
     setActiveSessionId(INITIAL_SESSIONS[0].id);
     setActiveCanvasCode('');
-    canvasLineageRef.current = 0;
-    setActiveCanvasLineage(0);
     setSettingsOpen(false);
   };
 
   const handleRunInCanvas = (code) => {
-    canvasLineageRef.current += 1;
-    setActiveCanvasLineage(canvasLineageRef.current);
     setActiveCanvasCode(code);
     setCanvasOpen(true);
     if (activeSessionId && code) {
@@ -445,7 +430,6 @@ export default function App() {
 
     if (revisionContextCode) {
       apiPrompt = `[Context: The user is requesting a revision for the following code block]\n\`\`\`\n${revisionContextCode}\n\`\`\`\n\nUser Request: ${promptText}`;
-      pendingRevisionRef.current = true;
       setRevisionContextCode('');
     }
 
@@ -486,8 +470,6 @@ export default function App() {
         if (aiMsg.type !== 'market') {
           const extractedCode = extractCodeFromMessage(aiMsg.content);
           if (extractedCode) {
-            if (!pendingRevisionRef.current) canvasLineageRef.current += 1;
-            setActiveCanvasLineage(canvasLineageRef.current);
             setActiveCanvasCode(extractedCode);
             setCanvasOpen(true);
           }
@@ -505,7 +487,6 @@ export default function App() {
         console.error('AI generation error:', err);
       }
     } finally {
-      pendingRevisionRef.current = false;
       localStorage.removeItem('corez_pending_request');
       setIsThinking(false);
       abortControllerRef.current = null;
@@ -621,7 +602,6 @@ export default function App() {
             {canvasOpen && (
               <CanvasPreview
                 code={activeCanvasCode}
-                lineage={activeCanvasLineage}
                 title={activeSession?.title || 'Untitled Application'}
                 onClose={() => setCanvasOpen(false)}
                 isFullScreen={canvasFullScreen}

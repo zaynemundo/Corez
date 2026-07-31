@@ -138,20 +138,6 @@ describe('R2 Multi-App Storage & Chat Deletion Cleanup Contract', () => {
       expect(sentBody).not.toContain('history');
     });
 
-    it('reuses an existing slug so revisions update the same share link', async () => {
-      const fetchMock = vi.fn(async () => new Response(
-        JSON.stringify({ success: true, slug: 'asyag23-123', url: '/asyag23-123' }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      ));
-      vi.stubGlobal('fetch', fetchMock);
-
-      const result = await publishAppInR2({ html: '<h1>v2</h1>', title: 'FPS Game', slug: 'asyag23-123' });
-
-      expect(result.slug).toBe('asyag23-123');
-      expect(JSON.parse(fetchMock.mock.calls[0][1].body).slug).toBe('asyag23-123');
-      expect(JSON.parse(fetchMock.mock.calls[0][1].body).html).toBe('<h1>v2</h1>');
-    });
-
     it('returns null when content is missing or the publish request fails', async () => {
       const fetchMock = vi.fn(async () => new Response(JSON.stringify({ error: 'down' }), { status: 400 }));
       vi.stubGlobal('fetch', fetchMock);
