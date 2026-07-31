@@ -20,6 +20,9 @@ If configured API keys are unavailable, missing, or return no usable response, C
 
 1. `@cf/moonshotai/kimi-k2.7-code`
 2. `@cf/deepseek-ai/deepseek-r1-distill-qwen-32b`
+3. `@cf/meta/llama-3.3-70b-instruct-fp8-fast`
+
+Each model is tried until one returns usable text: a thrown error, an empty result, or a response in a different envelope shape on one model falls through to the next instead of failing the request.
 
 ### Image generation
 

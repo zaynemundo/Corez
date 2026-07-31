@@ -31,6 +31,7 @@ check 'Worker routes text through GLM 5.2, DeepSeek V4 Pro, or DeepSeek V4 Flash
 check_absent 'Worker no longer routes through MiMo V2.5' 'xiaomi/mimo-v2[.]5' "$worker"
 check 'Worker uses Kimi 2.7 Code as the primary Workers AI fallback' '@cf/moonshotai/kimi-k2[.]7-code' "$worker"
 check 'Worker uses DeepSeek R1 Distill as the secondary Workers AI fallback' '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b' "$worker"
+check 'Worker uses Llama 3.3 70B Fast as the final Workers AI fallback' '@cf/meta/llama-3[.]3-70b-instruct-fp8-fast' "$worker"
 check 'Worker uses FLUX Schnell as the image model' '@cf/black-forest-labs/flux-1-schnell' "$worker"
 check_absent 'Worker no longer uses FLUX dev' '@cf/black-forest-labs/flux-1-dev' "$worker"
 check 'Worker invokes the native AI binding' 'env[.]AI[.]run' "$worker"

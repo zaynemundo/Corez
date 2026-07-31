@@ -9,6 +9,8 @@ const DEEPSEEK_V4_FLASH_MODEL = 'deepseek-v4-flash';
 const FLUX_MODEL = '@cf/black-forest-labs/flux-1-schnell';
 const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
 const DEEPSEEK_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
+const WORKERS_AI_FALLBACK_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+const WORKERS_AI_MODELS = [WORKERS_AI_MODEL, DEEPSEEK_MODEL, WORKERS_AI_FALLBACK_MODEL];
 const EMBEDDING_MODEL = '@cf/baai/bge-small-en-v1.5';
 const RERANK_MODEL = '@cf/baai/bge-reranker-base';
 
@@ -160,6 +162,51 @@ function messageText(message) {
   if (content.trim()) return content;
   const reasoning = extractContentText(message.reasoning_content);
   if (reasoning.trim()) return reasoning;
+  return '';
+}
+
+// Workers AI models do not share a single response envelope: OpenAI-compatible
+// models return { choices: [...] } while native models return { response: ... }
+// and a few wrap the text again under result/output/messages. Normalize every
+// known shape so a format mismatch is never mistaken for an empty answer.
+function extractWorkersAiText(result) {
+  if (typeof result === 'string') return result.trim();
+  if (!result || typeof result !== 'object') return '';
+
+  if (Array.isArray(result)) {
+    return result
+      .map(item => extractWorkersAiText(item))
+      .filter(Boolean)
+      .join('')
+      .trim();
+  }
+
+  if (Array.isArray(result.choices)) {
+    for (const choice of result.choices) {
+      if (!choice || typeof choice !== 'object') continue;
+      const message = messageText(choice.message);
+      if (message) return message.trim();
+      if (typeof choice.text === 'string' && choice.text.trim()) return choice.text.trim();
+    }
+  }
+
+  if (Array.isArray(result.messages)) {
+    const joined = result.messages
+      .map(message => messageText(message))
+      .filter(Boolean)
+      .join('');
+    if (joined.trim()) return joined.trim();
+  }
+
+  for (const key of ['response', 'output', 'text', 'content', 'result']) {
+    const value = result[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (value && typeof value === 'object') {
+      const nested = extractWorkersAiText(value);
+      if (nested) return nested;
+    }
+  }
+
   return '';
 }
 
@@ -339,53 +386,37 @@ async function handleAi(request, env) {
     }
   }
 
-  // 4. Cloudflare Workers AI Fallback
+  // 4. Cloudflare Workers AI Fallback (multi-model: try each catalog model
+  // until one returns usable text; a shape mismatch, empty result, or thrown
+  // error on one model must never dead-end the request).
   if (!env.AI || typeof env.AI.run !== 'function') {
     return jsonResponse(503, { error: 'Workers AI is not configured.' });
   }
 
-  try {
-    let result;
-    let usedModel = WORKERS_AI_MODEL;
-
+  let lastWorkersAiError = null;
+  for (const modelId of WORKERS_AI_MODELS) {
     try {
-      result = await env.AI.run(WORKERS_AI_MODEL, {
+      const result = await env.AI.run(modelId, {
         messages: apiMessages
       });
-      // An empty primary response is as useless as a thrown error: try the
-      // DeepSeek fallback model before giving up.
-      if (!messageText(result?.choices?.[0]?.message).trim()) {
-        console.warn('Primary Workers AI model returned an empty response, attempting DeepSeek fallback.');
-        usedModel = DEEPSEEK_MODEL;
-        result = await env.AI.run(DEEPSEEK_MODEL, {
-          messages: apiMessages
-        });
+      const content = extractWorkersAiText(result);
+      if (content) {
+        return jsonResponse(200, { content, model: modelId });
       }
-    } catch (primaryError) {
-      console.warn('Primary Workers AI model failed, attempting DeepSeek fallback:', safeErrorDetail(primaryError));
-      usedModel = DEEPSEEK_MODEL;
-      result = await env.AI.run(DEEPSEEK_MODEL, {
-        messages: apiMessages
-      });
+      console.warn(`Workers AI model ${modelId} returned an empty response.`);
+    } catch (modelError) {
+      lastWorkersAiError = modelError;
+      console.warn(`Workers AI model ${modelId} failed:`, safeErrorDetail(modelError));
     }
-
-    const content = messageText(result?.choices?.[0]?.message);
-    const normalizedContent = content.trim();
-    if (!normalizedContent) {
-      return jsonResponse(502, { error: 'Workers AI returned an empty response.' });
-    }
-
-    return jsonResponse(200, {
-      content: normalizedContent,
-      model: usedModel
-    });
-  } catch (error) {
-    console.error(JSON.stringify({
-      message: 'Workers AI generation failed',
-      error: safeErrorDetail(error)
-    }));
-    return jsonResponse(502, { error: 'Unable to generate AI response.' });
   }
+
+  console.error(JSON.stringify({
+    message: 'Workers AI generation failed',
+    error: lastWorkersAiError ? safeErrorDetail(lastWorkersAiError) : 'All Workers AI models returned empty responses.'
+  }));
+  return jsonResponse(502, {
+    error: lastWorkersAiError ? 'Unable to generate AI response.' : 'Workers AI returned an empty response.'
+  });
 }
 
 async function saveToR2IfAvailable(env, key, buffer, mimeType = 'image/png') {

@@ -30,11 +30,13 @@ async function json(response) {
   return response.json();
 }
 
-async function post(body, environment = env()) {
+async function post(body, environment = env(), clientIp = null) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (clientIp) headers['CF-Connecting-IP'] = clientIp;
   return worker.fetch(
     new Request('https://corez.test/api/ai', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body
     }),
     environment
@@ -426,6 +428,62 @@ async function run() {
   assert.equal(emptyResponse.status, 502);
   assert.deepEqual(await json(emptyResponse), {
     error: 'Workers AI returned an empty response.'
+  });
+
+  // Native Workers AI envelope ({ response: ... }) must not be misread as an
+  // empty answer just because there is no OpenAI-style choices array.
+  const nativeShapeResponse = await post(
+    JSON.stringify({ prompt: 'Explain fallback' }),
+    env({
+      AI: {
+        async run() {
+          return { response: 'Native Workers AI response' };
+        }
+      }
+    }),
+    '198.51.100.101'
+  );
+  assert.equal(nativeShapeResponse.status, 200);
+  assert.deepEqual(await json(nativeShapeResponse), {
+    content: 'Native Workers AI response',
+    model: '@cf/moonshotai/kimi-k2.7-code'
+  });
+
+  // A nested envelope ({ result: { response: ... } }) is normalized too.
+  const wrappedShapeResponse = await post(
+    JSON.stringify({ prompt: 'Explain fallback' }),
+    env({
+      AI: {
+        async run() {
+          return { result: { response: 'Wrapped Workers AI response' } };
+        }
+      }
+    }),
+    '198.51.100.102'
+  );
+  assert.equal(wrappedShapeResponse.status, 200);
+  assert.equal((await json(wrappedShapeResponse)).content, 'Wrapped Workers AI response');
+
+  // An empty primary result must not dead-end the request: the next Workers
+  // AI model in the chain is attempted before reporting failure.
+  let workersAiRunCount = 0;
+  const emptyPrimaryResponse = await post(
+    JSON.stringify({ prompt: 'Explain fallback' }),
+    env({
+      AI: {
+        async run(_model) {
+          workersAiRunCount += 1;
+          if (workersAiRunCount === 1) return { choices: [] };
+          return { response: 'Recovered via secondary Workers AI model' };
+        }
+      }
+    }),
+    '198.51.100.103'
+  );
+  assert.equal(emptyPrimaryResponse.status, 200);
+  assert.deepEqual(await json(emptyPrimaryResponse), {
+    content: 'Recovered via secondary Workers AI model',
+    model: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b'
   });
 
   // Test /api/image FLUX endpoint
