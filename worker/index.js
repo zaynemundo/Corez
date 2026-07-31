@@ -179,12 +179,15 @@ function extractContentText(content) {
 
 // Reasoning models can emit their internal thought inline wrapped in
 // <think>/<thinking> blocks. Strip those sections so thinking text is never
-// presented as the answer.
+// presented as the answer. An unclosed block (output truncated mid-thought)
+// is reasoning too: everything from the marker onward is dropped, since any
+// real answer would only ever follow a closed block.
 function stripThinkingBlocks(text) {
   if (typeof text !== 'string') return '';
   return text
     .replace(/<thinking\b[^>]*>[\s\S]*?<\/thinking>/gi, '')
     .replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, '')
+    .replace(/<(?:think|thinking)\b[^>]*>[\s\S]*$/gi, '')
     .trim();
 }
 

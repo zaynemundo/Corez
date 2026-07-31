@@ -324,6 +324,42 @@ async function run() {
       assert.equal(opencodeNudgeData.model, 'opencode:deepseek-v4-flash');
       assert.equal(opencodeGoCalls, 2);
 
+      // A truncated thinking-only reply (unclosed <think> marker, no closing
+      // tag) is reasoning too: it must never surface, and the continuation
+      // nudge applies exactly like an empty reply.
+      let opencodeTruncatedCalls = 0;
+      globalThis.fetch = async (_url, init) => {
+        const payload = JSON.parse(init.body);
+        opencodeTruncatedCalls += 1;
+        if (opencodeTruncatedCalls === 1) {
+          return new Response(JSON.stringify({
+            choices: [{ message: { content: '<think>I will plan the shop layout carefully so the action bar is always visible' } }]
+          }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        assert.match(payload.messages[payload.messages.length - 1].content, /only internal reasoning/i);
+        return new Response(JSON.stringify({
+          choices: [{ message: { content: 'Here is the revised game with the shop and action bar.' } }]
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      };
+      const opencodeTruncatedResp = await post(
+        JSON.stringify({
+          prompt: '[Context: The user is requesting a revision for the following code block]\n```html\n<canvas id="g"></canvas>\n```\n\nUser Request: add a shop',
+          intent: { type: 'app', summary: 'Revise embedded game.' }
+        }),
+        env({ AI: undefined, OPENCODE_GO_API_KEY: 'sk-opencode-test' }),
+        '198.51.100.109'
+      );
+      assert.equal(opencodeTruncatedResp.status, 200);
+      const opencodeTruncatedData = await opencodeTruncatedResp.json();
+      assert.equal(opencodeTruncatedData.content, 'Here is the revised game with the shop and action bar.');
+      assert.equal(opencodeTruncatedCalls, 2);
+
       // OpenCode Go wins when BOTH opencode and DeepSeek keys are configured
       globalThis.fetch = async (url, init) => {
         assert.equal(url, 'https://opencode.ai/zen/go/v1/chat/completions');

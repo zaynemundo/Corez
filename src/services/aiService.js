@@ -658,9 +658,19 @@ export async function generateHostedAIResponse(
     throw new Error(`Hosted AI request failed: ${serverMsg}`);
   }
 
-  const rawContent = typeof data?.content === 'string' ? data.content.trim() : null;
+  // Defense-in-depth: reasoning text must never reach the user. Strip closed
+  // <think>/<thinking> blocks and anything after an unclosed marker (a
+  // truncated thinking-only reply), mirroring the worker's sanitizer.
+  const strippedContent = (typeof data?.content === 'string' ? data.content : '')
+    .replace(/<thinking\b[^>]*>[\s\S]*?<\/thinking>/gi, '')
+    .replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, '')
+    .replace(/<(?:think|thinking)\b[^>]*>[\s\S]*$/gi, '')
+    .trim();
+  const rawContent = strippedContent || null;
 
-  if (!rawContent) return null;
+  if (!rawContent) {
+    throw new Error('Hosted AI returned only reasoning and no answer.');
+  }
 
   // 3. Local Reflection & Bounded Repair Loop
   const initialEval = evaluateResponse(rawContent, contract, fineIntent);

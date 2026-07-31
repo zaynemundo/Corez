@@ -79,6 +79,31 @@ describe('Hosted AI fallback behavior', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/ai', expect.anything());
   });
 
+  it('strips reasoning blocks from hosted replies', async () => {
+    const fetchMock = vi.fn(async () => Response.json({
+      content: '<think>I will plan the shop layout.</think>Here is the revised game.'
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await generateAIResponse(revisionPrompt('add a shop'), []);
+
+    expect(response).toBe('Here is the revised game.');
+    expect(response).not.toContain('<think>');
+  });
+
+  it('rejects a thinking-only hosted reply instead of showing it', async () => {
+    const fetchMock = vi.fn(async () => Response.json({
+      content: '<think>I will plan the shop layout so the action bar is always visible'
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await generateAIResponse(revisionPrompt('add a shop and keep the action bar'), []);
+
+    expect(response).not.toContain('<think>');
+    expect(response).toContain('I can see the code you want to revise');
+    expect(response).toContain('unavailable');
+  });
+
   it('propagates an abort while the response body is downloading instead of fabricating a fallback reply', async () => {
     const abortController = new AbortController();
     const fetchMock = vi.fn(async (_url, _options) => {
