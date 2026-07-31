@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { isExplicitImageRequest, generateAIResponse } from '../src/services/aiService.js';
+import { isExplicitImageRequest, createImageTitle, generateAIResponse } from '../src/services/aiService.js';
 
 describe('FLUX image request routing', () => {
   beforeEach(() => {
@@ -8,6 +8,23 @@ describe('FLUX image request routing', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('derives a proper title caption from image requests', () => {
+    const cases = [
+      ['give me an image of a black rose', 'Black Rose'],
+      ['generate a picture of a black rose', 'Black Rose'],
+      ['show me a photo of a cat', 'Cat'],
+      ['create a logo for my startup', 'My Startup'],
+      ['i want an image of a sunset', 'Sunset'],
+      ['make an image of a castle for my game', 'Castle for My Game'],
+      ['give me an image', 'Generated Image'],
+      ['draw a picture of the eiffel tower', 'Eiffel Tower'],
+      ['render a photo of a red rose in a vase', 'Red Rose in a Vase']
+    ];
+    for (const [prompt, expected] of cases) {
+      expect(createImageTitle(prompt), prompt).toBe(expected);
+    }
   });
 
   it('detects explicit image requests including mid-conversation phrasing', () => {
@@ -46,7 +63,7 @@ describe('FLUX image request routing', () => {
     ];
     const response = await generateAIResponse('give me an image', history);
 
-    expect(response).toContain('![give me an image](data:image/png;base64,FAKE)');
+    expect(response).toContain('![Generated Image](data:image/png;base64,FAKE)');
     expect(fetchMock).toHaveBeenCalledWith('/api/image', expect.anything());
     expect(fetchMock).not.toHaveBeenCalledWith('/api/ai', expect.anything());
   });
@@ -62,7 +79,7 @@ describe('FLUX image request routing', () => {
 
     const response = await generateAIResponse('generate a picture of a black rose', []);
 
-    expect(response).toContain('![generate a picture of a black rose](https://example.com/rose.png)');
+    expect(response).toContain('![Black Rose](https://example.com/rose.png)');
     expect(fetchMock).toHaveBeenCalledWith('/api/image', expect.anything());
   });
 
@@ -94,7 +111,7 @@ describe('FLUX image request routing', () => {
 
     const response = await generateAIResponse('tell me a story', []);
 
-    expect(response).toContain('![a sunset over the ocean](https://example.com/sunset.png)');
+    expect(response).toContain('![Sunset Over the Ocean](https://example.com/sunset.png)');
     expect(response).not.toContain('[IMAGE_PROMPT:');
     expect(fetchMock).toHaveBeenCalledWith('/api/image', expect.anything());
   });

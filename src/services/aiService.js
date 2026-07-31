@@ -2227,6 +2227,40 @@ export async function generateLocalAIResponse(prompt) {
 
 const IMAGE_PATTERNS = /\b(generate|create|draw|make|render|show|give me|give us|want|need|produce)\b.*\b(image|picture|photo|logo|illustration|artwork|wallpaper|drawing|graphic|icon)\b|\b(image|picture|photo|logo|illustration|artwork|wallpaper|drawing|graphic|icon)\b.*\b(generate|create|draw|make|render|flux)\b/i;
 
+const IMAGE_TITLE_SMALL_WORDS = new Set(['a', 'an', 'the', 'and', 'or', 'but', 'for', 'with', 'of', 'in', 'on', 'at', 'to', 'from', 'by', 'as', 'via', 'vs']);
+
+export function createImageTitle(prompt) {
+  const clean = String(prompt || '').trim();
+  if (!clean) return '';
+
+  let subject = clean
+    .toLowerCase()
+    // Strip courtesy / request framing
+    .replace(/^(please\s+)?(can you|could you|would you|will you)\s+/i, '')
+    .replace(/^(give me|give us|show me|generate|create|draw|make|render|produce|i want|i need|need|want)\s+(me\s+)?/i, '')
+    // Strip the deliverable noun + connector ("an image of", "a logo for", ...)
+    .replace(/^(an?\s+)?(image|picture|photo|illustration|artwork|wallpaper|drawing|graphic|logo)\s+(of|for|showing|featuring|with|that|about)\s+/i, '')
+    .replace(/^(an?\s+)?(image|picture|photo|illustration|artwork|wallpaper|drawing|graphic|logo)\s*$/i, '')
+    // Strip trailing courtesy phrases and leading articles
+    .replace(/\s+(for me|please|now)\s*$/i, '')
+    .replace(/^(a|an|the)\s+/i, '')
+    .replace(/[\]()[]/g, '')
+    .trim();
+
+  if (!subject) return 'Generated Image';
+
+  const words = subject.split(/\s+/).filter(Boolean);
+  const titled = words.map((word, index) => {
+    if (index === 0 || index === words.length - 1) {
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    }
+    if (IMAGE_TITLE_SMALL_WORDS.has(word)) return word;
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  }).join(' ');
+
+  return titled;
+}
+
 export function isExplicitImageRequest(prompt) {
   const clean = String(prompt || '').trim();
   if (!clean) return false;
@@ -2264,7 +2298,8 @@ export async function generateAIResponse(prompt, history = [], signal = null) {
     try {
       const imageUrl = await generateFluxImage(cleanPrompt, signal);
       if (imageUrl) {
-        return `Here is your generated image:\n\n![${cleanPrompt}](${imageUrl})`;
+        const title = createImageTitle(cleanPrompt);
+        return `Here is your generated image:\n\n![${title}](${imageUrl})`;
       }
     } catch (imgError) {
       if (imgError?.name === 'AbortError') throw imgError;
@@ -2283,7 +2318,7 @@ export async function generateAIResponse(prompt, history = [], signal = null) {
           const imageUrl = await generateFluxImage(imagePrompt, signal);
           if (imageUrl) {
              // Replace the tag with the actual image markdown
-             return hostedAiResponse.replace(imageMatch[0], `![${imagePrompt}](${imageUrl})`);
+             return hostedAiResponse.replace(imageMatch[0], `![${createImageTitle(imagePrompt)}](${imageUrl})`);
           }
         } catch (imgError) {
           if (imgError?.name === 'AbortError') throw imgError;
