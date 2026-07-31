@@ -1,4 +1,4 @@
-import baseWorker, { contextWindowForModel } from './index.js';
+import baseWorker from './index.js';
 import { safeErrorDetail, readBoundedJson } from './utils.js';
 
 const SWARM_MODEL = 'deepseek-v4-pro';
@@ -493,14 +493,11 @@ export default {
       })) {
         try {
           const swarmResult = await runOpenRouterSwarm(body, env, request.signal);
-          const payload = {
+          return new Response(JSON.stringify({
             content: swarmResult.content,
             model: swarmResult.model,
             swarm: swarmResult.telemetry
-          };
-          const windowTokens = contextWindowForModel(swarmResult.model);
-          if (windowTokens) payload.contextWindowTokens = windowTokens;
-          return new Response(JSON.stringify(payload), {
+          }), {
             status: 200,
             headers: {
               'Content-Type': 'application/json',

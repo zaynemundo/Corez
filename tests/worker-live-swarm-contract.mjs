@@ -275,8 +275,7 @@ async function run() {
   assert.equal(delegatedResponse.status, 200);
   assert.deepEqual(await delegatedResponse.json(), {
     content: 'Base Worker response',
-    model: '@cf/moonshotai/kimi-k2.7-code',
-    contextWindowTokens: 256_000
+    model: '@cf/moonshotai/kimi-k2.7-code'
   });
 
   console.log('Live Worker swarm contract passed.');

@@ -30,7 +30,7 @@ check_absent() {
 
 check 'frontend exposes a hosted AI response function' 'generateHostedAIResponse' "$service"
 check 'frontend uses the public AI route' '/api/ai' "$service"
-check 'frontend sends prompt, canonical intent, and message history' 'JSON[.]stringify\(\{[[:space:]]*prompt,[[:space:]]*intent,[[:space:]]*messages:[[:space:]]*(trimConversationForRequest\(history|history)' "$service"
+check 'frontend sends prompt, canonical intent, and message history' 'JSON[.]stringify\(\{[[:space:]]*prompt,[[:space:]]*intent,[[:space:]]*messages:[[:space:]]*(trimConversationForRequest\(history\)|history)' "$service"
 check 'hosted failures use provider-neutral fallback wording' 'Hosted AI unavailable; using local Corez fallback' "$service"
 check 'frontend retains local response fallback' 'generateLocalAIResponse' "$service"
 check 'frontend imports the deterministic market parser' 'parseMarketIntent' "$service"

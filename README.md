@@ -24,7 +24,7 @@ If configured API keys are unavailable, missing, or return no usable response, C
 
 Each model is tried until one returns usable text: a thrown error, an empty result, or a response in a different envelope shape on one model falls through to the next instead of failing the request.
 
-The worker reports the active model's context window (`contextWindowTokens`) with each reply, and the client compacts conversation history to match: 256k-window models keep up to 24 recent messages (~192 KB), 100k-window models keep up to 12 (~96 KB), and unknown/small windows keep the tight 6-message compact mode (~60 KB) — all well under the 256 KB worker body limit.
+Conversation history is always sent compact (6 recent messages, 3 KB each, ~15K tokens worst case, 60 KB total body) regardless of the model's context window — 256k and 100k windows included — to keep input tokens cheap.
 
 ### Image generation
 
