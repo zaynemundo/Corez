@@ -2229,6 +2229,10 @@ const IMAGE_PATTERNS = /\b(generate|create|draw|make|render|show|give me|give us
 
 const IMAGE_TITLE_SMALL_WORDS = new Set(['a', 'an', 'the', 'and', 'or', 'but', 'for', 'with', 'of', 'in', 'on', 'at', 'to', 'from', 'by', 'as', 'via', 'vs']);
 
+const QUESTION_PATTERNS = /\b(what is|what are|whats|what's|who is|who are|why is|why are|how does|how do|how is|explain|tell me about|describe|define|meaning of|difference between)\b/i;
+
+const IMAGE_REQUEST_TAIL = /\s*(and|also|then)?\s*(can you|could you|would you|please)?\s*(show|give|send|make|draw|generate|get)\s+(me|us)?\s*(an?|the)?\s*(image|picture|photo|illustration|artwork|wallpaper|drawing|graphic|logo|visual|pic|shot)\s*(of|for|showing)?\s*[.!?]*$/i;
+
 export function createImageTitle(prompt) {
   const clean = String(prompt || '').trim();
   if (!clean) return '';
@@ -2241,6 +2245,8 @@ export function createImageTitle(prompt) {
     // Strip the deliverable noun + connector ("an image of", "a logo for", ...)
     .replace(/^(an?\s+)?(image|picture|photo|illustration|artwork|wallpaper|drawing|graphic|logo)\s+(of|for|showing|featuring|with|that|about)\s+/i, '')
     .replace(/^(an?\s+)?(image|picture|photo|illustration|artwork|wallpaper|drawing|graphic|logo)\s*$/i, '')
+    // Strip trailing question tails ("... and explain what it is")
+    .replace(/\s+(and|then)?\s*(explain|describe|tell me|what is|what are|why is|why are|how does|how do|what does|what do)\s+.*$/i, '')
     // Strip trailing courtesy phrases and leading articles
     .replace(/\s+(for me|please|now)\s*$/i, '')
     .replace(/^(a|an|the)\s+/i, '')
@@ -2259,6 +2265,72 @@ export function createImageTitle(prompt) {
   }).join(' ');
 
   return titled;
+}
+
+export function isMixedQuestionImageRequest(prompt) {
+  const clean = String(prompt || '').trim();
+  if (!clean) return false;
+  return QUESTION_PATTERNS.test(clean)
+    && /\b(show|give|send|make|draw|generate|get)\s+(me|us)?\s*(an?|the)?\s*(image|picture|photo|illustration|artwork|wallpaper|drawing|graphic|logo|visual|pic|shot)\b/i.test(clean)
+    && isExplicitImageRequest(clean);
+}
+
+export function extractImageSubject(prompt) {
+  const clean = String(prompt || '').trim();
+  if (!clean) return '';
+  let subject = clean.toLowerCase();
+  // Strip leading question phrasing
+  subject = subject
+    .replace(/^(what is|what are|whats|what's|who is|who are|why is|why are|how does|how do|how is|explain|tell me about|describe|define|meaning of|difference between)\s+(the|an|a)?\s+/i, '')
+    .replace(/^(what is|what are|whats|what's|who is|who are|why is|why are|how does|how do|how is|explain|tell me about|describe|define|meaning of|difference between)\s+/i, '')
+    // Strip trailing image request tail
+    .replace(IMAGE_REQUEST_TAIL, '')
+    .replace(/\s*[.!?]+$/i, '')
+    .trim();
+  return subject;
+}
+
+export function extractQuestionPrompt(prompt) {
+  const clean = String(prompt || '').trim();
+  if (!clean) return '';
+  return clean
+    .replace(IMAGE_REQUEST_TAIL, '')
+    .trim();
+}
+
+export async function handleMixedQuestionImageRequest(prompt, intent, history, signal) {
+  const subject = extractImageSubject(prompt);
+  const fluxPrompt = subject ? `an image of ${subject}` : prompt;
+  const title = subject ? createImageTitle(subject) : createImageTitle(prompt);
+
+  // Answer the question with the image request stripped (so the worker's
+  // image-only rule never suppresses the explanation), and generate the FLUX
+  // image in parallel from the extracted subject.
+  const questionPrompt = extractQuestionPrompt(prompt) || prompt;
+  const questionHistory = Array.isArray(history) && history.length > 0
+    ? [...history.slice(0, -1), { role: 'user', content: questionPrompt }]
+    : [];
+
+  const [hostedResult, imageResult] = await Promise.allSettled([
+    generateHostedAIResponse(questionPrompt, intent, questionHistory, signal),
+    generateFluxImage(fluxPrompt, signal)
+  ]);
+
+  const hostedResponse = hostedResult.status === 'fulfilled' ? hostedResult.value : null;
+  const imageUrl = imageResult.status === 'fulfilled' ? imageResult.value : null;
+
+  if (imageUrl) {
+    const imageMarkdown = `![${title}](${imageUrl})`;
+    if (hostedResponse) {
+      const tagMatch = hostedResponse.match(/\[IMAGE_PROMPT:\s*(.*?)\]/i);
+      if (tagMatch) return hostedResponse.replace(tagMatch[0], imageMarkdown);
+      return `${hostedResponse.trim()}\n\n${imageMarkdown}`;
+    }
+    return `Here is your generated image:\n\n${imageMarkdown}`;
+  }
+
+  if (hostedResponse) return hostedResponse;
+  throw new Error('Mixed question and image generation both failed.');
 }
 
 export function isExplicitImageRequest(prompt) {
