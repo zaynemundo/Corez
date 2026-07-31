@@ -88,7 +88,7 @@ Adaptive Routing - Fast Path:
   const imageRequestInstructions = `
 - IMAGE REQUESTS: If the user explicitly requests an image, picture, photo, illustration, artwork, logo, or wallpaper, respond with EXACTLY ONE line containing \`[IMAGE_PROMPT: concise detailed description of the requested image]\` and nothing else. Never output raw SVG markup for image requests — the platform renders the image for you.`;
 
-  // Format full skill instructions
+  // Format full skill instructions (bounded so input tokens stay compact)
   let formattedSkills = '(none — direct execution path)';
   if (skills.length > 0) {
     formattedSkills = skills.map(s => {
@@ -96,23 +96,23 @@ Adaptive Routing - Fast Path:
       const name = typeof s === 'object' ? (s.name || s.id) : s;
       const phase = typeof s === 'object' ? (s.phase || 'IMPLEMENTING') : 'EXECUTION';
       const instructions = typeof s === 'object' && s.instructions ? s.instructions : (s.description || 'Execute skill requirements');
-      const reason = typeof s === 'object' && s.reasonSelected ? `\n    Reason: ${s.reasonSelected}` : '';
-      const constraints = typeof s === 'object' && Array.isArray(s.constraints) && s.constraints.length ? `\n    Constraints: ${s.constraints.join(' | ')}` : '';
-      return `\n- [${phase}] ${name} (${id})${reason}\n    Instructions: ${instructions}${constraints}`;
+      const reason = typeof s === 'object' && s.reasonSelected ? `\n    Reason: ${String(s.reasonSelected).slice(0, 150)}` : '';
+      const constraints = typeof s === 'object' && Array.isArray(s.constraints) && s.constraints.length ? `\n    Constraints: ${s.constraints.join(' | ').slice(0, 300)}` : '';
+      return `\n- [${phase}] ${name} (${id})${reason}\n    Instructions: ${String(instructions).slice(0, 300)}${constraints}`;
     }).join('');
   }
 
-  // Format intent contract & preservation constraints
+  // Format intent contract & preservation constraints (bounded)
   let formattedContract = '';
   if (contract) {
-    const mustAchieve = Array.isArray(contract.mustAchieve) && contract.mustAchieve.length ? `\n- Must Achieve: ${contract.mustAchieve.join('; ')}` : '';
-    const mustPreserve = Array.isArray(contract.mustPreserve) && contract.mustPreserve.length ? `\n- Must Preserve: ${contract.mustPreserve.join('; ')}` : '';
-    const mustNotInvent = Array.isArray(contract.mustNotInvent) && contract.mustNotInvent.length ? `\n- Must Not Change / Invent: ${contract.mustNotInvent.join('; ')}` : '';
+    const mustAchieve = Array.isArray(contract.mustAchieve) && contract.mustAchieve.length ? `\n- Must Achieve: ${contract.mustAchieve.join('; ').slice(0, 600)}` : '';
+    const mustPreserve = Array.isArray(contract.mustPreserve) && contract.mustPreserve.length ? `\n- Must Preserve: ${contract.mustPreserve.join('; ').slice(0, 600)}` : '';
+    const mustNotInvent = Array.isArray(contract.mustNotInvent) && contract.mustNotInvent.length ? `\n- Must Not Change / Invent: ${contract.mustNotInvent.join('; ').slice(0, 600)}` : '';
     formattedContract = `\n\nIntent Contract & Preservation Rules:${mustAchieve}${mustPreserve}${mustNotInvent}`;
   }
 
-  // Format Execution Plan
-  const formattedPlan = executionPlan ? `\n\n${executionPlan}` : '';
+  // Format Execution Plan (bounded)
+  const formattedPlan = executionPlan ? `\n\n${String(executionPlan).slice(0, 800)}` : '';
 
   return `You are COREZ AI.
 

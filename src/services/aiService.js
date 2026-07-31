@@ -550,9 +550,12 @@ ${awwwardsSpec}
 - Include a concise explanation of the changes and test verification steps.`;
 }
 
-const MAX_HISTORY_MESSAGES = 12;
-const MAX_HISTORY_MESSAGE_CHARS = 8000;
-const MAX_TRIMMED_BYTES = 220 * 1024;
+// Compact mode: keeps input tokens low. History is bounded to 6 recent
+// messages of 3 KB each (~15K tokens worst case) instead of the previous
+// 12 x 8 KB, and the total serialized body is capped at 60 KB.
+const MAX_HISTORY_MESSAGES = 6;
+const MAX_HISTORY_MESSAGE_CHARS = 3000;
+const MAX_TRIMMED_BYTES = 60 * 1024;
 
 /**
  * Trim conversation history before sending it to the hosted AI so long

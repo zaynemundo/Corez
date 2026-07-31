@@ -97,7 +97,7 @@ describe('Hosted AI fallback behavior', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/ai', expect.objectContaining({ signal: abortController.signal }));
   });
 
-  it('keeps oversized conversation history under the worker body limit', async () => {
+  it('keeps conversation history compact for low input tokens', async () => {
     const bigCodeBlock = 'x'.repeat(20 * 1024);
     const history = Array.from({ length: 20 }, (_, i) => ({
       role: i % 2 === 0 ? 'user' : 'assistant',
@@ -106,17 +106,17 @@ describe('Hosted AI fallback behavior', () => {
 
     const trimmed = trimConversationForRequest(history);
 
-    expect(trimmed.length).toBeLessThanOrEqual(12);
+    expect(trimmed.length).toBeLessThanOrEqual(6);
     expect(trimmed[trimmed.length - 1]).toEqual(history[history.length - 1]);
     for (const m of trimmed) {
-      if (m.content.length > 8000) expect(m.content).toMatch(/\[truncated\]$/);
+      if (m.content.length > 3000) expect(m.content).toMatch(/\[truncated\]$/);
     }
-    expect(JSON.stringify(trimmed).length).toBeLessThan(220 * 1024);
+    expect(JSON.stringify(trimmed).length).toBeLessThan(60 * 1024);
 
-    // Single oversized message still fits within the cap
+    // Single oversized message still fits within the compact cap
     const single = trimConversationForRequest([{ role: 'user', content: 'y'.repeat(300 * 1024) }]);
     expect(single.length).toBe(1);
-    expect(JSON.stringify(single).length).toBeLessThan(220 * 1024);
+    expect(JSON.stringify(single).length).toBeLessThan(60 * 1024);
   });
 
   it('salvages code from a truncated response with an unterminated code fence', () => {
