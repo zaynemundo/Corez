@@ -21,6 +21,7 @@ import { publishAppInR2 } from '../services/appStorageService';
 
 export default function CanvasPreview({ 
   code, 
+  lineage = 0,
   title = 'Untitled Application',
   onClose, 
   isFullScreen, 
@@ -32,8 +33,20 @@ export default function CanvasPreview({
   const [copied, setCopied] = useState(false);
   const [key, setKey] = useState(0);
   const [publishing, setPublishing] = useState(false);
-  const [publishResult, setPublishResult] = useState(null); // { slug, url }
+  const [shareModalOpen, setShareModalOpen] = useState(false);
   const [publishError, setPublishError] = useState(null);
+
+  // The published slug follows the app lineage: revisions keep the same
+  // share link, a genuinely new app starts a fresh one. Persisted so the
+  // link survives modal closes, canvas closes, and page reloads.
+  const slugStorageKey = `corez_published_slug_${lineage}`;
+  const [publishedSlug, setPublishedSlug] = useState(() => {
+    try { return localStorage.getItem(slugStorageKey); } catch { return null; }
+  });
+
+  useEffect(() => {
+    try { setPublishedSlug(localStorage.getItem(slugStorageKey)); } catch { setPublishedSlug(null); }
+  }, [slugStorageKey]);
 
   const formattedSrcDoc = useMemo(() => {
     return formatCodeForPreview(editableCode);
@@ -52,10 +65,12 @@ export default function CanvasPreview({
       const result = await publishAppInR2({
         html: formattedSrcDoc,
         title,
-        slug: publishResult?.slug || null
+        slug: publishedSlug || null
       });
       if (result && result.url) {
-        setPublishResult({ slug: result.slug, url: result.url });
+        setPublishedSlug(result.slug);
+        try { localStorage.setItem(slugStorageKey, result.slug); } catch { /* Ignore storage errors */ }
+        setShareModalOpen(true);
         setPublishError(null);
       } else {
         setPublishError('Publishing failed. The hosted service may be unavailable — try again.');
@@ -68,8 +83,8 @@ export default function CanvasPreview({
     }
   };
 
-  const publishLink = publishResult
-    ? new URL(publishResult.url, window.location.origin).href
+  const publishLink = publishedSlug
+    ? new URL(`/${publishedSlug}`, window.location.origin).href
     : null;
 
   const handleCopyLink = () => {
@@ -277,13 +292,13 @@ export default function CanvasPreview({
       </div>
 
       {/* Publish share modal */}
-      {publishLink && (
+      {shareModalOpen && publishLink && (
         <div
           className="modal-overlay"
           role="dialog"
           aria-modal="true"
           aria-label="Share your published creation"
-          onClick={() => setPublishResult(null)}
+          onClick={() => setShareModalOpen(false)}
         >
           <div className="modal-card publish-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
@@ -294,7 +309,7 @@ export default function CanvasPreview({
               <button
                 type="button"
                 className="icon-btn"
-                onClick={() => setPublishResult(null)}
+                onClick={() => setShareModalOpen(false)}
                 title="Close"
                 aria-label="Close"
               >
@@ -351,9 +366,9 @@ export default function CanvasPreview({
               </a>
             </div>
 
-            {publishResult.slug && (
+            {publishedSlug && (
               <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0 }}>
-                Slug: <code>{publishResult.slug}</code> · Publishing again updates this same link.
+                Slug: <code>{publishedSlug}</code> · Revising the app and publishing again updates this same link.
               </p>
             )}
 
