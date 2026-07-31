@@ -214,42 +214,8 @@ async function handleAi(request, env) {
     apiMessages.push({ role: 'user', content: prompt });
   }
 
-  // 1. Official DeepSeek API if DEEPSEEK_API_KEY is configured (primary provider)
-  const deepSeekKey = env?.DEEPSEEK_API_KEY;
-  if (deepSeekKey) {
-    const deepSeekEndpoint = env?.DEEPSEEK_ENDPOINT || DEEPSEEK_ENDPOINT;
-    const deepSeekModel = env?.DEEPSEEK_MODEL || DEFAULT_DEEPSEEK_MODEL;
-    try {
-      const deepSeekResp = await fetch(deepSeekEndpoint, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${deepSeekKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: deepSeekModel,
-          messages: apiMessages,
-          stream: false
-        }),
-        signal: AbortSignal.timeout(60_000)
-      });
-
-      if (deepSeekResp.ok) {
-        const data = await deepSeekResp.json();
-        const content = extractContentText(data?.choices?.[0]?.message?.content);
-        if (content && content.trim()) {
-          return jsonResponse(200, { content: content.trim(), model: `deepseek:${deepSeekModel}` });
-        }
-      } else {
-        const errText = await deepSeekResp.text().catch(() => '');
-        console.warn(`DeepSeek API returned HTTP ${deepSeekResp.status}:`, safeErrorDetail(errText));
-      }
-    } catch (deepSeekErr) {
-      console.warn('DeepSeek API request failed:', safeErrorDetail(deepSeekErr));
-    }
-  }
-
-  // 2. Try OpenCode Go API if OPENCODE_GO_API_KEY / OPENCODE_API_KEY is configured
+  // 1. OpenCode Go API first if OPENCODE_GO_API_KEY / OPENCODE_API_KEY is
+  // configured (serves the latest DeepSeek V4 Flash builds)
   let targetModels = getTargetModels();
   if (body.model && typeof body.model === 'string' && body.model.trim()) {
     const customModel = body.model.trim();
@@ -285,6 +251,41 @@ async function handleAi(request, env) {
       } catch (opencodeErr) {
         console.warn(`OpenCode Go model ${modelId} request failed:`, safeErrorDetail(opencodeErr));
       }
+    }
+  }
+
+  // 2. Official DeepSeek API if DEEPSEEK_API_KEY is configured
+  const deepSeekKey = env?.DEEPSEEK_API_KEY;
+  if (deepSeekKey) {
+    const deepSeekEndpoint = env?.DEEPSEEK_ENDPOINT || DEEPSEEK_ENDPOINT;
+    const deepSeekModel = env?.DEEPSEEK_MODEL || DEFAULT_DEEPSEEK_MODEL;
+    try {
+      const deepSeekResp = await fetch(deepSeekEndpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${deepSeekKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: deepSeekModel,
+          messages: apiMessages,
+          stream: false
+        }),
+        signal: AbortSignal.timeout(60_000)
+      });
+
+      if (deepSeekResp.ok) {
+        const data = await deepSeekResp.json();
+        const content = extractContentText(data?.choices?.[0]?.message?.content);
+        if (content && content.trim()) {
+          return jsonResponse(200, { content: content.trim(), model: `deepseek:${deepSeekModel}` });
+        }
+      } else {
+        const errText = await deepSeekResp.text().catch(() => '');
+        console.warn(`DeepSeek API returned HTTP ${deepSeekResp.status}:`, safeErrorDetail(errText));
+      }
+    } catch (deepSeekErr) {
+      console.warn('DeepSeek API request failed:', safeErrorDetail(deepSeekErr));
     }
   }
 

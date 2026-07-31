@@ -202,18 +202,8 @@ async function callAIGateway(apiKey, messages, options = {}) {
       'Content-Type': 'application/json'
     };
 
-    if (env.DEEPSEEK_API_KEY && apiKey === env.DEEPSEEK_API_KEY) {
-      // Official DeepSeek API: OpenAI-compatible, no provider-specific fields
-      endpoint = env.DEEPSEEK_ENDPOINT || 'https://api.deepseek.com/chat/completions';
-      requestBody = {
-        model: deepSeekModel,
-        messages,
-        max_tokens: maxTokens,
-        temperature: options.temperature ?? 0.2,
-        stream: false
-      };
-    } else if (env.OPENCODE_GO_API_KEY || env.OPENCODE_API_KEY) {
-      // OpenCode Go gateway: plain OpenAI-style chat request
+    if (env.OPENCODE_GO_API_KEY || env.OPENCODE_API_KEY) {
+      // OpenCode Go gateway first: plain OpenAI-style chat request
       endpoint = env.OPENCODE_ENDPOINT || 'https://opencode.ai/zen/go/v1/chat/completions';
       headers = {
         ...headers,
@@ -225,6 +215,15 @@ async function callAIGateway(apiKey, messages, options = {}) {
         messages,
         max_tokens: maxTokens,
         temperature: options.temperature ?? 0.2
+      };
+    } else if (env.DEEPSEEK_API_KEY && apiKey === env.DEEPSEEK_API_KEY) {
+      // Official DeepSeek API: OpenAI-compatible, no provider-specific fields
+      endpoint = env.DEEPSEEK_ENDPOINT || 'https://api.deepseek.com/chat/completions';
+      requestBody = {
+        model: deepSeekModel,
+        messages,
+        temperature: options.temperature ?? 0.2,
+        stream: false
       };
     } else {
       // OpenRouter: provider routing fields are valid here
@@ -399,10 +398,10 @@ Always identify publicly only as COREZ AI when identity is relevant.${appInstruc
 export async function runOpenRouterSwarm(body, env, signal) {
   const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : '';
   const intentType = normalizeIntentType(body?.intent?.type);
-  const apiKey = env?.DEEPSEEK_API_KEY || env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY || env?.OPENROUTER_API_KEY;
+  const apiKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY || env?.DEEPSEEK_API_KEY || env?.OPENROUTER_API_KEY;
 
   if (!apiKey) {
-    throw new Error('DEEPSEEK_API_KEY / OPENCODE_GO_API_KEY / OPENROUTER_API_KEY is not configured for swarm execution.');
+    throw new Error('OPENCODE_GO_API_KEY / DEEPSEEK_API_KEY / OPENROUTER_API_KEY is not configured for swarm execution.');
   }
 
   const agentSpecs = buildSwarmAgentSpecs(intentType, prompt);

@@ -237,6 +237,57 @@ async function run() {
       assert.equal(dsModelData.model, 'deepseek:deepseek-chat');
       assert.equal(deepSeekPayload.model, 'deepseek-chat');
 
+      // OpenCode Go wins when BOTH opencode and DeepSeek keys are configured
+      globalThis.fetch = async (url, init) => {
+        assert.equal(url, 'https://opencode.ai/zen/go/v1/chat/completions');
+        const payload = JSON.parse(init.body);
+        assert.equal(payload.model, 'deepseek-v4-flash');
+        assert.equal(payload.reasoning, undefined);
+        return new Response(JSON.stringify({
+          choices: [{ message: { content: 'OpenCode Go preferred response' } }]
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      };
+      const opencodePreferredResp = await post(
+        JSON.stringify({ prompt: 'Explain black roses', intent: { type: 'general' } }),
+        env({
+          AI: undefined,
+          OPENCODE_GO_API_KEY: 'sk-opencode-test',
+          DEEPSEEK_API_KEY: 'sk-deepseek-test'
+        })
+      );
+      assert.equal(opencodePreferredResp.status, 200);
+      const opencodePreferredData = await opencodePreferredResp.json();
+      assert.equal(opencodePreferredData.content, 'OpenCode Go preferred response');
+      assert.equal(opencodePreferredData.model, 'opencode:deepseek-v4-flash');
+
+      // OpenCode failure falls through to DeepSeek
+      globalThis.fetch = async (url) => {
+        if (url === 'https://opencode.ai/zen/go/v1/chat/completions') {
+          return new Response('{}', { status: 503 });
+        }
+        assert.equal(url, 'https://api.deepseek.com/chat/completions');
+        return new Response(JSON.stringify({
+          choices: [{ message: { content: 'DeepSeek after OpenCode failure' } }]
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      };
+      const opencodeFailResp = await post(
+        JSON.stringify({ prompt: 'Explain fallback chain' }),
+        env({
+          AI: undefined,
+          OPENCODE_GO_API_KEY: 'sk-opencode-test',
+          DEEPSEEK_API_KEY: 'sk-deepseek-test'
+        })
+      );
+      const opencodeFailData = await opencodeFailResp.json();
+      assert.equal(opencodeFailData.content, 'DeepSeek after OpenCode failure');
+      assert.equal(opencodeFailData.model, 'deepseek:deepseek-v4-flash');
+
       // DeepSeek failure falls through to the next provider (Workers AI)
       globalThis.fetch = async () => new Response('{}', { status: 502 });
       const deepSeekFallbackResp = await post(
