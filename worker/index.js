@@ -864,17 +864,9 @@ async function handleR2Apps(request, env) {
     }
 
     if (url.searchParams.get('format') === 'html') {
+      // Same originless-sandbox rendering contract as published creations.
       return new Response(appData.html || appData.code, {
-        headers: {
-          'Content-Type': 'text/html; charset=utf-8',
-          'Cache-Control': 'no-cache',
-          'X-Content-Type-Options': 'nosniff',
-          'X-Frame-Options': 'DENY',
-          'Referrer-Policy': 'no-referrer',
-          // Apps are AI-generated user content: sandbox them as documents and
-          // forbid all subresources so a generated app cannot exfiltrate data.
-          'Content-Security-Policy': "sandbox; default-src 'none'; script-src 'unsafe-inline'"
-        }
+        headers: publishedPageHeaders()
       });
     }
 
@@ -1237,9 +1229,11 @@ function publishedPageHeaders() {
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'DENY',
     'Referrer-Policy': 'no-referrer',
-    // Published creations are AI-generated user content: sandbox them as
-    // documents and forbid all subresources so they cannot exfiltrate data.
-    'Content-Security-Policy': "sandbox; default-src 'none'; script-src 'unsafe-inline'"
+    // Published creations are AI-generated user content: render them in an
+    // originless sandbox (no cookies, storage, or same-origin access) but
+    // let the app itself run exactly like the in-app preview — inline
+    // scripts/styles, CDN libraries, and embedded images/fonts included.
+    'Content-Security-Policy': "sandbox allow-scripts allow-forms allow-pointer-lock; default-src 'none'; script-src 'unsafe-inline' https:; style-src 'unsafe-inline' https:; img-src data: https: blob:; font-src data: https:; media-src data: https: blob:; connect-src https:"
   };
 }
 

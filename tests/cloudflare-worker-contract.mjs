@@ -849,7 +849,10 @@ async function run() {
   );
   assert.equal(publishedPage.status, 200);
   assert.match(publishedPage.headers.get('content-type'), /text\/html/);
-  assert.match(publishedPage.headers.get('content-security-policy'), /sandbox/);
+  const publishCsp = publishedPage.headers.get('content-security-policy');
+  assert.match(publishCsp, /sandbox allow-scripts/);
+  assert.match(publishCsp, /script-src 'unsafe-inline'/);
+  assert.match(publishCsp, /style-src 'unsafe-inline'/);
   assert.equal(await publishedPage.text(), '<!DOCTYPE html><html><body><h1>Shared FPS</h1></body></html>');
 
   // Republishing under the same slug updates the existing link
