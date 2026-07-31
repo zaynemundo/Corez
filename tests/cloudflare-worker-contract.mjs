@@ -311,40 +311,6 @@ async function run() {
       assert.equal(opencodeFailData.content, 'DeepSeek after OpenCode failure');
       assert.equal(opencodeFailData.model, 'deepseek:deepseek-v4-flash');
 
-      // A rejected primary model ID must not skip the OpenCode Go provider:
-      // the next model candidate is attempted before leaving the gateway.
-      const opencodeModelAttempts = [];
-      globalThis.fetch = async (url, init) => {
-        assert.equal(url, 'https://opencode.ai/zen/go/v1/chat/completions');
-        const payload = JSON.parse(init.body);
-        opencodeModelAttempts.push(payload.model);
-        if (opencodeModelAttempts.length === 1) {
-          return new Response(JSON.stringify({ error: 'model not found' }), {
-            status: 404,
-            headers: { 'Content-Type': 'application/json' }
-          });
-        }
-        return new Response(JSON.stringify({
-          choices: [{ message: { content: 'OpenCode Go recovered response' } }]
-        }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      };
-      const opencodeRecoveredResp = await post(
-        JSON.stringify({ prompt: 'Explain fallback chain' }),
-        env({
-          AI: undefined,
-          OPENCODE_GO_API_KEY: 'sk-opencode-test'
-        }),
-        '198.51.100.104'
-      );
-      assert.equal(opencodeRecoveredResp.status, 200);
-      const opencodeRecoveredData = await opencodeRecoveredResp.json();
-      assert.equal(opencodeRecoveredData.content, 'OpenCode Go recovered response');
-      assert.equal(opencodeRecoveredData.model, 'opencode:opencode-go/deepseek-v4-flash');
-      assert.deepEqual(opencodeModelAttempts.slice(0, 2), ['deepseek-v4-flash', 'opencode-go/deepseek-v4-flash']);
-
       // DeepSeek failure falls through to the next provider (Workers AI)
       globalThis.fetch = async () => new Response('{}', { status: 502 });
       const deepSeekFallbackResp = await post(

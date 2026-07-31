@@ -18,11 +18,6 @@ function getTargetModels() {
   return [DEEPSEEK_V4_FLASH_MODEL];
 }
 
-// OpenCode Go is the preferred provider: try every known OpenCode Go model
-// (plus the gateway's opencode-go/ prefixed ID forms) before falling through
-// to other providers, so a rejected or unknown model ID never skips it.
-const OPENCODE_GO_MODELS = [DEEPSEEK_V4_FLASH_MODEL, 'deepseek-v4-pro', 'kimi-k3'];
-
 const CANONICAL_INTENT_TYPES = new Set([
   'app',
   'code-help',
@@ -288,15 +283,7 @@ async function handleAi(request, env) {
   const opencodeKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY;
   const opencodeEndpoint = env?.OPENCODE_ENDPOINT || OPENCODE_DEFAULT_ENDPOINT;
   if (opencodeKey) {
-    const candidates = [];
-    for (const modelId of [...targetModels, ...OPENCODE_GO_MODELS]) {
-      if (candidates.includes(modelId)) continue;
-      candidates.push(modelId);
-      if (candidates.length === 1) {
-        candidates.push(`opencode-go/${modelId}`);
-      }
-    }
-    for (const modelId of candidates) {
+    for (const modelId of targetModels) {
       try {
         const opencodeResp = await fetch(opencodeEndpoint, {
           method: 'POST',
