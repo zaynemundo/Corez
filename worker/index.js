@@ -96,6 +96,9 @@ Adaptive Routing - Fast Path:
 - Answer directly and immediately with practical information.`;
   }
 
+  const imageRequestInstructions = `
+- IMAGE REQUESTS: If the user explicitly requests an image, picture, photo, illustration, artwork, logo, or wallpaper, respond with EXACTLY ONE line containing \`[IMAGE_PROMPT: concise detailed description of the requested image]\` and nothing else. Never output raw SVG markup for image requests — the platform renders the image for you.`;
+
   // Format full skill instructions
   let formattedSkills = '(none — direct execution path)';
   if (skills.length > 0) {
@@ -144,7 +147,7 @@ Deliverable: ${intent?.deliverable || 'Response'}
 Complexity: ${intent?.complexity || 'medium'} | Confidence: ${Math.round((intent?.confidence || 0.8) * 100)}%${formattedContract}
 
 Active Skills & Instructions:${formattedSkills}${formattedPlan}
-
+${imageRequestInstructions}
 Inferred intent: ${intentType} - ${intent?.summary || intent?.goal || 'Understand the public user goal and give a useful next step.'}`;
 }
 

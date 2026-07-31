@@ -473,6 +473,9 @@ export async function generateFluxImage(prompt, signal = null) {
     if (response.ok) {
       const data = await response.json();
       if (data?.image) return data.image;
+      console.warn('Hosted FLUX API responded without an image payload; rendering fallback visual.');
+    } else {
+      console.warn(`Hosted FLUX API request failed (HTTP ${response.status}); rendering fallback visual.`);
     }
   } catch (err) {
     if (err?.name === 'AbortError') throw err;
@@ -2222,7 +2225,22 @@ export async function generateLocalAIResponse(prompt) {
   return `I understand the goal: ${intent.summary}\n\nFor **"${cleanPrompt}"**, I’ll focus on what the public user is trying to accomplish and give a practical path forward.\n\nA good next step is to define the outcome, the audience, and the format you want. Once those are clear, I can help turn the idea into a plan, a written answer, code, or a live preview depending on what you need.`;
 }
 
-const IMAGE_PATTERNS = /\b(generate|create|draw|make|render|show|flux)\b.*\b(image|picture|photo|logo|illustration|artwork|wallpaper|drawing|graphic)\b|\b(image|picture|photo|logo|illustration|artwork|wallpaper|drawing|graphic)\b.*\b(generate|create|draw|make|render|flux)\b/i;
+const IMAGE_PATTERNS = /\b(generate|create|draw|make|render|show|give me|give us|want|need|produce)\b.*\b(image|picture|photo|logo|illustration|artwork|wallpaper|drawing|graphic|icon)\b|\b(image|picture|photo|logo|illustration|artwork|wallpaper|drawing|graphic|icon)\b.*\b(generate|create|draw|make|render|flux)\b/i;
+
+export function isExplicitImageRequest(prompt) {
+  const clean = String(prompt || '').trim();
+  if (!clean) return false;
+  const lower = clean.toLowerCase();
+  if (lower.startsWith('image:') || lower.startsWith('flux:')) return true;
+  if (IMAGE_PATTERNS.test(clean)) return true;
+  try {
+    const fine = classifyIntentNew(clean);
+    if (fine?.type === 'image_generation' && (fine.confidence || 0) >= 0.2) return true;
+  } catch {
+    // Classifier unavailable; rely on pattern checks above.
+  }
+  return false;
+}
 
 export async function generateAIResponse(prompt, history = [], signal = null) {
   const cleanPrompt = prompt.trim();
@@ -2239,8 +2257,10 @@ export async function generateAIResponse(prompt, history = [], signal = null) {
     }
   }
 
-  // If this is the first message and it obviously asks for an image, we can skip the LLM overhead.
-  if (history.length <= 1 && (IMAGE_PATTERNS.test(cleanPrompt) || cleanPrompt.toLowerCase().startsWith('image:') || cleanPrompt.toLowerCase().startsWith('flux:'))) {
+  // Explicit image requests always route to FLUX image generation, regardless of
+  // conversation length. Previously the history.length <= 1 gate let image requests
+  // mid-conversation fall through to the LLM, which answered with raw SVG markup.
+  if (isExplicitImageRequest(cleanPrompt)) {
     try {
       const imageUrl = await generateFluxImage(cleanPrompt, signal);
       if (imageUrl) {

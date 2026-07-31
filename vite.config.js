@@ -101,6 +101,79 @@ Inferred intent: ${intent?.type || 'app'} - ${intent?.summary || 'Create a publi
               res.end(JSON.stringify({ error: err.message }));
             }
           });
+        } else if (req.url === '/api/image' && req.method === 'POST') {
+          let body = '';
+          req.on('data', chunk => { body += chunk; });
+          req.on('end', async () => {
+            try {
+              const env = loadEnv(server.config.mode, process.cwd(), '');
+              const openRouterKey = env.OPENROUTER_API_KEY || env.VITE_OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY;
+
+              if (!openRouterKey) {
+                res.statusCode = 503;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: 'OPENROUTER_API_KEY is not set in environment or .env file.' }));
+                return;
+              }
+
+              const parsed = JSON.parse(body || '{}');
+              const prompt = typeof parsed.prompt === 'string' ? parsed.prompt.trim() : '';
+              if (!prompt) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: 'Prompt is required.' }));
+                return;
+              }
+
+              const imageResp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${openRouterKey}`,
+                  'HTTP-Referer': 'https://corez.ai',
+                  'X-Title': 'COREZ AI',
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  model: 'black-forest-labs/flux-1-schnell',
+                  messages: [{ role: 'user', content: prompt }]
+                })
+              });
+
+              if (!imageResp.ok) {
+                res.statusCode = 502;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: `OpenRouter image error: ${imageResp.status}` }));
+                return;
+              }
+
+              const data = await imageResp.json();
+              const message = data?.choices?.[0]?.message;
+              let image = null;
+              if (Array.isArray(message?.images) && message.images[0]?.url) {
+                image = message.images[0].url;
+              } else if (typeof message?.content === 'string' && message.content) {
+                const urlMatch = message.content.match(/https?:\/\/[^\s)"']+\.(?:png|jpg|jpeg|webp)/i)
+                  || message.content.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
+                if (urlMatch) image = urlMatch[1] || urlMatch[0];
+                if (!image && message.content.startsWith('data:image')) image = message.content;
+              }
+
+              if (!image) {
+                res.statusCode = 502;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: 'OpenRouter image generation returned no usable image.' }));
+                return;
+              }
+
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ image, model: 'black-forest-labs/flux-1-schnell' }));
+            } catch (err) {
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: err.message }));
+            }
+          });
         } else {
           next();
         }
