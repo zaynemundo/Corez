@@ -1,0 +1,71 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { generateAIResponse, generateLocalAIResponse, isRevisionContextPrompt } from '../src/services/aiService.js';
+
+const GAME_HTML = `<!DOCTYPE html><html><body><canvas id="game"></canvas><script>function gameLoop(){requestAnimationFrame(gameLoop);}requestAnimationFrame(gameLoop);</script></body></html>`;
+
+function revisionPrompt(request) {
+  return `[Context: The user is requesting a revision for the following code block]\n\`\`\`\n${GAME_HTML}\n\`\`\`\n\nUser Request: ${request}`;
+}
+
+describe('Hosted AI fallback behavior', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('detects revision-context prompts', () => {
+    expect(isRevisionContextPrompt(revisionPrompt('add a shop'))).toBe(true);
+    expect(isRevisionContextPrompt('add a shop to my game')).toBe(false);
+  });
+
+  it('never discards the code or fabricates a new app for revision requests when hosted AI is down', async () => {
+    const fetchMock = vi.fn(async () => Response.json({ error: 'OPENROUTER_API_KEY is not set' }, { status: 503 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await generateAIResponse(revisionPrompt('Revise code: add a shop and a hold click and reload animation'), []);
+
+    expect(response).toContain('I can see the code you want to revise');
+    expect(response).toContain('add a shop and a hold click and reload animation');
+    expect(response).toContain('OPENROUTER_API_KEY is not set');
+    expect(response).not.toContain('```html');
+    expect(response).not.toContain('Share the snippet');
+  });
+
+  it('reports hosted AI unavailability for code-help with an embedded code block', async () => {
+    const response = await generateLocalAIResponse(
+      'Help me fix this:\n```js\nlet x = 1;\n```',
+      new Error('Hosted AI request failed: 503')
+    );
+
+    expect(response).toContain('hosted AI service is currently unavailable');
+    expect(response).not.toContain('Share the snippet');
+  });
+
+  it('still synthesizes a new app locally for genuine creation prompts when hosted AI is down', async () => {
+    const fetchMock = vi.fn(async () => Response.json({ error: 'down' }, { status: 503 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await generateAIResponse('Build me a snake game', []);
+
+    expect(response).toContain('```html');
+    expect(response).not.toContain('I can see the code you want to revise');
+  });
+
+  it('routes revision requests to the hosted AI when it is available', async () => {
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/ai') {
+        return Response.json({ content: 'Here is the revised game with a shop.' });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await generateAIResponse(revisionPrompt('add a shop'), []);
+
+    expect(response).toBe('Here is the revised game with a shop.');
+    expect(fetchMock).toHaveBeenCalledWith('/api/ai', expect.anything());
+  });
+});

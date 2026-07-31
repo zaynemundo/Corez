@@ -2183,13 +2183,24 @@ function synthesizeCustomGame(prompt) {
 }
 
 // Generate concise, natural AI responses for any public user
-export async function generateLocalAIResponse(prompt) {
+export async function generateLocalAIResponse(prompt, hostedError = null) {
   const cleanPrompt = prompt.trim();
   const lower = cleanPrompt.toLowerCase();
   const intent = analyzePublicUserIntent(cleanPrompt);
 
   // Natural short latency (0.6s)
   await new Promise(r => setTimeout(r, 600));
+
+  // Revision context: the user asked to revise an embedded code block. Never
+  // discard their code or fabricate a different app — report the real status.
+  const revisionMatch = cleanPrompt.match(/\[Context: The user is requesting a revision for the following code block\]/i);
+  const hasEmbeddedCode = cleanPrompt.includes('```');
+  const userRequestPart = cleanPrompt.split(/User Request:\s*/i).slice(-1)[0]?.trim() || '';
+
+  if (revisionMatch) {
+    const reason = hostedError?.message ? ` The hosted AI service is unavailable: ${hostedError.message}` : ' The hosted AI service is currently unavailable.';
+    return `I can see the code you want to revise, but I couldn't apply your revision (${userRequestPart || 'no request captured'}).${reason} Please check that the AI service is reachable (e.g. OPENROUTER_API_KEY configured for local dev) and try again — your code has not been changed.`;
+  }
 
   // 1. GREETINGS & SMALL TALK (Universal & Natural)
   if (/^(hello|hi|hey|greetings|good morning|good afternoon|good evening|howdy|sup)(\s|!|\.|\?|$)/i.test(lower) || lower.includes('who are you') || lower.includes('what can you do')) {
@@ -2206,13 +2217,19 @@ export async function generateLocalAIResponse(prompt) {
   }
 
   // 3. PUBLIC APP / GAME / WIDGET CREATION INTENT
-  if (intent.type === 'app') {
+  // Only synthesize a brand-new experience for genuine creation prompts; a
+  // prompt that already embeds code is a revision/analysis of existing code.
+  if (intent.type === 'app' && !hasEmbeddedCode && !/^revise\s/i.test(cleanPrompt)) {
     const gameResult = synthesizeCustomGame(cleanPrompt);
     return `I've created **${gameResult.title}** for you! Click below to open it live in the preview canvas on the right side.\n\n\`\`\`html\n${gameResult.html}\n\`\`\``;
   }
 
   // 4. PUBLIC USER INTENT RESPONSES
   if (intent.type === 'code-help') {
+    if (hasEmbeddedCode) {
+      const reason = hostedError?.message ? `: ${hostedError.message}` : '';
+      return `I can see the code you shared, but the hosted AI service is currently unavailable${reason}, so I couldn't analyse or revise it. Please check the AI service configuration and try again — your code has not been changed.`;
+    }
     return `I understand the goal: ${intent.summary}\n\nShare the snippet, error message, or file you are working on. I’ll walk through what is happening, identify the likely cause, propose a fix, and explain how to verify it so you can move forward without guessing.`;
   }
 
@@ -2228,6 +2245,10 @@ export async function generateLocalAIResponse(prompt) {
 }
 
 const IMAGE_PATTERNS = /\b(generate|create|draw|make|render|show|give me|give us|want|need|produce)\b.*\b(image|picture|photo|logo|illustration|artwork|wallpaper|drawing|graphic|icon)\b|\b(image|picture|photo|logo|illustration|artwork|wallpaper|drawing|graphic|icon)\b.*\b(generate|create|draw|make|render|flux)\b/i;
+
+export function isRevisionContextPrompt(prompt) {
+  return /\[Context: The user is requesting a revision for the following code block\]/i.test(String(prompt || ''));
+}
 
 const IMAGE_TITLE_SMALL_WORDS = new Set(['a', 'an', 'the', 'and', 'or', 'but', 'for', 'with', 'of', 'in', 'on', 'at', 'to', 'from', 'by', 'as', 'via', 'vs']);
 
@@ -2355,7 +2376,7 @@ export async function generateAIResponse(prompt, history = [], signal = null) {
   const intent = analyzePublicUserIntent(cleanPrompt);
 
   const marketRequest = intent.type === 'app' ? null : parseMarketIntent(cleanPrompt);
-  if (marketRequest) {
+  if (marketRequest && !isRevisionContextPrompt(cleanPrompt)) {
     try {
       const market = await fetchMarketData(marketRequest, signal);
       return { type: 'market', request: marketRequest, market };
@@ -2414,6 +2435,7 @@ export async function generateAIResponse(prompt, history = [], signal = null) {
   } catch (hostedAiError) {
     if (hostedAiError?.name === 'AbortError') throw hostedAiError;
     console.warn('Hosted AI unavailable; using local Corez fallback.', hostedAiError);
+    return generateLocalAIResponse(cleanPrompt, hostedAiError);
   }
 
   return generateLocalAIResponse(cleanPrompt);
