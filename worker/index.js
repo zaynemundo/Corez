@@ -338,6 +338,7 @@ async function handleAi(request, env) {
     const safe = safeErrorDetail(reason);
     if (safe) providerFailures.push(`${label}: ${safe}`);
   };
+  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
   if (opencodeKey) {
     const callOpenCodeGo = async (modelId, messagesToSend) => {
       try {
@@ -359,30 +360,37 @@ async function handleAi(request, env) {
         if (!opencodeResp.ok) {
           const detail = (await opencodeResp.text().catch(() => '')).slice(0, 200);
           console.warn(`OpenCode Go model ${modelId} returned HTTP ${opencodeResp.status}:`, safeErrorDetail(detail));
-          recordFailure(`opencode:${modelId} HTTP ${opencodeResp.status}`, detail);
-          return null;
+          return { failure: `HTTP ${opencodeResp.status}: ${safeErrorDetail(detail)}` };
         }
         const data = await opencodeResp.json();
         const message = data?.choices?.[0]?.message;
         return { content: answerText(message), reasoning: hasReasoning(message) };
       } catch (opencodeErr) {
         console.warn(`OpenCode Go model ${modelId} request failed:`, safeErrorDetail(opencodeErr));
-        recordFailure(`opencode:${modelId}`, opencodeErr);
-        return null;
+        return { failure: safeErrorDetail(opencodeErr) };
       }
     };
 
     for (const modelId of targetModels) {
+      // OpenCode Go is the preferred provider: stay on it as hard as
+      // possible. A transient gateway failure gets one retry, and a
+      // reasoning-only/empty reply gets the continuation nudge; only then
+      // does the request move to DeepSeek / OpenRouter / Workers AI.
       let result = await callOpenCodeGo(modelId, apiMessages);
+      let lastFailure = result?.failure || null;
+      if (result?.failure) {
+        await sleep(750);
+        result = await callOpenCodeGo(modelId, apiMessages);
+        lastFailure = result?.failure || lastFailure;
+      }
       if (result && !result.content) {
-        // The model answered with only reasoning (or nothing): nudge it once
-        // to emit the actual final response before falling through.
         result = await callOpenCodeGo(modelId, [...apiMessages, CONTINUATION_NUDGE]);
+        lastFailure = result?.failure || lastFailure;
       }
       if (result && result.content) {
         return jsonResponse(200, { content: result.content, model: `opencode:${modelId}` });
       }
-      recordFailure(`opencode:${modelId}`, 'empty or reasoning-only response after continuation');
+      recordFailure(`opencode:${modelId}`, lastFailure || 'empty or reasoning-only response after continuation');
     }
   }
 

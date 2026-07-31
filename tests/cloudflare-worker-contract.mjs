@@ -406,6 +406,42 @@ async function run() {
       assert.equal(modelIgnoreResp.status, 200);
       assert.equal((await json(modelIgnoreResp)).content, 'Server model used');
 
+      // OpenCode Go is preferred as hard as possible: a transient gateway
+      // failure is retried once before any other provider is consulted.
+      let opencodeRetryCalls = 0;
+      globalThis.fetch = async (url, init) => {
+        if (url === 'https://opencode.ai/zen/go/v1/chat/completions') {
+          opencodeRetryCalls += 1;
+          if (opencodeRetryCalls === 1) {
+            return new Response(JSON.stringify({ error: 'temporary gateway hiccup' }), {
+              status: 503,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
+          return new Response(JSON.stringify({
+            choices: [{ message: { content: 'Recovered on the OpenCode Go retry' } }]
+          }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        throw new Error(`Unexpected provider consulted: ${url}`);
+      };
+      const opencodeRetryResp = await post(
+        JSON.stringify({ prompt: 'Explain fallback chain' }),
+        env({
+          AI: undefined,
+          OPENCODE_GO_API_KEY: 'sk-opencode-test',
+          DEEPSEEK_API_KEY: 'sk-deepseek-test'
+        }),
+        '198.51.100.110'
+      );
+      assert.equal(opencodeRetryResp.status, 200);
+      const opencodeRetryData = await json(opencodeRetryResp);
+      assert.equal(opencodeRetryData.content, 'Recovered on the OpenCode Go retry');
+      assert.equal(opencodeRetryData.model, 'opencode:deepseek-v4-flash');
+      assert.equal(opencodeRetryCalls, 2);
+
       // OpenCode failure falls through to DeepSeek
       globalThis.fetch = async (url) => {
         if (url === 'https://opencode.ai/zen/go/v1/chat/completions') {

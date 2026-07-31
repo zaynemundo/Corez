@@ -6,15 +6,11 @@ Corez deploys the Vite application and its AI endpoints together as a Cloudflare
 
 ### Text and multimodal requests
 
-When `OPENCODE_GO_API_KEY` (or `OPENCODE_API_KEY`) is configured, `/api/ai` uses the OpenCode Go API provider first (it serves the latest DeepSeek V4 Flash builds):
+When `OPENCODE_GO_API_KEY` (or `OPENCODE_API_KEY`) is configured, `/api/ai` uses the OpenCode Go API provider exclusively as long as it can serve the request (it serves the latest DeepSeek V4 Flash builds):
 
 - All chat, coding, app & swarm requests: `deepseek-v4-flash`
 
-When `DEEPSEEK_API_KEY` is configured, `/api/ai` uses the official DeepSeek API next:
-
-- All chat, coding, app & swarm requests: `deepseek-v4-flash` (currently the DeepSeek-V4-Flash-0731 build; override with the `DEEPSEEK_MODEL` secret; official API models include `deepseek-v4-pro`)
-
-When `OPENROUTER_API_KEY` is configured, `/api/ai` uses OpenRouter next.
+Transient gateway failures are retried once on OpenCode Go, and reasoning-only replies get one continuation nudge, before the request ever leaves the provider. `DEEPSEEK_API_KEY` (official DeepSeek API) and `OPENROUTER_API_KEY` (OpenRouter) are only consulted when OpenCode Go has no usable usage left; the free Workers AI binding is the final fallback.
 
 If configured API keys are unavailable, missing, or return no usable response, Corez uses the native Cloudflare Workers AI binding in this order:
 
