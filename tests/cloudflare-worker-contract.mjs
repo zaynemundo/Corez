@@ -859,6 +859,38 @@ async function run() {
   assert.equal(spaFallback.status, 200);
   assert.equal(await spaFallback.text(), 'asset:/not-a-slug-path');
 
+  // Only the app document is ever published: chat-ish fields sent by a
+  // client are ignored, never persisted, and never served.
+  const publishWithJunk = await worker.fetch(
+    new Request('https://corez.test/api/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: 'Only App',
+        html: '<h1>App Only</h1>',
+        sessionId: 'secret-session',
+        messages: [{ role: 'user', content: 'private chat text' }],
+        history: ['private history'],
+        prompt: 'create a game'
+      })
+    }),
+    memoryEnv()
+  );
+  assert.equal(publishWithJunk.status, 200);
+  const junkData = await json(publishWithJunk);
+  const junkRecord = JSON.parse(memoryStore.get(`publish/${junkData.slug}.json`).value);
+  assert.deepEqual(Object.keys(junkRecord).sort(), ['createdAt', 'html', 'slug', 'title']);
+  assert.equal(junkRecord.html, '<h1>App Only</h1>');
+  assert.equal(junkRecord.sessionId, undefined);
+  assert.equal(junkRecord.messages, undefined);
+
+  const junkPage = await worker.fetch(
+    new Request(`https://corez.test/${junkData.slug}`, { method: 'GET' }),
+    memoryEnv()
+  );
+  assert.equal(junkPage.status, 200);
+  assert.equal(await junkPage.text(), '<h1>App Only</h1>');
+
   // Asset upload validation: reject arbitrary content types, keys, and malformed data URLs
   const uploadBadType = await worker.fetch(
     new Request('https://corez.test/api/assets/upload', {

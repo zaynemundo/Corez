@@ -130,6 +130,12 @@ describe('R2 Multi-App Storage & Chat Deletion Cleanup Contract', () => {
         headers: { 'Content-Type': 'application/json' },
         body: expect.stringContaining('"html":"<h1>Game</h1>"')
       }));
+
+      // Only the app document is sent: chat/session payloads never leave the client.
+      const sentBody = fetchMock.mock.calls[0][1].body;
+      expect(sentBody).not.toContain('sessionId');
+      expect(sentBody).not.toContain('messages');
+      expect(sentBody).not.toContain('history');
     });
 
     it('returns null when content is missing or the publish request fails', async () => {

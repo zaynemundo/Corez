@@ -356,6 +356,10 @@ export default function CanvasPreview({
                 Slug: <code>{publishResult.slug}</code> · Publishing again updates this same link.
               </p>
             )}
+
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0 }}>
+              Only this app is shared — your chat stays private.
+            </p>
           </div>
         </div>
       )}
