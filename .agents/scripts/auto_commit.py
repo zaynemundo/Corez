@@ -117,8 +117,8 @@ def main():
         }))
         return
 
-    # Step 5a: Add changes (excluding local environment artifacts)
-    res_add = run_cmd(["git", "add", "-A", "--", ".", ":!install.cmd"], cwd=cwd)
+    # Step 5a: Add changes (excluding local environment and generated artifacts)
+    res_add = run_cmd(["git", "add", "-A", "--", ".", ":!install.cmd", ":!artifacts/"], cwd=cwd)
     if res_add.returncode != 0:
         print(json.dumps({
             "decision": "stop",

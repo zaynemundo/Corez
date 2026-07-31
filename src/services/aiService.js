@@ -552,6 +552,7 @@ ${awwwardsSpec}
 
 const MAX_HISTORY_MESSAGES = 12;
 const MAX_HISTORY_MESSAGE_CHARS = 8000;
+const MAX_TRIMMED_BYTES = 220 * 1024;
 
 /**
  * Trim conversation history before sending it to the hosted AI so long
@@ -562,14 +563,37 @@ const MAX_HISTORY_MESSAGE_CHARS = 8000;
 export function trimConversationForRequest(messages) {
   if (!Array.isArray(messages) || messages.length === 0) return messages;
   const trimmed = messages.slice(-MAX_HISTORY_MESSAGES).map(m => {
-    if (typeof m?.content !== 'string') return m;
+    if (typeof m?.content !== 'string') {
+      // Bound non-string payloads (e.g. market cards) that could blow the cap
+      const serialized = JSON.stringify(m);
+      if (serialized && serialized.length > MAX_HISTORY_MESSAGE_CHARS) {
+        return { ...m, content: `[truncated payload (${serialized.length} chars)]` };
+      }
+      return m;
+    }
     const content = m.content.length > MAX_HISTORY_MESSAGE_CHARS
       ? `${m.content.slice(0, MAX_HISTORY_MESSAGE_CHARS)}\n[truncated]`
       : m.content;
     return { ...m, content };
   });
-  while (trimmed.length > 1 && JSON.stringify(trimmed).length > 220 * 1024) {
-    trimmed.shift();
+
+  // Estimate size cheaply, then drop oldest messages until it fits.
+  const entrySize = m => (typeof m?.content === 'string' ? m.content.length : JSON.stringify(m).length) + 64;
+  let estimated = trimmed.reduce((sum, m) => sum + entrySize(m), 0);
+  while (trimmed.length > 1 && estimated > MAX_TRIMMED_BYTES) {
+    estimated -= entrySize(trimmed.shift());
+  }
+
+  // Verify exactly once; hard-cap the last entry if the estimate was off.
+  const serialized = JSON.stringify(trimmed);
+  if (serialized.length > MAX_TRIMMED_BYTES) {
+    const last = trimmed[trimmed.length - 1];
+    const budget = Math.max(512, MAX_TRIMMED_BYTES - 256);
+    const content = String(last?.content || '');
+    trimmed[trimmed.length - 1] = {
+      ...last,
+      content: `${content.slice(0, budget)}\n[truncated]`
+    };
   }
   return trimmed;
 }

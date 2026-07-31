@@ -258,7 +258,15 @@ export default function App() {
       if (savedPending) {
         const pendingData = JSON.parse(savedPending);
         if (pendingData && pendingData.sessionId && (Date.now() - (pendingData.timestamp || 0) < 300000)) {
-          const targetSession = sessions.find(s => s.id === pendingData.sessionId);
+          // Re-parse sessions fresh from storage: the mount-time snapshot may
+          // predate the session the pending request belongs to (e.g. a refresh
+          // inside the 300 ms persist debounce).
+          let storedSessions = sessions;
+          try {
+            const parsed = JSON.parse(localStorage.getItem('corez_sessions') || '[]');
+            if (Array.isArray(parsed)) storedSessions = parsed;
+          } catch { /* fall back to the in-memory snapshot */ }
+          const targetSession = storedSessions.find(s => s.id === pendingData.sessionId);
           if (targetSession) {
             setIsThinking(true);
             const controller = new AbortController();
@@ -319,6 +327,7 @@ export default function App() {
     setCanvasOpen(false);
     setCanvasFullScreen(false);
     setActiveCanvasCode(null);
+    setRevisionContextCode('');
     const target = sessions.find(s => s.id === id);
     if (target && Array.isArray(target.messages) && target.messages.length > 0) {
       const lastAssistantMsg = [...target.messages].reverse().find(m => m.role === 'assistant' && m.type !== 'market');
@@ -357,6 +366,8 @@ export default function App() {
     setActiveView('chat');
     setCanvasOpen(false);
     setCanvasFullScreen(false);
+    setRevisionContextCode('');
+    setActiveCanvasCode(null);
   };
 
   const handleDeleteSession = (id) => {
@@ -390,6 +401,10 @@ export default function App() {
         appId: `app_${Date.now()}`,
         title: activeSession?.title || 'Canvas Application',
         code
+      }).then(result => {
+        if (result && result.success === false) {
+          console.warn('R2 background store failed; app remains in local session state.');
+        }
       }).catch(err => console.warn('R2 background store notification:', err));
     }
   };
@@ -402,6 +417,9 @@ export default function App() {
     localStorage.removeItem('corez_pending_request');
     setIsThinking(false);
   };
+
+  const [chatInput, setChatInput] = useState('');
+  const [revisionContextCode, setRevisionContextCode] = useState('');
 
   const handleSendMessage = async (promptText) => {
     if (isThinking || !activeSession) return;
@@ -474,9 +492,6 @@ export default function App() {
       abortControllerRef.current = null;
     }
   };
-
-  const [chatInput, setChatInput] = useState('');
-  const [revisionContextCode, setRevisionContextCode] = useState('');
 
   const handleReviseCode = (code) => {
     setRevisionContextCode(code);

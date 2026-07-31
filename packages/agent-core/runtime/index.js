@@ -44,6 +44,7 @@ ${this.contextEngine.buildSystemContextPrompt()}`;
 
     let currentStep = 0;
     const stepsHistory = [];
+    let truncatedByStepCap = false;
 
     while (currentStep < this.maxSteps) {
       if (signal?.aborted) {
@@ -92,6 +93,13 @@ ${this.contextEngine.buildSystemContextPrompt()}`;
         break;
       }
 
+      // Step cap reached with tool calls still pending: report truncation
+      if (currentStep >= this.maxSteps) {
+        truncatedByStepCap = true;
+        onStatus({ type: 'truncated', message: `Reached the ${this.maxSteps}-step cap with work still pending.` });
+        break;
+      }
+
       // Execute each tool call emitted by model
       for (const call of toolCalls) {
         if (signal?.aborted) {
@@ -129,7 +137,8 @@ ${this.contextEngine.buildSystemContextPrompt()}`;
     const lastAssistantMessage = [...messages].reverse().find(m => m.role === 'assistant')?.content || 'Task finished.';
 
     return {
-      success: true,
+      success: !truncatedByStepCap,
+      truncated: truncatedByStepCap,
       response: lastAssistantMessage,
       stepsCount: currentStep,
       stepsHistory,

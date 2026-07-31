@@ -158,6 +158,7 @@ export function buildAwwwardsDesignPrompt(userPrompt = '') {
     prompt += `Category Design Pattern: ${matchedCategory.designPattern}\n`;
   }
   prompt += `Typography: Google Fonts (${AWWWARDS_DESIGN_SYSTEM.typography.fontFamilies.display})\n`;
+  prompt += `Font Import: ${AWWWARDS_DESIGN_SYSTEM.typography.googleFontsImport}\n`;
   prompt += `Color System: Background ${AWWWARDS_DESIGN_SYSTEM.colorPalette.background}, Accents: ${AWWWARDS_DESIGN_SYSTEM.colorPalette.accentPrimary}\n`;
   prompt += `Glassmorphism: ${AWWWARDS_DESIGN_SYSTEM.effects.glassmorphism}\n`;
   prompt += `Design Rules:\n`;

@@ -1,5 +1,5 @@
 import { handleMarket } from './market.js';
-import { safeErrorDetail, readBoundedJson } from './utils.js';
+import { safeErrorDetail, readBoundedJson, jsonResponse, createRateLimiter } from './utils.js';
 
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 const OPENCODE_DEFAULT_ENDPOINT = 'https://opencode.ai/zen/go/v1/chat/completions';
@@ -29,23 +29,8 @@ function normalizeIntentType(intentType) {
   return CANONICAL_INTENT_TYPES.has(intentType) ? intentType : 'general';
 }
 
-function jsonResponse(status, body, extraHeaders = {}) {
-  const corsOrigin = '*';
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': corsOrigin,
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      'Access-Control-Max-Age': '86400',
-      'X-Content-Type-Options': 'nosniff',
-      'X-Frame-Options': 'DENY',
-      'Referrer-Policy': 'no-referrer',
-      ...extraHeaders
-    }
-  });
-}
+const aiRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 20 });
+const imageRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 30 });
 
 function buildSystemPrompt(options = {}) {
   const intent = typeof options.intent === 'object' ? options.intent : null;
@@ -169,6 +154,11 @@ function extractContentText(content) {
 async function handleAi(request, env) {
   if (request.method !== 'POST') {
     return jsonResponse(405, { error: 'Method not allowed.' });
+  }
+
+  const retryAfter = aiRateLimiter(request);
+  if (retryAfter !== null) {
+    return jsonResponse(429, { error: 'Too many requests. Try again shortly.' }, { 'Retry-After': String(retryAfter) });
   }
 
   let body;
@@ -430,6 +420,11 @@ async function handleImage(request, env) {
     return jsonResponse(405, { error: 'Method not allowed.' });
   }
 
+  const retryAfter = imageRateLimiter(request);
+  if (retryAfter !== null) {
+    return jsonResponse(429, { error: 'Too many requests. Try again shortly.' }, { 'Retry-After': String(retryAfter) });
+  }
+
   let body;
   try {
     body = await readBoundedJson(request);
@@ -557,7 +552,8 @@ async function handleImage(request, env) {
       message: 'Image generation failed',
       error: safeErrorDetail(error)
     }));
-    return jsonResponse(502, { error: `Unable to generate image: ${safeErrorDetail(error)}` });
+    console.error('Image generation failed:', safeErrorDetail(error));
+    return jsonResponse(502, { error: 'Unable to generate image.' });
   }
 }
 
@@ -625,7 +621,7 @@ async function handleR2Assets(request, env) {
   }
 
   if (request.method === 'GET' && pathname.startsWith('/api/assets/')) {
-    const key = pathname.replace('/api/assets/', '');
+    const key = decodePathSegment(pathname.replace('/api/assets/', ''));
     if (!key) return jsonResponse(400, { error: 'Asset key is required.' });
 
     const object = await env.ASSET_BUCKET.get(key);
@@ -650,7 +646,7 @@ async function handleR2Assets(request, env) {
   }
 
   if (request.method === 'DELETE' && pathname.startsWith('/api/assets/')) {
-    const key = pathname.replace('/api/assets/', '');
+    const key = decodePathSegment(pathname.replace('/api/assets/', ''));
     if (!key || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$/.test(key)) {
       return jsonResponse(400, { error: 'Invalid asset key.' });
     }
@@ -719,8 +715,11 @@ async function handleR2Apps(request, env) {
   // 2. GET /api/apps/:sessionId/:appId - Fetch a specific app
   if (request.method === 'GET' && pathname.match(/^\/api\/apps\/[^/]+\/[^/]+$/)) {
     const parts = pathname.replace('/api/apps/', '').split('/');
-    const sessionId = parts[0];
-    const appId = parts[1];
+    const sessionId = decodePathSegment(parts[0]);
+    const appId = decodePathSegment(parts[1]);
+    if (sessionId === null || appId === null) {
+      return jsonResponse(400, { error: 'Invalid path segment.' });
+    }
 
     const key = `apps/${sessionId}/${appId}.json`;
     const object = await env.ASSET_BUCKET.get(key);
@@ -756,7 +755,10 @@ async function handleR2Apps(request, env) {
 
   // 3. GET /api/apps/:sessionId - List all apps stored for a chat session
   if (request.method === 'GET' && pathname.match(/^\/api\/apps\/[^/]+$/)) {
-    const sessionId = pathname.replace('/api/apps/', '');
+    const sessionId = decodePathSegment(pathname.replace('/api/apps/', ''));
+    if (sessionId === null) {
+      return jsonResponse(400, { error: 'Invalid session id in path.' });
+    }
     const prefix = `apps/${sessionId}/`;
     const list = await env.ASSET_BUCKET.list({ prefix });
 
@@ -786,8 +788,11 @@ async function handleR2Apps(request, env) {
   // 4. DELETE /api/apps/:sessionId/:appId - Delete a specific app
   if (request.method === 'DELETE' && pathname.match(/^\/api\/apps\/[^/]+\/[^/]+$/)) {
     const parts = pathname.replace('/api/apps/', '').split('/');
-    const sessionId = parts[0];
-    const appId = parts[1];
+    const sessionId = decodePathSegment(parts[0]);
+    const appId = decodePathSegment(parts[1]);
+    if (sessionId === null || appId === null) {
+      return jsonResponse(400, { error: 'Invalid path segment.' });
+    }
 
     const key = `apps/${sessionId}/${appId}.json`;
     await env.ASSET_BUCKET.delete(key);
@@ -796,7 +801,10 @@ async function handleR2Apps(request, env) {
 
   // 5. DELETE /api/apps/:sessionId - Delete ALL apps associated with a chat session
   if (request.method === 'DELETE' && pathname.match(/^\/api\/apps\/[^/]+$/)) {
-    const sessionId = pathname.replace('/api/apps/', '');
+    const sessionId = decodePathSegment(pathname.replace('/api/apps/', ''));
+    if (sessionId === null) {
+      return jsonResponse(400, { error: 'Invalid session id in path.' });
+    }
     const prefix = `apps/${sessionId}/`;
     const list = await env.ASSET_BUCKET.list({ prefix });
 
@@ -885,6 +893,23 @@ async function rerankDocuments(env, query, documents) {
   }
 }
 
+function publicMemoryRecord(record) {
+  if (!record || typeof record !== 'object') return record;
+  const publicRecord = { ...record };
+  // Embeddings are server-side only: never expose raw vectors to clients.
+  delete publicRecord.embedding;
+  delete publicRecord.embeddingModel;
+  return publicRecord;
+}
+
+function decodePathSegment(segment) {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return null;
+  }
+}
+
 async function handleR2Memory(request, env) {
   if (!env?.ASSET_BUCKET) {
     return jsonResponse(530, { error: 'R2 storage (ASSET_BUCKET) is not configured.' });
@@ -935,7 +960,8 @@ async function handleR2Memory(request, env) {
       userId,
       key: keyName,
       r2Key: key,
-      record: memoryRecord
+      embeddingStored: Boolean(embedding),
+      record: publicMemoryRecord(memoryRecord)
     });
   }
 
@@ -997,13 +1023,13 @@ async function handleR2Memory(request, env) {
           const top = reranked
             .sort((a, b) => b.score - a.score)
             .slice(0, 5)
-            .map(r => ({ ...ranked[r.index].memory, score: Math.round(r.score * 1000) / 1000 }));
+            .map(r => ({ ...publicMemoryRecord(ranked[r.index].memory), score: Math.round(r.score * 1000) / 1000 }));
           return jsonResponse(200, { userId, query, matches: top, source: 'semantic', rerank: true });
         }
 
         const top = ranked
           .slice(0, 5)
-          .map(r => ({ ...r.memory, similarity: Math.round(r.similarity * 1000) / 1000 }));
+          .map(r => ({ ...publicMemoryRecord(r.memory), similarity: Math.round(r.similarity * 1000) / 1000 }));
         return jsonResponse(200, { userId, query, matches: top, source: 'semantic', rerank: false });
       }
     }
@@ -1014,14 +1040,18 @@ async function handleR2Memory(request, env) {
       const keyLower = String(m.key || '').toLowerCase();
       const catLower = String(m.category || '').toLowerCase();
       return textLower.includes(query) || keyLower.includes(query) || catLower.includes(query);
-    });
+    }).map(publicMemoryRecord);
 
     return jsonResponse(200, { userId, query, matches: keywordMatches, source: 'keyword' });
   }
 
   // 3. GET /api/memory/:userId - List all memories for a user
   if (request.method === 'GET' && pathname.match(/^\/api\/memory\/[^/]+$/)) {
-    const userId = pathname.replace('/api/memory/', '');
+    const encodedUserId = pathname.replace('/api/memory/', '');
+    const userId = decodePathSegment(encodedUserId);
+    if (userId === null) {
+      return jsonResponse(400, { error: 'Invalid user id in path.' });
+    }
     const prefix = `memory/${userId}/`;
     const list = await env.ASSET_BUCKET.list({ prefix });
 
@@ -1033,7 +1063,7 @@ async function handleR2Memory(request, env) {
           if (item) {
             try {
               const data = JSON.parse(await item.text());
-              memories.push(data);
+              memories.push(publicMemoryRecord(data));
             } catch {
               /* ignore invalid cache entries */
             }
@@ -1048,8 +1078,11 @@ async function handleR2Memory(request, env) {
   // 4. DELETE /api/memory/:userId/:key - Delete a memory
   if (request.method === 'DELETE' && pathname.match(/^\/api\/memory\/[^/]+\/[^/]+$/)) {
     const parts = pathname.replace('/api/memory/', '').split('/');
-    const userId = parts[0];
-    const keyName = parts[1];
+    const userId = decodePathSegment(parts[0]);
+    const keyName = decodePathSegment(parts[1]);
+    if (userId === null || keyName === null) {
+      return jsonResponse(400, { error: 'Invalid path segment.' });
+    }
 
     const key = `memory/${userId}/${keyName}.json`;
     await env.ASSET_BUCKET.delete(key);
@@ -1057,6 +1090,15 @@ async function handleR2Memory(request, env) {
   }
 
   return jsonResponse(405, { error: 'Method not allowed.' });
+}
+
+async function runJsonSafe(operation) {
+  try {
+    return await operation();
+  } catch (err) {
+    console.error('Storage handler error:', safeErrorDetail(err));
+    return jsonResponse(500, { error: 'Storage operation failed.' });
+  }
 }
 
 export default {
@@ -1084,13 +1126,13 @@ export default {
       return handleMarket(request, env);
     }
     if (pathname.startsWith('/api/assets')) {
-      return handleR2Assets(request, env);
+      return runJsonSafe(() => handleR2Assets(request, env));
     }
     if (pathname.startsWith('/api/apps')) {
-      return handleR2Apps(request, env);
+      return runJsonSafe(() => handleR2Apps(request, env));
     }
     if (pathname.startsWith('/api/memory')) {
-      return handleR2Memory(request, env);
+      return runJsonSafe(() => handleR2Memory(request, env));
     }
     if (pathname.startsWith('/api/')) {
       return jsonResponse(404, { error: 'API route not found.' });

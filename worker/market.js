@@ -1,3 +1,5 @@
+import { jsonResponse } from './utils.js';
+
 const API_BASE = 'https://api.twelvedata.com';
 const FRESH_MS = 60_000;
 const STALE_MS = 15 * 60_000;
@@ -59,12 +61,10 @@ const rateClients = new Map();
 
 function apiError(status, code, message, retryAfter) {
   const hasRetryAfter = Number.isFinite(retryAfter) && retryAfter > 0;
-  return Response.json(
+  return jsonResponse(
+    status,
     { error: { code, message, ...(hasRetryAfter ? { retryAfter } : {}) } },
-    {
-      status,
-      headers: hasRetryAfter ? { 'Retry-After': String(Math.ceil(retryAfter)) } : undefined
-    }
+    hasRetryAfter ? { 'Retry-After': String(Math.ceil(retryAfter)) } : {}
   );
 }
 
@@ -740,7 +740,7 @@ export async function handleMarket(request, env) {
       cached.payload.meta.delayMinutes || 0
     );
     try {
-      return Response.json(rebindPayload(
+      return jsonResponse(200, rebindPayload(
         cached.payload,
         normalized,
         {
@@ -786,7 +786,7 @@ export async function handleMarket(request, env) {
 
   try {
     const payload = await pending;
-    return Response.json(rebindPayload(
+    return jsonResponse(200, rebindPayload(
       payload,
       normalized,
       { cached: false, stale: false },
@@ -796,7 +796,7 @@ export async function handleMarket(request, env) {
   } catch (error) {
     if (cached && age <= STALE_MS) {
       try {
-        return Response.json(rebindPayload(
+        return jsonResponse(200, rebindPayload(
           cached.payload,
           normalized,
           { cached: true, stale: true },

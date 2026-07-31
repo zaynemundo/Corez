@@ -1,4 +1,4 @@
-import { GenericSwarmOrchestrator } from '../../../agent-core/index.js';
+import { GenericSwarmOrchestrator, ModelProviderRouter } from '../../../agent-core/index.js';
 
 export async function handleSwarmCommand(prompt, options = {}, ui) {
   if (!prompt || typeof prompt !== 'string') {
@@ -9,7 +9,9 @@ export async function handleSwarmCommand(prompt, options = {}, ui) {
   ui.banner();
   ui.status('◐', `Initializing Multi-Agent Swarm Orchestrator for: "${prompt}"...`);
 
-  const orchestrator = new GenericSwarmOrchestrator();
+  const orchestrator = new GenericSwarmOrchestrator({
+    providerRouter: new ModelProviderRouter({ defaultModel: 'deepseek-v4-pro' })
+  });
 
   try {
     const result = await orchestrator.executeSwarmJob(prompt, {

@@ -25,7 +25,7 @@ export default function Sidebar({
   onCloseSidebar
 }) {
   return (
-    <aside className={`sidebar icon-only ${isOpen ? '' : 'collapsed'}`} aria-hidden={!isOpen}>
+    <aside className={`sidebar icon-only ${isOpen ? '' : 'collapsed'}`} aria-hidden={!isOpen} inert={!isOpen}>
       <div className="sidebar-header icon-only-header">
         <button 
           className="brand-icon-toggle" 

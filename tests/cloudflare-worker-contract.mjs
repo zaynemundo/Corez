@@ -486,11 +486,13 @@ async function run() {
   const storeNoAiData = await json(storeNoAi);
   assert.equal(storeNoAiData.record.embedding, undefined);
 
-  // Store memories WITH AI binding -> embeddings persisted
+  // Store memories WITH AI binding -> embeddings persisted server-side only
   const store1 = await memoryPost('/api/memory/store', { userId: 'u1', key: 'k1', text: 'User prefers blue themes.' });
   assert.equal(store1.status, 200);
   const store1Data = await json(store1);
-  assert.ok(Array.isArray(store1Data.record.embedding) && store1Data.record.embedding.length === 4);
+  assert.equal(store1Data.embeddingStored, true);
+  assert.equal(store1Data.record.embedding, undefined);
+  assert.equal(store1Data.record.embeddingModel, undefined);
 
   await memoryPost('/api/memory/store', { userId: 'u1', key: 'k2', text: 'User plays chess on weekends.' });
   await memoryPost('/api/memory/store', { userId: 'u1', key: 'k3', text: 'User works with React and Vite.' });

@@ -29,6 +29,7 @@ export async function storeAppInR2({ sessionId, appId, title = 'Untitled Applica
     if (res.ok) {
       return await res.json();
     }
+    console.warn(`R2 app storage failed with HTTP ${res.status}.`);
   } catch (err) {
     console.warn('R2 app storage request failed, falling back to local session state:', err);
   }

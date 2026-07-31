@@ -1,6 +1,9 @@
 import readline from 'node:readline';
 import { AgentRuntime, ContextEngine, PermissionManager, loadCorezConfig } from '../../../agent-core/index.js';
 import { handleModelCommand } from './model.js';
+import { handleFixCommand } from './fix.js';
+import { handleReviewCommand } from './review.js';
+import { handleSwarmCommand } from './swarm.js';
 
 export const SLASH_COMMANDS = Object.freeze([
   { cmd: '/model', desc: 'View or switch active AI model' },
@@ -54,7 +57,7 @@ export async function handleChatCommand(options = {}, ui) {
         return;
       }
 
-      if (['exit', 'quit', ':q'].includes(trimmed.toLowerCase())) {
+      if (['exit', 'quit', ':q', '/exit', '/quit'].includes(trimmed.toLowerCase())) {
         console.log('\nGoodbye!\n');
         rl.close();
         return;
@@ -123,6 +126,7 @@ export async function handleChatCommand(options = {}, ui) {
               permissionManager: readOnlyPermissions
             });
             const planResult = await planRuntime.runTask(`[READ-ONLY PLAN MODE]: ${planTask}`, {
+              signal: options.signal,
               onStatus: (st) => st.type === 'tool_start' && ui.status('●', `Tool: ${st.name}`)
             });
             console.log(`\n${planResult.response}\n`);
@@ -142,6 +146,7 @@ export async function handleChatCommand(options = {}, ui) {
           ui.status('◐', `Building task: "${buildTask}"...`);
           try {
             const buildResult = await runtime.runTask(buildTask, {
+              signal: options.signal,
               onStatus: (st) => st.type === 'tool_start' && ui.status('●', `Tool: ${st.name}`)
             });
             ui.brief({
@@ -160,10 +165,34 @@ export async function handleChatCommand(options = {}, ui) {
         return;
       }
 
+      if (lower === '/fix' || lower === 'fix') {
+        await handleFixCommand(options, ui);
+        promptUser();
+        return;
+      }
+
+      if (lower === '/review' || lower === 'review') {
+        await handleReviewCommand(options, ui);
+        promptUser();
+        return;
+      }
+
+      if (lower.startsWith('/swarm')) {
+        const swarmTask = trimmed.replace(/^\/swarm\s*/i, '').trim();
+        if (!swarmTask) {
+          console.log('\nUsage: /swarm <task description>\n');
+        } else {
+          await handleSwarmCommand(swarmTask, options, ui);
+        }
+        promptUser();
+        return;
+      }
+
       ui.status('◐', `Processing request...`);
 
       try {
         const result = await runtime.runTask(trimmed, {
+          signal: options.signal,
           onStatus: (st) => {
             if (st.type === 'tool_start') {
               ui.status('●', `Tool: ${st.name}`);

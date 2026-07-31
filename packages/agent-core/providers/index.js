@@ -15,7 +15,11 @@ export class ModelProviderRouter {
   getAvailableModels() {
     return MODEL_CATALOG.map(m => ({
       ...m,
-      configured: Boolean(this.opencodeApiKey || this.openrouterApiKey)
+      configured: m.provider === 'opencode-go'
+        ? Boolean(this.opencodeApiKey)
+        : m.provider === 'openrouter'
+          ? Boolean(this.openrouterApiKey)
+          : Boolean(this.opencodeApiKey || this.openrouterApiKey)
     }));
   }
 
@@ -55,6 +59,8 @@ export class ModelProviderRouter {
             raw: data
           };
         }
+        const detail = (await res.text().catch(() => '')).slice(0, 300);
+        console.warn(`[ModelProviderRouter] HTTP ${res.status} from ${endpoint}: ${detail || res.statusText}. Activating local agent simulation fallback.`);
       } catch (err) {
         if (err.name === 'AbortError') throw err;
         console.warn(`[ModelProviderRouter] Request failed: ${err.message}. Activating local agent simulation fallback.`);
