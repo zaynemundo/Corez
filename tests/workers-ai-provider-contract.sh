@@ -29,6 +29,9 @@ check_absent() {
 
 check 'Worker routes text through GLM 5.2, DeepSeek V4 Pro, or DeepSeek V4 Flash' 'glm-5.2|deepseek-v4-pro|deepseek-v4-flash' "$worker"
 check_absent 'Worker no longer routes through MiMo V2.5' 'xiaomi/mimo-v2[.]5' "$worker"
+check 'Worker allows long OpenCode Go generations (180s)' 'OPENCODE_CALL_TIMEOUT_MS[[:space:]]*=[[:space:]]*180_000' "$worker"
+check 'Worker gives the AI chain a generous total budget (300s)' 'AI_REQUEST_BUDGET_MS[[:space:]]*=[[:space:]]*300_000' "$worker"
+check 'Worker reports provider failure details' 'recordFailure' "$worker"
 check 'Worker uses Kimi 2.7 Code as the primary Workers AI fallback' '@cf/moonshotai/kimi-k2[.]7-code' "$worker"
 check 'Worker uses DeepSeek R1 Distill as the secondary Workers AI fallback' '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b' "$worker"
 check 'Worker uses Llama 3.3 70B Fast as the final Workers AI fallback' '@cf/meta/llama-3[.]3-70b-instruct-fp8-fast' "$worker"

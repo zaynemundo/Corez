@@ -655,7 +655,8 @@ export async function generateHostedAIResponse(
 
   if (!response.ok) {
     const serverMsg = typeof data?.error === 'string' ? data.error : (data?.error?.message || data?.message || `HTTP ${response.status}`);
-    throw new Error(`Hosted AI request failed: ${serverMsg}`);
+    const detail = typeof data?.detail === 'string' && data.detail.trim() ? ` (${data.detail.trim()})` : '';
+    throw new Error(`Hosted AI request failed: ${serverMsg}${detail}`);
   }
 
   // Defense-in-depth: reasoning text must never reach the user. Strip closed

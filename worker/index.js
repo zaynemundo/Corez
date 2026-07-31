@@ -323,7 +323,17 @@ async function handleAi(request, env) {
 
   // Provider calls abort when the client disconnects (request.signal) or the
   // overall budget expires, so Stop never leaves paid generations running.
-  const requestBudget = createTimedSignal(request.signal, 120_000);
+  // Large revisions (multiplayer additions, big games) legitimately take
+  // minutes to generate: aborting a slow-but-working generation just burns
+  // the fallback chain and ends in a 502.
+  const OPENCODE_CALL_TIMEOUT_MS = 180_000;
+  const AI_REQUEST_BUDGET_MS = 300_000;
+  const requestBudget = createTimedSignal(request.signal, AI_REQUEST_BUDGET_MS);
+  const providerFailures = [];
+  const recordFailure = (label, reason) => {
+    const safe = safeErrorDetail(reason);
+    if (safe) providerFailures.push(`${label}: ${safe}`);
+  };
   try {
   if (opencodeKey) {
     const callOpenCodeGo = async (modelId, messagesToSend) => {
@@ -340,12 +350,13 @@ async function handleAi(request, env) {
             model: modelId,
             messages: messagesToSend
           }),
-          signal: mergeSignals(requestBudget.signal, AbortSignal.timeout(45_000))
+          signal: mergeSignals(requestBudget.signal, AbortSignal.timeout(OPENCODE_CALL_TIMEOUT_MS))
         });
 
         if (!opencodeResp.ok) {
           const detail = (await opencodeResp.text().catch(() => '')).slice(0, 200);
           console.warn(`OpenCode Go model ${modelId} returned HTTP ${opencodeResp.status}:`, safeErrorDetail(detail));
+          recordFailure(`opencode:${modelId} HTTP ${opencodeResp.status}`, detail);
           return null;
         }
         const data = await opencodeResp.json();
@@ -353,6 +364,7 @@ async function handleAi(request, env) {
         return { content: answerText(message), reasoning: hasReasoning(message) };
       } catch (opencodeErr) {
         console.warn(`OpenCode Go model ${modelId} request failed:`, safeErrorDetail(opencodeErr));
+        recordFailure(`opencode:${modelId}`, opencodeErr);
         return null;
       }
     };
@@ -367,6 +379,7 @@ async function handleAi(request, env) {
       if (result && result.content) {
         return jsonResponse(200, { content: result.content, model: `opencode:${modelId}` });
       }
+      recordFailure(`opencode:${modelId}`, 'empty or reasoning-only response after continuation');
     }
   }
 
@@ -387,7 +400,7 @@ async function handleAi(request, env) {
           messages: apiMessages,
           stream: false
         }),
-        signal: mergeSignals(requestBudget.signal, AbortSignal.timeout(60_000))
+        signal: mergeSignals(requestBudget.signal, AbortSignal.timeout(120_000))
       });
 
       if (deepSeekResp.ok) {
@@ -399,9 +412,11 @@ async function handleAi(request, env) {
       } else {
         const errText = await deepSeekResp.text().catch(() => '');
         console.warn(`DeepSeek API returned HTTP ${deepSeekResp.status}:`, safeErrorDetail(errText));
+        recordFailure(`deepseek HTTP ${deepSeekResp.status}`, errText);
       }
     } catch (deepSeekErr) {
       console.warn('DeepSeek API request failed:', safeErrorDetail(deepSeekErr));
+      recordFailure('deepseek', deepSeekErr);
     }
   }
 
@@ -427,7 +442,7 @@ async function handleAi(request, env) {
             reasoning: { effort: reasoningEffort },
             messages: apiMessages
           }),
-          signal: mergeSignals(requestBudget.signal, AbortSignal.timeout(30_000))
+          signal: mergeSignals(requestBudget.signal, AbortSignal.timeout(60_000))
         });
 
         if (openRouterResp.ok) {
@@ -436,9 +451,13 @@ async function handleAi(request, env) {
           if (content) {
             return jsonResponse(200, { content, model: modelId });
           }
+        } else {
+          const detail = (await openRouterResp.text().catch(() => '')).slice(0, 200);
+          recordFailure(`openrouter:${modelId} HTTP ${openRouterResp.status}`, detail);
         }
       } catch (orErr) {
         console.warn(`OpenRouter model ${modelId} request failed:`, safeErrorDetail(orErr));
+        recordFailure(`openrouter:${modelId}`, orErr);
       }
     }
   }
@@ -464,6 +483,7 @@ async function handleAi(request, env) {
     } catch (modelError) {
       lastWorkersAiError = modelError;
       console.warn(`Workers AI model ${modelId} failed:`, safeErrorDetail(modelError));
+      recordFailure(`workers-ai:${modelId}`, modelError);
     }
   }
 
@@ -471,8 +491,12 @@ async function handleAi(request, env) {
     message: 'Workers AI generation failed',
     error: lastWorkersAiError ? safeErrorDetail(lastWorkersAiError) : 'All Workers AI models returned empty responses.'
   }));
+  const failureDetail = providerFailures.length > 0
+    ? providerFailures.slice(0, 3).join(' | ').slice(0, 300)
+    : 'all providers returned no usable response';
   return jsonResponse(502, {
-    error: lastWorkersAiError ? 'Unable to generate AI response.' : 'Workers AI returned an empty response.'
+    error: lastWorkersAiError ? 'Unable to generate AI response.' : 'Workers AI returned an empty response.',
+    detail: failureDetail
   });
   } finally {
     requestBudget.cleanup();

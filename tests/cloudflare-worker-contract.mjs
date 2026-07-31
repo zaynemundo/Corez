@@ -526,9 +526,9 @@ async function run() {
   }
   assert.equal(thrownResponse.status, 502);
   const thrownBody = await thrownResponse.text();
-  assert.deepEqual(JSON.parse(thrownBody), {
-    error: 'Unable to generate AI response.'
-  });
+  const thrownPayload = JSON.parse(thrownBody);
+  assert.equal(thrownPayload.error, 'Unable to generate AI response.');
+  assert.match(thrownPayload.detail, /workers-ai:@cf\/moonshotai\/kimi-k2[.]7-code/);
   assert.doesNotMatch(thrownBody, /super-secret-value/);
   assert.deepEqual(JSON.parse(loggedError), {
     message: 'Workers AI generation failed',
@@ -546,9 +546,9 @@ async function run() {
     })
   );
   assert.equal(emptyResponse.status, 502);
-  assert.deepEqual(await json(emptyResponse), {
-    error: 'Workers AI returned an empty response.'
-  });
+  const emptyPayload = await json(emptyResponse);
+  assert.equal(emptyPayload.error, 'Workers AI returned an empty response.');
+  assert.match(emptyPayload.detail, /all providers returned no usable response/);
 
   // Native Workers AI envelope ({ response: ... }) must not be misread as an
   // empty answer just because there is no OpenAI-style choices array.
