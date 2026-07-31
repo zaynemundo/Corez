@@ -340,6 +340,15 @@ async function handleAi(request, env) {
       result = await env.AI.run(WORKERS_AI_MODEL, {
         messages: apiMessages
       });
+      // An empty primary response is as useless as a thrown error: try the
+      // DeepSeek fallback model before giving up.
+      if (!extractContentText(result?.choices?.[0]?.message?.content).trim()) {
+        console.warn('Primary Workers AI model returned an empty response, attempting DeepSeek fallback.');
+        usedModel = DEEPSEEK_MODEL;
+        result = await env.AI.run(DEEPSEEK_MODEL, {
+          messages: apiMessages
+        });
+      }
     } catch (primaryError) {
       console.warn('Primary Workers AI model failed, attempting DeepSeek fallback:', safeErrorDetail(primaryError));
       usedModel = DEEPSEEK_MODEL;
