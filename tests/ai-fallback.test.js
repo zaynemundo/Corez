@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { generateAIResponse, generateLocalAIResponse, isRevisionContextPrompt } from '../src/services/aiService.js';
+import { generateAIResponse, generateLocalAIResponse, isRevisionContextPrompt, trimConversationForRequest } from '../src/services/aiService.js';
 
 const GAME_HTML = `<!DOCTYPE html><html><body><canvas id="game"></canvas><script>function gameLoop(){requestAnimationFrame(gameLoop);}requestAnimationFrame(gameLoop);</script></body></html>`;
 
@@ -95,5 +95,27 @@ describe('Hosted AI fallback behavior', () => {
     await expect(generateAIResponse('Tell me about black roses', [], abortController.signal))
       .rejects.toMatchObject({ name: 'AbortError' });
     expect(fetchMock).toHaveBeenCalledWith('/api/ai', expect.objectContaining({ signal: abortController.signal }));
+  });
+
+  it('keeps oversized conversation history under the worker body limit', async () => {
+    const bigCodeBlock = 'x'.repeat(20 * 1024);
+    const history = Array.from({ length: 20 }, (_, i) => ({
+      role: i % 2 === 0 ? 'user' : 'assistant',
+      content: i % 3 === 0 ? bigCodeBlock : `message ${i}`
+    }));
+
+    const trimmed = trimConversationForRequest(history);
+
+    expect(trimmed.length).toBeLessThanOrEqual(12);
+    expect(trimmed[trimmed.length - 1]).toEqual(history[history.length - 1]);
+    for (const m of trimmed) {
+      if (m.content.length > 8000) expect(m.content).toMatch(/\[truncated\]$/);
+    }
+    expect(JSON.stringify(trimmed).length).toBeLessThan(220 * 1024);
+
+    // Single oversized message still fits within the cap
+    const single = trimConversationForRequest([{ role: 'user', content: 'y'.repeat(300 * 1024) }]);
+    expect(single.length).toBe(1);
+    expect(JSON.stringify(single).length).toBeLessThan(220 * 1024);
   });
 });

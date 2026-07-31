@@ -174,8 +174,9 @@ async function handleAi(request, env) {
   let body;
   try {
     body = await readBoundedJson(request);
-  } catch {
-    return jsonResponse(400, { error: 'Request body must be valid JSON.' });
+  } catch (bodyErr) {
+    const message = bodyErr?.message || 'Invalid JSON payload.';
+    return jsonResponse(400, { error: `Request body rejected: ${message}` });
   }
 
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
@@ -432,8 +433,9 @@ async function handleImage(request, env) {
   let body;
   try {
     body = await readBoundedJson(request);
-  } catch {
-    return jsonResponse(400, { error: 'Request body must be valid JSON.' });
+  } catch (bodyErr) {
+    const message = bodyErr?.message || 'Invalid JSON payload.';
+    return jsonResponse(400, { error: `Request body rejected: ${message}` });
   }
 
   if (!body || typeof body !== 'object' || Array.isArray(body)) {

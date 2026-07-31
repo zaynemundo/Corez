@@ -126,9 +126,15 @@ async function run() {
 
   const malformedResponse = await post('{');
   assert.equal(malformedResponse.status, 400);
-  assert.deepEqual(await json(malformedResponse), {
-    error: 'Request body must be valid JSON.'
-  });
+  assert.match((await json(malformedResponse)).error, /Request body rejected/);
+
+  // Oversized bodies are rejected with a distinct, honest error message
+  const oversizedResponse = await post(JSON.stringify({
+    prompt: 'Explain this',
+    messages: [{ role: 'user', content: 'x'.repeat(300 * 1024) }]
+  }));
+  assert.equal(oversizedResponse.status, 400);
+  assert.match((await json(oversizedResponse)).error, /byte limit/);
 
   const nullBodyResponse = await post(JSON.stringify(null));
   assert.equal(nullBodyResponse.status, 400);

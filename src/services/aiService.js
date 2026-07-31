@@ -550,6 +550,30 @@ ${awwwardsSpec}
 - Include a concise explanation of the changes and test verification steps.`;
 }
 
+const MAX_HISTORY_MESSAGES = 12;
+const MAX_HISTORY_MESSAGE_CHARS = 8000;
+
+/**
+ * Trim conversation history before sending it to the hosted AI so long
+ * code-heavy chats stay under the worker's 256 KB request-body limit.
+ * Keeps the most recent messages, truncates oversized entries, and caps the
+ * total serialized size — without ever dropping the latest user turn.
+ */
+export function trimConversationForRequest(messages) {
+  if (!Array.isArray(messages) || messages.length === 0) return messages;
+  const trimmed = messages.slice(-MAX_HISTORY_MESSAGES).map(m => {
+    if (typeof m?.content !== 'string') return m;
+    const content = m.content.length > MAX_HISTORY_MESSAGE_CHARS
+      ? `${m.content.slice(0, MAX_HISTORY_MESSAGE_CHARS)}\n[truncated]`
+      : m.content;
+    return { ...m, content };
+  });
+  while (trimmed.length > 1 && JSON.stringify(trimmed).length > 220 * 1024) {
+    trimmed.shift();
+  }
+  return trimmed;
+}
+
 export async function generateHostedAIResponse(
   prompt,
   intent = analyzePublicUserIntent(prompt),
@@ -584,7 +608,7 @@ export async function generateHostedAIResponse(
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ prompt, intent, messages: history, fineIntent, executionPrompt, legacyIntent: legacyIntentType, contract, skills: resolved.skills, executionPlan: resolved.compactExecutionPlan || null, complexity }),
+    body: JSON.stringify({ prompt, intent, messages: trimConversationForRequest(history), fineIntent, executionPrompt, legacyIntent: legacyIntentType, contract, skills: resolved.skills, executionPlan: resolved.compactExecutionPlan || null, complexity }),
   };
   if (signal) fetchOptions.signal = signal;
 
@@ -2339,7 +2363,7 @@ export async function handleMixedQuestionImageRequest(prompt, intent, history, s
   // image in parallel from the extracted subject.
   const questionPrompt = extractQuestionPrompt(prompt) || prompt;
   const questionHistory = Array.isArray(history) && history.length > 0
-    ? [...history.slice(0, -1), { role: 'user', content: questionPrompt }]
+    ? [...trimConversationForRequest(history).slice(0, -1), { role: 'user', content: questionPrompt }]
     : [];
 
   const [hostedResult, imageResult] = await Promise.allSettled([
