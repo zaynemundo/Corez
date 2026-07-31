@@ -15,7 +15,7 @@ export function generateEngineSkeleton(gameSpec = {}) {
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #0c0d14; color: #fff; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-    #game-container { position: relative; width: 100%; max-width: 960px; aspect-ratio: 16/9; background: #161824; border: 2px solid #2a2d42; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); overflow: hidden; }
+    #game-container { position: relative; width: 100%; max-width: 960px; aspect-ratio: 16/9; background: #161824; border: 2px solid #2a2d42; border-radius: 8px; box-shadow: none; overflow: hidden; }
     canvas {
       width: 100%;
       height: 100%;

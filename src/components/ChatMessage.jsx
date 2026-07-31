@@ -119,7 +119,7 @@ function ExecutableCodeBlock({ code, onRunInCanvas, onReviseCode }) {
             alignItems: 'center',
             justifyContent: 'center',
             gap: '0.5rem',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+            boxShadow: 'none',
             transition: 'var(--transition-fast)'
           }}
           onClick={() => onRunInCanvas(code)}
