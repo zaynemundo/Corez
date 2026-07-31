@@ -6,7 +6,11 @@ Corez deploys the Vite application and its AI endpoints together as a Cloudflare
 
 ### Text and multimodal requests
 
-When `OPENCODE_GO_API_KEY` (or `OPENCODE_API_KEY`) is configured, `/api/ai` uses the OpenCode Go API provider endpoint first:
+When `DEEPSEEK_API_KEY` is configured, `/api/ai` uses the official DeepSeek API first:
+
+- All chat, coding, app & swarm requests: `deepseek-v4-flash-0731` (override with the `DEEPSEEK_MODEL` secret; official API models include `deepseek-chat` and `deepseek-reasoner`)
+
+When `OPENCODE_GO_API_KEY` (or `OPENCODE_API_KEY`) is configured, `/api/ai` uses the OpenCode Go API provider next:
 
 - All chat, coding, app & swarm requests: `deepseek-v4-flash`
 
@@ -21,7 +25,7 @@ If configured API keys are unavailable, missing, or return no usable response, C
 
 `/api/image` uses the Workers AI binding with `@cf/black-forest-labs/flux-1-schnell`.
 
-The `AI` binding is declared in `wrangler.jsonc`. Workers AI does not require a provider API key. `OPENROUTER_API_KEY` is optional and should be configured as a Worker secret when OpenRouter routing is required.
+The `AI` binding is declared in `wrangler.jsonc`. Workers AI does not require a provider API key. `DEEPSEEK_API_KEY` is the primary provider secret and should be configured as a Worker secret; `OPENROUTER_API_KEY` is optional for image/fallback routing.
 
 ## Local Intent Training & Classification
 

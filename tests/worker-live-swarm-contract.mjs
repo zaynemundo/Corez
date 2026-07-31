@@ -152,6 +152,65 @@ async function run() {
     globalThis.fetch = originalFetch;
   }
 
+  // Swarm routes to the official DeepSeek API when DEEPSEEK_API_KEY is set
+  {
+    const originalFetch = globalThis.fetch;
+    const deepSeekRequests = [];
+    try {
+      globalThis.fetch = async (url, init) => {
+        assert.equal(url, 'https://api.deepseek.com/chat/completions');
+        const payload = JSON.parse(init.body);
+        deepSeekRequests.push(payload);
+
+        const systemPrompt = payload.messages?.[0]?.content || '';
+        const content = systemPrompt.includes('lead synthesis agent')
+          ? 'Integrated DeepSeek swarm response'
+          : `Specialist contribution ${deepSeekRequests.length}`;
+
+        return new Response(JSON.stringify({
+          choices: [{ message: { content } }]
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      };
+
+      const body = {
+        prompt: 'Build a responsive retro platformer. Add touch controls. Add sound effects.',
+        intent: {
+          type: 'app',
+          summary: 'Build a complete browser game.'
+        },
+        complexity: 'high',
+        messages: [
+          { role: 'user', content: 'Build a responsive retro platformer. Add touch controls. Add sound effects.' }
+        ]
+      };
+
+      const response = await post(body, environment({
+        DEEPSEEK_API_KEY: 'sk-deepseek-test',
+        SWARM_AGENT_TIMEOUT_MS: '2000',
+        SWARM_RESPONSE_DEADLINE_MS: '2000',
+        SWARM_SYNTHESIS_TIMEOUT_MS: '2000'
+      }));
+
+      assert.equal(response.status, 200);
+      const data = await response.json();
+      assert.equal(data.content, 'Integrated DeepSeek swarm response');
+      assert.equal(data.swarm.enabled, true);
+      assert.ok(deepSeekRequests.length > 1);
+
+      for (const payload of deepSeekRequests) {
+        assert.equal(payload.model, 'deepseek-v4-flash-0731');
+        assert.equal(payload.reasoning, undefined);
+        assert.equal(payload.provider, undefined);
+        assert.ok(payload.max_tokens > 0);
+      }
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  }
+
   const delegatedResponse = await post(
     {
       prompt: 'Explain edge computing',

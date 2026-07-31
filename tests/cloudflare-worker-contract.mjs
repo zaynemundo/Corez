@@ -185,6 +185,76 @@ async function run() {
   assert.match(generalInput.messages[0].content, /Adaptive Routing - Fast Path/);
   assert.match(generalInput.messages[0].content, /Inferred intent: general/);
 
+  // DeepSeek official API is the primary provider when DEEPSEEK_API_KEY is set
+  {
+    const originalFetch = globalThis.fetch;
+    let deepSeekPayload;
+    try {
+      globalThis.fetch = async (url, init) => {
+        assert.equal(url, 'https://api.deepseek.com/chat/completions');
+        deepSeekPayload = JSON.parse(init.body);
+        return new Response(JSON.stringify({
+          choices: [{ message: { content: 'DeepSeek official response' } }]
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      };
+
+      const deepSeekResp = await post(
+        JSON.stringify({ prompt: 'Explain black roses', intent: { type: 'general' } }),
+        env({ AI: undefined, DEEPSEEK_API_KEY: 'sk-deepseek-test' })
+      );
+      assert.equal(deepSeekResp.status, 200);
+      const dsData = await deepSeekResp.json();
+      assert.equal(dsData.content, 'DeepSeek official response');
+      assert.equal(dsData.model, 'deepseek:deepseek-v4-flash-0731');
+      assert.equal(deepSeekPayload.model, 'deepseek-v4-flash-0731');
+      assert.equal(deepSeekPayload.stream, false);
+      assert.ok(deepSeekPayload.max_tokens > 0);
+      assert.ok(Array.isArray(deepSeekPayload.messages));
+      assert.equal(deepSeekPayload.messages.at(-1).content, 'Explain black roses');
+      assert.equal(deepSeekPayload.reasoning, undefined);
+      assert.equal(deepSeekPayload.provider, undefined);
+
+      // DEEPSEEK_MODEL env override is honored
+      const deepSeekModelResp = await post(
+        JSON.stringify({ prompt: 'Hi there' }),
+        env({
+          AI: undefined,
+          DEEPSEEK_API_KEY: 'sk-deepseek-test',
+          DEEPSEEK_MODEL: 'deepseek-chat'
+        })
+      );
+      const dsModelData = await deepSeekModelResp.json();
+      assert.equal(dsModelData.model, 'deepseek:deepseek-chat');
+      assert.equal(deepSeekPayload.model, 'deepseek-chat');
+
+      // DeepSeek failure falls through to the next provider (Workers AI)
+      globalThis.fetch = async () => new Response('{}', { status: 502 });
+      const deepSeekFallbackResp = await post(
+        JSON.stringify({ prompt: 'Explain fallback' }),
+        env({
+          AI: {
+            async run(_model, input) {
+              generalInput = input;
+              return {
+                choices: [{ message: { content: 'Workers AI after DeepSeek failure' } }]
+              };
+            }
+          },
+          DEEPSEEK_API_KEY: 'sk-deepseek-test'
+        })
+      );
+      assert.equal(deepSeekFallbackResp.status, 200);
+      const dsFallbackData = await deepSeekFallbackResp.json();
+      assert.equal(dsFallbackData.content, 'Workers AI after DeepSeek failure');
+      assert.equal(dsFallbackData.model, '@cf/moonshotai/kimi-k2.7-code');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  }
+
   const codeHelpPrompt = await captureSystemPrompt({
     type: 'code-help',
     summary: 'Fix a React component.'

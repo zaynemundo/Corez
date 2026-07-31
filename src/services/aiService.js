@@ -2203,7 +2203,7 @@ export async function generateLocalAIResponse(prompt, hostedError = null) {
 
   if (revisionMatch) {
     const reason = hostedError?.message ? ` The hosted AI service is unavailable: ${hostedError.message}` : ' The hosted AI service is currently unavailable.';
-    return `I can see the code you want to revise, but I couldn't apply your revision (${userRequestPart || 'no request captured'}).${reason} Please check that the AI service is reachable (e.g. OPENROUTER_API_KEY configured for local dev) and try again — your code has not been changed.`;
+    return `I can see the code you want to revise, but I couldn't apply your revision (${userRequestPart || 'no request captured'}).${reason} Please check that the AI service is reachable (e.g. DEEPSEEK_API_KEY configured for local dev) and try again — your code has not been changed.`;
   }
 
   // 1. GREETINGS & SMALL TALK (Universal & Natural)
@@ -2227,7 +2227,7 @@ export async function generateLocalAIResponse(prompt, hostedError = null) {
     const gameResult = synthesizeCustomGame(cleanPrompt);
     if (!gameResult) {
       const reason = hostedError?.message ? ` The hosted AI service is unavailable: ${hostedError.message}` : ' The hosted AI service is currently unavailable.';
-      return `I'd love to build that for you, but it doesn't match any app template I can synthesize offline, and ${reason.trim()} — so I can't create this specific app right now. Please check the AI service configuration (e.g. OPENROUTER_API_KEY for local dev) and try again.`;
+      return `I'd love to build that for you, but it doesn't match any app template I can synthesize offline, and ${reason.trim()} — so I can't create this specific app right now. Please check the AI service configuration (e.g. DEEPSEEK_API_KEY for local dev) and try again.`;
     }
     return `I've created **${gameResult.title}** for you! Click below to open it live in the preview canvas on the right side.\n\n\`\`\`html\n${gameResult.html}\n\`\`\``;
   }

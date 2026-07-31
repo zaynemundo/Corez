@@ -1,8 +1,7 @@
 import baseWorker from './index.js';
 import { safeErrorDetail, readBoundedJson } from './utils.js';
 
-const SWARM_MODEL = 'deepseek/deepseek-v4-pro';
-
+const SWARM_MODEL = 'deepseek-v4-pro';
 const CORE_AGENT_TEMPLATES = Object.freeze({
   app: [
     {
@@ -190,34 +189,71 @@ async function callAIGateway(apiKey, messages, options = {}) {
   const timedSignal = createTimedSignal(options.signal, timeoutMs);
 
   try {
-    const requestBody = {
-      model: SWARM_MODEL,
-      messages,
-      reasoning: {
-        effort: 'high',
-        exclude: true
-      },
-      provider: {
-        sort: 'throughput',
-        allow_fallbacks: true,
-        require_parameters: true
-      },
-      temperature: options.temperature ?? 0.2
+    const env = options.env || {};
+    const deepSeekModel = env.DEEPSEEK_MODEL || 'deepseek-v4-flash-0731';
+    const maxTokens = (Number.isFinite(options.maxTokens) && options.maxTokens > 0)
+      ? options.maxTokens
+      : 4096;
+
+    let endpoint;
+    let requestBody;
+    let headers = {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
     };
 
-    if (Number.isFinite(options.maxTokens) && options.maxTokens > 0) {
-      requestBody.max_tokens = options.maxTokens;
+    if (env.DEEPSEEK_API_KEY && apiKey === env.DEEPSEEK_API_KEY) {
+      // Official DeepSeek API: OpenAI-compatible, no provider-specific fields
+      endpoint = env.DEEPSEEK_ENDPOINT || 'https://api.deepseek.com/chat/completions';
+      requestBody = {
+        model: deepSeekModel,
+        messages,
+        max_tokens: maxTokens,
+        temperature: options.temperature ?? 0.2,
+        stream: false
+      };
+    } else if (env.OPENCODE_GO_API_KEY || env.OPENCODE_API_KEY) {
+      // OpenCode Go gateway: plain OpenAI-style chat request
+      endpoint = env.OPENCODE_ENDPOINT || 'https://opencode.ai/zen/go/v1/chat/completions';
+      headers = {
+        ...headers,
+        'HTTP-Referer': 'https://corez.ai',
+        'X-Title': 'COREZ AI'
+      };
+      requestBody = {
+        model: options.model || SWARM_MODEL,
+        messages,
+        max_tokens: maxTokens,
+        temperature: options.temperature ?? 0.2
+      };
+    } else {
+      // OpenRouter: provider routing fields are valid here
+      endpoint = 'https://openrouter.ai/api/v1/chat/completions';
+      headers = {
+        ...headers,
+        'HTTP-Referer': 'https://corez.ai',
+        'X-Title': 'COREZ AI'
+      };
+      requestBody = {
+        model: options.model || SWARM_MODEL,
+        messages,
+        reasoning: {
+          effort: 'high',
+          exclude: true
+        },
+        provider: {
+          sort: 'throughput',
+          allow_fallbacks: true,
+          require_parameters: true
+        },
+        max_tokens: maxTokens,
+        temperature: options.temperature ?? 0.2
+      };
     }
 
-    const endpoint = (options.env && options.env.OPENCODE_ENDPOINT) || 'https://opencode.ai/zen/go/v1/chat/completions';
     const response = await fetch(endpoint, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'HTTP-Referer': 'https://corez.ai',
-        'X-Title': 'COREZ AI',
-        'Content-Type': 'application/json'
-      },
+      headers,
       body: JSON.stringify(requestBody),
       signal: timedSignal.signal
     });
@@ -363,10 +399,10 @@ Always identify publicly only as COREZ AI when identity is relevant.${appInstruc
 export async function runOpenRouterSwarm(body, env, signal) {
   const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : '';
   const intentType = normalizeIntentType(body?.intent?.type);
-  const apiKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY || env?.OPENROUTER_API_KEY;
+  const apiKey = env?.DEEPSEEK_API_KEY || env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY || env?.OPENROUTER_API_KEY;
 
   if (!apiKey) {
-    throw new Error('OPENCODE_GO_API_KEY / OPENROUTER_API_KEY is not configured for swarm execution.');
+    throw new Error('DEEPSEEK_API_KEY / OPENCODE_GO_API_KEY / OPENROUTER_API_KEY is not configured for swarm execution.');
   }
 
   const agentSpecs = buildSwarmAgentSpecs(intentType, prompt);
@@ -430,7 +466,7 @@ export default {
       return Response.redirect(url.toString(), 301);
     }
 
-    const apiKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY || env?.OPENROUTER_API_KEY;
+    const apiKey = env?.DEEPSEEK_API_KEY || env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY || env?.OPENROUTER_API_KEY;
 
     if (url.pathname === '/api/ai' && request.method === 'POST' && apiKey) {
       const baseRequest = request.clone();
