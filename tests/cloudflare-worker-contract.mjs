@@ -1,19 +1,12 @@
 import assert from 'node:assert/strict';
 import worker from '../worker/index.js';
 
-const MODEL = '@cf/moonshotai/kimi-k2.7-code';
-const FLUX_MODEL = '@cf/black-forest-labs/flux-1-schnell';
+const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/chat/completions';
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 delete process.env.OPENROUTER_API_KEY;
 
 function env(overrides = {}) {
   return {
-    AI: {
-      async run() {
-        return {
-          choices: [{ message: { content: '  Worker response  ' } }]
-        };
-      }
-    },
     ASSETS: {
       async fetch(request) {
         return new Response(`asset:${new URL(request.url).pathname}`, {
@@ -45,23 +38,27 @@ async function post(body, environment = env(), clientIp = null) {
 
 async function captureSystemPrompt(intent) {
   let invocation;
-  const response = await post(
-    JSON.stringify({ prompt: 'Test request', intent }),
-    env({
-      AI: {
-        async run(model, input) {
-          invocation = { model, input };
-          return {
-            choices: [{ message: { content: 'Worker response' } }]
-          };
-        }
-      }
-    })
-  );
-
-  assert.equal(response.status, 200);
-  assert.equal(invocation.model, MODEL);
-  return invocation.input.messages[0].content;
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (url, init) => {
+      assert.equal(url, OPENCODE_URL);
+      invocation = { url, payload: JSON.parse(init.body) };
+      return new Response(JSON.stringify({
+        choices: [{ message: { content: 'Worker response' } }]
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    };
+    const response = await post(
+      JSON.stringify({ prompt: 'Test request', intent }),
+      env({ OPENCODE_GO_API_KEY: 'sk-opencode-test' })
+    );
+    assert.equal(response.status, 200);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  return invocation.payload.messages[0].content;
 }
 
 async function run() {
@@ -105,20 +102,23 @@ async function run() {
   assert.equal(methodResponse.status, 405);
   assert.equal(methodResponse.headers.get('content-type'), 'application/json');
 
-  const missingBindingResponse = await post(
+  // With no provider key configured, /api/ai reports an honest 502 instead of
+  // silently pretending to generate.
+  const noProviderResponse = await post(
     JSON.stringify({ prompt: 'Explain black roses' }),
-    env({ AI: undefined })
+    env()
   );
-  assert.equal(missingBindingResponse.status, 503);
-  assert.deepEqual(await json(missingBindingResponse), {
-    error: 'Workers AI is not configured.'
+  assert.equal(noProviderResponse.status, 502);
+  assert.deepEqual(await json(noProviderResponse), {
+    error: 'Unable to generate AI response.',
+    detail: 'all providers returned no usable response'
   });
 
   // Greeting fast-path: no LLM round-trip is required, so it succeeds even
-  // without any AI provider binding configured.
+  // without any AI provider configured.
   const greetingResponse = await post(
     JSON.stringify({ prompt: 'Hello' }),
-    env({ AI: undefined })
+    env()
   );
   assert.equal(greetingResponse.status, 200);
   assert.equal((await json(greetingResponse)).model, 'corez-greeting');
@@ -145,53 +145,61 @@ async function run() {
   });
 
   let invocation;
-  const successResponse = await post(
-    JSON.stringify({
-      prompt: 'Build a timer',
-      model: 'client/model-must-be-ignored',
-      intent: { type: 'app', summary: 'Build a timer app.' }
-    }),
-    env({
-      AI: {
-        async run(model, input) {
-          invocation = { model, input };
-          return {
-            choices: [{ message: { content: '  Worker response  ' } }]
-          };
-        }
-      }
-    })
-  );
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (url, init) => {
+      assert.equal(url, OPENCODE_URL);
+      invocation = { url, payload: JSON.parse(init.body) };
+      return new Response(JSON.stringify({
+        choices: [{ message: { content: '  Worker response  ' } }]
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    };
 
-  assert.equal(successResponse.status, 200);
-  assert.deepEqual(await json(successResponse), {
-    content: 'Worker response',
-    model: MODEL
-  });
-  assert.equal(invocation.model, MODEL);
-  assert.deepEqual(Object.keys(invocation.input), ['messages']);
-  assert.equal(invocation.input.messages[1].content, 'Build a timer');
-  assert.match(invocation.input.messages[0].content, /Build a timer app/);
-  assert.match(invocation.input.messages[0].content, /Inferred intent: app/);
+    const successResponse = await post(
+      JSON.stringify({
+        prompt: 'Build a timer',
+        model: 'client/model-must-be-ignored',
+        intent: { type: 'app', summary: 'Build a timer app.' }
+      }),
+      env({ OPENCODE_GO_API_KEY: 'sk-opencode-test' })
+    );
 
-  let generalInput;
-  const generalResponse = await post(
-    JSON.stringify({ prompt: 'Explain edge computing' }),
-    env({
-      AI: {
-        async run(_model, input) {
-          generalInput = input;
-          return {
-            choices: [{ message: { content: 'General response' } }]
-          };
-        }
-      }
-    })
-  );
-  assert.equal(generalResponse.status, 200);
-  assert.deepEqual(Object.keys(generalInput), ['messages']);
-  assert.match(generalInput.messages[0].content, /Adaptive Routing - Fast Path/);
-  assert.match(generalInput.messages[0].content, /Inferred intent: general/);
+    assert.equal(successResponse.status, 200);
+    assert.deepEqual(await json(successResponse), {
+      content: 'Worker response',
+      model: 'opencode:deepseek-v4-flash'
+    });
+    assert.equal(invocation.payload.model, 'deepseek-v4-flash');
+    assert.deepEqual(Object.keys(invocation.payload), ['model', 'messages']);
+    assert.equal(invocation.payload.messages[1].content, 'Build a timer');
+    assert.match(invocation.payload.messages[0].content, /Build a timer app/);
+    assert.match(invocation.payload.messages[0].content, /Inferred intent: app/);
+
+    let generalPayload;
+    globalThis.fetch = async (url, init) => {
+      assert.equal(url, OPENCODE_URL);
+      generalPayload = JSON.parse(init.body);
+      return new Response(JSON.stringify({
+        choices: [{ message: { content: 'General response' } }]
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    };
+    const generalResponse = await post(
+      JSON.stringify({ prompt: 'Explain edge computing' }),
+      env({ OPENCODE_GO_API_KEY: 'sk-opencode-test' })
+    );
+    assert.equal(generalResponse.status, 200);
+    assert.deepEqual(Object.keys(generalPayload), ['model', 'messages']);
+    assert.match(generalPayload.messages[0].content, /Adaptive Routing - Fast Path/);
+    assert.match(generalPayload.messages[0].content, /Inferred intent: general/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 
   // DeepSeek official API is the primary provider when DEEPSEEK_API_KEY is set
   {
@@ -241,9 +249,8 @@ async function run() {
 
       // Thinking-mode responses with empty content but populated
       // reasoning_content are internal thought, never the answer: the worker
-      // falls through to the next provider instead of handing back raw <think>
-      // text (DeepSeek default thinking mode can return content: '' for
-      // complex prompts).
+      // never hands back raw reasoning text, and with no other provider
+      // configured the request fails honestly instead.
       globalThis.fetch = async () => new Response(JSON.stringify({
         choices: [{ message: { content: '', reasoning_content: 'I thought through the revision steps carefully.' } }]
       }), {
@@ -255,20 +262,14 @@ async function run() {
           prompt: '[Context: The user is requesting a revision for the following code block]\n```html\n<canvas id="g"></canvas>\n```\n\nUser Request: fix movement',
           intent: { type: 'code-help', summary: 'Revise embedded code.' }
         }),
-        env({
-          AI: {
-            async run() {
-              return { response: 'Workers AI revision answer' };
-            }
-          },
-          DEEPSEEK_API_KEY: 'sk-deepseek-test'
-        }),
+        env({ DEEPSEEK_API_KEY: 'sk-deepseek-test' }),
         '198.51.100.106'
       );
-      assert.equal(thinkingResp.status, 200);
+      assert.equal(thinkingResp.status, 502);
       const thinkingData = await thinkingResp.json();
-      assert.equal(thinkingData.content, 'Workers AI revision answer');
-      assert.equal(thinkingData.content.includes('reasoning'), false);
+      assert.equal(thinkingData.error, 'Unable to generate AI response.');
+      assert.equal(thinkingData.content, undefined);
+      assert.equal(String(thinkingData.detail).includes('reasoning'), false);
 
       // Inline <think> blocks in the content field are stripped before the
       // answer is returned.
@@ -280,7 +281,7 @@ async function run() {
       });
       const thinkStripResp = await post(
         JSON.stringify({ prompt: 'Revise my game' }),
-        env({ AI: undefined, DEEPSEEK_API_KEY: 'sk-deepseek-test' }),
+        env({ DEEPSEEK_API_KEY: 'sk-deepseek-test' }),
         '198.51.100.107'
       );
       assert.equal(thinkStripResp.status, 200);
@@ -458,7 +459,6 @@ async function run() {
       const opencodeFailResp = await post(
         JSON.stringify({ prompt: 'Explain fallback chain' }),
         env({
-          AI: undefined,
           OPENCODE_GO_API_KEY: 'sk-opencode-test',
           DEEPSEEK_API_KEY: 'sk-deepseek-test'
         })
@@ -467,26 +467,17 @@ async function run() {
       assert.equal(opencodeFailData.content, 'DeepSeek after OpenCode failure');
       assert.equal(opencodeFailData.model, 'deepseek:deepseek-v4-flash');
 
-      // DeepSeek failure falls through to the next provider (Workers AI)
+      // DeepSeek failure with no further provider ends in an honest 502 whose
+      // detail names the failed providers.
       globalThis.fetch = async () => new Response('{}', { status: 502 });
       const deepSeekFallbackResp = await post(
         JSON.stringify({ prompt: 'Explain fallback' }),
-        env({
-          AI: {
-            async run(_model, input) {
-              generalInput = input;
-              return {
-                choices: [{ message: { content: 'Workers AI after DeepSeek failure' } }]
-              };
-            }
-          },
-          DEEPSEEK_API_KEY: 'sk-deepseek-test'
-        })
+        env({ DEEPSEEK_API_KEY: 'sk-deepseek-test' })
       );
-      assert.equal(deepSeekFallbackResp.status, 200);
-      const dsFallbackData = await deepSeekFallbackResp.json();
-      assert.equal(dsFallbackData.content, 'Workers AI after DeepSeek failure');
-      assert.equal(dsFallbackData.model, '@cf/moonshotai/kimi-k2.7-code');
+      assert.equal(deepSeekFallbackResp.status, 502);
+      const dsFallbackData = await json(deepSeekFallbackResp);
+      assert.equal(dsFallbackData.error, 'Unable to generate AI response.');
+      assert.match(dsFallbackData.detail, /deepseek/);
     } finally {
       globalThis.fetch = originalFetch;
     }
@@ -514,133 +505,39 @@ async function run() {
   assert.match(retiredIntentPrompt, /Inferred intent: general/);
   assert.doesNotMatch(retiredIntentPrompt, /Inferred intent: coding/);
 
-  let historyInput;
-  const historyResponse = await post(
-    JSON.stringify({
-      prompt: 'Current question',
-      intent: { type: 'general', summary: 'Answer directly.' },
-      messages: [
-        { role: 'user', content: 'Earlier question' },
-        { role: 'assistant', content: 'Earlier answer' },
-        { role: 'user', content: 'Current question' }
-      ]
-    }),
-    env({
-      AI: {
-        async run(_model, input) {
-          historyInput = input;
-          return {
-            choices: [{ message: { content: 'History response' } }]
-          };
-        }
-      }
-    })
-  );
-  assert.equal(historyResponse.status, 200);
+  let historyPayload;
+  const historyOriginalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (url, init) => {
+      assert.equal(url, OPENCODE_URL);
+      historyPayload = JSON.parse(init.body);
+      return new Response(JSON.stringify({
+        choices: [{ message: { content: 'History response' } }]
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    };
+    const historyResponse = await post(
+      JSON.stringify({
+        prompt: 'Current question',
+        intent: { type: 'general', summary: 'Answer directly.' },
+        messages: [
+          { role: 'user', content: 'Earlier question' },
+          { role: 'assistant', content: 'Earlier answer' },
+          { role: 'user', content: 'Current question' }
+        ]
+      }),
+      env({ OPENCODE_GO_API_KEY: 'sk-opencode-test' })
+    );
+    assert.equal(historyResponse.status, 200);
+  } finally {
+    globalThis.fetch = historyOriginalFetch;
+  }
   assert.deepEqual(
-    historyInput.messages.slice(1).map((message) => message.content),
+    historyPayload.messages.slice(1).map((message) => message.content),
     ['Earlier question', 'Earlier answer', 'Current question']
   );
-
-  const originalConsoleError = console.error;
-  let loggedError;
-  console.error = (entry) => { loggedError = entry; };
-  let thrownResponse;
-  try {
-    thrownResponse = await post(
-      JSON.stringify({ prompt: 'Tell me about black roses' }),
-      env({
-        AI: {
-          async run() {
-            throw { message: 'binding failure token=super-secret-value' };
-          }
-        }
-      })
-    );
-  } finally {
-    console.error = originalConsoleError;
-  }
-  assert.equal(thrownResponse.status, 502);
-  const thrownBody = await thrownResponse.text();
-  const thrownPayload = JSON.parse(thrownBody);
-  assert.equal(thrownPayload.error, 'Unable to generate AI response.');
-  assert.match(thrownPayload.detail, /workers-ai:@cf\/moonshotai\/kimi-k2[.]7-code/);
-  assert.doesNotMatch(thrownBody, /super-secret-value/);
-  assert.deepEqual(JSON.parse(loggedError), {
-    message: 'Workers AI generation failed',
-    error: 'binding failure token=[REDACTED]'
-  });
-
-  const emptyResponse = await post(
-    JSON.stringify({ prompt: 'Tell me about black roses' }),
-    env({
-      AI: {
-        async run() {
-          return { choices: [] };
-        }
-      }
-    })
-  );
-  assert.equal(emptyResponse.status, 502);
-  const emptyPayload = await json(emptyResponse);
-  assert.equal(emptyPayload.error, 'Workers AI returned an empty response.');
-  assert.match(emptyPayload.detail, /all providers returned no usable response/);
-
-  // Native Workers AI envelope ({ response: ... }) must not be misread as an
-  // empty answer just because there is no OpenAI-style choices array.
-  const nativeShapeResponse = await post(
-    JSON.stringify({ prompt: 'Explain fallback' }),
-    env({
-      AI: {
-        async run() {
-          return { response: 'Native Workers AI response' };
-        }
-      }
-    }),
-    '198.51.100.101'
-  );
-  assert.equal(nativeShapeResponse.status, 200);
-  assert.deepEqual(await json(nativeShapeResponse), {
-    content: 'Native Workers AI response',
-    model: '@cf/moonshotai/kimi-k2.7-code'
-  });
-
-  // A nested envelope ({ result: { response: ... } }) is normalized too.
-  const wrappedShapeResponse = await post(
-    JSON.stringify({ prompt: 'Explain fallback' }),
-    env({
-      AI: {
-        async run() {
-          return { result: { response: 'Wrapped Workers AI response' } };
-        }
-      }
-    }),
-    '198.51.100.102'
-  );
-  assert.equal(wrappedShapeResponse.status, 200);
-  assert.equal((await json(wrappedShapeResponse)).content, 'Wrapped Workers AI response');
-
-  // An empty primary result must not dead-end the request: the next Workers
-  // AI model in the chain is attempted before reporting failure.
-  let workersAiRunCount = 0;
-  const emptyPrimaryResponse = await post(
-    JSON.stringify({ prompt: 'Explain fallback' }),
-    env({
-      AI: {
-        async run(_model) {
-          workersAiRunCount += 1;
-          if (workersAiRunCount === 1) return { choices: [] };
-          return { response: 'Recovered via secondary Workers AI model' };
-        }
-      }
-    }),
-    '198.51.100.103'
-  );
-  assert.equal(emptyPrimaryResponse.status, 200);
-  assert.deepEqual(await json(emptyPrimaryResponse), {
-    content: 'Recovered via secondary Workers AI model',
-    model: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b'
-  });
 
   // Test /api/image FLUX endpoint
   const imageMethodResponse = await worker.fetch(
@@ -659,31 +556,52 @@ async function run() {
   );
   assert.equal(imageMissingPromptResponse.status, 400);
 
-  let fluxInvocation;
-  const dummyBuffer = new Uint8Array([137, 80, 78, 71]).buffer;
-  const imageSuccessResponse = await worker.fetch(
+  // Image generation runs through the OpenRouter FLUX API (no Workers AI).
+  const imageOriginalFetch = globalThis.fetch;
+  let imageFetchCalls = 0;
+  try {
+    globalThis.fetch = async (url, init) => {
+      assert.equal(url, OPENROUTER_URL);
+      imageFetchCalls += 1;
+      const payload = JSON.parse(init.body);
+      assert.equal(payload.model, 'black-forest-labs/flux-1-schnell');
+      return new Response(JSON.stringify({
+        choices: [{ message: { images: [{ url: 'https://cdn.example/flux-city.png' }] } }]
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    };
+    const imageSuccessResponse = await worker.fetch(
+      new Request('https://corez.test/api/image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: 'A futuristic city' })
+      }),
+      env({ OPENROUTER_API_KEY: 'sk-openrouter-test' })
+    );
+    assert.equal(imageSuccessResponse.status, 200);
+    const imageJsonData = await json(imageSuccessResponse);
+    assert.equal(imageJsonData.model, 'black-forest-labs/flux-1-schnell');
+    assert.equal(imageJsonData.image, 'https://cdn.example/flux-city.png');
+    assert.equal(imageFetchCalls, 1);
+  } finally {
+    globalThis.fetch = imageOriginalFetch;
+  }
+
+  // Without an OpenRouter key, image generation is unavailable (no Workers AI).
+  const imageNoKeyResponse = await worker.fetch(
     new Request('https://corez.test/api/image', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt: 'A futuristic city' })
     }),
-    env({
-      AI: {
-        async run(model, input) {
-          fluxInvocation = { model, input };
-          return dummyBuffer;
-        }
-      }
-    })
+    env()
   );
-  assert.equal(imageSuccessResponse.status, 200);
-  const imageJsonData = await json(imageSuccessResponse);
-  assert.equal(fluxInvocation.model, FLUX_MODEL);
-  assert.deepEqual(fluxInvocation.input, { prompt: 'A futuristic city', num_steps: 4 });
-  assert.equal(imageJsonData.model, FLUX_MODEL);
-  assert.match(imageJsonData.image, /^data:image\/png;base64,/);
+  assert.equal(imageNoKeyResponse.status, 503);
+  assert.match((await json(imageNoKeyResponse)).error, /OPENROUTER_API_KEY/);
 
-  // Test /api/memory store + search with embeddings and rerank
+  // Test /api/memory store + keyword search (no Workers AI embeddings)
   const memoryStore = new Map();
   const memoryBucket = {
     put: async (key, value, options) => {
@@ -698,58 +616,7 @@ async function run() {
     delete: async (key) => { memoryStore.delete(key); },
     list: async ({ prefix }) => ({ objects: [...memoryStore.keys()].filter(k => k.startsWith(prefix)).map(key => ({ key })) })
   };
-  const noAiMemoryEnv = () => env({ ASSET_BUCKET: memoryBucket, AI: undefined });
-  const embeddingOnlyEnv = () => env({
-    ASSET_BUCKET: memoryBucket,
-    AI: {
-      async run(model, input) {
-        if (model === '@cf/baai/bge-small-en-v1.5') {
-          const text = String(input.text[0] || '');
-          return {
-            shape: [1, 4],
-            data: [[
-              0.3 + (text.includes('blue') ? 0.5 : 0.1),
-              0.3 + (text.includes('theme') ? 0.5 : 0.1),
-              0.3 + (text.includes('chess') ? 0.5 : 0.1),
-              0.3 + (text.includes('react') || text.includes('vite') ? 0.5 : 0.1)
-            ]]
-          };
-        }
-        throw new Error('reranker unavailable');
-      }
-    }
-  });
-  const memoryEnv = () => env({
-    ASSET_BUCKET: memoryBucket,
-    AI: {
-      async run(model, input) {
-        if (model === '@cf/baai/bge-small-en-v1.5') {
-          const text = String(input.text[0] || '');
-          return {
-            shape: [1, 4],
-            data: [[
-              0.3 + (text.includes('blue') ? 0.5 : 0.1),
-              0.3 + (text.includes('theme') ? 0.5 : 0.1),
-              0.3 + (text.includes('chess') ? 0.5 : 0.1),
-              0.3 + (text.includes('react') || text.includes('vite') ? 0.5 : 0.1)
-            ]]
-          };
-        }
-        if (model === '@cf/baai/bge-reranker-base') {
-          // Match the real Workers AI API shape: contexts input, result output
-          const docs = input.contexts ?? [];
-          return {
-            result: docs.map((doc, index) => ({
-              index,
-              // The blue-theme document wins reranking wherever cosine ranked it
-              relevance_score: String(doc.text ?? doc).includes('blue') ? 0.9 : 0.5
-            }))
-          };
-        }
-        return { choices: [{ message: { content: 'Worker response' } }] };
-      }
-    }
-  });
+  const memoryEnv = () => env({ ASSET_BUCKET: memoryBucket });
 
   const memoryPost = (path, body, environment = memoryEnv()) => worker.fetch(
     new Request(`https://corez.test${path}`, {
@@ -760,66 +627,34 @@ async function run() {
     environment
   );
 
-  // Store a memory without AI binding -> no embedding stored
-  const storeNoAi = await worker.fetch(
-    new Request('https://corez.test/api/memory/store', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: 'u1', key: 'k1', text: 'User prefers blue themes.' })
-    }),
-    noAiMemoryEnv()
-  );
-  assert.equal(storeNoAi.status, 200);
-  const storeNoAiData = await json(storeNoAi);
-  assert.equal(storeNoAiData.record.embedding, undefined);
-
-  // Store memories WITH AI binding -> embeddings persisted server-side only
+  // Memory records are stored without embeddings (no Workers AI).
   const store1 = await memoryPost('/api/memory/store', { userId: 'u1', key: 'k1', text: 'User prefers blue themes.' });
   assert.equal(store1.status, 200);
   const store1Data = await json(store1);
-  assert.equal(store1Data.embeddingStored, true);
+  assert.equal(store1Data.embeddingStored, false);
   assert.equal(store1Data.record.embedding, undefined);
   assert.equal(store1Data.record.embeddingModel, undefined);
 
   await memoryPost('/api/memory/store', { userId: 'u1', key: 'k2', text: 'User plays chess on weekends.' });
   await memoryPost('/api/memory/store', { userId: 'u1', key: 'k3', text: 'User works with React and Vite.' });
 
-  // Semantic search with rerank
-  const semanticSearch = await memoryPost('/api/memory/search', { userId: 'u1', query: 'favorite color scheme' });
-  assert.equal(semanticSearch.status, 200);
-  const semanticData = await json(semanticSearch);
-  assert.equal(semanticData.source, 'semantic');
-  assert.equal(semanticData.rerank, true);
-  assert.ok(semanticData.matches.length >= 1 && semanticData.matches.length <= 5);
-  assert.ok(semanticData.matches.every(m => typeof m.score === 'number'));
-  // Blue-theme memory should win reranking for a color-scheme query
-  assert.equal(semanticData.matches[0].key, 'k1');
-
-  // Semantic search without a reranker falls back to pure embedding ranking
-  const noRerankSearch = await memoryPost('/api/memory/search', { userId: 'u1', query: 'favorite color scheme' }, embeddingOnlyEnv());
-  const noRerankData = await json(noRerankSearch);
-  assert.equal(noRerankData.source, 'semantic');
-  assert.equal(noRerankData.rerank, false);
-  assert.ok(noRerankData.matches.length >= 1);
-  assert.ok(noRerankData.matches.every(m => typeof m.similarity === 'number'));
-
-  // Keyword fallback: category filter still works via the semantic path
-  const categorySearch = await memoryPost('/api/memory/search', { userId: 'u1', query: 'blue', category: 'general' });
-  assert.equal(categorySearch.status, 200);
-
-  // Keyword-only search when AI binding is missing
-  const keywordSearch = await worker.fetch(
-    new Request('https://corez.test/api/memory/search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: 'u1', query: 'chess' })
-    }),
-    noAiMemoryEnv()
-  );
+  // Search is keyword-based (no Workers AI embeddings/rerank)
+  const keywordSearch = await memoryPost('/api/memory/search', { userId: 'u1', query: 'chess' });
   assert.equal(keywordSearch.status, 200);
   const keywordData = await json(keywordSearch);
   assert.equal(keywordData.source, 'keyword');
   assert.ok(keywordData.matches.some(m => m.key === 'k2'));
+  assert.ok(keywordData.matches.every(m => m.score === undefined && m.similarity === undefined));
+
+  // Category filter still narrows keyword search
+  const categorySearch = await memoryPost('/api/memory/search', { userId: 'u1', query: 'blue', category: 'general' });
+  assert.equal(categorySearch.status, 200);
+  assert.equal((await json(categorySearch)).source, 'keyword');
+
+  // A query matching nothing returns an empty keyword result
+  const noMatchSearch = await memoryPost('/api/memory/search', { userId: 'u1', query: 'quantum physics' });
+  assert.equal(noMatchSearch.status, 200);
+  assert.deepEqual((await json(noMatchSearch)).matches, []);
 
   // Empty query returns all category-filtered memories with keyword source
   const emptyQuery = await memoryPost('/api/memory/search', { userId: 'u1', query: '' });

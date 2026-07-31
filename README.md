@@ -10,15 +10,9 @@ When `OPENCODE_GO_API_KEY` (or `OPENCODE_API_KEY`) is configured, `/api/ai` uses
 
 - All chat, coding, app & swarm requests: `deepseek-v4-flash`
 
-Transient gateway failures are retried once on OpenCode Go, and reasoning-only replies get one continuation nudge, before the request ever leaves the provider. `DEEPSEEK_API_KEY` (official DeepSeek API) and `OPENROUTER_API_KEY` (OpenRouter) are only consulted when OpenCode Go has no usable usage left; the free Workers AI binding is the final fallback.
+Transient gateway failures are retried once on OpenCode Go, and reasoning-only replies get one continuation nudge, before the request ever leaves the provider. `DEEPSEEK_API_KEY` (official DeepSeek API) and `OPENROUTER_API_KEY` (OpenRouter) are only consulted when OpenCode Go has no usable usage left. Cloudflare Workers AI is not used anywhere.
 
-If configured API keys are unavailable, missing, or return no usable response, Corez uses the native Cloudflare Workers AI binding in this order:
-
-1. `@cf/moonshotai/kimi-k2.7-code`
-2. `@cf/deepseek-ai/deepseek-r1-distill-qwen-32b`
-3. `@cf/meta/llama-3.3-70b-instruct-fp8-fast`
-
-Each model is tried until one returns usable text: a thrown error, an empty result, or a response in a different envelope shape on one model falls through to the next instead of failing the request.
+Generations run as long as the model needs: no timeouts and no output token caps. The only abort is the client disconnecting (Stop button).
 
 Conversation history is always sent compact (6 recent messages, 3 KB each, ~15K tokens worst case, 60 KB total body) regardless of the model's context window — 256k and 100k windows included — to keep input tokens cheap.
 
@@ -30,9 +24,9 @@ Only the app document itself is published: conversation history, session IDs, an
 
 ### Image generation
 
-`/api/image` uses the Workers AI binding with `@cf/black-forest-labs/flux-1-schnell`.
+`/api/image` uses the OpenRouter FLUX API (`black-forest-labs/flux-1-schnell`). `OPENROUTER_API_KEY` is required for image generation.
 
-The `AI` binding is declared in `wrangler.jsonc`. Workers AI does not require a provider API key. `DEEPSEEK_API_KEY` is the primary provider secret and should be configured as a Worker secret; `OPENROUTER_API_KEY` is optional for image/fallback routing.
+`DEEPSEEK_API_KEY` and `OPENROUTER_API_KEY` should be configured as Worker secrets; `OPENCODE_GO_API_KEY` is the primary provider secret.
 
 ## Security notes
 

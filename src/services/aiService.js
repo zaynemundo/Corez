@@ -20,7 +20,7 @@ import { buildAwwwardsDesignPrompt } from '../../packages/agent-core/context/des
 import { resolveSkills } from '../skills/resolver.js';
 
 export const PUBLIC_USER_INTENT_PROMPT = `
-Analyze the public user intent behind the request. Corez delegates vision, art direction, UI layout, and game design/SVG creation to MiMo V2.5, and uses FLUX 1 for free background generation and image rendering.
+Analyze the public user intent behind the request. Corez uses FLUX 1 Schnell for background generation and image rendering.
 Identify whether the user wants to create a public-facing website, landing page, dashboard,
 portal, app, game (with full word dictionaries for word games like Scrabble & Wordle), widget, calculator, timer, prototype, tool, code help,
 writing help, an explanation, or general guidance. 

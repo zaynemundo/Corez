@@ -107,7 +107,7 @@ describe('FLUX image request routing', () => {
   it('routes an image request mid-conversation to the FLUX endpoint instead of the LLM', async () => {
     const fetchMock = vi.fn(async (url) => {
       if (url === '/api/image') {
-        return Response.json({ image: 'data:image/png;base64,FAKE', model: '@cf/black-forest-labs/flux-1-schnell' });
+        return Response.json({ image: 'data:image/png;base64,FAKE', model: 'black-forest-labs/flux-1-schnell' });
       }
       throw new Error(`Unexpected request: ${url}`);
     });

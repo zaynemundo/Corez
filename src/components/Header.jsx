@@ -22,7 +22,7 @@ export default function Header({
             >
               <PanelLeftOpen size={16} strokeWidth={1.5} />
             </button>
-            <img src="/corez.png" alt="Corez Logo" className="corez-bw-logo" style={{ width: '22px', height: '22px' }} />
+            <img src="/corez-white.png" alt="Corez Logo" className="corez-bw-logo" style={{ width: '22px', height: '22px' }} />
           </div>
         )}
       </div>

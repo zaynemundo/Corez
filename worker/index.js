@@ -6,13 +6,6 @@ const OPENCODE_DEFAULT_ENDPOINT = 'https://opencode.ai/zen/go/v1/chat/completion
 const DEEPSEEK_ENDPOINT = 'https://api.deepseek.com/chat/completions';
 const DEFAULT_DEEPSEEK_MODEL = 'deepseek-v4-flash';
 const DEEPSEEK_V4_FLASH_MODEL = 'deepseek-v4-flash';
-const FLUX_MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
-const DEEPSEEK_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
-const WORKERS_AI_FALLBACK_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
-const WORKERS_AI_MODELS = [WORKERS_AI_MODEL, DEEPSEEK_MODEL, WORKERS_AI_FALLBACK_MODEL];
-const EMBEDDING_MODEL = '@cf/baai/bge-small-en-v1.5';
-const RERANK_MODEL = '@cf/baai/bge-reranker-base';
 
 const CONTINUATION_NUDGE = {
   role: 'user',
@@ -92,7 +85,7 @@ Adaptive Routing - Complex Path:
     adaptiveInstructions = `
 Adaptive Routing - App & Game Creation Path (Awwwards Site of the Day Quality):
 - DeepSeek V4 Flash handles logic, vision, UI layout, art direction, and game design.
-- Use FLUX 1 Schnell (@cf/black-forest-labs/flux-1-schnell) for fast background image generation and visual graphics.
+- Use FLUX 1 Schnell for fast background image generation and visual graphics.
 ${designStyle}
 - Build a complete, rich, runnable experience ready for the preview canvas.
 - Word Games Requirement: When generating word games (Scrabble, Wordle, Crosswords, etc.), embed a full dictionary of valid English words and implement strict word validation logic.`;
@@ -204,51 +197,6 @@ function hasReasoning(message) {
   const reasoning = extractContentText(message.reasoning_content);
   if (reasoning.trim()) return true;
   return /<(?:think|thinking)\b/i.test(extractContentText(message.content));
-}
-
-// Workers AI models do not share a single response envelope: OpenAI-compatible
-// models return { choices: [...] } while native models return { response: ... }
-// and a few wrap the text again under result/output/messages. Normalize every
-// known shape so a format mismatch is never mistaken for an empty answer.
-function extractWorkersAiText(result) {
-  if (typeof result === 'string') return result.trim();
-  if (!result || typeof result !== 'object') return '';
-
-  if (Array.isArray(result)) {
-    return result
-      .map(item => extractWorkersAiText(item))
-      .filter(Boolean)
-      .join('')
-      .trim();
-  }
-
-  if (Array.isArray(result.choices)) {
-    for (const choice of result.choices) {
-      if (!choice || typeof choice !== 'object') continue;
-      const message = answerText(choice.message);
-      if (message) return message.trim();
-      if (typeof choice.text === 'string' && choice.text.trim()) return choice.text.trim();
-    }
-  }
-
-  if (Array.isArray(result.messages)) {
-    const joined = result.messages
-      .map(message => answerText(message))
-      .filter(Boolean)
-      .join('');
-    if (joined.trim()) return joined.trim();
-  }
-
-  for (const key of ['response', 'output', 'text', 'content', 'result']) {
-    const value = result[key];
-    if (typeof value === 'string' && value.trim()) return value.trim();
-    if (value && typeof value === 'object') {
-      const nested = extractWorkersAiText(value);
-      if (nested) return nested;
-    }
-  }
-
-  return '';
 }
 
 async function handleAi(request, env) {
@@ -473,40 +421,15 @@ async function handleAi(request, env) {
     }
   }
 
-  // 4. Cloudflare Workers AI Fallback (multi-model: try each catalog model
-  // until one returns usable text; a shape mismatch, empty result, or thrown
-  // error on one model must never dead-end the request).
-  if (!env.AI || typeof env.AI.run !== 'function') {
-    return jsonResponse(503, { error: 'Workers AI is not configured.' });
-  }
-
-  let lastWorkersAiError = null;
-  for (const modelId of WORKERS_AI_MODELS) {
-    try {
-      const result = await env.AI.run(modelId, {
-        messages: apiMessages
-      });
-      const content = extractWorkersAiText(result);
-      if (content) {
-        return jsonResponse(200, { content, model: modelId });
-      }
-      console.warn(`Workers AI model ${modelId} returned an empty response.`);
-    } catch (modelError) {
-      lastWorkersAiError = modelError;
-      console.warn(`Workers AI model ${modelId} failed:`, safeErrorDetail(modelError));
-      recordFailure(`workers-ai:${modelId}`, modelError);
-    }
-  }
-
   console.error(JSON.stringify({
-    message: 'Workers AI generation failed',
-    error: lastWorkersAiError ? safeErrorDetail(lastWorkersAiError) : 'All Workers AI models returned empty responses.'
+    message: 'AI generation failed',
+    error: providerFailures.join(' | ').slice(0, 500) || 'all providers returned no usable response'
   }));
   const failureDetail = providerFailures.length > 0
     ? providerFailures.slice(0, 3).join(' | ').slice(0, 300)
     : 'all providers returned no usable response';
   return jsonResponse(502, {
-    error: lastWorkersAiError ? 'Unable to generate AI response.' : 'Workers AI returned an empty response.',
+    error: 'Unable to generate AI response.',
     detail: failureDetail
   });
 }
@@ -635,82 +558,9 @@ async function handleImage(request, env) {
     }
   }
 
-  // 2. Fallback to Cloudflare Workers AI FLUX model
-  if (!env.AI || typeof env.AI.run !== 'function') {
-    return jsonResponse(503, { error: 'Workers AI is not configured and OpenRouter key is unavailable.' });
-  }
-
-  try {
-    const usedModel = FLUX_MODEL;
-    const result = await env.AI.run(FLUX_MODEL, {
-      prompt: prompt,
-      num_steps: 4
-    });
-
-    if (!result) {
-      return jsonResponse(502, { error: 'Workers AI returned empty image data.' });
-    }
-
-    // Handle object with base64 property
-    if (typeof result === 'object' && result !== null && typeof result.image === 'string') {
-      const b64 = result.image.startsWith('data:') ? result.image : `data:image/png;base64,${result.image}`;
-      const rawB64 = b64.split(',')[1] || b64;
-      const binaryStr = atob(rawB64);
-      let len = binaryStr.length;
-      const u8arr = new Uint8Array(len);
-      while (len--) {
-        u8arr[len] = binaryStr.charCodeAt(len);
-      }
-
-      const r2Url = await saveToR2IfAvailable(env, r2Key, u8arr.buffer, 'image/png');
-      return jsonResponse(200, { image: r2Url || b64, model: usedModel });
-    }
-
-    // Handle ArrayBuffer, View, Response, or Stream
-    let arrayBuffer;
-    if (result instanceof ArrayBuffer) {
-      arrayBuffer = result;
-    } else if (ArrayBuffer.isView(result)) {
-      arrayBuffer = result.buffer;
-    } else if (typeof result?.arrayBuffer === 'function') {
-      arrayBuffer = await result.arrayBuffer();
-    } else if (typeof Response !== 'undefined' && (result instanceof Response || typeof result?.getReader === 'function')) {
-      arrayBuffer = await new Response(result).arrayBuffer();
-    } else {
-      const str = String(result);
-      if (str.startsWith('data:image')) {
-        return jsonResponse(200, { image: str, model: usedModel });
-      }
-      return jsonResponse(502, { error: 'Unexpected Workers AI image format.' });
-    }
-
-    const r2Url = await saveToR2IfAvailable(env, r2Key, arrayBuffer, 'image/png');
-    if (r2Url) {
-      return jsonResponse(200, { image: r2Url, model: usedModel });
-    }
-
-    const bytes = new Uint8Array(arrayBuffer);
-    let binary = '';
-    const len = bytes.byteLength;
-    const chunkSize = 8192;
-    for (let i = 0; i < len; i += chunkSize) {
-      const chunk = bytes.subarray(i, i + chunkSize);
-      binary += String.fromCharCode.apply(null, chunk);
-    }
-    const base64 = btoa(binary);
-
-    return jsonResponse(200, {
-      image: `data:image/png;base64,${base64}`,
-      model: usedModel
-    });
-  } catch (error) {
-    console.error(JSON.stringify({
-      message: 'Image generation failed',
-      error: safeErrorDetail(error)
-    }));
-    console.error('Image generation failed:', safeErrorDetail(error));
-    return jsonResponse(502, { error: 'Unable to generate image.' });
-  }
+  return jsonResponse(503, {
+    error: 'Image generation is unavailable: OPENROUTER_API_KEY is not configured or the image API failed.'
+  });
 }
 
 async function handleR2Assets(request, env) {
@@ -978,77 +828,6 @@ async function handleR2Apps(request, env) {
   return jsonResponse(405, { error: 'Method not allowed.' });
 }
 
-function extractEmbedding(result) {
-  if (!result) return null;
-  // OpenAI-style: { data: [{ embedding: [...] }] }
-  if (Array.isArray(result.data) && result.data[0] && Array.isArray(result.data[0].embedding)) {
-    return result.data[0].embedding;
-  }
-  // Workers AI style: { shape: [1, dim], data: [[...]] }
-  if (Array.isArray(result.data) && Array.isArray(result.data[0]) && result.data[0].length > 0) {
-    return result.data[0];
-  }
-  if (Array.isArray(result) && Array.isArray(result[0]) && result[0].length > 0) {
-    return result[0];
-  }
-  return null;
-}
-
-async function embedText(env, text) {
-  if (!env?.AI || typeof env.AI.run !== 'function') return null;
-  try {
-    const result = await env.AI.run(EMBEDDING_MODEL, { text: [String(text).slice(0, 2000)] });
-    const embedding = extractEmbedding(result);
-    if (!embedding || embedding.length === 0) return null;
-    return embedding;
-  } catch (err) {
-    console.warn('Memory embedding failed; using keyword search fallback:', safeErrorDetail(err));
-    return null;
-  }
-}
-
-function cosineSimilarity(a, b) {
-  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length || a.length === 0) return 0;
-  let dot = 0;
-  let normA = 0;
-  let normB = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
-  }
-  if (normA === 0 || normB === 0) return 0;
-  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
-}
-
-function extractRerankScores(result) {
-  if (!result) return null;
-  const raw = Array.isArray(result.result) ? result.result
-    : Array.isArray(result.data) ? result.data
-    : Array.isArray(result.results) ? result.results
-    : null;
-  if (!raw) return null;
-  return raw.map(d => ({ index: d.index, score: d.relevance_score ?? d.score ?? 0 }));
-}
-
-async function rerankDocuments(env, query, documents) {
-  if (!env?.AI || typeof env.AI.run !== 'function') return null;
-  if (!Array.isArray(documents) || documents.length === 0) return null;
-  try {
-    const result = await env.AI.run(RERANK_MODEL, {
-      query: String(query).slice(0, 500),
-      contexts: documents.map(d => ({ text: String(d).slice(0, 2000) })),
-      top_k: 5
-    });
-    const scores = extractRerankScores(result);
-    if (!scores || scores.length === 0) return null;
-    return scores.filter(s => Number.isFinite(s.index) && s.index >= 0 && s.index < documents.length);
-  } catch (err) {
-    console.warn('Memory rerank failed; using embedding ranking fallback:', safeErrorDetail(err));
-    return null;
-  }
-}
-
 function publicMemoryRecord(record) {
   if (!record || typeof record !== 'object') return record;
   const publicRecord = { ...record };
@@ -1099,7 +878,6 @@ async function handleR2Memory(request, env) {
     }
 
     const now = new Date().toISOString();
-    const embedding = await embedText(env, text);
     const memoryRecord = {
       userId,
       key: keyName,
@@ -1108,8 +886,7 @@ async function handleR2Memory(request, env) {
       metadata: body?.metadata || {},
       tags: Array.isArray(body?.tags) ? body.tags : [],
       updatedAt: now,
-      createdAt: body?.createdAt || now,
-      ...(embedding ? { embedding, embeddingModel: EMBEDDING_MODEL } : {})
+      createdAt: body?.createdAt || now
     };
 
     const key = `memory/${userId}/${keyName}.json`;
@@ -1122,7 +899,7 @@ async function handleR2Memory(request, env) {
       userId,
       key: keyName,
       r2Key: key,
-      embeddingStored: Boolean(embedding),
+      embeddingStored: false,
       record: publicMemoryRecord(memoryRecord)
     });
   }
@@ -1172,35 +949,6 @@ async function handleR2Memory(request, env) {
       return jsonResponse(200, { userId, query, matches, source: 'keyword' });
     }
 
-    // 1. Semantic path: embed the query, rank by cosine similarity, then rerank
-    // the top candidates with the BGE reranker. Requires stored embeddings and a
-    // working AI binding; otherwise falls back to substring matching.
-    const queryEmbedding = await embedText(env, query);
-    if (queryEmbedding) {
-      const withVectors = matches.filter(m => Array.isArray(m.embedding) && m.embedding.length > 0);
-      if (withVectors.length > 0) {
-        const ranked = withVectors
-          .map(m => ({ memory: m, similarity: cosineSimilarity(queryEmbedding, m.embedding) }))
-          .sort((a, b) => b.similarity - a.similarity)
-          .slice(0, 20);
-
-        const reranked = await rerankDocuments(env, query, ranked.map(r => r.memory.text || ''));
-        if (reranked && reranked.length > 0) {
-          const top = reranked
-            .sort((a, b) => b.score - a.score)
-            .slice(0, 5)
-            .map(r => ({ ...publicMemoryRecord(ranked[r.index].memory), score: Math.round(r.score * 1000) / 1000 }));
-          return jsonResponse(200, { userId, query, matches: top, source: 'semantic', rerank: true });
-        }
-
-        const top = ranked
-          .slice(0, 5)
-          .map(r => ({ ...publicMemoryRecord(r.memory), similarity: Math.round(r.similarity * 1000) / 1000 }));
-        return jsonResponse(200, { userId, query, matches: top, source: 'semantic', rerank: false });
-      }
-    }
-
-    // 2. Keyword fallback (also catches memories stored without embeddings)
     const keywordMatches = matches.filter(m => {
       const textLower = String(m.text || '').toLowerCase();
       const keyLower = String(m.key || '').toLowerCase();

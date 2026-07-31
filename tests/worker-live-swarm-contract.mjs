@@ -10,13 +10,6 @@ delete process.env.OPENROUTER_API_KEY;
 
 function environment(overrides = {}) {
   return {
-    AI: {
-      async run() {
-        return {
-          choices: [{ message: { content: 'Base Worker response' } }]
-        };
-      }
-    },
     ASSETS: {
       async fetch(request) {
         return new Response(`asset:${new URL(request.url).pathname}`);
@@ -282,11 +275,10 @@ async function run() {
     },
     environment()
   );
-  assert.equal(delegatedResponse.status, 200);
-  assert.deepEqual(await delegatedResponse.json(), {
-    content: 'Base Worker response',
-    model: '@cf/moonshotai/kimi-k2.7-code'
-  });
+  assert.equal(delegatedResponse.status, 502);
+  const delegatedPayload = await delegatedResponse.json();
+  assert.equal(delegatedPayload.error, 'Unable to generate AI response.');
+  assert.match(delegatedPayload.detail, /all providers returned no usable response/);
 
   console.log('Live Worker swarm contract passed.');
 }

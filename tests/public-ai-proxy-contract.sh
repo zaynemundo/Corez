@@ -48,10 +48,8 @@ check_absent 'settings does not expose provider or model names' 'GLM|DeepSeek|Ki
 check 'README documents the optional OpenRouter secret' 'OPENROUTER_API_KEY' "$readme"
 check 'README documents primary text routing' 'glm-5.2|deepseek-v4-pro|deepseek-v4-flash' "$readme"
 check_absent 'README no longer documents MiMo V2.5' 'xiaomi/mimo-v2[.]5' "$readme"
-check 'README documents the primary Workers AI fallback' '@cf/moonshotai/kimi-k2[.]7-code' "$readme"
-check 'README documents the secondary Workers AI fallback' '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b' "$readme"
-check 'README documents the FLUX Schnell image model' '@cf/black-forest-labs/flux-1-schnell' "$readme"
-check_absent 'README no longer documents FLUX dev' '@cf/black-forest-labs/flux-1-dev' "$readme"
+check_absent 'README no longer documents Cloudflare Workers AI models' '@cf/' "$readme"
+check 'README documents the FLUX Schnell image model' 'black-forest-labs/flux-1-schnell' "$readme"
 check_absent 'README no longer describes GLM-4.7-Flash as the active model' 'GLM-4[.]7-Flash|@cf/zai-org/glm-4[.]7-flash' "$readme"
 check_absent 'settings has no model override storage' 'corez_openrouter_model' "$settings"
 
