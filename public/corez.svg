@@ -1,20 +1,27 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 454 454" width="100%" height="100%">
   <g fill="currentColor">
-    <path d="M 225,47 L 229,47 Z" fill="currentColor" fill-rule="evenodd" />
-    <path d="M 225,73 L 229,73 Z" fill="currentColor" fill-rule="evenodd" />
-    <path d="M 420,115 L 420,251 Z" fill="currentColor" fill-rule="evenodd" />
-    <path d="M 33,116 L 32,184 Z" fill="currentColor" fill-rule="evenodd" />
-    <path d="M 381,137 L 380,184 Z" fill="currentColor" fill-rule="evenodd" />
-    <path d="M 72,138 L 71,175 Z" fill="currentColor" fill-rule="evenodd" />
-    <path d="M 151,186 L 150,273 Z" fill="currentColor" fill-rule="evenodd" />
-    <path d="M 303,190 L 302,269 Z" fill="currentColor" fill-rule="evenodd" />
-    <path d="M 264,207 L 264,251 Z" fill="currentColor" fill-rule="evenodd" />
-    <path d="M 190,208 L 189,251 Z" fill="currentColor" fill-rule="evenodd" />
-    <path d="M 33,212 L 32,340 Z" fill="currentColor" fill-rule="evenodd" />
-    <path d="M 72,276 L 71,319 Z" fill="currentColor" fill-rule="evenodd" />
-    <path d="M 420,277 L 420,341 Z" fill="currentColor" fill-rule="evenodd" />
-    <path d="M 381,287 L 381,319 Z" fill="currentColor" fill-rule="evenodd" />
-    <path d="M 178,382 L 183,382 Z" fill="currentColor" fill-rule="evenodd" />
-    <path d="M 308,404 L 310,406 Z" fill="currentColor" fill-rule="evenodd" />
+    <path d="M 223,45 L 231,45 Z" fill="currentColor" fill-rule="evenodd" />
+    <path d="M 260,95 L 265,95 Z" fill="currentColor" fill-rule="evenodd" />
+    <path d="M 329,106 L 336,106 Z" fill="currentColor" fill-rule="evenodd" />
+    <path d="M 224,116 L 230,116 Z" fill="currentColor" fill-rule="evenodd" />
+    <path d="M 418,117 L 418,243 Z" fill="currentColor" fill-rule="evenodd" />
+    <path d="M 35,118 L 34,182 Z" fill="currentColor" fill-rule="evenodd" />
+    <path d="M 304,118 L 303,122 Z" fill="currentColor" fill-rule="evenodd" />
+    <path d="M 383,135 L 382,182 Z" fill="currentColor" fill-rule="evenodd" />
+    <path d="M 70,136 L 69,177 Z" fill="currentColor" fill-rule="evenodd" />
+    <path d="M 175,143 L 177,143 Z" fill="currentColor" fill-rule="evenodd" />
+    <path d="M 95,181 L 94,184 Z" fill="currentColor" fill-rule="evenodd" />
+    <path d="M 224,183 L 230,183 Z" fill="currentColor" fill-rule="evenodd" />
+    <path d="M 301,187 L 301,271 Z" fill="currentColor" fill-rule="evenodd" />
+    <path d="M 153,188 L 152,271 Z" fill="currentColor" fill-rule="evenodd" />
+    <path d="M 266,205 L 266,253 Z" fill="currentColor" fill-rule="evenodd" />
+    <path d="M 188,206 L 187,253 Z" fill="currentColor" fill-rule="evenodd" />
+    <path d="M 36,219 L 34,338 Z" fill="currentColor" fill-rule="evenodd" />
+    <path d="M 70,278 L 69,321 Z" fill="currentColor" fill-rule="evenodd" />
+    <path d="M 418,279 L 418,339 Z" fill="currentColor" fill-rule="evenodd" />
+    <path d="M 383,285 L 383,321 Z" fill="currentColor" fill-rule="evenodd" />
+    <path d="M 152,336 L 152,341 Z" fill="currentColor" fill-rule="evenodd" />
+    <path d="M 190,361 L 197,361 Z" fill="currentColor" fill-rule="evenodd" />
+    <path d="M 315,397 L 314,397 Z" fill="currentColor" fill-rule="evenodd" />
   </g>
 </svg>
