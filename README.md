@@ -32,6 +32,12 @@ Conversation history is always sent compact (6 recent messages, 3 KB each, ~15K 
 
 The `AI` binding is declared in `wrangler.jsonc`. Workers AI does not require a provider API key. `DEEPSEEK_API_KEY` is the primary provider secret and should be configured as a Worker secret; `OPENROUTER_API_KEY` is optional for image/fallback routing.
 
+## Security notes
+
+- AI-generated apps and games render inside sandboxed iframes (`allow-scripts`, no same-origin, no modals/popups). Generated code cannot read the page, cookies, or local storage, and it cannot navigate the parent.
+- `/api/apps` and `/api/memory` are anonymous: the `sessionId`/`userId` string is the only access credential, so choose unguessable values — anyone who knows one can read or delete that data. All storage key segments are validated (`[A-Za-z0-9._-]`, no slashes, no leading dots) on every R2-backed endpoint.
+- Provider requests abort when the client disconnects (Stop button), so no tokens are spent on abandoned generations.
+
 ## Local Intent Training & Classification
 
 Corez routes public user prompts using a deterministic local text classifier trained on a synthetic, reviewed dataset. This classifier operates entirely in-browser and requires no network calls, API keys, or external npm dependencies.

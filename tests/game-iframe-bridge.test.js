@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeGameHtml } from '../src/components/SecureGamePreview.jsx';
+import { sanitizeGameHtml, isTrustedGameMessage } from '../src/components/SecureGamePreview.jsx';
 import { testGameHtml } from '../src/services/gamePipeline/gameTester.js';
 
 describe('Secure Iframe & Automated Testing Bridge', () => {
@@ -12,6 +12,7 @@ describe('Secure Iframe & Automated Testing Bridge', () => {
           window.top.location = 'https://malicious-site.com';
           const c = document.cookie;
           window.open('https://pop-up.com');
+          window['open']('https://pop-up-2.com');
         </script>
       </body>
     </html>`;
@@ -21,6 +22,23 @@ describe('Secure Iframe & Automated Testing Bridge', () => {
     expect(sanitized).not.toContain('document.cookie');
     expect(sanitized).toContain('window._blocked_top_loc');
     expect(sanitized).toContain('window._blocked_cookie');
+    expect(sanitized).not.toContain("window['open'](");
+  });
+
+  it('accepts game handshake messages only from the sandboxed iframe', () => {
+    const iframeWindow = {};
+    const selfOrigin = 'https://corez.test';
+    const sandboxed = { source: iframeWindow, origin: 'null' };
+    const sameOrigin = { source: iframeWindow, origin: selfOrigin };
+    const foreign = { source: iframeWindow, origin: 'https://evil.example' };
+    const otherSource = { source: {}, origin: 'null' };
+
+    expect(isTrustedGameMessage(sandboxed, iframeWindow, selfOrigin)).toBe(true);
+    expect(isTrustedGameMessage(sameOrigin, iframeWindow, selfOrigin)).toBe(true);
+    expect(isTrustedGameMessage(foreign, iframeWindow, selfOrigin)).toBe(false);
+    expect(isTrustedGameMessage(otherSource, iframeWindow, selfOrigin)).toBe(false);
+    expect(isTrustedGameMessage(sandboxed, null, selfOrigin)).toBe(false);
+    expect(isTrustedGameMessage(null, iframeWindow, selfOrigin)).toBe(false);
   });
 
   it('runs automated DOM & script evaluation on valid game HTML', async () => {

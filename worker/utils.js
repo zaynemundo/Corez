@@ -86,3 +86,40 @@ export async function readBoundedJson(request, maxBytes = MAX_BODY_BYTES) {
   }
   return JSON.parse(text);
 }
+
+/**
+ * Combined timeout + parent abort signal. Aborts when the parent signal
+ * aborts (client disconnect) or when timeoutMs elapses, whichever comes
+ * first. Call cleanup() when the work is done to release the timer.
+ */
+export function createTimedSignal(parentSignal, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new Error(`Request exceeded ${timeoutMs}ms.`)), timeoutMs);
+  if (parentSignal) {
+    if (parentSignal.aborted) {
+      controller.abort();
+    } else {
+      parentSignal.addEventListener('abort', () => controller.abort(), { once: true });
+    }
+  }
+  return { signal: controller.signal, cleanup: () => clearTimeout(timer) };
+}
+
+/**
+ * Merge several AbortSignals into one that aborts when any of them does.
+ * Zero or one signals are returned as-is.
+ */
+export function mergeSignals(...signals) {
+  const active = signals.filter(signal => signal instanceof AbortSignal);
+  if (active.length <= 1) return active[0] || null;
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  for (const signal of active) {
+    if (signal.aborted) {
+      abort();
+      break;
+    }
+    signal.addEventListener('abort', abort, { once: true });
+  }
+  return controller.signal;
+}

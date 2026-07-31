@@ -350,6 +350,26 @@ async function run() {
       assert.equal(opencodePreferredData.content, 'OpenCode Go preferred response');
       assert.equal(opencodePreferredData.model, 'opencode:deepseek-v4-flash');
 
+      // Client-supplied body.model is never trusted: the server-controlled
+      // model list always wins.
+      globalThis.fetch = async (_url, init) => {
+        const payload = JSON.parse(init.body);
+        assert.equal(payload.model, 'deepseek-v4-flash');
+        return new Response(JSON.stringify({
+          choices: [{ message: { content: 'Server model used' } }]
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      };
+      const modelIgnoreResp = await post(
+        JSON.stringify({ prompt: 'Explain black roses', model: 'gpt-4o-mini' }),
+        env({ AI: undefined, OPENCODE_GO_API_KEY: 'sk-opencode-test' }),
+        '198.51.100.108'
+      );
+      assert.equal(modelIgnoreResp.status, 200);
+      assert.equal((await json(modelIgnoreResp)).content, 'Server model used');
+
       // OpenCode failure falls through to DeepSeek
       globalThis.fetch = async (url) => {
         if (url === 'https://opencode.ai/zen/go/v1/chat/completions') {
@@ -742,6 +762,36 @@ async function run() {
   );
   assert.equal(deleteMem.status, 200);
 
+  // Storage key segments are validated on every endpoint: no slashes, no
+  // leading dots, and no traversal via decoded path segments.
+  const badMemoryStoreUser = await memoryPost('/api/memory/store', { userId: '../escape', key: 'k', text: 'x' });
+  assert.equal(badMemoryStoreUser.status, 400);
+
+  const badMemoryStoreKey = await memoryPost('/api/memory/store', { userId: 'u1', key: 'a/b', text: 'x' });
+  assert.equal(badMemoryStoreKey.status, 400);
+
+  const badMemoryPath = await worker.fetch(
+    new Request('https://corez.test/api/memory/%2E%2E%2Fescape', { method: 'GET' }),
+    memoryEnv()
+  );
+  assert.equal(badMemoryPath.status, 400);
+
+  const badAppStore = await worker.fetch(
+    new Request('https://corez.test/api/apps/store', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: '../escape', appId: 'a1', code: '<html></html>' })
+    }),
+    memoryEnv()
+  );
+  assert.equal(badAppStore.status, 400);
+
+  const badAppPath = await worker.fetch(
+    new Request('https://corez.test/api/apps/session%2Fid/a1', { method: 'GET' }),
+    memoryEnv()
+  );
+  assert.equal(badAppPath.status, 400);
+
   // Asset upload validation: reject arbitrary content types, keys, and malformed data URLs
   const uploadBadType = await worker.fetch(
     new Request('https://corez.test/api/assets/upload', {
@@ -792,6 +842,13 @@ async function run() {
     memoryEnv()
   );
   assert.equal(uploadValid.status, 200);
+
+  // Asset GET validates the key format too (no %2F traversal reads).
+  const assetGetBadKey = await worker.fetch(
+    new Request('https://corez.test/api/assets/%2E%2E%2Fsecret.json', { method: 'GET' }),
+    memoryEnv()
+  );
+  assert.equal(assetGetBadKey.status, 400);
   const uploadValidData = await json(uploadValid);
   assert.equal(uploadValidData.url, '/api/assets/ok.png');
 

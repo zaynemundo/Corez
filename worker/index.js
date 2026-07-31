@@ -1,5 +1,5 @@
 import { handleMarket } from './market.js';
-import { safeErrorDetail, readBoundedJson, jsonResponse, createRateLimiter } from './utils.js';
+import { safeErrorDetail, readBoundedJson, jsonResponse, createRateLimiter, createTimedSignal, mergeSignals } from './utils.js';
 
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 const OPENCODE_DEFAULT_ENDPOINT = 'https://opencode.ai/zen/go/v1/chat/completions';
@@ -18,6 +18,10 @@ const CONTINUATION_NUDGE = {
   role: 'user',
   content: 'Your previous reply contained only internal reasoning and no final answer. Now respond with the actual complete final answer to the user\'s request (the code, explanation, or text itself). Do not include thinking, reasoning, or <think> blocks.'
 };
+
+// Storage key segments are validated identically on every R2-backed endpoint:
+// no slashes, no leading dots (blocks ../ traversal), bounded length.
+const SAFE_STORAGE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$/;
 
 function getTargetModels() {
   return [DEEPSEEK_V4_FLASH_MODEL];
@@ -293,14 +297,16 @@ async function handleAi(request, env) {
   }
 
   // 1. OpenCode Go API first if OPENCODE_GO_API_KEY / OPENCODE_API_KEY is
-  // configured (serves the latest DeepSeek V4 Flash builds)
-  let targetModels = getTargetModels();
-  if (body.model && typeof body.model === 'string' && body.model.trim()) {
-    const customModel = body.model.trim();
-    targetModels = [customModel, ...targetModels.filter(m => m !== customModel)];
-  }
+  // configured (serves the latest DeepSeek V4 Flash builds). The model list
+  // is server-controlled: client-supplied body.model is never trusted.
+  const targetModels = getTargetModels();
   const opencodeKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY;
   const opencodeEndpoint = env?.OPENCODE_ENDPOINT || OPENCODE_DEFAULT_ENDPOINT;
+
+  // Provider calls abort when the client disconnects (request.signal) or the
+  // overall budget expires, so Stop never leaves paid generations running.
+  const requestBudget = createTimedSignal(request.signal, 120_000);
+  try {
   if (opencodeKey) {
     const callOpenCodeGo = async (modelId, messagesToSend) => {
       try {
@@ -316,7 +322,7 @@ async function handleAi(request, env) {
             model: modelId,
             messages: messagesToSend
           }),
-          signal: AbortSignal.timeout(45_000)
+          signal: mergeSignals(requestBudget.signal, AbortSignal.timeout(45_000))
         });
 
         if (!opencodeResp.ok) {
@@ -363,7 +369,7 @@ async function handleAi(request, env) {
           messages: apiMessages,
           stream: false
         }),
-        signal: AbortSignal.timeout(60_000)
+        signal: mergeSignals(requestBudget.signal, AbortSignal.timeout(60_000))
       });
 
       if (deepSeekResp.ok) {
@@ -403,7 +409,7 @@ async function handleAi(request, env) {
             reasoning: { effort: reasoningEffort },
             messages: apiMessages
           }),
-          signal: AbortSignal.timeout(30_000)
+          signal: mergeSignals(requestBudget.signal, AbortSignal.timeout(30_000))
         });
 
         if (openRouterResp.ok) {
@@ -450,6 +456,9 @@ async function handleAi(request, env) {
   return jsonResponse(502, {
     error: lastWorkersAiError ? 'Unable to generate AI response.' : 'Workers AI returned an empty response.'
   });
+  } finally {
+    requestBudget.cleanup();
+  }
 }
 
 async function saveToR2IfAvailable(env, key, buffer, mimeType = 'image/png') {
@@ -466,7 +475,7 @@ async function saveToR2IfAvailable(env, key, buffer, mimeType = 'image/png') {
   return null;
 }
 
-async function callOpenRouterImage(apiKey, prompt) {
+async function callOpenRouterImage(apiKey, prompt, parentSignal) {
   try {
     const response = await fetch(OPENROUTER_ENDPOINT, {
       method: 'POST',
@@ -480,7 +489,7 @@ async function callOpenRouterImage(apiKey, prompt) {
         model: 'black-forest-labs/flux-1-schnell',
         messages: [{ role: 'user', content: prompt }]
       }),
-      signal: AbortSignal.timeout(60_000)
+      signal: mergeSignals(parentSignal, AbortSignal.timeout(60_000))
     });
 
     if (response.ok) {
@@ -529,10 +538,13 @@ async function handleImage(request, env) {
 
   const r2Key = `flux_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.png`;
 
+  const requestBudget = createTimedSignal(request.signal, 120_000);
+  try {
+
   // 1. Try OpenRouter Image Generation if OPENROUTER_API_KEY is present
   const openRouterKey = env?.OPENROUTER_API_KEY;
   if (openRouterKey) {
-    const openRouterImg = await callOpenRouterImage(openRouterKey, prompt);
+    const openRouterImg = await callOpenRouterImage(openRouterKey, prompt, requestBudget.signal);
     if (openRouterImg) {
       try {
         let buffer;
@@ -546,7 +558,9 @@ async function handleImage(request, env) {
           while (n--) u8arr[n] = bstr.charCodeAt(n);
           buffer = u8arr.buffer;
         } else {
-          const imgResp = await fetch(openRouterImg);
+          const imgResp = await fetch(openRouterImg, {
+            signal: mergeSignals(requestBudget.signal, AbortSignal.timeout(30_000))
+          });
           if (imgResp.ok) {
             mimeType = imgResp.headers.get('content-type') || 'image/png';
             buffer = await imgResp.arrayBuffer();
@@ -640,6 +654,9 @@ async function handleImage(request, env) {
     console.error('Image generation failed:', safeErrorDetail(error));
     return jsonResponse(502, { error: 'Unable to generate image.' });
   }
+  } finally {
+    requestBudget.cleanup();
+  }
 }
 
 async function handleR2Assets(request, env) {
@@ -707,7 +724,9 @@ async function handleR2Assets(request, env) {
 
   if (request.method === 'GET' && pathname.startsWith('/api/assets/')) {
     const key = decodePathSegment(pathname.replace('/api/assets/', ''));
-    if (!key) return jsonResponse(400, { error: 'Asset key is required.' });
+    if (!key || !SAFE_STORAGE_SEGMENT.test(key)) {
+      return jsonResponse(400, { error: 'Invalid asset key.' });
+    }
 
     const object = await env.ASSET_BUCKET.get(key);
     if (!object) {
@@ -732,7 +751,7 @@ async function handleR2Assets(request, env) {
 
   if (request.method === 'DELETE' && pathname.startsWith('/api/assets/')) {
     const key = decodePathSegment(pathname.replace('/api/assets/', ''));
-    if (!key || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$/.test(key)) {
+    if (!key || !SAFE_STORAGE_SEGMENT.test(key)) {
       return jsonResponse(400, { error: 'Invalid asset key.' });
     }
 
@@ -769,6 +788,12 @@ async function handleR2Apps(request, env) {
     if (!sessionId) {
       return jsonResponse(400, { error: 'sessionId is required.' });
     }
+    if (!SAFE_STORAGE_SEGMENT.test(sessionId)) {
+      return jsonResponse(400, { error: 'Invalid sessionId: use letters, digits, dots, dashes or underscores.' });
+    }
+    if (!SAFE_STORAGE_SEGMENT.test(appId)) {
+      return jsonResponse(400, { error: 'Invalid appId: use letters, digits, dots, dashes or underscores.' });
+    }
     if (!code && !html) {
       return jsonResponse(400, { error: 'code or html content is required.' });
     }
@@ -802,7 +827,7 @@ async function handleR2Apps(request, env) {
     const parts = pathname.replace('/api/apps/', '').split('/');
     const sessionId = decodePathSegment(parts[0]);
     const appId = decodePathSegment(parts[1]);
-    if (sessionId === null || appId === null) {
+    if (sessionId === null || appId === null || !SAFE_STORAGE_SEGMENT.test(sessionId) || !SAFE_STORAGE_SEGMENT.test(appId)) {
       return jsonResponse(400, { error: 'Invalid path segment.' });
     }
 
@@ -841,7 +866,7 @@ async function handleR2Apps(request, env) {
   // 3. GET /api/apps/:sessionId - List all apps stored for a chat session
   if (request.method === 'GET' && pathname.match(/^\/api\/apps\/[^/]+$/)) {
     const sessionId = decodePathSegment(pathname.replace('/api/apps/', ''));
-    if (sessionId === null) {
+    if (sessionId === null || !SAFE_STORAGE_SEGMENT.test(sessionId)) {
       return jsonResponse(400, { error: 'Invalid session id in path.' });
     }
     const prefix = `apps/${sessionId}/`;
@@ -875,7 +900,7 @@ async function handleR2Apps(request, env) {
     const parts = pathname.replace('/api/apps/', '').split('/');
     const sessionId = decodePathSegment(parts[0]);
     const appId = decodePathSegment(parts[1]);
-    if (sessionId === null || appId === null) {
+    if (sessionId === null || appId === null || !SAFE_STORAGE_SEGMENT.test(sessionId) || !SAFE_STORAGE_SEGMENT.test(appId)) {
       return jsonResponse(400, { error: 'Invalid path segment.' });
     }
 
@@ -887,7 +912,7 @@ async function handleR2Apps(request, env) {
   // 5. DELETE /api/apps/:sessionId - Delete ALL apps associated with a chat session
   if (request.method === 'DELETE' && pathname.match(/^\/api\/apps\/[^/]+$/)) {
     const sessionId = decodePathSegment(pathname.replace('/api/apps/', ''));
-    if (sessionId === null) {
+    if (sessionId === null || !SAFE_STORAGE_SEGMENT.test(sessionId)) {
       return jsonResponse(400, { error: 'Invalid session id in path.' });
     }
     const prefix = `apps/${sessionId}/`;
@@ -1020,6 +1045,12 @@ async function handleR2Memory(request, env) {
     if (!text) {
       return jsonResponse(400, { error: 'text or value content is required for memory storage.' });
     }
+    if (!SAFE_STORAGE_SEGMENT.test(userId)) {
+      return jsonResponse(400, { error: 'Invalid userId: use letters, digits, dots, dashes or underscores.' });
+    }
+    if (!SAFE_STORAGE_SEGMENT.test(keyName)) {
+      return jsonResponse(400, { error: 'Invalid memory key: use letters, digits, dots, dashes or underscores.' });
+    }
 
     const now = new Date().toISOString();
     const embedding = await embedText(env, text);
@@ -1062,6 +1093,10 @@ async function handleR2Memory(request, env) {
     const userId = typeof body?.userId === 'string' ? body.userId.trim() : 'default_user';
     const query = typeof body?.query === 'string' ? body.query.trim().toLowerCase() : '';
     const categoryFilter = typeof body?.category === 'string' ? body.category.trim().toLowerCase() : '';
+
+    if (!SAFE_STORAGE_SEGMENT.test(userId)) {
+      return jsonResponse(400, { error: 'Invalid userId: use letters, digits, dots, dashes or underscores.' });
+    }
 
     const prefix = `memory/${userId}/`;
     const list = await env.ASSET_BUCKET.list({ prefix });
@@ -1134,7 +1169,7 @@ async function handleR2Memory(request, env) {
   if (request.method === 'GET' && pathname.match(/^\/api\/memory\/[^/]+$/)) {
     const encodedUserId = pathname.replace('/api/memory/', '');
     const userId = decodePathSegment(encodedUserId);
-    if (userId === null) {
+    if (userId === null || !SAFE_STORAGE_SEGMENT.test(userId)) {
       return jsonResponse(400, { error: 'Invalid user id in path.' });
     }
     const prefix = `memory/${userId}/`;
@@ -1165,7 +1200,7 @@ async function handleR2Memory(request, env) {
     const parts = pathname.replace('/api/memory/', '').split('/');
     const userId = decodePathSegment(parts[0]);
     const keyName = decodePathSegment(parts[1]);
-    if (userId === null || keyName === null) {
+    if (userId === null || keyName === null || !SAFE_STORAGE_SEGMENT.test(userId) || !SAFE_STORAGE_SEGMENT.test(keyName)) {
       return jsonResponse(400, { error: 'Invalid path segment.' });
     }
 

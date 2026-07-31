@@ -21,14 +21,32 @@ export function sanitizeGameHtml(rawHtml) {
   // Strip top-level location / navigation attempts
   sanitized = sanitized.replace(/window\.top\.location/g, 'window._blocked_top_loc');
   sanitized = sanitized.replace(/window\.parent\.location/g, 'window._blocked_parent_loc');
-  
+
   // Strip document.cookie access
   sanitized = sanitized.replace(/document\.cookie/g, 'window._blocked_cookie');
 
-  // Strip prompt/alert popups if abused
+  // Strip prompt/alert popups if abused (including bracket notation)
   sanitized = sanitized.replace(/window\.open\(/g, 'console.log("Blocked window.open", ');
+  sanitized = sanitized.replace(/window\[['"]open['"]\]\(/g, 'console.log("Blocked window.open", ');
 
   return sanitized;
+}
+
+/**
+ * True when a message event is a legitimate game->parent handshake message:
+ * it must come from the sandboxed iframe window itself, whose opaque origin
+ * is the string "null" (sandbox without allow-same-origin) — or from the
+ * same origin, for non-sandboxed embedders.
+ */
+export function isTrustedGameMessage(
+  event,
+  iframeWindow,
+  expectedOrigin = typeof window !== 'undefined' ? window.location.origin : null
+) {
+  if (!event || !iframeWindow) return false;
+  if (event.source !== iframeWindow) return false;
+  const origin = event.origin === undefined ? null : String(event.origin);
+  return origin === 'null' || (expectedOrigin !== null && origin === expectedOrigin);
 }
 
 export default function SecureGamePreview({
@@ -48,8 +66,9 @@ export default function SecureGamePreview({
   // postMessage Handshake Listener
   useEffect(() => {
     const handlePostMessage = (event) => {
-      const trustedOrigin = window.location.origin;
-      if (event.origin !== trustedOrigin) return;
+      // Sandboxed iframes have an opaque origin ("null"); only accept
+      // messages from the preview iframe itself.
+      if (!isTrustedGameMessage(event, iframeRef.current?.contentWindow)) return;
       const { type, payload } = event.data || {};
       if (!type || typeof type !== 'string') return;
 
@@ -100,7 +119,9 @@ export default function SecureGamePreview({
 
   const handleRestart = () => {
     if (iframeRef.current) {
-      iframeRef.current.contentWindow?.postMessage({ type: 'COMMAND_RESTART' }, window.location.origin);
+      // The sandboxed iframe has an opaque origin ("null"), so targetOrigin
+      // must be '*' for the command to be delivered at all.
+      iframeRef.current.contentWindow?.postMessage({ type: 'COMMAND_RESTART' }, '*');
       // Trigger refresh fallback if needed
       iframeRef.current.srcdoc = sanitizedHtml;
     }

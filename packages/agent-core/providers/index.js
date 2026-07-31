@@ -1,6 +1,6 @@
 export const MODEL_CATALOG = Object.freeze([
   { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', provider: 'opencode-go', role: 'Primary Executor (Orchestration, Coding, UI, Building & Verification)' },
-  { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', provider: 'openrouter', role: 'Fast Secondary Executor (Rapid UI iterations & smoke testing)' },
+  { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', provider: 'opencode-go', role: 'Fast Secondary Executor (Rapid UI iterations & smoke testing)' },
   { id: 'kimi-k3', name: 'Kimi K3 Code', provider: 'opencode-go', role: 'Physics & Engine Advisor (specialized math/physics guidance)' },
   { id: 'flux-1-schnell', name: 'FLUX 1 Schnell', provider: 'cloudflare-workers-ai', role: 'Visual Asset & Art Director' }
 ]);
@@ -30,7 +30,7 @@ export class ModelProviderRouter {
     if (activeKey) {
       try {
         const endpoint = this.opencodeApiKey 
-          ? 'https://api.opencode.ai/v1/chat/completions'
+          ? 'https://opencode.ai/zen/go/v1/chat/completions'
           : 'https://openrouter.ai/api/v1/chat/completions';
 
         const body = {

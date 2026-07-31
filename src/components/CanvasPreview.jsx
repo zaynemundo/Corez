@@ -229,7 +229,7 @@ export default function CanvasPreview({
                 title={`Live Application Preview (${deviceSpecs[deviceMode].label})`}
                 srcDoc={formattedSrcDoc}
                 className="preview-iframe"
-                sandbox="allow-scripts allow-modals allow-forms allow-pointer-lock"
+                sandbox="allow-scripts allow-forms allow-pointer-lock"
                 style={
                   deviceMode !== 'desktop'
                     ? {
