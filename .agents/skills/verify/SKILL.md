@@ -7,46 +7,61 @@ description: How to launch and drive COREZ end-to-end for runtime verification
 
 ## Launch
 
-Chat persistence (threads/tasks API) requires PostgreSQL, and the owner login
-comes from env vars. A disposable stack that works in this codespace:
+CoreZ is a Vite SPA + Cloudflare Worker. Two ways to verify locally:
+
+### 1. Fully local (no Cloudflare)
 
 ```bash
-docker run -d --name relay-verify-pg -e POSTGRES_PASSWORD=verify \
-  -e POSTGRES_DB=relay -p 5433:5432 postgres:16-alpine
+# Terminal A: worker on :8787 (serves /api/ai, /api/image, /api/market,
+# /api/apps, /api/memory, /api/assets)
+DEEPSEEK_API_KEY=sk-... npx wrangler dev
 
-RELAY_PROVIDER=codex \
-RELAY_WORKER_MODEL=gpt-5.5 RELAY_LEAD_MODEL=gpt-5.5 \
-RELAY_FREE_FALLBACK_MODEL=gpt-5.5 RELAY_AUTHENTICATED_MODEL=gpt-5.5 \
-DATABASE_URL='postgres://postgres:verify@127.0.0.1:5433/relay' \
-RELAY_ADMIN_USERNAME=verifyowner RELAY_ADMIN_PASSWORD='verify-pass-123456' \
-npm run dev   # run in background; web on :5000, API proxied to :4317
+# Terminal B: Vite dev server on :3000 (proxies /api/* to :8787)
+npm run dev
 ```
 
-Gotchas:
-- The default models (`deepseek/…`) are rejected by a ChatGPT-account Codex
-  login — override all four model vars as above. `~/.codex/auth.json` is the
-  codex credential; `RELAY_PROVIDER=codex` is required or the server stays in
-  demo mode (default provider is openrouter, which needs a key).
-- Without `DATABASE_URL`, `POST /api/threads/:id/tasks` returns 503.
+Requires a `.dev.vars` file (or env var) with at least one AI provider key.
+Provider chain: DeepSeek (`DEEPSEEK_API_KEY`) -> OpenCode Go
+(`OPENCODE_GO_API_KEY`) -> OpenRouter (`OPENROUTER_API_KEY`) -> Workers AI
+binding (wrangler dev provides a real `AI` binding only when authenticated).
+
+### 2. Pre-built static + deployed worker
+
+```bash
+npm run build
+npm run deploy   # deploys worker + dist assets to Cloudflare
+```
 
 ## Drive
 
-- Login: `POST /api/auth/login` with the admin username/password; keep the
-  cookie. The SPA reads the token from `localStorage["relay:auth-token"]`.
-- Routing checks: `POST /api/route {prompt}` (owner-only) returns
-  `{"kind":"general"|"workspace"}` deterministically for prototype prompts.
-- Chat flow: `POST /api/threads` → `POST /api/threads/:id/tasks
-  {prompt, context:[]}` → poll `GET /api/tasks/:id`; general answers arrive as
-  `chat.chunk` events (concatenate their `text`).
-- UI: Playwright is in the repo's node_modules
-  (`import ... from "/workspaces/New-Corez/node_modules/playwright/index.mjs"`,
-  chromium already installed). Artifact previews render in
-  `.artifact-iframe`, sandboxed without `allow-same-origin`, so the frame DOM
-  is unreachable from the parent — interact by mouse coordinates and verify
-  via screenshots. Artifact cards are `.artifact-bubble-card`; the side panel
-  download button is `button[title="Download App"]`.
+- Chat: open http://localhost:3000, send a message; watch Network for
+  `POST /api/ai` returning `{content, model}` (model names the provider,
+  e.g. `deepseek:deepseek-v4-flash`).
+- Images: prompts matching the image intent hit `POST /api/image` and
+  return `{image}` (R2 URL when `ASSET_BUCKET` is configured).
+- Market: `POST /api/market` requires `TWELVE_DATA_API_KEY` (returns 503
+  `not_configured` without it).
+- Memory/apps: `/api/memory/*` and `/api/apps/*` require the `ASSET_BUCKET`
+  binding (503/530 without it); `wrangler dev` only provides real R2 with
+  `--remote` and a deployed bucket.
 
-## Cleanup
+## Automated verification (fast feedback)
 
-`pkill -f "tsx watch server/index.ts"; pkill -f vite;
-docker rm -f relay-verify-pg`
+```bash
+npm run lint
+npm test                              # 626+ unit tests
+npm run test:cloudflare               # all worker + contract suites
+npm run build
+```
+
+## Gotchas
+
+- Greeting prompts ("hello") short-circuit in the worker with
+  `model: 'corez-greeting'` — no LLM call.
+- Request bodies over 256 KB are rejected (`Request body rejected: ...
+  byte limit`); the frontend trims history, so this only appears from raw
+  API calls.
+- The swarm path only activates for `complexity: high/epic` app/code-help
+  requests or explicit `swarm: true`; it fans out to the same provider key.
+- `/api/ai` and `/api/image` are rate limited per client IP
+  (20/min and 30/min; HTTP 429 with `Retry-After`).
