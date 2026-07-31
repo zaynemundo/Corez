@@ -1,5 +1,5 @@
 import { handleMarket } from './market.js';
-import { safeErrorDetail, readBoundedJson, jsonResponse, createRateLimiter, createTimedSignal, mergeSignals } from './utils.js';
+import { safeErrorDetail, readBoundedJson, jsonResponse, createRateLimiter } from './utils.js';
 
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 const OPENCODE_DEFAULT_ENDPOINT = 'https://opencode.ai/zen/go/v1/chat/completions';
@@ -321,20 +321,23 @@ async function handleAi(request, env) {
   const opencodeKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY;
   const opencodeEndpoint = env?.OPENCODE_ENDPOINT || OPENCODE_DEFAULT_ENDPOINT;
 
-  // Provider calls abort when the client disconnects (request.signal) or the
-  // overall budget expires, so Stop never leaves paid generations running.
-  // Large revisions (multiplayer additions, big games) legitimately take
-  // minutes to generate: aborting a slow-but-working generation just burns
-  // the fallback chain and ends in a 502.
-  const OPENCODE_CALL_TIMEOUT_MS = 180_000;
-  const AI_REQUEST_BUDGET_MS = 300_000;
-  const requestBudget = createTimedSignal(request.signal, AI_REQUEST_BUDGET_MS);
+  // Generations run as long as the model needs and may use as many tokens
+  // as it wants: no timeouts and no output caps on the provider calls. The
+  // only abort is the client disconnecting (Stop button, tab close), which
+  // must not leave paid generations running.
+  const clientDisconnectSignal = (() => {
+    const controller = new AbortController();
+    if (request.signal) {
+      if (request.signal.aborted) controller.abort();
+      else request.signal.addEventListener('abort', () => controller.abort(), { once: true });
+    }
+    return controller.signal;
+  })();
   const providerFailures = [];
   const recordFailure = (label, reason) => {
     const safe = safeErrorDetail(reason);
     if (safe) providerFailures.push(`${label}: ${safe}`);
   };
-  try {
   if (opencodeKey) {
     const callOpenCodeGo = async (modelId, messagesToSend) => {
       try {
@@ -350,7 +353,7 @@ async function handleAi(request, env) {
             model: modelId,
             messages: messagesToSend
           }),
-          signal: mergeSignals(requestBudget.signal, AbortSignal.timeout(OPENCODE_CALL_TIMEOUT_MS))
+          signal: clientDisconnectSignal
         });
 
         if (!opencodeResp.ok) {
@@ -400,7 +403,7 @@ async function handleAi(request, env) {
           messages: apiMessages,
           stream: false
         }),
-        signal: mergeSignals(requestBudget.signal, AbortSignal.timeout(120_000))
+        signal: clientDisconnectSignal
       });
 
       if (deepSeekResp.ok) {
@@ -442,7 +445,7 @@ async function handleAi(request, env) {
             reasoning: { effort: reasoningEffort },
             messages: apiMessages
           }),
-          signal: mergeSignals(requestBudget.signal, AbortSignal.timeout(60_000))
+          signal: clientDisconnectSignal
         });
 
         if (openRouterResp.ok) {
@@ -498,9 +501,6 @@ async function handleAi(request, env) {
     error: lastWorkersAiError ? 'Unable to generate AI response.' : 'Workers AI returned an empty response.',
     detail: failureDetail
   });
-  } finally {
-    requestBudget.cleanup();
-  }
 }
 
 async function saveToR2IfAvailable(env, key, buffer, mimeType = 'image/png') {
@@ -531,7 +531,7 @@ async function callOpenRouterImage(apiKey, prompt, parentSignal) {
         model: 'black-forest-labs/flux-1-schnell',
         messages: [{ role: 'user', content: prompt }]
       }),
-      signal: mergeSignals(parentSignal, AbortSignal.timeout(60_000))
+      signal: parentSignal
     });
 
     if (response.ok) {
@@ -580,13 +580,20 @@ async function handleImage(request, env) {
 
   const r2Key = `flux_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.png`;
 
-  const requestBudget = createTimedSignal(request.signal, 120_000);
-  try {
+  // Image generation runs as long as it needs; only a client disconnect aborts.
+  const imageClientSignal = (() => {
+    const controller = new AbortController();
+    if (request.signal) {
+      if (request.signal.aborted) controller.abort();
+      else request.signal.addEventListener('abort', () => controller.abort(), { once: true });
+    }
+    return controller.signal;
+  })();
 
   // 1. Try OpenRouter Image Generation if OPENROUTER_API_KEY is present
   const openRouterKey = env?.OPENROUTER_API_KEY;
   if (openRouterKey) {
-    const openRouterImg = await callOpenRouterImage(openRouterKey, prompt, requestBudget.signal);
+    const openRouterImg = await callOpenRouterImage(openRouterKey, prompt, imageClientSignal);
     if (openRouterImg) {
       try {
         let buffer;
@@ -601,7 +608,7 @@ async function handleImage(request, env) {
           buffer = u8arr.buffer;
         } else {
           const imgResp = await fetch(openRouterImg, {
-            signal: mergeSignals(requestBudget.signal, AbortSignal.timeout(30_000))
+            signal: imageClientSignal
           });
           if (imgResp.ok) {
             mimeType = imgResp.headers.get('content-type') || 'image/png';
@@ -695,9 +702,6 @@ async function handleImage(request, env) {
     }));
     console.error('Image generation failed:', safeErrorDetail(error));
     return jsonResponse(502, { error: 'Unable to generate image.' });
-  }
-  } finally {
-    requestBudget.cleanup();
   }
 }
 
