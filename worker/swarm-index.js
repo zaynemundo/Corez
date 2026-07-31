@@ -203,19 +203,59 @@ async function callAIGateway(apiKey, messages, options = {}) {
     };
 
     if (env.OPENCODE_GO_API_KEY || env.OPENCODE_API_KEY) {
-      // OpenCode Go gateway first: plain OpenAI-style chat request
+      // OpenCode Go gateway first: plain OpenAI-style chat request. Try every
+      // known OpenCode Go model before failing, so a rejected model ID never
+      // silently routes the swarm away from the preferred provider.
       endpoint = env.OPENCODE_ENDPOINT || 'https://opencode.ai/zen/go/v1/chat/completions';
       headers = {
         ...headers,
         'HTTP-Referer': 'https://corez.ai',
         'X-Title': 'COREZ AI'
       };
-      requestBody = {
-        model: options.model || SWARM_MODEL,
-        messages,
-        max_tokens: maxTokens,
-        temperature: options.temperature ?? 0.2
-      };
+
+      const candidates = [options.model || SWARM_MODEL, 'deepseek-v4-flash', 'kimi-k3'];
+      const seen = new Set();
+      let lastDetail = '';
+      for (const modelId of candidates) {
+        if (seen.has(modelId)) continue;
+        seen.add(modelId);
+        requestBody = {
+          model: modelId,
+          messages,
+          max_tokens: maxTokens,
+          temperature: options.temperature ?? 0.2
+        };
+        try {
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(requestBody),
+            signal: timedSignal.signal
+          });
+
+          if (!response.ok) {
+            const detail = (await response.text()).slice(0, 300);
+            lastDetail = detail || response.statusText;
+            console.warn(`OpenCode Go model ${modelId} returned HTTP ${response.status}: ${lastDetail}`);
+            continue;
+          }
+
+          const data = await response.json();
+          const content = data?.choices?.[0]?.message?.content;
+          if (typeof content !== 'string' || !content.trim()) {
+            console.warn(`OpenCode Go model ${modelId} returned an empty response.`);
+            continue;
+          }
+          return content.trim();
+        } catch (fetchErr) {
+          if (fetchErr?.name === 'AbortError') throw fetchErr;
+          console.warn(`OpenCode Go model ${modelId} request failed:`, safeErrorDetail(fetchErr));
+        }
+      }
+
+      const error = new Error(`OpenCode Go gateway returned no usable response: ${lastDetail || 'all models failed'}`);
+      error.status = 502;
+      throw error;
     } else if (env.DEEPSEEK_API_KEY && apiKey === env.DEEPSEEK_API_KEY) {
       // Official DeepSeek API: OpenAI-compatible, no provider-specific fields
       endpoint = env.DEEPSEEK_ENDPOINT || 'https://api.deepseek.com/chat/completions';
