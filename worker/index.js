@@ -151,6 +151,18 @@ function extractContentText(content) {
   return '';
 }
 
+// DeepSeek V4 Flash runs thinking mode by default: for complex prompts the
+// model can fill the whole output with reasoning_content and return an empty
+// content field. Never treat that as "no response" — surface the reasoning.
+function messageText(message) {
+  if (!message || typeof message !== 'object') return '';
+  const content = extractContentText(message.content);
+  if (content.trim()) return content;
+  const reasoning = extractContentText(message.reasoning_content);
+  if (reasoning.trim()) return reasoning;
+  return '';
+}
+
 async function handleAi(request, env) {
   if (request.method !== 'POST') {
     return jsonResponse(405, { error: 'Method not allowed.' });
@@ -243,7 +255,7 @@ async function handleAi(request, env) {
 
         if (opencodeResp.ok) {
           const data = await opencodeResp.json();
-          const content = extractContentText(data?.choices?.[0]?.message?.content);
+          const content = messageText(data?.choices?.[0]?.message);
           if (content && content.trim()) {
             return jsonResponse(200, { content: content.trim(), model: `opencode:${modelId}` });
           }
@@ -276,7 +288,7 @@ async function handleAi(request, env) {
 
       if (deepSeekResp.ok) {
         const data = await deepSeekResp.json();
-        const content = extractContentText(data?.choices?.[0]?.message?.content);
+        const content = messageText(data?.choices?.[0]?.message);
         if (content && content.trim()) {
           return jsonResponse(200, { content: content.trim(), model: `deepseek:${deepSeekModel}` });
         }
@@ -316,7 +328,7 @@ async function handleAi(request, env) {
 
         if (openRouterResp.ok) {
           const data = await openRouterResp.json();
-          const content = extractContentText(data?.choices?.[0]?.message?.content);
+          const content = messageText(data?.choices?.[0]?.message);
           if (content && content.trim()) {
             return jsonResponse(200, { content: content.trim(), model: modelId });
           }
@@ -342,7 +354,7 @@ async function handleAi(request, env) {
       });
       // An empty primary response is as useless as a thrown error: try the
       // DeepSeek fallback model before giving up.
-      if (!extractContentText(result?.choices?.[0]?.message?.content).trim()) {
+      if (!messageText(result?.choices?.[0]?.message).trim()) {
         console.warn('Primary Workers AI model returned an empty response, attempting DeepSeek fallback.');
         usedModel = DEEPSEEK_MODEL;
         result = await env.AI.run(DEEPSEEK_MODEL, {
@@ -357,7 +369,7 @@ async function handleAi(request, env) {
       });
     }
 
-    const content = extractContentText(result?.choices?.[0]?.message?.content);
+    const content = messageText(result?.choices?.[0]?.message);
     const normalizedContent = content.trim();
     if (!normalizedContent) {
       return jsonResponse(502, { error: 'Workers AI returned an empty response.' });

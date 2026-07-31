@@ -237,6 +237,27 @@ async function run() {
       assert.equal(dsModelData.model, 'deepseek:deepseek-chat');
       assert.equal(deepSeekPayload.model, 'deepseek-chat');
 
+      // Thinking-mode responses with empty content but populated
+      // reasoning_content must still produce a reply (DeepSeek default
+      // thinking mode can return content: '' for complex prompts).
+      globalThis.fetch = async () => new Response(JSON.stringify({
+        choices: [{ message: { content: '', reasoning_content: 'I thought through the revision steps carefully.' } }]
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const thinkingResp = await post(
+        JSON.stringify({
+          prompt: '[Context: The user is requesting a revision for the following code block]\n```html\n<canvas id="g"></canvas>\n```\n\nUser Request: fix movement',
+          intent: { type: 'code-help', summary: 'Revise embedded code.' }
+        }),
+        env({ AI: undefined, DEEPSEEK_API_KEY: 'sk-deepseek-test' })
+      );
+      assert.equal(thinkingResp.status, 200);
+      const thinkingData = await thinkingResp.json();
+      assert.equal(thinkingData.content, 'I thought through the revision steps carefully.');
+      assert.equal(thinkingData.model, 'deepseek:deepseek-v4-flash');
+
       // OpenCode Go wins when BOTH opencode and DeepSeek keys are configured
       globalThis.fetch = async (url, init) => {
         assert.equal(url, 'https://opencode.ai/zen/go/v1/chat/completions');
