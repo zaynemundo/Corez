@@ -106,3 +106,31 @@ export async function deleteAppInR2(sessionId, appId) {
   }
   return false;
 }
+
+/**
+ * Publishes a creation so anyone with the returned share link can open it.
+ * The html payload is the fully formatted preview document (what the user
+ * sees in the canvas). Passing an existing slug republishes that link.
+ */
+export async function publishAppInR2({ html, title = 'Untitled Application', slug = null }) {
+  if (!html || typeof html !== 'string' || !html.trim()) return null;
+  const payload = {
+    html: html.trim(),
+    title: title.slice(0, 120),
+    ...(slug ? { slug } : {})
+  };
+  try {
+    const res = await fetch('/api/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+    console.warn(`Publish failed with HTTP ${res.status}.`);
+  } catch (err) {
+    console.warn('Publish request failed:', err);
+  }
+  return null;
+}

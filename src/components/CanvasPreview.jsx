@@ -11,15 +11,17 @@ import {
   Monitor,
   Laptop,
   Tablet,
-  Smartphone
+  Smartphone,
+  Share2,
+  ExternalLink,
+  Loader2
 } from 'lucide-react';
 import { formatCodeForPreview } from '../utils/previewTransformer';
-
-import { listSessionAppsInR2, getAppFromR2 } from '../services/appStorageService';
+import { publishAppInR2 } from '../services/appStorageService';
 
 export default function CanvasPreview({ 
   code, 
-  sessionId,
+  title = 'Untitled Application',
   onClose, 
   isFullScreen, 
   onToggleFullScreen 
@@ -29,8 +31,9 @@ export default function CanvasPreview({
   const [editableCode, setEditableCode] = useState(code || '');
   const [copied, setCopied] = useState(false);
   const [key, setKey] = useState(0);
-  const [sessionApps, setSessionApps] = useState([]);
-  const [selectedAppId, setSelectedAppId] = useState('');
+  const [publishing, setPublishing] = useState(false);
+  const [publishResult, setPublishResult] = useState(null); // { slug, url }
+  const [publishError, setPublishError] = useState(null);
 
   const formattedSrcDoc = useMemo(() => {
     return formatCodeForPreview(editableCode);
@@ -41,21 +44,39 @@ export default function CanvasPreview({
     setKey(prev => prev + 1);
   }, [code]);
 
-  useEffect(() => {
-    if (sessionId) {
-      listSessionAppsInR2(sessionId).then(apps => {
-        if (Array.isArray(apps)) setSessionApps(apps);
-      }).catch(() => {});
+  const handlePublish = async () => {
+    if (publishing || !editableCode) return;
+    setPublishing(true);
+    setPublishError(null);
+    try {
+      const result = await publishAppInR2({
+        html: formattedSrcDoc,
+        title,
+        slug: publishResult?.slug || null
+      });
+      if (result && result.url) {
+        setPublishResult({ slug: result.slug, url: result.url });
+        setPublishError(null);
+      } else {
+        setPublishError('Publishing failed. The hosted service may be unavailable — try again.');
+      }
+    } catch (err) {
+      console.warn('Publish error:', err);
+      setPublishError('Publishing failed. Please try again.');
+    } finally {
+      setPublishing(false);
     }
-  }, [sessionId]);
+  };
 
-  const handleSelectApp = async (appId) => {
-    setSelectedAppId(appId);
-    if (!appId) return;
-    const app = await getAppFromR2(sessionId, appId);
-    if (app && (app.code || app.html)) {
-      setEditableCode(app.code || app.html);
-      setKey(prev => prev + 1);
+  const publishLink = publishResult
+    ? new URL(publishResult.url, window.location.origin).href
+    : null;
+
+  const handleCopyLink = () => {
+    if (publishLink && navigator.clipboard) {
+      navigator.clipboard.writeText(publishLink).catch(() => {});
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
@@ -132,29 +153,19 @@ export default function CanvasPreview({
             </button>
           </div>
 
-          {/* Multi-App Selector if multiple apps exist in session */}
-          {sessionApps.length > 1 && (
-            <select
-              value={selectedAppId}
-              onChange={(e) => handleSelectApp(e.target.value)}
-              style={{
-                marginLeft: '0.5rem',
-                background: 'var(--bg-tertiary)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: 'var(--radius-pill)',
-                padding: '2px 8px',
-                fontSize: '0.725rem',
-                cursor: 'pointer'
-              }}
+          {/* Publish: share the creation with anyone via a short link */}
+          {activeTab === 'preview' && editableCode && (
+            <button
+              type="button"
+              className="code-btn publish-btn"
+              onClick={handlePublish}
+              disabled={publishing}
+              title="Publish this creation and share the link"
+              style={{ padding: '4px 10px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
             >
-              <option value="">Switch App ({sessionApps.length} stored)...</option>
-              {sessionApps.map((a, idx) => (
-                <option key={a.appId} value={a.appId}>
-                  App {idx + 1}: {typeof a.title === 'string' ? a.title.slice(0, 20) : 'Untitled'}
-                </option>
-              ))}
-            </select>
+              {publishing ? <Loader2 size={14} className="spin-icon" /> : <Share2 size={14} />}
+              <span>{publishing ? 'Publishing...' : 'Publish'}</span>
+            </button>
           )}
         </div>
 
@@ -264,6 +275,121 @@ export default function CanvasPreview({
           </div>
         )}
       </div>
+
+      {/* Publish share modal */}
+      {publishLink && (
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Share your published creation"
+          onClick={() => setPublishResult(null)}
+        >
+          <div className="modal-card publish-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="modal-title">
+                <Share2 size={15} style={{ marginRight: '6px', verticalAlign: 'middle', color: 'var(--accent, #818cf8)' }} />
+                Your creation is live
+              </span>
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => setPublishResult(null)}
+                title="Close"
+                aria-label="Close"
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
+              Anyone with this link can open <b style={{ color: 'var(--text-primary)' }}>{title.slice(0, 60)}</b>:
+            </p>
+
+            <div
+              className="publish-link-box"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: 'var(--bg-tertiary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                padding: '8px 10px'
+              }}
+            >
+              <input
+                readOnly
+                value={publishLink}
+                onFocus={(e) => e.target.select()}
+                aria-label="Published share link"
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.8rem',
+                  fontFamily: 'monospace'
+                }}
+              />
+              <button type="button" className="code-btn" onClick={handleCopyLink} title="Copy link">
+                {copied ? <Check size={14} /> : <Copy size={14} />}
+                <span>{copied ? 'Copied' : 'Copy'}</span>
+              </button>
+              <a
+                className="code-btn"
+                href={publishLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Open in new tab"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
+              >
+                <ExternalLink size={14} />
+                <span>Open</span>
+              </a>
+            </div>
+
+            {publishResult.slug && (
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0 }}>
+                Slug: <code>{publishResult.slug}</code> · Publishing again updates this same link.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {publishError && (
+        <div
+          role="alert"
+          style={{
+            position: 'absolute',
+            bottom: '12px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'var(--bg-tertiary)',
+            border: '1px solid var(--border-color)',
+            color: 'var(--text-primary)',
+            borderRadius: 'var(--radius-md)',
+            padding: '8px 14px',
+            fontSize: '0.8rem',
+            zIndex: 20
+          }}
+        >
+          {publishError}
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={() => setPublishError(null)}
+            title="Dismiss"
+            aria-label="Dismiss"
+            style={{ marginLeft: '8px', verticalAlign: 'middle' }}
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -26,6 +26,10 @@ Each model is tried until one returns usable text: a thrown error, an empty resu
 
 Conversation history is always sent compact (6 recent messages, 3 KB each, ~15K tokens worst case, 60 KB total body) regardless of the model's context window — 256k and 100k windows included — to keep input tokens cheap.
 
+### Publishing creations
+
+The canvas preview's **Publish** button shares the current creation as a short public link (`corez.pro/asyag23-123`). The worker stores the formatted preview document in R2 under `publish/<slug>.json` and serves it at the bare root path to anyone, sandboxed with the same CSP as the in-app preview. Publishing again under the same slug updates the existing link.
+
 ### Image generation
 
 `/api/image` uses the Workers AI binding with `@cf/black-forest-labs/flux-1-schnell`.

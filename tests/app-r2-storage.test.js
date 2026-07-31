@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import worker from '../worker/index.js';
+import { publishAppInR2 } from '../src/services/appStorageService.js';
 
 describe('R2 Multi-App Storage & Chat Deletion Cleanup Contract', () => {
   let mockBucket;
@@ -107,5 +108,39 @@ describe('R2 Multi-App Storage & Chat Deletion Cleanup Contract', () => {
     expect(mockBucket.store.has('apps/session-to-delete/app-2.json')).toBe(false);
     // Other session apps are untouched
     expect(mockBucket.store.has('apps/session-other/app-3.json')).toBe(true);
+  });
+
+  describe('publishAppInR2', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('publishes a creation and returns the share slug and URL', async () => {
+      const fetchMock = vi.fn(async () => new Response(
+        JSON.stringify({ success: true, slug: 'asyag23-123', url: '/asyag23-123' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      ));
+      vi.stubGlobal('fetch', fetchMock);
+
+      const result = await publishAppInR2({ html: '<h1>Game</h1>', title: 'FPS Game' });
+
+      expect(result).toEqual({ success: true, slug: 'asyag23-123', url: '/asyag23-123' });
+      expect(fetchMock).toHaveBeenCalledWith('/api/publish', expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: expect.stringContaining('"html":"<h1>Game</h1>"')
+      }));
+    });
+
+    it('returns null when content is missing or the publish request fails', async () => {
+      const fetchMock = vi.fn(async () => new Response(JSON.stringify({ error: 'down' }), { status: 400 }));
+      vi.stubGlobal('fetch', fetchMock);
+
+      expect(await publishAppInR2({ html: '' })).toBeNull();
+      expect(fetchMock).not.toHaveBeenCalled();
+
+      expect(await publishAppInR2({ html: '<h1>Game</h1>' })).toBeNull();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
   });
 });

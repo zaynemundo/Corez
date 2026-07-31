@@ -23,6 +23,21 @@ const CONTINUATION_NUDGE = {
 // no slashes, no leading dots (blocks ../ traversal), bounded length.
 const SAFE_STORAGE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$/;
 
+// Published creations get a short, human-shareable slug like "asyag23-123"
+// served at the bare root path corez.pro/<slug>.
+const PUBLISH_SLUG_PATTERN = /^[a-z0-9]{4,8}-[0-9]{1,6}$/;
+
+function generatePublishSlug() {
+  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+  let word = '';
+  const len = 5 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < len; i++) {
+    word += chars[Math.floor(Math.random() * chars.length)];
+  }
+  const num = 100 + Math.floor(Math.random() * 900);
+  return `${word}-${num}`;
+}
+
 function getTargetModels() {
   return [DEEPSEEK_V4_FLASH_MODEL];
 }
@@ -1212,6 +1227,103 @@ async function handleR2Memory(request, env) {
   return jsonResponse(405, { error: 'Method not allowed.' });
 }
 
+function publishedPageHeaders() {
+  return {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'no-cache',
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'no-referrer',
+    // Published creations are AI-generated user content: sandbox them as
+    // documents and forbid all subresources so they cannot exfiltrate data.
+    'Content-Security-Policy': "sandbox; default-src 'none'; script-src 'unsafe-inline'"
+  };
+}
+
+async function handlePublish(request, env) {
+  const url = new URL(request.url);
+  const pathname = url.pathname;
+
+  // POST /api/publish - publish (or republish under an explicit slug) a
+  // creation so anyone with the link can open it.
+  if (pathname === '/api/publish' && request.method === 'POST') {
+    let body;
+    try {
+      body = await readBoundedJson(request);
+    } catch {
+      return jsonResponse(400, { error: 'Invalid JSON payload.' });
+    }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      body = {};
+    }
+
+    const html = typeof body?.html === 'string' && body.html.trim()
+      ? body.html.trim()
+      : (typeof body?.code === 'string' && body.code.trim() ? body.code.trim() : '');
+    if (!html) {
+      return jsonResponse(400, { error: 'html or code content is required to publish.' });
+    }
+    if (html.length > 2 * 1024 * 1024) {
+      return jsonResponse(400, { error: 'Published content is too large.' });
+    }
+    if (!env?.ASSET_BUCKET) {
+      return jsonResponse(530, { error: 'R2 storage (ASSET_BUCKET) is not configured.' });
+    }
+
+    const title = typeof body?.title === 'string' ? body.title.slice(0, 120) : 'Untitled Application';
+    let slug = typeof body?.slug === 'string' && PUBLISH_SLUG_PATTERN.test(body.slug) ? body.slug : null;
+    if (!slug) {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const candidate = generatePublishSlug();
+        const existing = await env.ASSET_BUCKET.get(`publish/${candidate}.json`);
+        if (!existing) {
+          slug = candidate;
+          break;
+        }
+      }
+    }
+    if (!slug) {
+      return jsonResponse(503, { error: 'Could not allocate a unique publish slug. Try again.' });
+    }
+
+    await env.ASSET_BUCKET.put(`publish/${slug}.json`, JSON.stringify({
+      slug,
+      title,
+      html,
+      createdAt: new Date().toISOString()
+    }), {
+      httpMetadata: { contentType: 'application/json' }
+    });
+
+    return jsonResponse(200, { success: true, slug, url: `/${slug}` });
+  }
+
+  // GET /<slug> - serve a published creation to anyone (bare root path).
+  if (request.method === 'GET' && PUBLISH_SLUG_PATTERN.test(pathname.slice(1))) {
+    if (!env?.ASSET_BUCKET) {
+      return jsonResponse(530, { error: 'R2 storage (ASSET_BUCKET) is not configured.' });
+    }
+    const slug = pathname.slice(1);
+    const object = await env.ASSET_BUCKET.get(`publish/${slug}.json`);
+    if (!object) {
+      return jsonResponse(404, { error: 'Published creation not found.' });
+    }
+    let record;
+    try {
+      record = JSON.parse(await object.text());
+    } catch {
+      return jsonResponse(500, { error: 'Failed to parse published payload.' });
+    }
+    const html = typeof record?.html === 'string' ? record.html : '';
+    if (!html) {
+      return jsonResponse(404, { error: 'Published creation not found.' });
+    }
+    return new Response(html, { headers: publishedPageHeaders() });
+  }
+
+  return jsonResponse(405, { error: 'Method not allowed.' });
+}
+
 async function runJsonSafe(operation) {
   try {
     return await operation();
@@ -1253,6 +1365,9 @@ export default {
     }
     if (pathname.startsWith('/api/memory')) {
       return runJsonSafe(() => handleR2Memory(request, env));
+    }
+    if (pathname === '/api/publish' || (request.method === 'GET' && PUBLISH_SLUG_PATTERN.test(pathname.slice(1)))) {
+      return runJsonSafe(() => handlePublish(request, env));
     }
     if (pathname.startsWith('/api/')) {
       return jsonResponse(404, { error: 'API route not found.' });

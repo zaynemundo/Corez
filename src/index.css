@@ -1262,6 +1262,32 @@ h1, h2, h3, h4, h5, h6 {
   border-color: var(--border-hover);
 }
 
+/* Publish action: inverted primary pill, readable in both themes */
+.publish-btn {
+  background-color: var(--text-primary);
+  color: var(--bg-primary);
+  border-color: var(--text-primary);
+}
+
+.publish-btn:hover {
+  background-color: var(--text-primary);
+  color: var(--bg-primary);
+  opacity: 0.85;
+}
+
+.publish-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.publish-modal-card {
+  max-width: 520px;
+}
+
+.spin-icon {
+  animation: market-refresh-spin 0.8s linear infinite;
+}
+
 .code-content {
   padding: 0.85rem;
   overflow-x: auto;

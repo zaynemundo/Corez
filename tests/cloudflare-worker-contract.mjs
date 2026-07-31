@@ -792,6 +792,73 @@ async function run() {
   );
   assert.equal(badAppPath.status, 400);
 
+  // Publish: creates a shareable slug, serves the creation with sandbox
+  // headers, and falls through to static assets for non-slug bare paths.
+  const publishStore = await worker.fetch(
+    new Request('https://corez.test/api/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'FPS Game', html: '<!DOCTYPE html><html><body><h1>Shared FPS</h1></body></html>' })
+    }),
+    memoryEnv()
+  );
+  assert.equal(publishStore.status, 200);
+  const publishData = await json(publishStore);
+  assert.match(publishData.slug, /^[a-z0-9]{4,8}-[0-9]{1,6}$/);
+  assert.equal(publishData.url, `/${publishData.slug}`);
+
+  const publishedPage = await worker.fetch(
+    new Request(`https://corez.test${publishData.url}`, { method: 'GET' }),
+    memoryEnv()
+  );
+  assert.equal(publishedPage.status, 200);
+  assert.match(publishedPage.headers.get('content-type'), /text\/html/);
+  assert.match(publishedPage.headers.get('content-security-policy'), /sandbox/);
+  assert.equal(await publishedPage.text(), '<!DOCTYPE html><html><body><h1>Shared FPS</h1></body></html>');
+
+  // Republishing under the same slug updates the existing link
+  const republish = await worker.fetch(
+    new Request('https://corez.test/api/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug: publishData.slug, html: '<h1>v2</h1>' })
+    }),
+    memoryEnv()
+  );
+  assert.equal(republish.status, 200);
+  const republishedPage = await worker.fetch(
+    new Request(`https://corez.test/${publishData.slug}`, { method: 'GET' }),
+    memoryEnv()
+  );
+  assert.equal(republishedPage.status, 200);
+  assert.equal(await republishedPage.text(), '<h1>v2</h1>');
+
+  // Publish without content is rejected
+  const publishEmpty = await worker.fetch(
+    new Request('https://corez.test/api/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'Empty' })
+    }),
+    memoryEnv()
+  );
+  assert.equal(publishEmpty.status, 400);
+
+  // Unknown slug is a 404
+  const publishMissing = await worker.fetch(
+    new Request('https://corez.test/zzz999-000', { method: 'GET' }),
+    memoryEnv()
+  );
+  assert.equal(publishMissing.status, 404);
+
+  // Non-slug bare paths fall through to the SPA / static assets
+  const spaFallback = await worker.fetch(
+    new Request('https://corez.test/not-a-slug-path', { method: 'GET' }),
+    memoryEnv()
+  );
+  assert.equal(spaFallback.status, 200);
+  assert.equal(await spaFallback.text(), 'asset:/not-a-slug-path');
+
   // Asset upload validation: reject arbitrary content types, keys, and malformed data URLs
   const uploadBadType = await worker.fetch(
     new Request('https://corez.test/api/assets/upload', {

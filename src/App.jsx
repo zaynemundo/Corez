@@ -602,7 +602,7 @@ export default function App() {
             {canvasOpen && (
               <CanvasPreview
                 code={activeCanvasCode}
-                sessionId={activeSessionId}
+                title={activeSession?.title || 'Untitled Application'}
                 onClose={() => setCanvasOpen(false)}
                 isFullScreen={canvasFullScreen}
                 onToggleFullScreen={() => setCanvasFullScreen(prev => !prev)}
