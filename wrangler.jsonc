@@ -5,6 +5,20 @@
   "compatibility_date": "2026-07-18",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "GAME_ROOMS",
+        "class_name": "GameRoom"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1-game-rooms",
+      "new_sqlite_classes": ["GameRoom"]
+    }
+  ],
   "r2_buckets": [
     {
       "binding": "ASSET_BUCKET",

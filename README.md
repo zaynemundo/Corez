@@ -28,6 +28,26 @@ Only the app document itself is published: conversation history, session IDs, an
 
 `DEEPSEEK_API_KEY` and `OPENROUTER_API_KEY` should be configured as Worker secrets; `OPENCODE_GO_API_KEY` is the primary provider secret.
 
+### Online multiplayer
+
+Generated games can request real online multiplayer via the COREZ game protocol. A Cloudflare Durable Object (`GameRoom`) is the authoritative server for each room; clients connect over WebSocket at `wss://<host>/api/game/ws/<roomId>` where `<roomId>` is a short lowercase id (e.g. `dm-123`).
+
+Client → server messages (JSON):
+
+- `{"type":"join","name":"PlayerOne"}` — join the room (up to 8 players)
+- `{"type":"input","keys":{"up":true,"down":false,"left":false,"right":true}}` — movement input
+- `{"type":"shoot","dx":1,"dy":0.2}` — fire toward the direction vector
+
+Server → client messages (JSON):
+
+- `{"type":"welcome","playerId":"a1b2c3d4","roomId":"dm-123","players":[...]}` — on join
+- `{"type":"state","tick":42,"players":[{"id","name","x","y","color","score"}],"bullets":[{"x","y","ownerId"}]}` — ~20 Hz authoritative state in normalized 0..1 arena coordinates
+- `{"type":"kill","killerId","victimId","killerName","victimName"}`
+- `{"type":"player_joined","player":{...}}` / `{"type":"player_left","playerId","name"}`
+- `{"type":"error","message":"Room is full."}`
+
+The server simulates movement and bullet hits authoritatively; clients render the received state and map 0..1 coordinates onto their canvas. The system prompt instructs the model to use this protocol instead of inventing a backend.
+
 ## Security notes
 
 - AI-generated apps and games render inside sandboxed iframes (`allow-scripts`, no same-origin, no modals/popups). Generated code cannot read the page, cookies, or local storage, and it cannot navigate the parent.

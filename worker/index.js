@@ -20,6 +20,25 @@ const SAFE_STORAGE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$/;
 // served at the bare root path corez.pro/<slug>.
 const PUBLISH_SLUG_PATTERN = /^[a-z0-9]{4,8}-[0-9]{1,6}$/;
 
+// Online multiplayer rooms: short lowercase ids used in the WebSocket URL.
+const SAFE_ROOM_ID = /^[a-z0-9][a-z0-9-]{2,31}$/;
+
+async function handleGameSocket(request, env) {
+  const pathname = new URL(request.url).pathname;
+  const roomId = decodePathSegment(pathname.replace('/api/game/ws/', ''));
+  if (!roomId || !SAFE_ROOM_ID.test(roomId)) {
+    return jsonResponse(400, { error: 'Invalid room id: use lowercase letters, digits and dashes.' });
+  }
+  if (!env?.GAME_ROOMS || typeof env.GAME_ROOMS.get !== 'function') {
+    return jsonResponse(503, { error: 'Multiplayer is not configured.' });
+  }
+  if (!/websocket/i.test(request.headers.get('Upgrade') || '')) {
+    return jsonResponse(400, { error: 'WebSocket upgrade required.' });
+  }
+  const stub = env.GAME_ROOMS.get(env.GAME_ROOMS.idFromName(roomId));
+  return stub.fetch(request);
+}
+
 function generatePublishSlug() {
   const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
   let word = '';
@@ -86,6 +105,7 @@ Adaptive Routing - Complex Path:
 Adaptive Routing - App & Game Creation Path (Awwwards Site of the Day Quality):
 - DeepSeek V4 Flash handles logic, vision, UI layout, art direction, and game design.
 - Use FLUX 1 Schnell for fast background image generation and visual graphics.
+- ONLINE MULTIPLAYER: When the user asks for online multiplayer, use the COREZ multiplayer protocol: connect with \`new WebSocket(\`wss://\${location.host}/api/game/ws/<roomId>\`)\` where <roomId> is a short lowercase id like "dm-123". Send JSON {type:'join',name}, {type:'input',keys:{up,down,left,right}}, {type:'shoot',dx,dy}. Receive {type:'welcome',playerId,players}, {type:'state',players:[{id,name,x,y,color,score}],bullets:[{x,y,ownerId}]} at 20Hz (normalized 0..1 coordinates), {type:'kill',killerId,victimId}, {type:'player_joined'}, {type:'player_left'}. The server moves players and resolves hits authoritatively; render the received state and map 0..1 coordinates to your canvas. Never invent your own server, socket.io, or third-party backend.
 ${designStyle}
 - Build a complete, rich, runnable experience ready for the preview canvas.
 - Word Games Requirement: When generating word games (Scrabble, Wordle, Crosswords, etc.), embed a full dictionary of valid English words and implement strict word validation logic.`;
@@ -1149,6 +1169,9 @@ export default {
     }
     if (pathname === '/api/publish' || (request.method === 'GET' && PUBLISH_SLUG_PATTERN.test(pathname.slice(1)))) {
       return runJsonSafe(() => handlePublish(request, env));
+    }
+    if (pathname.startsWith('/api/game/ws/')) {
+      return runJsonSafe(() => handleGameSocket(request, env));
     }
     if (pathname.startsWith('/api/')) {
       return jsonResponse(404, { error: 'API route not found.' });

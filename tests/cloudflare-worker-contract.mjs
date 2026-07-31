@@ -539,6 +539,52 @@ async function run() {
     ['Earlier question', 'Earlier answer', 'Current question']
   );
 
+  // Online multiplayer routing: WebSocket upgrades go to the GameRoom Durable
+  // Object; invalid ids, missing upgrade headers, and missing bindings are
+  // rejected before any DO call.
+  let gameRoomId = null;
+  const gameRoomsBinding = {
+    idFromName: (name) => ({ name }),
+    get: (id) => {
+      gameRoomId = id.name;
+      return {
+        fetch: async () => new Response('room stub', { status: 200 })
+      };
+    }
+  };
+  const gameWsResponse = await worker.fetch(
+    new Request('https://corez.test/api/game/ws/dm-123', {
+      headers: { Upgrade: 'websocket', Connection: 'Upgrade' }
+    }),
+    env({ GAME_ROOMS: gameRoomsBinding })
+  );
+  assert.equal(gameWsResponse.status, 200);
+  assert.equal(await gameWsResponse.text(), 'room stub');
+  assert.equal(gameRoomId, 'dm-123');
+
+  const gameWsBadId = await worker.fetch(
+    new Request('https://corez.test/api/game/ws/BAD%2FID', {
+      headers: { Upgrade: 'websocket' }
+    }),
+    env({ GAME_ROOMS: gameRoomsBinding })
+  );
+  assert.equal(gameWsBadId.status, 400);
+
+  const gameWsNoUpgrade = await worker.fetch(
+    new Request('https://corez.test/api/game/ws/dm-123'),
+    env({ GAME_ROOMS: gameRoomsBinding })
+  );
+  assert.equal(gameWsNoUpgrade.status, 400);
+  assert.equal(gameRoomId, 'dm-123');
+
+  const gameWsNoBinding = await worker.fetch(
+    new Request('https://corez.test/api/game/ws/dm-123', {
+      headers: { Upgrade: 'websocket' }
+    }),
+    env()
+  );
+  assert.equal(gameWsNoBinding.status, 503);
+
   // Test /api/image FLUX endpoint
   const imageMethodResponse = await worker.fetch(
     new Request('https://corez.test/api/image'),
