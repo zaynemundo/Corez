@@ -118,7 +118,9 @@ export default function ImageShowcaseModal({ isOpen, onClose }) {
   };
 
   const handleCopyPrompt = (preset) => {
-    navigator.clipboard.writeText(preset.prompt);
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(preset.prompt).catch(() => {});
+    }
     setCopiedPresetId(preset.id);
     setTimeout(() => setCopiedPresetId(null), 2000);
   };

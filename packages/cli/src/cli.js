@@ -353,13 +353,15 @@ export async function runCli(argv = process.argv.slice(2), options = {}) {
     case 'run':
       return handleRunCommand(restArgs.join(' '), options, ui, execOptions);
 
-    case 'status':
-      await handleStatusCommand(restArgs, options, ui);
-      return 0;
+    case 'status': {
+      const statusResult = await handleStatusCommand(restArgs, options, ui);
+      return statusResult === false ? 1 : 0;
+    }
 
-    case 'models':
-      await handleModelsCommand(restArgs, options, ui);
-      return 0;
+    case 'models': {
+      const modelsResult = await handleModelsCommand(restArgs, options, ui);
+      return modelsResult === false ? 1 : 0;
+    }
 
     case 'model':
     case '/model':
@@ -368,32 +370,28 @@ export async function runCli(argv = process.argv.slice(2), options = {}) {
       return modelResult?.success === false ? 1 : 0;
     }
 
-    case 'agents':
-      await handleAgentsCommand(restArgs, options, ui);
-      return 0;
+    case 'agents': {
+      const agentsResult = await handleAgentsCommand(restArgs, options, ui);
+      return agentsResult === false ? 1 : 0;
+    }
 
     case 'plan':
       if (!validatePrompt('plan', restArgs.join(' '), ui)) return 1;
-      await handlePlanCommand(restArgs.join(' '), options, ui);
-      return 0;
+      return (await handlePlanCommand(restArgs.join(' '), options, ui)) === false ? 1 : 0;
 
     case 'build':
       if (!validatePrompt('build', restArgs.join(' '), ui)) return 1;
-      await handleBuildCommand(restArgs.join(' '), options, ui);
-      return 0;
+      return (await handleBuildCommand(restArgs.join(' '), options, ui)) === false ? 1 : 0;
 
     case 'fix':
-      await handleFixCommand(options, ui);
-      return 0;
+      return (await handleFixCommand(options, ui)) === false ? 1 : 0;
 
     case 'review':
-      await handleReviewCommand(options, ui);
-      return 0;
+      return (await handleReviewCommand(options, ui)) === false ? 1 : 0;
 
     case 'swarm':
       if (!validatePrompt('swarm', restArgs.join(' '), ui)) return 1;
-      await handleSwarmCommand(restArgs.join(' '), options, ui);
-      return 0;
+      return (await handleSwarmCommand(restArgs.join(' '), options, ui)) === false ? 1 : 0;
 
     case 'session':
       return handleSessionCommand(restArgs, options, ui);

@@ -3,7 +3,7 @@ import { AgentRuntime } from '../../../agent-core/index.js';
 export async function handleBuildCommand(prompt, options = {}, ui) {
   if (!prompt || typeof prompt !== 'string') {
     ui.error('Build command requires a prompt or task description.\nExample: corez build "create an admin dashboard"');
-    return;
+    return false;
   }
 
   ui.banner();
@@ -36,7 +36,9 @@ export async function handleBuildCommand(prompt, options = {}, ui) {
 
     ui.success('CoreZ Autonomous Build Complete:');
     console.log(`\n${result.response}\n`);
+    return true;
   } catch (err) {
     ui.error(err.message);
+    return false;
   }
 }

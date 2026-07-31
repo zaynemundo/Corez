@@ -27,7 +27,7 @@ function CodeSnippetBlock({ code, lang, onRunInCanvas, onReviseCode }) {
 
   const handleCopy = () => {
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(code);
+      navigator.clipboard.writeText(code).catch(() => {});
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }

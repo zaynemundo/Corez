@@ -590,7 +590,15 @@ export async function generateHostedAIResponse(
 
   const response = await fetch(AI_PROXY_ENDPOINT, fetchOptions);
 
-  const data = await response.json().catch(() => ({}));
+  let data;
+  try {
+    data = await response.json();
+  } catch (err) {
+    // A user-initiated abort must propagate so callers can stop cleanly
+    // instead of fabricating a fallback reply after Stop was pressed.
+    if (err?.name === 'AbortError' || signal?.aborted) throw err;
+    data = {};
+  }
 
   if (!response.ok) {
     const serverMsg = typeof data?.error === 'string' ? data.error : (data?.error?.message || data?.message || `HTTP ${response.status}`);
@@ -2173,13 +2181,9 @@ function synthesizeCustomGame(prompt) {
     };
   }
 
-  const gameTitle = clean.replace(/(create|build|make|generate|a|an|the|game|play|app|widget|prototype)/gi, '').trim() || 'Interactive App';
-  const capitalizedTitle = gameTitle.charAt(0).toUpperCase() + gameTitle.slice(1);
-
-  return {
-    title: `COREZ ${capitalizedTitle} App`,
-    html: synthesizePlatformerGame()
-  };
+  // No recognized app template: do NOT fabricate an unrelated platformer as
+  // if it were the requested app. Report the real status instead.
+  return null;
 }
 
 // Generate concise, natural AI responses for any public user
@@ -2221,6 +2225,10 @@ export async function generateLocalAIResponse(prompt, hostedError = null) {
   // prompt that already embeds code is a revision/analysis of existing code.
   if (intent.type === 'app' && !hasEmbeddedCode && !/^revise\s/i.test(cleanPrompt)) {
     const gameResult = synthesizeCustomGame(cleanPrompt);
+    if (!gameResult) {
+      const reason = hostedError?.message ? ` The hosted AI service is unavailable: ${hostedError.message}` : ' The hosted AI service is currently unavailable.';
+      return `I'd love to build that for you, but it doesn't match any app template I can synthesize offline, and ${reason.trim()} — so I can't create this specific app right now. Please check the AI service configuration (e.g. OPENROUTER_API_KEY for local dev) and try again.`;
+    }
     return `I've created **${gameResult.title}** for you! Click below to open it live in the preview canvas on the right side.\n\n\`\`\`html\n${gameResult.html}\n\`\`\``;
   }
 

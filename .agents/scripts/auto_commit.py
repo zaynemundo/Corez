@@ -83,7 +83,9 @@ def main():
                     commit_summary = first_line[:57] + "..."
                 else:
                     commit_summary = first_line
-                commit_description = last_input
+                # Never embed the full prompt in git history: prompts can contain
+                # secrets or sensitive context that would be permanently recorded.
+                commit_description = last_input[:500]
         except Exception as e:
             log(f"Error reading transcript: {e}")
 
@@ -115,8 +117,8 @@ def main():
         }))
         return
 
-    # Step 5a: Add changes
-    res_add = run_cmd(["git", "add", "-A"], cwd=cwd)
+    # Step 5a: Add changes (excluding local environment artifacts)
+    res_add = run_cmd(["git", "add", "-A", "--", ".", ":!install.cmd"], cwd=cwd)
     if res_add.returncode != 0:
         print(json.dumps({
             "decision": "stop",

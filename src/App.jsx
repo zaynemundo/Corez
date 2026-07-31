@@ -318,6 +318,7 @@ export default function App() {
     setActiveView('chat');
     setCanvasOpen(false);
     setCanvasFullScreen(false);
+    setActiveCanvasCode(null);
     const target = sessions.find(s => s.id === id);
     if (target && Array.isArray(target.messages) && target.messages.length > 0) {
       const lastAssistantMsg = [...target.messages].reverse().find(m => m.role === 'assistant' && m.type !== 'market');

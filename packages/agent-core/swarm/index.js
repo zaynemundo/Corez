@@ -131,11 +131,29 @@ export class GenericSwarmOrchestrator {
       await Promise.allSettled(executions);
     }
 
+    const failedTasks = Array.from(graph.tasks.values()).filter(
+      t => t.status === AGENT_LIFECYCLE_STATES.FAILED
+    );
+    const stuckTasks = Array.from(graph.tasks.values()).filter(t => {
+      const terminal = [AGENT_LIFECYCLE_STATES.COMPLETED, AGENT_LIFECYCLE_STATES.FAILED];
+      return !terminal.includes(t.status);
+    });
+
+    if (failedTasks.length > 0 || stuckTasks.length > 0) {
+      onStatus({
+        step: 'swarm_failed',
+        message: `${failedTasks.length} task(s) failed, ${stuckTasks.length} task(s) incomplete.`,
+        tasks: [...failedTasks, ...stuckTasks].map(t => ({ taskId: t.taskId, role: t.role, status: t.status }))
+      });
+    }
+
     return {
       projectId,
-      completed: true,
+      completed: failedTasks.length === 0 && stuckTasks.length === 0,
       tasksCount: graph.tasks.size,
-      results: completedResults
+      results: completedResults,
+      failedTasks: failedTasks.map(t => ({ taskId: t.taskId, role: t.role })),
+      incompleteTasks: stuckTasks.map(t => ({ taskId: t.taskId, role: t.role, status: t.status }))
     };
   }
 

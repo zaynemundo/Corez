@@ -60,9 +60,11 @@ export default function CanvasPreview({
   };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(editableCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(editableCode).catch(() => {});
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const handleDownload = () => {

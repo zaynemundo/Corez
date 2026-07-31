@@ -28,7 +28,9 @@ export async function handleFixCommand(options = {}, ui) {
     ui.divider();
     ui.success('CoreZ Fix Task Complete:');
     console.log(`\n${result.response}\n`);
+    return true;
   } catch (err) {
     ui.error(err.message);
+    return false;
   }
 }

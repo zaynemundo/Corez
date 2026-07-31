@@ -3,7 +3,7 @@ import { GenericSwarmOrchestrator } from '../../../agent-core/index.js';
 export async function handleSwarmCommand(prompt, options = {}, ui) {
   if (!prompt || typeof prompt !== 'string') {
     ui.error('Swarm command requires a prompt or task description.\nExample: corez swarm "build a browser game"');
-    return;
+    return false;
   }
 
   ui.banner();
@@ -24,9 +24,15 @@ export async function handleSwarmCommand(prompt, options = {}, ui) {
     });
 
     ui.divider();
+    if (result.completed === false) {
+      ui.error(`Swarm execution incomplete: ${result.failedTasks?.length || 0} task(s) failed, ${result.incompleteTasks?.length || 0} incomplete.`);
+      return false;
+    }
     ui.success('CoreZ Swarm Execution Completed Successfully!');
     ui.status('✓', `Total Agent Tasks Executed: ${result.tasksCount}`);
+    return true;
   } catch (err) {
     ui.error(err.message);
+    return false;
   }
 }

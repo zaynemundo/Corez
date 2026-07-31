@@ -51,9 +51,11 @@ describe('GenericSwarmOrchestrator', () => {
       onStatus: (st) => events.push(st)
     });
 
-    // No hang: every agent failed and the swarm terminated with zero completed tasks
-    expect(result.completed).toBe(true);
+    // No hang: every agent failed and the swarm terminated, reporting the failure
+    expect(result.completed).toBe(false);
     expect(result.results).toHaveLength(0);
+    expect(result.failedTasks.length).toBeGreaterThan(0);
     expect(events.filter(e => e.step === 'agent_failed').length).toBeGreaterThan(0);
+    expect(events.some(e => e.step === 'swarm_failed')).toBe(true);
   });
 });

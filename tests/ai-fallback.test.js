@@ -48,10 +48,20 @@ describe('Hosted AI fallback behavior', () => {
     const fetchMock = vi.fn(async () => Response.json({ error: 'down' }, { status: 503 }));
     vi.stubGlobal('fetch', fetchMock);
 
-    const response = await generateAIResponse('Build me a snake game', []);
+    const response = await generateAIResponse('Build me a chess game', []);
 
     expect(response).toContain('```html');
     expect(response).not.toContain('I can see the code you want to revise');
+  });
+
+  it('never fabricates an unrelated app for app types the local fallback cannot synthesize', async () => {
+    const fetchMock = vi.fn(async () => Response.json({ error: 'down' }, { status: 503 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await generateAIResponse('Build me a landing page for a bakery', []);
+
+    expect(response).toContain("doesn't match any app template");
+    expect(response).not.toContain('```html');
   });
 
   it('routes revision requests to the hosted AI when it is available', async () => {
@@ -67,5 +77,23 @@ describe('Hosted AI fallback behavior', () => {
 
     expect(response).toBe('Here is the revised game with a shop.');
     expect(fetchMock).toHaveBeenCalledWith('/api/ai', expect.anything());
+  });
+
+  it('propagates an abort while the response body is downloading instead of fabricating a fallback reply', async () => {
+    const abortController = new AbortController();
+    const fetchMock = vi.fn(async (_url, _options) => {
+      abortController.abort();
+      return {
+        ok: true,
+        json: async () => {
+          throw new DOMException('The operation was aborted.', 'AbortError');
+        }
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(generateAIResponse('Tell me about black roses', [], abortController.signal))
+      .rejects.toMatchObject({ name: 'AbortError' });
+    expect(fetchMock).toHaveBeenCalledWith('/api/ai', expect.objectContaining({ signal: abortController.signal }));
   });
 });

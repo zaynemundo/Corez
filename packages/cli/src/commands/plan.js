@@ -3,7 +3,7 @@ import { AgentRuntime, PermissionManager } from '../../../agent-core/index.js';
 export async function handlePlanCommand(prompt, options = {}, ui) {
   if (!prompt || typeof prompt !== 'string') {
     ui.error('Plan command requires a prompt or task description.\nExample: corez plan "add Stripe subscriptions"');
-    return;
+    return false;
   }
 
   ui.banner();
@@ -44,7 +44,9 @@ Output format:
     ui.success('CoreZ Implementation Plan Generated:');
     console.log(`\n${result.response}\n`);
     ui.info(`Inspected ${result.inspectedFiles.length} files during planning.`);
+    return true;
   } catch (err) {
     ui.error(err.message);
+    return false;
   }
 }

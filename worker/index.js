@@ -153,6 +153,17 @@ ${imageRequestInstructions}
 Inferred intent: ${intentType} - ${intent?.summary || intent?.goal || 'Understand the public user goal and give a useful next step.'}`;
 }
 
+function extractContentText(content) {
+  if (typeof content === 'string') return content;
+  // Multimodal responses can wrap text in content parts: [{ type, text }]
+  if (Array.isArray(content)) {
+    return content
+      .map(part => (part && typeof part === 'object' && typeof part.text === 'string') ? part.text : '')
+      .join('');
+  }
+  return '';
+}
+
 async function handleAi(request, env) {
   if (request.method !== 'POST') {
     return jsonResponse(405, { error: 'Method not allowed.' });
@@ -232,13 +243,14 @@ async function handleAi(request, env) {
           body: JSON.stringify({
             model: modelId,
             messages: apiMessages
-          })
+          }),
+          signal: AbortSignal.timeout(30_000)
         });
 
         if (opencodeResp.ok) {
           const data = await opencodeResp.json();
-          const content = data?.choices?.[0]?.message?.content;
-          if (content && typeof content === 'string' && content.trim()) {
+          const content = extractContentText(data?.choices?.[0]?.message?.content);
+          if (content && content.trim()) {
             return jsonResponse(200, { content: content.trim(), model: `opencode:${modelId}` });
           }
         }
@@ -269,13 +281,14 @@ async function handleAi(request, env) {
             model: modelId,
             reasoning: { effort: reasoningEffort },
             messages: apiMessages
-          })
+          }),
+          signal: AbortSignal.timeout(30_000)
         });
 
         if (openRouterResp.ok) {
           const data = await openRouterResp.json();
-          const content = data?.choices?.[0]?.message?.content;
-          if (content && typeof content === 'string' && content.trim()) {
+          const content = extractContentText(data?.choices?.[0]?.message?.content);
+          if (content && content.trim()) {
             return jsonResponse(200, { content: content.trim(), model: modelId });
           }
         }
@@ -306,8 +319,8 @@ async function handleAi(request, env) {
       });
     }
 
-    const content = result?.choices?.[0]?.message?.content;
-    const normalizedContent = typeof content === 'string' ? content.trim() : '';
+    const content = extractContentText(result?.choices?.[0]?.message?.content);
+    const normalizedContent = content.trim();
     if (!normalizedContent) {
       return jsonResponse(502, { error: 'Workers AI returned an empty response.' });
     }
@@ -352,7 +365,8 @@ async function callOpenRouterImage(apiKey, prompt) {
       body: JSON.stringify({
         model: 'black-forest-labs/flux-1-schnell',
         messages: [{ role: 'user', content: prompt }]
-      })
+      }),
+      signal: AbortSignal.timeout(60_000)
     });
 
     if (response.ok) {
@@ -523,6 +537,9 @@ async function handleR2Assets(request, env) {
       return jsonResponse(400, { error: 'Invalid JSON payload.' });
     }
 
+    const ALLOWED_ASSET_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml', 'image/x-icon'];
+    const SAFE_KEY = /^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$/;
+
     const key = typeof body?.key === 'string' ? body.key.replace(/^\/+/, '') : `asset_${Date.now()}`;
     const dataUrl = typeof body?.dataUrl === 'string' ? body.dataUrl : '';
     const mimeType = typeof body?.mimeType === 'string' ? body.mimeType : 'image/png';
@@ -530,16 +547,33 @@ async function handleR2Assets(request, env) {
     if (!dataUrl) {
       return jsonResponse(400, { error: 'dataUrl is required.' });
     }
-
-    const parts = dataUrl.split(',');
-    const bstr = atob(parts[1] || parts[0]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) {
-      u8arr[n] = bstr.charCodeAt(n);
+    if (!SAFE_KEY.test(key)) {
+      return jsonResponse(400, { error: 'Invalid asset key: use letters, digits, dots, dashes or underscores.' });
+    }
+    if (!ALLOWED_ASSET_TYPES.includes(mimeType)) {
+      return jsonResponse(400, { error: `Unsupported content type "${mimeType}".` });
+    }
+    // The data URL must be a base64 data URL whose declared image type matches
+    // the stored content type; arbitrary bytes are never stored as-is.
+    const expectedPrefix = `data:${mimeType};base64,`;
+    if (!dataUrl.startsWith(expectedPrefix)) {
+      return jsonResponse(400, { error: 'dataUrl must be a base64 data URL matching the declared content type.' });
     }
 
-    await env.ASSET_BUCKET.put(key, u8arr.buffer, {
+    let bytes;
+    try {
+      const parts = dataUrl.split(',');
+      const bstr = atob(parts[1] || '');
+      const u8arr = new Uint8Array(bstr.length);
+      for (let i = 0; i < bstr.length; i++) {
+        u8arr[i] = bstr.charCodeAt(i);
+      }
+      bytes = u8arr.buffer;
+    } catch {
+      return jsonResponse(400, { error: 'Invalid base64 payload.' });
+    }
+
+    await env.ASSET_BUCKET.put(key, bytes, {
       httpMetadata: { contentType: mimeType }
     });
 
@@ -567,13 +601,19 @@ async function handleR2Assets(request, env) {
     headers.set('X-Content-Type-Options', 'nosniff');
     headers.set('X-Frame-Options', 'DENY');
     headers.set('Referrer-Policy', 'no-referrer');
+    // SVG can carry <script>; sandbox it so it never executes as a document.
+    if ((headers.get('content-type') || '').includes('svg')) {
+      headers.set('Content-Security-Policy', "sandbox; default-src 'none'");
+    }
 
     return new Response(object.body, { headers });
   }
 
   if (request.method === 'DELETE' && pathname.startsWith('/api/assets/')) {
     const key = pathname.replace('/api/assets/', '');
-    if (!key) return jsonResponse(400, { error: 'Asset key is required.' });
+    if (!key || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$/.test(key)) {
+      return jsonResponse(400, { error: 'Invalid asset key.' });
+    }
 
     await env.ASSET_BUCKET.delete(key);
     return jsonResponse(200, { success: true, deletedKey: key });
@@ -660,7 +700,13 @@ async function handleR2Apps(request, env) {
       return new Response(appData.html || appData.code, {
         headers: {
           'Content-Type': 'text/html; charset=utf-8',
-          'Cache-Control': 'no-cache'
+          'Cache-Control': 'no-cache',
+          'X-Content-Type-Options': 'nosniff',
+          'X-Frame-Options': 'DENY',
+          'Referrer-Policy': 'no-referrer',
+          // Apps are AI-generated user content: sandbox them as documents and
+          // forbid all subresources so a generated app cannot exfiltrate data.
+          'Content-Security-Policy': "sandbox; default-src 'none'; script-src 'unsafe-inline'"
         }
       });
     }
@@ -773,13 +819,12 @@ function cosineSimilarity(a, b) {
 
 function extractRerankScores(result) {
   if (!result) return null;
-  if (Array.isArray(result.data)) {
-    return result.data.map(d => ({ index: d.index, score: d.relevance_score ?? d.score ?? 0 }));
-  }
-  if (Array.isArray(result.results)) {
-    return result.results.map(d => ({ index: d.index, score: d.relevance_score ?? d.score ?? 0 }));
-  }
-  return null;
+  const raw = Array.isArray(result.result) ? result.result
+    : Array.isArray(result.data) ? result.data
+    : Array.isArray(result.results) ? result.results
+    : null;
+  if (!raw) return null;
+  return raw.map(d => ({ index: d.index, score: d.relevance_score ?? d.score ?? 0 }));
 }
 
 async function rerankDocuments(env, query, documents) {
@@ -788,7 +833,8 @@ async function rerankDocuments(env, query, documents) {
   try {
     const result = await env.AI.run(RERANK_MODEL, {
       query: String(query).slice(0, 500),
-      documents: documents.map(d => String(d).slice(0, 2000))
+      contexts: documents.map(d => ({ text: String(d).slice(0, 2000) })),
+      top_k: 5
     });
     const scores = extractRerankScores(result);
     if (!scores || scores.length === 0) return null;

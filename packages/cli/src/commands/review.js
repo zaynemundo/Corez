@@ -30,7 +30,9 @@ export async function handleReviewCommand(options = {}, ui) {
     ui.divider();
     ui.success('CoreZ Code Review Report:');
     console.log(`\n${result.response}\n`);
+    return true;
   } catch (err) {
     ui.error(err.message);
+    return false;
   }
 }

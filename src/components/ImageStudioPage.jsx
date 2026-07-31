@@ -156,7 +156,9 @@ export default function ImageStudioPage() {
   };
 
   const handleCopyPrompt = (id, text) => {
-    navigator.clipboard.writeText(text);
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).catch(() => {});
+    }
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };

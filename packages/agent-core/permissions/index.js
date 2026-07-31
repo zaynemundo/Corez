@@ -6,13 +6,30 @@ export const PERMISSION_CATEGORIES = Object.freeze({
   DANGEROUS: 'dangerous'
 });
 
+const DANGEROUS_RM_TARGETS = /(\.{1,2}(?:\/|$)|~(?:\/|$)|\*|\$HOME|\/\s*$)/i;
+
 export const BLOCKED_DANGEROUS_COMMANDS = Object.freeze([
-  /\brm\s+(-{1,2}[a-z]+\s+)*(--no-preserve-root\s+)?(\.|\*|~|\/|\$HOME)(\s|$)/i,
-  /^rm\s+(-{1,2}[a-z]+\s+)*--(recursive|force)/i,
-  /rm\s+-r\s+-f\s+/i,
+  // rm with any force/recursive flag cluster (e.g. -rf, -fr, -rfi) targeting
+  // traversal/root paths
+  new RegExp(`\\brm\\s+(-{0,2}[a-z]*[rf][a-z]*[rf][a-z]*\\s+)*${DANGEROUS_RM_TARGETS.source}`, 'i'),
+  // rm with flags targeting traversal/root paths
+  new RegExp(`\\brm\\s+(-{0,2}[a-z-]+\\s+)*--no-preserve-root\\s+${DANGEROUS_RM_TARGETS.source}`, 'i'),
+  new RegExp(`\\brm\\s+(-{0,2}[a-z-]+\\s+)*${DANGEROUS_RM_TARGETS.source}(\\s|$)`, 'i'),
+  /\brm\s+-r\s+-f\s+/i,
+  /\brm\s+-rfi\s+/i,
+  // find with destructive actions
+  /\bfind\s+[^|;&]+\s+-(?:exec|ok|delete)\b/i,
+  // shell -c wrappers around destructive primitives
+  /\b(?:sh|bash|zsh|ksh)\s+-c\b[^|;&]*(?:rm\b|mkfs|dd\s+if=|:\(\)|curl|wget|eval|git\s+reset)[^|;&]*/i,
+  // eval with command substitution or strings
+  /\beval\s+[$("`]/i,
+  // git checkout/restore of whole trees (with or without --)
+  /git\s+checkout\s+(--\s+)?(\.{1,2}|~|\/|\*)/i,
+  /git\s+restore\s+(--\s+)?(\.{1,2}|~|\/|\*)/i,
   /git\s+reset\s+--hard/i,
   /git\s+clean\s+(-{1,2}[a-z]+)/i,
-  /git\s+checkout\s+--\s+(\.|\/)/i,
+  // pipe remote scripts straight into a shell
+  /\b(?:curl|wget)\b[^|;&]*\|\s*(?:sudo\s+)?(?:sh|bash|zsh)\b/i,
   /sudo\s+/i,
   /mkfs/i,
   /dd\s+if=/i,

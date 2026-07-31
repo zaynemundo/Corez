@@ -323,8 +323,15 @@ async function run() {
   // Test /api/memory store + search with embeddings and rerank
   const memoryStore = new Map();
   const memoryBucket = {
-    put: async (key, value) => { memoryStore.set(key, value); },
-    get: async (key) => memoryStore.has(key) ? { text: async () => memoryStore.get(key) } : null,
+    put: async (key, value, options) => {
+      memoryStore.set(key, { value, contentType: options?.httpMetadata?.contentType || 'application/octet-stream' });
+    },
+    get: async (key) => memoryStore.has(key) ? {
+      text: async () => memoryStore.get(key).value,
+      arrayBuffer: async () => memoryStore.get(key).value,
+      writeHttpMetadata: (headers) => { headers.set('Content-Type', memoryStore.get(key).contentType); },
+      httpEtag: 'mock-etag'
+    } : null,
     delete: async (key) => { memoryStore.delete(key); },
     list: async ({ prefix }) => ({ objects: [...memoryStore.keys()].filter(k => k.startsWith(prefix)).map(key => ({ key })) })
   };
@@ -366,11 +373,13 @@ async function run() {
           };
         }
         if (model === '@cf/baai/bge-reranker-base') {
+          // Match the real Workers AI API shape: contexts input, result output
+          const docs = input.contexts ?? [];
           return {
-            data: input.documents.map((doc, index) => ({
+            result: docs.map((doc, index) => ({
               index,
               // The blue-theme document wins reranking wherever cosine ranked it
-              relevance_score: String(doc).includes('blue') ? 0.9 : 0.5
+              relevance_score: String(doc.text ?? doc).includes('blue') ? 0.9 : 0.5
             }))
           };
         }
@@ -459,6 +468,73 @@ async function run() {
     memoryEnv()
   );
   assert.equal(deleteMem.status, 200);
+
+  // Asset upload validation: reject arbitrary content types, keys, and malformed data URLs
+  const uploadBadType = await worker.fetch(
+    new Request('https://corez.test/api/assets/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'evil.html', dataUrl: 'data:text/html;base64,PGh0bWw+', mimeType: 'text/html' })
+    }),
+    memoryEnv()
+  );
+  assert.equal(uploadBadType.status, 400);
+
+  const uploadBadKey = await worker.fetch(
+    new Request('https://corez.test/api/assets/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: '../../escape', dataUrl: 'data:image/png;base64,iVBORw0KGgo=', mimeType: 'image/png' })
+    }),
+    memoryEnv()
+  );
+  assert.equal(uploadBadKey.status, 400);
+
+  const uploadMismatch = await worker.fetch(
+    new Request('https://corez.test/api/assets/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'ok.png', dataUrl: 'data:text/html;base64,PGh0bWw+', mimeType: 'image/png' })
+    }),
+    memoryEnv()
+  );
+  assert.equal(uploadMismatch.status, 400);
+
+  const uploadMalformed = await worker.fetch(
+    new Request('https://corez.test/api/assets/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'ok.png', dataUrl: 'data:image/png;base64,!!!not-base64!!!', mimeType: 'image/png' })
+    }),
+    memoryEnv()
+  );
+  assert.equal(uploadMalformed.status, 400);
+
+  const uploadValid = await worker.fetch(
+    new Request('https://corez.test/api/assets/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'ok.png', dataUrl: 'data:image/png;base64,iVBORw0KGgo=', mimeType: 'image/png' })
+    }),
+    memoryEnv()
+  );
+  assert.equal(uploadValid.status, 200);
+  const uploadValidData = await json(uploadValid);
+  assert.equal(uploadValidData.url, '/api/assets/ok.png');
+
+  // Asset GET serves with security headers; SVG gets a CSP sandbox
+  const svgUpload = await worker.fetch(
+    new Request('https://corez.test/api/assets/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'icon.svg', dataUrl: 'data:image/svg+xml;base64,PHN2Zy8+', mimeType: 'image/svg+xml' })
+    }),
+    memoryEnv()
+  );
+  assert.equal(svgUpload.status, 200);
+  const svgGet = await worker.fetch(new Request('https://corez.test/api/assets/icon.svg'), memoryEnv());
+  assert.equal(svgGet.status, 200);
+  assert.ok(String(svgGet.headers.get('content-security-policy') || '').includes('sandbox'));
 
   console.log('Cloudflare Worker behavior contract passed.');
 }
