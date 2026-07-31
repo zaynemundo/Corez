@@ -234,6 +234,32 @@ h1, h2, h3, h4, h5, h6 {
   transition: opacity var(--transition-fast), transform var(--transition-fast);
 }
 
+.corez-bw-logo {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  filter: grayscale(100%) contrast(150%);
+  border-radius: 4px;
+  display: block;
+}
+
+[data-theme="dark"] .corez-bw-logo {
+  filter: grayscale(100%) invert(100%) brightness(1.2);
+}
+
+.corez-welcome-logo-img {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  filter: grayscale(100%) contrast(150%);
+  border-radius: 8px;
+  display: block;
+}
+
+[data-theme="dark"] .corez-welcome-logo-img {
+  filter: grayscale(100%) invert(100%) brightness(1.2);
+}
+
 .brand-logo-hover {
   position: absolute;
   opacity: 0;

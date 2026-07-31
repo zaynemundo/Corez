@@ -551,6 +551,9 @@ export default function App() {
               <div className="messages-scroll">
                 {activeSession?.messages.length === 0 ? (
                   <div className="welcome-container">
+                    <div className="welcome-logo">
+                      <img src="/corez.png" alt="Corez Logo" className="corez-welcome-logo-img" />
+                    </div>
                     <h1 className="welcome-title">COREZ</h1>
                   </div>
                 ) : (

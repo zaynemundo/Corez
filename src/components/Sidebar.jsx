@@ -32,7 +32,7 @@ export default function Sidebar({
           onClick={onCloseSidebar}
           title="Collapse Sidebar"
         >
-          <Layers size={20} strokeWidth={1.5} className="brand-logo-default" />
+          <img src="/corez.png" alt="Corez Logo" className="brand-logo-default corez-bw-logo" />
           <PanelLeftClose size={20} strokeWidth={1.5} className="brand-logo-hover" />
         </button>
       </div>

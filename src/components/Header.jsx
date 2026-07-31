@@ -14,13 +14,16 @@ export default function Header({
     <header className="top-header">
       <div className="header-left">
         {!sidebarOpen && (
-          <button 
-            className="icon-btn" 
-            onClick={onToggleSidebar}
-            title="Open Sidebar"
-          >
-            <PanelLeftOpen size={16} strokeWidth={1.5} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            <button 
+              className="icon-btn" 
+              onClick={onToggleSidebar}
+              title="Open Sidebar"
+            >
+              <PanelLeftOpen size={16} strokeWidth={1.5} />
+            </button>
+            <img src="/corez.png" alt="Corez Logo" className="corez-bw-logo" style={{ width: '22px', height: '22px' }} />
+          </div>
         )}
       </div>
 
