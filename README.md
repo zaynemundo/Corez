@@ -8,7 +8,7 @@ Corez deploys the Vite application and its AI endpoints together as a Cloudflare
 
 When `DEEPSEEK_API_KEY` is configured, `/api/ai` uses the official DeepSeek API first:
 
-- All chat, coding, app & swarm requests: `deepseek-v4-flash-0731` (override with the `DEEPSEEK_MODEL` secret; official API models include `deepseek-chat` and `deepseek-reasoner`)
+- All chat, coding, app & swarm requests: `deepseek-v4-flash` (currently the DeepSeek-V4-Flash-0731 build; override with the `DEEPSEEK_MODEL` secret; official API models include `deepseek-v4-pro`)
 
 When `OPENCODE_GO_API_KEY` (or `OPENCODE_API_KEY`) is configured, `/api/ai` uses the OpenCode Go API provider next:
 

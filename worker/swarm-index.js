@@ -190,7 +190,7 @@ async function callAIGateway(apiKey, messages, options = {}) {
 
   try {
     const env = options.env || {};
-    const deepSeekModel = env.DEEPSEEK_MODEL || 'deepseek-v4-flash-0731';
+    const deepSeekModel = env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
     const maxTokens = (Number.isFinite(options.maxTokens) && options.maxTokens > 0)
       ? options.maxTokens
       : 4096;

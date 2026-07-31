@@ -4,7 +4,7 @@ import { safeErrorDetail, readBoundedJson } from './utils.js';
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 const OPENCODE_DEFAULT_ENDPOINT = 'https://opencode.ai/zen/go/v1/chat/completions';
 const DEEPSEEK_ENDPOINT = 'https://api.deepseek.com/chat/completions';
-const DEFAULT_DEEPSEEK_MODEL = 'deepseek-v4-flash-0731';
+const DEFAULT_DEEPSEEK_MODEL = 'deepseek-v4-flash';
 const DEEPSEEK_V4_FLASH_MODEL = 'deepseek-v4-flash';
 const FLUX_MODEL = '@cf/black-forest-labs/flux-1-schnell';
 const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';

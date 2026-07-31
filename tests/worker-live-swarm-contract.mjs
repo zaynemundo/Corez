@@ -201,7 +201,7 @@ async function run() {
       assert.ok(deepSeekRequests.length > 1);
 
       for (const payload of deepSeekRequests) {
-        assert.equal(payload.model, 'deepseek-v4-flash-0731');
+        assert.equal(payload.model, 'deepseek-v4-flash');
         assert.equal(payload.reasoning, undefined);
         assert.equal(payload.provider, undefined);
         assert.ok(payload.max_tokens > 0);

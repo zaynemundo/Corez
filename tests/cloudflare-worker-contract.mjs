@@ -208,8 +208,8 @@ async function run() {
       assert.equal(deepSeekResp.status, 200);
       const dsData = await deepSeekResp.json();
       assert.equal(dsData.content, 'DeepSeek official response');
-      assert.equal(dsData.model, 'deepseek:deepseek-v4-flash-0731');
-      assert.equal(deepSeekPayload.model, 'deepseek-v4-flash-0731');
+      assert.equal(dsData.model, 'deepseek:deepseek-v4-flash');
+      assert.equal(deepSeekPayload.model, 'deepseek-v4-flash');
       assert.equal(deepSeekPayload.stream, false);
       assert.ok(deepSeekPayload.max_tokens > 0);
       assert.ok(Array.isArray(deepSeekPayload.messages));
