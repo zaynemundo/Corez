@@ -59,9 +59,19 @@ async function run() {
   const expandedSpecs = buildSwarmAgentSpecs('app', expandedPrompt);
 
   assert.ok(simpleSpecs.length >= 5);
-  assert.ok(expandedSpecs.length >= 28);
+  // The swarm is hard-bounded: every spec is one subrequest and Worker
+  // invocations have a subrequest cap, so oversized prompts are trimmed.
+  assert.ok(expandedSpecs.length <= 8);
   assert.ok(expandedSpecs.length > simpleSpecs.length);
   assert.equal(new Set(expandedSpecs.map((spec) => spec.agentId)).size, expandedSpecs.length);
+
+  // Code-heavy revision prompts never swarm: the embedded code block must not
+  // fragment into specialist agents, and any such prompt stays bounded.
+  const revisionPrompt = '[Context: The user is requesting a revision for the following code block]\n```html\n<canvas id="g"></canvas>\n```\n\nUser Request: add online multiplayer with a death match mode. And a shop. And more enemies.';
+  assert.equal(shouldUseSwarm('app', revisionPrompt, { complexity: 'high' }), false);
+  assert.equal(shouldUseSwarm('app', 'Build a new game with ```js\nconsole.log(1)\n``` inside the request', { complexity: 'high' }), false);
+  const codeHeavySpecs = buildSwarmAgentSpecs('app', revisionPrompt);
+  assert.ok(codeHeavySpecs.length <= 8);
 
   const retryAttempts = new Map();
   const poolResult = await runAdaptiveAgentPool(

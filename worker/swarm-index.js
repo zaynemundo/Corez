@@ -2,6 +2,10 @@ import baseWorker from './index.js';
 import { safeErrorDetail, readBoundedJson } from './utils.js';
 
 const SWARM_MODEL = 'deepseek-v4-pro';
+// Hard bounds for swarm size: each spec is one subrequest and Worker
+// invocations have a subrequest cap.
+const MAX_REQUIREMENT_SPECIALISTS = 4;
+const MAX_TOTAL_SPECS = 8;
 const CORE_AGENT_TEMPLATES = Object.freeze({
   app: [
     {
@@ -81,8 +85,13 @@ function slugify(value) {
 }
 
 function extractRequirementWorkstreams(prompt) {
-  const fragments = String(prompt || '')
-    .replace(/\r/g, '\n')
+  // Code blocks are not requirements: strip fenced content (closed and
+  // unterminated fences) so embedded code never spawns specialist agents.
+  const prose = String(prompt || '')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/```[\s\S]*$/g, ' ')
+    .replace(/\r/g, '\n');
+  const fragments = prose
     .split(/\n+|[.;!?]\s+|\s+(?:and then|also|plus)\s+/i)
     .map((fragment) => fragment.replace(/^[-*•\d.)\s]+/, '').trim())
     .filter((fragment) => fragment.length >= 12);
@@ -95,7 +104,9 @@ function extractRequirementWorkstreams(prompt) {
     seen.add(key);
     unique.push(fragment);
   }
-  return unique;
+  // Bound the swarm size: every workstream becomes a specialist subrequest
+  // and the Worker invocation subrequest cap is limited.
+  return unique.slice(0, MAX_REQUIREMENT_SPECIALISTS);
 }
 
 function containsMedia(messages) {
@@ -147,8 +158,16 @@ function createTimedSignal(parentSignal, timeoutMs) {
 
 export function shouldUseSwarm(intentType, prompt, options = {}) {
   if (options.hasMedia) return false;
-  if (!String(prompt || '').trim()) return false;
+  const promptText = String(prompt || '');
+  if (!promptText.trim()) return false;
   const normalized = normalizeIntentType(intentType);
+
+  // Revisions of existing code are single-artifact edits: never swarm over
+  // an embedded code block, which would fragment into dozens of specialist
+  // subrequests and blow the Worker invocation subrequest limit.
+  if (/\[Context: The user is requesting a revision/.test(promptText) || /```/.test(promptText)) {
+    return false;
+  }
 
   // Explicit swarm coordination or a client opt-in always uses the swarm
   if (normalized === 'swarm' || options.explicitSwarm === true) return true;
@@ -181,7 +200,7 @@ export function buildSwarmAgentSpecs(intentType, prompt) {
     });
   });
 
-  return specs;
+  return specs.slice(0, MAX_TOTAL_SPECS);
 }
 
 async function callAIGateway(apiKey, messages, options = {}) {
