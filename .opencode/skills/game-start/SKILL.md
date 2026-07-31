@@ -212,8 +212,13 @@ task_graph:
     - name: "Verification"
       parallel: false
       tasks:
-        - "Run QA smoke tests"
+        - "Run game-smoke-test for DOM, canvas, and input smoke suite"
+        - "Run game-qa-plan to extend coverage for new mechanics"
+        - "Run game-regression to confirm no baseline failures"
+        - "Run game-performance-review for frame-timing and memory audit"
+        - "Run game-code-review for spec compliance and safety audit"
         - "Run lint and typecheck"
+        - "Run game-release-check and obtain final signoff"
         - "Fix any failures"
 
 entry_criteria_met: true

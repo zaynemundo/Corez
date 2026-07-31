@@ -1,11 +1,10 @@
-# game-smoke-test
-
-**Role**: QA Tester  
-**Version**: 1.0.0  
-**Tags**: `qa`, `smoke`, `dom`, `canvas`, `input-events`, `vitest`  
-**Dependencies**: none (standalone)  
-**Token Estimate**: 150 tokens per smoke test execution
-
+---
+name: game-smoke-test
+description: QA Tester skill for vitest/jsdom smoke tests covering DOM renders, canvas init, and input events.
+version: 1.0.0
+tags: [qa, smoke, dom, canvas, input-events, vitest]
+dependencies: []
+token_estimate: 150
 ---
 
 ## 1. Smoke Test Suite Structure

@@ -1,11 +1,10 @@
-# game-release-check
-
-**Role**: Producer — Final Gate  
-**Version**: 1.0.0  
-**Tags**: `release`, `signoff`, `gate`, `qa`, `code-review`  
-**Dependencies**: game-qa-plan, game-regression, game-smoke-test, game-performance-review  
-**Token Estimate**: 100 tokens per signoff check
-
+---
+name: game-release-check
+description: Producer final-gate skill for release signoff checklists that block release when any check fails.
+version: 1.0.0
+tags: [release, signoff, gate, qa, code-review]
+dependencies: [game-qa-plan, game-regression, game-smoke-test, game-performance-review]
+token_estimate: 100
 ---
 
 ## 1. Final Signoff Checklist

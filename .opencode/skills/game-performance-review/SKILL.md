@@ -1,11 +1,10 @@
-# game-performance-review
-
-**Role**: Technical Director  
-**Version**: 1.0.0  
-**Tags**: `performance`, `frame-timing`, `memory`, `asset-audit`, `profiling`  
-**Dependencies**: none (standalone)  
-**Token Estimate**: 200 tokens per review pass
-
+---
+name: game-performance-review
+description: Technical Director skill for frame-timing audits, memory checks, and asset reviews to protect frame-rate performance.
+version: 1.0.0
+tags: [performance, frame-timing, memory, asset-audit, profiling]
+dependencies: []
+token_estimate: 200
 ---
 
 ## 1. Frame Timing Audit Checklist

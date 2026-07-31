@@ -1,15 +1,11 @@
-# game-architecture
-
-> Technical Director skill for establishing browser game module boundaries, entity systems, and frame-rate performance guidelines.
-
-## Frontmatter
-
-```yaml
+---
+name: game-architecture
+description: Technical Director skill for establishing browser game module boundaries, entity systems, and frame-rate performance guidelines.
 version: 1.0.0
 tags: [game-architecture, technical-director, structure, performance, planning]
 dependencies: [game-spec, game-art-direction]
 token_estimate: 3200
-```
+---
 
 ## Standard Directory Structure Blueprint
 

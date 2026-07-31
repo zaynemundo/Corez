@@ -1,11 +1,10 @@
-# game-regression
-
-**Role**: QA Lead & Tester  
-**Version**: 1.0.0  
-**Tags**: `qa`, `regression`, `test-suite`, `baseline`, `collateral`  
-**Dependencies**: game-qa-plan, game-smoke-test  
-**Token Estimate**: 250 tokens per regression pass
-
+---
+name: game-regression
+description: QA Lead and Tester skill for running full regression suites against baselines and checking collateral damage.
+version: 1.0.0
+tags: [qa, regression, test-suite, baseline, collateral]
+dependencies: [game-qa-plan, game-smoke-test]
+token_estimate: 250
 ---
 
 ## 1. Regression Test Workflow

@@ -1,11 +1,10 @@
-# game-qa-plan
-
-**Role**: QA Lead  
-**Version**: 1.0.0  
-**Tags**: `qa`, `test-plan`, `coverage`, `edge-cases`, `regression`  
-**Dependencies**: game-smoke-test, game-regression  
-**Token Estimate**: 300 tokens per test plan creation
-
+---
+name: game-qa-plan
+description: QA Lead skill for creating test plans covering controls, input handling, edge cases, and coverage gates.
+version: 1.0.0
+tags: [qa, test-plan, coverage, edge-cases, regression]
+dependencies: [game-smoke-test, game-regression]
+token_estimate: 300
 ---
 
 ## 1. Test Plan Template

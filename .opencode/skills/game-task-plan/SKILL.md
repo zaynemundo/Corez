@@ -1,15 +1,11 @@
-# game-task-plan
-
-> Lead Programmer skill for building DAG task graphs and task briefs for specialist programmers.
-
-## Frontmatter
-
-```yaml
+---
+name: game-task-plan
+description: Lead Programmer skill for building DAG task graphs and task briefs for specialist programmers.
 version: 1.0.0
 tags: [game-task-plan, lead-programmer, planning, decomposition, dag]
 dependencies: [game-architecture, game-spec]
 token_estimate: 2800
-```
+---
 
 ## DAG Task Structure Specification
 

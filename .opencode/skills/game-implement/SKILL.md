@@ -1,15 +1,11 @@
-# game-implement
-
-> Specialist programmer execution skill for building gameplay, AI behaviors, engine mechanics, and UI modules.
-
-## Frontmatter
-
-```yaml
+---
+name: game-implement
+description: Specialist programmer execution skill for building gameplay, AI behaviors, engine mechanics, and UI modules.
 version: 1.0.0
 tags: [game-implement, programmer, tdd, execution, specialist]
 dependencies: [game-task-plan, game-architecture]
 token_estimate: 2400
-```
+---
 
 ## TDD Workflow: RED-GREEN-REFACTOR
 

@@ -1,11 +1,10 @@
-# game-bug-triage
-
-**Role**: QA Lead  
-**Version**: 1.0.0  
-**Tags**: `qa`, `bug-triage`, `severity`, `reproduction`, `verification`  
-**Dependencies**: game-qa-plan, game-regression, game-smoke-test  
-**Token Estimate**: 200 tokens per classification cycle
-
+---
+name: game-bug-triage
+description: QA Lead skill for classifying bug severity, writing reproduction steps, and verifying fixes before closure.
+version: 1.0.0
+tags: [qa, bug-triage, severity, reproduction, verification]
+dependencies: [game-qa-plan, game-regression, game-smoke-test]
+token_estimate: 200
 ---
 
 ## 1. Severity Classification Guide
