@@ -9,7 +9,10 @@ import MarketCard from './MarketCard';
 
 function safeImageUrl(url) {
   if (!url || typeof url !== 'string') return '';
-  if (url.startsWith('https://') || url.startsWith('http://') || url.startsWith('data:image/png') || url.startsWith('data:image/jpeg') || url.startsWith('data:image/webp')) return url;
+  if (url.startsWith('https://') || url.startsWith('http://')) return url;
+  // Same-origin relative paths (e.g. the worker's R2 asset URLs like /api/assets/flux_*.png)
+  if (url.startsWith('/') && !url.startsWith('//')) return url;
+  if (url.startsWith('data:image/png') || url.startsWith('data:image/jpeg') || url.startsWith('data:image/webp') || url.startsWith('data:image/svg+xml')) return url;
   return '';
 }
 
