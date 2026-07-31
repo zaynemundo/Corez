@@ -7,6 +7,8 @@ const DEEPSEEK_V4_FLASH_MODEL = 'deepseek-v4-flash';
 const FLUX_MODEL = '@cf/black-forest-labs/flux-1-schnell';
 const WORKERS_AI_MODEL = '@cf/moonshotai/kimi-k2.7-code';
 const DEEPSEEK_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
+const EMBEDDING_MODEL = '@cf/baai/bge-small-en-v1.5';
+const RERANK_MODEL = '@cf/baai/bge-reranker-base';
 
 function getTargetModels() {
   return [DEEPSEEK_V4_FLASH_MODEL];
@@ -726,6 +728,77 @@ async function handleR2Apps(request, env) {
   return jsonResponse(405, { error: 'Method not allowed.' });
 }
 
+function extractEmbedding(result) {
+  if (!result) return null;
+  // OpenAI-style: { data: [{ embedding: [...] }] }
+  if (Array.isArray(result.data) && result.data[0] && Array.isArray(result.data[0].embedding)) {
+    return result.data[0].embedding;
+  }
+  // Workers AI style: { shape: [1, dim], data: [[...]] }
+  if (Array.isArray(result.data) && Array.isArray(result.data[0]) && result.data[0].length > 0) {
+    return result.data[0];
+  }
+  if (Array.isArray(result) && Array.isArray(result[0]) && result[0].length > 0) {
+    return result[0];
+  }
+  return null;
+}
+
+async function embedText(env, text) {
+  if (!env?.AI || typeof env.AI.run !== 'function') return null;
+  try {
+    const result = await env.AI.run(EMBEDDING_MODEL, { text: [String(text).slice(0, 2000)] });
+    const embedding = extractEmbedding(result);
+    if (!embedding || embedding.length === 0) return null;
+    return embedding;
+  } catch (err) {
+    console.warn('Memory embedding failed; using keyword search fallback:', safeErrorDetail(err));
+    return null;
+  }
+}
+
+function cosineSimilarity(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length || a.length === 0) return 0;
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  if (normA === 0 || normB === 0) return 0;
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+function extractRerankScores(result) {
+  if (!result) return null;
+  if (Array.isArray(result.data)) {
+    return result.data.map(d => ({ index: d.index, score: d.relevance_score ?? d.score ?? 0 }));
+  }
+  if (Array.isArray(result.results)) {
+    return result.results.map(d => ({ index: d.index, score: d.relevance_score ?? d.score ?? 0 }));
+  }
+  return null;
+}
+
+async function rerankDocuments(env, query, documents) {
+  if (!env?.AI || typeof env.AI.run !== 'function') return null;
+  if (!Array.isArray(documents) || documents.length === 0) return null;
+  try {
+    const result = await env.AI.run(RERANK_MODEL, {
+      query: String(query).slice(0, 500),
+      documents: documents.map(d => String(d).slice(0, 2000))
+    });
+    const scores = extractRerankScores(result);
+    if (!scores || scores.length === 0) return null;
+    return scores.filter(s => Number.isFinite(s.index) && s.index >= 0 && s.index < documents.length);
+  } catch (err) {
+    console.warn('Memory rerank failed; using embedding ranking fallback:', safeErrorDetail(err));
+    return null;
+  }
+}
+
 async function handleR2Memory(request, env) {
   if (!env?.ASSET_BUCKET) {
     return jsonResponse(530, { error: 'R2 storage (ASSET_BUCKET) is not configured.' });
@@ -753,6 +826,7 @@ async function handleR2Memory(request, env) {
     }
 
     const now = new Date().toISOString();
+    const embedding = await embedText(env, text);
     const memoryRecord = {
       userId,
       key: keyName,
@@ -761,7 +835,8 @@ async function handleR2Memory(request, env) {
       metadata: body?.metadata || {},
       tags: Array.isArray(body?.tags) ? body.tags : [],
       updatedAt: now,
-      createdAt: body?.createdAt || now
+      createdAt: body?.createdAt || now,
+      ...(embedding ? { embedding, embeddingModel: EMBEDDING_MODEL } : {})
     };
 
     const key = `memory/${userId}/${keyName}.json`;
@@ -802,14 +877,9 @@ async function handleR2Memory(request, env) {
           if (item) {
             try {
               const data = JSON.parse(await item.text());
-              const textLower = String(data.text || '').toLowerCase();
               const catLower = String(data.category || '').toLowerCase();
-              const keyLower = String(data.key || '').toLowerCase();
 
-              const matchesCategory = !categoryFilter || catLower === categoryFilter;
-              const matchesQuery = !query || textLower.includes(query) || keyLower.includes(query) || catLower.includes(query);
-
-              if (matchesCategory && matchesQuery) {
+              if (!categoryFilter || catLower === categoryFilter) {
                 matches.push(data);
               }
             } catch {
@@ -820,7 +890,47 @@ async function handleR2Memory(request, env) {
       }
     }
 
-    return jsonResponse(200, { userId, query, matches });
+    if (!query) {
+      return jsonResponse(200, { userId, query, matches, source: 'keyword' });
+    }
+
+    // 1. Semantic path: embed the query, rank by cosine similarity, then rerank
+    // the top candidates with the BGE reranker. Requires stored embeddings and a
+    // working AI binding; otherwise falls back to substring matching.
+    const queryEmbedding = await embedText(env, query);
+    if (queryEmbedding) {
+      const withVectors = matches.filter(m => Array.isArray(m.embedding) && m.embedding.length > 0);
+      if (withVectors.length > 0) {
+        const ranked = withVectors
+          .map(m => ({ memory: m, similarity: cosineSimilarity(queryEmbedding, m.embedding) }))
+          .sort((a, b) => b.similarity - a.similarity)
+          .slice(0, 20);
+
+        const reranked = await rerankDocuments(env, query, ranked.map(r => r.memory.text || ''));
+        if (reranked && reranked.length > 0) {
+          const top = reranked
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 5)
+            .map(r => ({ ...ranked[r.index].memory, score: Math.round(r.score * 1000) / 1000 }));
+          return jsonResponse(200, { userId, query, matches: top, source: 'semantic', rerank: true });
+        }
+
+        const top = ranked
+          .slice(0, 5)
+          .map(r => ({ ...r.memory, similarity: Math.round(r.similarity * 1000) / 1000 }));
+        return jsonResponse(200, { userId, query, matches: top, source: 'semantic', rerank: false });
+      }
+    }
+
+    // 2. Keyword fallback (also catches memories stored without embeddings)
+    const keywordMatches = matches.filter(m => {
+      const textLower = String(m.text || '').toLowerCase();
+      const keyLower = String(m.key || '').toLowerCase();
+      const catLower = String(m.category || '').toLowerCase();
+      return textLower.includes(query) || keyLower.includes(query) || catLower.includes(query);
+    });
+
+    return jsonResponse(200, { userId, query, matches: keywordMatches, source: 'keyword' });
   }
 
   // 3. GET /api/memory/:userId - List all memories for a user

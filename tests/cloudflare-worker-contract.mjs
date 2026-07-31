@@ -320,6 +320,146 @@ async function run() {
   assert.equal(imageJsonData.model, FLUX_MODEL);
   assert.match(imageJsonData.image, /^data:image\/png;base64,/);
 
+  // Test /api/memory store + search with embeddings and rerank
+  const memoryStore = new Map();
+  const memoryBucket = {
+    put: async (key, value) => { memoryStore.set(key, value); },
+    get: async (key) => memoryStore.has(key) ? { text: async () => memoryStore.get(key) } : null,
+    delete: async (key) => { memoryStore.delete(key); },
+    list: async ({ prefix }) => ({ objects: [...memoryStore.keys()].filter(k => k.startsWith(prefix)).map(key => ({ key })) })
+  };
+  const noAiMemoryEnv = () => env({ ASSET_BUCKET: memoryBucket, AI: undefined });
+  const embeddingOnlyEnv = () => env({
+    ASSET_BUCKET: memoryBucket,
+    AI: {
+      async run(model, input) {
+        if (model === '@cf/baai/bge-small-en-v1.5') {
+          const text = String(input.text[0] || '');
+          return {
+            shape: [1, 4],
+            data: [[
+              0.3 + (text.includes('blue') ? 0.5 : 0.1),
+              0.3 + (text.includes('theme') ? 0.5 : 0.1),
+              0.3 + (text.includes('chess') ? 0.5 : 0.1),
+              0.3 + (text.includes('react') || text.includes('vite') ? 0.5 : 0.1)
+            ]]
+          };
+        }
+        throw new Error('reranker unavailable');
+      }
+    }
+  });
+  const memoryEnv = () => env({
+    ASSET_BUCKET: memoryBucket,
+    AI: {
+      async run(model, input) {
+        if (model === '@cf/baai/bge-small-en-v1.5') {
+          const text = String(input.text[0] || '');
+          return {
+            shape: [1, 4],
+            data: [[
+              0.3 + (text.includes('blue') ? 0.5 : 0.1),
+              0.3 + (text.includes('theme') ? 0.5 : 0.1),
+              0.3 + (text.includes('chess') ? 0.5 : 0.1),
+              0.3 + (text.includes('react') || text.includes('vite') ? 0.5 : 0.1)
+            ]]
+          };
+        }
+        if (model === '@cf/baai/bge-reranker-base') {
+          return {
+            data: input.documents.map((doc, index) => ({
+              index,
+              // The blue-theme document wins reranking wherever cosine ranked it
+              relevance_score: String(doc).includes('blue') ? 0.9 : 0.5
+            }))
+          };
+        }
+        return { choices: [{ message: { content: 'Worker response' } }] };
+      }
+    }
+  });
+
+  const memoryPost = (path, body, environment = memoryEnv()) => worker.fetch(
+    new Request(`https://corez.test${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }),
+    environment
+  );
+
+  // Store a memory without AI binding -> no embedding stored
+  const storeNoAi = await worker.fetch(
+    new Request('https://corez.test/api/memory/store', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: 'u1', key: 'k1', text: 'User prefers blue themes.' })
+    }),
+    noAiMemoryEnv()
+  );
+  assert.equal(storeNoAi.status, 200);
+  const storeNoAiData = await json(storeNoAi);
+  assert.equal(storeNoAiData.record.embedding, undefined);
+
+  // Store memories WITH AI binding -> embeddings persisted
+  const store1 = await memoryPost('/api/memory/store', { userId: 'u1', key: 'k1', text: 'User prefers blue themes.' });
+  assert.equal(store1.status, 200);
+  const store1Data = await json(store1);
+  assert.ok(Array.isArray(store1Data.record.embedding) && store1Data.record.embedding.length === 4);
+
+  await memoryPost('/api/memory/store', { userId: 'u1', key: 'k2', text: 'User plays chess on weekends.' });
+  await memoryPost('/api/memory/store', { userId: 'u1', key: 'k3', text: 'User works with React and Vite.' });
+
+  // Semantic search with rerank
+  const semanticSearch = await memoryPost('/api/memory/search', { userId: 'u1', query: 'favorite color scheme' });
+  assert.equal(semanticSearch.status, 200);
+  const semanticData = await json(semanticSearch);
+  assert.equal(semanticData.source, 'semantic');
+  assert.equal(semanticData.rerank, true);
+  assert.ok(semanticData.matches.length >= 1 && semanticData.matches.length <= 5);
+  assert.ok(semanticData.matches.every(m => typeof m.score === 'number'));
+  // Blue-theme memory should win reranking for a color-scheme query
+  assert.equal(semanticData.matches[0].key, 'k1');
+
+  // Semantic search without a reranker falls back to pure embedding ranking
+  const noRerankSearch = await memoryPost('/api/memory/search', { userId: 'u1', query: 'favorite color scheme' }, embeddingOnlyEnv());
+  const noRerankData = await json(noRerankSearch);
+  assert.equal(noRerankData.source, 'semantic');
+  assert.equal(noRerankData.rerank, false);
+  assert.ok(noRerankData.matches.length >= 1);
+  assert.ok(noRerankData.matches.every(m => typeof m.similarity === 'number'));
+
+  // Keyword fallback: category filter still works via the semantic path
+  const categorySearch = await memoryPost('/api/memory/search', { userId: 'u1', query: 'blue', category: 'general' });
+  assert.equal(categorySearch.status, 200);
+
+  // Keyword-only search when AI binding is missing
+  const keywordSearch = await worker.fetch(
+    new Request('https://corez.test/api/memory/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: 'u1', query: 'chess' })
+    }),
+    noAiMemoryEnv()
+  );
+  assert.equal(keywordSearch.status, 200);
+  const keywordData = await json(keywordSearch);
+  assert.equal(keywordData.source, 'keyword');
+  assert.ok(keywordData.matches.some(m => m.key === 'k2'));
+
+  // Empty query returns all category-filtered memories with keyword source
+  const emptyQuery = await memoryPost('/api/memory/search', { userId: 'u1', query: '' });
+  const emptyQueryData = await json(emptyQuery);
+  assert.equal(emptyQueryData.source, 'keyword');
+  assert.equal(emptyQueryData.matches.length, 3);
+
+  // Delete a memory
+  const deleteMem = await worker.fetch(
+    new Request('https://corez.test/api/memory/u1/k1', { method: 'DELETE' }),
+    memoryEnv()
+  );
+  assert.equal(deleteMem.status, 200);
+
   console.log('Cloudflare Worker behavior contract passed.');
 }
 
