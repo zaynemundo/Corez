@@ -706,6 +706,18 @@ export function extractCodeFromMessage(text) {
     return matchAny[1].trim();
   }
 
+  // Salvage truncated responses: a long generated app is often cut off
+  // mid-code-block (no closing ```), so the strict matchers above miss it.
+  // Extract everything after the last recognized fence when it still looks
+  // like code, so the preview canvas can open anyway.
+  const truncatedBlock = text.match(/```(?:html|xml|jsx|tsx|js|javascript|react)\s*([\s\S]*)$/i);
+  if (truncatedBlock && truncatedBlock[1].trim()) {
+    const code = truncatedBlock[1].trim();
+    if (code.includes('<') || code.includes('export default') || code.includes('function ') || code.includes('import ') || code.includes('const ')) {
+      return code;
+    }
+  }
+
   return null;
 }
 

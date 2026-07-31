@@ -217,7 +217,8 @@ async function run() {
       assert.equal(dsData.model, 'deepseek:deepseek-v4-flash');
       assert.equal(deepSeekPayload.model, 'deepseek-v4-flash');
       assert.equal(deepSeekPayload.stream, false);
-      assert.ok(deepSeekPayload.max_tokens > 0);
+      // No max_tokens cap: output length is unbounded (model default)
+      assert.equal(deepSeekPayload.max_tokens, undefined);
       assert.ok(Array.isArray(deepSeekPayload.messages));
       assert.equal(deepSeekPayload.messages.at(-1).content, 'Explain black roses');
       assert.equal(deepSeekPayload.reasoning, undefined);

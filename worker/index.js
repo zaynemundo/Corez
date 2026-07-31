@@ -229,7 +229,6 @@ async function handleAi(request, env) {
         body: JSON.stringify({
           model: deepSeekModel,
           messages: apiMessages,
-          max_tokens: 8192,
           stream: false
         }),
         signal: AbortSignal.timeout(60_000)

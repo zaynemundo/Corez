@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { generateAIResponse, generateLocalAIResponse, isRevisionContextPrompt, trimConversationForRequest } from '../src/services/aiService.js';
+import { generateAIResponse, generateLocalAIResponse, isRevisionContextPrompt, trimConversationForRequest, extractCodeFromMessage } from '../src/services/aiService.js';
 
 const GAME_HTML = `<!DOCTYPE html><html><body><canvas id="game"></canvas><script>function gameLoop(){requestAnimationFrame(gameLoop);}requestAnimationFrame(gameLoop);</script></body></html>`;
 
@@ -117,5 +117,19 @@ describe('Hosted AI fallback behavior', () => {
     const single = trimConversationForRequest([{ role: 'user', content: 'y'.repeat(300 * 1024) }]);
     expect(single.length).toBe(1);
     expect(JSON.stringify(single).length).toBeLessThan(220 * 1024);
+  });
+
+  it('salvages code from a truncated response with an unterminated code fence', () => {
+    const truncated = 'Here is your 3D game:\n\n```html\n<!DOCTYPE html>\n<html>\n<body>\n<canvas id="game"></canvas>\n<script>\nconst scene = new THREE.Scene();\nscene.add(new THREE.BoxGeometry());';
+
+    const code = extractCodeFromMessage(truncated);
+
+    expect(code).toContain('<!DOCTYPE html>');
+    expect(code).toContain('THREE.Scene');
+
+    // Prose without a fence must not be misdetected as code
+    expect(extractCodeFromMessage('Sorry, the game generation failed.')).toBeNull();
+    // Plain prose that merely mentions angle brackets stays null
+    expect(extractCodeFromMessage('Use <div> tags in React.')).toBeNull();
   });
 });
