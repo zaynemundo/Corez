@@ -18,6 +18,8 @@ import { createIntentContract } from './promptIntelligence/intentContract.js';
 import { evaluateResponse, repairResponse, recordQualitySignal } from './reflectionEngine.js';
 import { buildAwwwardsDesignPrompt } from '../../packages/agent-core/context/designTokens.js';
 import { resolveSkills } from '../skills/resolver.js';
+import { classifyExecutionMode, EXECUTION_MODES } from './executionModes.js';
+import { persistAndSummarize } from './contextStore.js';
 
 export const PUBLIC_USER_INTENT_PROMPT = `
 Analyze the public user intent behind the request. Corez uses FLUX 1 Schnell for background generation and image rendering.
@@ -559,12 +561,13 @@ const EXACT_EVIDENCE_PATTERN = /```[\s\S]*?```|(?:error|exception|failed|fix|bug
 /**
  * Compact conversation history before sending it to the hosted AI.
  *
- * Unlike the old trimmer, this never applies a fixed message count, a
- * per-message character cap, or a small byte budget. The full conversation
- * is sent unchanged unless it approaches the platform request-body limit.
- * Only then are redundant older prose turns summarised semantically — the
- * latest user request, code blocks, errors, and explicit requirements are
- * always preserved verbatim as exact evidence.
+ * The full conversation is sent unchanged unless it approaches the platform
+ * request-body limit. Only then are redundant older prose turns removed from
+ * the request — but never deleted: every dropped message is persisted as an
+ * exact retrievable record, and the request carries a REAL generated summary
+ * (requirements, negative constraints, exact errors, decisions) with
+ * retrieval keys linking back to the records. The latest user request, code
+ * blocks, errors, and explicit requirements are preserved verbatim.
  */
 export function compactConversationForRequest(messages) {
   if (!Array.isArray(messages) || messages.length === 0) return messages;
@@ -589,30 +592,30 @@ export function compactConversationForRequest(messages) {
   }
 
   if (dropped.length > 0) {
-    compacted.splice(1, 0, {
-      role: 'system',
-      content: `[Context compaction: ${dropped.length} earlier message(s) were summarised away as redundant. The latest user request, all code blocks, errors, and explicit requirements below are preserved verbatim.]`
-    });
+    // Persist the dropped messages verbatim and generate a real summary with
+    // retrieval links — never a generic "were summarised" placeholder.
+    const { summaryMessage } = persistAndSummarize(dropped);
+    compacted.splice(1, 0, summaryMessage);
   }
 
   // Final guard: if even the evidence-only payload exceeds the platform
-  // limit, keep the latest user turn and every code block exactly, and fold
-  // only the remaining prose into a semantic placeholder.
+  // limit, keep the latest user turn and every code block exactly; fold the
+  // remaining prose into a persisted record with a real summary.
   const finalSerialized = JSON.stringify(compacted);
   if (finalSerialized.length > MAX_COMPACTED_BYTES) {
     const last = compacted[compacted.length - 1];
     const prefix = [];
+    const overflow = [];
     for (const message of compacted.slice(0, -1)) {
       const content = typeof message?.content === 'string' ? message.content : '';
       if (/```/.test(content) || /(?:error|exception|failed|bug|must|require|constraint)/i.test(content)) {
         prefix.push(message);
+      } else {
+        overflow.push(message);
       }
     }
-    compacted = [
-      ...prefix,
-      { role: 'system', content: `[Earlier context retained above; remaining prose compacted because the payload approaches the platform request-body limit.]` },
-      last
-    ];
+    const { summaryMessage } = persistAndSummarize(overflow);
+    compacted = [...prefix, summaryMessage, last];
   }
 
   return compacted;
@@ -646,13 +649,30 @@ export async function generateHostedAIResponse(
   });
 
   const complexity = classifyComplexity(prompt, fineIntent);
+  // Explicit execution mode: repository engineering work routes to the agent
+  // path (and is reported honestly when no workspace is attached), while
+  // conversational and standalone preview-creation prompts stay on the
+  // direct provider route.
+  const executionMode = classifyExecutionMode(prompt);
 
   const fetchOptions = {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ prompt, intent, messages: compactConversationForRequest(history), fineIntent, executionPrompt, legacyIntent: legacyIntentType, contract, skills: resolved.skills, executionPlan: resolved.compactExecutionPlan || null, complexity }),
+    body: JSON.stringify({
+      prompt,
+      intent,
+      messages: compactConversationForRequest(history),
+      fineIntent,
+      executionPrompt,
+      legacyIntent: legacyIntentType,
+      contract,
+      skills: resolved.skills,
+      executionPlan: resolved.compactExecutionPlan || null,
+      complexity,
+      mode: executionMode
+    }),
   };
   if (signal) fetchOptions.signal = signal;
 
@@ -668,7 +688,38 @@ export async function generateHostedAIResponse(
     data = {};
   }
 
-  if (!response.ok) {
+  // Multi-wave swarm task: the worker returned 202 with a taskId and more
+  // waves are still queued. Poll the status endpoint until the final result
+  // arrives (each wave runs in its own Worker invocation).
+  if (response.status === 202 && data?.taskId) {
+    const taskId = data.taskId;
+    for (let poll = 0; poll < 600; poll += 1) {
+      if (signal?.aborted) throw new Error('cancelled by user');
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const statusResponse = await fetch(`/api/swarm/status/${encodeURIComponent(taskId)}`, { signal });
+      let status;
+      try {
+        status = await statusResponse.json();
+      } catch {
+        status = {};
+      }
+      if (status?.status === 'completed' && typeof status?.content === 'string' && status.content.trim()) {
+        data = { content: status.content, model: status.model || 'swarm' };
+        break;
+      }
+      if (status?.status === 'cancelled') {
+        throw new Error('Hosted AI swarm task was cancelled.');
+      }
+      if (status?.status === 'blocked') {
+        throw new Error('Hosted AI swarm task is blocked with no usable specialist output.');
+      }
+      if (statusResponse.status !== 200 && statusResponse.status !== 202) {
+        throw new Error(`Hosted AI swarm status request failed: HTTP ${statusResponse.status}`);
+      }
+    }
+  }
+
+  if (!response.ok && !(response.status === 202 && data?.content)) {
     const serverMsg = typeof data?.error === 'string' ? data.error : (data?.error?.message || data?.message || `HTTP ${response.status}`);
     const detail = typeof data?.detail === 'string' && data.detail.trim() ? ` (${data.detail.trim()})` : '';
     throw new Error(`Hosted AI request failed: ${serverMsg}${detail}`);
@@ -2302,6 +2353,14 @@ export async function generateLocalAIResponse(prompt, hostedError = null) {
   // Natural short latency (0.6s)
   await new Promise(r => setTimeout(r, 600));
 
+  // Repository-agent mode with no hosted AI: report the honest status. The
+  // local client has no repository workspace, and CoreZ never pretends
+  // repository tools ran.
+  if (classifyExecutionMode(cleanPrompt) === EXECUTION_MODES.REPOSITORY_AGENT) {
+    const reason = describeHostedUnavailable(hostedError).replace(/^ The hosted AI service is unavailable/, '');
+    return `I can analyse that request, but I don't have a repository workspace here, so I cannot modify real files — nothing was executed${reason ? ` (${reason.trim()})` : ''}. Run CoreZ with a repository workspace attached for the full evidence-backed agent loop: inspect, plan, implement, test, lint, build, review, finalise.`;
+  }
+
   // Revision context: the user asked to revise an embedded code block. Never
   // discard their code or fabricate a different app — report the real status.
   const revisionMatch = cleanPrompt.match(/\[Context: The user is requesting a revision for the following code block\]/i);
@@ -2310,7 +2369,7 @@ export async function generateLocalAIResponse(prompt, hostedError = null) {
 
   if (revisionMatch) {
     const reason = describeHostedUnavailable(hostedError);
-    return `I can see the code you want to revise, but I couldn't apply your revision (${userRequestPart || 'no request captured'}).${reason} Please check that an AI provider is configured (e.g. DEEPSEEK_API_KEY set as a secret on the deployed worker or in .dev.vars for local dev) and try again — your code has not been changed.`;
+    return `I can see the code you want to revise, but I couldn't apply your revision (${userRequestPart || 'no request captured'}).${reason} Please check that an AI provider is configured (e.g. OPENCODE_GO_API_KEY set as a secret on the deployed worker or in .dev.vars for local dev) and try again — your code has not been changed.`;
   }
 
   // 1. GREETINGS & SMALL TALK (Universal & Natural)
@@ -2334,7 +2393,7 @@ export async function generateLocalAIResponse(prompt, hostedError = null) {
     const gameResult = synthesizeCustomGame(cleanPrompt);
     if (!gameResult) {
       const reason = describeHostedUnavailable(hostedError);
-      return `I'd love to build that for you, but it doesn't match any app template I can synthesize offline, and ${reason.trim()} — so I can't create this specific app right now. Please check the AI service configuration (e.g. DEEPSEEK_API_KEY for local dev) and try again.`;
+      return `I'd love to build that for you, but it doesn't match any app template I can synthesize offline, and ${reason.trim()} — so I can't create this specific app right now. Please check the AI service configuration (e.g. OPENCODE_GO_API_KEY for local dev) and try again.`;
     }
     return `I've created **${gameResult.title}** for you! Click below to open it live in the preview canvas on the right side.\n\n\`\`\`html\n${gameResult.html}\n\`\`\``;
   }

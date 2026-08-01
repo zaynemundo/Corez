@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import swarmWorker from '../worker/swarm-index.js';
 
 const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/chat/completions';
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 function post(worker, env, body) {
   return worker.fetch(
@@ -104,27 +103,34 @@ describe('AI response speed optimizations', () => {
     expect(fetchMock.mock.calls.length).toBeGreaterThan(1);
   });
 
-  it('uses medium reasoning effort for simple requests and high for complex ones on OpenRouter', async () => {
+  it('routes both simple and complex requests to OpenCode Go with no artificial reasoning-effort caps', async () => {
     const payloads = [];
     const fetchMock = vi.fn(async (url, init) => {
-      expect(url).toBe(OPENROUTER_URL);
+      expect(url).toBe(OPENCODE_URL);
       payloads.push(JSON.parse(init.body));
       return Response.json({ choices: [{ message: { content: 'answer' } }] });
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    await post(swarmWorker, { OPENROUTER_API_KEY: 'test' }, {
+    await post(swarmWorker, { OPENCODE_GO_API_KEY: 'test' }, {
       prompt: 'Explain black roses',
       intent: { type: 'explanation' },
       complexity: 'low'
     });
-    await post(swarmWorker, { OPENROUTER_API_KEY: 'test' }, {
+    await post(swarmWorker, { OPENCODE_GO_API_KEY: 'test' }, {
       prompt: 'Build a full SaaS platform with auth and billing',
       intent: { type: 'app' },
       complexity: 'high'
     });
 
-    expect(payloads[0].reasoning.effort).toBe('medium');
-    expect(payloads[1].reasoning.effort).toBe('high');
+    // OpenCode Go is the only provider: every request carries the full
+    // prompt with the server-controlled model and no reasoning-effort cap —
+    // the model decides how much reasoning the task needs.
+    expect(payloads.length).toBeGreaterThan(0);
+    for (const payload of payloads) {
+      expect(payload.model).toBe('deepseek-v4-flash');
+      expect(payload.messages?.length).toBeGreaterThan(0);
+      expect(payload.reasoning).toBeUndefined();
+    }
   });
 });

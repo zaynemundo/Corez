@@ -1,11 +1,11 @@
 import { handleMarket } from './market.js';
 import { safeErrorDetail, readBoundedJson, jsonResponse } from './utils.js';
 
-const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
+// OpenCode Go is the only configured AI provider (serves CoreZ models via
+// the opencode.ai gateway). Direct DeepSeek and OpenRouter integrations have
+// been removed.
 const OPENCODE_DEFAULT_ENDPOINT = 'https://opencode.ai/zen/go/v1/chat/completions';
-const DEEPSEEK_ENDPOINT = 'https://api.deepseek.com/chat/completions';
-const DEFAULT_DEEPSEEK_MODEL = 'deepseek-v4-flash';
-const DEEPSEEK_V4_FLASH_MODEL = 'deepseek-v4-flash';
+const CORE_MODEL = 'deepseek-v4-flash';
 
 const CONTINUATION_NUDGE = {
   role: 'user',
@@ -51,7 +51,7 @@ function generatePublishSlug() {
 }
 
 function getTargetModels() {
-  return [DEEPSEEK_V4_FLASH_MODEL];
+  return [CORE_MODEL];
 }
 
 const CANONICAL_INTENT_TYPES = new Set([
@@ -100,7 +100,6 @@ Adaptive Routing - Complex Path:
 
     adaptiveInstructions = `
 Adaptive Routing - App & Game Creation Path (Awwwards Site of the Day Quality):
-- DeepSeek V4 Flash handles logic, vision, UI layout, art direction, and game design.
 - Use FLUX 1 Schnell for fast background image generation and visual graphics.
 - ONLINE MULTIPLAYER: When the user asks for online multiplayer, use the COREZ multiplayer protocol: connect with \`new WebSocket(\`wss://\${location.host}/api/game/ws/<roomId>\`)\` where <roomId> is a short lowercase id like "dm-123". Send JSON {type:'join',name}, {type:'input',keys:{up,down,left,right}}, {type:'shoot',dx,dy}. Receive {type:'welcome',playerId,players}, {type:'state',players:[{id,name,x,y,color,score}],bullets:[{x,y,ownerId}]} at 20Hz (normalized 0..1 coordinates), {type:'kill',killerId,victimId}, {type:'player_joined'}, {type:'player_left'}. The server moves players and resolves hits authoritatively; render the received state and map 0..1 coordinates to your canvas. Never invent your own server, socket.io, or third-party backend.
 ${designStyle}
@@ -241,6 +240,57 @@ async function handleAi(request, env) {
     return jsonResponse(400, { error: 'Prompt is required.' });
   }
 
+  // Repository-agent mode: chat requests that target an existing repository
+  // must run the full agent cycle (understand, inspect, plan, implement,
+  // verify, review, finalise). This deployment has no repository workspace
+  // attached unless a WORKSPACE_BINDING is configured, and CoreZ never
+  // pretends repository tools ran. Without a workspace the request is
+  // reported honestly, unexecuted.
+  if (body.mode === 'repository-agent') {
+    const workspace = env?.WORKSPACE_BINDING;
+    if (!workspace || typeof workspace.cwd !== 'string') {
+      return jsonResponse(200, {
+        content: 'I can analyse that request, but this deployment has no repository workspace attached, so I cannot modify real files here — nothing was executed. Run CoreZ with a workspace attached (e.g. the local CLI agent against a repository) to get the full evidence-backed loop: inspect, plan, implement, test, lint, build, review, finalise.',
+        model: 'corez:no-workspace'
+      });
+    }
+    try {
+      // Local/self-hosted scenario with nodejs_compat: run the real agent
+      // runtime against the bound workspace. In production Workers without a
+      // workspace this branch is unreachable (guarded above).
+      const { AgentRuntime } = await import('../packages/agent-core/runtime/index.js');
+      const runtime = new AgentRuntime({
+        cwd: workspace.cwd,
+        mode: 'repository',
+        autoApprove: true
+      });
+      const agentResult = await runtime.runTask(prompt, {
+        onStatus: (status) => {
+          if (typeof status?.message === 'string') console.warn(`[agent:${status.type}] ${status.message}`);
+        }
+      });
+      const evidence = {
+        steps: agentResult.stepsCount,
+        inspected: agentResult.inspectedFiles?.length || 0,
+        modified: agentResult.modifiedFiles?.length || 0,
+        blocked: agentResult.blocked || false
+      };
+      const suffix = agentResult.blocked
+        ? `\n\nThe task stopped because the agent could not make further progress: ${agentResult.blockedReason || 'no new evidence'}.`
+        : '';
+      return jsonResponse(200, {
+        content: `${agentResult.response}${suffix}\n\n[Agent evidence: ${evidence.steps} steps, ${evidence.inspected} files inspected, ${evidence.modified} files modified${agentResult.blocked ? ', blocked' : ''}]`,
+        model: 'corez:agent'
+      });
+    } catch (agentErr) {
+      console.warn('Repository agent runtime unavailable:', safeErrorDetail(agentErr));
+      return jsonResponse(200, {
+        content: `A repository workspace is attached, but the agent runtime could not start here (${safeErrorDetail(agentErr)}). Your request was not executed. Run CoreZ locally against the repository instead.`,
+        model: 'corez:no-workspace'
+      });
+    }
+  }
+
   // Greeting fast-path: common greetings get the mandated persona reply
   // instantly without paying an LLM round-trip.
   const GREETING_PATTERN = /^(hi|hello|hey|yo|sup|howdy|greetings|good\s+(morning|afternoon|evening|day)|who\s+(are|r)\s+you|what\s+(are|r)\s+you|whats?\s+(is\s+)?your\s+name)\b[.?!]*$/i;
@@ -340,17 +390,32 @@ async function handleAi(request, env) {
     };
 
     for (const modelId of targetModels) {
-      // OpenCode Go is the preferred provider: stay on it as long as there
-      // is evidence a retry can succeed. Transient gateway failures (5xx,
-      // 429, network) get adaptive backoff using the provider's Retry-After
-      // when supplied; reasoning-only/empty replies get the continuation
-      // nudge. Only then does the request move to DeepSeek / OpenRouter —
-      // the fallback chain is the continuation mechanism.
+      // Condition-based recovery, not a fixed retry count: transient gateway
+      // failures (5xx, 429, 408, network) are retried with adaptive backoff
+      // honouring Retry-After plus jitter until the provider recovers, the
+      // client disconnects, the failure is classified permanent, or the
+      // recovery window exceeds the unavailability horizon. Only then does
+      // the request move to the next model / fallback provider — the chain
+      // itself is the continuation mechanism, and it resumes the same work.
       let result = await callOpenCodeGo(modelId, apiMessages);
       let lastFailure = result?.failure || null;
-      for (let transientAttempt = 1; result?.failure && result?.transient && transientAttempt <= 3; transientAttempt += 1) {
-        const backoff = result.retryAfter ? result.retryAfter * 1000 : 750 * transientAttempt;
-        await sleep(backoff);
+      let recoveryStartedAt = Date.now();
+      let recoveryAttempts = 0;
+      const HORIZON_MS = 60_000;
+
+      while (result?.failure && result?.transient && !result.permanent) {
+        if (clientDisconnectSignal.aborted) break;
+        recoveryAttempts += 1;
+        const retryAfterMs = result.retryAfter ? result.retryAfter * 1000 : 0;
+        const backoffMs = retryAfterMs > 0
+          ? retryAfterMs
+          : Math.min(750 * 2 ** (recoveryAttempts - 1) + Math.random() * 500, HORIZON_MS);
+        if (Date.now() - recoveryStartedAt + backoffMs >= HORIZON_MS) {
+          // The provider is externally unavailable within this request's
+          // interaction horizon: fall through to the next configured provider.
+          break;
+        }
+        await sleep(backoffMs);
         result = await callOpenCodeGo(modelId, apiMessages);
         lastFailure = result?.failure || lastFailure;
       }
@@ -365,85 +430,8 @@ async function handleAi(request, env) {
     }
   }
 
-  // 2. Official DeepSeek API if DEEPSEEK_API_KEY is configured
-  const deepSeekKey = env?.DEEPSEEK_API_KEY;
-  if (deepSeekKey) {
-    const deepSeekEndpoint = env?.DEEPSEEK_ENDPOINT || DEEPSEEK_ENDPOINT;
-    const deepSeekModel = env?.DEEPSEEK_MODEL || DEFAULT_DEEPSEEK_MODEL;
-    try {
-      const deepSeekResp = await fetch(deepSeekEndpoint, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${deepSeekKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: deepSeekModel,
-          messages: apiMessages,
-          stream: false
-        }),
-        signal: clientDisconnectSignal
-      });
-
-      if (deepSeekResp.ok) {
-        const data = await deepSeekResp.json();
-        const content = answerText(data?.choices?.[0]?.message);
-        if (content) {
-          return jsonResponse(200, { content, model: `deepseek:${deepSeekModel}` });
-        }
-      } else {
-        const errText = await deepSeekResp.text().catch(() => '');
-        console.warn(`DeepSeek API returned HTTP ${deepSeekResp.status}:`, safeErrorDetail(errText));
-        recordFailure(`deepseek HTTP ${deepSeekResp.status}`, errText);
-      }
-    } catch (deepSeekErr) {
-      console.warn('DeepSeek API request failed:', safeErrorDetail(deepSeekErr));
-      recordFailure('deepseek', deepSeekErr);
-    }
-  }
-
-  // 3. Try OpenRouter API if OPENROUTER_API_KEY is configured
-  const openRouterKey = env?.OPENROUTER_API_KEY;
-  if (openRouterKey) {
-    const requestComplexity = String(
-      body?.complexity || body?.fineIntent?.complexity || intent?.enriched?.complexity || ''
-    ).toLowerCase();
-    const reasoningEffort = ['high', 'epic'].includes(requestComplexity) ? 'high' : 'medium';
-    for (const modelId of targetModels) {
-      try {
-        const openRouterResp = await fetch(OPENROUTER_ENDPOINT, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openRouterKey}`,
-            'HTTP-Referer': 'https://corez.ai',
-            'X-Title': 'COREZ AI',
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: modelId,
-            reasoning: { effort: reasoningEffort },
-            messages: apiMessages
-          }),
-          signal: clientDisconnectSignal
-        });
-
-        if (openRouterResp.ok) {
-          const data = await openRouterResp.json();
-          const content = answerText(data?.choices?.[0]?.message);
-          if (content) {
-            return jsonResponse(200, { content, model: modelId });
-          }
-        } else {
-          const detail = (await openRouterResp.text().catch(() => '')).slice(0, 200);
-          recordFailure(`openrouter:${modelId} HTTP ${openRouterResp.status}`, detail);
-        }
-      } catch (orErr) {
-        console.warn(`OpenRouter model ${modelId} request failed:`, safeErrorDetail(orErr));
-        recordFailure(`openrouter:${modelId}`, orErr);
-      }
-    }
-  }
-
+  // OpenCode Go is the only provider: when it is unavailable, the request
+  // fails honestly — there are no other providers to fall back to.
   console.error(JSON.stringify({
     message: 'AI generation failed',
     error: providerFailures.join(' | ').slice(0, 500) || 'all providers returned no usable response'
@@ -457,55 +445,7 @@ async function handleAi(request, env) {
   });
 }
 
-async function saveToR2IfAvailable(env, key, buffer, mimeType = 'image/png') {
-  if (env.ASSET_BUCKET && typeof env.ASSET_BUCKET.put === 'function') {
-    try {
-      await env.ASSET_BUCKET.put(key, buffer, {
-        httpMetadata: { contentType: mimeType }
-      });
-      return `/api/assets/${key}`;
-    } catch (err) {
-      console.warn('R2 Bucket save failed, using fallback data URI:', safeErrorDetail(err));
-    }
-  }
-  return null;
-}
-
-async function callOpenRouterImage(apiKey, prompt, parentSignal) {
-  try {
-    const response = await fetch(OPENROUTER_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': 'https://corez.ai',
-        'X-Title': 'COREZ AI',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'black-forest-labs/flux-1-schnell',
-        messages: [{ role: 'user', content: prompt }]
-      }),
-      signal: parentSignal
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      const message = data?.choices?.[0]?.message;
-      if (Array.isArray(message?.images) && message.images[0]?.url) {
-        return message.images[0].url;
-      }
-      const content = message?.content || '';
-      const urlMatch = content.match(/https?:\/\/[^\s)"']+\.(?:png|jpg|jpeg|webp)/i) || content.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
-      if (urlMatch) return urlMatch[1] || urlMatch[0];
-      if (content.startsWith('data:image')) return content;
-    }
-  } catch (err) {
-    console.warn('OpenRouter image generation attempt failed:', safeErrorDetail(err));
-  }
-  return null;
-}
-
-async function handleImage(request, env) {
+async function handleImage(request) {
   if (request.method !== 'POST') {
     return jsonResponse(405, { error: 'Method not allowed.' });
   }
@@ -527,57 +467,11 @@ async function handleImage(request, env) {
     return jsonResponse(400, { error: 'Prompt is required.' });
   }
 
-  const r2Key = `flux_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.png`;
-
-  // Image generation runs as long as it needs; only a client disconnect aborts.
-  const imageClientSignal = (() => {
-    const controller = new AbortController();
-    if (request.signal) {
-      if (request.signal.aborted) controller.abort();
-      else request.signal.addEventListener('abort', () => controller.abort(), { once: true });
-    }
-    return controller.signal;
-  })();
-
-  // 1. Try OpenRouter Image Generation if OPENROUTER_API_KEY is present
-  const openRouterKey = env?.OPENROUTER_API_KEY;
-  if (openRouterKey) {
-    const openRouterImg = await callOpenRouterImage(openRouterKey, prompt, imageClientSignal);
-    if (openRouterImg) {
-      try {
-        let buffer;
-        let mimeType = 'image/png';
-        if (openRouterImg.startsWith('data:')) {
-          const parts = openRouterImg.split(',');
-          mimeType = parts[0].match(/:(.*?);/)?.[1] || 'image/png';
-          const bstr = atob(parts[1]);
-          let n = bstr.length;
-          const u8arr = new Uint8Array(n);
-          while (n--) u8arr[n] = bstr.charCodeAt(n);
-          buffer = u8arr.buffer;
-        } else {
-          const imgResp = await fetch(openRouterImg, {
-            signal: imageClientSignal
-          });
-          if (imgResp.ok) {
-            mimeType = imgResp.headers.get('content-type') || 'image/png';
-            buffer = await imgResp.arrayBuffer();
-          }
-        }
-
-        if (buffer) {
-          const r2Url = await saveToR2IfAvailable(env, r2Key, buffer, mimeType);
-          return jsonResponse(200, { image: r2Url || openRouterImg, model: 'black-forest-labs/flux-1-schnell' });
-        }
-      } catch (e) {
-        console.warn('Failed to persist OpenRouter image to R2, returning URL:', safeErrorDetail(e));
-      }
-      return jsonResponse(200, { image: openRouterImg, model: 'black-forest-labs/flux-1-schnell' });
-    }
-  }
-
+  // Image generation previously used the OpenRouter API, which has been
+  // removed. No image provider is configured on this deployment, so the
+  // request is reported honestly instead of fabricating an image.
   return jsonResponse(503, {
-    error: 'Image generation is unavailable: OPENROUTER_API_KEY is not configured or the image API failed.'
+    error: 'Image generation is unavailable: no image provider is configured on this deployment (OpenRouter image API has been removed).'
   });
 }
 

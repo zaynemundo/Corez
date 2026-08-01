@@ -8,7 +8,6 @@ export const MODEL_CATALOG = Object.freeze([
 export class ModelProviderRouter {
   constructor(options = {}) {
     this.opencodeApiKey = process.env.OPENCODE_GO_API_KEY || process.env.OPENCODE_API_KEY || options.opencodeApiKey;
-    this.openrouterApiKey = process.env.OPENROUTER_API_KEY || options.openrouterApiKey;
     this.defaultModel = options.defaultModel || 'deepseek-v4-pro';
   }
 
@@ -17,21 +16,18 @@ export class ModelProviderRouter {
       ...m,
       configured: m.provider === 'opencode-go'
         ? Boolean(this.opencodeApiKey)
-        : m.provider === 'openrouter'
-          ? Boolean(this.openrouterApiKey)
-          : Boolean(this.opencodeApiKey || this.openrouterApiKey)
+        : Boolean(this.opencodeApiKey)
     }));
   }
 
   async generate({ model = this.defaultModel, messages = [], tools = [], _reasoning = 'high', signal }) {
-    const activeKey = this.opencodeApiKey || this.openrouterApiKey;
+    const activeKey = this.opencodeApiKey;
 
-    // If API keys are present, execute HTTP request
+    // If the API key is present, execute HTTP request against OpenCode Go
+    // (the only configured provider; direct OpenRouter integration removed).
     if (activeKey) {
       try {
-        const endpoint = this.opencodeApiKey 
-          ? 'https://opencode.ai/zen/go/v1/chat/completions'
-          : 'https://openrouter.ai/api/v1/chat/completions';
+        const endpoint = 'https://opencode.ai/zen/go/v1/chat/completions';
 
         const body = {
           model,
@@ -110,13 +106,13 @@ export class ModelProviderRouter {
   async generateEmbeddings({ input, model = 'nvidia/nemotron-3-embed-1b:free', signal }) {
     const inputs = Array.isArray(input) ? input : [input];
 
-    if (this.openrouterApiKey) {
+    if (this.opencodeApiKey) {
       try {
-        const res = await fetch('https://openrouter.ai/api/v1/embeddings', {
+        const res = await fetch('https://opencode.ai/zen/go/v1/embeddings', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.openrouterApiKey}`
+            'Authorization': `Bearer ${this.opencodeApiKey}`
           },
           body: JSON.stringify({ model, input: inputs }),
           signal

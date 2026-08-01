@@ -492,6 +492,118 @@ export class ToolRegistry {
         };
       }
     });
+
+    // 15. create_plan
+    this.registerTool({
+      name: 'create_plan',
+      category: PERMISSION_CATEGORIES.READ,
+      description: 'Record the task plan before implementing. Plan items must be marked done via update_plan_item as they complete.',
+      parameters: {
+        type: 'object',
+        properties: {
+          planItems: {
+            type: 'array',
+            description: 'Ordered list of plan items',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', description: 'Stable identifier' },
+                description: { type: 'string', description: 'What this step accomplishes' }
+              },
+              required: ['id', 'description']
+            }
+          }
+        },
+        required: ['planItems']
+      },
+      async execute({ planItems }) {
+        return { success: true, planned: (planItems || []).length };
+      }
+    });
+
+    // 16. update_plan_item
+    this.registerTool({
+      name: 'update_plan_item',
+      category: PERMISSION_CATEGORIES.READ,
+      description: 'Mark a plan item as done/in-progress/blocked as implementation proceeds.',
+      parameters: {
+        type: 'object',
+        properties: {
+          itemId: { type: 'string', description: 'Plan item id from create_plan' },
+          status: { type: 'string', enum: ['planned', 'in-progress', 'done', 'blocked'], description: 'New status' }
+        },
+        required: ['itemId', 'status']
+      },
+      async execute({ itemId, status }) {
+        return { success: true, itemId, status };
+      }
+    });
+
+    // 17. git_diff_check
+    this.registerTool({
+      name: 'git_diff_check',
+      category: PERMISSION_CATEGORIES.READ,
+      description: 'Run `git diff --check` to detect whitespace errors and conflict markers before finalising.',
+      parameters: { type: 'object', properties: {} },
+      async execute(_, { context }) {
+        const cwd = context?.cwd || process.cwd();
+        try {
+          const stdout = execSync('git diff --check', { cwd, encoding: 'utf8' });
+          return { command: 'git diff --check', stdout: stdout.trim(), exitCode: 0 };
+        } catch (err) {
+          return {
+            command: 'git diff --check',
+            stdout: err.stdout ? err.stdout.trim() : '',
+            stderr: err.stderr ? err.stderr.trim() : '',
+            error: err.message,
+            exitCode: err.status || 1
+          };
+        }
+      }
+    });
+
+    // 18. finalize_task — the runtime-owned completion gate for repository tasks.
+    this.registerTool({
+      name: 'finalize_task',
+      category: PERMISSION_CATEGORIES.READ,
+      description: 'Submit the completion gate for a repository task. The runtime verifies the evidence (diff inspected after the last change, tests, lint, build, git diff --check) before accepting. If evidence is missing, the response lists the missing actions.',
+      parameters: {
+        type: 'object',
+        properties: {
+          verifiedConstraints: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Must-preserve constraints you verified against the final state'
+          },
+          reviewFindingsResolved: { type: 'boolean', description: 'True when no blocking review finding remains' },
+          unrelatedChangesPreserved: { type: 'boolean', description: 'True when unrelated user changes were left untouched' }
+        },
+        required: ['reviewFindingsResolved', 'unrelatedChangesPreserved']
+      },
+      async execute(args, runtimeOptions) {
+        const gate = runtimeOptions?.gate;
+        if (!gate) return { error: 'finalize_task is unavailable outside the agent runtime.' };
+        const { evaluateCompletionGate } = await import('../runtime/gate.js');
+        const scripts = runtimeOptions?.scripts || {};
+        const result = evaluateCompletionGate(gate, {
+          availableScripts: scripts,
+          declaredConstraints: Array.isArray(args?.verifiedConstraints) ? args.verifiedConstraints : [],
+          reviewFindingsResolved: args?.reviewFindingsResolved === true,
+          unrelatedChangesPreserved: args?.unrelatedChangesPreserved === true
+        });
+        gate.finalizeAttempted = true;
+        gate.finalizePassed = result.passed;
+        if (result.passed) {
+          return { success: true, gate: 'passed', message: 'Completion gate passed. The task may now be summarised.' };
+        }
+        return {
+          success: false,
+          gate: 'pending',
+          missingActions: result.missing,
+          message: `Completion gate not passed. Missing: ${result.missing.join('; ')}`
+        };
+      }
+    });
   }
 }
 

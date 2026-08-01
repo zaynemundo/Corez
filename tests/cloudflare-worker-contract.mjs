@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import worker from '../worker/index.js';
 
 const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/chat/completions';
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 delete process.env.OPENROUTER_API_KEY;
 
 function env(overrides = {}) {
@@ -225,75 +224,61 @@ async function run() {
     globalThis.fetch = originalFetch;
   }
 
-  // DeepSeek official API is the primary provider when DEEPSEEK_API_KEY is set
+  // OpenCode Go is the only provider: a client-supplied DEEPSEEK_API_KEY is
+  // ignored entirely, and OpenCode Go is always consulted.
   {
     const originalFetch = globalThis.fetch;
-    let deepSeekPayload;
+    let opencodePayload;
     try {
       globalThis.fetch = async (url, init) => {
-        assert.equal(url, 'https://api.deepseek.com/chat/completions');
-        deepSeekPayload = JSON.parse(init.body);
+        assert.equal(url, 'https://opencode.ai/zen/go/v1/chat/completions');
+        opencodePayload = JSON.parse(init.body);
         return new Response(JSON.stringify({
-          choices: [{ message: { content: 'DeepSeek official response' } }]
+          choices: [{ message: { content: 'OpenCode Go response' } }]
         }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         });
       };
 
-      const deepSeekResp = await post(
+      const opencodeResp = await post(
         JSON.stringify({ prompt: 'Explain black roses', intent: { type: 'general' } }),
-        env({ AI: undefined, DEEPSEEK_API_KEY: 'sk-deepseek-test' })
+        env({ DEEPSEEK_API_KEY: 'sk-deepseek-test' })
       );
-      assert.equal(deepSeekResp.status, 200);
-      const dsData = await deepSeekResp.json();
-      assert.equal(dsData.content, 'DeepSeek official response');
-      assert.equal(dsData.model, 'deepseek:deepseek-v4-flash');
-      assert.equal(deepSeekPayload.model, 'deepseek-v4-flash');
-      assert.equal(deepSeekPayload.stream, false);
+      assert.equal(opencodeResp.status, 502);
+      // DEEPSEEK_API_KEY alone is not an AI provider on this deployment: no
+      // usable response exists, and the request fails honestly.
+      const opencodeData = await opencodeResp.json();
+      assert.equal(opencodeData.error, 'Unable to generate AI response.');
+      assert.equal(opencodeData.content, undefined);
+
+      // With OPENCODE_GO_API_KEY configured, the request succeeds and the
+      // payload carries no provider-specific or reasoning-effort fields.
+      globalThis.fetch = async (url, init) => {
+        assert.equal(url, 'https://opencode.ai/zen/go/v1/chat/completions');
+        opencodePayload = JSON.parse(init.body);
+        return new Response(JSON.stringify({
+          choices: [{ message: { content: 'OpenCode Go response' } }]
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      };
+      const opencodeKeyResp = await post(
+        JSON.stringify({ prompt: 'Explain black roses', intent: { type: 'general' } }),
+        env({ OPENCODE_GO_API_KEY: 'sk-opencode-test' })
+      );
+      assert.equal(opencodeKeyResp.status, 200);
+      const opencodeKeyData = await opencodeKeyResp.json();
+      assert.equal(opencodeKeyData.content, 'OpenCode Go response');
+      assert.equal(opencodeKeyData.model, 'opencode:deepseek-v4-flash');
+      assert.equal(opencodePayload.model, 'deepseek-v4-flash');
       // No max_tokens cap: output length is unbounded (model default)
-      assert.equal(deepSeekPayload.max_tokens, undefined);
-      assert.ok(Array.isArray(deepSeekPayload.messages));
-      assert.equal(deepSeekPayload.messages.at(-1).content, 'Explain black roses');
-      assert.equal(deepSeekPayload.reasoning, undefined);
-      assert.equal(deepSeekPayload.provider, undefined);
-
-      // DEEPSEEK_MODEL env override is honored
-      const deepSeekModelResp = await post(
-        JSON.stringify({ prompt: 'Hi there' }),
-        env({
-          AI: undefined,
-          DEEPSEEK_API_KEY: 'sk-deepseek-test',
-          DEEPSEEK_MODEL: 'deepseek-chat'
-        })
-      );
-      const dsModelData = await deepSeekModelResp.json();
-      assert.equal(dsModelData.model, 'deepseek:deepseek-chat');
-      assert.equal(deepSeekPayload.model, 'deepseek-chat');
-
-      // Thinking-mode responses with empty content but populated
-      // reasoning_content are internal thought, never the answer: the worker
-      // never hands back raw reasoning text, and with no other provider
-      // configured the request fails honestly instead.
-      globalThis.fetch = async () => new Response(JSON.stringify({
-        choices: [{ message: { content: '', reasoning_content: 'I thought through the revision steps carefully.' } }]
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
-      const thinkingResp = await post(
-        JSON.stringify({
-          prompt: '[Context: The user is requesting a revision for the following code block]\n```html\n<canvas id="g"></canvas>\n```\n\nUser Request: fix movement',
-          intent: { type: 'code-help', summary: 'Revise embedded code.' }
-        }),
-        env({ DEEPSEEK_API_KEY: 'sk-deepseek-test' }),
-        '198.51.100.106'
-      );
-      assert.equal(thinkingResp.status, 502);
-      const thinkingData = await thinkingResp.json();
-      assert.equal(thinkingData.error, 'Unable to generate AI response.');
-      assert.equal(thinkingData.content, undefined);
-      assert.equal(String(thinkingData.detail).includes('reasoning'), false);
+      assert.equal(opencodePayload.max_tokens, undefined);
+      assert.ok(Array.isArray(opencodePayload.messages));
+      assert.equal(opencodePayload.messages.at(-1).content, 'Explain black roses');
+      assert.equal(opencodePayload.reasoning, undefined);
+      assert.equal(opencodePayload.provider, undefined);
 
       // Inline <think> blocks in the content field are stripped before the
       // answer is returned.
@@ -305,7 +290,7 @@ async function run() {
       });
       const thinkStripResp = await post(
         JSON.stringify({ prompt: 'Revise my game' }),
-        env({ DEEPSEEK_API_KEY: 'sk-deepseek-test' }),
+        env({ OPENCODE_GO_API_KEY: 'sk-opencode-test' }),
         '198.51.100.107'
       );
       assert.equal(thinkStripResp.status, 200);
@@ -467,41 +452,20 @@ async function run() {
       assert.equal(opencodeRetryData.model, 'opencode:deepseek-v4-flash');
       assert.equal(opencodeRetryCalls, 2);
 
-      // OpenCode failure falls through to DeepSeek
+      // OpenCode failure with no further provider ends in an honest 502 whose
+      // detail names the failed provider.
       globalThis.fetch = async (url) => {
-        if (url === 'https://opencode.ai/zen/go/v1/chat/completions') {
-          return new Response('{}', { status: 503 });
-        }
-        assert.equal(url, 'https://api.deepseek.com/chat/completions');
-        return new Response(JSON.stringify({
-          choices: [{ message: { content: 'DeepSeek after OpenCode failure' } }]
-        }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        assert.equal(url, 'https://opencode.ai/zen/go/v1/chat/completions');
+        return new Response('{}', { status: 503 });
       };
       const opencodeFailResp = await post(
         JSON.stringify({ prompt: 'Explain fallback chain' }),
-        env({
-          OPENCODE_GO_API_KEY: 'sk-opencode-test',
-          DEEPSEEK_API_KEY: 'sk-deepseek-test'
-        })
+        env({ OPENCODE_GO_API_KEY: 'sk-opencode-test' })
       );
-      const opencodeFailData = await opencodeFailResp.json();
-      assert.equal(opencodeFailData.content, 'DeepSeek after OpenCode failure');
-      assert.equal(opencodeFailData.model, 'deepseek:deepseek-v4-flash');
-
-      // DeepSeek failure with no further provider ends in an honest 502 whose
-      // detail names the failed providers.
-      globalThis.fetch = async () => new Response('{}', { status: 502 });
-      const deepSeekFallbackResp = await post(
-        JSON.stringify({ prompt: 'Explain fallback' }),
-        env({ DEEPSEEK_API_KEY: 'sk-deepseek-test' })
-      );
-      assert.equal(deepSeekFallbackResp.status, 502);
-      const dsFallbackData = await json(deepSeekFallbackResp);
-      assert.equal(dsFallbackData.error, 'Unable to generate AI response.');
-      assert.match(dsFallbackData.detail, /deepseek/);
+      assert.equal(opencodeFailResp.status, 502);
+      const opencodeFailData = await json(opencodeFailResp);
+      assert.equal(opencodeFailData.error, 'Unable to generate AI response.');
+      assert.match(opencodeFailData.detail, /opencode/);
     } finally {
       globalThis.fetch = originalFetch;
     }
@@ -626,23 +590,17 @@ async function run() {
   );
   assert.equal(imageMissingPromptResponse.status, 400);
 
-  // Image generation runs through the OpenRouter FLUX API (no Workers AI).
+  // Image generation: the OpenRouter FLUX integration has been removed, so
+  // /api/image reports an honest 503 on this deployment and never fabricates
+  // an image. No external fetch is made.
   const imageOriginalFetch = globalThis.fetch;
   let imageFetchCalls = 0;
   try {
-    globalThis.fetch = async (url, init) => {
-      assert.equal(url, OPENROUTER_URL);
+    globalThis.fetch = async () => {
       imageFetchCalls += 1;
-      const payload = JSON.parse(init.body);
-      assert.equal(payload.model, 'black-forest-labs/flux-1-schnell');
-      return new Response(JSON.stringify({
-        choices: [{ message: { images: [{ url: 'https://cdn.example/flux-city.png' }] } }]
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      throw new Error('No image provider should be consulted.');
     };
-    const imageSuccessResponse = await worker.fetch(
+    const imageUnavailableResponse = await worker.fetch(
       new Request('https://corez.test/api/image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -650,16 +608,15 @@ async function run() {
       }),
       env({ OPENROUTER_API_KEY: 'sk-openrouter-test' })
     );
-    assert.equal(imageSuccessResponse.status, 200);
-    const imageJsonData = await json(imageSuccessResponse);
-    assert.equal(imageJsonData.model, 'black-forest-labs/flux-1-schnell');
-    assert.equal(imageJsonData.image, 'https://cdn.example/flux-city.png');
-    assert.equal(imageFetchCalls, 1);
+    assert.equal(imageUnavailableResponse.status, 503);
+    assert.match((await json(imageUnavailableResponse)).error, /no image provider is configured/);
+    assert.equal(imageFetchCalls, 0);
   } finally {
     globalThis.fetch = imageOriginalFetch;
   }
 
-  // Without an OpenRouter key, image generation is unavailable (no Workers AI).
+  // With no provider key configured the same honest 503 is returned (no
+  // Workers AI image fallback).
   const imageNoKeyResponse = await worker.fetch(
     new Request('https://corez.test/api/image', {
       method: 'POST',
@@ -669,7 +626,7 @@ async function run() {
     env()
   );
   assert.equal(imageNoKeyResponse.status, 503);
-  assert.match((await json(imageNoKeyResponse)).error, /OPENROUTER_API_KEY/);
+  assert.match((await json(imageNoKeyResponse)).error, /no image provider is configured/);
 
   // Test /api/memory store + keyword search (no Workers AI embeddings)
   const memoryStore = new Map();

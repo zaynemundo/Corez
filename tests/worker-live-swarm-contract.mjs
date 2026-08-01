@@ -93,18 +93,18 @@ async function run() {
   assert.equal(retryAttempts.get('rate-limited-agent'), 2);
 
   const originalFetch = globalThis.fetch;
-  const openRouterRequests = [];
+  const openCodeRequests = [];
 
   try {
     globalThis.fetch = async (url, init) => {
-      assert.ok(url === 'https://openrouter.ai/api/v1/chat/completions' || url === 'https://opencode.ai/api/v1/chat/completions' || url === 'https://opencode.ai/zen/go/v1/chat/completions');
+      assert.equal(url, 'https://opencode.ai/zen/go/v1/chat/completions');
       const payload = JSON.parse(init.body);
-      openRouterRequests.push(payload);
+      openCodeRequests.push(payload);
 
       const systemPrompt = payload.messages?.[0]?.content || '';
       const content = systemPrompt.includes('lead synthesis agent')
         ? 'Integrated live swarm response'
-        : `Specialist contribution ${openRouterRequests.length}`;
+        : `Specialist contribution ${openCodeRequests.length}`;
 
       return new Response(JSON.stringify({
         choices: [{ message: { content } }]
@@ -127,7 +127,7 @@ async function run() {
     };
 
     const response = await post(body, environment({
-      OPENROUTER_API_KEY: 'test-openrouter-key',
+      OPENCODE_GO_API_KEY: 'sk-opencode-test',
       SWARM_AGENT_TIMEOUT_MS: '2000',
       SWARM_RESPONSE_DEADLINE_MS: '2000',
       SWARM_SYNTHESIS_TIMEOUT_MS: '2000'
@@ -138,99 +138,39 @@ async function run() {
     const expectedAgentCount = buildSwarmAgentSpecs('app', body.prompt).length;
 
     assert.equal(data.content, 'Integrated live swarm response');
-    assert.match(data.model, /deepseek/i);
+    assert.match(data.model, /opencode/i);
     assert.equal(data.swarm.enabled, true);
     assert.equal(data.swarm.created, expectedAgentCount);
     assert.equal(data.swarm.completed, expectedAgentCount);
     assert.equal(data.swarm.failed, 0);
     assert.equal(data.swarm.skipped, 0);
-    assert.equal(openRouterRequests.length, expectedAgentCount + 1);
+    assert.equal(openCodeRequests.length, expectedAgentCount + 1);
 
-    for (const payload of openRouterRequests) {
+    for (const payload of openCodeRequests) {
       assert.match(payload.model, /deepseek/i);
-      assert.equal(payload.reasoning.effort, 'high');
-      assert.equal(payload.reasoning.exclude, true);
-      assert.equal(payload.provider.sort, 'throughput');
-      assert.equal(payload.provider.allow_fallbacks, true);
-      assert.equal(payload.provider.require_parameters, true);
+      assert.equal(payload.reasoning, undefined);
+      assert.equal(payload.provider, undefined);
+      assert.equal(payload.max_tokens, undefined);
     }
   } finally {
     globalThis.fetch = originalFetch;
   }
 
-  // Swarm routes to the official DeepSeek API when DEEPSEEK_API_KEY is set
+  // OpenCode Go is the only provider: a DeepSeek key is ignored and the
+  // swarm still routes through OpenCode Go (or fails honestly without it).
   {
     const originalFetch = globalThis.fetch;
     const deepSeekRequests = [];
     try {
       globalThis.fetch = async (url, init) => {
-        assert.equal(url, 'https://api.deepseek.com/chat/completions');
+        assert.equal(url, 'https://opencode.ai/zen/go/v1/chat/completions');
         const payload = JSON.parse(init.body);
         deepSeekRequests.push(payload);
 
         const systemPrompt = payload.messages?.[0]?.content || '';
         const content = systemPrompt.includes('lead synthesis agent')
-          ? 'Integrated DeepSeek swarm response'
+          ? 'Integrated OpenCode swarm response'
           : `Specialist contribution ${deepSeekRequests.length}`;
-
-        return new Response(JSON.stringify({
-          choices: [{ message: { content } }]
-        }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      };
-
-      const body = {
-        prompt: 'Build a responsive retro platformer. Add touch controls. Add sound effects.',
-        intent: {
-          type: 'app',
-          summary: 'Build a complete browser game.'
-        },
-        complexity: 'high',
-        messages: [
-          { role: 'user', content: 'Build a responsive retro platformer. Add touch controls. Add sound effects.' }
-        ]
-      };
-
-      const response = await post(body, environment({
-        DEEPSEEK_API_KEY: 'sk-deepseek-test',
-        SWARM_AGENT_TIMEOUT_MS: '2000',
-        SWARM_RESPONSE_DEADLINE_MS: '2000',
-        SWARM_SYNTHESIS_TIMEOUT_MS: '2000'
-      }));
-
-      assert.equal(response.status, 200);
-      const data = await response.json();
-      assert.equal(data.content, 'Integrated DeepSeek swarm response');
-      assert.equal(data.swarm.enabled, true);
-      assert.ok(deepSeekRequests.length > 1);
-
-      for (const payload of deepSeekRequests) {
-        assert.equal(payload.model, 'deepseek-v4-flash');
-        assert.equal(payload.reasoning, undefined);
-        assert.equal(payload.provider, undefined);
-        assert.equal(payload.max_tokens, undefined);
-      }
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
-  }
-
-  // Swarm prefers OpenCode Go when BOTH opencode and DeepSeek keys are set
-  {
-    const originalFetch = globalThis.fetch;
-    const openCodeRequests = [];
-    try {
-      globalThis.fetch = async (url, init) => {
-        assert.equal(url, 'https://opencode.ai/zen/go/v1/chat/completions');
-        const payload = JSON.parse(init.body);
-        openCodeRequests.push(payload);
-
-        const systemPrompt = payload.messages?.[0]?.content || '';
-        const content = systemPrompt.includes('lead synthesis agent')
-          ? 'Integrated opencode swarm response'
-          : `Specialist contribution ${openCodeRequests.length}`;
 
         return new Response(JSON.stringify({
           choices: [{ message: { content } }]
@@ -262,13 +202,35 @@ async function run() {
 
       assert.equal(response.status, 200);
       const data = await response.json();
-      assert.equal(data.content, 'Integrated opencode swarm response');
-      assert.ok(openCodeRequests.length > 1);
-      assert.equal(openCodeRequests[0].provider, undefined);
-      assert.equal(openCodeRequests[0].reasoning, undefined);
+      assert.equal(data.content, 'Integrated OpenCode swarm response');
+      assert.equal(data.swarm.enabled, true);
+      assert.ok(deepSeekRequests.length > 1);
+
+      for (const payload of deepSeekRequests) {
+        assert.match(payload.model, /deepseek/i);
+        assert.equal(payload.reasoning, undefined);
+        assert.equal(payload.provider, undefined);
+        assert.equal(payload.max_tokens, undefined);
+      }
     } finally {
       globalThis.fetch = originalFetch;
     }
+  }
+
+  // Without an OpenCode Go key the swarm reports an honest error instead of
+  // pretending another provider exists.
+  {
+    const response = await post(
+      {
+        prompt: 'Build a responsive retro platformer. Add touch controls. Add sound effects.',
+        intent: { type: 'app', summary: 'Build a complete browser game.' },
+        complexity: 'high'
+      },
+      environment({ DEEPSEEK_API_KEY: 'sk-deepseek-test' })
+    );
+    assert.equal(response.status, 502);
+    const payload = await response.json();
+    assert.match(String(payload.error), /Unable to generate AI response/);
   }
 
   const delegatedResponse = await post(

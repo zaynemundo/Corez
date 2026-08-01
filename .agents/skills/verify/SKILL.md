@@ -17,16 +17,16 @@ CoreZ is a Vite SPA + Cloudflare Worker. Two ways to verify locally:
 ```bash
 # Terminal A: worker on :8787 (serves /api/ai, /api/image, /api/market,
 # /api/apps, /api/memory, /api/assets)
-DEEPSEEK_API_KEY=sk-... npx wrangler dev
+OPENCODE_GO_API_KEY=sk-... npx wrangler dev
 
 # Terminal B: Vite dev server on :3000 (proxies /api/* to :8787)
 npm run dev
 ```
 
-Requires a `.dev.vars` file (or env var) with at least one AI provider key.
-Provider chain: DeepSeek (`DEEPSEEK_API_KEY`) -> OpenCode Go
-(`OPENCODE_GO_API_KEY`) -> OpenRouter (`OPENROUTER_API_KEY`) -> Workers AI
-binding (wrangler dev provides a real `AI` binding only when authenticated).
+Requires a `.dev.vars` file (or env var) with the OpenCode Go provider key.
+OpenCode Go (`OPENCODE_GO_API_KEY` / `OPENCODE_API_KEY`) is the only AI
+provider — the direct DeepSeek API and OpenRouter integrations have been
+removed.
 
 ### 2. Pre-built static + deployed worker
 

@@ -6,15 +6,15 @@ Corez deploys the Vite application and its AI endpoints together as a Cloudflare
 
 ### Text and multimodal requests
 
-When `OPENCODE_GO_API_KEY` (or `OPENCODE_API_KEY`) is configured, `/api/ai` uses the OpenCode Go API provider exclusively as long as it can serve the request (it serves the latest DeepSeek V4 Flash builds):
+When `OPENCODE_GO_API_KEY` (or `OPENCODE_API_KEY`) is configured, `/api/ai` uses the OpenCode Go API provider exclusively (it serves the latest DeepSeek V4 Flash builds):
 
 - All chat, coding, app & swarm requests: `deepseek-v4-flash`
 
-Transient gateway failures are retried once on OpenCode Go, and reasoning-only replies get one continuation nudge, before the request ever leaves the provider. `DEEPSEEK_API_KEY` (official DeepSeek API) and `OPENROUTER_API_KEY` (OpenRouter) are only consulted when OpenCode Go has no usable usage left. Cloudflare Workers AI is not used anywhere.
+OpenCode Go is the only AI provider: the direct DeepSeek API and OpenRouter integrations have been removed. Transient gateway failures are retried with adaptive backoff (honouring `Retry-After`), and reasoning-only replies get one continuation nudge, before the request is reported as failed. Cloudflare Workers AI is not used anywhere.
 
 Generations run as long as the model needs: no timeouts and no output token caps. The only abort is the client disconnecting (Stop button).
 
-Conversation history is always sent compact (6 recent messages, 3 KB each, ~15K tokens worst case, 60 KB total body) regardless of the model's context window — 256k and 100k windows included — to keep input tokens cheap.
+Conversation history is sent in full below the platform body guard; only when a request approaches the guard are older redundant turns compacted with a real generated summary and persisted retrievable records (exact code, errors, requirements and the latest user turn are always preserved verbatim).
 
 ### Publishing creations
 
@@ -24,9 +24,9 @@ Only the app document itself is published: conversation history, session IDs, an
 
 ### Image generation
 
-`/api/image` uses the OpenRouter FLUX API (`black-forest-labs/flux-1-schnell`). `OPENROUTER_API_KEY` is required for image generation.
+`/api/image` previously used the OpenRouter FLUX API; OpenRouter has been removed, so image generation is currently unavailable on this deployment and returns an honest error. No image provider credential is configured or accepted.
 
-`DEEPSEEK_API_KEY` and `OPENROUTER_API_KEY` should be configured as Worker secrets; `OPENCODE_GO_API_KEY` is the primary provider secret.
+`OPENCODE_GO_API_KEY` is the only Worker secret required for AI.
 
 ### Online multiplayer
 
