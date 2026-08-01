@@ -1675,6 +1675,10 @@ h1, h2, h3, h4, h5, h6 {
     height: 100dvh;
   }
 
+  button {
+    touch-action: manipulation;
+  }
+
   .sidebar {
     position: fixed;
     top: calc(var(--sidebar-margin) + env(safe-area-inset-top, 0px));
@@ -1777,6 +1781,36 @@ h1, h2, h3, h4, h5, h6 {
     padding: 0.55rem 0.55rem 0.55rem 0.85rem;
   }
 
+  /* 16px input prevents iOS Safari auto-zoom on focus */
+  .chat-textarea {
+    font-size: 1rem;
+    max-height: 120px;
+  }
+
+  .icon-btn {
+    width: 38px;
+    height: 38px;
+  }
+
+  .send-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  /* Allow the code action bar to wrap instead of overflowing */
+  .code-header {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 32px;
+    padding: 0.4rem 0.85rem;
+    row-gap: 0.35rem;
+  }
+
+  .code-content {
+    font-size: 0.8rem;
+    padding: 0.7rem;
+  }
+
   .canvas-pane {
     width: 100%;
     height: auto;
@@ -1785,6 +1819,20 @@ h1, h2, h3, h4, h5, h6 {
     max-height: 42dvh;
     border-left: none;
     border-top: 1px solid var(--border-color);
+  }
+
+  /* True fullscreen overlay on mobile (replaces the bottom sheet) */
+  .canvas-pane.full-width {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    flex: none;
+    width: 100%;
+    height: 100dvh;
+    min-height: 0;
+    max-height: none;
+    border-top: none;
+    overflow: hidden;
   }
 
   .chat-pane.canvas-active {
@@ -1798,14 +1846,37 @@ h1, h2, h3, h4, h5, h6 {
     min-height: 52px;
     padding: 0.55rem 0.85rem;
     gap: 0.5rem;
+    flex-wrap: wrap;
+    row-gap: 0.4rem;
   }
 
   .canvas-title {
     min-width: 0;
+    flex-wrap: wrap;
+    row-gap: 0.35rem;
+  }
+
+  /* Compact the preview header so it fits one row on narrow phones */
+  .canvas-title > span:first-child {
+    display: none;
+  }
+
+  .canvas-title .publish-btn {
+    padding: 4px 9px;
+  }
+
+  .canvas-title .publish-btn span {
+    display: none;
   }
 
   .canvas-controls {
     gap: 0.3rem;
+    margin-left: auto;
+  }
+
+  .canvas-controls .icon-btn {
+    width: 32px;
+    height: 32px;
   }
 
   .device-mode-bar {
@@ -1829,6 +1900,58 @@ h1, h2, h3, h4, h5, h6 {
   .messages-inner,
   .input-box {
     max-width: 100%;
+  }
+}
+
+/* 5. Phones in Landscape: side-by-side chat + canvas instead of a bottom sheet */
+@media (max-width: 900px) and (orientation: landscape) and (max-height: 500px) {
+  .main-content {
+    flex-direction: row;
+  }
+
+  .canvas-pane {
+    flex: 0 0 48%;
+    width: 48%;
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+    border-top: none;
+    border-left: 1px solid var(--border-color);
+  }
+
+  .canvas-pane.full-width {
+    position: static;
+    inset: auto;
+    flex: 1 1 100%;
+    height: 100%;
+  }
+
+  .chat-pane.canvas-active {
+    flex: 1 1 52%;
+  }
+
+  .top-header,
+  .canvas-header {
+    min-height: 44px;
+    padding: 0.35rem 0.75rem;
+  }
+
+  .messages-scroll {
+    padding: 0.75rem;
+  }
+
+  .messages-inner {
+    gap: 0.9rem;
+  }
+
+  .chat-input-container {
+    padding: 0.5rem 0.75rem;
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .sidebar {
+    top: env(safe-area-inset-top, 0px);
+    left: env(safe-area-inset-left, 0px);
   }
 }
 
