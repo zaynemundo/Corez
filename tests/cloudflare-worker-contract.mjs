@@ -410,7 +410,7 @@ async function run() {
       // OpenCode Go is preferred as hard as possible: a transient gateway
       // failure is retried once before any other provider is consulted.
       let opencodeRetryCalls = 0;
-      globalThis.fetch = async (url, init) => {
+      globalThis.fetch = async (url, _init) => {
         if (url === 'https://opencode.ai/zen/go/v1/chat/completions') {
           opencodeRetryCalls += 1;
           if (opencodeRetryCalls === 1) {

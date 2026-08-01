@@ -31,8 +31,12 @@ export default [
       globals: {
         ...globals.serviceworker,
         ...globals.node,
+        WebSocketPair: 'readonly',
         process: 'readonly'
       }
+    },
+    rules: {
+      'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }]
     }
   },
   {

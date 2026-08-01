@@ -23,7 +23,7 @@ function clamp(value, min, max) {
 }
 
 export class GameRoom {
-  constructor(state, env) {
+  constructor(state, _env) {
     this.state = state;
     this.players = new Map(); // playerId -> { id, ws, name, x, y, color, score, keys }
     this.bullets = [];
@@ -33,7 +33,7 @@ export class GameRoom {
 
   // ---- WebSocket lifecycle -------------------------------------------------
 
-  async fetch(request) {
+  async fetch(_request) {
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
     server.accept();
