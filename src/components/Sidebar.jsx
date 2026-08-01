@@ -3,7 +3,7 @@ import {
   Sun, 
   Moon
 } from 'lucide-react';
-import { ChatSparkleIcon, PlusIcon, TrashIcon } from './icons';
+import { ChatSparkleIcon, PlusIcon } from './icons';
 
 export default function Sidebar({
   isOpen,
@@ -11,7 +11,6 @@ export default function Sidebar({
   activeSessionId,
   onSelectSession,
   onNewChat,
-  onDeleteSession,
   onOpenSettings,
   activeView,
   theme,
@@ -58,16 +57,6 @@ export default function Sidebar({
             title={session.title}
           >
             <ChatSparkleIcon size={20} strokeWidth={1.5} />
-            <button
-              className="delete-chat-btn icon-only-delete"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDeleteSession(session.id);
-              }}
-              title={`Delete ${session.title}`}
-            >
-              <TrashIcon size={12} strokeWidth={1.5} />
-            </button>
           </div>
         ))}
       </div>

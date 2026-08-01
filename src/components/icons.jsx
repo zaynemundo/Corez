@@ -37,15 +37,3 @@ export function PlusIcon({ size = 20, strokeWidth = 1.5 }) {
     </svg>
   );
 }
-
-export function TrashIcon({ size = 12, strokeWidth = 1.5 }) {
-  return (
-    <svg {...iconProps(size, strokeWidth)}>
-      <path d="M4 7h16" />
-      <path d="M10 7V5.5A1.5 1.5 0 0 1 11.5 4h1A1.5 1.5 0 0 1 14 5.5V7" />
-      <path d="M6.5 7l.7 11a2 2 0 0 0 2 1.9h5.6a2 2 0 0 0 2-1.9l.7-11" />
-      <path d="M10 11v6" />
-      <path d="M14 11v6" />
-    </svg>
-  );
-}
