@@ -168,7 +168,7 @@ h1, h2, h3, h4, h5, h6 {
   height: 100%;
   margin: var(--sidebar-margin);
   padding: 0;
-  background-color: var(--sidebar-bg);
+  background-color: var(--bg-primary);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: none;
@@ -196,7 +196,7 @@ h1, h2, h3, h4, h5, h6 {
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   aside.sidebar {
-    background-color: var(--sidebar-bg-opaque);
+    background-color: var(--bg-primary);
   }
 }
 
