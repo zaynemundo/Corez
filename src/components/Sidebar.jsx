@@ -1,11 +1,9 @@
 import { 
-  Plus, 
-  Trash2, 
   Settings, 
   Sun, 
-  Moon, 
-  MessageCircleMore
+  Moon
 } from 'lucide-react';
+import { ChatSparkleIcon, PlusIcon, TrashIcon } from './icons';
 
 export default function Sidebar({
   isOpen,
@@ -38,7 +36,7 @@ export default function Sidebar({
           onClick={onNewChat}
           title="New Chat Session"
         >
-          <Plus size={20} strokeWidth={2} />
+          <PlusIcon size={20} strokeWidth={1.5} />
         </button>
       </div>
 
@@ -59,7 +57,7 @@ export default function Sidebar({
             aria-label={`Open conversation ${session.title}`}
             title={session.title}
           >
-            <MessageCircleMore size={20} strokeWidth={2} />
+            <ChatSparkleIcon size={20} strokeWidth={1.5} />
             <button
               className="delete-chat-btn icon-only-delete"
               onClick={(e) => {
@@ -68,7 +66,7 @@ export default function Sidebar({
               }}
               title={`Delete ${session.title}`}
             >
-              <Trash2 size={12} strokeWidth={2} />
+              <TrashIcon size={12} strokeWidth={1.5} />
             </button>
           </div>
         ))}
@@ -80,14 +78,14 @@ export default function Sidebar({
           onClick={onToggleTheme}
           title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
         >
-          {theme === 'dark' ? <Sun size={20} strokeWidth={2} /> : <Moon size={20} strokeWidth={2} />}
+          {theme === 'dark' ? <Sun size={20} strokeWidth={1.5} /> : <Moon size={20} strokeWidth={1.5} />}
         </button>
         <button 
           className="footer-action-btn icon-only-btn" 
           onClick={onOpenSettings}
           title="Corez Settings"
         >
-          <Settings size={20} strokeWidth={2} />
+          <Settings size={20} strokeWidth={1.5} />
         </button>
       </div>
     </aside>
