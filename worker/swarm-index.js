@@ -1,5 +1,6 @@
 import baseWorker from './index.js';
 import { safeErrorDetail, readBoundedJson } from './utils.js';
+export { GameRoom } from './gameRoom.js';
 
 const SWARM_MODEL = 'deepseek-v4-pro';
 // Hard bounds for swarm size: each spec is one subrequest and Worker
