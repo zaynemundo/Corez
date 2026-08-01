@@ -90,7 +90,8 @@ TC-<section>-<number>: <description>
 - Include section A tests if input handling was modified
 - Include section B tests if collision physics changed
 - Include section F tests if layout/CSS changed
-- Re-run full suite before every release
+- Re-run full suite before every release: `npm test` (and `npm run test:game` for game suites)
+- Execution: smoke tests via `game-smoke-test`, regression comparison via `game-regression`, and record the plan in `game-project/design/test-plan.md`
 
 ---
 

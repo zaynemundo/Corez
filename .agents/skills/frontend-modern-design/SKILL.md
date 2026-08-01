@@ -102,3 +102,19 @@ Establish a clean, cohesive design system using CSS custom properties for colors
   - Support `100dvh` for dynamic mobile browser address bars.
   - Utilize safe-area insets (`calc(var(--margin) + env(safe-area-inset-top, 0px))`).
   - Convert sidebars to dismissible overlay drawers with backdrop blur overlays.
+
+## 5. Z-Index Layering Mandate (strict stacking order)
+
+Every UI must follow the repository layering contract — declare container positions explicitly and never scatter arbitrary z-values:
+
+| Layer | z-index | Elements |
+|-------|---------|----------|
+| Background | `z: 0` | page backgrounds, art, textures |
+| Content | `z: 10` | main panels, cards, game canvas |
+| HUD / Controls | `z: 20-30` | headers, toolbars, floating controls |
+| Overlays / Modals | `z: 40-50+` | dropdowns, drawers, modals, toasts |
+
+Rules:
+- Define z-index only on positioned containers (`position: relative/absolute/fixed`), never on bare elements.
+- Use increments of 10 so new layers can slot in without renumbering.
+- Modals + their backdrops must share a stacking context (e.g. inside a `position: fixed` wrapper) so page content can never interleave between them.

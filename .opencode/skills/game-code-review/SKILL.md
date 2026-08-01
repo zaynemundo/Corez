@@ -174,12 +174,24 @@ Readability and maintainability directly affect iteration speed.
 
 ## 2. Review Output Format
 
+### Output Files
+
+The review writes TWO files:
+
+| File | Path | Contents |
+|------|------|----------|
+| Findings | `docs/review/findings.json` | Structured JSON per schema below |
+| Report | `docs/review/code-review.md` | Human-readable summary for `game-release-check` |
+
+`docs/review/` is created on demand by this skill; the Producer's `game-release-check`
+collects `docs/review/code-review.md` into release evidence, so these paths MUST NOT be
+relocated without updating `game-release-check` too.
+
 All findings must be reported as structured JSON conforming to the schema below.
 Each finding is a single object; findings are collected in an array.
 
 ```json
 {
-  "$schema": "https://corez.ai/schemas/game-code-review-finding.json",
   "findings": [
     {
       "id": "FR-001",
@@ -286,6 +298,7 @@ Catch these recurring issues during review:
 
 After completing the review pass, execute these verification steps:
 
+- [ ] `docs/review/findings.json` and `docs/review/code-review.md` are written (create `docs/review/` if missing).
 - [ ] All findings are recorded in the structured JSON output schema.
 - [ ] Each finding has a unique ID, severity, category, file, line, and recommendation.
 - [ ] Every spec requirement in `game-spec.json` has a corresponding PASS/FAIL entry.

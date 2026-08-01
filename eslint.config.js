@@ -3,7 +3,7 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**', 'artifacts/**']
+    ignores: ['dist/**', 'node_modules/**', 'artifacts/**', '.agents/skills/**', '.opencode/skills/**']
   },
   js.configs.recommended,
   {

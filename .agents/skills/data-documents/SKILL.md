@@ -24,3 +24,6 @@ description: Analyses datasets and produces validated spreadsheets, charts, PDFs
 - Clearly label estimates, simulated data, projections, and incomplete source material.
 - Avoid misleading chart scales or unsupported causal conclusions.
 - For financial or trading analysis, separate historical results from forward expectations and disclose material assumptions.
+
+## Related skill
+- For PDF creation and processing (HTML/Paged.js, LaTeX, form filling, merge/split/extract), delegate to the `pdf` skill instead of generating PDFs ad hoc.

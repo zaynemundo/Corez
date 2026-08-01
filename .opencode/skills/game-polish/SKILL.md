@@ -173,7 +173,7 @@ const Easing = {
 };
 
 class Tween {
-  static to(obj: any, props: Record<string, number>, duration: number, easing = Easing.easeOutQuad): Promise<void> {
+  static to<T extends object>(obj: T, props: Record<keyof T, number>, duration: number, easing = Easing.easeOutQuad): Promise<void> {
     const start = { ...props };
     for (const k in props) start[k] = obj[k];
     const startTime = performance.now();

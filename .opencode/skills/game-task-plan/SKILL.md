@@ -89,14 +89,15 @@ task-006 (player damage)   → depends on task-005 (player in world)
 
 ### Step 4: Assign Agents
 
-Map each task to a specialist skill:
+Map each task to a real subagent type (see `game-start` role matrix) or a specialist skill:
 
-| Agent Skill | Task Types |
+| Agent / Skill | Task Types |
 |-------------|------------|
 | `gameplay-programmer` | Player, enemies, items, interactions |
-| `physics-programmer` | Physics system, collision, spatial hash |
+| `engine-programmer` | Physics system, collision, game loop, spatial hash |
+| `game-ai-programmer` | Enemy AI behaviors, state machines, boss patterns |
 | `ui-programmer` | HUD, menus, overlays, pause screen |
-| `audio-programmer` | SFX triggers, music manager, volume |
+| `audio-programmer` (via `game-polish`) | SFX triggers, music manager, volume |
 | `level-designer` | Tilemap data, spawn config, parallax layers |
 
 ## Dependency Resolution (Topological Ordering)
@@ -130,8 +131,8 @@ If circular dependency detected: merge the involved tasks into one larger task, 
 |------|-------------|
 | Exclusive write | No two tasks in the same parallel batch may edit the same file. |
 | Read allowed | A task may read any file but may only write files listed in its `files` array. |
-| Shared interfaces | Place shared types in `src/game/types.ts`. Only one task may own this file. |
-| Ownership registry | Maintain a `task-plan.json` with a `fileOwners` map: `{ "src/player.ts": "task-004" }` |
+| Shared interfaces | Place shared types in one owned file (e.g. `src/game/types.ts` per the `game-architecture` blueprint). Only one task may own this file. |
+| Ownership registry | Maintain `game-project/design/task-plan.json` with a `fileOwners` map: `{ "src/player.ts": "task-004" }` |
 | Handoff protocol | When task A writes a file that task B depends on, A commits and pushes before B starts. |
 
 ## Task Brief Composition Template
@@ -211,7 +212,7 @@ Each gate must pass before a task moves to the next phase:
 | G1: Plan Review | After task graph built | No circular deps, all tasks sized correctly, file ownership non-overlapping. |
 | G2: Test Gate | After TDD RED | `npm test` fails as expected for new tests. |
 | G3: Implementation Gate | After TDD GREEN | `npm test` passes. |
-| G4: Quality Gate | After TDD REFACTOR | `npm test`, `npm run lint`, `npm run typecheck` all exit 0. |
+| G4: Quality Gate | After TDD REFACTOR | `npm test` and `npm run lint` exit 0 (plus `npm run build`; this repo has no typecheck script). |
 | G5: Integration Gate | After dependency chain complete | Full `npm test` suite passes with all integrated modules. |
 | G6: Acceptance Gate | Before marking COMPLETE | Every acceptance criterion verified via test or manual check. |
 

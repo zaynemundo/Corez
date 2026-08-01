@@ -106,9 +106,11 @@ If total exceeds 16ms consistently, reduce render budget first (most common offe
 
 ### Quick Audit Script
 ```bash
-# Check for common perf anti-patterns
-rg "Date\.now\(\)" src/ --type ts
-rg "new " --include "*.ts" src/game/   # allocations in game module
-rg "ctx\.save\(\)" src/ --type ts     # save/restore in loops
-rg "\.push\(" src/game/ --type ts      # array growth in hot path
+# Check for common perf anti-patterns (rg uses -g for globs; --type <name> for known types)
+rg "Date\.now\(\)" src --type js
+rg "new " src -g '*.js'    # allocations in hot paths
+rg "ctx\.save\(\)" src --type js    # save/restore in loops
+rg "\.push\(" src --type js         # array growth in hot path
 ```
+
+Adjust `src`/globs to the actual game module path (per the `game-architecture` blueprint).

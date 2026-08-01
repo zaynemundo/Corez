@@ -30,3 +30,13 @@ Enforces strict WCAG 2.2 AA accessibility standards on all generated UI elements
 - **Touch Target Size**: Interactive elements on touch viewports must have a minimum hit area of 44x44px (`min-width: 44px; min-height: 44px;`).
 - **Reduced Motion**: Respect user OS preferences via `@media (prefers-reduced-motion: reduce)` by disabling non-essential transitions and animations.
 - **Zoom & Text Scaling**: Ensure layouts remain usable and legible at 200% browser text zoom without clipping or horizontal overflow.
+
+## Audit Workflow (apply to every UI change)
+
+1. **Automated scan**: Run `npx @axe-core/cli <url>` or the browser's built-in Lighthouse accessibility audit; treat zero violations as the bar.
+2. **Keyboard pass**: Tab through the page from top to bottom — every interactive control must receive focus in logical DOM order, show a visible `:focus-visible` ring, and have no focus trap (except within modals, where focus loops and `Escape` returns to the trigger).
+3. **Screen reader pass**: Verify with NVDA/VoiceOver that every control has an accessible name, live regions announce dynamic updates, and no duplicate/incorrect ARIA roles exist.
+4. **Contrast pass**: Measure all text and non-text UI with a contrast tool (axe covers this) against the 4.5:1 / 3:1 thresholds.
+5. **Resize pass**: Test at 200% zoom and viewport widths 320px-1440px — no horizontal scroll, no clipped controls, touch targets stay >= 44x44px.
+6. **Reduced motion pass**: Enable `prefers-reduced-motion: reduce` and confirm essential content remains accessible without animations.
+7. **Report**: State which checks passed/failed and fix any failures before marking the task complete.

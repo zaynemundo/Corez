@@ -11,7 +11,7 @@ token_estimate: 150
 
 ### A. DOM Renders
 ```typescript
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 
 describe('DOM Structure', () => {
@@ -128,15 +128,17 @@ Smoke tests alone are sufficient when:
 
 ## 4. Test Execution Command
 
+Smoke tests live in `tests/` as `tests/*-smoke.test.js` (or alongside game code). Execute with vitest:
+
 ```bash
-# Run full smoke suite
-npm run test:smoke
+# Run the full suite (includes smoke tests)
+npm test
+
+# Run a specific smoke file
+npx vitest run tests/game-smoke.test.js
 
 # Run with watch mode during development
-npm run test:smoke -- --watch
-
-# Run with coverage
-npm run test:smoke -- --coverage
+npx vitest tests/game-smoke.test.js
 
 # Expected output:
 #  ✓ DOM Structure (2 tests)
@@ -148,3 +150,7 @@ npm run test:smoke -- --coverage
 # Exit code 0 → smoke pass
 # Exit code 1 → smoke fail, escalate to full QA
 ```
+
+> Note: there is no `test:smoke` script in this repo's `package.json`. Run vitest directly,
+> or add `"test:smoke": "vitest run tests/*-smoke.test.js"` to `package.json` if a dedicated
+> smoke command is wanted.

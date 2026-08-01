@@ -14,7 +14,7 @@ description: Applies durable user preferences, memory, location, tone, appearanc
 
 ## Workflow
 1. Separate durable preferences from temporary task details.
-2. Save or remove memory only through the approved memory capability and acknowledge the observed result.
+2. Save or remove memory only through the approved memory capability (`r2-mem0-memory` skill — R2-backed `/api/memory/*` endpoints) and acknowledge the observed result.
 3. Apply known preferences quietly when relevant; do not surface unrelated personal context.
 4. Request or infer location only for local services, delivery, travel, weather, laws, pricing, or similar geographically dependent tasks.
 5. Before changing interface settings, inspect the available supported values and use only valid options.

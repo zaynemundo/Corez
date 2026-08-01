@@ -3,7 +3,7 @@ name: game-release-check
 description: Producer final-gate skill for release signoff checklists that block release when any check fails.
 version: 1.0.0
 tags: [release, signoff, gate, qa, code-review]
-dependencies: [game-qa-plan, game-regression, game-smoke-test, game-performance-review]
+dependencies: [game-qa-plan, game-regression, game-smoke-test, game-performance-review, game-code-review, game-visual-review, game-bug-triage]
 token_estimate: 100
 ---
 
@@ -54,18 +54,19 @@ Before signoff, collect and attach the following artifacts:
 
 | Check | Evidence | Storage Path |
 |-------|----------|-------------|
-| QA suite | `npm run test:ci` terminal output | `release-evidence/<version>/test-output.txt` |
-| Code review | Review report from code-reviewer | `release-evidence/<version>/code-review.md` |
-| Visual inspection | Screenshots (menu, gameplay, pause, game-over) | `release-evidence/<version>/screenshots/` |
+| QA suite | `npm test` terminal output | `release-evidence/<version>/test-output.txt` |
+| Code review | Review report from code-reviewer (written by `game-code-review` to `docs/review/`) | `release-evidence/<version>/code-review.md` |
+| Visual inspection | Screenshots (menu, gameplay, pause, game-over) — captured by `game-visual-review` to `review/screenshots/` | `release-evidence/<version>/screenshots/` |
 | Performance | DevTools recording export (.json) | `release-evidence/<version>/performance-profile.json` |
 | Bug triage | Bug tracker snapshot or list | `release-evidence/<version>/known-issues.md` |
 
 Collection command:
 ```bash
 mkdir -p release-evidence/<version>/screenshots
-npm run test:ci > release-evidence/<version>/test-output.txt 2>&1
+npm test > release-evidence/<version>/test-output.txt 2>&1
 cp docs/review/code-review.md release-evidence/<version>/
-# manually add screenshots and performance profile
+cp -r review/screenshots/* release-evidence/<version>/screenshots/
+# manually add performance profile
 ```
 
 ---

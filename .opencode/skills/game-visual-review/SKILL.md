@@ -11,6 +11,12 @@ token_estimate: 3400
 
 Evaluates captured screenshot files from project review directories against `art-direction.json` and outputs structured findings.
 
+> **Screenshot location:** captures go to `review/screenshots/` and findings to `review/findings/`
+> (both created on demand — they do not exist until this skill creates them). The Producer's
+> `game-release-check` copies `review/screenshots/` into `release-evidence/<version>/screenshots/`.
+> For the Corez app itself, pre-captured UI screenshots already live in `artifacts/ui/`
+> (e.g. `corez-desktop-1440.png`, `corez-phone-390.png`) and can be reviewed directly without a browser.
+
 ---
 
 ## Review Process: Capture → Compare → Report
@@ -18,7 +24,8 @@ Evaluates captured screenshot files from project review directories against `art
 ```
 step 1: CAPTURE
   ├── Load game in browser at target resolution
-  ├── Capture screenshot → `review/screenshots/{scene}-{timestamp}.png`
+  ├── Capture screenshot → `review/screenshots/{scene}-{timestamp}.png` (mkdir -p review/screenshots first)
+  ├── Alternative: reuse existing captures in `artifacts/ui/`
   └── Record: viewport size, scene description, timestamp
 
 step 2: COMPARE
@@ -27,7 +34,7 @@ step 2: COMPARE
   └── Check each compliance category below
 
 step 3: REPORT
-  └── Write structured findings → `review/findings/{scene}-review.json`
+  └── Write structured findings → `review/findings/{scene}-review.json` (mkdir -p review/findings first)
 ```
 
 ---

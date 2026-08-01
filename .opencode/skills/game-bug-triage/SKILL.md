@@ -67,13 +67,17 @@ What should happen per spec
 
 | Severity  | Assigned Agent         | SLA     |
 |-----------|------------------------|---------|
-| CRITICAL  | lead-programmer        | <1 hour |
-| IMPORTANT | specialist-programmer  | <4 hours|
-| MINOR     | fix-bucket / backlog   | <1 week |
+| CRITICAL  | `lead-programmer`      | <1 hour |
+| IMPORTANT | `gameplay-programmer` / `engine-programmer` / `ui-programmer` (per affected module) | <4 hours|
+| MINOR     | backlog                | <1 week |
 
-Routing command:
+Routing command (PowerShell on Windows):
 ```
-agy-delegate.ps1 -Mode Implement -Task '[severity] bug: <title>' -Assignee <agent>
+scripts/agy-delegate.ps1 -Mode Implement -Task '[severity] bug: <title>' -Assignee <agent>
+```
+On Linux/macOS use the shell equivalent:
+```
+bash scripts/agy-delegate.sh -Mode Implement -Task '[severity] bug: <title>' -Assignee <agent>
 ```
 
 ---

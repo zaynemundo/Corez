@@ -14,13 +14,13 @@ Every implementation follows three strict phases. No skipping.
 ### RED — Write a Failing Test First
 
 1. Read the task brief's acceptance criteria. Every criterion maps to at least one test.
-2. Place tests in `src/__tests__/` or alongside the source file as `*.test.ts`.
-3. Use vitest. Configure in `vitest.config.ts` at project root.
+2. Place tests in `tests/` as `tests/<module>.test.js` (repo convention; this project is JavaScript, not TypeScript).
+3. Use vitest. No separate `vitest.config.ts` is required — vitest picks up `vite.config.js` defaults; add a `test` block there only if new options are needed.
 4. Write assertions that describe the desired behavior *before* writing implementation.
 
 ```typescript
 import { describe, it, expect } from 'vitest';
-import { Player } from '../entities/player';
+import { Player } from '../src/entities/player';
 
 describe('Player', () => {
   it('starts with 3 lives', () => {
@@ -70,39 +70,32 @@ export class Player {
 
 ## Test Framework Setup
 
-```typescript
-// vitest.config.ts
-import { defineConfig } from 'vitest/config';
+This repo already ships vitest. Only add configuration if the defaults need changing
+(optionally in `vite.config.js` under a `test` key):
 
-export default defineConfig({
-  test: {
-    globals: true,
-    environment: 'jsdom', // or 'node' for non-DOM code
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
-    coverage: {
-      provider: 'v8',
-      branches: 80,
-      functions: 80,
-      lines: 80,
-      statements: 80,
-    },
-  },
-});
+```typescript
+// vite.config.js (optional addition)
+test: {
+  globals: true,
+  environment: 'jsdom', // or 'node' for non-DOM code
+  include: ['tests/**/*.test.js', 'src/**/*.test.js'],
+},
 ```
 
-Dependencies: `npm install -D vitest @vitest/coverage-v8`
+Dependencies: vitest is already in `devDependencies`; add `@vitest/coverage-v8` only if coverage is needed.
 
-Scripts in `package.json`:
+Scripts already present in this repo's `package.json`:
 
 ```json
 {
   "scripts": {
     "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:game": "vitest run tests/game-manifest.test.js tests/game-asset-storage.test.js tests/game-pipeline-state.test.js tests/game-iframe-bridge.test.js"
   }
 }
 ```
+
+For watch mode use `npx vitest`; for coverage use `npx vitest run --coverage` (requires `@vitest/coverage-v8`).
 
 ## File Boundary Rules
 
@@ -131,19 +124,16 @@ Scripts in `package.json`:
 
 ```bash
 # Step 1: Run unit tests
-npm test -- --run
+npm test
 
 # Step 2: Run linter
 npm run lint
 
-# Step 3: TypeScript check
-npm run typecheck
-
-# Step 4 (if applicable): Build
+# Step 3: Build (bundling errors surface here; this repo has no typecheck script)
 npm run build
 ```
 
-All four must exit with code 0 before marking task COMPLETE.
+All three must exit with code 0 before marking task COMPLETE.
 
 If a script is missing from `package.json`, report it explicitly — do not assume it passes.
 
@@ -163,7 +153,7 @@ When the task brief is unclear, follow this decision tree:
 | Writing too much GREEN code | Strictly implement only what the test demands. If your test asserts `lives === 3`, do not add `score`, `name`, or `inventory`. |
 | Refactoring before GREEN | Refactor phase exists for a reason. Never refactor while tests are failing. |
 | Ignoring the full suite | A passing single-module test does not mean the full suite passes. Always run `npm test` at the end. |
-| Editing shared types | Shared types in `src/game/types.ts` affect every module. Never edit them without explicit brief permission. |
+| Editing shared types | Shared types affect every module. Never edit them without explicit brief permission. |
 | Silent test skips | `it.skip` or `describe.skip` are forbidden. If a test can't be written yet, escalate. |
 | Over-mocking | Mock at the boundary (IO, network, rendering). Do not mock internal logic — that defeats TDD. |
-| Forgetting coverage | Run `npm run test:coverage` and verify thresholds before committing. |
+| Forgetting coverage | Run `npx vitest run --coverage` (requires `@vitest/coverage-v8`) and verify thresholds before committing. |

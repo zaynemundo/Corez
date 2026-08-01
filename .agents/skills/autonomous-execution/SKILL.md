@@ -8,7 +8,7 @@ description: Guidance for executing tasks completely autonomously in agy auto-ap
 This skill provides a robust operational framework for the agent when running in auto-pilot or auto-approve mode (`agy --dangerously-skip-permissions`). Since you are running without step-by-step human verification, you must be extremely rigorous, self-correcting, and safety-conscious.
 
 ## 1. Safety & Command Validation
-- **Dry-run verification**: Before executing commands that modify data, perform a dry-run or verify their impact (e.g., `git diff`, `npm run build -- --dry-run`).
+- **Dry-run verification**: Before executing commands that modify data, perform a dry-run or verify their impact (e.g., `git diff`, `git diff --check` for whitespace/conflict markers, `npm test` before deleting code).
 - **Path containment**: Never target system directories outside the workspace (e.g., `/usr/bin`, `/etc`). Always use absolute paths within the workspace.
 - **Process management**: When launching long-running processes (e.g., development servers), ensure they run in the background, monitor their output, and kill them cleanly when finished.
 

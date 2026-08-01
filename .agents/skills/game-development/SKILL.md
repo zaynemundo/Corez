@@ -370,7 +370,7 @@ When building Wordle, Scrabble, Anagrams, or Crossword games:
    ```javascript
    const DICTIONARY = new Set([
      'APPLE','BEACH','CLOUD','DREAM','EAGLE','FLAME','GRAPE','HEART','LIGHT','OCEAN',
-     'PLANT','RIVER','SOLAR','TIGER','WORLD','BRAIN','CODEZ','REACT','STAGE','PIXEL',
+     'PLANT','RIVER','SOLAR','TIGER','WORLD','BRAIN','CODER','REACT','STAGE','PIXEL',
      'SUPER','CRAFT','GUESS','SHARP','SCORE','FLASH','LOGIC','MAGIC','QUICK','SMART'
    ]);
    ```

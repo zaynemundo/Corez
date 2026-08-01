@@ -5,6 +5,9 @@ description: How to launch and drive COREZ end-to-end for runtime verification
 
 # Verifying COREZ end-to-end
 
+> Config note: worker config lives in `wrangler.jsonc` (not `wrangler.toml`) and the worker
+> entry is `./worker/swarm-index.js`. `wrangler dev` uses port 8787 by default.
+
 ## Launch
 
 CoreZ is a Vite SPA + Cloudflare Worker. Two ways to verify locally:

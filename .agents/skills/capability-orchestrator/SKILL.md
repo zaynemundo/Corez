@@ -18,11 +18,18 @@ Use this skill to analyze incoming user requests, determine the minimal required
 | Web Game / Canvas Arcade | DeepSeek V4 Flash | `game-development`, `frontend-modern-design` | Canvas 2D / JS physics engine |
 | Back-End API / Worker Router | DeepSeek V4 Flash | `backend-architecture`, `ai-infrastructure` | Cloudflare Worker / Node route handlers |
 | Bug Investigation / Refactoring | DeepSeek V4 Flash | `auto-debugging`, `code-review-testing`, `software-engineering` | Verified code fix & green test run |
+| PDF / Document Deliverables | DeepSeek V4 Flash | `pdf` | HTML/Paged.js or LaTeX PDF, processed PDFs |
+| Live Facts / Lookups (weather, time, rates) | DeepSeek V4 Flash | `live-utilities`, `research-current-information` | Dated, source-cited answer |
+| Memory / Preferences | DeepSeek V4 Flash | `r2-mem0-memory`, `personalisation-context` | R2-stored memory records |
+| Scheduling / Reminders | DeepSeek V4 Flash | `scheduling-automation` | Confirmed scheduled action |
+| Credentials / Env Setup | DeepSeek V4 Flash | `ask-env-values` | Explicitly confirmed env values |
+| Runtime Verification | DeepSeek V4 Flash | `verify` | Launched app with verified endpoints |
+| Data Analysis / Reports | DeepSeek V4 Flash | `data-documents` | Validated spreadsheets, charts, docs |
 
 ---
 
 ## 2. Orchestration Strategy
 
 1. **Minimal Surface**: Activate only the skills directly required for the request to conserve context budget and latency.
-2. **Subagent Delegation**: Delegate broad research tasks to the `research` subagent to keep context clean.
+2. **Subagent Delegation**: Delegate broad research tasks to the `research` subagent (or the `research-current-information` skill when live web research is required) to keep context clean.
 3. **Strict Policy Compliance**: Enforce git completion policies (`git-superpowers`) upon finishing file modifications.

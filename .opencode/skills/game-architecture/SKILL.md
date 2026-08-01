@@ -9,7 +9,13 @@ token_estimate: 3200
 
 ## Standard Directory Structure Blueprint
 
-Every browser game under CoreZ follows this layout:
+Every browser game under CoreZ follows this layout.
+
+> **Note:** This is the per-game-project blueprint created at `game-project/src/` by the game
+> workflow (via `game-task-plan` / `game-implement`). It does NOT exist in the CoreZ host repo
+> itself, whose `src/` is the React dashboard (App.jsx, components/, services/). Apply this
+> blueprint inside the game project, never to the host app. This repo is JavaScript, so
+> files are `*.js` in practice; types are JSDoc or a shared types module.
 
 ```
 src/

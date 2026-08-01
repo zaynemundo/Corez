@@ -141,3 +141,12 @@ Note: the physics-textbook `v²/(2·decel)` is *not* what Apple ships — use th
 ## 8. Hint in the direction of the gesture
 
 Humans predict a final state from a trajectory. Intermediate motion should telegraph where things are going — Control Center modules "grow up and out toward your finger." Make the in-between frames point at the outcome, not just interpolate blindly to it.
+
+## 9. Respect reduced motion
+
+Apple motion is physical but never gratuitous — every animation serves feedback or spatial understanding.
+
+- Wrap spring/gesture animations in `@media (prefers-reduced-motion: reduce)` and collapse them to near-instant opacity/fade (150-200ms, no distance, no scale, no blur).
+- Keep the gesture *state* fully functional (drag still commits/cancels) even when the animated *translation* is skipped.
+- Do not disable scroll, focus, or state-change feedback — only the decorative motion.
+- Where a spring library is used, map `reducedMotion: 'reduce'` (Framer Motion) or a `useReducedMotion()` guard (Motion) instead of hand-rolled media queries.

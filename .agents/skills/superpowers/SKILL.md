@@ -27,7 +27,7 @@ For multi-step or multi-task operations, use a structured plan (such as those in
 ### Guidelines for Plan Tracking
 - **Checklist Syntax**: Keep track of the current status of each sub-task using:
   - `- [ ]` for pending tasks
-  - `- [/]` or `[ ]` (in progress) for current focus
+  - `- [/]` for current focus (in progress)
   - `- [x]` for successfully completed tasks
 - **Atomic Updates**: Modify the plan file after completing each step to keep the workspace and user informed.
 - **Verification**: Run tests or verification commands at the end of each task to ensure correctness before checking it off.
