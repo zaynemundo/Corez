@@ -5,7 +5,6 @@ import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
 import CanvasPreview from './components/CanvasPreview';
 import SettingsModal from './components/SettingsModal';
-import ImageStudioPage from './components/ImageStudioPage';
 import { generateAIResponse, extractCodeFromMessage } from './services/aiService';
 import { fetchMarketData, unavailableMarket } from './services/marketService';
 import { storeAppInR2, deleteSessionAppsInR2 } from './services/appStorageService';
@@ -180,7 +179,7 @@ export default function App() {
     return sessions[0]?.id || 'session-default';
   });
 
-  const [activeView, setActiveView] = useState('chat'); // 'chat' | 'image-studio'
+  const [activeView, setActiveView] = useState('chat');
 
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     if (typeof window === 'undefined') return true;
@@ -518,7 +517,6 @@ export default function App() {
         onNewChat={handleNewChat}
         onDeleteSession={handleDeleteSession}
         onOpenSettings={() => setSettingsOpen(true)}
-        onOpenImageShowcase={() => setActiveView('image-studio')}
         activeView={activeView}
         theme={theme}
         onToggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
@@ -535,11 +533,8 @@ export default function App() {
       )}
 
       <main className="main-content">
-        {activeView === 'image-studio' ? (
-          <ImageStudioPage />
-        ) : (
-          <>
-            <div className={`chat-pane ${canvasOpen ? 'canvas-active' : ''}`}>
+        <>
+          <div className={`chat-pane ${canvasOpen ? 'canvas-active' : ''}`}>
               <Header
                 sidebarOpen={sidebarOpen}
                 onToggleSidebar={() => setSidebarOpen(prev => !prev)}
@@ -612,7 +607,6 @@ export default function App() {
               />
             )}
           </>
-        )}
       </main>
 
       <SettingsModal

@@ -225,13 +225,11 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: var(--transition-fast);
 }
 
 .brand-logo-default {
   color: var(--text-primary);
   opacity: 1;
-  transition: opacity var(--transition-fast), transform var(--transition-fast);
 }
 
 .corez-bw-logo {
@@ -258,22 +256,6 @@ h1, h2, h3, h4, h5, h6 {
   filter: invert(100%);
 }
 
-.brand-logo-hover {
-  position: absolute;
-  opacity: 0;
-  color: var(--text-primary);
-  transition: opacity var(--transition-fast), transform var(--transition-fast);
-}
-
-.brand-icon-toggle:hover .brand-logo-default {
-  opacity: 0;
-}
-
-.brand-icon-toggle:hover .brand-logo-hover {
-  opacity: 1;
-  transform: scale(1.1);
-}
-
 .sidebar-action-box {
   padding: 7.5px 0;
   display: flex;
@@ -285,6 +267,22 @@ h1, h2, h3, h4, h5, h6 {
 .sidebar button,
 .sidebar .history-item {
   color: var(--text-primary);
+}
+
+.icon-only-btn,
+.history-item.icon-only-item {
+  border-radius: 8px;
+}
+
+.icon-only-btn:hover,
+.history-item.icon-only-item:hover {
+  background: var(--sidebar-item-hover-bg);
+}
+
+.history-item.icon-only-item.active {
+  background: var(--sidebar-item-active-bg);
+  color: var(--text-primary);
+  box-shadow: none;
 }
 
 .new-chat-btn.icon-only-btn {
@@ -300,42 +298,10 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: var(--transition-fast);
 }
 
 .new-chat-btn.icon-only-btn:hover {
   color: var(--text-primary);
-  background: transparent;
-  transform: scale(1.1);
-}
-
-.sidebar-tools-section {
-  padding: 7.5px 0;
-  display: flex;
-  justify-content: center;
-  border-bottom: 1px solid var(--sidebar-border);
-}
-
-.image-creator-btn.icon-only-btn {
-  width: 30px;
-  height: 30px;
-  min-height: 30px;
-  margin: 0 auto;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: var(--transition-fast);
-}
-
-.image-creator-btn.icon-only-btn:hover {
-  color: var(--text-primary);
-  background: transparent;
-  transform: scale(1.1);
 }
 
 .chat-history-list.icon-only-list {
@@ -360,7 +326,6 @@ h1, h2, h3, h4, h5, h6 {
   min-height: var(--sidebar-item-min-height);
   font-size: var(--sidebar-body-size);
   color: var(--text-primary);
-  transition: background-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
 }
 
 .history-item.active {
@@ -372,7 +337,6 @@ h1, h2, h3, h4, h5, h6 {
   min-width: 38px;
   min-height: 38px;
   color: var(--text-secondary);
-  transition: opacity var(--transition-fast), color var(--transition-fast);
 }
 
 .history-item.icon-only-item {
@@ -385,7 +349,6 @@ h1, h2, h3, h4, h5, h6 {
   justify-content: center;
   color: var(--text-primary);
   cursor: pointer;
-  transition: var(--transition-fast);
   position: relative;
   margin: 0 auto;
   background: transparent;
@@ -394,13 +357,10 @@ h1, h2, h3, h4, h5, h6 {
 
 .history-item.icon-only-item:hover {
   color: var(--text-primary);
-  background: transparent;
-  transform: scale(1.1);
 }
 
 .history-item.icon-only-item.active {
   color: var(--text-primary);
-  background: transparent;
   box-shadow: none;
 }
 
@@ -408,12 +368,12 @@ h1, h2, h3, h4, h5, h6 {
   position: absolute;
   top: -1px;
   right: -1px;
-  width: 12px;
-  height: 12px;
-  min-width: 12px;
-  min-height: 12px;
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  min-height: 14px;
   padding: 0;
-  opacity: 0;
+  opacity: 1;
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: 50%;
@@ -422,11 +382,6 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: opacity var(--transition-fast), color var(--transition-fast);
-}
-
-.history-item.icon-only-item:hover .delete-chat-btn.icon-only-delete {
-  opacity: 1;
 }
 
 .delete-chat-btn.icon-only-delete:hover {
@@ -455,13 +410,10 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: var(--transition-fast);
 }
 
 .footer-action-btn.icon-only-btn:hover {
   color: var(--text-primary);
-  background: transparent;
-  transform: scale(1.1);
 }
 
 .sidebar .icon-btn {

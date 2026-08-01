@@ -4,11 +4,8 @@ import {
   Settings, 
   Sun, 
   Moon, 
-  PanelLeftClose,
-  Layers,
-  Image as ImageIcon
+  MessageCircleMore
 } from 'lucide-react';
-import MessageCircleMore from './icons/MessageCircleMore';
 
 export default function Sidebar({
   isOpen,
@@ -18,7 +15,6 @@ export default function Sidebar({
   onNewChat,
   onDeleteSession,
   onOpenSettings,
-  onOpenImageShowcase,
   activeView,
   theme,
   onToggleTheme,
@@ -33,7 +29,6 @@ export default function Sidebar({
           title="Collapse Sidebar"
         >
           <img src="/corez-white.png" alt="Corez Logo" className="brand-logo-default corez-bw-logo" />
-          <PanelLeftClose size={20} strokeWidth={1.5} className="brand-logo-hover" />
         </button>
       </div>
 
@@ -43,17 +38,7 @@ export default function Sidebar({
           onClick={onNewChat}
           title="New Chat Session"
         >
-          <Plus size={20} strokeWidth={1.5} />
-        </button>
-      </div>
-
-      <div className="sidebar-tools-section">
-        <button 
-          className={`image-creator-btn icon-only-btn ${activeView === 'image-studio' ? 'active' : ''}`}
-          onClick={onOpenImageShowcase}
-          title="COREZ STUDIO"
-        >
-          <ImageIcon size={20} strokeWidth={1.5} />
+          <Plus size={20} strokeWidth={2} />
         </button>
       </div>
 
@@ -74,7 +59,7 @@ export default function Sidebar({
             aria-label={`Open conversation ${session.title}`}
             title={session.title}
           >
-            <MessageCircleMore size={20} strokeWidth={1.5} />
+            <MessageCircleMore size={20} strokeWidth={2} />
             <button
               className="delete-chat-btn icon-only-delete"
               onClick={(e) => {
@@ -83,7 +68,7 @@ export default function Sidebar({
               }}
               title={`Delete ${session.title}`}
             >
-              <Trash2 size={12} strokeWidth={1.5} />
+              <Trash2 size={12} strokeWidth={2} />
             </button>
           </div>
         ))}
@@ -95,14 +80,14 @@ export default function Sidebar({
           onClick={onToggleTheme}
           title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
         >
-          {theme === 'dark' ? <Sun size={20} strokeWidth={1.5} /> : <Moon size={20} strokeWidth={1.5} />}
+          {theme === 'dark' ? <Sun size={20} strokeWidth={2} /> : <Moon size={20} strokeWidth={2} />}
         </button>
         <button 
           className="footer-action-btn icon-only-btn" 
           onClick={onOpenSettings}
           title="Corez Settings"
         >
-          <Settings size={20} strokeWidth={1.5} />
+          <Settings size={20} strokeWidth={2} />
         </button>
       </div>
     </aside>
