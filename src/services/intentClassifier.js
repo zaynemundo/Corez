@@ -13,7 +13,7 @@ export function tokenize(text) {
   }
 
   const tokens = [...unigrams, ...bigrams];
-  return tokens.slice(0, 512);
+  return tokens;
 }
 
 function roundToFixed(num, decimals = 12) {

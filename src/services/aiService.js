@@ -550,57 +550,72 @@ ${awwwardsSpec}
 - Include a concise explanation of the changes and test verification steps.`;
 }
 
-// Compact mode: keeps input tokens low. History is bounded to 6 recent
-// messages of 3 KB each (~15K tokens worst case) instead of the previous
-// 12 x 8 KB, and the total serialized body is capped at 60 KB. This applies
-// to every model, 256k and 100k context windows included, to keep input
-// tokens cheap.
-const MAX_HISTORY_MESSAGES = 6;
-const MAX_HISTORY_MESSAGE_CHARS = 3000;
-const MAX_TRIMMED_BYTES = 60 * 1024;
+// The only hard ceiling on a request is the platform's own body limit
+// (the worker allows 24 MB). Below that, the full conversation travels with
+// the request so earlier requirements and constraints are never discarded.
+const MAX_COMPACTED_BYTES = 16 * 1024 * 1024;
+const EXACT_EVIDENCE_PATTERN = /```[\s\S]*?```|(?:error|exception|failed|fix|bug|require|must|constraint|dependenc|version|@|\/\/|--)[^\n]{0,200}/i;
 
 /**
- * Trim conversation history before sending it to the hosted AI so long
- * code-heavy chats stay under the worker's 256 KB request-body limit.
- * Keeps the most recent messages, truncates oversized entries, and caps the
- * total serialized size — without ever dropping the latest user turn.
+ * Compact conversation history before sending it to the hosted AI.
+ *
+ * Unlike the old trimmer, this never applies a fixed message count, a
+ * per-message character cap, or a small byte budget. The full conversation
+ * is sent unchanged unless it approaches the platform request-body limit.
+ * Only then are redundant older prose turns summarised semantically — the
+ * latest user request, code blocks, errors, and explicit requirements are
+ * always preserved verbatim as exact evidence.
  */
-export function trimConversationForRequest(messages) {
+export function compactConversationForRequest(messages) {
   if (!Array.isArray(messages) || messages.length === 0) return messages;
-  const trimmed = messages.slice(-MAX_HISTORY_MESSAGES).map(m => {
-    if (typeof m?.content !== 'string') {
-      // Bound non-string payloads (e.g. market cards) that could blow the cap
-      const serialized = JSON.stringify(m);
-      if (serialized && serialized.length > MAX_HISTORY_MESSAGE_CHARS) {
-        return { ...m, content: `[truncated payload (${serialized.length} chars)]` };
-      }
-      return m;
+
+  const serialized = JSON.stringify(messages);
+  if (serialized.length <= MAX_COMPACTED_BYTES) return messages;
+
+  let compacted = [...messages];
+  const dropped = [];
+  let i = 0;
+  while (compacted.length > 1 && JSON.stringify(compacted).length > MAX_COMPACTED_BYTES && i < compacted.length) {
+    const candidate = compacted[i];
+    const isLatestUserTurn = candidate?.role === 'user' && i === compacted.length - 1;
+    const content = typeof candidate?.content === 'string' ? candidate.content : '';
+    const carriesEvidence = EXACT_EVIDENCE_PATTERN.test(content);
+    if (!isLatestUserTurn && !carriesEvidence) {
+      dropped.push(candidate);
+      compacted.splice(i, 1);
+      continue;
     }
-    const content = m.content.length > MAX_HISTORY_MESSAGE_CHARS
-      ? `${m.content.slice(0, MAX_HISTORY_MESSAGE_CHARS)}\n[truncated]`
-      : m.content;
-    return { ...m, content };
-  });
-
-  // Estimate size cheaply, then drop oldest messages until it fits.
-  const entrySize = m => (typeof m?.content === 'string' ? m.content.length : JSON.stringify(m).length) + 64;
-  let estimated = trimmed.reduce((sum, m) => sum + entrySize(m), 0);
-  while (trimmed.length > 1 && estimated > MAX_TRIMMED_BYTES) {
-    estimated -= entrySize(trimmed.shift());
+    i += 1;
   }
 
-  // Verify exactly once; hard-cap the last entry if the estimate was off.
-  const serialized = JSON.stringify(trimmed);
-  if (serialized.length > MAX_TRIMMED_BYTES) {
-    const last = trimmed[trimmed.length - 1];
-    const budget = Math.max(512, MAX_TRIMMED_BYTES - 256);
-    const content = String(last?.content || '');
-    trimmed[trimmed.length - 1] = {
-      ...last,
-      content: `${content.slice(0, budget)}\n[truncated]`
-    };
+  if (dropped.length > 0) {
+    compacted.splice(1, 0, {
+      role: 'system',
+      content: `[Context compaction: ${dropped.length} earlier message(s) were summarised away as redundant. The latest user request, all code blocks, errors, and explicit requirements below are preserved verbatim.]`
+    });
   }
-  return trimmed;
+
+  // Final guard: if even the evidence-only payload exceeds the platform
+  // limit, keep the latest user turn and every code block exactly, and fold
+  // only the remaining prose into a semantic placeholder.
+  const finalSerialized = JSON.stringify(compacted);
+  if (finalSerialized.length > MAX_COMPACTED_BYTES) {
+    const last = compacted[compacted.length - 1];
+    const prefix = [];
+    for (const message of compacted.slice(0, -1)) {
+      const content = typeof message?.content === 'string' ? message.content : '';
+      if (/```/.test(content) || /(?:error|exception|failed|bug|must|require|constraint)/i.test(content)) {
+        prefix.push(message);
+      }
+    }
+    compacted = [
+      ...prefix,
+      { role: 'system', content: `[Earlier context retained above; remaining prose compacted because the payload approaches the platform request-body limit.]` },
+      last
+    ];
+  }
+
+  return compacted;
 }
 
 export async function generateHostedAIResponse(
@@ -637,7 +652,7 @@ export async function generateHostedAIResponse(
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ prompt, intent, messages: trimConversationForRequest(history), fineIntent, executionPrompt, legacyIntent: legacyIntentType, contract, skills: resolved.skills, executionPlan: resolved.compactExecutionPlan || null, complexity }),
+    body: JSON.stringify({ prompt, intent, messages: compactConversationForRequest(history), fineIntent, executionPrompt, legacyIntent: legacyIntentType, contract, skills: resolved.skills, executionPlan: resolved.compactExecutionPlan || null, complexity }),
   };
   if (signal) fetchOptions.signal = signal;
 
@@ -679,7 +694,9 @@ export async function generateHostedAIResponse(
   let repaired = false;
 
   if (!initialEval.isCompliant) {
-    const repairResult = repairResponse(rawContent, initialEval, contract, 1, 0, fineIntent);
+    // Progress-aware repair: repairResponse iterates while each pass makes a
+    // material change and stops when the response is compliant or blocked.
+    const repairResult = repairResponse(rawContent, initialEval, contract, Number.MAX_SAFE_INTEGER, 0, fineIntent);
     finalContent = repairResult.finalContent;
     repaired = repairResult.repaired;
   }
@@ -2429,7 +2446,7 @@ export async function handleMixedQuestionImageRequest(prompt, intent, history, s
   // image in parallel from the extracted subject.
   const questionPrompt = extractQuestionPrompt(prompt) || prompt;
   const questionHistory = Array.isArray(history) && history.length > 0
-    ? [...trimConversationForRequest(history).slice(0, -1), { role: 'user', content: questionPrompt }]
+        ? [...compactConversationForRequest(history).slice(0, -1), { role: 'user', content: questionPrompt }]
     : [];
 
   const [hostedResult, imageResult] = await Promise.allSettled([

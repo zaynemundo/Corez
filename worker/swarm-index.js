@@ -3,10 +3,11 @@ import { safeErrorDetail, readBoundedJson } from './utils.js';
 export { GameRoom } from './gameRoom.js';
 
 const SWARM_MODEL = 'deepseek-v4-pro';
-// Hard bounds for swarm size: each spec is one subrequest and Worker
-// invocations have a subrequest cap.
-const MAX_REQUIREMENT_SPECIALISTS = 4;
-const MAX_TOTAL_SPECS = 8;
+// Cloudflare enforces a real per-invocation subrequest ceiling (1000). Every
+// swarm spec is one subrequest, so the swarm reserves headroom under that
+// platform limit. This is an external platform constraint, not an AI
+// capability cap: requirements are never silently discarded below it.
+const PLATFORM_SUBREQUEST_CEILING = 900;
 const CORE_AGENT_TEMPLATES = Object.freeze({
   app: [
     {
@@ -105,9 +106,9 @@ function extractRequirementWorkstreams(prompt) {
     seen.add(key);
     unique.push(fragment);
   }
-  // Bound the swarm size: every workstream becomes a specialist subrequest
-  // and the Worker invocation subrequest cap is limited.
-  return unique.slice(0, MAX_REQUIREMENT_SPECIALISTS);
+  // Every independent requirement becomes a specialist workstream. Only the
+  // platform subrequest ceiling can bound the swarm, never a fixed count.
+  return unique;
 }
 
 function containsMedia(messages) {
@@ -118,6 +119,8 @@ function containsMedia(messages) {
 
 function recentTextConversation(messages) {
   if (!Array.isArray(messages)) return [];
+  // The full conversation travels with the request: the model needs every
+  // earlier requirement and constraint, so no fixed recent-message window.
   return messages
     .filter((message) => (message?.role === 'user' || message?.role === 'assistant')
       && typeof message?.content === 'string'
@@ -125,36 +128,19 @@ function recentTextConversation(messages) {
     .map((message) => ({
       role: message.role === 'assistant' ? 'assistant' : 'user',
       content: message.content.trim()
-    }))
-    .slice(-8);
+    }));
 }
 
-function createTimedSignal(parentSignal, timeoutMs) {
+// The only signal wired into provider calls is the client disconnecting
+// (Stop button, tab close): generations run as long as the provider needs.
+// No artificial timeouts are imposed by CoreZ.
+function createClientDisconnectSignal(parentSignal) {
   const controller = new AbortController();
-  let parentAbortHandler;
-
   if (parentSignal) {
-    parentAbortHandler = () => controller.abort(parentSignal.reason);
-    if (parentSignal.aborted) {
-      parentAbortHandler();
-    } else {
-      parentSignal.addEventListener('abort', parentAbortHandler, { once: true });
-    }
+    if (parentSignal.aborted) controller.abort(parentSignal.reason);
+    else parentSignal.addEventListener('abort', () => controller.abort(parentSignal.reason), { once: true });
   }
-
-  const timer = setTimeout(() => {
-    controller.abort(new Error(`AI Gateway request exceeded ${timeoutMs}ms.`));
-  }, timeoutMs);
-
-  return {
-    signal: controller.signal,
-    cleanup() {
-      clearTimeout(timer);
-      if (parentSignal && parentAbortHandler) {
-        parentSignal.removeEventListener('abort', parentAbortHandler);
-      }
-    }
-  };
+  return controller.signal;
 }
 
 export function shouldUseSwarm(intentType, prompt, options = {}) {
@@ -162,13 +148,6 @@ export function shouldUseSwarm(intentType, prompt, options = {}) {
   const promptText = String(prompt || '');
   if (!promptText.trim()) return false;
   const normalized = normalizeIntentType(intentType);
-
-  // Revisions of existing code are single-artifact edits: never swarm over
-  // an embedded code block, which would fragment into dozens of specialist
-  // subrequests and blow the Worker invocation subrequest limit.
-  if (/\[Context: The user is requesting a revision/.test(promptText) || /```/.test(promptText)) {
-    return false;
-  }
 
   // Explicit swarm coordination or a client opt-in always uses the swarm
   if (normalized === 'swarm' || options.explicitSwarm === true) return true;
@@ -201,19 +180,24 @@ export function buildSwarmAgentSpecs(intentType, prompt) {
     });
   });
 
-  return specs.slice(0, MAX_TOTAL_SPECS);
+  // Only the platform subrequest ceiling can trim the swarm: never drop a
+  // requirement below it, and never overrun it.
+  return specs.slice(0, PLATFORM_SUBREQUEST_CEILING);
 }
 
 async function callAIGateway(apiKey, messages, options = {}) {
-  const timeoutMs = readPositiveNumber(options.timeoutMs, 20_000);
-  const timedSignal = createTimedSignal(options.signal, timeoutMs);
+  // No output-token caps and no artificial timeouts: the provider decides
+  // how much it generates. An operator may still configure a hang guard via
+  // SWARM_AGENT_TIMEOUT_MS / SWARM_SYNTHESIS_TIMEOUT_MS, but no limit is
+  // imposed by default.
+  const timeoutMs = readPositiveNumber(options.timeoutMs, 0);
+  const signal = timeoutMs > 0
+    ? createOperatorTimedSignal(options.signal, timeoutMs)
+    : createClientDisconnectSignal(options.signal);
 
   try {
     const env = options.env || {};
     const deepSeekModel = env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
-    const maxTokens = (Number.isFinite(options.maxTokens) && options.maxTokens > 0)
-      ? options.maxTokens
-      : 4096;
 
     let endpoint;
     let requestBody;
@@ -234,7 +218,6 @@ async function callAIGateway(apiKey, messages, options = {}) {
       requestBody = {
         model: options.model || 'deepseek-v4-flash',
         messages,
-        max_tokens: maxTokens,
         temperature: options.temperature ?? 0.2
       };
     } else if (env.DEEPSEEK_API_KEY && apiKey === env.DEEPSEEK_API_KEY) {
@@ -266,7 +249,6 @@ async function callAIGateway(apiKey, messages, options = {}) {
           allow_fallbacks: true,
           require_parameters: true
         },
-        max_tokens: maxTokens,
         temperature: options.temperature ?? 0.2
       };
     }
@@ -275,7 +257,7 @@ async function callAIGateway(apiKey, messages, options = {}) {
       method: 'POST',
       headers,
       body: JSON.stringify(requestBody),
-      signal: timedSignal.signal
+      signal
     });
 
     if (!response.ok) {
@@ -293,20 +275,46 @@ async function callAIGateway(apiKey, messages, options = {}) {
 
     return content.trim();
   } finally {
-    timedSignal.cleanup();
+    if (timeoutMs > 0) signal.cleanup?.();
   }
 }
 
+// Operator-configured hang guard only: not a default CoreZ limit.
+function createOperatorTimedSignal(parentSignal, timeoutMs) {
+  const controller = new AbortController();
+  let parentAbortHandler;
+  if (parentSignal) {
+    parentAbortHandler = () => controller.abort(parentSignal.reason);
+    if (parentSignal.aborted) controller.abort(parentSignal.reason);
+    else parentSignal.addEventListener('abort', parentAbortHandler, { once: true });
+  }
+  const timer = setTimeout(() => {
+    controller.abort(new Error(`AI Gateway request exceeded ${timeoutMs}ms (operator-configured hang guard).`));
+  }, timeoutMs);
+  return {
+    signal: controller.signal,
+    cleanup() {
+      clearTimeout(timer);
+      if (parentSignal && parentAbortHandler) {
+        parentSignal.removeEventListener('abort', parentAbortHandler);
+      }
+    }
+  };
+}
+
 export async function runAdaptiveAgentPool(agentSpecs, executeAgent, options = {}) {
+  // No default wall-clock deadline: the pool runs until every spec is
+  // completed, blocked, or the client disconnects. An operator may pass an
+  // explicit deadlineMs as a hang guard, but CoreZ imposes none by default.
   const startedAt = Date.now();
-  const deadlineMs = readPositiveNumber(options.deadlineMs, 18_000);
-  const pending = agentSpecs.map((spec) => ({ spec, attempt: 0 }));
+  const deadlineMs = readPositiveNumber(options.deadlineMs, 0);
+  const pending = agentSpecs.map((spec) => ({ spec, attempt: 0, lastBackoff: 0 }));
   const completed = [];
   const failed = [];
 
   let concurrency = Math.max(2, Math.ceil(Math.sqrt(Math.max(1, pending.length))));
 
-  while (pending.length > 0 && Date.now() - startedAt < deadlineMs) {
+  while (pending.length > 0 && (deadlineMs <= 0 || Date.now() - startedAt < deadlineMs)) {
     const batchSize = Math.min(concurrency, pending.length);
     const batch = pending.splice(0, batchSize);
     const batchStartedAt = Date.now();
@@ -329,10 +337,16 @@ export async function runAdaptiveAgentPool(agentSpecs, executeAgent, options = {
       const error = result.reason;
       const status = Number(error?.status);
       const isRateLimited = status === 429 || /429|rate limit/i.test(String(error?.message || ''));
+      const retryAfter = Number(error?.retryAfter) || 0;
 
-      if (isRateLimited && item.attempt < 1) {
+      if (isRateLimited && item.attempt < 3) {
         rateLimitCount += 1;
-        pending.push({ spec: item.spec, attempt: item.attempt + 1 });
+        // Adaptive backoff honouring the provider's Retry-After when given,
+        // otherwise exponential: 1s, 2s, 4s.
+        const backoff = retryAfter > 0
+          ? retryAfter * 1000
+          : (2 ** item.attempt) * 1000;
+        pending.push({ spec: item.spec, attempt: item.attempt + 1, lastBackoff: backoff });
       } else {
         failed.push({
           spec: item.spec,
@@ -342,14 +356,27 @@ export async function runAdaptiveAgentPool(agentSpecs, executeAgent, options = {
       }
     });
 
+    // Backpressure: wait for the slowest retry's backoff so the provider is
+    // not hammered, then adapt concurrency from the observed evidence.
+    const slowestBackoff = Math.max(0, ...batch.map((item) => item.lastBackoff || 0));
+    if (slowestBackoff > 0) await sleep(slowestBackoff);
+
     const batchDuration = Date.now() - batchStartedAt;
     if (rateLimitCount > 0) {
       concurrency = Math.max(1, Math.floor(concurrency / 2));
-      await sleep(250 + Math.floor(Math.random() * 250));
     } else if (successCount === batch.length && batchDuration < 8_000) {
       concurrency += Math.max(1, Math.ceil(concurrency * 0.25));
     } else if (successCount < batch.length) {
       concurrency = Math.max(1, concurrency - 1);
+    }
+
+    // Progress-aware stall guard: if every remaining item has already failed
+    // once (no completions, no rate-limit retries scheduled) and the batch
+    // made no progress, the swarm is genuinely blocked — stop and report
+    // instead of repeating the same failed actions.
+    if (successCount === 0 && rateLimitCount === 0) {
+      const retryableLeft = pending.some((item) => item.attempt < 3);
+      if (!retryableLeft) break;
     }
   }
 
@@ -427,8 +454,11 @@ export async function runOpenRouterSwarm(body, env, signal) {
 
   const agentSpecs = buildSwarmAgentSpecs(intentType, prompt);
   const history = recentTextConversation(body?.messages);
-  const agentTimeoutMs = readPositiveNumber(env?.SWARM_AGENT_TIMEOUT_MS, 14_000);
-  const deadlineMs = readPositiveNumber(env?.SWARM_RESPONSE_DEADLINE_MS, 18_000);
+  // No CoreZ-imposed timeouts by default: specialists and synthesis run as
+  // long as the provider needs. Operators may configure hang guards via
+  // SWARM_AGENT_TIMEOUT_MS / SWARM_SYNTHESIS_TIMEOUT_MS / SWARM_RESPONSE_DEADLINE_MS.
+  const agentTimeoutMs = readPositiveNumber(env?.SWARM_AGENT_TIMEOUT_MS, 0);
+  const deadlineMs = readPositiveNumber(env?.SWARM_RESPONSE_DEADLINE_MS, 0);
 
   const poolResult = await runAdaptiveAgentPool(
     agentSpecs,
@@ -439,7 +469,6 @@ export async function runOpenRouterSwarm(body, env, signal) {
         env,
         signal,
         timeoutMs: agentTimeoutMs,
-        maxTokens: 2200,
         temperature: 0.15
       }
     ),
@@ -450,7 +479,7 @@ export async function runOpenRouterSwarm(body, env, signal) {
     throw new Error('The live swarm produced no usable specialist output.');
   }
 
-  const synthesisTimeoutMs = readPositiveNumber(env?.SWARM_SYNTHESIS_TIMEOUT_MS, 35_000);
+  const synthesisTimeoutMs = readPositiveNumber(env?.SWARM_SYNTHESIS_TIMEOUT_MS, 0);
   const finalContent = await callAIGateway(
     apiKey,
     buildSynthesisMessages(prompt, history, intentType, poolResult.completed),
@@ -458,7 +487,6 @@ export async function runOpenRouterSwarm(body, env, signal) {
       env,
       signal,
       timeoutMs: synthesisTimeoutMs,
-      maxTokens: intentType === 'app' ? 16_000 : 7_000,
       temperature: 0.2
     }
   );

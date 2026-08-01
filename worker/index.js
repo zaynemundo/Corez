@@ -1,5 +1,5 @@
 import { handleMarket } from './market.js';
-import { safeErrorDetail, readBoundedJson, jsonResponse, createRateLimiter } from './utils.js';
+import { safeErrorDetail, readBoundedJson, jsonResponse } from './utils.js';
 
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 const OPENCODE_DEFAULT_ENDPOINT = 'https://opencode.ai/zen/go/v1/chat/completions';
@@ -67,9 +67,6 @@ function normalizeIntentType(intentType) {
   return CANONICAL_INTENT_TYPES.has(intentType) ? intentType : 'general';
 }
 
-const aiRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 20 });
-const imageRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 30 });
-
 function buildSystemPrompt(options = {}) {
   const intent = typeof options.intent === 'object' ? options.intent : null;
   const legacyIntent = options.legacyIntent || (typeof options.intent === 'string' ? options.intent : intent?.type);
@@ -127,7 +124,8 @@ Adaptive Routing - Fast Path:
   const imageRequestInstructions = `
 - IMAGE REQUESTS: If the user explicitly requests an image, picture, photo, illustration, artwork, logo, or wallpaper, respond with EXACTLY ONE line containing \`[IMAGE_PROMPT: concise detailed description of the requested image]\` and nothing else. Never output raw SVG markup for image requests — the platform renders the image for you.`;
 
-  // Format full skill instructions (bounded so input tokens stay compact)
+  // Format full skill instructions: every selected skill passes intact so
+  // the model never loses applicable guidance.
   let formattedSkills = '(none — direct execution path)';
   if (skills.length > 0) {
     formattedSkills = skills.map(s => {
@@ -135,23 +133,25 @@ Adaptive Routing - Fast Path:
       const name = typeof s === 'object' ? (s.name || s.id) : s;
       const phase = typeof s === 'object' ? (s.phase || 'IMPLEMENTING') : 'EXECUTION';
       const instructions = typeof s === 'object' && s.instructions ? s.instructions : (s.description || 'Execute skill requirements');
-      const reason = typeof s === 'object' && s.reasonSelected ? `\n    Reason: ${String(s.reasonSelected).slice(0, 150)}` : '';
-      const constraints = typeof s === 'object' && Array.isArray(s.constraints) && s.constraints.length ? `\n    Constraints: ${s.constraints.join(' | ').slice(0, 300)}` : '';
-      return `\n- [${phase}] ${name} (${id})${reason}\n    Instructions: ${String(instructions).slice(0, 300)}${constraints}`;
+      const reason = typeof s === 'object' && s.reasonSelected ? `\n    Reason: ${String(s.reasonSelected)}` : '';
+      const constraints = typeof s === 'object' && Array.isArray(s.constraints) && s.constraints.length ? `\n    Constraints: ${s.constraints.join(' | ')}` : '';
+      return `\n- [${phase}] ${name} (${id})${reason}\n    Instructions: ${String(instructions)}${constraints}`;
     }).join('');
   }
 
-  // Format intent contract & preservation constraints (bounded)
+  // Format intent contract & preservation constraints in full: these are
+  // must-preserve rules, and dropping any part could let the model violate
+  // an explicit requirement.
   let formattedContract = '';
   if (contract) {
-    const mustAchieve = Array.isArray(contract.mustAchieve) && contract.mustAchieve.length ? `\n- Must Achieve: ${contract.mustAchieve.join('; ').slice(0, 600)}` : '';
-    const mustPreserve = Array.isArray(contract.mustPreserve) && contract.mustPreserve.length ? `\n- Must Preserve: ${contract.mustPreserve.join('; ').slice(0, 600)}` : '';
-    const mustNotInvent = Array.isArray(contract.mustNotInvent) && contract.mustNotInvent.length ? `\n- Must Not Change / Invent: ${contract.mustNotInvent.join('; ').slice(0, 600)}` : '';
+    const mustAchieve = Array.isArray(contract.mustAchieve) && contract.mustAchieve.length ? `\n- Must Achieve: ${contract.mustAchieve.join('; ')}` : '';
+    const mustPreserve = Array.isArray(contract.mustPreserve) && contract.mustPreserve.length ? `\n- Must Preserve: ${contract.mustPreserve.join('; ')}` : '';
+    const mustNotInvent = Array.isArray(contract.mustNotInvent) && contract.mustNotInvent.length ? `\n- Must Not Change / Invent: ${contract.mustNotInvent.join('; ')}` : '';
     formattedContract = `\n\nIntent Contract & Preservation Rules:${mustAchieve}${mustPreserve}${mustNotInvent}`;
   }
 
-  // Format Execution Plan (bounded)
-  const formattedPlan = executionPlan ? `\n\n${String(executionPlan).slice(0, 800)}` : '';
+  // Format Execution Plan in full.
+  const formattedPlan = executionPlan ? `\n\n${String(executionPlan)}` : '';
 
   return `You are COREZ AI.
 
@@ -222,11 +222,6 @@ function hasReasoning(message) {
 async function handleAi(request, env) {
   if (request.method !== 'POST') {
     return jsonResponse(405, { error: 'Method not allowed.' });
-  }
-
-  const retryAfter = aiRateLimiter(request);
-  if (retryAfter !== null) {
-    return jsonResponse(429, { error: 'Too many requests. Try again shortly.' }, { 'Retry-After': String(retryAfter) });
   }
 
   let body;
@@ -328,26 +323,34 @@ async function handleAi(request, env) {
         if (!opencodeResp.ok) {
           const detail = (await opencodeResp.text().catch(() => '')).slice(0, 200);
           console.warn(`OpenCode Go model ${modelId} returned HTTP ${opencodeResp.status}:`, safeErrorDetail(detail));
-          return { failure: `HTTP ${opencodeResp.status}: ${safeErrorDetail(detail)}` };
+          const retryAfter = Number(opencodeResp.headers.get('Retry-After') || 0);
+          return {
+            failure: `HTTP ${opencodeResp.status}: ${safeErrorDetail(detail)}`,
+            transient: opencodeResp.status >= 500 || opencodeResp.status === 429,
+            retryAfter: Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : null
+          };
         }
         const data = await opencodeResp.json();
         const message = data?.choices?.[0]?.message;
         return { content: answerText(message), reasoning: hasReasoning(message) };
       } catch (opencodeErr) {
         console.warn(`OpenCode Go model ${modelId} request failed:`, safeErrorDetail(opencodeErr));
-        return { failure: safeErrorDetail(opencodeErr) };
+        return { failure: safeErrorDetail(opencodeErr), transient: true, retryAfter: null };
       }
     };
 
     for (const modelId of targetModels) {
-      // OpenCode Go is the preferred provider: stay on it as hard as
-      // possible. A transient gateway failure gets one retry, and a
-      // reasoning-only/empty reply gets the continuation nudge; only then
-      // does the request move to DeepSeek / OpenRouter.
+      // OpenCode Go is the preferred provider: stay on it as long as there
+      // is evidence a retry can succeed. Transient gateway failures (5xx,
+      // 429, network) get adaptive backoff using the provider's Retry-After
+      // when supplied; reasoning-only/empty replies get the continuation
+      // nudge. Only then does the request move to DeepSeek / OpenRouter —
+      // the fallback chain is the continuation mechanism.
       let result = await callOpenCodeGo(modelId, apiMessages);
       let lastFailure = result?.failure || null;
-      if (result?.failure) {
-        await sleep(750);
+      for (let transientAttempt = 1; result?.failure && result?.transient && transientAttempt <= 3; transientAttempt += 1) {
+        const backoff = result.retryAfter ? result.retryAfter * 1000 : 750 * transientAttempt;
+        await sleep(backoff);
         result = await callOpenCodeGo(modelId, apiMessages);
         lastFailure = result?.failure || lastFailure;
       }
@@ -505,11 +508,6 @@ async function callOpenRouterImage(apiKey, prompt, parentSignal) {
 async function handleImage(request, env) {
   if (request.method !== 'POST') {
     return jsonResponse(405, { error: 'Method not allowed.' });
-  }
-
-  const retryAfter = imageRateLimiter(request);
-  if (retryAfter !== null) {
-    return jsonResponse(429, { error: 'Too many requests. Try again shortly.' }, { 'Retry-After': String(retryAfter) });
   }
 
   let body;

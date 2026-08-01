@@ -52,19 +52,22 @@ async function run() {
   const expandedSpecs = buildSwarmAgentSpecs('app', expandedPrompt);
 
   assert.ok(simpleSpecs.length >= 5);
-  // The swarm is hard-bounded: every spec is one subrequest and Worker
-  // invocations have a subrequest cap, so oversized prompts are trimmed.
-  assert.ok(expandedSpecs.length <= 8);
+  // No fixed swarm cap: every independent requirement becomes a specialist
+  // workstream. Only the platform subrequest ceiling (900) can bound it.
+  assert.equal(expandedSpecs.length, 4 + 24);
+  assert.ok(expandedSpecs.length <= 900);
   assert.ok(expandedSpecs.length > simpleSpecs.length);
   assert.equal(new Set(expandedSpecs.map((spec) => spec.agentId)).size, expandedSpecs.length);
 
-  // Code-heavy revision prompts never swarm: the embedded code block must not
-  // fragment into specialist agents, and any such prompt stays bounded.
+  // High-complexity revisions may use specialist analysis where safe: the
+  // workstream extractor strips embedded code blocks, so revisions never
+  // fragment code into duplicate agents.
   const revisionPrompt = '[Context: The user is requesting a revision for the following code block]\n```html\n<canvas id="g"></canvas>\n```\n\nUser Request: add online multiplayer with a death match mode. And a shop. And more enemies.';
-  assert.equal(shouldUseSwarm('app', revisionPrompt, { complexity: 'high' }), false);
-  assert.equal(shouldUseSwarm('app', 'Build a new game with ```js\nconsole.log(1)\n``` inside the request', { complexity: 'high' }), false);
+  assert.equal(shouldUseSwarm('app', revisionPrompt, { complexity: 'high' }), true);
+  assert.equal(shouldUseSwarm('app', 'Build a new game with ```js\nconsole.log(1)\n``` inside the request', { complexity: 'high' }), true);
   const codeHeavySpecs = buildSwarmAgentSpecs('app', revisionPrompt);
-  assert.ok(codeHeavySpecs.length <= 8);
+  assert.ok(codeHeavySpecs.length > 0);
+  assert.ok(codeHeavySpecs.length <= 900);
 
   const retryAttempts = new Map();
   const poolResult = await runAdaptiveAgentPool(

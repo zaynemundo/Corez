@@ -9,7 +9,6 @@
  *   4. Logs lightweight anonymous quality metrics for observability.
  */
 
-export const MAX_REPAIR_ATTEMPTS = 1;
 const _qualityMetricsLog = [];
 
 /**
@@ -94,13 +93,16 @@ export function evaluateResponse(responseContent, contract = {}, intent = {}) {
 }
 
 /**
- * Bounded repair loop: performs deterministic local repairs when material issues are found.
- * Stops strictly after maxAttempts (default: 1).
+ * Progress-aware repair loop: performs deterministic local repairs when
+ * material issues are found and iterates while each pass makes a measurable
+ * change to the content. It stops when the response is compliant, when a
+ * pass changes nothing (genuinely blocked), or when an explicit caller
+ * ceiling is reached. There is no fixed default attempt cap.
  *
  * @param {string} responseContent
  * @param {object} evaluationResult
  * @param {object} contract
- * @param {number} [maxAttempts=1]
+ * @param {number} [maxAttempts=Infinity]
  * @param {number} [currentAttempt=0]
  * @returns {object} { finalContent, repaired, attempts, evaluation }
  */
@@ -108,40 +110,48 @@ export function repairResponse(
   responseContent,
   evaluationResult,
   contract = {},
-  maxAttempts = MAX_REPAIR_ATTEMPTS,
+  maxAttempts = Number.MAX_SAFE_INTEGER,
   currentAttempt = 0,
   intent = {}
 ) {
-  if (evaluationResult.isCompliant || currentAttempt >= maxAttempts) {
-    return {
-      finalContent: responseContent,
-      repaired: false,
-      attempts: currentAttempt,
-      evaluation: evaluationResult,
-    };
-  }
+  let content = responseContent;
+  let evaluation = evaluationResult;
+  let attempt = currentAttempt;
 
-  let repairedContent = responseContent;
+  while (!evaluation.isCompliant && attempt < maxAttempts) {
+    const before = content;
 
-  // Apply deterministic local repairs for detected violations
-  for (const violation of evaluationResult.violations) {
-    // Repair unclosed code block if truncated
-    if (violation.includes('code output block') && !repairedContent.includes('```')) {
-      repairedContent += '\n\n```jsx\n// Self-contained component fallback\nexport default function App() {\n  return <div className="p-4">App Content</div>;\n}\n```';
+    // Apply deterministic local repairs for detected violations
+    for (const violation of evaluation.violations) {
+      if (violation.includes('code output block') && !content.includes('```')) {
+        content += '\n\n```jsx\n// Self-contained component fallback\nexport default function App() {\n  return <div className="p-4">App Content</div>;\n}\n```';
+      }
+      if (violation.includes('usage') || violation.includes('rate_limit')) {
+        content = content.replace(/\b(usage_limit|rate_limit|token_limit|monthly_quota)\s*=\s*[^;\n]+/gi, '');
+      }
     }
-    // Revert forbidden usage/rate limit mutations if accidentally introduced
-    if (violation.includes('usage') || violation.includes('rate_limit')) {
-      repairedContent = repairedContent.replace(/\b(usage_limit|rate_limit|token_limit|monthly_quota)\s*=\s*[^;\n]+/gi, '');
-    }
-  }
 
-  const newEval = evaluateResponse(repairedContent, contract, intent);
+    attempt += 1;
+
+    // Progress guard: if a full pass changed nothing, the response is
+    // genuinely blocked and further identical attempts cannot help.
+    if (content === before) {
+      return {
+        finalContent: content,
+        repaired: attempt > currentAttempt,
+        attempts: attempt,
+        evaluation,
+      };
+    }
+
+    evaluation = evaluateResponse(content, contract, intent);
+  }
 
   return {
-    finalContent: repairedContent,
-    repaired: true,
-    attempts: currentAttempt + 1,
-    evaluation: newEval,
+    finalContent: content,
+    repaired: attempt > currentAttempt,
+    attempts: attempt,
+    evaluation,
   };
 }
 

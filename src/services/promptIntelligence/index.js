@@ -140,19 +140,26 @@ export async function process({ prompt, projectContext, verbose, dryRun, signal 
     log('ARCHITECT', `Generated enriched prompt (${enriched.split(/\s+/).length} words)`);
   }
 
-  // ----- 6. Critic + Refinement Loop -----
+  // ----- 6. Critic + Refinement Loop (progress-aware) -----
   let criticResult = critiquePrompt(rawPrompt, enriched, intent, requirements);
   result.prompt.score = criticResult.score;
 
   if (verbose) log('CRITIC', `${criticResult.score}/10`, `issues: ${criticResult.issues.length}`);
 
+  // Continue refining only while each pass measurably improves the prompt
+  // (>= 0.05 score gain). Once a refinement stops improving the prompt, the
+  // state is genuinely stable and further identical attempts cannot help.
   let refinementCount = 0;
   while (criticResult.score < MIN_PROMPT_SCORE && refinementCount < MAX_REFINEMENT_LOOPS) {
     refinementCount += 1;
+    const previousScore = criticResult.score;
     enriched = refinePrompt(enriched, criticResult, { intent, requirements, context, rawPrompt });
     criticResult = critiquePrompt(rawPrompt, enriched, intent, requirements);
 
     if (verbose) log(`REFINE #${refinementCount}`, `${criticResult.score}/10`);
+
+    // Progress guard: no measurable improvement means the prompt is stable.
+    if (criticResult.score - previousScore < 0.05) break;
   }
   result.prompt.refinementCount = refinementCount;
   result.prompt.score = criticResult.score;

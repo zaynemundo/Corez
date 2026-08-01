@@ -99,7 +99,9 @@ export class ContextEngine {
       try {
         const content = await this.fileReader.read(file);
         if (content && content.length > 0) {
-          instructions.push({ file, preview: content.slice(0, 400) });
+          // Full instruction content: repository rules must reach the model
+          // intact, never a preview.
+          instructions.push({ file, content });
         }
       } catch {
         // skip
@@ -170,8 +172,7 @@ function detectStyling(pkg) {
 function extractKeyDeps(pkg) {
   if (!pkg) return [];
   const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
-  const keys = Object.keys(deps);
-  return keys.slice(0, 20);
+  return Object.keys(deps);
 }
 
 function detectExistingFeatures(prompt, intent) {

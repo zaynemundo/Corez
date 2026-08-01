@@ -1,4 +1,7 @@
-export const MAX_BODY_BYTES = 256 * 1024;
+// Request-body guard: protects the Worker from memory exhaustion only.
+// 24 MB is far beyond any legitimate conversation payload (the platform's
+// own request limit is 100 MB), so normal AI tasks are never squeezed.
+export const MAX_BODY_BYTES = 24 * 1024 * 1024;
 
 export const SECURITY_HEADERS = {
   'Access-Control-Allow-Origin': '*',

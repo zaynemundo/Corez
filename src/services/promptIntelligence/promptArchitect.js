@@ -8,7 +8,10 @@
 import { INTENT_TYPES, COMPLEXITY_LEVELS } from './schemas.js';
 
 export const MIN_PROMPT_SCORE = 8.5;
-export const MAX_REFINEMENT_LOOPS = 2;
+// Safety ceiling only: refinement normally stops on the progress rule
+// (score must keep improving). 100 passes of pure local prompt critique is
+// beyond any plausible need; the progress condition is the real stop.
+export const MAX_REFINEMENT_LOOPS = 100;
 
 /**
  * @param {object} intent       — IntentEngine result

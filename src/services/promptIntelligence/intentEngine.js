@@ -291,7 +291,7 @@ export function classifyIntent(prompt) {
       type: INTENT_TYPES.GENERAL_QUESTION,
       primaryIntent: INTENT_TYPES.GENERAL_QUESTION,
       secondaryIntent: null,
-      goal: lower.slice(0, 80),
+      goal: lower,
       confidence: candidateMatches[0]?.confidence || 0.1,
       isExistingProject: isExisting,
       outputFormat: format,
@@ -316,7 +316,7 @@ export function classifyIntent(prompt) {
     primaryIntent: topMatch.handler.type,
     secondaryIntent,
     confidence: topMatch.confidence,
-    goal: extracted.goal || lower.slice(0, 80),
+    goal: extracted.goal || lower,
     domain: extracted.domain || '',
     deliverable: extracted.deliverable || '',
     isExistingProject: isExisting,
@@ -374,7 +374,7 @@ export function extractRequirements(prompt, intent) {
   const actionMatch = prompt.match(/\b(build|make|create|generate|design|code|fix|add|implement|change|update)\b/i);
   if (actionMatch) {
     const subjectStart = prompt.indexOf(actionMatch[0]) + actionMatch[0].length;
-    const subjectChunk = prompt.slice(subjectStart).trim().slice(0, 60);
+    const subjectChunk = prompt.slice(subjectStart).trim();
     if (subjectChunk) explicit.push(`${actionMatch[0].toLowerCase()} ${subjectChunk}`);
   }
 

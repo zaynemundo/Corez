@@ -130,13 +130,37 @@ async function run() {
   assert.equal(malformedResponse.status, 400);
   assert.match((await json(malformedResponse)).error, /Request body rejected/);
 
-  // Oversized bodies are rejected with a distinct, honest error message
+  // Bodies beyond the memory-exhaustion guard are rejected with a distinct,
+  // honest error message. The guard (24 MB) sits far above any legitimate
+  // conversation payload, so normal AI tasks are never squeezed.
   const oversizedResponse = await post(JSON.stringify({
     prompt: 'Explain this',
-    messages: [{ role: 'user', content: 'x'.repeat(300 * 1024) }]
+    messages: [{ role: 'user', content: 'x'.repeat(25 * 1024 * 1024) }]
   }));
   assert.equal(oversizedResponse.status, 400);
   assert.match((await json(oversizedResponse)).error, /byte limit/);
+
+  // Large-but-legitimate conversations pass through unchanged: no fixed
+  // history windows or per-message caps at the platform boundary.
+  {
+    const originalFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = async () => new Response(JSON.stringify({
+        choices: [{ message: { content: 'Large conversation accepted' } }]
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      const largeConversationResponse = await post(JSON.stringify({
+        prompt: 'Keep going',
+        messages: [
+          { role: 'user', content: 'Early requirement: preserve offline mode.' },
+          { role: 'assistant', content: 'x'.repeat(2 * 1024 * 1024) },
+          { role: 'user', content: 'Continue implementing.' }
+        ]
+      }), env({ OPENCODE_GO_API_KEY: 'sk-opencode-test' }));
+      assert.equal(largeConversationResponse.status, 200);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  }
 
   const nullBodyResponse = await post(JSON.stringify(null));
   assert.equal(nullBodyResponse.status, 400);

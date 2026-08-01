@@ -1061,8 +1061,8 @@ describe('Full Pipeline — process()', () => {
 // 15. Refinement Loop Limits
 // =========================================================================
 describe('Refinement Loop', () => {
-  it('MAX_REFINEMENT_LOOPS is 2 (prevents infinite loops)', () => {
-    expect(MAX_REFINEMENT_LOOPS).toBe(2);
+  it('MAX_REFINEMENT_LOOPS is a safety ceiling, not a capability cap (100)', () => {
+    expect(MAX_REFINEMENT_LOOPS).toBe(100);
   });
 
   it('MIN_PROMPT_SCORE is 8.5', () => {

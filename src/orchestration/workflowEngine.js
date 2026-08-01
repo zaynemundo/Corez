@@ -123,17 +123,32 @@ export class SuperpowersWorkflowEngine {
       let verificationRecord = await this.runVerificationPass(userPrompt, implementationOutputs, options);
       workflow.addVerificationRecord(verificationRecord);
 
+      // Progress-aware repair loop: keep repairing while each pass changes
+      // the outputs (new evidence) and verification still fails. A pass that
+      // changes nothing means the state is genuinely blocked; an operator may
+      // still cap total passes via options.maxRepairAttempts, but no fixed
+      // default limit applies.
       let repairAttempts = 0;
-      const maxRepairAttempts = options.maxRepairAttempts || 3;
+      const maxRepairAttempts = options.maxRepairAttempts ?? Number.MAX_SAFE_INTEGER;
+      let lastRepairContent = null;
       while ((verificationRecord.exitCode !== 0 || verificationRecord.failed > 0) && repairAttempts < maxRepairAttempts) {
         repairAttempts++;
         workflow.startStage(WORKFLOW_STAGES.REPAIRING, { attempt: repairAttempts, failure: verificationRecord }, { agent: 'REPAIR_AGENT', skill: 'auto-debugging' });
         const repairOutputs = await this.runVerificationRepairPass(implementationOutputs, verificationRecord, options);
+        const repairContent = Object.entries(repairOutputs)
+          .filter(([key]) => key.startsWith('verify-repair'))
+          .map(([, value]) => value)
+          .join('\n');
         Object.assign(implementationOutputs, repairOutputs);
         workflow.completeStage(WORKFLOW_STAGES.REPAIRING, repairOutputs);
 
         verificationRecord = await this.runVerificationPass(userPrompt, implementationOutputs, options);
         workflow.addVerificationRecord(verificationRecord);
+
+        // Progress guard: a repair pass that produced no new evidence cannot
+        // help — stop instead of repeating the same failed action.
+        if (repairContent !== '' && repairContent === lastRepairContent) break;
+        lastRepairContent = repairContent;
       }
 
       // 8. Transition to Complete

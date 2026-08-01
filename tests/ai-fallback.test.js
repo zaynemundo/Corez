@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { generateAIResponse, generateLocalAIResponse, isRevisionContextPrompt, trimConversationForRequest, extractCodeFromMessage } from '../src/services/aiService.js';
+import { generateAIResponse, generateLocalAIResponse, isRevisionContextPrompt, compactConversationForRequest, extractCodeFromMessage } from '../src/services/aiService.js';
 
 const GAME_HTML = `<!DOCTYPE html><html><body><canvas id="game"></canvas><script>function gameLoop(){requestAnimationFrame(gameLoop);}requestAnimationFrame(gameLoop);</script></body></html>`;
 
@@ -122,26 +122,59 @@ describe('Hosted AI fallback behavior', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/ai', expect.objectContaining({ signal: abortController.signal }));
   });
 
-  it('keeps conversation history compact for low input tokens', async () => {
+  it('keeps the full conversation intact below the platform body limit', async () => {
     const bigCodeBlock = 'x'.repeat(20 * 1024);
     const history = Array.from({ length: 20 }, (_, i) => ({
       role: i % 2 === 0 ? 'user' : 'assistant',
       content: i % 3 === 0 ? bigCodeBlock : `message ${i}`
     }));
 
-    const trimmed = trimConversationForRequest(history);
+    const compacted = compactConversationForRequest(history);
 
-    expect(trimmed.length).toBeLessThanOrEqual(6);
-    expect(trimmed[trimmed.length - 1]).toEqual(history[history.length - 1]);
-    for (const m of trimmed) {
-      if (m.content.length > 3000) expect(m.content).toMatch(/\[truncated\]$/);
-    }
-    expect(JSON.stringify(trimmed).length).toBeLessThan(60 * 1024);
+    // No fixed message count or per-message caps: everything passes through.
+    expect(compacted.length).toBe(history.length);
+    expect(compacted).toEqual(history);
 
-    // Single oversized message still fits within the compact cap
-    const single = trimConversationForRequest([{ role: 'user', content: 'y'.repeat(300 * 1024) }]);
-    expect(single.length).toBe(1);
-    expect(JSON.stringify(single).length).toBeLessThan(60 * 1024);
+    // An early requirement survives in a long conversation untouched.
+    const longConversation = [
+      { role: 'user', content: 'Requirement: the app MUST keep offline mode working.' },
+      ...Array.from({ length: 60 }, (_, i) => ({
+        role: i % 2 === 0 ? 'assistant' : 'user',
+        content: `iteration ${i} detail`
+      }))
+    ];
+    const kept = compactConversationForRequest(longConversation);
+    expect(kept.length).toBe(longConversation.length);
+    expect(kept[0].content).toContain('MUST keep offline mode working.');
+  });
+
+  it('compacts only redundant prose when the payload approaches the platform limit', async () => {
+    // Many plain-text turns far below 16 MB: sent unchanged.
+    const plain = Array.from({ length: 200 }, (_, i) => ({
+      role: i % 2 === 0 ? 'user' : 'assistant',
+      content: `plain conversation turn ${i} with some detail`
+    }));
+    expect(compactConversationForRequest(plain).length).toBe(plain.length);
+
+    // A payload genuinely over the platform budget compacts older prose but
+    // keeps the latest user turn, code blocks, and requirement markers exact.
+    const hugeProse = 'z'.repeat(10 * 1024 * 1024);
+    const oversized = [
+      { role: 'user', content: 'Early requirement: keep the auth flow intact.' },
+      { role: 'assistant', content: hugeProse },
+      { role: 'user', content: 'Second requirement: preserve the dashboard.' },
+      { role: 'assistant', content: hugeProse },
+      { role: 'user', content: 'FINAL REQUEST: ship the fix now.' }
+    ];
+    const compacted = compactConversationForRequest(oversized);
+
+    const finalSerialized = JSON.stringify(compacted);
+    expect(finalSerialized.length).toBeLessThanOrEqual(16 * 1024 * 1024);
+    expect(compacted[compacted.length - 1].content).toBe('FINAL REQUEST: ship the fix now.');
+    // Requirement markers survive as exact evidence.
+    expect(finalSerialized).toContain('keep the auth flow intact');
+    expect(finalSerialized).toContain('preserve the dashboard');
+    expect(finalSerialized).toMatch(/\[Context compaction/);
   });
 
   it('salvages code from a truncated response with an unterminated code fence', () => {

@@ -13,7 +13,10 @@ export const DEFAULT_CONFIG = Object.freeze({
     dangerous: false
   },
   swarm: {
-    maxConcurrency: 16,
+    // 0 = adaptive: concurrency is derived from the number of independent
+    // pending workstreams with backpressure, never capped by CoreZ. An
+    // operator may still set an explicit ceiling for infrastructure reasons.
+    maxConcurrency: 0,
     strategy: 'dag'
   }
 });

@@ -98,11 +98,11 @@ export class ContextEngine {
     prompt += `- Workspace Root: ${info.cwd}\n`;
     prompt += `- Project Name: ${info.name}\n`;
     prompt += `- Git Branch: ${info.gitBranch}\n`;
-    prompt += `- Dependencies: ${info.dependencies.slice(0, 10).join(', ')}${info.dependencies.length > 10 ? '...' : ''}\n`;
+    prompt += `- Dependencies: ${info.dependencies.join(', ')}\n`;
     prompt += `- Available Scripts: ${Object.keys(info.scripts).join(', ')}\n`;
 
     if (this.inspectedFiles.size > 0) {
-      prompt += `- Inspected Files: ${Array.from(this.inspectedFiles).slice(0, 15).join(', ')}\n`;
+      prompt += `- Inspected Files: ${Array.from(this.inspectedFiles).join(', ')}\n`;
     }
     if (this.modifiedFiles.size > 0) {
       prompt += `- Modified Files: ${Array.from(this.modifiedFiles).join(', ')}\n`;
@@ -111,7 +111,7 @@ export class ContextEngine {
     if (instructions && instructions.length > 0) {
       prompt += `\nProject Rules & Instructions:\n`;
       for (const inst of instructions) {
-        prompt += `--- Begin ${inst.filename} ---\n${inst.content.slice(0, 2000)}\n--- End ${inst.filename} ---\n`;
+        prompt += `--- Begin ${inst.filename} ---\n${inst.content}\n--- End ${inst.filename} ---\n`;
       }
     }
 

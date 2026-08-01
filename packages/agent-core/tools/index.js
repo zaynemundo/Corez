@@ -3,6 +3,14 @@ import path from 'node:path';
 import { execSync, spawnSync } from 'node:child_process';
 import { PERMISSION_CATEGORIES } from '../permissions/index.js';
 
+// No fixed command timeout: valid builds, tests, and long-running commands
+// must never be terminated prematurely. An operator may set an explicit
+// hang guard via COREZ_COMMAND_TIMEOUT_MS; 0 means unlimited (default).
+function commandTimeout() {
+  const raw = Number(process.env.COREZ_COMMAND_TIMEOUT_MS || 0);
+  return Number.isFinite(raw) && raw > 0 ? raw : 0;
+}
+
 export class ToolRegistry {
   constructor() {
     this.tools = new Map();
@@ -224,7 +232,7 @@ export class ToolRegistry {
         }
         
         walk(cwd);
-        return { pattern, matches: results.slice(0, 50) };
+        return { pattern, matches: results };
       }
     });
 
@@ -245,11 +253,9 @@ export class ToolRegistry {
         const matches = [];
         
         function walk(dir) {
-          if (matches.length >= 30) return;
           if (dir.includes('node_modules') || dir.includes('.git') || dir.includes('dist')) return;
           const entries = fs.readdirSync(dir, { withFileTypes: true });
           for (const entry of entries) {
-            if (matches.length >= 30) break;
             const full = path.join(dir, entry.name);
             if (entry.isDirectory()) {
               walk(full);
@@ -260,7 +266,7 @@ export class ToolRegistry {
                   const rel = path.relative(cwd, full);
                   const lines = text.split('\n');
                   lines.forEach((line, idx) => {
-                    if (line.includes(query) && matches.length < 30) {
+                    if (line.includes(query)) {
                       matches.push({ file: rel, lineNumber: idx + 1, content: line.trim() });
                     }
                   });
@@ -292,7 +298,7 @@ export class ToolRegistry {
       async execute({ command }, { context }) {
         const cwd = context?.cwd || process.cwd();
         try {
-          const stdout = execSync(command, { cwd, encoding: 'utf8', timeout: 30000 });
+          const stdout = execSync(command, { cwd, encoding: 'utf8', timeout: commandTimeout() });
           return { command, stdout: stdout.trim(), exitCode: 0 };
         } catch (err) {
           return {
@@ -387,12 +393,12 @@ export class ToolRegistry {
       async execute({ testFilter = '' } = {}, { context }) {
         const cwd = context?.cwd || process.cwd();
         const safeFilter = typeof testFilter === 'string' && testFilter.trim()
-          ? testFilter.trim().replace(/[;&|`$(){}<>]/g, '').slice(0, 200)
+          ? testFilter.trim().replace(/[;&|`$(){}<>]/g, '')
           : '';
         const args = safeFilter ? ['test', '--', safeFilter] : ['test'];
         const cmd = ['npm', ...args].join(' ');
         try {
-          const result = spawnSync('npm', args, { cwd, encoding: 'utf8', timeout: 45000, shell: false });
+          const result = spawnSync('npm', args, { cwd, encoding: 'utf8', timeout: commandTimeout(), shell: false });
           if (result.status !== 0) {
             return {
               command: cmd,
@@ -424,7 +430,7 @@ export class ToolRegistry {
       async execute(_, { context }) {
         const cwd = context?.cwd || process.cwd();
         try {
-          const stdout = execSync('npm run build', { cwd, encoding: 'utf8', timeout: 45000 });
+          const stdout = execSync('npm run build', { cwd, encoding: 'utf8', timeout: commandTimeout() });
           return { command: 'npm run build', stdout: stdout.trim(), exitCode: 0 };
         } catch (err) {
           return {
@@ -447,7 +453,7 @@ export class ToolRegistry {
       async execute(_, { context }) {
         const cwd = context?.cwd || process.cwd();
         try {
-          const stdout = execSync('npm run lint', { cwd, encoding: 'utf8', timeout: 30000 });
+          const stdout = execSync('npm run lint', { cwd, encoding: 'utf8', timeout: commandTimeout() });
           return { command: 'npm run lint', stdout: stdout.trim(), exitCode: 0 };
         } catch (err) {
           return {
