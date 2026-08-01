@@ -150,6 +150,33 @@ interface ArtDirection {
 
 ---
 
+## Asset Production Techniques (memory + scalability)
+
+Apply these from the Art stage forward so assets don't need rework later.
+
+### Tiling
+- Tile patterned assets (ground, walls, water, sky) instead of one large image: a single 16x16 tile repeated in a `pattern` or drawn in a loop saves memory and keeps files small.
+- Ensure tile edges wrap seamlessly (test a 2x2 arrangement; fix any visible seam before accepting the asset).
+
+### 9-Slice / 9-Patch (scalable UI)
+- UI panels, buttons, and frames that must stretch use 9-slice: unscalable corners + stretchable center/edges.
+- In SVG, emit corner/edge/center as separate rects, or provide a slice descriptor in the asset manifest (`slices: { left, top, right, bottom }`).
+- Never scale a 1px border UI image with CSS `background-size: 100% 100%` — it distorts corners.
+
+### Compression-friendly dimensions
+- Make every asset dimension a **multiple of 4** (or a **power of 2** when texture compression is used) to avoid wasted padding in packed textures.
+- Pack multiple sprites into one spritesheet (256x256, 512x512) rather than many single files — fewer downloads, one draw-batch-able texture.
+
+### Animation approaches
+| Approach | Best For | Trade-off |
+|----------|----------|-----------|
+| **Frame-by-frame** (sprite sheet rows) | Pixel art, snappy actions | More art work, predictable |
+| **Bone-based** (limbs rotated/translated in code) | Fluid characters, fewer files | Needs a rig contract in code; weaker pixel-art feel |
+
+Decide at Art stage and record in the asset manifest — switching after implementation wastes the sprite budget.
+
+---
+
 ## SVG Rendering Requirements
 
 ```svg
@@ -189,4 +216,6 @@ canvas, img, svg {
 - [ ] SVG crispEdges rendering verified
 - [ ] UI font, button, panel styles defined
 - [ ] z-index layer map produced
+- [ ] Tiling/9-slice/packing decisions recorded for scalable assets
+- [ ] Animation approach (frame-by-frame vs bone-based) chosen and recorded
 - [ ] Exported to `game-project/design/art-direction.json`

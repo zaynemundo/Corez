@@ -341,6 +341,35 @@ class SFX {
 | Audio latency        | Pre-create AudioContext on first user gesture   |
 | CSS transitions      | Use `transform` and `opacity` only (GPU composited) |
 | requestAnimationFrame| Single loop, batch all effect updates together  |
+
+---
+
+## Audio Direction (mood-first)
+
+Audio must match the game's mood — mismatched audio breaks immersion faster than missing audio.
+
+### Decision order
+1. **Does the game need audio?** Memory/scope permitting, yes — even minimal SFX lifts juice massively.
+2. **Which layers?** Music, SFX, and/or voice. Match the mood: retro = square-wave chiptune SFX; modern/clean = short sine/triangle blips; dark/tense = low sawtooth drones (see `mood.audio` from `game-brainstorm`).
+3. **Procedural (default)** — use the Web Audio `SFX` class above: zero download cost, infinite variety.
+4. **Pre-made only when needed** — music tracks or complex ambience.
+
+### Free audio sources (attribute correctly)
+| Source | Content | License |
+|--------|---------|---------|
+| Bfxr / as3sfxr / Chiptone / Leshy SFMaker | Retro SFX generators | Free |
+| Incompetech (Kevin MacLeod) | CC music | Attribution required |
+| Bensound | CC music | Attribution required |
+| SoundCloud CC playlists | Music/ambience | Attribution required |
+
+- Record attribution (title, author, license) in the asset manifest when using any CC asset.
+- If the mood demands a track that can't be licensed, generate procedural ambience instead of shipping unlicensed audio.
+
+### Verification
+- [ ] Every sound maps to a spec action (no orphan sounds, no silent actions that need feedback)
+- [ ] SFX volume balanced under music (music -6dB relative to SFX is a sane default)
+- [ ] AudioContext created on first user gesture (autoplay policy)
+- [ ] Mute toggle persists and is reachable from pause
 | Hit-stop             | Cap freeze at 10 frames max                     |
 | Particle overlap     | Merge overlapping particles in low-end mode     |
 

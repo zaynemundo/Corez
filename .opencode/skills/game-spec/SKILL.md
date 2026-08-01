@@ -133,6 +133,16 @@ Formulates structured, validated `game-spec.json` files from brainstorm output. 
   "progression": {
     "abilities": ["wall-jump", "dash", "double-jump"],
     "unlockOrder": "linear"
+  },
+  "story": {
+    "type": "emergent",
+    "premise": "A lone courier races through a neon city to deliver a package before sunrise",
+    "emotionArc": "curious -> tense -> triumphant"
+  },
+  "mood": {
+    "vibe": "retro-neon",
+    "visual": "cyan/magenta on deep purple, sharp geometric shapes",
+    "audio": "synthwave tempo 120bpm, square-wave SFX"
   }
 }
 ```
@@ -183,13 +193,22 @@ Apply these checks programmatically before accepting a spec:
 - [ ] All point values must be >= 0
 - [ ] If `comboSystem` is true, at least one enemy must exist
 
+### Story (optional)
+- [ ] `type` must be one of: `explicit`, `emergent`, `player-projected`
+- [ ] If `explicit`, a `premise` string must be present
+- [ ] `emotionArc` (if present) must list emotions in play order
+
+### Mood (optional)
+- [ ] `vibe` must match one of the `game-art-direction` themes (retro, cyberpunk, fantasy, minimalist, etc.)
+- [ ] `audio` direction must be achievable with the project size (SMALL: procedural only)
+
 ---
 
 ## 4. Spec Generation Process
 
 ```
 Step 1: Read brainstorm output
-        -> Extract vision, fantasy, genre, loop, mechanics, controls
+        -> Extract vision, fantasy, genre, loop, mechanics, controls, story, mood
         -> If any section is missing, reject and request game-brainstorm completion
 
 Step 2: Map fields 1:1
@@ -198,6 +217,8 @@ Step 2: Map fields 1:1
         -> core_loop.* -> coreLoop.*
         -> controls.* -> controls.*
         -> mechanics -> enemies, scoring, progression
+        -> story.type/premise/emotion_arc -> story.* (recorded, informs pacing)
+        -> mood.vibe/visual/audio -> mood.* (passed to art-direction + polish)
 
 Step 3: Write win/lose conditions
         -> winCondition must describe an end state reachable through the macro loop

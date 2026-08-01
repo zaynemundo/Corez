@@ -137,8 +137,37 @@ Eliminate any mechanic that fails 3 or more checks.
 
 ---
 
-## 6. Control Scheme Brainstorming
+## 6. Story & Mood Formulation
 
+Every game has a story — if not explicit, the player creates it from the mechanics (rising numbers in 2048, silent interactions in Monument Valley). Capturing Story and Mood up front makes the rest of the design concrete.
+
+### Story Worksheet
+```
+Story type:   [explicit narrative | emergent-from-mechanics | player-projected]
+Premise:      [One sentence — what happens in the world]
+Emotion arc:  [How should the player feel at minute 1, 5, 30?]
+Memorable:    [What moment should players retell to a friend?]
+Ending:       [What emotional note does the game end on?]
+```
+
+- If the story is **emergent**, state what the player-created narrative is (e.g., "the rising empire of your civilization")
+- If the story is **explicit**, keep it deliverable in 3 screens of text or less for a SMALL/MEDIUM game
+- Every mechanic should reinforce at least one emotional beat — mechanics that contradict the emotion get cut
+
+### Mood Worksheet
+```
+Vibe:         [retro chiptune | modern flat | cozy | dark/tense | whimsical]
+Visual:       [palette direction, shape language — feed to game-art-direction]
+Audio:        [music genre/tempo, SFX character — feed to game-polish]
+First impression: [What does the player see/hear in the first 3 seconds?]
+Contrast:     [What mood shift punctuates important moments?]
+```
+
+**Mood validation:** the mood must be achievable with the project's art budget (SMALL = 1 palette + procedural audio; LARGE = multiple palettes + music). If the mood requires art the size can't support, simplify the mood.
+
+---
+
+## 7. Control Scheme Brainstorming
 ### Keyboard-first (browser default)
 | Action | Key | Alternative | Why |
 |--------|-----|-------------|-----|
@@ -175,7 +204,7 @@ Eliminate any mechanic that fails 3 or more checks.
 
 ---
 
-## 7. Output Format for game-spec Consumption
+## 8. Output Format for game-spec Consumption
 
 After brainstorming, produce structured notes:
 
@@ -197,6 +226,18 @@ genre:
   primary_challenge: "reflexes | strategy | resource | exploration | social"
   scope: "single-screen | scrolling | hub | open-world"
 
+story:
+  type: "explicit | emergent | player-projected"
+  premise: "One sentence"
+  emotion_arc: "minute 1 -> minute 5 -> minute 30"
+  memorable_moment: "What players retell"
+
+mood:
+  vibe: "retro | modern | cozy | dark | whimsical"
+  visual: "Palette/shape direction for game-art-direction"
+  audio: "Music genre + SFX character for game-polish"
+  first_impression: "What the player sees/hears in 3 seconds"
+
 core_loop:
   micro: { input: "press X", action: "character does Y", feedback: "screen shows Z", state_change: "+10 score" }
   meso: { goal: "complete room", obstacle: "enemy waves", reward: "key item", pacing: "tension builds then resets on clear" }
@@ -215,7 +256,7 @@ controls:
 
 ---
 
-## 8. Anti-Patterns to Avoid
+## 9. Anti-Patterns to Avoid
 
 | Anti-Pattern | Why It Fails | Better Approach |
 |---|---|---|

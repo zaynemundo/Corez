@@ -87,6 +87,45 @@ class Pool<T> {
 
 If total exceeds 16ms consistently, reduce render budget first (most common offender).
 
+### Target Frame Rate
+
+Not every game needs 60 FPS. Set an explicit target and clamp the loop:
+
+| Genre | Target FPS | Why |
+|-------|-----------|-----|
+| Platformer / fighter / bullet hell | 60 | Reaction-critical, motion clarity |
+| Puzzle / visual novel / card game | 30 | Input-driven, slow visuals |
+| Sim / strategy with heavy simulation | 30 | Save CPU for sim ticks |
+
+```typescript
+const TARGET_FPS = 60;
+const FRAME_MS = 1000 / TARGET_FPS;
+let last = performance.now();
+function frame(now: number) {
+  const dt = Math.min(now - last, FRAME_MS * 2);
+  last = now;
+  update(dt);
+  render();
+}
+```
+
+Set the target in `config.ts` (per `game-architecture`) and use it for all budgets above. A lower target lets the device spend less time rendering and reduces heat/battery drain.
+
+### Culling (skip invisible work)
+
+- **Off-screen entities**: skip update+render for entities outside the viewport (broad-phase AABB vs camera rect).
+- **Distant particles**: pause particle emitters off-screen; reset on return.
+- **Parallax layers**: render only layers intersecting the camera view.
+- **Canvas clipping**: use `ctx.clip()` to the visible rect once per frame for huge worlds.
+
+### Asset Compression
+
+| Asset | Rule |
+|-------|------|
+| Texture | Multiple of 4 (or power of 2) dimensions; spritesheet packing; PNG8 for flat palettes |
+| Audio | SFX as procedural Web Audio (zero cost) or compressed OGG; stream music instead of preloading all tracks |
+| SVG | Inline critical icons, reference the rest; strip unnecessary precision |
+
 ---
 
 ## 5. Tools

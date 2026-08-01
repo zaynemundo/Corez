@@ -105,3 +105,27 @@ TC-<section>-<number>: <description>
 - [ ] Mobile layout renders without overflow
 - [ ] Touch controls functional on at least one touch device
 - [ ] Rapid input does not break state machine
+
+---
+
+## 6. Playtesting with Humans
+
+Automated tests prove correctness; human playtests reveal playability. Run at least one human playtest before release.
+
+### Rules
+- **Never self-playtest as the only test** — the designer plays "as intended" and misses what's broken.
+- Watch the player live (in person or via screen share) — players often fail to describe bugs; seeing them is faster.
+- Give no instructions; observe whether the player figures out the controls and goal unaided.
+- Watch for: hesitation >3s (confusing), repeated wrong input (bad mapping), frustration cues (jumping repeatedly at a puzzle).
+
+### Playtest protocol
+1. One player at a time, fresh state, no hints.
+2. Note three things: (a) what they struggled with, (b) what delighted them, (c) where they stopped paying attention.
+3. Fix the top-1 frustration, then re-test with a NEW player.
+4. For every **targeted platform** (Windows/macOS/Linux, Android/iOS, touch vs keyboard), repeat a shortened pass — editor ≠ deployed: it may work in dev and break where it matters.
+
+### Platform testing checklist
+- [ ] Tested on all targeted OS/browser combinations
+- [ ] Touch controls tested on a real touch device (not just emulation)
+- [ ] Keyboard-only path fully playable
+- [ ] Tested with the production build (`npm run build` + deployed worker), not just dev server

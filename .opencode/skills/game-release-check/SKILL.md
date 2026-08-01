@@ -3,7 +3,7 @@ name: game-release-check
 description: Producer final-gate skill for release signoff checklists that block release when any check fails.
 version: 1.0.0
 tags: [release, signoff, gate, qa, code-review]
-dependencies: [game-qa-plan, game-regression, game-smoke-test, game-performance-review, game-code-review, game-visual-review, game-bug-triage]
+dependencies: [game-qa-plan, game-regression, game-smoke-test, game-performance-review, game-code-review, game-visual-review, game-bug-triage, game-publish]
 token_estimate: 100
 ---
 

@@ -3,7 +3,7 @@ name: game-start
 description: Initiates the AI Game Studio workflow for browser game requests, sizing complexity (SMALL, MEDIUM, LARGE) and provisioning required departments.
 version: 1.0.0
 tags: [orchestration, producer, workflow, game-studio, complexity-sizing]
-dependencies: [game-brainstorm, game-spec, game-art-direction, game-asset-spec, game-task-plan, game-implement, game-code-review, game-qa-plan, game-smoke-test, game-regression, game-performance-review, game-visual-review, game-release-check, game-bug-triage]
+dependencies: [game-brainstorm, game-spec, game-art-direction, game-asset-spec, game-task-plan, game-implement, game-code-review, game-qa-plan, game-smoke-test, game-regression, game-performance-review, game-visual-review, game-release-check, game-bug-triage, game-publish]
 token_estimate: 4500
 ---
 
@@ -219,6 +219,7 @@ task_graph:
         - "Run game-code-review for spec compliance and safety audit"
         - "Run lint (npm run lint)"
         - "Run game-release-check and obtain final signoff"
+        - "Run game-publish (optional): distribution pages, press kit, launch posts"
         - "Fix any failures"
 
 entry_criteria_met: true
