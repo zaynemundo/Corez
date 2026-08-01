@@ -27,7 +27,7 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
 ## Adaptation Highlights for CoreZ
 
 1. **Native OpenCode + OpenCode Go Models**:
-   - All agents adapted to native `.opencode/agents/*.md`, `.opencode/skills/`, and `.opencode/commands/`.
+   - All agents adapted to native `.opencode/agents/*.md`, `.opencode/commands/`, and the consolidated `game-development` skill in `.agents/skills/game-development/` (the former `.opencode/skills/game-*` suite merged into one 18-part skill).
    - All AI models mapped strictly to `opencode-go/*` provider endpoints (`deepseek-v4-flash`, `deepseek-v4-pro`, `kimi-k3`).
 
 2. **Game Complexity Sizing**:
