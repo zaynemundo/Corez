@@ -2262,6 +2262,20 @@ function synthesizeCustomGame(prompt) {
   return null;
 }
 
+// Build the "why" for the honest fallback: name the transport error when the
+// fetch itself failed, and point local users at the missing Worker backend.
+export function describeHostedUnavailable(hostedError) {
+  const message = hostedError?.message || '';
+  const isTransportFailure = /networkerror|failed to fetch|load failed|fetch failed|ERR_CONNECTION|net::/i.test(message);
+  const onLocalhost = typeof window !== 'undefined'
+    && /^(localhost|127\.0\.0\.1|\[::1\])/i.test(window.location.hostname || '');
+  let reason = message ? ` The hosted AI service is unavailable: ${message}` : ' The hosted AI service is currently unavailable.';
+  if (isTransportFailure && onLocalhost) {
+    reason += ' Locally, /api/* is proxied to the Cloudflare Worker on port 8787 — start it with `npx wrangler dev` (with a provider key in .dev.vars) so this request has a backend to answer.';
+  }
+  return reason;
+}
+
 // Generate concise, natural AI responses for any public user
 export async function generateLocalAIResponse(prompt, hostedError = null) {
   const cleanPrompt = prompt.trim();
@@ -2278,7 +2292,7 @@ export async function generateLocalAIResponse(prompt, hostedError = null) {
   const userRequestPart = cleanPrompt.split(/User Request:\s*/i).slice(-1)[0]?.trim() || '';
 
   if (revisionMatch) {
-    const reason = hostedError?.message ? ` The hosted AI service is unavailable: ${hostedError.message}` : ' The hosted AI service is currently unavailable.';
+    const reason = describeHostedUnavailable(hostedError);
     return `I can see the code you want to revise, but I couldn't apply your revision (${userRequestPart || 'no request captured'}).${reason} Please check that an AI provider is configured (e.g. DEEPSEEK_API_KEY set as a secret on the deployed worker or in .dev.vars for local dev) and try again — your code has not been changed.`;
   }
 
@@ -2302,7 +2316,7 @@ export async function generateLocalAIResponse(prompt, hostedError = null) {
   if (intent.type === 'app' && !hasEmbeddedCode && !/^revise\s/i.test(cleanPrompt)) {
     const gameResult = synthesizeCustomGame(cleanPrompt);
     if (!gameResult) {
-      const reason = hostedError?.message ? ` The hosted AI service is unavailable: ${hostedError.message}` : ' The hosted AI service is currently unavailable.';
+      const reason = describeHostedUnavailable(hostedError);
       return `I'd love to build that for you, but it doesn't match any app template I can synthesize offline, and ${reason.trim()} — so I can't create this specific app right now. Please check the AI service configuration (e.g. DEEPSEEK_API_KEY for local dev) and try again.`;
     }
     return `I've created **${gameResult.title}** for you! Click below to open it live in the preview canvas on the right side.\n\n\`\`\`html\n${gameResult.html}\n\`\`\``;
@@ -2311,7 +2325,7 @@ export async function generateLocalAIResponse(prompt, hostedError = null) {
   // 4. PUBLIC USER INTENT RESPONSES
   if (intent.type === 'code-help') {
     if (hasEmbeddedCode) {
-      const reason = hostedError?.message ? `: ${hostedError.message}` : '';
+      const reason = describeHostedUnavailable(hostedError).replace(/^ The hosted AI service is unavailable/, '');
       return `I can see the code you shared, but the hosted AI service is currently unavailable${reason}, so I couldn't analyse or revise it. Please check the AI service configuration and try again — your code has not been changed.`;
     }
     return `I understand the goal: ${intent.summary}\n\nShare the snippet, error message, or file you are working on. I’ll walk through what is happening, identify the likely cause, propose a fix, and explain how to verify it so you can move forward without guessing.`;
