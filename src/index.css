@@ -210,7 +210,6 @@ h1, h2, h3, h4, h5, h6 {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border-bottom: 1px solid var(--sidebar-border);
 }
 
 .brand-icon-toggle {
@@ -260,7 +259,6 @@ h1, h2, h3, h4, h5, h6 {
   padding: 7.5px 0;
   display: flex;
   justify-content: center;
-  border-bottom: 1px solid var(--sidebar-border);
 }
 
 .sidebar svg,
@@ -391,7 +389,6 @@ h1, h2, h3, h4, h5, h6 {
 
 .sidebar-footer.icon-only-footer {
   padding: 7.5px 0;
-  border-top: 1px solid var(--sidebar-border);
   display: flex;
   flex-direction: column;
   align-items: center;
