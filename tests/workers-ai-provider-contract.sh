@@ -2,6 +2,7 @@
 set -u
 
 worker="worker/index.js"
+providerChain="worker/providerChain.js"
 service="src/services/aiService.js"
 failures=0
 
@@ -27,20 +28,21 @@ check_absent() {
   fi
 }
 
-check 'Worker routes text through OpenCode Go with the DeepSeek V4 Flash build' 'deepseek-v4-flash' "$worker"
+check 'Worker routes text through OpenCode Go with the DeepSeek V4 Flash build' 'deepseek-v4-flash' "$providerChain"
 check_absent 'Worker no longer routes through MiMo V2.5' 'xiaomi/mimo-v2[.]5' "$worker"
 check_absent 'Worker imposes no AI generation timeouts' 'AbortSignal[.]timeout' "$worker"
 check_absent 'Worker imposes no AI output token caps' 'max_tokens' "$worker"
-check 'Worker reports provider failure details' 'recordFailure' "$worker"
+check 'Worker reports provider failure details' 'recordFailure' "$providerChain"
 check_absent 'Worker no longer uses Cloudflare Workers AI models' '@cf/' "$worker"
 check_absent 'Worker no longer invokes the Workers AI binding' 'env[.]AI[.]run' "$worker"
 check 'Worker sends a system message' "role: 'system'" "$worker"
 check 'Worker sends a user message' "role: 'user'" "$worker"
-check_absent 'Worker no longer routes to the OpenRouter text endpoint' 'openrouter[.]ai' "$worker"
-check_absent 'Worker no longer accepts OPENROUTER_API_KEY' 'OPENROUTER_API_KEY' "$worker"
-check_absent 'Worker no longer routes to the official DeepSeek API' 'api[.]deepseek[.]com' "$worker"
-check_absent 'Worker no longer accepts DEEPSEEK_API_KEY' 'DEEPSEEK_API_KEY' "$worker"
-check 'Worker uses the OpenCode Go endpoint' 'opencode[.]ai' "$worker"
+check 'Worker routes to the OpenRouter text endpoint' 'openrouter[.]ai' "$providerChain"
+check 'Worker accepts OPENROUTER_API_KEY' 'OPENROUTER_API_KEY' "$providerChain"
+check 'Worker routes to the official DeepSeek API' 'api[.]deepseek[.]com' "$providerChain"
+check 'Worker accepts DEEPSEEK_API_KEY' 'DEEPSEEK_API_KEY' "$providerChain"
+check 'Worker uses the OpenCode Go endpoint' 'opencode[.]ai' "$providerChain"
+check 'Worker keeps OpenCode Go as the preferred provider' 'OPENCODE_GO_API_KEY' "$providerChain"
 check 'Worker recognises canonical code-help intent' "'code-help'" "$worker"
 check 'Worker recognises canonical swarm intent' "'swarm'" "$worker"
 check_absent 'Worker no longer branches on retired coding intent' "intentType === 'coding'" "$worker"

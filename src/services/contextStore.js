@@ -15,10 +15,14 @@
  * must-preserve constraints, unresolved decisions.
  */
 
+import { getContextClient } from './contextStoreClient.js';
+
 const STORE_KEY = 'corez_context_records';
 
-function isBrowser() {
-  return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+function localStore() {
+  if (typeof window !== 'undefined' && window.localStorage) return window.localStorage;
+  if (typeof globalThis !== 'undefined' && globalThis.localStorage) return globalThis.localStorage;
+  return null;
 }
 
 function safeParse(text) {
@@ -30,40 +34,72 @@ function safeParse(text) {
 }
 
 export function loadContextRecords() {
-  if (!isBrowser()) return {};
-  return safeParse(window.localStorage.getItem(STORE_KEY)) || {};
+  const storage = localStore();
+  if (!storage) return {};
+  return safeParse(storage.getItem(STORE_KEY)) || {};
 }
 
 export function storeContextRecords(records) {
-  if (!isBrowser()) return;
+  const storage = localStore();
+  if (!storage) return;
   const existing = loadContextRecords();
   // Best-effort persistence: the browser localStorage quota (a few MB) may be
   // exceeded when a compacted conversation contained very large messages.
   // Persistence must never break the request — the summary carries the
   // content regardless.
   try {
-    window.localStorage.setItem(STORE_KEY, JSON.stringify({ ...existing, ...records }));
+    storage.setItem(STORE_KEY, JSON.stringify({ ...existing, ...records }));
   } catch {
     // Record persistence is optional; skip silently.
   }
 }
 
-export function retrieveContextRecords(keys) {
-  const records = loadContextRecords();
-  const list = Array.isArray(keys) ? keys : [keys];
-  return list
-    .map((key) => records[key])
-    .filter(Boolean)
-    .map((record) => record.content);
+/**
+ * Retrieve a single context record in full: { id, createdAt, messages }.
+ * Returns null when the record does not exist. The exact stored messages are
+ * returned — never a summary and never the (legacy, string) .content field.
+ * Backward compatibility: a legacy record that has .content but no .messages
+ * is returned as-is.
+ */
+export function retrieveContextRecord(recordId) {
+  if (typeof recordId !== 'string' || !recordId) return null;
+  const sessionRecord = getContextClient().store.get(recordId);
+  if (sessionRecord) return sessionRecord;
+  const legacy = loadContextRecords()[recordId];
+  return legacy || null;
+}
+
+/**
+ * Retrieve the exact message objects of a context record. Returns [] when the
+ * record is unknown or when a legacy .content record (no .messages) is found.
+ */
+export function retrieveContextMessages(recordId) {
+  const record = retrieveContextRecord(recordId);
+  if (!record) return [];
+  return Array.isArray(record.messages) ? record.messages : [];
+}
+
+/**
+ * Retrieve exact message arrays for multiple record ids, preserving the input
+ * order. Unknown records yield [] at their position.
+ */
+export function retrieveContextRecords(recordIds) {
+  const list = Array.isArray(recordIds) ? recordIds : [recordIds];
+  return list.map((recordId) => retrieveContextMessages(recordId));
 }
 
 export function deleteContextRecords(keys) {
-  if (!isBrowser()) return;
+  const storage = localStore();
+  if (!storage) return;
   const records = loadContextRecords();
   for (const key of Array.isArray(keys) ? keys : [keys]) {
     delete records[key];
   }
-  window.localStorage.setItem(STORE_KEY, JSON.stringify(records));
+  try {
+    storage.setItem(STORE_KEY, JSON.stringify(records));
+  } catch {
+    // Best effort.
+  }
 }
 
 function makeRecordId() {
@@ -160,18 +196,50 @@ export function buildContextSummary(messages) {
  * Persist dropped messages as exact retrievable records and return a
  * system message that contains the REAL summary plus links back to the
  * records.
+ *
+ * Persistence flow:
+ *   1. The record lands synchronously in the shared in-session store (exact
+ *      retrieval within the session) and in the lightweight localStorage
+ *      metadata index ({ recordId, createdAt, summaryKeys }).
+ *   2. With a server backend, the record is pushed to the R2-backed
+ *      /api/context/records worker endpoint asynchronously — the durable
+ *      copy that survives a page refresh.
+ *
+ * Honesty contract: persisted is true only when the local index write
+ * succeeded on a configured backend. When durable storage is unavailable
+ * (no backend, localStorage quota) the summary marks { persisted: false }
+ * and never claims full records are retrievable by key. The in-session copy
+ * is always kept (a record is never silently deleted).
+ *
+ * The heuristic caps in buildContextSummary (400 chars/line, 2 MB topic
+ * scan, 8 topics, 24 keys, 48-char keys) are indexing optimisations only:
+ * the exact source is durably retrievable, so the summary never needs to be
+ * a lossless transcript.
  */
 export function persistAndSummarize(messages) {
+  const messagesList = Array.isArray(messages) ? messages : [];
   const recordId = makeRecordId();
+  const built = buildContextSummary(messagesList);
   const record = {
     id: recordId,
     createdAt: Date.now(),
-    messages: Array.isArray(messages) ? messages : []
+    messages: messagesList,
+    summaryKeys: built.retrievalKeys
   };
-  storeContextRecords({ [recordId]: record });
 
-  const built = buildContextSummary(messages);
-  const parts = ['[Context compaction: earlier messages persisted as exact retrievable records. Summary with retrieval links below; full records can be re-fetched verbatim by key.]'];
+  const client = getContextClient();
+  const saved = client.saveRecordSync(record);
+  if (client.backend === 'server') {
+    // Fire-and-forget durable push: the session copy already guarantees
+    // exact retrieval within this session; the server copy completes the
+    // cross-refresh guarantee in the background.
+    void client.saveRecord(record);
+  }
+  const persisted = Boolean(saved.ok);
+
+  const parts = persisted
+    ? ['[Context compaction: earlier messages persisted as exact retrievable records. Summary with retrieval links below; full records can be re-fetched verbatim by key.]']
+    : ['[Context compaction: earlier messages kept in-session but NOT durably persisted (persisted: false). The summary below is the only reliable source of the extracted content.]'];
 
   if (built.summary.topics.length > 0) {
     parts.push(`Topics: ${built.summary.topics.join(', ')}.`);
@@ -191,10 +259,15 @@ export function persistAndSummarize(messages) {
   if (built.summary.codeSignatures.length > 0) {
     parts.push(`Code blocks referenced: ${built.summary.codeSignatures.join(' | ')}`);
   }
-  parts.push(`Full records: retrieve by key "${recordId}" (or via retrieveContextRecords).`);
+  if (persisted) {
+    parts.push(`Full records: retrieve by key "${recordId}" (or via retrieveContextRecords).`);
+  } else {
+    parts.push('Full records are not retrievable: durable storage was unavailable (persisted: false).');
+  }
 
   return {
     recordId,
+    persisted,
     summaryMessage: {
       role: 'system',
       content: parts.join('\n')

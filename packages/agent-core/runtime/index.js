@@ -53,7 +53,7 @@ Mandatory repository workflow — do not skip steps:
 4. Implement the changes with \`write_file\` / \`edit_file\`.
 5. Verify: run targeted tests (\`run_tests\`), lint (\`run_lint\`), build (\`run_build\`), and \`git_diff_check\`.
 6. Inspect the final \`git_diff\` AFTER your last change.
-7. Call \`finalize_task\` with the completion evidence. If it reports missing actions, perform them and call it again.
+7. Call \`finalize_task\` with structured completion evidence: \`constraints\` (each verified, with a non-empty verificationMethod and evidence) and \`reviewFindings\` (a real review pass; every blocking finding resolved with resolutionEvidence). Boolean flags are not accepted as proof.
 8. Only when \`finalize_task\` passes may you give the final summary.
 
 You MUST NOT finish the task merely by answering without tool calls: an unfinished repository operation continues with the next required action.
@@ -76,6 +76,65 @@ ${this.contextEngine.buildSystemContextPrompt()}`;
     let previousStepSnapshot = null;
     let previousActionKeys = null;
     let previousAssistantContent = null;
+    let finalSummaryContent = null;
+
+    // After the completion gate passes, the runtime performs ONE additional
+    // provider call with tools disabled: the model turns the verified
+    // evidence into the final user-facing summary. If that call fails, the
+    // last assistant message is used as a fallback (the task never crashes).
+    const performFinalSummary = async (stepNumber) => {
+      const evidence = {
+        goal: userPrompt,
+        plan: Array.from(gate.planItems.entries()).map(([id, item]) => ({
+          id,
+          description: item.description,
+          status: item.status
+        })),
+        changedFiles: Array.from((gate.fileLifecycles || new Map()).entries())
+          .filter(([, lifecycle]) => lifecycle.lastSuccessfulWriteAt !== null)
+          .map(([filePath]) => filePath),
+        tests: gate.toolExecutions.get('run_tests') ?? null,
+        lint: gate.toolExecutions.get('run_lint') ?? null,
+        build: gate.toolExecutions.get('run_build') ?? null,
+        diffCheck: gate.toolExecutions.get('git_diff_check') ?? null,
+        constraintEvidence: gate.constraintEvidence ?? [],
+        reviewResults: gate.reviewResults ?? [],
+        remainingRisks: (gate.reviewResults ?? [])
+          .filter((finding) => !((finding?.severity || 'blocking') === 'blocking' && finding?.status === 'resolved'))
+          .map((finding) => ({
+            findingId: finding?.findingId,
+            severity: finding?.severity,
+            description: finding?.description
+          }))
+      };
+      messages.push({
+        role: 'user',
+        content: `[FINAL RESPONSE REQUIRED] The completion gate has passed. Produce the final user response with exactly these sections: "Completed", "Changed", "Verified", "Preserved", "Remaining". Do not include hidden chain-of-thought. Verified evidence:\n${JSON.stringify(evidence, null, 2)}`
+      });
+      let content;
+      try {
+        const aiResponse = await this.providerRouter.generate({
+          model,
+          messages,
+          tools: [],
+          reasoning: this.config.reasoning,
+          signal
+        });
+        content = (aiResponse && aiResponse.content) || '';
+      } catch (err) {
+        if (err.name === 'AbortError' || signal?.aborted) {
+          throw new Error('Task execution cancelled by user (SIGINT).', { cause: err });
+        }
+        // Provider failure on the final call: fall back to the last
+        // assistant message below instead of crashing the task.
+        content = null;
+      }
+      if (content !== null) {
+        messages.push({ role: 'assistant', content });
+        stepsHistory.push({ step: stepNumber, content, toolCallsCount: 0 });
+      }
+      return content;
+    };
 
     // No fixed step cap: the task runs until the completion gate passes, the
     // user cancels, a permanent blocker is proven, or all providers fail.
@@ -124,6 +183,9 @@ ${this.contextEngine.buildSystemContextPrompt()}`;
         }
         // Repository mode: completion requires the evidence-backed gate.
         if (gate.finalizePassed) {
+          currentStep++;
+          onStatus({ type: 'step', step: currentStep, message: 'Generating the final summary...' });
+          finalSummaryContent = await performFinalSummary(currentStep);
           onStatus({ type: 'complete', message: 'Task completed (completion gate passed).' });
           gatePassed = true;
           break;
@@ -142,9 +204,8 @@ ${this.contextEngine.buildSystemContextPrompt()}`;
         // instruction naming the next missing action.
         const gateEval = evaluateCompletionGate(gate, {
           availableScripts,
-          declaredConstraints: [],
-          reviewFindingsResolved: false,
-          unrelatedChangesPreserved: false
+          constraints: [],
+          reviewFindings: []
         });
         const next = gateEval.missing[0] || 'call finalize_task with the completion evidence';
         onStatus({ type: 'continuation', message: `Repository task unfinished. Next action: ${next}` });
@@ -183,7 +244,7 @@ ${this.contextEngine.buildSystemContextPrompt()}`;
         });
 
         onStatus({ type: 'tool_end', name: fnName, result });
-        recordToolExecution(gate, fnName, fnArgs, result);
+        recordToolExecution(gate, fnName, fnArgs, result, this.cwd);
         tracker.applyToolResult(fnName, fnArgs, result);
 
         if (fnName === 'finalize_task' && result?.success === true) {
@@ -198,10 +259,15 @@ ${this.contextEngine.buildSystemContextPrompt()}`;
         });
       }
 
-      // The completion gate passed: the task is finished. Stop immediately —
-      // running another step would repeat identical actions against unchanged
-      // evidence, which is a deterministic stall, not a continuation.
+      // The completion gate passed: the task's evidence is complete. Do NOT
+      // break immediately — perform ONE additional provider call with tools
+      // disabled so the model produces the final user-facing summary from
+      // the verified evidence. The final call is not an implementation step,
+      // so it can never trigger a deterministic-stall blocker.
       if (gatePassed) {
+        currentStep++;
+        onStatus({ type: 'step', step: currentStep, message: 'Generating the final summary...' });
+        finalSummaryContent = await performFinalSummary(currentStep);
         onStatus({ type: 'complete', message: 'Task completed (completion gate passed).' });
         break;
       }
@@ -228,7 +294,9 @@ ${this.contextEngine.buildSystemContextPrompt()}`;
       previousActionKeys = stepResultKeys.join('|');
     }
 
-    const lastAssistantMessage = [...messages].reverse().find(m => m.role === 'assistant')?.content || 'Task finished.';
+    const lastAssistantMessage = (finalSummaryContent
+      ?? [...messages].reverse().find(m => m.role === 'assistant')?.content)
+      || 'Task finished.';
 
     return {
       success: !blocked,

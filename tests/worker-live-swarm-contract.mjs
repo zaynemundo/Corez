@@ -2,8 +2,12 @@ import assert from 'node:assert/strict';
 import worker, {
   buildSwarmAgentSpecs,
   runAdaptiveAgentPool,
+  runSwarmMultiWave,
+  continueSwarmTask,
+  runSwarmTask,
   shouldUseSwarm
 } from '../worker/swarm-index.js';
+import { createTaskStateStore } from '../worker/utils.js';
 
 const originalOpenRouterKey = process.env.OPENROUTER_API_KEY;
 delete process.env.OPENROUTER_API_KEY;
@@ -52,8 +56,9 @@ async function run() {
   const expandedSpecs = buildSwarmAgentSpecs('app', expandedPrompt);
 
   assert.ok(simpleSpecs.length >= 5);
-  // No fixed swarm cap: every independent requirement becomes a specialist
-  // workstream. Only the platform subrequest ceiling (900) can bound it.
+  // The wave size is a per-invocation operational boundary, not a total
+  // swarm limit: every independent requirement becomes a workstream and is
+  // executed in persisted waves.
   assert.equal(expandedSpecs.length, 4 + 24);
   assert.ok(expandedSpecs.length <= 900);
   assert.ok(expandedSpecs.length > simpleSpecs.length);
@@ -144,7 +149,21 @@ async function run() {
     assert.equal(data.swarm.completed, expectedAgentCount);
     assert.equal(data.swarm.failed, 0);
     assert.equal(data.swarm.skipped, 0);
-    assert.equal(openCodeRequests.length, expectedAgentCount + 1);
+
+    // 7 completed outputs (4 core + 3 requirements) exceed the collapse
+    // threshold, so the hierarchy runs: specialists + one wave summary per
+    // wave + one domain summary per domain + the final synthesis call.
+    assert.ok(openCodeRequests.length >= expectedAgentCount + 1);
+    const synthesisPayload = openCodeRequests.find(
+      (payload) => payload.messages?.[0]?.content.includes("You are COREZ AI's lead synthesis agent.")
+    );
+    assert.ok(synthesisPayload, 'final synthesis call must exist');
+    const synthesisUser = synthesisPayload.messages.at(-1).content;
+    assert.match(synthesisUser, /Domain summary/);
+    assert.doesNotMatch(synthesisUser, /### Contribution/);
+    assert.match(synthesisUser, new RegExp(`Hierarchy coverage: ${expectedAgentCount} specialist outputs`));
+    assert.ok(openCodeRequests.some((payload) => payload.messages?.[0]?.content.includes('wave summary')));
+    assert.ok(openCodeRequests.some((payload) => payload.messages?.[0]?.content.includes('domain summary')));
 
     for (const payload of openCodeRequests) {
       assert.match(payload.model, /deepseek/i);
@@ -152,6 +171,21 @@ async function run() {
       assert.equal(payload.provider, undefined);
       assert.equal(payload.max_tokens, undefined);
     }
+
+    // runSwarmTask keeps the documented response shape.
+    const direct = await runSwarmTask(
+      { prompt: body.prompt, intent: body.intent, complexity: 'high' },
+      { OPENCODE_GO_API_KEY: 'sk-opencode-test' },
+      null,
+      { drain: true, store: createTaskStateStore({}) }
+    );
+    assert.equal(typeof direct.content, 'string');
+    assert.equal(direct.content, 'Integrated live swarm response');
+    assert.equal(typeof direct.model, 'string');
+    assert.equal(typeof direct.taskId, 'string');
+    assert.equal(direct.taskStatus, 'completed');
+    assert.equal(typeof direct.telemetry, 'object');
+    assert.equal(direct.telemetry.completed, expectedAgentCount);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -218,19 +252,227 @@ async function run() {
   }
 
   // Without an OpenCode Go key the swarm reports an honest error instead of
-  // pretending another provider exists.
+  // pretending another provider exists. The provider chain fallback (official
+  // DeepSeek API) is stubbed deterministically: a permanent 401 means the
+  // worker must return 502 with no live network access.
   {
-    const response = await post(
-      {
-        prompt: 'Build a responsive retro platformer. Add touch controls. Add sound effects.',
-        intent: { type: 'app', summary: 'Build a complete browser game.' },
-        complexity: 'high'
+    const originalFetch = globalThis.fetch;
+    const deepSeekRequests = [];
+    try {
+      globalThis.fetch = async (url) => {
+        assert.equal(url, 'https://api.deepseek.com/chat/completions');
+        deepSeekRequests.push(url);
+        return new Response('unauthorized', { status: 401 });
+      };
+
+      const response = await post(
+        {
+          prompt: 'Build a responsive retro platformer. Add touch controls. Add sound effects.',
+          intent: { type: 'app', summary: 'Build a complete browser game.' },
+          complexity: 'high'
+        },
+        environment({ DEEPSEEK_API_KEY: 'sk-deepseek-test' })
+      );
+      assert.equal(response.status, 502);
+      const payload = await response.json();
+      assert.match(String(payload.error), /blocked with no usable specialist output/);
+      assert.match(String(payload.detail), /No specialist can ever complete/);
+      assert.ok(deepSeekRequests.length > 0);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  }
+
+  // Durable continuation: task state survives store recreation (a NEW store
+  // object bound to the same fake bucket Map), continuations resume rather
+  // than restart, and duplicate continuation calls never duplicate work.
+  {
+    const bucketMap = new Map();
+    const bucket = {
+      async put(key, value) { bucketMap.set(key, String(value)); },
+      async get(key) {
+        const value = bucketMap.get(key);
+        return value === undefined ? null : { async text() { return value; } };
       },
-      environment({ DEEPSEEK_API_KEY: 'sk-deepseek-test' })
-    );
-    assert.equal(response.status, 502);
-    const payload = await response.json();
-    assert.match(String(payload.error), /Unable to generate AI response/);
+      async delete(key) { bucketMap.delete(key); }
+    };
+    const baseEnv = { OPENCODE_GO_API_KEY: 'sk-opencode-test', ASSET_BUCKET: bucket };
+    const specs = buildSwarmAgentSpecs('app', expandedPrompt);
+    const totalSpecs = specs.length;
+    const taskId = 'swarm-durable-continuation-test';
+
+    const originalFetch = globalThis.fetch;
+    let providerCalls = 0;
+    try {
+      globalThis.fetch = async (url, init) => {
+        assert.equal(url, 'https://opencode.ai/zen/go/v1/chat/completions');
+        providerCalls += 1;
+        const payload = JSON.parse(init.body);
+        const system = payload.messages?.[0]?.content || '';
+        let content;
+        if (system.includes("You are COREZ AI's lead synthesis agent.")) {
+          content = 'Durable final answer';
+        } else if (system.includes('wave summary') || system.includes('domain summary')) {
+          content = 'summary ok';
+        } else {
+          content = 'specialist ok';
+        }
+        return new Response(JSON.stringify({ choices: [{ message: { content } }] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      };
+
+      const storeA = createTaskStateStore(baseEnv);
+      const first = await runSwarmMultiWave({
+        taskId,
+        prompt: expandedPrompt,
+        intentType: 'app',
+        history: [],
+        specs,
+        apiKey: 'sk-opencode-test',
+        env: baseEnv,
+        store: storeA,
+        options: { waveBudget: 6 }
+      });
+      assert.equal(first.completed, false);
+      assert.ok(first.state.completed.length > 0);
+      assert.ok(first.state.queue.length > 0);
+      assert.equal(first.state.completed.length + first.state.queue.length, totalSpecs);
+
+      // A NEW store object over the SAME bucket must see the same state.
+      const storeB = createTaskStateStore(baseEnv);
+      const reloaded = await storeB.load(taskId);
+      assert.ok(reloaded);
+      assert.equal(reloaded.completed.length, first.state.completed.length);
+
+      let previous = first.state;
+      let guard = 0;
+      while (previous.queue.length > 0 && guard < 100) {
+        const next = await continueSwarmTask({ taskId, env: baseEnv, store: storeB, options: { waveBudget: 6 } });
+        assert.ok(['active', 'completed'].includes(next.state.status));
+        // Continuation resumes rather than restarts: the queue shrinks and
+        // completed work never duplicates an agentId.
+        assert.ok(next.state.queue.length < previous.queue.length);
+        assert.equal(
+          new Set(next.state.completed.map((entry) => entry.spec.agentId)).size,
+          next.state.completed.length
+        );
+        assert.equal(next.state.completed.length + next.state.queue.length, totalSpecs);
+        previous = next.state;
+        guard += 1;
+      }
+      assert.equal(previous.status, 'completed');
+      assert.equal(previous.queue.length, 0);
+      assert.equal(previous.completed.length, totalSpecs);
+      assert.equal(previous.finalContent, 'Durable final answer');
+
+      // Duplicate continuation after completion: idempotent — no new waves,
+      // no new provider calls, completed work stable.
+      const callsAfterCompletion = providerCalls;
+      const again = await continueSwarmTask({ taskId, env: baseEnv, store: storeB, options: { waveBudget: 6 } });
+      assert.equal(again.completed, true);
+      assert.equal(again.state.completed.length, totalSpecs);
+      assert.equal(again.state.queue.length, 0);
+      assert.equal(providerCalls, callsAfterCompletion);
+
+      // Duplicate mid-flight continuation: the second call advances the next
+      // wave deterministically without re-running completed agentIds.
+      const taskId2 = 'swarm-duplicate-continuation-test';
+      const first2 = await runSwarmMultiWave({
+        taskId: taskId2,
+        prompt: expandedPrompt,
+        intentType: 'app',
+        history: [],
+        specs,
+        apiKey: 'sk-opencode-test',
+        env: baseEnv,
+        store: storeB,
+        options: { waveBudget: 6 }
+      });
+      assert.equal(first2.completed, false);
+      const second2 = await continueSwarmTask({ taskId: taskId2, env: baseEnv, store: storeB, options: { waveBudget: 6 } });
+      assert.equal(
+        new Set(second2.state.completed.map((entry) => entry.spec.agentId)).size,
+        second2.state.completed.length
+      );
+      assert.ok(second2.state.completed.length > first2.state.completed.length);
+      assert.ok(second2.state.queue.length < first2.state.queue.length);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  }
+
+  // Cancellation during a wave persists status 'cancelled', preserves the
+  // completed results and the remaining queue, and never synthesises.
+  {
+    const bucketMap = new Map();
+    const bucket = {
+      async put(key, value) { bucketMap.set(key, String(value)); },
+      async get(key) {
+        const value = bucketMap.get(key);
+        return value === undefined ? null : { async text() { return value; } };
+      },
+      async delete(key) { bucketMap.delete(key); }
+    };
+    const baseEnv = { OPENCODE_GO_API_KEY: 'sk-opencode-test', ASSET_BUCKET: bucket };
+    const specs = buildSwarmAgentSpecs('app', expandedPrompt);
+    const taskId = 'swarm-cancel-contract-test';
+
+    const originalFetch = globalThis.fetch;
+    let providerCalls = 0;
+    try {
+      globalThis.fetch = async (url, _init) => {
+        assert.equal(url, 'https://opencode.ai/zen/go/v1/chat/completions');
+        providerCalls += 1;
+        return new Response(JSON.stringify({ choices: [{ message: { content: 'x' } }] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      };
+
+      const store = createTaskStateStore(baseEnv);
+      const first = await runSwarmMultiWave({
+        taskId,
+        prompt: expandedPrompt,
+        intentType: 'app',
+        history: [],
+        specs,
+        apiKey: 'sk-opencode-test',
+        env: baseEnv,
+        store,
+        options: { waveBudget: 6 }
+      });
+      assert.equal(first.completed, false);
+      const callsAfterFirstWave = providerCalls;
+      const completedAtCancel = first.state.completed.length;
+      const queueAtCancel = first.state.queue.length;
+
+      const controller = new AbortController();
+      controller.abort();
+      const cancelled = await continueSwarmTask({
+        taskId,
+        env: baseEnv,
+        signal: controller.signal,
+        store,
+        options: { waveBudget: 6 }
+      });
+      assert.equal(cancelled.completed, false);
+      assert.equal(cancelled.cancelled, true);
+      assert.equal(cancelled.state.status, 'cancelled');
+      // Results preserved, queue preserved, no synthesis, no new waves.
+      assert.equal(cancelled.state.completed.length, completedAtCancel);
+      assert.equal(cancelled.state.queue.length, queueAtCancel);
+      assert.equal(cancelled.state.finalContent, null);
+      assert.equal(providerCalls, callsAfterFirstWave);
+
+      const persisted = await store.load(taskId);
+      assert.equal(persisted.status, 'cancelled');
+      assert.equal(persisted.completed.length, completedAtCancel);
+      assert.equal(persisted.queue.length, queueAtCancel);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   }
 
   const delegatedResponse = await post(

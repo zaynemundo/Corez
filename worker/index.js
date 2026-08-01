@@ -1,16 +1,6 @@
 import { handleMarket } from './market.js';
-import { safeErrorDetail, readBoundedJson, jsonResponse } from './utils.js';
-
-// OpenCode Go is the only configured AI provider (serves CoreZ models via
-// the opencode.ai gateway). Direct DeepSeek and OpenRouter integrations have
-// been removed.
-const OPENCODE_DEFAULT_ENDPOINT = 'https://opencode.ai/zen/go/v1/chat/completions';
-const CORE_MODEL = 'deepseek-v4-flash';
-
-const CONTINUATION_NUDGE = {
-  role: 'user',
-  content: 'Your previous reply contained only internal reasoning and no final answer. Now respond with the actual complete final answer to the user\'s request (the code, explanation, or text itself). Do not include thinking, reasoning, or <think> blocks.'
-};
+import { safeErrorDetail, readBoundedJson, jsonResponse, createTaskStateStore } from './utils.js';
+import { runProviderChain, callOpenRouterImage, FLUX_IMAGE_MODEL } from './providerChain.js';
 
 // Storage key segments are validated identically on every R2-backed endpoint:
 // no slashes, no leading dots (blocks ../ traversal), bounded length.
@@ -48,10 +38,6 @@ function generatePublishSlug() {
   }
   const num = 100 + Math.floor(Math.random() * 900);
   return `${word}-${num}`;
-}
-
-function getTargetModels() {
-  return [CORE_MODEL];
 }
 
 const CANONICAL_INTENT_TYPES = new Set([
@@ -178,46 +164,6 @@ ${imageRequestInstructions}
 Inferred intent: ${intentType} - ${intent?.summary || intent?.goal || 'Understand the public user goal and give a useful next step.'}`;
 }
 
-function extractContentText(content) {
-  if (typeof content === 'string') return content;
-  // Multimodal responses can wrap text in content parts: [{ type, text }]
-  if (Array.isArray(content)) {
-    return content
-      .map(part => (part && typeof part === 'object' && typeof part.text === 'string') ? part.text : '')
-      .join('');
-  }
-  return '';
-}
-
-// Reasoning models can emit their internal thought inline wrapped in
-// <think>/<thinking> blocks. Strip those sections so thinking text is never
-// presented as the answer. An unclosed block (output truncated mid-thought)
-// is reasoning too: everything from the marker onward is dropped, since any
-// real answer would only ever follow a closed block.
-function stripThinkingBlocks(text) {
-  if (typeof text !== 'string') return '';
-  return text
-    .replace(/<thinking\b[^>]*>[\s\S]*?<\/thinking>/gi, '')
-    .replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, '')
-    .replace(/<(?:think|thinking)\b[^>]*>[\s\S]*$/gi, '')
-    .trim();
-}
-
-// The real answer of a chat message is its content field. reasoning_content
-// is internal model thought: it is a retry signal, never the answer (surfacing
-// it previously handed users raw <think> dumps instead of the requested code).
-function answerText(message) {
-  if (!message || typeof message !== 'object') return '';
-  return stripThinkingBlocks(extractContentText(message.content));
-}
-
-function hasReasoning(message) {
-  if (!message || typeof message !== 'object') return false;
-  const reasoning = extractContentText(message.reasoning_content);
-  if (reasoning.trim()) return true;
-  return /<(?:think|thinking)\b/i.test(extractContentText(message.content));
-}
-
 async function handleAi(request, env) {
   if (request.method !== 'POST') {
     return jsonResponse(405, { error: 'Method not allowed.' });
@@ -327,17 +273,16 @@ async function handleAi(request, env) {
     apiMessages.push({ role: 'user', content: prompt });
   }
 
-  // 1. OpenCode Go API first if OPENCODE_GO_API_KEY / OPENCODE_API_KEY is
-  // configured (serves the latest DeepSeek V4 Flash builds). The model list
-  // is server-controlled: client-supplied body.model is never trusted.
-  const targetModels = getTargetModels();
-  const opencodeKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY;
-  const opencodeEndpoint = env?.OPENCODE_ENDPOINT || OPENCODE_DEFAULT_ENDPOINT;
-
-  // Generations run as long as the model needs and may use as many tokens
-  // as it wants: no timeouts and no output caps on the provider calls. The
-  // only abort is the client disconnecting (Stop button, tab close), which
-  // must not leave paid generations running.
+  // Provider fallback chain: OpenCode Go is preferred and stays preferred;
+  // the official DeepSeek API and OpenRouter are fallbacks tried in order
+  // only when the preferred provider cannot serve. The same messages travel
+  // to every provider, so a fallback resumes the same task — completed work
+  // is never restarted.
+  //
+  // Generations run as long as the model needs and may use as many tokens as
+  // it wants: no timeouts and no output caps on the provider calls. The only
+  // abort is the client disconnecting (Stop button, tab close), which must
+  // not leave paid generations running.
   const clientDisconnectSignal = (() => {
     const controller = new AbortController();
     if (request.signal) {
@@ -346,106 +291,66 @@ async function handleAi(request, env) {
     }
     return controller.signal;
   })();
-  const providerFailures = [];
-  const recordFailure = (label, reason) => {
-    const safe = safeErrorDetail(reason);
-    if (safe) providerFailures.push(`${label}: ${safe}`);
-  };
-  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-  if (opencodeKey) {
-    const callOpenCodeGo = async (modelId, messagesToSend) => {
-      try {
-        const opencodeResp = await fetch(opencodeEndpoint, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${opencodeKey}`,
-            'HTTP-Referer': 'https://corez.ai',
-            'X-Title': 'COREZ AI',
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: modelId,
-            messages: messagesToSend
-          }),
-          signal: clientDisconnectSignal
-        });
 
-        if (!opencodeResp.ok) {
-          const detail = (await opencodeResp.text().catch(() => '')).slice(0, 200);
-          console.warn(`OpenCode Go model ${modelId} returned HTTP ${opencodeResp.status}:`, safeErrorDetail(detail));
-          const retryAfter = Number(opencodeResp.headers.get('Retry-After') || 0);
-          return {
-            failure: `HTTP ${opencodeResp.status}: ${safeErrorDetail(detail)}`,
-            transient: opencodeResp.status >= 500 || opencodeResp.status === 429,
-            retryAfter: Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : null
-          };
-        }
-        const data = await opencodeResp.json();
-        const message = data?.choices?.[0]?.message;
-        return { content: answerText(message), reasoning: hasReasoning(message) };
-      } catch (opencodeErr) {
-        console.warn(`OpenCode Go model ${modelId} request failed:`, safeErrorDetail(opencodeErr));
-        return { failure: safeErrorDetail(opencodeErr), transient: true, retryAfter: null };
-      }
-    };
+  const result = await runProviderChain(apiMessages, {
+    env,
+    signal: clientDisconnectSignal,
+    store: createTaskStateStore(env),
+    sleep: retrySleepFor(env)
+  });
 
-    for (const modelId of targetModels) {
-      // Condition-based recovery, not a fixed retry count: transient gateway
-      // failures (5xx, 429, 408, network) are retried with adaptive backoff
-      // honouring Retry-After plus jitter until the provider recovers, the
-      // client disconnects, the failure is classified permanent, or the
-      // recovery window exceeds the unavailability horizon. Only then does
-      // the request move to the next model / fallback provider — the chain
-      // itself is the continuation mechanism, and it resumes the same work.
-      let result = await callOpenCodeGo(modelId, apiMessages);
-      let lastFailure = result?.failure || null;
-      let recoveryStartedAt = Date.now();
-      let recoveryAttempts = 0;
-      const HORIZON_MS = 60_000;
-
-      while (result?.failure && result?.transient && !result.permanent) {
-        if (clientDisconnectSignal.aborted) break;
-        recoveryAttempts += 1;
-        const retryAfterMs = result.retryAfter ? result.retryAfter * 1000 : 0;
-        const backoffMs = retryAfterMs > 0
-          ? retryAfterMs
-          : Math.min(750 * 2 ** (recoveryAttempts - 1) + Math.random() * 500, HORIZON_MS);
-        if (Date.now() - recoveryStartedAt + backoffMs >= HORIZON_MS) {
-          // The provider is externally unavailable within this request's
-          // interaction horizon: fall through to the next configured provider.
-          break;
-        }
-        await sleep(backoffMs);
-        result = await callOpenCodeGo(modelId, apiMessages);
-        lastFailure = result?.failure || lastFailure;
-      }
-      if (result && !result.content) {
-        result = await callOpenCodeGo(modelId, [...apiMessages, CONTINUATION_NUDGE]);
-        lastFailure = result?.failure || lastFailure;
-      }
-      if (result && result.content) {
-        return jsonResponse(200, { content: result.content, model: `opencode:${modelId}` });
-      }
-      recordFailure(`opencode:${modelId}`, lastFailure || 'empty or reasoning-only response after continuation');
-    }
+  if (result.status === 'retry-scheduled') {
+    // The provider could not recover within this request's practical window;
+    // the retry schedule is persisted and the task resumes on a later call.
+    return jsonResponse(200, {
+      taskId: result.taskId,
+      status: 'retry-scheduled',
+      retryAfterSeconds: result.retryAfterSeconds
+    });
   }
 
-  // OpenCode Go is the only provider: when it is unavailable, the request
-  // fails honestly — there are no other providers to fall back to.
+  if (result.status === 'cancelled') {
+    return jsonResponse(499, { error: 'AI request cancelled.' });
+  }
+
+  if (result.content) {
+    return jsonResponse(200, { content: result.content, model: result.model });
+  }
+
   console.error(JSON.stringify({
     message: 'AI generation failed',
-    error: providerFailures.join(' | ').slice(0, 500) || 'all providers returned no usable response'
+    error: result.error || 'all providers returned no usable response'
   }));
-  const failureDetail = providerFailures.length > 0
-    ? providerFailures.slice(0, 3).join(' | ').slice(0, 300)
-    : 'all providers returned no usable response';
   return jsonResponse(502, {
     error: 'Unable to generate AI response.',
-    detail: failureDetail
+    detail: result.error || 'all providers returned no usable response'
   });
 }
 
-async function handleImage(request) {
+// Test-only sleep override: contract suites drive the worker with real
+// fetches and a real clock, so retry backoffs can be collapsed to a fixed
+// duration (0 for instant). Unset in production, where backoff runs normally.
+function retrySleepFor(env) {
+  const overrideMs = Number(env?.__COREZ_RETRY_SLEEP_MS);
+  if (!Number.isFinite(overrideMs) || overrideMs < 0) return undefined;
+  return () => new Promise((resolve) => setTimeout(resolve, overrideMs));
+}
+
+async function saveToR2IfAvailable(env, key, buffer, mimeType = 'image/png') {
+  if (env.ASSET_BUCKET && typeof env.ASSET_BUCKET.put === 'function') {
+    try {
+      await env.ASSET_BUCKET.put(key, buffer, {
+        httpMetadata: { contentType: mimeType }
+      });
+      return `/api/assets/${key}`;
+    } catch {
+      // R2 is optional: the provider URL is returned when storage fails.
+    }
+  }
+  return null;
+}
+
+async function handleImage(request, env) {
   if (request.method !== 'POST') {
     return jsonResponse(405, { error: 'Method not allowed.' });
   }
@@ -467,12 +372,65 @@ async function handleImage(request) {
     return jsonResponse(400, { error: 'Prompt is required.' });
   }
 
-  // Image generation previously used the OpenRouter API, which has been
-  // removed. No image provider is configured on this deployment, so the
-  // request is reported honestly instead of fabricating an image.
-  return jsonResponse(503, {
-    error: 'Image generation is unavailable: no image provider is configured on this deployment (OpenRouter image API has been removed).'
-  });
+  const openRouterKey = env?.OPENROUTER_API_KEY;
+  if (!openRouterKey) {
+    // Honest 503: no image provider is configured. Text providers are never
+    // routed as fake image providers.
+    return jsonResponse(503, {
+      error: 'Image generation is unavailable: no image provider is configured on this deployment (set OPENROUTER_API_KEY to enable FLUX image generation).'
+    });
+  }
+
+  const r2Key = `flux_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.png`;
+
+  // Image generation runs as long as it needs; only a client disconnect
+  // aborts (Stop button, tab close).
+  const imageClientSignal = (() => {
+    const controller = new AbortController();
+    if (request.signal) {
+      if (request.signal.aborted) controller.abort();
+      else request.signal.addEventListener('abort', () => controller.abort(), { once: true });
+    }
+    return controller.signal;
+  })();
+
+  // FLUX 1 Schnell via OpenRouter: images[0].url, content URLs and
+  // data:image payloads are all accepted.
+  const imageUrl = await callOpenRouterImage(openRouterKey, prompt, imageClientSignal);
+  if (!imageUrl) {
+    return jsonResponse(503, {
+      error: 'Image generation is unavailable: the image provider did not return an image.'
+    });
+  }
+
+  try {
+    let buffer;
+    let mimeType = 'image/png';
+    if (imageUrl.startsWith('data:')) {
+      const parts = imageUrl.split(',');
+      mimeType = parts[0].match(/:(.*?);/)?.[1] || 'image/png';
+      const bstr = atob(parts[1] || '');
+      const u8arr = new Uint8Array(bstr.length);
+      for (let i = 0; i < bstr.length; i++) {
+        u8arr[i] = bstr.charCodeAt(i);
+      }
+      buffer = u8arr.buffer;
+    } else {
+      const imgResp = await fetch(imageUrl, { signal: imageClientSignal });
+      if (imgResp.ok) {
+        mimeType = imgResp.headers.get('content-type') || 'image/png';
+        buffer = await imgResp.arrayBuffer();
+      }
+    }
+
+    if (buffer) {
+      const r2Url = await saveToR2IfAvailable(env, r2Key, buffer, mimeType);
+      return jsonResponse(200, { image: r2Url || imageUrl, model: FLUX_IMAGE_MODEL });
+    }
+  } catch (err) {
+    console.warn('Failed to persist image to R2, returning provider URL:', safeErrorDetail(err));
+  }
+  return jsonResponse(200, { image: imageUrl, model: FLUX_IMAGE_MODEL });
 }
 
 async function handleR2Assets(request, env) {

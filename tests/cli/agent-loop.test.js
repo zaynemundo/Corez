@@ -208,8 +208,14 @@ describe('AgentRuntime Execution Loop', () => {
     const runtime = new AgentRuntime({
       cwd: process.cwd(),
       providerRouter: {
-        async generate() {
+        async generate(options) {
           step += 1;
+          // After the gate passes, the runtime performs one final provider
+          // call with tools disabled; the stub answers with the final
+          // user-facing summary.
+          if (options.tools && options.tools.length === 0) {
+            return { content: 'Summary: all done.', toolCalls: [] };
+          }
           const calls = [];
           const add = (name, args) => calls.push({ id: `c${step}-${name}`, function: { name, arguments: JSON.stringify(args) } });
 
@@ -229,9 +235,12 @@ describe('AgentRuntime Execution Loop', () => {
           add('run_lint', {});
           add('run_build', {});
           add('finalize_task', {
-            verifiedConstraints: ['preserve existing API'],
-            reviewFindingsResolved: true,
-            unrelatedChangesPreserved: true
+            constraints: [
+              { constraintId: 'c1', description: 'preserve existing API', verificationMethod: 'final diff inspection', evidence: 'no API signature change in final diff', status: 'verified' }
+            ],
+            reviewFindings: [
+              { findingId: 'f1', severity: 'blocking', file: 'package.json', line: 1, description: 'review pass over the final diff', status: 'resolved', resolutionEvidence: 'checked final state' }
+            ]
           });
           return { content: 'verifying and finalising', toolCalls: calls };
         }
@@ -249,9 +258,8 @@ describe('AgentRuntime Execution Loop', () => {
         run_build: { command: 'npm run build', stdout: 'ok', exitCode: 0 },
         finalize_task: (_args, _opts) => {
           toolOrder.push('finalize');
-          // Delegate to the runtime's real gate evaluation via the recorded
-          // executions would be ideal, but the stub returns the canonical
-          // result shape; the runtime records it and marks gatePassed.
+          // The stub finalize is trusted: it declares the gate passed and the
+          // runtime then performs the single final summary generation call.
           return { success: true, gate: 'passed', message: 'Completion gate passed.' };
         }
       })
@@ -263,7 +271,10 @@ describe('AgentRuntime Execution Loop', () => {
 
     expect(result.gatePassed).toBe(true);
     expect(result.success).toBe(true);
-    expect(result.stepsCount).toBe(2);
+    // After finalize passes, the runtime performs one final no-tool summary
+    // generation call: 2 evidence steps + 1 final summary step.
+    expect(result.stepsCount).toBe(3);
+    expect(result.response).toBe('Summary: all done.');
   });
 
   it('user cancellation immediately stops execution', async () => {

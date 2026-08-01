@@ -1,15 +1,33 @@
 import baseWorker from './index.js';
 import { safeErrorDetail, readBoundedJson, classifyProviderFailure, createTaskStateStore } from './utils.js';
+import { runProviderChain, buildProviderChain } from './providerChain.js';
 export { GameRoom } from './gameRoom.js';
 
 // One Worker invocation may make up to 1000 subrequests (platform limit).
 // Each specialist is one subrequest, and synthesis + the continuation fetch
-// need headroom too. WAVE_SPEC_BUDGET therefore sizes one wave, not the
-// whole swarm: requirements beyond a single wave are persisted and processed
+// need headroom too. WAVE_SPEC_BUDGET therefore sizes ONE wave, not the
+// whole swarm: it is a per-invocation operational boundary, never a total
+// swarm limit. Requirements beyond a single wave are persisted and processed
 // in later waves (see runSwarmMultiWave). No requirement is ever discarded.
 const WAVE_SPEC_BUDGET = 80;
 const DEFAULT_TRANSIENT_BACKOFF_MS = 250;
-const DEFAULT_UNAVAILABILITY_HORIZON_MS = 60_000;
+// Per-invocation retry budget: how long ONE invocation will sleep inside the
+// pool before deferring a transiently-failing spec to the persisted recovery
+// schedule (see runSwarmMultiWave). This is an operational boundary of a
+// single request, never a recovery ceiling: the task continues in later
+// invocations until recovery, cancellation or permanent-error classification.
+const DEFAULT_INVOCATION_RETRY_BUDGET_MS = 60_000;
+// Small swarms (at most this many completed outputs) skip the summary
+// hierarchy and synthesise from raw outputs in a single call to save
+// latency. Larger swarms collapse SPECIALIST OUTPUTS -> WAVE SUMMARIES ->
+// DOMAIN SUMMARIES -> FINAL SYNTHESIS so the final synthesis prompt never
+// exceeds the model context window.
+const SWARM_COLLAPSE_THRESHOLD = 6;
+// Lease held only for the duration of one wave (acquired before the wave is
+// executed, released when the wave's results are persisted). A crashed
+// invocation leaves the lease in place until it expires; the next poll or
+// invocation can then take over.
+const SWARM_LEASE_MS = 5 * 60 * 1000;
 const CORE_AGENT_TEMPLATES = Object.freeze({
   app: [
     {
@@ -104,8 +122,11 @@ function extractRequirementWorkstreams(prompt) {
     seen.add(key);
     unique.push(fragment);
   }
-  // Every independent requirement becomes a specialist workstream. Only the
-  // platform subrequest ceiling can bound the swarm, never a fixed count.
+  // Every independent requirement becomes a specialist workstream. A single
+  // Worker invocation is bounded by its own subrequest budget, so the wave
+  // size is a per-invocation operational boundary — never a total swarm
+  // limit: workstreams beyond one wave are persisted and processed in later
+  // waves by runSwarmMultiWave.
   return unique;
 }
 
@@ -139,6 +160,40 @@ function createClientDisconnectSignal(parentSignal) {
     else parentSignal.addEventListener('abort', () => controller.abort(parentSignal.reason), { once: true });
   }
   return controller.signal;
+}
+
+function abortError() {
+  const error = new Error('Swarm task aborted.');
+  error.name = 'AbortError';
+  return error;
+}
+
+function isAbortError(error) {
+  return error?.name === 'AbortError';
+}
+
+// Abortable sleep: resolves when the timer fires, but throws an
+// AbortError-compatible error as soon as the signal aborts so cancellation
+// is never held hostage by a backoff window.
+async function abortableSleep(ms, signal) {
+  if (!signal) {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+    return;
+  }
+  if (signal.aborted) throw abortError();
+  return new Promise((resolve, reject) => {
+    let timer;
+    const onAbort = () => {
+      clearTimeout(timer);
+      signal.removeEventListener('abort', onAbort);
+      reject(abortError());
+    };
+    timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 export function shouldUseSwarm(intentType, prompt, options = {}) {
@@ -196,46 +251,57 @@ async function callAIGateway(apiKey, messages, options = {}) {
   const signal = timed ? timed.signal : createClientDisconnectSignal(options.signal);
 
   try {
+    // Cancellation is honoured before the request, by the request itself
+    // (fetch aborts on the signal) and again once the response arrives.
+    if (signal.aborted) throw abortError();
     const env = options.env || {};
 
-    // OpenCode Go is the only provider: plain OpenAI-style chat request
-    // using the configured CoreZ model.
-    const endpoint = env.OPENCODE_ENDPOINT || 'https://opencode.ai/zen/go/v1/chat/completions';
-    const headers = {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://corez.ai',
-      'X-Title': 'COREZ AI'
-    };
-    const requestBody = {
-      model: options.model || env.OPENCODE_MODEL || 'deepseek-v4-flash',
-      messages,
-      temperature: options.temperature ?? 0.2
-    };
-
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(requestBody),
-      signal
+    // The same provider fallback chain as the direct route: OpenCode Go is
+    // preferred, then the official DeepSeek API, then OpenRouter. The same
+    // messages travel to every provider, so a fallback resumes the same
+    // specialist work — completed work is never restarted. `apiKey` is kept
+    // for call-site compatibility: when the environment has no configured
+    // provider, it is used as the OpenCode Go credential (the historical
+    // swarm behaviour).
+    const chainEnv = (env && buildProviderChain(env).length > 0)
+      ? env
+      : { ...env, OPENCODE_GO_API_KEY: apiKey };
+    const chainResult = await runProviderChain(messages, {
+      env: chainEnv,
+      signal,
+      store: options.store,
+      sleep: options.sleep,
+      clock: options.clock
     });
 
-    if (!response.ok) {
-      const detail = (await response.text()).slice(0, 300);
-      const error = new Error(`AI Gateway ${response.status}: ${detail || response.statusText}`);
-      error.status = response.status;
-      const retryAfter = Number(response.headers.get('Retry-After') || 0);
-      if (Number.isFinite(retryAfter) && retryAfter > 0) error.retryAfter = retryAfter;
+    if (signal.aborted) throw abortError();
+
+    if (chainResult.status === 'retry-scheduled') {
+      // The provider could not recover within this request's practical
+      // window; the retry schedule is persisted. The pool defers this spec
+      // against its recovery schedule so a later invocation resumes it.
+      const error = new Error(`AI Gateway deferred: retry scheduled in ${chainResult.retryAfterSeconds}s`);
+      error.status = 429;
+      error.retryAfter = chainResult.retryAfterSeconds;
       throw error;
     }
 
-    const data = await response.json();
-    const content = data?.choices?.[0]?.message?.content;
-    if (typeof content !== 'string' || !content.trim()) {
-      throw new Error('AI Gateway returned an empty swarm response.');
+    if (chainResult.status === 'cancelled') throw abortError();
+
+    if (typeof chainResult.content === 'string' && chainResult.content.trim()) {
+      return chainResult.content.trim();
     }
 
-    return content.trim();
+    // Preserve the real provider status when the chain exhausted its
+    // providers: permanent failures (401, 400, unsupported model) must be
+    // classified permanent by the pool so the task blocks with evidence
+    // instead of retrying a doomed spec.
+    const failure = new Error(chainResult.error || 'AI Gateway returned no usable swarm response.');
+    failure.status = Number(chainResult.errorStatus) > 0 ? Number(chainResult.errorStatus) : 502;
+    if (failure.status === 502 && !/unauthorized|invalid api|authentication|forbidden|unsupported model|validation error/i.test(failure.message)) {
+      failure.status = 502;
+    }
+    throw failure;
   } finally {
     if (timed) timed.cleanup();
   }
@@ -270,9 +336,9 @@ export async function runAdaptiveAgentPool(agentSpecs, executeAgent, options = {
   // pass an explicit deadlineMs as a hang guard, but CoreZ imposes none by
   // default.
   const clock = options.clock || (() => Date.now());
-  const sleepFn = options.sleep || ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+  const sleepFn = options.sleep || ((ms, sleepSignal) => abortableSleep(ms, sleepSignal));
   const backoffBaseMs = readPositiveNumber(options.backoffBaseMs, DEFAULT_TRANSIENT_BACKOFF_MS);
-  const unavailabilityHorizonMs = readPositiveNumber(options.unavailabilityHorizonMs, DEFAULT_UNAVAILABILITY_HORIZON_MS);
+  const invocationRetryBudgetMs = readPositiveNumber(options.invocationRetryBudgetMs, DEFAULT_INVOCATION_RETRY_BUDGET_MS);
   const signal = options.signal || null;
   const onProgress = options.onProgress || (() => {});
   const startedAt = clock();
@@ -281,13 +347,26 @@ export async function runAdaptiveAgentPool(agentSpecs, executeAgent, options = {
   // pending: specs eligible to run now. waiting: specs whose individual
   // recovery window (nextEligibleAt) has not arrived yet. A delayed spec
   // never freezes the pool — unrelated eligible work continues.
-  const pending = agentSpecs.map((spec) => ({ spec, attempt: 0, nextEligibleAt: 0 }));
+  //
+  // Entries may be plain specs or pre-seeded entries
+  // ({ spec, attempt, nextEligibleAt }) carrying a persisted recovery
+  // schedule: those whose window has not arrived start in `waiting`, and the
+  // promotion loop below resumes them exactly when the persisted schedule
+  // says they are eligible again.
+  const pending = [];
   const waiting = [];
+  for (const entry of agentSpecs) {
+    const seeded = entry && typeof entry === 'object' && entry.spec
+      ? { spec: entry.spec, attempt: Number(entry.attempt) || 0, nextEligibleAt: Number(entry.nextEligibleAt) > 0 ? Number(entry.nextEligibleAt) : 0 }
+      : { spec: entry, attempt: 0, nextEligibleAt: 0 };
+    if (seeded.nextEligibleAt > clock()) waiting.push(seeded);
+    else pending.push(seeded);
+  }
   const completed = [];
   const failed = [];
   const cancelled = [];
 
-  let concurrency = Math.max(1, Math.ceil(Math.sqrt(Math.max(1, pending.length))));
+  let concurrency = Math.max(1, Math.ceil(Math.sqrt(Math.max(1, pending.length + waiting.length))));
 
   while ((pending.length > 0 || waiting.length > 0) && (deadlineMs <= 0 || clock() - startedAt < deadlineMs)) {
     if (signal?.aborted) {
@@ -311,9 +390,20 @@ export async function runAdaptiveAgentPool(agentSpecs, executeAgent, options = {
       if (waiting.length === 0) break;
       // Sleep only until the earliest recovery window (bounded chunk so new
       // eligibility or cancellation is honoured promptly). No whole-swarm
-      // freeze: other work proceeds in the next loop pass.
+      // freeze: other work proceeds in the next loop pass. The sleep is
+      // abortable, so cancellation interrupts the backoff immediately.
       const nextWake = Math.min(...waiting.map((item) => item.nextEligibleAt));
-      await sleepFn(Math.max(0, Math.min(nextWake - now, 1000)));
+      try {
+        await sleepFn(Math.max(0, Math.min(nextWake - now, 1000)), signal);
+      } catch (err) {
+        if (isAbortError(err)) {
+          cancelled.push(...pending, ...waiting);
+          pending.length = 0;
+          waiting.length = 0;
+          break;
+        }
+        throw err;
+      }
       continue;
     }
 
@@ -328,7 +418,6 @@ export async function runAdaptiveAgentPool(agentSpecs, executeAgent, options = {
 
     settled.forEach((result, index) => {
       const item = batch[index];
-      if (signal?.aborted) return;
 
       if (result.status === 'fulfilled') {
         successCount += 1;
@@ -337,6 +426,14 @@ export async function runAdaptiveAgentPool(agentSpecs, executeAgent, options = {
       }
 
       const error = result.reason;
+
+      // Cancelled work is never retried: the caller persists status
+      // 'cancelled' and preserves everything completed so far.
+      if (isAbortError(error) || signal?.aborted) {
+        cancelled.push({ spec: item.spec, error: 'cancelled' });
+        return;
+      }
+
       const cls = classifyProviderFailure(error);
 
       if (cls.kind === 'permanent') {
@@ -359,15 +456,17 @@ export async function runAdaptiveAgentPool(agentSpecs, executeAgent, options = {
       const jitter = Math.random() * backoffBaseMs;
       const backoff = baseBackoff + jitter;
 
-      if (backoff >= unavailabilityHorizonMs) {
-        // Externally confirmed provider unavailability: the recovery window
-        // exceeds the horizon, so further identical retries cannot produce
-        // new evidence. Recorded with evidence, never retried silently.
+      if (backoff >= invocationRetryBudgetMs) {
+        // The retry window exceeds this invocation's sleep budget: the spec
+        // is deferred — never failed — with its persisted recovery schedule,
+        // and a later invocation retries exactly when the window arrives.
         failed.push({
           spec: item.spec,
-          error: `provider externally unavailable: repeated transient failure (${cls.status || 'network'}) beyond ${unavailabilityHorizonMs}ms recovery horizon`,
+          error: `transient failure (${cls.status || 'network'}) deferred: retry window ${Math.round(backoff)}ms exceeds this invocation's ${invocationRetryBudgetMs}ms retry budget; scheduled for a later invocation`,
           status: cls.status,
-          kind: 'unavailable'
+          kind: 'deferred',
+          attempt: item.attempt,
+          nextEligibleAt: clock() + backoff
         });
         return;
       }
@@ -431,10 +530,70 @@ Inferred intent: ${intentType}.`
   ];
 }
 
-function buildSynthesisMessages(prompt, history, intentType, completedAgents) {
-  const contributions = completedAgents
-    .map(({ spec, output }, index) => `### Contribution ${index + 1}: ${spec.role}\n${output}`)
+// One provider call per wave: a dense factual summary preserving every
+// requirement ID, blocking finding, interface, exact decision, test
+// requirement and contradiction, plus the agentId link to each complete
+// stored specialist output.
+function buildWaveSummaryMessages(prompt, history, intentType, waveEntries) {
+  const body = waveEntries
+    .map((entry, index) => `### Specialist output ${index + 1} (agentId: ${entry.spec.agentId}, role: ${entry.spec.role}, priority: ${entry.spec.priority})\n${entry.output}`)
     .join('\n\n');
+  return [
+    {
+      role: 'system',
+      content: `You are COREZ AI's wave summary agent for one execution wave of a specialist swarm.
+Summarise the specialist outputs of this wave densely and factually.
+Preserve: requirement IDs, blocking findings, interfaces, exact decisions, test requirements, contradictions, and the agentId link to every complete stored output.
+Do not invent findings, do not answer the user request, and do not mention internal agents or providers.`
+    },
+    ...history,
+    {
+      role: 'user',
+      content: `Original user request:\n${prompt}\n\nWave specialist outputs (complete texts remain retrievable under the listed agentIds):\n${body}\n\nProduce the wave summary now.`
+    }
+  ];
+}
+
+// One provider call per domain: merges the wave summaries of that domain
+// (core agents vs requirement specialists) into a per-domain summary that
+// still carries every requirement ID and agentId link.
+function buildDomainSummaryMessages(prompt, history, intentType, domain, waveSummaryText) {
+  return [
+    {
+      role: 'system',
+      content: `You are COREZ AI's domain synthesis agent for the "${domain}" domain.
+Merge the wave summaries of this domain into one coherent per-domain summary.
+Preserve every requirement ID, blocking finding, interface, decision, test requirement, and contradiction, and keep the agentId links to the complete stored specialist outputs.
+Do not answer the user request yourself; produce the domain summary only.`
+    },
+    ...history,
+    {
+      role: 'user',
+      content: `Original user request:\n${prompt}\n\nWave summaries for the "${domain}" domain:\n${waveSummaryText}\n\nProduce the domain summary now.`
+    }
+  ];
+}
+
+/**
+ * Final synthesis prompt. `domainSummaries` is an array of
+ * { domain, content } summaries — per-domain summaries when the hierarchy is
+ * used, or a single { domain: 'all', content: rawOutputs } entry for small
+ * swarms. `outputIndex` maps every agentId to its complete specialist output
+ * so the model keeps full evidence retrievability by ID. `notes` carries any
+ * degradation that happened while building the hierarchy (never a silent
+ * drop of contributions).
+ */
+function buildSynthesisMessages(prompt, history, intentType, domainSummaries, outputIndex = null, notes = []) {
+  const contributions = domainSummaries
+    .map((summary, index) => `### Domain summary ${index + 1}: ${summary.domain}\n${summary.content}`)
+    .join('\n\n');
+
+  const coverage = outputIndex && typeof outputIndex === 'object'
+    ? `\nHierarchy coverage: ${Object.keys(outputIndex).length} specialist outputs are represented above; every complete specialist output remains retrievable by agentId.`
+    : '';
+  const degradation = Array.isArray(notes) && notes.length > 0
+    ? `\nDegradation notes (some summaries fell back to the raw outputs they covered): ${notes.join(' ')}`
+    : '';
 
   const appInstructions = intentType === 'app'
     ? `\n- Output clean, modern React/JSX code inside one \`\`\`jsx ... \`\`\` code block starting with \`export default function App()\`. DO NOT wrap React code inside HTML boilerplate (\`<!DOCTYPE html>\`, \`<head>\`, \`<script type="text/babel">\`, or \`ReactDOM.createRoot()\`) because the preview canvas compiles and renders React/JSX code automatically!
@@ -460,9 +619,114 @@ Always identify publicly only as COREZ AI when identity is relevant.${appInstruc
     ...history,
     {
       role: 'user',
-      content: `Original user request:\n${prompt}\n\nSpecialist contributions:\n${contributions}\n\nDeliver the final answer now.`
+      content: `Original user request:\n${prompt}\n\nSpecialist contributions:\n${contributions}${coverage}${degradation}\n\nDeliver the final answer now.`
     }
   ];
+}
+
+/**
+ * Collapse SPECIALIST OUTPUTS -> WAVE SUMMARIES -> DOMAIN SUMMARIES ->
+ * FINAL SYNTHESIS. Small swarms (<= collapseThreshold completed outputs)
+ * collapse straight to the single synthesis call to save latency.
+ *
+ * Wave and domain summaries are cached in task state so a continuation only
+ * summarises the waves it added. If a summary provider call fails, the raw
+ * outputs it covered are used instead (contributions are never dropped) and
+ * a degradation note is added to the synthesis prompt.
+ */
+async function summarizeSwarmHierarchy({
+  state,
+  apiKey,
+  env,
+  signal,
+  prompt,
+  history,
+  intentType,
+  timeoutMs,
+  store,
+  taskId,
+  collapseThreshold,
+  sleep: optionsSleep,
+  clock: optionsClock
+}) {
+  if (state.completed.length <= collapseThreshold) {
+    const raw = state.completed
+      .map(({ spec, output }, index) => `### Contribution ${index + 1}: ${spec.role}\n${output}`)
+      .join('\n\n');
+    return { domainSummaries: [{ domain: 'all', content: raw }], notes: [] };
+  }
+
+  const notes = [];
+  const byWave = new Map();
+  for (const entry of state.completed) {
+    const wave = Number.isFinite(Number(entry.waveIndex)) ? Number(entry.waveIndex) : 0;
+    if (!byWave.has(wave)) byWave.set(wave, []);
+    byWave.get(wave).push(entry);
+  }
+
+  const waveSummaries = [];
+  for (const [wave, entries] of [...byWave.entries()].sort((a, b) => a[0] - b[0])) {
+    const cacheKey = `wave-${wave}`;
+    const cached = state.waveSummaries?.[cacheKey];
+    let text;
+    let degraded = false;
+    if (cached && typeof cached.text === 'string') {
+      text = cached.text;
+      degraded = Boolean(cached.degraded);
+    } else {
+      try {
+        if (signal?.aborted) throw abortError();
+        text = await callAIGateway(
+          apiKey,
+          buildWaveSummaryMessages(prompt, history, intentType, entries),
+          { env, signal, timeoutMs, temperature: 0.15, store, sleep: optionsSleep, clock: optionsClock }
+        );
+      } catch (err) {
+        if (isAbortError(err)) throw err;
+        degraded = true;
+        text = entries
+          .map((entry) => `### ${entry.spec.agentId} (${entry.spec.role})\n${entry.output}`)
+          .join('\n\n');
+        notes.push(`Wave ${wave} summary degraded to the raw specialist outputs it covered (provider error: ${safeErrorDetail(err)}).`);
+      }
+      state.waveSummaries[cacheKey] = { text, degraded };
+    }
+    const domains = new Set(entries.map((entry) => entry.spec.priority === 'core' ? 'core' : 'requirement'));
+    waveSummaries.push({ wave, text, degraded, domains });
+  }
+
+  const domainSummaries = [];
+  const presentDomains = [...new Set(waveSummaries.flatMap((ws) => [...ws.domains]))];
+  for (const domain of presentDomains) {
+    const covered = waveSummaries.filter((ws) => ws.domains.has(domain));
+    const cached = state.domainSummaries?.[domain];
+    let text;
+    let degraded = false;
+    if (cached && typeof cached.text === 'string') {
+      text = cached.text;
+      degraded = Boolean(cached.degraded);
+    } else {
+      const inputText = covered.map((ws) => ws.text).join('\n\n');
+      try {
+        if (signal?.aborted) throw abortError();
+        text = await callAIGateway(
+          apiKey,
+          buildDomainSummaryMessages(prompt, history, intentType, domain, inputText),
+          { env, signal, timeoutMs, temperature: 0.15, store, sleep: optionsSleep, clock: optionsClock }
+        );
+      } catch (err) {
+        if (isAbortError(err)) throw err;
+        degraded = true;
+        text = inputText;
+        notes.push(`Domain "${domain}" summary degraded to the raw wave summaries it covered (provider error: ${safeErrorDetail(err)}).`);
+      }
+      state.domainSummaries[domain] = { text, degraded };
+    }
+    domainSummaries.push({ domain, content: text, degraded });
+  }
+
+  await store.save(taskId, state);
+  return { domainSummaries, notes };
 }
 
 function createSwarmTaskState({ taskId, prompt, intentType, history, specs }) {
@@ -475,9 +739,16 @@ function createSwarmTaskState({ taskId, prompt, intentType, history, specs }) {
     completed: [],
     failed: [],
     cancelled: [],
+    outputById: {},
     retrySchedule: [],
+    waveSummaries: {},
+    domainSummaries: {},
+    continuations: [],
+    lease: null,
     waveCount: 0,
     status: 'active',
+    blockedReason: null,
+    cancelledReason: null,
     finalContent: null,
     createdAt: Date.now(),
     updatedAt: Date.now()
@@ -501,6 +772,13 @@ function nextTaskId() {
  * active for the next wave. With `drain: true` every wave runs inside this
  * call (used by tests and small swarms); otherwise exactly one wave runs and
  * the caller schedules the continuation. No requirement is ever discarded.
+ *
+ * Durable continuation: an active task is protected by a short lease
+ * (state.lease) while a wave runs, so a duplicate concurrent invocation
+ * returns `leaseBusy` without duplicating work. Wave application is
+ * idempotent anyway — completed outputs are deduplicated by agentId and
+ * queue advancement is deterministic. Wave/domain summaries are cached in
+ * the task state so a continuation only summarises the waves it added.
  */
 export async function runSwarmMultiWave({
   taskId,
@@ -518,77 +796,285 @@ export async function runSwarmMultiWave({
   const agentTimeoutMs = readPositiveNumber(env?.SWARM_AGENT_TIMEOUT_MS, 0);
   const deadlineMs = readPositiveNumber(env?.SWARM_RESPONSE_DEADLINE_MS, 0);
   const synthesisTimeoutMs = readPositiveNumber(env?.SWARM_SYNTHESIS_TIMEOUT_MS, 0);
+  const collapseThreshold = readPositiveNumber(options.collapseThreshold, SWARM_COLLAPSE_THRESHOLD);
+  const clock = typeof options.clock === 'function' ? options.clock : (() => Date.now());
+  const sleepFn = options.sleep || ((ms, wakeSignal) => abortableSleep(ms, wakeSignal));
+  const leaseHolder = typeof options.leaseHolder === 'string' && options.leaseHolder
+    ? options.leaseHolder
+    : `inv-${clock()}-${Math.random().toString(16).slice(2, 10)}`;
 
   let state = (await store.load(taskId)) || createSwarmTaskState({ taskId, prompt, intentType, history, specs });
 
+  // Normalize fields for states persisted before these fields existed.
+  state.outputById = state.outputById || {};
+  state.waveSummaries = state.waveSummaries || {};
+  state.domainSummaries = state.domainSummaries || {};
+  state.continuations = Array.isArray(state.continuations) ? state.continuations : [];
+  state.retrySchedule = Array.isArray(state.retrySchedule) ? state.retrySchedule : [];
+  state.lease = state.lease || null;
+
+  // Legacy states may carry 'deferred' entries that predate persisted
+  // recovery scheduling: only permanent classification or user cancellation
+  // marks a spec failed, so these are moved back into the queue.
+  if (Array.isArray(state.failed)) {
+    const stale = state.failed.filter((entry) => entry?.kind !== 'permanent');
+    if (stale.length > 0) {
+      state.failed = state.failed.filter((entry) => entry?.kind === 'permanent');
+      for (const entry of stale) {
+        if (!entry?.spec?.agentId) continue;
+        if (state.queue.some((spec) => spec.agentId === entry.spec.agentId)) continue;
+        state.queue.push(entry.spec);
+        if (!state.retrySchedule.some((schedule) => schedule.agentId === entry.spec.agentId)) {
+          const nextEligibleAt = Number(entry.nextEligibleAt) > 0 ? Number(entry.nextEligibleAt) : clock();
+          state.retrySchedule.push({
+            agentId: entry.spec.agentId,
+            attempt: Number(entry.attempt) || 0,
+            backoffMs: Math.max(0, nextEligibleAt - clock()),
+            nextEligibleAt,
+            at: clock()
+          });
+        }
+      }
+    }
+  }
+
+  if (state.status === 'completed') {
+    return { completed: true, content: state.finalContent, state };
+  }
+  if (state.status === 'cancelled') {
+    return { completed: false, cancelled: true, state };
+  }
+  if (state.status === 'blocked') {
+    return { completed: false, blocked: true, state };
+  }
+
+  const acquireLease = (now = clock()) => {
+    if (state.lease && state.lease.holder !== leaseHolder && state.lease.expiresAt > now) {
+      return false;
+    }
+    state.lease = { holder: leaseHolder, acquiredAt: now, expiresAt: now + SWARM_LEASE_MS };
+    return true;
+  };
+  const releaseLease = () => {
+    state.lease = null;
+  };
+
+  const persist = async () => {
+    releaseLease();
+    state.updatedAt = clock();
+    await store.save(taskId, state);
+  };
+
+  const cancelTask = async () => {
+    state.status = 'cancelled';
+    state.cancelledReason = 'client disconnected or request aborted';
+    state.updatedAt = clock();
+    releaseLease();
+    await store.save(taskId, state);
+    return { completed: false, cancelled: true, state };
+  };
+
+  // Mark the newest scheduled continuation as served, if one is pending.
+  if (state.continuations.length > 0) {
+    const unserved = [...state.continuations].reverse().find((entry) => !entry.invokedAt);
+    if (unserved) unserved.invokedAt = clock();
+  }
+
+  const executeAgent = (spec) => callAIGateway(
+    apiKey,
+    buildSpecialistMessages(spec, prompt, history, intentType),
+    { env, signal, timeoutMs: agentTimeoutMs, temperature: 0.15, store, sleep: sleepFn, clock }
+  );
+
   const runWave = async () => {
+    const waveIndex = state.waveCount;
     const wave = state.queue.slice(0, waveBudget);
     state.queue = state.queue.slice(waveBudget);
 
-    const poolResult = await runAdaptiveAgentPool(
-      wave,
-      (spec) => callAIGateway(
-        apiKey,
-        buildSpecialistMessages(spec, prompt, history, intentType),
-        { env, signal, timeoutMs: agentTimeoutMs, temperature: 0.15 }
-      ),
-      {
-        deadlineMs,
-        onProgress: (progress) => {
-          state.retrySchedule.push({ agentId: progress.agentId, attempt: progress.attempt, backoffMs: progress.backoffMs, at: Date.now() });
-        }
-      }
-    );
+    // Seed the pool with the persisted recovery schedule: a spec whose
+    // retry window has not arrived starts in the pool's waiting list and is
+    // promoted by runAdaptiveAgentPool exactly when it becomes eligible.
+    const nowAtWave = clock();
+    const scheduleByAgent = new Map(state.retrySchedule.map((entry) => [entry.agentId, entry]));
+    const waveEntries = wave.map((spec) => {
+      const scheduled = scheduleByAgent.get(spec.agentId);
+      const nextEligibleAt = scheduled ? Number(scheduled.nextEligibleAt) : 0;
+      return {
+        spec,
+        attempt: 0,
+        nextEligibleAt: Number.isFinite(nextEligibleAt) && nextEligibleAt > nowAtWave ? nextEligibleAt : 0
+      };
+    });
 
-    state.completed.push(...poolResult.completed);
-    state.failed.push(...poolResult.failed);
-    state.cancelled.push(...poolResult.cancelled);
+    const poolResult = await runAdaptiveAgentPool(waveEntries, executeAgent, {
+      deadlineMs,
+      clock,
+      sleep: sleepFn,
+      onProgress: (progress) => {
+        const nextEligibleAt = clock() + progress.backoffMs;
+        state.retrySchedule = state.retrySchedule.filter((entry) => entry.agentId !== progress.agentId);
+        state.retrySchedule.push({
+          agentId: progress.agentId,
+          attempt: progress.attempt,
+          backoffMs: progress.backoffMs,
+          nextEligibleAt,
+          at: clock()
+        });
+      }
+    });
+
+    // Apply results idempotently: an agentId never applies twice, and
+    // anything the pool could not finish (skipped) is put back on the queue
+    // so no workstream is ever discarded.
+    const completedIds = new Set(state.completed.map((entry) => entry.spec?.agentId));
+    const cancelledIds = new Set(state.cancelled.map((entry) => entry.spec?.agentId));
+
+    for (const entry of poolResult.completed) {
+      if (completedIds.has(entry.spec.agentId)) continue;
+      completedIds.add(entry.spec.agentId);
+      state.completed.push({ spec: entry.spec, output: entry.output, waveIndex });
+      state.outputById[entry.spec.agentId] = {
+        spec: entry.spec,
+        output: entry.output,
+        waveIndex,
+        completedAt: clock()
+      };
+      state.retrySchedule = state.retrySchedule.filter((schedule) => schedule.agentId !== entry.spec.agentId);
+    }
+
+    for (const entry of poolResult.failed) {
+      if (entry.kind !== 'permanent') {
+        // Transient/deferred: NOT terminal. Re-queue with the persisted
+        // recovery schedule so a later invocation retries when the window
+        // arrives (only permanent classification or cancellation marks it
+        // failed).
+        const alreadyQueued = state.queue.some((spec) => spec.agentId === entry.spec.agentId);
+        if (!alreadyQueued && !completedIds.has(entry.spec.agentId)) {
+          state.queue.push(entry.spec);
+        }
+        const nextEligibleAt = Number(entry.nextEligibleAt) > 0 ? Number(entry.nextEligibleAt) : clock();
+        state.retrySchedule = state.retrySchedule.filter((schedule) => schedule.agentId !== entry.spec.agentId);
+        state.retrySchedule.push({
+          agentId: entry.spec.agentId,
+          attempt: Number(entry.attempt) || 0,
+          backoffMs: Math.max(0, nextEligibleAt - clock()),
+          nextEligibleAt,
+          at: clock()
+        });
+        continue;
+      }
+      const alreadyFailed = state.failed.some((failed) => failed.spec?.agentId === entry.spec.agentId);
+      if (alreadyFailed) continue;
+      state.failed.push({ spec: entry.spec, error: entry.error, status: entry.status, kind: 'permanent' });
+      state.retrySchedule = state.retrySchedule.filter((schedule) => schedule.agentId !== entry.spec.agentId);
+    }
+
+    for (const entry of poolResult.cancelled) {
+      const spec = entry.spec || entry;
+      if (!spec?.agentId) continue;
+      if (cancelledIds.has(spec.agentId)) continue;
+      cancelledIds.add(spec.agentId);
+      state.cancelled.push({ spec, error: entry.error || 'cancelled' });
+    }
+
+    for (const entry of poolResult.skipped) {
+      const spec = entry.spec || entry;
+      if (!spec?.agentId) continue;
+      if (completedIds.has(spec.agentId) || cancelledIds.has(spec.agentId)) continue;
+      const alreadyQueued = state.queue.some((queued) => queued.agentId === spec.agentId);
+      if (!alreadyQueued) state.queue.push(spec);
+    }
+
     state.waveCount += 1;
-    state.updatedAt = Date.now();
-    await store.save(taskId, state);
+    await persist();
     return poolResult;
   };
 
   const synthesize = async () => {
     if (state.completed.length === 0) {
+      // Dead-letter/blocked: only when NO spec can ever complete (every spec
+// permanently failed and nothing else remains). Transient/deferred
+// specs stay queued against their persisted recovery schedule, so a
+      // resumable task is never marked blocked.
       state.status = 'blocked';
+      state.blockedReason = state.failed.length > 0
+        ? `No specialist can ever complete: ${state.failed.map((entry) => entry.spec?.agentId || 'unknown').join(', ')}`
+        : 'The live swarm produced no usable specialist output.';
+      state.updatedAt = clock();
       await store.save(taskId, state);
-      throw new Error('The live swarm produced no usable specialist output.');
+      throw new Error(state.blockedReason);
     }
+    const { domainSummaries, notes } = await summarizeSwarmHierarchy({
+      state,
+      apiKey,
+      env,
+      signal,
+      prompt,
+      history,
+      intentType,
+      timeoutMs: synthesisTimeoutMs,
+      store,
+      taskId,
+      collapseThreshold,
+      sleep: sleepFn,
+      clock
+    });
+    if (signal?.aborted) throw abortError();
     const finalContent = await callAIGateway(
       apiKey,
-      buildSynthesisMessages(prompt, history, intentType, state.completed),
-      { env, signal, timeoutMs: synthesisTimeoutMs, temperature: 0.2 }
+      buildSynthesisMessages(prompt, history, intentType, domainSummaries, state.outputById, notes),
+      { env, signal, timeoutMs: synthesisTimeoutMs, temperature: 0.2, store, sleep: sleepFn, clock }
     );
     state.status = 'completed';
     state.finalContent = finalContent;
-    state.updatedAt = Date.now();
-    await store.save(taskId, state);
+    await persist();
     return finalContent;
   };
 
-  if (state.status === 'completed') {
-    return { completed: true, content: state.finalContent, state };
-  }
-
-  do {
-    if (signal?.aborted) {
-      state.status = 'cancelled';
-      state.updatedAt = Date.now();
-      await store.save(taskId, state);
-      return { completed: false, cancelled: true, state };
-    }
-    await runWave();
-    if (state.queue.length === 0) {
+  // Finalise with cancellation safety: an abort during synthesis persists
+  // 'cancelled' (results preserved, no final answer, no new waves) instead
+  // of surfacing as a failure; a dead-locked swarm reports 'blocked'.
+  const finalize = async () => {
+    try {
       const content = await synthesize();
       return { completed: true, content, state };
+    } catch (err) {
+      if (isAbortError(err)) return cancelTask();
+      if (state.status === 'blocked') return { completed: false, blocked: true, state };
+      throw err;
+    }
+  };
+
+  do {
+    if (signal?.aborted) return await cancelTask();
+
+    if (state.queue.length === 0) {
+      return await finalize();
+    }
+
+    if (!acquireLease()) {
+      // Another invocation is executing the current wave: report processing
+      // without duplicating work.
+      return { completed: false, leaseBusy: true, state };
+    }
+    await store.save(taskId, state);
+    await runWave();
+
+    if (signal?.aborted) return await cancelTask();
+
+    if (state.queue.length === 0) {
+      return await finalize();
     }
   } while (options.drain === true);
 
+  await persist();
   return { completed: false, state };
 }
 
-/** Resume a persisted swarm task from its stored state (next wave). */
+/** Resume a persisted swarm task from its stored state (next wave). The
+ *  call is idempotent: it loads the durable state, honours any lease another
+ *  invocation holds (returning leaseBusy without duplicating work), and
+ *  advances the queue deterministically. */
 export async function continueSwarmTask({ taskId, env, signal, store, options = {} }) {
   const state = await store.load(taskId);
   if (!state) {
@@ -600,8 +1086,12 @@ export async function continueSwarmTask({ taskId, env, signal, store, options = 
   if (state.status === 'cancelled') {
     return { completed: false, cancelled: true, state };
   }
-  const apiKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY;
-  if (!apiKey) {
+  if (state.status === 'blocked') {
+    return { completed: false, blocked: true, state };
+  }
+  // The provider fallback chain decides which provider serves this task; any
+  // configured provider (OpenCode Go, DeepSeek, OpenRouter) can continue it.
+  if (buildProviderChain(env).length === 0) {
     throw new Error('No AI provider key configured for swarm continuation.');
   }
   return runSwarmMultiWave({
@@ -610,12 +1100,30 @@ export async function continueSwarmTask({ taskId, env, signal, store, options = 
     intentType: state.intentType,
     history: state.history,
     specs: [],
-    apiKey,
     env,
     signal,
     store,
-    options: { waveBudget: readPositiveNumber(options.waveBudget, WAVE_SPEC_BUDGET), drain: options.drain === true }
+    options: {
+      waveBudget: readPositiveNumber(options.waveBudget, WAVE_SPEC_BUDGET),
+      drain: options.drain === true,
+      clock: options.clock,
+      sleep: options.sleep,
+      leaseHolder: options.leaseHolder,
+      collapseThreshold: readPositiveNumber(options.collapseThreshold, SWARM_COLLAPSE_THRESHOLD)
+    }
   });
+}
+
+/** Persist the durable continuation schedule before a 202 (processing)
+ *  response: status stays 'active' and the record lets the next invocation
+ *  (or a status poll) pick the task up even if the fire-and-forget
+ *  continuation fetch fails. */
+export async function persistContinuationSchedule(store, taskId, state, now = Date.now()) {
+  state.continuations = Array.isArray(state.continuations) ? state.continuations : [];
+  state.continuations.push({ scheduledAt: now, invokedAt: null, attempt: 0 });
+  state.status = 'active';
+  state.updatedAt = now;
+  await store.save(taskId, state);
 }
 
 /** Fire-and-forget continuation: spawns a new Worker invocation that picks
@@ -638,10 +1146,11 @@ function scheduleNextWave({ ctx, taskId, origin }) {
 export async function runSwarmTask(body, env, signal, options = {}) {
   const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : '';
   const intentType = normalizeIntentType(body?.intent?.type);
-  const apiKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY;
 
-  if (!apiKey) {
-    throw new Error('OPENCODE_GO_API_KEY is not configured for swarm execution.');
+  // Any configured provider can serve the swarm through the fallback chain;
+  // OpenCode Go stays preferred when it is configured.
+  if (buildProviderChain(env).length === 0) {
+    throw new Error('No AI provider key configured for swarm execution.');
   }
 
   const agentSpecs = buildSwarmAgentSpecs(intentType, prompt);
@@ -655,7 +1164,6 @@ export async function runSwarmTask(body, env, signal, options = {}) {
     intentType,
     history,
     specs: agentSpecs,
-    apiKey,
     env,
     signal,
     store,
@@ -670,6 +1178,7 @@ export async function runSwarmTask(body, env, signal, options = {}) {
     model: 'opencode-go:swarm',
     taskId,
     taskStatus: result.state.status,
+    blockedReason: result.state.blockedReason || null,
     pendingWaveCount: result.completed ? 0 : Math.ceil(result.state.queue.length / WAVE_SPEC_BUDGET),
     telemetry: {
       enabled: true,
@@ -694,7 +1203,6 @@ export default {
       return Response.redirect(url.toString(), 301);
     }
 
-    const apiKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY;
     const store = createTaskStateStore(env);
     const jsonHeaders = {
       'Content-Type': 'application/json',
@@ -707,26 +1215,41 @@ export default {
     };
 
     // Task-continuation status: progress or final result of a persisted swarm
-    // task (frontend polls this while waves are still queued).
+    // task (frontend polls this while waves are still queued). This is also a
+    // durable continuation path: when the task is active with remaining work
+    // and no live lease, one more wave is executed inline before responding,
+    // so a failed continuation fetch never strands the task.
     if (url.pathname.startsWith('/api/swarm/status/') && request.method === 'GET') {
       const taskId = decodeURIComponent(url.pathname.slice('/api/swarm/status/'.length));
       const state = await store.load(taskId);
       if (!state) {
         return new Response(JSON.stringify({ error: 'Unknown swarm task.' }), { status: 404, headers: jsonHeaders });
       }
+      const leaseActive = state.lease && Number(state.lease.expiresAt) > Date.now();
+      if (state.status === 'active' && state.queue.length > 0 && !leaseActive) {
+        try {
+          await continueSwarmTask({ taskId, env, signal: request.signal, store });
+        } catch (error) {
+          console.warn('Inline swarm continuation from status poll failed:', safeErrorDetail(error));
+        }
+      }
+      const refreshed = (await store.load(taskId)) || state;
       return new Response(JSON.stringify({
         taskId,
-        status: state.status,
-        waveCount: state.waveCount,
-        completed: state.completed.length,
-        failed: state.failed.length,
-        cancelled: state.cancelled.length,
-        remaining: state.queue.length,
-        content: state.finalContent || null
+        status: refreshed.status,
+        waveCount: refreshed.waveCount,
+        completed: refreshed.completed.length,
+        failed: refreshed.failed.length,
+        cancelled: refreshed.cancelled.length,
+        remaining: refreshed.queue.length,
+        content: refreshed.finalContent || null
       }), { status: 200, headers: jsonHeaders });
     }
 
-    if (url.pathname === '/api/ai' && request.method === 'POST' && apiKey) {
+    // The /api/ai handler serves both the direct route (baseWorker) and the
+    // swarm; the provider fallback chain decides which configured provider
+    // actually answers. Without ANY provider key both fail honestly.
+    if (url.pathname === '/api/ai' && request.method === 'POST') {
       const baseRequest = request.clone();
       let body;
       try {
@@ -760,7 +1283,39 @@ export default {
               swarm: { enabled: true, cancelled: true }
             }), { status: 200, headers: jsonHeaders });
           }
-          // More waves remain: schedule the next invocation and report progress.
+          if (result.blocked) {
+            return new Response(JSON.stringify({
+              taskId: body.swarmContinue,
+              status: 'blocked',
+              swarm: { enabled: true, blocked: true }
+            }), { status: 200, headers: jsonHeaders });
+          }
+          if (result.leaseBusy) {
+            // Another invocation already holds the wave lease: report
+            // processing without scheduling duplicate work.
+            return new Response(JSON.stringify({
+              taskId: body.swarmContinue,
+              status: 'processing',
+              waveCount: result.state.waveCount,
+              remaining: result.state.queue.length
+            }), { status: 202, headers: jsonHeaders });
+          }
+          if (request.signal?.aborted) {
+            // Client disconnected: persist cancellation, never schedule more
+            // waves, never synthesise.
+            result.state.status = 'cancelled';
+            result.state.cancelledReason = 'client disconnected';
+            result.state.updatedAt = Date.now();
+            await store.save(body.swarmContinue, result.state);
+            return new Response(JSON.stringify({
+              taskId: body.swarmContinue,
+              status: 'cancelled',
+              swarm: { enabled: true, cancelled: true }
+            }), { status: 200, headers: jsonHeaders });
+          }
+          // More waves remain: persist the durable continuation schedule,
+          // then fire the fast-path kick and report progress.
+          await persistContinuationSchedule(store, body.swarmContinue, result.state);
           scheduleNextWave({ env, ctx, taskId: body.swarmContinue, origin: url.origin });
           return new Response(JSON.stringify({
             taskId: body.swarmContinue,
@@ -804,8 +1359,41 @@ export default {
               swarm: swarmResult.telemetry
             }), { status: 200, headers: jsonHeaders });
           }
-          // The task spans multiple waves: schedule the next invocation and
+          if (swarmResult.taskStatus === 'blocked') {
+            // The swarm dead-locked with evidence (e.g. every spec failed
+            // permanently): no response will ever arrive, so the initial
+            // call reports the honest error instead of handing out a taskId
+            // that can never complete.
+            return new Response(JSON.stringify({
+              error: 'Live swarm task is blocked with no usable specialist output.',
+              detail: swarmResult.blockedReason || 'no specialist can complete',
+              taskId: swarmResult.taskId,
+              swarm: swarmResult.telemetry
+            }), { status: 502, headers: jsonHeaders });
+          }
+          if (request.signal?.aborted) {
+            // Client disconnected: persist cancellation, never schedule more
+            // waves, never synthesise.
+            const state = await store.load(swarmResult.taskId);
+            if (state) {
+              state.status = 'cancelled';
+              state.cancelledReason = 'client disconnected';
+              state.updatedAt = Date.now();
+              await store.save(swarmResult.taskId, state);
+            }
+            return new Response(JSON.stringify({
+              taskId: swarmResult.taskId,
+              status: 'cancelled',
+              swarm: swarmResult.telemetry
+            }), { status: 200, headers: jsonHeaders });
+          }
+          // The task spans multiple waves: persist the durable continuation
+          // schedule (status stays 'active'), fire the fast-path kick, and
           // hand the client a taskId to poll for progress / final result.
+          const state = await store.load(swarmResult.taskId);
+          if (state) {
+            await persistContinuationSchedule(store, swarmResult.taskId, state);
+          }
           scheduleNextWave({ env, ctx, taskId: swarmResult.taskId, origin: url.origin });
           return new Response(JSON.stringify({
             taskId: swarmResult.taskId,

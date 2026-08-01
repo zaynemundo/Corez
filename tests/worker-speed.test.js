@@ -125,12 +125,15 @@ describe('AI response speed optimizations', () => {
 
     // OpenCode Go is the only provider: every request carries the full
     // prompt with the server-controlled model and no reasoning-effort cap —
-    // the model decides how much reasoning the task needs.
+    // the model decides how much reasoning the task needs. No payload ever
+    // carries an output-token cap either.
     expect(payloads.length).toBeGreaterThan(0);
     for (const payload of payloads) {
       expect(payload.model).toBe('deepseek-v4-flash');
       expect(payload.messages?.length).toBeGreaterThan(0);
       expect(payload.reasoning).toBeUndefined();
+      expect(payload.max_tokens).toBeUndefined();
+      expect(payload.max_completion_tokens).toBeUndefined();
     }
   });
 });

@@ -621,6 +621,172 @@ export function compactConversationForRequest(messages) {
   return compacted;
 }
 
+// --- Resumable swarm status client ----------------------------------------
+// A multi-wave swarm task keeps running server-side after the browser
+// disconnects. The task id is persisted in localStorage so a refreshed page
+// can reconnect to the in-flight task. Polling has NO fixed ceiling: it
+// continues with adaptive intervals (start 1500 ms, grow to 10000 ms, shrink
+// on progress) until the task completes, is cancelled, is blocked, the caller
+// aborts, or transient network failures are exhausted.
+
+const SWARM_TASK_KEY = 'corez_swarm_task';
+const SWARM_POLL_START_MS = 1500;
+const SWARM_POLL_MIN_MS = 1500;
+const SWARM_POLL_MAX_MS = 10000;
+const SWARM_NETWORK_RETRY_LIMIT = 3;
+
+function swarmStorage() {
+  if (typeof window !== 'undefined' && window.localStorage) return window.localStorage;
+  if (typeof globalThis !== 'undefined' && globalThis.localStorage) return globalThis.localStorage;
+  return null;
+}
+
+export function getStoredSwarmTaskId() {
+  const storage = swarmStorage();
+  if (!storage) return null;
+  try {
+    const raw = storage.getItem(SWARM_TASK_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed && typeof parsed.taskId === 'string' && parsed.taskId ? parsed.taskId : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearStoredSwarmTaskId() {
+  const storage = swarmStorage();
+  if (!storage) return;
+  try {
+    storage.removeItem(SWARM_TASK_KEY);
+  } catch {
+    // Best effort.
+  }
+}
+
+function storeSwarmTaskId(taskId) {
+  const storage = swarmStorage();
+  if (!storage) return;
+  try {
+    storage.setItem(SWARM_TASK_KEY, JSON.stringify({ taskId, storedAt: Date.now() }));
+  } catch {
+    // Persisting the resume handle is best-effort; polling still works.
+  }
+}
+
+function swarmAbortError() {
+  const error = new Error('cancelled by user');
+  error.name = 'AbortError';
+  return error;
+}
+
+function sleepResumable(ms, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(swarmAbortError());
+      return;
+    }
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(swarmAbortError());
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+let lastCompletedSwarmResult = null;
+
+export function getLastCompletedSwarmResult() {
+  return lastCompletedSwarmResult;
+}
+
+/**
+ * Reconnect to a running swarm task and wait for its final result.
+ *
+ * Polls /api/swarm/status/:taskId with adaptive intervals until completion.
+ * Never counts polls — it stops only on a terminal status, an abort signal
+ * (AbortError), or an honest error after transient network failures are
+ * retried (a browser disconnection is not a task failure: the task keeps
+ * running server-side). On completion the stored task id is cleared and the
+ * final result is retained for the session.
+ *
+ * options (mainly for tests): startDelayMs, minDelayMs, maxDelayMs.
+ */
+export async function resumeSwarmTask(taskId, signal = null, options = {}) {
+  if (!taskId || typeof taskId !== 'string') {
+    throw new Error('Invalid swarm task id.');
+  }
+  const startMs = Number.isFinite(options.startDelayMs) ? options.startDelayMs : SWARM_POLL_START_MS;
+  const minMs = Number.isFinite(options.minDelayMs) ? options.minDelayMs : SWARM_POLL_MIN_MS;
+  const maxMs = Number.isFinite(options.maxDelayMs) ? options.maxDelayMs : SWARM_POLL_MAX_MS;
+
+  let delay = Math.min(Math.max(startMs, minMs), maxMs);
+  let networkFailures = 0;
+  let lastProgress = null;
+
+  for (;;) {
+    if (signal?.aborted) throw swarmAbortError();
+    await sleepResumable(delay, signal);
+
+    let response;
+    try {
+      response = await fetch(`/api/swarm/status/${encodeURIComponent(taskId)}`, { signal });
+    } catch (err) {
+      if (err?.name === 'AbortError' || signal?.aborted) throw swarmAbortError();
+      networkFailures += 1;
+      if (networkFailures >= SWARM_NETWORK_RETRY_LIMIT) {
+        // Transient network failures exhausted: report honestly instead of
+        // treating the task as failed. The task keeps running server-side.
+        throw new Error(`Hosted AI swarm status request failed after ${networkFailures} network retries.`, { cause: err });
+      }
+      delay = Math.min(delay * 2, maxMs);
+      continue;
+    }
+    networkFailures = 0;
+
+    let status;
+    try {
+      status = await response.json();
+    } catch {
+      status = {};
+    }
+
+    if (status?.status === 'completed' && typeof status?.content === 'string' && status.content.trim()) {
+      clearStoredSwarmTaskId();
+      lastCompletedSwarmResult = { taskId, content: status.content, model: status.model || 'swarm' };
+      return { content: status.content, model: status.model || 'swarm', taskId };
+    }
+    if (status?.status === 'cancelled') {
+      clearStoredSwarmTaskId();
+      throw new Error('Hosted AI swarm task was cancelled.');
+    }
+    if (status?.status === 'blocked') {
+      clearStoredSwarmTaskId();
+      throw new Error('Hosted AI swarm task is blocked with no usable specialist output.');
+    }
+    if (response.status !== 200 && response.status !== 202) {
+      throw new Error(`Hosted AI swarm status request failed: HTTP ${response.status}`);
+    }
+    if (status?.status !== 'active' && status?.status !== 'processing') {
+      clearStoredSwarmTaskId();
+      throw new Error(`Hosted AI swarm task ended unexpectedly (status: ${String(status?.status || 'unknown')}).`);
+    }
+
+    // Adaptive pacing: shrink the interval when the task made progress since
+    // the last poll; otherwise grow towards the ceiling.
+    const progress = `${status.waveCount ?? 0}:${status.completed ?? 0}:${status.remaining ?? -1}`;
+    if (lastProgress !== null && progress !== lastProgress) {
+      delay = Math.max(minMs, Math.round(delay * 0.75));
+    } else {
+      delay = Math.min(delay * 1.5, maxMs);
+    }
+    lastProgress = progress;
+  }
+}
+
 export async function generateHostedAIResponse(
   prompt,
   intent = analyzePublicUserIntent(prompt),
@@ -689,34 +855,16 @@ export async function generateHostedAIResponse(
   }
 
   // Multi-wave swarm task: the worker returned 202 with a taskId and more
-  // waves are still queued. Poll the status endpoint until the final result
-  // arrives (each wave runs in its own Worker invocation).
+  // waves are still queued. Poll the status endpoint through the resumable
+  // client until the final result arrives (each wave runs in its own Worker
+  // invocation). The task id is persisted so a page refresh can reconnect;
+  // browser disconnection is never treated as task failure, and polling has
+  // no fixed ceiling.
   if (response.status === 202 && data?.taskId) {
     const taskId = data.taskId;
-    for (let poll = 0; poll < 600; poll += 1) {
-      if (signal?.aborted) throw new Error('cancelled by user');
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      const statusResponse = await fetch(`/api/swarm/status/${encodeURIComponent(taskId)}`, { signal });
-      let status;
-      try {
-        status = await statusResponse.json();
-      } catch {
-        status = {};
-      }
-      if (status?.status === 'completed' && typeof status?.content === 'string' && status.content.trim()) {
-        data = { content: status.content, model: status.model || 'swarm' };
-        break;
-      }
-      if (status?.status === 'cancelled') {
-        throw new Error('Hosted AI swarm task was cancelled.');
-      }
-      if (status?.status === 'blocked') {
-        throw new Error('Hosted AI swarm task is blocked with no usable specialist output.');
-      }
-      if (statusResponse.status !== 200 && statusResponse.status !== 202) {
-        throw new Error(`Hosted AI swarm status request failed: HTTP ${statusResponse.status}`);
-      }
-    }
+    storeSwarmTaskId(taskId);
+    const resumed = await resumeSwarmTask(taskId, signal);
+    data = { content: resumed.content, model: resumed.model || 'swarm' };
   }
 
   if (!response.ok && !(response.status === 202 && data?.content)) {

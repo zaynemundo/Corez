@@ -24,9 +24,14 @@ npm run dev
 ```
 
 Requires a `.dev.vars` file (or env var) with the OpenCode Go provider key.
-OpenCode Go (`OPENCODE_GO_API_KEY` / `OPENCODE_API_KEY`) is the only AI
-provider — the direct DeepSeek API and OpenRouter integrations have been
-removed.
+Provider fallback chain (OpenCode Go is preferred and stays preferred):
+1. OpenCode Go (`OPENCODE_GO_API_KEY` / `OPENCODE_API_KEY`)
+2. Official DeepSeek API (`DEEPSEEK_API_KEY`)
+3. OpenRouter (`OPENROUTER_API_KEY`, also the FLUX 1 Schnell image provider)
+
+Fallbacks are tried only when the preferred provider cannot serve; each can
+be disabled with `OPENCODE_GO_DISABLED` / `DEEPSEEK_DISABLED` /
+`OPENROUTER_DISABLED`.
 
 ### 2. Pre-built static + deployed worker
 
@@ -39,9 +44,11 @@ npm run deploy   # deploys worker + dist assets to Cloudflare
 
 - Chat: open http://localhost:3000, send a message; watch Network for
   `POST /api/ai` returning `{content, model}` (model names the provider,
-  e.g. `deepseek:deepseek-v4-flash`).
+  e.g. `opencode:deepseek-v4-flash`, `deepseek:deepseek-v4-flash`,
+  `openrouter:deepseek-v4-flash`).
 - Images: prompts matching the image intent hit `POST /api/image` and
-  return `{image}` (R2 URL when `ASSET_BUCKET` is configured).
+  return `{image, model: "black-forest-labs/flux-1-schnell"}` (R2 URL when
+  `ASSET_BUCKET` is configured; honest 503 without `OPENROUTER_API_KEY`).
 - Market: `POST /api/market` requires `TWELVE_DATA_API_KEY` (returns 503
   `not_configured` without it).
 - Memory/apps: `/api/memory/*` and `/api/apps/*` require the `ASSET_BUCKET`
@@ -66,5 +73,9 @@ npm run build
   API calls.
 - The swarm path only activates for `complexity: high/epic` app/code-help
   requests or explicit `swarm: true`; it fans out to the same provider key.
+- `/api/ai` transient provider failures (429/5xx/network) are retried with
+  adaptive backoff; when one request's practical window is exceeded the
+  worker returns `200 {taskId, status: "retry-scheduled",
+  retryAfterSeconds}` and resending the same messages resumes the task.
 - `/api/ai` and `/api/image` are rate limited per client IP
   (20/min and 30/min; HTTP 429 with `Retry-After`).

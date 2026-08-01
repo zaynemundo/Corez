@@ -6,13 +6,17 @@ Corez deploys the Vite application and its AI endpoints together as a Cloudflare
 
 ### Text and multimodal requests
 
-When `OPENCODE_GO_API_KEY` (or `OPENCODE_API_KEY`) is configured, `/api/ai` uses the OpenCode Go API provider exclusively (it serves the latest DeepSeek V4 Flash builds):
+When `OPENCODE_GO_API_KEY` (or `OPENCODE_API_KEY`) is configured, `/api/ai` routes through the **OpenCode Go API** first (it serves the latest DeepSeek V4 Flash builds). OpenCode Go is preferred and stays preferred; the official DeepSeek API and OpenRouter are fallbacks tried in order only when the preferred provider cannot serve:
 
-- All chat, coding, app & swarm requests: `deepseek-v4-flash`
+1. **OpenCode Go** — `OPENCODE_GO_API_KEY` / `OPENCODE_API_KEY`, endpoint `OPENCODE_ENDPOINT` (default `https://opencode.ai/zen/go/v1/chat/completions`), model `OPENCODE_MODEL` (default `deepseek-v4-flash`).
+2. **Official DeepSeek API** — `DEEPSEEK_API_KEY`, endpoint `DEEPSEEK_ENDPOINT` (default `https://api.deepseek.com/chat/completions`), model `DEEPSEEK_MODEL` (default `deepseek-v4-flash`).
+3. **OpenRouter** — `OPENROUTER_API_KEY`, endpoint `https://openrouter.ai/api/v1/chat/completions`, model `OPENROUTER_MODEL` (default `deepseek-v4-flash`).
 
-OpenCode Go is the only AI provider: the direct DeepSeek API and OpenRouter integrations have been removed. Transient gateway failures are retried with adaptive backoff (honouring `Retry-After`), and reasoning-only replies get one continuation nudge, before the request is reported as failed. Cloudflare Workers AI is not used anywhere.
+All chat, coding, app & swarm requests use `deepseek-v4-flash` unless overridden per provider. The model list is server-controlled: client-supplied `body.model` is never trusted. Individual providers can be disabled with `OPENCODE_GO_DISABLED`, `DEEPSEEK_DISABLED`, or `OPENROUTER_DISABLED` (any truthy value). Provider keys never leave the worker, each provider gets its own `Authorization` header, and the content returned to users is provider-neutral.
 
-Generations run as long as the model needs: no timeouts and no output token caps. The only abort is the client disconnecting (Stop button).
+Transient failures (408, 429, 5xx, network) are retried with adaptive exponential backoff (750 ms base, doubling, jittered, honouring each provider's `Retry-After`, single sleeps capped at 30 s) until the provider recovers, the client disconnects, or the failure is classified permanent (401/403/400/unsupported model — never retried). Reasoning-only replies get one continuation nudge. When a provider cannot recover within one request's practical window, the retry schedule is persisted (`retry/<provider>/<task>` records) and the request answers `200 { taskId, status: "retry-scheduled", retryAfterSeconds }`; resending the same messages resumes the exact task, so no work is restarted. Permanent exhaustion of every provider ends in an honest `502`. Cloudflare Workers AI is not used anywhere.
+
+Generations run as long as the model needs: no timeouts and no output token caps (`max_tokens` is never sent to any provider). The only abort is the client disconnecting (Stop button).
 
 Conversation history is sent in full below the platform body guard; only when a request approaches the guard are older redundant turns compacted with a real generated summary and persisted retrievable records (exact code, errors, requirements and the latest user turn are always preserved verbatim).
 
@@ -24,9 +28,9 @@ Only the app document itself is published: conversation history, session IDs, an
 
 ### Image generation
 
-`/api/image` previously used the OpenRouter FLUX API; OpenRouter has been removed, so image generation is currently unavailable on this deployment and returns an honest error. No image provider credential is configured or accepted.
+`/api/image` generates images with **FLUX 1 Schnell** (`black-forest-labs/flux-1-schnell`) through OpenRouter when `OPENROUTER_API_KEY` is configured (the same key also serves as the text fallback). The image is stored in R2 when `ASSET_BUCKET` is available and returned as a public `/api/assets/...` URL; otherwise the provider's image URL is returned directly. Client disconnects abort generation. Without `OPENROUTER_API_KEY` the endpoint returns an honest `503` — no image provider is configured and text providers are never used as fake image providers.
 
-`OPENCODE_GO_API_KEY` is the only Worker secret required for AI.
+`OPENCODE_GO_API_KEY` (or `OPENCODE_API_KEY`) is the only required Worker secret for text AI; `OPENROUTER_API_KEY` is optional (text fallback + FLUX images) and `DEEPSEEK_API_KEY` is optional (text fallback).
 
 ### Online multiplayer
 

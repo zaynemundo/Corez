@@ -2,6 +2,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execSync, spawnSync } from 'node:child_process';
 import { PERMISSION_CATEGORIES } from '../permissions/index.js';
+import { resolveWorkspacePath } from '../runtime/pathResolver.js';
+import {
+  checkReadBeforeWrite,
+  ensureFileLifecycle,
+  ensureRelevantFile,
+  recordFileRead,
+  recordFileWritten
+} from '../runtime/fileLifecycle.js';
 
 // No fixed command timeout: valid builds, tests, and long-running commands
 // must never be terminated prematurely. An operator may set an explicit
@@ -88,10 +96,14 @@ export class ToolRegistry {
         },
         required: ['filePath']
       },
-      async execute({ filePath, startLine, endLine }, { context }) {
+      async execute({ filePath, startLine, endLine }, { context, gate }) {
         const cwd = context?.cwd || process.cwd();
-        const fullPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
-        
+        const resolved = resolveWorkspacePath(cwd, filePath);
+        if (!resolved.ok) {
+          return { success: false, error: resolved.error, code: resolved.code };
+        }
+        const fullPath = resolved.path;
+
         if (!fs.existsSync(fullPath)) {
           return { error: `File not found: ${filePath}` };
         }
@@ -104,6 +116,12 @@ export class ToolRegistry {
           const start = Math.max(1, startLine || 1) - 1;
           const end = endLine ? Math.min(lines.length, endLine) : lines.length;
           selectedLines = lines.slice(start, end);
+        }
+
+        if (gate) {
+          // Successful reads only: failed reads never count as read evidence.
+          recordFileRead(gate, fullPath);
+          ensureRelevantFile(gate, fullPath, { discoveredBy: 'model-read', readSuccessfully: true });
         }
         
         return {
@@ -127,12 +145,35 @@ export class ToolRegistry {
         },
         required: ['filePath', 'content']
       },
-      async execute({ filePath, content }, { context }) {
+      async execute({ filePath, content }, { context, gate }) {
         const cwd = context?.cwd || process.cwd();
-        const fullPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
-        
+        const resolved = resolveWorkspacePath(cwd, filePath);
+        if (!resolved.ok) {
+          return { success: false, error: resolved.error, code: resolved.code };
+        }
+        const fullPath = resolved.path;
+
+        // Read-before-write: existing files must be read successfully before
+        // they may be modified. New files may be created without a read.
+        if (gate) {
+          const rbw = checkReadBeforeWrite(gate, fullPath);
+          if (!rbw.ok) {
+            return { success: false, error: rbw.error, code: rbw.code, message: rbw.message };
+          }
+        }
+
         fs.mkdirSync(path.dirname(fullPath), { recursive: true });
         fs.writeFileSync(fullPath, content, 'utf8');
+
+        if (gate) {
+          const lifecycle = ensureFileLifecycle(gate, fullPath);
+          recordFileWritten(gate, fullPath, lifecycle?.existedBeforeTask === true);
+          ensureRelevantFile(gate, fullPath, {
+            discoveredBy: 'model-write',
+            modified: true,
+            readSuccessfully: lifecycle?.readSucceeded === true
+          });
+        }
         
         return { success: true, filePath, bytesWritten: Buffer.byteLength(content, 'utf8') };
       }
@@ -152,12 +193,24 @@ export class ToolRegistry {
         },
         required: ['filePath', 'targetContent', 'replacementContent']
       },
-      async execute({ filePath, targetContent, replacementContent }, { context }) {
+      async execute({ filePath, targetContent, replacementContent }, { context, gate }) {
         const cwd = context?.cwd || process.cwd();
-        const fullPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
-        
+        const resolved = resolveWorkspacePath(cwd, filePath);
+        if (!resolved.ok) {
+          return { success: false, error: resolved.error, code: resolved.code };
+        }
+        const fullPath = resolved.path;
+
         if (!fs.existsSync(fullPath)) {
           return { error: `File not found: ${filePath}` };
+        }
+
+        // Read-before-write: existing files must be read successfully first.
+        if (gate) {
+          const rbw = checkReadBeforeWrite(gate, fullPath);
+          if (!rbw.ok) {
+            return { success: false, error: rbw.error, code: rbw.code, message: rbw.message };
+          }
         }
         
         const original = fs.readFileSync(fullPath, 'utf8');
@@ -167,6 +220,16 @@ export class ToolRegistry {
         
         const updated = original.replace(targetContent, replacementContent);
         fs.writeFileSync(fullPath, updated, 'utf8');
+
+        if (gate) {
+          const lifecycle = ensureFileLifecycle(gate, fullPath);
+          recordFileWritten(gate, fullPath, lifecycle?.existedBeforeTask === true);
+          ensureRelevantFile(gate, fullPath, {
+            discoveredBy: 'model-write',
+            modified: true,
+            readSuccessfully: lifecycle?.readSucceeded === true
+          });
+        }
         
         return { success: true, filePath };
       }
@@ -185,7 +248,11 @@ export class ToolRegistry {
       },
       async execute({ dirPath = '.' } = {}, { context }) {
         const cwd = context?.cwd || process.cwd();
-        const fullPath = path.isAbsolute(dirPath) ? dirPath : path.join(cwd, dirPath);
+        const resolved = resolveWorkspacePath(cwd, dirPath);
+        if (!resolved.ok) {
+          return { success: false, error: resolved.error, code: resolved.code };
+        }
+        const fullPath = resolved.path;
         
         if (!fs.existsSync(fullPath)) {
           return { error: `Directory not found: ${dirPath}` };
@@ -566,30 +633,58 @@ export class ToolRegistry {
     this.registerTool({
       name: 'finalize_task',
       category: PERMISSION_CATEGORIES.READ,
-      description: 'Submit the completion gate for a repository task. The runtime verifies the evidence (diff inspected after the last change, tests, lint, build, git diff --check) before accepting. If evidence is missing, the response lists the missing actions.',
+      description: 'Submit the completion gate for a repository task. The runtime verifies the real evidence (diff inspected after the last change, tests, lint, build, git diff --check, constraints with verification method and evidence, review findings with resolution evidence, baseline git status preserved). Boolean flags are not accepted as proof. If evidence is missing, the response lists the missing actions.',
       parameters: {
         type: 'object',
         properties: {
-          verifiedConstraints: {
+          constraints: {
             type: 'array',
-            items: { type: 'string' },
-            description: 'Must-preserve constraints you verified against the final state'
+            description: 'Must-preserve constraints verified against the final state. Each constraint requires a non-empty verificationMethod and non-empty evidence.',
+            items: {
+              type: 'object',
+              properties: {
+                constraintId: { type: 'string', description: 'Stable constraint identifier' },
+                description: { type: 'string', description: 'What must be preserved' },
+                verificationMethod: { type: 'string', description: 'How the constraint was verified (must be non-empty)' },
+                evidence: { type: 'string', description: 'Evidence proving the constraint holds (must be non-empty)' },
+                status: { type: 'string', enum: ['verified', 'unverified'], description: 'Constraint verification status' }
+              },
+              required: ['constraintId', 'description', 'verificationMethod', 'evidence', 'status']
+            }
           },
-          reviewFindingsResolved: { type: 'boolean', description: 'True when no blocking review finding remains' },
-          unrelatedChangesPreserved: { type: 'boolean', description: 'True when unrelated user changes were left untouched' }
+          reviewFindings: {
+            type: 'array',
+            description: 'Findings from a real review pass over the final diff. Every blocking finding must be resolved with non-empty resolutionEvidence.',
+            items: {
+              type: 'object',
+              properties: {
+                findingId: { type: 'string', description: 'Stable finding identifier' },
+                severity: { type: 'string', enum: ['blocking', 'warning', 'info'], description: 'Blocking findings block completion until resolved' },
+                file: { type: 'string', description: 'File the finding refers to' },
+                line: { type: 'number', description: 'Line number the finding refers to' },
+                description: { type: 'string', description: 'What the review found' },
+                status: { type: 'string', enum: ['open', 'resolved'], description: 'Finding resolution status' },
+                resolutionEvidence: { type: 'string', description: 'Evidence proving a blocking finding is resolved (must be non-empty)' }
+              },
+              required: ['findingId', 'severity', 'description', 'status']
+            }
+          }
         },
-        required: ['reviewFindingsResolved', 'unrelatedChangesPreserved']
+        required: ['constraints', 'reviewFindings']
       },
       async execute(args, runtimeOptions) {
         const gate = runtimeOptions?.gate;
         if (!gate) return { error: 'finalize_task is unavailable outside the agent runtime.' };
         const { evaluateCompletionGate } = await import('../runtime/gate.js');
         const scripts = runtimeOptions?.scripts || {};
+        const constraints = Array.isArray(args?.constraints) ? args.constraints : [];
+        const reviewFindings = Array.isArray(args?.reviewFindings) ? args.reviewFindings : [];
+        gate.constraintEvidence = constraints;
+        gate.reviewResults = reviewFindings;
         const result = evaluateCompletionGate(gate, {
           availableScripts: scripts,
-          declaredConstraints: Array.isArray(args?.verifiedConstraints) ? args.verifiedConstraints : [],
-          reviewFindingsResolved: args?.reviewFindingsResolved === true,
-          unrelatedChangesPreserved: args?.unrelatedChangesPreserved === true
+          constraints,
+          reviewFindings
         });
         gate.finalizeAttempted = true;
         gate.finalizePassed = result.passed;

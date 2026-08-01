@@ -46,10 +46,12 @@ check_absent 'hardcoded financial demo does not claim live data' 'LIVE DATA' "$s
 check 'settings explains automatic server-managed routing' 'automatically routes.*managed server-side|managed server-side.*automatically routes' "$settings"
 check_absent 'settings does not expose provider or model names' 'GLM|DeepSeek|Kimi|MiMo|OpenRouter|FLUX|Cloudflare Workers AI|@cf/' "$settings"
 check 'README documents the OpenCode Go secret' 'OPENCODE_GO_API_KEY' "$readme"
+check 'README documents the DeepSeek fallback secret' 'DEEPSEEK_API_KEY' "$readme"
+check 'README documents the OpenRouter fallback secret' 'OPENROUTER_API_KEY' "$readme"
 check 'README documents primary text routing' 'deepseek-v4-flash' "$readme"
+check 'README documents the OpenRouter FLUX image model' 'black-forest-labs/flux-1-schnell' "$readme"
 check_absent 'README no longer documents MiMo V2.5' 'xiaomi/mimo-v2[.]5' "$readme"
 check_absent 'README no longer documents Cloudflare Workers AI models' '@cf/' "$readme"
-check_absent 'README no longer documents the OpenRouter FLUX image model' 'black-forest-labs/flux-1-schnell' "$readme"
 check_absent 'README no longer describes GLM-4.7-Flash as the active model' 'GLM-4[.]7-Flash|@cf/zai-org/glm-4[.]7-flash' "$readme"
 check_absent 'settings has no model override storage' 'corez_openrouter_model' "$settings"
 
