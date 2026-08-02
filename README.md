@@ -1,5 +1,13 @@
 # New-Corez
 
+## Slash commands
+
+Type a command at the start of any chat message for an explicit, unambiguous intent — the command token is stripped before the prompt reaches any model, so the AI is never confused by it:
+
+- **`/website <description>`** — creates a website or web page (forces the app/website creation path with Awwwards design inspiration).
+- **`/game <description>`** — creates a game (forces the game creation path).
+- **`/research <topic>`** — runs a full research pipeline: searches the web (DuckDuckGo + Wikipedia through the worker), writes a comprehensive report grounded in the real results with cited sources, and delivers it as a downloadable PDF in the preview canvas (`Download .pdf` / `Print / Save as PDF`). The PDF is generated client-side with no API keys; if no reliable results come back, CoreZ reports honestly instead of inventing content.
+
 ## Hosted AI routing
 
 Corez deploys the Vite application and its AI endpoints together as a Cloudflare Worker. Public users call `/api/ai` for text and multimodal conversations and `/api/image` for image generation. Model selection is controlled server-side and cannot be overridden by the browser.

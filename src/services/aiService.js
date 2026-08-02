@@ -22,6 +22,7 @@ import { classifyExecutionMode, EXECUTION_MODES } from './executionModes.js';
 import { persistAndSummarize } from './contextStore.js';
 import { fetchWebSearch } from './searchService.js';
 import { fetchAwwwardsInspiration } from './inspirationService.js';
+import { synthesizePdfDocumentHtml } from './pdfGenerator.js';
 
 export const PUBLIC_USER_INTENT_PROMPT = `
 Analyze the public user intent behind the request. Corez uses FLUX 1 Schnell for background generation and image rendering.
@@ -2506,10 +2507,28 @@ function synthesizeCustomGame(prompt) {
 // scores, weather, or explicit "search the web / look up / google it"
 // phrasing. Explanation and knowledge questions WITHOUT a recency signal are
 // left to the model's own knowledge.
+// Slash commands typed in the chat box give CoreZ an explicit, unambiguous
+// intent — the AI is never asked to guess. The command token is stripped
+// before the prompt reaches any model, so the model sees only the clean
+// request.
+const SLASH_COMMANDS = new Set(['website', 'game', 'research']);
+
+export function parseSlashCommand(prompt) {
+  const text = String(prompt || '').trim();
+  const match = text.match(/^\/([a-z]+)\b/i);
+  if (!match) return { command: null, rest: text };
+  const command = match[1].toLowerCase();
+  if (!SLASH_COMMANDS.has(command)) return { command: null, rest: text };
+  return { command, rest: text.slice(match[0].length).trim() };
+}
+
+export function isSlashCommand(prompt) {
+  return parseSlashCommand(prompt).command !== null;
+}
+
 export function isWebSearchRequest(prompt) {
   const text = String(prompt || '').toLowerCase();
   if (!text.trim()) return false;
-
   const searchPhrase = /\b(search|look up|lookup|google|browse|find out|fetch|retrieve|check)\b[\s\S]{0,60}\b(web|internet|online|current|latest|recent|news|updates?|today|now|live|real[- ]?time)\b/i;
   const factualRecency = /\b(what|who|which|where|when|how)\b[\s\S]{0,80}\b(happened|occurred|happening|won|winner|released|launched|announced|published|updated|changed|result|score|price|rate|weather|temperature|stock|cases)\b/i;
   if (searchPhrase.test(text) || factualRecency.test(text)) return true;
@@ -2565,6 +2584,62 @@ ${search.results.map((result, index) => `${index + 1}. ${result.title} â€” 
 
   if (grounded) return grounded;
   return formatSearchResults(search);
+}
+
+// Full research pipeline for the /research command: search the web
+// (DuckDuckGo + Wikipedia through the worker), write a comprehensive
+// research report grounded in the real results, and deliver it as a
+// downloadable PDF in the preview canvas.
+export async function runResearchCommand(topic, history = [], signal = null) {
+  const cleanTopic = String(topic || '').trim();
+  if (!cleanTopic) {
+    return 'Please tell me what to research, e.g. `/research quantum computing`';
+  }
+
+  let search;
+  try {
+    search = await fetchWebSearch(cleanTopic, signal);
+  } catch (error) {
+    if (error?.name === 'AbortError') throw error;
+    return `I couldn't research "${cleanTopic}" right now — the web search service is unavailable. Please try again later.`;
+  }
+  const results = Array.isArray(search?.results) ? search.results : [];
+  if (results.length === 0) {
+    return `I searched the web for **"${cleanTopic}"** but no reliable results came back, so I can't write a grounded research report about it. Try a different topic.`;
+  }
+
+  // Build the report content: prefer the hosted AI grounded on the real
+  // results; fall back to a factual summary of the sources.
+  let reportBody = '';
+  try {
+    const researchPrompt = `Write a comprehensive research report on: "${cleanTopic}"
+
+Use ONLY the web search results below as factual grounding. Structure the report with clear sections: Overview, Key Findings, Details, and Conclusion. Cite sources inline as [1], [2], etc., and include the numbered Sources list at the end with the exact titles and URLs provided. If the results do not cover something, say so honestly instead of guessing. Do not invent facts, URLs, or sources.
+
+SEARCH RESULTS:
+${results.map((result, index) => `${index + 1}. ${result.title} — ${result.url}\n   ${result.snippet || ''} (source: ${result.source})`).join('\n')}`;
+    const hosted = await generateHostedAIResponse(researchPrompt, analyzePublicUserIntent(cleanTopic), history, signal);
+    if (hosted) reportBody = hosted;
+  } catch (error) {
+    if (error?.name === 'AbortError') throw error;
+    // Hosted AI unavailable: build the report from the real sources directly.
+  }
+
+  if (!reportBody) {
+    reportBody = `# Research Report: ${cleanTopic}\n\n## Overview\n\nThis report summarises information gathered from the sources listed below.\n\n## Key Findings\n\n${results
+      .slice(0, 5)
+      .map((r) => `- ${r.title}: ${r.snippet || 'See source for details.'}`)
+      .join('\n')}\n\n## Sources\n\n${results
+      .map((r, i) => `${i + 1}. ${r.title} — ${r.url}`)
+      .join('\n')}\n\n_Generated by CoreZ from live web search results._`;
+  }
+
+  // Strip markdown fences so the content renders cleanly in the PDF editor.
+  const plainBody = reportBody.replace(/```/g, '').trim();
+  const title = `${cleanTopic.slice(0, 60)} — Research Report`;
+  const pdf = synthesizePdfDocumentHtml({ title, body: plainBody, sources: results });
+
+  return `Here is your research report on **${cleanTopic}**, grounded in live web search results. Open it in the preview canvas and click **"Download .pdf"** to save it as a PDF, or **"Print / Save as PDF"** to print it.\n\n\`\`\`html\n${pdf.html}\n\`\`\``;
 }
 
 // Build the "why" for the honest fallback: name the transport error when the
@@ -2783,8 +2858,37 @@ export function isExplicitImageRequest(prompt) {
 }
 
 export async function generateAIResponse(prompt, history = [], signal = null) {
-  const cleanPrompt = prompt.trim();
+  // Explicit slash commands first: /website, /game, /research. The command
+  // token is stripped before any model sees the prompt, so the AI is never
+  // confused by it.
+  const { command, rest } = parseSlashCommand(prompt);
+  if (command === 'research') {
+    return runResearchCommand(rest, history, signal);
+  }
+
+  let cleanPrompt = command === 'website' || command === 'game' ? rest : prompt.trim();
+  if (!cleanPrompt) cleanPrompt = command === 'game' ? 'Build a game' : 'Build a website';
   const intent = analyzePublicUserIntent(cleanPrompt);
+
+  // /website and /game force the exact intent the user asked for instead of
+  // letting the classifier guess.
+  if (command === 'website') {
+    intent.type = 'app';
+    intent.primaryIntent = 'website_creation';
+    intent.summary = 'Create a public website or web page.';
+    intent.confidence = 1;
+    if (!/\b(website|web ?site|landing|page|site|homepage)\b/i.test(cleanPrompt)) {
+      cleanPrompt = `Build a website: ${cleanPrompt}`;
+    }
+  } else if (command === 'game') {
+    intent.type = 'app';
+    intent.primaryIntent = 'game_creation';
+    intent.summary = 'Create a playable game.';
+    intent.confidence = 1;
+    if (!/\b(game|playable|arcade|simulator)\b/i.test(cleanPrompt)) {
+      cleanPrompt = `Build a game: ${cleanPrompt}`;
+    }
+  }
 
   const marketRequest = intent.type === 'app' ? null : parseMarketIntent(cleanPrompt);
   if (marketRequest && !isRevisionContextPrompt(cleanPrompt)) {
