@@ -3,7 +3,7 @@ import {
   Sun, 
   Moon
 } from 'lucide-react';
-import { ChatSparkleIcon, PlusIcon } from './icons';
+import { ChatBubbleIcon, PlusIcon } from './icons';
 
 export default function Sidebar({
   isOpen,
@@ -56,7 +56,7 @@ export default function Sidebar({
             aria-label={`Open conversation ${session.title}`}
             title={session.title}
           >
-            <ChatSparkleIcon size={20} strokeWidth={1.5} />
+            <ChatBubbleIcon size={20} strokeWidth={1.5} />
           </div>
         ))}
       </div>

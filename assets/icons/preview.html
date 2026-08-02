@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Chat icon preview — original vs new SVG</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: #fff; color: #111; margin: 0; padding: 24px; }
+  h1 { font-size: 18px; }
+  .row { display: flex; gap: 40px; flex-wrap: wrap; margin-bottom: 28px; }
+  .cell { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+  .cell .label { font-size: 12px; color: #666; }
+  .tile { width: 256px; height: 256px; border: 1px solid #e5e5e5; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+  .small-tile { width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; }
+  .chip { display: inline-flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid #e5e5e5; border-radius: 10px; }
+</style>
+</head>
+<body>
+  <h1>Flaticon chat icon (10322417) — original PNG vs new thin SVG</h1>
+
+  <div class="row">
+    <div class="cell">
+      <div class="tile"><img src="flaticon-chat-10322417.png" alt="original" style="width: 240px; height: 240px;" /></div>
+      <span class="label">Original (Flaticon PNG, 512px, thick outline)</span>
+    </div>
+    <div class="cell">
+      <div class="tile"><img src="chat-bubble.svg" alt="new svg" style="width: 240px; height: 240px;" /></div>
+      <span class="label">New SVG (24×24, stroke 1.5, currentColor)</span>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="chip">
+      <span class="label">At 20px in app:</span>
+      <span class="small-tile"><img src="chat-bubble.svg" alt="app size" style="width: 20px; height: 20px;" /></span>
+      <span class="small-tile"><img src="chat-bubble.svg" alt="app size 2" style="width: 20px; height: 20px; color: #10a37f;" /></span>
+      <span class="small-tile"><img src="chat-bubble.svg" alt="app size 3" style="width: 20px; height: 20px; color: #8e8ea0;" /></span>
+    </div>
+  </div>
+
+  <p style="font-size: 13px; color: #666; max-width: 720px;">
+    Reconstruction notes: the original is a thick-outline (8.4% stroke) speech bubble with a pointed
+    zig-zag tail at the bottom-left and a plus sign at the bottom-right. The SVG keeps the same
+    silhouette with a thinner 6.25% stroke. If any detail (tail, plus, corner shapes) looks off
+    versus the Flaticon page, describe it and I will adjust.
+  </p>
+</body>
+</html>
