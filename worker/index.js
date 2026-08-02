@@ -272,7 +272,7 @@ async function handleAi(request, env) {
   // model has concrete visual direction. Best-effort: failure never blocks
   // the request and never fabricates references.
   const appIntent = intent?.type === 'app' || legacyIntent === 'app';
-  if (appIntent && !body.pdf) {
+  if (appIntent) {
     try {
       const inspiration = await fetchAwwwardsInspiration(prompt, env?.__INSPIRATION_FETCH);
       if (Array.isArray(inspiration?.sites) && inspiration.sites.length > 0) {
@@ -287,17 +287,6 @@ async function handleAi(request, env) {
     } catch (error) {
       console.warn('Awwwards inspiration fetch failed (request continues):', safeErrorDetail(error));
     }
-  }
-
-  // PDF/document requests: instruct the model to output a complete,
-  // self-contained HTML document (A4 print-styled, with a Print/Save-as-PDF
-  // button) instead of a game/app. The client renders it in the preview
-  // canvas where the user can download or print to PDF.
-  if (body.pdf === true) {
-    apiMessages.push({
-      role: 'system',
-      content: 'The user asked for a PDF or printable document. Produce ONE complete self-contained HTML document (DOCTYPE, head with print-friendly CSS, @page A4 rules, body). It must include a toolbar with a "Print / Save as PDF" button (window.print()) and a "Download .pdf" button that builds a client-side PDF (or triggers print). The document content must directly fulfil the user\'s request with real content, styled for printing on A4 pages. Return ONLY the HTML document inside a single ```html code block, no preamble.'
-    });
   }
 
   let hasAppendedPrompt = false;
