@@ -110,14 +110,31 @@ Save-MaskPng -Path "$OutDir\corez-logo.png" -Size 1024 -MarkColor $white
 Save-MaskPng -Path "$OutDir\corez.png" -Size 1024 -MarkColor $black
 Save-MaskPng -Path "$OutDir\corez-bw.png" -Size 1024 -MarkColor $black
 
-# ---- Favicon: white mark, cropped to content, on transparent (no tile) ---
+# ---- Favicon: white mark, eroded + cropped to content, transparent -------
 function Save-Favicon {
   param([string]$Path, [int]$Size)
-  # Content bbox of the mask so the mark can be scaled up to fill the canvas.
+  # Erode the mask (L1 diamond, radius 2 at 256px) so strokes render thinner.
+  $er = 2
+  $emask = New-Object 'byte[,]' $H, $W
+  for ($y = $er; $y -lt ($H - $er); $y++) {
+    for ($x = $er; $x -lt ($W - $er); $x++) {
+      if ($mask[$y, $x] -ne 1) { continue }
+      $ok = $true
+      for ($dy = -$er; $dy -le $er -and $ok; $dy++) {
+        $rem = $er - [Math]::Abs($dy)
+        for ($dx = -$rem; $dx -le $rem -and $ok; $dx++) {
+          if ($mask[$y + $dy, $x + $dx] -ne 1) { $ok = $false }
+        }
+      }
+      if ($ok) { $emask[$y, $x] = 1 }
+    }
+  }
+
+  # Content bbox of the eroded mask so the mark can be scaled to fill canvas.
   $minX = $W; $minY = $H; $maxX = -1; $maxY = -1
   for ($y = 0; $y -lt $H; $y++) {
     for ($x = 0; $x -lt $W; $x++) {
-      if ($mask[$y, $x] -eq 1) {
+      if ($emask[$y, $x] -eq 1) {
         if ($x -lt $minX) { $minX = $x }
         if ($x -gt $maxX) { $maxX = $x }
         if ($y -lt $minY) { $minY = $y }
@@ -133,15 +150,15 @@ function Save-Favicon {
   $g.Clear([System.Drawing.Color]::Transparent)
   $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
 
-  # White mark at 92% of the canvas (cropped to the mask content), centered.
-  $fill = 0.92
+  # White mark at 86% of the canvas (cropped to the mask content), centered.
+  $fill = 0.86
   $scale = $fill * $W / [Math]::Max($bw, $bh)
   $offsetX = ($W - $bw * $scale) / 2
   $offsetY = ($H - $bh * $scale) / 2
   $whiteBrush = New-Object System.Drawing.SolidBrush($white)
   for ($y = 0; $y -lt $H; $y++) {
     for ($x = 0; $x -lt $W; $x++) {
-      if ($mask[$y, $x] -eq 1) {
+      if ($emask[$y, $x] -eq 1) {
         $g.FillRectangle($whiteBrush, $offsetX + ($x - $minX) * $scale, $offsetY + ($y - $minY) * $scale, $scale, $scale)
       }
     }
