@@ -1277,6 +1277,85 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   justify-content: center;
   background: var(--bg-primary);
+  position: relative;
+}
+
+/* Slash-command suggestion dropdown */
+.slash-suggestions {
+  position: absolute;
+  bottom: calc(100% - 0.5rem);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 760px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  z-index: 50;
+  padding: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.slash-suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.slash-suggestion-item:hover,
+.slash-suggestion-item.active {
+  background: var(--bg-tertiary);
+}
+
+.slash-suggestion-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  color: var(--accent, #818cf8);
+}
+
+.slash-suggestion-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.slash-suggestion-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.slash-suggestion-desc {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.slash-suggestion-chevron {
+  color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .input-box {
