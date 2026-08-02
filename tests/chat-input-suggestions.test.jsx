@@ -50,11 +50,16 @@ describe('ChatInput slash-command suggestions', () => {
     expect(screen.queryByText('/website')).toBeNull();
   });
 
-  it('selects a suggestion with Enter and fills the placeholder', () => {
-    const t = setup('/');
-    fireEvent.keyDown(t.textarea(), { key: 'ArrowDown' }); // /game
-    fireEvent.keyDown(t.textarea(), { key: 'Enter' });
-    expect(t.setInput.mock).toBeUndefined(); // sanity: plain setter
+  it('selects a suggestion with Enter and fills only the command token', () => {
+    let value = '/';
+    const setter = (v) => { value = v; };
+    const utils = render(<ChatInput input={value} setInput={setter} onSendMessage={() => {}} isStreaming={false} />);
+    const textarea = utils.container.querySelector('textarea');
+    fireEvent.change(textarea, { target: { value: '/' } });
+    utils.rerender(<ChatInput input={value} setInput={setter} onSendMessage={() => {}} isStreaming={false} />);
+    fireEvent.keyDown(textarea, { key: 'ArrowDown' }); // /game
+    fireEvent.keyDown(textarea, { key: 'Enter' });
+    expect(value).toBe('/game ');
   });
 
   it('selects the first suggestion with Tab', () => {
@@ -63,7 +68,7 @@ describe('ChatInput slash-command suggestions', () => {
     const utils = render(<ChatInput input={value} setInput={setter} onSendMessage={() => {}} isStreaming={false} />);
     const textarea = utils.container.querySelector('textarea');
     fireEvent.keyDown(textarea, { key: 'Tab' });
-    expect(value).toBe('/website premium headphones store');
+    expect(value).toBe('/website ');
   });
 
   it('dismisses with Escape', () => {
@@ -82,6 +87,6 @@ describe('ChatInput slash-command suggestions', () => {
     fireEvent.change(textarea, { target: { value: '/' } });
     utils.rerender(<ChatInput input={value} setInput={setter} onSendMessage={() => {}} isStreaming={false} />);
     fireEvent.click(screen.getByText('/research'));
-    expect(value).toBe('/research quantum computing');
+    expect(value).toBe('/research ');
   });
 });

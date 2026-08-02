@@ -8,21 +8,18 @@ const SLASH_COMMANDS = [
     command: 'website',
     label: '/website',
     description: 'Create a website or web page',
-    placeholder: '/website premium headphones store',
     icon: Globe
   },
   {
     command: 'game',
     label: '/game',
     description: 'Create a playable game',
-    placeholder: '/game space shooter',
     icon: Gamepad2
   },
   {
     command: 'research',
     label: '/research',
     description: 'Full research with web search + PDF report',
-    placeholder: '/research quantum computing',
     icon: Search
   }
 ];
@@ -76,13 +73,15 @@ export default function ChatInput({
   }, [show, refToUse]);
 
   const applySuggestion = (command) => {
-    const entry = SLASH_COMMANDS.find((c) => c.command === command) || SLASH_COMMANDS[0];
-    setInput(entry.placeholder);
+    // Fill only the command token (with a trailing space so the user can
+    // continue typing the description) — never example text like
+    // "/game space shooter".
+    setInput(`/${command} `);
     setShowSuggestions(false);
     setActiveIndex(0);
     if (refToUse.current) {
       refToUse.current.focus();
-      const pos = entry.placeholder.length;
+      const pos = `/${command} `.length;
       refToUse.current.setSelectionRange(pos, pos);
     }
   };
