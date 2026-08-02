@@ -612,6 +612,28 @@ async function run() {
   assert.equal(gameWsNoUpgrade.status, 400);
   assert.equal(gameRoomId, 'dm-123');
 
+  // Cross-site WebSocket hijacking guard: a browser-style Origin from a
+  // different host is rejected before any DO call.
+  const gameWsCrossSite = await worker.fetch(
+    new Request('https://corez.test/api/game/ws/dm-123', {
+      headers: { Upgrade: 'websocket', Connection: 'Upgrade', Origin: 'https://evil.example' }
+    }),
+    env({ GAME_ROOMS: gameRoomsBinding })
+  );
+  assert.equal(gameWsCrossSite.status, 403);
+  assert.equal(gameRoomId, 'dm-123');
+
+  // A same-host Origin (the normal browser flow) is accepted.
+  const gameWsSameOrigin = await worker.fetch(
+    new Request('https://corez.test/api/game/ws/dm-123', {
+      headers: { Upgrade: 'websocket', Connection: 'Upgrade', Origin: 'https://corez.test' }
+    }),
+    env({ GAME_ROOMS: gameRoomsBinding })
+  );
+  assert.equal(gameWsSameOrigin.status, 200);
+  assert.equal(await gameWsSameOrigin.text(), 'room stub');
+  assert.equal(gameRoomId, 'dm-123');
+
   const gameWsNoBinding = await worker.fetch(
     new Request('https://corez.test/api/game/ws/dm-123', {
       headers: { Upgrade: 'websocket' }
@@ -671,6 +693,37 @@ async function run() {
     assert.equal(imageData.model, 'black-forest-labs/flux-1-schnell');
   } finally {
     globalThis.fetch = imageOriginalFetch;
+  }
+
+  // A provider-returned non-https image URL is rejected (SSRF guard): the
+  // response is an honest 502 and no fetch of the http URL is attempted.
+  const insecureImageOriginalFetch = globalThis.fetch;
+  let insecureFetchAttempted = false;
+  try {
+    globalThis.fetch = async (url, _init) => {
+      if (typeof url === 'string' && url.startsWith('http://')) {
+        insecureFetchAttempted = true;
+        return new Response('nope', { status: 500 });
+      }
+      return new Response(JSON.stringify({
+        choices: [{ message: { images: [{ url: 'http://internal.example/steal.png' }] } }]
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    };
+    const insecureImageResponse = await worker.fetch(
+      new Request('https://corez.test/api/image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: 'A futuristic city' })
+      }),
+      env({ OPENROUTER_API_KEY: 'sk-openrouter-test' })
+    );
+    assert.equal(insecureImageResponse.status, 502);
+    assert.equal(insecureFetchAttempted, false);
+  } finally {
+    globalThis.fetch = insecureImageOriginalFetch;
   }
 
   // With no provider key configured an honest 503 is returned and no image

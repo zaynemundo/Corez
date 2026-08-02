@@ -32,7 +32,9 @@ export function safeErrorDetail(error) {
       : String(error);
 
   return raw
-    .replace(/(authorization\s*:\s*bearer\s+)[^\s,;]+/gi, '$1[REDACTED]')
+    .replace(/(authorization\s*:\s*(?:bearer|token|basic)\s+)[^\s,;]+/gi, '$1[REDACTED]')
+    .replace(/(x-api-key\s*:\s*)[^\s,;]+/gi, '$1[REDACTED]')
+    .replace(/([?&](?:api[_-]?key|token|secret|password|key|access_token)=)[^&\s]+/gi, '$1[REDACTED]')
     .replace(/\b(api[_-]?key|token|secret|password)\b(\s*[:=]\s*)([^\s&,;]+)/gi, '$1$2[REDACTED]')
     .slice(0, 500);
 }
@@ -128,9 +130,26 @@ export async function readBoundedJson(request, maxBytes = MAX_BODY_BYTES) {
   if (contentLength > maxBytes) {
     throw new Error(`Request body exceeds ${maxBytes} byte limit.`);
   }
-  const text = await request.text();
-  if (text.length > maxBytes) {
-    throw new Error(`Request body exceeds ${maxBytes} byte limit.`);
+  // Stream the body and enforce the cap while reading: a chunked body with a
+  // spoofed small Content-Length (or none at all) never gets buffered beyond
+  // the limit, so this guard works even when the platform's own 100 MB cap
+  // would otherwise allow a large body to reach memory.
+  const decoder = new TextDecoder();
+  let text = '';
+  let bytesRead = 0;
+  if (request.body) {
+    const reader = request.body.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytesRead += value.byteLength;
+      if (bytesRead > maxBytes) {
+        await reader.cancel();
+        throw new Error(`Request body exceeds ${maxBytes} byte limit.`);
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    text += decoder.decode();
   }
   return JSON.parse(text);
 }

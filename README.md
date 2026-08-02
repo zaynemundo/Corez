@@ -40,6 +40,8 @@ Only the app document itself is published: conversation history, session IDs, an
 
 `OPENCODE_GO_API_KEY` (or `OPENCODE_API_KEY`) is the only required Worker secret for text AI; `OPENROUTER_API_KEY` is optional (text fallback + FLUX images) and `DEEPSEEK_API_KEY` is optional (text fallback).
 
+Repository-agent mode (`mode: "repository-agent"`) is disabled on deployments without a bound workspace. If a `WORKSPACE_BINDING` is ever configured, requests must present a matching `WORKSPACE_OPERATOR_KEY` bearer token; without that secret configured the mode is never executed.
+
 ### Online multiplayer
 
 Generated games can request real online multiplayer via the COREZ game protocol. A Cloudflare Durable Object (`GameRoom`) is the authoritative server for each room; clients connect over WebSocket at `wss://<host>/api/game/ws/<roomId>` where `<roomId>` is a short lowercase id (e.g. `dm-123`).

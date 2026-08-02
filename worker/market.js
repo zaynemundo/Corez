@@ -625,8 +625,10 @@ function rebindPayload(payload, normalized, meta, status, now) {
 }
 
 function clientIdentity(request) {
+  // CF-Connecting-IP is set by Cloudflare and cannot be spoofed by clients.
+  // X-Forwarded-For is deliberately NOT trusted: clients can set it, which
+  // would let them rotate identities and reset the rate limit.
   const candidate = request.headers.get('CF-Connecting-IP')
-    || request.headers.get('X-Forwarded-For')?.split(',')[0]
     || 'anonymous';
   return candidate.trim().slice(0, 128) || 'anonymous';
 }

@@ -487,6 +487,15 @@ async function run() {
   assert.equal(delegatedPayload.error, 'Unable to generate AI response.');
   assert.match(delegatedPayload.detail, /all providers returned no usable response/);
 
+  // Malformed (non-decodable) swarm status ids get a clean 400, never a 500.
+  const badStatusResponse = await worker.fetch(
+    new Request('https://corez.test/api/swarm/status/%zz', {
+      method: 'GET'
+    }),
+    environment()
+  );
+  assert.equal(badStatusResponse.status, 400);
+
   console.log('Live Worker swarm contract passed.');
 }
 

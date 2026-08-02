@@ -1220,7 +1220,12 @@ export default {
     // and no live lease, one more wave is executed inline before responding,
     // so a failed continuation fetch never strands the task.
     if (url.pathname.startsWith('/api/swarm/status/') && request.method === 'GET') {
-      const taskId = decodeURIComponent(url.pathname.slice('/api/swarm/status/'.length));
+      let taskId;
+      try {
+        taskId = decodeURIComponent(url.pathname.slice('/api/swarm/status/'.length));
+      } catch {
+        return new Response(JSON.stringify({ error: 'Invalid swarm task id.' }), { status: 400, headers: jsonHeaders });
+      }
       const state = await store.load(taskId);
       if (!state) {
         return new Response(JSON.stringify({ error: 'Unknown swarm task.' }), { status: 404, headers: jsonHeaders });

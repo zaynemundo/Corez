@@ -54,6 +54,13 @@ export class GameRoom {
     this.stopTickIfIdle();
   }
 
+  // Socket-level errors surface through this handler instead of becoming
+  // unhandled errors on the Durable Object; the player is treated as gone.
+  webSocketError(ws, error) {
+    console.warn('GameRoom WebSocket error:', String(error?.message || error).slice(0, 200));
+    this.webSocketClose(ws);
+  }
+
   // ---- Message handling ----------------------------------------------------
 
   handleMessage(ws, raw) {

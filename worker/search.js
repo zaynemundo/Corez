@@ -13,11 +13,12 @@
  * never fabricates search results.
  */
 
-import { jsonResponse } from './utils.js';
+import { jsonResponse, readBoundedJson } from './utils.js';
 
 const MAX_QUERY_CHARS = 200;
 const MAX_RESULTS = 8;
 const PROVIDER_TIMEOUT_MS = 8_000;
+const MAX_SEARCH_BODY_BYTES = 64 * 1024;
 const DDG_ENDPOINT = 'https://api.duckduckgo.com/';
 const WIKIPEDIA_ENDPOINT = 'https://en.wikipedia.org/w/api.php';
 
@@ -139,7 +140,7 @@ export async function handleSearch(request, env) {
 
   let body;
   try {
-    body = await request.json();
+    body = await readBoundedJson(request, MAX_SEARCH_BODY_BYTES);
   } catch {
     return jsonResponse(400, { error: 'Request body must be valid JSON.' });
   }

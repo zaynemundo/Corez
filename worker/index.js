@@ -27,6 +27,24 @@ async function handleGameSocket(request, env) {
   if (!/websocket/i.test(request.headers.get('Upgrade') || '')) {
     return jsonResponse(400, { error: 'WebSocket upgrade required.' });
   }
+  // Cross-site WebSocket hijacking guard: browsers always send an Origin
+  // header, so a third-party page cannot open sockets into our rooms. The
+  // room must originate from this host (or a localhost dev host); CLI
+  // tooling without an Origin header remains allowed.
+  const origin = request.headers.get('Origin');
+  if (origin) {
+    let originHost;
+    try {
+      originHost = new URL(origin).hostname;
+    } catch {
+      return jsonResponse(403, { error: 'Invalid Origin header.' });
+    }
+    const requestHost = new URL(request.url).hostname;
+    const isLocalhost = (host) => host === 'localhost' || host === '127.0.0.1' || host === '::1';
+    if (originHost !== requestHost && !(isLocalhost(originHost) && isLocalhost(requestHost))) {
+      return jsonResponse(403, { error: 'Cross-site WebSocket connections are not allowed.' });
+    }
+  }
   const stub = env.GAME_ROOMS.get(env.GAME_ROOMS.idFromName(roomId));
   return stub.fetch(request);
 }
@@ -200,6 +218,19 @@ async function handleAi(request, env) {
       return jsonResponse(200, {
         content: 'I can analyse that request, but this deployment has no repository workspace attached, so I cannot modify real files here — nothing was executed. Run CoreZ with a workspace attached (e.g. the local CLI agent against a repository) to get the full evidence-backed loop: inspect, plan, implement, test, lint, build, review, finalise.',
         model: 'corez:no-workspace'
+      });
+    }
+    // The agent runs with auto-approve: it can modify real files on the
+    // bound workspace. Only requests presenting the operator bearer key
+    // (WORKSPACE_OPERATOR_KEY, set as a Worker secret) may reach it;
+    // without the key configured the mode stays honestly unexecuted.
+    const operatorKey = env?.WORKSPACE_OPERATOR_KEY;
+    const presentedKey = String(request.headers.get('Authorization') || '')
+      .replace(/^Bearer\s+/i, '')
+      .trim();
+    if (!operatorKey || !presentedKey || presentedKey !== operatorKey) {
+      return jsonResponse(403, {
+        error: 'Repository-agent mode is restricted: a valid operator bearer key is required on this deployment.'
       });
     }
     try {
@@ -433,10 +464,26 @@ async function handleImage(request, env) {
     });
   }
 
+  // Only https: or inline data: payloads are ever fetched. This blocks the
+  // provider-returned URL from being used to reach internal hosts
+  // (metadata endpoints, private ranges) via a malformed or injected reply.
+  const isDataUrl = imageUrl.startsWith('data:');
+  if (!isDataUrl) {
+    let parsed;
+    try {
+      parsed = new URL(imageUrl);
+    } catch {
+      return jsonResponse(502, { error: 'Image generation failed: the provider returned an invalid image URL.' });
+    }
+    if (parsed.protocol !== 'https:') {
+      return jsonResponse(502, { error: 'Image generation failed: the provider returned a non-https image URL.' });
+    }
+  }
+
   try {
     let buffer;
     let mimeType = 'image/png';
-    if (imageUrl.startsWith('data:')) {
+    if (isDataUrl) {
       const parts = imageUrl.split(',');
       mimeType = parts[0].match(/:(.*?);/)?.[1] || 'image/png';
       const bstr = atob(parts[1] || '');
@@ -446,6 +493,8 @@ async function handleImage(request, env) {
       }
       buffer = u8arr.buffer;
     } else {
+      // Image generation runs as long as it needs (project contract: no
+      // artificial generation timeouts); only client disconnect aborts.
       const imgResp = await fetch(imageUrl, { signal: imageClientSignal });
       if (imgResp.ok) {
         mimeType = imgResp.headers.get('content-type') || 'image/png';
@@ -453,7 +502,7 @@ async function handleImage(request, env) {
       }
     }
 
-    if (buffer) {
+    if (buffer && buffer.byteLength > 0) {
       const r2Url = await saveToR2IfAvailable(env, r2Key, buffer, mimeType);
       return jsonResponse(200, { image: r2Url || imageUrl, model: FLUX_IMAGE_MODEL });
     }
@@ -670,20 +719,19 @@ async function handleR2Apps(request, env) {
 
     const apps = [];
     if (list && Array.isArray(list.objects)) {
-      for (const obj of list.objects) {
-        if (obj.key.endsWith('.json')) {
-          const item = await env.ASSET_BUCKET.get(obj.key);
-          if (item) {
-            try {
-              const data = JSON.parse(await item.text());
-              apps.push({
-                appId: data.appId,
-                title: data.title,
-                updatedAt: data.updatedAt,
-                url: `/api/apps/${sessionId}/${data.appId}`
-              });
-            } catch { /* ignore invalid cache entries */ }
-          }
+      const jsonObjects = list.objects.filter(obj => obj.key.endsWith('.json'));
+      const items = await Promise.all(jsonObjects.map(obj => env.ASSET_BUCKET.get(obj.key)));
+      for (const item of items) {
+        if (item) {
+          try {
+            const data = JSON.parse(await item.text());
+            apps.push({
+              appId: data.appId,
+              title: data.title,
+              updatedAt: data.updatedAt,
+              url: `/api/apps/${sessionId}/${data.appId}`
+            });
+          } catch { /* ignore invalid cache entries */ }
         }
       }
     }
@@ -826,27 +874,27 @@ async function handleR2Memory(request, env) {
 
     const matches = [];
     if (list && Array.isArray(list.objects)) {
-      for (const obj of list.objects) {
-        if (obj.key.endsWith('.json')) {
-          const item = await env.ASSET_BUCKET.get(obj.key);
-          if (item) {
-            try {
-              const data = JSON.parse(await item.text());
-              const catLower = String(data.category || '').toLowerCase();
+      const jsonObjects = list.objects.filter(obj => obj.key.endsWith('.json'));
+      const items = await Promise.all(jsonObjects.map(obj => env.ASSET_BUCKET.get(obj.key)));
+      for (const item of items) {
+        if (item) {
+          try {
+            const data = JSON.parse(await item.text());
+            const catLower = String(data.category || '').toLowerCase();
 
-              if (!categoryFilter || catLower === categoryFilter) {
-                matches.push(data);
-              }
-            } catch {
-              /* ignore invalid cache entries */
+            if (!categoryFilter || catLower === categoryFilter) {
+              matches.push(data);
             }
+          } catch {
+            /* ignore invalid cache entries */
           }
         }
       }
     }
 
     if (!query) {
-      return jsonResponse(200, { userId, query, matches, source: 'keyword' });
+      const publicMatches = matches.map(publicMemoryRecord);
+      return jsonResponse(200, { userId, query, matches: publicMatches, source: 'keyword' });
     }
 
     const keywordMatches = matches.filter(m => {
@@ -871,16 +919,15 @@ async function handleR2Memory(request, env) {
 
     const memories = [];
     if (list && Array.isArray(list.objects)) {
-      for (const obj of list.objects) {
-        if (obj.key.endsWith('.json')) {
-          const item = await env.ASSET_BUCKET.get(obj.key);
-          if (item) {
-            try {
-              const data = JSON.parse(await item.text());
-              memories.push(publicMemoryRecord(data));
-            } catch {
-              /* ignore invalid cache entries */
-            }
+      const jsonObjects = list.objects.filter(obj => obj.key.endsWith('.json'));
+      const items = await Promise.all(jsonObjects.map(obj => env.ASSET_BUCKET.get(obj.key)));
+      for (const item of items) {
+        if (item) {
+          try {
+            const data = JSON.parse(await item.text());
+            memories.push(publicMemoryRecord(data));
+          } catch {
+            /* ignore invalid cache entries */
           }
         }
       }
