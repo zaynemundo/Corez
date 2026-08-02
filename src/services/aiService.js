@@ -20,6 +20,7 @@ import { buildAwwwardsDesignPrompt } from '../../packages/agent-core/context/des
 import { resolveSkills } from '../skills/resolver.js';
 import { classifyExecutionMode, EXECUTION_MODES } from './executionModes.js';
 import { persistAndSummarize } from './contextStore.js';
+import { fetchWebSearch } from './searchService.js';
 
 export const PUBLIC_USER_INTENT_PROMPT = `
 Analyze the public user intent behind the request. Corez uses FLUX 1 Schnell for background generation and image rendering.
@@ -2497,6 +2498,72 @@ export function isPdfRequest(prompt) {
     && /\b(create|make|build|generate|write|compose|draft|produce|download|convert|save|turn)\b/.test(text);
 }
 
+// Detect requests that need live, up-to-date information from the web:
+// current events, latest news, prices outside the market catalog, live
+// scores, weather, or explicit "search the web / look up / google it"
+// phrasing. Explanation and knowledge questions WITHOUT a recency signal are
+// left to the model's own knowledge.
+export function isWebSearchRequest(prompt) {
+  const text = String(prompt || '').toLowerCase();
+  if (!text.trim()) return false;
+
+  const searchPhrase = /\b(search|look up|lookup|google|browse|find out|fetch|retrieve|check)\b[\s\S]{0,60}\b(web|internet|online|current|latest|recent|news|updates?|today|now|live|real[- ]?time)\b/i;
+  const factualRecency = /\b(what|who|which|where|when|how)\b[\s\S]{0,80}\b(happened|occurred|happening|won|winner|released|launched|announced|published|updated|changed|result|score|price|rate|weather|temperature|stock|cases)\b/i;
+  if (searchPhrase.test(text) || factualRecency.test(text)) return true;
+
+  const recency = /\b(latest|current|recent|today|yesterday|this (week|month|year)|right now|as of|breaking|live|newly|up[- ]to[- ]date|202[4-9]|20\d\d)\b/i;
+  if (!recency.test(text)) return false;
+
+  const newsy = /\b(news|headlines|event|happening|happened|developments?|updates?|announcement|release|launch|score|results?|forecast|weather|temperature|election|awards?|winners?|match|game (today|tonight)|schedule)\b/i;
+  return newsy.test(text);
+}
+
+// Format search results into a compact, honest summary used when the hosted
+// AI is unavailable. Every result keeps its source URL; nothing is invented.
+export function formatSearchResults(search) {
+  const results = Array.isArray(search?.results) ? search.results : [];
+  if (results.length === 0) {
+    return 'I searched the web but no reliable results came back for that query.';
+  }
+  const lines = results.map((result, index) => {
+    const title = result.title || 'Result';
+    const url = result.url ? `\n   ${result.url}` : '';
+    const snippet = result.snippet ? `\n   ${result.snippet}` : '';
+    const source = result.source ? ` (${result.source})` : '';
+    return `${index + 1}. **${title}**${source}${url}${snippet}`;
+  });
+  return `I searched the web for **"${search.query}"** and found these sources:\n\n${lines.join('\n\n')}\n\n_Results are search summaries; open the sources for full details._`;
+}
+
+// Answer a web-search request: prefer the hosted AI with the real search
+// results as grounding; when it is unavailable, present the sources directly.
+export async function answerWithWebSearch(cleanPrompt, intent, history, signal) {
+  const search = await fetchWebSearch(cleanPrompt, signal);
+  if (!Array.isArray(search?.results) || search.results.length === 0) {
+    return 'I searched the web for that, but no usable results came back.';
+  }
+
+  const grounded = await (async () => {
+    try {
+      const groundedPrompt = `The user asked: "${cleanPrompt}"
+
+Use the following web search results as your factual grounding. Answer the user's question with real, current information from these results. Always name the source(s) you used (title + URL). If the results do not contain the answer, say so honestly instead of guessing. Do NOT invent URLs or facts.
+
+SEARCH RESULTS:
+${search.results.map((result, index) => `${index + 1}. ${result.title} — ${result.url}\n   ${result.snippet || ''} (source: ${result.source})`).join('\n')}`;
+      const hosted = await generateHostedAIResponse(groundedPrompt, intent, history, signal);
+      if (hosted) return hosted;
+    } catch (error) {
+      if (error?.name === 'AbortError') throw error;
+      console.warn('Hosted AI unavailable for grounded search answer; showing sources.', error);
+    }
+    return null;
+  })();
+
+  if (grounded) return grounded;
+  return formatSearchResults(search);
+}
+
 // A dependency-free, client-side PDF generator. Produces a valid PDF 1.4
 // document (A4, Helvetica, wrapped text, multi-page) entirely in the browser,
 // so "create a PDF" works even when the hosted AI is unavailable.
@@ -2946,6 +3013,22 @@ export async function generateAIResponse(prompt, history = [], signal = null) {
     } catch (error) {
       if (error?.name === 'AbortError') throw error;
       return { type: 'market', request: marketRequest, market: unavailableMarket(error) };
+    }
+  }
+
+  // Live web information: route to real search results (worker provider
+  // chain), answered by the hosted AI with grounded sources — or the sources
+  // themselves when the hosted AI is unavailable. CoreZ never fabricates
+  // current information from its own training.
+  if (isWebSearchRequest(cleanPrompt)) {
+    try {
+      const grounded = await answerWithWebSearch(cleanPrompt, intent, history, signal);
+      if (typeof grounded === 'string' && grounded.trim()) return grounded;
+    } catch (error) {
+      if (error?.name === 'AbortError') throw error;
+      // Search is best-effort: fall through to the normal AI path when the
+      // search service itself fails (offline, no provider, etc.).
+      console.warn('Web search unavailable; falling back to the standard AI path.', error);
     }
   }
 

@@ -102,6 +102,15 @@ Enter the value only at Wrangler's hidden prompt. Do not add it to `.env`, `wran
 
 Successful provider responses are cached by canonical request for 60 seconds. If Twelve Data later fails, the Worker may serve the most recent validated quote for up to 15 minutes while retaining its original provider timestamp and clearly marking it as stale; older quotes are not returned as market values. Cards identify Twelve Data as the source, distinguish live, delayed, closed, stale, and unavailable states, and label every price as indicative data rather than an executable quote. If no trustworthy provider or eligible cached value exists, the card shows an unavailable state without a guessed price or a general-AI price fallback.
 
+## Live web search
+
+Requests that need current information ("latest news", "search the web", "what happened in 2026", live weather/scores/prices) route to `POST /api/search` before the general AI route. The Worker searches with a provider chain that requires **no API keys**:
+
+- **DuckDuckGo Instant Answer** first.
+- **Wikipedia** as the second provider.
+
+The browser never receives provider credentials. The hosted AI answers using the real results as grounding and cites its sources; when the hosted AI is unavailable the user is shown the actual sources (title + URL) instead of fabricated facts. If every provider returns nothing, CoreZ reports honestly — it never invents search results.
+
 ## Cloudflare Worker deployment
 
 Corez deploys the Vite SPA, `/api/ai`, and `/api/image` together as the `ai` Cloudflare Worker. Local Wrangler commands require Node.js 22 or later.

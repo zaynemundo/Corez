@@ -1,4 +1,5 @@
 import { handleMarket } from './market.js';
+import { handleSearch } from './search.js';
 import { safeErrorDetail, readBoundedJson, jsonResponse, createTaskStateStore } from './utils.js';
 import { runProviderChain, callOpenRouterImage, FLUX_IMAGE_MODEL } from './providerChain.js';
 
@@ -1018,6 +1019,9 @@ export default {
     }
     if (pathname === '/api/market') {
       return handleMarket(request, env);
+    }
+    if (pathname === '/api/search') {
+      return handleSearch(request, env);
     }
     if (pathname.startsWith('/api/assets')) {
       return runJsonSafe(() => handleR2Assets(request, env));
