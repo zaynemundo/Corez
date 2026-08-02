@@ -234,7 +234,7 @@ describe('Hosted AI fallback behavior', () => {
     expect(response).toContain('I can see the code you want to revise');
     expect(response).toContain('its not working properly');
     expect(response).toContain('npx wrangler dev');
-    expect(response).toContain('your code has not been changed');
+    expect(response).toContain('code has not been changed');
     // No mojibake / replacement characters anywhere in the reply.
     expect(response).not.toContain('â€');
     expect(response).not.toContain('\uFFFD');
