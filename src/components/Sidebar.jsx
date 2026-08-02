@@ -3,7 +3,7 @@ import {
   Sun, 
   Moon
 } from 'lucide-react';
-import { ChatBubbleIcon, PlusIcon } from './icons';
+import { ChatBubbleIcon } from './icons';
 
 export default function Sidebar({
   isOpen,
@@ -35,7 +35,7 @@ export default function Sidebar({
           onClick={onNewChat}
           title="New Chat Session"
         >
-          <PlusIcon size={20} strokeWidth={1.5} />
+          <ChatBubbleIcon size={20} strokeWidth={1.5} />
         </button>
       </div>
 
