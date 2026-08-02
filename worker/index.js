@@ -1,5 +1,6 @@
 import { handleMarket } from './market.js';
 import { handleSearch } from './search.js';
+import { fetchAwwwardsInspiration, handleInspiration } from './inspiration.js';
 import { safeErrorDetail, readBoundedJson, jsonResponse, createTaskStateStore } from './utils.js';
 import { runProviderChain, callOpenRouterImage, FLUX_IMAGE_MODEL } from './providerChain.js';
 
@@ -253,12 +254,40 @@ async function handleAi(request, env) {
   const contract = body.contract && typeof body.contract === 'object' ? body.contract : null;
   const skills = Array.isArray(body.skills) ? body.skills : [];
   const executionPlan = typeof body.executionPlan === 'string' ? body.executionPlan : null;
+  // The client-computed execution prompt carries the design spec (Awwwards
+  // principles, layout rules, code format). It must reach the model: it
+  // replaces the bare user prompt when present.
+  const executionPrompt = typeof body.executionPrompt === 'string' && body.executionPrompt.trim()
+    ? body.executionPrompt.trim()
+    : null;
 
   const messages = Array.isArray(body.messages) ? body.messages : [];
   const systemPrompt = buildSystemPrompt({ intent, legacyIntent, skills, contract, executionPlan });
   const apiMessages = [
     { role: 'system', content: systemPrompt }
   ];
+
+  // Live Awwwards inspiration for app/site/game requests: real award-winning
+  // site references (title + URL) are injected into the system prompt so the
+  // model has concrete visual direction. Best-effort: failure never blocks
+  // the request and never fabricates references.
+  const appIntent = intent?.type === 'app' || legacyIntent === 'app';
+  if (appIntent && !body.pdf) {
+    try {
+      const inspiration = await fetchAwwwardsInspiration(prompt, env?.__INSPIRATION_FETCH);
+      if (Array.isArray(inspiration?.sites) && inspiration.sites.length > 0) {
+        const refs = inspiration.sites
+          .map((site) => `- ${site.title} — ${site.url}`)
+          .join('\n');
+        apiMessages.push({
+          role: 'system',
+          content: `Live design inspiration from Awwwards (${inspiration.category} category):\n${refs}\n\nUse these award-winning sites as visual references for layout, typography, colour, and interaction quality. Do NOT claim you visited them; use them as design direction.`
+        });
+      }
+    } catch (error) {
+      console.warn('Awwwards inspiration fetch failed (request continues):', safeErrorDetail(error));
+    }
+  }
 
   // PDF/document requests: instruct the model to output a complete,
   // self-contained HTML document (A4 print-styled, with a Print/Save-as-PDF
@@ -275,14 +304,14 @@ async function handleAi(request, env) {
   for (const m of messages) {
     if (m.role && m.content) {
       apiMessages.push({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content });
-      if (typeof m.content === 'string' && m.content === prompt && m.role === 'user') {
+      if (typeof m.content === 'string' && (m.content === prompt || m.content === executionPrompt) && m.role === 'user') {
         hasAppendedPrompt = true;
       }
     }
   }
   
   if (!hasAppendedPrompt) {
-    apiMessages.push({ role: 'user', content: prompt });
+    apiMessages.push({ role: 'user', content: executionPrompt || prompt });
   }
 
   // Provider fallback chain: OpenCode Go is preferred and stays preferred;
@@ -1022,6 +1051,9 @@ export default {
     }
     if (pathname === '/api/search') {
       return handleSearch(request, env);
+    }
+    if (pathname === '/api/inspiration') {
+      return handleInspiration(request, env);
     }
     if (pathname.startsWith('/api/assets')) {
       return runJsonSafe(() => handleR2Assets(request, env));

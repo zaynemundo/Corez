@@ -60,7 +60,10 @@ describe('AI response speed optimizations', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    const response = await post(swarmWorker, { OPENCODE_GO_API_KEY: 'test' }, {
+    const response = await post(swarmWorker, {
+      OPENCODE_GO_API_KEY: 'test',
+      __INSPIRATION_FETCH: async () => ({ sites: [], category: 'websites', source: 'Awwwards' })
+    }, {
       prompt: 'Build a timer app',
       intent: { type: 'app', summary: 'Build a timer' },
       complexity: 'medium'

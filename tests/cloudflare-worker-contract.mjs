@@ -192,9 +192,13 @@ async function run() {
       JSON.stringify({
         prompt: 'Build a timer',
         model: 'client/model-must-be-ignored',
-        intent: { type: 'app', summary: 'Build a timer app.' }
+        intent: { type: 'app', summary: 'Build a timer app.' },
+        executionPrompt: 'Build a timer\n\n--- Awwwards Visual Design Principles ---\nStyle Target: Luxury Dark Mode'
       }),
-      env({ OPENCODE_GO_API_KEY: 'sk-opencode-test' })
+      env({
+        OPENCODE_GO_API_KEY: 'sk-opencode-test',
+        __INSPIRATION_FETCH: async () => ({ sites: [], category: 'websites', source: 'Awwwards' })
+      })
     );
 
     assert.equal(successResponse.status, 200);
@@ -204,7 +208,9 @@ async function run() {
     });
     assert.equal(invocation.payload.model, 'deepseek-v4-flash');
     assert.deepEqual(Object.keys(invocation.payload), ['model', 'messages']);
-    assert.equal(invocation.payload.messages[1].content, 'Build a timer');
+    // The execution prompt (with the Awwwards design spec) reaches the model
+    // as the user message instead of the bare prompt.
+    assert.equal(invocation.payload.messages[1].content, 'Build a timer\n\n--- Awwwards Visual Design Principles ---\nStyle Target: Luxury Dark Mode');
     assert.match(invocation.payload.messages[0].content, /Build a timer app/);
     assert.match(invocation.payload.messages[0].content, /Inferred intent: app/);
 

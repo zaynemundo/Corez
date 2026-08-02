@@ -26,7 +26,7 @@
     "test:worker-swarm": "node tests/worker-live-swarm-contract.mjs",
     "test:market": "vitest run tests/market-intent.test.js tests/market-service.test.js tests/market-card.test.jsx && node tests/market-worker-contract.mjs",
     "test:market:watch": "vitest tests/market-intent.test.js tests/market-service.test.js tests/market-card.test.jsx",
-    "test:cloudflare": "node tests/cloudflare-worker-contract.mjs && node tests/worker-live-swarm-contract.mjs && node tests/market-worker-contract.mjs && node tests/search-worker-contract.mjs && bash tests/cloudflare-worker-config-contract.sh && bash tests/workers-ai-provider-contract.sh && bash tests/public-ai-proxy-contract.sh && bash tests/ai-live-intent-eval-contract.sh && node tests/ai-live-intent-eval-response-contract.mjs && bash tests/env-question-skill-contract.sh",
+    "test:cloudflare": "node tests/cloudflare-worker-contract.mjs && node tests/worker-live-swarm-contract.mjs && node tests/market-worker-contract.mjs && node tests/search-worker-contract.mjs && node tests/inspiration-worker-contract.mjs && bash tests/cloudflare-worker-config-contract.sh && bash tests/workers-ai-provider-contract.sh && bash tests/public-ai-proxy-contract.sh && bash tests/ai-live-intent-eval-contract.sh && node tests/ai-live-intent-eval-response-contract.mjs && bash tests/env-question-skill-contract.sh",
     "dev:worker": "npm run build && wrangler dev",
     "deploy": "npm run build && wrangler deploy"
   },

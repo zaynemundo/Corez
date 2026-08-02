@@ -111,6 +111,12 @@ Requests that need current information ("latest news", "search the web", "what h
 
 The browser never receives provider credentials. The hosted AI answers using the real results as grounding and cites its sources; when the hosted AI is unavailable the user is shown the actual sources (title + URL) instead of fabricated facts. If every provider returns nothing, CoreZ reports honestly — it never invents search results.
 
+## Awwwards design inspiration
+
+App/site/game requests are enriched with real award-winning site references from **Awwwards**. CoreZ fetches the matching Awwwards category page (`/api/inspiration`), extracts the actual award-site slugs from the server-rendered HTML, and injects `{ title, url }` references into the design prompt — so the model has concrete visual direction (layout, typography, colour, interaction quality) instead of only generic design tokens. Category detection covers e-commerce, portfolio, agency, gaming, SaaS, editorial, architecture, art, fashion, food, travel, music, mobile, web3, education, events, and wellness.
+
+The client-computed execution prompt (with the Awwwards design principles) now also reaches the model via `/api/ai`. Inspiration is strictly best-effort: an unreachable Awwwards page yields an empty reference list and the request continues with static design tokens — CoreZ never fabricates inspiration sites.
+
 ## Cloudflare Worker deployment
 
 Corez deploys the Vite SPA, `/api/ai`, and `/api/image` together as the `ai` Cloudflare Worker. Local Wrangler commands require Node.js 22 or later.

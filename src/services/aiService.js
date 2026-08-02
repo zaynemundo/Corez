@@ -21,6 +21,7 @@ import { resolveSkills } from '../skills/resolver.js';
 import { classifyExecutionMode, EXECUTION_MODES } from './executionModes.js';
 import { persistAndSummarize } from './contextStore.js';
 import { fetchWebSearch } from './searchService.js';
+import { fetchAwwwardsInspiration } from './inspirationService.js';
 
 export const PUBLIC_USER_INTENT_PROMPT = `
 Analyze the public user intent behind the request. Corez uses FLUX 1 Schnell for background generation and image rendering.
@@ -500,6 +501,24 @@ export async function improveCodingPrompt(prompt, intent = null) {
     return cleanPrompt;
   }
 
+  const isAppIntent = intentType === 'app' || INTENT_PATTERNS.app.test(cleanPrompt);
+
+  // Build the Awwwards design spec + live inspiration once for app requests.
+  // The live references are best-effort: failure never blocks and never
+  // fabricates sites.
+  const designSpec = isAppIntent ? buildAwwwardsDesignPrompt(cleanPrompt) : '';
+  const liveInspiration = isAppIntent ? await (async () => {
+    try {
+      const { sites } = await fetchAwwwardsInspiration(cleanPrompt, null);
+      if (sites.length === 0) return '';
+      return `\n\n--- Live Awwwards Design Inspiration (real references) ---\n${sites
+        .map((site) => `- ${site.title} — ${site.url}`)
+        .join('\n')}\nUse these award-winning sites as visual direction for layout, typography, colour, and interaction quality.`;
+    } catch {
+      return '';
+    }
+  })() : '';
+
   // Use the Prompt Intelligence Engine for structured enrichment
   try {
     const pipelineResult = await processPromptIntelligence({
@@ -508,20 +527,23 @@ export async function improveCodingPrompt(prompt, intent = null) {
     });
 
     if (pipelineResult && pipelineResult.executionPrompt && pipelineResult.executionPrompt !== cleanPrompt) {
-      return pipelineResult.executionPrompt;
+      // Append the design spec + live inspiration to the enriched prompt so
+      // the model always receives the Awwwards visual direction.
+      return isAppIntent
+        ? `${pipelineResult.executionPrompt}\n\n${designSpec}${liveInspiration}`
+        : pipelineResult.executionPrompt;
     }
   } catch {
     // Fall back to legacy enhancement on pipeline failure
   }
 
-  if (intentType === 'app' || INTENT_PATTERNS.app.test(cleanPrompt)) {
-    const awwwardsSpec = buildAwwwardsDesignPrompt(cleanPrompt);
+  if (isAppIntent) {
     const isExplicitNonJsx = /\b(html\b|css\b|vanilla|plain html|pure html|html\/css|raw html|html\s*\+\s*css|vanilla js)\b/i.test(cleanPrompt);
 
     if (isExplicitNonJsx) {
       return `${cleanPrompt}
 
-${awwwardsSpec}
+${designSpec}${liveInspiration}
 
 [SINGLE-FILE HTML/CSS/JS SPECIFICATION]:
 - ALWAYS begin your response with a clear, detailed overview explaining the features, layout, and styling choices!
@@ -533,7 +555,7 @@ ${awwwardsSpec}
 
     return `${cleanPrompt}
 
-${awwwardsSpec}
+${designSpec}${liveInspiration}
 
 [SINGLE-FILE REACT SPECIFICATION]:
 - ALWAYS begin your response with a clear, detailed overview explaining the features, architecture, styling decisions, and layout choices!
