@@ -105,10 +105,10 @@ export default function CanvasPreview({
   };
 
   const deviceSpecs = {
-    desktop: { label: 'Desktop', width: '100%', res: 'Fluid / 1920px' },
-    laptop: { label: 'Laptop', width: '1100px', res: '1366 × 768' },
-    tablet: { label: 'Tablet', width: '768px', res: '768 × 1024' },
-    mobile: { label: 'Mobile', width: '375px', res: '375 × 812' }
+    desktop: { label: 'Desktop', width: '100%', res: 'Fluid / 1920px', ratio: null },
+    laptop: { label: 'Laptop', width: '1100px', res: '1366 × 768', ratio: '16 / 9' },
+    tablet: { label: 'Tablet', width: '768px', res: '768 × 1024', ratio: '3 / 4' },
+    mobile: { label: 'Mobile', width: '375px', res: '375 × 812', ratio: '375 / 812' }
   };
 
   return (
@@ -240,15 +240,19 @@ export default function CanvasPreview({
                 title={`Live Application Preview (${deviceSpecs[deviceMode].label})`}
                 srcDoc={formattedSrcDoc}
                 className="preview-iframe"
-                sandbox="allow-scripts allow-forms allow-pointer-lock allow-downloads"
+                sandbox="allow-scripts allow-forms allow-pointer-lock allow-downloads allow-popups"
                 style={
                   deviceMode !== 'desktop'
                     ? {
-                        width: '100%',
-                        maxWidth: deviceSpecs[deviceMode].width,
-                        height: '100%',
-                        maxHeight: '100%',
-                        margin: '0 auto',
+                        // Fixed device width, real device aspect ratio, and
+                        // height derived from it — the frame never stretches
+                        // to the pane height or clips. margin:auto centers
+                        // while remaining scrollable when the pane is small.
+                        width: deviceSpecs[deviceMode].width,
+                        maxWidth: '100%',
+                        aspectRatio: deviceSpecs[deviceMode].ratio,
+                        height: 'auto',
+                        margin: 'auto',
                         borderRadius: deviceMode === 'mobile' ? '20px' : '12px'
                       }
                     : {}

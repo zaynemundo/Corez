@@ -38,6 +38,20 @@ export function formatCodeForPreview(rawCode) {
       return false;
     };
     window.addEventListener('mousedown', function() { window.focus(); });
+    // Navigation guard: form submissions and anchor navigations inside the
+    // sandboxed iframe would leave the srcdoc and blank the preview to
+    // white. Same-page hash links, javascript: links, and _blank targets are
+    // safe; everything else stays inside the preview.
+    document.addEventListener('submit', function(e) { e.preventDefault(); }, true);
+    document.addEventListener('click', function(e) {
+      var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+      if (!a) return;
+      var href = (a.getAttribute('href') || '').trim();
+      if (href === '' || href.charAt(0) === '#') return;
+      if (/^javascript:/i.test(href)) return;
+      if (a.target === '_blank') return;
+      e.preventDefault();
+    }, true);
   </script>
 </head>
 <body>
@@ -165,6 +179,20 @@ export function formatCodeForPreview(rawCode) {
       return false;
     };
     window.addEventListener('mousedown', function() { window.focus(); });
+    // Navigation guard: form submissions and anchor navigations inside the
+    // sandboxed iframe would leave the srcdoc and blank the preview to
+    // white. Same-page hash links, javascript: links, and _blank targets are
+    // safe; everything else stays inside the preview.
+    document.addEventListener('submit', function(e) { e.preventDefault(); }, true);
+    document.addEventListener('click', function(e) {
+      var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+      if (!a) return;
+      var href = (a.getAttribute('href') || '').trim();
+      if (href === '' || href.charAt(0) === '#') return;
+      if (/^javascript:/i.test(href)) return;
+      if (a.target === '_blank') return;
+      e.preventDefault();
+    }, true);
   </script>
 </head>
 <body>

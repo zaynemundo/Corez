@@ -1567,12 +1567,15 @@ h1, h2, h3, h4, h5, h6 {
 .preview-container.device-mode-tablet,
 .preview-container.device-mode-mobile {
   background: var(--bg-card);
-  padding: 1.25rem;
+  padding: 1rem 1.25rem 1.25rem;
   border-radius: var(--radius-xl);
   border: 1px solid var(--border-color);
   max-width: 100%;
   max-height: 100%;
-  overflow: hidden;
+  /* Scroll-safe: the device frame (header + iframe at its real aspect
+     ratio) can exceed a small pane; it scrolls instead of clipping. */
+  overflow: auto;
+  gap: 0.75rem;
 }
 
 .preview-iframe {
@@ -1580,6 +1583,10 @@ h1, h2, h3, h4, h5, h6 {
   height: 100%;
   border: none;
   background-color: #ffffff;
+  /* Device modes set height:auto + aspect-ratio inline; this keeps the
+     desktop full-bleed case working without forcing height on framed
+     devices. */
+  flex: 0 0 auto;
   transition: max-width 0.45s cubic-bezier(0.16, 1, 0.3, 1),
               max-height 0.45s cubic-bezier(0.16, 1, 0.3, 1),
               border-radius 0.45s cubic-bezier(0.16, 1, 0.3, 1);
