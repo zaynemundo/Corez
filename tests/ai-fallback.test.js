@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { generateAIResponse, generateLocalAIResponse, isRevisionContextPrompt, compactConversationForRequest, extractCodeFromMessage } from '../src/services/aiService.js';
+import { generateAIResponse, generateLocalAIResponse, isRevisionContextPrompt, compactConversationForRequest, extractCodeFromMessage, describeHostedUnavailable } from '../src/services/aiService.js';
 
 const GAME_HTML = `<!DOCTYPE html><html><body><canvas id="game"></canvas><script>function gameLoop(){requestAnimationFrame(gameLoop);}requestAnimationFrame(gameLoop);</script></body></html>`;
 
@@ -189,5 +189,54 @@ describe('Hosted AI fallback behavior', () => {
     expect(extractCodeFromMessage('Sorry, the game generation failed.')).toBeNull();
     // Plain prose that merely mentions angle brackets stays null
     expect(extractCodeFromMessage('Use <div> tags in React.')).toBeNull();
+  });
+
+  it('gives actionable backend guidance for network failures regardless of hostname', () => {
+    // Simulate a transport failure (the browser never got an HTTP response)
+    // on a LAN IP / custom host, not strict localhost.
+    const host = '192.168.1.50';
+    const reason = describeHostedUnavailable(
+      new Error('NetworkError when attempting to fetch resource.')
+    );
+
+    expect(reason).toContain('NetworkError when attempting to fetch resource');
+    expect(reason).toContain('npx wrangler dev');
+    expect(reason).toContain('8787');
+    expect(reason).toContain('.dev.vars');
+    expect(reason).toContain('npx wrangler deploy');
+    expect(reason).toContain('never reached the AI worker');
+    expect(reason).not.toContain('check that an AI provider is configured');
+    // No mojibake or replacement characters.
+    expect(reason).not.toContain('â€');
+    expect(reason).not.toContain('\uFFFD');
+    expect(host).toBe('192.168.1.50');
+  });
+
+  it('keeps the provider-key detail for real HTTP errors but never appends it to transport failures', () => {
+    const httpReason = describeHostedUnavailable(
+      new Error('Hosted AI request failed: 503 OPENROUTER_API_KEY is not set')
+    );
+    expect(httpReason).toContain('OPENROUTER_API_KEY is not set');
+
+    const transportReason = describeHostedUnavailable(
+      new Error('failed to fetch')
+    );
+    expect(transportReason).toContain('npx wrangler dev');
+    expect(transportReason).not.toContain('OPENROUTER_API_KEY');
+  });
+
+  it('revision fallback for a network failure explains the backend and keeps the code untouched', async () => {
+    const fetchMock = vi.fn(async () => { throw new TypeError('NetworkError when attempting to fetch resource.'); });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await generateAIResponse(revisionPrompt('Revise code: its not working properly'), []);
+
+    expect(response).toContain('I can see the code you want to revise');
+    expect(response).toContain('its not working properly');
+    expect(response).toContain('npx wrangler dev');
+    expect(response).toContain('your code has not been changed');
+    // No mojibake / replacement characters anywhere in the reply.
+    expect(response).not.toContain('â€');
+    expect(response).not.toContain('\uFFFD');
   });
 });

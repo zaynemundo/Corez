@@ -513,7 +513,7 @@ export async function improveCodingPrompt(prompt, intent = null) {
       const { sites } = await fetchAwwwardsInspiration(cleanPrompt, null);
       if (sites.length === 0) return '';
       return `\n\n--- Live Awwwards Design Inspiration (real references) ---\n${sites
-        .map((site) => `- ${site.title} â€” ${site.url}`)
+        .map((site) => `- ${site.title} — ${site.url}`)
         .join('\n')}\nUse these award-winning sites as visual direction for layout, typography, colour, and interaction quality.`;
     } catch {
       return '';
@@ -587,7 +587,7 @@ const EXACT_EVIDENCE_PATTERN = /```[\s\S]*?```|(?:error|exception|failed|fix|bug
  *
  * The full conversation is sent unchanged unless it approaches the platform
  * request-body limit. Only then are redundant older prose turns removed from
- * the request â€” but never deleted: every dropped message is persisted as an
+ * the request — but never deleted: every dropped message is persisted as an
  * exact retrievable record, and the request carries a REAL generated summary
  * (requirements, negative constraints, exact errors, decisions) with
  * retrieval keys linking back to the records. The latest user request, code
@@ -617,7 +617,7 @@ export function compactConversationForRequest(messages) {
 
   if (dropped.length > 0) {
     // Persist the dropped messages verbatim and generate a real summary with
-    // retrieval links â€” never a generic "were summarised" placeholder.
+    // retrieval links — never a generic "were summarised" placeholder.
     const { summaryMessage } = persistAndSummarize(dropped);
     compacted.splice(1, 0, summaryMessage);
   }
@@ -731,7 +731,7 @@ export function getLastCompletedSwarmResult() {
  * Reconnect to a running swarm task and wait for its final result.
  *
  * Polls /api/swarm/status/:taskId with adaptive intervals until completion.
- * Never counts polls â€” it stops only on a terminal status, an abort signal
+ * Never counts polls — it stops only on a terminal status, an abort signal
  * (AbortError), or an honest error after transient network failures are
  * retried (a browser disconnection is not a task failure: the task keeps
  * running server-side). On completion the stored task id is cleared and the
@@ -2572,7 +2572,7 @@ export async function answerWithWebSearch(cleanPrompt, intent, history, signal) 
 Use the following web search results as your factual grounding. Answer the user's question with real, current information from these results. Always name the source(s) you used (title + URL). If the results do not contain the answer, say so honestly instead of guessing. Do NOT invent URLs or facts.
 
 SEARCH RESULTS:
-${search.results.map((result, index) => `${index + 1}. ${result.title} â€” ${result.url}\n   ${result.snippet || ''} (source: ${result.source})`).join('\n')}`;
+${search.results.map((result, index) => `${index + 1}. ${result.title} — ${result.url}\n   ${result.snippet || ''} (source: ${result.source})`).join('\n')}`;
       const hosted = await generateHostedAIResponse(groundedPrompt, intent, history, signal);
       if (hosted) return hosted;
     } catch (error) {
@@ -2643,15 +2643,17 @@ ${results.map((result, index) => `${index + 1}. ${result.title} — ${result.url
 }
 
 // Build the "why" for the honest fallback: name the transport error when the
-// fetch itself failed, and point local users at the missing Worker backend.
+// fetch itself failed, and give actionable guidance — the request never
+// reached an AI provider, so a provider-key hint would be misleading.
 export function describeHostedUnavailable(hostedError) {
   const message = hostedError?.message || '';
-  const isTransportFailure = /networkerror|failed to fetch|load failed|fetch failed|ERR_CONNECTION|net::/i.test(message);
-  const onLocalhost = typeof window !== 'undefined'
-    && /^(localhost|127\.0\.0\.1|\[::1\])/i.test(window.location.hostname || '');
+  const isTransportFailure = /networkerror|failed to fetch|load failed|fetch failed|ERR_CONNECTION|net::|econnrefused|connection refused/i.test(message);
   let reason = message ? ` The hosted AI service is unavailable: ${message}` : ' The hosted AI service is currently unavailable.';
-  if (isTransportFailure && onLocalhost) {
-    reason += ' Locally, /api/* is proxied to the Cloudflare Worker on port 8787 â€” start it with `npx wrangler dev` (with a provider key in .dev.vars) so this request has a backend to answer.';
+  if (isTransportFailure) {
+    // The browser never got an HTTP response: this is a backend connectivity
+    // problem, not a missing provider key. Give actionable guidance for both
+    // local development and the deployed Worker regardless of hostname.
+    reason += ' The request never reached the AI worker. Locally, /api/* is proxied to the Cloudflare Worker on port 8787 — start it with `npx wrangler dev` (with OPENCODE_GO_API_KEY in .dev.vars) so this request has a backend to answer. For the deployed site, make sure the Worker is deployed with `npx wrangler deploy`.';
   }
   return reason;
 }
@@ -2670,18 +2672,18 @@ export async function generateLocalAIResponse(prompt, hostedError = null) {
   // repository tools ran.
   if (classifyExecutionMode(cleanPrompt) === EXECUTION_MODES.REPOSITORY_AGENT) {
     const reason = describeHostedUnavailable(hostedError).replace(/^ The hosted AI service is unavailable/, '');
-    return `I can analyse that request, but I don't have a repository workspace here, so I cannot modify real files â€” nothing was executed${reason ? ` (${reason.trim()})` : ''}. Run CoreZ with a repository workspace attached for the full evidence-backed agent loop: inspect, plan, implement, test, lint, build, review, finalise.`;
+    return `I can analyse that request, but I don't have a repository workspace here, so I cannot modify real files — nothing was executed${reason ? ` (${reason.trim()})` : ''}. Run CoreZ with a repository workspace attached for the full evidence-backed agent loop: inspect, plan, implement, test, lint, build, review, finalise.`;
   }
 
   // Revision context: the user asked to revise an embedded code block. Never
-  // discard their code or fabricate a different app â€” report the real status.
+  // discard their code or fabricate a different app — report the real status.
   const revisionMatch = cleanPrompt.match(/\[Context: The user is requesting a revision for the following code block\]/i);
   const hasEmbeddedCode = cleanPrompt.includes('```');
   const userRequestPart = cleanPrompt.split(/User Request:\s*/i).slice(-1)[0]?.trim() || '';
 
   if (revisionMatch) {
     const reason = describeHostedUnavailable(hostedError);
-    return `I can see the code you want to revise, but I couldn't apply your revision (${userRequestPart || 'no request captured'}).${reason} Please check that an AI provider is configured (e.g. OPENCODE_GO_API_KEY set as a secret on the deployed worker or in .dev.vars for local dev) and try again â€” your code has not been changed.`;
+    return `I can see the code you want to revise, but I couldn't apply your revision (${userRequestPart || 'no request captured'}).${reason} Your code has not been changed.`;
   }
 
   // 1. GREETINGS & SMALL TALK (Universal & Natural)
@@ -2705,7 +2707,7 @@ export async function generateLocalAIResponse(prompt, hostedError = null) {
     const gameResult = synthesizeCustomGame(cleanPrompt);
     if (!gameResult) {
       const reason = describeHostedUnavailable(hostedError);
-      return `I'd love to build that for you, but it doesn't match any app template I can synthesize offline, and ${reason.trim()} â€” so I can't create this specific app right now. Please check the AI service configuration (e.g. OPENCODE_GO_API_KEY for local dev) and try again.`;
+      return `I'd love to build that for you, but it doesn't match any app template I can synthesize offline, and ${reason.trim()} — so I can't create this specific app right now. Please check the AI service configuration (e.g. OPENCODE_GO_API_KEY for local dev) and try again.`;
     }
     return `I've created **${gameResult.title}** for you! Click below to open it live in the preview canvas on the right side.\n\n\`\`\`html\n${gameResult.html}\n\`\`\``;
   }
@@ -2714,7 +2716,7 @@ export async function generateLocalAIResponse(prompt, hostedError = null) {
   if (intent.type === 'code-help') {
     if (hasEmbeddedCode) {
       const reason = describeHostedUnavailable(hostedError).replace(/^ The hosted AI service is unavailable/, '');
-      return `I can see the code you shared, but the hosted AI service is currently unavailable${reason}, so I couldn't analyse or revise it. Please check the AI service configuration and try again â€” your code has not been changed.`;
+      return `I can see the code you shared, but the hosted AI service is currently unavailable${reason}, so I couldn't analyse or revise it. Please check the AI service configuration and try again — your code has not been changed.`;
     }
     return `I understand the goal: ${intent.summary}\n\nShare the snippet, error message, or file you are working on. Iâ€™ll walk through what is happening, identify the likely cause, propose a fix, and explain how to verify it so you can move forward without guessing.`;
   }
@@ -2902,7 +2904,7 @@ export async function generateAIResponse(prompt, history = [], signal = null) {
   }
 
   // Live web information: route to real search results (worker provider
-  // chain), answered by the hosted AI with grounded sources â€” or the sources
+  // chain), answered by the hosted AI with grounded sources — or the sources
   // themselves when the hosted AI is unavailable. CoreZ never fabricates
   // current information from its own training.
   if (isWebSearchRequest(cleanPrompt)) {
