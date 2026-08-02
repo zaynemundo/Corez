@@ -110,7 +110,7 @@ Save-MaskPng -Path "$OutDir\corez-logo.png" -Size 1024 -MarkColor $white
 Save-MaskPng -Path "$OutDir\corez.png" -Size 1024 -MarkColor $black
 Save-MaskPng -Path "$OutDir\corez-bw.png" -Size 1024 -MarkColor $black
 
-# ---- Favicon: white mark on a rounded black tile (visible on any tab) ----
+# ---- Favicon: plain black mark on transparent (no tile) ------------------
 function Save-Favicon {
   param([string]$Path, [int]$Size)
   $canvas = New-Object System.Drawing.Bitmap($W, $H, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
@@ -118,32 +118,18 @@ function Save-Favicon {
   $g.Clear([System.Drawing.Color]::Transparent)
   $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
 
-  # Rounded black tile inset by 6% of the mask size.
-  $inset = [int]($W * 0.06)
-  $tile = New-Object System.Drawing.Drawing2D.GraphicsPath
-  $radius = [int]($W * 0.22)
-  $tile.AddArc($inset, $inset, $radius, $radius, 180, 90)
-  $tile.AddArc($W - $inset - $radius, $inset, $radius, $radius, 270, 90)
-  $tile.AddArc($W - $inset - $radius, $H - $inset - $radius, $radius, $radius, 0, 90)
-  $tile.AddArc($inset, $H - $inset - $radius, $radius, $radius, 90, 90)
-  $tile.CloseFigure()
-  $blackBrush = New-Object System.Drawing.SolidBrush($black)
-  $g.FillPath($blackBrush, $tile)
-  $blackBrush.Dispose()
-  $tile.Dispose()
-
-  # White mark, centered, at 72% of the tile.
-  $scale = 0.72 * (($W - 2 * $inset) / $W)
+  # Black mark at 92% of the canvas, centered, on a transparent background.
+  $scale = 0.92
   $offset = ($W - $W * $scale) / 2
-  $whiteBrush = New-Object System.Drawing.SolidBrush($white)
+  $blackBrush = New-Object System.Drawing.SolidBrush($black)
   for ($y = 0; $y -lt $H; $y++) {
     for ($x = 0; $x -lt $W; $x++) {
       if ($mask[$y, $x] -eq 1) {
-        $g.FillRectangle($whiteBrush, $offset + $x * $scale, $offset + $y * $scale, $scale, $scale)
+        $g.FillRectangle($blackBrush, $offset + $x * $scale, $offset + $y * $scale, $scale, $scale)
       }
     }
   }
-  $whiteBrush.Dispose()
+  $blackBrush.Dispose()
   $g.Dispose()
 
   $big = New-Object System.Drawing.Bitmap($Size, $Size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
