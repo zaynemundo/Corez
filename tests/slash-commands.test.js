@@ -64,6 +64,12 @@ describe('/website and /game routing', () => {
         expect(payload.prompt).toContain('Build a game');
         expect(payload.prompt).not.toContain('/game');
         expect(payload.intent.type).toBe('app');
+        expect(payload.intent.primaryIntent).toBe('game_creation');
+        // The skill resolver must select the game-development skill for
+        // /game so the model receives its instructions (direct route and
+        // swarm route).
+        expect(Array.isArray(payload.skills)).toBe(true);
+        expect(payload.skills.some((s) => s.id === 'game-development')).toBe(true);
         return Response.json({ content: '```html\n<!DOCTYPE html><html><body><canvas></canvas></body></html>\n```' });
       }
       if (url === '/api/inspiration') {

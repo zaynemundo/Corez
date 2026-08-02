@@ -376,6 +376,56 @@ async function run() {
       assert.equal(again.state.queue.length, 0);
       assert.equal(providerCalls, callsAfterCompletion);
 
+      // Skills resolved by the chat frontend (e.g. /game -> game-development)
+      // must reach every specialist prompt AND the final synthesis, and be
+      // persisted in task state so continuations keep them.
+      const skills = [
+        { id: 'game-development', name: 'Game Development', instructions: 'Build runnable single-file HTML5 canvas games with complete game loops.' },
+        { id: 'visual-creative', name: 'Visual Creative Engine', description: '8-bit SVG sprite & visual asset direction.' }
+      ];
+      const capturedSkillPrompts = [];
+      const skillFetch = globalThis.fetch;
+      try {
+        globalThis.fetch = async (url, init) => {
+          const messages = JSON.parse(init.body).messages;
+          capturedSkillPrompts.push(messages.map((message) => String(message.content || '')).join('\n'));
+          const content = 'skill-aware specialist output';
+          return new Response(JSON.stringify({ choices: [{ message: { content } }] }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        };
+        const skillsStore = createTaskStateStore(baseEnv);
+        const skillsTaskId = 'swarm-skills-test';
+        const skillsResult = await runSwarmMultiWave({
+          taskId: skillsTaskId,
+          prompt: expandedPrompt,
+          intentType: 'app',
+          history: [],
+          specs,
+          apiKey: 'sk-opencode-test',
+          env: baseEnv,
+          store: skillsStore,
+          skills,
+          options: { waveBudget: 6, drain: true }
+        });
+        assert.equal(skillsResult.completed, true);
+        const persistedSkills = (await skillsStore.load(skillsTaskId)).skills;
+        assert.deepEqual(persistedSkills.map((s) => s.id), ['game-development', 'visual-creative']);
+        assert.equal(
+          capturedSkillPrompts.some((text) => text.includes('game-development') && text.includes('HTML5 canvas games')),
+          true,
+          'specialist prompts must include the game-development skill'
+        );
+        assert.equal(
+          capturedSkillPrompts.some((text) => text.includes('lead synthesis agent') && text.includes('visual-creative')),
+          true,
+          'synthesis prompt must include the resolved skills'
+        );
+      } finally {
+        globalThis.fetch = skillFetch;
+      }
+
       // Duplicate mid-flight continuation: the second call advances the next
       // wave deterministically without re-running completed agentIds.
       const taskId2 = 'swarm-duplicate-continuation-test';
