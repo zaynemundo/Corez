@@ -183,7 +183,7 @@ export default function SecureGamePreview({
           title="COREZ Secure Game Sandbox"
           referrerPolicy="no-referrer"
           srcDoc={sanitizedHtml}
-          sandbox="allow-scripts allow-pointer-lock"
+          sandbox="allow-scripts allow-pointer-lock allow-downloads"
           style={{
             width: '100%',
             height: '100%',
