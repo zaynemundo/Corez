@@ -207,67 +207,15 @@ async function handleAi(request, env) {
   }
 
   // Repository-agent mode: chat requests that target an existing repository
-  // must run the full agent cycle (understand, inspect, plan, implement,
-  // verify, review, finalise). This deployment has no repository workspace
-  // attached unless a WORKSPACE_BINDING is configured, and CoreZ never
-  // pretends repository tools ran. Without a workspace the request is
-  // reported honestly, unexecuted.
+  // would need the full agent cycle (understand, inspect, plan, implement,
+  // verify, review, finalise). This public deployment has no repository
+  // workspace and never executes one — the request is reported honestly,
+  // unexecuted. CoreZ never pretends repository tools ran.
   if (body.mode === 'repository-agent') {
-    const workspace = env?.WORKSPACE_BINDING;
-    if (!workspace || typeof workspace.cwd !== 'string') {
-      return jsonResponse(200, {
-        content: 'I can analyse that request, but this deployment has no repository workspace attached, so I cannot modify real files here — nothing was executed. Run CoreZ with a workspace attached (e.g. the local CLI agent against a repository) to get the full evidence-backed loop: inspect, plan, implement, test, lint, build, review, finalise.',
-        model: 'corez:no-workspace'
-      });
-    }
-    // The agent runs with auto-approve: it can modify real files on the
-    // bound workspace. Only requests presenting the operator bearer key
-    // (WORKSPACE_OPERATOR_KEY, set as a Worker secret) may reach it;
-    // without the key configured the mode stays honestly unexecuted.
-    const operatorKey = env?.WORKSPACE_OPERATOR_KEY;
-    const presentedKey = String(request.headers.get('Authorization') || '')
-      .replace(/^Bearer\s+/i, '')
-      .trim();
-    if (!operatorKey || !presentedKey || presentedKey !== operatorKey) {
-      return jsonResponse(403, {
-        error: 'Repository-agent mode is restricted: a valid operator bearer key is required on this deployment.'
-      });
-    }
-    try {
-      // Local/self-hosted scenario with nodejs_compat: run the real agent
-      // runtime against the bound workspace. In production Workers without a
-      // workspace this branch is unreachable (guarded above).
-      const { AgentRuntime } = await import('../packages/agent-core/runtime/index.js');
-      const runtime = new AgentRuntime({
-        cwd: workspace.cwd,
-        mode: 'repository',
-        autoApprove: true
-      });
-      const agentResult = await runtime.runTask(prompt, {
-        onStatus: (status) => {
-          if (typeof status?.message === 'string') console.warn(`[agent:${status.type}] ${status.message}`);
-        }
-      });
-      const evidence = {
-        steps: agentResult.stepsCount,
-        inspected: agentResult.inspectedFiles?.length || 0,
-        modified: agentResult.modifiedFiles?.length || 0,
-        blocked: agentResult.blocked || false
-      };
-      const suffix = agentResult.blocked
-        ? `\n\nThe task stopped because the agent could not make further progress: ${agentResult.blockedReason || 'no new evidence'}.`
-        : '';
-      return jsonResponse(200, {
-        content: `${agentResult.response}${suffix}\n\n[Agent evidence: ${evidence.steps} steps, ${evidence.inspected} files inspected, ${evidence.modified} files modified${agentResult.blocked ? ', blocked' : ''}]`,
-        model: 'corez:agent'
-      });
-    } catch (agentErr) {
-      console.warn('Repository agent runtime unavailable:', safeErrorDetail(agentErr));
-      return jsonResponse(200, {
-        content: `A repository workspace is attached, but the agent runtime could not start here (${safeErrorDetail(agentErr)}). Your request was not executed. Run CoreZ locally against the repository instead.`,
-        model: 'corez:no-workspace'
-      });
-    }
+    return jsonResponse(200, {
+      content: 'I can analyse that request, but this deployment has no repository workspace attached, so I cannot modify real files here — nothing was executed. Run CoreZ with a workspace attached (e.g. the local CLI agent against a repository) to get the full evidence-backed loop: inspect, plan, implement, test, lint, build, review, finalise.',
+      model: 'corez:no-workspace'
+    });
   }
 
   // Greeting fast-path: common greetings get the mandated persona reply

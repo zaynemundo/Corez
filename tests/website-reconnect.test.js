@@ -203,120 +203,22 @@ describe('website task API + SSE reconnection', () => {
     expect(cancelledEvent).toBeDefined();
   });
 
-  it('repository tasks are honestly rejected without a configured remote runner', async () => {
-    const env = environment({ ASSET_BUCKET: memoryBucket(), OPENCODE_GO_API_KEY: 'test-key' });
+  it('repository tasks are honestly rejected: the public deployment never executes workspaces', async () => {
+    // Even with remote-runner env vars configured, repository tasks are
+    // blocked — corez.pro is public and never executes or delegates to a
+    // repository workspace.
+    const env = environment({
+      ASSET_BUCKET: memoryBucket(),
+      OPENCODE_GO_API_KEY: 'test-key',
+      COREZ_REMOTE_RUNNER_URL: 'https://runner.example.com',
+      COREZ_REMOTE_RUNNER_TOKEN: 'runner-secret',
+      COREZ_REMOTE_WORKSPACES: '/srv/checkouts/corez'
+    });
     const response = await worker.fetch(fetchRequest('https://corez.test/api/tasks', {
       method: 'POST',
-      body: JSON.stringify({ prompt: 'edit repo', workspaceId: '/tmp/some-checkout' })
+      body: JSON.stringify({ prompt: 'edit repo', workspaceId: '/srv/checkouts/corez' })
     }), env);
     expect(response.status).toBe(400);
-    expect((await response.json()).error).toContain('no remote runner is configured');
-  });
-
-  it('repository tasks delegate to a configured remote runner for allowlisted workspaces', async () => {
-    const env = environment({
-      ASSET_BUCKET: memoryBucket(),
-      OPENCODE_GO_API_KEY: 'test-key',
-      COREZ_REMOTE_RUNNER_URL: 'https://runner.example.com',
-      COREZ_REMOTE_RUNNER_TOKEN: 'runner-secret',
-      COREZ_REMOTE_WORKSPACES: '/srv/checkouts/corez'
-    });
-
-    // Workspace not on the allowlist -> 403.
-    const forbidden = await worker.fetch(fetchRequest('https://corez.test/api/tasks', {
-      method: 'POST',
-      body: JSON.stringify({ prompt: 'edit repo', workspaceId: '/tmp/other' })
-    }), env);
-    expect(forbidden.status).toBe(403);
-    expect((await forbidden.json()).error).toContain('allowlist');
-
-    // Allowlisted workspace -> the task runs through the remote runner.
-    let remoteBody = null;
-    globalThis.fetch = async (url, init) => {
-      if (String(url) === 'https://runner.example.com/tasks') {
-        remoteBody = JSON.parse(init.body);
-        expect(init.headers.Authorization).toBe('Bearer runner-secret');
-        return Response.json({
-          success: true,
-          response: 'implemented: add login (remote runner evidence-backed)',
-          blocked: false,
-          blockedReason: null,
-          cancelled: false
-        }, { status: 200, headers: { 'Content-Type': 'application/json' } });
-      }
-      throw new Error(`unexpected fetch: ${url}`);
-    };
-
-    const response = await worker.fetch(fetchRequest('https://corez.test/api/tasks', {
-      method: 'POST',
-      body: JSON.stringify({ prompt: 'add login', workspaceId: '/srv/checkouts/corez' })
-    }), env);
-    expect(response.status).toBe(202);
-    const { taskId } = await response.json();
-
-    // The task runs in the background; wait for the remote runner call.
-    for (let i = 0; i < 40 && remoteBody === null; i += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-    expect(remoteBody.workspaceId).toBe('/srv/checkouts/corez');
-    expect(remoteBody.prompt).toBe('add login');
-
-    // Poll the task until the remote result lands (task.completed).
-    let finalTask = null;
-    for (let i = 0; i < 40; i += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 150));
-      const get = await worker.fetch(fetchRequest(`https://corez.test/api/tasks/${taskId}`), env);
-      const task = await get.json();
-      if (task.status === 'completed' || task.status === 'failed' || task.status === 'blocked') {
-        finalTask = task;
-        break;
-      }
-    }
-    expect(finalTask.status).toBe('completed');
-    expect(finalTask.result).toBe('implemented: add login (remote runner evidence-backed)');
-    delete globalThis.fetch;
-  });
-
-  it('maps remote runner blocks and failures to the task state', async () => {
-    const env = environment({
-      ASSET_BUCKET: memoryBucket(),
-      OPENCODE_GO_API_KEY: 'test-key',
-      COREZ_REMOTE_RUNNER_URL: 'https://runner.example.com',
-      COREZ_REMOTE_RUNNER_TOKEN: 'runner-secret',
-      COREZ_REMOTE_WORKSPACES: '/srv/checkouts/corez'
-    });
-    globalThis.fetch = async (url) => {
-      if (String(url) === 'https://runner.example.com/tasks') {
-        return Response.json({
-          success: false,
-          response: '',
-          blocked: true,
-          blockedReason: 'Completion gate not satisfied: tests missing.',
-          cancelled: false
-        }, { status: 200, headers: { 'Content-Type': 'application/json' } });
-      }
-      throw new Error(`unexpected fetch: ${url}`);
-    };
-
-    const response = await worker.fetch(fetchRequest('https://corez.test/api/tasks', {
-      method: 'POST',
-      body: JSON.stringify({ prompt: 'do work', workspaceId: '/srv/checkouts/corez' })
-    }), env);
-    expect(response.status).toBe(202);
-    const { taskId } = await response.json();
-
-    let finalTask = null;
-    for (let i = 0; i < 40; i += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 150));
-      const get = await worker.fetch(fetchRequest(`https://corez.test/api/tasks/${taskId}`), env);
-      const task = await get.json();
-      if (['completed', 'failed', 'blocked', 'cancelled'].includes(task.status)) {
-        finalTask = task;
-        break;
-      }
-    }
-    expect(finalTask.status).toBe('blocked');
-    expect(finalTask.error).toContain('tests missing');
-    delete globalThis.fetch;
+    expect((await response.json()).error).toContain('public deployment');
   });
 });
