@@ -272,7 +272,7 @@ export default function ChatInput({
             aria-label="Attach files"
             disabled={isStreaming}
           >
-            <PlusIcon size={18} strokeWidth={1.5} />
+            <PlusIcon size={18} strokeWidth={2} />
           </button>
           <input
             ref={fileInputRef}
