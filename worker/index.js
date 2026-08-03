@@ -9,8 +9,15 @@ import { runProviderChain, callOpenRouterImage, FLUX_IMAGE_MODEL } from './provi
 const SAFE_STORAGE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$/;
 
 // Published creations get a short, human-shareable slug like "asyag23-123"
-// served at the bare root path corez.pro/<slug>.
+// served at the bare root path corez.pro/<slug>. Multi-page creations are
+// additionally served at corez.pro/<slug>/<page>.html.
 const PUBLISH_SLUG_PATTERN = /^[a-z0-9]{4,8}-[0-9]{1,6}$/;
+
+// Sub-page paths inside a published multi-page creation: /<slug>/<page>.html
+// where <page> is a validated file name (no slashes, no ".." traversal).
+const PUBLISH_PAGE_PATTERN = /^([a-z0-9]{4,8}-[0-9]{1,6})\/([a-z0-9][a-z0-9_-]{0,63}\.html)$/;
+const PUBLISH_PAGE_NAME_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}\.html$/i;
+const MAX_PUBLISH_PAGES = 12;
 
 // Online multiplayer rooms: short lowercase ids used in the WebSocket URL.
 const SAFE_ROOM_ID = /^[a-z0-9][a-z0-9-]{2,31}$/;
@@ -944,6 +951,25 @@ async function handlePublish(request, env) {
     }
 
     const title = typeof body?.title === 'string' ? body.title.slice(0, 120) : 'Untitled Application';
+
+    // Optional multi-page payload: a map of validated page names to their
+    // full formatted HTML documents. Every name is validated, the count and
+    // total size are bounded, and the home html + pages share one 2 MB cap.
+    const pages = {};
+    if (body?.pages && typeof body.pages === 'object' && !Array.isArray(body.pages)) {
+      let pagesTotal = html.length;
+      for (const [pageName, pageHtml] of Object.entries(body.pages)) {
+        if (pagesTotal >= 2 * 1024 * 1024) break;
+        if (!PUBLISH_PAGE_NAME_PATTERN.test(pageName)) continue;
+        if (typeof pageHtml !== 'string' || !pageHtml.trim()) continue;
+        const pageContent = pageHtml.trim();
+        pagesTotal += pageContent.length;
+        if (pagesTotal > 2 * 1024 * 1024) break;
+        if (Object.keys(pages).length >= MAX_PUBLISH_PAGES) break;
+        pages[pageName] = pageContent;
+      }
+    }
+
     let slug = typeof body?.slug === 'string' && PUBLISH_SLUG_PATTERN.test(body.slug) ? body.slug : null;
     if (!slug) {
       for (let attempt = 0; attempt < 5; attempt++) {
@@ -959,16 +985,52 @@ async function handlePublish(request, env) {
       return jsonResponse(503, { error: 'Could not allocate a unique publish slug. Try again.' });
     }
 
-    await env.ASSET_BUCKET.put(`publish/${slug}.json`, JSON.stringify({
+    const record = {
       slug,
       title,
       html,
       createdAt: new Date().toISOString()
-    }), {
+    };
+    if (Object.keys(pages).length > 0) {
+      record.pages = pages;
+    }
+
+    await env.ASSET_BUCKET.put(`publish/${slug}.json`, JSON.stringify(record), {
       httpMetadata: { contentType: 'application/json' }
     });
 
     return jsonResponse(200, { success: true, slug, url: `/${slug}` });
+  }
+
+  // GET /<slug>/<page>.html - serve one page of a published multi-page
+  // creation. Same sandbox headers as the home page plus a CORS allow-origin
+  // header: sandboxed pages run with an opaque origin, so their internal
+  // fetch-swap navigation is a cross-origin request.
+  if (request.method === 'GET') {
+    const pageMatch = pathname.slice(1).match(PUBLISH_PAGE_PATTERN);
+    if (pageMatch) {
+      if (!env?.ASSET_BUCKET) {
+        return jsonResponse(530, { error: 'R2 storage (ASSET_BUCKET) is not configured.' });
+      }
+      const [, slug, pageName] = pageMatch;
+      const object = await env.ASSET_BUCKET.get(`publish/${slug}.json`);
+      if (!object) {
+        return jsonResponse(404, { error: 'Published creation not found.' });
+      }
+      let record;
+      try {
+        record = JSON.parse(await object.text());
+      } catch {
+        return jsonResponse(500, { error: 'Failed to parse published payload.' });
+      }
+      const pageHtml = typeof record?.pages?.[pageName] === 'string' ? record.pages[pageName] : '';
+      if (!pageHtml) {
+        return jsonResponse(404, { error: 'Published page not found.' });
+      }
+      return new Response(pageHtml, {
+        headers: { ...publishedPageHeaders(), 'Access-Control-Allow-Origin': '*' }
+      });
+    }
   }
 
   // GET /<slug> - serve a published creation to anyone (bare root path).
@@ -1045,7 +1107,8 @@ export default {
     if (pathname.startsWith('/api/memory')) {
       return runJsonSafe(() => handleR2Memory(request, env));
     }
-    if (pathname === '/api/publish' || (request.method === 'GET' && PUBLISH_SLUG_PATTERN.test(pathname.slice(1)))) {
+    if (pathname === '/api/publish' ||
+        (request.method === 'GET' && (PUBLISH_SLUG_PATTERN.test(pathname.slice(1)) || PUBLISH_PAGE_PATTERN.test(pathname.slice(1))))) {
       return runJsonSafe(() => handlePublish(request, env));
     }
     if (pathname.startsWith('/api/game/ws/')) {

@@ -881,6 +881,72 @@ async function run() {
   assert.equal(republishedPage.status, 200);
   assert.equal(await republishedPage.text(), '<h1>v2</h1>');
 
+  // Multi-page publishes: a validated pages map is stored alongside the home
+  // document and each page is served at /<slug>/<page>.html with sandbox
+  // headers plus a CORS allow-origin (sandboxed pages fetch-swap across the
+  // opaque origin).
+  const publishMulti = await worker.fetch(
+    new Request('https://corez.test/api/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: 'Multi Page Site',
+        html: '<!DOCTYPE html><html><body><h1>Home</h1><a href="about.html">About</a></body></html>',
+        pages: {
+          'about.html': '<!DOCTYPE html><html><body><h1>About Page</h1></body></html>',
+          'contact.html': '<!DOCTYPE html><html><body><h1>Contact Page</h1></body></html>',
+          '../escape.html': '<!DOCTYPE html><html><body>Traversal</body></html>',
+          'evil/name.html': '<!DOCTYPE html><html><body>Slash</body></html>',
+          'BIG.html': '<h1>Upper case name is valid</h1>'
+        }
+      })
+    }),
+    memoryEnv()
+  );
+  assert.equal(publishMulti.status, 200);
+  const publishMultiData = await json(publishMulti);
+
+  const multiRecord = JSON.parse(memoryStore.get(`publish/${publishMultiData.slug}.json`).value);
+  assert.ok(multiRecord.pages);
+  assert.equal(multiRecord.pages['about.html'], '<!DOCTYPE html><html><body><h1>About Page</h1></body></html>');
+  assert.equal(multiRecord.pages['../escape.html'], undefined);
+  assert.equal(multiRecord.pages['evil/name.html'], undefined);
+
+  const aboutPage = await worker.fetch(
+    new Request(`https://corez.test/${publishMultiData.slug}/about.html`, { method: 'GET' }),
+    memoryEnv()
+  );
+  assert.equal(aboutPage.status, 200);
+  assert.match(aboutPage.headers.get('content-type'), /text\/html/);
+  assert.equal(aboutPage.headers.get('access-control-allow-origin'), '*');
+  assert.match(aboutPage.headers.get('content-security-policy'), /sandbox allow-scripts/);
+  assert.equal(await aboutPage.text(), '<!DOCTYPE html><html><body><h1>About Page</h1></body></html>');
+
+  // The home page still serves at the bare slug.
+  const multiHome = await worker.fetch(
+    new Request(`https://corez.test/${publishMultiData.slug}`, { method: 'GET' }),
+    memoryEnv()
+  );
+  assert.equal(multiHome.status, 200);
+  assert.equal(await multiHome.text(), '<!DOCTYPE html><html><body><h1>Home</h1><a href="about.html">About</a></body></html>');
+
+  // Unknown sub-pages are 404s, and traversal/invalid paths never match.
+  const missingPage = await worker.fetch(
+    new Request(`https://corez.test/${publishMultiData.slug}/pricing.html`, { method: 'GET' }),
+    memoryEnv()
+  );
+  assert.equal(missingPage.status, 404);
+
+  const traversalPage = await worker.fetch(
+    new Request(`https://corez.test/${publishMultiData.slug}/%2E%2E%2Fsecret.html`, { method: 'GET' }),
+    memoryEnv()
+  );
+  assert.equal(traversalPage.status, 200);
+  assert.equal(await traversalPage.text(), `asset:/${publishMultiData.slug}/%2E%2E%2Fsecret.html`);
+
+  // Invalid page names in the pages map are dropped, never stored.
+  assert.equal(multiRecord.pages['evil/name.html'], undefined);
+
   // Publish without content is rejected
   const publishEmpty = await worker.fetch(
     new Request('https://corez.test/api/publish', {

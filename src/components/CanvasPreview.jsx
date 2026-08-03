@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Code2, 
   RotateCw, 
@@ -16,7 +16,7 @@ import {
   ExternalLink,
   Loader2
 } from 'lucide-react';
-import { formatCodeForPreview } from '../utils/previewTransformer';
+import { formatCodeForPreview, parseMultiPageSite, injectMultiPageRouter } from '../utils/previewTransformer';
 import { publishAppInR2 } from '../services/appStorageService';
 
 export default function CanvasPreview({ 
@@ -34,25 +34,64 @@ export default function CanvasPreview({
   const [publishing, setPublishing] = useState(false);
   const [publishResult, setPublishResult] = useState(null); // { slug, url }
   const [publishError, setPublishError] = useState(null);
+  const [activePage, setActivePage] = useState('index.html');
+  const iframeRef = useRef(null);
+
+  const multiPage = useMemo(() => parseMultiPageSite(editableCode), [editableCode]);
+
+  const currentPage = useMemo(() => {
+    return multiPage.pages.find((p) => p.name === activePage) || multiPage.pages[0] || { name: 'index.html', html: '' };
+  }, [multiPage, activePage]);
 
   const formattedSrcDoc = useMemo(() => {
-    return formatCodeForPreview(editableCode);
-  }, [editableCode]);
+    if (!currentPage.html) return '';
+    const doc = formatCodeForPreview(currentPage.html);
+    return multiPage.isMultiPage
+      ? injectMultiPageRouter(doc, multiPage.pages.map((p) => p.name))
+      : doc;
+  }, [currentPage, multiPage]);
 
   useEffect(() => {
     setEditableCode(code || '');
+    setActivePage('index.html');
     setKey(prev => prev + 1);
   }, [code]);
+
+  // Multi-page navigation: the sandboxed iframe cannot navigate or reach the
+  // parent, so pages postMessage a { type: 'corez-nav', page } request. Only
+  // messages from THIS preview iframe are trusted, and the requested page
+  // must already exist in the parsed page set — message content is never
+  // treated as code or HTML.
+  useEffect(() => {
+    const handleNavMessage = (event) => {
+      if (event.source !== iframeRef.current?.contentWindow) return;
+      const data = event.data;
+      if (!data || typeof data !== 'object' || data.type !== 'corez-nav') return;
+      if (typeof data.page !== 'string' || !data.page) return;
+      const target = multiPage.pages.find((p) => p.name === data.page);
+      if (!target) return;
+      setActivePage(target.name);
+    };
+    window.addEventListener('message', handleNavMessage);
+    return () => window.removeEventListener('message', handleNavMessage);
+  }, [multiPage]);
 
   const handlePublish = async () => {
     if (publishing || !editableCode) return;
     setPublishing(true);
     setPublishError(null);
     try {
+      const pagesPayload = {};
+      if (multiPage.isMultiPage) {
+        for (const page of multiPage.pages) {
+          pagesPayload[page.name] = injectMultiPageRouter(formatCodeForPreview(page.html), multiPage.pages.map((p) => p.name));
+        }
+      }
       const result = await publishAppInR2({
         html: formattedSrcDoc,
         title,
-        slug: publishResult?.slug || null
+        slug: publishResult?.slug || null,
+        ...(Object.keys(pagesPayload).length > 0 ? { pages: pagesPayload } : {})
       });
       if (result && result.url) {
         setPublishResult({ slug: result.slug, url: result.url });
@@ -206,6 +245,42 @@ export default function CanvasPreview({
           </div>
         )}
 
+        {/* Multi-page site tabs: one tab per parsed page. The iframe swaps
+            srcDoc (never navigates) so the sandbox stays intact. */}
+        {activeTab === 'preview' && multiPage.isMultiPage && (
+          <div
+            className="page-tab-bar"
+            role="tablist"
+            aria-label="Site pages"
+            style={{ display: 'flex', alignItems: 'center', gap: '4px', maxWidth: '100%', overflowX: 'auto' }}
+          >
+            {multiPage.pages.map((page) => (
+              <button
+                key={page.name}
+                type="button"
+                role="tab"
+                aria-selected={activePage === page.name}
+                onClick={() => setActivePage(page.name)}
+                title={`Open ${page.name}`}
+                style={{
+                  padding: '3px 10px',
+                  borderRadius: 'var(--radius-pill)',
+                  border: '1px solid var(--border-color)',
+                  background: activePage === page.name ? 'var(--text-primary)' : 'var(--bg-tertiary)',
+                  color: activePage === page.name ? 'var(--bg-primary)' : 'var(--text-secondary)',
+                  fontSize: '0.7rem',
+                  fontWeight: 300,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'var(--transition-fast)'
+                }}
+              >
+                {page.name}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="canvas-controls">
           <button className="icon-btn" onClick={handleRefresh} title="Reload Preview">
             <RotateCw size={14} strokeWidth={1.5} />
@@ -236,7 +311,8 @@ export default function CanvasPreview({
                 </div>
               )}
               <iframe
-                key={key}
+                key={`${key}-${activePage}`}
+                ref={iframeRef}
                 title={`Live Application Preview (${deviceSpecs[deviceMode].label})`}
                 srcDoc={formattedSrcDoc}
                 className="preview-iframe"

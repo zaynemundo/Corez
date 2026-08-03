@@ -152,18 +152,29 @@ export async function deleteAppInR2(sessionId, appId) {
  * duplicate slugs; a new slug is only allocated for genuinely new content.
  * Passing an explicit slug always republishes that link.
  */
-export async function publishAppInR2({ html, title = 'Untitled Application', slug = null }) {
+export async function publishAppInR2({ html, title = 'Untitled Application', slug = null, pages = null }) {
   if (!html || typeof html !== 'string' || !html.trim()) return null;
 
+  const pagesPayload = (() => {
+    if (!pages || typeof pages !== 'object' || Array.isArray(pages)) return null;
+    const entries = Object.entries(pages).filter(([name, content]) =>
+      /^[a-z0-9][a-z0-9_-]{0,63}\.html$/i.test(name) &&
+      typeof content === 'string' &&
+      content.trim().length > 0
+    );
+    return entries.length > 0 ? Object.fromEntries(entries) : null;
+  })();
+
   const registry = loadPublishRegistry();
-  const hash = contentHash(html.trim());
+  const hash = contentHash(html.trim() + (pagesPayload ? JSON.stringify(pagesPayload) : ''));
   const existing = registry.find((entry) => entry.contentHash === hash && entry.slug);
   const effectiveSlug = slug || existing?.slug || null;
 
   const payload = {
     html: html.trim(),
     title: title.slice(0, 120),
-    ...(effectiveSlug ? { slug: effectiveSlug } : {})
+    ...(effectiveSlug ? { slug: effectiveSlug } : {}),
+    ...(pagesPayload ? { pages: pagesPayload } : {})
   };
   try {
     const res = await fetch('/api/publish', {

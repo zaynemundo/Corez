@@ -2,6 +2,132 @@
  * Transforms raw HTML or React JSX code into a self-contained HTML document
  * ready to be rendered safely inside an iframe.
  */
+
+// Multi-page site support: the model may emit multiple full HTML documents
+// inside ONE code block, separated by page markers:
+//
+//   <!-- CORESITE-PAGES: index.html, about.html, contact.html -->
+//   <!-- PAGE: index.html -->
+//   <!DOCTYPE html>...
+//   <!-- PAGE: about.html -->
+//   <!DOCTYPE html>...
+//
+// The splitter below turns that into a { pages } list; any malformed or
+// marker-less output falls back to a single page (today's behaviour).
+export const MULTI_PAGE_NAME_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}\.html$/i;
+export const MAX_MULTI_PAGE_COUNT = 12;
+export const MAX_MULTI_PAGE_TOTAL_BYTES = 2 * 1024 * 1024;
+
+const MULTI_PAGE_MARKER_PATTERN = /^\s*<!--\s*PAGE:\s*([^\s>]+)\s*-->\s*$/gm;
+const MULTI_PAGE_HEADER_PATTERN = /^\s*<!--\s*CORESITE-PAGES:[\s\S]*?-->\s*$/gm;
+
+/**
+ * Splits a model output into pages when it uses the multi-page marker
+ * convention. Returns { isMultiPage, pages: [{ name, html }] }. Falls back to
+ * a single "index.html" page for anything malformed so the preview contract
+ * never breaks.
+ */
+export function parseMultiPageSite(rawCode) {
+  if (!rawCode || typeof rawCode !== 'string') {
+    return { isMultiPage: false, pages: [{ name: 'index.html', html: rawCode || '' }] };
+  }
+
+  const trimmed = rawCode.trim();
+  const hasMarker = MULTI_PAGE_MARKER_PATTERN.test(trimmed);
+  MULTI_PAGE_MARKER_PATTERN.lastIndex = 0;
+  if (!hasMarker) {
+    return { isMultiPage: false, pages: [{ name: 'index.html', html: trimmed }] };
+  }
+
+  const segments = trimmed.split(MULTI_PAGE_MARKER_PATTERN);
+  // segments = [preamble, name1, html1, name2, html2, ...]
+  const pages = [];
+  let totalBytes = 0;
+
+  for (let i = 1; i + 1 < segments.length; i += 2) {
+    const name = segments[i].trim();
+    if (!MULTI_PAGE_NAME_PATTERN.test(name)) continue;
+
+    let html = segments[i + 1].replace(MULTI_PAGE_HEADER_PATTERN, '').trim();
+    if (!html) continue;
+    if (pages.length >= MAX_MULTI_PAGE_COUNT) break;
+
+    totalBytes += html.length;
+    if (totalBytes > MAX_MULTI_PAGE_TOTAL_BYTES) break;
+
+    pages.push({ name, html });
+  }
+
+  if (pages.length === 0) {
+    return { isMultiPage: false, pages: [{ name: 'index.html', html: trimmed }] };
+  }
+
+  // Index page (if present) must come first so the preview opens on the home
+  // page even when the model lists pages out of order.
+  pages.sort((a, b) => {
+    if (a.name === 'index.html') return -1;
+    if (b.name === 'index.html') return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return { isMultiPage: pages.length > 1, pages };
+}
+
+/**
+ * Router script injected into every multi-page preview/published document.
+ * Intercepts clicks on internal .html links and:
+ *  - inside the sandboxed preview iframe: forwards the target page to the
+ *    parent via postMessage so the parent swaps the srcdoc (no navigation),
+ *  - on a published top-level page: fetches the sub-page and swaps the
+ *    document in place (the sandbox CSP blocks real URL navigation).
+ * Hash links and external links keep the existing guard behaviour.
+ */
+export const MULTI_PAGE_ROUTER_SCRIPT = `
+(function () {
+  var pageNamePattern = /^[a-z0-9][a-z0-9_-]{0,63}\\.html$/i;
+  function resolvePageName(href) {
+    if (!href) return null;
+    var clean = href.split('#')[0].split('?')[0].trim();
+    if (clean.indexOf('/') !== -1) clean = clean.slice(clean.lastIndexOf('/') + 1);
+    if (!pageNamePattern.test(clean)) return null;
+    return clean;
+  }
+  document.addEventListener('click', function (e) {
+    var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+    if (!a) return;
+    var href = (a.getAttribute('href') || '').trim();
+    if (href.charAt(0) === '#' || /^javascript:/i.test(href)) return;
+    // Absolute URLs are never internal pages (the navigation guard opens
+    // them in a real new tab); only relative .html links route to pages.
+    if (/^(?:[a-z]+:)?\\/\\//i.test(href) || /^[a-z][a-z0-9+.-]*:/i.test(href)) return;
+    var page = resolvePageName(href);
+    if (!page) return;
+    e.preventDefault();
+    try {
+      if (window.self !== window.top && window.parent && window.parent.postMessage) {
+        window.parent.postMessage({ type: 'corez-nav', page: page }, '*');
+        return;
+      }
+      fetch(href.split('#')[0]).then(function (res) {
+        if (!res.ok) throw new Error('Page not found: ' + page);
+        return res.text();
+      }).then(function (htmlText) {
+        document.open();
+        document.write(htmlText);
+        document.close();
+      }).catch(function () {});
+    } catch (err) {}
+  }, true);
+})();`;
+
+export function injectMultiPageRouter(html, pageNames) {
+  if (!html || typeof html !== 'string' || !pageNames || pageNames.length === 0) return html;
+  const script = `<script>${MULTI_PAGE_ROUTER_SCRIPT}</script>`;
+  if (/<\/head>/i.test(html)) return html.replace(/<\/head>/i, `${script}\n</head>`);
+  if (/<\/body>/i.test(html)) return html.replace(/<\/body>/i, `${script}\n</body>`);
+  return `${html}\n${script}`;
+}
+
 export function formatCodeForPreview(rawCode) {
   if (!rawCode || typeof rawCode !== 'string') return '';
   const trimmed = rawCode.trim();

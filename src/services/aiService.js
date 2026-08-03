@@ -550,6 +550,10 @@ ${designSpec}${liveInspiration}
 - ALWAYS begin your response with a clear, detailed overview explaining the features, layout, and styling choices!
 - Ensure proper visual layering and z-index stacking hierarchy (Background z-index:0 -> Content z-index:10 -> HUD/Toolbars z-index:20-30 -> Modals/Overlays z-index:40-50+) so elements don't obscure interactive controls!
 - Output complete, clean HTML/CSS/JS code inside ONE SINGLE \`\`\`html ... \`\`\` code block including inline \`<style>\` and \`<script>\` tags.
+- MULTI-PAGE SITES: if the user requested MULTIPLE pages (e.g. About, Pricing, Contact, Blog), output every page as its own complete standalone HTML document inside the SAME single code block, separated by markers:
+  <!-- PAGE: about.html -->
+  <!DOCTYPE html>... complete page with inline <style>/<script> ...
+  Link pages with plain anchors: <a href="about.html">About</a>. Keep filenames lowercase like index.html, about.html, contact.html (max 12 pages). When the user did NOT ask for multiple pages, output ONE single page exactly as before.
 - Build a complete, responsive, standalone experience ready for the preview canvas.
 - ALWAYS end your response with a step-by-step user guide and feature summary after the code block! Never output ONLY a bare code block.`;
     }
@@ -565,6 +569,10 @@ ${designSpec}${liveInspiration}
 - DO NOT wrap React code inside HTML boilerplate (\`<!DOCTYPE html>\`, \`<head>\`, \`<script type="text/babel">\`, or \`ReactDOM.createRoot()\`) because the preview canvas automatically compiles and renders React/JSX code!
 - Do NOT split your output into multiple separate code blocks, file headers (// App.tsx, // components/Navbar.tsx), or relative file imports (import Navbar from './components/Navbar').
 - Define all child components (Navbar, Hero, Footer, etc.) inline within the SAME file BEFORE the main App component!
+- MULTI-PAGE SITES: if the user requested MULTIPLE pages, switch to plain HTML and output every page as its own complete standalone HTML document inside the SAME single \`\`\`html ... \`\`\` code block, separated by markers:
+  <!-- PAGE: about.html -->
+  <!DOCTYPE html>... complete page ...
+  Link pages with plain anchors: <a href="about.html">About</a>. Keep filenames lowercase like index.html, about.html, contact.html (max 12 pages). When the user did NOT ask for multiple pages, output a single React component exactly as described above.
 - ALWAYS end your response with a step-by-step user guide and feature summary after the code block! Never output ONLY a bare code block.`;
   }
 

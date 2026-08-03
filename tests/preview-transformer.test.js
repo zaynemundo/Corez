@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatCodeForPreview } from '../src/utils/previewTransformer.js';
+import { formatCodeForPreview, parseMultiPageSite, injectMultiPageRouter, MULTI_PAGE_NAME_PATTERN } from '../src/utils/previewTransformer.js';
 
 describe('previewTransformer', () => {
   it('passes through pure HTML documents untouched', () => {
@@ -235,5 +235,91 @@ export default function Navbar() {
     expect(formatted).toContain('<div class="box">');
     expect(formatted).toContain('Clicked!');
     expect(formatted).not.toContain('react.production.min.js');
+  });
+});
+
+describe('parseMultiPageSite', () => {
+  const multiPageCode = `<!-- CORESITE-PAGES: index.html, about.html -->
+<!-- PAGE: index.html -->
+<!DOCTYPE html><html><body><h1>Home</h1><a href="about.html">About</a></body></html>
+<!-- PAGE: about.html -->
+<!DOCTYPE html><html><body><h1>About Us</h1></body></html>`;
+
+  it('splits marker-delimited documents into separate pages', () => {
+    const result = parseMultiPageSite(multiPageCode);
+    expect(result.isMultiPage).toBe(true);
+    expect(result.pages.map((p) => p.name)).toEqual(['index.html', 'about.html']);
+    expect(result.pages[0].html).toContain('<h1>Home</h1>');
+    expect(result.pages[1].html).toContain('<h1>About Us</h1>');
+  });
+
+  it('removes the CORESITE-PAGES header from page documents', () => {
+    const result = parseMultiPageSite(multiPageCode);
+    for (const page of result.pages) {
+      expect(page.html).not.toContain('CORESITE-PAGES');
+    }
+  });
+
+  it('falls back to a single page when no markers are present', () => {
+    const result = parseMultiPageSite('<!DOCTYPE html><html><body><h1>Single</h1></body></html>');
+    expect(result.isMultiPage).toBe(false);
+    expect(result.pages).toHaveLength(1);
+    expect(result.pages[0].name).toBe('index.html');
+  });
+
+  it('falls back to a single page when markers are malformed or empty', () => {
+    expect(parseMultiPageSite('<!-- PAGE: -->\n<h1>Empty name</h1>').isMultiPage).toBe(false);
+    expect(parseMultiPageSite('<!-- PAGE: bad/name.html -->\n<h1>Slash</h1>').isMultiPage).toBe(false);
+    expect(parseMultiPageSite('<!-- PAGE: "../evil.html" -->\n<h1>Traversal</h1>').isMultiPage).toBe(false);
+    expect(parseMultiPageSite('<!-- PAGE: about.html -->\n   ').isMultiPage).toBe(false);
+  });
+
+  it('orders index.html first regardless of marker order', () => {
+    const reversed = `<!-- PAGE: about.html -->
+<!DOCTYPE html><html><body><h1>About</h1></body></html>
+<!-- PAGE: index.html -->
+<!DOCTYPE html><html><body><h1>Home</h1></body></html>`;
+    const result = parseMultiPageSite(reversed);
+    expect(result.pages[0].name).toBe('index.html');
+  });
+
+  it('skips pages with invalid names and caps the total page count', () => {
+    let code = '<!-- PAGE: index.html -->\n<!DOCTYPE html><html><body>Home</body></html>';
+    for (let i = 0; i < 20; i += 1) {
+      code += `\n<!-- PAGE: page${i}.html -->\n<!DOCTYPE html><html><body>P${i}</body></html>`;
+    }
+    const result = parseMultiPageSite(code);
+    expect(result.pages.length).toBeLessThanOrEqual(12);
+    for (const page of result.pages) {
+      expect(MULTI_PAGE_NAME_PATTERN.test(page.name)).toBe(true);
+    }
+  });
+
+  it('formats each page independently through the preview pipeline', () => {
+    const result = parseMultiPageSite(multiPageCode);
+    const formatted = formatCodeForPreview(result.pages[1].html);
+    expect(formatted).toContain('<!DOCTYPE html>');
+    expect(formatted).toContain('<h1>About Us</h1>');
+  });
+
+  it('injects the multi-page router into a formatted page', () => {
+    const formatted = formatCodeForPreview('<h1>Page</h1>');
+    const withRouter = injectMultiPageRouter(formatted, ['index.html', 'about.html']);
+    expect(withRouter).toContain("type: 'corez-nav'");
+    expect(withRouter).toContain('window.parent.postMessage');
+    expect(withRouter).toContain('document.open');
+    expect(withRouter).not.toBe(formatted);
+  });
+
+  it('injects the router before </body> when the document has no head', () => {
+    const doc = '<!DOCTYPE html><html><body><h1>No head</h1></body></html>';
+    const withRouter = injectMultiPageRouter(doc, ['index.html']);
+    expect(withRouter).toContain("type: 'corez-nav'");
+    expect(withRouter).toContain('</body>');
+  });
+
+  it('leaves documents untouched when no page names are given for injection', () => {
+    const formatted = formatCodeForPreview('<h1>Page</h1>');
+    expect(injectMultiPageRouter(formatted, [])).toBe(formatted);
   });
 });
