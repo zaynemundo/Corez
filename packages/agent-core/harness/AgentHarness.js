@@ -237,6 +237,7 @@ export class AgentHarness {
     try {
       const result = await this.repositoryRunner.runTask(task.prompt, {
         model: task.model,
+        workspaceId: task.workspaceId,
         signal,
         autoApprove: options.autoApprove === true
       });

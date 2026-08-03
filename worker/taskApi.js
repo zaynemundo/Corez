@@ -11,6 +11,7 @@ import { CancellationManager } from '../packages/agent-core/harness/Cancellation
 import { R2TaskStore } from '../packages/agent-core/persistence/R2TaskStore.js';
 import { ContextStore } from '../packages/agent-core/persistence/ContextStore.js';
 import { OpenCodeGoAdapter, DeepSeekAdapter, OpenRouterAdapter } from '../packages/agent-core/providers/adapters.js';
+import { RemoteRunner } from '../packages/agent-core/runners/RemoteRunner.js';
 import { TERMINAL_TASK_STATUSES } from '../packages/agent-core/harness/TaskState.js';
 import { jsonResponse, readBoundedJson, safeErrorDetail } from './utils.js';
 
@@ -54,7 +55,17 @@ export function buildHarness(env) {
     defaultModel: 'deepseek-v4-flash',
     persistEvents: true,
     cancellationManager: sharedCancellations,
-    maxRetryWaitMs: 0 // no in-process retry waits in the Worker; resume via API
+    maxRetryWaitMs: 0, // no in-process retry waits in the Worker; resume via API
+    // Repository tasks delegate to an operator-configured Node runner over
+    // HTTP (COREZ_REMOTE_RUNNER_URL); without one they are honestly blocked.
+    ...(env?.COREZ_REMOTE_RUNNER_URL
+      ? {
+          repositoryRunner: new RemoteRunner({
+            baseUrl: env.COREZ_REMOTE_RUNNER_URL,
+            token: env.COREZ_REMOTE_RUNNER_TOKEN || null
+          })
+        }
+      : {})
   });
 }
 
@@ -107,19 +118,36 @@ export async function handleTaskApi(request, env) {
     if (!prompt) {
       return jsonResponse(400, { error: 'prompt is required.' });
     }
+
+    // Repository tasks need a workspace AND an operator-configured remote
+    // runner; users may never pick arbitrary filesystem roots.
     if (body?.workspaceId) {
-      return jsonResponse(400, {
-        error: 'Repository mode is not available in the browser runtime: file and shell tools cannot execute here. Use a Node-side runner (CLI) for repository tasks.'
-      });
+      if (!env?.COREZ_REMOTE_RUNNER_URL) {
+        return jsonResponse(400, {
+          error: 'Repository mode is not available in this deployment: no remote runner is configured (COREZ_REMOTE_RUNNER_URL). Use the local CLI agent against a repository, or configure a runner.'
+        });
+      }
+      const allowed = String(env?.COREZ_REMOTE_WORKSPACES || '')
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+      const requested = String(body.workspaceId).trim();
+      if (!allowed.includes(requested)) {
+        return jsonResponse(403, {
+          error: 'workspaceId is not in the deployment allowlist (COREZ_REMOTE_WORKSPACES).'
+        });
+      }
     }
+
     const harness = buildHarness(env);
+    const isRepository = Boolean(body?.workspaceId);
     const task = await harness.startTask({
       userId,
       sessionId: typeof body?.sessionId === 'string' ? body.sessionId.slice(0, 160) : null,
-      workspaceId: null,
+      workspaceId: isRepository ? String(body.workspaceId).trim() : null,
       prompt,
       model: typeof body?.model === 'string' ? body.model.slice(0, 120) : undefined,
-      mode: 'conversation',
+      mode: isRepository ? 'repository' : 'conversation',
       autoApprove: false
     });
     return jsonResponse(202, publicTask(task));
