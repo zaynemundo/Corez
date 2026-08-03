@@ -157,7 +157,7 @@ function buildWebsitePrompt(rawPrompt, intent, requirements, context) {
     // <a href="name.html"> anchors.
     result += `MULTI-PAGE BY DEFAULT: output a multi-page website. Every page is a complete standalone HTML document inside the SAME single code block, one per page, separated by markers:\n`;
     result += `<!-- PAGE: index.html -->\n<!DOCTYPE html>... complete page ...\n`;
-    result += `Link pages with plain anchors: <a href="about.html">About</a>. Keep lowercase filenames (index.html, about.html, contact.html), max 12 pages.\n`;
+    result += `Link pages with PLAIN RELATIVE anchors ONLY: <a href="about.html">About</a>. Never use a leading slash or absolute URL for internal links (never "/about.html", "https://...", or "corez.pro/...") — the preview and the published site serve every page under its own folder (corez.pro/<slug>/about.html), so only bare relative filenames resolve to the right URL. Keep lowercase filenames (index.html, about.html, contact.html), max 12 pages.\n`;
     result += `COMPLETENESS CHECK before finishing: always include an index.html home page, only link to pages that exist in your output, and keep every page a complete HTML document.\n\n`;
   }
 

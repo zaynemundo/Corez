@@ -922,12 +922,22 @@ async function run() {
   assert.match(aboutPage.headers.get('content-security-policy'), /sandbox allow-scripts/);
   assert.equal(await aboutPage.text(), '<!DOCTYPE html><html><body><h1>About Page</h1></body></html>');
 
-  // The home page still serves at the bare slug.
-  const multiHome = await worker.fetch(
+  // Multi-page home pages serve at the trailing-slash root /<slug>/ so every
+  // relative link (<a href="about.html">) resolves to /<slug>/about.html —
+  // never the site root. The bare /<slug> path redirects to the root.
+  const multiHomeBare = await worker.fetch(
     new Request(`https://corez.test/${publishMultiData.slug}`, { method: 'GET' }),
     memoryEnv()
   );
+  assert.equal(multiHomeBare.status, 301);
+  assert.equal(multiHomeBare.headers.get('location'), `/${publishMultiData.slug}/`);
+
+  const multiHome = await worker.fetch(
+    new Request(`https://corez.test/${publishMultiData.slug}/`, { method: 'GET' }),
+    memoryEnv()
+  );
   assert.equal(multiHome.status, 200);
+  assert.match(multiHome.headers.get('content-type'), /text\/html/);
   assert.equal(await multiHome.text(), '<!DOCTYPE html><html><body><h1>Home</h1><a href="about.html">About</a></body></html>');
 
   // Unknown sub-pages are 404s, and traversal/invalid paths never match.

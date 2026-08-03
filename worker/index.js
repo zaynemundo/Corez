@@ -10,7 +10,9 @@ const SAFE_STORAGE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$/;
 
 // Published creations get a short, human-shareable slug like "asyag23-123"
 // served at the bare root path corez.pro/<slug>. Multi-page creations are
-// additionally served at corez.pro/<slug>/<page>.html.
+// served with the home page at corez.pro/<slug>/ and each page at
+// corez.pro/<slug>/<page>.html so relative links always resolve inside the
+// slug directory; the bare /<slug> path redirects there.
 const PUBLISH_SLUG_PATTERN = /^[a-z0-9]{4,8}-[0-9]{1,6}$/;
 
 // Sub-page paths inside a published multi-page creation: /<slug>/<page>.html
@@ -18,6 +20,13 @@ const PUBLISH_SLUG_PATTERN = /^[a-z0-9]{4,8}-[0-9]{1,6}$/;
 const PUBLISH_PAGE_PATTERN = /^([a-z0-9]{4,8}-[0-9]{1,6})\/([a-z0-9][a-z0-9_-]{0,63}\.html)$/;
 const PUBLISH_PAGE_NAME_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}\.html$/i;
 const MAX_PUBLISH_PAGES = 12;
+
+// Trailing-slash root of a published creation: /<slug>/ serves the home page
+// so every RELATIVE sub-page link (<a href="about.html">) resolves inside the
+// slug directory (corez.pro/<slug>/about.html) instead of the site root
+// (corez.pro/about.html). Multi-page creations redirect the bare /<slug>
+// path here for the same reason.
+const PUBLISH_SLUG_ROOT_PATTERN = /^\/([a-z0-9]{4,8}-[0-9]{1,6})\/$/;
 
 // Online multiplayer rooms: short lowercase ids used in the WebSocket URL.
 const SAFE_ROOM_ID = /^[a-z0-9][a-z0-9-]{2,31}$/;
@@ -1033,7 +1042,39 @@ async function handlePublish(request, env) {
     }
   }
 
+  // GET /<slug>/ - serve the home page at a trailing-slash URL. Relative
+  // sub-page links inside the document then resolve to /<slug>/<page>.html —
+  // for both the router's fetch-swap and plain browser navigation (middle
+  // click, direct visit) — instead of falling to the site root.
+  if (request.method === 'GET') {
+    const slugRootMatch = pathname.match(PUBLISH_SLUG_ROOT_PATTERN);
+    if (slugRootMatch) {
+      if (!env?.ASSET_BUCKET) {
+        return jsonResponse(530, { error: 'R2 storage (ASSET_BUCKET) is not configured.' });
+      }
+      const slug = slugRootMatch[1];
+      const object = await env.ASSET_BUCKET.get(`publish/${slug}.json`);
+      if (!object) {
+        return jsonResponse(404, { error: 'Published creation not found.' });
+      }
+      let record;
+      try {
+        record = JSON.parse(await object.text());
+      } catch {
+        return jsonResponse(500, { error: 'Failed to parse published payload.' });
+      }
+      const html = typeof record?.html === 'string' ? record.html : '';
+      if (!html) {
+        return jsonResponse(404, { error: 'Published creation not found.' });
+      }
+      return new Response(html, { headers: publishedPageHeaders() });
+    }
+  }
+
   // GET /<slug> - serve a published creation to anyone (bare root path).
+  // Multi-page creations redirect to /<slug>/ so their relative links keep
+  // resolving inside the slug directory; single-page creations (no pages map)
+  // are served directly since they contain no internal .html navigation.
   if (request.method === 'GET' && PUBLISH_SLUG_PATTERN.test(pathname.slice(1))) {
     if (!env?.ASSET_BUCKET) {
       return jsonResponse(530, { error: 'R2 storage (ASSET_BUCKET) is not configured.' });
@@ -1048,6 +1089,12 @@ async function handlePublish(request, env) {
       record = JSON.parse(await object.text());
     } catch {
       return jsonResponse(500, { error: 'Failed to parse published payload.' });
+    }
+    if (record?.pages && typeof record.pages === 'object' && Object.keys(record.pages).length > 0) {
+      return new Response(null, {
+        status: 301,
+        headers: { Location: `/${slug}/` }
+      });
     }
     const html = typeof record?.html === 'string' ? record.html : '';
     if (!html) {
@@ -1108,7 +1155,10 @@ export default {
       return runJsonSafe(() => handleR2Memory(request, env));
     }
     if (pathname === '/api/publish' ||
-        (request.method === 'GET' && (PUBLISH_SLUG_PATTERN.test(pathname.slice(1)) || PUBLISH_PAGE_PATTERN.test(pathname.slice(1))))) {
+        (request.method === 'GET' &&
+          (PUBLISH_SLUG_PATTERN.test(pathname.slice(1)) ||
+            PUBLISH_PAGE_PATTERN.test(pathname.slice(1)) ||
+            PUBLISH_SLUG_ROOT_PATTERN.test(pathname)))) {
       return runJsonSafe(() => handlePublish(request, env));
     }
     if (pathname.startsWith('/api/game/ws/')) {
