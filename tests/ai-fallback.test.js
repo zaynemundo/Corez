@@ -44,11 +44,12 @@ describe('Hosted AI fallback behavior', () => {
     expect(response).not.toContain('Share the snippet');
   });
 
-  it('answers who created Corez with the full creator names and a description of the AI when hosted AI is down', async () => {
+  it('answers who created Corez with clickable creator profiles and the why, without self-introducing or mentioning APIs', async () => {
     const response = await generateLocalAIResponse('Who created Corez?', new Error('Hosted AI request failed: 503'));
-    expect(response).toContain('Zayne Mundo');
-    expect(response).toContain('Christian Jericon');
-    expect(response).toContain('Corez');
+    expect(response).toContain('[Zayne Mundo](https://www.linkedin.com/in/zayne-mundo/)');
+    expect(response).toContain('[Christian Vestil](https://www.linkedin.com/in/christian-jericson-belderol/)');
+    expect(response).toMatch(/created Corez to/i);
+    expect(response).not.toContain("I'm Corez");
     expect(response).not.toMatch(/api|API|model|provider/i);
   });
 
