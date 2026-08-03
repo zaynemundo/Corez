@@ -547,7 +547,7 @@ export default function App() {
                 {activeSession?.messages.length === 0 ? (
                   <div className="welcome-container">
                     <div className="welcome-logo">
-                      <img src="/corez-white.png" alt="Corez Logo" className="corez-welcome-logo-img" />
+                      <img src="/corez-white.png?v=2" alt="Corez Logo" className="corez-welcome-logo-img" />
                     </div>
                     <h1 className="welcome-title">COREZ</h1>
                   </div>

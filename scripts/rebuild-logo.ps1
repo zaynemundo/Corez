@@ -76,16 +76,39 @@ for ($y = 0; $y -lt $H; $y++) {
   }
 }
 
+# ---- Erode the main mark so strokes render thinner (same as the favicon) --
+function Erode-Mask {
+  param($src, [int]$er)
+  $out = New-Object 'byte[,]' $H, $W
+  for ($y = $er; $y -lt ($H - $er); $y++) {
+    for ($x = $er; $x -lt ($W - $er); $x++) {
+      if ($src[$y, $x] -ne 1) { continue }
+      $ok = $true
+      for ($dy = -$er; $dy -le $er -and $ok; $dy++) {
+        $rem = $er - [Math]::Abs($dy)
+        for ($dx = -$rem; $dx -le $rem -and $ok; $dx++) {
+          if ($src[$y + $dy, $x + $dx] -ne 1) { $ok = $false }
+        }
+      }
+      if ($ok) { $out[$y, $x] = 1 }
+    }
+  }
+  return $out
+}
+# The favicon keeps the FULL-weight mask (it applies its own erosion below).
+$thin = Erode-Mask -src $mask -er 2
+
 # ---- Render transparent PNGs --------------------------------------------
 function Save-MaskPng {
   param([string]$Path, [int]$Size, [System.Drawing.Color]$MarkColor)
+  $srcMask = $renderMask
   $canvas = New-Object System.Drawing.Bitmap($W, $H, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
   $g = [System.Drawing.Graphics]::FromImage($canvas)
   $g.Clear([System.Drawing.Color]::Transparent)
   $brush = New-Object System.Drawing.SolidBrush($MarkColor)
   for ($y = 0; $y -lt $H; $y++) {
     for ($x = 0; $x -lt $W; $x++) {
-      if ($mask[$y, $x] -eq 1) { $g.FillRectangle($brush, $x, $y, 1, 1) }
+      if ($srcMask[$y, $x] -eq 1) { $g.FillRectangle($brush, $x, $y, 1, 1) }
     }
   }
   $g.Dispose()
@@ -104,6 +127,8 @@ function Save-MaskPng {
 
 $white = [System.Drawing.Color]::FromArgb(255, 255, 255, 255)
 $black = [System.Drawing.Color]::FromArgb(255, 0, 0, 0)
+# Render from the eroded (thinner) mark.
+$renderMask = $thin
 Save-MaskPng -Path "$OutDir\corez-white.png" -Size 1024 -MarkColor $white
 Save-MaskPng -Path "$OutDir\corez-black.png" -Size 1024 -MarkColor $black
 Save-MaskPng -Path "$OutDir\corez-logo.png" -Size 1024 -MarkColor $white
@@ -186,9 +211,10 @@ $dy8 = @(-1, -1, 0, 1, 1, 1, 0, -1)
 $visited = New-Object 'bool[,]' $H, $W
 $loops = New-Object System.Collections.Generic.List[object]
 
+$traceMask = $thin
 for ($sy0 = 0; $sy0 -lt $H; $sy0++) {
   for ($sx0 = 0; $sx0 -lt $W; $sx0++) {
-    if ($mask[$sy0, $sx0] -ne 1 -or $visited[$sy0, $sx0]) { continue }
+    if ($traceMask[$sy0, $sx0] -ne 1 -or $visited[$sy0, $sx0]) { continue }
 
     $isBoundary = $false
     foreach ($d in 0, 2, 4, 6) {
@@ -212,7 +238,7 @@ for ($sy0 = 0; $sy0 -lt $H; $sy0++) {
       for ($i = 1; $i -le 8; $i++) {
         $d = ($entryDir + $i) % 8
         $nx = $curX + $dx8[$d]; $ny = $curY + $dy8[$d]
-        if ($nx -ge 0 -and $nx -lt $W -and $ny -ge 0 -and $ny -lt $H -and $mask[$ny, $nx] -eq 1) {
+        if ($nx -ge 0 -and $nx -lt $W -and $ny -ge 0 -and $ny -lt $H -and $traceMask[$ny, $nx] -eq 1) {
           $loop.Add(@($nx, $ny))
           $visited[$ny, $nx] = $true
           $curX = $nx; $curY = $ny
