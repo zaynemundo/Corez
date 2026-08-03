@@ -12,7 +12,9 @@
     "./tools": "./tools/index.js",
     "./providers": "./providers/index.js",
     "./runtime": "./runtime/index.js",
-    "./swarm": "./swarm/index.js"
+    "./swarm": "./swarm/index.js",
+    "./harness": "./harness/index.js",
+    "./persistence": "./persistence/TaskStore.js"
   },
   "engines": {
     "node": ">=22.0.0"

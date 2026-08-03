@@ -1,6 +1,7 @@
 import baseWorker from './index.js';
 import { safeErrorDetail, readBoundedJson, classifyProviderFailure, createTaskStateStore } from './utils.js';
 import { runProviderChain, buildProviderChain } from './providerChain.js';
+import { handleTaskApi } from './taskApi.js';
 export { GameRoom } from './gameRoom.js';
 
 // One Worker invocation may make up to 1000 subrequests (platform limit).
@@ -1238,6 +1239,13 @@ export default {
       'X-Frame-Options': 'DENY',
       'Referrer-Policy': 'no-referrer'
     };
+
+    // Unified harness task API (task lifecycle + SSE events) and context
+    // records through the real entrypoint — same harness layer as the CLI.
+    if (url.pathname.startsWith('/api/tasks') || url.pathname.startsWith('/api/context/records')) {
+      const taskResponse = await handleTaskApi(request, env);
+      if (taskResponse) return taskResponse;
+    }
 
     // Task-continuation status: progress or final result of a persisted swarm
     // task (frontend polls this while waves are still queued). This is also a

@@ -7,6 +7,8 @@ export {
 
 export { AdaptiveConcurrencyQueue } from '../../../src/services/gamePipeline/swarm/adaptiveQueue.js';
 
+export { HierarchicalSynthesis, chunkByTokens, DEFAULT_CHUNK_MAX_TOKENS } from './hierarchicalSynthesis.js';
+
 import { TaskDependencyGraph, AGENT_LIFECYCLE_STATES } from '../../../src/services/gamePipeline/swarm/taskGraph.js';
 import { AdaptiveConcurrencyQueue } from '../../../src/services/gamePipeline/swarm/adaptiveQueue.js';
 
