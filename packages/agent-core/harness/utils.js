@@ -19,15 +19,6 @@ export function abortableSleep(ms, signal) {
   });
 }
 
-export function parseToolArguments(raw) {
-  if (typeof raw !== 'string') return raw && typeof raw === 'object' ? raw : {};
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return {};
-  }
-}
-
 export function nowIso() {
   return new Date().toISOString();
 }

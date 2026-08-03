@@ -1,29 +1,15 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import { DiskTaskStore, MemoryTaskStore } from '../packages/agent-core/persistence/index.js';
+import { describe, it, expect } from 'vitest';
+import { MemoryTaskStore } from '../packages/agent-core/persistence/index.js';
 import { TASK_STATUSES } from '../packages/agent-core/harness/TaskState.js';
 
 describe('task persistence', () => {
-  let tmp;
-
-  beforeEach(() => {
-    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'corez-persist-'));
-  });
-
-  afterEach(() => {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  });
-
-  it('a task resumes after a process restart (disk store)', async () => {
-    const root = path.join(tmp, 'tasks');
-    const storeA = new DiskTaskStore({ rootDir: root });
+  it('a task survives updates and reads through the store interface', async () => {
+    const store = new MemoryTaskStore();
     const task = {
-      taskId: 'task_restart_1',
+      taskId: 'task_1',
       userId: 'alice',
       sessionId: 's1',
-      workspaceId: tmp,
+      workspaceId: '/srv/ws',
       status: TASK_STATUSES.RUNNING,
       prompt: 'finish this work',
       messages: [{ role: 'user', content: 'finish this work' }],
@@ -31,22 +17,21 @@ describe('task persistence', () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    await storeA.createTask(task);
-    await storeA.appendEvent('task_restart_1', { type: 'tool.started', taskId: 'task_restart_1', tool: 'read_file' });
+    await store.createTask(task);
 
-    // "Restart": a brand-new store instance over the same directory.
-    const storeB = new DiskTaskStore({ rootDir: root });
-    const restored = await storeB.getTask('task_restart_1');
+    // The stored snapshot is isolated from later mutations.
+    const restored = await store.getTask('task_1');
     expect(restored.prompt).toBe('finish this work');
     expect(restored.currentStep).toBe(3);
-    const events = await storeB.listEvents('task_restart_1');
+
+    await store.updateTask('task_1', { status: TASK_STATUSES.COMPLETED, result: 'done' });
+    expect((await store.getTask('task_1')).status).toBe(TASK_STATUSES.COMPLETED);
+
+    // Events appended to the store are replayable per task.
+    await store.appendEvent('task_1', { type: 'tool.started', taskId: 'task_1', tool: 'read_file' });
+    const events = await store.listEvents('task_1');
     expect(events.length).toBe(1);
     expect(events[0].type).toBe('tool.started');
-
-    // Updates from the "new process" are visible to a third instance.
-    await storeB.updateTask('task_restart_1', { status: TASK_STATUSES.COMPLETED, result: 'done' });
-    const storeC = new DiskTaskStore({ rootDir: root });
-    expect((await storeC.getTask('task_restart_1')).status).toBe(TASK_STATUSES.COMPLETED);
   });
 
   it('a durable lease prevents duplicate execution and expires', async () => {

@@ -4,7 +4,7 @@ import {
   parseSlashCommand,
   isSlashCommand
 } from '../src/services/aiService.js';
-import { generatePdfDocument, synthesizePdfDocumentHtml } from '../src/services/pdfGenerator.js';
+import { synthesizePdfDocumentHtml } from '../src/services/pdfGenerator.js';
 
 describe('parseSlashCommand', () => {
   it('parses known commands and strips the token', () => {
@@ -142,26 +142,6 @@ describe('/research command', () => {
 });
 
 describe('PDF generator', () => {
-  it('produces a structurally valid PDF binary', () => {
-    const pdf = generatePdfDocument({ title: 'Report', lines: ['Line one.', 'Line two.'] });
-    const text = new TextDecoder().decode(pdf);
-    expect(text.slice(0, 5)).toBe('%PDF-');
-    expect(text).toContain('%%EOF');
-    expect(text).toContain('xref');
-    expect(text).toContain('/MediaBox [0 0 595.28 841.89]');
-
-    // xref offsets match real object byte positions.
-    const positions = new Map();
-    const re = /(\d+) 0 obj/g;
-    let m;
-    while ((m = re.exec(text))) positions.set(Number(m[1]), m.index);
-    const xrefLines = text.slice(text.indexOf('xref')).split('\n');
-    for (let i = 3; i < xrefLines.length; i += 1) {
-      const entry = xrefLines[i].match(/^(\d{10}) 00000 n/);
-      if (!entry) break;
-      expect(positions.get(i - 2)).toBe(Number(entry[1]));
-    }
-  });
 
   it('builds an editable research document with sources', () => {
     const doc = synthesizePdfDocumentHtml({

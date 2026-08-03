@@ -91,21 +91,6 @@ export class TaskState {
     this.touch();
   }
 
-  setPlan(plan) {
-    this.plan = plan;
-    this.touch();
-  }
-
-  updatePlanItem(itemId, patch) {
-    if (!this.plan || !Array.isArray(this.plan.items)) return null;
-    const item = this.plan.items.find((i) => i.itemId === itemId);
-    if (!item) return null;
-    Object.assign(item, patch, { updatedAt: new Date().toISOString() });
-    this.plan.updatedAt = new Date().toISOString();
-    this.touch();
-    return item;
-  }
-
   markTerminal(status, result = null, error = null) {
     this.status = status;
     if (result !== null) this.result = result;

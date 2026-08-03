@@ -89,18 +89,6 @@ export class TaskManager {
     return updated;
   }
 
-  async appendEvent(taskId, event, userId = null) {
-    // Ownership check before appending to another user's task event log.
-    await this.getTask(taskId, userId);
-    if (this.store) return this.store.appendEvent(taskId, { ...event, taskId });
-    return null;
-  }
-
-  async listEvents(taskId, { sinceId = 0 } = {}) {
-    if (!this.store) return [];
-    return this.store.listEvents(taskId, { sinceId });
-  }
-
   // ---- Workspace concurrency ----
 
   async acquireWorkspaceLock(workspaceId, holder, ttlMs = 5 * 60_000) {
