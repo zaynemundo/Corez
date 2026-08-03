@@ -203,7 +203,7 @@ describe('multi-page router script', () => {
     document.body.innerHTML = '';
   });
 
-  it('fetch-swaps the document on a published top-level page', async () => {
+  it('fetch-swaps the document on a published sub-page', async () => {
     const fn = routerFn();
     const pageDoc = '<!DOCTYPE html><html><body><h1>Fetched About</h1></body></html>';
     // Top-level context: self === top, so the router falls through to fetch.
@@ -211,7 +211,8 @@ describe('multi-page router script', () => {
     const fakeWindow = {
       self: topWindow,
       top: topWindow,
-      parent: { postMessage: () => {} }
+      parent: { postMessage: () => {} },
+      location: { pathname: '/test-123/about.html' }
     };
     fn.call(fakeWindow, fakeWindow, document);
 
@@ -230,8 +231,72 @@ describe('multi-page router script', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(click.defaultPrevented).toBe(true);
-    expect(fetchStub).toHaveBeenCalledWith('about.html');
+    expect(fetchStub).toHaveBeenCalledWith('/test-123/about.html');
     expect(writeCalls.join('')).toContain('<h1>Fetched About</h1>');
+    globalThis.fetch = originalFetch;
+    document.body.innerHTML = '';
+  });
+
+  it('resolves sub-pages from the bare published home page against the slug directory', async () => {
+    const fn = routerFn();
+    const pageDoc = '<!DOCTYPE html><html><body><h1>Fetched About</h1></body></html>';
+    // The home page is served at the bare /<slug> path (no trailing slash):
+    // a relative "about.html" must fetch /<slug>/about.html, never the root.
+    const topWindow = { top: true };
+    const fakeWindow = {
+      self: topWindow,
+      top: topWindow,
+      parent: { postMessage: () => {} },
+      location: { pathname: '/test-123' }
+    };
+    fn.call(fakeWindow, fakeWindow, document);
+
+    const fetchStub = vi.fn(() => Promise.resolve({ ok: true, text: () => Promise.resolve(pageDoc) }));
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = fetchStub;
+
+    document.body.innerHTML = '<a href="about.html">About</a>';
+    document.open = () => {};
+    document.write = () => {};
+    document.close = () => {};
+    const anchor = document.querySelector('a');
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true, target: anchor });
+    anchor.dispatchEvent(click);
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(click.defaultPrevented).toBe(true);
+    expect(fetchStub).toHaveBeenCalledWith('/test-123/about.html');
+    globalThis.fetch = originalFetch;
+    document.body.innerHTML = '';
+  });
+
+  it('resolves page fetches from a trailing-slash home URL against the slug directory', async () => {
+    const fn = routerFn();
+    const pageDoc = '<!DOCTYPE html><html><body><h1>Fetched About</h1></body></html>';
+    const topWindow = { top: true };
+    const fakeWindow = {
+      self: topWindow,
+      top: topWindow,
+      parent: { postMessage: () => {} },
+      location: { pathname: '/test-123/' }
+    };
+    fn.call(fakeWindow, fakeWindow, document);
+
+    const fetchStub = vi.fn(() => Promise.resolve({ ok: true, text: () => Promise.resolve(pageDoc) }));
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = fetchStub;
+
+    document.body.innerHTML = '<a href="pages/about.html">About</a>';
+    document.open = () => {};
+    document.write = () => {};
+    document.close = () => {};
+    const anchor = document.querySelector('a');
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true, target: anchor });
+    anchor.dispatchEvent(click);
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(click.defaultPrevented).toBe(true);
+    expect(fetchStub).toHaveBeenCalledWith('/test-123/about.html');
     globalThis.fetch = originalFetch;
     document.body.innerHTML = '';
   });

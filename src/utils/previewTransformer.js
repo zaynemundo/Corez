@@ -148,6 +148,19 @@ export const MULTI_PAGE_ROUTER_SCRIPT = `
     if (!pageNamePattern.test(clean)) return null;
     return clean;
   }
+  // Published pages are served at /<slug>/<page>.html but the home page is
+  // served at the bare /<slug> path, so a relative href like "about.html"
+  // resolves against the site root there and misses the slug directory.
+  // Rebuild the directory the current page was served from and fetch every
+  // sub-page relative to it.
+  function pageBase() {
+    var path = (window.location && window.location.pathname) || '/';
+    var slash = path.lastIndexOf('/');
+    if (slash < 0) return '/';
+    var last = path.slice(slash + 1);
+    if (last.indexOf('.') !== -1) return path.slice(0, slash + 1);
+    return path.charAt(path.length - 1) === '/' ? path : path + '/';
+  }
   document.addEventListener('click', function (e) {
     var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
     if (!a) return;
@@ -164,7 +177,7 @@ export const MULTI_PAGE_ROUTER_SCRIPT = `
         window.parent.postMessage({ type: 'corez-nav', page: page }, '*');
         return;
       }
-      fetch(href.split('#')[0]).then(function (res) {
+      fetch(pageBase() + page).then(function (res) {
         if (!res.ok) throw new Error('Page not found: ' + page);
         return res.text();
       }).then(function (htmlText) {
