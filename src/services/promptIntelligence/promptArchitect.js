@@ -147,13 +147,16 @@ function buildWebsitePrompt(rawPrompt, intent, requirements, context) {
   result += `Create a polished, responsive website for ${domain}.\n\n`;
   result += `The website should communicate quality, clarity, and visual polish.\n\n`;
 
-  // Multi-page sites: when the user asked for multiple pages or routes,
-  // output each page as its own complete HTML document inside the SAME
-  // single code block, separated by <!-- PAGE: name.html --> markers and
-  // linked with plain <a href="name.html"> anchors.
-  if (/\b(pages?|multi[-\s]?page|routes?|separate pages|about page|contact page|pricing page|blog page)\b/i.test(rawPrompt)) {
-    result += `The user requested MULTIPLE pages. Output every page as a complete standalone HTML document inside the SAME single code block, one per page, separated by markers:\n`;
-    result += `<!-- PAGE: about.html -->\n<!DOCTYPE html>... complete page ...\n`;
+  // One-shot mode: the user asked for a single page only.
+  if (/\b(oneshot|one-shot|one shot|single[- ]page|one[- ]page)\b/i.test(rawPrompt)) {
+    result += `ONE-SHOT MODE: the user asked for a single page only. Output ONE single complete HTML document and nothing else — no sub-pages, no markers.\n\n`;
+  } else {
+    // Multi-page by default: output each page as its own complete HTML
+    // document inside the SAME single code block, separated by
+    // <!-- PAGE: name.html --> markers and linked with plain
+    // <a href="name.html"> anchors.
+    result += `MULTI-PAGE BY DEFAULT: output a multi-page website. Every page is a complete standalone HTML document inside the SAME single code block, one per page, separated by markers:\n`;
+    result += `<!-- PAGE: index.html -->\n<!DOCTYPE html>... complete page ...\n`;
     result += `Link pages with plain anchors: <a href="about.html">About</a>. Keep lowercase filenames (index.html, about.html, contact.html), max 12 pages.\n`;
     result += `COMPLETENESS CHECK before finishing: always include an index.html home page, only link to pages that exist in your output, and keep every page a complete HTML document.\n\n`;
   }

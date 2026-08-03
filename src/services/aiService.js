@@ -540,6 +540,7 @@ export async function improveCodingPrompt(prompt, intent = null) {
 
   if (isAppIntent) {
     const isExplicitNonJsx = /\b(html\b|css\b|vanilla|plain html|pure html|html\/css|raw html|html\s*\+\s*css|vanilla js)\b/i.test(cleanPrompt);
+    const isOneShot = /\b(oneshot|one-shot|one shot|single[- ]page|one[- ]page)\b/i.test(cleanPrompt);
 
     if (isExplicitNonJsx) {
       return `${cleanPrompt}
@@ -550,10 +551,11 @@ ${designSpec}${liveInspiration}
 - ALWAYS begin your response with a clear, detailed overview explaining the features, layout, and styling choices!
 - Ensure proper visual layering and z-index stacking hierarchy (Background z-index:0 -> Content z-index:10 -> HUD/Toolbars z-index:20-30 -> Modals/Overlays z-index:40-50+) so elements don't obscure interactive controls!
 - Output complete, clean HTML/CSS/JS code inside ONE SINGLE \`\`\`html ... \`\`\` code block including inline \`<style>\` and \`<script>\` tags.
-- MULTI-PAGE SITES: if the user requested MULTIPLE pages (e.g. About, Pricing, Contact, Blog), output every page as its own complete standalone HTML document inside the SAME single code block, separated by markers:
-  <!-- PAGE: about.html -->
+- ${isOneShot ? 'ONE-SHOT MODE: output ONE single page only — no sub-pages, no markers.' : 'MULTI-PAGE BY DEFAULT: output a multi-page website unless the user explicitly asked for ONE-SHOT (single page only). For multi-page output, put every page as its own complete standalone HTML document inside the SAME single code block, separated by markers:'}
+  <!-- PAGE: index.html -->
   <!DOCTYPE html>... complete page with inline <style>/<script> ...
-  Link pages with plain anchors: <a href="about.html">About</a>. Keep filenames lowercase like index.html, about.html, contact.html (max 12 pages). COMPLETENESS CHECK before you finish: ALWAYS output an index.html home page, make every <a href="..."> point to a page you actually output (a link to a page you never created is a broken site), and keep every page a complete standalone HTML document. When the user did NOT ask for multiple pages, output ONE single page exactly as before.
+  Link pages with plain anchors: <a href="about.html">About</a>. Keep filenames lowercase like index.html, about.html, contact.html (max 12 pages). COMPLETENESS CHECK before you finish: ALWAYS output an index.html home page, make every <a href="..."> point to a page you actually output (a link to a page you never created is a broken site), and keep every page a complete standalone HTML document.
+- ONE-SHOT MODE: ONLY when the user explicitly asked for "oneshot" (or "one shot", "single page", "one page"), output ONE single page only (no sub-pages, no markers).
 - Build a complete, responsive, standalone experience ready for the preview canvas.
 - ALWAYS end your response with a step-by-step user guide and feature summary after the code block! Never output ONLY a bare code block.`;
     }
@@ -569,10 +571,11 @@ ${designSpec}${liveInspiration}
 - DO NOT wrap React code inside HTML boilerplate (\`<!DOCTYPE html>\`, \`<head>\`, \`<script type="text/babel">\`, or \`ReactDOM.createRoot()\`) because the preview canvas automatically compiles and renders React/JSX code!
 - Do NOT split your output into multiple separate code blocks, file headers (// App.tsx, // components/Navbar.tsx), or relative file imports (import Navbar from './components/Navbar').
 - Define all child components (Navbar, Hero, Footer, etc.) inline within the SAME file BEFORE the main App component!
-- MULTI-PAGE SITES: if the user requested MULTIPLE pages, switch to plain HTML and output every page as its own complete standalone HTML document inside the SAME single \`\`\`html ... \`\`\` code block, separated by markers:
-  <!-- PAGE: about.html -->
+- MULTI-PAGE BY DEFAULT: build a multi-page website unless the user explicitly asked for ONE-SHOT (single page only). For multi-page output, switch to plain HTML and output every page as its own complete standalone HTML document inside the SAME single \`\`\`html ... \`\`\` code block, separated by markers:
+  <!-- PAGE: index.html -->
   <!DOCTYPE html>... complete page ...
-  Link pages with plain anchors: <a href="about.html">About</a>. Keep filenames lowercase like index.html, about.html, contact.html (max 12 pages). COMPLETENESS CHECK before you finish: ALWAYS output an index.html home page, make every <a href="..."> point to a page you actually output (a link to a page you never created is a broken site), and keep every page a complete standalone HTML document. When the user did NOT ask for multiple pages, output a single React component exactly as described above.
+  Link pages with plain anchors: <a href="about.html">About</a>. Keep filenames lowercase like index.html, about.html, contact.html (max 12 pages). COMPLETENESS CHECK before you finish: ALWAYS output an index.html home page, make every <a href="..."> point to a page you actually output (a link to a page you never created is a broken site), and keep every page a complete standalone HTML document.
+- ONE-SHOT MODE: ONLY when the user explicitly asked for "oneshot" (or "one shot", "single page", "one page"), output a single React component exactly as described above (no sub-pages, no markers).
 - ALWAYS end your response with a step-by-step user guide and feature summary after the code block! Never output ONLY a bare code block.`;
   }
 
@@ -2594,22 +2597,66 @@ ${search.results.map((result, index) => `${index + 1}. ${result.title} — ${res
   return formatSearchResults(search);
 }
 
-// Full research pipeline for the /research command: search the web
-// (Wikipedia + DuckDuckGo through the worker, with full article extracts for
-// the top sources), write a detailed research report grounded in the real
-// results, run an editorial verification pass over the draft, and deliver it
+// Deep research pipeline for the /research command, structured after the
+// two-phase Deep Research skill methodology (Weizhena/Deep-Research-skills,
+// MIT): Phase 1 decomposes the topic into research items with focused search
+// queries; Phase 2 runs a dedicated web search per item (Wikipedia +
+// DuckDuckGo through the worker, with full article extracts); Phase 3
+// synthesises a deep report with a table of contents and per-item sections,
+// then an editorial verification pass over the draft; the report is delivered
 // as a downloadable PDF in the preview canvas.
 //
-// Methodology adapted in original form from Academic Research Skills by
-// Cheng-I Wu (CC-BY-NC 4.0, https://github.com/Imbad0202/academic-research-skills):
-// research-question scoping, systematic grounding in full sources, cross-source
+// Methodology also draws on Academic Research Skills by Cheng-I Wu (CC-BY-NC
+// 4.0, https://github.com/Imbad0202/academic-research-skills): research
+// question scoping, systematic grounding in full sources, cross-source
 // synthesis with contradiction handling, and an editorial verification pass.
+// CoreZ never fabricates: every source, URL and extract comes from the real
+// search service, and the AI is explicitly forbidden from inventing any.
+
+const DEEP_RESEARCH_MAX_ITEMS = 5;
+const DEEP_RESEARCH_MAX_EXTRACT_CHARS = 3000;
+const DEEP_RESEARCH_MAX_DRAFT_CHARS = 24000;
+
+// Parse the hosted AI's outline answer (strict JSON: {"items":[{name,query}]}).
+// Returns a bounded, sanitized item list or null when the answer is unusable.
+export function extractOutlineItems(text) {
+  if (!text) return null;
+  const match = String(text).match(/\{[\s\S]*\}/);
+  if (!match) return null;
+  try {
+    const data = JSON.parse(match[0]);
+    if (!Array.isArray(data?.items)) return null;
+    const items = data.items
+      .map((item, index) => ({
+        name: String(item?.name || '').trim().slice(0, 80) || `Item ${index + 1}`,
+        query: String(item?.query || '').trim().slice(0, 200)
+      }))
+      .filter((item) => item.name && item.query);
+    if (items.length === 0) return null;
+    return items.slice(0, DEEP_RESEARCH_MAX_ITEMS);
+  } catch {
+    return null;
+  }
+}
+
+// Deduplicate sources by URL (fall back to title) preserving first occurrence.
+export function dedupeSources(list) {
+  const seen = new Set();
+  return (Array.isArray(list) ? list : []).filter((s) => {
+    const key = (s && s.url) || (s && s.title);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export async function runResearchCommand(topic, history = [], signal = null) {
   const cleanTopic = String(topic || '').trim();
   if (!cleanTopic) {
     return 'Please tell me what to research, e.g. `/research quantum computing`';
   }
 
+  // Phase 1a: topic-level search — also grounds the outline decomposition.
   let search;
   try {
     search = await fetchWebSearch(cleanTopic, signal, { detail: true });
@@ -2630,38 +2677,128 @@ export async function runResearchCommand(topic, history = [], signal = null) {
   const resultsText = results
     .map((result, index) => `${index + 1}. ${result.title} — ${result.url}\n   ${result.snippet || ''} (source: ${result.source})`)
     .join('\n');
-  const extracts = results
-    .map((result, index) => (result.extract ? `[${index + 1}] ${result.title}\n${result.extract}` : null))
-    .filter(Boolean);
-  const extractsText = extracts.length > 0
-    ? `\nFULL ARTICLE EXTRACTS (use these for depth and detail):\n\n${extracts.join('\n\n')}`
+
+  // Phase 1b: outline decomposition — the model splits the topic into the
+  // items a deep report must cover, each with a focused search query. The
+  // outline is only a plan; every fact still comes from real searches.
+  let items = null;
+  try {
+    const outlinePrompt = `You are a research outline planner. Topic: "${cleanTopic}".
+
+Decompose this topic into the key research items a deep report must cover (entities, products, people, sub-topics, technologies). For each item give a focused, self-contained web search query.
+
+Return ONLY a JSON object with no commentary, in exactly this shape:
+{"items":[{"name":"Item name","query":"focused search query"}]}
+
+Rules:
+- 2 to ${DEEP_RESEARCH_MAX_ITEMS} items, ordered by importance.
+- Each query must be self-contained (carry the topic context), 3 to 12 words, and specific enough to return item-focused results.
+- Prefer items grounded in the search results below; do not invent URLs or facts.
+
+TOPIC-LEVEL SEARCH RESULTS:
+${resultsText}`;
+    const hosted = await generateHostedAIResponse(outlinePrompt, analyzePublicUserIntent(cleanTopic), history, signal);
+    if (hosted) items = extractOutlineItems(hosted);
+  } catch (error) {
+    if (error?.name === 'AbortError') throw error;
+    // Outline planner unavailable: fall through to the honest source report.
+  }
+
+  // Phase 2: one dedicated search per item, run in parallel. Items keep
+  // their own source sets; sources are aggregated once, deduplicated, and
+  // numbered globally so every inline citation [n] resolves in the PDF.
+  const itemResults = Array.isArray(items) && items.length > 0
+    ? await (async () => {
+        const settled = await Promise.allSettled(
+          items.map((item) => fetchWebSearch(item.query, signal, { detail: true }))
+        );
+        if (signal?.aborted) {
+          const abort = new Error('Aborted');
+          abort.name = 'AbortError';
+          throw abort;
+        }
+        return settled.map((outcome) =>
+          outcome.status === 'fulfilled' && Array.isArray(outcome.value?.results)
+            ? outcome.value.results
+            : []
+        );
+      })()
+    : [];
+  const researched = Array.isArray(items) && items.length > 0;
+
+  const globalSources = dedupeSources(
+    researched
+      ? [...results, ...itemResults.flat()]
+      : results
+  );
+  const indexByKey = new Map(globalSources.map((source, index) => [(source.url || source.title), index]));
+
+  function sourceLine(source) {
+    return `${(indexByKey.get((source && source.url) || (source && source.title)) ?? 0) + 1}. ${source.title || 'Source'} — ${source.url || ''}`;
+  }
+
+  function itemBlock(item, index) {
+    const sources = itemResults[index] || [];
+    if (sources.length === 0) {
+      return `### Item: ${item.name}\n(no dedicated results returned for query "${item.query}"; covered by the topic-level sources above)`;
+    }
+    const lines = sources.map((source) => {
+      const extract = typeof source.extract === 'string' && source.extract.trim()
+        ? `\n   FULL EXTRACT: ${source.extract.trim().slice(0, DEEP_RESEARCH_MAX_EXTRACT_CHARS)}`
+        : '';
+      return `${sourceLine(source)}\n   ${source.snippet || ''}${extract}`;
+    });
+    return `### Item: ${item.name} (query: "${item.query}")\n${lines.join('\n')}`;
+  }
+
+  const outlineSection = researched
+    ? `\n\nRESEARCH ITEMS (deep-researched individually):\n${items.map((item, index) => `${index + 1}. ${item.name} — ${item.query}`).join('\n')}\n\nITEM SOURCES:\n${items.map((item, index) => itemBlock(item, index)).join('\n\n')}`
     : '';
 
-  // Draft pass: research-question scoping, detailed multi-section report
-  // grounded in snippets AND full article extracts.
+  const globalSourcesText = globalSources.map((source, index) => `${index + 1}. ${source.title} — ${source.url}\n   ${source.snippet || ''} (source: ${source.source})`).join('\n');
+
+  // Phase 3a: deep synthesis — a single comprehensive report with a table of
+  // contents and a dedicated section per researched item.
   let reportBody = '';
   try {
-    const researchPrompt = `Write a detailed, comprehensive research report on: "${cleanTopic}"
+    const researchPrompt = `Write a detailed, comprehensive deep research report on: "${cleanTopic}"
 
 RESEARCH METHOD:
 - First, frame the precise research question this report answers and its scope.
-- Use ONLY the web search results and full article extracts below as factual grounding.
-- Cite every claim inline as [1], [2], etc. Where a claim is not supported by the sources, say so explicitly instead of guessing. Never invent facts, URLs, or sources.
+- Use ONLY the sources below as factual grounding. Citations [n] refer to the globally numbered source list.
+- Cite every claim inline as [n]. Where a claim is not supported by the sources, say so explicitly instead of guessing. Never invent facts, URLs, or sources.
 - Synthesize across sources: where sources disagree or cover different aspects, say so explicitly and resolve the contradiction when the evidence allows.
+${researched ? `- Cover EVERY researched item in its own section, drawing on its dedicated sources (and full extracts) for depth.` : ''}
 
 REPORT STRUCTURE (produce ALL sections):
-1. Research Question & Scope — the precise question this report answers and what it deliberately does not cover.
-2. Overview — a concise orientation for a general reader.
-3. Key Findings — the most important, evidence-backed conclusions, each cited.
-4. Detailed Analysis — the core of the report: examine each notable subject in its own subsection with multiple paragraphs, drawing on the full article extracts for depth (background, context, specifics, examples).
-5. Contradictions & Unresolved Questions — where the sources disagree, what remains unknown, and where evidence is thin.
-6. Conclusion — synthesise the findings and answer the research question directly.
+## Table of Contents
+1. ${researched ? items.map((item) => item.name).join('\n2. ') : 'Overview'}
+(plus any cross-cutting sections you add)
 
-Aim for a thorough, in-depth report (roughly 800+ words), not a summary. Write clear, well-structured prose.
+## Research Question & Scope
+The precise question this report answers and what it deliberately does not cover.
 
-SEARCH RESULTS:
-${resultsText}
-${extractsText}`;
+## Overview
+A concise orientation for a general reader.
+
+## Key Findings
+The most important, evidence-backed conclusions, each cited.
+${researched ? `\n${items.map((item) => `## Item: ${item.name}\nDedicated analysis of this item with multiple paragraphs, drawing on its full article extracts for depth (background, context, specifics, examples).`).join('\n\n')}` : '\n## Detailed Analysis\nThe core of the report: examine each notable subject in its own subsection with multiple paragraphs, drawing on the full article extracts for depth.'}
+
+## Cross-Cutting Synthesis
+How the items relate, compare, and combine into the full picture of "${cleanTopic}".
+
+## Contradictions & Unresolved Questions
+Where the sources disagree, what remains unknown, and where evidence is thin.
+
+## Conclusion
+Synthesise the findings and answer the research question directly.
+
+Aim for a thorough, in-depth report (roughly 1200+ words), not a summary. Write clear, well-structured prose.
+
+SOURCES:
+${globalSourcesText}
+${outlineSection}`;
     const hosted = await generateHostedAIResponse(researchPrompt, analyzePublicUserIntent(cleanTopic), history, signal);
     if (hosted) reportBody = hosted;
   } catch (error) {
@@ -2669,22 +2806,22 @@ ${extractsText}`;
     // Hosted AI unavailable: build the report from the real sources directly.
   }
 
-  // Editorial verification pass: every claim must be traceable to a source;
-  // unsupported claims and contradictions are corrected in the final text.
-  // Best effort — a failing review keeps the draft.
+  // Phase 3b: editorial verification pass — every claim must be traceable to
+  // a source; unsupported claims and contradictions are corrected in the
+  // final text. Best effort — a failing review keeps the draft.
   if (reportBody) {
     try {
-      const reviewPrompt = `You are an editorial reviewer for a research report. Critically review the draft against the source list:
+      const reviewPrompt = `You are an editorial reviewer for a deep research report. Critically review the draft against the source list:
 - Every claim must be traceable to a source: flag and correct any claim that is not supported.
 - Fix contradictions, overreach, and missing evidence in the final text.
-- Keep the structure and all accurate, well-supported content; do not add facts that are not in the sources.
+- Keep the structure (table of contents, per-item sections) and all accurate, well-supported content; do not add facts that are not in the sources.
 Then output THE FINAL REVISED REPORT ONLY (no review commentary, no preamble).
 
 SOURCES:
-${resultsText}
+${globalSourcesText}
 
 DRAFT:
-${reportBody.slice(0, 24000)}`;
+${reportBody.slice(0, DEEP_RESEARCH_MAX_DRAFT_CHARS)}`;
       const revised = await generateHostedAIResponse(reviewPrompt, analyzePublicUserIntent(cleanTopic), history, signal);
       if (revised) reportBody = revised;
     } catch (error) {
@@ -2692,33 +2829,41 @@ ${reportBody.slice(0, 24000)}`;
     }
   }
 
+  // Honest fallback: the hosted model was unavailable, so the real sources
+  // are presented directly, structured per researched item when available.
   if (!reportBody) {
-    reportBody = `# Research Report: ${cleanTopic}
+    const fallbackSections = researched
+      ? items.map((item, index) => {
+          const sources = itemResults[index] || [];
+          if (sources.length === 0) return `## Item: ${item.name}\n\nNo dedicated results returned for this item during the run.`;
+          return `## Item: ${item.name}\n\n${sources
+            .map((r) => `- ${r.title}: ${(r.extract || r.snippet || 'See source for details.').slice(0, 600)} — ${r.url}`)
+            .join('\n')}`;
+        }).join('\n\n')
+      : `## Detailed Analysis\n\n${results
+          .map((r, i) => `${i + 1}. ${r.title} — ${r.url}\n   ${(r.extract || r.snippet || 'See source for details.').slice(0, 600)}`)
+          .join('\n\n')}`;
+    reportBody = `# Deep Research Report: ${cleanTopic}
 
 ## Research Question & Scope
 
 This report answers: what does the available evidence say about "${cleanTopic}"? It is grounded strictly in the live web search results listed below.
 
+## Table of Contents
+${researched ? items.map((item, index) => `${index + 1}. ${item.name}`).join('\n') : '1. Overview\n2. Sources'}
+
 ## Key Findings
 
-${results
+${(researched ? itemResults.flat() : results)
   .slice(0, 6)
   .map((r) => `- ${r.title}: ${r.snippet || 'See source for details.'}`)
   .join('\n')}
 
-## Detailed Analysis
-
-${results
-  .map((r, i) => `${i + 1}. ${r.title} — ${r.url}\n   ${(r.extract || r.snippet || 'See source for details.').slice(0, 600)}`)
-  .join('\n\n')}
+${fallbackSections}
 
 ## Contradictions & Unresolved Questions
 
 The hosted model was unavailable during this run, so the excerpts above are presented directly from the sources without cross-source synthesis.
-
-## Sources
-
-${results.map((r, i) => `${i + 1}. ${r.title} — ${r.url}`).join('\n')}
 
 _Generated by CoreZ from live web search results._`;
   }
@@ -2726,9 +2871,12 @@ _Generated by CoreZ from live web search results._`;
   // Strip markdown fences so the content renders cleanly in the PDF editor.
   const plainBody = reportBody.replace(/```/g, '').trim();
   const title = `${cleanTopic.slice(0, 60)} — Research Report`;
-  const pdf = synthesizePdfDocumentHtml({ title, body: plainBody, sources: results });
+  const pdf = synthesizePdfDocumentHtml({ title, body: plainBody, sources: globalSources });
 
-  return `Here is your research report on **${cleanTopic}**, grounded in live web search results. Open it in the preview canvas and click **"Download .pdf"** to save it as a PDF, or **"Print / Save as PDF"** to print it.\n\n\`\`\`html\n${pdf.html}\n\`\`\``;
+  const depthNote = researched
+    ? ` — **${items.length} items** deep-researched across ${globalSources.length} sources`
+    : '';
+  return `Here is your deep research report on **${cleanTopic}**${depthNote}, grounded in live web search results. Open it in the preview canvas and click **"Download .pdf"** to save it as a PDF, or **"Print / Save as PDF"** to print it.\n\n\`\`\`html\n${pdf.html}\n\`\`\``;
 }
 
 // Build the "why" for the honest fallback: name the transport error when the

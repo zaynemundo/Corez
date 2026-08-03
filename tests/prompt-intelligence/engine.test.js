@@ -524,6 +524,30 @@ describe('Prompt Architect', () => {
     expect(result).not.toMatch(/include.*testimonials/);
   });
 
+  it('outputs multi-page by default for website creation', () => {
+    const result = architectPrompt({
+      intent: defaultIntent,
+      requirements: defaultReqs,
+      context: defaultContext,
+      rawPrompt: 'make me a website for office chairs',
+    });
+    expect(result).toContain('MULTI-PAGE BY DEFAULT');
+    expect(result).toContain('<!-- PAGE: index.html -->');
+    expect(result).not.toContain('ONE-SHOT MODE');
+  });
+
+  it('outputs a single page only when the user asks for oneshot', () => {
+    const result = architectPrompt({
+      intent: defaultIntent,
+      requirements: defaultReqs,
+      context: defaultContext,
+      rawPrompt: 'make me a oneshot website for office chairs',
+    });
+    expect(result).toContain('ONE-SHOT MODE');
+    expect(result).not.toContain('MULTI-PAGE BY DEFAULT');
+    expect(result).not.toContain('<!-- PAGE:');
+  });
+
   it('references existing framework and styling', () => {
     const result = architectPrompt({
       intent: defaultIntent,

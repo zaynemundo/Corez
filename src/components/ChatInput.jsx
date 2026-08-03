@@ -20,7 +20,7 @@ const SLASH_COMMANDS = [
   {
     command: 'research',
     label: '/research',
-    description: 'Full research with web search + PDF report',
+    description: 'Deep research: multi-item web search + PDF report',
     icon: Search
   }
 ];

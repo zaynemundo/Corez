@@ -2,9 +2,55 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   generateAIResponse,
   parseSlashCommand,
-  isSlashCommand
+  isSlashCommand,
+  extractOutlineItems,
+  dedupeSources
 } from '../src/services/aiService.js';
 import { synthesizePdfDocumentHtml } from '../src/services/pdfGenerator.js';
+
+describe('deep research outline parsing', () => {
+  it('parses a clean JSON outline answer', () => {
+    const items = extractOutlineItems('{"items":[{"name":"Alpha","query":"alpha framework 2026"},{"name":"Beta","query":"beta library comparison"}]}');
+    expect(items).toEqual([
+      { name: 'Alpha', query: 'alpha framework 2026' },
+      { name: 'Beta', query: 'beta library comparison' }
+    ]);
+  });
+
+  it('extracts JSON wrapped in prose and markdown fences', () => {
+    const items = extractOutlineItems('Here is the plan:\n```json\n{"items":[{"name":"Gamma","query":"gamma engine features"}]}\n```\nHope this helps.');
+    expect(items).toEqual([{ name: 'Gamma', query: 'gamma engine features' }]);
+  });
+
+  it('caps the item count at the deep research limit', () => {
+    const items = extractOutlineItems(JSON.stringify({
+      items: Array.from({ length: 9 }, (_, i) => ({ name: `Item ${i}`, query: `query ${i}` }))
+    }));
+    expect(items.length).toBe(5);
+  });
+
+  it('returns null for unusable answers and empty item lists', () => {
+    expect(extractOutlineItems('no json here')).toBeNull();
+    expect(extractOutlineItems('{"items":[]}')).toBeNull();
+    expect(extractOutlineItems('{"items":[{"name":"","query":""}]}')).toBeNull();
+    expect(extractOutlineItems(null)).toBeNull();
+  });
+});
+
+describe('deep research source aggregation', () => {
+  it('deduplicates sources by URL preserving first occurrence', () => {
+    const sources = dedupeSources([
+      { title: 'A', url: 'https://a.example' },
+      { title: 'A dupe', url: 'https://a.example' },
+      { title: 'B', url: 'https://b.example' },
+      { title: '', url: '' }
+    ]);
+    expect(sources).toEqual([
+      { title: 'A', url: 'https://a.example' },
+      { title: 'B', url: 'https://b.example' }
+    ]);
+  });
+});
 
 describe('parseSlashCommand', () => {
   it('parses known commands and strips the token', () => {
@@ -86,29 +132,55 @@ describe('/website and /game routing', () => {
 });
 
 describe('/research command', () => {
-  it('produces a grounded research report with a downloadable PDF', async () => {
+  it('runs the deep research pipeline: outline, per-item search, synthesis and review', async () => {
     const fetchMock = vi.fn(async (url, init) => {
       if (url === '/api/search') {
         const body = JSON.parse(init.body);
         expect(body.detail).toBe(true); // deep research requests full extracts
-        return Response.json({
-          kind: 'search',
-          query: 'quantum computing',
-          results: [
-            { title: 'Quantum Computing Basics', url: 'https://en.wikipedia.org/wiki/Quantum_computing', snippet: 'Quantum computing uses qubits.', source: 'Wikipedia', extract: 'Quantum computing is the use of quantum mechanics for computation.' },
-            { title: 'Qubits Explained', url: 'https://example.com/qubits', snippet: 'Qubits can be 0, 1, or both.', source: 'DuckDuckGo' }
-          ],
-          meta: { source: 'Wikipedia', extracted: true }
-        });
+        if (body.query === 'quantum computing') {
+          return Response.json({
+            kind: 'search',
+            query: body.query,
+            results: [
+              { title: 'Quantum Computing Basics', url: 'https://en.wikipedia.org/wiki/Quantum_computing', snippet: 'Quantum computing uses qubits.', source: 'Wikipedia', extract: 'Quantum computing is the use of quantum mechanics for computation.' },
+              { title: 'Qubits Explained', url: 'https://example.com/qubits', snippet: 'Qubits can be 0, 1, or both.', source: 'DuckDuckGo' }
+            ],
+            meta: { source: 'Wikipedia', extracted: true }
+          });
+        }
+        if (body.query.includes('superposition')) {
+          return Response.json({
+            kind: 'search',
+            query: body.query,
+            results: [
+              { title: 'Superposition in Quantum Computing', url: 'https://example.com/superposition', snippet: 'Superposition allows multiple states at once.', source: 'Wikipedia', extract: 'A qubit in superposition is a combination of 0 and 1.' }
+            ],
+            meta: { source: 'Wikipedia', extracted: true }
+          });
+        }
+        if (body.query.includes('entanglement')) {
+          return Response.json({
+            kind: 'search',
+            query: body.query,
+            results: [
+              { title: 'Entanglement Explained', url: 'https://example.com/entanglement', snippet: 'Entangled qubits share state.', source: 'DuckDuckGo' }
+            ],
+            meta: { source: 'DuckDuckGo' }
+          });
+        }
+        return Response.json({ kind: 'search', results: [] });
       }
       if (url === '/api/ai') {
         const payload = JSON.parse(init.body);
-        // Draft pass asks for the detailed structure; the editorial pass asks
-        // for the final revised report.
-        const isReview = /editorial reviewer/.test(payload.prompt || '');
+        const prompt = payload.prompt || '';
+        if (/research outline planner/.test(prompt)) {
+          // Outline pass returns the item decomposition as strict JSON.
+          return Response.json({ content: '{"items":[{"name":"Superposition","query":"superposition in quantum computing"},{"name":"Entanglement","query":"quantum entanglement explained"}]}' });
+        }
+        const isReview = /editorial reviewer/.test(prompt);
         return Response.json({ content: isReview
-          ? 'Overview\n\nQuantum computing is a field, revised and verified.\n\nKey Findings\n\n- Qubits.' 
-          : 'Overview\n\nQuantum computing is a field.\n\nKey Findings\n\n- Qubits.\n\nSources\n\n1. Quantum Computing Basics — https://en.wikipedia.org/wiki/Quantum_computing' });
+          ? 'Overview\n\nQuantum computing is a field, revised and verified.\n\nKey Findings\n\n- Qubits.'
+          : '## Table of Contents\n\n1. Superposition\n2. Entanglement\n\n## Item: Superposition\n\nSuperposition is a quantum property [3].\n\n## Item: Entanglement\n\nEntangled qubits share state [4].\n\n## Conclusion\n\nDone.' });
       }
       throw new Error(`Unexpected fetch: ${url}`);
     });
@@ -117,8 +189,35 @@ describe('/research command', () => {
     const response = await generateAIResponse('/research quantum computing', []);
     expect(response).toContain('Download .pdf');
     expect(response).toContain('```html');
-    expect(response).toContain('Quantum computing is a field');
-    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/ai').length).toBe(2);
+    expect(response).toContain('deep-researched across');
+    // Outline pass + draft pass + editorial review pass.
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/ai').length).toBe(3);
+    // Topic-level search + one dedicated search per researched item.
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/search').length).toBe(3);
+    vi.unstubAllGlobals();
+  });
+
+  it('falls back to an honest source report when the hosted AI is unavailable', async () => {
+    vi.stubGlobal('fetch', async (url) => {
+      if (url === '/api/search') {
+        return Response.json({
+          kind: 'search',
+          results: [
+            { title: 'Quantum Computing Basics', url: 'https://en.wikipedia.org/wiki/Quantum_computing', snippet: 'Quantum computing uses qubits.', source: 'Wikipedia', extract: 'Quantum computing uses quantum mechanics.' }
+          ],
+          meta: { source: 'Wikipedia', extracted: true }
+        });
+      }
+      if (url === '/api/ai') {
+        return Response.json({ error: 'unavailable' }, { status: 500 });
+      }
+      throw new Error('unexpected');
+    });
+    const response = await generateAIResponse('/research quantum computing', []);
+    expect(response).toContain('Download .pdf');
+    // Real sources are presented directly — nothing is fabricated.
+    expect(response).toContain('presented directly');
+    expect(response).toContain('Quantum Computing Basics');
     vi.unstubAllGlobals();
   });
 

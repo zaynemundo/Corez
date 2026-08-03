@@ -29,6 +29,25 @@ describe('Coding Prompt Enhancer', () => {
     expect(enhanced.toLowerCase()).toMatch(/html|css|javascript|visual|output/i);
   });
 
+  it('defaults app builds to multi-page output', async () => {
+    const enhanced = await improveCodingPrompt('Build me a website for a bakery', { type: 'app' });
+    expect(enhanced).toContain('MULTI-PAGE BY DEFAULT');
+    expect(enhanced).toContain('<!-- PAGE: index.html -->');
+    expect(enhanced).not.toContain('ONE-SHOT MODE');
+  });
+
+  it('produces a single page only when the user asks for oneshot', async () => {
+    const enhanced = await improveCodingPrompt('Build me a oneshot website for a bakery', { type: 'app' });
+    expect(enhanced).toContain('ONE-SHOT MODE');
+    expect(enhanced).not.toContain('MULTI-PAGE BY DEFAULT');
+  });
+
+  it('produces a single HTML page when oneshot is combined with plain HTML', async () => {
+    const enhanced = await improveCodingPrompt('Build a one shot landing page in plain HTML and CSS', { type: 'app' });
+    expect(enhanced).toContain('ONE-SHOT MODE');
+    expect(enhanced).not.toContain('MULTI-PAGE BY DEFAULT');
+  });
+
   it('leaves non-coding prompts (writing/explanation/general) intact', async () => {
     const raw = 'Explain edge computing in simple words';
     const enhanced = await improveCodingPrompt(raw, { type: 'explanation' });
