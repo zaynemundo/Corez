@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { generateAIResponse, generateLocalAIResponse, isRevisionContextPrompt, compactConversationForRequest, extractCodeFromMessage, describeHostedUnavailable } from '../src/services/aiService.js';
+import { generateAIResponse, generateLocalAIResponse, generateHostedAIResponse, isRevisionContextPrompt, compactConversationForRequest, extractCodeFromMessage, describeHostedUnavailable } from '../src/services/aiService.js';
 
 const GAME_HTML = `<!DOCTYPE html><html><body><canvas id="game"></canvas><script>function gameLoop(){requestAnimationFrame(gameLoop);}requestAnimationFrame(gameLoop);</script></body></html>`;
 
@@ -103,6 +103,45 @@ describe('Hosted AI fallback behavior', () => {
     expect(response).toContain('I can see the code you want to revise');
     expect(response).toContain('unavailable');
   });
+
+  it('resumes a retry-scheduled generation after the provider recovery window', async () => {
+    // The worker persists a retry schedule and answers HTTP 200 with
+    // { status: 'retry-scheduled', taskId, retryAfterSeconds } when the
+    // provider cannot recover in time. The client must wait out the window
+    // and re-issue the same request so the schedule resumes — it is NOT a
+    // "reasoning only" failure.
+    const fetchMock = vi.fn(async (url, init) => {
+      if (url !== '/api/ai') throw new Error(`Unexpected request: ${url}`);
+      const calls = fetchMock.mock.calls.length;
+      if (calls === 1) {
+        return Response.json({ taskId: 'rt-deadbeef', status: 'retry-scheduled', retryAfterSeconds: 1 });
+      }
+      expect(JSON.parse(init.body).prompt).toBe('Tell me about black roses');
+      return Response.json({ content: 'Recovered answer after the retry window.' });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await generateHostedAIResponse('Tell me about black roses');
+    expect(response).toBe('Recovered answer after the retry window.');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    vi.unstubAllGlobals();
+  }, 15000);
+
+  it('reports an honest busy error when the provider is still recovering after retries', async () => {
+    const fetchMock = vi.fn(async () => Response.json({
+      taskId: 'rt-deadbeef',
+      status: 'retry-scheduled',
+      retryAfterSeconds: 1
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(generateHostedAIResponse('Tell me about black roses'))
+      .rejects.toThrow(/temporarily busy/);
+    // Initial attempt + three bounded waits; the request is never misread as
+    // "reasoning only" and never fabricates a reply.
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    vi.unstubAllGlobals();
+  }, 15000);
 
   it('propagates an abort while the response body is downloading instead of fabricating a fallback reply', async () => {
     const abortController = new AbortController();

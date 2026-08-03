@@ -877,7 +877,7 @@ export async function generateHostedAIResponse(
   };
   if (signal) fetchOptions.signal = signal;
 
-  const response = await fetch(AI_PROXY_ENDPOINT, fetchOptions);
+  let response = await fetch(AI_PROXY_ENDPOINT, fetchOptions);
 
   let data;
   try {
@@ -887,6 +887,37 @@ export async function generateHostedAIResponse(
     // instead of fabricating a fallback reply after Stop was pressed.
     if (err?.name === 'AbortError' || signal?.aborted) throw err;
     data = {};
+  }
+
+  // Provider recovery window: when the provider chain cannot recover within
+  // the request's practical window, the worker persists a retry schedule and
+  // answers HTTP 200 with { status: 'retry-scheduled', taskId,
+  // retryAfterSeconds } — no content. The same request (same messages) hashes
+  // to the same task, so re-issuing it after the window resumes the persisted
+  // schedule and completes the original generation. Without this handling the
+  // contentless 200 was misread as "reasoning only", failing app builds with
+  // a misleading error.
+  const RETRY_SCHEDULED_MAX_ATTEMPTS = 3;
+  const RETRY_SCHEDULED_MIN_WAIT_MS = 500;
+  const RETRY_SCHEDULED_MAX_WAIT_MS = 120000;
+  for (
+    let attempt = 0;
+    attempt < RETRY_SCHEDULED_MAX_ATTEMPTS && data?.status === 'retry-scheduled';
+    attempt += 1
+  ) {
+    const waitSeconds = Math.max(1, Math.min(Number(data?.retryAfterSeconds) || 10, RETRY_SCHEDULED_MAX_WAIT_MS / 1000));
+    await sleepResumable(Math.max(RETRY_SCHEDULED_MIN_WAIT_MS, waitSeconds * 1000), signal);
+    response = await fetch(AI_PROXY_ENDPOINT, fetchOptions);
+    try {
+      data = await response.json();
+    } catch (err) {
+      // A user-initiated abort must propagate so callers can stop cleanly.
+      if (err?.name === 'AbortError' || signal?.aborted) throw err;
+      data = {};
+    }
+  }
+  if (data?.status === 'retry-scheduled') {
+    throw new Error('The hosted AI service is temporarily busy and its recovery is still scheduled. Please try again shortly.');
   }
 
   // Multi-wave swarm task: the worker returned 202 with a taskId and more
