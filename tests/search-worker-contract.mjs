@@ -49,28 +49,43 @@ async function run() {
   assert.ok(typeof freeData.results[0].title === 'string' && freeData.results[0].title.length > 0);
   assert.ok(typeof freeData.meta.servedAt === 'string');
 
-  // DuckDuckGo is tried first: its instant-answer results win over Wikipedia.
-  const ddgResponse = await post(
-    { query: 'what is a black rose' },
+  // Both providers run and merge: Wikipedia results plus DuckDuckGo Lite
+  // results, deduped by URL.
+  const mergedResponse = await post(
+    { query: 'red turtles' },
     {
       __SEARCH_FETCH: async (url) => {
         const u = new URL(url);
-        if (u.hostname === 'api.duckduckgo.com') {
-          return Response.json({
-            AbstractText: 'A black rose is a rose with dark petals.',
-            AbstractURL: 'https://duckduckgo.com/?q=black+rose',
-            Heading: 'Black Rose',
-            RelatedTopics: []
-          });
+        if (u.hostname === 'lite.duckduckgo.com') {
+          return new Response(
+            `<html><body>
+              <a rel="nofollow" href="//duckduckgo.com/l/?uddg=${encodeURIComponent('https://www.thesprucepets.com/red-eared-sliders')}&amp;rut=abc" class='result-link'>Red-Eared Slider Care</a>
+              <td class='result-snippet'>They are popular pets.</td>
+              <a rel="nofollow" href="//duckduckgo.com/l/?uddg=${encodeURIComponent('https://en.wikipedia.org/wiki/Red-eared_slider')}&amp;rut=def" class='result-link'>Red-eared slider - Wikipedia</a>
+              <td class='result-snippet'>A subspecies of the pond slider.</td>
+            </body></html>`,
+            { status: 200, headers: { 'Content-Type': 'text/html' } }
+          );
         }
-        return Response.json({ query: { search: [] } });
+        return Response.json({
+          query: { search: [{ title: 'Red-eared slider', snippet: 'A terrapin.', wordcount: 5 }] }
+        });
       }
     }
   );
-  assert.equal(ddgResponse.status, 200);
-  const ddgData = await ddgResponse.json();
-  assert.equal(ddgData.results[0].source, 'DuckDuckGo');
-  assert.equal(ddgData.results[0].url, 'https://duckduckgo.com/?q=black+rose');
+  assert.equal(mergedResponse.status, 200);
+  const mergedData = await mergedResponse.json();
+  assert.ok(Array.isArray(mergedData.results));
+  // DuckDuckGo result is present with its real (decoded) URL.
+  const ddgResult = mergedData.results.find((r) => r.source === 'DuckDuckGo');
+  assert.ok(ddgResult, 'DuckDuckGo results must be merged in');
+  assert.equal(ddgResult.url, 'https://www.thesprucepets.com/red-eared-sliders');
+  assert.equal(ddgResult.title, 'Red-Eared Slider Care');
+  // The Wikipedia page appears in both providers but is deduped by URL.
+  const wikiResults = mergedData.results.filter((r) => r.url === 'https://en.wikipedia.org/wiki/Red-eared_slider');
+  assert.equal(wikiResults.length, 1);
+  assert.ok(mergedData.meta.sources.includes('Wikipedia') && mergedData.meta.sources.includes('DuckDuckGo'));
+  assert.ok(mergedData.results.length <= 8);
 
   // Results are bounded (max 8).
   const manyResponse = await post(

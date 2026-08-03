@@ -112,16 +112,15 @@ describe('Worker /api/search endpoint', () => {
     expect(data.results[0].source).toBe('Wikipedia');
   });
 
-  it('prefers DuckDuckGo instant answers over Wikipedia when both respond', async () => {
+  it('merges DuckDuckGo and Wikipedia results, deduped by URL', async () => {
     const fetchImpl = async (url) => {
       const u = new URL(url);
-      if (u.hostname === 'api.duckduckgo.com') {
-        return Response.json({
-          AbstractText: 'An instant answer about the query.',
-          AbstractURL: 'https://duckduckgo.com/?q=query',
-          Heading: 'Query',
-          RelatedTopics: []
-        });
+      if (u.hostname === 'lite.duckduckgo.com') {
+        return new Response(
+          `<a rel="nofollow" href="//duckduckgo.com/l/?uddg=${encodeURIComponent('https://example.com/result')}&amp;rut=x" class='result-link'>A DDG result</a>
+           <td class='result-snippet'>From DuckDuckGo.</td>`,
+          { status: 200, headers: { 'Content-Type': 'text/html' } }
+        );
       }
       return Response.json({ query: { search: [] } });
     };
@@ -135,7 +134,10 @@ describe('Worker /api/search endpoint', () => {
     );
     expect(response.status).toBe(200);
     const data = await response.json();
-    expect(data.results[0].source).toBe('DuckDuckGo');
+    // DuckDuckGo results are merged in alongside Wikipedia results.
+    expect(data.results.some((r) => r.source === 'DuckDuckGo')).toBe(true);
+    expect(data.results[0].url).toBe('https://example.com/result');
+    expect(data.meta.sources).toContain('DuckDuckGo');
   });
 
   it('rejects invalid queries with 400', async () => {

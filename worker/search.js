@@ -20,7 +20,7 @@ const MAX_QUERY_CHARS = 200;
 const MAX_RESULTS = 8;
 const PROVIDER_TIMEOUT_MS = 8_000;
 const MAX_SEARCH_BODY_BYTES = 64 * 1024;
-const DDG_ENDPOINT = 'https://api.duckduckgo.com/';
+const DDG_LITE_ENDPOINT = 'https://lite.duckduckgo.com/lite/';
 const WIKIPEDIA_ENDPOINT = 'https://en.wikipedia.org/w/api.php';
 
 function isObject(value) {
@@ -69,54 +69,68 @@ function providerFetchOptions() {
   };
 }
 
-/** DuckDuckGo Instant Answer: no key required. */
+/**
+ * DuckDuckGo Lite: real web results (not the zero-click instant-answer API,
+ * which returns nothing for most queries). The Lite HTML page lists results
+ * as redirect links (`uddg=` carries the real URL) with snippets. No key.
+ */
 async function searchDuckDuckGo(query, fetchImpl) {
-  const url = new URL(DDG_ENDPOINT);
+  const url = new URL(DDG_LITE_ENDPOINT);
   url.searchParams.set('q', query);
-  url.searchParams.set('format', 'json');
-  url.searchParams.set('no_html', '1');
-  url.searchParams.set('skip_disambig', '1');
   const response = await fetchImpl(url, providerFetchOptions());
   if (!response.ok) {
     throw new Error(`DuckDuckGo HTTP ${response.status}`);
   }
-  const data = await response.json();
+  const html = await response.text();
   const results = [];
-
-  if (typeof data.AbstractText === 'string' && data.AbstractText.trim()
-    && validHttpUrl(data.AbstractURL)) {
-    const abstract = normalizeResult(
-      data.Heading || 'DuckDuckGo result',
-      data.AbstractURL,
-      data.AbstractText,
+  const links = [];
+  const linkPattern = /<a[^>]*href="([^"]*uddg=[^"]*)"[^>]*class=['"]result-link['"]>([\s\S]*?)<\/a>/gi;
+  let match;
+  while ((match = linkPattern.exec(html)) !== null) {
+    links.push({ href: match[1], title: decodeHtmlText(stripHtmlTags(match[2])).trim() });
+    if (links.length >= MAX_RESULTS) break;
+  }
+  const snippets = [];
+  const snippetPattern = /class=['"]result-snippet['"]>([\s\S]*?)<\/td>/gi;
+  while ((match = snippetPattern.exec(html)) !== null) {
+    snippets.push(decodeHtmlText(stripHtmlTags(match[1])).trim());
+  }
+  links.forEach((link, index) => {
+    const realUrl = extractUddgUrl(link.href);
+    if (!realUrl || !validHttpUrl(realUrl)) return;
+    const result = normalizeResult(
+      link.title || 'DuckDuckGo result',
+      realUrl,
+      snippets[index] || '',
       'DuckDuckGo'
     );
-    if (abstract) results.push(abstract);
-  }
-  if (Array.isArray(data.RelatedTopics)) {
-    const collect = (topics) => {
-      for (const topic of topics) {
-        if (!isObject(topic)) continue;
-        if (Array.isArray(topic.Topics)) {
-          collect(topic.Topics);
-          continue;
-        }
-        if (typeof topic.Text === 'string' && topic.Text.trim()
-          && validHttpUrl(topic.FirstURL)) {
-          const result = normalizeResult(
-            topic.Text.split(' - ')[0] || 'Result',
-            topic.FirstURL,
-            topic.Text,
-            'DuckDuckGo'
-          );
-          if (result) results.push(result);
-        }
-        if (results.length >= MAX_RESULTS) break;
-      }
-    };
-    collect(data.RelatedTopics);
-  }
+    if (result) results.push(result);
+  });
   return results.slice(0, MAX_RESULTS);
+}
+
+function extractUddgUrl(href) {
+  const match = String(href).match(/[?&]uddg=([^&]+)/);
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return null;
+  }
+}
+
+function stripHtmlTags(value) {
+  return String(value).replace(/<[^>]*>/g, '');
+}
+
+function decodeHtmlText(value) {
+  return String(value)
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ');
 }
 
 /** Wikipedia search: free, no key required. */
@@ -169,28 +183,54 @@ export async function handleSearch(request, env) {
   }
 
   const fetchImpl = env?.__SEARCH_FETCH || fetch;
-  // Free, keyless providers: Wikipedia first (reliable from Worker egress),
-  // DuckDuckGo second (zero-click API is often empty or blocked).
+  // Free, keyless providers, run together and merged (deduped by URL):
+  // Wikipedia (reliable from Worker egress) and DuckDuckGo Lite (real web
+  // results, no key). One provider answering no longer hides the other.
   const providers = [
     async () => searchWikipedia(query, fetchImpl),
     async () => searchDuckDuckGo(query, fetchImpl)
   ];
 
   const failures = [];
+  const providerResults = [];
   for (const provider of providers) {
     try {
-      const results = await provider();
-      if (Array.isArray(results) && results.length > 0) {
-        return jsonResponse(200, {
-          kind: 'search',
-          query,
-          results,
-          meta: { source: results[0]?.source || 'search', servedAt: new Date().toISOString() }
-        });
-      }
+      providerResults.push(await provider());
     } catch (error) {
+      providerResults.push([]);
       failures.push(String(error?.message || error).slice(0, 200));
     }
+  }
+
+  // Round-robin merge (Wikipedia, DuckDuckGo, Wikipedia, ...) so one provider
+  // never hides the other, deduped by URL.
+  const merged = [];
+  const seen = new Set();
+  const maxLen = Math.max(0, ...providerResults.map((list) => list.length));
+  for (let index = 0; index < maxLen && merged.length < MAX_RESULTS; index += 1) {
+    for (const list of providerResults) {
+      const result = list[index];
+      if (!result) continue;
+      const key = String(result.url || result.title).replace(/\/+$/, '').toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      merged.push(result);
+      if (merged.length >= MAX_RESULTS) break;
+    }
+  }
+
+  if (merged.length > 0) {
+    const sources = Array.from(new Set(merged.map((r) => r.source)));
+    return jsonResponse(200, {
+      kind: 'search',
+      query,
+      results: merged.slice(0, MAX_RESULTS),
+      meta: {
+        source: merged[0]?.source || 'search',
+        sources,
+        servedAt: new Date().toISOString()
+      }
+    });
   }
 
   // No provider yielded usable results: report honestly, never fabricate.

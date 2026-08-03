@@ -7,11 +7,22 @@
  * API keys; nothing is ever fabricated.
  */
 
+// Map common Unicode punctuation to WinAnsi equivalents so PDF standard
+// fonts can encode it; the rest is dropped by escapePdfText.
+function toLatin1(text) {
+  return String(text)
+    .replace(/[—–]/g, '-')
+    .replace(/[•]/g, '·')
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/…/g, '...');
+}
+
 // Escape text for a PDF content stream and drop characters outside the
 // WinAnsi range (PDF standard fonts cannot encode them).
 function escapePdfText(text) {
   let out = '';
-  const input = String(text);
+  const input = toLatin1(text);
   for (let i = 0; i < input.length; i += 1) {
     const code = input.charCodeAt(i);
     if (code < 32 || code > 255) continue; // control + non-Latin-1 dropped
@@ -147,10 +158,15 @@ function inlineReportText(text) {
     .replace(/(\[\d+\](?:\[\d+\])*)/g, '<span class="ref">$1</span>');
 }
 
-// Render the report body as structured HTML: the leading "# Title" line is
-// dropped (the report title is redundant), "## Section" becomes a section
-// heading, "- item" bullets are grouped, everything else is a paragraph.
-function renderReportHtml(body) {
+// Strip bold/italic markers for plain-text output (PDF).
+function stripInlineMarkdown(text) {
+  return String(text).replace(/\*\*/g, '').replace(/\*/g, '');
+}
+
+// Parse the report body into structured blocks. The leading "# Title" line
+// is dropped (the title is redundant); "## Section" becomes a heading,
+// "- item" lines become bullets, everything else is a paragraph.
+function parseReportBlocks(body) {
   const rawLines = String(body || '').split('\n').map((line) => line.replace(/\r/g, ''));
   let start = 0;
   while (start < rawLines.length && !rawLines[start].trim()) start += 1;
@@ -158,32 +174,44 @@ function renderReportHtml(body) {
   if (lines.length > 0 && /^#\s+\S/.test(lines[0])) lines.shift();
 
   const blocks = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (/^#{2,}\s+/.test(trimmed)) {
+      blocks.push({ kind: 'heading', text: trimmed.replace(/^#{2,}\s+/, '') });
+    } else if (/^[-*]\s+/.test(trimmed)) {
+      blocks.push({ kind: 'bullet', text: trimmed.replace(/^[-*]\s+/, '') });
+    } else {
+      blocks.push({ kind: 'paragraph', text: trimmed });
+    }
+  }
+  return blocks;
+}
+
+// Render the report body as structured HTML (sections, grouped bullets,
+// paragraphs with inline formatting).
+function renderReportHtml(body) {
+  const html = [];
   let listItems = null;
   const flushList = () => {
     if (listItems !== null) {
-      blocks.push(`<ul>${listItems}</ul>`);
+      html.push(`<ul>${listItems}</ul>`);
       listItems = null;
     }
   };
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) {
+  for (const block of parseReportBlocks(body)) {
+    if (block.kind === 'heading') {
       flushList();
-      continue;
-    }
-    if (/^#{2,}\s+/.test(trimmed)) {
-      flushList();
-      blocks.push(`<h2>${inlineReportText(trimmed.replace(/^#{2,}\s+/, ''))}</h2>`);
-    } else if (/^[-*]\s+/.test(trimmed)) {
-      listItems = (listItems === null ? '' : listItems) + `<li>${inlineReportText(trimmed.replace(/^[-*]\s+/, ''))}</li>`;
+      html.push(`<h2>${inlineReportText(block.text)}</h2>`);
+    } else if (block.kind === 'bullet') {
+      listItems = (listItems === null ? '' : listItems) + `<li>${inlineReportText(block.text)}</li>`;
     } else {
       flushList();
-      blocks.push(`<p>${inlineReportText(trimmed)}</p>`);
+      html.push(`<p>${inlineReportText(block.text)}</p>`);
     }
   }
   flushList();
-  return blocks.join('\n');
+  return html.join('\n');
 }
 
 export function synthesizePdfDocumentHtml({ title = 'CoreZ Research Report', body = '', sources = [] }) {
@@ -199,9 +227,15 @@ export function synthesizePdfDocumentHtml({ title = 'CoreZ Research Report', bod
     ? `<h2>Sources</h2><ol class="sources">${sourceItems}</ol>`
     : '';
   // Title/body are baked into the script for the PDF builder; there is no
-  // editable form anymore.
+  // editable form anymore. PDF paragraphs are structured (headings/bullets)
+  // with markdown markers stripped, so the downloaded PDF reads cleanly.
   const jsTitle = JSON.stringify(safeTitle);
-  const jsBody = JSON.stringify(body || '');
+  const jsParagraphs = JSON.stringify(
+    parseReportBlocks(body).map((block) => ({
+      kind: block.kind,
+      text: stripInlineMarkdown(block.text).replace(/[<>]/g, '')
+    }))
+  );
 
   return {
     title: `COREZ Research Report — ${safeTitle}`,
@@ -278,18 +312,33 @@ export function synthesizePdfDocumentHtml({ title = 'CoreZ Research Report', bod
   </article>
 <script>
   var REPORT_TITLE = ${jsTitle};
-  var REPORT_BODY = ${jsBody};
-  function escapePdfText(t){ return String(t).replace(/\\\\/g,'\\\\\\\\').replace(/\\(/g,'\\\\(').replace(/\\)/g,'\\\\)').replace(/[^\\x00-\\xff]/g,''); }
+  var REPORT_PARAGRAPHS = ${jsParagraphs};
+  function escapePdfText(t){ t=String(t).replace(/[—–]/g,'-').replace(/•/g,'·').replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/…/g,'...');
+    return t.replace(/\\\\/g,'\\\\\\\\').replace(/\\(/g,'\\\\(').replace(/\\)/g,'\\\\)').replace(/[^\\x00-\\xff]/g,''); }
   function wrapPdfText(t, maxChars){ var words = String(t).split(/\\s+/).filter(Boolean), lines = [], cur = '';
     for (var i=0;i<words.length;i++){ var w=words[i]; if ((cur+' '+w).trim().length>maxChars){ if(cur) lines.push(cur); cur=w; } else { cur=(cur+' '+w).trim(); } }
     if (cur) lines.push(cur); return lines; }
-  function buildPdf(title, bodyText){
-    var pageW=595.28, pageH=841.89, margin=56.69, maxChars=88, lineH=16;
-    var items=[]; items.push({t:title||'Untitled',s:18,g:10}); items.push({t:'',s:12,g:4});
-    var paras=String(bodyText).split(/\\n+/).filter(Boolean);
-    for (var p=0;p<paras.length;p++){ var ws=wrapPdfText(paras[p],maxChars); for (var k=0;k<ws.length;k++) items.push({t:ws[k],s:12,g:lineH}); items.push({t:'',s:12,g:6}); }
+  function buildPdf(){
+    var pageW=595.28, pageH=841.89, margin=56.69, lineH=16;
+    var items=[]; items.push({t:REPORT_TITLE||'Untitled',s:18,g:10}); items.push({t:'',s:12,g:4});
+    for (var i=0;i<REPORT_PARAGRAPHS.length;i++){
+      var block = REPORT_PARAGRAPHS[i];
+      if (block.kind === 'heading') {
+        items.push({t:block.text,s:14,g:12});
+        items.push({t:'',s:12,g:6});
+      } else if (block.kind === 'bullet') {
+        var bw = wrapPdfText(block.text, 82);
+        for (var k=0;k<bw.length;k++) items.push({t:(k===0?'\\u00b7 ':'    ')+bw[k], s:12, g:lineH});
+        items.push({t:'',s:12,g:6});
+      } else {
+        var pw = wrapPdfText(block.text, 88);
+        for (var j=0;j<pw.length;j++) items.push({t:pw[j],s:12,g:lineH});
+        items.push({t:'',s:12,g:6});
+      }
+    }
     var pages=[], cur=[], y=pageH-margin;
     for (var n=0;n<items.length;n++){ var it=items[n];
+      if (it.t && it.s>13){ if (y-24<margin){ pages.push(cur); cur=[]; y=pageH-margin; } }
       if (it.t && y-it.s-4<margin){ pages.push(cur); cur=[]; y=pageH-margin; }
       if (it.t){ cur.push('BT /F1 '+it.s+' Tf '+margin+' '+y+' Td ('+escapePdfText(it.t)+') Tj ET'); y-=it.g; } else { y-=it.g; } }
     if (cur.length>0||pages.length===0) pages.push(cur);
@@ -313,7 +362,7 @@ export function synthesizePdfDocumentHtml({ title = 'CoreZ Research Report', bod
     return new Blob([out], { type: 'application/pdf' });
   }
   function downloadPdf(){
-    var blob = buildPdf(REPORT_TITLE, REPORT_BODY);
+    var blob = buildPdf();
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url; a.download = (REPORT_TITLE || 'research-report').replace(/[^A-Za-z0-9 _-]/g,'') + '.pdf';
