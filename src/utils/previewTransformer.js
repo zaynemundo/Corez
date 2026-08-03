@@ -40,8 +40,10 @@ export function formatCodeForPreview(rawCode) {
     window.addEventListener('mousedown', function() { window.focus(); });
     // Navigation guard: form submissions and anchor navigations inside the
     // sandboxed iframe would leave the srcdoc and blank the preview to
-    // white. Same-page hash links, javascript: links, and _blank targets are
-    // safe; everything else stays inside the preview.
+    // Links: same-frame navigation would blank the preview to white, so
+    // external links (http(s), mailto, tel) open in a real new tab instead
+    // of navigating the iframe. Hash and javascript: links keep default
+    // behaviour.
     document.addEventListener('submit', function(e) { e.preventDefault(); }, true);
     document.addEventListener('click', function(e) {
       var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
@@ -49,8 +51,10 @@ export function formatCodeForPreview(rawCode) {
       var href = (a.getAttribute('href') || '').trim();
       if (href === '' || href.charAt(0) === '#') return;
       if (/^javascript:/i.test(href)) return;
-      if (a.target === '_blank') return;
       e.preventDefault();
+      if (/^(https?:|mailto:|tel:)/i.test(href)) {
+        window.open(href, '_blank', 'noopener');
+      }
     }, true);
   </script>
 </head>
@@ -181,8 +185,10 @@ export function formatCodeForPreview(rawCode) {
     window.addEventListener('mousedown', function() { window.focus(); });
     // Navigation guard: form submissions and anchor navigations inside the
     // sandboxed iframe would leave the srcdoc and blank the preview to
-    // white. Same-page hash links, javascript: links, and _blank targets are
-    // safe; everything else stays inside the preview.
+    // Links: same-frame navigation would blank the preview to white, so
+    // external links (http(s), mailto, tel) open in a real new tab instead
+    // of navigating the iframe. Hash and javascript: links keep default
+    // behaviour.
     document.addEventListener('submit', function(e) { e.preventDefault(); }, true);
     document.addEventListener('click', function(e) {
       var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
@@ -190,8 +196,10 @@ export function formatCodeForPreview(rawCode) {
       var href = (a.getAttribute('href') || '').trim();
       if (href === '' || href.charAt(0) === '#') return;
       if (/^javascript:/i.test(href)) return;
-      if (a.target === '_blank') return;
       e.preventDefault();
+      if (/^(https?:|mailto:|tel:)/i.test(href)) {
+        window.open(href, '_blank', 'noopener');
+      }
     }, true);
   </script>
 </head>

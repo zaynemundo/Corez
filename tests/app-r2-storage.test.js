@@ -138,6 +138,34 @@ describe('R2 Multi-App Storage & Chat Deletion Cleanup Contract', () => {
       expect(sentBody).not.toContain('history');
     });
 
+    it('reuses the same published link when the same content is republished', async () => {
+      const fetchMock = vi.fn(async () => new Response(
+        JSON.stringify({ success: true, slug: 'asyag23-123', url: '/asyag23-123' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      ));
+      vi.stubGlobal('fetch', fetchMock);
+      const store = {};
+      globalThis.localStorage = {
+        getItem: (key) => store[key] ?? null,
+        setItem: (key, value) => { store[key] = value; }
+      };
+      try {
+        const html = '<h1>Same content</h1>';
+        await publishAppInR2({ html, title: 'First publish' });
+        await publishAppInR2({ html, title: 'Updated content' });
+
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        // The second publish updates the SAME link (slug reused), it never
+        // allocates a duplicate slug.
+        const bodies = fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body));
+        expect(bodies[0].slug).toBeUndefined();
+        expect(bodies[1].slug).toBe('asyag23-123');
+        expect(bodies[1].title).toBe('Updated content');
+      } finally {
+        delete globalThis.localStorage;
+      }
+    });
+
     it('returns null when content is missing or the publish request fails', async () => {
       const fetchMock = vi.fn(async () => new Response(JSON.stringify({ error: 'down' }), { status: 400 }));
       vi.stubGlobal('fetch', fetchMock);

@@ -6,6 +6,41 @@
 
 const API_APPS_ENDPOINT = '/api/apps';
 
+// Local registry of published links so re-publishing the SAME content
+// updates the existing link instead of creating a new slug each time.
+// Keyed by a content hash, capped to the most recent entries.
+const PUBLISH_REGISTRY_KEY = 'corez_published_links';
+const PUBLISH_REGISTRY_MAX = 20;
+
+function contentHash(value) {
+  let hash = 5381;
+  const text = String(value || '');
+  for (let i = 0; i < text.length; i += 1) {
+    hash = ((hash << 5) + hash + text.charCodeAt(i)) >>> 0;
+  }
+  return hash.toString(36);
+}
+
+function loadPublishRegistry() {
+  try {
+    if (typeof localStorage === 'undefined') return [];
+    const raw = localStorage.getItem(PUBLISH_REGISTRY_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePublishRegistry(entries) {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(PUBLISH_REGISTRY_KEY, JSON.stringify(entries.slice(0, PUBLISH_REGISTRY_MAX)));
+  } catch {
+    // Registry persistence is best-effort; publishing still works.
+  }
+}
+
 /**
  * Stores or updates an app artifact in Cloudflare R2 bucket.
  */
@@ -110,14 +145,25 @@ export async function deleteAppInR2(sessionId, appId) {
 /**
  * Publishes a creation so anyone with the returned share link can open it.
  * The html payload is the fully formatted preview document (what the user
- * sees in the canvas). Passing an existing slug republishes that link.
+ * sees in the canvas).
+ *
+ * Update semantics: publishing the SAME content again reuses the previously
+ * published link (recorded locally by content hash) so updates never create
+ * duplicate slugs; a new slug is only allocated for genuinely new content.
+ * Passing an explicit slug always republishes that link.
  */
 export async function publishAppInR2({ html, title = 'Untitled Application', slug = null }) {
   if (!html || typeof html !== 'string' || !html.trim()) return null;
+
+  const registry = loadPublishRegistry();
+  const hash = contentHash(html.trim());
+  const existing = registry.find((entry) => entry.contentHash === hash && entry.slug);
+  const effectiveSlug = slug || existing?.slug || null;
+
   const payload = {
     html: html.trim(),
     title: title.slice(0, 120),
-    ...(slug ? { slug } : {})
+    ...(effectiveSlug ? { slug: effectiveSlug } : {})
   };
   try {
     const res = await fetch('/api/publish', {
@@ -126,7 +172,15 @@ export async function publishAppInR2({ html, title = 'Untitled Application', slu
       body: JSON.stringify(payload)
     });
     if (res.ok) {
-      return await res.json();
+      const data = await res.json();
+      if (data?.slug) {
+        const next = [
+          { contentHash: hash, slug: data.slug, url: data.url, title: title.slice(0, 120), updatedAt: new Date().toISOString() },
+          ...registry.filter((entry) => entry.slug !== data.slug)
+        ];
+        savePublishRegistry(next);
+      }
+      return data;
     }
     console.warn(`Publish failed with HTTP ${res.status}.`);
   } catch (err) {

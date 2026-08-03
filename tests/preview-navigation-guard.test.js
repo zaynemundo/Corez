@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { formatCodeForPreview } from '../src/utils/previewTransformer.js';
 
 // jsdom does not execute <script> elements injected via innerHTML, so the
@@ -76,14 +76,27 @@ describe('preview navigation guard', () => {
     document.body.innerHTML = '';
   });
 
-  it('allows _blank links to open in a new tab', () => {
-    const html = formatCodeForPreview('<a href="https://example.com" target="_blank">New tab</a>');
+  it('opens external links in a real new tab instead of blanking the preview', () => {
+    const html = formatCodeForPreview('<a href="https://example.com" target="_blank">New tab</a><a href="https://example.org">Plain</a>');
     document.body.innerHTML = html;
     installGuard(html);
-    const anchor = document.querySelector('a');
-    const click = new MouseEvent('click', { bubbles: true, cancelable: true, target: anchor });
-    anchor.dispatchEvent(click);
-    expect(click.defaultPrevented).toBe(false);
-    document.body.innerHTML = '';
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    try {
+      const anchors = document.querySelectorAll('a');
+      const blankClick = new MouseEvent('click', { bubbles: true, cancelable: true, target: anchors[0] });
+      anchors[0].dispatchEvent(blankClick);
+      const plainClick = new MouseEvent('click', { bubbles: true, cancelable: true, target: anchors[1] });
+      anchors[1].dispatchEvent(plainClick);
+
+      // Same-frame navigation is always prevented (the preview must not
+      // blank to white) and both links open in a real new tab.
+      expect(blankClick.defaultPrevented).toBe(true);
+      expect(plainClick.defaultPrevented).toBe(true);
+      expect(openSpy).toHaveBeenCalledWith('https://example.com', '_blank', 'noopener');
+      expect(openSpy).toHaveBeenCalledWith('https://example.org', '_blank', 'noopener');
+    } finally {
+      openSpy.mockRestore();
+      document.body.innerHTML = '';
+    }
   });
 });

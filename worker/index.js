@@ -1,7 +1,7 @@
 import { handleMarket } from './market.js';
 import { handleSearch } from './search.js';
 import { fetchAwwwardsInspiration, handleInspiration } from './inspiration.js';
-import { safeErrorDetail, readBoundedJson, jsonResponse, createTaskStateStore } from './utils.js';
+import { safeErrorDetail, readBoundedJson, jsonResponse, createTaskStateStore, createRateLimiter } from './utils.js';
 import { runProviderChain, callOpenRouterImage, FLUX_IMAGE_MODEL } from './providerChain.js';
 
 // Storage key segments are validated identically on every R2-backed endpoint:
@@ -899,10 +899,15 @@ function publishedPageHeaders() {
     // Published creations are AI-generated user content: render them in an
     // originless sandbox (no cookies, storage, or same-origin access) but
     // let the app itself run exactly like the in-app preview — inline
-    // scripts/styles, CDN libraries, and embedded images/fonts included.
-    'Content-Security-Policy': "sandbox allow-scripts allow-forms allow-pointer-lock; default-src 'none'; script-src 'unsafe-inline' https:; style-src 'unsafe-inline' https:; img-src data: https: blob:; font-src data: https:; media-src data: https: blob:; connect-src https:"
+    // scripts/styles, CDN libraries, embedded images/fonts, and external
+    // links (popups escape the sandbox so links open in real tabs).
+    'Content-Security-Policy': "sandbox allow-scripts allow-forms allow-pointer-lock allow-popups allow-popups-to-escape-sandbox; default-src 'none'; script-src 'unsafe-inline' https:; style-src 'unsafe-inline' https:; img-src data: https: blob:; font-src data: https:; media-src data: https: blob:; connect-src https:"
   };
 }
+
+// Published links are public shareable URLs backed by R2 storage: bound the
+// creation rate per client so the store cannot be spammed with slugs.
+const publishRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 10 });
 
 async function handlePublish(request, env) {
   const url = new URL(request.url);
@@ -911,6 +916,10 @@ async function handlePublish(request, env) {
   // POST /api/publish - publish (or republish under an explicit slug) a
   // creation so anyone with the link can open it.
   if (pathname === '/api/publish' && request.method === 'POST') {
+    const retryAfter = publishRateLimiter(request);
+    if (retryAfter !== null) {
+      return jsonResponse(429, { error: 'Too many publish requests. Try again shortly.' }, { 'Retry-After': String(retryAfter) });
+    }
     let body;
     try {
       body = await readBoundedJson(request);
