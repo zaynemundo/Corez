@@ -1,0 +1,47 @@
+# Third-Party Attribution: Deep Research Integration
+
+This repository incorporates the structured deep research workflow, prompt templates, validator script, and web-search agent methodology adapted from **Weizhena/Deep-Research-skills**:
+
+* **Upstream Repository**: https://github.com/Weizhena/Deep-Research-skills
+* **Upstream Author**: Weizhena
+* **License**: MIT License
+* **Inspiration**: RhinoInsight: Improving Deep Research through Control Mechanisms for Model Behavior and Context (https://arxiv.org/abs/2511.18743)
+
+## License Text
+
+```text
+MIT License
+
+Copyright (c) Weizhena
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## Imported & Adapted Components
+
+1. `research` skill (`.agents/skills/research/`) - Consolidated two-phase workflow (outline + deep research + report), adapted from upstream's `research`, `research-add-items`, `research-add-fields`, `research-deep`, and `research-report` skills into a single skill with a single `/research` command entry point.
+2. `validate_json.py` (`.agents/skills/research/validate_json.py`) - Field coverage validator, copied verbatim from upstream.
+3. `web-search` agent (`.opencode/agents/web-search.md`) - Research subagent adapted for `web_fetch`-only searching (no search API), using the workspace model instead of the upstream default.
+4. `web-search-modules` (`.opencode/agents/web-search-modules/`) - Search strategy modules (`github-debug`, `general-web`, `stackoverflow`, `academic-papers`, `chinese-tech`), copied from upstream.
+
+## Local Modifications
+
+* **Single command**: The five upstream commands (`/research`, `/research-add-items`, `/research-add-fields`, `/research-deep`, `/research-report`) are consolidated into one `.opencode/commands/research.md`; item/field additions are inline user checkpoints inside the skill.
+* **Tool adaptations**: `AskUserQuestion` replaced with the `question` tool; `WebSearch` replaced with `web_fetch`-based search-URL strategies; validator path points at the project-local skill file.
+* **Model adaptation**: Subagent uses the workspace convention model (`opencode-go/deepseek-v4-flash`).
