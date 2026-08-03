@@ -113,6 +113,97 @@ async function run() {
   assert.equal(failingResponse.status, 502);
   assert.match((await failingResponse.json()).error, /no usable results/i);
 
+  // Rerank is best-effort: without an OpenRouter key nothing is sent and the
+  // merged order is returned untouched.
+  const noKeyResponse = await post(
+    { query: 'red turtles' },
+    { __SEARCH_FETCH: wikipediaResults(['Alpha', 'Beta']) }
+  );
+  const noKeyData = await noKeyResponse.json();
+  assert.equal(noKeyData.meta.rerank, null);
+  assert.equal(noKeyData.results[0].title, 'Alpha');
+
+  // With OPENROUTER_API_KEY the rerank model re-orders by relevance score.
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (url, init) => {
+      if (String(url).includes('/rerank')) {
+        const body = JSON.parse(init.body);
+        assert.equal(body.model, 'nvidia/llama-nemotron-rerank-vl-1b-v2:free');
+        assert.ok(Array.isArray(body.documents) && body.documents.length === 2);
+        const n = body.documents.length;
+        return Response.json({
+          results: Array.from({ length: n }, (_, i) => ({ index: n - 1 - i, relevance_score: n - i }))
+        });
+      }
+      throw new Error(`unexpected ranking URL: ${url}`);
+    };
+    const rerankResponse = await post(
+      { query: 'red turtles' },
+      {
+        OPENROUTER_API_KEY: 'sk-test',
+        __SEARCH_FETCH: wikipediaResults(['Alpha', 'Beta'])
+      }
+    );
+    assert.equal(rerankResponse.status, 200);
+    const rerankData = await rerankResponse.json();
+    assert.equal(rerankData.meta.rerank, 'rerank');
+    // Mock scores reverse the order: Beta scores higher.
+    assert.equal(rerankData.results[0].title, 'Beta');
+    assert.equal(rerankData.results[1].title, 'Alpha');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  // When rerank is unavailable, embedding cosine similarity ranks instead.
+  const originalFetch2 = globalThis.fetch;
+  try {
+    globalThis.fetch = async (url) => {
+      if (String(url).includes('/rerank')) return new Response('down', { status: 500 });
+      if (String(url).includes('/embeddings')) {
+        return Response.json({
+          data: [
+            { index: 0, embedding: [1, 0, 0] }, // query
+            { index: 1, embedding: [0, 1, 0] }, // Alpha (low)
+            { index: 2, embedding: [1, 0, 0] } // Beta (high)
+          ]
+        });
+      }
+      throw new Error(`unexpected ranking URL: ${url}`);
+    };
+    const embedResponse = await post(
+      { query: 'red turtles' },
+      {
+        OPENROUTER_API_KEY: 'sk-test',
+        __SEARCH_FETCH: wikipediaResults(['Alpha', 'Beta'])
+      }
+    );
+    const embedData = await embedResponse.json();
+    assert.equal(embedData.meta.rerank, 'embeddings');
+    assert.equal(embedData.results[0].title, 'Beta');
+  } finally {
+    globalThis.fetch = originalFetch2;
+  }
+
+  // Both ranking paths failing keeps the merged order — search never breaks.
+  const originalFetch3 = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => new Response('down', { status: 503 });
+    const downResponse = await post(
+      { query: 'red turtles' },
+      {
+        OPENROUTER_API_KEY: 'sk-test',
+        __SEARCH_FETCH: wikipediaResults(['Alpha', 'Beta'])
+      }
+    );
+    assert.equal(downResponse.status, 200);
+    const downData = await downResponse.json();
+    assert.equal(downData.meta.rerank, null);
+    assert.equal(downData.results[0].title, 'Alpha');
+  } finally {
+    globalThis.fetch = originalFetch3;
+  }
+
   console.log('Web search Worker contract passed.');
 }
 

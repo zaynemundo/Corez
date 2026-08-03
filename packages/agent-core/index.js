@@ -28,4 +28,4 @@ export {
   CancellationManager
 } from './harness/index.js';
 export { TaskStore, MemoryTaskStore } from './persistence/TaskStore.js';
-export { GenericSwarmOrchestrator, SWARM_ROLES, TaskDependencyGraph, AdaptiveConcurrencyQueue, SharedProjectState } from './swarm/index.js';
+export { GenericSwarmOrchestrator, SWARM_ROLES, TaskDependencyGraph, AdaptiveConcurrencyQueue, SharedProjectState, HierarchicalSynthesis, chunkByTokens, DEFAULT_CHUNK_MAX_TOKENS } from './swarm/index.js';

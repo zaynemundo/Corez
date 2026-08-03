@@ -22,6 +22,12 @@ const PROVIDER_TIMEOUT_MS = 8_000;
 const MAX_SEARCH_BODY_BYTES = 64 * 1024;
 const DDG_LITE_ENDPOINT = 'https://lite.duckduckgo.com/lite/';
 const WIKIPEDIA_ENDPOINT = 'https://en.wikipedia.org/w/api.php';
+const OPENROUTER_RERANK_ENDPOINT = 'https://openrouter.ai/api/v1/rerank';
+const OPENROUTER_EMBEDDINGS_ENDPOINT = 'https://openrouter.ai/api/v1/embeddings';
+const DEFAULT_RERANK_MODEL = 'nvidia/llama-nemotron-rerank-vl-1b-v2:free';
+const DEFAULT_EMBED_MODEL = 'nvidia/nemotron-3-embed-1b:free';
+const RERANK_TIMEOUT_MS = 10_000;
+const EMBED_TIMEOUT_MS = 10_000;
 
 function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -133,6 +139,154 @@ function decodeHtmlText(value) {
     .replace(/&nbsp;/g, ' ');
 }
 
+function cosineSimilarity(vecA, vecB) {
+  if (!Array.isArray(vecA) || !Array.isArray(vecB) || vecA.length !== vecB.length || vecA.length === 0) {
+    return 0;
+  }
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < vecA.length; i += 1) {
+    dot += vecA[i] * vecB[i];
+    normA += vecA[i] * vecA[i];
+    normB += vecB[i] * vecB[i];
+  }
+  const magnitude = Math.sqrt(normA) * Math.sqrt(normB);
+  return magnitude > 0 ? dot / magnitude : 0;
+}
+
+function resultText(result) {
+  return `${result.title || ''}. ${result.snippet || ''}`.replace(/\s+/g, ' ').trim().slice(0, 500);
+}
+
+function openRouterKey(env) {
+  return env?.OPENROUTER_API_KEY || null;
+}
+
+/**
+ * Re-rank merged search results with an OpenRouter rerank model
+ * (nvidia/llama-nemotron-rerank-vl-1b-v2:free by default) so the most
+ * relevant results lead. Best effort: any failure returns null and the
+ * caller keeps the original order — search never breaks on rerank.
+ * The OpenRouter key is only ever sent to OpenRouter.
+ */
+async function rerankWithOpenRouter(query, results, env) {
+  const apiKey = openRouterKey(env);
+  const model = env?.OPENROUTER_RERANK_MODEL || DEFAULT_RERANK_MODEL;
+  if (!apiKey || env?.OPENROUTER_RERANK_DISABLED === 'true') return null;
+
+  let response;
+  try {
+    response = await fetch(OPENROUTER_RERANK_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model,
+        query,
+        documents: results.map((result) => ({ text: resultText(result) }))
+      }),
+      signal: AbortSignal.timeout(RERANK_TIMEOUT_MS)
+    });
+  } catch {
+    return null;
+  }
+  if (!response.ok) return null;
+
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    return null;
+  }
+
+  const scored = Array.isArray(data?.results) ? data.results : [];
+  // A partial response is treated as a failure: reordering on incomplete
+  // scores would scramble the merged order.
+  if (scored.length < results.length) return null;
+
+  const scoreByIndex = new Map(
+    scored
+      .filter((entry) => Number.isFinite(entry?.index) && Number.isFinite(entry?.relevance_score))
+      .map((entry) => [entry.index, entry.relevance_score])
+  );
+  if (scoreByIndex.size < results.length) return null;
+
+  return {
+    method: 'rerank',
+    results: [...results]
+      .map((result, index) => ({ result, score: scoreByIndex.get(index) }))
+      .sort((a, b) => b.score - a.score)
+      .map((entry) => entry.result)
+  };
+}
+
+/**
+ * Fallback ranking with OpenRouter embeddings (nvidia/nemotron-3-embed-1b:free
+ * by default): cosine similarity between the query and each result text.
+ * Best effort — any failure returns null and the original order is kept.
+ */
+async function rankWithEmbeddings(query, results, env) {
+  const apiKey = openRouterKey(env);
+  const model = env?.OPENROUTER_EMBED_MODEL || DEFAULT_EMBED_MODEL;
+  if (!apiKey || env?.OPENROUTER_EMBED_DISABLED === 'true') return null;
+
+  let response;
+  try {
+    response = await fetch(OPENROUTER_EMBEDDINGS_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model,
+        input: [query, ...results.map((result) => resultText(result))]
+      }),
+      signal: AbortSignal.timeout(EMBED_TIMEOUT_MS)
+    });
+  } catch {
+    return null;
+  }
+  if (!response.ok) return null;
+
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    return null;
+  }
+
+  const vectors = Array.isArray(data?.data) ? data.data : [];
+  if (vectors.length < results.length + 1) return null;
+
+  const queryVector = vectors.find((item) => item?.index === 0)?.embedding;
+  const docVectors = new Map(
+    vectors
+      .filter((item) => Number.isFinite(item?.index) && item.index > 0 && Array.isArray(item.embedding))
+      .map((item) => [item.index - 1, item.embedding])
+  );
+  if (!Array.isArray(queryVector) || docVectors.size < results.length) return null;
+
+  return {
+    method: 'embeddings',
+    results: [...results]
+      .map((result, index) => ({ result, score: cosineSimilarity(queryVector, docVectors.get(index)) }))
+      .sort((a, b) => b.score - a.score)
+      .map((entry) => entry.result)
+  };
+}
+
+// Rank merged results: OpenRouter rerank first, embeddings similarity as the
+// fallback. Never throws — returns null when neither can rank.
+async function rankSearchResults(query, results, env) {
+  const reranked = await rerankWithOpenRouter(query, results, env);
+  if (reranked) return reranked;
+  return rankWithEmbeddings(query, results, env);
+}
+
 /** Wikipedia search: free, no key required. */
 async function searchWikipedia(query, fetchImpl) {
   const url = new URL(WIKIPEDIA_ENDPOINT);
@@ -220,14 +374,24 @@ export async function handleSearch(request, env) {
   }
 
   if (merged.length > 0) {
-    const sources = Array.from(new Set(merged.map((r) => r.source)));
+    let results = merged.slice(0, MAX_RESULTS);
+    let rerankMethod = null;
+    if (results.length > 1) {
+      const ranked = await rankSearchResults(query, results, env);
+      if (ranked) {
+        results = ranked.results;
+        rerankMethod = ranked.method;
+      }
+    }
+    const sources = Array.from(new Set(results.map((r) => r.source)));
     return jsonResponse(200, {
       kind: 'search',
       query,
-      results: merged.slice(0, MAX_RESULTS),
+      results,
       meta: {
-        source: merged[0]?.source || 'search',
+        source: results[0]?.source || 'search',
         sources,
+        rerank: rerankMethod,
         servedAt: new Date().toISOString()
       }
     });
