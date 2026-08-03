@@ -165,4 +165,30 @@ describe('PDF generator', () => {
     expect(doc.html).toContain('Sources');
     expect(doc.html).toContain('https://en.wikipedia.org/wiki/X');
   });
+
+  it('drops the body Sources section in favour of the styled list and skips rules', () => {
+    const doc = synthesizePdfDocumentHtml({
+      title: 'Dupes',
+      body: '## Overview\n\nIntro text.\n\n---\n\n## Sources\n\n1. Fake — https://example.com',
+      sources: [{ title: 'Real Source', url: 'https://real.example' }]
+    });
+    expect(doc.html).toContain('Intro text');
+    expect(doc.html).not.toContain('<p>---</p>');
+    expect(doc.html).not.toContain('Fake'); // body copy of the sources is removed
+    expect(doc.html).toContain('Real Source'); // styled list is the single source of truth
+    expect((doc.html.match(/<h2>Sources<\/h2>/g) || []).length).toBe(1);
+    // The downloaded PDF still lists the structured sources.
+    const paras = JSON.parse(doc.html.match(/var REPORT_PARAGRAPHS = (\[[\s\S]*?\]);/)[1]);
+    expect(paras.some((p) => p.kind === 'numbered' && p.text.includes('Real Source — https://real.example'))).toBe(true);
+  });
+
+  it('renders subheadings and numbered items as real lists', () => {
+    const doc = synthesizePdfDocumentHtml({
+      title: 'Structure',
+      body: '## Details\n\n### 1. First\n\n- a bullet\n\n1. numbered one\n\n2. numbered two',
+      sources: []
+    });
+    expect(doc.html).toContain('<h3>1. First</h3>');
+    expect(doc.html).toContain('<ol><li>numbered one</li><li>numbered two</li></ol>');
+  });
 });

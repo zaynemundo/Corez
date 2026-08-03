@@ -163,9 +163,14 @@ function stripInlineMarkdown(text) {
   return String(text).replace(/\*\*/g, '').replace(/\*/g, '');
 }
 
+const HORIZONTAL_RULE = /^[-*_]{3,}\s*$/;
+const NUMBERED_ITEM = /^(\d+)[.)]\s+/;
+
 // Parse the report body into structured blocks. The leading "# Title" line
 // is dropped (the title is redundant); "## Section" becomes a heading,
-// "- item" lines become bullets, everything else is a paragraph.
+// "### / numbered" lines become subheadings, "- item" lines become bullets,
+// "1. item" lines become numbered items, horizontal rules are skipped and
+// everything else is a paragraph.
 function parseReportBlocks(body) {
   const rawLines = String(body || '').split('\n').map((line) => line.replace(/\r/g, ''));
   let start = 0;
@@ -176,11 +181,14 @@ function parseReportBlocks(body) {
   const blocks = [];
   for (const line of lines) {
     const trimmed = line.trim();
-    if (!trimmed) continue;
+    if (!trimmed || HORIZONTAL_RULE.test(trimmed)) continue;
     if (/^#{2,}\s+/.test(trimmed)) {
-      blocks.push({ kind: 'heading', text: trimmed.replace(/^#{2,}\s+/, '') });
+      const text = trimmed.replace(/^#{2,}\s+/, '');
+      blocks.push({ kind: NUMBERED_ITEM.test(text) ? 'subheading' : 'heading', text });
     } else if (/^[-*]\s+/.test(trimmed)) {
       blocks.push({ kind: 'bullet', text: trimmed.replace(/^[-*]\s+/, '') });
+    } else if (NUMBERED_ITEM.test(trimmed)) {
+      blocks.push({ kind: 'numbered', text: trimmed });
     } else {
       blocks.push({ kind: 'paragraph', text: trimmed });
     }
@@ -188,23 +196,42 @@ function parseReportBlocks(body) {
   return blocks;
 }
 
-// Render the report body as structured HTML (sections, grouped bullets,
-// paragraphs with inline formatting).
-function renderReportHtml(body) {
+// The AI body often ends with its own "## Sources" listing; when the styled
+// structured source list exists, the body copy is redundant and is dropped.
+function cutSourcesBlock(blocks, hasStructuredSources) {
+  if (!hasStructuredSources) return blocks;
+  const index = blocks.findIndex((b) => b.kind === 'heading' && /^sources\s*$/i.test(b.text));
+  return index >= 0 ? blocks.slice(0, index) : blocks;
+}
+
+// Render structured blocks as HTML (sections, grouped bullets, grouped
+// numbered items, subheadings, paragraphs with inline formatting).
+function renderReportHtml(blocks) {
   const html = [];
+  let listTag = null;
   let listItems = null;
   const flushList = () => {
     if (listItems !== null) {
-      html.push(`<ul>${listItems}</ul>`);
+      html.push(`<${listTag}>${listItems}</${listTag}>`);
       listItems = null;
+      listTag = null;
     }
   };
-  for (const block of parseReportBlocks(body)) {
+  for (const block of blocks) {
     if (block.kind === 'heading') {
       flushList();
       html.push(`<h2>${inlineReportText(block.text)}</h2>`);
+    } else if (block.kind === 'subheading') {
+      flushList();
+      html.push(`<h3>${inlineReportText(block.text)}</h3>`);
     } else if (block.kind === 'bullet') {
+      if (listTag !== 'ul') flushList();
+      listTag = 'ul';
       listItems = (listItems === null ? '' : listItems) + `<li>${inlineReportText(block.text)}</li>`;
+    } else if (block.kind === 'numbered') {
+      if (listTag !== 'ol') flushList();
+      listTag = 'ol';
+      listItems = (listItems === null ? '' : listItems) + `<li>${inlineReportText(block.text.replace(NUMBERED_ITEM, ''))}</li>`;
     } else {
       flushList();
       html.push(`<p>${inlineReportText(block.text)}</p>`);
@@ -216,7 +243,6 @@ function renderReportHtml(body) {
 
 export function synthesizePdfDocumentHtml({ title = 'CoreZ Research Report', body = '', sources = [] }) {
   const safeTitle = String(title).replace(/[<>&"']/g, '').slice(0, 200);
-  const reportHtml = renderReportHtml(body);
   const sourceItems = Array.isArray(sources)
     ? sources
         .filter((s) => s && (s.title || s.url))
@@ -226,16 +252,33 @@ export function synthesizePdfDocumentHtml({ title = 'CoreZ Research Report', bod
   const sourcesBlock = sourceItems
     ? `<h2>Sources</h2><ol class="sources">${sourceItems}</ol>`
     : '';
+
+  // Body blocks with the redundant AI "Sources" section removed when the
+  // styled structured list is shown instead.
+  const bodyBlocks = cutSourcesBlock(parseReportBlocks(body), sourceItems.length > 0);
+  const reportHtml = renderReportHtml(bodyBlocks);
+
+  // PDF paragraphs: the same structured blocks, with the structured sources
+  // appended so the downloaded PDF still lists every source.
+  const pdfBlocks = bodyBlocks.map((block) => ({
+    kind: block.kind,
+    text: stripInlineMarkdown(block.text).replace(/[<>]/g, '')
+  }));
+  if (sourceItems.length > 0) {
+    pdfBlocks.push({ kind: 'heading', text: 'Sources' });
+    const cleanSources = sources.filter((s) => s && (s.title || s.url));
+    cleanSources.forEach((source, index) => {
+      pdfBlocks.push({
+        kind: 'numbered',
+        text: `${index + 1}. ${source.title || 'Source'} — ${source.url || ''}`.replace(/[<>]/g, '')
+      });
+    });
+  }
+
   // Title/body are baked into the script for the PDF builder; there is no
-  // editable form anymore. PDF paragraphs are structured (headings/bullets)
-  // with markdown markers stripped, so the downloaded PDF reads cleanly.
+  // editable form anymore.
   const jsTitle = JSON.stringify(safeTitle);
-  const jsParagraphs = JSON.stringify(
-    parseReportBlocks(body).map((block) => ({
-      kind: block.kind,
-      text: stripInlineMarkdown(block.text).replace(/[<>]/g, '')
-    }))
-  );
+  const jsParagraphs = JSON.stringify(pdfBlocks);
 
   return {
     title: `COREZ Research Report — ${safeTitle}`,
@@ -269,12 +312,18 @@ export function synthesizePdfDocumentHtml({ title = 'CoreZ Research Report', bod
     text-transform: uppercase; letter-spacing: .16em; color: #4f46e5; margin: 38px 0 14px;
     padding-bottom: 9px; border-bottom: 1px solid #e2e8f0; }
   .paper h2:first-child { margin-top: 0; }
+  .paper h3 { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 15px; font-weight: 700;
+    color: #1e293b; margin: 28px 0 10px; }
   .paper p { margin: 0 0 15px; font-size: 15px; line-height: 1.85; }
   .paper strong { color: #0f172a; font-weight: 700; }
-  .paper ul { list-style: none; margin: 0 0 18px; padding: 0; }
-  .paper ul li { position: relative; padding-left: 24px; margin-bottom: 11px; font-size: 15px; line-height: 1.7; }
+  .paper ul, .paper ol { list-style: none; margin: 0 0 18px; padding: 0; }
+  .paper ul li, .paper ol li { position: relative; padding-left: 24px; margin-bottom: 11px; font-size: 15px; line-height: 1.7; }
   .paper ul li::before { content: ''; position: absolute; left: 2px; top: .58em; width: 9px; height: 9px;
     border-radius: 3px; background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+  .paper ol { counter-reset: numbered; }
+  .paper ol li::before { counter-increment: numbered; content: counter(numbered) '.';
+    position: absolute; left: 0; top: 0; color: #6366f1; font-weight: 700;
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 13px; }
   .paper .ref { color: #7c3aed; font-size: .72em; font-weight: 700; vertical-align: super;
     font-family: ui-sans-serif, system-ui, sans-serif; letter-spacing: .02em; }
   .paper em { color: #475569; }
@@ -294,7 +343,8 @@ export function synthesizePdfDocumentHtml({ title = 'CoreZ Research Report', bod
     .toolbar { display: none !important; }
     .paper { box-shadow: none; border-radius: 0; margin: 0; max-width: none; padding: 0; }
     .paper h2 { color: #111; border-color: #cbd5e1; }
-    .paper ul li::before { background: #475569; }
+    .paper h3 { color: #111; }
+    .paper ul li::before, .paper ol li::before { color: #475569; background: #475569; }
     .paper .ref { color: #334155; }
     .paper .sources a { color: #111; }
     @page { size: A4; margin: 18mm 20mm; }
@@ -326,9 +376,17 @@ export function synthesizePdfDocumentHtml({ title = 'CoreZ Research Report', bod
       if (block.kind === 'heading') {
         items.push({t:block.text,s:14,g:12});
         items.push({t:'',s:12,g:6});
+      } else if (block.kind === 'subheading') {
+        items.push({t:block.text,s:13,g:10});
+        items.push({t:'',s:12,g:5});
       } else if (block.kind === 'bullet') {
         var bw = wrapPdfText(block.text, 82);
         for (var k=0;k<bw.length;k++) items.push({t:(k===0?'\\u00b7 ':'    ')+bw[k], s:12, g:lineH});
+        items.push({t:'',s:12,g:6});
+      } else if (block.kind === 'numbered') {
+        // Numbered items keep their number in the text (server-side).
+        var nw = wrapPdfText(block.text, 84);
+        for (var q=0;q<nw.length;q++) items.push({t:nw[q],s:12,g:lineH});
         items.push({t:'',s:12,g:6});
       } else {
         var pw = wrapPdfText(block.text, 88);
