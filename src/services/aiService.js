@@ -2951,16 +2951,21 @@ export async function generateLocalAIResponse(prompt, hostedError = null) {
     return `Hello! I'm COREZ AI. How can I help you today?`;
   }
 
+  // 2. CREATOR FACT
+  if (/\bwho\b.{0,20}\b(created|made|built|invented|developed)\b|\b(created|made|built|invented|developed)\b.{0,30}\b(corez|core z)\b/i.test(lower)) {
+    return `Corez was created by Zayne and Chris.`;
+  }
+
   if (/^(how are you|how is it going|how's it going)(\s|!|\.|\?|$)/i.test(lower)) {
     return `Doing great! Ready to help whenever you are. What's on your mind?`;
   }
 
-  // 2. GRATITUDE INTENT
+  // 3. GRATITUDE INTENT
   if (/^(thanks|thank you|awesome|great|cool|nice|perfect)(\s|!|\.|$)/i.test(lower)) {
     return `You're very welcome! Let me know if there's anything else I can help with.`;
   }
 
-  // 3. PUBLIC APP / GAME / WIDGET CREATION INTENT
+  // 4. PUBLIC APP / GAME / WIDGET CREATION INTENT
   // Only synthesize a brand-new experience for genuine creation prompts; a
   // prompt that already embeds code is a revision/analysis of existing code.
   if (intent.type === 'app' && !hasEmbeddedCode && !/^revise\s/i.test(cleanPrompt)) {
@@ -2972,7 +2977,7 @@ export async function generateLocalAIResponse(prompt, hostedError = null) {
     return `I've created **${gameResult.title}** for you! Click below to open it live in the preview canvas on the right side.\n\n\`\`\`html\n${gameResult.html}\n\`\`\``;
   }
 
-  // 4. PUBLIC USER INTENT RESPONSES
+  // 5. PUBLIC USER INTENT RESPONSES
   if (intent.type === 'code-help') {
     if (hasEmbeddedCode) {
       const reason = describeHostedUnavailable(hostedError).replace(/^ The hosted AI service is unavailable/, '');

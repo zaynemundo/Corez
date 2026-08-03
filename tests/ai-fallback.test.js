@@ -44,6 +44,11 @@ describe('Hosted AI fallback behavior', () => {
     expect(response).not.toContain('Share the snippet');
   });
 
+  it('answers who created Corez with Zayne and Chris when hosted AI is down', async () => {
+    const response = await generateLocalAIResponse('Who created Corez?', new Error('Hosted AI request failed: 503'));
+    expect(response).toContain('Zayne and Chris');
+  });
+
   it('still synthesizes a new app locally for genuine creation prompts when hosted AI is down', async () => {
     const fetchMock = vi.fn(async () => Response.json({ error: 'down' }, { status: 503 }));
     vi.stubGlobal('fetch', fetchMock);
