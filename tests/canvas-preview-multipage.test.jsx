@@ -1,8 +1,14 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest';
 import { render, fireEvent, screen, cleanup, act } from '@testing-library/react';
 import CanvasPreview from '../src/components/CanvasPreview.jsx';
 import { formatCodeForPreview, injectMultiPageRouter } from '../src/utils/previewTransformer.js';
+
+vi.mock('../src/services/appStorageService', () => ({
+  publishAppInR2: vi.fn(() => Promise.resolve({ slug: 'test-123', url: '/test-123' }))
+}));
+
+import { publishAppInR2 } from '../src/services/appStorageService';
 
 const MULTI_PAGE_CODE = `<!-- CORESITE-PAGES: index.html, about.html -->
 <!-- PAGE: index.html -->
@@ -10,7 +16,16 @@ const MULTI_PAGE_CODE = `<!-- CORESITE-PAGES: index.html, about.html -->
 <!-- PAGE: about.html -->
 <!DOCTYPE html><html><body><h1>About Us</h1></body></html>`;
 
+const INCOMPLETE_MULTI_PAGE_CODE = `<!-- PAGE: index.html -->
+<!DOCTYPE html><html><body><h1>Home</h1><a href="pricing.html">Pricing</a></body></html>
+<!-- PAGE: about.html -->
+<!DOCTYPE html><html><body><h1>About</h1></body></html>`;
+
 afterEach(cleanup);
+
+beforeEach(() => {
+  publishAppInR2.mockClear();
+});
 
 function renderPreview(code = MULTI_PAGE_CODE) {
   return render(
@@ -100,6 +115,36 @@ describe('CanvasPreview multi-page sites', () => {
   it('does not render page tabs for single-page creations', () => {
     renderPreview('<!DOCTYPE html><html><body><h1>Single</h1></body></html>');
     expect(screen.queryAllByRole('tab')).toHaveLength(0);
+  });
+
+  it('does not show a completeness warning for a complete multi-page site', () => {
+    renderPreview();
+    expect(screen.queryByText(/Incomplete site/)).toBeNull();
+  });
+
+  it('shows an incompleteness banner when the site has broken internal links', () => {
+    renderPreview(INCOMPLETE_MULTI_PAGE_CODE);
+    expect(screen.getByText(/Incomplete site/)).toBeTruthy();
+    expect(screen.getByText(/missing page pricing\.html/)).toBeTruthy();
+    expect(screen.getByText(/Publishing is blocked until fixed/)).toBeTruthy();
+  });
+
+  it('blocks publishing an incomplete multi-page site', () => {
+    renderPreview(INCOMPLETE_MULTI_PAGE_CODE);
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
+    expect(publishAppInR2).not.toHaveBeenCalled();
+    expect(screen.getByText(/incomplete: index\.html links to missing page pricing\.html/i)).toBeTruthy();
+  });
+
+  it('publishes a complete multi-page site normally', async () => {
+    renderPreview();
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
+    await act(async () => {});
+    expect(publishAppInR2).toHaveBeenCalledTimes(1);
+    const payload = publishAppInR2.mock.calls[0][0];
+    expect(payload.pages['index.html']).toContain('<h1>Home</h1>');
+    expect(payload.pages['about.html']).toContain('<h1>About Us</h1>');
+    expect(payload.pages['index.html']).toContain("type: 'corez-nav'");
   });
 });
 

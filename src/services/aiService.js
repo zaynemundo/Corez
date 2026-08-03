@@ -553,7 +553,7 @@ ${designSpec}${liveInspiration}
 - MULTI-PAGE SITES: if the user requested MULTIPLE pages (e.g. About, Pricing, Contact, Blog), output every page as its own complete standalone HTML document inside the SAME single code block, separated by markers:
   <!-- PAGE: about.html -->
   <!DOCTYPE html>... complete page with inline <style>/<script> ...
-  Link pages with plain anchors: <a href="about.html">About</a>. Keep filenames lowercase like index.html, about.html, contact.html (max 12 pages). When the user did NOT ask for multiple pages, output ONE single page exactly as before.
+  Link pages with plain anchors: <a href="about.html">About</a>. Keep filenames lowercase like index.html, about.html, contact.html (max 12 pages). COMPLETENESS CHECK before you finish: ALWAYS output an index.html home page, make every <a href="..."> point to a page you actually output (a link to a page you never created is a broken site), and keep every page a complete standalone HTML document. When the user did NOT ask for multiple pages, output ONE single page exactly as before.
 - Build a complete, responsive, standalone experience ready for the preview canvas.
 - ALWAYS end your response with a step-by-step user guide and feature summary after the code block! Never output ONLY a bare code block.`;
     }
@@ -572,7 +572,7 @@ ${designSpec}${liveInspiration}
 - MULTI-PAGE SITES: if the user requested MULTIPLE pages, switch to plain HTML and output every page as its own complete standalone HTML document inside the SAME single \`\`\`html ... \`\`\` code block, separated by markers:
   <!-- PAGE: about.html -->
   <!DOCTYPE html>... complete page ...
-  Link pages with plain anchors: <a href="about.html">About</a>. Keep filenames lowercase like index.html, about.html, contact.html (max 12 pages). When the user did NOT ask for multiple pages, output a single React component exactly as described above.
+  Link pages with plain anchors: <a href="about.html">About</a>. Keep filenames lowercase like index.html, about.html, contact.html (max 12 pages). COMPLETENESS CHECK before you finish: ALWAYS output an index.html home page, make every <a href="..."> point to a page you actually output (a link to a page you never created is a broken site), and keep every page a complete standalone HTML document. When the user did NOT ask for multiple pages, output a single React component exactly as described above.
 - ALWAYS end your response with a step-by-step user guide and feature summary after the code block! Never output ONLY a bare code block.`;
   }
 

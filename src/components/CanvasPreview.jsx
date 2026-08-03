@@ -16,7 +16,7 @@ import {
   ExternalLink,
   Loader2
 } from 'lucide-react';
-import { formatCodeForPreview, parseMultiPageSite, injectMultiPageRouter } from '../utils/previewTransformer';
+import { formatCodeForPreview, parseMultiPageSite, injectMultiPageRouter, validateMultiPageSite } from '../utils/previewTransformer';
 import { publishAppInR2 } from '../services/appStorageService';
 
 export default function CanvasPreview({ 
@@ -38,6 +38,15 @@ export default function CanvasPreview({
   const iframeRef = useRef(null);
 
   const multiPage = useMemo(() => parseMultiPageSite(editableCode), [editableCode]);
+
+  // Completeness gate: before the creation is shown or published, check that
+  // a multi-page output has an index.html, no empty pages, and no broken
+  // internal links. Errors block publishing; warnings are shown as quality
+  // notes. Single-page creations always pass (validation is skipped).
+  const multiPageValidation = useMemo(() => {
+    if (!multiPage.isMultiPage) return null;
+    return validateMultiPageSite(multiPage.pages);
+  }, [multiPage]);
 
   const currentPage = useMemo(() => {
     return multiPage.pages.find((p) => p.name === activePage) || multiPage.pages[0] || { name: 'index.html', html: '' };
@@ -78,6 +87,19 @@ export default function CanvasPreview({
 
   const handlePublish = async () => {
     if (publishing || !editableCode) return;
+    // Completeness gate: never publish an incomplete multi-page site. The
+    // user sees exactly which pages are missing or broken and can ask Corez
+    // to fix the output instead of sharing a broken link.
+    if (multiPageValidation && !multiPageValidation.valid) {
+      const errors = multiPageValidation.issues
+        .filter((issue) => issue.severity === 'error')
+        .map((issue) => issue.message)
+        .slice(0, 3);
+      setPublishError(
+        `This multi-page site is incomplete: ${errors.join('; ')}. Ask Corez to fix it before publishing.`
+      );
+      return;
+    }
     setPublishing(true);
     setPublishError(null);
     try {
@@ -301,6 +323,35 @@ export default function CanvasPreview({
       </div>
 
       <div className={`canvas-body ${deviceMode !== 'desktop' && activeTab === 'preview' ? 'device-wrapper' : ''}`}>
+        {multiPageValidation && !multiPageValidation.valid && (
+          <div
+            role="alert"
+            className="multipage-validation-banner"
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '8px',
+              margin: '0 0 10px',
+              padding: '8px 12px',
+              background: 'rgba(239, 68, 68, 0.12)',
+              border: '1px solid rgba(239, 68, 68, 0.35)',
+              borderRadius: 'var(--radius-md)',
+              color: 'var(--text-primary)',
+              fontSize: '0.78rem',
+              lineHeight: 1.4
+            }}
+          >
+            <span style={{ color: '#f87171', fontWeight: 600, whiteSpace: 'nowrap' }}>Incomplete site</span>
+            <span>
+              {multiPageValidation.issues
+                .filter((issue) => issue.severity === 'error')
+                .map((issue) => issue.message)
+                .join(' · ')}
+              {' '}
+              Publishing is blocked until fixed.
+            </span>
+          </div>
+        )}
         {editableCode ? (
           activeTab === 'preview' ? (
             <div className={`preview-container device-mode-${deviceMode}`}>

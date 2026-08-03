@@ -154,7 +154,8 @@ function buildWebsitePrompt(rawPrompt, intent, requirements, context) {
   if (/\b(pages?|multi[-\s]?page|routes?|separate pages|about page|contact page|pricing page|blog page)\b/i.test(rawPrompt)) {
     result += `The user requested MULTIPLE pages. Output every page as a complete standalone HTML document inside the SAME single code block, one per page, separated by markers:\n`;
     result += `<!-- PAGE: about.html -->\n<!DOCTYPE html>... complete page ...\n`;
-    result += `Link pages with plain anchors: <a href="about.html">About</a>. Keep lowercase filenames (index.html, about.html, contact.html), max 12 pages.\n\n`;
+    result += `Link pages with plain anchors: <a href="about.html">About</a>. Keep lowercase filenames (index.html, about.html, contact.html), max 12 pages.\n`;
+    result += `COMPLETENESS CHECK before finishing: always include an index.html home page, only link to pages that exist in your output, and keep every page a complete HTML document.\n\n`;
   }
 
   // Sections

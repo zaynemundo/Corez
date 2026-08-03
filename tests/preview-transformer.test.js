@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatCodeForPreview, parseMultiPageSite, injectMultiPageRouter, MULTI_PAGE_NAME_PATTERN } from '../src/utils/previewTransformer.js';
+import { formatCodeForPreview, parseMultiPageSite, injectMultiPageRouter, validateMultiPageSite, MULTI_PAGE_NAME_PATTERN } from '../src/utils/previewTransformer.js';
 
 describe('previewTransformer', () => {
   it('passes through pure HTML documents untouched', () => {
@@ -321,5 +321,81 @@ describe('parseMultiPageSite', () => {
   it('leaves documents untouched when no page names are given for injection', () => {
     const formatted = formatCodeForPreview('<h1>Page</h1>');
     expect(injectMultiPageRouter(formatted, [])).toBe(formatted);
+  });
+});
+
+describe('validateMultiPageSite', () => {
+  const completePages = [
+    { name: 'index.html', html: '<!DOCTYPE html><html><body><h1>Home</h1><a href="about.html">About</a></body></html>' },
+    { name: 'about.html', html: '<!DOCTYPE html><html><body><h1>About</h1></body></html>' }
+  ];
+
+  it('passes a complete site with an index page and resolvable links', () => {
+    const result = validateMultiPageSite(completePages);
+    expect(result.valid).toBe(true);
+    expect(result.issues).toHaveLength(0);
+  });
+
+  it('flags a missing index.html home page', () => {
+    const result = validateMultiPageSite([
+      { name: 'about.html', html: '<!DOCTYPE html><html><body><h1>About</h1></body></html>' }
+    ]);
+    expect(result.valid).toBe(false);
+    expect(result.issues.some((i) => i.message.includes('Missing index.html'))).toBe(true);
+  });
+
+  it('flags broken internal links to pages that do not exist', () => {
+    const result = validateMultiPageSite([
+      { name: 'index.html', html: '<!DOCTYPE html><html><body><a href="pricing.html">Pricing</a></body></html>' },
+      { name: 'about.html', html: '<!DOCTYPE html><html><body>About</body></html>' }
+    ]);
+    expect(result.valid).toBe(false);
+    expect(result.issues.some((i) => i.message.includes('missing page pricing.html'))).toBe(true);
+  });
+
+  it('flags empty pages and warns about incomplete HTML fragments', () => {
+    const result = validateMultiPageSite([
+      { name: 'index.html', html: '<!DOCTYPE html><html><body><h1>Home</h1></body></html>' },
+      { name: 'empty.html', html: '   ' },
+      { name: 'frag.html', html: '<h1>fragment</h1>' }
+    ]);
+    expect(result.valid).toBe(false);
+    expect(result.issues.some((i) => i.message.includes('empty.html is empty'))).toBe(true);
+    expect(result.issues.some((i) => i.severity === 'warn' && i.message.includes('not a complete HTML document'))).toBe(true);
+  });
+
+  it('ignores external, mailto, tel, protocol-relative, and hash-only links', () => {
+    const result = validateMultiPageSite([
+      {
+        name: 'index.html',
+        html: [
+          '<!DOCTYPE html><html><body>',
+          '<a href="https://example.com/faq.html">External</a>',
+          '<a href="//cdn.example.com/x.html">CDN</a>',
+          '<a href="mailto:hi@example.com">Mail</a>',
+          '<a href="tel:+123">Call</a>',
+          '<a href="#section">Hash</a>',
+          '<a href="about.html#team">With anchor</a>',
+          '<a href="about.html?lang=en">With query</a>',
+          '</body></html>'
+        ].join('')
+      },
+      { name: 'about.html', html: '<!DOCTYPE html><html><body>About</body></html>' }
+    ]);
+    expect(result.valid).toBe(true);
+  });
+
+  it('resolves links with subdirectories against the page set by basename', () => {
+    const result = validateMultiPageSite([
+      { name: 'index.html', html: '<!DOCTYPE html><html><body><a href="pages/about.html">About</a></body></html>' },
+      { name: 'about.html', html: '<!DOCTYPE html><html><body>About</body></html>' }
+    ]);
+    expect(result.valid).toBe(true);
+  });
+
+  it('rejects an empty page list entirely', () => {
+    const result = validateMultiPageSite([]);
+    expect(result.valid).toBe(false);
+    expect(result.issues[0].message).toContain('No pages');
   });
 });

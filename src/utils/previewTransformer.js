@@ -73,6 +73,62 @@ export function parseMultiPageSite(rawCode) {
   return { isMultiPage: pages.length > 1, pages };
 }
 
+// Absolute or protocol-relative URLs never point at pages inside the site.
+const INTERNAL_LINK_PATTERN = /\bhref\s*=\s*["']([^"']+)["']/gi;
+const PAGE_TARGET_PATTERN = /([a-z0-9][a-z0-9_-]{0,63}\.html)(?:[#?][^"']*)?$/i;
+const ABSOLUTE_URL_PATTERN = /^[a-z][a-z0-9+.-]*:/i;
+const PROTOCOL_RELATIVE_PATTERN = /^\/\//i;
+
+/**
+ * Completeness gate for a parsed multi-page site. Checks that the output is
+ * actually complete before it is shown or published:
+ *  - index.html exists (the site opens on a home page)
+ *  - no page is empty
+ *  - every internal .html link points at an existing page
+ *  - pages are full HTML documents, not fragments
+ * External links (https:, mailto:, tel:, protocol-relative) are ignored.
+ *
+ * Returns { valid, issues: [{ severity: 'error'|'warn', page, message }] }.
+ * 'error' issues make the site incomplete; 'warn' issues are quality notes.
+ */
+export function validateMultiPageSite(pages) {
+  const issues = [];
+
+  if (!Array.isArray(pages) || pages.length === 0) {
+    return { valid: false, issues: [{ severity: 'error', page: null, message: 'No pages were produced.' }] };
+  }
+
+  const names = new Set(pages.map((p) => p.name));
+  if (!names.has('index.html')) {
+    issues.push({ severity: 'error', page: null, message: 'Missing index.html home page.' });
+  }
+
+  for (const page of pages) {
+    const html = typeof page?.html === 'string' ? page.html : '';
+    if (!html.trim()) {
+      issues.push({ severity: 'error', page: page.name, message: `${page.name} is empty.` });
+      continue;
+    }
+    if (!/<\/html>/i.test(html)) {
+      issues.push({ severity: 'warn', page: page.name, message: `${page.name} is not a complete HTML document (missing closing </html>).` });
+    }
+
+    for (const match of html.matchAll(INTERNAL_LINK_PATTERN)) {
+      const href = match[1].trim();
+      if (!href || href.charAt(0) === '#' || ABSOLUTE_URL_PATTERN.test(href) || PROTOCOL_RELATIVE_PATTERN.test(href)) {
+        continue;
+      }
+      const target = href.split(/[#?]/)[0].split('/').pop();
+      if (!PAGE_TARGET_PATTERN.test(target)) continue;
+      if (!names.has(target)) {
+        issues.push({ severity: 'error', page: page.name, message: `${page.name} links to missing page ${target}.` });
+      }
+    }
+  }
+
+  return { valid: issues.every((issue) => issue.severity !== 'error'), issues };
+}
+
 /**
  * Router script injected into every multi-page preview/published document.
  * Intercepts clicks on internal .html links and:
