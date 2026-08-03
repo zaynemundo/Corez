@@ -13,7 +13,7 @@ Use this skill to analyze incoming user requests, determine the minimal required
 
 | Request Type | Lead Engine | Required Skills | Output Artifact |
 | --- | --- | --- | --- |
-| Web Application / UI Layout | DeepSeek V4 Flash / MiMo V2.5 | `frontend-modern-design`, `apple-design`, `accessibility-expert` | React / HTML / CSS components |
+| Web Application / UI Layout | DeepSeek V4 Flash | `frontend-modern-design`, `apple-design`, `accessibility-expert` | React / HTML / CSS components |
 | Image Generation / Artwork | FLUX 1 (`schnell` / `dev`) | `visual-creative` | R2 stored image URLs & gallery cards |
 | Web Game / Canvas Arcade | DeepSeek V4 Flash | `game-development`, `frontend-modern-design` | Canvas 2D / JS physics engine |
 | Back-End API / Worker Router | DeepSeek V4 Flash | `backend-architecture`, `ai-infrastructure` | Cloudflare Worker / Node route handlers |

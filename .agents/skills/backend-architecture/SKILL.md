@@ -80,3 +80,13 @@ Use this skill whenever designing, building, reviewing, or refactoring APIs, ser
 ### 2. Database & Search Optimization
 - Add indexes on frequently queried foreign keys, filter attributes, and timestamp sort fields.
 - Avoid N+1 query patterns; use batch joins or single-query data fetching.
+
+---
+
+## Repository integration (CoreZ worker)
+
+- Entry point is `worker/swarm-index.js`; route dispatch lives in `worker/index.js`. Wrap storage handlers with `runJsonSafe`, return uniform payloads via `jsonResponse`, parse bodies with `readBoundedJson`, and reuse `safeErrorDetail` for sanitized error messages — all from `worker/utils.js`.
+- Validate every path segment / storage key against `SAFE_STORAGE_SEGMENT` (letters, digits, dots, dashes, underscores; no slashes or leading dots) before touching R2 — this blocks `../` traversal on `/api/apps`, `/api/memory`, and `/api/assets`.
+- Rate limit public endpoints with `createRateLimiter` (see `/api/publish`, `/api/ai`, `/api/image`) and return HTTP 429 with `Retry-After`.
+- Env bindings: `ASSET_BUCKET` (R2, required for storage/memory/publish endpoints), `GAME_ROOMS` (Durable Object for multiplayer), `ASSETS` (static SPA).
+- Verify changes with `npm test` plus the worker contract suite: `npm run test:cloudflare` (includes `tests/cloudflare-worker-contract.mjs`).

@@ -1,6 +1,6 @@
 ---
 name: visual-creative
-description: Handles image analysis, AI generation direction (FLUX 1), background removal, product visualization, SVG vector creation, brand identity, and visual art direction with MiMo V2.5.
+description: Handles image analysis, AI generation direction (FLUX 1 Schnell), background removal, product visualization, SVG vector creation, brand identity, and visual art direction.
 ---
 
 # Visual & Creative Production Skill
@@ -11,12 +11,12 @@ Use this skill whenever analyzing visual artwork, designing UI graphics, craftin
 
 ## 1. Engine Delegation & Capabilities
 
-- **MiMo V2.5 (Visual Design Lead)**: Delegate vision inspection, art direction, UI layout design, color palette curation, and SVG vector graphic creation to MiMo V2.5.
-- **FLUX 1 (Background & Artwork Generation)**: Primary engine (`@cf/black-forest-labs/flux-1-dev` / `schnell`) for background image generation, high-res texture synthesis, and visual artwork rendering.
+- **DeepSeek V4 Flash (Visual Direction Lead)**: Direct vision inspection, art direction, UI layout design, color palette curation, and SVG vector graphic creation.
+- **FLUX 1 Schnell (Background & Artwork Generation)**: Primary image engine (`black-forest-labs/flux-1-schnell`) exposed by CoreZ through `POST /api/image` for background image generation, high-res texture synthesis, and visual artwork rendering. When `ASSET_BUCKET` is configured the worker returns an R2 URL; without `OPENROUTER_API_KEY` it honestly returns 503 rather than a fake image.
 
 ---
 
-## 2. AI Image Prompt Engineering (FLUX 1 / OpenRouter)
+## 2. AI Image Prompt Engineering (FLUX 1 Schnell via `/api/image`)
 
 Structure prompts with explicit visual dimensions:
 ```

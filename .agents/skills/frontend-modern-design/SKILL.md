@@ -65,7 +65,7 @@ Establish a clean, cohesive design system using CSS custom properties for colors
 
 - **Glass & Depth**: Combine semi-transparent backgrounds with backdrop blur (`backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);`) and subtle inset borders.
 - **Card Elevation**: Use multi-layered elevation shadows (`box-shadow: 0 4px 16px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.1);`) for floating panels and modals.
-- **No Unstyled Placeholders**: Use rich content, SVGs, or `generate_image` assets instead of empty frames or broken image placeholders.
+- **No Unstyled Placeholders**: Use rich content, SVGs, or generated image assets (in CoreZ, ask the image pipeline — `POST /api/image`, FLUX 1 Schnell — for background artwork) instead of empty frames or broken image placeholders.
 
 ---
 

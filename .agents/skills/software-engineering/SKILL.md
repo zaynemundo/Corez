@@ -11,7 +11,7 @@ Use this skill whenever designing, engineering, refactoring, debugging, or revie
 
 ## 1. Core Engineering Workflow
 
-1. **Investigate Before Editing**: Use code search (`grep_search`), file viewing (`view_file`), and directory listing (`list_dir`) to inspect authoritative schemas, imports, and caller signatures before writing code. Never guess function arguments or property names.
+1. **Investigate Before Editing**: Use code search (Grep tool), file reading (Read tool with offset/limit windows), and directory listing (Glob / Read on directories) to inspect authoritative schemas, imports, and caller signatures before writing code. Never guess function arguments or property names.
 2. **Modular Architecture**: Write single-responsibility functions and decoupled components. Avoid monolithic 1000-line files; extract reusable helpers into distinct modules.
 3. **Preserve API Contracts**: When modifying a function signature, search for and update every invocation site across the codebase.
 4. **Typed & Validated Inputs**: Use TypeScript interfaces, JSDoc types, or runtime schema validation (Zod, TypeBox) for all public functions and API endpoints.
@@ -41,4 +41,11 @@ Use this skill whenever designing, engineering, refactoring, debugging, or revie
 ## 4. Empirical Verification & Git Completion
 
 - **Mandatory Verification**: Run all applicable unit tests, contract scripts, linter commands, and production builds before declaring a task finished.
-- **Git Completion**: Commit verified work on local `main`, rebase onto `origin/main`, and push without merge commits.
+- **Repository commands** (this repo):
+  ```bash
+  npm test                # full vitest suite (850+ tests)
+  npm run lint            # eslint static analysis
+  npm run build           # production build (vite)
+  npm run test:cloudflare # worker + contract suites (node/bash scripts)
+  ```
+- **Git Completion**: Commit verified work on local `main`, rebase onto `origin/main`, and push without merge commits (use the `git-superpowers` skill).

@@ -112,7 +112,7 @@ Check for completed JSON files in `output_dir`; skip items that already have res
 - Each `web-search` subagent handles `items_per_agent` items.
 - Launch subagents in parallel: multiple `task` tool calls in a single message. Disable per-agent narrative output; the agent's deliverable is the JSON file it writes.
 
-**Parameters**: `{item_related_info}` = item's full yaml content (name + category + description), `{fields_path}` = absolute path to `{topic_slug}/fields.yaml`, `{output_path}` = absolute path to `{output_dir}/{item_name_slug}.json` (slugify: spaces -> `_`, strip special chars), `{validator}` = absolute path to `.agents/skills/research/validate_json.py` (resolve with `realpath`).
+**Parameters**: `{item_related_info}` = item's full yaml content (name + category + description), `{fields_path}` = absolute path to `{topic_slug}/fields.yaml`, `{output_path}` = absolute path to `{output_dir}/{item_name_slug}.json` (slugify: spaces -> `_`, strip special chars), `{validator}` = absolute path to `.agents/skills/research/validate_json.py` (resolve to the absolute path directly; on Windows use the full path instead of `realpath`).
 
 Prompt template per agent (replace only variables in {xxx}):
 
@@ -197,6 +197,6 @@ Run `python3 {topic_slug}/generate_report.py`. Fix any script errors, re-run unt
 ## Guardrails
 
 - Confirm with the user before each batch and before finishing the outline; never fabricate citations, URLs, prices, or release details.
-- The `web-search` subagent researches with `web_fetch` only (no search API) — instruct it to construct search-engine and site-search URLs and analyze the fetched pages.
+- The `web-search` subagent researches with the `webfetch` tool only (no search API) — instruct it to construct search-engine and site-search URLs and analyze the fetched pages.
 - Mark every uncertain value with `[uncertain]` and list it in the `uncertain` array; the report skips those fields.
 - Keep all research output values in English.

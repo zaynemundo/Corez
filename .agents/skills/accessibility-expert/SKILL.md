@@ -40,3 +40,9 @@ Enforces strict WCAG 2.2 AA accessibility standards on all generated UI elements
 5. **Resize pass**: Test at 200% zoom and viewport widths 320px-1440px — no horizontal scroll, no clipped controls, touch targets stay >= 44x44px.
 6. **Reduced motion pass**: Enable `prefers-reduced-motion: reduce` and confirm essential content remains accessible without animations.
 7. **Report**: State which checks passed/failed and fix any failures before marking the task complete.
+
+## Repository integration
+
+- Apply the repo z-index layering contract (Background `0` -> Content `10` -> HUD `20-30` -> Overlays/Modals `40-50+`, increments of 10) so modals, toasts, and drawers never sit outside the expected stacking context; see the `frontend-modern-design` skill.
+- Respect the repo design tokens (`--text-primary`, `--text-secondary`, `--text-muted`, `--border-color` in `src/index.css`) when choosing colors so contrast pairs stay consistent.
+- Responsive/contrast contracts are asserted by the repository's `tests/ui-responsive-contract.sh` — run it (via `npm run test:cloudflare` or directly with `bash`) before landing UI changes.

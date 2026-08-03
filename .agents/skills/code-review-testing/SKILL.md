@@ -49,7 +49,7 @@ Use this skill whenever analyzing, auditing, reviewing code changes, debugging, 
 - Ensure test suites are fast, deterministic, and isolated (no state leaks between tests).
 
 ### Contract Tests & Bash Verification Scripts
-- Maintain repository contract scripts (e.g. `tests/ui-responsive-contract.sh`, `tests/cloudflare-worker-contract.mjs`).
+- Maintain repository contract scripts (e.g. `tests/ui-responsive-contract.sh`, `tests/cloudflare-worker-contract.mjs`, `tests/search-worker-contract.mjs`, `tests/market-worker-contract.mjs`).
 - Verify CSS design tokens, DOM classes, ARIA attributes, responsive layout breakpoints, and API status codes against explicit contract specs.
 
 ---
@@ -57,12 +57,12 @@ Use this skill whenever analyzing, auditing, reviewing code changes, debugging, 
 ## 4. Verification Protocol (Empirical Proof Required)
 
 - **Rule**: NEVER declare a task resolved, a bug fixed, or a code review complete until empirical execution commands (build scripts, test scripts, linters) have been run and returned clean exit codes (`0`).
-- **Commands**:
+- **Commands** (this repo):
   ```bash
   # Run applicable tests and contract checks
   npm test
-  bash tests/ui-responsive-contract.sh
-  
+  npm run test:cloudflare   # worker + contract suites (node/bash scripts)
+
   # Validate build compilation and linting
   npm run build
   npm run lint

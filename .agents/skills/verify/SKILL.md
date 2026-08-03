@@ -16,7 +16,7 @@ CoreZ is a Vite SPA + Cloudflare Worker. Two ways to verify locally:
 
 ```bash
 # Terminal A: worker on :8787 (serves /api/ai, /api/image, /api/market,
-# /api/apps, /api/memory, /api/assets)
+# /api/apps, /api/memory, /api/assets, /api/publish, /api/game/ws)
 OPENCODE_GO_API_KEY=sk-... npx wrangler dev
 
 # Terminal B: Vite dev server on :3000 (proxies /api/* to :8787)
@@ -59,7 +59,7 @@ npm run deploy   # deploys worker + dist assets to Cloudflare
 
 ```bash
 npm run lint
-npm test                              # 626+ unit tests
+npm test                              # 850+ unit tests
 npm run test:cloudflare               # all worker + contract suites
 npm run build
 ```

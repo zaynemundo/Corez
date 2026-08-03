@@ -11,12 +11,13 @@ The `superpowers` skill equips the agent with advanced orchestration and executi
 
 ## 1. Subagent-Driven Development (`superpowers:subagent-driven-development`)
 
-When implementing complex features or parallelizable tasks, delegate to specialized subagents using the `invoke_subagent` tool.
+When implementing complex features or parallelizable tasks, delegate to specialized subagents using the `task` tool (subagent types such as `general`, `engine-programmer`, `gameplay-programmer`, `ui-programmer`, `code-reviewer`, `qa-tester`, `explore`, or `web-search`). The available subagent types are listed by the environment; pick the narrowest type that can complete the job.
 
 ### Guidelines for Subagent Orchestration
-- **Define Clear Prompts**: Give the subagent a focused, unambiguous goal and clear inputs/outputs.
+- **Define Clear Prompts**: Give the subagent a focused, unambiguous goal and clear inputs/outputs; state whether it is analysis-only or authorised to edit, and name the exact files it may touch.
+- **Bounded Context**: Pass only the task-relevant context (task, role, goal, allowed files, acceptance criteria) — never dump full conversation history.
 - **Avoid Polling**: Once spawned, do not query the subagent's status in a loop. Allow the system to notify you upon subagent completion.
-- **Handoff Integration**: Integrate the subagent's deliverables into the primary workspace and final synthesis.
+- **Handoff Integration**: Integrate the subagent's deliverables into the primary workspace and final synthesis, then critically review the returned diff before accepting it.
 
 ---
 

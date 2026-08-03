@@ -23,8 +23,8 @@ push `main` to `origin/main`.
 ## Configuration
 
 The automation is driven by a `Stop` event hook defined in
-[hooks.json](file:///workspaces/New-Corez/.agents/hooks.json) that executes
-[auto_commit.py](file:///workspaces/New-Corez/.agents/scripts/auto_commit.py).
+`.agents/hooks.json` (repository root) that executes
+`.agents/scripts/auto_commit.py`.
 
 Self-verification: `bash tests/git-superpowers-contract.sh` asserts the policy
 (main-only commits, rebase, push `main:main`, no merge commits) against the

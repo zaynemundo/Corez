@@ -21,8 +21,9 @@ Use this skill when designing, building, or optimizing AI model integrations, LL
 
 ## 1. Model Routing & Primary/Secondary Failovers
 
-- **Routing Logic**: Direct fast structured classification tasks to lightweight models (e.g. Workers AI `@cf/meta/llama-3-8b-instruct`), and complex reasoning/art direction to high-capability models (e.g. MiMo V2.5, DeepSeek V4 Flash).
-- **Graceful Failover**: If the primary API endpoint times out (8–12s) or returns 5xx status codes, automatically degrade to secondary backup providers without throwing unhandled UI errors.
+- **Routing Logic**: Direct fast structured classification tasks to lightweight local logic (e.g. the repo's `src/services/intentClassifier.js`) and complex reasoning/art direction to the primary model (DeepSeek V4 Flash, `deepseek-v4-flash`).
+- **Graceful Failover**: CoreZ runs a provider chain (OpenCode Go -> DeepSeek official -> OpenRouter). If the primary API endpoint times out (8–12s) or returns 5xx status codes, automatically degrade to secondary backup providers without throwing unhandled UI errors. Each provider can be disabled via `OPENCODE_GO_DISABLED` / `DEEPSEEK_DISABLED` / `OPENROUTER_DISABLED`.
+- **Image routing**: background artwork and textures go through `POST /api/image` (FLUX 1 Schnell, `black-forest-labs/flux-1-schnell`), rate limited per client IP.
 
 ---
 
