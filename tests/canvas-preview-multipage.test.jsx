@@ -41,11 +41,10 @@ function withFakeIframeWindow(container) {
 }
 
 describe('CanvasPreview multi-page sites', () => {
-  it('renders one tab per parsed page', () => {
+  it('does not render a page tab bar', () => {
     renderPreview();
-    const tabs = screen.getAllByRole('tab');
-    expect(tabs.map((tab) => tab.textContent)).toEqual(['index.html', 'about.html']);
-    expect(tabs[0].getAttribute('aria-selected')).toBe('true');
+    expect(screen.queryByRole('tablist')).toBeNull();
+    expect(screen.queryAllByRole('tab')).toHaveLength(0);
   });
 
   it('starts on the index page and renders it in the iframe', () => {
@@ -53,14 +52,6 @@ describe('CanvasPreview multi-page sites', () => {
     const iframe = screen.getByTitle('Live Application Preview (Desktop)');
     expect(iframe.getAttribute('srcdoc')).toContain('<h1>Home</h1>');
     expect(iframe.getAttribute('srcdoc')).toContain("type: 'corez-nav'");
-  });
-
-  it('swaps the iframe document when a tab is clicked', () => {
-    renderPreview();
-    fireEvent.click(screen.getByRole('tab', { name: 'about.html' }));
-    const iframe = screen.getByTitle('Live Application Preview (Desktop)');
-    expect(iframe.getAttribute('srcdoc')).toContain('<h1>About Us</h1>');
-    expect(iframe.getAttribute('srcdoc')).not.toContain('<h1>Home</h1>');
   });
 
   it('navigates to a known page when the iframe posts a corez-nav message', () => {
@@ -112,9 +103,9 @@ describe('CanvasPreview multi-page sites', () => {
     expect(iframe.getAttribute('srcdoc')).toContain('<h1>Home</h1>');
   });
 
-  it('does not render page tabs for single-page creations', () => {
+  it('shows no tab bar for single-page creations either', () => {
     renderPreview('<!DOCTYPE html><html><body><h1>Single</h1></body></html>');
-    expect(screen.queryAllByRole('tab')).toHaveLength(0);
+    expect(screen.queryByRole('tablist')).toBeNull();
   });
 
   it('does not show a completeness warning for a complete multi-page site', () => {

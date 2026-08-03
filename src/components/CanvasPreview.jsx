@@ -269,41 +269,9 @@ export default function CanvasPreview({
           </div>
         )}
 
-        {/* Multi-page site tabs: one tab per parsed page. The iframe swaps
-            srcDoc (never navigates) so the sandbox stays intact. */}
-        {activeTab === 'preview' && multiPage.isMultiPage && (
-          <div
-            className="page-tab-bar"
-            role="tablist"
-            aria-label="Site pages"
-            style={{ display: 'flex', alignItems: 'center', gap: '4px', maxWidth: '100%', overflowX: 'auto' }}
-          >
-            {multiPage.pages.map((page) => (
-              <button
-                key={page.name}
-                type="button"
-                role="tab"
-                aria-selected={activePage === page.name}
-                onClick={() => setActivePage(page.name)}
-                title={`Open ${page.name}`}
-                style={{
-                  padding: '3px 10px',
-                  borderRadius: 'var(--radius-pill)',
-                  border: '1px solid var(--border-color)',
-                  background: activePage === page.name ? 'var(--text-primary)' : 'var(--bg-tertiary)',
-                  color: activePage === page.name ? 'var(--bg-primary)' : 'var(--text-secondary)',
-                  fontSize: '0.7rem',
-                  fontWeight: 300,
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  transition: 'var(--transition-fast)'
-                }}
-              >
-                {page.name}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Multi-page navigation happens inside the preview itself: the
+            injected router intercepts <a href="..."> clicks and posts a
+            corez-nav message, so no external tab bar is needed. */}
 
         <div className="canvas-controls">
           <button className="icon-btn" onClick={handleRefresh} title="Reload Preview">
