@@ -121,22 +121,87 @@ export function generatePdfDocument({ title = 'CoreZ Document', lines = [] }) {
 }
 
 /**
- * Build the self-contained HTML document for the preview canvas: an editable
+ * Build the self-contained HTML document for the preview canvas: a polished
  * research report with a "Download .pdf" button and a "Print / Save as PDF"
  * button. The PDF is generated client-side from the same content.
+ *
+ * The report renders its markdown-ish structure (## sections, - bullets,
+ * **bold**, [n] citations) as a real document; the redundant title heading
+ * and the editable Title/Content form are not shown — the report stands
+ * alone with clean typography.
  */
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function inlineReportText(text) {
+  return escapeHtml(text)
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    .replace(/(\[\d+\](?:\[\d+\])*)/g, '<span class="ref">$1</span>');
+}
+
+// Render the report body as structured HTML: the leading "# Title" line is
+// dropped (the report title is redundant), "## Section" becomes a section
+// heading, "- item" bullets are grouped, everything else is a paragraph.
+function renderReportHtml(body) {
+  const rawLines = String(body || '').split('\n').map((line) => line.replace(/\r/g, ''));
+  let start = 0;
+  while (start < rawLines.length && !rawLines[start].trim()) start += 1;
+  const lines = rawLines.slice(start);
+  if (lines.length > 0 && /^#\s+\S/.test(lines[0])) lines.shift();
+
+  const blocks = [];
+  let listItems = null;
+  const flushList = () => {
+    if (listItems !== null) {
+      blocks.push(`<ul>${listItems}</ul>`);
+      listItems = null;
+    }
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      flushList();
+      continue;
+    }
+    if (/^#{2,}\s+/.test(trimmed)) {
+      flushList();
+      blocks.push(`<h2>${inlineReportText(trimmed.replace(/^#{2,}\s+/, ''))}</h2>`);
+    } else if (/^[-*]\s+/.test(trimmed)) {
+      listItems = (listItems === null ? '' : listItems) + `<li>${inlineReportText(trimmed.replace(/^[-*]\s+/, ''))}</li>`;
+    } else {
+      flushList();
+      blocks.push(`<p>${inlineReportText(trimmed)}</p>`);
+    }
+  }
+  flushList();
+  return blocks.join('\n');
+}
+
 export function synthesizePdfDocumentHtml({ title = 'CoreZ Research Report', body = '', sources = [] }) {
   const safeTitle = String(title).replace(/[<>&"']/g, '').slice(0, 200);
-  const safeBody = String(body).replace(/[<>&"']/g, '');
+  const reportHtml = renderReportHtml(body);
   const sourceItems = Array.isArray(sources)
     ? sources
         .filter((s) => s && (s.title || s.url))
-        .map((s) => `<li>${String(s.title || 'Source').replace(/[<>&"']/g, '')} — <a href="${String(s.url || '').replace(/[<>&"']/g, '')}">${String(s.url || '').replace(/[<>&"']/g, '')}</a></li>`)
+        .map((s) => `<li><a href="${escapeHtml(s.url || '')}">${escapeHtml(s.title || 'Source')}</a>${s.url ? `<span>${escapeHtml(s.url)}</span>` : ''}</li>`)
         .join('')
     : '';
   const sourcesBlock = sourceItems
-    ? `<h2>Sources</h2><ul>${sourceItems}</ul>`
+    ? `<h2>Sources</h2><ol class="sources">${sourceItems}</ol>`
     : '';
+  // Title/body are baked into the script for the PDF builder; there is no
+  // editable form anymore.
+  const jsTitle = JSON.stringify(safeTitle);
+  const jsBody = JSON.stringify(body || '');
 
   return {
     title: `COREZ Research Report — ${safeTitle}`,
@@ -149,53 +214,71 @@ export function synthesizePdfDocumentHtml({ title = 'CoreZ Research Report', bod
 <style>
   :root { color-scheme: light; }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: #e8e8ec; color: #1c1c22; }
-  .toolbar { position: sticky; top: 0; z-index: 10; display: flex; gap: 10px; align-items: center;
-    padding: 12px 20px; background: #fafafa; border-bottom: 1px solid #d4d4d8; }
-  .toolbar h1 { font-size: 15px; margin: 0 auto 0 0; font-weight: 600; }
-  .btn { border: 0; border-radius: 8px; padding: 9px 16px; font-size: 13px; font-weight: 600;
-    cursor: pointer; background: #6366f1; color: #fff; }
-  .btn.secondary { background: #e4e4e7; color: #27272a; }
-  .btn:hover { filter: brightness(0.96); }
-  .editor { display: flex; gap: 16px; padding: 16px 20px; max-width: 1200px; margin: 0 auto; }
-  .editor label { display: block; font-size: 12px; font-weight: 600; color: #52525b; margin-bottom: 6px; }
-  input[type=text], textarea { width: 100%; border: 1px solid #d4d4d8; border-radius: 8px; padding: 10px;
-    font: 13px/1.5 inherit; resize: vertical; }
-  .paper { background: #fff; width: 794px; min-height: 1123px; margin: 8px auto 40px;
-    box-shadow: 0 4px 24px rgba(0,0,0,.18); padding: 64px 72px; font: 12px/1.55 'Times New Roman', Georgia, serif; }
-  .paper h1 { font-size: 22px; margin: 0 0 20px; }
-  .paper h2 { font-size: 15px; margin: 22px 0 8px; }
-  .paper p { margin: 0 0 12px; white-space: pre-wrap; }
-  .paper li { margin-bottom: 6px; }
-  .paper a { color: #4338ca; }
+  body { margin: 0; font-family: ui-serif, Georgia, 'Times New Roman', serif;
+    background:
+      radial-gradient(1100px 480px at 12% -10%, rgba(99,102,241,.14), transparent 60%),
+      radial-gradient(900px 420px at 96% -6%, rgba(168,85,247,.12), transparent 55%),
+      linear-gradient(165deg, #eef1f6 0%, #e3e8f0 100%);
+    color: #1e293b; min-height: 100vh; }
+  .toolbar { position: sticky; top: 0; z-index: 10; display: flex; justify-content: flex-end; gap: 10px;
+    padding: 12px 22px; background: rgba(255,255,255,.72); backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(148,163,184,.35); }
+  .btn { border: 0; border-radius: 999px; padding: 9px 18px; font-size: 13px; font-weight: 600;
+    font-family: ui-sans-serif, system-ui, sans-serif; cursor: pointer; letter-spacing: .01em; }
+  .btn.print { background: #eef2ff; color: #3730a3; }
+  .btn.download { background: #4f46e5; color: #fff; box-shadow: 0 6px 18px rgba(79,70,229,.35); }
+  .btn:hover { filter: brightness(0.97); }
+  .paper { max-width: 840px; margin: 30px auto 64px; background: #fff; border-radius: 14px;
+    box-shadow: 0 24px 64px rgba(15,23,42,.16), 0 2px 8px rgba(15,23,42,.06);
+    padding: 68px 84px 76px; }
+  .paper h2 { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .16em; color: #4f46e5; margin: 38px 0 14px;
+    padding-bottom: 9px; border-bottom: 1px solid #e2e8f0; }
+  .paper h2:first-child { margin-top: 0; }
+  .paper p { margin: 0 0 15px; font-size: 15px; line-height: 1.85; }
+  .paper strong { color: #0f172a; font-weight: 700; }
+  .paper ul { list-style: none; margin: 0 0 18px; padding: 0; }
+  .paper ul li { position: relative; padding-left: 24px; margin-bottom: 11px; font-size: 15px; line-height: 1.7; }
+  .paper ul li::before { content: ''; position: absolute; left: 2px; top: .58em; width: 9px; height: 9px;
+    border-radius: 3px; background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+  .paper .ref { color: #7c3aed; font-size: .72em; font-weight: 700; vertical-align: super;
+    font-family: ui-sans-serif, system-ui, sans-serif; letter-spacing: .02em; }
+  .paper em { color: #475569; }
+  .paper .sources { list-style: none; counter-reset: src; margin: 0; padding: 0; }
+  .paper .sources li { counter-increment: src; position: relative; padding-left: 40px;
+    margin-bottom: 12px; font-size: 13.5px; line-height: 1.6; }
+  .paper .sources li::before { content: counter(src); position: absolute; left: 0; top: .15em;
+    width: 24px; height: 24px; border-radius: 50%; background: #eef2ff; color: #4338ca;
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11.5px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; }
+  .paper .sources a { color: #4338ca; text-decoration: none; font-weight: 600; }
+  .paper .sources a:hover { text-decoration: underline; }
+  .paper .sources span { display: block; color: #64748b; font-size: 12px; word-break: break-all;
+    font-family: ui-sans-serif, system-ui, sans-serif; }
   @media print {
     body { background: #fff; }
-    .toolbar, .editor { display: none !important; }
-    .paper { box-shadow: none; margin: 0; width: auto; min-height: 0; padding: 40px 48px; }
-    @page { size: A4; margin: 20mm; }
+    .toolbar { display: none !important; }
+    .paper { box-shadow: none; border-radius: 0; margin: 0; max-width: none; padding: 0; }
+    .paper h2 { color: #111; border-color: #cbd5e1; }
+    .paper ul li::before { background: #475569; }
+    .paper .ref { color: #334155; }
+    .paper .sources a { color: #111; }
+    @page { size: A4; margin: 18mm 20mm; }
   }
 </style>
 </head>
 <body>
   <div class="toolbar">
-    <h1>CoreZ Research Report</h1>
-    <button class="btn secondary" onclick="window.print()" type="button">Print / Save as PDF</button>
-    <button class="btn" onclick="downloadPdf()" type="button">Download .pdf</button>
+    <button class="btn print" onclick="window.print()" type="button">Print / Save as PDF</button>
+    <button class="btn download" onclick="downloadPdf()" type="button">Download .pdf</button>
   </div>
-  <div class="editor">
-    <div style="flex:1"><label for="docTitle">Title</label><input id="docTitle" type="text" value="${safeTitle}"></div>
-    <div style="flex:1.6"><label for="docBody">Content</label><textarea id="docBody" rows="10">${safeBody}</textarea></div>
-  </div>
-  <div class="paper">
-    <h1 id="previewTitle">${safeTitle}</h1>
-    <p id="previewBody">${safeBody}</p>
-    ${sourcesBlock ? `<div id="previewSources">${sourcesBlock}</div>` : ''}
-  </div>
+  <article class="paper">
+    ${reportHtml}
+    ${sourcesBlock}
+  </article>
 <script>
-  var titleInput = document.getElementById('docTitle');
-  var bodyInput = document.getElementById('docBody');
-  titleInput.addEventListener('input', function(){ document.getElementById('previewTitle').textContent = titleInput.value || 'Untitled'; });
-  bodyInput.addEventListener('input', function(){ document.getElementById('previewBody').textContent = bodyInput.value; });
+  var REPORT_TITLE = ${jsTitle};
+  var REPORT_BODY = ${jsBody};
   function escapePdfText(t){ return String(t).replace(/\\\\/g,'\\\\\\\\').replace(/\\(/g,'\\\\(').replace(/\\)/g,'\\\\)').replace(/[^\\x00-\\xff]/g,''); }
   function wrapPdfText(t, maxChars){ var words = String(t).split(/\\s+/).filter(Boolean), lines = [], cur = '';
     for (var i=0;i<words.length;i++){ var w=words[i]; if ((cur+' '+w).trim().length>maxChars){ if(cur) lines.push(cur); cur=w; } else { cur=(cur+' '+w).trim(); } }
@@ -230,10 +313,10 @@ export function synthesizePdfDocumentHtml({ title = 'CoreZ Research Report', bod
     return new Blob([out], { type: 'application/pdf' });
   }
   function downloadPdf(){
-    var blob = buildPdf(titleInput.value, bodyInput.value);
+    var blob = buildPdf(REPORT_TITLE, REPORT_BODY);
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
-    a.href = url; a.download = (titleInput.value || 'research-report').replace(/[^A-Za-z0-9 _-]/g,'') + '.pdf';
+    a.href = url; a.download = (REPORT_TITLE || 'research-report').replace(/[^A-Za-z0-9 _-]/g,'') + '.pdf';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
   }
