@@ -2953,7 +2953,7 @@ export async function generateLocalAIResponse(prompt, hostedError = null) {
 
   // 2. CREATOR FACT
   if (/\bwho\b.{0,20}\b(created|made|built|invented|developed)\b|\b(created|made|built|invented|developed)\b.{0,30}\b(corez|core z)\b/i.test(lower)) {
-    return `Corez was created by Zayne and Chris.`;
+    return `Corez was created by Zayne Mundo and Christian Jericon. I'm Corez — a friendly AI assistant that builds websites, apps, games, and tools right in your chat, answers your questions, writes and explains code, and helps with research and writing. What would you like to create or learn about today?`;
   }
 
   if (/^(how are you|how is it going|how's it going)(\s|!|\.|\?|$)/i.test(lower)) {
