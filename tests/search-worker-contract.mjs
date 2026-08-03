@@ -94,7 +94,7 @@ async function run() {
   );
   assert.equal(manyResponse.status, 200);
   const manyData = await manyResponse.json();
-  assert.ok(manyData.results.length <= 8);
+  assert.ok(manyData.results.length <= 12);
 
   // Every provider returning nothing -> honest 502, never fabricated results.
   const emptyResponse = await post(
@@ -203,6 +203,42 @@ async function run() {
   } finally {
     globalThis.fetch = originalFetch3;
   }
+
+  // Deep research mode (detail: true) attaches full Wikipedia extracts to the
+  // top Wikipedia results.
+  const detailResponse = await post(
+    { query: 'red turtles', detail: true },
+    {
+      __SEARCH_FETCH: async (url) => {
+        const u = new URL(url);
+        if (u.hostname === 'en.wikipedia.org' && u.searchParams.get('prop') === 'extracts') {
+          const title = u.searchParams.get('titles');
+          return Response.json({
+            query: { pages: { 1: { title, extract: `${title} full article text. `.repeat(50) } } }
+          });
+        }
+        if (u.hostname === 'en.wikipedia.org') {
+          return Response.json({ query: { search: [{ title: 'Red turtle', snippet: 'S.', wordcount: 5 }] } });
+        }
+        return Response.json({});
+      }
+    }
+  );
+  assert.equal(detailResponse.status, 200);
+  const detailData = await detailResponse.json();
+  assert.equal(detailData.meta.extracted, true);
+  const withExtract = detailData.results.find((r) => r.extract);
+  assert.ok(withExtract, 'extracts must be attached in detail mode');
+  assert.ok(withExtract.extract.length >= 100);
+
+  // Plain searches never attach extracts.
+  const plainResponse = await post(
+    { query: 'red turtles' },
+    { __SEARCH_FETCH: wikipediaResults(['Alpha']) }
+  );
+  const plainData = await plainResponse.json();
+  assert.equal(plainData.meta.extracted, false);
+  assert.ok(plainData.results.every((r) => r.extract === undefined));
 
   console.log('Web search Worker contract passed.');
 }

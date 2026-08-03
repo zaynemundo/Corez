@@ -58,7 +58,7 @@ describe('fetchWebSearch client', () => {
     });
     expect(fetchMock).toHaveBeenCalledWith('/api/search', expect.objectContaining({
       method: 'POST',
-      body: JSON.stringify({ query: 'web search' })
+      body: JSON.stringify({ query: 'web search', detail: false })
     }));
     vi.unstubAllGlobals();
   });

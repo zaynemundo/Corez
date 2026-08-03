@@ -9,7 +9,7 @@
 
 export const SEARCH_PROXY_ENDPOINT = '/api/search';
 
-const MAX_RESULTS = 8;
+const MAX_RESULTS = 12;
 
 export class SearchApiError extends Error {
   constructor(message, status, detail) {
@@ -32,7 +32,10 @@ function normalizeResults(payload) {
       title: typeof result.title === 'string' ? result.title : '',
       url: typeof result.url === 'string' ? result.url : '',
       snippet: typeof result.snippet === 'string' ? result.snippet : '',
-      source: typeof result.source === 'string' ? result.source : 'search'
+      source: typeof result.source === 'string' ? result.source : 'search',
+      ...(typeof result.extract === 'string' && result.extract
+        ? { extract: result.extract }
+        : {})
     }))
     .filter((result) => result.title || result.url)
     .slice(0, MAX_RESULTS);
@@ -43,8 +46,11 @@ function normalizeResults(payload) {
  * results is a normalized, validated array. Throws SearchApiError on honest
  * failure (no provider configured, no results, network error) — CoreZ never
  * fabricates search results.
+ *
+ * With `{ detail: true }` the worker also attaches full article extracts to
+ * the top Wikipedia results, so reports can be grounded in real content.
  */
-export async function fetchWebSearch(query, signal = null) {
+export async function fetchWebSearch(query, signal = null, options = {}) {
   if (!query || typeof query !== 'string' || !query.trim()) {
     throw new SearchApiError('A search query is required.', 400);
   }
@@ -52,7 +58,7 @@ export async function fetchWebSearch(query, signal = null) {
   const fetchOptions = {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query: trimmed })
+    body: JSON.stringify({ query: trimmed, detail: options.detail === true })
   };
   if (signal) fetchOptions.signal = signal;
 

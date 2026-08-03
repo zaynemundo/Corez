@@ -2587,9 +2587,15 @@ ${search.results.map((result, index) => `${index + 1}. ${result.title} — ${res
 }
 
 // Full research pipeline for the /research command: search the web
-// (DuckDuckGo + Wikipedia through the worker), write a comprehensive
-// research report grounded in the real results, and deliver it as a
-// downloadable PDF in the preview canvas.
+// (Wikipedia + DuckDuckGo through the worker, with full article extracts for
+// the top sources), write a detailed research report grounded in the real
+// results, run an editorial verification pass over the draft, and deliver it
+// as a downloadable PDF in the preview canvas.
+//
+// Methodology adapted in original form from Academic Research Skills by
+// Cheng-I Wu (CC-BY-NC 4.0, https://github.com/Imbad0202/academic-research-skills):
+// research-question scoping, systematic grounding in full sources, cross-source
+// synthesis with contradiction handling, and an editorial verification pass.
 export async function runResearchCommand(topic, history = [], signal = null) {
   const cleanTopic = String(topic || '').trim();
   if (!cleanTopic) {
@@ -2598,7 +2604,7 @@ export async function runResearchCommand(topic, history = [], signal = null) {
 
   let search;
   try {
-    search = await fetchWebSearch(cleanTopic, signal);
+    search = await fetchWebSearch(cleanTopic, signal, { detail: true });
   } catch (error) {
     if (error?.name === 'AbortError') throw error;
     // Name the real failure so the user (or developer) can see why the
@@ -2613,16 +2619,41 @@ export async function runResearchCommand(topic, history = [], signal = null) {
     return `I searched the web for **"${cleanTopic}"** but no reliable results came back, so I can't write a grounded research report about it. Try a different topic.`;
   }
 
-  // Build the report content: prefer the hosted AI grounded on the real
-  // results; fall back to a factual summary of the sources.
+  const resultsText = results
+    .map((result, index) => `${index + 1}. ${result.title} — ${result.url}\n   ${result.snippet || ''} (source: ${result.source})`)
+    .join('\n');
+  const extracts = results
+    .map((result, index) => (result.extract ? `[${index + 1}] ${result.title}\n${result.extract}` : null))
+    .filter(Boolean);
+  const extractsText = extracts.length > 0
+    ? `\nFULL ARTICLE EXTRACTS (use these for depth and detail):\n\n${extracts.join('\n\n')}`
+    : '';
+
+  // Draft pass: research-question scoping, detailed multi-section report
+  // grounded in snippets AND full article extracts.
   let reportBody = '';
   try {
-    const researchPrompt = `Write a comprehensive research report on: "${cleanTopic}"
+    const researchPrompt = `Write a detailed, comprehensive research report on: "${cleanTopic}"
 
-Use ONLY the web search results below as factual grounding. Structure the report with clear sections: Overview, Key Findings, Details, and Conclusion. Cite sources inline as [1], [2], etc., and include the numbered Sources list at the end with the exact titles and URLs provided. If the results do not cover something, say so honestly instead of guessing. Do not invent facts, URLs, or sources.
+RESEARCH METHOD:
+- First, frame the precise research question this report answers and its scope.
+- Use ONLY the web search results and full article extracts below as factual grounding.
+- Cite every claim inline as [1], [2], etc. Where a claim is not supported by the sources, say so explicitly instead of guessing. Never invent facts, URLs, or sources.
+- Synthesize across sources: where sources disagree or cover different aspects, say so explicitly and resolve the contradiction when the evidence allows.
+
+REPORT STRUCTURE (produce ALL sections):
+1. Research Question & Scope — the precise question this report answers and what it deliberately does not cover.
+2. Overview — a concise orientation for a general reader.
+3. Key Findings — the most important, evidence-backed conclusions, each cited.
+4. Detailed Analysis — the core of the report: examine each notable subject in its own subsection with multiple paragraphs, drawing on the full article extracts for depth (background, context, specifics, examples).
+5. Contradictions & Unresolved Questions — where the sources disagree, what remains unknown, and where evidence is thin.
+6. Conclusion — synthesise the findings and answer the research question directly.
+
+Aim for a thorough, in-depth report (roughly 800+ words), not a summary. Write clear, well-structured prose.
 
 SEARCH RESULTS:
-${results.map((result, index) => `${index + 1}. ${result.title} — ${result.url}\n   ${result.snippet || ''} (source: ${result.source})`).join('\n')}`;
+${resultsText}
+${extractsText}`;
     const hosted = await generateHostedAIResponse(researchPrompt, analyzePublicUserIntent(cleanTopic), history, signal);
     if (hosted) reportBody = hosted;
   } catch (error) {
@@ -2630,13 +2661,58 @@ ${results.map((result, index) => `${index + 1}. ${result.title} — ${result.url
     // Hosted AI unavailable: build the report from the real sources directly.
   }
 
+  // Editorial verification pass: every claim must be traceable to a source;
+  // unsupported claims and contradictions are corrected in the final text.
+  // Best effort — a failing review keeps the draft.
+  if (reportBody) {
+    try {
+      const reviewPrompt = `You are an editorial reviewer for a research report. Critically review the draft against the source list:
+- Every claim must be traceable to a source: flag and correct any claim that is not supported.
+- Fix contradictions, overreach, and missing evidence in the final text.
+- Keep the structure and all accurate, well-supported content; do not add facts that are not in the sources.
+Then output THE FINAL REVISED REPORT ONLY (no review commentary, no preamble).
+
+SOURCES:
+${resultsText}
+
+DRAFT:
+${reportBody.slice(0, 24000)}`;
+      const revised = await generateHostedAIResponse(reviewPrompt, analyzePublicUserIntent(cleanTopic), history, signal);
+      if (revised) reportBody = revised;
+    } catch (error) {
+      if (error?.name === 'AbortError') throw error;
+    }
+  }
+
   if (!reportBody) {
-    reportBody = `# Research Report: ${cleanTopic}\n\n## Overview\n\nThis report summarises information gathered from the sources listed below.\n\n## Key Findings\n\n${results
-      .slice(0, 5)
-      .map((r) => `- ${r.title}: ${r.snippet || 'See source for details.'}`)
-      .join('\n')}\n\n## Sources\n\n${results
-      .map((r, i) => `${i + 1}. ${r.title} — ${r.url}`)
-      .join('\n')}\n\n_Generated by CoreZ from live web search results._`;
+    reportBody = `# Research Report: ${cleanTopic}
+
+## Research Question & Scope
+
+This report answers: what does the available evidence say about "${cleanTopic}"? It is grounded strictly in the live web search results listed below.
+
+## Key Findings
+
+${results
+  .slice(0, 6)
+  .map((r) => `- ${r.title}: ${r.snippet || 'See source for details.'}`)
+  .join('\n')}
+
+## Detailed Analysis
+
+${results
+  .map((r, i) => `${i + 1}. ${r.title} — ${r.url}\n   ${(r.extract || r.snippet || 'See source for details.').slice(0, 600)}`)
+  .join('\n\n')}
+
+## Contradictions & Unresolved Questions
+
+The hosted model was unavailable during this run, so the excerpts above are presented directly from the sources without cross-source synthesis.
+
+## Sources
+
+${results.map((r, i) => `${i + 1}. ${r.title} — ${r.url}`).join('\n')}
+
+_Generated by CoreZ from live web search results._`;
   }
 
   // Strip markdown fences so the content renders cleanly in the PDF editor.

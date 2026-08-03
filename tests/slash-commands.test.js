@@ -87,20 +87,28 @@ describe('/website and /game routing', () => {
 
 describe('/research command', () => {
   it('produces a grounded research report with a downloadable PDF', async () => {
-    const fetchMock = vi.fn(async (url) => {
+    const fetchMock = vi.fn(async (url, init) => {
       if (url === '/api/search') {
+        const body = JSON.parse(init.body);
+        expect(body.detail).toBe(true); // deep research requests full extracts
         return Response.json({
           kind: 'search',
           query: 'quantum computing',
           results: [
-            { title: 'Quantum Computing Basics', url: 'https://en.wikipedia.org/wiki/Quantum_computing', snippet: 'Quantum computing uses qubits.', source: 'Wikipedia' },
+            { title: 'Quantum Computing Basics', url: 'https://en.wikipedia.org/wiki/Quantum_computing', snippet: 'Quantum computing uses qubits.', source: 'Wikipedia', extract: 'Quantum computing is the use of quantum mechanics for computation.' },
             { title: 'Qubits Explained', url: 'https://example.com/qubits', snippet: 'Qubits can be 0, 1, or both.', source: 'DuckDuckGo' }
           ],
-          meta: { source: 'Wikipedia' }
+          meta: { source: 'Wikipedia', extracted: true }
         });
       }
       if (url === '/api/ai') {
-        return Response.json({ content: 'Overview\n\nQuantum computing is a field.\n\nKey Findings\n\n- Qubits.\n\nSources\n\n1. Quantum Computing Basics — https://en.wikipedia.org/wiki/Quantum_computing' });
+        const payload = JSON.parse(init.body);
+        // Draft pass asks for the detailed structure; the editorial pass asks
+        // for the final revised report.
+        const isReview = /editorial reviewer/.test(payload.prompt || '');
+        return Response.json({ content: isReview
+          ? 'Overview\n\nQuantum computing is a field, revised and verified.\n\nKey Findings\n\n- Qubits.' 
+          : 'Overview\n\nQuantum computing is a field.\n\nKey Findings\n\n- Qubits.\n\nSources\n\n1. Quantum Computing Basics — https://en.wikipedia.org/wiki/Quantum_computing' });
       }
       throw new Error(`Unexpected fetch: ${url}`);
     });
@@ -110,6 +118,7 @@ describe('/research command', () => {
     expect(response).toContain('Download .pdf');
     expect(response).toContain('```html');
     expect(response).toContain('Quantum computing is a field');
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/ai').length).toBe(2);
     vi.unstubAllGlobals();
   });
 

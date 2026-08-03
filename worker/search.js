@@ -17,11 +17,15 @@
 import { jsonResponse, readBoundedJson } from './utils.js';
 
 const MAX_QUERY_CHARS = 200;
-const MAX_RESULTS = 8;
+const MAX_RESULTS = 12;
+const MAX_EXTRACT_RESULTS = 4;
+const MAX_EXTRACT_CHARS = 3000;
 const PROVIDER_TIMEOUT_MS = 8_000;
+const EXTRACT_TIMEOUT_MS = 8_000;
 const MAX_SEARCH_BODY_BYTES = 64 * 1024;
 const DDG_LITE_ENDPOINT = 'https://lite.duckduckgo.com/lite/';
 const WIKIPEDIA_ENDPOINT = 'https://en.wikipedia.org/w/api.php';
+const WIKIPEDIA_EXTRACTS_ENDPOINT = 'https://en.wikipedia.org/w/api.php';
 const OPENROUTER_RERANK_ENDPOINT = 'https://openrouter.ai/api/v1/rerank';
 const OPENROUTER_EMBEDDINGS_ENDPOINT = 'https://openrouter.ai/api/v1/embeddings';
 const DEFAULT_RERANK_MODEL = 'nvidia/llama-nemotron-rerank-vl-1b-v2:free';
@@ -287,6 +291,46 @@ async function rankSearchResults(query, results, env) {
   return rankWithEmbeddings(query, results, env);
 }
 
+/**
+ * Fetch full plain-text article extracts for Wikipedia results. The MediaWiki
+ * extracts API only returns content for ONE page per batched titles= request,
+ * so each title is fetched in parallel (bounded, best effort). Used for deep
+ * research so reports are grounded in the actual article content, not just
+ * search snippets. Any failure omits the extract rather than failing search.
+ */
+async function fetchWikipediaExtracts(titles, fetchImpl) {
+  const unique = Array.from(new Set(titles.filter((title) => typeof title === 'string' && title.trim())))
+    .slice(0, MAX_EXTRACT_RESULTS);
+  if (unique.length === 0) return new Map();
+
+  const extracts = new Map();
+  await Promise.allSettled(unique.map(async (title) => {
+    const url = new URL(WIKIPEDIA_EXTRACTS_ENDPOINT);
+    url.searchParams.set('action', 'query');
+    url.searchParams.set('prop', 'extracts');
+    url.searchParams.set('explaintext', '1');
+    url.searchParams.set('exlimit', '1');
+    url.searchParams.set('titles', title);
+    url.searchParams.set('format', 'json');
+    url.searchParams.set('origin', '*');
+
+    const response = await fetchImpl(url, {
+      ...providerFetchOptions(),
+      signal: AbortSignal.timeout(EXTRACT_TIMEOUT_MS)
+    });
+    if (!response.ok) return;
+    const data = await response.json();
+    const pages = data?.query?.pages;
+    if (!isObject(pages)) return;
+    for (const page of Object.values(pages)) {
+      if (!isObject(page) || typeof page.title !== 'string') continue;
+      const extract = typeof page.extract === 'string' ? page.extract.trim() : '';
+      if (extract) extracts.set(page.title, extract.slice(0, MAX_EXTRACT_CHARS));
+    }
+  }));
+  return extracts;
+}
+
 /** Wikipedia search: free, no key required. */
 async function searchWikipedia(query, fetchImpl) {
   const url = new URL(WIKIPEDIA_ENDPOINT);
@@ -383,6 +427,23 @@ export async function handleSearch(request, env) {
         rerankMethod = ranked.method;
       }
     }
+
+    // Deep research mode (body.detail === true): attach full Wikipedia
+    // article extracts to the top Wikipedia results so reports can be
+    // grounded in real article content, not just snippets. Best effort.
+    let extracted = false;
+    if (body?.detail === true) {
+      const wikiResults = results.filter((result) => result.source === 'Wikipedia');
+      const extracts = await fetchWikipediaExtracts(wikiResults.map((result) => result.title), fetchImpl);
+      if (extracts.size > 0) {
+        results = results.map((result) => {
+          const extract = extracts.get(result.title);
+          return extract ? { ...result, extract } : result;
+        });
+        extracted = true;
+      }
+    }
+
     const sources = Array.from(new Set(results.map((r) => r.source)));
     return jsonResponse(200, {
       kind: 'search',
@@ -392,6 +453,7 @@ export async function handleSearch(request, env) {
         source: results[0]?.source || 'search',
         sources,
         rerank: rerankMethod,
+        extracted,
         servedAt: new Date().toISOString()
       }
     });
