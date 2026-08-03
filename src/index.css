@@ -1379,7 +1379,7 @@ h1, h2, h3, h4, h5, h6 {
   padding: 0.55rem 0.65rem;
   display: flex;
   flex-direction: row;
-  align-items: center;
+  align-items: flex-end;
   gap: 0.65rem;
   transition: max-width 0.4s cubic-bezier(0.16, 1, 0.3, 1), width 0.4s cubic-bezier(0.16, 1, 0.3, 1), border-color var(--transition-fast), background-color var(--transition-fast);
 }
