@@ -240,6 +240,32 @@ async function run() {
   assert.equal(plainData.meta.extracted, false);
   assert.ok(plainData.results.every((r) => r.extract === undefined));
 
+  // DuckDuckGo sponsored links (y.js?ad_domain=...) are never surfaced.
+  const adsResponse = await post(
+    { query: 'shopping' },
+    {
+      __SEARCH_FETCH: async (url) => {
+        const u = new URL(url);
+        if (u.hostname === 'lite.duckduckgo.com') {
+          return new Response(
+            `<a rel="nofollow" href="//duckduckgo.com/l/?uddg=${encodeURIComponent('https://duckduckgo.com/y.js?ad_domain=amazon.co.uk&ad_type=txad&u3=https%3A%2F%2Fwww.bing.com%2Faclick%3Fld%3Dx')}&amp;rut=ad1" class='result-link'>Buy stuff now</a>
+             <td class='result-snippet'>Sponsored listing.</td>
+             <a rel="nofollow" href="//duckduckgo.com/l/?uddg=${encodeURIComponent('https://example.com/real-result')}&amp;rut=ok" class='result-link'>Real result</a>
+             <td class='result-snippet'>Real content with &#x27;apostrophe&#x27; and &amp; entities.</td>`,
+            { status: 200, headers: { 'Content-Type': 'text/html' } }
+          );
+        }
+        return Response.json({ query: { search: [] } });
+      }
+    }
+  );
+  assert.equal(adsResponse.status, 200);
+  const adsData = await adsResponse.json();
+  assert.ok(adsData.results.every((r) => !/y\.js|ad_domain|aclick/i.test(r.url)), 'ads must be filtered');
+  assert.ok(adsData.results.some((r) => r.url === 'https://example.com/real-result'));
+  const realResult = adsData.results.find((r) => r.url === 'https://example.com/real-result');
+  assert.equal(realResult.snippet, "Real content with 'apostrophe' and & entities.");
+
   console.log('Web search Worker contract passed.');
 }
 

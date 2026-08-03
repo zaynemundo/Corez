@@ -24,10 +24,16 @@ function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+// DuckDuckGo Lite can interleave sponsored links (y.js?ad_domain=...);
+// they are never surfaced as results.
+function isAdUrl(value) {
+  return /(?:y\.js\?|ad_domain=|ad_provider=|ad_type=|click_metadata=|\/aclick\?)/i.test(String(value || ''));
+}
+
 function normalizeResults(payload) {
   if (!isObject(payload) || !Array.isArray(payload.results)) return [];
   return payload.results
-    .filter((result) => isObject(result))
+    .filter((result) => isObject(result) && !isAdUrl(result.url))
     .map((result) => ({
       title: typeof result.title === 'string' ? result.title : '',
       url: typeof result.url === 'string' ? result.url : '',

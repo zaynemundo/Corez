@@ -107,7 +107,7 @@ async function searchDuckDuckGo(query, fetchImpl) {
   }
   links.forEach((link, index) => {
     const realUrl = extractUddgUrl(link.href);
-    if (!realUrl || !validHttpUrl(realUrl)) return;
+    if (!realUrl || !validHttpUrl(realUrl) || isAdUrl(realUrl)) return;
     const result = normalizeResult(
       link.title || 'DuckDuckGo result',
       realUrl,
@@ -133,14 +133,43 @@ function stripHtmlTags(value) {
   return String(value).replace(/<[^>]*>/g, '');
 }
 
+// DuckDuckGo Lite can interleave sponsored links that redirect through
+// duckduckgo.com/y.js?ad_domain=...&click_metadata=... — never surface ads
+// as search results.
+function isAdUrl(value) {
+  const url = String(value || '');
+  return /(?:y\.js\?|ad_domain=|ad_provider=|ad_type=|click_metadata=|\/aclick\?)/i.test(url);
+}
+
+const HTML_ENTITIES = Object.freeze([
+  [/&amp;/g, '&'],
+  [/&lt;/g, '<'],
+  [/&gt;/g, '>'],
+  [/&quot;/g, '"'],
+  [/&#34;/g, '"'],
+  [/&#x22;/g, '"'],
+  [/&#39;/g, "'"],
+  [/&#039;/g, "'"],
+  [/&#x27;/g, "'"],
+  [/&apos;/g, "'"],
+  [/&#x2F;/g, '/'],
+  [/&nbsp;/g, ' '],
+  [/&hellip;/g, '...'],
+  [/&ndash;/g, '-'],
+  [/&mdash;/g, '—'],
+  [/&lsquo;/g, '\u2018'],
+  [/&rsquo;/g, '\u2019'],
+  [/&ldquo;/g, '\u201C'],
+  [/&rdquo;/g, '\u201D'],
+  [/&bull;/g, '\u2022']
+]);
+
 function decodeHtmlText(value) {
-  return String(value)
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ');
+  let out = String(value);
+  for (const [pattern, replacement] of HTML_ENTITIES) {
+    out = out.replace(pattern, replacement);
+  }
+  return out;
 }
 
 function cosineSimilarity(vecA, vecB) {
@@ -351,10 +380,13 @@ async function searchWikipedia(query, fetchImpl) {
     .map((hit) => {
       if (!isObject(hit) || typeof hit.title !== 'string') return null;
       const slug = encodeURIComponent(hit.title.replace(/ /g, '_'));
+      const snippet = typeof hit.snippet === 'string'
+        ? decodeHtmlText(stripHtmlTags(hit.snippet)).trim()
+        : '';
       return normalizeResult(
         hit.title,
         `https://en.wikipedia.org/wiki/${slug}`,
-        typeof hit.snippet === 'string' ? hit.snippet.replace(/<[^>]*>/g, '') : '',
+        snippet,
         'Wikipedia'
       );
     })
@@ -410,7 +442,7 @@ export async function handleSearch(request, env) {
       const result = list[index];
       if (!result) continue;
       const key = String(result.url || result.title).replace(/\/+$/, '').toLowerCase();
-      if (!key || seen.has(key)) continue;
+      if (!key || seen.has(key) || isAdUrl(result.url)) continue;
       seen.add(key);
       merged.push(result);
       if (merged.length >= MAX_RESULTS) break;
