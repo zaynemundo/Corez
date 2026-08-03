@@ -7,3 +7,6 @@ dist/
 .wrangler/
 
 scratch/
+
+# Python bytecode cache
+__pycache__/
