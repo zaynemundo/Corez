@@ -30,7 +30,7 @@ Conversation history is sent in full below the platform body guard; only when a 
 
 ### Publishing creations
 
-The canvas preview's **Publish** button shares the current creation as a short public link (`corez.pro/asyag23-123`). The worker stores the formatted preview document in R2 under `publish/<slug>.json` and serves it at the bare root path to anyone, sandboxed with the same CSP as the in-app preview. Publishing again under the same slug updates the existing link.
+The canvas preview's **Publish** button shares the current creation as a short public link (`corez.pro/asyag23-123`). The worker stores the formatted preview document in R2 under `publish/<slug>.json` and serves it at the bare root path to anyone, sandboxed with the same CSP as the in-app preview. Publishing again updates the same link: identical content, a revised version from the same chat session, and multi-page sub-pages all republish under the existing slug rather than creating duplicates.
 
 Only the app document itself is published: conversation history, session IDs, and prompts are never sent to `/api/publish` (the endpoint ignores them even if a client sends them), and the shared page contains nothing but the app.
 

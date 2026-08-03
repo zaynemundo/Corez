@@ -604,6 +604,7 @@ export default function App() {
                 onClose={() => setCanvasOpen(false)}
                 isFullScreen={canvasFullScreen}
                 onToggleFullScreen={() => setCanvasFullScreen(prev => !prev)}
+                sessionId={activeSession?.id || null}
               />
             )}
           </>

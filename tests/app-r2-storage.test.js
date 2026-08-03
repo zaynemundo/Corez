@@ -176,5 +176,133 @@ describe('R2 Multi-App Storage & Chat Deletion Cleanup Contract', () => {
       expect(await publishAppInR2({ html: '<h1>Game</h1>' })).toBeNull();
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
+
+    it('updates the SAME published link when revised content is republished from the same session', async () => {
+      let publishCount = 0;
+      const fetchMock = vi.fn(async () => new Response(
+        JSON.stringify({ success: true, slug: `asyag23-${++publishCount}`, url: `/asyag23-${publishCount}` }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      ));
+      vi.stubGlobal('fetch', fetchMock);
+      const store = {};
+      globalThis.localStorage = {
+        getItem: (key) => store[key] ?? null,
+        setItem: (key, value) => { store[key] = value; }
+      };
+      try {
+        // First publish allocates a new slug for the session.
+        await publishAppInR2({ html: '<h1>Site v1</h1>', title: 'Site', sessionId: 'session-1' });
+        expect(fetchMock.mock.calls[0][1].body).not.toContain('"slug"');
+
+        // A REVISION of the site (different content, same session) must
+        // republish under the SAME slug — this survives closing the preview,
+        // switching sessions, and page refreshes because it is persisted.
+        await publishAppInR2({ html: '<h1>Site v2 - revised</h1>', title: 'Site v2', sessionId: 'session-1' });
+        const bodies = fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body));
+        expect(bodies[1].slug).toBe('asyag23-1');
+        expect(bodies[1].title).toBe('Site v2');
+      } finally {
+        delete globalThis.localStorage;
+      }
+    });
+
+    it('allocates separate links for separate sessions', async () => {
+      let publishCount = 0;
+      const fetchMock = vi.fn(async () => new Response(
+        JSON.stringify({ success: true, slug: `asyag23-${++publishCount}`, url: `/asyag23-${publishCount}` }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      ));
+      vi.stubGlobal('fetch', fetchMock);
+      const store = {};
+      globalThis.localStorage = {
+        getItem: (key) => store[key] ?? null,
+        setItem: (key, value) => { store[key] = value; }
+      };
+      try {
+        await publishAppInR2({ html: '<h1>A</h1>', sessionId: 'session-a' });
+        await publishAppInR2({ html: '<h1>B</h1>', sessionId: 'session-b' });
+
+        const bodies = fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body));
+        expect(bodies[0].slug).toBeUndefined();
+        expect(bodies[1].slug).toBeUndefined();
+      } finally {
+        delete globalThis.localStorage;
+      }
+    });
+
+    it('an explicit slug always wins over session lineage', async () => {
+      const fetchMock = vi.fn(async (url, init) => {
+        const body = JSON.parse(init.body);
+        return new Response(
+          JSON.stringify({ success: true, slug: body.slug || 'lineage-1', url: `/${body.slug || 'lineage-1'}` }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      const store = {};
+      globalThis.localStorage = {
+        getItem: (key) => store[key] ?? null,
+        setItem: (key, value) => { store[key] = value; }
+      };
+      try {
+        await publishAppInR2({ html: '<h1>v1</h1>', sessionId: 'session-1' });
+        await publishAppInR2({ html: '<h1>v2</h1>', sessionId: 'session-1', slug: 'explicit-1' });
+        const bodies = fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body));
+        expect(bodies[0].slug).toBeUndefined();
+        expect(bodies[1].slug).toBe('explicit-1');
+      } finally {
+        delete globalThis.localStorage;
+      }
+    });
+
+    it('republishing a revised multi-page site updates its sub-pages under the same slug', async () => {
+      let publishCount = 0;
+      const fetchMock = vi.fn(async () => new Response(
+        JSON.stringify({ success: true, slug: `asyag23-${++publishCount}`, url: `/asyag23-${publishCount}` }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      ));
+      vi.stubGlobal('fetch', fetchMock);
+      const store = {};
+      globalThis.localStorage = {
+        getItem: (key) => store[key] ?? null,
+        setItem: (key, value) => { store[key] = value; }
+      };
+      try {
+        const v1Pages = { 'about.html': '<!DOCTYPE html><html><body><h1>About v1</h1></body></html>' };
+        const v2Pages = { 'about.html': '<!DOCTYPE html><html><body><h1>About v2</h1></body></html>', 'contact.html': '<!DOCTYPE html><html><body><h1>Contact</h1></body></html>' };
+
+        await publishAppInR2({ html: '<h1>Home v1</h1>', pages: v1Pages, sessionId: 'session-1' });
+        await publishAppInR2({ html: '<h1>Home v2</h1>', pages: v2Pages, sessionId: 'session-1' });
+
+        const bodies = fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body));
+        expect(bodies[1].slug).toBe('asyag23-1');
+        expect(bodies[1].pages['about.html']).toContain('About v2');
+        expect(bodies[1].pages['contact.html']).toContain('Contact');
+      } finally {
+        delete globalThis.localStorage;
+      }
+    });
+
+    it('keeps the session lineage capped to the most recent sessions', async () => {
+      const fetchMock = vi.fn(async () => new Response(
+        JSON.stringify({ success: true, slug: 'cap-1', url: '/cap-1' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      ));
+      vi.stubGlobal('fetch', fetchMock);
+      const store = {};
+      globalThis.localStorage = {
+        getItem: (key) => store[key] ?? null,
+        setItem: (key, value) => { store[key] = value; }
+      };
+      try {
+        for (let i = 0; i < 60; i += 1) {
+          await publishAppInR2({ html: `<h1>${i}</h1>`, sessionId: `session-${i}` });
+        }
+        const lineage = JSON.parse(store['corez_publish_lineage']);
+        expect(Object.keys(lineage).length).toBeLessThanOrEqual(50);
+      } finally {
+        delete globalThis.localStorage;
+      }
+    });
   });
 });

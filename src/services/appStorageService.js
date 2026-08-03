@@ -12,6 +12,13 @@ const API_APPS_ENDPOINT = '/api/apps';
 const PUBLISH_REGISTRY_KEY = 'corez_published_links';
 const PUBLISH_REGISTRY_MAX = 20;
 
+// Per-session publish lineage: remembers the slug each chat session last
+// published under, so publishing a REVISED version of a creation updates the
+// same public link instead of allocating a new slug (even after the preview
+// is closed, the session switches, or the page refreshes).
+const PUBLISH_LINEAGE_KEY = 'corez_publish_lineage';
+const PUBLISH_LINEAGE_MAX = 50;
+
 function contentHash(value) {
   let hash = 5381;
   const text = String(value || '');
@@ -38,6 +45,29 @@ function savePublishRegistry(entries) {
     localStorage.setItem(PUBLISH_REGISTRY_KEY, JSON.stringify(entries.slice(0, PUBLISH_REGISTRY_MAX)));
   } catch {
     // Registry persistence is best-effort; publishing still works.
+  }
+}
+
+function loadPublishLineage() {
+  try {
+    if (typeof localStorage === 'undefined') return {};
+    const raw = localStorage.getItem(PUBLISH_LINEAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function savePublishLineage(lineage) {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    const entries = Object.entries(lineage)
+      .sort((a, b) => (b[1].updatedAt || '').localeCompare(a[1].updatedAt || ''))
+      .slice(0, PUBLISH_LINEAGE_MAX);
+    localStorage.setItem(PUBLISH_LINEAGE_KEY, JSON.stringify(Object.fromEntries(entries)));
+  } catch {
+    // Lineage persistence is best-effort; publishing still works.
   }
 }
 
@@ -147,12 +177,18 @@ export async function deleteAppInR2(sessionId, appId) {
  * The html payload is the fully formatted preview document (what the user
  * sees in the canvas).
  *
- * Update semantics: publishing the SAME content again reuses the previously
- * published link (recorded locally by content hash) so updates never create
- * duplicate slugs; a new slug is only allocated for genuinely new content.
- * Passing an explicit slug always republishes that link.
+ * Update semantics:
+ *  - Passing an explicit slug always republishes that link.
+ *  - Publishing the SAME content again reuses the previously published link
+ *    (recorded locally by content hash) so identical republishes never
+ *    create duplicate slugs.
+ *  - Publishing REVISED content from the same chat session updates the link
+ *    that session published before (per-session lineage), so "publish, then
+ *    revise, then publish again" keeps one stable URL.
+ *  - A new slug is only allocated for genuinely new content from a session
+ *    that has not published yet.
  */
-export async function publishAppInR2({ html, title = 'Untitled Application', slug = null, pages = null }) {
+export async function publishAppInR2({ html, title = 'Untitled Application', slug = null, pages = null, sessionId = null }) {
   if (!html || typeof html !== 'string' || !html.trim()) return null;
 
   const pagesPayload = (() => {
@@ -166,9 +202,11 @@ export async function publishAppInR2({ html, title = 'Untitled Application', slu
   })();
 
   const registry = loadPublishRegistry();
+  const lineage = loadPublishLineage();
   const hash = contentHash(html.trim() + (pagesPayload ? JSON.stringify(pagesPayload) : ''));
   const existing = registry.find((entry) => entry.contentHash === hash && entry.slug);
-  const effectiveSlug = slug || existing?.slug || null;
+  const sessionRecord = typeof sessionId === 'string' && sessionId ? lineage[sessionId] : null;
+  const effectiveSlug = slug || existing?.slug || sessionRecord?.slug || null;
 
   const payload = {
     html: html.trim(),
@@ -190,6 +228,10 @@ export async function publishAppInR2({ html, title = 'Untitled Application', slu
           ...registry.filter((entry) => entry.slug !== data.slug)
         ];
         savePublishRegistry(next);
+        if (typeof sessionId === 'string' && sessionId) {
+          lineage[sessionId] = { slug: data.slug, contentHash: hash, title: title.slice(0, 120), updatedAt: new Date().toISOString() };
+          savePublishLineage(lineage);
+        }
       }
       return data;
     }

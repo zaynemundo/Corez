@@ -24,7 +24,8 @@ export default function CanvasPreview({
   title = 'Untitled Application',
   onClose, 
   isFullScreen, 
-  onToggleFullScreen 
+  onToggleFullScreen,
+  sessionId = null
 }) {
   const [activeTab, setActiveTab] = useState('preview');
   const [deviceMode, setDeviceMode] = useState('desktop'); // 'desktop' | 'laptop' | 'tablet' | 'mobile'
@@ -113,6 +114,7 @@ export default function CanvasPreview({
         html: formattedSrcDoc,
         title,
         slug: publishResult?.slug || null,
+        sessionId,
         ...(Object.keys(pagesPayload).length > 0 ? { pages: pagesPayload } : {})
       });
       if (result && result.url) {

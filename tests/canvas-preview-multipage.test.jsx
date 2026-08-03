@@ -146,6 +146,15 @@ describe('CanvasPreview multi-page sites', () => {
     expect(payload.pages['about.html']).toContain('<h1>About Us</h1>');
     expect(payload.pages['index.html']).toContain("type: 'corez-nav'");
   });
+
+  it('passes the chat session id to the publish service so revisions update the same link', async () => {
+    render(
+      <CanvasPreview code={MULTI_PAGE_CODE} title="Test Site" onClose={() => {}} isFullScreen={false} onToggleFullScreen={() => {}} sessionId="session-42" />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
+    await act(async () => {});
+    expect(publishAppInR2.mock.calls[0][0].sessionId).toBe('session-42');
+  });
 });
 
 describe('multi-page router script', () => {
