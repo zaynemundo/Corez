@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
 import { Send, Square, ChevronRight, Globe, Gamepad2, Search, X } from 'lucide-react';
-import { RoundedPlusIcon } from './icons';
+import { PlusIcon } from './icons';
 
 // Slash commands offered as suggestions when the user types "/".
 // Keep in sync with parseSlashCommand in services/aiService.js.
@@ -272,7 +272,7 @@ export default function ChatInput({
             aria-label="Attach files"
             disabled={isStreaming}
           >
-            <RoundedPlusIcon size={18} strokeWidth={1.5} />
+            <PlusIcon size={18} strokeWidth={1.5} />
           </button>
           <input
             ref={fileInputRef}
