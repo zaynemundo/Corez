@@ -2601,7 +2601,12 @@ export async function runResearchCommand(topic, history = [], signal = null) {
     search = await fetchWebSearch(cleanTopic, signal);
   } catch (error) {
     if (error?.name === 'AbortError') throw error;
-    return `I couldn't research "${cleanTopic}" right now — the web search service is unavailable. Please try again later.`;
+    // Name the real failure so the user (or developer) can see why the
+    // search service could not answer — never fabricate results.
+    const detail = typeof error?.detail === 'string' && error.detail.trim()
+      ? ` (${error.detail.trim().slice(0, 200)})`
+      : '';
+    return `I couldn't research "${cleanTopic}" right now — the web search service is unavailable${detail}. Please try again later.`;
   }
   const results = Array.isArray(search?.results) ? search.results : [];
   if (results.length === 0) {

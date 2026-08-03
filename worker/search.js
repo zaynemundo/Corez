@@ -5,8 +5,9 @@
  * that the AI (or the local fallback) uses to answer the user's request.
  *
  * Provider chain (honest, dependency-free, no API keys required):
- *   1. DuckDuckGo Instant Answer API.
- *   2. Wikipedia search API.
+ *   1. Wikipedia search API (reliable, keyless, works from Workers egress).
+ *   2. DuckDuckGo Instant Answer API (zero-click; frequently returns empty
+ *      and is often blocked from datacenter egress, so it is the fallback).
  *
  * Every result is normalized to { title, url, snippet, source }. When no
  * provider yields usable results the request fails honestly (502) — CoreZ
@@ -152,10 +153,11 @@ export async function handleSearch(request, env) {
   }
 
   const fetchImpl = env?.__SEARCH_FETCH || fetch;
-  // Free, keyless providers: DuckDuckGo first, Wikipedia second.
+  // Free, keyless providers: Wikipedia first (reliable from Worker egress),
+  // DuckDuckGo second (zero-click API is often empty or blocked).
   const providers = [
-    async () => searchDuckDuckGo(query, fetchImpl),
-    async () => searchWikipedia(query, fetchImpl)
+    async () => searchWikipedia(query, fetchImpl),
+    async () => searchDuckDuckGo(query, fetchImpl)
   ];
 
   const failures = [];
