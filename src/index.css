@@ -1280,6 +1280,18 @@ h1, h2, h3, h4, h5, h6 {
   position: relative;
 }
 
+.input-wrap {
+  width: 100%;
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.chat-pane.canvas-active .input-wrap {
+  max-width: 680px;
+}
+
 /* Slash-command suggestion dropdown */
 .slash-suggestions {
   position: absolute;
@@ -1364,7 +1376,7 @@ h1, h2, h3, h4, h5, h6 {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
-  padding: 0.55rem 0.65rem 0.55rem 1.25rem;
+  padding: 0.55rem 0.65rem;
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -1404,6 +1416,45 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   justify-content: flex-end;
   flex-shrink: 0;
+}
+
+.attach-btn {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.attach-btn:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  border-color: var(--text-primary);
+  color: var(--text-primary);
+  transform: scale(1.06);
+}
+
+.attach-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.visually-hidden-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .send-btn {
@@ -2258,6 +2309,26 @@ h1, h2, h3, h4, h5, h6 {
 
 .remove-chip-btn:hover {
   color: var(--text-primary);
+}
+
+.message-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.message-attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.6rem;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill);
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  max-width: 100%;
 }
 
 .generator-label {

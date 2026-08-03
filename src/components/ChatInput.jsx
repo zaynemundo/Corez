@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
-import { Send, Square, ChevronRight, Globe, Gamepad2, Search } from 'lucide-react';
+import { Send, Square, ChevronRight, Globe, Gamepad2, Search, X } from 'lucide-react';
+import { RoundedPlusIcon } from './icons';
 
 // Slash commands offered as suggestions when the user types "/".
 // Keep in sync with parseSlashCommand in services/aiService.js.
@@ -24,6 +25,41 @@ const SLASH_COMMANDS = [
   }
 ];
 
+const MAX_IMAGE_THUMB_BYTES = 1.5 * 1024 * 1024;
+const MAX_TEXT_CONTENT_BYTES = 200 * 1024;
+const TEXT_EXTENSIONS = new Set([
+  'txt', 'md', 'markdown', 'json', 'js', 'jsx', 'ts', 'tsx', 'css', 'html', 'xml',
+  'svg', 'csv', 'log', 'py', 'yml', 'yaml', 'sh', 'sql', 'ini', 'toml', 'env',
+  'gitignore', 'config', 'rst', 'tex', 'bat', 'ps1'
+]);
+
+function extensionOf(name) {
+  const dot = String(name || '').lastIndexOf('.');
+  return dot > 0 && dot < name.length - 1 ? name.slice(dot + 1).toLowerCase() : '';
+}
+
+function isTextLike(file) {
+  return Boolean(file?.type?.startsWith('text/'))
+    || (file?.type === 'application/json')
+    || TEXT_EXTENSIONS.has(extensionOf(file?.name));
+}
+
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file);
+  });
+}
+
 export default function ChatInput({ 
   input, 
   setInput, 
@@ -37,6 +73,8 @@ export default function ChatInput({
   const [showSuggestions, setShowSuggestions] = useState(() => String(input || '').startsWith('/'));
   const [activeIndex, setActiveIndex] = useState(0);
   const suggestionsRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const [attachments, setAttachments] = useState([]);
 
   useEffect(() => {
     if (refToUse.current) {
@@ -86,15 +124,53 @@ export default function ChatInput({
     }
   };
 
+  const handleFileSelect = (event) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+
+    const created = files.map((file, index) => {
+      const id = `attach-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`;
+      return { id, name: file.name, type: file.type || '', size: file.size, file };
+    });
+
+    setAttachments(prev => [
+      ...prev,
+      ...created.map(({ id, name, type, size }) => ({ id, name, type, size }))
+    ]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+
+    created.forEach((entry) => {
+      if (entry.file.type.startsWith('image/') && entry.file.size <= MAX_IMAGE_THUMB_BYTES) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (reader.result && typeof reader.result === 'string') {
+            setAttachments(prev => prev.map(a => a.id === entry.id ? { ...a, thumb: reader.result } : a));
+          }
+        };
+        reader.readAsDataURL(entry.file);
+      }
+      if (isTextLike(entry.file) && entry.file.size <= MAX_TEXT_CONTENT_BYTES) {
+        readFileAsText(entry.file).then(content => {
+          setAttachments(prev => prev.map(a => a.id === entry.id ? { ...a, content } : a));
+        }).catch(() => {});
+      }
+    });
+  };
+
+  const removeAttachment = (id) => {
+    setAttachments(prev => prev.filter(a => a.id !== id));
+  };
+
   const handleSubmit = (e) => {
     e?.preventDefault();
     if (isStreaming) {
       if (onStopMessage) onStopMessage();
       return;
     }
-    if (!input.trim()) return;
-    onSendMessage(input.trim());
+    if (!input.trim() && attachments.length === 0) return;
+    onSendMessage(input.trim(), attachments);
     setInput('');
+    setAttachments([]);
     setShowSuggestions(false);
     if (refToUse.current) {
       refToUse.current.style.height = 'auto';
@@ -162,42 +238,87 @@ export default function ChatInput({
           })}
         </div>
       )}
-      <form onSubmit={handleSubmit} className="input-box">
-        <textarea
-          ref={refToUse}
-          className="chat-textarea"
-          value={input}
-          onChange={(e) => {
-            setInput(e.target.value);
-            setShowSuggestions(true);
-          }}
-          onKeyDown={handleKeyDown}
-          placeholder={isStreaming ? "Corez is generating..." : "Ask Corez..."}
-          aria-label={isStreaming ? "Corez is generating" : "Message Corez"}
-          rows={1}
-        />
-        <div className="input-actions-bar">
-          {isStreaming ? (
-            <button
-              type="button"
-              className="send-btn stop-btn"
-              onClick={onStopMessage}
-              title="Stop Generation"
-            >
-              <Square size={13} fill="currentColor" strokeWidth={1.5} />
-            </button>
-          ) : (
-            <button
-              type="submit"
-              className="send-btn"
-              disabled={!input.trim()}
-              title="Send Message"
-            >
-              <Send size={15} strokeWidth={1.5} />
-            </button>
-          )}
-        </div>
-      </form>
+      <div className="input-wrap">
+        {attachments.length > 0 && (
+          <div className="attachment-chips-bar" aria-label="Attached files">
+            {attachments.map((attachment) => (
+              <span key={attachment.id} className="attachment-chip">
+                {attachment.thumb && (
+                  <img src={attachment.thumb} alt="" className="attachment-chip-thumb" />
+                )}
+                <span className="chip-filename" title={`${attachment.name} (${formatBytes(attachment.size)})`}>
+                  {attachment.name}
+                </span>
+                <button
+                  type="button"
+                  className="remove-chip-btn"
+                  onClick={() => removeAttachment(attachment.id)}
+                  aria-label={`Remove ${attachment.name}`}
+                  title="Remove attachment"
+                  disabled={isStreaming}
+                >
+                  <X size={12} strokeWidth={1.5} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        <form onSubmit={handleSubmit} className="input-box">
+          <button
+            type="button"
+            className="attach-btn"
+            onClick={() => fileInputRef.current?.click()}
+            title="Attach files"
+            aria-label="Attach files"
+            disabled={isStreaming}
+          >
+            <RoundedPlusIcon size={18} strokeWidth={1.5} />
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="visually-hidden-file-input"
+            onChange={handleFileSelect}
+            tabIndex={-1}
+            aria-hidden="true"
+          />
+          <textarea
+            ref={refToUse}
+            className="chat-textarea"
+            value={input}
+            onChange={(e) => {
+              setInput(e.target.value);
+              setShowSuggestions(true);
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder={isStreaming ? "Corez is generating..." : "Ask Corez..."}
+            aria-label={isStreaming ? "Corez is generating" : "Message Corez"}
+            rows={1}
+          />
+          <div className="input-actions-bar">
+            {isStreaming ? (
+              <button
+                type="button"
+                className="send-btn stop-btn"
+                onClick={onStopMessage}
+                title="Stop Generation"
+              >
+                <Square size={13} fill="currentColor" strokeWidth={1.5} />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                className="send-btn"
+                disabled={!input.trim() && attachments.length === 0}
+                title="Send Message"
+              >
+                <Send size={15} strokeWidth={1.5} />
+              </button>
+            )}
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

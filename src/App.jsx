@@ -162,6 +162,25 @@ const INITIAL_SESSIONS = [
   }
 ];
 
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function buildAttachmentPrompt(attachments) {
+  if (!Array.isArray(attachments) || attachments.length === 0) return '';
+  const sections = attachments.map((attachment) => {
+    const meta = `- ${attachment.name} (${attachment.type || 'unknown type'}, ${formatBytes(attachment.size)})`;
+    if (typeof attachment.content === 'string' && attachment.content.trim()) {
+      return `${meta}\n  --- file content ---\n${attachment.content}\n  --- end of file ---`;
+    }
+    return meta;
+  });
+  return `\n\n[Attached files]\n${sections.join('\n')}\n`;
+}
+
 export default function App() {
   const [sessions, setSessions] = useState(() => {
     try {
@@ -420,27 +439,33 @@ export default function App() {
   const [chatInput, setChatInput] = useState('');
   const [revisionContextCode, setRevisionContextCode] = useState('');
 
-  const handleSendMessage = async (promptText) => {
+  const handleSendMessage = async (promptText, attachments = []) => {
     if (isThinking || !activeSession) return;
     const targetSessionId = activeSessionId;
 
-    let displayPrompt = promptText;
-    let apiPrompt = promptText;
+    const attachmentPrompt = buildAttachmentPrompt(attachments);
+    const displayPrompt = promptText;
+    let apiPrompt = attachmentPrompt
+      ? `${promptText}${attachmentPrompt}`.trim()
+      : promptText;
 
     if (revisionContextCode) {
-      apiPrompt = `[Context: The user is requesting a revision for the following code block]\n\`\`\`\n${revisionContextCode}\n\`\`\`\n\nUser Request: ${promptText}`;
+      apiPrompt = `[Context: The user is requesting a revision for the following code block]\n\`\`\`\n${revisionContextCode}\n\`\`\`\n\nUser Request: ${apiPrompt}`;
       setRevisionContextCode('');
     }
 
-    const displayMsg = { role: 'user', content: displayPrompt };
-    const apiMsg = { role: 'user', content: apiPrompt };
+    const displayAttachments = attachments.map(({ id, name, type, size, thumb }) => ({ id, name, type, size, thumb }));
+    const apiAttachments = attachments.map(({ name, type, size, content }) => ({ name, type, size, content }));
+
+    const displayMsg = { role: 'user', content: displayPrompt, attachments: displayAttachments };
+    const apiMsg = { role: 'user', content: apiPrompt, attachments: apiAttachments };
 
     const updatedApiMessages = [...activeSession.messages, apiMsg];
 
     setSessions(prev => prev.map(s => {
       if (s.id === targetSessionId) {
         const updatedTitle = s.messages.length === 0
-          ? (promptText.length > 30 ? promptText.slice(0, 27) + '...' : promptText)
+          ? (promptText || displayAttachments[0]?.name || 'New Conversation').slice(0, 30)
           : s.title;
         return { ...s, title: updatedTitle, messages: [...s.messages, displayMsg] };
       }

@@ -57,3 +57,13 @@ export function PlusIcon({ size = 20, strokeWidth = 1.5 }) {
     </svg>
   );
 }
+
+export function RoundedPlusIcon({ size = 20, strokeWidth = 1.5 }) {
+  return (
+    <svg {...iconProps(size, strokeWidth)}>
+      <rect x="3" y="3" width="18" height="18" rx="5.5" />
+      <path d="M12 8v8" />
+      <path d="M8 12h8" />
+    </svg>
+  );
+}

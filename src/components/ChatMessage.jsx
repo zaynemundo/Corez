@@ -162,6 +162,24 @@ function ExecutableCodeBlock({ code, onRunInCanvas, onReviseCode }) {
 export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onRefreshMarket, marketRefreshing = false }) {
   const isUser = message.role === 'user';
 
+  const renderAttachments = (attachments) => {
+    if (!Array.isArray(attachments) || attachments.length === 0) return null;
+    return (
+      <div className="message-attachments" aria-label="Attached files">
+        {attachments.map((attachment) => (
+          <span key={attachment.id || attachment.name} className="message-attachment-chip">
+            {attachment.thumb && (
+              <img src={attachment.thumb} alt="" className="attachment-chip-thumb" />
+            )}
+            <span className="chip-filename" title={attachment.name}>
+              {attachment.name}
+            </span>
+          </span>
+        ))}
+      </div>
+    );
+  };
+
   const renderInlineFormattedText = (text) => {
     if (!text) return null;
 
@@ -422,7 +440,10 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onRe
               refreshing={marketRefreshing}
             />
           ) : (
-            renderFormattedText(message.content)
+            <>
+              {isUser && renderAttachments(message.attachments)}
+              {renderFormattedText(message.content)}
+            </>
           )}
         </div>
       </div>
