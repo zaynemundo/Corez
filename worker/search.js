@@ -33,6 +33,76 @@ const DEFAULT_EMBED_MODEL = 'nvidia/nemotron-3-embed-1b:free';
 const RERANK_TIMEOUT_MS = 10_000;
 const EMBED_TIMEOUT_MS = 10_000;
 
+// Question/filler lead phrases stripped before a query reaches a provider.
+// Wikipedia's search matches EVERY token, so filler words like "what"/"is"
+// flood results with irrelevant "What Is ..." titles — "what is gold" must
+// search as "gold". Applied iteratively ("tell me about what is X" ->
+// "X"); if cleaning would empty the query the raw query is kept.
+const QUERY_LEAD_PATTERNS = [
+  /^(?:what|who|when|where|why|how|which|whose|whom)\s+(?:is|are|was|were|do|does|did|would|will|should|could|can|am|be|to|'s|'re|'ve|'d)\s+/i,
+  /^(?:tell\s+me(?:\s+(?:about|more\s+about|everything\s+about|something\s+about))?\s+|i\s+(?:want|wanna|need|would\s+like)\s+to\s+know(?:\s+about)?\s+|can\s+you\s+(?:tell|explain|give)\s+me(?:\s+(?:about|info|information))?\s+|explain(?:\s+to\s+me)?(?:\s+about)?\s+|define\s+|describe\s+|what\s+is\s+meant\s+by\s+|give\s+me\s+(?:info|information|details)(?:\s+(?:about|on))?\s+|information\s+(?:about|on)\s+|info\s+(?:about|on)\s+|search\s+the\s+web\s+for\s+|search\s+for\s+|look\s+(?:up|into)\s+|find\s+out(?:\s+about)?\s+|research(?:\s+on\s+|\s+about\s+|\s+)|about\s+)/i,
+  /^(?:is|are|was|were|do|does|did|the|a|an|tell|about)\s+/i
+];
+
+/**
+ * Reduces a natural-language request to its searchable topic:
+ * "what is gold?" -> "gold", "tell me about natural hydrogen" ->
+ * "natural hydrogen". Keeps the raw query when cleaning would leave nothing.
+ */
+export function cleanSearchQuery(rawQuery) {
+  if (typeof rawQuery !== 'string') return '';
+  let query = rawQuery.trim().replace(/[?!.]+$/, '').trim();
+  if (!query) return '';
+  let changed = true;
+  let guard = 0;
+  while (changed && guard < 10) {
+    changed = false;
+    guard += 1;
+    for (const pattern of QUERY_LEAD_PATTERNS) {
+      const next = query.replace(pattern, '');
+      if (next !== query && next.trim()) {
+        query = next.trim();
+        changed = true;
+      }
+    }
+  }
+  return query.replace(/\s+/g, ' ').trim();
+}
+
+// Media-disambiguation titles ("Fools Gold (song)", "Gold (film)") are noise
+// for single-word topics: a "what is gold" request wants the article about
+// the topic itself, not media with the topic in their names.
+const MEDIA_DISAMBIG_PATTERN = /\((?:song|single|album|ep|band|film|movie|video game|television series|tv series|novel|book|musical|opera|poem|magazine|song cycle|extended play)\)\s*$/i;
+
+function filterMediaNoise(results, searchTerm) {
+  if (/\s/.test(searchTerm)) return results;
+  const topic = searchTerm.toLowerCase();
+  const filtered = results.filter((result) => {
+    const title = (result.title || '').toLowerCase();
+    if (!MEDIA_DISAMBIG_PATTERN.test(title)) return true;
+    return title === topic || title.startsWith(`${topic} `);
+  });
+  return filtered.length > 0 ? filtered : results;
+}
+
+// Promote titles that actually contain the topic phrase so provider quirks
+// can never push the exact-topic article below unrelated titles. Stable and
+// never removes results.
+function promoteTitleMatches(results, searchTerm) {
+  const phrase = searchTerm.toLowerCase();
+  if (!phrase) return results;
+  const matching = [];
+  const others = [];
+  for (const result of results) {
+    if ((result.title || '').toLowerCase().includes(phrase)) {
+      matching.push(result);
+    } else {
+      others.push(result);
+    }
+  }
+  return [...matching, ...others];
+}
+
 function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -362,36 +432,68 @@ async function fetchWikipediaExtracts(titles, fetchImpl) {
 
 /** Wikipedia search: free, no key required. */
 async function searchWikipedia(query, fetchImpl) {
-  const url = new URL(WIKIPEDIA_ENDPOINT);
-  url.searchParams.set('action', 'query');
-  url.searchParams.set('list', 'search');
-  url.searchParams.set('srsearch', query);
-  url.searchParams.set('format', 'json');
-  url.searchParams.set('srlimit', String(MAX_RESULTS));
-  url.searchParams.set('origin', '*');
-  const response = await fetchImpl(url, providerFetchOptions());
-  if (!response.ok) {
-    throw new Error(`Wikipedia HTTP ${response.status}`);
+  // Search the cleaned topic, not the raw request: token search on
+  // "what is gold" matches "what"/"is" and floods results with unrelated
+  // "What Is ..." articles.
+  const searchTerm = cleanSearchQuery(query) || query;
+
+  const tokenUrl = new URL(WIKIPEDIA_ENDPOINT);
+  tokenUrl.searchParams.set('action', 'query');
+  tokenUrl.searchParams.set('list', 'search');
+  tokenUrl.searchParams.set('srsearch', searchTerm);
+  tokenUrl.searchParams.set('format', 'json');
+  tokenUrl.searchParams.set('srlimit', String(MAX_RESULTS));
+  tokenUrl.searchParams.set('origin', '*');
+
+  // Title-prefix search is the strongest relevance signal: "gold" yields
+  // "Gold" first. Its hits lead the merged list so the exact-topic article
+  // always surfaces ahead of generic token matches.
+  const prefixUrl = new URL(WIKIPEDIA_ENDPOINT);
+  prefixUrl.searchParams.set('action', 'query');
+  prefixUrl.searchParams.set('list', 'prefixsearch');
+  prefixUrl.searchParams.set('pssearch', searchTerm);
+  prefixUrl.searchParams.set('pslimit', '6');
+  prefixUrl.searchParams.set('format', 'json');
+  prefixUrl.searchParams.set('origin', '*');
+
+  const [tokenResponse, prefixResponse] = await Promise.allSettled([
+    fetchImpl(tokenUrl, providerFetchOptions()),
+    fetchImpl(prefixUrl, providerFetchOptions())
+  ]);
+
+  const results = [];
+  const seenTitles = new Set();
+
+  const appendHit = (hit, withSnippet) => {
+    if (!isObject(hit) || typeof hit.title !== 'string') return;
+    const title = hit.title.trim();
+    if (!title || seenTitles.has(title.toLowerCase())) return;
+    seenTitles.add(title.toLowerCase());
+    const slug = encodeURIComponent(title.replace(/ /g, '_'));
+    const snippet = withSnippet && typeof hit.snippet === 'string'
+      ? decodeHtmlText(stripHtmlTags(hit.snippet)).trim()
+      : '';
+    const result = normalizeResult(title, `https://en.wikipedia.org/wiki/${slug}`, snippet, 'Wikipedia');
+    if (result) results.push(result);
+  };
+
+  // Prefix hits first (exact-topic articles), then token-search hits.
+  if (prefixResponse.status === 'fulfilled' && prefixResponse.value?.ok) {
+    const data = await prefixResponse.value.json().catch(() => null);
+    const hits = data?.query?.prefixsearch;
+    if (Array.isArray(hits)) {
+      for (const hit of hits.slice(0, 6)) appendHit(hit, false);
+    }
   }
-  const data = await response.json();
-  const hits = data?.query?.search;
-  if (!Array.isArray(hits)) return [];
-  return hits
-    .map((hit) => {
-      if (!isObject(hit) || typeof hit.title !== 'string') return null;
-      const slug = encodeURIComponent(hit.title.replace(/ /g, '_'));
-      const snippet = typeof hit.snippet === 'string'
-        ? decodeHtmlText(stripHtmlTags(hit.snippet)).trim()
-        : '';
-      return normalizeResult(
-        hit.title,
-        `https://en.wikipedia.org/wiki/${slug}`,
-        snippet,
-        'Wikipedia'
-      );
-    })
-    .filter(Boolean)
-    .slice(0, MAX_RESULTS);
+  if (tokenResponse.status === 'fulfilled' && tokenResponse.value?.ok) {
+    const data = await tokenResponse.value.json().catch(() => null);
+    const hits = data?.query?.search;
+    if (Array.isArray(hits)) {
+      for (const hit of hits) appendHit(hit, true);
+    }
+  }
+
+  return promoteTitleMatches(filterMediaNoise(results, searchTerm), searchTerm).slice(0, MAX_RESULTS);
 }
 
 export async function handleSearch(request, env) {
@@ -413,12 +515,15 @@ export async function handleSearch(request, env) {
   }
 
   const fetchImpl = env?.__SEARCH_FETCH || fetch;
+  // Providers search the cleaned topic ("what is gold" -> "gold") so filler
+  // tokens never flood results; the original query is kept for reranking.
+  const searchTerm = cleanSearchQuery(query) || query;
   // Free, keyless providers, run together and merged (deduped by URL):
   // Wikipedia (reliable from Worker egress) and DuckDuckGo Lite (real web
   // results, no key). One provider answering no longer hides the other.
   const providers = [
     async () => searchWikipedia(query, fetchImpl),
-    async () => searchDuckDuckGo(query, fetchImpl)
+    async () => searchDuckDuckGo(searchTerm, fetchImpl)
   ];
 
   const failures = [];

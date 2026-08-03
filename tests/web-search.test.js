@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { generateAIResponse, isWebSearchRequest, formatSearchResults } from '../src/services/aiService.js';
 import { fetchWebSearch, SearchApiError } from '../src/services/searchService.js';
-import { handleSearch } from '../worker/search.js';
+import { handleSearch, cleanSearchQuery } from '../worker/search.js';
 
 describe('Web search detection', () => {
   it('detects recency/news/search requests', () => {
@@ -212,5 +212,135 @@ describe('generateAIResponse search routing', () => {
     expect(response).toBe('explanation answer');
     expect(fetchMock).not.toHaveBeenCalledWith('/api/search', expect.anything());
     vi.unstubAllGlobals();
+  });
+});
+
+describe('cleanSearchQuery', () => {
+  it('strips question leads and filler so the topic is searched, not the sentence', () => {
+    expect(cleanSearchQuery('what is gold')).toBe('gold');
+    expect(cleanSearchQuery('What are the symptoms of flu?')).toBe('symptoms of flu');
+    expect(cleanSearchQuery('who is Albert Einstein')).toBe('Albert Einstein');
+    expect(cleanSearchQuery('tell me about natural hydrogen')).toBe('natural hydrogen');
+    expect(cleanSearchQuery('i want to know about gold fixing')).toBe('gold fixing');
+    expect(cleanSearchQuery('search the web for bitcoin price')).toBe('bitcoin price');
+    expect(cleanSearchQuery('how to make a website')).toBe('make a website');
+    expect(cleanSearchQuery('research quantum computing')).toBe('quantum computing');
+    expect(cleanSearchQuery('can you tell me about what is gold?')).toBe('gold');
+  });
+
+  it('keeps genuine topics intact', () => {
+    expect(cleanSearchQuery('bitcoin price today')).toBe('bitcoin price today');
+    expect(cleanSearchQuery('2026 world cup final')).toBe('2026 world cup final');
+    expect(cleanSearchQuery('gold')).toBe('gold');
+  });
+
+  it('falls back to the raw query when cleaning would empty it', () => {
+    expect(cleanSearchQuery('what is')).toBe('what is');
+    expect(cleanSearchQuery('')).toBe('');
+  });
+});
+
+describe('Worker /api/search query relevance', () => {
+  it('searches the cleaned topic so "what is gold" cannot flood results with "What Is ..." titles', async () => {
+    const capturedQueries = [];
+    const response = await handleSearch(
+      new Request('https://corez.test/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'what is gold' })
+      }),
+      {
+        __SEARCH_FETCH: async (url) => {
+          const u = new URL(url);
+          const searchParam = u.searchParams.get('srsearch') || u.searchParams.get('pssearch');
+          if (searchParam) capturedQueries.push(searchParam);
+          if (u.hostname === 'lite.duckduckgo.com') return Response.json({ AbstractText: '', RelatedTopics: [] });
+          if (u.searchParams.get('list') === 'prefixsearch') {
+            return Response.json({
+              query: { prefixsearch: [{ title: 'Gold' }] }
+            });
+          }
+          return Response.json({
+            query: { search: [
+              { title: 'Gold', snippet: 'Chemical element.', wordcount: 5 },
+              { title: 'Gold as an investment', snippet: 'Store of value.', wordcount: 5 },
+              { title: 'What Is Intelligence?', snippet: 'x', wordcount: 5 },
+              { title: 'WhatsApp', snippet: 'x', wordcount: 5 },
+              { title: 'Fools Gold (song)', snippet: 'x', wordcount: 5 },
+              { title: 'Miaow (album)', snippet: 'x', wordcount: 5 }
+            ] }
+          });
+        }
+      }
+    );
+
+    expect(response.status).toBe(200);
+    // The topic sent to Wikipedia and DuckDuckGo is the cleaned term.
+    expect(capturedQueries).toContain('gold');
+    expect(capturedQueries).not.toContain('what is gold');
+
+    const data = await response.json();
+    const titles = data.results.map((r) => r.title);
+    // The exact-topic article leads (prefix hit first, deduped with token hit).
+    expect(titles[0]).toBe('Gold');
+    expect(titles.filter((t) => t === 'Gold')).toHaveLength(1);
+    // Topic-phrase titles are promoted ahead of unrelated titles.
+    const goldIdx = titles.indexOf('Gold as an investment');
+    const noiseIdx = Math.max(titles.indexOf('What Is Intelligence?'), titles.indexOf('WhatsApp'));
+    expect(noiseIdx).toBeGreaterThan(goldIdx);
+    // Media-disambiguation titles are dropped for single-word topics.
+    expect(titles).not.toContain('Fools Gold (song)');
+    expect(titles).not.toContain('Miaow (album)');
+  });
+
+  it('keeps media titles for multi-word topics like a movie query', async () => {
+    const response = await handleSearch(
+      new Request('https://corez.test/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'gold movie' })
+      }),
+      {
+        __SEARCH_FETCH: async (url) => {
+          const u = new URL(url);
+          if (u.hostname === 'lite.duckduckgo.com') return Response.json({ AbstractText: '', RelatedTopics: [] });
+          if (u.searchParams.get('list') === 'prefixsearch') {
+            return Response.json({ query: { prefixsearch: [] } });
+          }
+          return Response.json({
+            query: { search: [
+              { title: 'Gold (film)', snippet: '2016 film.', wordcount: 5 },
+              { title: 'Gold standard', snippet: 'Monetary system.', wordcount: 5 }
+            ] }
+          });
+        }
+      }
+    );
+    const data = await response.json();
+    const titles = data.results.map((r) => r.title);
+    expect(titles).toContain('Gold (film)');
+    expect(titles).toContain('Gold standard');
+  });
+
+  it('falls back to the raw query when cleaning empties it', async () => {
+    const capturedQueries = [];
+    const response = await handleSearch(
+      new Request('https://corez.test/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'what is' })
+      }),
+      {
+        __SEARCH_FETCH: async (url) => {
+          const u = new URL(url);
+          const searchParam = u.searchParams.get('srsearch') || u.searchParams.get('pssearch');
+          if (searchParam) capturedQueries.push(searchParam);
+          if (u.hostname === 'lite.duckduckgo.com') return Response.json({ AbstractText: '', RelatedTopics: [] });
+          return Response.json({ query: { search: [{ title: 'What is', snippet: 'x', wordcount: 5 }] } });
+        }
+      }
+    );
+    expect(response.status).toBe(200);
+    expect(capturedQueries).toContain('what is');
   });
 });
