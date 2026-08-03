@@ -3,14 +3,6 @@ import path from 'node:path';
 import { execSync, spawnSync } from 'node:child_process';
 import { PERMISSION_CATEGORIES } from '../permissions/index.js';
 import { resolveWorkspacePath } from '../runtime/pathResolver.js';
-import {
-  checkReadBeforeWrite,
-  ensureFileLifecycle,
-  ensureRelevantFile,
-  recordFileRead,
-  recordFileWritten
-} from '../runtime/fileLifecycle.js';
-
 // No fixed command timeout: valid builds, tests, and long-running commands
 // must never be terminated prematurely. An operator may set an explicit
 // hang guard via COREZ_COMMAND_TIMEOUT_MS; 0 means unlimited (default).
@@ -96,7 +88,7 @@ export class ToolRegistry {
         },
         required: ['filePath']
       },
-      async execute({ filePath, startLine, endLine }, { context, gate }) {
+      async execute({ filePath, startLine, endLine }, { context }) {
         const cwd = context?.cwd || process.cwd();
         const resolved = resolveWorkspacePath(cwd, filePath);
         if (!resolved.ok) {
@@ -118,12 +110,6 @@ export class ToolRegistry {
           selectedLines = lines.slice(start, end);
         }
 
-        if (gate) {
-          // Successful reads only: failed reads never count as read evidence.
-          recordFileRead(gate, fullPath);
-          ensureRelevantFile(gate, fullPath, { discoveredBy: 'model-read', readSuccessfully: true });
-        }
-        
         return {
           filePath,
           totalLines: lines.length,
@@ -145,7 +131,7 @@ export class ToolRegistry {
         },
         required: ['filePath', 'content']
       },
-      async execute({ filePath, content }, { context, gate }) {
+      async execute({ filePath, content }, { context }) {
         const cwd = context?.cwd || process.cwd();
         const resolved = resolveWorkspacePath(cwd, filePath);
         if (!resolved.ok) {
@@ -153,27 +139,8 @@ export class ToolRegistry {
         }
         const fullPath = resolved.path;
 
-        // Read-before-write: existing files must be read successfully before
-        // they may be modified. New files may be created without a read.
-        if (gate) {
-          const rbw = checkReadBeforeWrite(gate, fullPath);
-          if (!rbw.ok) {
-            return { success: false, error: rbw.error, code: rbw.code, message: rbw.message };
-          }
-        }
-
         fs.mkdirSync(path.dirname(fullPath), { recursive: true });
         fs.writeFileSync(fullPath, content, 'utf8');
-
-        if (gate) {
-          const lifecycle = ensureFileLifecycle(gate, fullPath);
-          recordFileWritten(gate, fullPath, lifecycle?.existedBeforeTask === true);
-          ensureRelevantFile(gate, fullPath, {
-            discoveredBy: 'model-write',
-            modified: true,
-            readSuccessfully: lifecycle?.readSucceeded === true
-          });
-        }
         
         return { success: true, filePath, bytesWritten: Buffer.byteLength(content, 'utf8') };
       }
@@ -193,7 +160,7 @@ export class ToolRegistry {
         },
         required: ['filePath', 'targetContent', 'replacementContent']
       },
-      async execute({ filePath, targetContent, replacementContent }, { context, gate }) {
+      async execute({ filePath, targetContent, replacementContent }, { context }) {
         const cwd = context?.cwd || process.cwd();
         const resolved = resolveWorkspacePath(cwd, filePath);
         if (!resolved.ok) {
@@ -204,14 +171,6 @@ export class ToolRegistry {
         if (!fs.existsSync(fullPath)) {
           return { error: `File not found: ${filePath}` };
         }
-
-        // Read-before-write: existing files must be read successfully first.
-        if (gate) {
-          const rbw = checkReadBeforeWrite(gate, fullPath);
-          if (!rbw.ok) {
-            return { success: false, error: rbw.error, code: rbw.code, message: rbw.message };
-          }
-        }
         
         const original = fs.readFileSync(fullPath, 'utf8');
         if (!original.includes(targetContent)) {
@@ -220,16 +179,6 @@ export class ToolRegistry {
         
         const updated = original.replace(targetContent, replacementContent);
         fs.writeFileSync(fullPath, updated, 'utf8');
-
-        if (gate) {
-          const lifecycle = ensureFileLifecycle(gate, fullPath);
-          recordFileWritten(gate, fullPath, lifecycle?.existedBeforeTask === true);
-          ensureRelevantFile(gate, fullPath, {
-            discoveredBy: 'model-write',
-            modified: true,
-            readSuccessfully: lifecycle?.readSucceeded === true
-          });
-        }
         
         return { success: true, filePath };
       }
@@ -672,30 +621,14 @@ export class ToolRegistry {
         },
         required: ['constraints', 'reviewFindings']
       },
-      async execute(args, runtimeOptions) {
-        const gate = runtimeOptions?.gate;
-        if (!gate) return { error: 'finalize_task is unavailable outside the agent runtime.' };
-        const { evaluateCompletionGate } = await import('../runtime/gate.js');
-        const scripts = runtimeOptions?.scripts || {};
-        const constraints = Array.isArray(args?.constraints) ? args.constraints : [];
-        const reviewFindings = Array.isArray(args?.reviewFindings) ? args.reviewFindings : [];
-        gate.constraintEvidence = constraints;
-        gate.reviewResults = reviewFindings;
-        const result = evaluateCompletionGate(gate, {
-          availableScripts: scripts,
-          constraints,
-          reviewFindings
-        });
-        gate.finalizeAttempted = true;
-        gate.finalizePassed = result.passed;
-        if (result.passed) {
-          return { success: true, gate: 'passed', message: 'Completion gate passed. The task may now be summarised.' };
-        }
+      async execute() {
+        // Repository execution was removed from CoreZ (site + CLI): there is
+        // no runtime completion gate anymore. This tool is retained in the
+        // registry for compatibility and answers honestly.
         return {
           success: false,
-          gate: 'pending',
-          missingActions: result.missing,
-          message: `Completion gate not passed. Missing: ${result.missing.join('; ')}`
+          gate: 'unavailable',
+          message: 'finalize_task is not available: repository execution was removed from CoreZ. Use the conversational path instead.'
         };
       }
     });

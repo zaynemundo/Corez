@@ -18,7 +18,7 @@ import { createIntentContract } from './promptIntelligence/intentContract.js';
 import { evaluateResponse, repairResponse, recordQualitySignal } from './reflectionEngine.js';
 import { buildAwwwardsDesignPrompt } from '../../packages/agent-core/context/designTokens.js';
 import { resolveSkills } from '../skills/resolver.js';
-import { classifyExecutionMode, EXECUTION_MODES } from './executionModes.js';
+import { classifyExecutionMode } from './executionModes.js';
 import { persistAndSummarize } from './contextStore.js';
 import { fetchWebSearch } from './searchService.js';
 import { fetchAwwwardsInspiration } from './inspirationService.js';
@@ -2747,14 +2747,6 @@ export async function generateLocalAIResponse(prompt, hostedError = null) {
 
   // Natural short latency (0.6s)
   await new Promise(r => setTimeout(r, 600));
-
-  // Repository-agent mode with no hosted AI: report the honest status. The
-  // local client has no repository workspace, and CoreZ never pretends
-  // repository tools ran.
-  if (classifyExecutionMode(cleanPrompt) === EXECUTION_MODES.REPOSITORY_AGENT) {
-    const reason = describeHostedUnavailable(hostedError).replace(/^ The hosted AI service is unavailable/, '');
-    return `I can analyse that request, but I don't have a repository workspace here, so I cannot modify real files — nothing was executed${reason ? ` (${reason.trim()})` : ''}. Run CoreZ with a repository workspace attached for the full evidence-backed agent loop: inspect, plan, implement, test, lint, build, review, finalise.`;
-  }
 
   // Revision context: the user asked to revise an embedded code block. Never
   // discard their code or fabricate a different app — report the real status.

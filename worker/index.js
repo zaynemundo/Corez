@@ -206,18 +206,6 @@ async function handleAi(request, env) {
     return jsonResponse(400, { error: 'Prompt is required.' });
   }
 
-  // Repository-agent mode: chat requests that target an existing repository
-  // would need the full agent cycle (understand, inspect, plan, implement,
-  // verify, review, finalise). This public deployment has no repository
-  // workspace and never executes one — the request is reported honestly,
-  // unexecuted. CoreZ never pretends repository tools ran.
-  if (body.mode === 'repository-agent') {
-    return jsonResponse(200, {
-      content: 'I can analyse that request, but this deployment has no repository workspace attached, so I cannot modify real files here — nothing was executed. Run CoreZ with a workspace attached (e.g. the local CLI agent against a repository) to get the full evidence-backed loop: inspect, plan, implement, test, lint, build, review, finalise.',
-      model: 'corez:no-workspace'
-    });
-  }
-
   // Greeting fast-path: common greetings get the mandated persona reply
   // instantly without paying an LLM round-trip.
   const GREETING_PATTERN = /^(hi|hello|hey|yo|sup|howdy|greetings|good\s+(morning|afternoon|evening|day)|who\s+(are|r)\s+you|what\s+(are|r)\s+you|whats?\s+(is\s+)?your\s+name)\b[.?!]*$/i;
