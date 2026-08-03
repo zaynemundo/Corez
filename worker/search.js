@@ -57,6 +57,18 @@ function validHttpUrl(value) {
   }
 }
 
+// Wikipedia's API policy requires a descriptive User-Agent; requests with a
+// generic/blank UA (e.g. Cloudflare Workers default egress) can be rejected
+// with 403. Setting an explicit UA is required for Workers deployments.
+const PROVIDER_USER_AGENT = 'CoreZ/1.0 (https://corez.pro; web search agent)';
+
+function providerFetchOptions() {
+  return {
+    signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+    headers: { 'User-Agent': PROVIDER_USER_AGENT }
+  };
+}
+
 /** DuckDuckGo Instant Answer: no key required. */
 async function searchDuckDuckGo(query, fetchImpl) {
   const url = new URL(DDG_ENDPOINT);
@@ -64,8 +76,10 @@ async function searchDuckDuckGo(query, fetchImpl) {
   url.searchParams.set('format', 'json');
   url.searchParams.set('no_html', '1');
   url.searchParams.set('skip_disambig', '1');
-  const response = await fetchImpl(url, { signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS) });
-  if (!response.ok) return [];
+  const response = await fetchImpl(url, providerFetchOptions());
+  if (!response.ok) {
+    throw new Error(`DuckDuckGo HTTP ${response.status}`);
+  }
   const data = await response.json();
   const results = [];
 
@@ -114,8 +128,10 @@ async function searchWikipedia(query, fetchImpl) {
   url.searchParams.set('format', 'json');
   url.searchParams.set('srlimit', String(MAX_RESULTS));
   url.searchParams.set('origin', '*');
-  const response = await fetchImpl(url, { signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS) });
-  if (!response.ok) return [];
+  const response = await fetchImpl(url, providerFetchOptions());
+  if (!response.ok) {
+    throw new Error(`Wikipedia HTTP ${response.status}`);
+  }
   const data = await response.json();
   const hits = data?.query?.search;
   if (!Array.isArray(hits)) return [];
