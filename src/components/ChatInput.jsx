@@ -210,7 +210,7 @@ export default function ChatInput({
   };
 
   return (
-    <div className="chat-input-container">
+    <div className="input-wrap">
       {show && filtered.length > 0 && (
         <div className="slash-suggestions" ref={suggestionsRef} role="listbox" aria-label="Slash commands">
           {filtered.map((entry, index) => {
@@ -238,8 +238,7 @@ export default function ChatInput({
           })}
         </div>
       )}
-      <div className="input-wrap">
-        {attachments.length > 0 && (
+      {attachments.length > 0 && (
           <div className="attachment-chips-bar" aria-label="Attached files">
             {attachments.map((attachment) => (
               <span key={attachment.id} className="attachment-chip">
@@ -318,7 +317,6 @@ export default function ChatInput({
             )}
           </div>
         </form>
-      </div>
     </div>
   );
 }
