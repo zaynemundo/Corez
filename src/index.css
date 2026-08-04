@@ -1394,12 +1394,13 @@ h1, h2, h3, h4, h5, h6 {
 /* Single-Line Fully Rounded Input Box */
 .input-wrap {
   width: 100%;
+  max-width: 760px;
+  align-self: center;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.4rem;
-  padding: 1rem 1.5rem 1.25rem 1.5rem;
-  background: var(--bg-primary);
+  padding: 0.5rem 0 0.75rem 0;
   position: sticky;
   bottom: 0;
   flex-shrink: 0;
@@ -2027,8 +2028,7 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .input-wrap {
-    padding: 0.85rem;
-    padding-bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
+    padding: 0.5rem 0 calc(0.5rem + env(safe-area-inset-bottom, 0px)) 0;
   }
 
   .input-box {
@@ -2200,8 +2200,7 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .input-wrap {
-    padding: 0.5rem 0.75rem;
-    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+    padding: 0.4rem 0 calc(0.4rem + env(safe-area-inset-bottom, 0px)) 0;
   }
 
   .sidebar {
