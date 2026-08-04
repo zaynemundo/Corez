@@ -877,7 +877,40 @@ export async function generateHostedAIResponse(
   };
   if (signal) fetchOptions.signal = signal;
 
-  let response = await fetch(AI_PROXY_ENDPOINT, fetchOptions);
+  // Transport resilience: a dropped connection (NetworkError / Failed to
+  // fetch) is often a transient blip on the client's network or at the edge,
+  // not a provider failure. Retry the same request once after a short pause
+  // before reporting the transport failure — never retry when the user
+  // pressed Stop.
+  const TRANSPORT_FAILURE_PATTERN = /networkerror|failed to fetch|load failed|fetch failed|connection (refused|reset|timed out)|network is unreachable|err_connection/i;
+  const fetchWithTransportRetry = async (options) => {
+    const attempts = [null, 3000];
+    for (let i = 0; i < attempts.length; i += 1) {
+      if (signal?.aborted) {
+        const err = new Error('AbortError');
+        err.name = 'AbortError';
+        throw err;
+      }
+      try {
+        return await fetch(AI_PROXY_ENDPOINT, options);
+      } catch (err) {
+        if (err?.name === 'AbortError' || signal?.aborted) throw err;
+        const message = `${err?.message || ''} ${err?.cause?.message || ''}`;
+        const isLastAttempt = i === attempts.length - 1;
+        if (!TRANSPORT_FAILURE_PATTERN.test(message) || isLastAttempt) throw err;
+        await new Promise((resolve) => {
+          const timer = setTimeout(resolve, attempts[i + 1]);
+          signal?.addEventListener('abort', () => {
+            clearTimeout(timer);
+            resolve();
+          }, { once: true });
+        });
+      }
+    }
+    throw new Error('Hosted AI request failed to reach the AI worker.');
+  };
+
+  let response = await fetchWithTransportRetry(fetchOptions);
 
   let data;
   try {
@@ -907,7 +940,7 @@ export async function generateHostedAIResponse(
   ) {
     const waitSeconds = Math.max(1, Math.min(Number(data?.retryAfterSeconds) || 10, RETRY_SCHEDULED_MAX_WAIT_MS / 1000));
     await sleepResumable(Math.max(RETRY_SCHEDULED_MIN_WAIT_MS, waitSeconds * 1000), signal);
-    response = await fetch(AI_PROXY_ENDPOINT, fetchOptions);
+    response = await fetchWithTransportRetry(fetchOptions);
     try {
       data = await response.json();
     } catch (err) {
