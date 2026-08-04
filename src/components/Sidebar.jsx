@@ -66,7 +66,6 @@ export default function Sidebar({
             aria-label={`Open conversation ${session.title}`}
             title={session.title}
           >
-            <ChatBubbleIcon size={16} />
             <span className="history-item-title">{session.title}</span>
           </div>
         ))}
