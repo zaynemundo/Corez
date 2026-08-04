@@ -210,7 +210,7 @@ export default function ChatInput({
   };
 
   return (
-    <div className="input-wrap">
+    <form onSubmit={handleSubmit} className="input-box">
       {show && filtered.length > 0 && (
         <div className="slash-suggestions" ref={suggestionsRef} role="listbox" aria-label="Slash commands">
           {filtered.map((entry, index) => {
@@ -262,61 +262,59 @@ export default function ChatInput({
             ))}
           </div>
         )}
-        <form onSubmit={handleSubmit} className="input-box">
-          <button
-            type="button"
-            className="attach-btn"
-            onClick={() => fileInputRef.current?.click()}
-            title="Attach files"
-            aria-label="Attach files"
-            disabled={isStreaming}
-          >
-            <PlusIcon size={18} strokeWidth={2} />
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            className="visually-hidden-file-input"
-            onChange={handleFileSelect}
-            tabIndex={-1}
-            aria-hidden="true"
-          />
-          <textarea
-            ref={refToUse}
-            className="chat-textarea"
-            value={input}
-            onChange={(e) => {
-              setInput(e.target.value);
-              setShowSuggestions(true);
-            }}
-            onKeyDown={handleKeyDown}
-            placeholder={isStreaming ? "Corez is generating..." : "Ask Corez..."}
-            aria-label={isStreaming ? "Corez is generating" : "Message Corez"}
-            rows={1}
-          />
-          <div className="input-actions-bar">
-            {isStreaming ? (
-              <button
-                type="button"
-                className="send-btn stop-btn"
-                onClick={onStopMessage}
-                title="Stop Generation"
-              >
-                <Square size={13} fill="currentColor" strokeWidth={1.5} />
-              </button>
-            ) : (
-              <button
-                type="submit"
-                className="send-btn"
-                disabled={!input.trim() && attachments.length === 0}
-                title="Send Message"
-              >
-                <Send size={15} strokeWidth={1.5} />
-              </button>
-            )}
-          </div>
-        </form>
-    </div>
+        <button
+          type="button"
+          className="attach-btn"
+          onClick={() => fileInputRef.current?.click()}
+          title="Attach files"
+          aria-label="Attach files"
+          disabled={isStreaming}
+        >
+          <PlusIcon size={18} strokeWidth={2} />
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="visually-hidden-file-input"
+          onChange={handleFileSelect}
+          tabIndex={-1}
+          aria-hidden="true"
+        />
+        <textarea
+          ref={refToUse}
+          className="chat-textarea"
+          value={input}
+          onChange={(e) => {
+            setInput(e.target.value);
+            setShowSuggestions(true);
+          }}
+          onKeyDown={handleKeyDown}
+          placeholder={isStreaming ? "Corez is generating..." : "Ask Corez..."}
+          aria-label={isStreaming ? "Corez is generating" : "Message Corez"}
+          rows={1}
+        />
+        <div className="input-actions-bar">
+          {isStreaming ? (
+            <button
+              type="button"
+              className="send-btn stop-btn"
+              onClick={onStopMessage}
+              title="Stop Generation"
+            >
+              <Square size={13} fill="currentColor" strokeWidth={1.5} />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              className="send-btn"
+              disabled={!input.trim() && attachments.length === 0}
+              title="Send Message"
+            >
+              <Send size={15} strokeWidth={1.5} />
+            </button>
+          )}
+        </div>
+    </form>
   );
 }
