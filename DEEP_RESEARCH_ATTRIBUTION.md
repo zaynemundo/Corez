@@ -38,7 +38,6 @@ SOFTWARE.
 1. `research` skill (`.agents/skills/research/`) - Consolidated two-phase workflow (outline + deep research + report), adapted from upstream's `research`, `research-add-items`, `research-add-fields`, `research-deep`, and `research-report` skills into a single skill with a single `/research` command entry point.
 2. `validate_json.py` (`.agents/skills/research/validate_json.py`) - Field coverage validator, copied verbatim from upstream.
 3. `web-search` agent (`.opencode/agents/web-search.md`) - Research subagent adapted for `web_fetch`-only searching (no search API), using the workspace model instead of the upstream default.
-4. `web-search-modules` (`.opencode/agents/web-search-modules/`) - Search strategy modules (`github-debug`, `general-web`, `stackoverflow`, `academic-papers`, `chinese-tech`), copied from upstream.
 5. CoreZ chat `/research` pipeline (`src/services/aiService.js`) - The chat app's deep research command implements the upstream two-phase methodology: Phase 1 outline decomposition into research items with focused queries, Phase 2 one dedicated web search per item run in parallel, Phase 3 deep report synthesis with a table of contents and per-item sections, plus the upstream uncertain-value honesty rule (every uncertainty is flagged; nothing is fabricated).
 
 ## Local Modifications
