@@ -26,7 +26,6 @@ export default function Sidebar({
           onClick={onCloseSidebar}
           title="Collapse Sidebar"
         >
-          <img src="/corez-white.png?v=2" alt="Corez Logo" className="brand-logo-default corez-bw-logo" />
           <span className="brand-wordmark">COREZ</span>
         </button>
         <button 
