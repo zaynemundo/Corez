@@ -205,6 +205,117 @@ async function run() {
     globalThis.fetch = originalFetch3;
   }
 
+  // DeepSeek V4 Flash setups (OPENCODE_GO_API_KEY only, no OpenRouter key):
+  // rerank goes through the OpenCode Go gateway first with the same key that
+  // serves deepseek-v4-flash.
+  const originalFetch4 = globalThis.fetch;
+  try {
+    globalThis.fetch = async (url, init) => {
+      if (String(url) === 'https://opencode.ai/zen/go/v1/rerank') {
+        const body = JSON.parse(init.body);
+        assert.equal(body.model, 'voyageai/rerank-2.5');
+        assert.equal(init.headers.Authorization, 'Bearer sk-opencode');
+        assert.ok(Array.isArray(body.documents) && body.documents.length === 2);
+        const n = body.documents.length;
+        return Response.json({
+          results: Array.from({ length: n }, (_, i) => ({ index: n - 1 - i, relevance_score: n - i }))
+        });
+      }
+      throw new Error(`unexpected ranking URL: ${url}`);
+    };
+    const opencodeRerankResponse = await post(
+      { query: 'red turtles' },
+      {
+        OPENCODE_GO_API_KEY: 'sk-opencode',
+        __SEARCH_FETCH: wikipediaResults(['Alpha', 'Beta'])
+      }
+    );
+    assert.equal(opencodeRerankResponse.status, 200);
+    const opencodeRerankData = await opencodeRerankResponse.json();
+    assert.equal(opencodeRerankData.meta.rerank, 'rerank');
+    assert.equal(opencodeRerankData.meta.rerankProvider, 'opencode');
+    assert.equal(opencodeRerankData.results[0].title, 'Beta');
+  } finally {
+    globalThis.fetch = originalFetch4;
+  }
+
+  // OpenCode Go gateway rerank down -> embeddings fallback on the same
+  // gateway (perplexity model), still with only the deepseek-v4-flash key.
+  const originalFetch5 = globalThis.fetch;
+  try {
+    globalThis.fetch = async (url, init) => {
+      if (String(url) === 'https://opencode.ai/zen/go/v1/rerank') {
+        return new Response('down', { status: 500 });
+      }
+      if (String(url) === 'https://opencode.ai/zen/go/v1/embeddings') {
+        const body = JSON.parse(init.body);
+        assert.equal(body.model, 'perplexity/pplx-embed-v1-0.6b');
+        assert.equal(init.headers.Authorization, 'Bearer sk-opencode');
+        return Response.json({
+          data: [
+            { index: 0, embedding: [1, 0, 0] }, // query
+            { index: 1, embedding: [0, 1, 0] }, // Alpha (low)
+            { index: 2, embedding: [1, 0, 0] } // Beta (high)
+          ]
+        });
+      }
+      throw new Error(`unexpected ranking URL: ${url}`);
+    };
+    const opencodeEmbedResponse = await post(
+      { query: 'red turtles' },
+      {
+        OPENCODE_GO_API_KEY: 'sk-opencode',
+        __SEARCH_FETCH: wikipediaResults(['Alpha', 'Beta'])
+      }
+    );
+    assert.equal(opencodeEmbedResponse.status, 200);
+    const opencodeEmbedData = await opencodeEmbedResponse.json();
+    assert.equal(opencodeEmbedData.meta.rerank, 'embeddings');
+    assert.equal(opencodeEmbedData.meta.rerankProvider, 'opencode');
+    assert.equal(opencodeEmbedData.results[0].title, 'Beta');
+  } finally {
+    globalThis.fetch = originalFetch5;
+  }
+
+  // When both providers are configured, OpenCode Go (deepseek-v4-flash
+  // gateway) is tried first and OpenRouter only falls back on failure.
+  const originalFetch6 = globalThis.fetch;
+  try {
+    let opencodeTried = false;
+    globalThis.fetch = async (url) => {
+      if (String(url) === 'https://opencode.ai/zen/go/v1/rerank') {
+        opencodeTried = true;
+        return new Response('down', { status: 500 });
+      }
+      if (String(url) === 'https://opencode.ai/zen/go/v1/embeddings') {
+        return new Response('down', { status: 500 });
+      }
+      if (String(url) === 'https://openrouter.ai/api/v1/rerank') {
+        const n = 2;
+        return Response.json({
+          results: Array.from({ length: n }, (_, i) => ({ index: n - 1 - i, relevance_score: n - i }))
+        });
+      }
+      throw new Error(`unexpected ranking URL: ${url}`);
+    };
+    const fallbackResponse = await post(
+      { query: 'red turtles' },
+      {
+        OPENCODE_GO_API_KEY: 'sk-opencode',
+        OPENROUTER_API_KEY: 'sk-or',
+        __SEARCH_FETCH: wikipediaResults(['Alpha', 'Beta'])
+      }
+    );
+    assert.equal(fallbackResponse.status, 200);
+    const fallbackData = await fallbackResponse.json();
+    assert.ok(opencodeTried, 'OpenCode Go must be tried before OpenRouter');
+    assert.equal(fallbackData.meta.rerank, 'rerank');
+    assert.equal(fallbackData.meta.rerankProvider, 'openrouter');
+    assert.equal(fallbackData.results[0].title, 'Beta');
+  } finally {
+    globalThis.fetch = originalFetch6;
+  }
+
   // Deep research mode (detail: true) attaches full Wikipedia extracts to the
   // top Wikipedia results.
   const detailResponse = await post(

@@ -103,18 +103,22 @@ export class ModelProviderRouter {
     };
   }
 
-  async generateEmbeddings({ input, model = 'perplexity/pplx-embed-v1-0.6b', signal }) {
+  async generateEmbeddings({ input, model, signal }) {
     const inputs = Array.isArray(input) ? input : [input];
+    const embedModel = model || process.env.OPENCODE_EMBED_MODEL || 'perplexity/pplx-embed-v1-0.6b';
+    const endpoint = process.env.OPENCODE_EMBED_ENDPOINT
+      || process.env.OPENCODE_EMBEDDINGS_ENDPOINT
+      || 'https://opencode.ai/zen/go/v1/embeddings';
 
     if (this.opencodeApiKey) {
       try {
-        const res = await fetch('https://opencode.ai/zen/go/v1/embeddings', {
+        const res = await fetch(endpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${this.opencodeApiKey}`
           },
-          body: JSON.stringify({ model, input: inputs }),
+          body: JSON.stringify({ model: embedModel, input: inputs }),
           signal
         });
 
@@ -123,7 +127,7 @@ export class ModelProviderRouter {
           const embeddings = (data.data || []).map(item => item.embedding);
           return {
             embeddings,
-            model: data.model || model,
+            model: data.model || embedModel,
             raw: data
           };
         }
@@ -149,7 +153,7 @@ export class ModelProviderRouter {
 
     return {
       embeddings: simulatedEmbeddings,
-      model,
+      model: embedModel,
       offline: true
     };
   }

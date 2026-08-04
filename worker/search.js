@@ -28,6 +28,8 @@ const WIKIPEDIA_ENDPOINT = 'https://en.wikipedia.org/w/api.php';
 const WIKIPEDIA_EXTRACTS_ENDPOINT = 'https://en.wikipedia.org/w/api.php';
 const OPENROUTER_RERANK_ENDPOINT = 'https://openrouter.ai/api/v1/rerank';
 const OPENROUTER_EMBEDDINGS_ENDPOINT = 'https://openrouter.ai/api/v1/embeddings';
+const OPENCODE_RERANK_ENDPOINT = 'https://opencode.ai/zen/go/v1/rerank';
+const OPENCODE_EMBEDDINGS_ENDPOINT = 'https://opencode.ai/zen/go/v1/embeddings';
 const DEFAULT_RERANK_MODEL = 'voyageai/rerank-2.5';
 const DEFAULT_EMBED_MODEL = 'perplexity/pplx-embed-v1-0.6b';
 const RERANK_TIMEOUT_MS = 10_000;
@@ -266,28 +268,64 @@ function openRouterKey(env) {
   return env?.OPENROUTER_API_KEY || null;
 }
 
+function openCodeKey(env) {
+  return env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY || null;
+}
+
+// Ranking providers, most preferred first. DeepSeek V4 Flash (the default
+// chat model) is served through the OpenCode Go gateway, so the same key and
+// gateway are used for rerank and embeddings first; OpenRouter is the
+// fallback provider. Each provider keeps its own key and endpoint.
+function rankingProviders(env) {
+  const providers = [];
+  const opencodeKey = openCodeKey(env);
+  if (opencodeKey) {
+    providers.push({
+      label: 'opencode',
+      apiKey: opencodeKey,
+      rerankEndpoint: OPENCODE_RERANK_ENDPOINT,
+      embedEndpoint: OPENCODE_EMBEDDINGS_ENDPOINT,
+      rerankModel: env?.OPENCODE_RERANK_MODEL || DEFAULT_RERANK_MODEL,
+      embedModel: env?.OPENCODE_EMBED_MODEL || DEFAULT_EMBED_MODEL,
+      rerankDisabled: env?.OPENCODE_RERANK_DISABLED === 'true',
+      embedDisabled: env?.OPENCODE_EMBED_DISABLED === 'true'
+    });
+  }
+  const openrouterKey = openRouterKey(env);
+  if (openrouterKey) {
+    providers.push({
+      label: 'openrouter',
+      apiKey: openrouterKey,
+      rerankEndpoint: OPENROUTER_RERANK_ENDPOINT,
+      embedEndpoint: OPENROUTER_EMBEDDINGS_ENDPOINT,
+      rerankModel: env?.OPENROUTER_RERANK_MODEL || DEFAULT_RERANK_MODEL,
+      embedModel: env?.OPENROUTER_EMBED_MODEL || DEFAULT_EMBED_MODEL,
+      rerankDisabled: env?.OPENROUTER_RERANK_DISABLED === 'true',
+      embedDisabled: env?.OPENROUTER_EMBED_DISABLED === 'true'
+    });
+  }
+  return providers;
+}
+
 /**
- * Re-rank merged search results with an OpenRouter rerank model
- * (voyageai/rerank-2.5 by default) so the most
- * relevant results lead. Best effort: any failure returns null and the
- * caller keeps the original order — search never breaks on rerank.
- * The OpenRouter key is only ever sent to OpenRouter.
+ * Re-rank merged search results with a rerank model (voyageai/rerank-2.5 by
+ * default) so the most relevant results lead. Best effort: any failure
+ * returns null and the caller keeps the original order — search never
+ * breaks on rerank. The provider's key is only ever sent to that provider.
  */
-async function rerankWithOpenRouter(query, results, env) {
-  const apiKey = openRouterKey(env);
-  const model = env?.OPENROUTER_RERANK_MODEL || DEFAULT_RERANK_MODEL;
-  if (!apiKey || env?.OPENROUTER_RERANK_DISABLED === 'true') return null;
+async function rerankWithProvider(query, results, provider) {
+  if (!provider?.apiKey || provider.rerankDisabled) return null;
 
   let response;
   try {
-    response = await fetch(OPENROUTER_RERANK_ENDPOINT, {
+    response = await fetch(provider.rerankEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`
+        Authorization: `Bearer ${provider.apiKey}`
       },
       body: JSON.stringify({
-        model,
+        model: provider.rerankModel,
         query,
         documents: results.map((result) => ({ text: resultText(result) }))
       }),
@@ -319,6 +357,7 @@ async function rerankWithOpenRouter(query, results, env) {
 
   return {
     method: 'rerank',
+    provider: provider.label,
     results: [...results]
       .map((result, index) => ({ result, score: scoreByIndex.get(index) }))
       .sort((a, b) => b.score - a.score)
@@ -327,25 +366,23 @@ async function rerankWithOpenRouter(query, results, env) {
 }
 
 /**
- * Fallback ranking with OpenRouter embeddings (perplexity/pplx-embed-v1-0.6b
- * by default): cosine similarity between the query and each result text.
+ * Fallback ranking with embeddings (perplexity/pplx-embed-v1-0.6b by
+ * default): cosine similarity between the query and each result text.
  * Best effort — any failure returns null and the original order is kept.
  */
-async function rankWithEmbeddings(query, results, env) {
-  const apiKey = openRouterKey(env);
-  const model = env?.OPENROUTER_EMBED_MODEL || DEFAULT_EMBED_MODEL;
-  if (!apiKey || env?.OPENROUTER_EMBED_DISABLED === 'true') return null;
+async function rankWithEmbeddingsProvider(query, results, provider) {
+  if (!provider?.apiKey || provider.embedDisabled) return null;
 
   let response;
   try {
-    response = await fetch(OPENROUTER_EMBEDDINGS_ENDPOINT, {
+    response = await fetch(provider.embedEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`
+        Authorization: `Bearer ${provider.apiKey}`
       },
       body: JSON.stringify({
-        model,
+        model: provider.embedModel,
         input: [query, ...results.map((result) => resultText(result))]
       }),
       signal: AbortSignal.timeout(EMBED_TIMEOUT_MS)
@@ -375,6 +412,7 @@ async function rankWithEmbeddings(query, results, env) {
 
   return {
     method: 'embeddings',
+    provider: provider.label,
     results: [...results]
       .map((result, index) => ({ result, score: cosineSimilarity(queryVector, docVectors.get(index)) }))
       .sort((a, b) => b.score - a.score)
@@ -382,12 +420,21 @@ async function rankWithEmbeddings(query, results, env) {
   };
 }
 
-// Rank merged results: OpenRouter rerank first, embeddings similarity as the
-// fallback. Never throws — returns null when neither can rank.
+// Rank merged results across every configured provider: rerank first,
+// embeddings similarity as the fallback. Never throws — returns null when
+// neither can rank. Rerank is tried on each provider before embeddings so
+// the strongest ranking wins; a provider that cannot serve either is skipped.
 async function rankSearchResults(query, results, env) {
-  const reranked = await rerankWithOpenRouter(query, results, env);
-  if (reranked) return reranked;
-  return rankWithEmbeddings(query, results, env);
+  const providers = rankingProviders(env);
+  for (const provider of providers) {
+    const reranked = await rerankWithProvider(query, results, provider);
+    if (reranked) return reranked;
+  }
+  for (const provider of providers) {
+    const embedded = await rankWithEmbeddingsProvider(query, results, provider);
+    if (embedded) return embedded;
+  }
+  return null;
 }
 
 /**
@@ -557,11 +604,13 @@ export async function handleSearch(request, env) {
   if (merged.length > 0) {
     let results = merged.slice(0, MAX_RESULTS);
     let rerankMethod = null;
+    let rerankProvider = null;
     if (results.length > 1) {
       const ranked = await rankSearchResults(query, results, env);
       if (ranked) {
         results = ranked.results;
         rerankMethod = ranked.method;
+        rerankProvider = ranked.provider || null;
       }
     }
 
@@ -590,6 +639,7 @@ export async function handleSearch(request, env) {
         source: results[0]?.source || 'search',
         sources,
         rerank: rerankMethod,
+        rerankProvider,
         extracted,
         servedAt: new Date().toISOString()
       }
