@@ -1,8 +1,11 @@
+import { useState, useEffect } from 'react';
 import { 
   Settings, 
   Sun, 
   Moon, 
-  PanelLeft
+  PanelLeft,
+  MoreVertical,
+  Trash2
 } from 'lucide-react';
 import { ChatBubbleIcon } from './icons';
 
@@ -13,11 +16,23 @@ export default function Sidebar({
   onSelectSession,
   onNewChat,
   onOpenSettings,
+  onDeleteSession,
   activeView,
   theme,
   onToggleTheme,
   onCloseSidebar
 }) {
+  const [openMenuId, setOpenMenuId] = useState(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.history-item-menu')) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   return (
     <aside className={`sidebar ${isOpen ? '' : 'collapsed'}`} aria-hidden={!isOpen} inert={!isOpen}>
       <div className="sidebar-header">
@@ -67,6 +82,42 @@ export default function Sidebar({
             title={session.title}
           >
             <span className="history-item-title">{session.title}</span>
+            <div className="history-item-menu">
+              <button
+                type="button"
+                className="history-menu-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpenMenuId(openMenuId === session.id ? null : session.id);
+                }}
+                title="Chat options"
+                aria-label={`Options for ${session.title}`}
+                aria-expanded={openMenuId === session.id}
+              >
+                <MoreVertical size={14} strokeWidth={1.5} />
+              </button>
+              {openMenuId === session.id && (
+                <div
+                  className="history-menu-dropdown"
+                  role="menu"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    className="history-menu-item delete"
+                    role="menuitem"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenMenuId(null);
+                      onDeleteSession(session.id);
+                    }}
+                  >
+                    <Trash2 size={14} strokeWidth={1.5} />
+                    <span>Delete</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         ))}
       </div>
