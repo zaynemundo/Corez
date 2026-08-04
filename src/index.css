@@ -59,10 +59,10 @@
 
 [data-theme="light"] {
   --bg-primary: #f2f2f2;
-  --bg-secondary: #f6f6f8;
+  --bg-secondary: #f2f2f2;
   --bg-tertiary: #eeeeef;
   --bg-card: #ffffff;
-  --bg-glass: rgba(246, 246, 248, 0.85);
+  --bg-glass: rgba(242, 242, 242, 0.85);
   --border-color: rgba(0, 0, 0, 0.08);
   --border-hover: rgba(0, 0, 0, 0.22);
   
