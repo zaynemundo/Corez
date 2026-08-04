@@ -142,6 +142,19 @@ Adaptive Routing - Fast Path:
 - Answer directly and immediately with practical information.`;
   }
 
+  // Informational answers (explanations, comparisons, lists, guides) follow
+  // strict scannable formatting: shallow heading levels, bold lead-ins,
+  // tables for attribute-heavy data, and an actionable closing section.
+  const informationalFormatting = `
+Informational & List Formatting (for every non-code answer):
+- Open with a one-paragraph overview that answers the question directly, then organize the rest into clear sections.
+- Start headings at the top level: use "## Section" for main parts and "### Subsection" at most — never begin below "###" and never nest deeper than three levels.
+- Prefer compact bullets with a bold lead-in: "- **Item name** — short description."
+- Use a markdown table whenever items share the same attributes (for example: program, issuer, focus, best for, level). Tables beat long lists for comparisons.
+- Keep each bullet to one line when possible; move detail into a follow-up sentence.
+- Finish with a short actionable section ("How to choose", "Next steps", or "What to verify") when the topic allows.
+- Never add filler sentences, emojis, or generic closers; every sentence must carry information.`;
+
   const imageRequestInstructions = `
 - IMAGE REQUESTS: If the user explicitly requests an image, picture, photo, illustration, artwork, logo, or wallpaper, respond with EXACTLY ONE line containing \`[IMAGE_PROMPT: concise detailed description of the requested image]\` and nothing else. Never output raw SVG markup for image requests — the platform renders the image for you.`;
 
@@ -174,6 +187,12 @@ Adaptive Routing - Fast Path:
   // Format Execution Plan in full.
   const formattedPlan = executionPlan ? `\n\n${String(executionPlan)}` : '';
 
+  // Non-code intents (explanations and informational chat answers) also
+  // receive the scannable formatting rules; code, app, swarm, and writing
+  // paths keep their own dedicated guidance.
+  const formattingIncluded = intentType === 'explanation' || intentType === 'chat' || intentType === 'fast' || !['code-help', 'app', 'swarm', 'writing'].includes(intentType);
+  const formattingSection = formattingIncluded ? informationalFormatting : '';
+
   return `You are COREZ AI.
 
 Identity & Persona:
@@ -189,7 +208,7 @@ Guidelines for Output:
 - PROPER LAYERING: Ensure proper visual layering (Background z-index:0 -> Content z-index:10 -> HUD/Toolbars z-index:20-30 -> Modals z-index:40-50+).
 - CRITICAL SINGLE-FILE MANDATE: Output all code as ONE SINGLE self-contained file in ONE SINGLE code block.
 - Always start your response with a brief summary explaining your implementation choices before the code block.
-${adaptiveInstructions}
+${adaptiveInstructions}${formattingSection}
 
 Fine-Grained Intent: ${primaryIntent}${secondaryIntent}
 Target Goal: ${intent?.goal || 'Assist user with requested deliverable'}
