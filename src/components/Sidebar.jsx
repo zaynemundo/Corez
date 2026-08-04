@@ -2,7 +2,7 @@ import {
   Settings, 
   Sun, 
   Moon, 
-  X
+  PanelLeft
 } from 'lucide-react';
 import { ChatBubbleIcon } from './icons';
 
@@ -34,7 +34,7 @@ export default function Sidebar({
           title="Collapse Sidebar"
           aria-label="Collapse Sidebar"
         >
-          <X size={16} strokeWidth={1.5} />
+          <PanelLeft size={16} strokeWidth={1.5} />
         </button>
       </div>
 
