@@ -63,6 +63,10 @@ describe('ChatMessage image rendering', () => {
     const icons = document.querySelectorAll('.linkedin-icon');
     expect(icons.length).toBe(2);
     expect(icons[0]).toHaveClass('linkedin-icon');
+
+    const firstLink = screen.getByRole('link', { name: /Zayne Mundo/i });
+    expect(firstLink.firstChild).toHaveClass('linkedin-icon');
+    expect(firstLink).toHaveTextContent('Zayne Mundo');
   });
 
   it('does not add a LinkedIn icon to non-LinkedIn links', () => {

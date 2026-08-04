@@ -1184,12 +1184,10 @@ h1, h2, h3, h4, h5, h6 {
 .linkedin-icon {
   width: 14px;
   height: 14px;
-  margin-left: 4px;
+  margin-right: 4px;
   border-radius: 4px;
   background-color: #0a66c2;
   fill: #ffffff;
-  padding: 2px;
-  box-sizing: border-box;
   vertical-align: -2px;
   display: inline-block;
 }
