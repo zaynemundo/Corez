@@ -1188,6 +1188,8 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: 4px;
   background-color: #0a66c2;
   fill: #ffffff;
+  padding: 3px;
+  box-sizing: border-box;
   vertical-align: -2px;
   display: inline-block;
 }
