@@ -58,7 +58,7 @@
 }
 
 [data-theme="light"] {
-  --bg-primary: #ffffff;
+  --bg-primary: #f6f6f6;
   --bg-secondary: #f6f6f8;
   --bg-tertiary: #eeeeef;
   --bg-card: #ffffff;
