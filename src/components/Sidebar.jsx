@@ -1,7 +1,8 @@
 import { 
   Settings, 
   Sun, 
-  Moon
+  Moon, 
+  X
 } from 'lucide-react';
 import { ChatBubbleIcon } from './icons';
 
@@ -18,32 +19,42 @@ export default function Sidebar({
   onCloseSidebar
 }) {
   return (
-    <aside className={`sidebar icon-only ${isOpen ? '' : 'collapsed'}`} aria-hidden={!isOpen} inert={!isOpen}>
-      <div className="sidebar-header icon-only-header">
+    <aside className={`sidebar ${isOpen ? '' : 'collapsed'}`} aria-hidden={!isOpen} inert={!isOpen}>
+      <div className="sidebar-header">
         <button 
           className="brand-icon-toggle" 
           onClick={onCloseSidebar}
           title="Collapse Sidebar"
         >
           <img src="/corez-white.png?v=2" alt="Corez Logo" className="brand-logo-default corez-bw-logo" />
+          <span className="brand-wordmark">COREZ</span>
+        </button>
+        <button 
+          className="sidebar-close-btn" 
+          onClick={onCloseSidebar}
+          title="Collapse Sidebar"
+          aria-label="Collapse Sidebar"
+        >
+          <X size={16} strokeWidth={1.5} />
         </button>
       </div>
 
       <div className="sidebar-action-box">
         <button 
-          className="new-chat-btn icon-only-btn" 
+          className="new-chat-btn" 
           onClick={onNewChat}
           title="New Chat Session"
         >
-          <ChatBubbleIcon size={17} strokeWidth={1.5} />
+          <ChatBubbleIcon size={16} />
+          <span>New Chat</span>
         </button>
       </div>
 
-      <div className="chat-history-list icon-only-list">
+      <div className="chat-history-list">
         {sessions.map((session) => (
           <div
             key={session.id}
-            className={`history-item icon-only-item ${activeView === 'chat' && session.id === activeSessionId ? 'active' : ''}`}
+            className={`history-item ${activeView === 'chat' && session.id === activeSessionId ? 'active' : ''}`}
             onClick={() => onSelectSession(session.id)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
@@ -56,25 +67,28 @@ export default function Sidebar({
             aria-label={`Open conversation ${session.title}`}
             title={session.title}
           >
-          <ChatBubbleIcon size={15} strokeWidth={1.5} />
+            <ChatBubbleIcon size={15} />
+            <span className="history-item-title">{session.title}</span>
           </div>
         ))}
       </div>
 
-      <div className="sidebar-footer icon-only-footer">
+      <div className="sidebar-footer">
         <button 
-          className="footer-action-btn icon-only-btn" 
+          className="footer-action-btn" 
           onClick={onToggleTheme}
           title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
         >
-          {theme === 'dark' ? <Sun size={17} strokeWidth={1.5} /> : <Moon size={17} strokeWidth={1.5} />}
+          {theme === 'dark' ? <Sun size={16} strokeWidth={1.5} /> : <Moon size={16} strokeWidth={1.5} />}
+          <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
         </button>
         <button 
-          className="footer-action-btn icon-only-btn" 
+          className="footer-action-btn" 
           onClick={onOpenSettings}
           title="Corez Settings"
         >
-          <Settings size={17} strokeWidth={1.5} />
+          <Settings size={16} strokeWidth={1.5} />
+          <span>Settings</span>
         </button>
       </div>
     </aside>
