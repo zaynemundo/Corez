@@ -11,7 +11,7 @@
   --border-color: rgba(255, 255, 255, 0.08);
   --border-hover: rgba(255, 255, 255, 0.22);
   
-  --text-primary: #f6f6f6;
+  --text-primary: #f2f2f2;
   --text-secondary: #a1a1a6;
   --text-muted: #8e8e96;
 
@@ -58,7 +58,7 @@
 }
 
 [data-theme="light"] {
-  --bg-primary: #f6f6f6;
+  --bg-primary: #f2f2f2;
   --bg-secondary: #f6f6f8;
   --bg-tertiary: #eeeeef;
   --bg-card: #ffffff;
@@ -772,7 +772,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 [data-theme="light"] .message-wrapper .message-content {
-  background-color: #f6f6f6;
+  background-color: #f2f2f2;
 }
 
 /* Inline Market Instrument */
