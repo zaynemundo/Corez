@@ -232,7 +232,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .brand-wordmark {
   font-size: 16px;
-  font-weight: 650;
+  font-weight: 400;
   letter-spacing: 0.06em;
   color: var(--text-primary);
   white-space: nowrap;
