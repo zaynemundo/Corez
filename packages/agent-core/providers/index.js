@@ -103,7 +103,7 @@ export class ModelProviderRouter {
     };
   }
 
-  async generateEmbeddings({ input, model = 'nvidia/nemotron-3-embed-1b:free', signal }) {
+  async generateEmbeddings({ input, model = 'perplexity/pplx-embed-v1-0.6b', signal }) {
     const inputs = Array.isArray(input) ? input : [input];
 
     if (this.opencodeApiKey) {

@@ -28,8 +28,8 @@ const WIKIPEDIA_ENDPOINT = 'https://en.wikipedia.org/w/api.php';
 const WIKIPEDIA_EXTRACTS_ENDPOINT = 'https://en.wikipedia.org/w/api.php';
 const OPENROUTER_RERANK_ENDPOINT = 'https://openrouter.ai/api/v1/rerank';
 const OPENROUTER_EMBEDDINGS_ENDPOINT = 'https://openrouter.ai/api/v1/embeddings';
-const DEFAULT_RERANK_MODEL = 'nvidia/llama-nemotron-rerank-vl-1b-v2:free';
-const DEFAULT_EMBED_MODEL = 'nvidia/nemotron-3-embed-1b:free';
+const DEFAULT_RERANK_MODEL = 'voyageai/rerank-2.5';
+const DEFAULT_EMBED_MODEL = 'perplexity/pplx-embed-v1-0.6b';
 const RERANK_TIMEOUT_MS = 10_000;
 const EMBED_TIMEOUT_MS = 10_000;
 
@@ -268,7 +268,7 @@ function openRouterKey(env) {
 
 /**
  * Re-rank merged search results with an OpenRouter rerank model
- * (nvidia/llama-nemotron-rerank-vl-1b-v2:free by default) so the most
+ * (voyageai/rerank-2.5 by default) so the most
  * relevant results lead. Best effort: any failure returns null and the
  * caller keeps the original order — search never breaks on rerank.
  * The OpenRouter key is only ever sent to OpenRouter.
@@ -327,7 +327,7 @@ async function rerankWithOpenRouter(query, results, env) {
 }
 
 /**
- * Fallback ranking with OpenRouter embeddings (nvidia/nemotron-3-embed-1b:free
+ * Fallback ranking with OpenRouter embeddings (perplexity/pplx-embed-v1-0.6b
  * by default): cosine similarity between the query and each result text.
  * Best effort — any failure returns null and the original order is kept.
  */

@@ -487,16 +487,16 @@ export class ToolRegistry {
     this.registerTool({
       name: 'embed_text',
       category: PERMISSION_CATEGORIES.READ,
-      description: 'Generate vector embeddings for input text using nvidia/nemotron-3-embed-1b:free model.',
+      description: 'Generate vector embeddings for input text using perplexity/pplx-embed-v1-0.6b model.',
       parameters: {
         type: 'object',
         properties: {
           text: { type: 'string', description: 'Text or code snippet to embed' },
-          model: { type: 'string', description: 'Embedding model (defaults to nvidia/nemotron-3-embed-1b:free)' }
+          model: { type: 'string', description: 'Embedding model (defaults to perplexity/pplx-embed-v1-0.6b)' }
         },
         required: ['text']
       },
-      async execute({ text, model = 'nvidia/nemotron-3-embed-1b:free' }) {
+      async execute({ text, model = 'perplexity/pplx-embed-v1-0.6b' }) {
         const { ModelProviderRouter } = await import('../providers/index.js');
         const router = new ModelProviderRouter();
         const result = await router.generateEmbeddings({ input: text, model });

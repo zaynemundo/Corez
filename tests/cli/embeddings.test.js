@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { ModelProviderRouter, cosineSimilarity, ToolRegistry } from '../../packages/agent-core/index.js';
 
-describe('Vector Embeddings (nvidia/nemotron-3-embed-1b:free)', () => {
-  it('generates vector embeddings with default model nvidia/nemotron-3-embed-1b:free', async () => {
+describe('Vector Embeddings (perplexity/pplx-embed-v1-0.6b)', () => {
+  it('generates vector embeddings with default model perplexity/pplx-embed-v1-0.6b', async () => {
     const router = new ModelProviderRouter();
     const res = await router.generateEmbeddings({
       input: 'const player = { x: 10, y: 20 };'
@@ -33,7 +33,7 @@ describe('Vector Embeddings (nvidia/nemotron-3-embed-1b:free)', () => {
       text: 'function gameLoop() { update(); render(); }'
     });
 
-    expect(result.model).toContain('nvidia/nemotron-3-embed-1b:free');
+    expect(result.model).toContain('perplexity/pplx-embed-v1-0.6b');
     expect(result.dimensions).toBeGreaterThan(0);
     expect(Array.isArray(result.embedding)).toBe(true);
   });

@@ -129,7 +129,7 @@ async function run() {
     globalThis.fetch = async (url, init) => {
       if (String(url).includes('/rerank')) {
         const body = JSON.parse(init.body);
-        assert.equal(body.model, 'nvidia/llama-nemotron-rerank-vl-1b-v2:free');
+        assert.equal(body.model, 'voyageai/rerank-2.5');
         assert.ok(Array.isArray(body.documents) && body.documents.length === 2);
         const n = body.documents.length;
         return Response.json({
@@ -158,9 +158,10 @@ async function run() {
   // When rerank is unavailable, embedding cosine similarity ranks instead.
   const originalFetch2 = globalThis.fetch;
   try {
-    globalThis.fetch = async (url) => {
+    globalThis.fetch = async (url, init) => {
       if (String(url).includes('/rerank')) return new Response('down', { status: 500 });
       if (String(url).includes('/embeddings')) {
+        assert.equal(JSON.parse(init.body).model, 'perplexity/pplx-embed-v1-0.6b');
         return Response.json({
           data: [
             { index: 0, embedding: [1, 0, 0] }, // query
