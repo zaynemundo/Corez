@@ -771,6 +771,10 @@ h1, h2, h3, h4, h5, h6 {
   line-height: 1.6;
 }
 
+[data-theme="light"] .message-wrapper .message-content {
+  background-color: #f6f6f6;
+}
+
 /* Inline Market Instrument */
 .market-card {
   width: min(100%, 720px);
