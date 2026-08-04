@@ -2986,7 +2986,16 @@ export async function generateLocalAIResponse(prompt, hostedError = null) {
 
   // 2. CREATOR FACT
   if (/\bwho\b.{0,20}\b(created|made|built|invented|developed)\b|\b(created|made|built|invented|developed)\b.{0,30}\b(corez|core z)\b/i.test(lower)) {
-    return `Corez was created by [Zayne Mundo](https://www.linkedin.com/in/zayne-mundo/) and [Christian Vestil](https://www.linkedin.com/in/christian-jericson-belderol/). Corez was created as a conversational AI creation platform that helps people turn ideas into working digital products without needing to code. Rather than only answering questions, it is designed to understand the user's intent, generate websites, apps, games, tools, images, research reports and other content, display the result in a live preview, allow revisions through chat and publish finished creations through a shareable link. Its core purpose is to remove the technical gap between having an idea and launching something functional, making digital creation accessible to designers, marketers, entrepreneurs, students and everyday users. In short, Corez turns plain conversation into creation — taking anyone from a first spark of an idea to a finished, shareable product.`;
+    return `**Corez was created by [Zayne Mundo](https://www.linkedin.com/in/zayne-mundo/) and [Christian Vestil](https://www.linkedin.com/in/christian-jericson-belderol/)** — a conversational AI creation platform that helps people turn ideas into working digital products without needing to code.
+
+Rather than only answering questions, Corez understands your intent and takes it all the way from idea to launch:
+
+- **Create** — websites, apps, games, tools, images, research reports and more
+- **Preview** — watch your creation come to life in a live preview
+- **Refine** — revise and polish it right through the chat
+- **Publish** — share your finished product with a shareable link
+
+Its core purpose is to remove the technical gap between having an idea and launching something functional, making digital creation accessible to designers, marketers, entrepreneurs, students and everyday users. In short, Corez turns plain conversation into creation — anyone can go from a first spark of an idea to a finished, shareable product.`;
   }
 
   if (/^(how are you|how is it going|how's it going)(\s|!|\.|\?|$)/i.test(lower)) {
