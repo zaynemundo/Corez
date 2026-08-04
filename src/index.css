@@ -1484,7 +1484,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .input-box {
   width: 100%;
-  max-width: 760px;
+  max-width: calc(760px - 3rem);
   align-self: center;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
@@ -1502,9 +1502,12 @@ h1, h2, h3, h4, h5, h6 {
   transition: max-width 0.4s cubic-bezier(0.16, 1, 0.3, 1), width 0.4s cubic-bezier(0.16, 1, 0.3, 1), border-color var(--transition-fast), background-color var(--transition-fast);
 }
 
-.chat-pane.canvas-active .messages-inner,
-.chat-pane.canvas-active .input-box {
+.chat-pane.canvas-active .messages-inner {
   max-width: 680px;
+}
+
+.chat-pane.canvas-active .input-box {
+  max-width: calc(680px - 3rem);
 }
 
 .input-box:focus-within {
@@ -1873,13 +1876,17 @@ h1, h2, h3, h4, h5, h6 {
 
 /* 1. Ultra-Wide & Large Desktop Screens (1440px+) */
 @media (min-width: 1440px) {
-  .messages-inner,
-  .input-box {
+  .messages-inner {
     max-width: 800px;
   }
-  .chat-pane.canvas-active .messages-inner,
-  .chat-pane.canvas-active .input-box {
+  .input-box {
+    max-width: calc(800px - 3rem);
+  }
+  .chat-pane.canvas-active .messages-inner {
     max-width: 720px;
+  }
+  .chat-pane.canvas-active .input-box {
+    max-width: calc(720px - 3rem);
   }
   .canvas-pane {
     width: 52%;
@@ -1888,13 +1895,17 @@ h1, h2, h3, h4, h5, h6 {
 
 /* 2. Standard Laptop Screens (1024px to 1439px) */
 @media (min-width: 1024px) and (max-width: 1439px) {
-  .messages-inner,
-  .input-box {
+  .messages-inner {
     max-width: 720px;
   }
-  .chat-pane.canvas-active .messages-inner,
-  .chat-pane.canvas-active .input-box {
+  .input-box {
+    max-width: calc(720px - 3rem);
+  }
+  .chat-pane.canvas-active .messages-inner {
     max-width: 620px;
+  }
+  .chat-pane.canvas-active .input-box {
+    max-width: calc(620px - 3rem);
   }
   .sample-prompts-grid {
     grid-template-columns: repeat(3, 1fr);
@@ -1907,13 +1918,17 @@ h1, h2, h3, h4, h5, h6 {
 
 /* 3. Small Laptop / Compact Screens (768px to 1023px) */
 @media (min-width: 768px) and (max-width: 1023px) {
-  .messages-inner,
-  .input-box {
+  .messages-inner {
     max-width: 640px;
   }
-  .chat-pane.canvas-active .messages-inner,
-  .chat-pane.canvas-active .input-box {
+  .input-box {
+    max-width: calc(640px - 3rem);
+  }
+  .chat-pane.canvas-active .messages-inner {
     max-width: 580px;
+  }
+  .chat-pane.canvas-active .input-box {
+    max-width: calc(580px - 3rem);
   }
   .sample-prompts-grid {
     grid-template-columns: 1fr;
@@ -2140,9 +2155,11 @@ h1, h2, h3, h4, h5, h6 {
     padding: 1.1rem;
   }
 
-  .messages-inner,
-  .input-box {
+  .messages-inner {
     max-width: 100%;
+  }
+  .input-box {
+    max-width: calc(100% - 3rem);
   }
 }
 
