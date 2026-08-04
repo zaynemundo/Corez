@@ -359,12 +359,16 @@ export default function App() {
     }
   };
 
+  const prevSessionIdRef = useRef(activeSessionId);
+
   useEffect(() => {
+    const sessionChanged = prevSessionIdRef.current !== activeSessionId;
+    prevSessionIdRef.current = activeSessionId;
     if (activeSession && Array.isArray(activeSession.messages) && activeSession.messages.length > 0) {
       const lastAssistantMsg = [...activeSession.messages].reverse().find(m => m.role === 'assistant' && m.type !== 'market');
       if (lastAssistantMsg) {
         const code = extractCodeFromMessage(lastAssistantMsg.content);
-        if (code && !activeCanvasCode) {
+        if (code && (sessionChanged || !activeCanvasCode)) {
           setActiveCanvasCode(code);
           setCanvasOpen(true);
         }
@@ -437,6 +441,9 @@ export default function App() {
 
     let targetSessionId = activeSessionId;
     const draftMessages = activeSession?.messages || [];
+    if (!targetSessionId) {
+      targetSessionId = `session-${Date.now()}`;
+    }
 
     const attachmentPrompt = buildAttachmentPrompt(attachments);
     const displayPrompt = promptText;
