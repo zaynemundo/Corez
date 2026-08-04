@@ -25,7 +25,7 @@ export default function Sidebar({
           onClick={onCloseSidebar}
           title="Collapse Sidebar"
         >
-          <img src="/corez-white.png?v=2" alt="Corez Logo" className="brand-logo-default corez-bw-logo" />
+          <img src="/corez-outline.svg?v=1" alt="Corez Logo" className="brand-logo-default corez-bw-logo" />
         </button>
       </div>
 
@@ -56,7 +56,7 @@ export default function Sidebar({
             aria-label={`Open conversation ${session.title}`}
             title={session.title}
           >
-            <ChatBubbleIcon size={20} strokeWidth={1.5} />
+          <ChatBubbleIcon size={18} strokeWidth={1.5} />
           </div>
         ))}
       </div>
