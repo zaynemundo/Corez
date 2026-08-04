@@ -36,7 +36,7 @@
   --sidebar-radius: 0px;
   --sidebar-heading-size: 11px;
   --sidebar-heading-tracking: 0.08em;
-  --sidebar-body-size: 13px;
+  --sidebar-body-size: 14px;
   --sidebar-icon-size: 20px;
   --sidebar-item-min-height: 38px;
   --sidebar-bg: #0a0a0a;
@@ -344,7 +344,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .new-chat-btn span,
 .footer-action-btn span {
-  font-size: 13px;
+  font-size: 14px;
   white-space: nowrap;
 }
 
