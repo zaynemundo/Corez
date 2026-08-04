@@ -1484,7 +1484,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .input-box {
   width: 100%;
-  max-width: calc(760px - 3rem);
+  max-width: calc(min(100%, 760px) - 3rem);
   align-self: center;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
@@ -1507,7 +1507,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .chat-pane.canvas-active .input-box {
-  max-width: calc(680px - 3rem);
+  max-width: calc(min(100%, 680px) - 3rem);
 }
 
 .input-box:focus-within {
@@ -1880,13 +1880,13 @@ h1, h2, h3, h4, h5, h6 {
     max-width: 800px;
   }
   .input-box {
-    max-width: calc(800px - 3rem);
+    max-width: calc(min(100%, 800px) - 3rem);
   }
   .chat-pane.canvas-active .messages-inner {
     max-width: 720px;
   }
   .chat-pane.canvas-active .input-box {
-    max-width: calc(720px - 3rem);
+    max-width: calc(min(100%, 720px) - 3rem);
   }
   .canvas-pane {
     width: 52%;
@@ -1899,13 +1899,13 @@ h1, h2, h3, h4, h5, h6 {
     max-width: 720px;
   }
   .input-box {
-    max-width: calc(720px - 3rem);
+    max-width: calc(min(100%, 720px) - 3rem);
   }
   .chat-pane.canvas-active .messages-inner {
     max-width: 620px;
   }
   .chat-pane.canvas-active .input-box {
-    max-width: calc(620px - 3rem);
+    max-width: calc(min(100%, 620px) - 3rem);
   }
   .sample-prompts-grid {
     grid-template-columns: repeat(3, 1fr);
@@ -1922,13 +1922,13 @@ h1, h2, h3, h4, h5, h6 {
     max-width: 640px;
   }
   .input-box {
-    max-width: calc(640px - 3rem);
+    max-width: calc(min(100%, 640px) - 3rem);
   }
   .chat-pane.canvas-active .messages-inner {
     max-width: 580px;
   }
   .chat-pane.canvas-active .input-box {
-    max-width: calc(580px - 3rem);
+    max-width: calc(min(100%, 580px) - 3rem);
   }
   .sample-prompts-grid {
     grid-template-columns: 1fr;
