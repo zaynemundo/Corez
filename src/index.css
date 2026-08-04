@@ -214,8 +214,10 @@ h1, h2, h3, h4, h5, h6 {
 
 .brand-icon-toggle {
   position: relative;
+  height: 38px;
+  min-height: 38px;
   min-width: 0;
-  padding: 0;
+  padding: 0 0.75rem;
   background: transparent;
   border: none;
   color: var(--text-primary);
