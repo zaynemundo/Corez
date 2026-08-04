@@ -1186,12 +1186,13 @@ h1, h2, h3, h4, h5, h6 {
   height: 14px;
   margin-right: 4px;
   border-radius: 4px;
-  background-color: #0a66c2;
-  fill: #ffffff;
+  background-color: #ffffff;
+  fill: #0a66c2;
   padding: 3px;
   box-sizing: border-box;
   vertical-align: -2px;
   display: inline-block;
+  border: 1px solid #0a66c2;
 }
 
 .thinking-indicator-box {
