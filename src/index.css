@@ -214,8 +214,8 @@ h1, h2, h3, h4, h5, h6 {
 
 .brand-icon-toggle {
   position: relative;
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   background: transparent;
   border: none;
@@ -232,8 +232,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .corez-bw-logo {
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   object-fit: contain;
   border-radius: 4px;
   display: block;
