@@ -1,5 +1,5 @@
 import { 
-  PanelLeftOpen, 
+  PanelLeft, 
   PanelRight
 } from 'lucide-react';
 
@@ -20,7 +20,7 @@ export default function Header({
               onClick={onToggleSidebar}
               title="Open Sidebar"
             >
-              <PanelLeftOpen size={16} strokeWidth={1.5} />
+              <PanelLeft size={16} strokeWidth={1.5} />
             </button>
             <img src="/corez-white.png?v=2" alt="Corez Logo" className="corez-bw-logo" style={{ width: '22px', height: '22px' }} />
           </div>
