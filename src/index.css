@@ -439,8 +439,16 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-secondary);
   border-radius: 6px;
   cursor: pointer;
-  opacity: 0.65;
+  opacity: 0;
+  pointer-events: none;
   transition: var(--transition-fast);
+}
+
+.history-item:hover .history-menu-btn,
+.history-item.active .history-menu-btn,
+.history-menu-btn:focus-visible {
+  opacity: 0.65;
+  pointer-events: auto;
 }
 
 .history-menu-btn:hover {
