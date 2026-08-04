@@ -346,35 +346,7 @@ export default function App() {
     setCanvasFullScreen(false);
     setActiveCanvasCode(null);
     setRevisionContextCode('');
-    const target = sessions.find(s => s.id === id);
-    if (target && Array.isArray(target.messages) && target.messages.length > 0) {
-      const lastAssistantMsg = [...target.messages].reverse().find(m => m.role === 'assistant' && m.type !== 'market');
-      if (lastAssistantMsg) {
-        const code = extractCodeFromMessage(lastAssistantMsg.content);
-        if (code) {
-          setActiveCanvasCode(code);
-          setCanvasOpen(true);
-        }
-      }
-    }
   };
-
-  const prevSessionIdRef = useRef(activeSessionId);
-
-  useEffect(() => {
-    const sessionChanged = prevSessionIdRef.current !== activeSessionId;
-    prevSessionIdRef.current = activeSessionId;
-    if (activeSession && Array.isArray(activeSession.messages) && activeSession.messages.length > 0) {
-      const lastAssistantMsg = [...activeSession.messages].reverse().find(m => m.role === 'assistant' && m.type !== 'market');
-      if (lastAssistantMsg) {
-        const code = extractCodeFromMessage(lastAssistantMsg.content);
-        if (code && (sessionChanged || !activeCanvasCode)) {
-          setActiveCanvasCode(code);
-          setCanvasOpen(true);
-        }
-      }
-    }
-  }, [activeSessionId, activeCanvasCode]);
 
   const handleNewChat = () => {
     setActiveSessionId(null);
