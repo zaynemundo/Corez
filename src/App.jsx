@@ -225,7 +225,7 @@ export default function App() {
   const focusTimeoutRef = useRef(null);
   const resumeStartedRef = useRef(false);
 
-  const activeSession = useMemo(() => sessions.find(s => s.id === activeSessionId) || sessions[0], [sessions, activeSessionId]);
+  const activeSession = useMemo(() => sessions.find(s => s.id === activeSessionId) || null, [sessions, activeSessionId]);
 
   useEffect(() => {
     const mobileQuery = window.matchMedia('(max-width: 767px)');
@@ -373,14 +373,7 @@ export default function App() {
   }, [activeSessionId, activeCanvasCode]);
 
   const handleNewChat = () => {
-    const newId = `session-${Date.now()}`;
-    const newSession = {
-      id: newId,
-      title: 'New Conversation',
-      messages: []
-    };
-    setSessions(prev => [newSession, ...prev]);
-    setActiveSessionId(newId);
+    setActiveSessionId(null);
     setActiveView('chat');
     setCanvasOpen(false);
     setCanvasFullScreen(false);
@@ -440,8 +433,10 @@ export default function App() {
   const [revisionContextCode, setRevisionContextCode] = useState('');
 
   const handleSendMessage = async (promptText, attachments = []) => {
-    if (isThinking || !activeSession) return;
-    const targetSessionId = activeSessionId;
+    if (isThinking) return;
+
+    let targetSessionId = activeSessionId;
+    const draftMessages = activeSession?.messages || [];
 
     const attachmentPrompt = buildAttachmentPrompt(attachments);
     const displayPrompt = promptText;
@@ -460,17 +455,31 @@ export default function App() {
     const displayMsg = { role: 'user', content: displayPrompt, attachments: displayAttachments };
     const apiMsg = { role: 'user', content: apiPrompt, attachments: apiAttachments };
 
-    const updatedApiMessages = [...activeSession.messages, apiMsg];
+    const updatedApiMessages = [...draftMessages, apiMsg];
 
-    setSessions(prev => prev.map(s => {
-      if (s.id === targetSessionId) {
-        const updatedTitle = s.messages.length === 0
-          ? (promptText || displayAttachments[0]?.name || 'New Conversation').slice(0, 30)
-          : s.title;
-        return { ...s, title: updatedTitle, messages: [...s.messages, displayMsg] };
+    setSessions(prev => {
+      const existing = prev.find(s => s.id === targetSessionId);
+      if (existing) {
+        return prev.map(s => {
+          if (s.id === targetSessionId) {
+            const updatedTitle = s.messages.length === 0
+              ? (promptText || displayAttachments[0]?.name || 'New Conversation').slice(0, 30)
+              : s.title;
+            return { ...s, title: updatedTitle, messages: [...s.messages, displayMsg] };
+          }
+          return s;
+        });
       }
-      return s;
-    }));
+      return [{
+        id: targetSessionId,
+        title: (promptText || displayAttachments[0]?.name || 'New Conversation').slice(0, 30),
+        messages: [displayMsg]
+      }, ...prev];
+    });
+
+    if (!activeSessionId) {
+      setActiveSessionId(targetSessionId);
+    }
 
     setIsThinking(true);
 
@@ -536,7 +545,7 @@ export default function App() {
     <div className="app-container">
       <Sidebar
         isOpen={sidebarOpen}
-        sessions={sessions}
+        sessions={sessions.filter(s => Array.isArray(s.messages) && s.messages.length > 0)}
         activeSessionId={activeSessionId}
         onSelectSession={handleSelectSession}
         onNewChat={handleNewChat}
@@ -569,7 +578,7 @@ export default function App() {
               />
 
               <div className="messages-scroll">
-                {activeSession?.messages.length === 0 ? (
+                {!activeSession || activeSession.messages.length === 0 ? (
                   <div className="welcome-container">
                     <h1 className="welcome-title">COREZ</h1>
                   </div>
