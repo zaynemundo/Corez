@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { PanelLeft } from 'lucide-react';
 import Sidebar from './components/Sidebar';
-import Header from './components/Header';
 import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
 import CanvasPreview from './components/CanvasPreview';
@@ -548,13 +548,17 @@ export default function App() {
       <main className="main-content">
         <>
           <div className={`chat-pane ${canvasOpen ? 'canvas-active' : ''}`}>
-              <Header
-                sidebarOpen={sidebarOpen}
-                onToggleSidebar={() => setSidebarOpen(prev => !prev)}
-                canvasOpen={canvasOpen}
-                onToggleCanvas={() => setCanvasOpen(prev => !prev)}
-                hasExecutableCode={!!activeCanvasCode}
-              />
+              {!sidebarOpen && (
+                <button
+                  type="button"
+                  className="sidebar-toggle-btn"
+                  onClick={() => setSidebarOpen(true)}
+                  title="Open Sidebar"
+                  aria-label="Open Sidebar"
+                >
+                  <PanelLeft size={16} strokeWidth={1.5} />
+                </button>
+              )}
 
               <div className="messages-scroll">
                 {!activeSession || activeSession.messages.length === 0 ? (
