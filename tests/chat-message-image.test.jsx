@@ -51,4 +51,24 @@ describe('ChatMessage image rendering', () => {
       expect(src).not.toContain('ftp://');
     });
   });
+
+  it('renders a rounded LinkedIn icon beside LinkedIn profile links', () => {
+    const content = '**Corez was created by [Zayne Mundo](https://www.linkedin.com/in/zayne-mundo/) and [Christian Vestil](https://www.linkedin.com/in/christian-jericson-belderol/)**';
+    render(<ChatMessage message={{ role: 'assistant', content }} />);
+
+    const link = screen.getByRole('link', { name: /Zayne Mundo/i });
+    expect(link).toHaveAttribute('href', 'https://www.linkedin.com/in/zayne-mundo/');
+    expect(link).toHaveAttribute('target', '_blank');
+
+    const icons = document.querySelectorAll('.linkedin-icon');
+    expect(icons.length).toBe(2);
+    expect(icons[0]).toHaveClass('linkedin-icon');
+  });
+
+  it('does not add a LinkedIn icon to non-LinkedIn links', () => {
+    const content = 'Learn more at [corez.pro](https://corez.pro)';
+    render(<ChatMessage message={{ role: 'assistant', content }} />);
+
+    expect(document.querySelectorAll('.linkedin-icon').length).toBe(0);
+  });
 });
