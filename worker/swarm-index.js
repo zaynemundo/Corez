@@ -456,14 +456,19 @@ export async function runAdaptiveAgentPool(agentSpecs, executeAgent, options = {
         : backoffBaseMs * (2 ** item.attempt);
       const jitter = Math.random() * backoffBaseMs;
       const backoff = baseBackoff + jitter;
+      // Cumulative recovery time is budgeted like the direct route: a
+      // provider that keeps answering 429 with a small Retry-After must not
+      // keep the invocation retrying forever — the spec is deferred with its
+      // schedule for a later invocation instead of being failed.
+      const waitedMs = (item.waitedMs || 0) + backoff;
 
-      if (backoff >= invocationRetryBudgetMs) {
+      if (backoff >= invocationRetryBudgetMs || waitedMs >= invocationRetryBudgetMs) {
         // The retry window exceeds this invocation's sleep budget: the spec
         // is deferred — never failed — with its persisted recovery schedule,
         // and a later invocation retries exactly when the window arrives.
         failed.push({
           spec: item.spec,
-          error: `transient failure (${cls.status || 'network'}) deferred: retry window ${Math.round(backoff)}ms exceeds this invocation's ${invocationRetryBudgetMs}ms retry budget; scheduled for a later invocation`,
+          error: `transient failure (${cls.status || 'network'}) deferred: cumulative retry window ${Math.round(waitedMs)}ms exceeds this invocation's ${invocationRetryBudgetMs}ms retry budget; scheduled for a later invocation`,
           status: cls.status,
           kind: 'deferred',
           attempt: item.attempt,
@@ -482,6 +487,7 @@ export async function runAdaptiveAgentPool(agentSpecs, executeAgent, options = {
       waiting.push({
         spec: item.spec,
         attempt: item.attempt + 1,
+        waitedMs,
         nextEligibleAt: clock() + backoff
       });
     });

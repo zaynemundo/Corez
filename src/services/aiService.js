@@ -2960,13 +2960,14 @@ export function describeHostedUnavailable(hostedError) {
 }
 
 // Generate concise, natural AI responses for any public user
-export async function generateLocalAIResponse(prompt, hostedError = null) {
+export async function generateLocalAIResponse(prompt, hostedError = null, signal = null) {
   const cleanPrompt = prompt.trim();
   const lower = cleanPrompt.toLowerCase();
   const intent = analyzePublicUserIntent(cleanPrompt);
 
-  // Natural short latency (0.6s)
-  await new Promise(r => setTimeout(r, 600));
+  // Natural short latency (0.6s), abortable so Stop interrupts the fallback
+  // like every other generation path.
+  await sleepResumable(600, signal);
 
   // Revision context: the user asked to revise an embedded code block. Never
   // discard their code or fabricate a different app — report the real status.
@@ -3275,8 +3276,8 @@ export async function generateAIResponse(prompt, history = [], signal = null) {
   } catch (hostedAiError) {
     if (hostedAiError?.name === 'AbortError') throw hostedAiError;
     console.warn('Hosted AI unavailable; using local Corez fallback.', hostedAiError);
-    return generateLocalAIResponse(cleanPrompt, hostedAiError);
+    return generateLocalAIResponse(cleanPrompt, hostedAiError, signal);
   }
 
-  return generateLocalAIResponse(cleanPrompt);
+  return generateLocalAIResponse(cleanPrompt, null, signal);
 }

@@ -46,12 +46,18 @@ export class GameRoom {
   }
 
   webSocketClose(ws) {
-    const player = this.findPlayerByWs(ws);
-    if (player) {
-      this.players.delete(player.id);
-      this.broadcast({ type: 'player_left', playerId: player.id, name: player.name });
+    // A connection may own several player records if it joined more than
+    // once before this guard existed — remove every record for this socket
+    // so the room cannot leak players (and the 20 Hz tick) forever.
+    let removed = 0;
+    for (const [playerId, player] of [...this.players.entries()]) {
+      if (player.ws === ws) {
+        this.players.delete(playerId);
+        removed += 1;
+        this.broadcast({ type: 'player_left', playerId, name: player.name });
+      }
     }
-    this.stopTickIfIdle();
+    if (removed > 0) this.stopTickIfIdle();
   }
 
   // Socket-level errors surface through this handler instead of becoming
@@ -89,6 +95,12 @@ export class GameRoom {
   }
 
   handleJoin(ws, data) {
+    // One connection may own at most one player: duplicate joins on the same
+    // socket would leak player records that are never cleaned up on close.
+    if (this.findPlayerByWs(ws)) {
+      this.send(ws, { type: 'error', message: 'Already joined.' });
+      return;
+    }
     if (this.players.size >= ARENA_MAX_PLAYERS) {
       this.send(ws, { type: 'error', message: 'Room is full.' });
       return;

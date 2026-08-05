@@ -726,6 +726,39 @@ async function run() {
     globalThis.fetch = insecureImageOriginalFetch;
   }
 
+  // A provider-returned https URL pointing at a private / cloud-metadata
+  // host is also rejected (SSRF guard) even though the scheme is https:
+  // the worker never fetches loopback, private, or link-local ranges.
+  const metadataImageOriginalFetch = globalThis.fetch;
+  let metadataFetchAttempted = false;
+  try {
+    globalThis.fetch = async (url, _init) => {
+      if (typeof url === 'string' && url.includes('169.254.169.254')) {
+        metadataFetchAttempted = true;
+        return new Response('imds', { status: 200 });
+      }
+      return new Response(JSON.stringify({
+        choices: [{ message: { images: [{ url: 'https://169.254.169.254/latest/meta-data/iam/security-credentials/' }] } }]
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    };
+    const metadataImageResponse = await worker.fetch(
+      new Request('https://corez.test/api/image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: 'A futuristic city' })
+      }),
+      env({ OPENROUTER_API_KEY: 'sk-openrouter-test' })
+    );
+    assert.equal(metadataImageResponse.status, 502);
+    assert.match((await json(metadataImageResponse)).error, /non-public image URL/);
+    assert.equal(metadataFetchAttempted, false);
+  } finally {
+    globalThis.fetch = metadataImageOriginalFetch;
+  }
+
   // With no provider key configured an honest 503 is returned and no image
   // fetch is attempted (no fake image provider ever answers).
   const imageNoKeyResponse = await worker.fetch(
@@ -1054,6 +1087,21 @@ async function run() {
     memoryEnv()
   );
   assert.equal(uploadMalformed.status, 400);
+
+  // Oversized decoded payloads are rejected (413) instead of filling R2.
+  const uploadTooLarge = await worker.fetch(
+    new Request('https://corez.test/api/assets/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        key: 'big.png',
+        dataUrl: `data:image/png;base64,${Buffer.alloc(11 * 1024 * 1024).toString('base64')}`,
+        mimeType: 'image/png'
+      })
+    }),
+    memoryEnv()
+  );
+  assert.equal(uploadTooLarge.status, 413);
 
   const uploadValid = await worker.fetch(
     new Request('https://corez.test/api/assets/upload', {

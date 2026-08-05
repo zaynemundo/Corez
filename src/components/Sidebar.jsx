@@ -71,6 +71,11 @@ export default function Sidebar({
             className={`history-item ${activeView === 'chat' && session.id === activeSessionId ? 'active' : ''}`}
             onClick={() => onSelectSession(session.id)}
             onKeyDown={(e) => {
+              // Keyboard activation belongs to the container itself; key
+              // events from nested buttons (options menu, delete) bubble up
+              // here and must not select the conversation or block the
+              // button's own activation.
+              if (e.target !== e.currentTarget) return;
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 onSelectSession(session.id);

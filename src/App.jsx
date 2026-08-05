@@ -188,7 +188,10 @@ export default function App() {
       if (!saved) return INITIAL_SESSIONS;
       const parsed = JSON.parse(saved);
       if (!Array.isArray(parsed) || parsed.length === 0) return INITIAL_SESSIONS;
-      return normalizeMarketMessageIds(parsed);
+      // Drop corrupted session records (e.g. interrupted writes) that would
+      // crash the message list, mirroring the Sidebar's own guard.
+      const conforming = parsed.filter((session) => session && Array.isArray(session.messages));
+      return conforming.length > 0 ? normalizeMarketMessageIds(conforming) : INITIAL_SESSIONS;
     } catch {
       return INITIAL_SESSIONS;
     }
@@ -210,7 +213,13 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [refreshingMarketKeys, setRefreshingMarketKeys] = useState(() => new Set());
-  const [theme, setTheme] = useState(() => localStorage.getItem('corez_theme') || 'dark');
+  const [theme, setTheme] = useState(() => {
+    try {
+      return localStorage.getItem('corez_theme') || 'dark';
+    } catch {
+      return 'dark';
+    }
+  });
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
     if (typeof window === 'undefined') return false;
     return window.matchMedia('(max-width: 767px)').matches;
@@ -255,7 +264,24 @@ export default function App() {
   useEffect(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
-      try { localStorage.setItem('corez_sessions', JSON.stringify(sessions)); } catch { /* Ignore storage errors */ }
+      try {
+        // Persist without image thumbnails (base64 data URLs up to 1.5 MB
+        // each): a few attachments would blow the localStorage quota and
+        // silently kill ALL session persistence. Thumbs are re-rendered only
+        // for the live session from memory; stored messages keep lightweight
+        // file metadata.
+        const serializable = sessions.map((session) => ({
+          ...session,
+          messages: session.messages.map((message) => {
+            if (!message?.attachments?.some((a) => a?.thumb)) return message;
+            return {
+              ...message,
+              attachments: message.attachments.map(({ thumb: _thumb, ...rest }) => rest)
+            };
+          })
+        }));
+        localStorage.setItem('corez_sessions', JSON.stringify(serializable));
+      } catch { /* Ignore storage errors */ }
     }, 300);
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -462,7 +488,10 @@ export default function App() {
 
     setIsThinking(true);
 
-    // Save pending request to localStorage for background execution across page refresh
+    // Save pending request to localStorage for background execution across
+    // page refresh. Large file payloads are stripped when the record would
+    // exceed the storage quota — resume still works, the attachments just
+    // resend as metadata-only.
     const pendingData = {
       sessionId: targetSessionId,
       apiPrompt,
@@ -470,7 +499,21 @@ export default function App() {
       messages: updatedApiMessages,
       timestamp: Date.now()
     };
-    try { localStorage.setItem('corez_pending_request', JSON.stringify(pendingData)); } catch { /* Ignore storage errors */ }
+    try {
+      const serializedPending = JSON.stringify(pendingData);
+      if (serializedPending.length <= 2 * 1024 * 1024) {
+        localStorage.setItem('corez_pending_request', serializedPending);
+      } else {
+        const slimMessages = updatedApiMessages.map((message) => ({
+          ...message,
+          attachments: (message.attachments || []).map(({ content: _content, ...rest }) => rest)
+        }));
+        localStorage.setItem('corez_pending_request', JSON.stringify({
+          ...pendingData,
+          messages: slimMessages
+        }));
+      }
+    } catch { /* Ignore storage errors */ }
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -499,9 +542,14 @@ export default function App() {
         console.error('AI generation error:', err);
       }
     } finally {
-      localStorage.removeItem('corez_pending_request');
-      setIsThinking(false);
-      abortControllerRef.current = null;
+      // Only settle the state this controller owns: an older generation that
+      // finishes after Stop + a new send must never clear the new request's
+      // pending record, thinking state, or abort controller.
+      if (abortControllerRef.current === controller) {
+        localStorage.removeItem('corez_pending_request');
+        setIsThinking(false);
+        abortControllerRef.current = null;
+      }
     }
   };
 

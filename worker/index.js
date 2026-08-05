@@ -31,6 +31,50 @@ const PUBLISH_SLUG_ROOT_PATTERN = /^\/([a-z0-9]{4,8}-[0-9]{1,6})\/$/;
 // Online multiplayer rooms: short lowercase ids used in the WebSocket URL.
 const SAFE_ROOM_ID = /^[a-z0-9][a-z0-9-]{2,31}$/;
 
+// Largest single decoded asset accepted by /api/assets/upload (10 MB decoded
+// ≈ 13.4 MB base64, well under the 24 MB JSON body bound).
+const MAX_ASSET_DECODED_BYTES = 10 * 1024 * 1024;
+
+// Server-side fetch guard: provider-returned image URLs may only point at
+// public internet hosts. Loopback, link-local, private, CGNAT, and cloud
+// metadata ranges are rejected so a malformed or injected provider reply can
+// never be used to probe internal services from the Worker.
+const PRIVATE_IPV4_PATTERNS = [
+  /^10\./,                                  // RFC 1918 class A
+  /^127\./,                                 // loopback
+  /^169\.254\./,                            // link-local + cloud metadata
+  /^172\.(1[6-9]|2[0-9]|3[01])\./,          // RFC 1918 class B
+  /^192\.168\./,                            // RFC 1918 class C
+  /^100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\./, // CGNAT
+  /^0\./,
+  /^198\.18\./,                             // benchmarking
+  /^192\.0\.0\./,
+  /^224\./,                                 // multicast
+  /^240\./                                  // reserved
+];
+const PRIVATE_IPV6_PATTERNS = [
+  /^::$/,
+  /^::1$/,                                  // loopback
+  /^fc/i, /^fd/i,                           // ULA
+  /^fe80:/i,                                // link-local
+  /^fe[89ab]f:/i,                           // IPv4-compatible
+  /^ff:/i,                                  // multicast
+  /^::ffff:/
+];
+
+function isBlockedInternalHost(hostname) {
+  const host = String(hostname || '').toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+  if (!host) return true;
+  if (host === 'localhost') return true;
+  if (PRIVATE_IPV4_PATTERNS.some((pattern) => pattern.test(host))) return true;
+  if (PRIVATE_IPV6_PATTERNS.some((pattern) => pattern.test(host))) return true;
+  // Non-numeric hostnames (e.g. intranet hostnames) are allowed: the worker
+  // only fetches https URLs, and DNS rebinding is not feasible against a
+  // hostname that resolves publicly. Numeric IPv4/IPv6 literals are covered
+  // by the patterns above.
+  return false;
+}
+
 async function handleGameSocket(request, env) {
   const pathname = new URL(request.url).pathname;
   const roomId = decodePathSegment(pathname.replace('/api/game/ws/', ''));
@@ -190,7 +234,7 @@ Informational & List Formatting (for every non-code answer):
   // Non-code intents (explanations and informational chat answers) also
   // receive the scannable formatting rules; code, app, swarm, and writing
   // paths keep their own dedicated guidance.
-  const formattingIncluded = intentType === 'explanation' || intentType === 'chat' || intentType === 'fast' || !['code-help', 'app', 'swarm', 'writing'].includes(intentType);
+  const formattingIncluded = intentType === 'explanation' || !['code-help', 'app', 'swarm', 'writing'].includes(intentType);
   const formattingSection = formattingIncluded ? informationalFormatting : '';
 
   return `You are COREZ AI.
@@ -450,6 +494,12 @@ async function handleImage(request, env) {
     if (parsed.protocol !== 'https:') {
       return jsonResponse(502, { error: 'Image generation failed: the provider returned a non-https image URL.' });
     }
+    // Scheme is not enough: never fetch loopback, private, link-local, or
+    // cloud metadata hosts (169.254.169.254) that a malformed provider reply
+    // could point at.
+    if (isBlockedInternalHost(parsed.hostname)) {
+      return jsonResponse(502, { error: 'Image generation failed: the provider returned a non-public image URL.' });
+    }
   }
 
   try {
@@ -527,6 +577,12 @@ async function handleR2Assets(request, env) {
     try {
       const parts = dataUrl.split(',');
       const bstr = atob(parts[1] || '');
+      // Cap the decoded payload: the bounded JSON body could still carry an
+      // ~18 MB image, and unbounded decoded sizes would let one client fill
+      // the bucket and every future read of this object.
+      if (bstr.length > MAX_ASSET_DECODED_BYTES) {
+        return jsonResponse(413, { error: 'Uploaded asset exceeds the size limit.' });
+      }
       const u8arr = new Uint8Array(bstr.length);
       for (let i = 0; i < bstr.length; i++) {
         u8arr[i] = bstr.charCodeAt(i);

@@ -140,6 +140,24 @@ describe('GameRoom multiplayer simulation', () => {
     expect(stateB.players).toHaveLength(1);
   });
 
+  it('rejects a duplicate join on the same socket so no player leaks', () => {
+    const room = createRoom();
+    const ws = fakeWs();
+    join(room, ws, 'First');
+
+    room.handleMessage(ws, JSON.stringify({ type: 'join', name: 'Second' }));
+
+    expect(room.players.size).toBe(1);
+    expect(ws.sent.some(m => m.type === 'error' && /already joined/i.test(m.message))).toBe(true);
+
+    // Closing the socket must remove every record owned by that socket (even
+    // legacy rooms that predate the duplicate-join guard) so the tick stops.
+    room.players.set('legacy-ghost', { id: 'legacy-ghost', ws, name: 'Ghost' });
+    room.webSocketClose(ws);
+    expect(room.players.size).toBe(0);
+    expect(room.tickTimer).toBeNull();
+  });
+
   it('ignores malformed, oversized, and unknown messages', () => {
     const room = createRoom();
     const ws = fakeWs();

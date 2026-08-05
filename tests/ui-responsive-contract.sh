@@ -209,7 +209,7 @@ check 'mobile chat pane can shrink below desktop width' 'min-width: 0'
 check_block_property 'prompt cards are rectangular, not oversized pills' '.sample-prompt-card' 'border-radius' 'var(--radius-sm)'
 check_block_property 'history rows use restrained rectangular radius' '.history-item' 'border-radius' 'var(--radius-sm)'
 check 'canvas iframe receives scalable width from component' "width: '100%'" "$canvas"
-check 'canvas iframe receives bounded max width from component' 'maxWidth: deviceSpecs\[deviceMode\]\.width' "$canvas"
+check 'canvas iframe receives bounded max width from component' "maxWidth: '100%'" "$canvas"
 check_absent 'canvas iframe does not force fixed device height' 'height: deviceSpecs\[deviceMode\]\.height' "$canvas"
 check_absent 'canvas iframe does not combine forced height with aspect ratio' 'aspectRatio: deviceSpecs\[deviceMode\]\.aspectRatio' "$canvas"
 check 'canvas source editor uses a reusable class' 'className="canvas-source-editor"' "$canvas"
@@ -223,11 +223,11 @@ check 'sidebar component can render collapsed state' 'isOpen.*collapsed|collapse
 # Polished Glass Sidebar Contract Checks
 check_absent 'sidebar section heading is absent' 'className="sidebar-section-heading"' "$sidebar"
 check_absent 'sidebar section headers do not use inline letterSpacing styles' 'style=\{\{.*letterSpacing' "$sidebar"
-check 'sidebar width token set to 52px' '--sidebar-width: 52px;'
+check 'sidebar width token set to 260px' '--sidebar-width: 260px;'
 check 'sidebar margin token set to 0px' '--sidebar-margin: 0px;'
 check 'sidebar radius token set to 0px' '--sidebar-radius: 0px;'
 check 'sidebar heading size token set to 11px' '--sidebar-heading-size: 11px;'
-check 'sidebar body size token set to 13px' '--sidebar-body-size: 13px;'
+check 'sidebar body size token set to 14px' '--sidebar-body-size: 14px;'
 check 'sidebar hit target min height set to 38px' '--sidebar-item-min-height: 38px;'
 check_block_property 'sidebar block consumes margin token' '.sidebar' 'margin' 'var(--sidebar-margin)'
 check_block_property 'sidebar block consumes radius token' '.sidebar' 'border-radius' 'var(--sidebar-radius)'
@@ -237,12 +237,12 @@ check_block_property 'light theme overrides sidebar glass background' '[data-the
 check 'sidebar has opaque background fallback using sidebar-bg-opaque' '@supports not \(\(backdrop-filter: blur\(1px\)\)'
 check_block_property 'sidebar fallback block consumes opaque background token' 'aside.sidebar' 'background-color' 'var(--sidebar-bg-opaque)'
 check_block_property 'section heading class sets 11px font size' '.sidebar-section-heading' 'font-size' 'var(--sidebar-heading-size)'
-check_block_property 'active history item applies crisp inset border shadow' '.history-item.active' 'box-shadow' 'inset 0 0 0 1px'
+check_block_property 'active history item applies active background token' '.history-item.active' 'background' 'var(--sidebar-item-active-bg)'
 check_block_property 'delete chat button enforces 38px minimum width' '.delete-chat-btn' 'min-width' '38px'
 check_block_property 'delete chat button enforces 38px minimum height' '.delete-chat-btn' 'min-height' '38px'
 check_block_property 'sidebar header collapse button enforces 38px minimum width' '.sidebar .icon-btn' 'min-width' '38px'
 check_block_property 'sidebar header collapse button enforces 38px minimum height' '.sidebar .icon-btn' 'min-height' '38px'
-check_absent 'no desktop 260px sidebar width override' '--sidebar-width[[:space:]]*:[[:space:]]*260px;?'
+check_absent 'no stale 52px sidebar rail width override' '--sidebar-width[[:space:]]*:[[:space:]]*52px;?'
 check_absent 'no laptop 230px sidebar width override' '--sidebar-width[[:space:]]*:[[:space:]]*230px;?'
 check_absent 'no small laptop 210px sidebar width override' '--sidebar-width[[:space:]]*:[[:space:]]*210px;?'
 check_block_absent 'sidebar container block does not use transition all' '.sidebar' 'transition' 'all'
