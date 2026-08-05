@@ -6,6 +6,16 @@ export const OPENROUTER_DEFAULT_ENDPOINT = 'https://openrouter.ai/api/v1/chat/co
 export const DEFAULT_MODEL = 'deepseek-v4-flash';
 export const FLUX_IMAGE_MODEL = 'black-forest-labs/flux-1-schnell';
 
+// OpenRouter retired black-forest-labs/flux-1-schnell, so the image chain
+// leads with Google's Nano Banana 2 (Gemini 3.1 Flash Image); FLUX remains
+// the final legacy candidate in case it returns. OPENROUTER_IMAGE_MODEL
+// overrides the whole chain with a single model.
+export const DEFAULT_IMAGE_MODEL_CHAIN = [
+  'google/gemini-3.1-flash-image',
+  'google/gemini-3.1-flash-lite-image',
+  FLUX_IMAGE_MODEL
+];
+
 // Transient failures are retried with adaptive exponential backoff (base
 // 750ms doubling, jittered, honouring the provider's Retry-After) until
 // recovery, cancellation, permanent classification, or the single request's
@@ -406,42 +416,53 @@ export async function runProviderChain(messages, options = {}) {
 }
 
 /**
- * FLUX 1 Schnell image generation through OpenRouter. The preferred path
- * parses choices[0].message.images[0].url; content URLs and data:image
- * payloads are also accepted. Returns the image URL or null when no usable
- * image was produced.
+ * Image generation through OpenRouter. Tries each model in the chain (env
+ * override, then the default chain) and returns the first usable image as
+ * { url, model } — the response reports the model that actually produced
+ * the image. The preferred path parses choices[0].message.images[0].url;
+ * content URLs and data:image payloads are also accepted. Returns null when
+ * no model produced a usable image.
  */
-export async function callOpenRouterImage(apiKey, prompt, parentSignal) {
-  try {
-    const response = await fetch(OPENROUTER_DEFAULT_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': 'https://corez.ai',
-        'X-Title': 'COREZ AI',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: FLUX_IMAGE_MODEL,
-        messages: [{ role: 'user', content: prompt }]
-      }),
-      signal: parentSignal
-    });
+export async function callOpenRouterImage(apiKey, prompt, parentSignal, imageModels = DEFAULT_IMAGE_MODEL_CHAIN) {
+  const models = Array.isArray(imageModels) && imageModels.length > 0 ? imageModels : DEFAULT_IMAGE_MODEL_CHAIN;
+  for (const model of models) {
+    try {
+      const response = await fetch(OPENROUTER_DEFAULT_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': 'https://corez.ai',
+          'X-Title': 'COREZ AI',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: 'user', content: prompt }]
+        }),
+        signal: parentSignal
+      });
 
-    if (response.ok) {
-      const data = await response.json();
-      const message = data?.choices?.[0]?.message;
-      if (Array.isArray(message?.images) && message.images[0]?.url) {
-        return message.images[0].url;
+      if (response.ok) {
+        const data = await response.json();
+        const message = data?.choices?.[0]?.message;
+        if (Array.isArray(message?.images) && message.images.length > 0) {
+          // Providers differ: some expose images[0].url, others use the
+          // OpenAI-style images[0].image_url.url — accept both.
+          const first = message.images[0];
+          const imageUrl = first?.url || first?.image_url?.url;
+          if (typeof imageUrl === 'string' && imageUrl) {
+            return { url: imageUrl, model };
+          }
+        }
+        const content = typeof message?.content === 'string' ? message.content : '';
+        const urlMatch = content.match(/https?:\/\/[^\s)"']+\.(?:png|jpg|jpeg|webp)/i)
+          || content.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
+        if (urlMatch) return { url: urlMatch[1] || urlMatch[0], model };
+        if (content.startsWith('data:image')) return { url: content, model };
       }
-      const content = typeof message?.content === 'string' ? message.content : '';
-      const urlMatch = content.match(/https?:\/\/[^\s)"']+\.(?:png|jpg|jpeg|webp)/i)
-        || content.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
-      if (urlMatch) return urlMatch[1] || urlMatch[0];
-      if (content.startsWith('data:image')) return content;
+    } catch (err) {
+      console.warn(`OpenRouter image generation attempt failed (${model}):`, safeErrorDetail(err));
     }
-  } catch (err) {
-    console.warn('OpenRouter image generation attempt failed:', safeErrorDetail(err));
   }
   return null;
 }

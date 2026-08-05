@@ -2,7 +2,7 @@ import { handleMarket } from './market.js';
 import { handleSearch } from './search.js';
 import { fetchAwwwardsInspiration, handleInspiration } from './inspiration.js';
 import { safeErrorDetail, readBoundedJson, jsonResponse, createTaskStateStore, createRateLimiter } from './utils.js';
-import { runProviderChain, callOpenRouterImage, FLUX_IMAGE_MODEL } from './providerChain.js';
+import { runProviderChain, callOpenRouterImage } from './providerChain.js';
 
 // Storage key segments are validated identically on every R2-backed endpoint:
 // no slashes, no leading dots (blocks ../ traversal), bounded length.
@@ -432,6 +432,11 @@ async function handleImage(request, env) {
     return jsonResponse(405, { error: 'Method not allowed.' });
   }
 
+  const retryAfter = imageRateLimiter(request);
+  if (retryAfter !== null) {
+    return jsonResponse(429, { error: 'Too many image requests. Try again shortly.' }, { 'Retry-After': String(retryAfter) });
+  }
+
   let body;
   try {
     body = await readBoundedJson(request);
@@ -472,13 +477,17 @@ async function handleImage(request, env) {
   })();
 
   // FLUX 1 Schnell via OpenRouter: images[0].url, content URLs and
-  // data:image payloads are all accepted.
-  const imageUrl = await callOpenRouterImage(openRouterKey, prompt, imageClientSignal);
-  if (!imageUrl) {
+  // data:image payloads are all accepted. OPENROUTER_IMAGE_MODEL overrides
+  // the model chain; otherwise the default chain (Nano Banana 2 first, FLUX
+  // as the legacy fallback) is tried in order.
+  const imageModels = env?.OPENROUTER_IMAGE_MODEL ? [String(env.OPENROUTER_IMAGE_MODEL)] : undefined;
+  const imageResult = await callOpenRouterImage(openRouterKey, prompt, imageClientSignal, imageModels);
+  if (!imageResult) {
     return jsonResponse(503, {
       error: 'Image generation is unavailable: the image provider did not return an image.'
     });
   }
+  const { url: imageUrl, model: imageModel } = imageResult;
 
   // Only https: or inline data: payloads are ever fetched. This blocks the
   // provider-returned URL from being used to reach internal hosts
@@ -526,12 +535,12 @@ async function handleImage(request, env) {
 
     if (buffer && buffer.byteLength > 0) {
       const r2Url = await saveToR2IfAvailable(env, r2Key, buffer, mimeType);
-      return jsonResponse(200, { image: r2Url || imageUrl, model: FLUX_IMAGE_MODEL });
+      return jsonResponse(200, { image: r2Url || imageUrl, model: imageModel });
     }
   } catch (err) {
     console.warn('Failed to persist image to R2, returning provider URL:', safeErrorDetail(err));
   }
-  return jsonResponse(200, { image: imageUrl, model: FLUX_IMAGE_MODEL });
+  return jsonResponse(200, { image: imageUrl, model: imageModel });
 }
 
 async function handleR2Assets(request, env) {
@@ -1000,6 +1009,10 @@ function publishedPageHeaders() {
 // Published links are public shareable URLs backed by R2 storage: bound the
 // creation rate per client so the store cannot be spammed with slugs.
 const publishRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 10 });
+
+// Paid image generations are expensive (provider cost + R2 writes): bound
+// them per client like every other costly endpoint.
+const imageRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 30 });
 
 async function handlePublish(request, env) {
   const url = new URL(request.url);

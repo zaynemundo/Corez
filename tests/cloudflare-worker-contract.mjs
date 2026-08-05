@@ -659,16 +659,16 @@ async function run() {
   );
   assert.equal(imageMissingPromptResponse.status, 400);
 
-  // Image generation via OpenRouter FLUX when OPENROUTER_API_KEY is
-  // configured: the payload targets black-forest-labs/flux-1-schnell and the
-  // parsed image URL is returned with the FLUX model label.
+  // Image generation via OpenRouter when OPENROUTER_API_KEY is configured:
+  // the payload targets the default chain lead (Nano Banana 2) and the
+  // parsed image URL is returned with the model label that served it.
   const imageOriginalFetch = globalThis.fetch;
   try {
     globalThis.fetch = async (url, init) => {
       assert.equal(url, OPENROUTER_URL);
       const payload = JSON.parse(init.body);
       capturedPayloads.push(payload);
-      assert.equal(payload.model, 'black-forest-labs/flux-1-schnell');
+      assert.equal(payload.model, 'google/gemini-3.1-flash-image');
       assert.equal(payload.max_tokens, undefined);
       assert.equal(payload.max_completion_tokens, undefined);
       assert.deepEqual(payload.messages, [{ role: 'user', content: 'A futuristic city' }]);
@@ -690,9 +690,35 @@ async function run() {
     assert.equal(imageResponse.status, 200);
     const imageData = await imageResponse.json();
     assert.equal(imageData.image, 'https://img.example.com/flux-city.png');
-    assert.equal(imageData.model, 'black-forest-labs/flux-1-schnell');
+    assert.equal(imageData.model, 'google/gemini-3.1-flash-image');
   } finally {
     globalThis.fetch = imageOriginalFetch;
+  }
+
+  // OPENROUTER_IMAGE_MODEL overrides the image model chain with one model.
+  const overrideImageOriginalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (url, init) => {
+      assert.equal(JSON.parse(init.body).model, 'custom/image-model-x');
+      return new Response(JSON.stringify({
+        choices: [{ message: { images: [{ url: 'https://img.example.com/custom.png' }] } }]
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    };
+    const overrideImageResponse = await worker.fetch(
+      new Request('https://corez.test/api/image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: 'A futuristic city' })
+      }),
+      env({ OPENROUTER_API_KEY: 'sk-openrouter-test', OPENROUTER_IMAGE_MODEL: 'custom/image-model-x' })
+    );
+    assert.equal(overrideImageResponse.status, 200);
+    assert.equal((await json(overrideImageResponse)).model, 'custom/image-model-x');
+  } finally {
+    globalThis.fetch = overrideImageOriginalFetch;
   }
 
   // A provider-returned non-https image URL is rejected (SSRF guard): the

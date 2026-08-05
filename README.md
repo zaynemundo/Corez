@@ -36,7 +36,7 @@ Only the app document itself is published: conversation history, session IDs, an
 
 ### Image generation
 
-`/api/image` generates images with **FLUX 1 Schnell** (`black-forest-labs/flux-1-schnell`) through OpenRouter when `OPENROUTER_API_KEY` is configured (the same key also serves as the text fallback). The image is stored in R2 when `ASSET_BUCKET` is available and returned as a public `/api/assets/...` URL; otherwise the provider's image URL is returned directly. Client disconnects abort generation. Without `OPENROUTER_API_KEY` the endpoint returns an honest `503` — no image provider is configured and text providers are never used as fake image providers.
+`/api/image` generates images through OpenRouter when `OPENROUTER_API_KEY` is configured (the same key also serves as the text fallback). The worker tries an image model chain in order — currently Google Nano Banana 2 (`google/gemini-3.1-flash-image`), its lite variant, then the legacy `black-forest-labs/flux-1-schnell` — and reports which model actually served the image. `OPENROUTER_IMAGE_MODEL` overrides the chain with a single model. The image is stored in R2 when `ASSET_BUCKET` is available and returned as a public `/api/assets/...` URL; otherwise the provider's image URL is returned directly. Client disconnects abort generation. Without `OPENROUTER_API_KEY` the endpoint returns an honest `503` — no image provider is configured and text providers are never used as fake image providers.
 
 `OPENCODE_GO_API_KEY` (or `OPENCODE_API_KEY`) is the only required Worker secret for text AI; `OPENROUTER_API_KEY` is optional (text fallback + FLUX images) and `DEEPSEEK_API_KEY` is optional (text fallback).
 

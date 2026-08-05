@@ -1,5 +1,5 @@
 import baseWorker from './index.js';
-import { safeErrorDetail, readBoundedJson, classifyProviderFailure, createTaskStateStore } from './utils.js';
+import { safeErrorDetail, readBoundedJson, classifyProviderFailure, createTaskStateStore, createRateLimiter } from './utils.js';
 import { runProviderChain, buildProviderChain } from './providerChain.js';
 import { handleTaskApi } from './taskApi.js';
 export { GameRoom } from './gameRoom.js';
@@ -1228,10 +1228,20 @@ export async function runSwarmTask(body, env, signal, options = {}) {
   };
 }
 
+// Per-client AI request rate bound: paid provider tokens are spent on every
+// /api/ai POST, so a single client must not be able to run up the bill.
+const aiRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 20 });
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    if (url.protocol === 'http:' && !url.hostname.includes('localhost') && !url.hostname.includes('127.0.0.1')) {
+    // Production http->https upgrade, gated on the client Host header:
+    // wrangler dev rewrites request.url to the first route host (corez.pro)
+    // even when the browser connected to localhost:8787, so gating on
+    // url.hostname alone would loop every dev request through a self 301.
+    const clientHost = String(request.headers.get('Host') || '').toLowerCase();
+    const isLocalClient = clientHost.includes('localhost') || clientHost.includes('127.0.0.1') || clientHost.includes('::1');
+    if (url.protocol === 'http:' && !isLocalClient) {
       url.protocol = 'https:';
       return Response.redirect(url.toString(), 301);
     }
@@ -1246,6 +1256,18 @@ export default {
       'X-Frame-Options': 'DENY',
       'Referrer-Policy': 'no-referrer'
     };
+
+    // Every /api/ai call spends paid provider tokens: bound the per-client
+    // rate (20/min per IP) so one client cannot burn the deployment budget.
+    if (url.pathname === '/api/ai' && request.method === 'POST') {
+      const retryAfter = aiRateLimiter(request);
+      if (retryAfter !== null) {
+        return new Response(JSON.stringify({ error: 'Too many AI requests. Try again shortly.' }), {
+          status: 429,
+          headers: { ...jsonHeaders, 'Retry-After': String(retryAfter) }
+        });
+      }
+    }
 
     // Unified harness task API (task lifecycle + SSE events) and context
     // records through the real entrypoint — same harness layer as the CLI.

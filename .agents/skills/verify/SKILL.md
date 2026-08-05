@@ -17,7 +17,9 @@ CoreZ is a Vite SPA + Cloudflare Worker. Two ways to verify locally:
 ```bash
 # Terminal A: worker on :8787 (serves /api/ai, /api/image, /api/market,
 # /api/apps, /api/memory, /api/assets, /api/publish, /api/game/ws)
-OPENCODE_GO_API_KEY=sk-... npx wrangler dev
+# --host localhost is REQUIRED: the custom-domain routes in wrangler.jsonc
+# otherwise make wrangler dev redirect every request (301 to itself).
+OPENCODE_GO_API_KEY=sk-... npx wrangler dev --host localhost
 
 # Terminal B: Vite dev server on :3000 (proxies /api/* to :8787)
 npm run dev
@@ -47,8 +49,10 @@ npm run deploy   # deploys worker + dist assets to Cloudflare
   e.g. `opencode:deepseek-v4-flash`, `deepseek:deepseek-v4-flash`,
   `openrouter:deepseek-v4-flash`).
 - Images: prompts matching the image intent hit `POST /api/image` and
-  return `{image, model: "black-forest-labs/flux-1-schnell"}` (R2 URL when
-  `ASSET_BUCKET` is configured; honest 503 without `OPENROUTER_API_KEY`).
+  return `{image, model}` — the worker tries an image model chain (Google
+  Nano Banana 2 first, legacy FLUX last; `OPENROUTER_IMAGE_MODEL` overrides)
+  and reports the model that served the image (R2 URL when `ASSET_BUCKET`
+  is configured; honest 503 without `OPENROUTER_API_KEY`).
 - Market: `POST /api/market` requires `TWELVE_DATA_API_KEY` (returns 503
   `not_configured` without it).
 - Memory/apps: `/api/memory/*` and `/api/apps/*` require the `ASSET_BUCKET`
@@ -68,7 +72,7 @@ npm run build
 
 - Greeting prompts ("hello") short-circuit in the worker with
   `model: 'corez-greeting'` — no LLM call.
-- Request bodies over 256 KB are rejected (`Request body rejected: ...
+- Request bodies over 24 MB are rejected (`Request body rejected: ...
   byte limit`); the frontend trims history, so this only appears from raw
   API calls.
 - The swarm path only activates for `complexity: high/epic` app/code-help
