@@ -2986,7 +2986,7 @@ export async function generateLocalAIResponse(prompt, hostedError = null) {
 
   // 2. CREATOR FACT
   if (/\bwho\b.{0,20}\b(created|made|built|invented|developed)\b|\b(created|made|built|invented|developed)\b.{0,30}\b(corez|core z)\b/i.test(lower)) {
-    return `**Corez was created by [Zayne Mundo](https://www.linkedin.com/in/zayne-mundo/) and [Christian Vestil](https://www.linkedin.com/in/christian-jericson-belderol/)** — a conversational AI creation platform that helps people turn ideas into working digital products without needing to code.
+    return `**Corez was created by [Zayne Mundo](https://www.linkedin.com/in/zayne-mundo/), [Christian Vestil](https://www.linkedin.com/in/christian-jericson-belderol/), and [Renz Cardona](https://www.linkedin.com/in/renz-cardona-5941051b9/)** — a conversational AI creation platform that helps people turn ideas into working digital products without needing to code.
 
 Rather than only answering questions, Corez understands your intent and takes it all the way from idea to launch:
 

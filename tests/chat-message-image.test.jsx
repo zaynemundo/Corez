@@ -53,7 +53,7 @@ describe('ChatMessage image rendering', () => {
   });
 
   it('renders a rounded LinkedIn icon beside LinkedIn profile links', () => {
-    const content = '**Corez was created by [Zayne Mundo](https://www.linkedin.com/in/zayne-mundo/) and [Christian Vestil](https://www.linkedin.com/in/christian-jericson-belderol/)**';
+    const content = '**Corez was created by [Zayne Mundo](https://www.linkedin.com/in/zayne-mundo/), [Christian Vestil](https://www.linkedin.com/in/christian-jericson-belderol/), and [Renz Cardona](https://www.linkedin.com/in/renz-cardona-5941051b9/)**';
     render(<ChatMessage message={{ role: 'assistant', content }} />);
 
     const link = screen.getByRole('link', { name: /Zayne Mundo/i });
@@ -61,7 +61,7 @@ describe('ChatMessage image rendering', () => {
     expect(link).toHaveAttribute('target', '_blank');
 
     const icons = document.querySelectorAll('.linkedin-icon');
-    expect(icons.length).toBe(2);
+    expect(icons.length).toBe(3);
     expect(icons[0]).toHaveClass('linkedin-icon');
 
     const firstLink = screen.getByRole('link', { name: /Zayne Mundo/i });

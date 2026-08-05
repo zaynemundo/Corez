@@ -48,6 +48,7 @@ describe('Hosted AI fallback behavior', () => {
     const response = await generateLocalAIResponse('Who created Corez?', new Error('Hosted AI request failed: 503'));
     expect(response).toContain('[Zayne Mundo](https://www.linkedin.com/in/zayne-mundo/)');
     expect(response).toContain('[Christian Vestil](https://www.linkedin.com/in/christian-jericson-belderol/)');
+    expect(response).toContain('[Renz Cardona](https://www.linkedin.com/in/renz-cardona-5941051b9/)');
     expect(response).toMatch(/conversational AI creation platform/i);
     expect(response).not.toContain("I'm Corez");
     expect(response).not.toMatch(/api|API|model|provider/i);
