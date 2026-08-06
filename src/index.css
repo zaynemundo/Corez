@@ -86,7 +86,7 @@
   --sidebar-border: rgba(0, 0, 0, 0.08);
   --sidebar-shadow: none;
   --sidebar-item-hover-bg: rgba(0, 0, 0, 0.035);
-  --sidebar-item-active-bg: rgba(0, 0, 0, 0.07);
+  --sidebar-item-active-bg: rgba(0, 0, 0, 0.06);
 }
 
 * {
