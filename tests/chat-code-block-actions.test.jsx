@@ -70,6 +70,6 @@ describe('ChatMessage code block actions', () => {
     const content = 'Example:\n\n```js\nfunction greet(name) { return `Hello ${name}`; }\n```';
     renderAssistant(content);
 
-    expect(screen.getByRole('button', { name: /Copy/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Copy$/i })).toBeInTheDocument();
   });
 });

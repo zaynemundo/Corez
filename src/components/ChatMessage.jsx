@@ -3,7 +3,9 @@ import {
   Layers,
   Copy,
   Check,
-  Wand2
+  Wand2,
+  ThumbsUp,
+  Share2
 } from 'lucide-react';
 import MarketCard from './MarketCard';
 
@@ -190,6 +192,78 @@ function ExecutableCodeBlock({ code, onRunInCanvas, onReviseCode }) {
           <span>Revise</span>
         </button>
       )}
+    </div>
+  );
+}
+
+function MessageActions({ content }) {
+  const [copied, setCopied] = useState(false);
+  const [rated, setRated] = useState(false);
+  const [shared, setShared] = useState(false);
+
+  const handleCopy = () => {
+    if (!content) return;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(content).catch(() => {});
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleRate = () => {
+    setRated(prev => !prev);
+  };
+
+  const handleShare = async () => {
+    const shareData = {
+      title: 'COREZ AI Response',
+      text: content
+    };
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+        setShared(true);
+        setTimeout(() => setShared(false), 2000);
+      } catch { /* Dismissed by the user */ }
+      return;
+    }
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(content).catch(() => {});
+      setShared(true);
+      setTimeout(() => setShared(false), 2000);
+    }
+  };
+
+  return (
+    <div className="message-actions" aria-label="Message actions">
+      <button
+        type="button"
+        className={`message-action-btn ${copied ? 'active' : ''}`}
+        onClick={handleCopy}
+        title="Copy response"
+        aria-label="Copy response"
+      >
+        {copied ? <Check size={14} strokeWidth={1.5} /> : <Copy size={14} strokeWidth={1.5} />}
+      </button>
+      <button
+        type="button"
+        className={`message-action-btn ${rated ? 'active' : ''}`}
+        onClick={handleRate}
+        title={rated ? 'Remove rating' : 'Rate response'}
+        aria-label={rated ? 'Remove rating' : 'Rate response'}
+        aria-pressed={rated}
+      >
+        <ThumbsUp size={14} strokeWidth={1.5} />
+      </button>
+      <button
+        type="button"
+        className={`message-action-btn ${shared ? 'active' : ''}`}
+        onClick={handleShare}
+        title={shared ? 'Copied' : 'Share response'}
+        aria-label={shared ? 'Copied' : 'Share response'}
+      >
+        <Share2 size={14} strokeWidth={1.5} />
+      </button>
     </div>
   );
 }
@@ -488,6 +562,9 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onRe
             </>
           )}
         </div>
+        {!isUser && (
+          <MessageActions content={message.content || ''} />
+        )}
       </div>
     </div>
   );
