@@ -61,7 +61,7 @@ const INTENT_HANDLERS = [
   {
     type: INTENT_TYPES.FEATURE_IMPLEMENTATION,
     pattern: /\b(add|implement|build|integrate|create)\b.*\b(feature|module|component|page|api|endpoint|route|service|handler|auth|login|authentication|search|search bar|filter|pagination|upload|export|toggle|dark mode|light mode|theme|settings|sort|modal|form|button|sidebar|header|footer|dashboard|analytics)\b/i,
-    signals: ['add', 'implement', 'integrate', 'feature', 'module', 'component', 'endpoint', 'toggle', 'dark mode', 'theme', 'settings', 'modal'],
+    signals: ['add', 'implement', 'integrate', 'feature', 'module', 'component', 'endpoint', 'toggle', 'dark mode', 'theme', 'settings', 'modal', 'search bar'],
     extract(_prompt, _lower) {
       return {
         type: INTENT_TYPES.FEATURE_IMPLEMENTATION,
@@ -105,8 +105,8 @@ const INTENT_HANDLERS = [
   },
   {
     type: INTENT_TYPES.RESEARCH,
-    pattern: /\b(research|find|search|look up|investigate|analyse|analyze|compare|what is|what are|how does|definition)\b/i,
-    signals: ['research', 'find', 'search', 'investigate', 'analyse', 'compare', 'definition'],
+    pattern: /\b(research|search for|search the web|look up|investigate|analyse|analyze|compare|definition of|what is|what are|how does|how do|tell me about|difference between|find out)\b/i,
+    signals: ['research', 'search for', 'look up', 'investigate', 'analyse', 'analyze', 'compare', 'definition', 'what is', 'tell me about', 'difference between'],
     extract(_prompt, _lower) {
       return {
         goal: `research the requested topic`,
