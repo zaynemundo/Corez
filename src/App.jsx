@@ -5,6 +5,7 @@ import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
 import CanvasPreview from './components/CanvasPreview';
 import SettingsModal from './components/SettingsModal';
+import CatPawButtonShowcase from './components/CatPawButtonShowcase';
 import { generateAIResponse, extractCodeFromMessage } from './services/aiService';
 import { fetchMarketData, unavailableMarket } from './services/marketService';
 import { storeAppInR2, deleteSessionAppsInR2 } from './services/appStorageService';
@@ -610,8 +611,14 @@ export default function App() {
 
               <div className="messages-scroll">
                 {!activeSession || activeSession.messages.length === 0 ? (
-                  <div className="welcome-container">
-                    <h1 className="welcome-title">COREZ</h1>
+                  <div className="welcome-container flex flex-col items-center justify-center p-4 w-full">
+                    <h1 className="welcome-title text-3xl font-extrabold tracking-widest text-slate-100 mb-2">COREZ</h1>
+                    <CatPawButtonShowcase 
+                      onOpenCanvasCode={(code) => {
+                        setActiveCanvasCode(code);
+                        setCanvasOpen(true);
+                      }}
+                    />
                   </div>
                 ) : (
                   <div className="messages-inner">
