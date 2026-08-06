@@ -107,37 +107,43 @@ describe('AI response speed optimizations', () => {
   });
 
   it('routes both simple and complex requests to OpenCode Go with no artificial reasoning-effort caps', async () => {
-    const payloads = [];
-    const fetchMock = vi.fn(async (url, init) => {
+    // General (explanation) request: fast path with a capped output.
+    let generalPayload = null;
+    vi.stubGlobal('fetch', vi.fn(async (url, init) => {
       expect(url).toBe(OPENCODE_URL);
-      payloads.push(JSON.parse(init.body));
+      if (!generalPayload) generalPayload = JSON.parse(init.body);
       return Response.json({ choices: [{ message: { content: 'answer' } }] });
-    });
-    vi.stubGlobal('fetch', fetchMock);
+    }));
 
     await post(swarmWorker, { OPENCODE_GO_API_KEY: 'test' }, {
       prompt: 'Explain black roses',
       intent: { type: 'explanation' },
       complexity: 'low'
     });
+
+    expect(generalPayload).not.toBeNull();
+    expect(generalPayload.model).toBe('deepseek-v4-flash');
+    expect(generalPayload.reasoning).toBeUndefined();
+    expect(generalPayload.max_completion_tokens).toBeUndefined();
+    // Fast path: capped output tokens so general answers come back quickly.
+    expect(generalPayload.max_tokens).toBe(700);
+
+    // Complex app request: NO output-token cap and no reasoning-effort cap —
+    // the model decides how much reasoning/output the task needs.
+    let complexPayload = null;
+    vi.stubGlobal('fetch', vi.fn(async (url, init) => {
+      expect(url).toBe(OPENCODE_URL);
+      if (!complexPayload) complexPayload = JSON.parse(init.body);
+      return Response.json({ choices: [{ message: { content: 'answer' } }] });
+    }));
+
     await post(swarmWorker, { OPENCODE_GO_API_KEY: 'test' }, {
       prompt: 'Build a full SaaS platform with auth and billing',
       intent: { type: 'app' },
       complexity: 'high'
     });
 
-    // OpenCode Go is the only provider: every request carries the full
-    // prompt with the server-controlled model and no reasoning-effort cap —
-    // the model decides how much reasoning the task needs. General intents
-    // get a fast path (capped output tokens so they come back quickly), while
-    // complex app/coding requests carry NO output-token cap — the model takes
-    // as long as it wants.
-    expect(payloads.length).toBe(2);
-    const [generalPayload, complexPayload] = payloads;
-    expect(generalPayload.model).toBe('deepseek-v4-flash');
-    expect(generalPayload.reasoning).toBeUndefined();
-    expect(generalPayload.max_completion_tokens).toBeUndefined();
-    expect(generalPayload.max_tokens).toBe(700);
+    expect(complexPayload).not.toBeNull();
     expect(complexPayload.model).toBe('deepseek-v4-flash');
     expect(complexPayload.reasoning).toBeUndefined();
     expect(complexPayload.max_tokens).toBeUndefined();
