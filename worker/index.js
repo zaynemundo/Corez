@@ -160,9 +160,12 @@ Adaptive Routing - Complex Path:
 - Provide a robust architectural overview before diving into specific code.`;
   } else if (intentType === 'app' || ['website_creation', 'game_creation', 'design_task'].includes(primaryIntent)) {
     const isExplicitDesignRequest = skills.some(s => s.id === 'frontend-modern-design') || /\b(glassmorphism|dark mode|awwwards|luxury|neon|aesthetic)\b/i.test(intent?.goal || '');
-    const designStyle = isExplicitDesignRequest
-      ? '- VISUAL DESIGN: Build with luxury dark mode glassmorphism (background: #090A0F, surface: rgba(18, 20, 29, 0.75), glowing borders, Outfit/Inter typography).'
-      : '- VISUAL DESIGN: Follow clean, responsive, user-specified design instructions; preserve user explicit styling preferences.';
+    const isGameCreation = primaryIntent === 'game_creation' || /\bgame\b/i.test(`${intent?.goal || ''} ${intent?.summary || ''}`);
+    const designStyle = isGameCreation
+      ? '- VISUAL DESIGN (GAME): Build authentic game-appropriate art and UI — retro pixel art, themed color palettes, a designed in-game start screen, HUD, and typography that match the game world. NEVER apply generic web "dark glassmorphism", glass panels, luxury-app aesthetics, or Outfit/Inter web typography to games.'
+      : isExplicitDesignRequest
+        ? '- VISUAL DESIGN: Build with luxury dark mode glassmorphism (background: #090A0F, surface: rgba(18, 20, 29, 0.75), glowing borders, Outfit/Inter typography).'
+        : '- VISUAL DESIGN: Follow clean, responsive, user-specified design instructions; preserve user explicit styling preferences.';
 
     adaptiveInstructions = `
 Adaptive Routing - App & Game Creation Path (Awwwards Site of the Day Quality):

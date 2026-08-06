@@ -546,10 +546,9 @@ export async function improveCodingPrompt(prompt, intent = null) {
     if (isGameRequest) {
       return `${cleanPrompt}
 
-${designSpec}${liveInspiration}
-
 [SINGLE-FILE GAME SPECIFICATION]:
 - Begin your response with a SHORT brief of AT MOST 1-2 short sentences: the game title and its controls. Example: "Here's Neon Pong — move with the Arrow keys, Space to launch." NEVER write a long feature list, architecture summary, or "I built..." paragraph.
+- GAME ART DIRECTION: Design the game's own art and UI — retro pixel art or thematically matched visuals, a designed start screen and game-over screen, HUD, color palette, and typography that fit the game world. NEVER apply generic web "dark glassmorphism", glass panels, or luxury web-app styling to games.
 - Build a complete, runnable, self-contained single-file HTML canvas game inside ONE SINGLE \`\`\`html ... \`\`\` code block with inline <style> and <script> tags.
 - FULLSCREEN GAME REQUIREMENT: The game MUST fill the entire preview viewport — html/body with width:100%, height:100%, margin:0, overflow:hidden; a full-viewport canvas (width:100%, height:100%, display:block) with NO max-width, NO bordered box, NO rounded container around the game. Keep a fixed internal game resolution (e.g. 960x540) and scale it to the viewport with ctx.setTransform + a resize listener so the game always fills the screen.
 - MOBILE: size the canvas from visualViewport (not just innerHeight) and listen for orientationchange; include on-screen touch controls (left/right/jump/action buttons) shown only on touch or coarse-pointer devices, bound with touchstart/touchend/touchcancel.
