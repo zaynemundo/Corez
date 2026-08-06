@@ -643,7 +643,7 @@ h1, h2, h3, h4, h5, h6 {
 /* Spacious Message Inner Container */
 .messages-inner {
   width: 100%;
-  max-width: 760px;
+  max-width: 880px;
   margin-top: auto;
   padding: 1.5rem;
   display: flex;
@@ -1422,7 +1422,7 @@ h1, h2, h3, h4, h5, h6 {
 /* Single-Line Fully Rounded Input Box */
 .chat-pane.canvas-active .input-box,
 .chat-pane.canvas-active .attachment-chips-bar {
-  max-width: 680px;
+  max-width: 800px;
 }
 
 /* Slash-command suggestion dropdown */
@@ -1432,7 +1432,7 @@ h1, h2, h3, h4, h5, h6 {
   left: 50%;
   transform: translateX(-50%);
   width: 100%;
-  max-width: 760px;
+  max-width: 880px;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
@@ -1505,7 +1505,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .input-box {
   width: 100%;
-  max-width: calc(min(100%, 760px) - 3rem);
+  max-width: calc(min(100%, 880px) - 3rem);
   align-self: center;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
@@ -1524,11 +1524,11 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .chat-pane.canvas-active .messages-inner {
-  max-width: 680px;
+  max-width: 800px;
 }
 
 .chat-pane.canvas-active .input-box {
-  max-width: calc(min(100%, 680px) - 3rem);
+  max-width: calc(min(100%, 800px) - 3rem);
 }
 
 .input-box:focus-within {
@@ -1898,16 +1898,16 @@ h1, h2, h3, h4, h5, h6 {
 /* 1. Ultra-Wide & Large Desktop Screens (1440px+) */
 @media (min-width: 1440px) {
   .messages-inner {
-    max-width: 800px;
+    max-width: 920px;
   }
   .input-box {
-    max-width: calc(min(100%, 800px) - 3rem);
+    max-width: calc(min(100%, 920px) - 3rem);
   }
   .chat-pane.canvas-active .messages-inner {
-    max-width: 720px;
+    max-width: 840px;
   }
   .chat-pane.canvas-active .input-box {
-    max-width: calc(min(100%, 720px) - 3rem);
+    max-width: calc(min(100%, 840px) - 3rem);
   }
   .canvas-pane {
     width: 52%;
@@ -1917,16 +1917,16 @@ h1, h2, h3, h4, h5, h6 {
 /* 2. Standard Laptop Screens (1024px to 1439px) */
 @media (min-width: 1024px) and (max-width: 1439px) {
   .messages-inner {
-    max-width: 720px;
+    max-width: 840px;
   }
   .input-box {
-    max-width: calc(min(100%, 720px) - 3rem);
+    max-width: calc(min(100%, 840px) - 3rem);
   }
   .chat-pane.canvas-active .messages-inner {
-    max-width: 620px;
+    max-width: 720px;
   }
   .chat-pane.canvas-active .input-box {
-    max-width: calc(min(100%, 620px) - 3rem);
+    max-width: calc(min(100%, 720px) - 3rem);
   }
   .sample-prompts-grid {
     grid-template-columns: repeat(3, 1fr);
@@ -1940,16 +1940,16 @@ h1, h2, h3, h4, h5, h6 {
 /* 3. Small Laptop / Compact Screens (768px to 1023px) */
 @media (min-width: 768px) and (max-width: 1023px) {
   .messages-inner {
-    max-width: 640px;
+    max-width: 740px;
   }
   .input-box {
-    max-width: calc(min(100%, 640px) - 3rem);
+    max-width: calc(min(100%, 740px) - 3rem);
   }
   .chat-pane.canvas-active .messages-inner {
-    max-width: 580px;
+    max-width: 680px;
   }
   .chat-pane.canvas-active .input-box {
-    max-width: calc(min(100%, 580px) - 3rem);
+    max-width: calc(min(100%, 680px) - 3rem);
   }
   .sample-prompts-grid {
     grid-template-columns: 1fr;
@@ -2415,7 +2415,7 @@ h1, h2, h3, h4, h5, h6 {
   left: 50%;
   transform: translateX(-50%);
   width: 100%;
-  max-width: 760px;
+  max-width: 880px;
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
