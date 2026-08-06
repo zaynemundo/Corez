@@ -39,8 +39,8 @@
   --sidebar-body-size: 14px;
   --sidebar-icon-size: 20px;
   --sidebar-item-min-height: 38px;
-  --sidebar-bg: #0a0a0a;
-  --sidebar-bg-opaque: #0a0a0a;
+  --sidebar-bg: var(--bg-primary);
+  --sidebar-bg-opaque: var(--bg-primary);
   --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-shadow: none;
   --sidebar-item-hover-bg: rgba(255, 255, 255, 0.05);
@@ -81,8 +81,8 @@
   --selection-color: #000000;
   --inline-code-color: #7c5e10;
 
-  --sidebar-bg: #ffffff;
-  --sidebar-bg-opaque: #ffffff;
+  --sidebar-bg: var(--bg-primary);
+  --sidebar-bg-opaque: var(--bg-primary);
   --sidebar-border: rgba(0, 0, 0, 0.08);
   --sidebar-shadow: none;
   --sidebar-item-hover-bg: rgba(0, 0, 0, 0.035);
