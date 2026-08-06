@@ -3192,10 +3192,12 @@ export function generateSessionTitle(prompt) {
         .trim();
       title = `Generate a ${subject || 'custom'} image`;
     } else if (type === 'market') {
-      const tickerMatch = lower.match(/\b([a-z]{1,6})\b(?: price| stock| value| quote)?/i);
-      const ticker = tickerMatch && !['the', 'a', 'an', 'and', 'for', 'of'].includes(tickerMatch[1].toLowerCase())
-        ? tickerMatch[1].toUpperCase()
-        : '';
+      const tickerStop = new Set(['the', 'a', 'an', 'and', 'for', 'of', 'to', 'in', 'price', 'stock', 'current', 'check', 'show', 'what', 'is', 'me', 'us', 'bitcoin', 'ethereum', 'crypto']);
+      const tickerMatch = lower.match(/\b([a-z]{1,6})\s+(?:price|stock|value|quote)\b/i)
+        || lower.match(/\b(?:price|stock|quote)\s+of\s+([a-z]{1,6})\b/i)
+        || lower.match(/\b(?:btc|eth|usd|eur|php|jpy|gbp|inr|aud|cad|sgd)\b/i);
+      const rawTicker = tickerMatch ? (tickerMatch[1] || tickerMatch[0]).toLowerCase() : '';
+      const ticker = rawTicker && !tickerStop.has(rawTicker) ? rawTicker.toUpperCase() : '';
       title = ticker ? `Check ${ticker} price` : 'Market check';
     } else if (type === 'bug_fix' || type === 'code_refactor' || type === 'feature_implementation' || type === 'simple_edit') {
       const featureMatch = clean.match(FEATURE_PATTERN);
