@@ -504,6 +504,10 @@ export async function improveCodingPrompt(prompt, intent = null) {
 
   const isAppIntent = intentType === 'app' || INTENT_PATTERNS.app.test(cleanPrompt);
 
+  // Game creation: respond with a SMALL brief, not a feature dump.
+  const isGameRequest = currentIntent?.primaryIntent === 'game_creation'
+    || /\b(build|create|make|generate|design|want|need|give|show|play)\b.{0,60}\b(game|arcade|platformer|pong|snake|tetris|flappy|simulator|puzzle|shooter|rpg|runner|clicker)\b/i.test(cleanPrompt);
+
   // Build the Awwwards design spec + live inspiration once for app requests.
   // The live references are best-effort: failure never blocks and never
   // fabricates sites.
@@ -539,6 +543,19 @@ export async function improveCodingPrompt(prompt, intent = null) {
   }
 
   if (isAppIntent) {
+    if (isGameRequest) {
+      return `${cleanPrompt}
+
+${designSpec}${liveInspiration}
+
+[SINGLE-FILE GAME SPECIFICATION]:
+- Begin your response with a SHORT brief of AT MOST 1-2 short sentences: the game title and its controls. Example: "Here's Neon Pong — move with the Arrow keys, Space to launch." NEVER write a long feature list, architecture summary, or "I built..." paragraph.
+- Build a complete, runnable, self-contained single-file HTML canvas game inside ONE SINGLE \`\`\`html ... \`\`\` code block with inline <style> and <script> tags.
+- FULLSCREEN GAME REQUIREMENT: The game MUST fill the entire preview viewport — html/body with width:100%, height:100%, margin:0, overflow:hidden; a full-viewport canvas (width:100%, height:100%, display:block) with NO max-width, NO bordered box, NO rounded container around the game. Keep a fixed internal game resolution (e.g. 960x540) and scale it to the viewport with ctx.setTransform + a resize listener so the game always fills the screen.
+- MOBILE: size the canvas from visualViewport (not just innerHeight) and listen for orientationchange; include on-screen touch controls (left/right/jump/action buttons) shown only on touch or coarse-pointer devices, bound with touchstart/touchend/touchcancel.
+- Output ONLY the brief followed by the code block — NO feature summary, NO step-by-step guide, NO closing paragraph after the code.`;
+    }
+
     const isExplicitNonJsx = /\b(html\b|css\b|vanilla|plain html|pure html|html\/css|raw html|html\s*\+\s*css|vanilla js)\b/i.test(cleanPrompt);
     const isOneShot = /\b(oneshot|one-shot|one shot|single[- ]page|one[- ]page)\b/i.test(cleanPrompt);
 
