@@ -183,6 +183,7 @@ export function toLegacyIntentType(intentType) {
     case INTENT_TYPES.CODE_QUESTION:
       return 'code-help';
     case INTENT_TYPES.RESEARCH:
+    case INTENT_TYPES.MARKET:
       return 'explanation';
     case INTENT_TYPES.CONTENT_CREATION:
       return 'writing';

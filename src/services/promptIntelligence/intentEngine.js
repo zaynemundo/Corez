@@ -22,6 +22,17 @@ import { INTENT_TYPES, COMPLEXITY_LEVELS, createIntentResult } from './schemas.j
 
 const INTENT_HANDLERS = [
   {
+    type: INTENT_TYPES.MARKET,
+    pattern: /\b(price|prices|stock|stocks|ticker|quote|how much is|convert|to usd|to eur|to php|exchange rate|bitcoin|ethereum|crypto)\b/i,
+    signals: ['price', 'stock', 'quote', 'convert', 'ticker', 'crypto', 'bitcoin', 'ethereum', 'usd', 'eur', 'php', 'how much'],
+    extract(prompt, lower) {
+      return {
+        goal: `check the current market price`,
+        deliverable: 'live market data',
+      };
+    },
+  },
+  {
     type: INTENT_TYPES.WEBSITE_CREATION,
     pattern: /\b(build|make|create|generate|design|code|develop)\b.*\b(website|site|landing page|webpage|web app|web application|homepage|portfolio site)\b|\b(website|site|landing page|portfolio)\b.*\b(build|make|create|generate|design|code|develop)\b/i,
     signals: ['website', 'landing page', 'homepage', 'web app', 'web application', 'site', 'portfolio site'],
@@ -36,8 +47,8 @@ const INTENT_HANDLERS = [
   },
   {
     type: INTENT_TYPES.GAME_CREATION,
-    pattern: /\b(build|make|create|generate|design|code|develop|program)\b.*\b(game|simulator|simulation|sandbox|multiplayer|rpg|platformer|shooter|chess|pong|snake|quiz|wordle|scrabble|puzzle|arcade|canvas game|2d game|3d game|physics sandbox)\b|\b(game|simulator|chess|pong|snake|platformer|shooter)\b.*\b(build|make|create|generate|design|code|develop)\b/i,
-    signals: ['game', 'play', 'simulator', 'simulation', 'sandbox', 'multiplayer', 'platformer', 'shooter', 'chess', 'pong', 'snake', 'quiz', 'wordle', 'scrabble', 'puzzle', 'arcade'],
+    pattern: /\b(build|make|create|generate|design|code|develop|program)\b.*\b(game|simulator|simulation|sandbox|multiplayer|rpg|platformer|shooter|chess|pong|snake|quiz|wordle|scrabble|puzzle|arcade|canvas game|2d game|3d game|physics sandbox|tetris|flappy|clicker|idle game)\b|\b(game|simulator|chess|pong|snake|platformer|shooter|tetris|flappy)\b.*\b(build|make|create|generate|design|code|develop)\b/i,
+    signals: ['game', 'play', 'simulator', 'simulation', 'sandbox', 'multiplayer', 'platformer', 'shooter', 'chess', 'pong', 'snake', 'quiz', 'wordle', 'scrabble', 'puzzle', 'arcade', 'tetris', 'flappy', 'clicker'],
     extract(prompt, lower) {
       const genre = extractGenre(lower) || 'general';
       return {
@@ -49,8 +60,8 @@ const INTENT_HANDLERS = [
   },
   {
     type: INTENT_TYPES.FEATURE_IMPLEMENTATION,
-    pattern: /\b(add|implement|build|integrate|create)\b.*\b(feature|module|component|page|api|endpoint|route|service|handler|auth|login|authentication|search|filter|pagination|upload|export)\b/i,
-    signals: ['add', 'implement', 'integrate', 'feature', 'module', 'component', 'endpoint'],
+    pattern: /\b(add|implement|build|integrate|create)\b.*\b(feature|module|component|page|api|endpoint|route|service|handler|auth|login|authentication|search|search bar|filter|pagination|upload|export|toggle|dark mode|light mode|theme|settings|sort|modal|form|button|sidebar|header|footer|dashboard|analytics)\b/i,
+    signals: ['add', 'implement', 'integrate', 'feature', 'module', 'component', 'endpoint', 'toggle', 'dark mode', 'theme', 'settings', 'modal'],
     extract(_prompt, _lower) {
       return {
         type: INTENT_TYPES.FEATURE_IMPLEMENTATION,
@@ -186,7 +197,9 @@ function extractGenre(lower) {
   const genres = [
     'platformer', 'shooter', 'rpg', 'puzzle', 'quiz', 'word', 'chess',
     'racing', 'strategy', 'simulation', 'arcade', 'card', 'action',
-    'adventure', 'browser', 'multiplayer', 'snake', 'pong',
+    'adventure', 'browser', 'multiplayer', 'snake', 'pong', 'tetris',
+    'flappy', 'clicker', 'idle', 'runner', 'endless', 'tower defense',
+    'wordle', 'scrabble', 'memory', 'maze', 'survival', 'horror', 'fps',
   ];
   for (const g of genres) {
     if (lower.includes(g)) return g;
@@ -199,6 +212,8 @@ function extractFeature(lower) {
     'authentication', 'login', 'search', 'filter', 'pagination',
     'upload', 'export', 'dashboard', 'admin panel', 'payment',
     'chat', 'notification', 'profile', 'settings', 'analytics',
+    'dark mode', 'theme', 'modal', 'form', 'sidebar', 'header', 'footer',
+    'toggle', 'sort', 'sign up', 'register', 'search bar',
   ];
   for (const f of features) {
     if (lower.includes(f)) return f;

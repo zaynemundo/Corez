@@ -173,7 +173,8 @@ export function buildProviderChain(env = {}) {
         label: 'opencode',
         messages,
         signal: options.signal,
-        extraHeaders: { 'HTTP-Referer': 'https://corez.ai', 'X-Title': 'COREZ AI' }
+        extraHeaders: { 'HTTP-Referer': 'https://corez.ai', 'X-Title': 'COREZ AI' },
+        bodyExtra: options.maxTokens ? { max_tokens: options.maxTokens } : {}
       })
     });
   }
@@ -192,7 +193,7 @@ export function buildProviderChain(env = {}) {
         label: 'deepseek',
         messages,
         signal: options.signal,
-        bodyExtra: { stream: false }
+        bodyExtra: options.maxTokens ? { stream: false, max_tokens: options.maxTokens } : { stream: false }
       })
     });
   }
@@ -211,7 +212,8 @@ export function buildProviderChain(env = {}) {
         label: 'openrouter',
         messages,
         signal: options.signal,
-        extraHeaders: { 'HTTP-Referer': 'https://corez.ai', 'X-Title': 'COREZ AI' }
+        extraHeaders: { 'HTTP-Referer': 'https://corez.ai', 'X-Title': 'COREZ AI' },
+        bodyExtra: options.maxTokens ? { max_tokens: options.maxTokens } : {}
       })
     });
   }
@@ -230,8 +232,10 @@ export function buildProviderChain(env = {}) {
  * of failing with a 502.
  *
  * Options: { env, signal, sleep, clock, jitter, store, maxRequestRetryMs,
- * taskHash, taskId } — sleep/clock/jitter are injectable for deterministic
- * tests.
+ * taskHash, taskId, maxTokens } — sleep/clock/jitter are injectable for
+ * deterministic tests. `maxTokens` caps the output for fast/general requests;
+ * coding and creation requests pass none so the model takes as long as it
+ * wants.
  */
 export async function runProviderChain(messages, options = {}) {
   const env = options.env || {};
@@ -240,6 +244,7 @@ export async function runProviderChain(messages, options = {}) {
   const sleep = options.sleep || defaultSleep;
   const jitter = options.jitter || Math.random;
   const store = options.store !== undefined ? options.store : createTaskStateStore(env);
+  const maxTokens = Number.isFinite(options.maxTokens) && options.maxTokens > 0 ? Math.round(options.maxTokens) : null;
   const maxRequestRetryMs = Number.isFinite(options.maxRequestRetryMs) && options.maxRequestRetryMs >= 0
     ? options.maxRequestRetryMs
     : DEFAULT_REQUEST_RETRY_MS;
@@ -289,7 +294,7 @@ export async function runProviderChain(messages, options = {}) {
       }
     }
 
-    let result = await provider.call(messages, { signal, attempt });
+    let result = await provider.call(messages, { signal, attempt, maxTokens });
 
     while (result?.failure) {
       const cls = result.classified || classifyProviderFailure(result.failure);
@@ -345,7 +350,7 @@ export async function runProviderChain(messages, options = {}) {
 
       await sleepInterruptible(backoffMs, signal, sleep);
       if (signal?.aborted) return { taskId, status: 'cancelled' };
-      result = await provider.call(messages, { signal, attempt });
+      result = await provider.call(messages, { signal, attempt, maxTokens });
     }
 
     if (result?.content) {
@@ -368,7 +373,7 @@ export async function runProviderChain(messages, options = {}) {
     // Reasoning-only or empty reply: one continuation nudge per provider so
     // the actual answer is produced instead of raw thought.
     if (!result || !result.failure) {
-      result = await provider.call([...messages, CONTINUATION_NUDGE], { signal, attempt });
+      result = await provider.call([...messages, CONTINUATION_NUDGE], { signal, attempt, maxTokens });
       if (result?.content) {
         if (store) {
           try {

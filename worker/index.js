@@ -208,10 +208,12 @@ Informational & List Formatting (for every non-code answer):
 - IMAGE REQUESTS: If the user explicitly requests an image, picture, photo, illustration, artwork, logo, or wallpaper, respond with EXACTLY ONE line containing \`[IMAGE_PROMPT: concise detailed description of the requested image]\` and nothing else. Never output raw SVG markup for image requests — the platform renders the image for you.`;
 
   // Format full skill instructions: every selected skill passes intact so
-  // the model never loses applicable guidance.
+  // the model never loses applicable guidance. They are MANDATORY: the
+  // resolver selected them specifically for this request, and the model must
+  // follow their steps rather than treating them as optional suggestions.
   let formattedSkills = '(none — direct execution path)';
   if (skills.length > 0) {
-    formattedSkills = skills.map(s => {
+    formattedSkills = `\nThe skills below were selected specifically for this request and are MANDATORY: follow their instructions and verification steps exactly when they apply. Do not weaken, skip, or summarize them away. If a skill does not apply to the final deliverable, ignore it silently.${skills.map(s => {
       const id = typeof s === 'string' ? s : (s.id || s.name);
       const name = typeof s === 'object' ? (s.name || s.id) : s;
       const phase = typeof s === 'object' ? (s.phase || 'IMPLEMENTING') : 'EXECUTION';
@@ -219,7 +221,7 @@ Informational & List Formatting (for every non-code answer):
       const reason = typeof s === 'object' && s.reasonSelected ? `\n    Reason: ${String(s.reasonSelected)}` : '';
       const constraints = typeof s === 'object' && Array.isArray(s.constraints) && s.constraints.length ? `\n    Constraints: ${s.constraints.join(' | ')}` : '';
       return `\n- [${phase}] ${name} (${id})${reason}\n    Instructions: ${String(instructions)}${constraints}`;
-    }).join('');
+    }).join('')}`;
   }
 
   // Format intent contract & preservation constraints in full: these are
@@ -252,6 +254,7 @@ Identity & Persona:
 - Never list bullet points or technical specializations when giving greetings unless requested.
 
 Guidelines for Output:
+- FOLLOW THE USER'S REQUEST EXACTLY: deliver precisely what the user asked for — implement everything they requested and add nothing they did not ask for. When the user's instruction conflicts with any default or template behaviour, the user's explicit instruction wins.
 - DEFAULT FORMAT (React/JSX): When writing code or building apps, components, tools, dashboards, or games without an explicitly requested format, default to clean, modern React/JSX components (using \`\`\`jsx ... \`\`\` code blocks). ALWAYS name your main top-level component "export default function App()".
 - REQUESTED FORMATS (HTML/CSS/JS): If the user explicitly requests HTML, CSS, vanilla JS, or plain web code, output complete single-file HTML/CSS/JS inside ONE SINGLE \`\`\`html ... \`\`\` code block.
 - PROPER LAYERING: Ensure proper visual layering (Background z-index:0 -> Content z-index:10 -> HUD/Toolbars z-index:20-30 -> Modals z-index:40-50+).
@@ -303,6 +306,7 @@ async function handleAi(request, env) {
 
   const intent = body.intent && typeof body.intent === 'object' && !Array.isArray(body.intent) ? body.intent : null;
   const legacyIntent = body.legacyIntent || (typeof intent === 'string' ? intent : intent?.type);
+  const intentType = normalizeIntentType(legacyIntent || intent?.type);
   const contract = body.contract && typeof body.contract === 'object' ? body.contract : null;
   const skills = Array.isArray(body.skills) ? body.skills : [];
   const executionPlan = typeof body.executionPlan === 'string' ? body.executionPlan : null;
@@ -318,6 +322,21 @@ async function handleAi(request, env) {
   const apiMessages = [
     { role: 'system', content: systemPrompt }
   ];
+
+  // Fast path for general intents: explanations, writing, and casual chat are
+  // answered from the last few turns only, with a capped output, so they come
+  // back quickly. Coding, app, game, and swarm requests keep the FULL history
+  // and NO output cap — the model takes as long as it wants.
+  const primaryIntent = intent?.primaryIntent || legacyIntent || intentType;
+  const isFastIntent = ['explanation', 'general', 'writing'].includes(intentType)
+    && !['bug_fix', 'code_refactor', 'feature_implementation', 'simple_edit', 'code_question', 'app', 'website_creation', 'game_creation', 'design_task', 'swarm'].includes(primaryIntent)
+    && intentType !== 'app';
+  const FAST_MAX_TOKENS = 700;
+  const fastHistoryWindow = Math.max(2, Math.min(8, body.fastHistoryWindow || 8));
+
+  const fastMessages = isFastIntent
+    ? messages.filter(m => m.role && m.content).slice(-fastHistoryWindow)
+    : messages;
 
   // Live Awwwards inspiration for app/site/game requests: real award-winning
   // site references (title + URL) are injected into the system prompt so the
@@ -342,7 +361,7 @@ async function handleAi(request, env) {
   }
 
   let hasAppendedPrompt = false;
-  for (const m of messages) {
+  for (const m of fastMessages) {
     if (m.role && m.content) {
       apiMessages.push({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content });
       if (typeof m.content === 'string' && (m.content === prompt || m.content === executionPrompt) && m.role === 'user') {
@@ -378,7 +397,8 @@ async function handleAi(request, env) {
     env,
     signal: clientDisconnectSignal,
     store: createTaskStateStore(env),
-    sleep: retrySleepFor(env)
+    sleep: retrySleepFor(env),
+    maxTokens: isFastIntent ? FAST_MAX_TOKENS : null
   });
 
   if (result.status === 'retry-scheduled') {

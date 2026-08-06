@@ -30,6 +30,7 @@ export const INTENT_TYPES = Object.freeze({
   GENERAL_QUESTION: 'general_question',
   SIMPLE_EDIT: 'simple_edit',
   SWARM: 'swarm',
+  MARKET: 'market',
   UNKNOWN: 'unknown',
 });
 

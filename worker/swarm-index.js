@@ -526,12 +526,15 @@ export async function runAdaptiveAgentPool(agentSpecs, executeAgent, options = {
 function formatSkillsForSwarm(skills) {
   const list = Array.isArray(skills) ? skills : [];
   if (list.length === 0) return '';
-  return list.map((s) => {
+  const rendered = list.map((s) => {
     const id = typeof s === 'string' ? s : (s.id || s.name);
     const name = typeof s === 'object' ? (s.name || s.id) : s;
     const instructions = typeof s === 'object' && s.instructions ? s.instructions : (s.description || 'Execute skill requirements');
     return `\n- ${name} (${id}): ${String(instructions)}`;
   }).join('');
+  // Skills are MANDATORY guidance for the request: agents must follow them
+  // exactly, never treat them as optional suggestions.
+  return `\n\nMANDATORY SKILLS (selected for this request — follow their instructions exactly when they apply):${rendered}`;
 }
 
 function buildSpecialistMessages(spec, prompt, history, intentType, skills) {
