@@ -795,6 +795,10 @@ h1, h2, h3, h4, h5, h6 {
   background-color: #ffffff;
 }
 
+[data-theme="dark"] .message-wrapper .message-content {
+  background-color: #000000;
+}
+
 /* AI Message Action Bar (Copy / Rate / Share) */
 .message-actions {
   display: flex;
