@@ -197,13 +197,82 @@ export function injectMultiPageRouter(html, pageNames) {
   return `${html}\n${script}`;
 }
 
+/**
+ * Fullscreen game patch injected into every canvas-based preview/published
+ * document. Many generated games are authored as a fixed-resolution canvas
+ * (e.g. 960x540) wrapped in a bordered, max-width "block" that leaves the
+ * background cut off. This patch forces the main canvas to cover the entire
+ * viewport with a scale-to-cover transform (game logic keeps running in its
+ * own internal coordinates) and strips the bordered wrapper, so games fill
+ * the whole screen on desktop and mobile.
+ */
+export const FULLSCREEN_GAME_PATCH = `
+(function () {
+  function applyToCanvas() {
+    try {
+      var canvases = document.querySelectorAll('canvas');
+      if (!canvases || canvases.length === 0) return false;
+      var best = null, bestArea = 0;
+      for (var i = 0; i < canvases.length; i++) {
+        var c = canvases[i];
+        var w = parseInt(c.getAttribute('width'), 10) || 0;
+        var h = parseInt(c.getAttribute('height'), 10) || 0;
+        var area = w * h;
+        if (area > bestArea) { bestArea = area; best = { el: c, w: w, h: h }; }
+      }
+      if (!best || bestArea <= 0) return false;
+      var w = best.w, h = best.h, canvas = best.el;
+      var hay = ((canvas.id || '') + ' ' + (canvas.className || '') + ' ' + (document.title || '') + ' ' + ((document.body && document.body.className) || '')).toLowerCase();
+      var gameHint = /(game|arcade|player|score|enemy|pixel|retro)/.test(hay);
+      var resHint = w >= 480 && h >= 360 && w <= 1920 && h <= 1080;
+      if (!gameHint && !resHint) return false;
+      var html = document.documentElement, body = document.body;
+      if (html) { html.style.margin = '0'; html.style.padding = '0'; html.style.width = '100%'; html.style.height = '100%'; html.style.overflow = 'hidden'; }
+      if (body) { body.style.margin = '0'; body.style.padding = '0'; body.style.width = '100%'; body.style.height = '100%'; body.style.overflow = 'hidden'; }
+      var style = document.createElement('style');
+      style.textContent = '#game-container, .game-container, #gameCanvasContainer, .canvas-container { position: fixed !important; inset: 0 !important; width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important; margin: 0 !important; padding: 0 !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; background: #0c0d14 !important; }';
+      (document.head || document.documentElement).appendChild(style);
+      canvas.style.position = 'fixed';
+      canvas.style.left = '50%';
+      canvas.style.top = '50%';
+      canvas.style.maxWidth = 'none';
+      canvas.style.maxHeight = 'none';
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+      var dpr = Math.min(window.devicePixelRatio || 1, 2);
+      var apply = function () {
+        var s = Math.max((window.innerWidth * dpr) / w, (window.innerHeight * dpr) / h);
+        canvas.style.transform = 'translate(-50%, -50%) scale(' + s + ')';
+        canvas.style.transformOrigin = 'center center';
+      };
+      apply();
+      window.addEventListener('resize', apply);
+      window.addEventListener('orientationchange', apply);
+      return true;
+    } catch (e) { return false; }
+  }
+  var attempts = 0;
+  (function poll() {
+    if (applyToCanvas()) return;
+    attempts++;
+    if (attempts < 20) setTimeout(poll, 500);
+  })();
+})();`;
+
+export function injectFullscreenGamePatch(html) {
+  if (!html || typeof html !== 'string' || !html.includes('<canvas')) return html;
+  const script = `<script>${FULLSCREEN_GAME_PATCH}</script>`;
+  if (/<\/body>/i.test(html)) return html.replace(/<\/body>/i, `${script}\n</body>`);
+  return `${html}\n${script}`;
+}
+
 export function formatCodeForPreview(rawCode) {
   if (!rawCode || typeof rawCode !== 'string') return '';
   const trimmed = rawCode.trim();
 
   // 1. If it's already a full HTML document, return as-is
   if (/^\s*<!DOCTYPE html/i.test(trimmed) || /^\s*<html/i.test(trimmed)) {
-    return trimmed;
+    return injectFullscreenGamePatch(trimmed);
   }
 
   // 2. If it's pure HTML/CSS/JS without React/JSX syntax, wrap into a clean preview HTML document
@@ -255,6 +324,7 @@ export function formatCodeForPreview(rawCode) {
 </head>
 <body>
   ${trimmed}
+  <script>${FULLSCREEN_GAME_PATCH}</script>
 </body>
 </html>`;
   }
@@ -630,10 +700,11 @@ export function formatCodeForPreview(rawCode) {
       } else {
         document.getElementById('root').innerHTML = '<div style="padding: 2rem; color: #ef4444; font-family: sans-serif;"><h3>Preview Warning</h3><p>Could not auto-detect a React component. Please ensure your code exports or defines a React component.</p></div>';
       }
-    } catch (err) {
+      } catch (err) {
       document.getElementById('root').innerHTML = '<div style="padding: 2rem; color: #ef4444; font-family: sans-serif; white-space: pre-wrap;"><h3>Runtime Error</h3><p>' + err.message + '</p></div>';
     }
   </script>
+  <script>${FULLSCREEN_GAME_PATCH}</script>
 </body>
 </html>`;
 }
