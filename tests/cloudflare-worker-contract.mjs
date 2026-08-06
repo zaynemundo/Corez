@@ -660,7 +660,7 @@ async function run() {
   assert.equal(imageMissingPromptResponse.status, 400);
 
   // Image generation via OpenRouter when OPENROUTER_API_KEY is configured:
-  // the payload targets the default chain lead (Nano Banana 2) and the
+  // the payload targets the default image model (Nano Banana 2 lite) and the
   // parsed image URL is returned with the model label that served it.
   const imageOriginalFetch = globalThis.fetch;
   try {
@@ -668,7 +668,7 @@ async function run() {
       assert.equal(url, OPENROUTER_URL);
       const payload = JSON.parse(init.body);
       capturedPayloads.push(payload);
-      assert.equal(payload.model, 'google/gemini-3.1-flash-image');
+      assert.equal(payload.model, 'google/gemini-3.1-flash-lite-image');
       assert.equal(payload.max_tokens, undefined);
       assert.equal(payload.max_completion_tokens, undefined);
       assert.deepEqual(payload.messages, [{ role: 'user', content: 'A futuristic city' }]);
@@ -690,7 +690,7 @@ async function run() {
     assert.equal(imageResponse.status, 200);
     const imageData = await imageResponse.json();
     assert.equal(imageData.image, 'https://img.example.com/flux-city.png');
-    assert.equal(imageData.model, 'google/gemini-3.1-flash-image');
+    assert.equal(imageData.model, 'google/gemini-3.1-flash-lite-image');
   } finally {
     globalThis.fetch = imageOriginalFetch;
   }

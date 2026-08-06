@@ -4,16 +4,12 @@ export const OPENCODE_DEFAULT_ENDPOINT = 'https://opencode.ai/zen/go/v1/chat/com
 export const DEEPSEEK_DEFAULT_ENDPOINT = 'https://api.deepseek.com/chat/completions';
 export const OPENROUTER_DEFAULT_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 export const DEFAULT_MODEL = 'deepseek-v4-flash';
-export const FLUX_IMAGE_MODEL = 'black-forest-labs/flux-1-schnell';
 
-// OpenRouter retired black-forest-labs/flux-1-schnell, so the image chain
-// leads with Google's Nano Banana 2 (Gemini 3.1 Flash Image); FLUX remains
-// the final legacy candidate in case it returns. OPENROUTER_IMAGE_MODEL
-// overrides the whole chain with a single model.
+// OpenRouter retired black-forest-labs/flux-1-schnell, so image generation
+// uses Google's Nano Banana 2 lite (Gemini 3.1 Flash Lite Image) only.
+// OPENROUTER_IMAGE_MODEL overrides the chain with a single model.
 export const DEFAULT_IMAGE_MODEL_CHAIN = [
-  'google/gemini-3.1-flash-image',
-  'google/gemini-3.1-flash-lite-image',
-  FLUX_IMAGE_MODEL
+  'google/gemini-3.1-flash-lite-image'
 ];
 
 // Transient failures are retried with adaptive exponential backoff (base
