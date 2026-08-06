@@ -5,7 +5,6 @@ import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
 import CanvasPreview from './components/CanvasPreview';
 import SettingsModal from './components/SettingsModal';
-import TypingPaw from './components/TypingPaw';
 import { generateAIResponse, extractCodeFromMessage } from './services/aiService';
 import { fetchMarketData, unavailableMarket } from './services/marketService';
 import { storeAppInR2, deleteSessionAppsInR2 } from './services/appStorageService';
@@ -637,7 +636,11 @@ export default function App() {
                     {isThinking && (
                       <div className="message-wrapper ai">
                         <div className="message-body">
-                          <TypingPaw />
+                          <div className="thinking-indicator-box thinking-dots" aria-label="Corez is thinking" role="status">
+                            <span className="thinking-dot" />
+                            <span className="thinking-dot" />
+                            <span className="thinking-dot" />
+                          </div>
                         </div>
                       </div>
                     )}

@@ -1286,68 +1286,37 @@ h1, h2, h3, h4, h5, h6 {
   display: inline-block;
 }
 
-.typing-paw {
-  display: inline-flex;
+.thinking-indicator-box {
+  display: flex;
   align-items: center;
-  gap: 0.75rem;
+  padding: 0.35rem 0;
+  background-color: transparent;
   color: var(--text-secondary);
   width: fit-content;
-  --px: -24px;
-  --s: 1;
-  --tap: 0;
-  animation: typing-paw-pat 2.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 
-/* Pixel cat paw typing indicator: the paw slides out from behind the teal
-   pill and pats its edge three times, then retracts behind it. Custom
-   properties drive both paw layers (behind = covered by the pill, front =
-   faded in while tapping) so the paw appears to pat on top of the pill. */
-@keyframes typing-paw-pat {
-  0% { --px: 28px; --s: 1; --tap: 0; }
-  10% { --px: -24px; --s: 1; --tap: 0; }
-  20% { --px: -8px; --s: 0.94; --tap: 1; }
-  28% { --px: -24px; --s: 1.03; --tap: 0; }
-  38% { --px: -8px; --s: 0.94; --tap: 1; }
-  46% { --px: -24px; --s: 1.03; --tap: 0; }
-  56% { --px: -8px; --s: 0.94; --tap: 1; }
-  64% { --px: -24px; --s: 1; --tap: 0; }
-  86% { --px: -24px; --s: 1; --tap: 0; }
-  100% { --px: 28px; --s: 1; --tap: 0; }
+@keyframes thinkingDotPulse {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1.1); }
 }
 
-.typing-paw__svg {
-  width: 108px;
-  height: 72px;
-  flex-shrink: 0;
-  shape-rendering: crispEdges;
+.thinking-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
 }
 
-.typing-paw__paw {
-  transform: translateX(var(--px, -24px)) scale(var(--s, 1));
-  will-change: transform;
+.thinking-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--text-secondary);
+  animation: thinkingDotPulse 1.4s infinite ease-in-out both;
 }
 
-.typing-paw__paw--front {
-  opacity: var(--tap, 0);
-}
-
-.typing-paw__pill {
-  fill: #4ecdc4;
-}
-
-.typing-paw__label {
-  font-size: 0.8rem;
-  font-weight: 400;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .typing-paw {
-    animation: none;
-    --px: -24px;
-    --s: 1;
-    --tap: 0;
-  }
-}
+.thinking-dot:nth-child(1) { animation-delay: -0.32s; }
+.thinking-dot:nth-child(2) { animation-delay: -0.16s; }
 
 /* HTML: <div class="loader"></div> */
 .loader {
