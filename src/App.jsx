@@ -6,6 +6,7 @@ import ChatInput from './components/ChatInput';
 import CanvasPreview from './components/CanvasPreview';
 import SettingsModal from './components/SettingsModal';
 import CatPawButtonShowcase from './components/CatPawButtonShowcase';
+import { CAT_PAW_BUTTON_HTML } from './data/catPawButtonCode';
 import { generateAIResponse, extractCodeFromMessage } from './services/aiService';
 import { fetchMarketData, unavailableMarket } from './services/marketService';
 import { storeAppInR2, deleteSessionAppsInR2 } from './services/appStorageService';
@@ -158,8 +159,13 @@ export async function runMarketRefresh({
 const INITIAL_SESSIONS = [
   {
     id: 'session-default',
-    title: 'New Conversation',
-    messages: []
+    title: 'Cat Paw Button Demo 🐾',
+    messages: [
+      {
+        role: 'assistant',
+        content: `Here is the recreated **Cat Paw Button** interaction (inspired by Hannah Goodridge's CodePen \`019f8fb8-b31f-7027-bcc6-0f15214de112\` & Rive's SVG button animation).\n\n\`\`\`html\n${CAT_PAW_BUTTON_HTML}\n\`\`\``
+      }
+    ]
   }
 ];
 
@@ -189,8 +195,6 @@ export default function App() {
       if (!saved) return INITIAL_SESSIONS;
       const parsed = JSON.parse(saved);
       if (!Array.isArray(parsed) || parsed.length === 0) return INITIAL_SESSIONS;
-      // Drop corrupted session records (e.g. interrupted writes) that would
-      // crash the message list, mirroring the Sidebar's own guard.
       const conforming = parsed.filter((session) => session && Array.isArray(session.messages));
       return conforming.length > 0 ? normalizeMarketMessageIds(conforming) : INITIAL_SESSIONS;
     } catch {
@@ -208,9 +212,9 @@ export default function App() {
     if (typeof window === 'undefined') return true;
     return !window.matchMedia('(max-width: 767px)').matches;
   });
-  const [canvasOpen, setCanvasOpen] = useState(false);
+  const [canvasOpen, setCanvasOpen] = useState(true);
   const [canvasFullScreen, setCanvasFullScreen] = useState(false);
-  const [activeCanvasCode, setActiveCanvasCode] = useState('');
+  const [activeCanvasCode, setActiveCanvasCode] = useState(CAT_PAW_BUTTON_HTML);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [refreshingMarketKeys, setRefreshingMarketKeys] = useState(() => new Set());
