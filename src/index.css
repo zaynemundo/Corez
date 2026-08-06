@@ -1602,7 +1602,7 @@ h1, h2, h3, h4, h5, h6 {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
-  padding: 0.55rem 0.65rem;
+  padding: 0.7rem 0.65rem;
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -1639,10 +1639,10 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 400;
   resize: none;
   max-height: 140px;
-  min-height: 24px;
+  min-height: 30px;
   /* line-height matches min-height so the placeholder text sits exactly on
      the same center line as the attach (+) and send icons */
-  line-height: 24px;
+  line-height: 30px;
   padding: 0.2rem 0;
   display: flex;
   align-items: center;
