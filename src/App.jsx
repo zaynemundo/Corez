@@ -5,7 +5,7 @@ import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
 import CanvasPreview from './components/CanvasPreview';
 import SettingsModal from './components/SettingsModal';
-import { generateAIResponse, extractCodeFromMessage } from './services/aiService';
+import { generateAIResponse, extractCodeFromMessage, generateSessionTitle } from './services/aiService';
 import { fetchMarketData, unavailableMarket } from './services/marketService';
 import { storeAppInR2, deleteSessionAppsInR2 } from './services/appStorageService';
 
@@ -468,7 +468,7 @@ export default function App() {
         return prev.map(s => {
           if (s.id === targetSessionId) {
             const updatedTitle = s.messages.length === 0
-              ? (promptText || displayAttachments[0]?.name || 'New Conversation').slice(0, 30)
+              ? generateSessionTitle(promptText || displayAttachments[0]?.name || 'New Conversation')
               : s.title;
             return { ...s, title: updatedTitle, messages: [...s.messages, displayMsg] };
           }
@@ -477,7 +477,7 @@ export default function App() {
       }
       return [{
         id: targetSessionId,
-        title: (promptText || displayAttachments[0]?.name || 'New Conversation').slice(0, 30),
+        title: generateSessionTitle(promptText || displayAttachments[0]?.name || 'New Conversation'),
         messages: [displayMsg]
       }, ...prev];
     });
