@@ -14,8 +14,10 @@ export function generateEngineSkeleton(gameSpec = {}) {
   <title>${title}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #0c0d14; color: #fff; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-    #game-container { position: relative; width: 100%; max-width: 960px; aspect-ratio: 16/9; background: #161824; border: 2px solid #2a2d42; border-radius: 8px; box-shadow: none; overflow: hidden; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #0c0d14; color: #fff; font-family: 'Courier New', monospace; touch-action: none; overscroll-behavior: none; }
+    /* Fullscreen: the game fills the entire viewport — no box, no border,
+       no max-width. Draw in 960x540 logical space via View.beginFrame(). */
+    #game-container { position: fixed; inset: 0; width: 100%; height: 100%; background: #0c0d14; overflow: hidden; }
     canvas {
       width: 100%;
       height: 100%;
@@ -24,9 +26,16 @@ export function generateEngineSkeleton(gameSpec = {}) {
       image-rendering: crisp-edges;
       image-rendering: -moz-crisp-edges;
     }
-    .touch-controls { position: absolute; bottom: 12px; left: 0; right: 0; display: none; justify-content: space-between; padding: 0 16px; pointer-events: none; }
-    .touch-btn { width: 56px; height: 56px; background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.4); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; color: #fff; pointer-events: auto; touch-action: manipulation; }
-    .touch-btn:active { background: rgba(255,255,255,0.4); transform: scale(0.95); }
+    .touch-controls { position: absolute; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); left: 0; right: 0; display: none; justify-content: space-between; align-items: flex-end; padding: 0 18px; pointer-events: none; }
+    .touch-btn { width: 62px; height: 62px; background: rgba(255,255,255,0.16); border: 2px solid rgba(255,255,255,0.45); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 20px; color: #fff; pointer-events: auto; touch-action: manipulation; -webkit-user-select: none; }
+    .touch-btn:active { background: rgba(255,255,255,0.45); transform: scale(0.92); }
+    @media (max-width: 560px) {
+      .touch-btn { width: 54px; height: 54px; font-size: 17px; }
+    }
+    @media (max-height: 480px) {
+      .touch-controls { opacity: 0.85; }
+      .touch-btn { width: 48px; height: 48px; font-size: 15px; }
+    }
   </style>
 </head>
 <body>
@@ -45,7 +54,49 @@ export function generateEngineSkeleton(gameSpec = {}) {
   </div>
 
   <script>
-    // 1. PostMessage Bridge Integration
+    // 1. Fullscreen Resolution System: the canvas always fills the viewport.
+    // Keep game logic in the fixed 960x540 logical space below and call
+    // View.beginFrame(ctx) at the start of every render frame so drawing is
+    // scaled to fill the whole screen (centered, aspect preserved).
+    // Mobile-aware: uses visualViewport so iOS Safari's collapsing URL bar
+    // never leaves a gap, and listens for orientation changes too.
+    const VIEW_W = 960;
+    const VIEW_H = 540;
+    const canvas = document.getElementById('gameCanvas');
+    const View = {
+      W: VIEW_W,
+      H: VIEW_H,
+      scale: 1,
+      ox: 0,
+      oy: 0,
+      resize() {
+        const vv = window.visualViewport;
+        const vw = vv ? vv.width : window.innerWidth;
+        const vh = vv ? vv.height : window.innerHeight;
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.max(1, Math.round(vw * dpr));
+        canvas.height = Math.max(1, Math.round(vh * dpr));
+        this.scale = Math.min(canvas.width / this.W, canvas.height / this.H);
+        this.ox = (canvas.width - this.W * this.scale) / 2;
+        this.oy = (canvas.height - this.H * this.scale) / 2;
+      },
+      beginFrame(ctx) {
+        ctx.setTransform(this.scale, 0, 0, this.scale, this.ox, this.oy);
+        ctx.imageSmoothingEnabled = false;
+        ctx.mozImageSmoothingEnabled = false;
+        ctx.webkitImageSmoothingEnabled = false;
+      }
+    };
+    const viewResizeListener = () => View.resize();
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', viewResizeListener);
+      window.visualViewport.addEventListener('scroll', viewResizeListener);
+    }
+    window.addEventListener('resize', viewResizeListener);
+    window.addEventListener('orientationchange', viewResizeListener);
+    View.resize();
+
+    // 2. PostMessage Bridge Integration
     function sendHostMessage(type, payload = {}) {
       if (window.parent && window.parent !== window) {
         window.parent.postMessage({ type, payload, timestamp: Date.now() }, '*');
@@ -54,7 +105,7 @@ export function generateEngineSkeleton(gameSpec = {}) {
 
     sendHostMessage('GAME_LOADING', { progress: 0 });
 
-    // 2. Input Manager
+    // 3. Input Manager
     const Input = {
       keys: {},
       mouse: { down: false, x: 0, y: 0 },
@@ -78,16 +129,25 @@ export function generateEngineSkeleton(gameSpec = {}) {
           Input.mouse.y = e.clientY;
         });
 
-        // Touch support
-        if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+        // Touch support: show the on-screen controls on any touch-capable or
+        // coarse-pointer (mobile) device, and bind them with robust
+        // touchstart/touchend/touchcancel handling so a sliding finger or a
+        // gesture interrupt never leaves a key stuck down.
+        const isTouchDevice = ('ontouchstart' in window || navigator.maxTouchPoints > 0)
+          || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+        if (isTouchDevice) {
           const controlsEl = document.getElementById('touchControls');
           if (controlsEl) controlsEl.style.display = 'flex';
-          
+
           const bindTouch = (id, keyName) => {
             const el = document.getElementById(id);
             if (!el) return;
-            el.addEventListener('touchstart', e => { e.preventDefault(); Input.touch[keyName] = true; });
-            el.addEventListener('touchend', e => { e.preventDefault(); Input.touch[keyName] = false; });
+            const press = (e) => { e.preventDefault(); Input.touch[keyName] = true; };
+            const release = (e) => { e.preventDefault(); Input.touch[keyName] = false; };
+            el.addEventListener('touchstart', press, { passive: false });
+            el.addEventListener('touchend', release, { passive: false });
+            el.addEventListener('touchcancel', release, { passive: false });
+            el.addEventListener('contextmenu', (e) => e.preventDefault());
           };
           bindTouch('btnLeft', 'left');
           bindTouch('btnRight', 'right');
@@ -97,10 +157,16 @@ export function generateEngineSkeleton(gameSpec = {}) {
       },
       isDown(code, touchKey) {
         return !!(Input.keys[code] || (touchKey && Input.touch[touchKey]));
-      }
+      },
+      // Convenience: maps the most common controls so games on mobile only
+      // need to check keys here (Space/ArrowUp fire from the on-screen pad too).
+      fire() { return this.isDown('Space', 'action'); },
+      jump() { return this.isDown('Space', 'up') || this.isDown('ArrowUp', 'up'); },
+      left() { return this.isDown('ArrowLeft', 'left'); },
+      right() { return this.isDown('ArrowRight', 'right'); }
     };
 
-    // 3. Audio Synth Manager
+    // 4. Audio Synth Manager
     const Sound = {
       ctx: null,
       init() {
@@ -124,7 +190,7 @@ export function generateEngineSkeleton(gameSpec = {}) {
       }
     };
 
-    // 4. Collision Detection System (AABB)
+    // 5. Collision Detection System (AABB)
     function checkCollision(rect1, rect2) {
       return (
         rect1.x < rect2.x + rect2.width &&
@@ -134,7 +200,7 @@ export function generateEngineSkeleton(gameSpec = {}) {
       );
     }
 
-    // 5. Game State Manager
+    // 6. Game State Manager
     const GameState = {
       current: 'START', // 'START' | 'PLAYING' | 'GAMEOVER' | 'VICTORY'
       score: 0,
