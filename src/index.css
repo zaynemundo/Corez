@@ -39,12 +39,12 @@
   --sidebar-body-size: 14px;
   --sidebar-icon-size: 20px;
   --sidebar-item-min-height: 38px;
-  --sidebar-bg: #ffffff;
-  --sidebar-bg-opaque: #ffffff;
-  --sidebar-border: rgba(0, 0, 0, 0.08);
+  --sidebar-bg: #0a0a0a;
+  --sidebar-bg-opaque: #0a0a0a;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-shadow: none;
-  --sidebar-item-hover-bg: rgba(0, 0, 0, 0.05);
-  --sidebar-item-active-bg: rgba(0, 0, 0, 0.10);
+  --sidebar-item-hover-bg: rgba(255, 255, 255, 0.05);
+  --sidebar-item-active-bg: rgba(255, 255, 255, 0.10);
 
   --radius-xs: 6px;
   --radius-sm: 8px;
@@ -186,12 +186,6 @@ h1, h2, h3, h4, h5, h6 {
   flex-shrink: 0;
   visibility: visible;
   overflow: hidden;
-}
-
-/* White sidebar in dark mode: keep its text readable with dark colors */
-[data-theme="dark"] .sidebar {
-  --text-primary: #111111;
-  --text-secondary: #4b5563;
 }
 
 .sidebar.collapsed {
