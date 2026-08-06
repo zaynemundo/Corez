@@ -649,7 +649,7 @@ h1, h2, h3, h4, h5, h6 {
   width: 100%;
   max-width: 880px;
   margin-top: auto;
-  padding: 1.5rem;
+  padding: 1.5rem 1.5rem 2.5rem;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
