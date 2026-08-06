@@ -215,13 +215,16 @@ function MessageActions({ content }) {
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [rateOpen]);
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (!content) return;
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(content).catch(() => {});
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+    if (!navigator.clipboard) return;
+    // A standalone image message copies as its absolute image URL so pasting
+    // shows the picture link instead of raw markdown like ![](/api/assets/...).
+    const imgMatch = content.match(/^!\[(.*?)\]\((.*?)\)\s*$/);
+    const text = imgMatch ? new URL(imgMatch[2], window.location.origin).href : content;
+    navigator.clipboard.writeText(text).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleRateToggle = () => {
@@ -234,9 +237,10 @@ function MessageActions({ content }) {
   };
 
   const handleShare = async () => {
+    const imgMatch = content.match(/^!\[(.*?)\]\((.*?)\)\s*$/);
     const shareData = {
       title: 'COREZ AI Response',
-      text: content
+      text: imgMatch ? new URL(imgMatch[2], window.location.origin).href : content
     };
     if (navigator.share) {
       try {
