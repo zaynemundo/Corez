@@ -271,6 +271,33 @@ describe('provider fallback chain recovery', () => {
     }
   });
 
+  it('sends max_tokens only when maxTokens is passed (fast general path)', async () => {
+    const payloads = [];
+    vi.stubGlobal('fetch', vi.fn(async (url, init) => {
+      const payload = JSON.parse(init.body);
+      payloads.push({ url, payload });
+      if (url === OPENCODE_URL) return errorResponse(401, 'unauthorized');
+      return okResponse('quick answer');
+    }));
+
+    const result = await runProviderChain([{ role: 'user', content: 'hi' }], {
+      env: providerEnv(),
+      sleep: async () => {},
+      jitter: () => 0,
+      maxTokens: 700
+    });
+
+    expect(result.content).toBe('quick answer');
+    for (const { payload } of payloads) {
+      if (payloads.indexOf(payloads.find(p => p.payload === payload)) === payloads.length - 1) {
+        expect(payload.max_tokens).toBe(700);
+      }
+    }
+    expect(payloads.at(-1).payload.max_tokens).toBe(700);
+    // Coding path: no cap means no max_tokens anywhere.
+    expect(payloads.some((p) => p.payload.max_completion_tokens !== undefined)).toBe(false);
+  });
+
   it('skips providers disabled by configuration', async () => {
     const urls = [];
     vi.stubGlobal('fetch', vi.fn(async (url) => {
