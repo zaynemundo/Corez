@@ -3120,7 +3120,6 @@ export function extractQuestionPrompt(prompt) {
 export async function handleMixedQuestionImageRequest(prompt, intent, history, signal) {
   const subject = extractImageSubject(prompt);
   const fluxPrompt = subject ? `an image of ${subject}` : prompt;
-  const title = subject ? createImageTitle(subject) : createImageTitle(prompt);
 
   // Answer the question with the image request stripped (so the worker's
   // image-only rule never suppresses the explanation), and generate the FLUX
@@ -3139,13 +3138,13 @@ export async function handleMixedQuestionImageRequest(prompt, intent, history, s
   const imageUrl = imageResult.status === 'fulfilled' ? imageResult.value : null;
 
   if (imageUrl) {
-    const imageMarkdown = `![${title}](${imageUrl})`;
+    const imageMarkdown = `![](${imageUrl})`;
     if (hostedResponse) {
       const tagMatch = hostedResponse.match(/\[IMAGE_PROMPT:\s*(.*?)\]/i);
       if (tagMatch) return hostedResponse.replace(tagMatch[0], imageMarkdown);
       return `${hostedResponse.trim()}\n\n${imageMarkdown}`;
     }
-    return `Here is your generated image:\n\n${imageMarkdown}`;
+    return imageMarkdown;
   }
 
   if (hostedResponse) return hostedResponse;
@@ -3244,8 +3243,7 @@ export async function generateAIResponse(prompt, history = [], signal = null) {
     try {
       const imageUrl = await generateFluxImage(cleanPrompt, signal);
       if (imageUrl) {
-        const title = createImageTitle(cleanPrompt);
-        return `Here is your generated image:\n\n![${title}](${imageUrl})`;
+        return `![](${imageUrl})`;
       }
     } catch (imgError) {
       if (imgError?.name === 'AbortError') throw imgError;
@@ -3264,7 +3262,7 @@ export async function generateAIResponse(prompt, history = [], signal = null) {
           const imageUrl = await generateFluxImage(imagePrompt, signal);
           if (imageUrl) {
              // Replace the tag with the actual image markdown
-             return hostedAiResponse.replace(imageMatch[0], `![${createImageTitle(imagePrompt)}](${imageUrl})`);
+             return hostedAiResponse.replace(imageMatch[0], `![](${imageUrl})`);
           }
         } catch (imgError) {
           if (imgError?.name === 'AbortError') throw imgError;

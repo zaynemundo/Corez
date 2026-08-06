@@ -79,7 +79,7 @@ describe('FLUX image request routing', () => {
     const response = await generateAIResponse('what is black rose and can you show me an image', []);
 
     expect(response).toContain('A black rose is a rose with dark petals.');
-    expect(response).toContain('![Black Rose](data:image/png;base64,FAKE)');
+    expect(response).toContain('![](data:image/png;base64,FAKE)');
     expect(fetchMock).toHaveBeenCalledWith('/api/image', expect.anything());
     expect(fetchMock).toHaveBeenCalledWith('/api/ai', expect.anything());
   });
@@ -120,7 +120,7 @@ describe('FLUX image request routing', () => {
     ];
     const response = await generateAIResponse('give me an image', history);
 
-    expect(response).toContain('![Generated Image](data:image/png;base64,FAKE)');
+    expect(response).toContain('![](data:image/png;base64,FAKE)');
     expect(fetchMock).toHaveBeenCalledWith('/api/image', expect.anything());
     expect(fetchMock).not.toHaveBeenCalledWith('/api/ai', expect.anything());
   });
@@ -136,7 +136,7 @@ describe('FLUX image request routing', () => {
 
     const response = await generateAIResponse('generate a picture of a black rose', []);
 
-    expect(response).toContain('![Black Rose](https://example.com/rose.png)');
+    expect(response).toContain('![](https://example.com/rose.png)');
     expect(fetchMock).toHaveBeenCalledWith('/api/image', expect.anything());
   });
 
@@ -168,7 +168,7 @@ describe('FLUX image request routing', () => {
 
     const response = await generateAIResponse('tell me a story', []);
 
-    expect(response).toContain('![Sunset Over the Ocean](https://example.com/sunset.png)');
+    expect(response).toContain('![](https://example.com/sunset.png)');
     expect(response).not.toContain('[IMAGE_PROMPT:');
     expect(fetchMock).toHaveBeenCalledWith('/api/image', expect.anything());
   });

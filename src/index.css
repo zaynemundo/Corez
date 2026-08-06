@@ -780,7 +780,7 @@ h1, h2, h3, h4, h5, h6 {
   background-color: var(--bg-card);
   border: none;
   border-radius: var(--radius-lg);
-  padding: 0.9rem 1.15rem;
+  padding: 0.9rem 0;
   width: 100%;
   max-width: 100%;
   min-width: 0;
