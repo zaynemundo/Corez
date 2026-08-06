@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { 
   Layers,
   Copy,
   Check,
   Wand2,
   ThumbsUp,
+  ThumbsDown,
   Share2
 } from 'lucide-react';
 import MarketCard from './MarketCard';
@@ -198,8 +199,21 @@ function ExecutableCodeBlock({ code, onRunInCanvas, onReviseCode }) {
 
 function MessageActions({ content }) {
   const [copied, setCopied] = useState(false);
-  const [rated, setRated] = useState(false);
+  const [rateOpen, setRateOpen] = useState(false);
+  const [rating, setRating] = useState(null);
   const [shared, setShared] = useState(false);
+  const rateWrapperRef = useRef(null);
+
+  useEffect(() => {
+    if (!rateOpen) return;
+    const handleOutsideClick = (event) => {
+      if (rateWrapperRef.current && !rateWrapperRef.current.contains(event.target)) {
+        setRateOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [rateOpen]);
 
   const handleCopy = () => {
     if (!content) return;
@@ -210,8 +224,13 @@ function MessageActions({ content }) {
     }
   };
 
-  const handleRate = () => {
-    setRated(prev => !prev);
+  const handleRateToggle = () => {
+    setRateOpen(prev => !prev);
+  };
+
+  const handleRateChoice = (choice) => {
+    setRating(prev => prev === choice ? null : choice);
+    setRateOpen(false);
   };
 
   const handleShare = async () => {
@@ -245,16 +264,44 @@ function MessageActions({ content }) {
       >
         {copied ? <Check size={14} strokeWidth={1.5} /> : <Copy size={14} strokeWidth={1.5} />}
       </button>
-      <button
-        type="button"
-        className={`message-action-btn ${rated ? 'active' : ''}`}
-        onClick={handleRate}
-        title={rated ? 'Remove rating' : 'Rate response'}
-        aria-label={rated ? 'Remove rating' : 'Rate response'}
-        aria-pressed={rated}
-      >
-        <ThumbsUp size={14} strokeWidth={1.5} />
-      </button>
+      <div className="rate-wrapper" ref={rateWrapperRef}>
+        <button
+          type="button"
+          className={`message-action-btn ${rating ? 'active' : ''}`}
+          onClick={handleRateToggle}
+          title={rating ? (rating === 'good' ? 'Good response (click to change)' : 'Bad response (click to change)') : 'Rate response'}
+          aria-label={rating ? 'Change rating' : 'Rate response'}
+          aria-pressed={!!rating}
+          aria-expanded={rateOpen}
+          aria-haspopup="true"
+        >
+          {rating === 'good' ? <ThumbsUp size={14} strokeWidth={1.5} /> : rating === 'bad' ? <ThumbsDown size={14} strokeWidth={1.5} /> : <ThumbsUp size={14} strokeWidth={1.5} />}
+        </button>
+        {rateOpen && (
+          <div className="rate-options" role="group" aria-label="Rate this response">
+            <button
+              type="button"
+              className={`rate-option-btn ${rating === 'good' ? 'active good' : ''}`}
+              onClick={() => handleRateChoice('good')}
+              title="Good response"
+              aria-label="Good response"
+              aria-pressed={rating === 'good'}
+            >
+              <ThumbsUp size={13} strokeWidth={1.5} />
+            </button>
+            <button
+              type="button"
+              className={`rate-option-btn ${rating === 'bad' ? 'active bad' : ''}`}
+              onClick={() => handleRateChoice('bad')}
+              title="Bad response"
+              aria-label="Bad response"
+              aria-pressed={rating === 'bad'}
+            >
+              <ThumbsDown size={13} strokeWidth={1.5} />
+            </button>
+          </div>
+        )}
+      </div>
       <button
         type="button"
         className={`message-action-btn ${shared ? 'active' : ''}`}

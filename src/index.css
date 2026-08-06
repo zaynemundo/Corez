@@ -830,6 +830,59 @@ h1, h2, h3, h4, h5, h6 {
   border-color: var(--border-color);
 }
 
+/* Rate popup with Good / Bad choice */
+.rate-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.rate-options {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.3rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  z-index: 20;
+}
+
+.rate-option-btn {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.rate-option-btn:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-tertiary);
+}
+
+.rate-option-btn.active.good {
+  color: var(--market-positive);
+  border-color: var(--market-positive);
+  background-color: var(--bg-tertiary);
+}
+
+.rate-option-btn.active.bad {
+  color: var(--market-negative);
+  border-color: var(--market-negative);
+  background-color: var(--bg-tertiary);
+}
+
 /* Inline Market Instrument */
 .market-card {
   width: min(100%, 720px);
