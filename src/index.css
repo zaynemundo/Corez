@@ -774,7 +774,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .message-wrapper.ai .message-content {
   background-color: var(--bg-card);
-  border: 1px solid var(--border-color);
+  border: none;
   border-radius: var(--radius-lg);
   padding: 0.9rem 1.15rem;
   width: 100%;
