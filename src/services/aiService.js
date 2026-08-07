@@ -858,10 +858,13 @@ export async function generateHostedAIResponse(
     ? await improveCodingPrompt(prompt, intent)
     : prompt;
 
-  // 2. Skill resolution with fine-grained intent
+  // 2. Skill resolution with fine-grained intent. Classification patterns run
+  // against the RAW user prompt — never the model-enriched coding prompt,
+  // whose generic boilerplate ("accessibility contrast standards", design
+  // guidance) would false-positive specialist and workflow matching.
   const resolved = resolveSkills({
     intent: fineIntent,
-    prompt: executionPrompt,
+    prompt,
     registry: defaultSkillRegistry,
   });
 

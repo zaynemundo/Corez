@@ -328,11 +328,17 @@ async function handleAi(request, env) {
   // Fast path for general intents: explanations, writing, and casual chat are
   // answered from the last few turns only, with a capped output, so they come
   // back quickly. Coding, app, game, and swarm requests keep the FULL history
-  // and NO output cap — the model takes as long as it wants.
+  // and NO output cap — the model takes as long as it wants. Requests that
+  // resolved a specialist skill (research reports, business plans, document
+  // generation, ...) also escape the cap: those deliverables need room to run.
   const primaryIntent = intent?.primaryIntent || legacyIntent || intentType;
+  const specialistSkills = Array.isArray(skills) && skills.length > 0
+    ? skills.map((s) => (typeof s === 'string' ? s : s.id)).filter(Boolean)
+    : [];
   const isFastIntent = ['explanation', 'general', 'writing'].includes(intentType)
     && !['bug_fix', 'code_refactor', 'feature_implementation', 'simple_edit', 'code_question', 'app', 'website_creation', 'game_creation', 'design_task', 'swarm'].includes(primaryIntent)
-    && intentType !== 'app';
+    && intentType !== 'app'
+    && specialistSkills.length === 0;
   const FAST_MAX_TOKENS = 700;
   const fastHistoryWindow = Math.max(2, Math.min(8, body.fastHistoryWindow || 8));
 

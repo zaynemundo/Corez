@@ -12,6 +12,51 @@ const SUBSTANTIAL_APP_PATTERNS = /\b(build|create|make|develop|design|launch)\b.
 const SMALL_EDIT_PATTERNS = /\b(tweak|minor edit|minor change|small edit|typo|fix typo|margin|padding|button text|change text|update link|rename)\b/i;
 const REPO_REVIEW_PATTERNS = /\b(review|audit|inspect|survey|check|analyze|analyse)\b.*\b(repo|repository|codebase|project|architecture|files)\b/i;
 
+// Specialist skills are the lightweight, non-engineering capabilities CoreZ
+// applies to everyday conversational requests (research, documents, marketing,
+// translation, utilities, tutoring, business, career, accessibility, data).
+// They must activate even on the "fast path" intents that skip the heavy
+// Superpowers engineering workflow.
+export const SPECIALIST_SKILL_IDS = [
+  'research-report',
+  'document-generation',
+  'data-analysis',
+  'marketing-copywriting',
+  'translation-localization',
+  'live-data-utilities',
+  'education-tutor',
+  'accessibility-compliance',
+  'business-planning',
+  'resume-career'
+];
+
+const SPECIALIST_TRIGGER_PATTERNS = [
+  { id: 'research-report', pattern: /\b(research report|research on|literature review|white paper|market research|deep dive|survey of|study of)\b/i },
+  { id: 'document-generation', pattern: /\b(invoice|contract|business letter|formal document|memo|pdf|docx|word document|letterhead)\b/i },
+  { id: 'data-analysis', pattern: /\b(analyze\s+(this\s+)?(data|dataset|csv|sales)|spreadsheet|excel|statistics|sales data|metrics|budget tracker|data analysis)\b/i },
+  { id: 'marketing-copywriting', pattern: /\b(marketing|ad copy|advertisement|advertising campaign|campaign|tagline|slogan|landing page copy|seo|blog post|social media|newsletter|email campaign|content plan|brand voice|brand identity|brand strategy|rebrand)\b/i },
+  { id: 'translation-localization', pattern: /\b(translate|translation|localize|localization|multilingual)\b|(in|into)\s+(french|spanish|tagalog|japanese|german|korean|chinese|italian|portuguese|arabic|hindi)\b/i },
+  { id: 'live-data-utilities', pattern: /(\bconvert\s+\d+\b|\bcurrency\b|\bexchange rate\b|\bweather\b|\bforecast\b|\btemperature\b|\btime zone\b|\bwhat time\b|\bunit conversion\b|\bcalculate\b|\bcalculator\b)/i },
+  { id: 'education-tutor', pattern: /\b(teach me|tutorial|explain.{0,30}like|from zero|beginner|study plan|lesson|homework|exam prep)\b/i },
+  { id: 'accessibility-compliance', pattern: /\b(wcag|accessible|accessibility|screen reader|aria|contrast|keyboard navigation|a11y)\b/i },
+  { id: 'business-planning', pattern: /\b(business plan|go-to-market|pricing strategy|financial projection|pitch deck|business model|revenue model|mvp strategy|market entry)\b/i },
+  { id: 'resume-career', pattern: /\b(resume|cv|cover letter|job application|interview|career|linkedin profile|job posting|portfolio)\b/i }
+];
+
+// Runs specialist detection BEFORE the heavy-workflow early return so everyday
+// conversational requests still receive their matching capability. Returns the
+// matched skill ids with a short activation reason, or null when none apply.
+function matchSpecialistSkills(cleanPrompt) {
+  if (!cleanPrompt) return null;
+  const matches = [];
+  for (const { id, pattern } of SPECIALIST_TRIGGER_PATTERNS) {
+    if (pattern.test(cleanPrompt)) {
+      matches.push(id);
+    }
+  }
+  return matches.length > 0 ? matches : null;
+}
+
 export function resolveSkills({ intent, prompt = '', availableTools = [], registry = defaultSkillRegistry }) {
   const cleanPrompt = String(prompt || '').trim();
 
@@ -31,6 +76,37 @@ export function resolveSkills({ intent, prompt = '', availableTools = [], regist
     complexity = intent.complexity || 'medium';
     isExistingProject = Boolean(intent.isExistingProject);
     forbiddenChanges = Array.isArray(intent.forbiddenChanges) ? intent.forbiddenChanges : [];
+  }
+
+  // Specialist capabilities apply to everyday conversational requests even on
+  // the fast path — but they must never hijack engineering workflows (apps,
+  // games, websites, code, swarms). Those intents keep their dedicated heavy
+  // workflow below; specialists only fire for non-engineering intents and are
+  // matched against the raw user prompt, never the enriched coding prompt.
+  const ENGINEERING_INTENTS = new Set([
+    'app', 'code-help', 'swarm', 'bug_fix', 'code_refactor', 'feature_implementation',
+    'simple_edit', 'code_question', 'website_creation', 'game_creation', 'design_task'
+  ]);
+  const isEngineeringIntent = ENGINEERING_INTENTS.has(legacyIntent) || ENGINEERING_INTENTS.has(primaryIntent);
+  const specialistMatches = isEngineeringIntent ? null : matchSpecialistSkills(cleanPrompt);
+  if (specialistMatches) {
+    const specialistSkills = [];
+    for (const id of specialistMatches) {
+      const skill = registry.getSkill(id);
+      if (skill) {
+        specialistSkills.push({
+          id: skill.id,
+          name: skill.name || skill.id,
+          phase: skill.phase || 'IMPLEMENTING',
+          priority: skill.priority || 50,
+          reasonSelected: `Specialist capability matched by user request: ${skill.description}`,
+          instructions: skill.instructions || skill.description || '',
+          constraints: [...(skill.constraints || []), ...(forbiddenChanges.length ? [`Forbidden: ${forbiddenChanges.join(', ')}`] : [])],
+          requiredCapabilities: skill.requiresTools || [],
+        });
+      }
+    }
+    return buildExecutionResult(specialistSkills);
   }
 
   // 1. Simple explanation, writing, or trivial requests do not activate heavy Superpowers workflows
@@ -74,6 +150,9 @@ export function resolveSkills({ intent, prompt = '', availableTools = [], regist
     }
     if (/\b(design|modern|glassmorphism|ui|aesthetic|theme)\b/i.test(cleanPrompt) || primaryIntent === 'design_task') {
       selectionMap.set('frontend-modern-design', 'Modern dark mode & responsive UI styling');
+    }
+    if (/\b(wcag|accessible|accessibility|screen reader|aria|contrast|keyboard navigation|a11y)\b/i.test(cleanPrompt)) {
+      selectionMap.set('accessibility-compliance', 'WCAG 2.2 AA compliance for the requested build');
     }
   } else if (legacyIntent === 'swarm' || primaryIntent === 'swarm') {
     selectionMap.set('brainstorming', 'High-level multi-agent orchestration architecture');
