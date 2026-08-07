@@ -476,35 +476,84 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onRe
       }
 
       if (trimmed.startsWith('# ') || trimmed.startsWith('## ') || trimmed.startsWith('### ')) {
+        const level = Math.min(3, trimmed.match(/^(#+)/)[1].length);
         const headingText = trimmed.replace(/^#+\s*/, '');
+        const HeadingTag = level === 1 ? 'h2' : level === 2 ? 'h3' : 'h4';
         elements.push(
-          <h3 key={`h-${i}`} className="markdown-heading">
+          <HeadingTag key={`h-${i}`} className={`markdown-heading level-${level}`}>
             {renderInlineFormattedText(headingText)}
-          </h3>
+          </HeadingTag>
         );
         i++;
         continue;
       }
 
+      // Blockquote, upgraded to a callout when it opens with a bold keyword
+      // ("**Note:** ...", "**Tip:** ...") or a status emoji.
       if (trimmed.startsWith('> ')) {
         const quoteText = trimmed.slice(2);
+        const CALL_OUT_TYPES = ['note', 'info', 'tip', 'warning', 'caution', 'important', 'danger', 'success'];
+        // "**Note:** ..." (colon inside the bold) or "**Tip** — ..." (separator outside).
+        const calloutMatch = quoteText.match(/^\*\*([A-Za-z]+):?\*\*\s*[:—-]?\s*/i);
+        const keyword = calloutMatch ? calloutMatch[1].toLowerCase() : null;
+        const calloutType = keyword && CALL_OUT_TYPES.includes(keyword) ? keyword : null;
+        const emojiMatch = !calloutType && quoteText.match(/^(💡|ℹ️|⚠️|❌|✅|🔥|🚀|📌)\s*/);
+        const isCallout = !!calloutType || !!emojiMatch;
+        const body = calloutType
+          ? quoteText.slice(calloutMatch[0].length)
+          : emojiMatch
+            ? quoteText.slice(emojiMatch[0].length)
+            : quoteText;
+        const typeClass = calloutType ? `callout-${calloutType === 'caution' ? 'warning' : calloutType}` : '';
         elements.push(
-          <blockquote key={`q-${i}`} className="markdown-blockquote">
-            {renderInlineFormattedText(quoteText)}
+          <blockquote key={`q-${i}`} className={`markdown-blockquote ${isCallout ? `markdown-callout ${typeClass}`.trim() : ''}`.trim()}>
+            {calloutType && <strong className="callout-label">{calloutMatch[1]}</strong>}
+            {renderInlineFormattedText(body)}
           </blockquote>
         );
         i++;
         continue;
       }
 
-      if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || /^\d+\.\s/.test(trimmed)) {
-        const listText = trimmed.replace(/^[-*]\s+|\d+\.\s+/, '');
+      // List detection: group consecutive bullet or numbered items into a real
+      // <ul>/<ol> with styled markers; "[x]"/"[ ]" task items become checkboxes.
+      const listItemMatch = trimmed.match(/^([-*]|\d+\.)\s+(.*)$/);
+      if (listItemMatch) {
+        const ordered = /^\d+\.\s/.test(trimmed);
+        const items = [];
+        while (i < lines.length) {
+          const innerLine = lines[i].trim();
+          const innerMatch = innerLine.match(/^([-*]|\d+\.)\s+(.*)$/);
+          if (!innerMatch || (ordered && !/^\d+\.\s/.test(innerLine)) || (!ordered && !/^[-*]\s/.test(innerLine))) break;
+          items.push(innerMatch[2]);
+          i++;
+        }
+        const ListTag = ordered ? 'ol' : 'ul';
         elements.push(
-          <li key={`li-${i}`} className="markdown-list-item">
-            {renderInlineFormattedText(listText)}
-          </li>
+          <ListTag key={`list-${i}`} className={`markdown-list ${ordered ? 'ordered' : ''}`}>
+            {items.map((itemText, itemIdx) => {
+              const taskMatch = itemText.match(/^\[([ xX])\]\s+(.*)$/);
+              if (taskMatch) {
+                const checked = taskMatch[1].toLowerCase() === 'x';
+                return (
+                  <li key={itemIdx} className="markdown-list-item markdown-task-list-item">
+                    <span className={`markdown-checkbox ${checked ? 'checked' : ''}`} aria-hidden="true">
+                      {checked && <Check size={11} strokeWidth={3} />}
+                    </span>
+                    <span className={checked ? 'markdown-task-done' : ''}>
+                      {renderInlineFormattedText(taskMatch[2])}
+                    </span>
+                  </li>
+                );
+              }
+              return (
+                <li key={itemIdx} className="markdown-list-item">
+                  {renderInlineFormattedText(itemText)}
+                </li>
+              );
+            })}
+          </ListTag>
         );
-        i++;
         continue;
       }
 
