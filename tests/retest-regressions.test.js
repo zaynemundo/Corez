@@ -51,7 +51,7 @@ describe('post-upgrade retest regressions', () => {
   });
 
   it('still rejects malformed full HTML documents', () => {
-    const result = validateHtmlDocument('<html><body><div>Broken</body></html>');
+    const result = validateHtmlDocument('<html><body><div>Broken</html>');
     expect(result.ok).toBe(false);
     expect(result.issues).toContain('unclosed-body-tag');
     expect(result.issues).toContain('unclosed-div-tags');
