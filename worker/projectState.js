@@ -20,12 +20,30 @@ const FEATURE_ALIASES = {
   'game-over': /\b(game[- ]?over|gameOver)\b/i
 };
 
+const PROJECT_ACTION = /\b(build|create|make|design|implement|develop|generate|prototype)\b/i;
+const PROJECT_NOUN = /\b(game|app|application|website|site|webpage|page|dashboard|component|workspace|tool|interface|ui|canvas|player|snake|pong|platformer)\b/i;
+const PROJECT_EDIT_ACTION = /\b(change|add|remove|update|fix|modify|edit|undo|revert|switch|convert|replace|preserve|keep)\b/i;
+const PROJECT_EDIT_TARGET = /\b(game|app|application|website|site|page|component|button|canvas|player|snake|paddle|ball|enemy|level|background|colour|color|controls?|touch|mobile|score|speed|layout|style|screen|feature|function|component)\b/i;
+
 function cleanList(value) {
   if (!Array.isArray(value)) return [];
   return value
     .map((item) => (typeof item === 'string' ? item.trim() : ''))
     .filter(Boolean)
     .slice(0, 40);
+}
+
+function looksLikeProjectRequest(prompt) {
+  const text = String(prompt || '').trim();
+  if (!text) return false;
+  if (PROJECT_ACTION.test(text) && PROJECT_NOUN.test(text)) return true;
+  if (PROJECT_EDIT_ACTION.test(text) && PROJECT_EDIT_TARGET.test(text)) return true;
+  // Common terse follow-ups such as "make the snake blue" or "add touch controls".
+  if (/^(now|then|also|instead|actually|please|can you|could you)?\s*(make|change|add|remove|update|fix|modify|edit|undo|revert|switch|convert|replace)\b/i.test(text)
+    && PROJECT_EDIT_TARGET.test(text)) {
+    return true;
+  }
+  return false;
 }
 
 // Validate and normalize a client-supplied project state object.
@@ -53,7 +71,9 @@ export function parseProjectState(raw) {
 
 // Deterministically derive a project state object from the conversation so a
 // follow-up request always knows the current implementation even when the
-// client sends no structured state.
+// client sends no structured state. A normal explanation/debugging answer can
+// contain code too, so when user history exists we only create project memory
+// if the user actually asked to create or edit a project-like artefact.
 export function deriveProjectState(messages) {
   const history = Array.isArray(messages) ? messages : [];
   const assistantReplies = history
@@ -63,6 +83,14 @@ export function deriveProjectState(messages) {
   const blocks = extractCodeBlocks(latest);
   const code = blocks.map((b) => b.code).join('\n');
   if (!code.trim()) return null;
+
+  const userPrompts = history
+    .filter((m) => m?.role === 'user' && typeof m?.content === 'string' && m.content.trim())
+    .map((m) => m.content.trim());
+  const latestUserPrompt = userPrompts[userPrompts.length - 1] || '';
+  if (latestUserPrompt && !looksLikeProjectRequest(latestUserPrompt)) {
+    return null;
+  }
 
   const project = {
     projectType: null,
@@ -103,6 +131,18 @@ export function deriveProjectState(messages) {
     if (pattern.test(code)) project.features.push(feature);
   }
 
+  // Internal-only source snapshot. serializeProjectState intentionally drops
+  // this field, but it lets the worker compare a follow-up against the actual
+  // previous implementation when conversation history is available.
+  project.latestCode = code;
+
+  if (userPrompts.length > 1) {
+    project.recentChanges = userPrompts
+      .slice(-8)
+      .filter((entry) => PROJECT_EDIT_ACTION.test(entry) && PROJECT_EDIT_TARGET.test(entry))
+      .map((entry) => entry.slice(0, 180));
+  }
+
   return project;
 }
 
@@ -123,30 +163,40 @@ export function buildProjectContextSection(project, userPrompt) {
   const features = Array.isArray(state.features) && state.features.length > 0
     ? state.features.map((f) => `- ${f}`).join('\n')
     : '- (none recorded)';
+  const recentChanges = Array.isArray(state.recentChanges) && state.recentChanges.length > 0
+    ? state.recentChanges.slice(-6).map((change) => `- ${change}`).join('\n')
+    : '- (none recorded)';
   return `
-EXISTING PROJECT STATE (an earlier turn created this project — inspect it before answering):
+FOLLOW-UP OVERRIDE — THIS SECTION OVERRIDES FRESH-CREATION INSTRUCTIONS FOR THIS TURN.
+
+EXISTING PROJECT STATE (an earlier turn created this project — inspect the previous assistant implementation before answering):
 - Project type: ${state.projectType || 'unknown'}
 - Framework: ${state.framework}
 - Language: ${state.language}
 - Rendering: ${state.rendering || 'not recorded'}
 - Known features (must remain working unless the user explicitly asks otherwise):
 ${features}
+- Recent project changes:
+${recentChanges}
 
 FOLLOW-UP REQUEST (this turn modifies the existing project):
 ${String(userPrompt || '').slice(0, 600)}
 
 REQUIRED BEHAVIOUR FOR FOLLOW-UPS:
-- This is a MODIFICATION request, not a fresh build. Do NOT regenerate the entire project from scratch.
-- Apply the smallest change that satisfies the request: edit the existing implementation.
+- Treat the previous assistant code in this conversation as the canonical source. This is a MODIFICATION request, not a fresh build.
+- Apply the SMALLEST safe code change that satisfies the request. Do not redesign, re-architect, rename unrelated functions, reorder the whole file, or replace working logic merely to produce a different-looking answer.
+- Return the complete updated runnable code when the preview requires a full artefact, but keep untouched sections effectively unchanged. A complete-code response is NOT permission to rewrite the project from scratch.
 - PRESERVE the existing framework (${state.framework}), language (${state.language}), structure, naming conventions, styling, controls, scoring, game-over, restart and all features listed above unless the change explicitly requires otherwise.
-- Keep the same code format and architecture as the previous answer (same language of code fences, same React/JSX or HTML/CSS/JS structure).
-- Describe what changed and confirm what was preserved; never claim a change to something that did not previously exist (for example, never say "instead of discrete levels" if the previous version had no levels).
-- If the user asks to undo a previous change, restore the earlier behaviour while keeping later unrelated changes.
+- Do not add bonus features, new screens, new state, new controls, or visual redesigns that the user did not request. This keeps follow-ups faster and regression-safe.
+- If the requested behaviour already exists, state that accurately and make only the smallest adjustment needed; never invent previous behaviour (for example, never claim there were "discrete levels" if the prior implementation had none).
+- For tiny edits such as a colour, speed constant or label change, keep the explanation to one short sentence and preserve the rest of the implementation.
+- If the user asks to undo a previous change, restore only that behaviour while keeping later unrelated changes.
 `;
 }
 
 // Render the project state for the client to persist (no instructions, just
-// data).
+// data). Internal-only source snapshots such as latestCode are deliberately
+// omitted so project memory remains lightweight.
 export function serializeProjectState(project) {
   const parsed = parseProjectState(project);
   if (!parsed) return null;
