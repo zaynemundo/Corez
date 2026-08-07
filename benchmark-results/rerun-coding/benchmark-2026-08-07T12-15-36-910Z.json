@@ -1,0 +1,646 @@
+{
+  "generatedAt": "2026-08-07T12:15:36.911Z",
+  "mode": "LIVE PROVIDER",
+  "url": null,
+  "summary": {
+    "total": 19,
+    "passed": 18,
+    "failed": 1
+  },
+  "results": [
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "coding-001",
+      "category": "coding",
+      "prompt": "Write a JavaScript function that returns the factorial of a number.",
+      "passed": true,
+      "score": 4.5,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 0.8999999999999999,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 1,
+          "syntax": [
+            {
+              "lang": "javascript",
+              "ok": true,
+              "issues": []
+            }
+          ]
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "syntaxIssues": [],
+        "ttftMs": 8985,
+        "totalMs": 8985,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1090,
+        "outputTokens": 700,
+        "fallbackUsed": false
+      },
+      "latencyMs": 9196,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 542
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "coding-002",
+      "category": "coding",
+      "prompt": "My JavaScript sort does not order numbers correctly. What is wrong?",
+      "passed": true,
+      "score": 4.7,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 1,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 1,
+          "syntax": [
+            {
+              "lang": "javascript",
+              "ok": true,
+              "issues": []
+            }
+          ]
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "syntaxIssues": [],
+        "ttftMs": 9662,
+        "totalMs": 9662,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1090,
+        "outputTokens": 870,
+        "fallbackUsed": false
+      },
+      "latencyMs": 9666,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 867
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "coding-003",
+      "category": "coding",
+      "prompt": "Explain how async/await works in JavaScript with a small example.",
+      "passed": true,
+      "score": 4.5,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 0.8999999999999999,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 2,
+          "syntax": [
+            {
+              "lang": "javascript",
+              "ok": true,
+              "issues": []
+            },
+            {
+              "lang": "javascript",
+              "ok": true,
+              "issues": []
+            }
+          ]
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "syntaxIssues": [],
+        "ttftMs": 12625,
+        "totalMs": 12625,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1260,
+        "outputTokens": 1088,
+        "fallbackUsed": false
+      },
+      "latencyMs": 12630,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 2463
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "coding-004",
+      "category": "coding",
+      "prompt": "Refactor this code to use modern array methods: const doubled = []; for (let i = 0; i < nums.length; i++) { doubled.push(nums[i] * 2); }",
+      "passed": true,
+      "score": 4.5,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 0.8999999999999999,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 1,
+          "syntax": [
+            {
+              "lang": "js",
+              "ok": true,
+              "issues": []
+            }
+          ]
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "syntaxIssues": [],
+        "ttftMs": 2966,
+        "totalMs": 2966,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1117,
+        "outputTokens": 131,
+        "fallbackUsed": false
+      },
+      "latencyMs": 2967,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 250
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "coding-005",
+      "category": "coding",
+      "prompt": "Create a React component that shows a counter with increment and decrement buttons.",
+      "passed": true,
+      "score": 4.5,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 0.8999999999999999,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 1,
+          "syntax": [
+            {
+              "lang": "jsx",
+              "ok": true,
+              "issues": []
+            }
+          ]
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "syntaxIssues": [],
+        "ttftMs": 12906,
+        "totalMs": 12906,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1573,
+        "outputTokens": 1217,
+        "fallbackUsed": false
+      },
+      "latencyMs": 13184,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 1690
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "coding-006",
+      "category": "coding",
+      "prompt": "Fix the bug in this event handler: <button onClick={handleClick}>Click</button> where handleClick never fires.",
+      "passed": true,
+      "score": 4.5,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 0.8999999999999999,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 1,
+          "syntax": [
+            {
+              "lang": "jsx",
+              "ok": true,
+              "issues": []
+            }
+          ]
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "syntaxIssues": [],
+        "ttftMs": 7502,
+        "totalMs": 7502,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1101,
+        "outputTokens": 611,
+        "fallbackUsed": false
+      },
+      "latencyMs": 7503,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 1470
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "coding-007",
+      "category": "coding",
+      "prompt": "Write a small HTML page with a text input and a button that shows the input value in an alert.",
+      "passed": true,
+      "score": 4.5,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 0.8999999999999999,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 1,
+          "syntax": [
+            {
+              "lang": "html",
+              "ok": true,
+              "issues": []
+            }
+          ]
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "syntaxIssues": [],
+        "ttftMs": 3094,
+        "totalMs": 3094,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1579,
+        "outputTokens": 254,
+        "fallbackUsed": false
+      },
+      "latencyMs": 3348,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 689
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "coding-008",
+      "category": "coding",
+      "prompt": "How would you debounce a search input in React?",
+      "passed": true,
+      "score": 4.5,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 0.8999999999999999,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 1,
+          "syntax": [
+            {
+              "lang": "jsx",
+              "ok": true,
+              "issues": []
+            }
+          ]
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "syntaxIssues": [],
+        "ttftMs": 11217,
+        "totalMs": 11217,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1089,
+        "outputTokens": 1221,
+        "fallbackUsed": false
+      },
+      "latencyMs": 11222,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 2040
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "coding-009",
+      "category": "coding",
+      "prompt": "Write a CSS rule that centres a fixed-width box both horizontally and vertically.",
+      "passed": false,
+      "score": 3.5,
+      "aspects": {
+        "instructionAdherence": 0,
+        "functionalCorrectness": 0.8999999999999999,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [
+        "ignored-core-requirement (need one of: margin)",
+        "ignored-core-requirement (need one of: grid)",
+        "ignored-core-requirement (need one of: centre)"
+      ],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 2,
+          "syntax": []
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "syntaxIssues": [],
+        "ttftMs": 4448,
+        "totalMs": 4448,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1089,
+        "outputTokens": 319,
+        "fallbackUsed": false
+      },
+      "latencyMs": 4453,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 789
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-001",
+      "category": "failure",
+      "description": "truncated explanation",
+      "passed": true,
+      "score": 4.6,
+      "hardFailures": [
+        "truncated-response (ends-with-conjunction)"
+      ],
+      "expectedReason": "truncated response",
+      "responseLength": 84
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-002",
+      "category": "failure",
+      "description": "truncated code fence",
+      "passed": true,
+      "score": 4.7,
+      "hardFailures": [
+        "truncated-response (open-code-fence)"
+      ],
+      "expectedReason": "open code fence",
+      "responseLength": 47
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-003",
+      "category": "failure",
+      "description": "syntactically invalid JS",
+      "passed": true,
+      "score": 3.9,
+      "hardFailures": [
+        "truncated-response (unmatched-())",
+        "syntax-failure (js: Unexpected identifier 'x')"
+      ],
+      "expectedReason": "syntax failure",
+      "responseLength": 69
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-004",
+      "category": "failure",
+      "description": "completely wrong answer",
+      "passed": true,
+      "score": 3.1,
+      "hardFailures": [
+        "ignored-core-requirement (missing: focus, work)"
+      ],
+      "expectedReason": "ignored core requirement (no focus/work tips)",
+      "responseLength": 107
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-005",
+      "category": "failure",
+      "description": "empty response",
+      "passed": true,
+      "score": 4.6,
+      "hardFailures": [
+        "empty-provider-response",
+        "truncated-response (empty-response)"
+      ],
+      "expectedReason": "empty provider response",
+      "responseLength": 0
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-006",
+      "category": "failure",
+      "description": "working answer but wrong framework",
+      "passed": true,
+      "score": 4.4,
+      "hardFailures": [
+        "unrelated-framework-replacement-during-follow-up",
+        "removed-existing-functionality"
+      ],
+      "expectedReason": "unrelated framework replacement during follow-up",
+      "responseLength": 117
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-007",
+      "category": "failure",
+      "description": "deletes existing functionality",
+      "passed": true,
+      "score": 4.7,
+      "hardFailures": [
+        "removed-existing-functionality"
+      ],
+      "expectedReason": "removal of required existing functionality",
+      "responseLength": 103
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-008",
+      "category": "failure",
+      "description": "fabricated claim about previous implementation",
+      "passed": true,
+      "score": 4.3,
+      "hardFailures": [
+        "unrelated-framework-replacement-during-follow-up",
+        "removed-existing-functionality",
+        "fabricated-claim-about-existing-implementation"
+      ],
+      "expectedReason": "fabricated claim about existing implementation",
+      "responseLength": 103
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-009",
+      "category": "failure",
+      "description": "malformed response for a code request",
+      "passed": true,
+      "score": 3.8,
+      "hardFailures": [
+        "missing-requested-deliverable (no code block)"
+      ],
+      "expectedReason": "missing requested deliverable (no code)",
+      "responseLength": 82
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-010",
+      "category": "failure",
+      "description": "beautiful UI with broken game logic",
+      "passed": true,
+      "score": 4.1,
+      "hardFailures": [
+        "broken-game-logic (missing signals: game-loop, scoring, controls)"
+      ],
+      "expectedReason": "no scoring / game-over logic despite beautiful UI",
+      "responseLength": 288
+    }
+  ]
+}

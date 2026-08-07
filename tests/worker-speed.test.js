@@ -23,17 +23,27 @@ describe('AI response speed optimizations', () => {
     vi.unstubAllGlobals();
   });
 
-  it('answers greetings instantly without calling any LLM provider', async () => {
+  it('answers greetings instantly with a natural reply and no LLM provider call', async () => {
     const fetchMock = vi.fn(async () => {
       throw new Error('LLM should not be called for greetings');
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    for (const prompt of ['hi', 'hello', 'hey', 'who are you', 'what is your name', 'good morning']) {
+    // Natural greeting contract: short, human, creation-oriented — never the
+    // robotic fixed line. Identity questions carry the persona.
+    for (const prompt of ['hi', 'hello', 'hey', 'good morning']) {
       const response = await post(swarmWorker, {}, { prompt });
       expect(response.status).toBe(200);
       const data = await response.json();
-      expect(data.content).toContain("Hello! I'm COREZ AI");
+      expect(data.content).not.toContain("Hello! I'm COREZ AI");
+      expect(data.content.length).toBeLessThan(120);
+      expect(data.content).toMatch(/building|create|idea/i);
+      expect(data.model).toBe('corez-greeting');
+    }
+    for (const prompt of ['who are you', 'what is your name']) {
+      const response = await post(swarmWorker, {}, { prompt });
+      const data = await response.json();
+      expect(data.content).toContain('COREZ AI');
       expect(data.model).toBe('corez-greeting');
     }
     expect(fetchMock).not.toHaveBeenCalled();
@@ -126,7 +136,10 @@ describe('AI response speed optimizations', () => {
     expect(generalPayload.reasoning).toBeUndefined();
     expect(generalPayload.max_completion_tokens).toBeUndefined();
     // Fast path: capped output tokens so general answers come back quickly.
-    expect(generalPayload.max_tokens).toBe(700);
+    // The cap (1500) is high enough that explanations complete in one pass —
+    // the old 700-token cap truncated frequently, doubling latency with
+    // repair round-trips.
+    expect(generalPayload.max_tokens).toBe(1500);
 
     // Complex app request: NO output-token cap and no reasoning-effort cap —
     // the model decides how much reasoning/output the task needs.

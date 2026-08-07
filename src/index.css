@@ -764,20 +764,20 @@ h1, h2, h3, h4, h5, h6 {
 .message-content {
   padding: 0.8rem 1.1rem;
   border-radius: var(--radius-md);
-  font-size: 0.875rem;
+  font-size: 1rem;
   font-weight: 400;
-  line-height: 1.6;
+  line-height: 1.7;
 }
 
 .message-wrapper.user .message-content {
   background-color: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
+  border: none;
   color: var(--text-primary);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
 }
 
 .message-wrapper.ai .message-content {
-  background-color: var(--bg-card);
+  background-color: transparent;
   border: none;
   border-radius: var(--radius-lg);
   padding: 0.9rem 0;
@@ -786,17 +786,26 @@ h1, h2, h3, h4, h5, h6 {
   min-width: 0;
   color: var(--text-primary);
   box-shadow: none;
-  font-size: 0.875rem;
+  font-size: 1rem;
   font-weight: 400;
-  line-height: 1.6;
+  line-height: 1.7;
 }
 
-[data-theme="light"] .message-wrapper .message-content {
-  background-color: #ffffff;
+[data-theme="light"] .message-wrapper.user .message-content {
+  background-color: #f4f4f4;
 }
 
-[data-theme="dark"] .message-wrapper .message-content {
-  background-color: #000000;
+[data-theme="dark"] .message-wrapper.user .message-content {
+  background-color: #2f2f2f;
+}
+
+/* Live streaming assistant text: rendered as it arrives, subtle blur until
+   the generation completes so partial tokens never look final. */
+.streaming-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  filter: blur(0.4px);
+  opacity: 0.9;
 }
 
 /* AI Message Action Bar (Copy / Rate / Share) */
@@ -1143,13 +1152,13 @@ h1, h2, h3, h4, h5, h6 {
 .markdown-body {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.4rem;
 }
 
 .markdown-body p {
-  margin-bottom: 0.2rem;
-  font-size: 0.875rem;
-  line-height: 1.6;
+  margin-bottom: 0.35rem;
+  font-size: 1rem;
+  line-height: 1.7;
   color: var(--text-primary);
   font-weight: 400;
 }
@@ -1161,9 +1170,9 @@ h1, h2, h3, h4, h5, h6 {
 
 .markdown-heading {
   position: relative;
-  font-size: 0.95rem;
+  font-size: 1.25rem;
   font-weight: 650;
-  margin: 0.75rem 0 0.35rem 0;
+  margin: 1rem 0 0.4rem;
   color: var(--text-primary);
   letter-spacing: -0.01em;
   padding-left: 0.65rem;
@@ -1179,11 +1188,11 @@ h1, h2, h3, h4, h5, h6 {
   width: 3px;
   height: 1.05em;
   border-radius: 2px;
-  background: linear-gradient(180deg, #a855f7, #6366f1);
+  background: var(--text-secondary);
 }
 
 .markdown-heading.level-3 {
-  font-size: 0.9rem;
+  font-size: 1.05rem;
   font-weight: 600;
 }
 
@@ -1215,52 +1224,52 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .markdown-callout.callout-note {
-  border-left-color: #3b82f6;
-  background: rgba(59, 130, 246, 0.07);
+  border-left-color: var(--border-hover);
+  background: var(--bg-tertiary);
 }
 
 .markdown-callout.callout-note .callout-label {
-  color: #60a5fa;
+  color: var(--text-secondary);
 }
 
 .markdown-callout.callout-info {
-  border-left-color: #06b6d4;
-  background: rgba(6, 182, 212, 0.07);
+  border-left-color: var(--border-hover);
+  background: var(--bg-tertiary);
 }
 
 .markdown-callout.callout-info .callout-label {
-  color: #22d3ee;
+  color: var(--text-secondary);
 }
 
 .markdown-callout.callout-tip,
 .markdown-callout.callout-success {
-  border-left-color: #10b981;
-  background: rgba(16, 185, 129, 0.07);
+  border-left-color: var(--border-hover);
+  background: var(--bg-tertiary);
 }
 
 .markdown-callout.callout-tip .callout-label,
 .markdown-callout.callout-success .callout-label {
-  color: #34d399;
+  color: var(--text-secondary);
 }
 
 .markdown-callout.callout-warning {
-  border-left-color: #f59e0b;
-  background: rgba(245, 158, 11, 0.07);
+  border-left-color: var(--border-hover);
+  background: var(--bg-tertiary);
 }
 
 .markdown-callout.callout-warning .callout-label {
-  color: #fbbf24;
+  color: var(--text-secondary);
 }
 
 .markdown-callout.callout-danger,
 .markdown-callout.callout-important {
-  border-left-color: #ef4444;
-  background: rgba(239, 68, 68, 0.07);
+  border-left-color: var(--border-hover);
+  background: var(--bg-tertiary);
 }
 
 .markdown-callout.callout-danger .callout-label,
 .markdown-callout.callout-important .callout-label {
-  color: #f87171;
+  color: var(--text-secondary);
 }
 
 /* Horizontal rule divider */
@@ -1285,14 +1294,14 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .markdown-list-item {
-  font-size: 0.875rem;
-  line-height: 1.55;
+  font-size: 1rem;
+  line-height: 1.7;
   color: var(--text-primary);
   font-weight: 400;
 }
 
 .markdown-list:not(.ordered) > .markdown-list-item::marker {
-  color: #a855f7;
+  color: var(--text-secondary);
   font-size: 0.9em;
 }
 
@@ -1303,7 +1312,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Accent-colored bold lead-ins: "- **Item name** — description." */
 .markdown-list-item > strong:first-child {
-  color: #a855f7;
+  color: var(--text-primary);
   font-weight: 650;
 }
 
@@ -1326,13 +1335,13 @@ h1, h2, h3, h4, h5, h6 {
   flex-shrink: 0;
   border: 1.5px solid var(--text-secondary);
   border-radius: 4px;
-  color: #ffffff;
+  color: var(--bg-primary);
   transition: background var(--transition-fast), border-color var(--transition-fast);
 }
 
 .markdown-checkbox.checked {
-  background: #a855f7;
-  border-color: #a855f7;
+  background: var(--text-primary);
+  border-color: var(--text-primary);
 }
 
 .markdown-task-done {
@@ -1348,7 +1357,7 @@ h1, h2, h3, h4, h5, h6 {
   padding: 0.1rem 0.3rem;
   font-family: var(--font-mono, monospace);
   font-size: 0.8rem;
-  color: var(--inline-code-color);
+  color: var(--text-primary);
 }
 
 /* Beautiful Markdown Tables */
@@ -1422,14 +1431,14 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .markdown-link {
-  color: #a855f7;
+  color: var(--text-primary);
   text-decoration: underline;
   text-underline-offset: 3px;
   transition: color 0.2s ease;
 }
 
 .markdown-link:hover {
-  color: #c084fc;
+  color: var(--text-secondary);
 }
 
 .linkedin-icon {
@@ -1437,8 +1446,9 @@ h1, h2, h3, h4, h5, h6 {
   height: 14px;
   margin-right: 5px;
   border-radius: 4px;
-  background-color: #0a66c2;
-  fill: #ffffff;
+  background-color: var(--text-primary);
+  color: var(--bg-primary);
+  fill: currentColor;
   padding: 2px;
   box-sizing: border-box;
   vertical-align: -2px;
@@ -3320,4 +3330,3 @@ h1, h2, h3, h4, h5, h6 {
   gap: 0.5rem;
   margin-top: 0.5rem;
 }
-

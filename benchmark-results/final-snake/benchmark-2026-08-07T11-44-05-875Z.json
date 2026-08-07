@@ -1,0 +1,504 @@
+{
+  "generatedAt": "2026-08-07T11:44:05.877Z",
+  "mode": "LIVE PROVIDER",
+  "url": null,
+  "summary": {
+    "total": 11,
+    "passed": 10,
+    "failed": 1
+  },
+  "results": [
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "scenario",
+      "id": "snake-5-turn-continuity",
+      "category": "multi-turn",
+      "description": "Create, then delta-edit the same snake game across five turns.",
+      "passed": false,
+      "score": 4.7,
+      "turns": [
+        {
+          "turn": 1,
+          "id": "snake-5-turn-continuity-t1",
+          "prompt": "Build me a snake game with a score counter, speed that increases as you eat, and a game over screen.",
+          "passed": true,
+          "score": 4.5,
+          "aspects": {
+            "instructionAdherence": 1,
+            "functionalCorrectness": 0.8999999999999999,
+            "conversationContinuity": 0.6,
+            "executionValidation": 1,
+            "completeness": 1,
+            "uxQuality": 0.9,
+            "efficiency": 1
+          },
+          "hardFailures": [],
+          "breakdown": null,
+          "diagnostics": {
+            "truncationDetected": false,
+            "truncationSignals": [],
+            "languageMismatch": false,
+            "languageRatio": 0,
+            "repaired": false,
+            "repairAttempts": 0,
+            "repairReasons": [],
+            "validation": {
+              "codeBlockCount": 1,
+              "syntax": [
+                {
+                  "lang": "jsx",
+                  "ok": true,
+                  "issues": []
+                }
+              ],
+              "gameSignals": [
+                "game-loop",
+                "controls",
+                "scoring",
+                "collision",
+                "canvas"
+              ]
+            },
+            "continuity": null,
+            "stopReason": "stop",
+            "ttftMs": 26976,
+            "totalMs": 26976,
+            "provider": "opencode-go",
+            "model": "opencode:deepseek-v4-flash",
+            "inputTokens": 1633,
+            "outputTokens": 3901,
+            "fallbackUsed": false
+          },
+          "latencyMs": 27521,
+          "provider": "opencode-go",
+          "model": "opencode:deepseek-v4-flash",
+          "responseLength": 11213
+        },
+        {
+          "turn": 2,
+          "id": "snake-5-turn-continuity-t2",
+          "prompt": "Now make the snake speed up gradually instead of jumping between levels.",
+          "passed": true,
+          "score": 5,
+          "aspects": {
+            "instructionAdherence": 1,
+            "functionalCorrectness": 1,
+            "conversationContinuity": 1,
+            "executionValidation": 1,
+            "completeness": 1,
+            "uxQuality": 0.9,
+            "efficiency": 1
+          },
+          "hardFailures": [],
+          "breakdown": {
+            "overall": null,
+            "continuity": 5,
+            "changePrecision": 5,
+            "regressionSafety": 5
+          },
+          "diagnostics": {
+            "truncationDetected": false,
+            "truncationSignals": [],
+            "languageMismatch": false,
+            "languageRatio": 0,
+            "repaired": false,
+            "repairAttempts": 0,
+            "repairReasons": [],
+            "validation": {
+              "codeBlockCount": 1,
+              "syntax": [
+                {
+                  "lang": "jsx",
+                  "ok": true,
+                  "issues": []
+                }
+              ],
+              "gameSignals": [
+                "game-loop",
+                "controls",
+                "scoring",
+                "collision",
+                "canvas"
+              ]
+            },
+            "continuity": {
+              "score": 5,
+              "checks": {
+                "used-previous-implementation": true,
+                "preserved-framework": true,
+                "preserved-unrelated-features": true,
+                "implemented-requested-change": true,
+                "avoided-unnecessary-rewrite": true
+              },
+              "codeBlockCount": 1
+            },
+            "stopReason": "stop",
+            "ttftMs": 41814,
+            "totalMs": 41814,
+            "provider": "opencode-go",
+            "model": "opencode:deepseek-v4-flash",
+            "inputTokens": 5154,
+            "outputTokens": 5942,
+            "fallbackUsed": false
+          },
+          "latencyMs": 42136,
+          "provider": "opencode-go",
+          "model": "opencode:deepseek-v4-flash",
+          "responseLength": 11465
+        },
+        {
+          "turn": 3,
+          "id": "snake-5-turn-continuity-t3",
+          "prompt": "Make the snake blue. Do not change anything else.",
+          "passed": true,
+          "score": 5,
+          "aspects": {
+            "instructionAdherence": 1,
+            "functionalCorrectness": 1,
+            "conversationContinuity": 1,
+            "executionValidation": 1,
+            "completeness": 1,
+            "uxQuality": 0.9,
+            "efficiency": 1
+          },
+          "hardFailures": [],
+          "breakdown": {
+            "overall": null,
+            "continuity": 5,
+            "changePrecision": 5,
+            "regressionSafety": 5
+          },
+          "diagnostics": {
+            "truncationDetected": false,
+            "truncationSignals": [],
+            "languageMismatch": false,
+            "languageRatio": 0,
+            "repaired": false,
+            "repairAttempts": 0,
+            "repairReasons": [],
+            "validation": {
+              "codeBlockCount": 1,
+              "syntax": [
+                {
+                  "lang": "jsx",
+                  "ok": true,
+                  "issues": []
+                }
+              ],
+              "gameSignals": [
+                "game-loop",
+                "controls",
+                "scoring",
+                "collision",
+                "canvas"
+              ]
+            },
+            "continuity": {
+              "score": 5,
+              "checks": {
+                "used-previous-implementation": true,
+                "preserved-framework": true,
+                "preserved-unrelated-features": true,
+                "implemented-requested-change": true,
+                "avoided-unnecessary-rewrite": true
+              },
+              "codeBlockCount": 1
+            },
+            "stopReason": "stop",
+            "ttftMs": 19462,
+            "totalMs": 19462,
+            "provider": "opencode-go",
+            "model": "opencode:deepseek-v4-flash",
+            "inputTokens": 8383,
+            "outputTokens": 3563,
+            "fallbackUsed": false
+          },
+          "latencyMs": 19730,
+          "provider": "opencode-go",
+          "model": "opencode:deepseek-v4-flash",
+          "responseLength": 11458
+        },
+        {
+          "turn": 4,
+          "id": "snake-5-turn-continuity-t4",
+          "prompt": "Add touch controls for mobile.",
+          "passed": false,
+          "score": 4.1,
+          "aspects": {
+            "instructionAdherence": 1,
+            "functionalCorrectness": 1,
+            "conversationContinuity": 0.2,
+            "executionValidation": 1,
+            "completeness": 0.5855555555555556,
+            "uxQuality": 0.9,
+            "efficiency": 1
+          },
+          "hardFailures": [
+            "unrelated-framework-replacement-during-follow-up",
+            "removed-existing-functionality",
+            "continuity-failure (1.0/5)"
+          ],
+          "breakdown": {
+            "overall": null,
+            "continuity": 1,
+            "changePrecision": 1,
+            "regressionSafety": 1
+          },
+          "diagnostics": {
+            "truncationDetected": false,
+            "truncationSignals": [],
+            "languageMismatch": false,
+            "languageRatio": 0,
+            "repaired": false,
+            "repairAttempts": 0,
+            "repairReasons": [],
+            "validation": {
+              "codeBlockCount": 0,
+              "syntax": []
+            },
+            "continuity": {
+              "score": 1,
+              "checks": {
+                "used-previous-implementation": false,
+                "preserved-framework": false,
+                "preserved-unrelated-features": false,
+                "implemented-requested-change": false,
+                "avoided-unnecessary-rewrite": true
+              },
+              "codeBlockCount": 0
+            },
+            "stopReason": "stop",
+            "ttftMs": 18954,
+            "totalMs": 18954,
+            "provider": "opencode-go",
+            "model": "opencode:deepseek-v4-flash",
+            "inputTokens": 11714,
+            "outputTokens": 1839,
+            "fallbackUsed": false
+          },
+          "latencyMs": 19216,
+          "provider": "opencode-go",
+          "model": "opencode:deepseek-v4-flash",
+          "responseLength": 527
+        },
+        {
+          "turn": 5,
+          "id": "snake-5-turn-continuity-t5",
+          "prompt": "Undo only the blue snake change, keep everything else.",
+          "passed": true,
+          "score": 5,
+          "aspects": {
+            "instructionAdherence": 1,
+            "functionalCorrectness": 1,
+            "conversationContinuity": 1,
+            "executionValidation": 1,
+            "completeness": 1,
+            "uxQuality": 0.9,
+            "efficiency": 1
+          },
+          "hardFailures": [],
+          "breakdown": {
+            "overall": null,
+            "continuity": 5,
+            "changePrecision": 5,
+            "regressionSafety": 5
+          },
+          "diagnostics": {
+            "truncationDetected": false,
+            "truncationSignals": [],
+            "languageMismatch": false,
+            "languageRatio": 0,
+            "repaired": false,
+            "repairAttempts": 0,
+            "repairReasons": [],
+            "validation": {
+              "codeBlockCount": 1,
+              "syntax": [
+                {
+                  "lang": "jsx",
+                  "ok": true,
+                  "issues": []
+                }
+              ],
+              "gameSignals": [
+                "game-loop",
+                "controls",
+                "scoring",
+                "collision",
+                "canvas"
+              ]
+            },
+            "continuity": {
+              "score": 5,
+              "checks": {
+                "used-previous-implementation": true,
+                "preserved-framework": true,
+                "preserved-unrelated-features": true,
+                "implemented-requested-change": true,
+                "avoided-unnecessary-rewrite": true
+              },
+              "codeBlockCount": 1
+            },
+            "stopReason": "stop",
+            "ttftMs": 21669,
+            "totalMs": 21669,
+            "provider": "opencode-go",
+            "model": "opencode:deepseek-v4-flash",
+            "inputTokens": 11791,
+            "outputTokens": 3853,
+            "fallbackUsed": false
+          },
+          "latencyMs": 21929,
+          "provider": "opencode-go",
+          "model": "opencode:deepseek-v4-flash",
+          "responseLength": 11458
+        }
+      ]
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-001",
+      "category": "failure",
+      "description": "truncated explanation",
+      "passed": true,
+      "score": 4.6,
+      "hardFailures": [
+        "truncated-response (ends-with-conjunction)"
+      ],
+      "expectedReason": "truncated response",
+      "responseLength": 84
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-002",
+      "category": "failure",
+      "description": "truncated code fence",
+      "passed": true,
+      "score": 4.7,
+      "hardFailures": [
+        "truncated-response (open-code-fence)"
+      ],
+      "expectedReason": "open code fence",
+      "responseLength": 47
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-003",
+      "category": "failure",
+      "description": "syntactically invalid JS",
+      "passed": true,
+      "score": 3.9,
+      "hardFailures": [
+        "truncated-response (unmatched-())",
+        "syntax-failure (js: Unexpected identifier 'x')"
+      ],
+      "expectedReason": "syntax failure",
+      "responseLength": 69
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-004",
+      "category": "failure",
+      "description": "completely wrong answer",
+      "passed": true,
+      "score": 3.1,
+      "hardFailures": [
+        "ignored-core-requirement (missing: focus, work)"
+      ],
+      "expectedReason": "ignored core requirement (no focus/work tips)",
+      "responseLength": 107
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-005",
+      "category": "failure",
+      "description": "empty response",
+      "passed": true,
+      "score": 4.6,
+      "hardFailures": [
+        "empty-provider-response",
+        "truncated-response (empty-response)"
+      ],
+      "expectedReason": "empty provider response",
+      "responseLength": 0
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-006",
+      "category": "failure",
+      "description": "working answer but wrong framework",
+      "passed": true,
+      "score": 4.4,
+      "hardFailures": [
+        "unrelated-framework-replacement-during-follow-up",
+        "removed-existing-functionality"
+      ],
+      "expectedReason": "unrelated framework replacement during follow-up",
+      "responseLength": 117
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-007",
+      "category": "failure",
+      "description": "deletes existing functionality",
+      "passed": true,
+      "score": 4.7,
+      "hardFailures": [
+        "removed-existing-functionality"
+      ],
+      "expectedReason": "removal of required existing functionality",
+      "responseLength": 103
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-008",
+      "category": "failure",
+      "description": "fabricated claim about previous implementation",
+      "passed": true,
+      "score": 4.3,
+      "hardFailures": [
+        "unrelated-framework-replacement-during-follow-up",
+        "removed-existing-functionality",
+        "fabricated-claim-about-existing-implementation"
+      ],
+      "expectedReason": "fabricated claim about existing implementation",
+      "responseLength": 103
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-009",
+      "category": "failure",
+      "description": "malformed response for a code request",
+      "passed": true,
+      "score": 3.8,
+      "hardFailures": [
+        "missing-requested-deliverable (no code block)"
+      ],
+      "expectedReason": "missing requested deliverable (no code)",
+      "responseLength": 82
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-010",
+      "category": "failure",
+      "description": "beautiful UI with broken game logic",
+      "passed": true,
+      "score": 4.1,
+      "hardFailures": [
+        "broken-game-logic (missing signals: game-loop, scoring, controls)"
+      ],
+      "expectedReason": "no scoring / game-over logic despite beautiful UI",
+      "responseLength": 288
+    }
+  ]
+}

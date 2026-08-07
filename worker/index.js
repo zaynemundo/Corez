@@ -2,7 +2,15 @@ import { handleMarket } from './market.js';
 import { handleSearch } from './search.js';
 import { fetchAwwwardsInspiration, handleInspiration } from './inspiration.js';
 import { safeErrorDetail, readBoundedJson, jsonResponse, createTaskStateStore, createRateLimiter } from './utils.js';
-import { runProviderChain, callOpenRouterImage } from './providerChain.js';
+import { runProviderChain, runStreamingChain, callOpenRouterImage } from './providerChain.js';
+import { processResponse } from './responseProcessor.js';
+import {
+  parseProjectState,
+  deriveProjectState,
+  isFollowUpRequest,
+  buildProjectContextSection,
+  serializeProjectState
+} from './projectState.js';
 
 // Storage key segments are validated identically on every R2-backed endpoint:
 // no slashes, no leading dots (blocks ../ traversal), bounded length.
@@ -297,11 +305,24 @@ async function handleAi(request, env) {
   }
 
   // Greeting fast-path: common greetings get the mandated persona reply
-  // instantly without paying an LLM round-trip.
+  // instantly without paying an LLM round-trip. Replies are short, natural
+  // variants selected deterministically (no large LLM for tiny requests).
   const GREETING_PATTERN = /^(hi|hello|hey|yo|sup|howdy|greetings|good\s+(morning|afternoon|evening|day)|who\s+(are|r)\s+you|what\s+(are|r)\s+you|whats?\s+(is\s+)?your\s+name)\b[.?!]*$/i;
   if (prompt.length <= 60 && GREETING_PATTERN.test(prompt)) {
+    const isIdentityQuestion = /who\s+(are|r)\s+you|what\s+(are|r)\s+you|whats?\s+(is\s+)?your\s+name/i.test(prompt);
+    const greetingReplies = isIdentityQuestion
+      ? [
+          "I'm COREZ AI — turn ideas into working digital products. What are we building today?",
+          "I'm COREZ AI: describe an idea and I'll build it for you. What's the idea?"
+        ]
+      : [
+          'Hey! What are we building today?',
+          'Hey there — what should we create?',
+          'Hi! What are we building today?'
+        ];
+    const index = [...prompt.toLowerCase()].reduce((acc, char) => acc + char.charCodeAt(0), 0) % greetingReplies.length;
     return jsonResponse(200, {
-      content: "Hello! I'm COREZ AI. How can I help you today?",
+      content: greetingReplies[index],
       model: 'corez-greeting'
     });
   }
@@ -339,7 +360,11 @@ async function handleAi(request, env) {
     && !['bug_fix', 'code_refactor', 'feature_implementation', 'simple_edit', 'code_question', 'app', 'website_creation', 'game_creation', 'design_task', 'swarm'].includes(primaryIntent)
     && intentType !== 'app'
     && specialistSkills.length === 0;
-  const FAST_MAX_TOKENS = 700;
+  // Capped but generous: 1500 output tokens so explanations and writing
+  // answers complete in one pass (the 700-token cap frequently truncated
+  // mid-sentence, forcing a repair round-trip and doubling latency). The
+  // repair loop remains the safety net, not the primary path.
+  const FAST_MAX_TOKENS = 1500;
   const fastHistoryWindow = Math.max(2, Math.min(8, body.fastHistoryWindow || 8));
 
   const fastMessages = isFastIntent
@@ -382,6 +407,22 @@ async function handleAi(request, env) {
     apiMessages.push({ role: 'user', content: executionPrompt || prompt });
   }
 
+  // State-aware follow-ups: build/merge lightweight project memory so a
+  // modification request edits the existing implementation instead of
+  // regenerating it. The client may send persisted state (body.project); the
+  // worker also derives it deterministically from the conversation when the
+  // client did not.
+  const clientProject = parseProjectState(body.project);
+  const derivedProject = deriveProjectState(messages);
+  const activeProject = clientProject || derivedProject;
+  const isFollowUp = isFollowUpRequest(prompt, activeProject);
+  if (isFollowUp && activeProject) {
+    apiMessages.push({
+      role: 'system',
+      content: buildProjectContextSection(activeProject, prompt)
+    });
+  }
+
   // Provider fallback chain: OpenCode Go is preferred and stays preferred;
   // the official DeepSeek API and OpenRouter are fallbacks tried in order
   // only when the preferred provider cannot serve. The same messages travel
@@ -400,6 +441,109 @@ async function handleAi(request, env) {
     }
     return controller.signal;
   })();
+
+  const requestStartedAt = Date.now();
+
+  // Streaming path: SSE through provider -> worker -> client, so the user
+  // sees content quickly (TTFT is a headline UX metric). The stream is
+  // validated after completion and repaired before the final done event.
+  if (body.stream === true) {
+    const chainOptions = {
+      env,
+      signal: clientDisconnectSignal,
+      maxTokens: isFastIntent ? FAST_MAX_TOKENS : null
+    };
+    const encoder = new TextEncoder();
+    const sse = (event) => `data: ${JSON.stringify(event)}\n\n`;
+    const readable = new ReadableStream({
+      async start(controller) {
+        let collected = '';
+        let providerId = null;
+        let providerModel = null;
+        let inputTokens = null;
+        let outputTokens = null;
+        try {
+          for await (const event of runStreamingChain(apiMessages, chainOptions)) {
+            if (event.type === 'delta') {
+              collected += event.text;
+              controller.enqueue(encoder.encode(sse(event)));
+            } else if (event.type === 'meta') {
+              providerId = providerId || event.provider || null;
+              providerModel = providerModel || event.model || null;
+              controller.enqueue(encoder.encode(sse(event)));
+            } else if (event.type === 'usage') {
+              inputTokens = event.inputTokens ?? inputTokens;
+              outputTokens = event.outputTokens ?? outputTokens;
+            } else if (event.type === 'done') {
+              providerId = providerId || event.provider || null;
+              providerModel = providerModel || event.model || null;
+              // Post-stream validation: truncation/language repair.
+              const repair = await processResponse(apiMessages, collected, {
+                userPrompt: prompt,
+                project: activeProject,
+                stopReason: event.finishReason || null,
+                generate: async (repairMessages) => {
+                  const repaired = await runProviderChain(repairMessages, {
+                    env,
+                    signal: clientDisconnectSignal,
+                    store: createTaskStateStore(env),
+                    sleep: retrySleepFor(env),
+                    maxTokens: null
+                  });
+                  return repaired.content ? repaired : null;
+                },
+                maxRepairs: 2
+              });
+              if (repair.diagnostics.repaired && repair.diagnostics.repairReasons.length > 0) {
+                controller.enqueue(encoder.encode(sse({ type: 'validation', action: 'repaired', reasons: repair.diagnostics.repairReasons })));
+                const appended = repair.content.slice(collected.length);
+                if (appended) {
+                  controller.enqueue(encoder.encode(sse({ type: 'delta', text: appended })));
+                }
+                collected = repair.content;
+              }
+              const returnedProject = activeProject
+                || deriveProjectState([{ role: 'assistant', content: repair.content }]);
+              controller.enqueue(encoder.encode(sse({ type: 'done', final: true, projectState: serializeProjectState(returnedProject) })));
+              controller.enqueue(encoder.encode(sse({
+                type: 'diagnostics',
+                diagnostics: {
+                  ...repair.diagnostics,
+                  ttftMs: event.ttftMs || 0,
+                  totalMs: Date.now() - requestStartedAt,
+                  provider: providerId,
+                  model: providerModel,
+                  inputTokens,
+                  outputTokens
+                }
+              })));
+              controller.close();
+              return;
+            } else if (event.type === 'error') {
+              controller.enqueue(encoder.encode(sse(event)));
+              controller.close();
+              return;
+            }
+          }
+          controller.enqueue(encoder.encode(sse({ type: 'done', final: true, projectState: null })));
+          controller.close();
+        } catch (err) {
+          controller.enqueue(encoder.encode(sse({ type: 'error', message: safeErrorDetail(err), status: 502 })));
+          controller.close();
+        }
+      }
+    });
+    return new Response(readable, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'X-Accel-Buffering': 'no'
+      }
+    });
+  }
 
   const result = await runProviderChain(apiMessages, {
     env,
@@ -424,7 +568,47 @@ async function handleAi(request, env) {
   }
 
   if (result.content) {
-    return jsonResponse(200, { content: result.content, model: result.model });
+    // Reliability pipeline: truncation/language detection, code validation,
+    // automatic repair, and diagnostics — before the answer reaches the user.
+    const processed = await processResponse(apiMessages, result.content, {
+      userPrompt: prompt,
+      project: activeProject,
+      stopReason: result.stopReason || null,
+      generate: async (repairMessages) => {
+        const repaired = await runProviderChain(repairMessages, {
+          env,
+          signal: clientDisconnectSignal,
+          store: createTaskStateStore(env),
+          sleep: retrySleepFor(env),
+          maxTokens: null
+        });
+        return repaired.content ? repaired : null;
+      },
+      maxRepairs: 2
+    });
+    // Project state returned to the client: the client-provided or
+    // conversation-derived state, or — on first creation turns with no prior
+    // code — the state derived from the just-generated answer, so the client
+    // can persist it and send it back on the next follow-up turn.
+    const returnedProject = activeProject
+      || deriveProjectState([{ role: 'assistant', content: processed.content }]);
+    const diagnostics = {
+      ...processed.diagnostics,
+      ttftMs: Date.now() - requestStartedAt,
+      totalMs: Date.now() - requestStartedAt,
+      provider: result.provider || null,
+      model: result.model || null,
+      inputTokens: result.usage?.inputTokens ?? null,
+      outputTokens: result.usage?.outputTokens ?? null,
+      fallbackUsed: Boolean(result.resumed)
+    };
+    return jsonResponse(200, {
+      content: processed.content,
+      model: result.model,
+      provider: result.provider || null,
+      projectState: serializeProjectState(returnedProject) || undefined,
+      diagnostics
+    });
   }
 
   console.error(JSON.stringify({

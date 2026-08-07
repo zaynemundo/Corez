@@ -102,6 +102,128 @@ function defaultClock() {
   return Date.now();
 }
 
+// Parse an SSE data line from a streaming OpenAI-compatible endpoint.
+function parseSseData(line) {
+  if (!line.startsWith('data:')) return null;
+  const payload = line.slice(5).trim();
+  if (!payload || payload === '[DONE]') return { done: true };
+  try {
+    return JSON.parse(payload);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Streaming chat completion. Returns an async iterable of
+ * { text, usage, finishReason, ttftMs } — text deltas as they arrive plus a
+ * final chunk carrying usage/finish_reason when the provider sends them.
+ * Provider fallback is NOT handled here: runProviderChain owns the chain.
+ */
+async function* streamChatEndpoint({ endpoint, key, model, label, messages, signal, extraHeaders = {}, bodyExtra = {}, onTtft }) {
+  const requestStartedAt = Date.now();
+  let ttftEmitted = false;
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${key}`,
+      'Content-Type': 'application/json',
+      ...extraHeaders
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      stream: true,
+      ...bodyExtra
+    }),
+    signal
+  });
+
+  if (!response.ok) {
+    const detail = (await response.text().catch(() => '')).slice(0, 200);
+    const failure = new Error(`HTTP ${response.status}: ${safeErrorDetail(detail)}`);
+    failure.status = response.status;
+    const retryAfter = Number(response.headers.get('Retry-After') || 0);
+    if (Number.isFinite(retryAfter) && retryAfter > 0) failure.retryAfter = retryAfter;
+    throw failure;
+  }
+
+  if (!response.body) throw new Error(`${label} streaming response had no body`);
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let usage = null;
+  let finishReason = null;
+  let sawDone = false;
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        const parsed = parseSseData(line.trim());
+        if (!parsed) continue;
+        if (parsed.done) {
+          sawDone = true;
+          continue;
+        }
+        if (parsed.usage) usage = parsed.usage;
+        const choice = parsed.choices && parsed.choices[0];
+        if (choice?.finish_reason) finishReason = choice.finish_reason;
+        if (choice?.delta) {
+          const delta = extractContentText(choice.delta.content);
+          if (delta) {
+            if (!ttftEmitted) {
+              ttftEmitted = true;
+              const ttftMs = Date.now() - requestStartedAt;
+              if (typeof onTtft === 'function') onTtft(ttftMs);
+              yield { text: delta, ttftMs };
+            } else {
+              yield { text: delta };
+            }
+          }
+        }
+      }
+    }
+    if (!sawDone && finishReason === null && !ttftEmitted) {
+      // No chunks at all: treat as empty response.
+      throw new Error('empty streaming response');
+    }
+    yield { text: '', usage, finishReason };
+  } finally {
+    try {
+      reader.releaseLock();
+    } catch {
+      // Already released.
+    }
+  }
+}
+
+// Wrap an async iterable in a backpressure-aware ReadableStream.
+export function iterableToReadableStream(iterable) {
+  const iterator = iterable[Symbol.asyncIterator]();
+  return new ReadableStream({
+    async pull(controller) {
+      try {
+        const { value, done } = await iterator.next();
+        if (done) controller.close();
+        else controller.enqueue(value);
+      } catch (err) {
+        controller.error(err);
+      }
+    },
+    cancel() {
+      if (typeof iterator.return === 'function') {
+        iterator.return().catch(() => {});
+      }
+    }
+  });
+}
+
 function taskHash(messages) {
   const input = JSON.stringify(messages || []);
   let hash = 0x811c9dc5;
@@ -157,7 +279,14 @@ async function callChatEndpoint({ endpoint, key, model, label, messages, signal,
     return {
       content: answerText(message),
       reasoning: hasReasoning(message),
-      model: `${label}:${model}`
+      model: `${label}:${model}`,
+      usage: data?.usage
+        ? {
+            inputTokens: Number(data.usage.prompt_tokens) || 0,
+            outputTokens: Number(data.usage.completion_tokens) || 0
+          }
+        : null,
+      stopReason: data?.choices?.[0]?.finish_reason || null
     };
   } catch (err) {
     console.warn(`${label} model ${model} request failed:`, safeErrorDetail(err));
@@ -181,19 +310,29 @@ export function buildProviderChain(env = {}) {
   const opencodeKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY;
   if (opencodeKey && !isDisabled(env?.OPENCODE_GO_DISABLED)) {
     const model = env?.OPENCODE_MODEL || DEFAULT_MODEL;
+    const callOptions = (envOverrides = {}) => ({
+      endpoint: envOverrides.endpoint || env?.OPENCODE_ENDPOINT || OPENCODE_DEFAULT_ENDPOINT,
+      key: opencodeKey,
+      model,
+      label: 'opencode',
+      extraHeaders: { 'HTTP-Referer': 'https://corez.ai', 'X-Title': 'COREZ AI' }
+    });
     chain.push({
       id: 'opencode-go',
       label: 'opencode',
       model,
       call: (messages, options = {}) => callChatEndpoint({
-        endpoint: env?.OPENCODE_ENDPOINT || OPENCODE_DEFAULT_ENDPOINT,
-        key: opencodeKey,
-        model,
-        label: 'opencode',
+        ...callOptions(),
         messages,
         signal: options.signal,
-        extraHeaders: { 'HTTP-Referer': 'https://corez.ai', 'X-Title': 'COREZ AI' },
         bodyExtra: options.maxTokens ? { max_tokens: options.maxTokens } : {}
+      }),
+      stream: (messages, options = {}) => streamChatEndpoint({
+        ...callOptions(),
+        messages,
+        signal: options.signal,
+        bodyExtra: options.maxTokens ? { max_tokens: options.maxTokens } : {},
+        onTtft: options.onTtft
       })
     });
   }
@@ -201,18 +340,28 @@ export function buildProviderChain(env = {}) {
   const deepseekKey = env?.DEEPSEEK_API_KEY;
   if (deepseekKey && !isDisabled(env?.DEEPSEEK_DISABLED)) {
     const model = env?.DEEPSEEK_MODEL || DEFAULT_MODEL;
+    const callOptions = (envOverrides = {}) => ({
+      endpoint: envOverrides.endpoint || env?.DEEPSEEK_ENDPOINT || DEEPSEEK_DEFAULT_ENDPOINT,
+      key: deepseekKey,
+      model,
+      label: 'deepseek'
+    });
     chain.push({
       id: 'deepseek',
       label: 'deepseek',
       model,
       call: (messages, options = {}) => callChatEndpoint({
-        endpoint: env?.DEEPSEEK_ENDPOINT || DEEPSEEK_DEFAULT_ENDPOINT,
-        key: deepseekKey,
-        model,
-        label: 'deepseek',
+        ...callOptions(),
         messages,
         signal: options.signal,
         bodyExtra: options.maxTokens ? { stream: false, max_tokens: options.maxTokens } : { stream: false }
+      }),
+      stream: (messages, options = {}) => streamChatEndpoint({
+        ...callOptions(),
+        messages,
+        signal: options.signal,
+        bodyExtra: options.maxTokens ? { max_tokens: options.maxTokens } : {},
+        onTtft: options.onTtft
       })
     });
   }
@@ -220,19 +369,29 @@ export function buildProviderChain(env = {}) {
   const openrouterKey = env?.OPENROUTER_API_KEY;
   if (openrouterKey && !isDisabled(env?.OPENROUTER_DISABLED)) {
     const model = env?.OPENROUTER_MODEL || DEFAULT_MODEL;
+    const callOptions = (envOverrides = {}) => ({
+      endpoint: envOverrides.endpoint || env?.OPENROUTER_ENDPOINT || OPENROUTER_DEFAULT_ENDPOINT,
+      key: openrouterKey,
+      model,
+      label: 'openrouter',
+      extraHeaders: { 'HTTP-Referer': 'https://corez.ai', 'X-Title': 'COREZ AI' }
+    });
     chain.push({
       id: 'openrouter',
       label: 'openrouter',
       model,
       call: (messages, options = {}) => callChatEndpoint({
-        endpoint: env?.OPENROUTER_ENDPOINT || OPENROUTER_DEFAULT_ENDPOINT,
-        key: openrouterKey,
-        model,
-        label: 'openrouter',
+        ...callOptions(),
         messages,
         signal: options.signal,
-        extraHeaders: { 'HTTP-Referer': 'https://corez.ai', 'X-Title': 'COREZ AI' },
         bodyExtra: options.maxTokens ? { max_tokens: options.maxTokens } : {}
+      }),
+      stream: (messages, options = {}) => streamChatEndpoint({
+        ...callOptions(),
+        messages,
+        signal: options.signal,
+        bodyExtra: options.maxTokens ? { max_tokens: options.maxTokens } : {},
+        onTtft: options.onTtft
       })
     });
   }
@@ -385,15 +544,44 @@ export async function runProviderChain(messages, options = {}) {
         model: result.model || `${provider.label}:${provider.model}`,
         provider: provider.id,
         taskId,
-        resumed
+        resumed,
+        usage: result.usage || null,
+        stopReason: result.stopReason || null
       };
     }
 
-    // Reasoning-only or empty reply: one continuation nudge per provider so
-    // the actual answer is produced instead of raw thought.
+    // Reasoning-only or empty reply: up to two continuation nudges per
+    // provider so the actual answer is produced instead of raw thought.
+    // Under load the gateway occasionally returns an empty completion for
+    // the first (or second) call; a second nudge with a minimal message
+    // recovers most of those without touching the user-visible answer.
     if (!result || !result.failure) {
-      result = await provider.call([...messages, CONTINUATION_NUDGE], { signal, attempt, maxTokens });
-      if (result?.content) {
+      let nudged = null;
+      const nudgeMessages = [
+        [...messages, CONTINUATION_NUDGE],
+        [{ role: 'user', content: 'Now answer completely: provide the final response to the original request now (the code or text itself). No reasoning. No thinking.' }]
+      ];
+      for (const candidate of nudgeMessages) {
+        result = await provider.call(candidate, { signal, attempt, maxTokens });
+        if (result?.content) {
+          nudged = result;
+          break;
+        }
+        if (result?.failure) {
+          const cls = result.classified || classifyProviderFailure(result.failure);
+          recordFailure(provider.label, result.failure);
+          lastErrorStatus = Number(result.failure?.status) > 0 ? Number(result.failure.status) : lastErrorStatus;
+          if (cls.kind === 'permanent' && store) {
+            try {
+              await clearRetrySchedule(store, retryKey, taskId);
+            } catch {
+              // Best effort.
+            }
+          }
+          break;
+        }
+      }
+      if (nudged?.content) {
         if (store) {
           try {
             await clearRetrySchedule(store, retryKey, taskId);
@@ -402,26 +590,17 @@ export async function runProviderChain(messages, options = {}) {
           }
         }
         return {
-          content: result.content,
-          model: result.model || `${provider.label}:${provider.model}`,
+          content: nudged.content,
+          model: nudged.model || `${provider.label}:${provider.model}`,
           provider: provider.id,
           taskId,
-          resumed
+          resumed,
+          usage: nudged.usage || null,
+          stopReason: nudged.stopReason || null
         };
       }
-      if (result?.failure) {
-        const cls = result.classified || classifyProviderFailure(result.failure);
-        recordFailure(provider.label, result.failure);
-        lastErrorStatus = Number(result.failure?.status) > 0 ? Number(result.failure.status) : lastErrorStatus;
-        if (cls.kind === 'permanent' && store) {
-          try {
-            await clearRetrySchedule(store, retryKey, taskId);
-          } catch {
-            // Best effort.
-          }
-        }
-      } else {
-        recordFailure(provider.label, 'empty or reasoning-only response after continuation');
+      if (!result?.failure) {
+        recordFailure(provider.label, 'empty or reasoning-only response after continuation nudges');
       }
       if (signal?.aborted) return { taskId, status: 'cancelled' };
     }
@@ -433,6 +612,140 @@ export async function runProviderChain(messages, options = {}) {
     errorStatus: lastErrorStatus,
     taskId
   };
+}
+
+/**
+ * Streaming variant of runProviderChain. Returns a ReadableStream of events:
+ *
+ *   { type: 'meta', provider, model }
+ *   { type: 'delta', text }
+ *   { type: 'usage', inputTokens, outputTokens }
+ *   { type: 'done', finishReason, ttftMs, totalMs, provider, model, resumed }
+ *   { type: 'error', message, status }  — all providers failed
+ *
+ * The same provider fallback order applies; a provider that fails mid-stream
+ * falls through to the next one, and the client sees one meta event per
+ * provider actually attempted. TTFT is measured per provider from request
+ * start to its first delta. Reasoning-only streams get one continuation
+ * nudge before the provider is abandoned.
+ */
+export function runStreamingChain(messages, options = {}) {
+  const env = options.env || {};
+  const signal = options.signal || null;
+  const clock = options.clock || defaultClock;
+  const maxTokens = Number.isFinite(options.maxTokens) && options.maxTokens > 0 ? Math.round(options.maxTokens) : null;
+
+  const startedAt = clock();
+  const providers = buildProviderChain(env);
+  const failureMessages = [];
+
+  async function* events() {
+    if (providers.length === 0) {
+      yield { type: 'error', message: 'No AI provider key configured on this deployment.', status: 502 };
+      return;
+    }
+
+    let resumed = false;
+    for (const provider of providers) {
+      yield { type: 'meta', provider: provider.id, model: provider.model };
+      const ttftHolder = { ms: 0 };
+      try {
+        const iter = provider.stream(messages, {
+          signal,
+          maxTokens,
+          onTtft: (ms) => { ttftHolder.ms = ms; }
+        });
+        let receivedText = false;
+        let usage = null;
+        let finishReason = null;
+        for await (const chunk of iter) {
+          if (chunk.text) {
+            receivedText = true;
+            yield { type: 'delta', text: chunk.text };
+          }
+          if (chunk.usage) usage = chunk.usage;
+          if (chunk.finishReason) finishReason = chunk.finishReason;
+        }
+        if (receivedText) {
+          yield {
+            type: 'usage',
+            inputTokens: usage?.inputTokens ?? 0,
+            outputTokens: usage?.outputTokens ?? 0
+          };
+          yield {
+            type: 'done',
+            finishReason: finishReason || 'stop',
+            ttftMs: ttftHolder.ms || 0,
+            totalMs: clock() - startedAt,
+            provider: provider.id,
+            model: provider.model,
+            resumed
+          };
+          return;
+        }
+        // Reasoning-only or empty stream: two continuation nudges (the
+        // gateway occasionally returns an empty stream under load).
+        resumed = true;
+        failureMessages.push(`${provider.label}: empty or reasoning-only stream`);
+        const nudgeMessages = [
+          [...messages, CONTINUATION_NUDGE],
+          [{ role: 'user', content: 'Now answer completely: provide the final response to the original request now (the code or text itself). No reasoning. No thinking.' }]
+        ];
+        let nudged = false;
+        let nudgeUsage = null;
+        let nudgeFinish = null;
+        for (const candidate of nudgeMessages) {
+          const nudgeIter = provider.stream(candidate, {
+            signal,
+            maxTokens,
+            onTtft: (ms) => { ttftHolder.ms = ttftHolder.ms || ms; }
+          });
+          let gotText = false;
+          for await (const chunk of nudgeIter) {
+            if (chunk.text) {
+              gotText = true;
+              nudged = true;
+              yield { type: 'delta', text: chunk.text };
+            }
+            if (chunk.usage) nudgeUsage = chunk.usage;
+            if (chunk.finishReason) nudgeFinish = chunk.finishReason;
+          }
+          if (gotText) break;
+        }
+        if (nudged) {
+          yield {
+            type: 'usage',
+            inputTokens: nudgeUsage?.inputTokens ?? 0,
+            outputTokens: nudgeUsage?.outputTokens ?? 0
+          };
+          yield {
+            type: 'done',
+            finishReason: nudgeFinish || 'stop',
+            ttftMs: ttftHolder.ms || 0,
+            totalMs: clock() - startedAt,
+            provider: provider.id,
+            model: provider.model,
+            resumed
+          };
+          return;
+        }
+      } catch (err) {
+        const failure = err instanceof Error ? err : new Error(safeErrorDetail(err));
+        failureMessages.push(`${provider.label}: ${safeErrorDetail(failure)}`);
+        if (signal?.aborted) {
+          yield { type: 'error', message: 'AI request cancelled.', status: 499 };
+          return;
+        }
+      }
+    }
+    yield {
+      type: 'error',
+      message: failureMessages.slice(0, 3).join(' | ').slice(0, 300) || 'all providers returned no usable stream',
+      status: 502
+    };
+  }
+
+  return iterableToReadableStream(events());
 }
 
 /**

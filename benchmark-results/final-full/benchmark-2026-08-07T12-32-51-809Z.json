@@ -1,0 +1,1132 @@
+{
+  "generatedAt": "2026-08-07T12:32:51.810Z",
+  "mode": "LIVE PROVIDER",
+  "url": null,
+  "summary": {
+    "total": 14,
+    "passed": 11,
+    "failed": 3
+  },
+  "results": [
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "scenario",
+      "id": "snake-5-turn-continuity",
+      "category": "multi-turn",
+      "description": "Create, then delta-edit the same snake game across five turns.",
+      "passed": false,
+      "score": 4.4,
+      "turns": [
+        {
+          "turn": 1,
+          "id": "snake-5-turn-continuity-t1",
+          "prompt": "Build me a snake game with a score counter, speed that increases as you eat, and a game over screen.",
+          "passed": false,
+          "score": 2.3,
+          "aspects": {
+            "instructionAdherence": 0,
+            "functionalCorrectness": 0.4,
+            "conversationContinuity": 0.6,
+            "executionValidation": 1,
+            "completeness": 0,
+            "uxQuality": 0.7,
+            "efficiency": 1
+          },
+          "hardFailures": [
+            "empty-provider-response",
+            "truncated-response (empty-response)",
+            "ignored-core-requirement (missing: snake, score)",
+            "missing-requested-deliverable (no code block)"
+          ],
+          "breakdown": null,
+          "diagnostics": null,
+          "latencyMs": 69788,
+          "provider": null,
+          "model": null,
+          "responseLength": 0
+        },
+        {
+          "turn": 2,
+          "id": "snake-5-turn-continuity-t2",
+          "prompt": "Now make the snake speed up gradually instead of jumping between levels.",
+          "passed": true,
+          "score": 4.7,
+          "aspects": {
+            "instructionAdherence": 1,
+            "functionalCorrectness": 1,
+            "conversationContinuity": 0.6,
+            "executionValidation": 1,
+            "completeness": 1,
+            "uxQuality": 0.9,
+            "efficiency": 1
+          },
+          "hardFailures": [],
+          "breakdown": {
+            "overall": null,
+            "continuity": 0,
+            "changePrecision": 1,
+            "regressionSafety": 5
+          },
+          "diagnostics": {
+            "truncationDetected": false,
+            "truncationSignals": [],
+            "languageMismatch": false,
+            "languageRatio": 0,
+            "repaired": false,
+            "repairAttempts": 0,
+            "repairReasons": [],
+            "validation": {
+              "codeBlockCount": 1,
+              "syntax": [
+                {
+                  "lang": "html",
+                  "ok": true,
+                  "issues": []
+                }
+              ],
+              "gameSignals": [
+                "game-loop",
+                "controls",
+                "scoring",
+                "collision",
+                "canvas"
+              ]
+            },
+            "continuity": null,
+            "missingCodeForModification": null,
+            "stopReason": "stop",
+            "syntaxIssues": [],
+            "ttftMs": 41009,
+            "totalMs": 41009,
+            "provider": "opencode-go",
+            "model": "opencode:deepseek-v4-flash",
+            "inputTokens": 1645,
+            "outputTokens": 4924,
+            "fallbackUsed": false
+          },
+          "latencyMs": 41274,
+          "provider": "opencode-go",
+          "model": "opencode:deepseek-v4-flash",
+          "responseLength": 16463
+        },
+        {
+          "turn": 3,
+          "id": "snake-5-turn-continuity-t3",
+          "prompt": "Make the snake blue. Do not change anything else.",
+          "passed": true,
+          "score": 5,
+          "aspects": {
+            "instructionAdherence": 1,
+            "functionalCorrectness": 1,
+            "conversationContinuity": 1,
+            "executionValidation": 1,
+            "completeness": 1,
+            "uxQuality": 0.9,
+            "efficiency": 1
+          },
+          "hardFailures": [],
+          "breakdown": {
+            "overall": null,
+            "continuity": 5,
+            "changePrecision": 5,
+            "regressionSafety": 5
+          },
+          "diagnostics": {
+            "truncationDetected": false,
+            "truncationSignals": [],
+            "languageMismatch": false,
+            "languageRatio": 0,
+            "repaired": false,
+            "repairAttempts": 0,
+            "repairReasons": [],
+            "validation": {
+              "codeBlockCount": 1,
+              "syntax": [
+                {
+                  "lang": "html",
+                  "ok": true,
+                  "issues": []
+                }
+              ],
+              "gameSignals": [
+                "game-loop",
+                "controls",
+                "scoring",
+                "collision",
+                "canvas"
+              ]
+            },
+            "continuity": {
+              "score": 5,
+              "checks": {
+                "used-previous-implementation": true,
+                "preserved-framework": true,
+                "preserved-unrelated-features": true,
+                "implemented-requested-change": true,
+                "avoided-unnecessary-rewrite": true
+              },
+              "codeBlockCount": 1
+            },
+            "missingCodeForModification": false,
+            "stopReason": "stop",
+            "syntaxIssues": [],
+            "ttftMs": 24815,
+            "totalMs": 24815,
+            "provider": "opencode-go",
+            "model": "opencode:deepseek-v4-flash",
+            "inputTokens": 5608,
+            "outputTokens": 4105,
+            "fallbackUsed": false
+          },
+          "latencyMs": 25079,
+          "provider": "opencode-go",
+          "model": "opencode:deepseek-v4-flash",
+          "responseLength": 16408
+        },
+        {
+          "turn": 4,
+          "id": "snake-5-turn-continuity-t4",
+          "prompt": "Add touch controls for mobile.",
+          "passed": true,
+          "score": 5,
+          "aspects": {
+            "instructionAdherence": 1,
+            "functionalCorrectness": 1,
+            "conversationContinuity": 1,
+            "executionValidation": 1,
+            "completeness": 1,
+            "uxQuality": 0.9,
+            "efficiency": 1
+          },
+          "hardFailures": [],
+          "breakdown": {
+            "overall": null,
+            "continuity": 5,
+            "changePrecision": 5,
+            "regressionSafety": 5
+          },
+          "diagnostics": {
+            "truncationDetected": false,
+            "truncationSignals": [],
+            "languageMismatch": false,
+            "languageRatio": 0,
+            "repaired": false,
+            "repairAttempts": 0,
+            "repairReasons": [],
+            "validation": {
+              "codeBlockCount": 1,
+              "syntax": [
+                {
+                  "lang": "html",
+                  "ok": true,
+                  "issues": []
+                }
+              ],
+              "gameSignals": [
+                "game-loop",
+                "controls",
+                "scoring",
+                "collision",
+                "canvas"
+              ]
+            },
+            "continuity": {
+              "score": 5,
+              "checks": {
+                "used-previous-implementation": true,
+                "preserved-framework": true,
+                "preserved-unrelated-features": true,
+                "implemented-requested-change": true,
+                "avoided-unnecessary-rewrite": true
+              },
+              "codeBlockCount": 1
+            },
+            "missingCodeForModification": false,
+            "stopReason": "stop",
+            "syntaxIssues": [],
+            "ttftMs": 36017,
+            "totalMs": 36017,
+            "provider": "opencode-go",
+            "model": "opencode:deepseek-v4-flash",
+            "inputTokens": 9358,
+            "outputTokens": 5886,
+            "fallbackUsed": false
+          },
+          "latencyMs": 36275,
+          "provider": "opencode-go",
+          "model": "opencode:deepseek-v4-flash",
+          "responseLength": 19255
+        },
+        {
+          "turn": 5,
+          "id": "snake-5-turn-continuity-t5",
+          "prompt": "Undo only the blue snake change, keep everything else.",
+          "passed": true,
+          "score": 5,
+          "aspects": {
+            "instructionAdherence": 1,
+            "functionalCorrectness": 1,
+            "conversationContinuity": 1,
+            "executionValidation": 1,
+            "completeness": 1,
+            "uxQuality": 0.9,
+            "efficiency": 1
+          },
+          "hardFailures": [],
+          "breakdown": {
+            "overall": null,
+            "continuity": 5,
+            "changePrecision": 5,
+            "regressionSafety": 5
+          },
+          "diagnostics": {
+            "truncationDetected": false,
+            "truncationSignals": [],
+            "languageMismatch": false,
+            "languageRatio": 0,
+            "repaired": false,
+            "repairAttempts": 0,
+            "repairReasons": [],
+            "validation": {
+              "codeBlockCount": 1,
+              "syntax": [
+                {
+                  "lang": "html",
+                  "ok": true,
+                  "issues": []
+                }
+              ],
+              "gameSignals": [
+                "game-loop",
+                "controls",
+                "scoring",
+                "collision",
+                "canvas"
+              ]
+            },
+            "continuity": {
+              "score": 5,
+              "checks": {
+                "used-previous-implementation": true,
+                "preserved-framework": true,
+                "preserved-unrelated-features": true,
+                "implemented-requested-change": true,
+                "avoided-unnecessary-rewrite": true
+              },
+              "codeBlockCount": 1
+            },
+            "missingCodeForModification": false,
+            "stopReason": "stop",
+            "syntaxIssues": [],
+            "ttftMs": 30293,
+            "totalMs": 30293,
+            "provider": "opencode-go",
+            "model": "opencode:deepseek-v4-flash",
+            "inputTokens": 13761,
+            "outputTokens": 5336,
+            "fallbackUsed": false
+          },
+          "latencyMs": 30554,
+          "provider": "opencode-go",
+          "model": "opencode:deepseek-v4-flash",
+          "responseLength": 19205
+        }
+      ]
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "scenario",
+      "id": "pong-4-turn-continuity",
+      "category": "multi-turn",
+      "description": "Pong created once, then three small delta edits.",
+      "passed": false,
+      "score": 4.5,
+      "turns": [
+        {
+          "turn": 1,
+          "id": "pong-4-turn-continuity-t1",
+          "prompt": "Make a two-player pong game with a scoreboard and keyboard controls.",
+          "passed": true,
+          "score": 4.5,
+          "aspects": {
+            "instructionAdherence": 1,
+            "functionalCorrectness": 0.8999999999999999,
+            "conversationContinuity": 0.6,
+            "executionValidation": 1,
+            "completeness": 1,
+            "uxQuality": 0.9,
+            "efficiency": 1
+          },
+          "hardFailures": [],
+          "breakdown": null,
+          "diagnostics": {
+            "truncationDetected": false,
+            "truncationSignals": [],
+            "languageMismatch": false,
+            "languageRatio": 0,
+            "repaired": false,
+            "repairAttempts": 0,
+            "repairReasons": [],
+            "validation": {
+              "codeBlockCount": 1,
+              "syntax": [
+                {
+                  "lang": "jsx",
+                  "ok": true,
+                  "issues": []
+                }
+              ],
+              "gameSignals": [
+                "game-loop",
+                "controls",
+                "scoring",
+                "canvas"
+              ]
+            },
+            "continuity": null,
+            "missingCodeForModification": null,
+            "stopReason": "stop",
+            "syntaxIssues": [],
+            "ttftMs": 113501,
+            "totalMs": 113501,
+            "provider": "opencode-go",
+            "model": "opencode:deepseek-v4-flash",
+            "inputTokens": 1624,
+            "outputTokens": 13494,
+            "fallbackUsed": false
+          },
+          "latencyMs": 113755,
+          "provider": "opencode-go",
+          "model": "opencode:deepseek-v4-flash",
+          "responseLength": 10454
+        },
+        {
+          "turn": 2,
+          "id": "pong-4-turn-continuity-t2",
+          "prompt": "Make the left paddle faster.",
+          "passed": true,
+          "score": 5,
+          "aspects": {
+            "instructionAdherence": 1,
+            "functionalCorrectness": 1,
+            "conversationContinuity": 1,
+            "executionValidation": 1,
+            "completeness": 1,
+            "uxQuality": 0.9,
+            "efficiency": 1
+          },
+          "hardFailures": [],
+          "breakdown": {
+            "overall": null,
+            "continuity": 5,
+            "changePrecision": 5,
+            "regressionSafety": 5
+          },
+          "diagnostics": {
+            "truncationDetected": false,
+            "truncationSignals": [],
+            "languageMismatch": false,
+            "languageRatio": 0,
+            "repaired": false,
+            "repairAttempts": 0,
+            "repairReasons": [],
+            "validation": {
+              "codeBlockCount": 1,
+              "syntax": [
+                {
+                  "lang": "jsx",
+                  "ok": true,
+                  "issues": []
+                }
+              ],
+              "gameSignals": [
+                "game-loop",
+                "controls",
+                "scoring",
+                "canvas"
+              ]
+            },
+            "continuity": {
+              "score": 5,
+              "checks": {
+                "used-previous-implementation": true,
+                "preserved-framework": true,
+                "preserved-unrelated-features": true,
+                "implemented-requested-change": true,
+                "avoided-unnecessary-rewrite": true
+              },
+              "codeBlockCount": 1
+            },
+            "missingCodeForModification": false,
+            "stopReason": "stop",
+            "syntaxIssues": [],
+            "ttftMs": 26086,
+            "totalMs": 26086,
+            "provider": "opencode-go",
+            "model": "opencode:deepseek-v4-flash",
+            "inputTokens": 4879,
+            "outputTokens": 3832,
+            "fallbackUsed": false
+          },
+          "latencyMs": 26343,
+          "provider": "opencode-go",
+          "model": "opencode:deepseek-v4-flash",
+          "responseLength": 10554
+        },
+        {
+          "turn": 3,
+          "id": "pong-4-turn-continuity-t3",
+          "prompt": "Change the ball colour to green and keep the paddles as they are.",
+          "passed": true,
+          "score": 5,
+          "aspects": {
+            "instructionAdherence": 1,
+            "functionalCorrectness": 1,
+            "conversationContinuity": 1,
+            "executionValidation": 1,
+            "completeness": 1,
+            "uxQuality": 0.9,
+            "efficiency": 1
+          },
+          "hardFailures": [],
+          "breakdown": {
+            "overall": null,
+            "continuity": 5,
+            "changePrecision": 5,
+            "regressionSafety": 5
+          },
+          "diagnostics": {
+            "truncationDetected": false,
+            "truncationSignals": [],
+            "languageMismatch": false,
+            "languageRatio": 0,
+            "repaired": false,
+            "repairAttempts": 0,
+            "repairReasons": [],
+            "validation": {
+              "codeBlockCount": 1,
+              "syntax": [
+                {
+                  "lang": "jsx",
+                  "ok": true,
+                  "issues": []
+                }
+              ],
+              "gameSignals": [
+                "game-loop",
+                "controls",
+                "scoring",
+                "canvas"
+              ]
+            },
+            "continuity": {
+              "score": 5,
+              "checks": {
+                "used-previous-implementation": true,
+                "preserved-framework": true,
+                "preserved-unrelated-features": true,
+                "implemented-requested-change": true,
+                "avoided-unnecessary-rewrite": true
+              },
+              "codeBlockCount": 1
+            },
+            "missingCodeForModification": false,
+            "stopReason": "stop",
+            "syntaxIssues": [],
+            "ttftMs": 19178,
+            "totalMs": 19178,
+            "provider": "opencode-go",
+            "model": "opencode:deepseek-v4-flash",
+            "inputTokens": 7952,
+            "outputTokens": 3326,
+            "fallbackUsed": false
+          },
+          "latencyMs": 19434,
+          "provider": "opencode-go",
+          "model": "opencode:deepseek-v4-flash",
+          "responseLength": 10517
+        },
+        {
+          "turn": 4,
+          "id": "pong-4-turn-continuity-t4",
+          "prompt": "Add a sound effect when the ball hits a paddle.",
+          "passed": false,
+          "score": 3.5,
+          "aspects": {
+            "instructionAdherence": 0,
+            "functionalCorrectness": 0.6,
+            "conversationContinuity": 1,
+            "executionValidation": 1,
+            "completeness": 1,
+            "uxQuality": 0.9,
+            "efficiency": 1
+          },
+          "hardFailures": [
+            "ignored-core-requirement (missing: sound)"
+          ],
+          "breakdown": {
+            "overall": null,
+            "continuity": 5,
+            "changePrecision": 5,
+            "regressionSafety": 5
+          },
+          "diagnostics": {
+            "truncationDetected": false,
+            "truncationSignals": [],
+            "languageMismatch": false,
+            "languageRatio": 0,
+            "repaired": false,
+            "repairAttempts": 0,
+            "repairReasons": [],
+            "validation": {
+              "codeBlockCount": 1,
+              "syntax": [
+                {
+                  "lang": "jsx",
+                  "ok": true,
+                  "issues": []
+                }
+              ],
+              "gameSignals": [
+                "game-loop",
+                "controls",
+                "scoring",
+                "canvas"
+              ]
+            },
+            "continuity": {
+              "score": 5,
+              "checks": {
+                "used-previous-implementation": true,
+                "preserved-framework": true,
+                "preserved-unrelated-features": true,
+                "implemented-requested-change": true,
+                "avoided-unnecessary-rewrite": true
+              },
+              "codeBlockCount": 1
+            },
+            "missingCodeForModification": false,
+            "stopReason": "stop",
+            "syntaxIssues": [],
+            "ttftMs": 56488,
+            "totalMs": 56488,
+            "provider": "opencode-go",
+            "model": "opencode:deepseek-v4-flash",
+            "inputTokens": 11052,
+            "outputTokens": 6930,
+            "fallbackUsed": false
+          },
+          "latencyMs": 56745,
+          "provider": "opencode-go",
+          "model": "opencode:deepseek-v4-flash",
+          "responseLength": 11597
+        }
+      ]
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "scenario",
+      "id": "landing-3-turn-continuity",
+      "category": "multi-turn",
+      "description": "A landing page created once, then two content edits.",
+      "passed": false,
+      "score": 3.9,
+      "turns": [
+        {
+          "turn": 1,
+          "id": "landing-3-turn-continuity-t1",
+          "prompt": "Make me a landing page for a small bakery with a menu section.",
+          "passed": false,
+          "score": 3.2,
+          "aspects": {
+            "instructionAdherence": 1,
+            "functionalCorrectness": 0.55,
+            "conversationContinuity": 0.6,
+            "executionValidation": 0,
+            "completeness": 1,
+            "uxQuality": 0.9,
+            "efficiency": 0.5
+          },
+          "hardFailures": [
+            "syntax-failure (jsx: unbalanced brackets (jsx/module code))"
+          ],
+          "breakdown": null,
+          "diagnostics": {
+            "truncationDetected": false,
+            "truncationSignals": [],
+            "languageMismatch": false,
+            "languageRatio": 0,
+            "repaired": true,
+            "repairAttempts": 2,
+            "repairReasons": [
+              "syntax-failure (jsx:unbalanced brackets (jsx/module code))",
+              "syntax-failure (jsx:unbalanced brackets (jsx/module code))"
+            ],
+            "validation": {
+              "codeBlockCount": 1,
+              "syntax": [
+                {
+                  "lang": "jsx",
+                  "ok": false,
+                  "issues": [
+                    "unbalanced brackets (jsx/module code)"
+                  ]
+                }
+              ]
+            },
+            "continuity": null,
+            "missingCodeForModification": null,
+            "stopReason": "stop",
+            "syntaxIssues": [
+              "jsx:unbalanced brackets (jsx/module code)"
+            ],
+            "ttftMs": 141169,
+            "totalMs": 141169,
+            "provider": "opencode-go",
+            "model": "opencode:deepseek-v4-flash",
+            "inputTokens": 1572,
+            "outputTokens": 8511,
+            "fallbackUsed": false
+          },
+          "latencyMs": 141423,
+          "provider": "opencode-go",
+          "model": "opencode:deepseek-v4-flash",
+          "responseLength": 23629
+        },
+        {
+          "turn": 2,
+          "id": "landing-3-turn-continuity-t2",
+          "prompt": "Add a contact form to the page.",
+          "passed": false,
+          "score": 4.2,
+          "aspects": {
+            "instructionAdherence": 1,
+            "functionalCorrectness": 1,
+            "conversationContinuity": 1,
+            "executionValidation": 0,
+            "completeness": 1,
+            "uxQuality": 0.9,
+            "efficiency": 1
+          },
+          "hardFailures": [
+            "syntax-failure (jsx: unbalanced brackets (jsx/module code))"
+          ],
+          "breakdown": {
+            "overall": null,
+            "continuity": 5,
+            "changePrecision": 5,
+            "regressionSafety": 5
+          },
+          "diagnostics": {
+            "truncationDetected": false,
+            "truncationSignals": [],
+            "languageMismatch": false,
+            "languageRatio": 0,
+            "repaired": true,
+            "repairAttempts": 2,
+            "repairReasons": [
+              "syntax-failure (jsx:unbalanced brackets (jsx/module code))",
+              "syntax-failure (jsx:unbalanced brackets (jsx/module code))"
+            ],
+            "validation": {
+              "codeBlockCount": 1,
+              "syntax": [
+                {
+                  "lang": "jsx",
+                  "ok": false,
+                  "issues": [
+                    "unbalanced brackets (jsx/module code)"
+                  ]
+                }
+              ]
+            },
+            "continuity": {
+              "score": 5,
+              "checks": {
+                "used-previous-implementation": true,
+                "preserved-framework": true,
+                "preserved-unrelated-features": true,
+                "implemented-requested-change": true,
+                "avoided-unnecessary-rewrite": true
+              },
+              "codeBlockCount": 1
+            },
+            "missingCodeForModification": false,
+            "stopReason": "stop",
+            "syntaxIssues": [
+              "jsx:unbalanced brackets (jsx/module code)"
+            ],
+            "ttftMs": 157080,
+            "totalMs": 157080,
+            "provider": "opencode-go",
+            "model": "opencode:deepseek-v4-flash",
+            "inputTokens": 8240,
+            "outputTokens": 8372,
+            "fallbackUsed": false
+          },
+          "latencyMs": 157337,
+          "provider": "opencode-go",
+          "model": "opencode:deepseek-v4-flash",
+          "responseLength": 29041
+        },
+        {
+          "turn": 3,
+          "id": "landing-3-turn-continuity-t3",
+          "prompt": "Change the heading to \"Fresh Bread Daily\" and keep the rest.",
+          "passed": false,
+          "score": 4.2,
+          "aspects": {
+            "instructionAdherence": 1,
+            "functionalCorrectness": 1,
+            "conversationContinuity": 1,
+            "executionValidation": 0,
+            "completeness": 1,
+            "uxQuality": 0.9,
+            "efficiency": 1
+          },
+          "hardFailures": [
+            "syntax-failure (jsx: unbalanced brackets (jsx/module code))"
+          ],
+          "breakdown": {
+            "overall": null,
+            "continuity": 5,
+            "changePrecision": 5,
+            "regressionSafety": 5
+          },
+          "diagnostics": {
+            "truncationDetected": false,
+            "truncationSignals": [],
+            "languageMismatch": false,
+            "languageRatio": 0,
+            "repaired": true,
+            "repairAttempts": 2,
+            "repairReasons": [
+              "syntax-failure (jsx:unbalanced brackets (jsx/module code))",
+              "syntax-failure (jsx:unbalanced brackets (jsx/module code))"
+            ],
+            "validation": {
+              "codeBlockCount": 1,
+              "syntax": [
+                {
+                  "lang": "jsx",
+                  "ok": false,
+                  "issues": [
+                    "unbalanced brackets (jsx/module code)"
+                  ]
+                }
+              ]
+            },
+            "continuity": {
+              "score": 5,
+              "checks": {
+                "used-previous-implementation": true,
+                "preserved-framework": true,
+                "preserved-unrelated-features": true,
+                "implemented-requested-change": true,
+                "avoided-unnecessary-rewrite": true
+              },
+              "codeBlockCount": 1
+            },
+            "missingCodeForModification": false,
+            "stopReason": "stop",
+            "syntaxIssues": [
+              "jsx:unbalanced brackets (jsx/module code)"
+            ],
+            "ttftMs": 131724,
+            "totalMs": 131724,
+            "provider": "opencode-go",
+            "model": "opencode:deepseek-v4-flash",
+            "inputTokens": 15909,
+            "outputTokens": 8143,
+            "fallbackUsed": false
+          },
+          "latencyMs": 131981,
+          "provider": "opencode-go",
+          "model": "opencode:deepseek-v4-flash",
+          "responseLength": 28906
+        }
+      ]
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "scenario",
+      "id": "timer-2-turn-continuity",
+      "category": "multi-turn",
+      "description": "A simple app created once, then one small change.",
+      "passed": true,
+      "score": 4.8,
+      "turns": [
+        {
+          "turn": 1,
+          "id": "timer-2-turn-continuity-t1",
+          "prompt": "Build me a pomodoro timer with a start and reset button.",
+          "passed": true,
+          "score": 4.5,
+          "aspects": {
+            "instructionAdherence": 1,
+            "functionalCorrectness": 0.8999999999999999,
+            "conversationContinuity": 0.6,
+            "executionValidation": 1,
+            "completeness": 1,
+            "uxQuality": 0.9,
+            "efficiency": 1
+          },
+          "hardFailures": [],
+          "breakdown": null,
+          "diagnostics": {
+            "truncationDetected": false,
+            "truncationSignals": [],
+            "languageMismatch": false,
+            "languageRatio": 0,
+            "repaired": false,
+            "repairAttempts": 0,
+            "repairReasons": [],
+            "validation": {
+              "codeBlockCount": 1,
+              "syntax": [
+                {
+                  "lang": "jsx",
+                  "ok": true,
+                  "issues": []
+                }
+              ],
+              "gameSignals": [
+                "game-loop"
+              ]
+            },
+            "continuity": null,
+            "missingCodeForModification": null,
+            "stopReason": "stop",
+            "syntaxIssues": [],
+            "ttftMs": 24034,
+            "totalMs": 24034,
+            "provider": "opencode-go",
+            "model": "opencode:deepseek-v4-flash",
+            "inputTokens": 1571,
+            "outputTokens": 3000,
+            "fallbackUsed": false
+          },
+          "latencyMs": 24292,
+          "provider": "opencode-go",
+          "model": "opencode:deepseek-v4-flash",
+          "responseLength": 6871
+        },
+        {
+          "turn": 2,
+          "id": "timer-2-turn-continuity-t2",
+          "prompt": "Change the default session length to 45 minutes.",
+          "passed": true,
+          "score": 5,
+          "aspects": {
+            "instructionAdherence": 1,
+            "functionalCorrectness": 1,
+            "conversationContinuity": 1,
+            "executionValidation": 1,
+            "completeness": 1,
+            "uxQuality": 0.9,
+            "efficiency": 1
+          },
+          "hardFailures": [],
+          "breakdown": {
+            "overall": null,
+            "continuity": 5,
+            "changePrecision": 5,
+            "regressionSafety": 5
+          },
+          "diagnostics": {
+            "truncationDetected": false,
+            "truncationSignals": [],
+            "languageMismatch": false,
+            "languageRatio": 0,
+            "repaired": false,
+            "repairAttempts": 0,
+            "repairReasons": [],
+            "validation": {
+              "codeBlockCount": 1,
+              "syntax": [
+                {
+                  "lang": "jsx",
+                  "ok": true,
+                  "issues": []
+                }
+              ],
+              "gameSignals": [
+                "game-loop"
+              ]
+            },
+            "continuity": {
+              "score": 3,
+              "checks": {
+                "used-previous-implementation": false,
+                "preserved-framework": true,
+                "preserved-unrelated-features": true,
+                "implemented-requested-change": true,
+                "avoided-unnecessary-rewrite": false
+              },
+              "codeBlockCount": 1
+            },
+            "missingCodeForModification": false,
+            "stopReason": "stop",
+            "syntaxIssues": [],
+            "ttftMs": 13269,
+            "totalMs": 13269,
+            "provider": "opencode-go",
+            "model": "opencode:deepseek-v4-flash",
+            "inputTokens": 3772,
+            "outputTokens": 2199,
+            "fallbackUsed": false
+          },
+          "latencyMs": 13527,
+          "provider": "opencode-go",
+          "model": "opencode:deepseek-v4-flash",
+          "responseLength": 6927
+        }
+      ]
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-001",
+      "category": "failure",
+      "description": "truncated explanation",
+      "passed": true,
+      "score": 4.6,
+      "hardFailures": [
+        "truncated-response (ends-with-conjunction)"
+      ],
+      "expectedReason": "truncated response",
+      "responseLength": 84
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-002",
+      "category": "failure",
+      "description": "truncated code fence",
+      "passed": true,
+      "score": 4.7,
+      "hardFailures": [
+        "truncated-response (open-code-fence)"
+      ],
+      "expectedReason": "open code fence",
+      "responseLength": 47
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-003",
+      "category": "failure",
+      "description": "syntactically invalid JS",
+      "passed": true,
+      "score": 3.9,
+      "hardFailures": [
+        "truncated-response (unmatched-())",
+        "syntax-failure (js: Unexpected identifier 'x')"
+      ],
+      "expectedReason": "syntax failure",
+      "responseLength": 69
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-004",
+      "category": "failure",
+      "description": "completely wrong answer",
+      "passed": true,
+      "score": 3.1,
+      "hardFailures": [
+        "ignored-core-requirement (missing: focus, work)"
+      ],
+      "expectedReason": "ignored core requirement (no focus/work tips)",
+      "responseLength": 107
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-005",
+      "category": "failure",
+      "description": "empty response",
+      "passed": true,
+      "score": 4.6,
+      "hardFailures": [
+        "empty-provider-response",
+        "truncated-response (empty-response)"
+      ],
+      "expectedReason": "empty provider response",
+      "responseLength": 0
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-006",
+      "category": "failure",
+      "description": "working answer but wrong framework",
+      "passed": true,
+      "score": 4.4,
+      "hardFailures": [
+        "unrelated-framework-replacement-during-follow-up",
+        "removed-existing-functionality"
+      ],
+      "expectedReason": "unrelated framework replacement during follow-up",
+      "responseLength": 117
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-007",
+      "category": "failure",
+      "description": "deletes existing functionality",
+      "passed": true,
+      "score": 4.7,
+      "hardFailures": [
+        "removed-existing-functionality"
+      ],
+      "expectedReason": "removal of required existing functionality",
+      "responseLength": 103
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-008",
+      "category": "failure",
+      "description": "fabricated claim about previous implementation",
+      "passed": true,
+      "score": 4.3,
+      "hardFailures": [
+        "unrelated-framework-replacement-during-follow-up",
+        "removed-existing-functionality",
+        "fabricated-claim-about-existing-implementation"
+      ],
+      "expectedReason": "fabricated claim about existing implementation",
+      "responseLength": 103
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-009",
+      "category": "failure",
+      "description": "malformed response for a code request",
+      "passed": true,
+      "score": 3.8,
+      "hardFailures": [
+        "missing-requested-deliverable (no code block)"
+      ],
+      "expectedReason": "missing requested deliverable (no code)",
+      "responseLength": 82
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-010",
+      "category": "failure",
+      "description": "beautiful UI with broken game logic",
+      "passed": true,
+      "score": 4.1,
+      "hardFailures": [
+        "broken-game-logic (missing signals: game-loop, scoring, controls)"
+      ],
+      "expectedReason": "no scoring / game-over logic despite beautiful UI",
+      "responseLength": 288
+    }
+  ]
+}

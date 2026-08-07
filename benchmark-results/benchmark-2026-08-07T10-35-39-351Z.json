@@ -1,0 +1,303 @@
+{
+  "generatedAt": "2026-08-07T10:35:39.351Z",
+  "mode": "LIVE PROVIDER",
+  "url": null,
+  "summary": {
+    "total": 13,
+    "passed": 11,
+    "failed": 2
+  },
+  "results": [
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "general-001",
+      "category": "general",
+      "prompt": "What is the difference between a compiler and an interpreter?",
+      "passed": false,
+      "score": 4.5,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 1,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 0.5
+      },
+      "hardFailures": [
+        "truncated-response (provider-stop-reason-length)"
+      ],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": true,
+        "repairAttempts": 1,
+        "repairReasons": [
+          "truncation (mid-sentence-cutoff, provider-stop-reason-length)"
+        ],
+        "validation": {
+          "codeBlockCount": 0,
+          "syntax": []
+        },
+        "continuity": null,
+        "stopReason": "length",
+        "ttftMs": 25808,
+        "totalMs": 25808,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1256,
+        "outputTokens": 700,
+        "fallbackUsed": false
+      },
+      "latencyMs": 25906,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 4807
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "general-002",
+      "category": "general",
+      "prompt": "Give me three tips for staying focused while working from home.",
+      "passed": true,
+      "score": 4.7,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 1,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 0,
+          "syntax": []
+        },
+        "continuity": null,
+        "stopReason": "stop",
+        "ttftMs": 8395,
+        "totalMs": 8395,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1255,
+        "outputTokens": 466,
+        "fallbackUsed": false
+      },
+      "latencyMs": 8397,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 1633
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "general-003",
+      "category": "general",
+      "prompt": "Explain how the internet works in simple terms.",
+      "passed": false,
+      "score": 4.5,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 1,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 0.5
+      },
+      "hardFailures": [
+        "truncated-response (provider-stop-reason-length)"
+      ],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": true,
+        "repairAttempts": 1,
+        "repairReasons": [
+          "truncation (mid-sentence-cutoff, provider-stop-reason-length)"
+        ],
+        "validation": {
+          "codeBlockCount": 0,
+          "syntax": []
+        },
+        "continuity": null,
+        "stopReason": "length",
+        "ttftMs": 18672,
+        "totalMs": 18672,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1254,
+        "outputTokens": 700,
+        "fallbackUsed": false
+      },
+      "latencyMs": 18673,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 4082
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-001",
+      "category": "failure",
+      "description": "truncated explanation",
+      "passed": true,
+      "score": 4.6,
+      "hardFailures": [
+        "truncated-response (ends-with-conjunction)"
+      ],
+      "expectedReason": "truncated response",
+      "responseLength": 84
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-002",
+      "category": "failure",
+      "description": "truncated code fence",
+      "passed": true,
+      "score": 4.7,
+      "hardFailures": [
+        "truncated-response (open-code-fence)"
+      ],
+      "expectedReason": "open code fence",
+      "responseLength": 47
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-003",
+      "category": "failure",
+      "description": "syntactically invalid JS",
+      "passed": true,
+      "score": 3.9,
+      "hardFailures": [
+        "truncated-response (unmatched-())",
+        "syntax-failure (js: Unexpected identifier 'x')"
+      ],
+      "expectedReason": "syntax failure",
+      "responseLength": 69
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-004",
+      "category": "failure",
+      "description": "completely wrong answer",
+      "passed": true,
+      "score": 3.1,
+      "hardFailures": [
+        "ignored-core-requirement (missing: focus, work)"
+      ],
+      "expectedReason": "ignored core requirement (no focus/work tips)",
+      "responseLength": 107
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-005",
+      "category": "failure",
+      "description": "empty response",
+      "passed": true,
+      "score": 4.6,
+      "hardFailures": [
+        "empty-provider-response",
+        "truncated-response (empty-response)"
+      ],
+      "expectedReason": "empty provider response",
+      "responseLength": 0
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-006",
+      "category": "failure",
+      "description": "working answer but wrong framework",
+      "passed": true,
+      "score": 4.4,
+      "hardFailures": [
+        "unrelated-framework-replacement-during-follow-up",
+        "removed-existing-functionality"
+      ],
+      "expectedReason": "unrelated framework replacement during follow-up",
+      "responseLength": 117
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-007",
+      "category": "failure",
+      "description": "deletes existing functionality",
+      "passed": true,
+      "score": 4.7,
+      "hardFailures": [
+        "removed-existing-functionality"
+      ],
+      "expectedReason": "removal of required existing functionality",
+      "responseLength": 103
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-008",
+      "category": "failure",
+      "description": "fabricated claim about previous implementation",
+      "passed": true,
+      "score": 4.3,
+      "hardFailures": [
+        "unrelated-framework-replacement-during-follow-up",
+        "removed-existing-functionality",
+        "fabricated-claim-about-existing-implementation"
+      ],
+      "expectedReason": "fabricated claim about existing implementation",
+      "responseLength": 103
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-009",
+      "category": "failure",
+      "description": "malformed response for a code request",
+      "passed": true,
+      "score": 3.8,
+      "hardFailures": [
+        "missing-requested-deliverable (no code block)"
+      ],
+      "expectedReason": "missing requested deliverable (no code)",
+      "responseLength": 82
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-010",
+      "category": "failure",
+      "description": "beautiful UI with broken game logic",
+      "passed": true,
+      "score": 4.1,
+      "hardFailures": [
+        "broken-game-logic (missing signals: game-loop, scoring, controls)"
+      ],
+      "expectedReason": "no scoring / game-over logic despite beautiful UI",
+      "responseLength": 288
+    }
+  ]
+}

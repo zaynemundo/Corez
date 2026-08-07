@@ -212,6 +212,7 @@ export default function App() {
   const [activeCanvasCode, setActiveCanvasCode] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
+  const [streamingContent, setStreamingContent] = useState(null);
   const [refreshingMarketKeys, setRefreshingMarketKeys] = useState(() => new Set());
   const [theme, setTheme] = useState(() => {
     try {
@@ -316,7 +317,9 @@ export default function App() {
             const controller = new AbortController();
             abortControllerRef.current = controller;
 
-            generateAIResponse(pendingData.apiPrompt, pendingData.messages, controller.signal)
+            generateAIResponse(pendingData.apiPrompt, pendingData.messages, controller.signal, (delta) => {
+              setStreamingContent(prev => (prev || '') + delta);
+            })
               .then(response => {
                 if (!response) return;
                 const aiMsg = toAssistantMessage(response);
@@ -344,6 +347,7 @@ export default function App() {
               .finally(() => {
                 localStorage.removeItem('corez_pending_request');
                 setIsThinking(false);
+                setStreamingContent(null);
                 if (abortControllerRef.current === controller) abortControllerRef.current = null;
               });
           } else {
@@ -519,7 +523,10 @@ export default function App() {
     abortControllerRef.current = controller;
 
     try {
-      const response = await generateAIResponse(apiPrompt, updatedApiMessages, controller.signal);
+      setStreamingContent('');
+      const response = await generateAIResponse(apiPrompt, updatedApiMessages, controller.signal, (delta) => {
+        setStreamingContent(prev => (prev || '') + delta);
+      });
       if (response) {
         const aiMsg = toAssistantMessage(response);
         if (aiMsg.type !== 'market') {
@@ -548,6 +555,7 @@ export default function App() {
       if (abortControllerRef.current === controller) {
         localStorage.removeItem('corez_pending_request');
         setIsThinking(false);
+        setStreamingContent(null);
         abortControllerRef.current = null;
       }
     }
@@ -636,11 +644,17 @@ export default function App() {
                     {isThinking && (
                       <div className="message-wrapper ai">
                         <div className="message-body">
-                          <div className="thinking-indicator-box thinking-dots" aria-label="Corez is thinking" role="status">
-                            <span className="thinking-dot" />
-                            <span className="thinking-dot" />
-                            <span className="thinking-dot" />
-                          </div>
+                          {streamingContent ? (
+                            <div className="message-content streaming-text" role="status" aria-label="Corez is responding">
+                              {streamingContent}
+                            </div>
+                          ) : (
+                            <div className="thinking-indicator-box thinking-dots" aria-label="Corez is thinking" role="status">
+                              <span className="thinking-dot" />
+                              <span className="thinking-dot" />
+                              <span className="thinking-dot" />
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}

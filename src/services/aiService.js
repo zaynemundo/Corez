@@ -838,11 +838,33 @@ export async function resumeSwarmTask(taskId, signal = null, options = {}) {
   }
 }
 
+// Persisted project memory: the worker returns a lightweight structured
+// project state with every creation/modification response; it is stored here
+// and sent back with the next request so follow-up turns edit the existing
+// project instead of regenerating it. Session-scoped in practice: it is
+// overwritten when a new project is created.
+let persistedProjectState = null;
+let onProjectStateChange = null;
+let lastHostedDiagnostics = null;
+export function getLastHostedDiagnostics() {
+  return lastHostedDiagnostics;
+}
+export function setProjectStateListener(listener) {
+  onProjectStateChange = typeof listener === 'function' ? listener : null;
+}
+export function getPersistedProjectState() {
+  return persistedProjectState;
+}
+export function clearPersistedProjectState() {
+  persistedProjectState = null;
+}
+
 export async function generateHostedAIResponse(
   prompt,
   intent = analyzePublicUserIntent(prompt),
   history = [],
-  signal = null
+  signal = null,
+  options = {}
 ) {
   // 1. Fine-grained intent classification & contract generation
   const fineIntent = classifyIntentNew(prompt);
@@ -891,10 +913,70 @@ export async function generateHostedAIResponse(
       skills: resolved.skills,
       executionPlan: resolved.compactExecutionPlan || null,
       complexity,
-      mode: executionMode
+      mode: executionMode,
+      project: persistedProjectState || undefined,
+      stream: options.stream === true
     }),
   };
   if (signal) fetchOptions.signal = signal;
+
+  // Streaming path: the worker answers with SSE events (meta/delta/usage/
+  // done/diagnostics). Deltas are delivered to onDelta as they arrive so the
+  // user sees content before the generation finishes; the final content is
+  // resolved when the done event closes the stream.
+  if (options.stream === true) {
+    const response = await fetchWithTransportRetry(fetchOptions);
+    if (!response.ok) {
+      let errorText = '';
+      try {
+        errorText = await response.text();
+      } catch { /* keep empty */ }
+      throw new Error(`Hosted AI stream failed: HTTP ${response.status} ${errorText.slice(0, 200)}`);
+    }
+    if (!response.body) throw new Error('Hosted AI stream had no body.');
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let streamed = '';
+    let projectState = null;
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+        const payload = trimmed.slice(5).trim();
+        if (!payload) continue;
+        let event;
+        try {
+          event = JSON.parse(payload);
+        } catch {
+          continue;
+        }
+        if (event.type === 'delta' && typeof event.text === 'string') {
+          streamed += event.text;
+          options.onDelta?.(event.text);
+        } else if (event.type === 'done' && event.projectState) {
+          projectState = event.projectState;
+        } else if (event.type === 'diagnostics' && typeof event.diagnostics === 'object') {
+          lastHostedDiagnostics = event.diagnostics;
+        } else if (event.type === 'error') {
+          throw new Error(event.message || 'Hosted AI stream error.');
+        }
+      }
+    }
+    if (projectState) {
+      persistedProjectState = projectState;
+      onProjectStateChange?.(projectState);
+    }
+    if (!streamed.trim()) {
+      throw new Error('Hosted AI returned no streamed content.');
+    }
+    return streamed;
+  }
 
   // Transport resilience: a dropped connection (NetworkError / Failed to
   // fetch) is often a transient blip on the client's network or at the edge,
@@ -1026,6 +1108,16 @@ export async function generateHostedAIResponse(
 
   if (!rawContent) {
     throw new Error('Hosted AI returned only reasoning and no answer.');
+  }
+
+  // Persist project memory returned by the worker so the next follow-up turn
+  // edits the existing implementation (delta-first) instead of rebuilding.
+  if (data?.projectState && typeof data.projectState === 'object') {
+    persistedProjectState = data.projectState;
+    onProjectStateChange?.(data.projectState);
+  }
+  if (data?.diagnostics && typeof data.diagnostics === 'object') {
+    lastHostedDiagnostics = data.diagnostics;
   }
 
   // 3. Local Reflection & Bounded Repair Loop
@@ -3295,7 +3387,7 @@ export function isExplicitImageRequest(prompt) {
   return false;
 }
 
-export async function generateAIResponse(prompt, history = [], signal = null) {
+export async function generateAIResponse(prompt, history = [], signal = null, onDelta = null) {
   // Explicit slash commands first: /website, /game, /research. The command
   // token is stripped before any model sees the prompt, so the AI is never
   // confused by it.
@@ -3381,7 +3473,10 @@ export async function generateAIResponse(prompt, history = [], signal = null) {
   }
 
   try {
-    const hostedAiResponse = await generateHostedAIResponse(cleanPrompt, intent, history, signal);
+    const hostedAiResponse = await generateHostedAIResponse(cleanPrompt, intent, history, signal, {
+      stream: typeof onDelta === 'function',
+      onDelta
+    });
     if (hostedAiResponse) {
       // Check if the AI decided to generate an image
       const imageMatch = hostedAiResponse.match(/\[IMAGE_PROMPT:\s*(.*?)\]/i);

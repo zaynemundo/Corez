@@ -202,10 +202,15 @@ async function run() {
     );
 
     assert.equal(successResponse.status, 200);
-    assert.deepEqual(await json(successResponse), {
-      content: 'Worker response',
-      model: 'opencode:deepseek-v4-flash'
-    });
+    const successBody = await json(successResponse);
+    // New API contract: the worker returns provider + diagnostics alongside
+    // content/model so clients can report truncation, repairs and latency.
+    assert.equal(successBody.content, 'Worker response');
+    assert.equal(successBody.model, 'opencode:deepseek-v4-flash');
+    assert.equal(successBody.provider, 'opencode-go');
+    assert.equal(successBody.diagnostics.truncationDetected, false);
+    assert.equal(successBody.diagnostics.repaired, false);
+    assert.equal(typeof successBody.diagnostics.ttftMs, 'number');
     assert.equal(invocation.payload.model, 'deepseek-v4-flash');
     assert.deepEqual(Object.keys(invocation.payload), ['model', 'messages']);
     // The execution prompt (with the Awwwards design spec) reaches the model
@@ -234,7 +239,7 @@ async function run() {
     // Fast path: general requests carry a capped output (max_tokens) so they
     // come back quickly; the model still decides its own reasoning.
     assert.deepEqual(Object.keys(generalPayload), ['model', 'messages', 'max_tokens']);
-    assert.equal(generalPayload.max_tokens, 700);
+    assert.equal(generalPayload.max_tokens, 1500);
     assert.match(generalPayload.messages[0].content, /Adaptive Routing - Fast Path/);
     assert.match(generalPayload.messages[0].content, /Inferred intent: general/);
   } finally {
@@ -271,7 +276,7 @@ async function run() {
       assert.equal(deepseekPayload.model, 'deepseek-v4-flash');
       assert.equal(deepseekPayload.stream, false);
       // Fast path for general intents: output capped so they respond quickly.
-      assert.equal(deepseekPayload.max_tokens, 700);
+      assert.equal(deepseekPayload.max_tokens, 1500);
       assert.equal(deepseekPayload.max_completion_tokens, undefined);
       assert.ok(Array.isArray(deepseekPayload.messages));
       assert.equal(deepseekPayload.messages.at(-1).content, 'Explain black roses');
@@ -301,7 +306,7 @@ async function run() {
       assert.equal(opencodeKeyData.model, 'opencode:deepseek-v4-flash');
       assert.equal(opencodePayload.model, 'deepseek-v4-flash');
       // Fast path for general intents: capped output, no reasoning fields.
-      assert.equal(opencodePayload.max_tokens, 700);
+      assert.equal(opencodePayload.max_tokens, 1500);
       assert.ok(Array.isArray(opencodePayload.messages));
       assert.equal(opencodePayload.messages.at(-1).content, 'Explain black roses');
       assert.equal(opencodePayload.reasoning, undefined);
@@ -1167,10 +1172,10 @@ async function run() {
 
   // Coding, app, and image payloads never carry an output-token cap: the
   // model takes as long as it wants. General/fast-intent payloads carry
-  // exactly the fast-path cap (700) so casual chat comes back quickly.
+  // exactly the fast-path cap (1500) so casual chat comes back quickly.
   for (const payload of capturedPayloads) {
     if (payload.max_tokens !== undefined) {
-      assert.equal(payload.max_tokens, 700);
+      assert.equal(payload.max_tokens, 1500);
     }
     assert.equal(payload.max_completion_tokens, undefined);
   }

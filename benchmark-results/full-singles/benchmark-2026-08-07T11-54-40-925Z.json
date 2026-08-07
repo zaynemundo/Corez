@@ -1,0 +1,1689 @@
+{
+  "generatedAt": "2026-08-07T11:54:40.926Z",
+  "mode": "LIVE PROVIDER",
+  "url": null,
+  "summary": {
+    "total": 40,
+    "passed": 32,
+    "failed": 8
+  },
+  "results": [
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "general-001",
+      "category": "general",
+      "prompt": "What is the difference between a compiler and an interpreter?",
+      "passed": true,
+      "score": 4.7,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 1,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 0,
+          "syntax": []
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 12016,
+        "totalMs": 12016,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1256,
+        "outputTokens": 924,
+        "fallbackUsed": false
+      },
+      "latencyMs": 12309,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 3547
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "general-002",
+      "category": "general",
+      "prompt": "Give me three tips for staying focused while working from home.",
+      "passed": true,
+      "score": 4.7,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 1,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 0,
+          "syntax": []
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 7444,
+        "totalMs": 7444,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1255,
+        "outputTokens": 546,
+        "fallbackUsed": false
+      },
+      "latencyMs": 7455,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 1191
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "general-003",
+      "category": "general",
+      "prompt": "Explain how the internet works in simple terms.",
+      "passed": true,
+      "score": 4.7,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 1,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 0,
+          "syntax": []
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 13172,
+        "totalMs": 13172,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1254,
+        "outputTokens": 1032,
+        "fallbackUsed": false
+      },
+      "latencyMs": 13185,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 3128
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "general-004",
+      "category": "general",
+      "prompt": "What should I check before deploying a website to production?",
+      "passed": true,
+      "score": 4.5,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 1,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 0.5
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 0,
+          "syntax": []
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 33868,
+        "totalMs": 33868,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1302,
+        "outputTokens": 1136,
+        "fallbackUsed": false
+      },
+      "latencyMs": 33876,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 4945
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "general-005",
+      "category": "general",
+      "prompt": "Compare MySQL and PostgreSQL in a few short points.",
+      "passed": true,
+      "score": 4.7,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 1,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 0,
+          "syntax": []
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 7314,
+        "totalMs": 7314,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1253,
+        "outputTokens": 461,
+        "fallbackUsed": false
+      },
+      "latencyMs": 7315,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 1693
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "general-006",
+      "category": "general",
+      "prompt": "What is the difference between HTTP and HTTPS?",
+      "passed": true,
+      "score": 4.7,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 1,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 0,
+          "syntax": []
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 7395,
+        "totalMs": 7395,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1254,
+        "outputTokens": 504,
+        "fallbackUsed": false
+      },
+      "latencyMs": 7397,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 1898
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "general-007",
+      "category": "general",
+      "prompt": "How do I choose a good password manager?",
+      "passed": true,
+      "score": 4.7,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 1,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 0,
+          "syntax": []
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 12504,
+        "totalMs": 12504,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1252,
+        "outputTokens": 929,
+        "fallbackUsed": false
+      },
+      "latencyMs": 12511,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 3122
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "general-008",
+      "category": "general",
+      "prompt": "What are the steps to publish a React app to GitHub Pages?",
+      "passed": false,
+      "score": 4.5,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 1,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 0.5
+      },
+      "hardFailures": [
+        "truncated-response (unclosed-html-username, unclosed-html-repository, unclosed-html-username, unclosed-html-repository, unclosed-html-repository, unclosed-html-username, unclosed-html-repository, unclosed-html-username, unclosed-html-repository)"
+      ],
+      "diagnostics": {
+        "truncationDetected": true,
+        "truncationSignals": [
+          "unclosed-html-username",
+          "unclosed-html-repository",
+          "unclosed-html-username",
+          "unclosed-html-repository",
+          "unclosed-html-repository",
+          "unclosed-html-username",
+          "unclosed-html-repository",
+          "unclosed-html-username",
+          "unclosed-html-repository"
+        ],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": true,
+        "repairAttempts": 2,
+        "repairReasons": [
+          "truncation (unclosed-html-username, unclosed-html-repository, unclosed-html-username, unclosed-html-repository, unclosed-html-repository, unclosed-html-username, unclosed-html-repository)",
+          "truncation (unclosed-html-username, unclosed-html-repository, unclosed-html-username, unclosed-html-repository, unclosed-html-repository, unclosed-html-username, unclosed-html-repository)"
+        ],
+        "validation": {
+          "codeBlockCount": 8,
+          "syntax": [
+            {
+              "lang": "js",
+              "ok": true,
+              "issues": []
+            }
+          ]
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 54127,
+        "totalMs": 54127,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1260,
+        "outputTokens": 1361,
+        "fallbackUsed": false
+      },
+      "latencyMs": 54138,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 7945
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "writing-001",
+      "category": "writing",
+      "prompt": "Write a short tagline for a coffee shop that roasts beans in-house.",
+      "passed": false,
+      "score": 3.2,
+      "aspects": {
+        "instructionAdherence": 0,
+        "functionalCorrectness": 0.6,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [
+        "ignored-core-requirement (missing: coffee)"
+      ],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 0,
+          "syntax": []
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 3942,
+        "totalMs": 3942,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1035,
+        "outputTokens": 270,
+        "fallbackUsed": false
+      },
+      "latencyMs": 3944,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 335
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "writing-002",
+      "category": "writing",
+      "prompt": "Rewrite this sentence to sound more professional: \"We will get back to you soon.\"",
+      "passed": false,
+      "score": 3.7,
+      "aspects": {
+        "instructionAdherence": 0.5,
+        "functionalCorrectness": 0.6,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [
+        "ignored-core-requirement (missing: rewrite)"
+      ],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 0,
+          "syntax": []
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 3548,
+        "totalMs": 3548,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1035,
+        "outputTokens": 201,
+        "fallbackUsed": false
+      },
+      "latencyMs": 3549,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 437
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "writing-003",
+      "category": "writing",
+      "prompt": "Change the tone of this message to be friendly and casual: \"Your order has been shipped.\"",
+      "passed": false,
+      "score": 3.7,
+      "aspects": {
+        "instructionAdherence": 0.5,
+        "functionalCorrectness": 0.6,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [
+        "ignored-core-requirement (missing: shipped)"
+      ],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 0,
+          "syntax": []
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 3414,
+        "totalMs": 3414,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1036,
+        "outputTokens": 228,
+        "fallbackUsed": false
+      },
+      "latencyMs": 3416,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 247
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "writing-004",
+      "category": "writing",
+      "prompt": "Summarise the key points of a remote work policy in 5 bullets.",
+      "passed": true,
+      "score": 4.7,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 1,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 0,
+          "syntax": []
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 4526,
+        "totalMs": 4526,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1034,
+        "outputTokens": 267,
+        "fallbackUsed": false
+      },
+      "latencyMs": 4527,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 1095
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "writing-005",
+      "category": "writing",
+      "prompt": "Expand this one-liner into a short product description: \"A notebook that syncs to the cloud.\"",
+      "passed": true,
+      "score": 4.7,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 1,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 0,
+          "syntax": []
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 3673,
+        "totalMs": 3673,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1038,
+        "outputTokens": 208,
+        "fallbackUsed": false
+      },
+      "latencyMs": 3673,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 506
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "writing-006",
+      "category": "writing",
+      "prompt": "Write a friendly email asking a client for feedback on a delivered project.",
+      "passed": true,
+      "score": 4.7,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 1,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 0,
+          "syntax": []
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 5317,
+        "totalMs": 5317,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1031,
+        "outputTokens": 344,
+        "fallbackUsed": false
+      },
+      "latencyMs": 5317,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 1210
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "writing-007",
+      "category": "writing",
+      "prompt": "Write a one-paragraph mission statement for a community garden.",
+      "passed": true,
+      "score": 4.7,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 1,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 0,
+          "syntax": []
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 4053,
+        "totalMs": 4053,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1030,
+        "outputTokens": 224,
+        "fallbackUsed": false
+      },
+      "latencyMs": 4054,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 574
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "coding-001",
+      "category": "coding",
+      "prompt": "Write a JavaScript function that returns the factorial of a number.",
+      "passed": true,
+      "score": 4.5,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 0.8999999999999999,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 1,
+          "syntax": [
+            {
+              "lang": "javascript",
+              "ok": true,
+              "issues": []
+            }
+          ]
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 6037,
+        "totalMs": 6037,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1090,
+        "outputTokens": 490,
+        "fallbackUsed": false
+      },
+      "latencyMs": 6037,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 589
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "coding-002",
+      "category": "coding",
+      "prompt": "My JavaScript sort does not order numbers correctly. What is wrong?",
+      "passed": false,
+      "score": 3.7,
+      "aspects": {
+        "instructionAdherence": 0.5,
+        "functionalCorrectness": 0.6,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [
+        "ignored-core-requirement (missing: comparison)"
+      ],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 4,
+          "syntax": [
+            {
+              "lang": "js",
+              "ok": true,
+              "issues": []
+            },
+            {
+              "lang": "js",
+              "ok": true,
+              "issues": []
+            },
+            {
+              "lang": "js",
+              "ok": true,
+              "issues": []
+            },
+            {
+              "lang": "js",
+              "ok": true,
+              "issues": []
+            }
+          ]
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 6432,
+        "totalMs": 6432,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1090,
+        "outputTokens": 572,
+        "fallbackUsed": false
+      },
+      "latencyMs": 6432,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 1231
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "coding-003",
+      "category": "coding",
+      "prompt": "Explain how async/await works in JavaScript with a small example.",
+      "passed": true,
+      "score": 4.5,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 0.8999999999999999,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 2,
+          "syntax": [
+            {
+              "lang": "js",
+              "ok": true,
+              "issues": []
+            },
+            {
+              "lang": "js",
+              "ok": true,
+              "issues": []
+            }
+          ]
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 9858,
+        "totalMs": 9858,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1260,
+        "outputTokens": 951,
+        "fallbackUsed": false
+      },
+      "latencyMs": 9859,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 2595
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "coding-004",
+      "category": "coding",
+      "prompt": "Refactor this code to use modern array methods: const doubled = []; for (let i = 0; i < nums.length; i++) { doubled.push(nums[i] * 2); }",
+      "passed": true,
+      "score": 4.5,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 0.8999999999999999,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 1,
+          "syntax": [
+            {
+              "lang": "javascript",
+              "ok": true,
+              "issues": []
+            }
+          ]
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 4357,
+        "totalMs": 4357,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1117,
+        "outputTokens": 343,
+        "fallbackUsed": false
+      },
+      "latencyMs": 4357,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 347
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "coding-005",
+      "category": "coding",
+      "prompt": "Create a React component that shows a counter with increment and decrement buttons.",
+      "passed": true,
+      "score": 4.5,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 0.8999999999999999,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 1,
+          "syntax": [
+            {
+              "lang": "jsx",
+              "ok": true,
+              "issues": []
+            }
+          ]
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 8176,
+        "totalMs": 8176,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1573,
+        "outputTokens": 895,
+        "fallbackUsed": false
+      },
+      "latencyMs": 8457,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 1766
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "coding-006",
+      "category": "coding",
+      "prompt": "Fix the bug in this event handler: <button onClick={handleClick}>Click</button> where handleClick never fires.",
+      "passed": false,
+      "score": 4.5,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 0.8999999999999999,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [
+        "truncated-response (unclosed-html-form, unclosed-html-form)"
+      ],
+      "diagnostics": {
+        "truncationDetected": true,
+        "truncationSignals": [
+          "unclosed-html-form",
+          "unclosed-html-form"
+        ],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": true,
+        "repairAttempts": 2,
+        "repairReasons": [
+          "truncation (unclosed-html-form)",
+          "truncation (unclosed-html-form, unclosed-html-form)"
+        ],
+        "validation": {
+          "codeBlockCount": 2,
+          "syntax": [
+            {
+              "lang": "jsx",
+              "ok": true,
+              "issues": []
+            },
+            {
+              "lang": "jsx",
+              "ok": true,
+              "issues": []
+            }
+          ]
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 43522,
+        "totalMs": 43522,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1101,
+        "outputTokens": 766,
+        "fallbackUsed": false
+      },
+      "latencyMs": 43523,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 5021
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "coding-007",
+      "category": "coding",
+      "prompt": "Write a small HTML page with a text input and a button that shows the input value in an alert.",
+      "passed": true,
+      "score": 4.5,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 0.8999999999999999,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 1,
+          "syntax": [
+            {
+              "lang": "html",
+              "ok": true,
+              "issues": []
+            }
+          ]
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 6457,
+        "totalMs": 6457,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1579,
+        "outputTokens": 817,
+        "fallbackUsed": false
+      },
+      "latencyMs": 6710,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 1742
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "coding-008",
+      "category": "coding",
+      "prompt": "How would you debounce a search input in React?",
+      "passed": true,
+      "score": 4.5,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 0.8999999999999999,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 1,
+          "syntax": [
+            {
+              "lang": "jsx",
+              "ok": true,
+              "issues": []
+            }
+          ]
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 7936,
+        "totalMs": 7936,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1089,
+        "outputTokens": 878,
+        "fallbackUsed": false
+      },
+      "latencyMs": 7937,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 2695
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "coding-009",
+      "category": "coding",
+      "prompt": "Write a CSS rule that centres a fixed-width box both horizontally and vertically.",
+      "passed": true,
+      "score": 4.5,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 0.8999999999999999,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 1,
+          "syntax": [
+            {
+              "lang": "html",
+              "ok": true,
+              "issues": []
+            }
+          ]
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 10257,
+        "totalMs": 10257,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1089,
+        "outputTokens": 1173,
+        "fallbackUsed": false
+      },
+      "latencyMs": 10257,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 1018
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "adversarial-001",
+      "category": "adversarial",
+      "prompt": "Explain how databases index data. Do not include any code.",
+      "passed": true,
+      "score": 4.7,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 1,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": true,
+        "repairAttempts": 1,
+        "repairReasons": [
+          "truncation (provider-stop-reason-length)"
+        ],
+        "validation": {
+          "codeBlockCount": 0,
+          "syntax": []
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 23640,
+        "totalMs": 23640,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1257,
+        "outputTokens": 1500,
+        "fallbackUsed": false
+      },
+      "latencyMs": 23640,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 6763
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "adversarial-002",
+      "category": "adversarial",
+      "prompt": "Write a haiku about the ocean. Only the haiku, nothing else.",
+      "passed": false,
+      "score": 3.2,
+      "aspects": {
+        "instructionAdherence": 0,
+        "functionalCorrectness": 0.6,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [
+        "ignored-core-requirement (missing: ocean)"
+      ],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 0,
+          "syntax": []
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 1960,
+        "totalMs": 1960,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1035,
+        "outputTokens": 78,
+        "fallbackUsed": false
+      },
+      "latencyMs": 1961,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 88
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "adversarial-003",
+      "category": "adversarial",
+      "prompt": "List three healthy breakfast ideas. Keep the answer under ten lines.",
+      "passed": false,
+      "score": 3.2,
+      "aspects": {
+        "instructionAdherence": 0,
+        "functionalCorrectness": 0.6,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [
+        "ignored-core-requirement (missing: breakfast)"
+      ],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 0,
+          "syntax": []
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 2160,
+        "totalMs": 2160,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1256,
+        "outputTokens": 110,
+        "fallbackUsed": false
+      },
+      "latencyMs": 2161,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 314
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "adversarial-004",
+      "category": "adversarial",
+      "prompt": "Answer in one sentence: why is version control useful?",
+      "passed": true,
+      "score": 4.6,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 1,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.7,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 0,
+          "syntax": []
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 1843,
+        "totalMs": 1843,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1254,
+        "outputTokens": 77,
+        "fallbackUsed": false
+      },
+      "latencyMs": 1845,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 178
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "adversarial-005",
+      "category": "adversarial",
+      "prompt": "Explain DNS. Do not mention \"cache\" at all.",
+      "passed": true,
+      "score": 4.7,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 1,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 0,
+          "syntax": []
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 11912,
+        "totalMs": 11912,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1259,
+        "outputTokens": 1056,
+        "fallbackUsed": false
+      },
+      "latencyMs": 11914,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 3294
+    },
+    {
+      "label": "LIVE PROVIDER",
+      "kind": "single",
+      "id": "adversarial-006",
+      "category": "adversarial",
+      "prompt": "Give me a recipe for lemonade using only four ingredients. Format it as a numbered list.",
+      "passed": true,
+      "score": 4.7,
+      "aspects": {
+        "instructionAdherence": 1,
+        "functionalCorrectness": 1,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 1,
+        "uxQuality": 0.9,
+        "efficiency": 1
+      },
+      "hardFailures": [],
+      "diagnostics": {
+        "truncationDetected": false,
+        "truncationSignals": [],
+        "languageMismatch": false,
+        "languageRatio": 0,
+        "repaired": false,
+        "repairAttempts": 0,
+        "repairReasons": [],
+        "validation": {
+          "codeBlockCount": 0,
+          "syntax": []
+        },
+        "continuity": null,
+        "missingCodeForModification": null,
+        "stopReason": "stop",
+        "ttftMs": 4818,
+        "totalMs": 4818,
+        "provider": "opencode-go",
+        "model": "opencode:deepseek-v4-flash",
+        "inputTokens": 1262,
+        "outputTokens": 395,
+        "fallbackUsed": false
+      },
+      "latencyMs": 4819,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "transportError": null,
+      "responseLength": 950
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-001",
+      "category": "failure",
+      "description": "truncated explanation",
+      "passed": true,
+      "score": 4.6,
+      "hardFailures": [
+        "truncated-response (ends-with-conjunction)"
+      ],
+      "expectedReason": "truncated response",
+      "responseLength": 84
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-002",
+      "category": "failure",
+      "description": "truncated code fence",
+      "passed": true,
+      "score": 4.7,
+      "hardFailures": [
+        "truncated-response (open-code-fence)"
+      ],
+      "expectedReason": "open code fence",
+      "responseLength": 47
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-003",
+      "category": "failure",
+      "description": "syntactically invalid JS",
+      "passed": true,
+      "score": 3.9,
+      "hardFailures": [
+        "truncated-response (unmatched-())",
+        "syntax-failure (js: Unexpected identifier 'x')"
+      ],
+      "expectedReason": "syntax failure",
+      "responseLength": 69
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-004",
+      "category": "failure",
+      "description": "completely wrong answer",
+      "passed": true,
+      "score": 3.1,
+      "hardFailures": [
+        "ignored-core-requirement (missing: focus, work)"
+      ],
+      "expectedReason": "ignored core requirement (no focus/work tips)",
+      "responseLength": 107
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-005",
+      "category": "failure",
+      "description": "empty response",
+      "passed": true,
+      "score": 4.6,
+      "hardFailures": [
+        "empty-provider-response",
+        "truncated-response (empty-response)"
+      ],
+      "expectedReason": "empty provider response",
+      "responseLength": 0
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-006",
+      "category": "failure",
+      "description": "working answer but wrong framework",
+      "passed": true,
+      "score": 4.4,
+      "hardFailures": [
+        "unrelated-framework-replacement-during-follow-up",
+        "removed-existing-functionality"
+      ],
+      "expectedReason": "unrelated framework replacement during follow-up",
+      "responseLength": 117
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-007",
+      "category": "failure",
+      "description": "deletes existing functionality",
+      "passed": true,
+      "score": 4.7,
+      "hardFailures": [
+        "removed-existing-functionality"
+      ],
+      "expectedReason": "removal of required existing functionality",
+      "responseLength": 103
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-008",
+      "category": "failure",
+      "description": "fabricated claim about previous implementation",
+      "passed": true,
+      "score": 4.3,
+      "hardFailures": [
+        "unrelated-framework-replacement-during-follow-up",
+        "removed-existing-functionality",
+        "fabricated-claim-about-existing-implementation"
+      ],
+      "expectedReason": "fabricated claim about existing implementation",
+      "responseLength": 103
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-009",
+      "category": "failure",
+      "description": "malformed response for a code request",
+      "passed": true,
+      "score": 3.8,
+      "hardFailures": [
+        "missing-requested-deliverable (no code block)"
+      ],
+      "expectedReason": "missing requested deliverable (no code)",
+      "responseLength": 82
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-010",
+      "category": "failure",
+      "description": "beautiful UI with broken game logic",
+      "passed": true,
+      "score": 4.1,
+      "hardFailures": [
+        "broken-game-logic (missing signals: game-loop, scoring, controls)"
+      ],
+      "expectedReason": "no scoring / game-over logic despite beautiful UI",
+      "responseLength": 288
+    }
+  ]
+}
