@@ -454,6 +454,14 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onRe
         continue;
       }
 
+      // Horizontal rule: a line made only of dashes/asterisks/underscores
+      // (e.g. "---", "* * *") becomes a visual divider instead of raw text.
+      if (/^(\s*[-*_]\s*){3,}$/.test(trimmed)) {
+        elements.push(<hr key={`hr-${i}`} className="markdown-hr" />);
+        i++;
+        continue;
+      }
+
       // Standalone Image ![caption](url)
       const standaloneImgMatch = trimmed.match(/^!\[(.*?)\]\((.*?)\)$/);
       if (standaloneImgMatch) {

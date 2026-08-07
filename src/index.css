@@ -1175,6 +1175,13 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
 }
 
+.markdown-hr {
+  border: none;
+  height: 1px;
+  margin: 0.9rem 0;
+  background: linear-gradient(90deg, transparent, var(--border-color, rgba(255, 255, 255, 0.12)), transparent);
+}
+
 .markdown-list-item {
   margin-left: 1.2rem;
   list-style-type: disc;

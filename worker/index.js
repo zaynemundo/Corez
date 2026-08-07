@@ -202,6 +202,7 @@ Informational & List Formatting (for every non-code answer):
 - Use a markdown table whenever items share the same attributes (for example: program, issuer, focus, best for, level). Tables beat long lists for comparisons.
 - Keep each bullet to one line when possible; move detail into a follow-up sentence.
 - Finish with a short actionable section ("How to choose", "Next steps", or "What to verify") when the topic allows.
+- NEVER use "---" (horizontal rule) lines or "***" to separate sections — separate sections with "##" headings or a blank line instead. The chat interface renders them as stray text otherwise.
 - Never add filler sentences, emojis, or generic closers; every sentence must carry information.`;
 
   const imageRequestInstructions = `
@@ -259,6 +260,7 @@ Guidelines for Output:
 - REQUESTED FORMATS (HTML/CSS/JS): If the user explicitly requests HTML, CSS, vanilla JS, or plain web code, output complete single-file HTML/CSS/JS inside ONE SINGLE \`\`\`html ... \`\`\` code block.
 - PROPER LAYERING: Ensure proper visual layering (Background z-index:0 -> Content z-index:10 -> HUD/Toolbars z-index:20-30 -> Modals z-index:40-50+).
 - CRITICAL SINGLE-FILE MANDATE: Output all code as ONE SINGLE self-contained file in ONE SINGLE code block.
+- NEVER use "---" or "***" horizontal-rule lines anywhere in your response (they render as stray text in the chat UI); separate sections with "##" headings or blank lines instead.
 - Always start your response with a brief summary explaining your implementation choices before the code block.
 ${adaptiveInstructions}${formattingSection}
 
