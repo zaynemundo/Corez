@@ -1,6 +1,6 @@
 import baseWorker from './index.js';
 import { safeErrorDetail, readBoundedJson, classifyProviderFailure, createTaskStateStore, createRateLimiter } from './utils.js';
-import { runProviderChain, buildProviderChain } from './providerChain.js';
+import { runProviderChain, buildProviderChain, TASK_STATUS_STORE_PREFIX } from './providerChain.js';
 import { handleTaskApi } from './taskApi.js';
 export { GameRoom } from './gameRoom.js';
 
@@ -1316,6 +1316,43 @@ export default {
         cancelled: refreshed.cancelled.length,
         remaining: refreshed.queue.length,
         content: refreshed.finalContent || null
+      }), { status: 200, headers: jsonHeaders });
+    }
+
+    // Retry-schedule status: GET /api/task/<taskId> tells a client when a
+    // retry-scheduled AI generation becomes eligible again, so it can wait
+    // precisely (instead of blind fixed sleeps) and never treats the deferred
+    // 200 as a failure. The record is mirrored from providerChain under
+    // task-status/<taskId> when the schedule is persisted and removed when the
+    // task completes or fails permanently — a missing record means the task is
+    // no longer deferred (resend to fetch the result, or it never existed).
+    if (url.pathname.startsWith('/api/task/')) {
+      if (request.method !== 'GET') {
+        return new Response(JSON.stringify({ error: 'Method not allowed.' }), { status: 405, headers: jsonHeaders });
+      }
+      let taskId;
+      try {
+        taskId = decodeURIComponent(url.pathname.slice('/api/task/'.length));
+      } catch {
+        return new Response(JSON.stringify({ error: 'Invalid task id.' }), { status: 400, headers: jsonHeaders });
+      }
+      if (!taskId || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/.test(taskId)) {
+        return new Response(JSON.stringify({ error: 'Invalid task id.' }), { status: 400, headers: jsonHeaders });
+      }
+      const record = await store.load(`${TASK_STATUS_STORE_PREFIX}${taskId}`);
+      if (!record || record.status !== 'retry-scheduled') {
+        return new Response(JSON.stringify({ taskId, status: 'not-scheduled' }), { status: 200, headers: jsonHeaders });
+      }
+      const retryAfterSeconds = Math.max(0, Math.ceil((Number(record.nextEligibleAt) - Date.now()) / 1000));
+      return new Response(JSON.stringify({
+        taskId,
+        status: 'retry-scheduled',
+        provider: record.provider || null,
+        providerLabel: record.providerLabel || null,
+        attempt: Number(record.attempt) || 0,
+        nextEligibleAt: Number(record.nextEligibleAt) || 0,
+        retryAfterSeconds,
+        lastError: record.lastError || null
       }), { status: 200, headers: jsonHeaders });
     }
 

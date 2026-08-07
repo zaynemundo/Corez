@@ -9,7 +9,10 @@ permissions:
   contents: read
 
 jobs:
-  verify:
+  # Fast feedback lane: lint, unit tests, and the production build. Contract
+  # suites run in parallel below so a unit regression never waits on the
+  # slower hosted-worker contracts.
+  verify-fast:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -27,14 +30,29 @@ jobs:
       - name: Run linter
         run: npm run lint
 
-      - name: Run full unit test suite
+      - name: Run unit test suite
         run: npm test
+
+      - name: Run production build
+        run: npm run build
+
+  verify-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Run hosted AI contract suite
         run: npm run test:cloudflare
 
       - name: Run swarm unit tests
         run: npm run test:swarm
-
-      - name: Run production build
-        run: npm run build

@@ -18,6 +18,25 @@ export const DEFAULT_IMAGE_MODEL_CHAIN = [
 // practical window. Beyond that window the retry schedule is persisted so a
 // later invocation resumes the same task instead of returning a 502.
 const RETRY_STORE_PREFIX = 'retry/';
+// The retry schedule is also mirrored under `task-status/<taskId>` so the
+// public GET /api/task/<taskId> endpoint can report when a deferred task
+// becomes eligible again (the retry key itself embeds the provider id and
+// message hash, which the client never sees).
+export const TASK_STATUS_STORE_PREFIX = 'task-status/';
+
+async function persistRetrySchedule(store, retryKey, taskId, schedule) {
+  await store.save(retryKey, schedule);
+  if (taskId) {
+    await store.save(`${TASK_STATUS_STORE_PREFIX}${taskId}`, { ...schedule, retryKey });
+  }
+}
+
+async function clearRetrySchedule(store, retryKey, taskId) {
+  await store.remove(retryKey);
+  if (taskId) {
+    await store.remove(`${TASK_STATUS_STORE_PREFIX}${taskId}`);
+  }
+}
 const BACKOFF_BASE_MS = 750;
 const BACKOFF_JITTER_MS = 500;
 const MAX_SINGLE_SLEEP_MS = 30_000;
@@ -305,7 +324,7 @@ export async function runProviderChain(messages, options = {}) {
         // Authentication, validation, unsupported-model etc.: never retried.
         if (store) {
           try {
-            await store.remove(retryKey);
+            await clearRetrySchedule(store, retryKey, taskId);
           } catch {
             // Best effort.
           }
@@ -327,7 +346,7 @@ export async function runProviderChain(messages, options = {}) {
         // persist the retry schedule so a later invocation resumes the task.
         if (store) {
           try {
-            await store.save(retryKey, {
+            await persistRetrySchedule(store, retryKey, taskId, {
               provider: provider.id,
               providerLabel: provider.label,
               taskId,
@@ -356,7 +375,7 @@ export async function runProviderChain(messages, options = {}) {
     if (result?.content) {
       if (store) {
         try {
-          await store.remove(retryKey);
+          await clearRetrySchedule(store, retryKey, taskId);
         } catch {
           // Best effort.
         }
@@ -377,7 +396,7 @@ export async function runProviderChain(messages, options = {}) {
       if (result?.content) {
         if (store) {
           try {
-            await store.remove(retryKey);
+            await clearRetrySchedule(store, retryKey, taskId);
           } catch {
             // Best effort.
           }
@@ -396,7 +415,7 @@ export async function runProviderChain(messages, options = {}) {
         lastErrorStatus = Number(result.failure?.status) > 0 ? Number(result.failure.status) : lastErrorStatus;
         if (cls.kind === 'permanent' && store) {
           try {
-            await store.remove(retryKey);
+            await clearRetrySchedule(store, retryKey, taskId);
           } catch {
             // Best effort.
           }

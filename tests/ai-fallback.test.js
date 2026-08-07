@@ -117,10 +117,13 @@ describe('Hosted AI fallback behavior', () => {
   it('resumes a retry-scheduled generation after the provider recovery window', async () => {
     // The worker persists a retry schedule and answers HTTP 200 with
     // { status: 'retry-scheduled', taskId, retryAfterSeconds } when the
-    // provider cannot recover in time. The client must wait out the window
-    // and re-issue the same request so the schedule resumes — it is NOT a
-    // "reasoning only" failure.
+    // provider cannot recover in time. The client polls GET /api/task/<id>
+    // for the exact eligibility time and re-issues the same request so the
+    // schedule resumes — it is NOT a "reasoning only" failure.
     const fetchMock = vi.fn(async (url, init) => {
+      if (url === '/api/task/rt-deadbeef') {
+        return Response.json({ taskId: 'rt-deadbeef', status: 'retry-scheduled', retryAfterSeconds: 1 });
+      }
       if (url !== '/api/ai') throw new Error(`Unexpected request: ${url}`);
       const calls = fetchMock.mock.calls.length;
       if (calls === 1) {
@@ -133,11 +136,15 @@ describe('Hosted AI fallback behavior', () => {
 
     const response = await generateHostedAIResponse('Tell me about black roses');
     expect(response).toBe('Recovered answer after the retry window.');
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // Initial attempt + one status poll + one resume.
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     vi.unstubAllGlobals();
   }, 15000);
 
   it('reports an honest busy error when the provider is still recovering after retries', async () => {
+    // Every /api/ai call AND every /api/task/<id> status poll reports the
+    // same persistent retry-scheduled state; after three bounded wait cycles
+    // the client gives up honestly instead of fabricating a reply.
     const fetchMock = vi.fn(async () => Response.json({
       taskId: 'rt-deadbeef',
       status: 'retry-scheduled',
@@ -147,9 +154,8 @@ describe('Hosted AI fallback behavior', () => {
 
     await expect(generateHostedAIResponse('Tell me about black roses'))
       .rejects.toThrow(/temporarily busy/);
-    // Initial attempt + three bounded waits; the request is never misread as
-    // "reasoning only" and never fabricates a reply.
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    // Initial attempt + three bounded cycles of (status poll + resume).
+    expect(fetchMock).toHaveBeenCalledTimes(7);
     vi.unstubAllGlobals();
   }, 15000);
 

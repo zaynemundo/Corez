@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { buildProviderChain, runProviderChain } from '../worker/providerChain.js';
+import { buildProviderChain, runProviderChain, TASK_STATUS_STORE_PREFIX } from '../worker/providerChain.js';
 import { createTaskStateStore } from '../worker/utils.js';
 
 const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/chat/completions';
@@ -245,6 +245,60 @@ describe('provider fallback chain recovery', () => {
     expect(attempts).toHaveLength(3);
     // The retry schedule is cleared once the task completes.
     expect([...bucket.store.keys()].some((key) => key.includes('retry_'))).toBe(false);
+  });
+
+  it('mirrors the retry schedule under task-status/<taskId> and clears it on completion', async () => {
+    const bucket = mockBucket();
+    const bucketEnv = { ...providerEnv(), ASSET_BUCKET: bucket.env };
+    const { clock, sleep, state } = fakeClock();
+    let failuresRemaining = 2;
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      if (failuresRemaining > 0) {
+        failuresRemaining -= 1;
+        return errorResponse(429, 'busy');
+      }
+      return okResponse('status answer');
+    }));
+
+    const store1 = createTaskStateStore(bucketEnv);
+    const first = await runProviderChain([{ role: 'user', content: 'status task' }], {
+      env: bucketEnv,
+      store: store1,
+      sleep,
+      clock,
+      jitter: () => 0,
+      maxRequestRetryMs: 1200
+    });
+    expect(first.status).toBe('retry-scheduled');
+    expect(first.taskId).toMatch(/^rt-[0-9a-f]{8}$/);
+
+    // The task-status record mirrors the schedule under a deterministic key
+    // that the public /api/task/<taskId> endpoint can load.
+    const mirrored = await store1.load(`${TASK_STATUS_STORE_PREFIX}${first.taskId}`);
+    expect(mirrored).not.toBe(null);
+    expect(mirrored.status).toBe('retry-scheduled');
+    expect(mirrored.retryKey).toContain('retry/');
+    expect(mirrored.taskId).toBe(first.taskId);
+    expect(Number(mirrored.nextEligibleAt)).toBeGreaterThan(0);
+
+    // A fresh store reading the same bucket sees the mirror too.
+    const freshStore = createTaskStateStore(bucketEnv);
+    expect(await freshStore.load(`${TASK_STATUS_STORE_PREFIX}${first.taskId}`)).not.toBe(null);
+
+    // After the resume succeeds, both the retry record and its mirror are gone.
+    state.now = 4000;
+    const store2 = createTaskStateStore(bucketEnv);
+    const second = await runProviderChain([{ role: 'user', content: 'status task' }], {
+      env: bucketEnv,
+      store: store2,
+      sleep,
+      clock,
+      jitter: () => 0,
+      maxRequestRetryMs: 1200
+    });
+    expect(second.content).toBe('status answer');
+    expect(await store2.load(`${TASK_STATUS_STORE_PREFIX}${first.taskId}`)).toBe(null);
+    expect([...bucket.store.keys()].some((key) => key.includes('task-status_'))).toBe(false);
   });
 
   it('never sends max_tokens or max_completion_tokens to any provider', async () => {

@@ -25,7 +25,7 @@ const INTENT_HANDLERS = [
     type: INTENT_TYPES.MARKET,
     pattern: /\b(price|prices|stock|stocks|ticker|quote|how much is|convert|to usd|to eur|to php|exchange rate|bitcoin|ethereum|crypto)\b/i,
     signals: ['price', 'stock', 'quote', 'convert', 'ticker', 'crypto', 'bitcoin', 'ethereum', 'usd', 'eur', 'php', 'how much'],
-    extract(prompt, lower) {
+    extract(_prompt, _lower) {
       return {
         goal: `check the current market price`,
         deliverable: 'live market data',

@@ -8,5 +8,9 @@ dist/
 
 scratch/
 
+# Subagent workflow artifacts: review diffs, briefs, and progress notes from
+# the SDD workflow. Historical copies stay in git history; main stays clean.
+.superpowers/
+
 # Python bytecode cache
 __pycache__/

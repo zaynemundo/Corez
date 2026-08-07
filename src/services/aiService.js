@@ -946,6 +946,13 @@ export async function generateHostedAIResponse(
   // schedule and completes the original generation. Without this handling the
   // contentless 200 was misread as "reasoning only", failing app builds with
   // a misleading error.
+  // Provider recovery polling: when the worker persists a retry schedule it
+  // also mirrors a task-status record at GET /api/task/<taskId>, so instead
+  // of blind fixed sleeps the client waits exactly until the task becomes
+  // eligible again (nextEligibleAt) and then re-issues the request — the same
+  // messages hash to the same task, resuming the original generation. The
+  // promise stays pending throughout, so the UI keeps showing the normal
+  // "working" state instead of a dead wait or a premature error.
   const RETRY_SCHEDULED_MAX_ATTEMPTS = 3;
   const RETRY_SCHEDULED_MIN_WAIT_MS = 500;
   const RETRY_SCHEDULED_MAX_WAIT_MS = 120000;
@@ -954,8 +961,24 @@ export async function generateHostedAIResponse(
     attempt < RETRY_SCHEDULED_MAX_ATTEMPTS && data?.status === 'retry-scheduled';
     attempt += 1
   ) {
-    const waitSeconds = Math.max(1, Math.min(Number(data?.retryAfterSeconds) || 10, RETRY_SCHEDULED_MAX_WAIT_MS / 1000));
-    await sleepResumable(Math.max(RETRY_SCHEDULED_MIN_WAIT_MS, waitSeconds * 1000), signal);
+    // Ask the worker when this task becomes eligible again. A missing record
+    // means the task is no longer deferred (it completed or was permanently
+    // classified), so the worker's own estimate is kept and the request is
+    // re-issued anyway — the only way to fetch a final result.
+    let statusWaitSeconds = Math.max(1, Number(data?.retryAfterSeconds) || 10);
+    if (typeof data?.taskId === 'string' && data.taskId) {
+      try {
+        const statusResponse = await fetch(`/api/task/${encodeURIComponent(data.taskId)}`, { signal });
+        const status = await statusResponse.json();
+        if (status?.status === 'retry-scheduled') {
+          statusWaitSeconds = Math.max(1, Number(status.retryAfterSeconds) || statusWaitSeconds);
+        }
+      } catch {
+        // Status poll failed: fall back to the worker's own estimate.
+      }
+    }
+    const waitMs = Math.max(RETRY_SCHEDULED_MIN_WAIT_MS, Math.min(statusWaitSeconds * 1000, RETRY_SCHEDULED_MAX_WAIT_MS));
+    await sleepResumable(waitMs, signal);
     response = await fetchWithTransportRetry(fetchOptions);
     try {
       data = await response.json();
