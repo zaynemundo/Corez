@@ -4,10 +4,12 @@
  * Searches the internet from the worker side and returns normalized results
  * that the AI (or the local fallback) uses to answer the user's request.
  *
- * Provider chain (honest, dependency-free, no API keys required):
- *   1. Wikipedia search API (reliable, keyless, works from Workers egress).
- *   2. DuckDuckGo Instant Answer API (zero-click; frequently returns empty
- *      and is often blocked from datacenter egress, so it is the fallback).
+ * Provider chain:
+ *   1. Exa neural search (premium, only when EXA_API_KEY is configured;
+ *      leads the merged results with real web pages and highlight snippets).
+ *   2. Wikipedia search API (reliable, keyless, works from Workers egress).
+ *   3. DuckDuckGo Lite (real web results, no key; often blocked from
+ *      datacenter egress, so it is the last fallback).
  *
  * Every result is normalized to { title, url, snippet, source }. When no
  * provider yields usable results the request fails honestly (502) — CoreZ
@@ -26,6 +28,7 @@ const MAX_SEARCH_BODY_BYTES = 64 * 1024;
 const DDG_LITE_ENDPOINT = 'https://lite.duckduckgo.com/lite/';
 const WIKIPEDIA_ENDPOINT = 'https://en.wikipedia.org/w/api.php';
 const WIKIPEDIA_EXTRACTS_ENDPOINT = 'https://en.wikipedia.org/w/api.php';
+const EXA_SEARCH_ENDPOINT = 'https://api.exa.ai/search';
 const OPENROUTER_RERANK_ENDPOINT = 'https://openrouter.ai/api/v1/rerank';
 const OPENROUTER_EMBEDDINGS_ENDPOINT = 'https://openrouter.ai/api/v1/embeddings';
 const OPENCODE_RERANK_ENDPOINT = 'https://opencode.ai/zen/go/v1/rerank';
@@ -477,6 +480,63 @@ async function fetchWikipediaExtracts(titles, fetchImpl) {
   return extracts;
 }
 
+/**
+ * Exa neural search (premium, requires EXA_API_KEY): real web pages with
+ * highlight snippets, ranked by semantic relevance. Used first in the chain
+ * when the key is configured; Wikipedia and DuckDuckGo still run and merge
+ * in as keyless backstops. Deep research (detail mode) asks Exa for full
+ * page text and attaches it as the extract, so reports stay grounded in
+ * actual page content. Never called without a key.
+ */
+async function searchExa(query, env, fetchImpl, detail = false) {
+  const apiKey = env?.EXA_API_KEY || null;
+  if (!apiKey) return [];
+
+  const url = new URL(EXA_SEARCH_ENDPOINT);
+  const response = await fetchImpl(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey
+    },
+    body: JSON.stringify({
+      query,
+      numResults: detail ? MAX_EXTRACT_RESULTS : MAX_RESULTS,
+      type: 'auto',
+      contents: detail ? { text: true, highlights: true } : { highlights: true }
+    }),
+    signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS)
+  });
+  if (!response.ok) {
+    throw new Error(`Exa HTTP ${response.status}`);
+  }
+
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    return [];
+  }
+
+  const hits = Array.isArray(data?.results) ? data.results : [];
+  const results = [];
+  for (const hit of hits) {
+    if (!isObject(hit)) continue;
+    const title = typeof hit.title === 'string' ? hit.title.trim() : '';
+    const urlValue = typeof hit.url === 'string' ? hit.url.trim() : '';
+    const highlight = Array.isArray(hit.highlights) && hit.highlights.length > 0
+      ? String(hit.highlights[0]).trim()
+      : '';
+    const result = normalizeResult(title, urlValue, highlight, 'Exa');
+    if (!result || !validHttpUrl(result.url)) continue;
+    if (detail && typeof hit.text === 'string' && hit.text.trim()) {
+      result.extract = hit.text.trim().slice(0, MAX_EXTRACT_CHARS);
+    }
+    results.push(result);
+  }
+  return results.slice(0, MAX_RESULTS);
+}
+
 /** Wikipedia search: free, no key required. */
 async function searchWikipedia(query, fetchImpl) {
   // Search the cleaned topic, not the raw request: token search on
@@ -565,13 +625,18 @@ export async function handleSearch(request, env) {
   // Providers search the cleaned topic ("what is gold" -> "gold") so filler
   // tokens never flood results; the original query is kept for reranking.
   const searchTerm = cleanSearchQuery(query) || query;
-  // Free, keyless providers, run together and merged (deduped by URL):
-  // Wikipedia (reliable from Worker egress) and DuckDuckGo Lite (real web
-  // results, no key). One provider answering no longer hides the other.
-  const providers = [
+  // Exa (premium, when EXA_API_KEY is set) leads the chain; the keyless
+  // Wikipedia and DuckDuckGo Lite providers still run and merge in, so one
+  // provider answering no longer hides the other. Exa failing never breaks
+  // search — the keyless backstops still answer.
+  const providers = [];
+  if (env?.EXA_API_KEY) {
+    providers.push(async () => searchExa(searchTerm, env, fetchImpl, body?.detail === true));
+  }
+  providers.push(
     async () => searchWikipedia(query, fetchImpl),
     async () => searchDuckDuckGo(searchTerm, fetchImpl)
-  ];
+  );
 
   const failures = [];
   const providerResults = [];
@@ -617,8 +682,9 @@ export async function handleSearch(request, env) {
     // Deep research mode (body.detail === true): attach full Wikipedia
     // article extracts to the top Wikipedia results so reports can be
     // grounded in real article content, not just snippets. Best effort.
-    let extracted = false;
-    if (body?.detail === true) {
+    // Exa already returns full page text as its extract in this mode.
+    let extracted = results.some((result) => result.extract !== undefined);
+    if (body?.detail === true && !extracted) {
       const wikiResults = results.filter((result) => result.source === 'Wikipedia');
       const extracts = await fetchWikipediaExtracts(wikiResults.map((result) => result.title), fetchImpl);
       if (extracts.size > 0) {

@@ -49,6 +49,103 @@ async function run() {
   assert.ok(typeof freeData.results[0].title === 'string' && freeData.results[0].title.length > 0);
   assert.ok(typeof freeData.meta.servedAt === 'string');
 
+  // Exa (premium): when EXA_API_KEY is configured, Exa leads the merged
+  // results and its pages are normalized to the same shape with highlight
+  // snippets.
+  const exaResponse = await post(
+    { query: 'neural search' },
+    {
+      EXA_API_KEY: 'exa-uuid-test',
+      __SEARCH_FETCH: async (url, init) => {
+        const u = new URL(url);
+        if (u.hostname === 'api.exa.ai') {
+          const requestBody = JSON.parse(init.body);
+          assert.equal(requestBody.query, 'neural search');
+          assert.equal(init.headers['x-api-key'], 'exa-uuid-test');
+          assert.equal(requestBody.contents.highlights, true);
+          return Response.json({
+            resolvedSearchType: 'auto',
+            results: [
+              { title: 'Exa Docs', url: 'https://docs.exa.ai/', highlights: ['Search API reference.'] },
+              { title: 'Exa Blog', url: 'https://blog.exa.ai/post', highlights: ['Company updates.'] }
+            ]
+          });
+        }
+        if (u.hostname === 'en.wikipedia.org') {
+          return Response.json({ query: { search: [{ title: 'Search engine', snippet: 'S.', wordcount: 5 }] } });
+        }
+        return Response.json({ AbstractText: '', RelatedTopics: [] });
+      }
+    }
+  );
+  assert.equal(exaResponse.status, 200);
+  const exaData = await exaResponse.json();
+  assert.ok(exaData.results.some((r) => r.source === 'Exa'), 'Exa results must merge in');
+  assert.equal(exaData.results[0].source, 'Exa', 'Exa leads when keyed');
+  assert.equal(exaData.results[0].url, 'https://docs.exa.ai/');
+  assert.equal(exaData.results[0].snippet, 'Search API reference.');
+  assert.ok(exaData.meta.sources.includes('Exa'));
+
+  // Without a key Exa is never called and the keyless chain still answers.
+  let exaCalled = false;
+  const keylessResponse = await post(
+    { query: 'red turtles' },
+    {
+      __SEARCH_FETCH: async (url) => {
+        const u = new URL(url);
+        if (u.hostname === 'api.exa.ai') {
+          exaCalled = true;
+          return Response.json({ results: [] });
+        }
+        return Response.json({ query: { search: [{ title: 'Red turtle', snippet: 'S.', wordcount: 5 }] } });
+      }
+    }
+  );
+  assert.equal(keylessResponse.status, 200);
+  assert.equal(exaCalled, false, 'Exa must not be called without EXA_API_KEY');
+  assert.equal((await keylessResponse.json()).results[0].source, 'Wikipedia');
+
+  // Exa failing never breaks search: the keyless backstops still answer.
+  const exaDownResponse = await post(
+    { query: 'red turtles' },
+    {
+      EXA_API_KEY: 'exa-uuid-test',
+      __SEARCH_FETCH: async (url) => {
+        const u = new URL(url);
+        if (u.hostname === 'api.exa.ai') throw new Error('exa offline');
+        return Response.json({ query: { search: [{ title: 'Red turtle', snippet: 'S.', wordcount: 5 }] } });
+      }
+    }
+  );
+  assert.equal(exaDownResponse.status, 200);
+  assert.equal((await exaDownResponse.json()).results[0].source, 'Wikipedia');
+
+  // Deep research with Exa: full page text becomes the extract directly.
+  const exaDetailResponse = await post(
+    { query: 'neural search', detail: true },
+    {
+      EXA_API_KEY: 'exa-uuid-test',
+      __SEARCH_FETCH: async (url, init) => {
+        const u = new URL(url);
+        if (u.hostname === 'api.exa.ai') {
+          assert.equal(JSON.parse(init.body).contents.text, true);
+          return Response.json({
+            results: [
+              { title: 'Exa Docs', url: 'https://docs.exa.ai/', text: 'Full page content. '.repeat(200), highlights: ['h'] }
+            ]
+          });
+        }
+        return Response.json({ query: { search: [] } });
+      }
+    }
+  );
+  assert.equal(exaDetailResponse.status, 200);
+  const exaDetailData = await exaDetailResponse.json();
+  assert.equal(exaDetailData.meta.extracted, true);
+  const exaDetailResult = exaDetailData.results.find((r) => r.source === 'Exa');
+  assert.ok(exaDetailResult.extract, 'Exa extracts must attach in detail mode');
+  assert.ok(exaDetailResult.extract.length >= 100);
+
   // Both providers run and merge: Wikipedia results plus DuckDuckGo Lite
   // results, deduped by URL.
   const mergedResponse = await post(

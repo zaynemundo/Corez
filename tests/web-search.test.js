@@ -152,6 +152,135 @@ describe('Worker /api/search endpoint', () => {
     expect(response.status).toBe(400);
   });
 
+  it('leads with Exa results when EXA_API_KEY is configured', async () => {
+    const response = await handleSearch(
+      new Request('https://corez.test/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'quantum computing news' })
+      }),
+      {
+        EXA_API_KEY: 'exa-uuid-test',
+        __SEARCH_FETCH: async (url, init) => {
+          const u = new URL(url);
+          if (u.hostname === 'api.exa.ai') {
+            const requestBody = JSON.parse(init.body);
+            expect(requestBody.query).toBe('quantum computing news');
+            expect(init.headers['x-api-key']).toBe('exa-uuid-test');
+            expect(requestBody.contents).toEqual({ highlights: true });
+            return Response.json({
+              resolvedSearchType: 'auto',
+              results: [
+                { title: 'Quantum News', url: 'https://quantum.example/news', highlights: ['Latest breakthrough.'] }
+              ]
+            });
+          }
+          return Response.json({ query: { search: [] } });
+        }
+      }
+    );
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.results[0]).toMatchObject({
+      title: 'Quantum News',
+      url: 'https://quantum.example/news',
+      snippet: 'Latest breakthrough.',
+      source: 'Exa'
+    });
+    expect(data.meta.sources).toContain('Exa');
+  });
+
+  it('never calls Exa without a key and keeps the keyless backstop', async () => {
+    let exaCalled = false;
+    const response = await handleSearch(
+      new Request('https://corez.test/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'keyless test' })
+      }),
+      {
+        __SEARCH_FETCH: async (url) => {
+          const u = new URL(url);
+          if (u.hostname === 'api.exa.ai') {
+            exaCalled = true;
+            return Response.json({ results: [] });
+          }
+          if (u.hostname === 'en.wikipedia.org') {
+            return Response.json({
+              query: { search: [{ title: 'Keyless', snippet: 'S.', wordcount: 5 }] }
+            });
+          }
+          return Response.json({});
+        }
+      }
+    );
+    expect(response.status).toBe(200);
+    expect(exaCalled).toBe(false);
+    const data = await response.json();
+    expect(data.results.some((r) => r.source === 'Wikipedia')).toBe(true);
+  });
+
+  it('keeps answering via keyless providers when Exa fails', async () => {
+    const response = await handleSearch(
+      new Request('https://corez.test/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'red turtles' })
+      }),
+      {
+        EXA_API_KEY: 'exa-uuid-test',
+        __SEARCH_FETCH: async (url) => {
+          const u = new URL(url);
+          if (u.hostname === 'api.exa.ai') throw new Error('exa offline');
+          if (u.hostname === 'en.wikipedia.org') {
+            return Response.json({
+              query: { search: [{ title: 'Red turtle', snippet: 'S.', wordcount: 5 }] }
+            });
+          }
+          return Response.json({});
+        }
+      }
+    );
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.results[0].source).toBe('Wikipedia');
+  });
+
+  it('attaches full Exa page text as the extract in detail mode', async () => {
+    const response = await handleSearch(
+      new Request('https://corez.test/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'deep dive', detail: true })
+      }),
+      {
+        EXA_API_KEY: 'exa-uuid-test',
+        __SEARCH_FETCH: async (url, init) => {
+          const u = new URL(url);
+          if (u.hostname === 'api.exa.ai') {
+            expect(JSON.parse(init.body).contents).toEqual({ text: true, highlights: true });
+            return Response.json({
+              results: [
+                {
+                  title: 'Deep Page',
+                  url: 'https://deep.example/page',
+                  text: 'Full article text. '.repeat(200),
+                  highlights: ['Highlight.']
+                }
+              ]
+            });
+          }
+          return Response.json({ query: { search: [] } });
+        }
+      }
+    );
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.meta.extracted).toBe(true);
+    const exaResult = data.results.find((r) => r.source === 'Exa');
+    expect(exaResult.extract).toContain('Full article text.');
+  });
+
   it('returns an honest 502 when every provider yields nothing', async () => {
     const response = await handleSearch(
       new Request('https://corez.test/api/search', {
@@ -240,8 +369,7 @@ describe('cleanSearchQuery', () => {
   });
 });
 
-describe('Worker /api/search query relevance', () => {
-  it('searches the cleaned topic so "what is gold" cannot flood results with "What Is ..." titles', async () => {
+describe('Worker /api/search query relevance', () => {  it('searches the cleaned topic so "what is gold" cannot flood results with "What Is ..." titles', async () => {
     const capturedQueries = [];
     const response = await handleSearch(
       new Request('https://corez.test/api/search', {
