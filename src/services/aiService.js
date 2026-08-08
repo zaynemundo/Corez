@@ -3121,9 +3121,13 @@ export async function generateLocalAIResponse(prompt, hostedError = null, signal
 
   // 2. CREATOR FACT
   if (/\bwho\b.{0,20}\b(created|made|built|invented|developed)\b|\b(created|made|built|invented|developed)\b.{0,30}\b(corez|core z)\b/i.test(lower)) {
-    return `**Corez was founded and developed by [Zayne Mundo](https://www.linkedin.com/in/zayne-mundo/) (Founder & Lead Developer), alongside [Christian Vestil](https://www.linkedin.com/in/christian-jericson-belderol/) (Quality Assurance Tester) and [Renz Cardona](https://www.linkedin.com/in/renz-cardona-5941051b9/) (Chief Innovation Officer)** — a conversational AI creation platform that helps people turn ideas into working digital products without needing to code.
+    return `**Corez was founded and developed by:**
 
-Rather than only answering questions, Corez understands your intent and takes it all the way from idea to launch:
+- [Zayne Mundo](https://www.linkedin.com/in/zayne-mundo/) — **Founder & Lead Developer**
+- [Christian Vestil](https://www.linkedin.com/in/christian-jericson-belderol/) — **Quality Assurance Tester**
+- [Renz Cardona](https://www.linkedin.com/in/renz-cardona-5941051b9/) — **Chief Innovation Officer**
+
+**Why Corez exists?** Corez is a conversational AI creation platform that helps people turn ideas into working digital products without needing to code. Rather than only answering questions, it understands your intent and takes it all the way from idea to launch:
 
 - **Create** — websites, apps, games, tools, images, research reports and more
 - **Preview** — watch your creation come to life in a live preview
