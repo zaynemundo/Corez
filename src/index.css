@@ -1441,14 +1441,6 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-secondary);
 }
 
-.markdown-link.linkedin-link {
-  color: #0a66c2;
-}
-
-.markdown-link.linkedin-link:hover {
-  color: #004182;
-}
-
 .linkedin-icon {
   width: 14px;
   height: 14px;
