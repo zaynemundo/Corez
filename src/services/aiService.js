@@ -920,6 +920,41 @@ export async function generateHostedAIResponse(
   };
   if (signal) fetchOptions.signal = signal;
 
+  // Transport resilience: a dropped connection (NetworkError / Failed to
+  // fetch) is often a transient blip on the client's network or at the edge,
+  // not a provider failure. Retry the same request once after a short pause
+  // before reporting the transport failure — never retry when the user
+  // pressed Stop. Declared before the streaming branch: both paths use it,
+  // and a const referenced before its initializer would throw a temporal
+  // dead zone error on every streamed request.
+  const TRANSPORT_FAILURE_PATTERN = /networkerror|failed to fetch|load failed|fetch failed|connection (refused|reset|timed out)|network is unreachable|err_connection/i;
+  const fetchWithTransportRetry = async (options) => {
+    const attempts = [null, 3000];
+    for (let i = 0; i < attempts.length; i += 1) {
+      if (signal?.aborted) {
+        const err = new Error('AbortError');
+        err.name = 'AbortError';
+        throw err;
+      }
+      try {
+        return await fetch(AI_PROXY_ENDPOINT, options);
+      } catch (err) {
+        if (err?.name === 'AbortError' || signal?.aborted) throw err;
+        const message = `${err?.message || ''} ${err?.cause?.message || ''}`;
+        const isLastAttempt = i === attempts.length - 1;
+        if (!TRANSPORT_FAILURE_PATTERN.test(message) || isLastAttempt) throw err;
+        await new Promise((resolve) => {
+          const timer = setTimeout(resolve, attempts[i + 1]);
+          signal?.addEventListener('abort', () => {
+            clearTimeout(timer);
+            resolve();
+          }, { once: true });
+        });
+      }
+    }
+    throw new Error('Hosted AI request failed to reach the AI worker.');
+  };
+
   // Streaming path: the worker answers with SSE events (meta/delta/usage/
   // done/diagnostics). Deltas are delivered to onDelta as they arrive so the
   // user sees content before the generation finishes; the final content is
@@ -978,39 +1013,8 @@ export async function generateHostedAIResponse(
     return streamed;
   }
 
-  // Transport resilience: a dropped connection (NetworkError / Failed to
-  // fetch) is often a transient blip on the client's network or at the edge,
-  // not a provider failure. Retry the same request once after a short pause
-  // before reporting the transport failure — never retry when the user
-  // pressed Stop.
-  const TRANSPORT_FAILURE_PATTERN = /networkerror|failed to fetch|load failed|fetch failed|connection (refused|reset|timed out)|network is unreachable|err_connection/i;
-  const fetchWithTransportRetry = async (options) => {
-    const attempts = [null, 3000];
-    for (let i = 0; i < attempts.length; i += 1) {
-      if (signal?.aborted) {
-        const err = new Error('AbortError');
-        err.name = 'AbortError';
-        throw err;
-      }
-      try {
-        return await fetch(AI_PROXY_ENDPOINT, options);
-      } catch (err) {
-        if (err?.name === 'AbortError' || signal?.aborted) throw err;
-        const message = `${err?.message || ''} ${err?.cause?.message || ''}`;
-        const isLastAttempt = i === attempts.length - 1;
-        if (!TRANSPORT_FAILURE_PATTERN.test(message) || isLastAttempt) throw err;
-        await new Promise((resolve) => {
-          const timer = setTimeout(resolve, attempts[i + 1]);
-          signal?.addEventListener('abort', () => {
-            clearTimeout(timer);
-            resolve();
-          }, { once: true });
-        });
-      }
-    }
-    throw new Error('Hosted AI request failed to reach the AI worker.');
-  };
-
+  // Transport resilience: retry logic lives above with the streaming path
+  // (fetchWithTransportRetry). Non-streaming request:
   let response = await fetchWithTransportRetry(fetchOptions);
 
   let data;

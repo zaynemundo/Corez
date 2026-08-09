@@ -63,6 +63,38 @@ describe('Hosted AI fallback behavior', () => {
     expect(response).not.toContain('Hereâ€™s the useful way to think about');
   });
 
+  it('streams hosted responses without a temporal-dead-zone crash', async () => {
+    const fetchMock = vi.fn(async () => new Response(
+      'data: {"type":"meta"}\n\ndata: {"type":"delta","text":"Red is a color. "}\n\ndata: {"type":"delta","text":"It has the longest wavelength."}\n\ndata: {"type":"done","final":true}\n\n',
+      { status: 200 }
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const deltas = [];
+    const response = await generateHostedAIResponse('What is red?', undefined, [], null, {
+      stream: true,
+      onDelta: (text) => deltas.push(text)
+    });
+
+    expect(response).toBe('Red is a color. It has the longest wavelength.');
+    expect(deltas).toEqual(['Red is a color. ', 'It has the longest wavelength.']);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('delivers the full streamed answer to the chat flow without hitting the local fallback', async () => {
+    const fetchMock = vi.fn(async () => new Response(
+      'data: {"type":"meta"}\n\ndata: {"type":"delta","text":"Red is the color of blood and apples."}\n\ndata: {"type":"done","final":true}\n\n',
+      { status: 200 }
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await generateAIResponse('What is red?', [], null, () => {});
+
+    expect(response).toBe('Red is the color of blood and apples.');
+    expect(response).not.toContain('unavailable');
+    expect(response).not.toContain('Core idea');
+  });
+
   it('answers who created Corez with clickable creator profiles and the why, without self-introducing or mentioning APIs', async () => {
     const response = await generateLocalAIResponse('Who created Corez?', new Error('Hosted AI request failed: 503'));
     expect(response).toContain('[Zayne Mundo](https://www.linkedin.com/in/zayne-mundo/)');
