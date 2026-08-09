@@ -15,7 +15,11 @@ import {
   detectLiveDataNeed,
   buildRuntimeContext,
   buildRuntimeContextBlock,
-  runVerificationWithRepair
+  runVerificationWithRepair,
+  extractDataSeriesNumbers,
+  calcStats,
+  calcLinearTrend,
+  round2
 } from './skillVerification.js';
 
 // Storage key segments are validated identically on every R2-backed endpoint:
@@ -48,6 +52,56 @@ const SAFE_ROOM_ID = /^[a-z0-9][a-z0-9-]{2,31}$/;
 // Largest single decoded asset accepted by /api/assets/upload (10 MB decoded
 // ≈ 13.4 MB base64, well under the 24 MB JSON body bound).
 const MAX_ASSET_DECODED_BYTES = 10 * 1024 * 1024;
+
+function buildLiveDataDiagnostics(liveDataEvidence, liveDataNeed, verification) {
+  if (!liveDataEvidence) {
+    return liveDataNeed.required
+      ? { liveDataRequired: true, searchFetched: false, liveDataUsed: false, answerGrounded: false, liveDataNeed: liveDataNeed.kind }
+      : null;
+  }
+
+  const results = Array.isArray(verification?.results) ? verification.results : [];
+  const liveResult = results.find((result) => result.skillId === 'live-data-utilities');
+  const researchResult = results.find((result) => result.skillId === 'research-report');
+  const honestRefusal = Boolean(liveResult?.evidence?.honestRefusal);
+  const answerGrounded = liveResult
+    ? Boolean(liveResult.evidence?.liveDataUsed && liveResult.failures?.length === 0)
+    : researchResult
+      ? Boolean(researchResult.evidence?.groundingValid && researchResult.failures?.length === 0)
+      : false;
+
+  return {
+    liveDataRequired: liveDataNeed.required || false,
+    searchFetched: true,
+    liveDataUsed: answerGrounded,
+    answerGrounded,
+    honestRefusal,
+    dataSource: liveDataEvidence.sources,
+    fetchedAt: liveDataEvidence.fetchedAt,
+    sourceTimestamp: liveDataEvidence.servedAt,
+    freshnessMs: Math.max(0, Date.now() - new Date(liveDataEvidence.servedAt).getTime()),
+    resultsCount: liveDataEvidence.results.length
+  };
+}
+
+function buildDataAnalysisContext(prompt) {
+  const numbers = extractDataSeriesNumbers(prompt);
+  if (numbers.length < 2) return null;
+  const stats = calcStats(numbers);
+  const trend = calcLinearTrend(numbers);
+  const direction = numbers[numbers.length - 1] > numbers[0]
+    ? 'upward'
+    : numbers[numbers.length - 1] < numbers[0] ? 'downward' : 'flat';
+  return `Deterministic data-analysis results (authoritative; source order preserved):
+- Values: ${numbers.join(', ')}
+- Total: ${round2(stats.sum)}
+- Mean: ${round2(stats.mean)}
+- Median: ${round2(stats.median)}
+- First-to-last direction: ${direction}
+${trend ? `- Least-squares trend: y = ${round2(trend.intercept)} + ${round2(trend.slope)} * period
+- Next-period forecast: ${round2(trend.intercept + trend.slope * (numbers.length + 1))}` : ''}
+Use these checked values exactly. Do not recompute them from memory.`;
+}
 
 // Server-side fetch guard: provider-returned image URLs may only point at
 // public internet hosts. Loopback, link-local, private, CGNAT, and cloud
@@ -365,7 +419,11 @@ async function handleAi(request, env) {
   const specialistIds = Array.isArray(skills)
     ? skills.map((s) => (typeof s === 'string' ? s : s.id)).filter(Boolean)
     : [];
-  const needsGrounding = liveDataNeed.required || specialistIds.some((id) => ['live-data-utilities', 'research-report'].includes(id));
+  if (specialistIds.includes('data-analysis')) {
+    const dataContext = buildDataAnalysisContext(executionPrompt || prompt);
+    if (dataContext) apiMessages.push({ role: 'system', content: dataContext });
+  }
+  const needsGrounding = liveDataNeed.required || specialistIds.includes('research-report');
   let liveDataEvidence = null;
   if (needsGrounding && env?.__DISABLE_LIVE_GROUNDING !== 'true') {
     apiMessages.push({ role: 'system', content: buildRuntimeContextBlock(runtimeContext) });
@@ -513,6 +571,7 @@ async function handleAi(request, env) {
     };
     const encoder = new TextEncoder();
     const sse = (event) => `data: ${JSON.stringify(event)}\n\n`;
+    const bufferForSkillVerification = specialistSkills.length > 0;
     const readable = new ReadableStream({
       async start(controller) {
         let collected = '';
@@ -524,7 +583,7 @@ async function handleAi(request, env) {
           for await (const event of runStreamingChain(apiMessages, chainOptions)) {
             if (event.type === 'delta') {
               collected += event.text;
-              controller.enqueue(encoder.encode(sse(event)));
+              if (!bufferForSkillVerification) controller.enqueue(encoder.encode(sse(event)));
             } else if (event.type === 'meta') {
               providerId = providerId || event.provider || null;
               providerModel = providerModel || event.model || null;
@@ -557,7 +616,7 @@ async function handleAi(request, env) {
               if (repair.diagnostics.repaired && repair.diagnostics.repairReasons.length > 0) {
                 controller.enqueue(encoder.encode(sse({ type: 'validation', action: 'repaired', reasons: repair.diagnostics.repairReasons })));
                 const appended = repair.content.slice(collected.length);
-                if (appended) {
+                if (appended && !bufferForSkillVerification) {
                   controller.enqueue(encoder.encode(sse({ type: 'delta', text: appended })));
                 }
                 collected = repair.content;
@@ -568,10 +627,14 @@ async function handleAi(request, env) {
                 content: repair.content,
                 skills,
                 runtimeContext,
-                liveDataEvidence
+                liveDataEvidence,
+                searchEvidence: liveDataEvidence
               });
               const finalContent = verification.content;
-              if (finalContent !== collected) {
+              if (bufferForSkillVerification) {
+                controller.enqueue(encoder.encode(sse({ type: 'delta', text: finalContent })));
+                collected = finalContent;
+              } else if (finalContent !== collected) {
                 const appended = finalContent.slice(collected.length);
                 if (appended) {
                   controller.enqueue(encoder.encode(sse({ type: 'delta', text: appended })));
@@ -598,17 +661,7 @@ async function handleAi(request, env) {
                     repairAttempts: verification.repairAttempts,
                     latencyMs: verification.latencyMs
                   },
-                  liveData: liveDataEvidence
-                    ? {
-                        liveDataRequired: liveDataNeed.required || false,
-                        liveDataUsed: true,
-                        dataSource: liveDataEvidence.sources,
-                        fetchedAt: liveDataEvidence.fetchedAt,
-                        sourceTimestamp: liveDataEvidence.servedAt,
-                        freshnessMs: Math.max(0, Date.now() - new Date(liveDataEvidence.servedAt).getTime()),
-                        resultsCount: liveDataEvidence.results.length
-                      }
-                    : (liveDataNeed.required ? { liveDataRequired: true, liveDataUsed: false, liveDataNeed: liveDataNeed.kind } : null),
+                  liveData: buildLiveDataDiagnostics(liveDataEvidence, liveDataNeed, verification),
                   usage: {
                     initial: { inputTokens, outputTokens },
                     repairs: repairUsage,
@@ -710,7 +763,8 @@ async function handleAi(request, env) {
       content: processed.content,
       skills,
       runtimeContext,
-      liveDataEvidence
+      liveDataEvidence,
+      searchEvidence: liveDataEvidence
     });
     const finalContent = verification.content;
     const initialTokens = {
@@ -746,17 +800,7 @@ async function handleAi(request, env) {
         repairAttempts: verification.repairAttempts,
         latencyMs: verification.latencyMs
       },
-      liveData: liveDataEvidence
-        ? {
-            liveDataRequired: liveDataNeed.required || false,
-            liveDataUsed: true,
-            dataSource: liveDataEvidence.sources,
-            fetchedAt: liveDataEvidence.fetchedAt,
-            sourceTimestamp: liveDataEvidence.servedAt,
-            freshnessMs: Math.max(0, Date.now() - new Date(liveDataEvidence.servedAt).getTime()),
-            resultsCount: liveDataEvidence.results.length
-          }
-        : (liveDataNeed.required ? { liveDataRequired: true, liveDataUsed: false, liveDataNeed: liveDataNeed.kind } : null),
+      liveData: buildLiveDataDiagnostics(liveDataEvidence, liveDataNeed, verification),
       usage: {
         initial: initialTokens,
         repairs: repairUsage,

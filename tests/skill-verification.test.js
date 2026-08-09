@@ -8,7 +8,9 @@ import {
   buildRuntimeContext,
   checkTemporalClaims,
   extractNumbers,
+  extractDataSeriesNumbers,
   calcStats,
+  calcLinearTrend,
   round2,
   verifyArithmetic,
   checkOutputQuality,
@@ -27,6 +29,7 @@ import {
   verifyProductivity,
   runSkillVerification,
   applyDeterministicPatches,
+  applyMeetingNotesPatches,
   runVerificationWithRepair
 } from '../worker/skillVerification.js';
 import { evaluateCase } from '../benchmarks/evaluator-core.js';
@@ -83,6 +86,18 @@ describe('deterministic calculator', () => {
     expect(round2(stats.pctChanges[0])).toBe(100);
   });
 
+  it('computes percentage changes in source order', () => {
+    const stats = calcStats([12000, 15000, 9000, 16000, 21000]);
+    expect(round2(stats.pctChanges[0])).toBe(25);
+    expect(round2(stats.pctChanges[1])).toBe(-40);
+  });
+
+  it('computes a least-squares linear trend', () => {
+    const trend = calcLinearTrend([12000, 15000, 9000, 16000, 21000]);
+    expect(trend.slope).toBe(1900);
+    expect(trend.intercept).toBe(8900);
+  });
+
   it('verifies arithmetic and reports mismatches', () => {
     const ok = verifyArithmetic({ expected: 427.35, actual: 427.35 });
     expect(ok.failures).toEqual([]);
@@ -92,6 +107,11 @@ describe('deterministic calculator', () => {
 
   it('extracts numbers from text', () => {
     expect(extractNumbers('25,000 PHP and 1.5 hours')).toEqual([25000, 1.5]);
+  });
+
+  it('excludes incidental years and percentages from data series', () => {
+    expect(extractDataSeriesNumbers('Sales in 2026 were 12000, 15000, 9000.')).toEqual([12000, 15000, 9000]);
+    expect(extractDataSeriesNumbers('Analyze 5% growth over 100, 200, 300.')).toEqual([100, 200, 300]);
   });
 });
 
@@ -117,12 +137,26 @@ describe('live-data verifier', () => {
     expect(result.liveData.honestRefusal).toBe(true);
   });
 
+  it('rejects an approximation hidden inside an honest live-data refusal', () => {
+    const result = verifyLiveData({
+      prompt: 'Convert 25000 PHP to USD.',
+      content: 'I cannot retrieve the current rate, but 25000 PHP is usually in the low $400s.',
+      runtimeContext: buildRuntimeContext()
+    });
+    expect(result.failures).toContain('fabricated-live-value');
+  });
+
   it('accepts grounded live evidence with a fresh timestamp', () => {
     const result = verifyLiveData({
       prompt: 'Convert 25000 PHP to USD.',
-      content: 'As of August 9, 2026 (source: web-search), 25000 PHP converts to about 427 USD.',
+      content: 'As of August 9, 2026, 25000 PHP converts to about 427 USD (source: https://example.com/rate).',
       runtimeContext: buildRuntimeContext(new Date('2026-08-09T12:00:00Z')),
-      liveDataEvidence: { servedAt: '2026-08-09T10:00:00Z', sources: ['Wikipedia'], fetchedAt: '2026-08-09T10:00:00Z' }
+      liveDataEvidence: {
+        servedAt: '2026-08-09T10:00:00Z',
+        sources: ['example.com'],
+        fetchedAt: '2026-08-09T10:00:00Z',
+        results: [{ url: 'https://example.com/rate' }]
+      }
     });
     expect(result.failures).toEqual([]);
     expect(result.liveData.liveDataUsed).toBe(true);
@@ -137,12 +171,58 @@ describe('live-data verifier', () => {
     });
     expect(result.failures).toContain('stale-live-data');
   });
+
+  it('requires a real source URL for a numeric live claim', () => {
+    const result = verifyLiveData({
+      prompt: 'Convert 25000 PHP to USD.',
+      content: 'As of August 9, 2026, the current rate is 58.5 and the result is 427 USD.',
+      runtimeContext: buildRuntimeContext(new Date('2026-08-09T12:00:00Z')),
+      liveDataEvidence: { servedAt: '2026-08-09T10:00:00Z', sources: ['web-search'] }
+    });
+    expect(result.failures).toContain('missing-live-source');
+    expect(result.failures).toContain('fabricated-live-value');
+  });
+
+  it('rejects a live citation that was not among fetched evidence', () => {
+    const result = verifyLiveData({
+      prompt: 'Convert 25000 PHP to USD.',
+      content: '25000 PHP is 427 USD (source: https://rates.example.com/current).',
+      runtimeContext: buildRuntimeContext(),
+      liveDataEvidence: {
+        servedAt: new Date().toISOString(),
+        sources: ['Frankfurter'],
+        results: [{ url: 'https://api.frankfurter.app/latest?amount=25000&from=PHP&to=USD' }]
+      }
+    });
+    expect(result.failures).toContain('missing-live-source');
+    expect(result.failures).toContain('fabricated-live-value');
+  });
+
+  it('rejects invalid live evidence timestamps', () => {
+    const result = verifyLiveData({
+      prompt: 'Convert 25000 PHP to USD.',
+      content: '25000 PHP is 427 USD (source: https://example.com/rate).',
+      runtimeContext: buildRuntimeContext(),
+      liveDataEvidence: { servedAt: 'not-a-date', sources: ['example.com'], results: [{ url: 'https://example.com/rate' }] }
+    });
+    expect(result.failures).toContain('stale-live-data');
+  });
 });
 
 describe('research verifier', () => {
   it('extracts citations', () => {
     const citations = extractCitations('See [EV market](https://en.wikipedia.org/wiki/Electric_vehicle) and [IEA](https://www.iea.org/reports).');
     expect(citations).toHaveLength(2);
+  });
+
+  it('does not duplicate a markdown URL whose path ends in a period', () => {
+    const citations = extractCitations('[Tesla](https://en.wikipedia.org/wiki/Tesla%2C_Inc.)');
+    expect(citations).toHaveLength(1);
+  });
+
+  it('extracts markdown URLs containing balanced parentheses', () => {
+    const citations = extractCitations('[X](https://en.wikipedia.org/wiki/X_(social_network))');
+    expect(citations).toEqual([{ label: 'X', url: 'https://en.wikipedia.org/wiki/X_(social_network)' }]);
   });
 
   it('accepts valid, grounded citations', () => {
@@ -172,6 +252,40 @@ describe('research verifier', () => {
       searchEvidence: { results: [], servedAt: null }
     });
     expect(result.failures).toContain('unsupported-citation');
+  });
+
+  it('does not trust a plausible domain that was not fetched', () => {
+    const result = verifyResearch({
+      prompt: 'Research EV adoption and cite sources.',
+      content: 'See [report](https://evilgov.example/report).',
+      searchEvidence: {
+        results: [{ url: 'https://www.iea.org/reports/global-ev-outlook-2025' }],
+        servedAt: '2026-08-09T10:00:00Z'
+      }
+    });
+    expect(result.failures).toContain('unsupported-citation');
+    expect(result.evidence.groundingValid).toBe(false);
+  });
+
+  it('requires requested research citations to match fetched evidence', () => {
+    const result = verifyResearch({
+      prompt: 'Research EV adoption and cite sources.',
+      content: 'See [Wikipedia](https://en.wikipedia.org/wiki/Electric_vehicle).',
+      searchEvidence: { results: [], servedAt: '2026-08-09T10:00:00Z' }
+    });
+    expect(result.failures).toContain('unsupported-citation');
+  });
+
+  it('matches a fetched bare URL followed by sentence punctuation', () => {
+    const result = verifyResearch({
+      prompt: 'Research EV adoption and cite sources.',
+      content: 'See https://www.iea.org/reports/global-ev-outlook-2025.',
+      searchEvidence: {
+        results: [{ url: 'https://www.iea.org/reports/global-ev-outlook-2025' }],
+        servedAt: '2026-08-09T10:00:00Z'
+      }
+    });
+    expect(result.failures).toEqual([]);
   });
 });
 
@@ -214,6 +328,23 @@ describe('meeting-notes verifier', () => {
     });
     expect(result.failures).toEqual([]);
   });
+
+  it('rejects an invented task assigned to a real owner', () => {
+    const result = verifyMeetingNotes({
+      prompt: source,
+      content: '## Action Items\n\n| Owner | Task | Deadline |\n|---|---|---|\n| Maria | Audit database security | Friday |',
+      sourceText: source
+    });
+    expect(result.failures).toContain('fabricated-action-item');
+  });
+
+  it('rejects an owner inferred from a distant unrelated mention', () => {
+    const result = verifyMeetingNotes({
+      prompt: 'Team agreed to launch in June. Maria owns the landing page. John finalizes pricing Friday. Next sync Wednesday.',
+      content: '## Action Items\n\n| Owner | Task | Deadline |\n|---|---|---|\n| Team | Attend next sync | Wednesday |'
+    });
+    expect(result.failures).toContain('fabricated-owner');
+  });
 });
 
 describe('marketing verifier', () => {
@@ -231,6 +362,48 @@ describe('marketing verifier', () => {
       content: '[Optional launch offer: 15% off your first order]. Consider offering free shipping for launch.'
     });
     expect(result.failures).toEqual([]);
+  });
+
+  it('accepts a claim nested inside a larger explicit placeholder', () => {
+    const result = verifyMarketing({
+      prompt: 'Write launch copy for my coffee company.',
+      content: '[Option: Every batch is roast date-stamped / ethically sourced / roasted in small batches — insert verified process here].'
+    });
+    expect(result.failures).toEqual([]);
+  });
+
+  it('does not exempt an invented claim because unrelated text is bracketed', () => {
+    const result = verifyMarketing({
+      prompt: 'Write launch copy for my coffee company.',
+      content: 'Get 15% off [your first order] today.'
+    });
+    expect(result.failures).toContain('unsupported-business-claim');
+  });
+
+  it('allows business claims framed as facts to verify', () => {
+    const result = verifyMarketing({
+      prompt: 'Write launch copy for my coffee company.',
+      content: 'Confirm whether you offer free shipping before publishing.'
+    });
+    expect(result.failures).toEqual([]);
+  });
+
+  it('does not exempt assertive copy containing advisory verbs', () => {
+    for (const content of [
+      'Check out our award-winning coffee, shipped fresh daily.',
+      'We confirm free shipping on all orders.',
+      'Decide today: 20% off your first order.'
+    ]) {
+      expect(verifyMarketing({ prompt: 'Write launch copy.', content }).failures).toContain('unsupported-business-claim');
+    }
+  });
+
+  it('rejects invented fulfillment operations', () => {
+    const result = verifyMarketing({
+      prompt: 'Write launch copy for my coffee company.',
+      content: 'Every bag is roasted to order and shipped fresh.'
+    });
+    expect(result.failures).toContain('unsupported-business-claim');
   });
 });
 
@@ -250,6 +423,14 @@ describe('presentation verifier', () => {
     });
     expect(result.failures).toEqual([]);
   });
+
+  it('rejects an invented equation-style productivity statistic', () => {
+    const result = verifyPresentation({
+      prompt: 'Create a presentation about remote work.',
+      content: 'Use this visual: 5 pings = 23 minutes of lost focus.'
+    });
+    expect(result.failures).toContain('unsupported-statistic');
+  });
 });
 
 describe('data-analysis and finance verifiers', () => {
@@ -267,6 +448,42 @@ describe('data-analysis and finance verifiers', () => {
     expect(bad.failures).toContain('arithmetic-error');
   });
 
+  it('verifies month-over-month percentages and forecast arithmetic', () => {
+    const wrongPercentage = verifyDataAnalysis({
+      prompt: 'Sales were 12000, 15000, 9000, 16000, 21000. What is the trend?',
+      content: 'The average is 14600. Month 3 fell 60% below month 2.'
+    });
+    expect(wrongPercentage.failures).toContain('percentage-error');
+
+    const wrongForecast = verifyDataAnalysis({
+      prompt: 'Sales were 12000, 15000, 9000, 16000, 21000. What is the trend?',
+      content: 'The average is 14600. Sales ≈ 8,900 + 1,900 × Month. Month 6 forecast: 21,300.'
+    });
+    expect(wrongForecast.failures).toContain('trend-calculation-error');
+
+    const wrongSlope = verifyDataAnalysis({
+      prompt: 'Sales were 12000, 15000, 9000, 16000, 21000. What is the trend?',
+      content: 'The average is 14600. Linear trend slope: 3700 per month. Month 6 forecast: 24500.'
+    });
+    expect(wrongSlope.failures).toContain('trend-calculation-error');
+  });
+
+  it('rejects a trend direction that contradicts the data', () => {
+    const result = verifyDataAnalysis({
+      prompt: 'Sales were 12000, 15000, 9000, 16000, 21000. What is the trend?',
+      content: 'The average is 14600. The overall trend is downward.'
+    });
+    expect(result.failures).toContain('trend-calculation-error');
+  });
+
+  it('does not mistake a percentage-of statement for percentage change', () => {
+    const result = verifyDataAnalysis({
+      prompt: 'Sales were 12000, 15000, 9000, 16000, 21000.',
+      content: 'The average is 14600. Month 3 sales were 9000, which is 60% of month 2 sales.'
+    });
+    expect(result.failures).not.toContain('percentage-error');
+  });
+
   it('verifies a budget totals exactly the stated income', () => {
     const ok = verifyFinance({
       prompt: 'Build a monthly budget for a family with 40000 PHP income.',
@@ -279,6 +496,22 @@ describe('data-analysis and finance verifiers', () => {
       content: 'Total: 38000 PHP.'
     });
     expect(bad.failures).toContain('arithmetic-error');
+  });
+
+  it('rejects an itemized budget whose rows do not add to the stated total', () => {
+    const result = verifyFinance({
+      prompt: 'Build a monthly budget for 40000 PHP income.',
+      content: '| Category | Monthly Budget |\n|---|---:|\n| Housing | 15000 PHP |\n| Food | 10000 PHP |\n| Savings | 10000 PHP |\n| **Total** | **40000 PHP** |'
+    });
+    expect(result.failures).toContain('arithmetic-error');
+  });
+
+  it('does not double-count subtotals or adjacent summary tables', () => {
+    const result = verifyFinance({
+      prompt: 'Build a monthly budget for 40000 PHP income.',
+      content: '| Category | Amount |\n|---|---:|\n| Needs | 24000 PHP |\n| Savings | 8000 PHP |\n| Wants | 8000 PHP |\n\n## Details\n\n| Line Item | Amount |\n|---|---:|\n| Rent | 15000 PHP |\n| Food | 9000 PHP |\n| Needs total | 24000 PHP |\n| Emergency fund | 8000 PHP |\n| Wants | 8000 PHP |\n| Grand Total | 40000 PHP |'
+    });
+    expect(result.failures).toEqual([]);
   });
 
   it('flags business figures without assumption labels', () => {
@@ -375,6 +608,10 @@ describe('productivity verifier', () => {
 });
 
 describe('output quality and deterministic patches', () => {
+  it('accepts an empty response without throwing', () => {
+    expect(checkOutputQuality('').failures).toEqual([]);
+  });
+
   it('detects duplicate paragraphs and dangling fences', () => {
     const result = checkOutputQuality('Same long paragraph here.\n\nSame long paragraph here.\n\n```js\ncode\n');
     expect(result.failures).toContain('duplicate-critical-content');
@@ -399,6 +636,25 @@ describe('output quality and deterministic patches', () => {
     });
     expect(verdict.repairAttempts).toBeLessThanOrEqual(MAX_REPAIR_ATTEMPTS);
     expect(verdict.hardFailures).toContain('fabricated-live-value');
+  });
+
+  it('removes unsupported meeting owners and replaces unsupported deadlines', () => {
+    const prompt = 'Team agreed to launch in June. Maria owns the landing page. John finalizes pricing Friday. Next sync Wednesday.';
+    const content = '## Action Items\n\n| Owner | Task | Due Date |\n|---|---|---|\n| Maria | Complete landing page | June launch |\n| John | Finalize pricing | Friday |\n| Team | Attend next sync | Wednesday |';
+    const patched = applyMeetingNotesPatches({ content, sourceText: prompt });
+    expect(patched.changed).toBe(true);
+    expect(patched.content).toContain('| Maria | Complete landing page | Not stated |');
+    expect(patched.content).toContain('| John | Finalize pricing | Friday |');
+    expect(patched.content).not.toContain('| Team |');
+
+    const verdict = runVerificationWithRepair({
+      prompt,
+      content,
+      skills: [{ id: 'meeting-notes' }],
+      runtimeContext: buildRuntimeContext()
+    });
+    expect(verdict.hardFailures).toEqual([]);
+    expect(verdict.repairAttempts).toBe(1);
   });
 });
 

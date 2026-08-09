@@ -48,7 +48,11 @@ export const SKILL_HARD_FAILURES = [
   'unsupported-forecast',
   'critical-safety-issue',
   'duplicate-critical-content',
-  'unlabeled-assumption'
+  'unlabeled-assumption',
+  'malformed-code-fence',
+  'broken-inline-code',
+  'empty-heading',
+  'unfinished-sentence'
 ];
 
 export const SKILL_HARD_FAILURE_SET = new Set(SKILL_HARD_FAILURES);
@@ -222,6 +226,13 @@ export function extractNumbers(value) {
     .filter((n) => Number.isFinite(n));
 }
 
+export function extractDataSeriesNumbers(value) {
+  const text = String(value || '')
+    .replace(/\b(?:19|20)\d{2}\b/g, '')
+    .replace(/\b\d[\d,]*(?:\.\d+)?\s*%/g, '');
+  return extractNumbers(text);
+}
+
 export function calcStats(numbers) {
   const sorted = [...numbers].sort((a, b) => a - b);
   const sum = sorted.reduce((acc, n) => acc + n, 0);
@@ -232,9 +243,9 @@ export function calcStats(numbers) {
     median = sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
   }
   const pctChanges = [];
-  for (let i = 1; i < sorted.length; i += 1) {
-    const prev = sorted[i - 1];
-    pctChanges.push(prev !== 0 ? ((sorted[i] - prev) / Math.abs(prev)) * 100 : null);
+  for (let i = 1; i < numbers.length; i += 1) {
+    const prev = numbers[i - 1];
+    pctChanges.push(prev !== 0 ? ((numbers[i] - prev) / Math.abs(prev)) * 100 : null);
   }
   return { sum, mean, median, pctChanges, count: sorted.length };
 }
@@ -311,7 +322,7 @@ export function checkOutputQuality(content) {
   // Unfinished sentence: only plain prose tails count. Lists, URLs, table
   // rows, code, and closing brackets are valid structural endings.
   const tail = text.trim().replace(/```\s*$/, '').trim();
-  const lastLine = tail.split('\n').filter(Boolean).pop().trim() || '';
+  const lastLine = tail.split('\n').filter(Boolean).pop()?.trim() || '';
   const structuralEnding = /^(?:[-*]|\d+[.)]|\|)/.test(lastLine)
     || /https?:\/\/\S+$/.test(lastLine)
     || /[.!?…""'')\]}>*|:]$/.test(lastLine)
@@ -344,13 +355,24 @@ const HONEST_LIVE_REFUSAL_PATTERNS = [
   /\[live data (unavailable|not configured|required)\]/i
 ];
 
-const LIVE_SOURCE_MARKER_PATTERNS = [
-  /https?:\/\/\S+/i,
-  /\b(?:source|via|from)\s*[:]?\s*(?:https?:\/\/\S+|\b[A-Za-z][\w.]*\.(?:com|org|gov|edu|net|io|co|ph|jp|de|uk|fr|finance|markets|investing)\b)/i,
-  /\b(as of|fetched at|retrieved on|last updated|as at)\s+[A-Za-z]{3,9}\s?\d{1,2},?\s?\d{4}/i,
-  /\b(as of|fetched at|retrieved on|last updated|as at)\s+\d{4}-\d{2}-\d{2}/i,
-  /\b(served at|fetchedAt|sourceTimestamp|data source)\b/i
-];
+const LIVE_SOURCE_URL_PATTERN = /https?:\/\/\S+/i;
+
+function extractLiveClaimNumbers(text) {
+  const claims = [];
+  const patterns = [
+    /(?:[$€£₱]\s*)?(\d[\d,]*(?:\.\d+)?)(?:s)?\s*(?:%|usd|php|eur|gbp|jpy|krw|cad|aud|inr|°c|°f|m\/s|km\/h|am|pm)\b/gi,
+    /[$€£₱]\s*(\d[\d,]*(?:\.\d+)?)(?:s)?\b/gi,
+    /\b(?:rate|price|temperature|score|value|amount)\s+(?:is|was|=|of)\s+(\d[\d,]*(?:\.\d+)?)/gi
+  ];
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(String(text || ''))) !== null) {
+      const value = Number(match[1].replace(/,/g, ''));
+      if (Number.isFinite(value)) claims.push(value);
+    }
+  }
+  return claims;
+}
 
 export function verifyLiveData({ prompt, content, runtimeContext, liveDataEvidence }) {
   const failures = [];
@@ -362,32 +384,49 @@ export function verifyLiveData({ prompt, content, runtimeContext, liveDataEviden
 
   const text = String(content || '');
 
+  const promptNumbers = extractNumbers(prompt);
+  const claimedNumbers = extractLiveClaimNumbers(text);
+  const newNumericClaims = claimedNumbers.filter((claim) => !promptNumbers.some((given) => Math.abs(given - claim) < 0.000001));
+  const hasNumericClaim = newNumericClaims.length > 0;
+
   if (HONEST_LIVE_REFUSAL_PATTERNS.some((p) => p.test(text))) {
     evidence.honestRefusal = true;
-    return { failures, evidence, liveData: { liveDataRequired: true, liveDataUsed: false, honestRefusal: true } };
+    evidence.numericClaims = newNumericClaims;
+    if (hasNumericClaim) failures.push('fabricated-live-value');
+    return {
+      failures: Array.from(new Set(failures)),
+      evidence,
+      liveData: { liveDataRequired: true, liveDataUsed: false, honestRefusal: true }
+    };
   }
 
-  const hasNumericClaim = /\b\d[\d,]*\.?\d*\s?(?:%|usd|php|eur|gbp|jpy|°c|°f|m\/s|km\/h|am|pm)\b/i.test(text);
-  const hasSource = LIVE_SOURCE_MARKER_PATTERNS.some((p) => p.test(text));
+  const citedUrls = extractCitations(text).map((citation) => citation.url);
+  const fetchedUrls = new Set((liveDataEvidence?.results || []).map((result) => canonicalUrl(result.url)));
+  const hasSource = LIVE_SOURCE_URL_PATTERN.test(text);
+  const hasGroundedSource = citedUrls.some((url) => fetchedUrls.has(canonicalUrl(url)));
   const usedLive = Boolean(liveDataEvidence && liveDataEvidence.servedAt);
 
   if (usedLive) {
     evidence.liveDataUsed = true;
     const servedAt = new Date(liveDataEvidence.servedAt);
-    const freshnessMs = Math.max(0, Date.now() - servedAt.getTime());
+    const validTimestamp = Number.isFinite(servedAt.getTime());
+    const freshnessMs = validTimestamp ? Math.max(0, Date.now() - servedAt.getTime()) : null;
     evidence.freshnessMs = freshnessMs;
     evidence.dataSource = liveDataEvidence.sources || 'web-search';
     evidence.fetchedAt = liveDataEvidence.fetchedAt || liveDataEvidence.servedAt;
     evidence.sourceTimestamp = liveDataEvidence.servedAt;
     const maxAgeMs = Number(liveDataEvidence.maxAgeMs) || 12 * 60 * 60 * 1000;
-    if (freshnessMs > maxAgeMs) failures.push('stale-live-data');
+    if (!validTimestamp || freshnessMs > maxAgeMs) failures.push('stale-live-data');
     // A value asserted without any source marker is still fabricated even
     // when live evidence was fetched (the model ignored the evidence).
-    if (hasNumericClaim && !hasSource) failures.push('fabricated-live-value');
+    if (hasNumericClaim && (!hasSource || !hasGroundedSource)) {
+      failures.push('missing-live-source');
+      failures.push('fabricated-live-value');
+    }
     return {
       failures: Array.from(new Set(failures)),
       evidence,
-      liveData: { liveDataRequired: true, liveDataUsed: true, freshnessValid: freshnessMs <= maxAgeMs, ...evidence }
+      liveData: { liveDataRequired: true, liveDataUsed: true, freshnessValid: validTimestamp && freshnessMs <= maxAgeMs, ...evidence }
     };
   }
 
@@ -408,7 +447,7 @@ export function verifyLiveData({ prompt, content, runtimeContext, liveDataEviden
 // Verifier: RESEARCH — citations must be real and grounded, never invented.
 // ---------------------------------------------------------------------------
 
-const CITATION_PATTERN = /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g;
+const CITATION_PATTERN = /\[([^\]]+)\]\((https?:\/\/(?:[^()\s]+|\([^()\s]*\))+)\)/g;
 
 export function extractCitations(content) {
   const text = String(content || '');
@@ -422,9 +461,11 @@ export function extractCitations(content) {
   }
   // Plain-text URLs (numbered source lists) count as citations too — a
   // sources section written as bare links is still evidence.
-  const bareUrls = text.match(/https?:\/\/[^\s)\]>]+/g) || [];
+  CITATION_PATTERN.lastIndex = 0;
+  const textWithoutMarkdownLinks = text.replace(CITATION_PATTERN, '');
+  const bareUrls = textWithoutMarkdownLinks.match(/https?:\/\/[^\s)\]>]+/g) || [];
   for (const url of bareUrls) {
-    const cleaned = url.replace(/[.,;]+$/, '');
+    const cleaned = url.replace(/[,;]+$/, '');
     const key = cleaned.replace(/\/+$/, '').toLowerCase();
     if (!seen.has(key)) {
       citations.push({ label: cleaned, url: cleaned });
@@ -446,17 +487,15 @@ function validCitationUrl(url) {
   }
 }
 
-const KNOWN_SOURCE_HOSTS = [
-  'wikipedia.org', 'gov', 'edu', 'who.int', 'un.org', 'europa.eu', 'bbc.com',
-  'reuters.com', 'apnews.com', 'nature.com', 'science.org', 'arxiv.org',
-  'worldbank.org', 'imf.org', 'oecd.org', 'investopedia.com', 'statista.com',
-  'mdpi.com', 'researchgate.net', 'springer.com', 'sciencedirect.com',
-  'frontiersin.org', 'ieee.org', 'wiley.com', 'acm.org', 'cell.com',
-  'biomedcentral.com', 'taylorfrancis.com', 'sagepub.com', 'cambridge.org',
-  'oup.com', 'jstor.org', 'pubmed.ncbi.nlm.nih.gov', 'ncbi.nlm.nih.gov',
-  'newscientist.com', 'economist.com', 'theguardian.com', 'nytimes.com',
-  'forbes.com', 'bloomberg.com', 'cnn.com', 'aljazeera.com'
-];
+function canonicalUrl(value) {
+  try {
+    const parsed = new URL(value);
+    const pathname = decodeURIComponent(parsed.pathname).replace(/\/$/, '').replace(/\.$/, '');
+    return `${parsed.protocol.toLowerCase()}//${parsed.hostname.toLowerCase()}${pathname}${parsed.search}`;
+  } catch {
+    return String(value || '').replace(/\/+$/, '').toLowerCase();
+  }
+}
 
 export function verifyResearch({ prompt, content, searchEvidence }) {
   const failures = [];
@@ -465,18 +504,17 @@ export function verifyResearch({ prompt, content, searchEvidence }) {
   const askedForSources = /\b(cite|sources?|references?|latest|current|recent|as of)\b/i.test(String(prompt || ''));
 
   const citations = extractCitations(text);
-  const fetchedUrls = new Set((searchEvidence?.results || []).map((r) => String(r.url || '').replace(/\/+$/, '').toLowerCase()));
+  const fetchedUrls = new Set((searchEvidence?.results || []).map((r) => canonicalUrl(r.url)));
 
   for (const citation of citations) {
     const valid = validCitationUrl(citation.url);
-    const fetched = fetchedUrls.size > 0 && fetchedUrls.has(citation.url.replace(/\/+$/, '').toLowerCase());
-    const knownHost = KNOWN_SOURCE_HOSTS.some((host) => citation.url.toLowerCase().includes(host));
+    const fetched = fetchedUrls.size > 0 && fetchedUrls.has(canonicalUrl(citation.url));
     evidence.citations.push({
       id: `c-${evidence.citations.length + 1}`,
       url: citation.url,
       title: citation.label,
       fetched: Boolean(fetched),
-      verified: valid && (fetched || knownHost),
+      verified: valid && fetched,
       supportsClaim: fetched ? 'pending' : null,
       claims: []
     });
@@ -486,13 +524,14 @@ export function verifyResearch({ prompt, content, searchEvidence }) {
     } else if (fetched) {
       evidence.fetchedSources += 1;
       evidence.verifiedSources += 1;
-    } else if (knownHost) {
-      evidence.verifiedSources += 1;
+    } else if (askedForSources) {
+      evidence.failedSources += 1;
+      failures.push('unsupported-citation');
     }
   }
   evidence.requestedSources = citations.length;
 
-  const hasAnyGrounded = citations.length > 0 && evidence.verifiedSources >= Math.ceil(citations.length * 0.5);
+  const hasAnyGrounded = citations.length > 0 && evidence.fetchedSources >= Math.ceil(citations.length * 0.5);
   if (askedForSources && citations.length === 0) {
     failures.push('unsupported-citation');
   }
@@ -573,18 +612,18 @@ export function verifyMeetingNotes({ prompt, content, sourceText }) {
     }
     seen.add(key);
 
-    let explicit = actionLower.length > 0 && (
+    const tokens = actionLower.replace(/[^a-z0-9 ]/g, ' ').split(/\s+/)
+      .filter((t) => t.length > 3 && !STOPWORDS.has(t));
+    const groundedTokens = tokens.filter((t) => normalizedSource.includes(t));
+    const actionGrounded = actionLower.length > 0 && (
       normalizedSource.includes(actionLower.slice(0, 40))
-      || (action.owner && normalizedSource.includes(action.owner.toLowerCase()))
+      || (tokens.length > 0 && groundedTokens.length >= Math.ceil(tokens.length / 2))
     );
-    // Paraphrased bullet actions count as grounded when the owner is in the
-    // source AND at least one meaningful action token appears there too.
-    if (!explicit && action.owner) {
-      const tokens = actionLower.replace(/[^a-z0-9 ]/g, ' ').split(/\s+/)
-        .filter((t) => t.length > 3 && !STOPWORDS.has(t));
-      const anyTokenGrounded = tokens.some((t) => normalizedSource.includes(t));
-      if (anyTokenGrounded) explicit = true;
-    }
+    const ownerLower = String(action.owner || '').toLowerCase();
+    const ownerIndex = ownerLower ? normalizedSource.indexOf(ownerLower) : -1;
+    const tokenIndexes = groundedTokens.map((token) => normalizedSource.indexOf(token)).filter((index) => index >= 0);
+    const ownerGrounded = !action.owner || (ownerIndex >= 0 && tokenIndexes.some((index) => Math.abs(index - ownerIndex) <= 80));
+    const explicit = actionGrounded && ownerGrounded;
     evidence.actions.push({
       action: action.action,
       owner: action.owner,
@@ -592,16 +631,19 @@ export function verifyMeetingNotes({ prompt, content, sourceText }) {
       sourceEvidence: actionLower.slice(0, 80),
       explicit: Boolean(explicit)
     });
-    if (!explicit && action.owner) {
+    if (!actionGrounded) {
+      failures.push('fabricated-action-item');
+    }
+    if (!ownerGrounded && action.owner) {
       failures.push('fabricated-owner');
     }
-    if (!explicit && action.deadline) {
+    const meaningfulDeadline = action.deadline && !/^(?:not stated|not specified|none|n\/a|tbd|ongoing)$/i.test(action.deadline.trim());
+    if (meaningfulDeadline) {
       // A deadline is fabricated when it is absent from the source, or when
       // it appears in the source only far away from the owner/action that
       // claims it (e.g. "Next sync Wednesday" must not become Maria's
       // Wednesday deadline).
       const deadlineLower = action.deadline.toLowerCase();
-      const ownerLower = String(action.owner || '').toLowerCase();
       const inSource = normalizedSource.includes(deadlineLower);
       let nearOwner = false;
       if (inSource && ownerLower) {
@@ -611,12 +653,6 @@ export function verifyMeetingNotes({ prompt, content, sourceText }) {
       }
       if (!inSource || (ownerLower && !nearOwner)) {
         failures.push('fabricated-deadline');
-      }
-    }
-    if (!explicit && !action.owner && actionLower.length > 0) {
-      const phrase = actionLower.split(/\s+/).slice(0, 6).join(' ');
-      if (phrase && !normalizedSource.includes(phrase)) {
-        failures.push('fabricated-action-item');
       }
     }
   }
@@ -640,10 +676,12 @@ const FABRICATED_BUSINESS_CLAIM_PATTERNS = [
   /\b(award[- ]winning|best[- ]selling|top[- ]rated)\b/i,
   /\bused by \d[\d,]* (customers|users|people|teams)\b/i,
   /\b(roasted|brewed|baked|handmade) (this|every) week\b/i,
-  /\b(backed by|trusted by) \d[\d,]*\b/i
+  /\b(backed by|trusted by) \d[\d,]*\b/i,
+  /\b(roasted to order|shipped fresh|packed within hours|built our own roastery|roasting in the garage)\b/i
 ];
 
 const PLACEHOLDER_MARKERS = /\[(?:optional|placeholder|insert|consider|suggested)[^\]]*\]|consider (?:offering|giving|adding|using)|suggest(?:ion|ed)?/i;
+const NON_ASSERTIVE_CLAIM_CONTEXT = /\b(?:check|confirm|verify)\s+(?:whether|if|before)\b|\bif\s+you\s+offer\b|\byour\s+real\s+(?:offer|policy|claim|rate|details?)\b/i;
 
 export function verifyMarketing({ _prompt, content }) {
   const failures = [];
@@ -658,7 +696,11 @@ export function verifyMarketing({ _prompt, content }) {
       // "[region/farm]") is an explicit placeholder, not an invented fact.
       // Markdown links are excluded from the bracket check.
       const withoutLinks = line.replace(/\[[^\]]+\]\([^)]+\)/g, '');
-      if (PLACEHOLDER_MARKERS.test(line) || /[[\]]/.test(withoutLinks)) continue;
+      const claimIndex = withoutLinks.indexOf(match[0]);
+      const claimIsBracketed = Array.from(withoutLinks.matchAll(/\[[^\]]*\]/g)).some((bracket) =>
+        claimIndex >= bracket.index && claimIndex < bracket.index + bracket[0].length
+      );
+      if (PLACEHOLDER_MARKERS.test(line) || NON_ASSERTIVE_CLAIM_CONTEXT.test(line) || claimIsBracketed) continue;
       evidence.claims.push(match[0].slice(0, 120));
       failures.push('unsupported-business-claim');    }
   }
@@ -675,7 +717,8 @@ const STATISTIC_CLAIM_PATTERNS = [
   /\b(?:increase|decrease|rise|drop|boost)\s+of\s+\d{1,3}%\b/i,
   /\b(?:additional|extra|saved)\s+\d+(?:\.\d+)? (hours|minutes|days|dollars|hours per week)\b/i,
   /\b(?:study|research|survey|report)[\s\S]{0,60}\b\d{1,3}%\b/i,
-  /\bper year\b.{0,40}\b\d+%/i
+  /\bper year\b.{0,40}\b\d+%/i,
+  /\b\d+\s+\w+\s*=\s*\d+(?:\.\d+)?\s*(?:minutes?|hours?|days?)\b/i
 ];
 
 export function verifyPresentation({ prompt, content }) {
@@ -704,7 +747,7 @@ export function verifyPresentation({ prompt, content }) {
 export function verifyDataAnalysis({ prompt, content }) {
   const failures = [];
   const evidence = { checks: [] };
-  const promptNumbers = extractNumbers(String(prompt || ''));
+  const promptNumbers = extractDataSeriesNumbers(String(prompt || ''));
   const responseNumbers = extractNumbers(String(content || ''));
   if (promptNumbers.length >= 2) {
     const expected = calcStats(promptNumbers);
@@ -722,8 +765,85 @@ export function verifyDataAnalysis({ prompt, content }) {
     // answer ("what is the trend?") has no obligation to state a total.
     check('sum', expected.sum, responseNumbers, /\btotal\b|\bsum of\b|\ball.?time\b/i.test(String(content || '')));
     check('mean', expected.mean, responseNumbers);
+
+    const text = String(content || '');
+    const monthPercentagePattern = /\bmonth\s+(\d+)\b[^\n]{0,40}?\b(?:fell|dropped|decreased|declined|rose|grew|increased)\s+(?:by\s+)?(\d+(?:\.\d+)?)%/gi;
+    let percentageMatch;
+    while ((percentageMatch = monthPercentagePattern.exec(text)) !== null) {
+      const month = Number(percentageMatch[1]);
+      const claimed = Number(percentageMatch[2]);
+      const expectedChange = expected.pctChanges[month - 2];
+      if (Number.isFinite(expectedChange) && Math.abs(Math.abs(expectedChange) - claimed) > 0.5) {
+        failures.push('percentage-error');
+        evidence.checks.push({ label: `month-${month}-percentage`, expected: round2(expectedChange), found: claimed });
+      }
+    }
+
+    const directionMatch = text.match(/\b(?:overall\s+)?trend\s+(?:is|was|looks?)\s+(upward|downward|flat|stable)\b/i);
+    if (directionMatch) {
+      const actualDirection = numbersDirection(promptNumbers);
+      const claimedDirection = /upward/i.test(directionMatch[1]) ? 'upward' : /downward/i.test(directionMatch[1]) ? 'downward' : 'flat';
+      if (actualDirection !== claimedDirection) {
+        failures.push('trend-calculation-error');
+        evidence.checks.push({ label: 'trend-direction', expected: actualDirection, found: claimedDirection });
+      }
+    }
+
+    const trend = calcLinearTrend(promptNumbers);
+    const slopeMatch = text.match(/\blinear\s+trend\s+slope[^\d+-]{0,20}([-+]?[\d,]+(?:\.\d+)?)/i)
+      || text.match(/\bexpected\s+(?:increase|decrease)[^\d+-]{0,20}([-+]?[\d,]+(?:\.\d+)?)\s+per\s+(?:month|period)/i);
+    if (slopeMatch && trend) {
+      const claimedSlope = Number(slopeMatch[1].replace(/,/g, ''));
+      const signedSlope = /decrease/i.test(slopeMatch[0]) && claimedSlope > 0 ? -claimedSlope : claimedSlope;
+      const arithmetic = verifyArithmetic({ expected: trend.slope, actual: signedSlope, tolerance: 0.01, failure: 'trend-calculation-error' });
+      failures.push(...arithmetic.failures);
+      evidence.checks.push({ label: 'linear-trend-slope', expected: round2(trend.slope), found: signedSlope, ok: arithmetic.failures.length === 0 });
+    }
+
+    const formulaMatch = text.match(/(?:sales|trend|y)?\s*[≈~=]\s*([\d,]+(?:\.\d+)?)\s*\+\s*([\d,]+(?:\.\d+)?)\s*[×*x]\s*(?:month|x)/i);
+    const forecastMatch = text.match(/\bmonth\s+(\d+)\s+forecast[^\d]{0,20}([\d,]+(?:\.\d+)?)/i);
+    if (formulaMatch && forecastMatch) {
+      const intercept = Number(formulaMatch[1].replace(/,/g, ''));
+      const slope = Number(formulaMatch[2].replace(/,/g, ''));
+      const month = Number(forecastMatch[1]);
+      const forecast = Number(forecastMatch[2].replace(/,/g, ''));
+      const formulaValue = intercept + slope * month;
+      const arithmetic = verifyArithmetic({ expected: formulaValue, actual: forecast, tolerance: 0.01, failure: 'trend-calculation-error' });
+      failures.push(...arithmetic.failures);
+      evidence.checks.push({ label: 'forecast-formula', expected: formulaValue, found: forecast, ok: arithmetic.failures.length === 0 });
+    } else if (forecastMatch && trend) {
+      const month = Number(forecastMatch[1]);
+      const forecast = Number(forecastMatch[2].replace(/,/g, ''));
+      const expectedForecast = trend.intercept + trend.slope * month;
+      const arithmetic = verifyArithmetic({ expected: expectedForecast, actual: forecast, tolerance: 0.01, failure: 'trend-calculation-error' });
+      failures.push(...arithmetic.failures);
+      evidence.checks.push({ label: 'linear-trend-forecast', expected: round2(expectedForecast), found: forecast, ok: arithmetic.failures.length === 0 });
+    }
   }
   return { failures: Array.from(new Set(failures)), evidence };
+}
+
+function numbersDirection(numbers) {
+  if (numbers.length < 2) return 'flat';
+  const delta = numbers[numbers.length - 1] - numbers[0];
+  if (Math.abs(delta) < 0.000001) return 'flat';
+  return delta > 0 ? 'upward' : 'downward';
+}
+
+export function calcLinearTrend(numbers) {
+  if (!Array.isArray(numbers) || numbers.length < 2) return null;
+  const meanX = (numbers.length + 1) / 2;
+  const meanY = numbers.reduce((sum, value) => sum + value, 0) / numbers.length;
+  let numerator = 0;
+  let denominator = 0;
+  for (let index = 0; index < numbers.length; index += 1) {
+    const x = index + 1;
+    numerator += (x - meanX) * (numbers[index] - meanY);
+    denominator += (x - meanX) ** 2;
+  }
+  if (denominator === 0) return null;
+  const slope = numerator / denominator;
+  return { slope, intercept: meanY - slope * meanX };
 }
 
 export function verifyFinance({ prompt, content }) {
@@ -740,6 +860,45 @@ export function verifyFinance({ prompt, content }) {
       evidence.checks.push({ label: 'budget-total', expected: round2(expectedTotal), found: responseNumbers.slice(0, 8) });
     } else {
       evidence.checks.push({ label: 'budget-total', expected: round2(expectedTotal), found, ok: true });
+    }
+
+    const tableGroups = [];
+    let activeTable = [];
+    for (const line of String(content || '').split('\n')) {
+      if (/^\s*\|.*\|\s*$/.test(line)) {
+        activeTable.push(line.replace(/^\s*\||\|\s*$/g, '').split('|').map((cell) => cell.replace(/[*_`]/g, '').trim()));
+      } else if (activeTable.length > 0) {
+        tableGroups.push(activeTable);
+        activeTable = [];
+      }
+    }
+    if (activeTable.length > 0) tableGroups.push(activeTable);
+
+    for (const rows of tableGroups) {
+      const headerIndex = rows.findIndex((cells) => cells.some((cell) => /category|line item/i.test(cell))
+        && cells.some((cell) => /budget|amount|allocation/i.test(cell)));
+      if (headerIndex < 0) continue;
+      const headers = rows[headerIndex];
+      const amountIndex = headers.findIndex((cell) => /budget|amount|allocation/i.test(cell));
+      let statedTotal = null;
+      let fallbackTotal = null;
+      const lineItems = [];
+      for (const cells of rows.slice(headerIndex + 1)) {
+        if (cells.every((cell) => /^:?-{3,}:?$/.test(cell))) continue;
+        const label = String(cells[0] || '');
+        const amount = extractNumbers(cells[amountIndex] || '')[0];
+        if (!Number.isFinite(amount)) continue;
+        if (/\bgrand total\b|^\s*total\s*$/i.test(label)) statedTotal = amount;
+        else if (/\btotal\b/i.test(label)) fallbackTotal = amount;
+        else lineItems.push(amount);
+      }
+      const tableTotal = statedTotal ?? fallbackTotal;
+      if (lineItems.length >= 2 && Number.isFinite(tableTotal)) {
+        const itemSum = lineItems.reduce((sum, amount) => sum + amount, 0);
+        const arithmetic = verifyArithmetic({ expected: tableTotal, actual: itemSum, tolerance: 0.001 });
+        failures.push(...arithmetic.failures);
+        evidence.checks.push({ label: 'line-item-sum', expected: tableTotal, found: itemSum, ok: arithmetic.failures.length === 0 });
+      }
     }
   }
   return { failures: Array.from(new Set(failures)), evidence };
@@ -1065,6 +1224,9 @@ export function runSkillVerification({ prompt, content, skills, runtimeContext, 
   const uniqueSkills = Array.from(new Set(skillIds));
 
   const quality = checkOutputQuality(content);
+  if (quality.failures.length > 0) {
+    results.push({ skillId: 'output-quality', risk: RISK_LEVELS.LOW, failures: quality.failures, evidence: quality.evidence });
+  }
   for (const f of quality.failures) hardFailures.push(f);
 
   for (const skillId of uniqueSkills) {
@@ -1141,6 +1303,56 @@ export function applyDeterministicPatches(content) {
   return { content: text, changed, attempts: 1 };
 }
 
+export function applyMeetingNotesPatches({ content, sourceText }) {
+  const source = String(sourceText || '').toLowerCase();
+  let changed = false;
+  const lines = String(content || '').split('\n');
+  let columns = null;
+
+  const output = lines.flatMap((line) => {
+    if (!/^\s*\|.*\|\s*$/.test(line)) return [line];
+    const cells = line.replace(/^\s*\||\|\s*$/g, '').split('|').map((cell) => cell.trim());
+    const lower = cells.map((cell) => cell.toLowerCase());
+    if (lower.includes('owner') && lower.some((cell) => /task|action/.test(cell)) && lower.some((cell) => /due|deadline/.test(cell))) {
+      columns = {
+        owner: lower.indexOf('owner'),
+        task: lower.findIndex((cell) => /task|action/.test(cell)),
+        deadline: lower.findIndex((cell) => /due|deadline/.test(cell))
+      };
+      return [line];
+    }
+    if (!columns || cells.every((cell) => /^:?-{3,}:?$/.test(cell))) return [line];
+
+    const owner = String(cells[columns.owner] || '').replace(/[*_`]/g, '').trim().toLowerCase();
+    const task = String(cells[columns.task] || '').replace(/[*_`]/g, '').trim().toLowerCase();
+    const deadline = String(cells[columns.deadline] || '').replace(/[*_`]/g, '').trim().toLowerCase();
+    const taskTokens = task.replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter((token) => token.length > 3);
+    const ownerIndex = owner ? source.indexOf(owner) : -1;
+    const nearbyTask = taskTokens.some((token) => {
+      const tokenIndex = source.indexOf(token);
+      return tokenIndex >= 0 && ownerIndex >= 0 && Math.abs(tokenIndex - ownerIndex) <= 80;
+    });
+    if (owner && (!source.includes(owner) || !nearbyTask)) {
+      changed = true;
+      return [];
+    }
+
+    const meaningfulDeadline = deadline && !/^(?:not stated|not specified|none|n\/a|tbd|ongoing)$/.test(deadline);
+    if (meaningfulDeadline) {
+      const deadlineIndex = source.lastIndexOf(deadline);
+      const deadlineGrounded = deadlineIndex >= 0 && (!owner || (ownerIndex >= 0 && Math.abs(deadlineIndex - ownerIndex) <= 80));
+      if (!deadlineGrounded) {
+        cells[columns.deadline] = 'Not stated';
+        changed = true;
+        return [`| ${cells.join(' | ')} |`];
+      }
+    }
+    return [line];
+  });
+
+  return { content: output.join('\n'), changed };
+}
+
 export function runVerificationWithRepair({ prompt, content, skills, runtimeContext, sourceText, liveDataEvidence, searchEvidence }) {
   let current = String(content || '');
   let attempts = 0;
@@ -1152,8 +1364,15 @@ export function runVerificationWithRepair({ prompt, content, skills, runtimeCont
     const patchable = verdict.hardFailures.filter((f) =>
       ['duplicate-critical-content', 'malformed-code-fence', 'broken-inline-code', 'empty-heading'].includes(f)
     );
-    if (patchable.length === 0) break;
-    const patched = applyDeterministicPatches(current);
+    const skillIds = (Array.isArray(skills) ? skills : []).map((skill) => typeof skill === 'string' ? skill : skill.id);
+    const meetingFailures = verdict.hardFailures.some((failure) => ['fabricated-action-item', 'fabricated-owner', 'fabricated-deadline'].includes(failure));
+    let patched = { content: current, changed: false };
+    if (meetingFailures && skillIds.includes('meeting-notes')) {
+      patched = applyMeetingNotesPatches({ content: current, sourceText: sourceText || prompt });
+    }
+    if (!patched.changed && patchable.length > 0) {
+      patched = applyDeterministicPatches(current);
+    }
     if (!patched.changed || patched.content === current) break;
     current = patched.content;
     attempts += 1;
@@ -1163,5 +1382,3 @@ export function runVerificationWithRepair({ prompt, content, skills, runtimeCont
   final.content = current;
   return final;
 }
-
-

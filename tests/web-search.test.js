@@ -140,6 +140,66 @@ describe('Worker /api/search endpoint', () => {
     expect(data.meta.sources).toContain('DuckDuckGo');
   });
 
+  it('returns a deterministic live currency conversion result', async () => {
+    const response = await handleSearch(
+      new Request('https://corez.test/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'Convert 25000 PHP to USD.' })
+      }),
+      {
+        __SEARCH_FETCH: async (url) => {
+          const parsed = new URL(url);
+          if (parsed.hostname === 'api.frankfurter.app') {
+            expect(parsed.searchParams.get('amount')).toBe('25000');
+            expect(parsed.searchParams.get('from')).toBe('PHP');
+            expect(parsed.searchParams.get('to')).toBe('USD');
+            return Response.json({ amount: 25000, base: 'PHP', date: '2026-08-07', rates: { USD: 410.74 } });
+          }
+          return Response.json({ query: { search: [] } });
+        }
+      }
+    );
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.results[0]).toMatchObject({
+      source: 'Frankfurter',
+      snippet: '25000 PHP = 410.74 USD. Reference rate date: 2026-08-07.'
+    });
+    expect(data.meta.sources).toContain('Frankfurter');
+  });
+
+  it('falls back to an independent currency provider', async () => {
+    const response = await handleSearch(
+      new Request('https://corez.test/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'Convert 25000 PHP to USD.' })
+      }),
+      {
+        __SEARCH_FETCH: async (url) => {
+          const parsed = new URL(url);
+          if (parsed.hostname === 'api.frankfurter.app') return Response.json({}, { status: 503 });
+          if (parsed.hostname === 'open.er-api.com') {
+            expect(parsed.pathname).toBe('/v6/latest/PHP');
+            return Response.json({
+              result: 'success',
+              time_last_update_utc: 'Sun, 09 Aug 2026 00:02:31 +0000',
+              rates: { USD: 0.016432 }
+            });
+          }
+          return Response.json({ query: { search: [] } });
+        }
+      }
+    );
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.results[0]).toMatchObject({
+      source: 'ExchangeRate-API',
+      snippet: '25000 PHP = 410.8 USD. Rate updated: Sun, 09 Aug 2026 00:02:31 +0000.'
+    });
+  });
+
   it('rejects invalid queries with 400', async () => {
     const response = await handleSearch(
       new Request('https://corez.test/api/search', {

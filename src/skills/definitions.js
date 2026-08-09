@@ -198,7 +198,7 @@ export const COREZ_SPECIALIST_SKILLS = [
     dependencies: [],
     compatibleIntents: ['explanation', 'general', 'writing'],
     requiresTools: [],
-    instructions: 'Build a research outline first (items + fields), then gather evidence from multiple sources, tracking every claim back to a citation. Synthesize a balanced report with an executive summary, findings by section, and a sources list. Cite only sources you actually consulted; never invent URLs. Never fabricate citations; mark uncertainty explicitly, state confidence per claim, and date-stamp time-sensitive data.'
+    instructions: 'Build a research outline first (items + fields), then gather evidence from multiple sources, tracking every claim back to a citation. Synthesize a balanced report with an executive summary, findings by section, and a sources list. Cite only source URLs provided in the live evidence, copying each URL exactly; omit any remembered source that was not fetched. Never fabricate or repair a URL from memory. Mark uncertainty explicitly, state confidence per claim, and date-stamp time-sensitive data.'
   },
   {
     id: 'document-generation',
@@ -222,7 +222,7 @@ export const COREZ_SPECIALIST_SKILLS = [
     dependencies: [],
     compatibleIntents: ['general', 'explanation', 'writing'],
     requiresTools: [],
-    instructions: 'Identify the key variables and the question being asked first, then compute meaningful summary statistics: totals, averages, trends, and outliers. Present findings with clear tables or charts, show the reasoning behind each conclusion, and flag data-quality issues such as missing values, inconsistencies, and small sample sizes. Never invent data points that are not in the dataset.'
+    instructions: 'Identify the key variables and the question being asked first, then compute and state the relevant total, average, trend, and outliers. Present findings with clear tables or charts, show the reasoning behind each conclusion, and cross-check every percentage, formula, and forecast against the source values before answering. Flag data-quality issues such as missing values, inconsistencies, and small sample sizes. Never invent data points that are not in the dataset.'
   },
   {
     id: 'marketing-copywriting',
@@ -234,7 +234,7 @@ export const COREZ_SPECIALIST_SKILLS = [
     dependencies: [],
     compatibleIntents: ['writing', 'general', 'explanation'],
     requiresTools: [],
-    instructions: 'Establish the brand voice and target audience first, then write persuasive, specific copy with a clear call to action. Offer multiple headline options, keep SEO keywords natural, and structure longer pieces (campaigns, calendars, email sequences) in scannable sections. Never present invented business facts as real: discounts, shipping policies, awards, customer counts, and sourcing claims must come from the user or appear in brackets as suggestions, e.g. "[Optional launch offer: 15% off first order]". No filler — every line must earn its place.'
+    instructions: 'Establish the brand voice and target audience first, then write persuasive, specific copy with a clear call to action. Offer multiple headline options, keep SEO keywords natural, and structure longer pieces (campaigns, calendars, email sequences) in scannable sections. Never present invented business facts as real: discounts, shipping policies, awards, customer counts, founder stories, facilities, roast schedules, fulfillment speed, and sourcing claims must come from the user. If the user supplied no business facts, do not invent an origin story or operating process. When a missing fact would improve the copy, bracket the entire claim as an explicit option, e.g. "[Optional launch offer: 15% off first order]" or "[Insert verified sourcing claim]"; do not blend an unsupported claim into otherwise publishable body copy. No filler — every line must earn its place.'
   },
   {
     id: 'translation-localization',
@@ -354,7 +354,7 @@ export const COREZ_SPECIALIST_SKILLS = [
     dependencies: [],
     compatibleIntents: ['general', 'explanation', 'writing'],
     requiresTools: [],
-    instructions: 'Start from the user\'s income, expenses, and goals, then build a realistic budget or plan with specific numbers. Separate needs from wants, show the math behind every recommendation, and flag risks. Give ranges and clear disclaimers for investment advice — never guarantee returns.'
+    instructions: 'Start from the user\'s income, expenses, and goals, then build a realistic budget or plan with specific numbers. Separate needs from wants, show the math behind every recommendation, and verify that every itemized budget adds exactly to the stated total and percentage. Flag risks. Give ranges and clear disclaimers for investment advice — never guarantee returns.'
   },
   {
     id: 'travel-planning',
@@ -366,7 +366,7 @@ export const COREZ_SPECIALIST_SKILLS = [
     dependencies: [],
     compatibleIntents: ['general', 'explanation', 'writing'],
     requiresTools: [],
-    instructions: 'Plan around the traveler\'s dates, budget, and interests: recommend a realistic itinerary with travel times, must-see stops, and backup options. Make sure every activity physically fits: start time + duration + travel buffer must not overlap the next activity, and mark unknown details as assumptions. Include practical details such as transit, booking tips, and local customs, plus a packing checklist.'
+    instructions: 'Plan around the traveler\'s dates, budget, and interests: recommend a realistic itinerary with travel times, must-see stops, and backup options. Make sure every activity physically fits: start time + duration + travel buffer must not overlap the next activity. Allow at least 30 minutes for any ride, drive, walk, or venue transfer unless the locations are explicitly adjacent, and mark unknown details as assumptions. Include practical details such as transit, booking tips, and local customs, plus a packing checklist.'
   },
   {
     id: 'fitness-nutrition',
@@ -414,6 +414,6 @@ export const COREZ_SPECIALIST_SKILLS = [
     dependencies: [],
     compatibleIntents: ['writing', 'general', 'explanation'],
     requiresTools: [],
-    instructions: 'Extract decisions, discussion points, and owners with deadlines into clear structured notes. Only list actions, owners, and deadlines that actually appear in the source material — never invent them. Put anything extra under a clearly labelled "Suggested Follow-ups" section, separate from confirmed actions. End with an action-item list (owner, task, due date) and ask for clarification when details are ambiguous.'
+    instructions: 'Extract decisions, discussion points, and owners with deadlines into clear structured notes. Only list actions, owners, and deadlines that actually appear in the source material — never infer them. A scheduled meeting with no explicitly named owner belongs in the summary or schedule, not the action-item table; never assign it to "Team". Put anything extra under a clearly labelled "Suggested Follow-ups" section, separate from confirmed actions. End with an action-item list (owner, task, due date) and ask for clarification when details are ambiguous.'
   }
 ];

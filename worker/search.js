@@ -5,10 +5,11 @@
  * that the AI (or the local fallback) uses to answer the user's request.
  *
  * Provider chain:
- *   1. Exa neural search (premium, only when EXA_API_KEY is configured;
+ *   1. Frankfurter currency rates (keyless, only for ISO currency conversions).
+ *   2. Exa neural search (premium, only when EXA_API_KEY is configured;
  *      leads the merged results with real web pages and highlight snippets).
- *   2. Wikipedia search API (reliable, keyless, works from Workers egress).
- *   3. DuckDuckGo Lite (real web results, no key; often blocked from
+ *   3. Wikipedia search API (reliable, keyless, works from Workers egress).
+ *   4. DuckDuckGo Lite (real web results, no key; often blocked from
  *      datacenter egress, so it is the last fallback).
  *
  * Every result is normalized to { title, url, snippet, source }. When no
@@ -29,6 +30,8 @@ const DDG_LITE_ENDPOINT = 'https://lite.duckduckgo.com/lite/';
 const WIKIPEDIA_ENDPOINT = 'https://en.wikipedia.org/w/api.php';
 const WIKIPEDIA_EXTRACTS_ENDPOINT = 'https://en.wikipedia.org/w/api.php';
 const EXA_SEARCH_ENDPOINT = 'https://api.exa.ai/search';
+const FRANKFURTER_ENDPOINT = 'https://api.frankfurter.app/latest';
+const OPEN_EXCHANGE_RATE_ENDPOINT = 'https://open.er-api.com/v6/latest/';
 const OPENROUTER_RERANK_ENDPOINT = 'https://openrouter.ai/api/v1/rerank';
 const OPENROUTER_EMBEDDINGS_ENDPOINT = 'https://openrouter.ai/api/v1/embeddings';
 const OPENCODE_RERANK_ENDPOINT = 'https://opencode.ai/zen/go/v1/rerank';
@@ -130,6 +133,56 @@ function normalizeResult(title, url, snippet, source) {
   const cleanSnippet = typeof snippet === 'string' ? snippet.trim().slice(0, 500) : '';
   if (!cleanTitle && !cleanUrl) return null;
   return { title: cleanTitle, url: cleanUrl, snippet: cleanSnippet, source };
+}
+
+function parseCurrencyConversion(query) {
+  const match = String(query || '').match(/\b(\d[\d,]*(?:\.\d+)?)\s+([a-z]{3})\s+(?:to|in|into)\s+([a-z]{3})\b/i);
+  if (!match) return null;
+  const amount = Number(match[1].replace(/,/g, ''));
+  if (!Number.isFinite(amount) || amount < 0) return null;
+  return { amount, from: match[2].toUpperCase(), to: match[3].toUpperCase() };
+}
+
+async function searchCurrencyRate(query, fetchImpl) {
+  const conversion = parseCurrencyConversion(query);
+  if (!conversion || conversion.from === conversion.to) return [];
+  const url = new URL(FRANKFURTER_ENDPOINT);
+  url.searchParams.set('amount', String(conversion.amount));
+  url.searchParams.set('from', conversion.from);
+  url.searchParams.set('to', conversion.to);
+  try {
+    const response = await fetchImpl(url, providerFetchOptions());
+    if (response.ok) {
+      const data = await response.json();
+      const converted = Number(data?.rates?.[conversion.to]);
+      if (Number.isFinite(converted) && typeof data?.date === 'string') {
+        const result = normalizeResult(
+          `${conversion.amount} ${conversion.from} to ${conversion.to}`,
+          url.toString(),
+          `${conversion.amount} ${conversion.from} = ${converted} ${conversion.to}. Reference rate date: ${data.date}.`,
+          'Frankfurter'
+        );
+        if (result) return [result];
+      }
+    }
+  } catch {
+    // Continue to the independent keyless fallback below.
+  }
+
+  const fallbackUrl = new URL(`${OPEN_EXCHANGE_RATE_ENDPOINT}${conversion.from}`);
+  const fallbackResponse = await fetchImpl(fallbackUrl, providerFetchOptions());
+  if (!fallbackResponse.ok) throw new Error(`ExchangeRate-API HTTP ${fallbackResponse.status}`);
+  const fallbackData = await fallbackResponse.json();
+  const rate = Number(fallbackData?.rates?.[conversion.to]);
+  if (fallbackData?.result !== 'success' || !Number.isFinite(rate)) return [];
+  const converted = Math.round(conversion.amount * rate * 100) / 100;
+  const result = normalizeResult(
+    `${conversion.amount} ${conversion.from} to ${conversion.to}`,
+    fallbackUrl.toString(),
+    `${conversion.amount} ${conversion.from} = ${converted} ${conversion.to}. Rate updated: ${fallbackData.time_last_update_utc || 'timestamp unavailable'}.`,
+    'ExchangeRate-API'
+  );
+  return result ? [result] : [];
 }
 
 function validHttpUrl(value) {
@@ -630,6 +683,9 @@ export async function handleSearch(request, env) {
   // provider answering no longer hides the other. Exa failing never breaks
   // search — the keyless backstops still answer.
   const providers = [];
+  if (parseCurrencyConversion(query)) {
+    providers.push(async () => searchCurrencyRate(query, fetchImpl));
+  }
   if (env?.EXA_API_KEY) {
     providers.push(async () => searchExa(searchTerm, env, fetchImpl, body?.detail === true));
   }

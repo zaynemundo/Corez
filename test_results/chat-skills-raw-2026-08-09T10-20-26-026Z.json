@@ -1,0 +1,2506 @@
+[
+  {
+    "id": "research-report",
+    "prompt": "Write me a research report on the benefits of electric vehicles, citing sources.",
+    "skillSelected": true,
+    "activatedSkills": [
+      "research-report"
+    ],
+    "ok": true,
+    "score": 5,
+    "passed": true,
+    "reasons": [],
+    "aspects": {
+      "instructionAdherence": 1,
+      "functionalCorrectness": 1,
+      "conversationContinuity": 0.6,
+      "executionValidation": 1,
+      "completeness": 1,
+      "uxQuality": 0.9,
+      "efficiency": 1,
+      "grounding": 1,
+      "factualAccuracy": 1,
+      "formatting": 1
+    },
+    "verification": {
+      "risk": "LIVE",
+      "hardFailures": [],
+      "results": [
+        {
+          "skillId": "research-report",
+          "risk": "LIVE",
+          "failures": [],
+          "evidence": {
+            "requestedSources": 8,
+            "fetchedSources": 8,
+            "verifiedSources": 8,
+            "failedSources": 0,
+            "citations": [
+              {
+                "id": "c-1",
+                "url": "https://www.mdpi.com/2076-3417/13/10/6016",
+                "title": "MDPI — Electric Vehicles: Benefits, Challenges, and Potential Solutions for Widespread Adaptation",
+                "fetched": true,
+                "verified": true,
+                "supportsClaim": "pending",
+                "claims": []
+              },
+              {
+                "id": "c-2",
+                "url": "https://www.sciencedirect.com/science/article/pii/S0301479724034017",
+                "title": "ScienceDirect — Electric vehicles in transition: Opportunities, challenges, and…",
+                "fetched": true,
+                "verified": true,
+                "supportsClaim": "pending",
+                "claims": []
+              },
+              {
+                "id": "c-3",
+                "url": "https://www.researchgate.net/publication/370793834_Electric_Vehicles_Benefits_Challenges_and_Potential_Solutions_for_Widespread_Adaptation",
+                "title": "ResearchGate — Electric Vehicles: Benefits, Challenges, and Potential Solutions for Widespread Adaptation",
+                "fetched": true,
+                "verified": true,
+                "supportsClaim": "pending",
+                "claims": []
+              },
+              {
+                "id": "c-4",
+                "url": "https://www.researchgate.net/topic/Electric-Vehicles/publications",
+                "title": "ResearchGate — Electric Vehicles topic publications",
+                "fetched": true,
+                "verified": true,
+                "supportsClaim": "pending",
+                "claims": []
+              },
+              {
+                "id": "c-5",
+                "url": "https://en.wikipedia.org/wiki/Tesla%2C_Inc.",
+                "title": "Wikipedia — Tesla, Inc.",
+                "fetched": true,
+                "verified": true,
+                "supportsClaim": "pending",
+                "claims": []
+              },
+              {
+                "id": "c-6",
+                "url": "https://en.wikipedia.org/wiki/Electric_vehicle_charging_infrastructure",
+                "title": "Wikipedia — Electric vehicle charging infrastructure",
+                "fetched": true,
+                "verified": true,
+                "supportsClaim": "pending",
+                "claims": []
+              },
+              {
+                "id": "c-7",
+                "url": "https://en.wikipedia.org/wiki/Toyota",
+                "title": "Wikipedia — Toyota",
+                "fetched": true,
+                "verified": true,
+                "supportsClaim": "pending",
+                "claims": []
+              },
+              {
+                "id": "c-8",
+                "url": "https://en.wikipedia.org/wiki/Honda",
+                "title": "Wikipedia — Honda",
+                "fetched": true,
+                "verified": true,
+                "supportsClaim": "pending",
+                "claims": []
+              }
+            ],
+            "groundingValid": true,
+            "groundingMode": "external-research",
+            "servedAt": "2026-08-09T10:11:35.146Z",
+            "fetchedAt": "2026-08-09T10:11:35.147Z"
+          }
+        }
+      ],
+      "repairAttempts": 0,
+      "latencyMs": 1,
+      "productionVerdict": true
+    },
+    "liveData": {
+      "liveDataRequired": false,
+      "searchFetched": true,
+      "liveDataUsed": true,
+      "answerGrounded": true,
+      "honestRefusal": false,
+      "dataSource": [
+        "Wikipedia",
+        "DuckDuckGo"
+      ],
+      "fetchedAt": "2026-08-09T10:11:35.147Z",
+      "sourceTimestamp": "2026-08-09T10:11:35.146Z",
+      "freshnessMs": 72891,
+      "resultsCount": 12
+    },
+    "usage": {
+      "initial": {
+        "inputTokens": 3101,
+        "outputTokens": 7044
+      },
+      "repairs": [
+        {
+          "inputTokens": 5006,
+          "outputTokens": 949
+        }
+      ],
+      "total": {
+        "inputTokens": 8107,
+        "outputTokens": 7993
+      }
+    },
+    "diagnostics": {
+      "truncationDetected": false,
+      "truncationSignals": [],
+      "languageMismatch": false,
+      "languageRatio": 0,
+      "repaired": true,
+      "repairAttempts": 1,
+      "repairReasons": [
+        "truncation (ends-with-structure-mark)"
+      ],
+      "validation": {
+        "codeBlockCount": 0,
+        "syntax": []
+      },
+      "continuity": null,
+      "missingCodeForModification": false,
+      "isModificationRequest": false,
+      "stopReason": "stop",
+      "syntaxIssues": [],
+      "ttftMs": 72890,
+      "totalMs": 72890,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "inputTokens": 3101,
+      "outputTokens": 7044,
+      "fallbackUsed": false,
+      "verification": {
+        "results": [
+          {
+            "skillId": "research-report",
+            "risk": "LIVE",
+            "failures": [],
+            "evidence": {
+              "requestedSources": 8,
+              "fetchedSources": 8,
+              "verifiedSources": 8,
+              "failedSources": 0,
+              "citations": [
+                {
+                  "id": "c-1",
+                  "url": "https://www.mdpi.com/2076-3417/13/10/6016",
+                  "title": "MDPI — Electric Vehicles: Benefits, Challenges, and Potential Solutions for Widespread Adaptation",
+                  "fetched": true,
+                  "verified": true,
+                  "supportsClaim": "pending",
+                  "claims": []
+                },
+                {
+                  "id": "c-2",
+                  "url": "https://www.sciencedirect.com/science/article/pii/S0301479724034017",
+                  "title": "ScienceDirect — Electric vehicles in transition: Opportunities, challenges, and…",
+                  "fetched": true,
+                  "verified": true,
+                  "supportsClaim": "pending",
+                  "claims": []
+                },
+                {
+                  "id": "c-3",
+                  "url": "https://www.researchgate.net/publication/370793834_Electric_Vehicles_Benefits_Challenges_and_Potential_Solutions_for_Widespread_Adaptation",
+                  "title": "ResearchGate — Electric Vehicles: Benefits, Challenges, and Potential Solutions for Widespread Adaptation",
+                  "fetched": true,
+                  "verified": true,
+                  "supportsClaim": "pending",
+                  "claims": []
+                },
+                {
+                  "id": "c-4",
+                  "url": "https://www.researchgate.net/topic/Electric-Vehicles/publications",
+                  "title": "ResearchGate — Electric Vehicles topic publications",
+                  "fetched": true,
+                  "verified": true,
+                  "supportsClaim": "pending",
+                  "claims": []
+                },
+                {
+                  "id": "c-5",
+                  "url": "https://en.wikipedia.org/wiki/Tesla%2C_Inc.",
+                  "title": "Wikipedia — Tesla, Inc.",
+                  "fetched": true,
+                  "verified": true,
+                  "supportsClaim": "pending",
+                  "claims": []
+                },
+                {
+                  "id": "c-6",
+                  "url": "https://en.wikipedia.org/wiki/Electric_vehicle_charging_infrastructure",
+                  "title": "Wikipedia — Electric vehicle charging infrastructure",
+                  "fetched": true,
+                  "verified": true,
+                  "supportsClaim": "pending",
+                  "claims": []
+                },
+                {
+                  "id": "c-7",
+                  "url": "https://en.wikipedia.org/wiki/Toyota",
+                  "title": "Wikipedia — Toyota",
+                  "fetched": true,
+                  "verified": true,
+                  "supportsClaim": "pending",
+                  "claims": []
+                },
+                {
+                  "id": "c-8",
+                  "url": "https://en.wikipedia.org/wiki/Honda",
+                  "title": "Wikipedia — Honda",
+                  "fetched": true,
+                  "verified": true,
+                  "supportsClaim": "pending",
+                  "claims": []
+                }
+              ],
+              "groundingValid": true,
+              "groundingMode": "external-research",
+              "servedAt": "2026-08-09T10:11:35.146Z",
+              "fetchedAt": "2026-08-09T10:11:35.147Z"
+            }
+          }
+        ],
+        "hardFailures": [],
+        "passed": true,
+        "repairAttempts": 0,
+        "latencyMs": 1
+      },
+      "liveData": {
+        "liveDataRequired": false,
+        "searchFetched": true,
+        "liveDataUsed": true,
+        "answerGrounded": true,
+        "honestRefusal": false,
+        "dataSource": [
+          "Wikipedia",
+          "DuckDuckGo"
+        ],
+        "fetchedAt": "2026-08-09T10:11:35.147Z",
+        "sourceTimestamp": "2026-08-09T10:11:35.146Z",
+        "freshnessMs": 72891,
+        "resultsCount": 12
+      },
+      "usage": {
+        "initial": {
+          "inputTokens": 3101,
+          "outputTokens": 7044
+        },
+        "repairs": [
+          {
+            "inputTokens": 5006,
+            "outputTokens": 949
+          }
+        ],
+        "total": {
+          "inputTokens": 8107,
+          "outputTokens": 7993
+        }
+      },
+      "latency": {
+        "routingMs": 0,
+        "providerMs": 60163,
+        "verificationMs": 1,
+        "repairMs": 12726,
+        "totalMs": 72890
+      }
+    },
+    "latencyMs": 85137,
+    "requestAttempts": 1,
+    "model": "opencode:deepseek-v4-flash",
+    "content": "This report synthesizes eight fetched sources — peer-reviewed articles, a systematic literature review, a research repository, and encyclopedia entries — to assess what the current evidence actually says about the benefits of electric vehicles (EVs). The strongest supported benefits are environmental (oil independence and no greenhouse gas emissions at point of use, per an MDPI review), commercial (demonstrated real-world market viability), and infrastructural (rapidly growing, increasingly manufacturer-agnostic charging networks). Notably, the same sources that document benefits also emphasize that the full payoff depends on solving open problems: battery technology, range anxiety, and charging speed. All claims below are attributed to specific fetched sources, with confidence levels and date stamps noted.\n\n## Research Outline\n\n| Report section | Key questions | Evidence sources used |\n|---|---|---|\n| Environmental & energy benefits | Do EVs address oil dependence and carbon emissions? | MDPI review |\n| Economic & market viability | Has EV manufacturing proven commercially viable? | Tesla (Wikipedia) |\n| Infrastructure & accessibility | How is charging access evolving? | Electric vehicle charging infrastructure (Wikipedia) |\n| Industry & research momentum | How are automakers and researchers responding? | ScienceDirect, ResearchGate, Toyota, Honda |\n| Challenges & open questions | What barriers remain to widespread adoption? | ResearchGate, MDPI, Toyota |\n\n## Executive Summary\n\n- **Environmental benefit (Confidence: High — peer-reviewed source).** The MDPI review positions EVs as a response to \"rising oil costs and increasing carbon emissions,\" noting EVs are gaining popularity because they are \"independent of oil and do not produce greenhouse gases.\" This is the core documented benefit: decoupling transportation from petroleum and tailpipe emissions.\n- **Market viability (Confidence: Medium — tertiary source).** Tesla's history demonstrates that EV manufacturing can reach commercial scale, culminating in the company becoming the world's most valuable automaker starting July 2020.\n- **Infrastructure benefit (Confidence: Medium).** Charging network growth is \"a key influence on consumer behaviour in the transition from internal combustion engine vehicles to electric vehicles,\" and networks have shifted from proprietary systems to supplying energy \"regardless of manufacturer.\"\n- **Remaining barriers.** The same body of evidence flags battery technology, range anxiety, and charging times as the open problems that determine how fully EV benefits are realized.\n\n## Findings\n\n### Environmental and Energy-Security Benefits\n\n- The MDPI review opens from the premise that \"the world's primary modes of transportation are facing two major problems: rising oil costs and increasing carbon emissions\" (Confidence: High that this is the source's framing).\n- Its central benefit claim: EVs \"are independent of oil and do not produce greenhouse gases\" — as stated by the review, this refers to vehicle operation (Confidence: High for the claim as attributed to the source).\n- Together these points frame the dual benefit: reduced petroleum dependence (energy security) and reduced emissions — the rationale driving EV adoption in the source literature.\n\n### Economic and Market Viability\n\n- **Proven production ramp.** Tesla was incorporated in July 2003 by Martin Eberhard and Marc Tarpenning, with Elon Musk leading the first funding round in February 2004 and becoming CEO in 2008. Production scaled from the Roadster (2008) through the Model S (2012), Model X (2015), Model 3 (2017), Model Y (2020), Tesla Semi (2022), and Cybertruck (2023) (Confidence: Medium — encyclopedia source).\n- **Market validation.** Tesla has been the world's most valuable automaker since July 2020 and was a US$1 trillion company from October 2021 to March 2022 (time-sensitive figures; date-stamped in the Wikipedia source).\n- **Scope note.** This is company-level evidence of commercial viability, not a full-industry cost-of-ownership analysis; no fetched source provided lifecycle or total-cost figures.\n\n### Infrastructure and Accessibility\n\n- **Adoption influence.** The proliferation of charging stations — driven by charging providers or government investment — is \"a key influence on consumer behaviour in the transition from internal combustion engine vehicles to electric vehicles\" (Confidence: Medium).\n- **Interoperability shift.** Past networks were often proprietary and limited to specific manufacturers (e.g., Tesla), but \"vendors now usually supply energy to electric vehicles regardless of manufacturer\" — a direct accessibility benefit for EV owners.\n- **Growth and discoverability.** Public charging infrastructure has grown rapidly worldwide, and mapping services now show location, power, network, connector type, and increasingly price and live availability (Confidence: Medium).\n- **Implication.** The historically top adoption barrier — \"where do I charge?\" — is becoming more open, cross-brand, and easier to locate.\n\n### Industry Transition and Research Momentum\n\n- **Research volume.** A ResearchGate topic page aggregates 51,643 PDFs on electric vehicle \"design, control and optimization,\" indicating a large and active research base.\n- **Systematic review evidence.** A ScienceDirect systematic review of 917 Scopus-indexed articles plus 23 stakeholder interviews maps \"critical themes\" in EV adoption and advances an integrated framework for EVs' role in sustainable transportation (Confidence: High).\n- **Divergent automaker strategies.** Honda is phasing out natural-gas-powered vehicles to focus on a new generation of electric vehicles including hybrids, while Toyota — the world's largest automaker at roughly 10 million vehicles per year — has been \"publicly skeptical of battery-electric vehicles, instead focusing on hybrid and hydrogen.\" This divergence signals that transition pace varies by manufacturer strategy (Confidence: Medium).\n\n## Challenges and Open Questions\n\n- The MDPI review that documents the benefits also acknowledges that \"despite their benefits, several operational challenges\" remain for widespread adaptation (Confidence: High; the source's detail on those challenges was truncated in the fetched evidence).\n- Research priorities in smart cities explicitly target \"improving battery technology, addressing range anxiety, reducing charging times\" — these are the unresolved constraints on converting EV benefits into universal adoption (ResearchGate publication).\n- Toyota's stated BEV skepticism indicates some manufacturers judge hybrid and hydrogen pathways as more practical in certain markets, meaning the \"benefits of EVs\" equation is not identical across regions or use cases (Confidence: Medium).\n\n## Confidence and Limitations\n\n- **High confidence** claims come from peer-reviewed sources (MDPI, ScienceDirect, ResearchGate article) and are attributed directly to those texts.\n- **Medium confidence** claims come from encyclopedia entries (Wikipedia: Tesla, Toyota, Honda, charging infrastructure), reliable for factual and historical detail but tertiary in nature.\n- **Time-sensitive data (date-stamped as of August 9, 2026):** Tesla's US$1 trillion valuation window (October 2021 – March 2022), its \"most valuable automaker since July 2020\" status, Honda's ~US$32 billion market capitalization (as of 2026), and Toyota's ~10 million vehicles per year production scale.\n- **Explicitly out of scope:** this report does not quantify lifecycle emissions, total cost of ownership, grid impacts, or battery disposal effects, because none of the eight fetched sources provided those figures. No claims beyond the cited evidence were included.\n\n## Sources\n\n| # | Source | Type | Used for |\n|---|---|---|---|\n| 1 | [MDPI — Electric Vehicles: Benefits, Challenges, and Potential Solutions for Widespread Adaptation](https://www.mdpi.com/2076-3417/13/10/6016) | Peer-reviewed article | Environmental benefits; operational challenges |\n| 2 | [ScienceDirect — Electric vehicles in transition: Opportunities, challenges, and…](https://www.sciencedirect.com/science/article/pii/S0301479724034017) | Systematic literature review | EV adoption themes; sustainable transportation framework |\n| 3 | [ResearchGate — Electric Vehicles: Benefits, Challenges, and Potential Solutions for Widespread Adaptation](https://www.researchgate.net/publication/370793834_Electric_Vehicles_Benefits_Challenges_and_Potential_Solutions_for_Widespread_Adaptation) | Peer-reviewed article | Future research directions: battery tech, range anxiety, charging times |\n| 4 | [ResearchGate — Electric Vehicles topic publications](https://www.researchgate.net/topic/Electric-Vehicles/publications) | Research repository | Volume of EV research (51,643 PDFs) |\n| 5 | [Wikipedia — Tesla, Inc.](https://en.wikipedia.org/wiki/Tesla%2C_Inc.) | Encyclopedia | Commercial and market viability evidence |\n| 6 | [Wikipedia — Electric vehicle charging infrastructure](https://en.wikipedia.org/wiki/Electric_vehicle_charging_infrastructure) | Encyclopedia | Charging access, interoperability, growth |\n| 7 | [Wikipedia — Toyota](https://en.wikipedia.org/wiki/Toyota) | Encyclopedia | Automaker strategy divergence |\n| 8 | [Wikipedia — Honda](https://en.wikipedia.org/wiki/Honda) | Encyclopedia | Automotive transition context |\n\n## Conclusion\n\nThe fetched evidence supports three core, well-sourced benefits of electric vehicles:\n\n- **Environmental and energy-security benefits** — per the MDPI review, EVs are independent of oil and produce no greenhouse gases at point of use, directly addressing the twin pressures of rising oil costs and carbon emissions (High confidence).\n- **Market viability** — Tesla's production ramp from the 2008 Roadster through the 2023 Cybertruck, culminating in its status as the world's most valuable automaker since July 2020, demonstrates that EV manufacturing can achieve commercial scale (Medium confidence).\n- **Accessibility benefits** — charging infrastructure has grown rapidly and shifted from proprietary, manufacturer-limited networks to cross-brand supply, with mapping services now showing location, power, connector type, and live availability — directly easing the adoption transition (Medium confidence).\n\nAt the same time, the evidence is explicit that these benefits are not yet fully realized. The same peer-reviewed sources that document the advantages also identify battery technology, range anxiety, and charging times as the open problems determining how widely those benefits spread. Automaker strategies also diverge — Toyota's sustained skepticism of battery-electric vehicles, in favor of hybrids and hydrogen, signals that the benefit equation differs by market and use case.\n\n**Overall assessment (Confidence: Medium):** the benefits of EVs are real, documented, and growing in scope — but the literature consistently frames them as conditional on continued infrastructure expansion and battery advancement rather than as already fully delivered.\n\n## What to Verify Next\n\nGiven the gaps in the fetched evidence, the following would strengthen or extend this report:\n\n- **Lifecycle emissions data** — none of the eight sources provided well-to-wheel or battery-production emission figures; verify against a peer-reviewed lifecycle assessment.\n- **Total cost of ownership** — purchase price, maintenance, fuel savings, and resale value comparisons were absent from the fetched sources.\n- **Grid and battery-disposal impacts** — the sources mention challenges but the fetched evidence did not include details on charging-load grid effects or battery end-of-life.\n- **Regional comparisons** — charging infrastructure growth and policy drivers vary by country; primary source material per region would add precision.\n- **Updated market figures** — Tesla's valuation and market-share data are time-sensitive; re-verify against current quarterly filings.\n\nThis concludes the report. All claims are traceable to the eight cited sources, copied exactly from the fetched URLs, with confidence levels and date stamps provided throughout."
+  },
+  {
+    "id": "document-generation",
+    "prompt": "Draft a service contract for my freelance web design work.",
+    "skillSelected": true,
+    "activatedSkills": [
+      "document-generation"
+    ],
+    "ok": true,
+    "score": 4.7,
+    "passed": true,
+    "reasons": [],
+    "aspects": {
+      "instructionAdherence": 1,
+      "functionalCorrectness": 1,
+      "conversationContinuity": 0.6,
+      "executionValidation": 1,
+      "completeness": 1,
+      "uxQuality": 0.9,
+      "efficiency": 1
+    },
+    "verification": {
+      "risk": "LOW",
+      "hardFailures": [],
+      "results": [],
+      "repairAttempts": 0,
+      "latencyMs": 0,
+      "productionVerdict": true
+    },
+    "liveData": null,
+    "usage": {
+      "initial": {
+        "inputTokens": 1421,
+        "outputTokens": 1064
+      },
+      "repairs": [],
+      "total": {
+        "inputTokens": 1421,
+        "outputTokens": 1064
+      }
+    },
+    "diagnostics": {
+      "truncationDetected": false,
+      "truncationSignals": [],
+      "languageMismatch": false,
+      "languageRatio": 0,
+      "repaired": false,
+      "repairAttempts": 0,
+      "repairReasons": [],
+      "validation": {
+        "codeBlockCount": 0,
+        "syntax": []
+      },
+      "continuity": null,
+      "missingCodeForModification": false,
+      "isModificationRequest": false,
+      "stopReason": "stop",
+      "syntaxIssues": [],
+      "ttftMs": 12042,
+      "totalMs": 12042,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "inputTokens": 1421,
+      "outputTokens": 1064,
+      "fallbackUsed": false,
+      "verification": {
+        "results": [],
+        "hardFailures": [],
+        "passed": true,
+        "repairAttempts": 0,
+        "latencyMs": 0
+      },
+      "liveData": null,
+      "usage": {
+        "initial": {
+          "inputTokens": 1421,
+          "outputTokens": 1064
+        },
+        "repairs": [],
+        "total": {
+          "inputTokens": 1421,
+          "outputTokens": 1064
+        }
+      },
+      "latency": {
+        "routingMs": 0,
+        "providerMs": 12041,
+        "verificationMs": 0,
+        "repairMs": 1,
+        "totalMs": 12042
+      }
+    },
+    "latencyMs": 12043,
+    "requestAttempts": 1,
+    "model": "opencode:deepseek-v4-flash",
+    "content": "## Service Contract for Freelance Web Design Work\n\nBelow is a general template you can adapt for your freelance web design projects. Fill in the bracketed placeholders with your specific details, and have both parties review the terms before signing. This is not legal advice — for high-value projects, consider having an attorney review the agreement.\n\n## 1. Parties\n\nThis contract is entered into on **[date]** by and between:\n\n- **Designer:** **[Your full name / business name]**, located at **[address]**, email: **[email]**\n- **Client:** **[Client full name / business name]**, located at **[address]**, email: **[email]**\n\nThe Designer and Client agree to the following terms.\n\n## 2. Project Scope & Services\n\nThe Designer will provide web design services for the Client, including:\n\n- **[List the primary deliverables, e.g., homepage design, 5-page website, responsive layout, contact form]**\n- **[Include any additional services, e.g., copy preparation, SEO setup, training session]**\n\nAny work outside this scope will be quoted separately and requires written approval from both parties.\n\n## 3. Timeline & Milestones\n\n| Milestone | Description | Due Date |\n|---|---|---|\n| Kickoff | Project discovery and content gathering | **[date]** |\n| Design concept | First mockup presented to Client | **[date]** |\n| Revision round(s) | Incorporate Client feedback | **[date]** |\n| Build & testing | Final pages developed and tested | **[date]** |\n| Delivery | Final files / published site handed over | **[date]** |\n\nTimeline may be adjusted if the Client delays providing required content or feedback beyond **[number]** business days.\n\n## 4. Payment Terms\n\n- **Total project fee:** **[amount]**\n- **Deposit (due at signing):** **[amount or percentage]**\n- **Remaining balance:** **[amount], due upon [e.g., delivery / publication / final approval]**\n- **Payment method:** **[e.g., bank transfer, PayPal]**\n\nInvoices are payable within **[number]** days of receipt. Late payments may incur a **[percentage]**% monthly fee and pause project work until payment is received.\n\n## 5. Revision Policy\n\nThe project includes **[number]** rounds of revisions. Additional revision rounds will be billed at **[rate]** per hour. The Client must submit feedback within **[number]** days of receiving a deliverable; otherwise, the deliverable is considered approved.\n\n## 6. Intellectual Property Rights\n\nUpon receipt of full payment, the Designer transfers ownership of the final website files and custom graphics to the Client. The Designer retains the right to:\n\n- Display the project in their portfolio\n- Reuse generic code patterns and libraries in future work\n\nThe Client is responsible for ensuring they own or have permission to use any text, photos, logos, and third-party assets provided to the Designer.\n\n## 7. Confidentiality\n\nBoth parties agree not to share confidential business information, trade secrets, or proprietary materials disclosed during the project with outside parties, except as needed to complete the work.\n\n## 8. Client Responsibilities\n\nThe Client agrees to:\n\n- Provide all brand assets, text content, and images in a timely manner\n- Reply to design and feedback requests within **[number]** business days\n- Obtain all necessary permissions for any third-party content used on the site\n\n## 9. Warranties & Liability\n\nThe Designer warrants that the work will conform to the agreed specifications and be free of material defects. The Designer is not liable for indirect or consequential damages, and total liability under this contract is limited to the total project fee paid.\n\n## 10. Termination\n\nEither party may terminate this contract with **[number]** days’ written notice. If the project is cancelled, the Client will pay for all work completed up to the termination date at the hourly rate of **[rate]**, minus any deposit already paid.\n\n## 11. Legal & Governing Law\n\nThis contract is governed by the laws of **[state / country]**. Any disputes will be resolved in the courts of **[location]**.\n\n## 12. Signatures\n\n**Designer**  \nName: ___________________________  \nSignature: ___________________________  \nDate: ___________________________\n\n**Client**  \nName: ___________________________  \nSignature: ___________________________  \nDate: ___________________________\n\nReview this template, customize the blanks to match your project, and have both parties sign before any work begins. Good luck with your freelance web design project!"
+  },
+  {
+    "id": "data-analysis",
+    "prompt": "Analyze this data: monthly sales were 12000, 15000, 9000, 16000, 21000. What is the trend?",
+    "skillSelected": true,
+    "activatedSkills": [
+      "data-analysis"
+    ],
+    "ok": true,
+    "score": 5,
+    "passed": true,
+    "reasons": [],
+    "aspects": {
+      "instructionAdherence": 1,
+      "functionalCorrectness": 1,
+      "conversationContinuity": 0.6,
+      "executionValidation": 1,
+      "completeness": 1,
+      "uxQuality": 0.9,
+      "efficiency": 1,
+      "factualAccuracy": 1,
+      "formatting": 1
+    },
+    "verification": {
+      "risk": "HIGH",
+      "hardFailures": [],
+      "results": [
+        {
+          "skillId": "data-analysis",
+          "risk": "HIGH",
+          "failures": [],
+          "evidence": {
+            "checks": [
+              {
+                "label": "sum",
+                "expected": 73000,
+                "found": 73000,
+                "ok": true
+              },
+              {
+                "label": "mean",
+                "expected": 14600,
+                "found": 14600,
+                "ok": true
+              }
+            ]
+          }
+        }
+      ],
+      "repairAttempts": 1,
+      "latencyMs": 0,
+      "productionVerdict": true
+    },
+    "liveData": null,
+    "usage": {
+      "initial": {
+        "inputTokens": 1580,
+        "outputTokens": 1293
+      },
+      "repairs": [],
+      "total": {
+        "inputTokens": 1580,
+        "outputTokens": 1293
+      }
+    },
+    "diagnostics": {
+      "truncationDetected": false,
+      "truncationSignals": [],
+      "languageMismatch": false,
+      "languageRatio": 0,
+      "repaired": false,
+      "repairAttempts": 0,
+      "repairReasons": [],
+      "validation": {
+        "codeBlockCount": 0,
+        "syntax": []
+      },
+      "continuity": null,
+      "missingCodeForModification": false,
+      "isModificationRequest": false,
+      "stopReason": "stop",
+      "syntaxIssues": [],
+      "ttftMs": 13065,
+      "totalMs": 13065,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "inputTokens": 1580,
+      "outputTokens": 1293,
+      "fallbackUsed": false,
+      "verification": {
+        "results": [
+          {
+            "skillId": "data-analysis",
+            "risk": "HIGH",
+            "failures": [],
+            "evidence": {
+              "checks": [
+                {
+                  "label": "sum",
+                  "expected": 73000,
+                  "found": 73000,
+                  "ok": true
+                },
+                {
+                  "label": "mean",
+                  "expected": 14600,
+                  "found": 14600,
+                  "ok": true
+                }
+              ]
+            }
+          }
+        ],
+        "hardFailures": [],
+        "passed": true,
+        "repairAttempts": 1,
+        "latencyMs": 0
+      },
+      "liveData": null,
+      "usage": {
+        "initial": {
+          "inputTokens": 1580,
+          "outputTokens": 1293
+        },
+        "repairs": [],
+        "total": {
+          "inputTokens": 1580,
+          "outputTokens": 1293
+        }
+      },
+      "latency": {
+        "routingMs": 0,
+        "providerMs": 13063,
+        "verificationMs": 0,
+        "repairMs": 0,
+        "totalMs": 13065
+      }
+    },
+    "latencyMs": 13066,
+    "requestAttempts": 1,
+    "model": "opencode:deepseek-v4-flash",
+    "content": "Based on the five monthly figures you provided, sales are trending upward overall, though with a noticeable dip in the middle of the series. The total sales across the five periods is 73,000, the monthly average is 14,600, and the median is 15,000. A simple linear trend line fitted to the data shows a consistent upward slope, with the next period projected at 20,300.\n\n## Data Overview\n\n| Period | Sales |\n|---|---|\n| 1 | 12,000 |\n| 2 | 15,000 |\n| 3 | 9,000 |\n| 4 | 16,000 |\n| 5 | 21,000 |\n\n## Key Statistics\n\n| Measure | Value |\n| Total sales | 73,000 |\n| Mean (average) | 14,600 |\n| Median | 15,000 |\n| Direction | Upward |\n| Trend equation | y = 8,900 + 1,900 × period |\n| Next-period forecast | 20,300 |\n\n## Trend Interpretation\n\n- **Overall direction** — Sales generally increase from period 1 to period 5, from 12,000 to 21,000.\n- **Growth rate** — On average, each period adds about 1,900 in sales according to the linear trend line.\n- **Notable dip** — Period 3 drops sharply to 9,000, well below the surrounding values. This is the main source of variability and worth investigating.\n- **Forecast** — If the trend holds, the next period would land near 20,300.\n\n## What to Verify Next\n\nThe dataset is small and lacks context, so before relying on the forecast, check:\n\n- **Reason for the dip** — Was period 3 affected by seasonality, a promotion gap, or a data-entry error?\n- **Sample size** — Five points are enough to show a direction but not to confirm a stable pattern.\n- **External factors** — Compare against the same period last year or known market conditions to validate whether the upward trend is real."
+  },
+  {
+    "id": "marketing-copywriting",
+    "prompt": "Write launch copy and a tagline for my new coffee brand.",
+    "skillSelected": true,
+    "activatedSkills": [
+      "marketing-copywriting"
+    ],
+    "ok": true,
+    "score": 5,
+    "passed": true,
+    "reasons": [],
+    "aspects": {
+      "instructionAdherence": 1,
+      "functionalCorrectness": 1,
+      "conversationContinuity": 0.6,
+      "executionValidation": 1,
+      "completeness": 1,
+      "uxQuality": 0.9,
+      "efficiency": 1,
+      "factualAccuracy": 1,
+      "assumptionDiscipline": 1,
+      "formatting": 1
+    },
+    "verification": {
+      "risk": "MEDIUM",
+      "hardFailures": [],
+      "results": [
+        {
+          "skillId": "marketing-copywriting",
+          "risk": "MEDIUM",
+          "failures": [],
+          "evidence": {
+            "claims": []
+          }
+        }
+      ],
+      "repairAttempts": 0,
+      "latencyMs": 0,
+      "productionVerdict": true
+    },
+    "liveData": null,
+    "usage": {
+      "initial": {
+        "inputTokens": 1551,
+        "outputTokens": 1027
+      },
+      "repairs": [],
+      "total": {
+        "inputTokens": 1551,
+        "outputTokens": 1027
+      }
+    },
+    "diagnostics": {
+      "truncationDetected": false,
+      "truncationSignals": [],
+      "languageMismatch": false,
+      "languageRatio": 0,
+      "repaired": false,
+      "repairAttempts": 0,
+      "repairReasons": [],
+      "validation": {
+        "codeBlockCount": 0,
+        "syntax": []
+      },
+      "continuity": null,
+      "missingCodeForModification": false,
+      "isModificationRequest": false,
+      "stopReason": "stop",
+      "syntaxIssues": [],
+      "ttftMs": 13596,
+      "totalMs": 13596,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "inputTokens": 1551,
+      "outputTokens": 1027,
+      "fallbackUsed": false,
+      "verification": {
+        "results": [
+          {
+            "skillId": "marketing-copywriting",
+            "risk": "MEDIUM",
+            "failures": [],
+            "evidence": {
+              "claims": []
+            }
+          }
+        ],
+        "hardFailures": [],
+        "passed": true,
+        "repairAttempts": 0,
+        "latencyMs": 0
+      },
+      "liveData": null,
+      "usage": {
+        "initial": {
+          "inputTokens": 1551,
+          "outputTokens": 1027
+        },
+        "repairs": [],
+        "total": {
+          "inputTokens": 1551,
+          "outputTokens": 1027
+        }
+      },
+      "latency": {
+        "routingMs": 0,
+        "providerMs": 13595,
+        "verificationMs": 0,
+        "repairMs": 1,
+        "totalMs": 13596
+      }
+    },
+    "latencyMs": 13596,
+    "requestAttempts": 2,
+    "model": "opencode:deepseek-v4-flash",
+    "content": "Since you haven't specified your brand voice or target audience, I'll write this for a modern, craft-focused coffee brand and keep every specific claim as a bracketed placeholder you can fill in or delete. Swap the tone words in brackets to match your actual positioning.\n\n## Tagline Options\n\n- **\"Brewed for the bold.\"** — Short, confident, works for any roast profile.\n- **\"Slow mornings, bold finish.\"** — Emphasizes ritual and intensity.\n- **\"Your daily grind, elevated.\"** — Playful and memorable, with a double meaning.\n- **\"From bean to ritual.\"** — Focuses on craft and the full experience.\n- **\"Honest coffee, no shortcuts.\"** — Works best if transparency and sourcing are core values.\n\n## Launch Copy — Social Media Post\n\n**Headline:** Something worth waking up for is here.\n\n**Body:** We didn't start a coffee brand to add another bag to the shelf. We started [Brand Name] because [insert your \"why\" — e.g., \"we couldn't find a daily roast that was both ethically sourced and genuinely bold\"]. Every batch is [insert verified process — e.g., \"small-batch roasted within 48 hours of shipping\"], and every bean is [insert verified sourcing claim — e.g., \"traceable to a single farm in [region]\"]. No filler, no burnt taste, no excuses — just coffee that earns the first sip.\n\n**[Optional launch offer: 20% off your first bag with code FIRSTSIP]**\n\n## Launch Copy — Email Announcement\n\n**Subject Line:** Your new morning ritual has arrived\n\n**Body:**\n\nMeet [Brand Name] — coffee built for [target audience — e.g., \"people who treat the first cup as non-negotiable\"].\n\nWe launched because we saw a gap: most \"premium\" coffee was either overpriced or over-roasted. So we built something different. [Insert one product detail — e.g., \"Our signature blend is a single-origin washed process with notes of dark chocolate and orange zest.\"] Every order is roasted [insert verified process — e.g., \"in small batches every Tuesday\"] and shipped [insert verified shipping fact — e.g., \"within 24 hours of roasting\"].\n\nThis isn't just another launch. It's an invitation to slow down and drink something that actually tastes like the work that went into it.\n\n[Button: **Order Your First Bag**]\n\n**[Optional: Insert unique social proof only if true — e.g., \"Already featured in [publication name]\"]**\n\n## Landing Page Hero Copy\n\n**Headline:** Coffee that respects your mornings.\n\n**Subheadline:** [Brand Name] delivers [flavor descriptor] single-origin beans, roasted [frequency] and shipped [speed]. No shortcuts.\n\n**Primary CTA:** Shop the Launch Blend\n\n**Secondary CTA:** Learn Our Sourcing Story\n\n## What to Fill In Before You Publish\n\n- **Your \"why\"** — the genuine reason the brand exists, not a generic mission statement.\n- **Origin and sourcing claims** — only include specifics you can verify (farm, region, certifications).\n- **Roast and shipping process** — real details only; if you don't have them yet, remove the sentence.\n- **Offer** — make sure the discount code and terms are live before you post.\n\nIf you share your actual brand name, target audience, and one authentic product detail, I'll rewrite everything with real specifics."
+  },
+  {
+    "id": "translation-localization",
+    "prompt": "Translate this into Spanish: \"Welcome to our website. Feel free to browse our products.\"",
+    "skillSelected": true,
+    "activatedSkills": [
+      "translation-localization"
+    ],
+    "ok": true,
+    "score": 5,
+    "passed": true,
+    "reasons": [],
+    "aspects": {
+      "instructionAdherence": 1,
+      "functionalCorrectness": 1,
+      "conversationContinuity": 0.6,
+      "executionValidation": 1,
+      "completeness": 1,
+      "uxQuality": 0.9,
+      "efficiency": 1,
+      "factualAccuracy": 1,
+      "formatting": 1
+    },
+    "verification": {
+      "risk": "LOW",
+      "hardFailures": [],
+      "results": [],
+      "repairAttempts": 0,
+      "latencyMs": 0,
+      "productionVerdict": true
+    },
+    "liveData": null,
+    "usage": {
+      "initial": {
+        "inputTokens": 1427,
+        "outputTokens": 359
+      },
+      "repairs": [],
+      "total": {
+        "inputTokens": 1427,
+        "outputTokens": 359
+      }
+    },
+    "diagnostics": {
+      "truncationDetected": false,
+      "truncationSignals": [],
+      "languageMismatch": false,
+      "languageRatio": 0,
+      "repaired": false,
+      "repairAttempts": 0,
+      "repairReasons": [],
+      "validation": {
+        "codeBlockCount": 0,
+        "syntax": []
+      },
+      "continuity": null,
+      "missingCodeForModification": false,
+      "isModificationRequest": false,
+      "stopReason": "stop",
+      "syntaxIssues": [],
+      "ttftMs": 6377,
+      "totalMs": 6377,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "inputTokens": 1427,
+      "outputTokens": 359,
+      "fallbackUsed": false,
+      "verification": {
+        "results": [],
+        "hardFailures": [],
+        "passed": true,
+        "repairAttempts": 0,
+        "latencyMs": 0
+      },
+      "liveData": null,
+      "usage": {
+        "initial": {
+          "inputTokens": 1427,
+          "outputTokens": 359
+        },
+        "repairs": [],
+        "total": {
+          "inputTokens": 1427,
+          "outputTokens": 359
+        }
+      },
+      "latency": {
+        "routingMs": 0,
+        "providerMs": 6376,
+        "verificationMs": 0,
+        "repairMs": 1,
+        "totalMs": 6377
+      }
+    },
+    "latencyMs": 6378,
+    "requestAttempts": 1,
+    "model": "opencode:deepseek-v4-flash",
+    "content": "**Bienvenido a nuestro sitio web. Siéntete libre de explorar nuestros productos.**\n\nNote on adaptation choices: I used *\"Bienvenido\"* (masculine singular) as a neutral default, which works for a general audience. *\"Siéntete libre\"* preserves the casual, friendly tone of \"feel free,\" and *\"explorar\"* (rather than *\"navegar\"*) fits naturally when talking about browsing products on a website. If you're addressing a mixed or formal group, you could adjust the first word to *\"Bienvenidos\"* and *\"Siéntanse libres\"* — let me know if you'd like that version instead."
+  },
+  {
+    "id": "live-data-utilities",
+    "prompt": "Convert 25000 PHP to USD.",
+    "skillSelected": true,
+    "activatedSkills": [
+      "live-data-utilities"
+    ],
+    "ok": true,
+    "score": 5,
+    "passed": true,
+    "reasons": [],
+    "aspects": {
+      "instructionAdherence": 1,
+      "functionalCorrectness": 1,
+      "conversationContinuity": 0.6,
+      "executionValidation": 1,
+      "completeness": 1,
+      "uxQuality": 0.9,
+      "efficiency": 1,
+      "grounding": 1,
+      "factualAccuracy": 1,
+      "freshness": 1,
+      "formatting": 1
+    },
+    "verification": {
+      "risk": "LIVE",
+      "hardFailures": [],
+      "results": [
+        {
+          "skillId": "live-data-utilities",
+          "risk": "LIVE",
+          "failures": [],
+          "evidence": {
+            "liveDataRequired": true,
+            "liveDataUsed": true,
+            "kind": "currency",
+            "freshnessMs": 7722,
+            "dataSource": [
+              "ExchangeRate-API",
+              "Wikipedia",
+              "DuckDuckGo"
+            ],
+            "fetchedAt": "2026-08-09T10:14:13.023Z",
+            "sourceTimestamp": "2026-08-09T10:14:13.023Z"
+          }
+        }
+      ],
+      "repairAttempts": 0,
+      "latencyMs": 2,
+      "productionVerdict": true
+    },
+    "liveData": {
+      "liveDataRequired": true,
+      "searchFetched": true,
+      "liveDataUsed": true,
+      "answerGrounded": true,
+      "honestRefusal": false,
+      "dataSource": [
+        "ExchangeRate-API",
+        "Wikipedia",
+        "DuckDuckGo"
+      ],
+      "fetchedAt": "2026-08-09T10:14:13.023Z",
+      "sourceTimestamp": "2026-08-09T10:14:13.023Z",
+      "freshnessMs": 7722,
+      "resultsCount": 12
+    },
+    "usage": {
+      "initial": {
+        "inputTokens": 2458,
+        "outputTokens": 569
+      },
+      "repairs": [],
+      "total": {
+        "inputTokens": 2458,
+        "outputTokens": 569
+      }
+    },
+    "diagnostics": {
+      "truncationDetected": false,
+      "truncationSignals": [],
+      "languageMismatch": false,
+      "languageRatio": 0,
+      "repaired": false,
+      "repairAttempts": 0,
+      "repairReasons": [],
+      "validation": {
+        "codeBlockCount": 0,
+        "syntax": []
+      },
+      "continuity": null,
+      "missingCodeForModification": false,
+      "isModificationRequest": false,
+      "stopReason": "stop",
+      "syntaxIssues": [],
+      "ttftMs": 7721,
+      "totalMs": 7721,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "inputTokens": 2458,
+      "outputTokens": 569,
+      "fallbackUsed": false,
+      "verification": {
+        "results": [
+          {
+            "skillId": "live-data-utilities",
+            "risk": "LIVE",
+            "failures": [],
+            "evidence": {
+              "liveDataRequired": true,
+              "liveDataUsed": true,
+              "kind": "currency",
+              "freshnessMs": 7722,
+              "dataSource": [
+                "ExchangeRate-API",
+                "Wikipedia",
+                "DuckDuckGo"
+              ],
+              "fetchedAt": "2026-08-09T10:14:13.023Z",
+              "sourceTimestamp": "2026-08-09T10:14:13.023Z"
+            }
+          }
+        ],
+        "hardFailures": [],
+        "passed": true,
+        "repairAttempts": 0,
+        "latencyMs": 2
+      },
+      "liveData": {
+        "liveDataRequired": true,
+        "searchFetched": true,
+        "liveDataUsed": true,
+        "answerGrounded": true,
+        "honestRefusal": false,
+        "dataSource": [
+          "ExchangeRate-API",
+          "Wikipedia",
+          "DuckDuckGo"
+        ],
+        "fetchedAt": "2026-08-09T10:14:13.023Z",
+        "sourceTimestamp": "2026-08-09T10:14:13.023Z",
+        "freshnessMs": 7722,
+        "resultsCount": 12
+      },
+      "usage": {
+        "initial": {
+          "inputTokens": 2458,
+          "outputTokens": 569
+        },
+        "repairs": [],
+        "total": {
+          "inputTokens": 2458,
+          "outputTokens": 569
+        }
+      },
+      "latency": {
+        "routingMs": 0,
+        "providerMs": 7719,
+        "verificationMs": 2,
+        "repairMs": 0,
+        "totalMs": 7721
+      }
+    },
+    "latencyMs": 33799,
+    "requestAttempts": 1,
+    "model": "opencode:deepseek-v4-flash",
+    "content": "Based on live exchange-rate data, **25,000 PHP = 410.80 USD**.\n\n## Conversion Details\n- **Amount converted** — 25,000 Philippine pesos (PHP)\n- **Converted value** — 410.80 US dollars (USD)\n- **Implied rate** — 1 PHP ≈ 0.01643 USD\n- **Data source** — [open.er-api.com](https://open.er-api.com/v6/latest/PHP)\n- **Rate timestamp** — Sun, 09 Aug 2026 00:02:31 +0000\n\n## Notes\n- Foreign-exchange rates fluctuate constantly, so this figure is accurate only as of the timestamp above.\n- Third-party platforms such as Wise, XE, or OANDA may display slightly different amounts because they apply their own spreads or transfer fees on top of the mid-market rate."
+  },
+  {
+    "id": "education-tutor",
+    "prompt": "Teach me the basics of how CSS Flexbox works.",
+    "skillSelected": true,
+    "activatedSkills": [
+      "education-tutor"
+    ],
+    "ok": true,
+    "score": 4.7,
+    "passed": true,
+    "reasons": [],
+    "aspects": {
+      "instructionAdherence": 1,
+      "functionalCorrectness": 1,
+      "conversationContinuity": 0.6,
+      "executionValidation": 1,
+      "completeness": 1,
+      "uxQuality": 0.9,
+      "efficiency": 1
+    },
+    "verification": {
+      "risk": "LOW",
+      "hardFailures": [],
+      "results": [],
+      "repairAttempts": 0,
+      "latencyMs": 0,
+      "productionVerdict": true
+    },
+    "liveData": null,
+    "usage": {
+      "initial": {
+        "inputTokens": 1415,
+        "outputTokens": 1276
+      },
+      "repairs": [],
+      "total": {
+        "inputTokens": 1415,
+        "outputTokens": 1276
+      }
+    },
+    "diagnostics": {
+      "truncationDetected": false,
+      "truncationSignals": [],
+      "languageMismatch": false,
+      "languageRatio": 0,
+      "repaired": false,
+      "repairAttempts": 0,
+      "repairReasons": [],
+      "validation": {
+        "codeBlockCount": 1,
+        "syntax": [
+          {
+            "lang": "html",
+            "ok": true,
+            "issues": []
+          }
+        ]
+      },
+      "continuity": null,
+      "missingCodeForModification": false,
+      "isModificationRequest": false,
+      "stopReason": "stop",
+      "syntaxIssues": [],
+      "ttftMs": 14296,
+      "totalMs": 14296,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "inputTokens": 1415,
+      "outputTokens": 1276,
+      "fallbackUsed": false,
+      "verification": {
+        "results": [],
+        "hardFailures": [],
+        "passed": true,
+        "repairAttempts": 0,
+        "latencyMs": 0
+      },
+      "liveData": null,
+      "usage": {
+        "initial": {
+          "inputTokens": 1415,
+          "outputTokens": 1276
+        },
+        "repairs": [],
+        "total": {
+          "inputTokens": 1415,
+          "outputTokens": 1276
+        }
+      },
+      "latency": {
+        "routingMs": 0,
+        "providerMs": 14294,
+        "verificationMs": 0,
+        "repairMs": 1,
+        "totalMs": 14296
+      }
+    },
+    "latencyMs": 14296,
+    "requestAttempts": 1,
+    "model": "opencode:deepseek-v4-flash",
+    "content": "Flexbox is a CSS layout mode designed for distributing space and aligning items in a one-dimensional row or column. It solves common layout problems — centering, equal spacing, and reordering — without floats or manual math.\n\n## Core Idea: The Container and the Items\n\nFlexbox works with two participant types:\n\n- **Flex container** — the parent element where you set `display: flex;`\n- **Flex items** — the direct children of that container\n\nWhen you declare `display: flex;` on an element, its children automatically become flex items and begin following flexbox rules.\n\n## The Two Axes\n\nFlexbox has two perpendicular axes that determine how items are placed:\n\n- **Main axis** — the direction items flow in (default: left to right, horizontal)\n- **Cross axis** — the perpendicular direction (default: top to bottom, vertical)\n\nThe direction of the main axis is controlled by `flex-direction`:\n\n| `flex-direction` value | Main axis direction |\n|------------------------|---------------------|\n| `row` (default)        | Left → Right        |\n| `row-reverse`          | Right → Left        |\n| `column`               | Top → Bottom        |\n| `column-reverse`       | Bottom → Top        |\n\n## Container Properties\n\nThese go on the flex container:\n\n- **`justify-content`** — aligns items along the **main axis**. Values: `flex-start`, `flex-end`, `center`, `space-between`, `space-around`, `space-evenly`.\n- **`align-items`** — aligns items along the **cross axis**. Values: `stretch` (default), `flex-start`, `flex-end`, `center`, `baseline`.\n- **`flex-wrap`** — allows items to wrap onto multiple lines if they exceed the container width. Values: `nowrap` (default), `wrap`, `wrap-reverse`.\n- **`gap`** — sets spacing between items. Example: `gap: 10px;`.\n\n## Item Properties\n\nThese go on individual flex items:\n\n- **`flex-grow`** — how much an item should grow to fill available space. `0` (default, no growth), `1` (share extra space equally), or a number for proportional growth.\n- **`flex-shrink`** — how much an item should shrink when space is tight. `1` (default, shrink allowed), `0` (never shrink).\n- **`flex-basis`** — the initial size of an item before growing or shrinking. Can be `auto`, `100px`, `20%`, etc.\n- **`flex`** — shorthand for `flex-grow`, `flex-shrink`, and `flex-basis`. Example: `flex: 1 1 200px;`.\n- **`align-self`** — overrides `align-items` for a single item.\n- **`order`** — changes the visual order of an item. Lower numbers appear first.\n\n## Simple Example\n\n```html\n<div style=\"display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 2px solid #333; padding: 10px;\">\n  <div style=\"background: #ff6b6b; padding: 10px;\">Item 1</div>\n  <div style=\"background: #4ecdc4; padding: 10px;\">Item 2</div>\n  <div style=\"background: #ffe66d; padding: 10px;\">Item 3</div>\n</div>\n```\n\nHere, the container spreads the three items evenly (`space-between`) and centers them vertically (`center`), with a `10px` gap between them.\n\n## Practice Exercise\n\nCreate a flex container that:\n- Uses `flex-direction: column;`\n- Centers items horizontally\n- Has a `20px` gap between items\n\nTry writing that in HTML/CSS, then change `flex-direction` to `row` and observe what changes.\n\n## Checkpoint Question\n\nWhat is the difference between `justify-content` and `align-items` — and how does changing `flex-direction` affect which axis each one controls?"
+  },
+  {
+    "id": "accessibility-compliance",
+    "prompt": "Explain how to make a form accessible for screen readers.",
+    "skillSelected": true,
+    "activatedSkills": [
+      "accessibility-compliance"
+    ],
+    "ok": true,
+    "score": 5,
+    "passed": true,
+    "reasons": [],
+    "aspects": {
+      "instructionAdherence": 1,
+      "functionalCorrectness": 1,
+      "conversationContinuity": 0.6,
+      "executionValidation": 1,
+      "completeness": 1,
+      "uxQuality": 0.9,
+      "efficiency": 1,
+      "formatting": 1
+    },
+    "verification": {
+      "risk": "HIGH",
+      "hardFailures": [],
+      "results": [
+        {
+          "skillId": "accessibility-compliance",
+          "risk": "HIGH",
+          "failures": [],
+          "evidence": {
+            "ids": [
+              "email",
+              "standard",
+              "express",
+              "password",
+              "password-help",
+              "username",
+              "username-error",
+              "name",
+              "email",
+              "email-help",
+              "question",
+              "support",
+              "message"
+            ],
+            "labels": 10,
+            "ariaRefs": [
+              "aria-describedby=\"password-help\"",
+              "aria-describedby=\"username-error\"",
+              "aria-describedby=\"email-help\""
+            ],
+            "issues": []
+          }
+        }
+      ],
+      "repairAttempts": 0,
+      "latencyMs": 0,
+      "productionVerdict": true
+    },
+    "liveData": null,
+    "usage": {
+      "initial": {
+        "inputTokens": 1429,
+        "outputTokens": 1924
+      },
+      "repairs": [],
+      "total": {
+        "inputTokens": 1429,
+        "outputTokens": 1924
+      }
+    },
+    "diagnostics": {
+      "truncationDetected": false,
+      "truncationSignals": [],
+      "languageMismatch": false,
+      "languageRatio": 0,
+      "repaired": false,
+      "repairAttempts": 0,
+      "repairReasons": [],
+      "validation": {
+        "codeBlockCount": 6,
+        "syntax": [
+          {
+            "lang": "html",
+            "ok": true,
+            "issues": []
+          },
+          {
+            "lang": "html",
+            "ok": true,
+            "issues": []
+          },
+          {
+            "lang": "html",
+            "ok": true,
+            "issues": []
+          },
+          {
+            "lang": "html",
+            "ok": true,
+            "issues": []
+          },
+          {
+            "lang": "html",
+            "ok": true,
+            "issues": []
+          },
+          {
+            "lang": "html",
+            "ok": true,
+            "issues": []
+          }
+        ]
+      },
+      "continuity": null,
+      "missingCodeForModification": false,
+      "isModificationRequest": false,
+      "stopReason": "stop",
+      "syntaxIssues": [],
+      "ttftMs": 22740,
+      "totalMs": 22740,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "inputTokens": 1429,
+      "outputTokens": 1924,
+      "fallbackUsed": false,
+      "verification": {
+        "results": [
+          {
+            "skillId": "accessibility-compliance",
+            "risk": "HIGH",
+            "failures": [],
+            "evidence": {
+              "ids": [
+                "email",
+                "standard",
+                "express",
+                "password",
+                "password-help",
+                "username",
+                "username-error",
+                "name",
+                "email",
+                "email-help",
+                "question",
+                "support",
+                "message"
+              ],
+              "labels": 10,
+              "ariaRefs": [
+                "aria-describedby=\"password-help\"",
+                "aria-describedby=\"username-error\"",
+                "aria-describedby=\"email-help\""
+              ],
+              "issues": []
+            }
+          }
+        ],
+        "hardFailures": [],
+        "passed": true,
+        "repairAttempts": 0,
+        "latencyMs": 0
+      },
+      "liveData": null,
+      "usage": {
+        "initial": {
+          "inputTokens": 1429,
+          "outputTokens": 1924
+        },
+        "repairs": [],
+        "total": {
+          "inputTokens": 1429,
+          "outputTokens": 1924
+        }
+      },
+      "latency": {
+        "routingMs": 0,
+        "providerMs": 22739,
+        "verificationMs": 0,
+        "repairMs": 0,
+        "totalMs": 22740
+      }
+    },
+    "latencyMs": 22741,
+    "requestAttempts": 2,
+    "model": "opencode:deepseek-v4-flash",
+    "content": "An accessible form communicates structure, labels, instructions, and errors through markup that assistive technologies can interpret. The goal isn’t just to make each field reachable, but to give screen reader users the same contextual information sighted users get from visuals — field names, required status, grouping, and feedback.\n\n## Core requirements for screen reader accessibility\n\nEvery control must have a programmatically associated label (WCAG 1.3.1, 3.3.2). This means using the `<label>` element with a `for` attribute or wrapping the input. Placeholders do **not** qualify as labels.\n\n```html\n<!-- Good: explicit label -->\n<label for=\"email\">Email</label>\n<input type=\"email\" id=\"email\" name=\"email\">\n\n<!-- Also good: wrapping label -->\n<label>Full name\n  <input type=\"text\" name=\"fullname\">\n</label>\n\n<!-- Bad: placeholder only -->\n<input type=\"email\" placeholder=\"Email\">\n```\n\n### 2. Group related fields with `fieldset` and `legend`\n\nFields like radio buttons, checkboxes, or shipping/billing addresses need a shared descriptor.\n\n```html\n<fieldset>\n  <legend>Shipping method</legend>\n  <input type=\"radio\" id=\"standard\" name=\"shipping\" value=\"standard\">\n  <label for=\"standard\">Standard (3–5 days)</label><br>\n  <input type=\"radio\" id=\"express\" name=\"shipping\" value=\"express\">\n  <label for=\"express\">Express (1–2 days)</label>\n</fieldset>\n```\n\n### 3. Provide instructions and associate them with the field\n\nUse `aria-describedby` to point to help text. This lets users hear the label first, then the help content.\n\n```html\n<label for=\"password\">Password</label>\n<input type=\"password\" id=\"password\" name=\"password\" aria-describedby=\"password-help\">\n<span id=\"password-help\">At least 8 characters, with one number.</span>\n```\n\n### 4. Announce errors clearly and programmatically\n\n- Add `aria-invalid=\"true\"` to invalid inputs\n- Use `aria-describedby` to link the error message\n- Place error messages in a live region (`role=\"alert\"` or `aria-live=\"assertive\"`) so they’re announced immediately\n\n```html\n<label for=\"username\">Username</label>\n<input type=\"text\" id=\"username\" name=\"username\" aria-invalid=\"true\" aria-describedby=\"username-error\">\n<p id=\"username-error\" style=\"color: #b00020;\">Username is required.</p>\n```\n\nFor form-wide errors, wrap the summary in a live region:\n\n```html\n<div role=\"alert\" tabindex=\"-1\">\n  <h2>There are 2 errors in your submission.</h2>\n  <ul>\n    <li><a href=\"#username\">Username is required.</a></li>\n    <li><a href=\"#email\">Email must be valid.</a></li>\n  </ul>\n</div>\n```\n\n### 5. Ensure keyboard-only operation and clear focus\n\nAll controls must be reachable and operable via the Tab key and Enter/Space. Focus must be visibly highlighted — never remove the default `:focus` outline. Also ensure the tab order follows the visual order.\n\n### 6. Avoid common pitfalls\n\n| Pitfall | Why it fails | Fix |\n|---|---|---|\n| `placeholder` as the only label | Placeholders disappear on input and aren’t treated as labels | Use a real `<label>` |\n| Label hidden with `display:none` | Hides from screen readers | Visually hide with a utility class, or use `aria-label` |\n| Using `title` for labels | Poor support and inconsistent announcements | Use `<label>` or `aria-labelledby` |\n| `aria-label` on silent elements | Can be ignored if element isn’t interactive | Place `aria-label` on inputs, not `<div>`s |\n| Error message not associated | User doesn’t know which field failed | Add `aria-describedby` on the input |\n\n## Quick verification checklist\n\n- **Keyboard only:** Tab through form — every control gets focus, no traps.\n- **Screen reader (NVDA, VoiceOver, or JAWS):** Listen for proper label announcements, group legends, and error messages.\n- **Contrast:** Text, borders, and error messages meet 4.5:1 (WCAG 1.4.3). Larger text can be 3:1.\n- **Name, Role, Value:** Each control exposes an accessible name, correct role (e.g., checkbox, textbox), and current state (e.g., checked, required, invalid).\n\n## Complete example\n\nHere’s a compact, accessible form combining the patterns above:\n\n```html\n<form novalidate>\n  <h2>Contact us</h2>\n\n  <div>\n    <label for=\"name\">Full name</label>\n    <input type=\"text\" id=\"name\" name=\"name\" autocomplete=\"name\" required>\n  </div>\n\n  <div>\n    <label for=\"email\">Email address</label>\n    <input type=\"email\" id=\"email\" name=\"email\" autocomplete=\"email\" required aria-describedby=\"email-help\">\n    <span id=\"email-help\">We’ll only use this to reply to you.</span>\n  </div>\n\n  <fieldset>\n    <legend>Reason for contact</legend>\n    <input type=\"radio\" id=\"question\" name=\"reason\" value=\"question\" checked>\n    <label for=\"question\">General question</label>\n    <input type=\"radio\" id=\"support\" name=\"reason\" value=\"support\">\n    <label for=\"support\">Technical support</label>\n  </fieldset>\n\n  <div>\n    <label for=\"message\">Message</label>\n    <textarea id=\"message\" name=\"message\" required></textarea>\n  </div>\n\n  <button type=\"submit\">Send message</button>\n</form>\n```\n\nAfter submission, if validation fails, the script should update each invalid input with `aria-invalid=\"true\"`, append an error message, and focus the first error. That combination gives screen reader users a fully self-voicing, operable form."
+  },
+  {
+    "id": "business-planning",
+    "prompt": "Help me plan a coffee shop startup: pricing and go-to-market.",
+    "skillSelected": true,
+    "activatedSkills": [
+      "business-planning"
+    ],
+    "ok": true,
+    "score": 5,
+    "passed": true,
+    "reasons": [],
+    "aspects": {
+      "instructionAdherence": 1,
+      "functionalCorrectness": 1,
+      "conversationContinuity": 0.6,
+      "executionValidation": 1,
+      "completeness": 1,
+      "uxQuality": 0.9,
+      "efficiency": 1,
+      "assumptionDiscipline": 1,
+      "formatting": 1
+    },
+    "verification": {
+      "risk": "MEDIUM",
+      "hardFailures": [],
+      "results": [
+        {
+          "skillId": "business-planning",
+          "risk": "MEDIUM",
+          "failures": [],
+          "evidence": {
+            "assumptionsLabeled": true
+          }
+        }
+      ],
+      "repairAttempts": 0,
+      "latencyMs": 1,
+      "productionVerdict": true
+    },
+    "liveData": null,
+    "usage": {
+      "initial": {
+        "inputTokens": 1431,
+        "outputTokens": 1754
+      },
+      "repairs": [],
+      "total": {
+        "inputTokens": 1431,
+        "outputTokens": 1754
+      }
+    },
+    "diagnostics": {
+      "truncationDetected": false,
+      "truncationSignals": [],
+      "languageMismatch": false,
+      "languageRatio": 0,
+      "repaired": false,
+      "repairAttempts": 0,
+      "repairReasons": [],
+      "validation": {
+        "codeBlockCount": 0,
+        "syntax": []
+      },
+      "continuity": null,
+      "missingCodeForModification": false,
+      "isModificationRequest": false,
+      "stopReason": "stop",
+      "syntaxIssues": [],
+      "ttftMs": 25153,
+      "totalMs": 25153,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "inputTokens": 1431,
+      "outputTokens": 1754,
+      "fallbackUsed": false,
+      "verification": {
+        "results": [
+          {
+            "skillId": "business-planning",
+            "risk": "MEDIUM",
+            "failures": [],
+            "evidence": {
+              "assumptionsLabeled": true
+            }
+          }
+        ],
+        "hardFailures": [],
+        "passed": true,
+        "repairAttempts": 0,
+        "latencyMs": 1
+      },
+      "liveData": null,
+      "usage": {
+        "initial": {
+          "inputTokens": 1431,
+          "outputTokens": 1754
+        },
+        "repairs": [],
+        "total": {
+          "inputTokens": 1431,
+          "outputTokens": 1754
+        }
+      },
+      "latency": {
+        "routingMs": 0,
+        "providerMs": 25152,
+        "verificationMs": 1,
+        "repairMs": 0,
+        "totalMs": 25153
+      }
+    },
+    "latencyMs": 25153,
+    "requestAttempts": 1,
+    "model": "opencode:deepseek-v4-flash",
+    "content": "## Overview\n\nA successful coffee shop launch depends on pricing that covers your costs while matching what your neighborhood will pay, and a go-to-market plan that builds a loyal base before you open. Below is a practical framework for a **specialty coffee shop** — assume a ~800 sq ft space, 40 seats, dine-in plus takeout, and an urban/suburban mixed-traffic location. All figures are **illustrative estimates** you should validate against your local market.\n\n## Problem & Solution\n\n- **Problem** — Most coffee shops fail because they price too low to be sustainable, or open quietly without a customer base, then rely on foot traffic that never comes.\n- **Solution** — A cost-driven menu with a premium \"signature\" tier, plus a pre-opening marketing sprint that builds an email/social following and generates first-week sales. The shop positions itself as a **third place** with consistent quality, not just a commodity coffee stop.\n\n## Target Market & Positioning\n\n- **Primary customers** — Remote workers, students, local professionals, and nearby residents aged 20–45.\n- **Positioning** — \"High-quality, approachable specialty coffee at a fair price.\" Not the cheapest cup, not the most precious — consistent and welcoming.\n- **Differentiators** — Locally roasted beans, faster-than-average service, reliable Wi-Fi, and a simple loyalty program.\n\n## Pricing Strategy\n\nUse a blend of **cost-plus** (cover costs), **competitor-based** (match the neighborhood range), and **value-based** (charge more for large/fancy drinks).\n\n### Illustrative Menu Prices\n\n| Item | Cost to make (estimate) | Price range | Margin |\n|---|---|---|---|\n| Espresso (single) | $0.35 – $0.50 | $2.00 – $2.75 | 75–85% |\n| Drip coffee (12 oz) | $0.40 – $0.60 | $2.50 – $3.50 | 80–85% |\n| Cappuccino / Latte (12 oz) | $0.70 – $1.00 | $4.00 – $5.00 | 75–80% |\n| Large specialty latte (16 oz) | $1.00 – $1.40 | $5.00 – $6.50 | 75–80% |\n| Cold brew (12 oz) | $0.60 – $0.90 | $4.00 – $5.50 | 80–85% |\n| Pastry (partner-supplied) | $1.20 – $1.80 | $3.00 – $4.50 | 55–65% |\n\nPricing rules to test:\n\n- **Anchor high** — A $6+ large specialty drink makes the $4 latte feel reasonable.\n- **Cheap entry point** — Keep drip coffee under $3 to attract daily regulars.\n- **Bundle deals** — Coffee + pastry combos at a $1–$1.50 discount lift average order value.\n\n## Go-to-Market Plan\n\n### Pre-Opening (6–8 weeks before launch)\n\n- **Soft launch** — Invite 50–100 friends, local business owners, and social media followers for free drinks a week before opening. Collect feedback and photos.\n- **Social media teaser build** — Post construction/renovation progress, bean sourcing stories, and staff introductions on Instagram/TikTok. Aim for 3–5 posts per week.\n- **Email list** — Put a simple \"Get 20% off opening week\" signup form on your website and at the door during build-out.\n- **Partnerships** — Pre-sell wholesale/pickup coffee to nearby offices, gyms, or co-working spaces at a 20–30% discount for bulk orders.\n\n### Launch Week\n\n- **Opening offer** — Buy one drink, get one 50% off, capped at the first 200 customers.\n- **Community event** — Host a \"Coffee 101\" tasting or live acoustic music night in the first two weekends to generate word-of-mouth.\n- **Local press** — Send a one-page launch note to neighborhood newsletters, local blogs, and city social media groups.\n- **Loyalty program** — Digital stamp card: 9 drinks = 1 free. Start on day one, not later.\n\n### First 90 Days\n\n- **Measure** — Track cost of goods sold (target 25–35% of sales), average ticket (target $6–$8), and customer return rate (target 30% weekly return).\n- **Adjust** — Cut menu items under 15% of sales; raise prices on best sellers if wait times stay short.\n- **Expand** — Add a simple pre-order option via Instagram DMs or a basic app if demand supports it.\n\n## Financial Snapshot (illustrative estimates)\n\n- **Startup costs** — Equipment, build-out, permits, and initial inventory: **$120,000 – $250,000**, assuming a leased space with basic renovation.\n- **Monthly fixed costs** — Rent, utilities, insurance, staff, and software: **$12,000 – $25,000** depending on city and staffing levels.\n- **Break-even point** — With an average sale of $6.50, you need roughly **240–390 customers per day** for 30 days to cover fixed costs. This assumes a 75% margin on food/drink and no debt payments.\n- **Revenue range** — A busy single-location shop typically does **$300,000 – $700,000** annual revenue; profitability depends heavily on rent and labor.\n\nThese are starting assumptions. You should build a full spreadsheet model with your actual lease terms, wage rates, and equipment quotes before committing.\n\n## What to Verify This Week\n\n1. **Check 3 competitor menu prices** — Walk or call nearby coffee shops; note drink sizes and prices to confirm your range.\n2. **Get 3 rent quotes** — Rent should stay under 10–12% of projected monthly revenue.\n3. **Draft a one-page business model** — List your 5 core drinks, 3 revenue streams (dine-in, takeout, wholesale), and your weekly marketing activities.\n\n## Next Actions (within 7 days)\n\n- **Pick your location and lease terms** — Do not sign until you have verified foot traffic counts and rent per square foot.\n- **Build a simple menu cost sheet** — Calculate the cost per drink for your top 10 items; adjust prices to hit at least a 70% gross margin.\n- **Create a pre-launch landing page** — Collect emails with the 20% off opening offer before you even order equipment.\n- **Finalize your go-to-market calendar** — Write down the soft launch date, opening date, and one event per weekend for the first month.\n\nUse these next three steps as your starting checklist: **validate pricing, lock the lease, and build the pre-opening audience.** Once those are in motion, you can safely invest in equipment and inventory."
+  },
+  {
+    "id": "resume-career",
+    "prompt": "Write 3 resume bullet points for a data analyst role.",
+    "skillSelected": true,
+    "activatedSkills": [
+      "resume-career"
+    ],
+    "ok": true,
+    "score": 4.7,
+    "passed": true,
+    "reasons": [],
+    "aspects": {
+      "instructionAdherence": 1,
+      "functionalCorrectness": 1,
+      "conversationContinuity": 0.6,
+      "executionValidation": 1,
+      "completeness": 1,
+      "uxQuality": 0.9,
+      "efficiency": 1
+    },
+    "verification": {
+      "risk": "MEDIUM",
+      "hardFailures": [],
+      "results": [],
+      "repairAttempts": 0,
+      "latencyMs": 0,
+      "productionVerdict": true
+    },
+    "liveData": null,
+    "usage": {
+      "initial": {
+        "inputTokens": 1432,
+        "outputTokens": 1409
+      },
+      "repairs": [],
+      "total": {
+        "inputTokens": 1432,
+        "outputTokens": 1409
+      }
+    },
+    "diagnostics": {
+      "truncationDetected": false,
+      "truncationSignals": [],
+      "languageMismatch": false,
+      "languageRatio": 0,
+      "repaired": false,
+      "repairAttempts": 0,
+      "repairReasons": [],
+      "validation": {
+        "codeBlockCount": 0,
+        "syntax": []
+      },
+      "continuity": null,
+      "missingCodeForModification": false,
+      "isModificationRequest": false,
+      "stopReason": "stop",
+      "syntaxIssues": [],
+      "ttftMs": 17620,
+      "totalMs": 17620,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "inputTokens": 1432,
+      "outputTokens": 1409,
+      "fallbackUsed": false,
+      "verification": {
+        "results": [],
+        "hardFailures": [],
+        "passed": true,
+        "repairAttempts": 0,
+        "latencyMs": 0
+      },
+      "liveData": null,
+      "usage": {
+        "initial": {
+          "inputTokens": 1432,
+          "outputTokens": 1409
+        },
+        "repairs": [],
+        "total": {
+          "inputTokens": 1432,
+          "outputTokens": 1409
+        }
+      },
+      "latency": {
+        "routingMs": 0,
+        "providerMs": 17620,
+        "verificationMs": 0,
+        "repairMs": 0,
+        "totalMs": 17620
+      }
+    },
+    "latencyMs": 17622,
+    "requestAttempts": 1,
+    "model": "opencode:deepseek-v4-flash",
+    "content": "Here are three strong, ATS-friendly bullet points for a data analyst resume. I’ve included bracketed placeholders so you can insert your own real numbers—never list achievements you can’t back up with actual results.\n\n## Example Bullet Points\n\n- **Built and maintained [X] interactive dashboards in [Power BI/Tableau]** to track key business metrics, reducing manual reporting time for [team/stakeholders] by [X]%.\n- **Analyzed [X] rows of customer transaction data using SQL and Python**, identifying [X] actionable insights that improved [conversion rate/operational efficiency/revenue] by [X]%.\n- **Automated weekly data extraction and cleaning workflows with [Python/SQL]**, cutting manual effort by [X] hours per week and increasing data accuracy from [X]% to [X]%.\n\nReplace each placeholder with your actual metrics, tools, and business context. Keep only bullets that reflect real work you performed—specific, quantified impact is what makes a data analyst resume stand out."
+  },
+  {
+    "id": "creative-writing",
+    "prompt": "Write me a short story about a lighthouse keeper.",
+    "skillSelected": true,
+    "activatedSkills": [
+      "creative-writing"
+    ],
+    "ok": true,
+    "score": 4.9,
+    "passed": true,
+    "reasons": [],
+    "aspects": {
+      "instructionAdherence": 1,
+      "functionalCorrectness": 1,
+      "conversationContinuity": 0.6,
+      "executionValidation": 1,
+      "completeness": 1,
+      "uxQuality": 0.9,
+      "efficiency": 1,
+      "formatting": 1,
+      "creativity": 0.9,
+      "coherence": 1
+    },
+    "verification": {
+      "risk": "LOW",
+      "hardFailures": [],
+      "results": [],
+      "repairAttempts": 0,
+      "latencyMs": 0,
+      "productionVerdict": true
+    },
+    "liveData": null,
+    "usage": {
+      "initial": {
+        "inputTokens": 1420,
+        "outputTokens": 1234
+      },
+      "repairs": [],
+      "total": {
+        "inputTokens": 1420,
+        "outputTokens": 1234
+      }
+    },
+    "diagnostics": {
+      "truncationDetected": false,
+      "truncationSignals": [],
+      "languageMismatch": false,
+      "languageRatio": 0,
+      "repaired": false,
+      "repairAttempts": 0,
+      "repairReasons": [],
+      "validation": {
+        "codeBlockCount": 0,
+        "syntax": []
+      },
+      "continuity": null,
+      "missingCodeForModification": false,
+      "isModificationRequest": false,
+      "stopReason": "stop",
+      "syntaxIssues": [],
+      "ttftMs": 18509,
+      "totalMs": 18509,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "inputTokens": 1420,
+      "outputTokens": 1234,
+      "fallbackUsed": false,
+      "verification": {
+        "results": [],
+        "hardFailures": [],
+        "passed": true,
+        "repairAttempts": 0,
+        "latencyMs": 0
+      },
+      "liveData": null,
+      "usage": {
+        "initial": {
+          "inputTokens": 1420,
+          "outputTokens": 1234
+        },
+        "repairs": [],
+        "total": {
+          "inputTokens": 1420,
+          "outputTokens": 1234
+        }
+      },
+      "latency": {
+        "routingMs": 0,
+        "providerMs": 18508,
+        "verificationMs": 0,
+        "repairMs": 1,
+        "totalMs": 18509
+      }
+    },
+    "latencyMs": 18509,
+    "requestAttempts": 1,
+    "model": "opencode:deepseek-v4-flash",
+    "content": "## The Keeper of the Last Light\n\nElias had been keeper of the Horned Point Light for thirty-one years, and in all that time, the sea had never once asked his name. It simply arrived — grey, patient, and hungry — throwing itself against the rocks below with the rhythm of a breathing thing. The lamp turned. The foghorn moaned. Elias tended both the way other men tended graves: with devotion, and without expectation.\n\nThe night the fog came in thick as wool, he heard something new under the horn's low cry. A voice. Thin. Almost a whisper, but pitched like a child's.\n\n\"Hello? Is someone there?\"\n\nElias set down his oil rag and listened. The wind combed the tower's iron ribs. Nothing. He told himself it was the gulls, or the diesel engine playing tricks. But at midnight, when he climbed to the gallery to check the lens, he found a girl standing at the railing.\n\nShe was maybe nine, wearing a yellow raincoat that glowed faintly in the beacon's sweep. Her hair was plastered to her cheeks, and her eyes were the pale green of sea glass.\n\n\"You're not supposed to be up here,\" Elias said, keeping his voice steady.\n\n\"I know,\" she said. \"But the water told me to come.\"\n\nThe water told her. He'd heard that before, in the voices of the drowned — the ones sailors said you'd meet on nights like this, wearing their last clothes, asking for passage home. Elias had never seen one himself. He'd always assumed the stories were the kind men told to keep fresh hands from sleeping at their posts.\n\n\"You need to go back,\" he said. \"Whatever you left down there, it's gone. Let it be.\"\n\nThe girl turned to face him, and the lamp's beam caught her fully. She wasn't wet. Not a drop. Her yellow raincoat was dry as a church pew.\n\n\"I'm not lost,\" she said. \"I'm the light.\"\n\nElias blinked. The fog was so thick now that the beacon seemed to push against it, a fist trying to punch through felt. Below, the sea moaned in its throat. The girl pointed out past the rocks, past the swells, to a place where the fog had thinned into a single dark gap.\n\n\"There's a boat out there,\" she said. \"A little one. The man inside has been rowing for hours. He's given up, but he doesn't know he has.\"\n\nThe lamp turned. The shadows swung. And for a moment — just a moment — Elias thought he saw a tiny wooden hull lifting on a swell, a figure hunched over oars.\n\n\"He can't see us,\" the girl said. \"The fog is too thick for color. But he knows the sound of the horn. Keep it sounding, Elias. Keep it sounding until morning.\"\n\nElias should have questioned her. He was a careful man; he logged everything, touched nothing twice. But the foghorn chose that moment to bellow, and the girl winced as if it had struck her.\n\n\"You're cold,\" he said.\n\n\"I'm not,\" she said. \"But you are. Go inside, Keeper. Light your stove. Trust the old sound.\"\n\nHe didn't go inside. He stood on the gallery with her, the wind clawing at his mackintosh, while the lamp wheeled its great eye over the water. The horn moaned every thirty seconds, regular as a heartbeat. And in the gap in the fog, the little boat kept appearing — closer now, turning slowly as if its oarsman had heard something at last.\n\nAt first light, the girl was gone. Elias found no footprints on the gallery, no smudge of salt on the railing. Below, the sea had smoothed itself into grey silk. He went down to the kitchen and made tea, and the lighthouse hummed around him like an old engine that had forgotten how to stop.\n\nThat afternoon, a coast guard cutter came by. The young lieutenant hailed him through a megaphone: had he seen a boat? A missing fisherman, out since Tuesday, wife in labor, all prayers up.\n\nElias walked to the railing. The sea was calm. The sky was doing that pale blue thing it does after a long storm.\n\n\"Look east of the reef,\" he said. \"About a mile out. I think you'll find him alive.\"\n\nThe lieutenant looked skeptical but nodded, and the cutter pulled away. Elias watched until it was a dot. Then he went back inside, checked the lamp, and for the first time in thirty-one years, hung a yellow raincoat on the hook by the door. He didn't know why. It just seemed like the kind of thing you did for someone who'd saved you — even if the someone was only a story, wearing the color of the light.\n\n---\n\n**A note on craft:** I kept the point of view tightly inside Elias to build mystery — the reader only knows what he sees, which lets the girl exist ambiguously as ghost, guardian, or projection. The yellow raincoat works as a visual anchor and emotional callback; the ending implies Elias has changed without stating it. If you'd like a version more grounded in realism (the girl as a real lost child), or one that goes full supernatural, I can revise either direction."
+  },
+  {
+    "id": "presentation-design",
+    "prompt": "Outline a 5-slide presentation about remote work productivity.",
+    "skillSelected": true,
+    "activatedSkills": [
+      "presentation-design"
+    ],
+    "ok": true,
+    "score": 5,
+    "passed": true,
+    "reasons": [],
+    "aspects": {
+      "instructionAdherence": 1,
+      "functionalCorrectness": 1,
+      "conversationContinuity": 0.6,
+      "executionValidation": 1,
+      "completeness": 1,
+      "uxQuality": 0.9,
+      "efficiency": 1,
+      "factualAccuracy": 1,
+      "formatting": 1
+    },
+    "verification": {
+      "risk": "MEDIUM",
+      "hardFailures": [],
+      "results": [
+        {
+          "skillId": "presentation-design",
+          "risk": "MEDIUM",
+          "failures": [],
+          "evidence": {
+            "statistics": []
+          }
+        }
+      ],
+      "repairAttempts": 0,
+      "latencyMs": 2,
+      "productionVerdict": true
+    },
+    "liveData": null,
+    "usage": {
+      "initial": {
+        "inputTokens": 1451,
+        "outputTokens": 1677
+      },
+      "repairs": [],
+      "total": {
+        "inputTokens": 1451,
+        "outputTokens": 1677
+      }
+    },
+    "diagnostics": {
+      "truncationDetected": false,
+      "truncationSignals": [],
+      "languageMismatch": false,
+      "languageRatio": 0,
+      "repaired": false,
+      "repairAttempts": 0,
+      "repairReasons": [],
+      "validation": {
+        "codeBlockCount": 0,
+        "syntax": []
+      },
+      "continuity": null,
+      "missingCodeForModification": false,
+      "isModificationRequest": false,
+      "stopReason": "stop",
+      "syntaxIssues": [],
+      "ttftMs": 21647,
+      "totalMs": 21647,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "inputTokens": 1451,
+      "outputTokens": 1677,
+      "fallbackUsed": false,
+      "verification": {
+        "results": [
+          {
+            "skillId": "presentation-design",
+            "risk": "MEDIUM",
+            "failures": [],
+            "evidence": {
+              "statistics": []
+            }
+          }
+        ],
+        "hardFailures": [],
+        "passed": true,
+        "repairAttempts": 0,
+        "latencyMs": 2
+      },
+      "liveData": null,
+      "usage": {
+        "initial": {
+          "inputTokens": 1451,
+          "outputTokens": 1677
+        },
+        "repairs": [],
+        "total": {
+          "inputTokens": 1451,
+          "outputTokens": 1677
+        }
+      },
+      "latency": {
+        "routingMs": 0,
+        "providerMs": 21644,
+        "verificationMs": 2,
+        "repairMs": 1,
+        "totalMs": 21647
+      }
+    },
+    "latencyMs": 21647,
+    "requestAttempts": 1,
+    "model": "opencode:deepseek-v4-flash",
+    "content": "Here's a 5-slide deck structured to move your audience from awareness to action: the arc is Hook → Reality Check → Problem → Solution → Call to Action. Each slide carries one idea, and every statistical claim is left as a placeholder so you can insert verified data before presenting.\n\n## Slide 1 — The Hook: The Remote Work Paradox\n**Title:** \"We Left the Office. Did Productivity Follow?\"\n- Remote work is now permanent for millions — yet most teams still measure productivity by hours, not outcomes.\n- Punchline: The old playbook doesn't work in a distributed world — and pretending it does is costing you more than you think.\n- **Key points:**\n  - Remote work isn't a trend — it's the default for [X]% of knowledge workers.\n  - \"Presenteeism\" has been replaced by its opposite: the fear that unseen work isn't happening.\n  - The real question isn't *if* people work — it's *what* they actually get done.\n\n**Speaker notes:**\nOpen with a rhetorical question about the audience's own trust in remote teams. Share one short anecdote (e.g., a manager who discovered a top performer was disengaged). Set up the tension: \"We've solved *where* we work. Now we have to solve *how* we work.\"\n\n**Visual suggestion:** Split-screen graphic — a crowded office on one side, an empty living-room desk on the other, with an overlapping question mark.\n\n## Slide 2 — The Reality Check: What the Data Says\n**Title:** \"The Evidence: Remote Teams Can Be More Productive — Under Conditions\"\n- Productive remote work isn't automatic; it's a product of structure, trust, and tooling.\n- **Key points:**\n  - Studies report productivity gains of [X]–[Y]% for fully remote teams — but only after the transition period ends. *[Insert verified statistic]*\n  - On average, remote workers save [X] minutes per day by eliminating commutes — which is not the same as recovered working hours. *[Insert verified statistic]*\n  - Collaboration quality sees a sharp dip in \"hybrid\" setups where some people are in-office and some are remote. *[Insert verified statistic]*\n\n**Speaker notes:**\nWalk through the numbers slowly. Emphasize that the *conditions* matter more than the *headline* numbers — teams with written processes and async norms outperform, while teams that replicate office habits remotely underperform. Invite the audience to mentally audit which bucket they fall into.\n\n**Visual suggestion:** A simple bar chart comparing in-office vs. remote productivity before/after a 6-month adjustment period, with an annotation: \"The dip is normal. The recovery is by design.\"\n\n## Slide 3 — The Real Problems: What Actually Kills Remote Productivity\n**Title:** \"Four Silent Killers of Remote Work\"\n- **Key points:**\n  - **Context switching** — constant chat pings make people feel busy but produce little; each switch costs roughly [X] minutes of refocusing time. *[Insert verified statistic]*\n  - **Coordination overload** — too many meetings \"just to stay aligned\" replace the deep work that used to happen between meetings.\n  - **Blurred boundaries** — no commute and no closing door means no clear end to the workday, leading to burnout that lowers output.\n  - **Invisible isolation** — lonely employees disengage quietly; disengagement costs teams up to [X]% in lost productivity. *[Insert verified statistic]*\n\n**Speaker notes:**\nFrame this slide as the diagnosis — no solutions yet, just honest naming of the problems. Ask the audience to silently rate their own team 1–5 on each killer. The discomfort here creates the urgency for slide 4.\n\n**Visual suggestion:** Four quadrant icons (chat bubble, calendar, sunrise/sunset, person alone in a frame) each with a one-word label and a short caption beneath.\n\n## Slide 4 — The Playbook: Five Practices That Restore Focus\n**Title:** \"Designing for Deep Work at a Distance\"\n- **Key points:**\n  - **Async-first communication** — default to written updates and recorded Loom-style briefs; protect synchronous time for decisions only.\n  - **Deep work blocks** — schedule 90-minute no-interruption blocks on shared calendars; let \"busy\" mean \"available,\" not \"micro-managed.\"\n  - **One source of truth** — every project lives in a single document/board so nobody chases status via chat.\n  - **Outcome-based goals** — replace \"hours logged\" with measurable weekly outcomes; trust is the new management layer.\n  - **Hard stop rituals** — a closing routine (e.g., a \"done list\" sent at end of day) that signals work is finished.\n\n**Speaker notes:**\nIntroduce the rule: \"If it can be written, don't meet about it.\" Walk through each practice with one concrete example (e.g., \"Replace the Monday status meeting with a 15-minute written update\"). Emphasize that these are *mutual commitments*, not individual tips — the whole team has to adopt them.\n\n**Visual suggestion:** A 5-step horizontal roadmap or ladder graphic, each step labeled with one practice and a tiny icon.\n\n## Slide 5 — The Call to Action: Your First Experiment\n**Title:** \"Pick One Change. Measure It for 30 Days.\"\n- Don't overhaul everything — run one focused experiment per team and let the data drive the next move.\n- **Key points:**\n  - Choose one practice from the playbook (suggestion: async-first updates or deep work blocks).\n  - Define one measurable outcome: tasks completed, project velocity, meeting hours reclaimed, or team satisfaction score.\n  - Commit to a 30-day trial, then review: keep it, adjust it, or kill it — publicly.\n  - Leadership must model the behavior first; policy only works when leaders practice it.\n\n**Speaker notes:**\nThis is your closing pivot. Invite the audience to commit out loud (or in a live poll) to the single experiment their team will run this quarter. Anticipate the objection: \"We don't have time to change how we work.\" Answer it: \"Exactly — that's why we're only changing *one* thing.\" End with the line: \"The future of work isn't about where you sit. It's about how deliberately you work. Choose your experiment today.\"\n\n**Visual suggestion:** A single bold button graphic reading \"Start Your 30-Day Experiment\" with a simple arrow, or a one-question poll prompt: \"Which practice will your team adopt first?\""
+  },
+  {
+    "id": "personal-productivity",
+    "prompt": "Plan my day: I have a report due, a team meeting, and I want to exercise.",
+    "skillSelected": true,
+    "activatedSkills": [
+      "personal-productivity"
+    ],
+    "ok": true,
+    "score": 4.7,
+    "passed": true,
+    "reasons": [],
+    "aspects": {
+      "instructionAdherence": 1,
+      "functionalCorrectness": 1,
+      "conversationContinuity": 0.6,
+      "executionValidation": 1,
+      "completeness": 1,
+      "uxQuality": 0.9,
+      "efficiency": 1
+    },
+    "verification": {
+      "risk": "MEDIUM",
+      "hardFailures": [],
+      "results": [
+        {
+          "skillId": "personal-productivity",
+          "risk": "MEDIUM",
+          "failures": [],
+          "evidence": {
+            "assumptions": []
+          }
+        }
+      ],
+      "repairAttempts": 0,
+      "latencyMs": 0,
+      "productionVerdict": true
+    },
+    "liveData": null,
+    "usage": {
+      "initial": {
+        "inputTokens": 1452,
+        "outputTokens": 851
+      },
+      "repairs": [],
+      "total": {
+        "inputTokens": 1452,
+        "outputTokens": 851
+      }
+    },
+    "diagnostics": {
+      "truncationDetected": false,
+      "truncationSignals": [],
+      "languageMismatch": false,
+      "languageRatio": 0,
+      "repaired": false,
+      "repairAttempts": 0,
+      "repairReasons": [],
+      "validation": {
+        "codeBlockCount": 0,
+        "syntax": []
+      },
+      "continuity": null,
+      "missingCodeForModification": false,
+      "isModificationRequest": false,
+      "stopReason": "stop",
+      "syntaxIssues": [],
+      "ttftMs": 12413,
+      "totalMs": 12413,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "inputTokens": 1452,
+      "outputTokens": 851,
+      "fallbackUsed": false,
+      "verification": {
+        "results": [
+          {
+            "skillId": "personal-productivity",
+            "risk": "MEDIUM",
+            "failures": [],
+            "evidence": {
+              "assumptions": []
+            }
+          }
+        ],
+        "hardFailures": [],
+        "passed": true,
+        "repairAttempts": 0,
+        "latencyMs": 0
+      },
+      "liveData": null,
+      "usage": {
+        "initial": {
+          "inputTokens": 1452,
+          "outputTokens": 851
+        },
+        "repairs": [],
+        "total": {
+          "inputTokens": 1452,
+          "outputTokens": 851
+        }
+      },
+      "latency": {
+        "routingMs": 0,
+        "providerMs": 12412,
+        "verificationMs": 0,
+        "repairMs": 1,
+        "totalMs": 12413
+      }
+    },
+    "latencyMs": 12414,
+    "requestAttempts": 2,
+    "model": "opencode:deepseek-v4-flash",
+    "content": "Here's a practical plan for your day, built around the two priorities that are time-sensitive (report and meeting) and the one that keeps you functional (exercise). I've made reasonable assumptions about times since you didn't specify them — swap in your actual schedule where noted. The core idea: do deep work on the report first while your focus is fresh, protect the meeting slot, then use exercise as a clear cutoff to recharge.\n\n## Morning – Report Deep Work\n\n- **9:00 – 10:30 AM** — **Report: Outline + key sections.** Start by writing the structure, then fill in the two hardest parts first. Put your phone in another room or on DND.\n- **10:30 – 10:45 AM** — **Break.** Step away from the screen, stretch, hydrate.\n- **10:45 AM – 12:00 PM** — **Report: Draft remaining sections.** If you get stuck, leave a placeholder and move on — you'll refine later.\n\n## Midday – Meeting and Buffer\n\n- **12:00 – 1:00 PM** — **Lunch + mental reset.** Don't work through this. You'll be more productive after.\n- **[Team meeting — actual time]** — **Attend and contribute.** Before joining, write down 2–3 key points you want to share or questions you want answered. Jot action items immediately after.\n- **Right after the meeting** — **Capture meeting notes** into your task list, then immediately return to the report for 30 minutes to make progress before you lose context.\n\n## Afternoon – Finalize the Report\n\n- **2:30 – 3:30 PM** — **Report: Edit, format, verify.** Cut fluff, check citations, ensure the requirements match. Aim to have a \"done\" version by 3:30, not perfect — you can do a light pass later.\n- **3:30 – 4:00 PM** — **Final proofread and submit.** Read it out loud or use text-to-speech to catch errors. Submit before you move to exercise so it's off your plate.\n\n## Late Afternoon – Exercise\n\n- **4:00 – 5:00 PM** — **Workout.** This is your reward and reset. Choose a session that matches your energy: strength, cardio, yoga, or a brisk walk. Block the full hour; treat it as non-negotiable.\n\n## Evening – Wind Down (Optional)\n\n- **5:00 PM onward** — **Done.** If anything remains, list it for tomorrow rather than starting new work. Review your calendar for tomorrow evening.\n\n## Tracking for Today\n\nKeep it simple: use a sticky note or a note app with three boxes:\n\n- [ ] Report submitted\n- [ ] Meeting attended + action items logged\n- [ ] Exercise completed\n\nCheck them off as you go. That's your lightweight accountability system — no apps or spreadsheets needed."
+  },
+  {
+    "id": "personal-finance",
+    "prompt": "Build a monthly budget for a family with 40000 PHP income.",
+    "skillSelected": true,
+    "activatedSkills": [
+      "personal-finance"
+    ],
+    "ok": true,
+    "score": 5,
+    "passed": true,
+    "reasons": [],
+    "aspects": {
+      "instructionAdherence": 1,
+      "functionalCorrectness": 1,
+      "conversationContinuity": 0.6,
+      "executionValidation": 1,
+      "completeness": 1,
+      "uxQuality": 0.9,
+      "efficiency": 1,
+      "factualAccuracy": 1,
+      "assumptionDiscipline": 1,
+      "formatting": 1
+    },
+    "verification": {
+      "risk": "HIGH",
+      "hardFailures": [],
+      "results": [
+        {
+          "skillId": "personal-finance",
+          "risk": "HIGH",
+          "failures": [],
+          "evidence": {
+            "checks": [
+              {
+                "label": "budget-total",
+                "expected": 40000,
+                "found": 40000,
+                "ok": true
+              },
+              {
+                "label": "line-item-sum",
+                "expected": 40000,
+                "found": 40000,
+                "ok": true
+              }
+            ]
+          }
+        }
+      ],
+      "repairAttempts": 1,
+      "latencyMs": 1,
+      "productionVerdict": true
+    },
+    "liveData": null,
+    "usage": {
+      "initial": {
+        "inputTokens": 1439,
+        "outputTokens": 2532
+      },
+      "repairs": [],
+      "total": {
+        "inputTokens": 1439,
+        "outputTokens": 2532
+      }
+    },
+    "diagnostics": {
+      "truncationDetected": false,
+      "truncationSignals": [],
+      "languageMismatch": false,
+      "languageRatio": 0,
+      "repaired": false,
+      "repairAttempts": 0,
+      "repairReasons": [],
+      "validation": {
+        "codeBlockCount": 0,
+        "syntax": []
+      },
+      "continuity": null,
+      "missingCodeForModification": false,
+      "isModificationRequest": false,
+      "stopReason": "stop",
+      "syntaxIssues": [],
+      "ttftMs": 23250,
+      "totalMs": 23250,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "inputTokens": 1439,
+      "outputTokens": 2532,
+      "fallbackUsed": false,
+      "verification": {
+        "results": [
+          {
+            "skillId": "personal-finance",
+            "risk": "HIGH",
+            "failures": [],
+            "evidence": {
+              "checks": [
+                {
+                  "label": "budget-total",
+                  "expected": 40000,
+                  "found": 40000,
+                  "ok": true
+                },
+                {
+                  "label": "line-item-sum",
+                  "expected": 40000,
+                  "found": 40000,
+                  "ok": true
+                }
+              ]
+            }
+          }
+        ],
+        "hardFailures": [],
+        "passed": true,
+        "repairAttempts": 1,
+        "latencyMs": 1
+      },
+      "liveData": null,
+      "usage": {
+        "initial": {
+          "inputTokens": 1439,
+          "outputTokens": 2532
+        },
+        "repairs": [],
+        "total": {
+          "inputTokens": 1439,
+          "outputTokens": 2532
+        }
+      },
+      "latency": {
+        "routingMs": 0,
+        "providerMs": 23248,
+        "verificationMs": 1,
+        "repairMs": 0,
+        "totalMs": 23250
+      }
+    },
+    "latencyMs": 23251,
+    "requestAttempts": 1,
+    "model": "opencode:deepseek-v4-flash",
+    "content": "Here’s a workable monthly budget for a family earning 40,000 PHP net income. This plan assumes a family of four in a provincial or suburban area, and it uses the 60/20/20 rule: 60% for needs, 20% for wants, and 20% for savings and debt. Every line item adds up exactly to 40,000 PHP.\n\n## Assumptions First\n\n- **Income:** 40,000 PHP is the **take-home pay** after taxes and government contributions (SSS, PhilHealth, Pag-IBIG). If this is your gross salary, subtract those deductions first and budget only what actually lands in your bank account.\n- **Family size:** 4 persons (2 adults, 2 children).\n- **Location:** Outside Metro Manila; housing and transport costs are moderate.\n- **Goal:** Keep the family solvent, build an emergency fund, and pay down any debts.\n\n## Budget Summary\n\n| Category | Amount (PHP) | % of Income | Notes |\n|---|---|---:|---:|---|\n| **Needs** | **24,000** | **60%** | Survival essentials |\n| **Wants** | **8,000** | **20%** | Lifestyle and fun |\n| **Savings & Debt** | **8,000** | **20%** | Future, insurance, and obligations |\n| **Total** | **40,000** | **100%** | Exactly equal to income |\n\n## Needs — 24,000 PHP (60%)\n\n| Item | Amount (PHP) | % of Income | What It Covers |\n|---|---:|---:|---|\n| Housing | 9,000 | 22.5% | Rent or mortgage, basic repairs |\n| Utilities | 3,500 | 8.75% | Electricity, water, internet, mobile data |\n| Food & Groceries | 8,000 | 20% | Market, rice, meat, vegetables, cooking essentials |\n| Transportation | 1,500 | 3.75% | Jeepney/bus fare, gasoline, jeep or motorcycle maintenance |\n| Healthcare | 1,000 | 2.5% | Medicines, vitamins, checkups, small medical expenses |\n| Education & Other | 1,000 | 2.5% | School fees (if any), school supplies, uniform installments |\n| **Subtotal** | **24,000** | **60%** | |\n\n## Wants — 8,000 PHP (20%)\n\n| Dining Out | 2,000 | 5% | Eat out or order food twice a month |\n| Entertainment | 2,000 | 5% | Netflix, streaming, occasional mall trip, games |\n| Personal Care | 2,000 | 5% | Haircuts, toiletries, simple grooming |\n| Miscellaneous | 2,000 | 5% | Hobbies, gifts, small treats, unexpected fun |\n| **Subtotal** | **8,000** | **20%** | |\n\n## Savings & Debt — 8,000 PHP (20%)\n\n| Emergency Fund | 4,000 | 10% | Build until you have 3–6 months of expenses, then stop or redirect |\n| Debt Repayment | 2,000 | 5% | Extra payments beyond minimum on loans, credit cards, or borrowings |\n| Insurance | 2,000 | 5% | Life or health insurance premiums, or prepaid health plan |\n\n## Math Verification\n\n- Needs: 9,000 + 3,500 + 8,000 + 1,500 + 1,000 + 1,000 = **24,000**\n- Wants: 2,000 + 2,000 + 2,000 + 2,000 = **8,000**\n- Savings: 4,000 + 2,000 + 2,000 = **8,000**\n- Grand total: 24,000 + 8,000 + 8,000 = **40,000**\n- Percentages: 60% + 20% + 20% = **100%**\n\n## How to Make This Work in Practice\n\n- **Track every peso for the first 30 days.** Use a simple notebook or a budgeting app. Adjust the line items to match your real spending before locking them in.\n- **Set aside savings first.** Transfer 4,000 PHP to a separate emergency fund account on payday — before you spend anything else. Do the same for the 2,000 PHP debt repayment.\n- **Use cash wallets.** Separate physical envelopes or GCash/Maya savings wallets for each major category. When the envelope is empty, the category is done for the month.\n- **Plan meals around the 8,000 PHP food budget.** This covers roughly 267 PHP per day for the whole family. Cooking in batches and buying staple goods in bulk helps stay under this.\n- **Revisit insurance.** If you already have employer health coverage, the 2,000 PHP can go to an HMO add-on or a life insurance upgrade. If not, prioritise PhilHealth contributions and a low-cost prepaid health card.\n\n## Risks and What to Watch Out For\n\n- **This budget breaks if rent exceeds 9,000 PHP.** Housing should ideally stay under 25–30% of income. If rent is higher, you must cut wants or savings.\n- **Food may be under-budgeted in Metro Manila.** For families in the NCR, groceries alone often cost 10,000–12,000 PHP. If you're in a high-cost area, shift 2,000–3,000 PHP from wants and entertainment into food.\n- **One-off expenses will ruin your total.** Medical emergencies, school enrolment, and vehicle repairs don't fit neatly into a monthly table. That's exactly why the emergency fund exists. Build it fast before prioritising extra debt payments.\n- **Don't expect the investment returns.** Any additional money after the emergency fund is fully built can go into MP2, mutual funds, or government bonds, but treat returns as uncertain — never guarantee or assume a fixed gain.\n- **Debt priority matters.** The 2,000 PHP debt repayment assumed you're already paying the minimum. If you have high-interest debt (credit cards, loan sharks), consider temporarily raising debt repayment to 5,000 PHP and shrinking the wants section to 5,000 PHP until the debt is gone.\n\n## Next Step for Your Family\n\nFill in just three real numbers for one week: actual rent, actual grocery bill, and actual transport cost. Compare those against this plan. If your rent is below 9,000, move the extra into food or emergency savings. If it's above, rework the table until every peso is assigned — the goal is not the exact amounts here, but a budget that matches your real life and still adds up to exactly 40,000 PHP."
+  },
+  {
+    "id": "travel-planning",
+    "prompt": "Plan a 3-day itinerary in Cebu.",
+    "skillSelected": true,
+    "activatedSkills": [
+      "travel-planning"
+    ],
+    "ok": true,
+    "score": 5,
+    "passed": true,
+    "reasons": [],
+    "aspects": {
+      "instructionAdherence": 1,
+      "functionalCorrectness": 1,
+      "conversationContinuity": 0.6,
+      "executionValidation": 1,
+      "completeness": 1,
+      "uxQuality": 0.9,
+      "efficiency": 1,
+      "factualAccuracy": 1,
+      "formatting": 1
+    },
+    "verification": {
+      "risk": "HIGH",
+      "hardFailures": [],
+      "results": [
+        {
+          "skillId": "travel-planning",
+          "risk": "HIGH",
+          "failures": [],
+          "evidence": {
+            "events": [
+              {
+                "activity": "| Tumalog Falls | 9:30–10:30 AM | 1 hr | ₱30 |",
+                "startTime": "9:30",
+                "durationHours": null,
+                "nextActivity": null
+              }
+            ]
+          }
+        }
+      ],
+      "repairAttempts": 0,
+      "latencyMs": 0,
+      "productionVerdict": true
+    },
+    "liveData": null,
+    "usage": {
+      "initial": {
+        "inputTokens": 1466,
+        "outputTokens": 2549
+      },
+      "repairs": [],
+      "total": {
+        "inputTokens": 1466,
+        "outputTokens": 2549
+      }
+    },
+    "diagnostics": {
+      "truncationDetected": false,
+      "truncationSignals": [],
+      "languageMismatch": false,
+      "languageRatio": 0,
+      "repaired": false,
+      "repairAttempts": 0,
+      "repairReasons": [],
+      "validation": {
+        "codeBlockCount": 0,
+        "syntax": []
+      },
+      "continuity": null,
+      "missingCodeForModification": false,
+      "isModificationRequest": false,
+      "stopReason": "stop",
+      "syntaxIssues": [],
+      "ttftMs": 24908,
+      "totalMs": 24908,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "inputTokens": 1466,
+      "outputTokens": 2549,
+      "fallbackUsed": false,
+      "verification": {
+        "results": [
+          {
+            "skillId": "travel-planning",
+            "risk": "HIGH",
+            "failures": [],
+            "evidence": {
+              "events": [
+                {
+                  "activity": "| Tumalog Falls | 9:30–10:30 AM | 1 hr | ₱30 |",
+                  "startTime": "9:30",
+                  "durationHours": null,
+                  "nextActivity": null
+                }
+              ]
+            }
+          }
+        ],
+        "hardFailures": [],
+        "passed": true,
+        "repairAttempts": 0,
+        "latencyMs": 0
+      },
+      "liveData": null,
+      "usage": {
+        "initial": {
+          "inputTokens": 1466,
+          "outputTokens": 2549
+        },
+        "repairs": [],
+        "total": {
+          "inputTokens": 1466,
+          "outputTokens": 2549
+        }
+      },
+      "latency": {
+        "routingMs": 0,
+        "providerMs": 24908,
+        "verificationMs": 0,
+        "repairMs": 0,
+        "totalMs": 24908
+      }
+    },
+    "latencyMs": 24909,
+    "requestAttempts": 3,
+    "model": "opencode:deepseek-v4-flash",
+    "content": "Cebu delivers a dense blend of history, coastal adventure, and jungle waterfalls. This 3-day plan combines a heritage day in Cebu City, an early-morning whale shark encounter in Oslob, and a canyoneering-plus-snorkeling finale in Moalboal. It assumes you start in Cebu City, use a private van or rented car for flexibility, and are willing to wake up early — that's the trade-off for hitting three regions without rushing. Every drive is budgeted with buffer time, and overnight stays are placed near the next morning's activity.\n\n## Day 1: Cebu City Heritage & Hills\n\nStart with the colonial core, then climb to the hilltop viewpoints before dinner.\n\n### Morning\n- **Magellan's Cross & Basilica del Santo Niño** — Adjacent landmarks in Plaza Sugbo. Spend 45–60 minutes total; the basilica has a small museum.\n- **Cebu Cathedral** — A short walk (10 minutes) from the basilica. Quick photo stop, 20 minutes.\n- **Lunch** — Try Cebu lechon at **Zubuchon** or **House of Lechon** (both have SM City Cebu branches near the city center).\n\n### Afternoon\n- **Fort San Pedro** — The triangular Spanish fort near the port. 30–45 minutes.\n- **Drive to busay hills** — 40 minutes with traffic. Visit **Temple of Leah** and then **Sirao Flower Garden** (the \"Little Amsterdam\" garden). Both are close (15-minute drive apart).\n- **Tops Lookout** — Sunset viewpoint overlooking Cebu City and Mactan Island. Arrive ~5:00 PM.\n\n### Evening\n- **Dinner** at **Sugbo Mercado** (I.T. Park food park) or along **Il Corso** near the seaside. Both have local and street-food options.\n- **Overnight** in Cebu City, ideally near I.T. Park or the waterfront for easy morning departure.\n\n## Day 2: Oslob Whale Sharks, Falls & Transfer to Moalboal\n\nThis is the long-travel day. Leave before sunrise to make the whale shark window.\n\n### Early Morning\n- **Depart Cebu City at 4:00 AM** — Drive 3.5–4 hours to Oslob (route via Cebu South Road). Arrive between 7:30–8:00 AM.\n- **Whale Shark Watching** — Board a small boat at **Barangay Tan-awan**; you'll spend about 30–45 minutes in the water with the sharks. Fee is roughly ₱1,500 per person including gear. No sunscreen or lotions allowed; wear a rash guard.\n- **Tumalog Falls** — 20 minutes away by tricycle. A wide, misty cascade fed by mountain water. Bring swimwear; the pool is shallow and chilly. 45–60 minutes.\n\n### Midday\n- **Lunch** in Oslob town — simple grilled seafood or lechon options.\n\n### Afternoon\n- **Sumilon Island sandbar** (optional) — 30 minutes by boat from Oslob; check low-tide timing or skip if you prefer more Moalboal time.\n- **Drive to Moalboal** — 2–2.5 hours via the Barili road. Check into your hotel in **Panagsama Beach** or **Basdaku** by late afternoon.\n- **Sunset stroll & dinner** along Panagsama's beachfront strip.\n- **Overnight** in Moalboal.\n\n## Day 3: Kawasan Falls & Moalboal Snorkeling\n\nEnd with adventure and then head back to the airport or city.\n\n### Morning\n- **Canyoneering at Kawasan Falls** — 30-minute drive from Moalboal to Badian. The tour lasts 3–4 hours: jungle trek, cliff jumps (4–15 meters), natural slides, and the iconic turquoise pool. Book with a local operator the evening before (~₱1,200–₱1,500 per person including gear, guides, and lunch).\n- **Return to Moalboal** by noon for lunch.\n\n### Afternoon\n- **Sardine Run Snorkel** — The bait ball is just meters from Panagsama Beach; free or cheap to snorkel independently. If you have time, a guide can take you to **Pescador Island** (sea turtles, vibrant coral) — a 3-hour trip including boat time.\n- **Drive back to Cebu City** — Depart Moalboal by 3:00–4:00 PM to beat night traffic; arrival in Cebu City or Mactan Airport by 6:30–7:30 PM.\n\n## Key Timings & Costs\n\n| Activity | Best Time | Duration | Approx. Cost per Person |\n|---|---|---|---|\n| Cebu City heritage sites | 8:00 AM–12:00 PM | 3–4 hrs | Free–₱100 |\n| Temple of Leah & Sirao Garden | 1:30 PM–4:30 PM | 3 hrs | ₱100–₱200 entrance |\n| Whale shark watching (Oslob) | 7:00–9:00 AM | 1 hr on site | ₱1,500 |\n| Tumalog Falls | 9:30–10:30 AM | 1 hr | ₱30 |\n| Kawasan canyoneering | 7:30 AM–12:00 PM | 3–4 hrs | ₱1,200–₱1,500 |\n| Pescador Island snorkel | 1:00–4:00 PM | 3 hrs | ₱600–₱900 |\n\n## Packing Checklist\n\n- **Water shoes** — essential for Kawasan canyoneering and rocky waterfalls\n- **Dry bag / phone pouch** — for valuables while swimming\n- **Two swimsuits** — one for Oslob in the morning, one for Moalboal later\n- **Rash guard** — protects from sun and jellyfish (and is required for whale sharks)\n- **Reef-safe sunscreen** — regular sunscreen is prohibited around whale sharks\n- **Quick-dry towel, insect repellent, and cash** — most operators accept cash only\n- **Power bank and light rain jacket** — Cebu showers are common year-round\n\n## Practical Tips\n\n- **Transportation** — A private van for 3 days (including airport pickup) runs roughly ₱7,000–₱9,000 total. Public options exist (Ceres buses to Oslob and Moalboal) but eat into sightseeing time.\n- **Book whale shark viewing** the evening before via your hotel — they can arrange an early slot and confirm the boat schedule.\n- **Kawasan update** — if canyoneering is closed due to weather, the lowest tier of the falls is still swimmable; ask your guide for the current trail status.\n- **Customization** — prefer a slower pace? Swap Sumilon Island, skip Pescador, or reverse the route (Moalboal first, then Oslob) to break up the driving."
+  },
+  {
+    "id": "fitness-nutrition",
+    "prompt": "Build me a beginner home workout plan with no equipment.",
+    "skillSelected": true,
+    "activatedSkills": [
+      "education-tutor",
+      "fitness-nutrition"
+    ],
+    "ok": true,
+    "score": 5,
+    "passed": true,
+    "reasons": [],
+    "aspects": {
+      "instructionAdherence": 1,
+      "functionalCorrectness": 1,
+      "conversationContinuity": 0.6,
+      "executionValidation": 1,
+      "completeness": 1,
+      "uxQuality": 0.9,
+      "efficiency": 1,
+      "safety": 1,
+      "formatting": 1
+    },
+    "verification": {
+      "risk": "HIGH",
+      "hardFailures": [],
+      "results": [
+        {
+          "skillId": "fitness-nutrition",
+          "risk": "HIGH",
+          "failures": [],
+          "evidence": {
+            "unsafe": []
+          }
+        }
+      ],
+      "repairAttempts": 0,
+      "latencyMs": 1,
+      "productionVerdict": true
+    },
+    "liveData": null,
+    "usage": {
+      "initial": {
+        "inputTokens": 1440,
+        "outputTokens": 2113
+      },
+      "repairs": [],
+      "total": {
+        "inputTokens": 1440,
+        "outputTokens": 2113
+      }
+    },
+    "diagnostics": {
+      "truncationDetected": false,
+      "truncationSignals": [],
+      "languageMismatch": false,
+      "languageRatio": 0,
+      "repaired": false,
+      "repairAttempts": 0,
+      "repairReasons": [],
+      "validation": {
+        "codeBlockCount": 0,
+        "syntax": []
+      },
+      "continuity": null,
+      "missingCodeForModification": false,
+      "isModificationRequest": false,
+      "stopReason": "stop",
+      "syntaxIssues": [],
+      "ttftMs": 20257,
+      "totalMs": 20257,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "inputTokens": 1440,
+      "outputTokens": 2113,
+      "fallbackUsed": false,
+      "verification": {
+        "results": [
+          {
+            "skillId": "fitness-nutrition",
+            "risk": "HIGH",
+            "failures": [],
+            "evidence": {
+              "unsafe": []
+            }
+          }
+        ],
+        "hardFailures": [],
+        "passed": true,
+        "repairAttempts": 0,
+        "latencyMs": 1
+      },
+      "liveData": null,
+      "usage": {
+        "initial": {
+          "inputTokens": 1440,
+          "outputTokens": 2113
+        },
+        "repairs": [],
+        "total": {
+          "inputTokens": 1440,
+          "outputTokens": 2113
+        }
+      },
+      "latency": {
+        "routingMs": 0,
+        "providerMs": 20256,
+        "verificationMs": 1,
+        "repairMs": 0,
+        "totalMs": 20257
+      }
+    },
+    "latencyMs": 20257,
+    "requestAttempts": 1,
+    "model": "opencode:deepseek-v4-flash",
+    "content": "Here’s a simple, effective beginner home workout plan that uses zero equipment, fits into 20–30 minutes, and builds full-body strength and stamina. You’ll train three days a week with rest days in between, using only your body weight on a stable floor or mat. All exercises are scaled for absolute beginners, with a clear progression path so you can keep improving without getting injured.\n\n## How to Use This Plan\n\n- **Schedule** — Do this workout on Monday, Wednesday, and Friday. Take rest days in between (or do gentle walking, stretching, or mobility work).\n- **Format** — Each session has a warm-up, a circuit of 5 exercises, and a cooldown.\n- **Sets/Rounds** — Start with **2 rounds** of the circuit. After two weeks, move up to 3 rounds.\n- **Rest** — Rest 30–60 seconds between exercises, and 90 seconds between rounds.\n- **Pace** — Move slowly and under control; quality beats speed.\n\n## The Workout\n\nComplete this circuit in order. The first week, just aim to finish 2 rounds with good form.\n\n### Warm-Up (3–4 minutes)\n\n- March in place — 60 seconds\n- Arm circles (10 forward, 10 backward)\n- Hip circles — 10 each direction\n- Gentle squat-to-touch-floor — 10 reps\n\n### Main Circuit\n\n1. **Bodyweight Squat** — 10–12 reps  \n   Stand with feet shoulder-width apart, lower your hips back and down as if sitting in a chair, then push through your heels to stand.\n\n2. **Incline Push-Up** — 6–10 reps  \n   Place your hands on a sturdy counter, table, or wall (never a rolling chair or unstable furniture). Keep your body in a straight line, lower your chest toward the surface, and push back up. If that's too easy, try knee push-ups on the floor.\n\n3. **Glute Bridge** — 12–15 reps  \n   Lie on your back, knees bent, feet flat. Squeeze your glutes and lift your hips until your body forms a straight line from shoulders to knees, then lower slowly.\n\n4. **Bird Dog** — 8–10 reps each side  \n   Start on all fours. Extend your right arm forward and left leg back, hold for 2 seconds, then return. Switch sides. Keep your hips level.\n\n5. **Plank** — 15–30 seconds  \n   Forearms on the ground, elbows under shoulders, body in a straight line from head to heels. Tighten your core and breathe steadily. Drop to your knees if needed.\n\n### Cooldown (3–5 minutes)\n\n- Child's pose — 30–45 seconds\n- Standing forward fold — 30 seconds\n- Quad stretch (standing, holding a wall) — 20 seconds each side\n- Cat-cow stretch — 8 slow reps\n\n## Progression Plan\n\n| Weeks | Rounds | Rest between exercises | Goal |\n|-------|--------|------------------------|------|\n| 1–2 | 2 | 60 seconds | Learn the moves, build consistency |\n| 3–4 | 3 | 45 seconds | Increase endurance |\n| 5–6 | 3 | 30 seconds | Add difficulty |\n\n- **Add reps** — When you can complete every rep with perfect form, add 1–2 reps per exercise.\n- **Add time** — For the plank, add 5–10 seconds each session.\n- **Change the push-up** — When incline push-ups feel easy, transition to knee push-ups, then full push-ups.\n- **Listen to your body** — Progress only when the current level feels manageable, not painful.\n\n## Safety Notes\n\n- Use a non-slip mat or carpeted floor to prevent slipping.\n- For incline push-ups, use a wall, sturdy counter, or solid table that will not move. Never use chairs, desks on wheels, or any unstable surface.\n- Stop if you feel sharp pain, dizziness, or unusual shortness of breath — tiredness is normal, joint pain is not.\n- Breathe out during the hard part of the movement (the push-up or squat up) and breathe in during the release.\n- If you have a medical condition, injury history, or haven’t exercised in a long time, check with a healthcare professional before starting.\n\n## Fuel Your Workouts\n\nYou don’t need a strict meal plan, but eating well helps your energy and recovery.\n\n- **Before (1–2 hours)**: banana, a handful of nuts, Greek yogurt, or oats.\n- **After**: protein plus carbs — eggs with toast, Greek yogurt with fruit, a protein shake, or chicken with rice.\n- **Hydration**: sip water before, during, and after your workout.\n\n## Next Steps\n\nStick with this routine for 4–6 weeks. Track your reps and rest times in a simple notebook or phone note. Once 3 rounds with 30-second rest feels easy, you’re ready to add new movements like lunges, hip bridges, or side planks. Consistency, not intensity, is what gets you results."
+  },
+  {
+    "id": "event-planning",
+    "prompt": "Give me a birthday party planning checklist for 20 guests.",
+    "skillSelected": true,
+    "activatedSkills": [
+      "event-planning"
+    ],
+    "ok": true,
+    "score": 4.7,
+    "passed": true,
+    "reasons": [],
+    "aspects": {
+      "instructionAdherence": 1,
+      "functionalCorrectness": 1,
+      "conversationContinuity": 0.6,
+      "executionValidation": 1,
+      "completeness": 1,
+      "uxQuality": 0.9,
+      "efficiency": 1
+    },
+    "verification": {
+      "risk": "LOW",
+      "hardFailures": [],
+      "results": [],
+      "repairAttempts": 0,
+      "latencyMs": 0,
+      "productionVerdict": true
+    },
+    "liveData": null,
+    "usage": {
+      "initial": {
+        "inputTokens": 1418,
+        "outputTokens": 1447
+      },
+      "repairs": [],
+      "total": {
+        "inputTokens": 1418,
+        "outputTokens": 1447
+      }
+    },
+    "diagnostics": {
+      "truncationDetected": false,
+      "truncationSignals": [],
+      "languageMismatch": false,
+      "languageRatio": 0,
+      "repaired": false,
+      "repairAttempts": 0,
+      "repairReasons": [],
+      "validation": {
+        "codeBlockCount": 0,
+        "syntax": []
+      },
+      "continuity": null,
+      "missingCodeForModification": false,
+      "isModificationRequest": false,
+      "stopReason": "stop",
+      "syntaxIssues": [],
+      "ttftMs": 16406,
+      "totalMs": 16406,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "inputTokens": 1418,
+      "outputTokens": 1447,
+      "fallbackUsed": false,
+      "verification": {
+        "results": [],
+        "hardFailures": [],
+        "passed": true,
+        "repairAttempts": 0,
+        "latencyMs": 0
+      },
+      "liveData": null,
+      "usage": {
+        "initial": {
+          "inputTokens": 1418,
+          "outputTokens": 1447
+        },
+        "repairs": [],
+        "total": {
+          "inputTokens": 1418,
+          "outputTokens": 1447
+        }
+      },
+      "latency": {
+        "routingMs": 0,
+        "providerMs": 16405,
+        "verificationMs": 0,
+        "repairMs": 1,
+        "totalMs": 16406
+      }
+    },
+    "latencyMs": 16406,
+    "requestAttempts": 1,
+    "model": "opencode:deepseek-v4-flash",
+    "content": "Here’s a complete birthday party planning checklist for 20 guests, built to run backward from your event date. Start with the critical path items (venue, budget, date) and work down to day-of details. I’ve included a timeline, vendor checklist, and contingency plans so nothing slips.\n\n## Critical Path (Do These First)\n- **Set date and time** — Confirm availability for your venue and key guests (especially the birthday person).\n- **Lock the budget** — Decide total spend and split into categories: venue, food, drinks, décor, entertainment, cake, invitations, favors, contingency (10% buffer).\n- **Confirm venue** — For 20 guests, options: home, backyard, rented hall, park pavilion, or restaurant private room. Book it immediately.\n- **Choose a theme (optional)** — Helps guide décor, invitations, and food; keep it simple if you’re short on time.\n\n## Planning Timeline (Work Backward from Event Day)\n| When | Task |\n|---|---|\n| 6–8 weeks out | Set date, budget, venue; choose theme; create guest list |\n| 4–6 weeks out | Send invitations (digital or paper); book caterer or plan menu; hire entertainment/rentals |\n| 3–4 weeks out | Order cake; confirm RSVPs; arrange rentals (tables, chairs, linens); plan activities/games |\n| 2–3 weeks out | Purchase décor and party favors; arrange music playlist; plan food quantities |\n| 1 week out | Confirm all vendors; finalize guest count; prep shopping list; assign helper roles |\n| 2–3 days out | Shop for non-perishables and supplies; prep décor and setup zones |\n| 1 day out | Prep food (if homemade); set up most décor; charge electronics; confirm cake pickup |\n| Day of | Final setup, ice/drinks, music, enjoy; clean-up plan |\n\n## Guest List & Invitations\n- **Final guest list** — Include names, contact info, RSVP status, and dietary restrictions.\n- **Invitations** — Send 4–6 weeks ahead; ask for RSVP by a firm date (e.g., 2 weeks before).\n- **Follow up** — Chase non-responders 1 week after the RSVP deadline; finalize headcount.\n- **Dietary notes** — Collect allergies, vegetarian/vegan, and halal/kosher needs when RSVPs come in.\n\n## Budget Breakdown (Sample for 20 Guests)\n| Category | Suggested Allocation | Notes |\n|---|---|---|\n| Venue | 20–30% | If not free (home/backyard) |\n| Food & catering | 30–35% | Buffet or taco bar works well for 20 |\n| Drinks & ice | 10% | Alcohol + non-alcoholic mix |\n| Cake & dessert | 5–10% | Add candles + serveware |\n| Décor & tableware | 10% | Balloons, banners, disposable platters |\n| Entertainment/activities | 5–10% | Playlist, games, photo booth props |\n| Invitations & favors | 5% | Digital invites save cost |\n| Contingency | 10% | For spills, extra food, last-minute needs |\n\n## Vendor & Supplies Checklist\n- **Caterer or food plan** — Buffet-style for 20: 2–3 mains, 2–3 sides, salad, bread. Or use drop-off catering.\n- **Cake** — Order 3–4 weeks ahead; for 20 guests, an 8–10 inch round or half-sheet cake works.\n- **Rentals (if needed)** — Chairs, tables, linens, portable speakers, extra cooler.\n- **Entertainment** — DJ, playlist, or games; for 20 guests, a mix of lawn games and board games works well.\n- **Photography** — Assign a friend with a camera or set up a phone tripod; no need for pro.\n- **Drinks** — 2–3 drinks per person per hour; plan for ice plus backup bottles.\n- **Tableware** — Plates, napkins, cups, cutlery, serving utensils for 25 (10% overage).\n\n## Day-of Checklist\n- **Morning** — Final clean, set up tables and chairs, lay tablecloths, place centerpieces.\n- **2 hours before** — Set up food stations, drink station, cake table; prep ice in coolers.\n- **1 hour before** — Turn on music, adjust lighting, arrange seating, start welcoming early guests.\n- **During party** — Keep food warm/cold, refill drinks, clear empty plates, run games/timeline.\n- **Cake moment** — Sing, blow candles, cut and serve; have a designated photographer ready.\n- **End of party** — Thank guests, hand out favors, start clean-up with assigned helpers.\n\n## Contingency Plans\n- **Weather (outdoor)** — Have an indoor backup space or rent a pop-up canopy; check forecast 3 days ahead.\n- **Vendor cancellation** — Keep backup contacts for cake/catering; confirm all bookings 1 week before.\n- **Low RSVP count** — Over-shop slightly; plan for 20 but prepare 22–24 servings of cheap staples (rice, bread).\n- **Guest cancellation** — Have a flexible seating plan; no need to adjust food until day-of if using drop-off catering.\n- **Overflow of kids (if mixed ages)** — Prepare simple activities (craft table, lawn games) to keep everyone engaged.\n\n## What to Verify Before the Party\n- **RSVP final count** — Confirm with caterer and cake shop 3 days before.\n- **Venue access time** — Know when you can start setting up and when you must be out.\n- **Power sources** — Extension cords for speakers, lights, or charging stations.\n- **Ice and drinks amount** — Calculate at least 1–2 kg ice per 10 guests for outdoor parties.\n- **Trash and recycling plan** — Bags, bins, and a clear clean-up assignment list.\n\nOnce you have a date and venue confirmed, send invitations immediately — that’s your biggest scheduling bottleneck for 20 guests. Use a simple table or spreadsheet to track RSVPs and dietary needs, then revisit this checklist the week of the party."
+  },
+  {
+    "id": "study-aids",
+    "prompt": "Make me a 5-question quiz on World War II with an answer key.",
+    "skillSelected": true,
+    "activatedSkills": [
+      "study-aids"
+    ],
+    "ok": true,
+    "score": 4.7,
+    "passed": true,
+    "reasons": [],
+    "aspects": {
+      "instructionAdherence": 1,
+      "functionalCorrectness": 1,
+      "conversationContinuity": 0.6,
+      "executionValidation": 1,
+      "completeness": 1,
+      "uxQuality": 0.9,
+      "efficiency": 1
+    },
+    "verification": {
+      "risk": "LOW",
+      "hardFailures": [],
+      "results": [],
+      "repairAttempts": 0,
+      "latencyMs": 0,
+      "productionVerdict": true
+    },
+    "liveData": null,
+    "usage": {
+      "initial": {
+        "inputTokens": 1424,
+        "outputTokens": 769
+      },
+      "repairs": [],
+      "total": {
+        "inputTokens": 1424,
+        "outputTokens": 769
+      }
+    },
+    "diagnostics": {
+      "truncationDetected": false,
+      "truncationSignals": [],
+      "languageMismatch": false,
+      "languageRatio": 0,
+      "repaired": false,
+      "repairAttempts": 0,
+      "repairReasons": [],
+      "validation": {
+        "codeBlockCount": 0,
+        "syntax": []
+      },
+      "continuity": null,
+      "missingCodeForModification": false,
+      "isModificationRequest": false,
+      "stopReason": "stop",
+      "syntaxIssues": [],
+      "ttftMs": 8719,
+      "totalMs": 8719,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "inputTokens": 1424,
+      "outputTokens": 769,
+      "fallbackUsed": false,
+      "verification": {
+        "results": [],
+        "hardFailures": [],
+        "passed": true,
+        "repairAttempts": 0,
+        "latencyMs": 0
+      },
+      "liveData": null,
+      "usage": {
+        "initial": {
+          "inputTokens": 1424,
+          "outputTokens": 769
+        },
+        "repairs": [],
+        "total": {
+          "inputTokens": 1424,
+          "outputTokens": 769
+        }
+      },
+      "latency": {
+        "routingMs": 0,
+        "providerMs": 8719,
+        "verificationMs": 0,
+        "repairMs": 0,
+        "totalMs": 8719
+      }
+    },
+    "latencyMs": 8720,
+    "requestAttempts": 1,
+    "model": "opencode:deepseek-v4-flash",
+    "content": "Here's a 5-question World War II quiz covering key events, alliances, and turning points, with a full answer key and brief explanations so you can learn from each answer.\n\n## Quiz Questions\n\n1. **Which event is generally recognized as the start of World War II in Europe?**\n   - A) The invasion of Poland by Germany\n   - B) The attack on Pearl Harbor\n   - C) The Battle of Britain\n   - D) The signing of the Munich Agreement\n\n2. **Which two countries were the main Axis powers in Europe alongside Germany?**\n   - A) Spain and Portugal\n   - B) Italy and Japan\n   - C) Finland and Hungary\n   - D) Turkey and Bulgaria\n\n3. **The D-Day invasion (Operation Overlord) took place on the beaches of which country?**\n   - A) Italy\n   - B) France\n   - C) Belgium\n   - D) Netherlands\n\n4. **Who was the leader of the Soviet Union during most of World War II?**\n   - A) Vladimir Lenin\n   - B) Leon Trotsky\n   - C) Joseph Stalin\n   - D) Mikhail Gorbachev\n\n5. **Which of the following battles is considered a major turning point in the Pacific Theater?**\n   - A) Battle of the Bulge\n   - B) Battle of Midway\n   - C) Battle of Stalingrad\n   - D) Battle of El Alamein\n\n## Answer Key & Explanations\n\n| # | Answer | Explanation |\n|---|--------|-------------|\n| 1 | **A) The invasion of Poland by Germany** | Germany invaded Poland on September 1, 1939, prompting Britain and France to declare war two days later. The Munich Agreement preceded the war, and Pearl Harbor brought the U.S. into a conflict already underway. |\n| 2 | **B) Italy and Japan** | Italy and Japan were the other two primary Axis powers, forming the Rome–Berlin–Tokyo Axis. The other countries listed were either neutral, aligned differently, or minor Axis participants. |\n| 3 | **B) France** | The Allied landings on June 6, 1944, occurred on the beaches of Normandy, France — a decisive step toward liberating Western Europe from Nazi control. |\n| 4 | **C) Joseph Stalin** | Stalin led the Soviet Union throughout WWII. Lenin died in 1924, Trotsky was exiled, and Gorbachev led the USSR decades later. |\n| 5 | **B) Battle of Midway** | The U.S. Navy's victory at Midway in June 1942 severely damaged Japan's carrier fleet and halted its expansion across the Pacific. Stalingrad and El Alamein were turning points in Europe and North Africa, respectively. |\n\n## Study Tip\n\nFor better retention, try self-testing: cover the answers, answer each question out loud, then reveal the explanations. Repeat after a day to strengthen long-term memory — this spaced-repetition approach helps facts stick more effectively than re-reading alone."
+  },
+  {
+    "id": "meeting-notes",
+    "prompt": "Summarize these meeting notes and list action items: Team agreed to launch in June. Maria owns the landing page. John will finalize pricing by Friday. Next sync Wednesday.",
+    "skillSelected": true,
+    "activatedSkills": [
+      "meeting-notes"
+    ],
+    "ok": true,
+    "score": 5,
+    "passed": true,
+    "reasons": [],
+    "aspects": {
+      "instructionAdherence": 1,
+      "functionalCorrectness": 1,
+      "conversationContinuity": 0.6,
+      "executionValidation": 1,
+      "completeness": 1,
+      "uxQuality": 0.9,
+      "efficiency": 1,
+      "factualAccuracy": 1,
+      "assumptionDiscipline": 1,
+      "formatting": 1
+    },
+    "verification": {
+      "risk": "MEDIUM",
+      "hardFailures": [],
+      "results": [
+        {
+          "skillId": "meeting-notes",
+          "risk": "MEDIUM",
+          "failures": [],
+          "evidence": {
+            "actions": [
+              {
+                "action": "Own/deliver the landing page",
+                "owner": "Maria",
+                "deadline": "Not specified",
+                "sourceEvidence": "own/deliver the landing page",
+                "explicit": true
+              },
+              {
+                "action": "Finalize pricing",
+                "owner": "John",
+                "deadline": "Friday",
+                "sourceEvidence": "finalize pricing",
+                "explicit": true
+              }
+            ],
+            "suggested": [],
+            "sourceFound": false
+          }
+        }
+      ],
+      "repairAttempts": 0,
+      "latencyMs": 1,
+      "productionVerdict": true
+    },
+    "liveData": null,
+    "usage": {
+      "initial": {
+        "inputTokens": 1494,
+        "outputTokens": 340
+      },
+      "repairs": [],
+      "total": {
+        "inputTokens": 1494,
+        "outputTokens": 340
+      }
+    },
+    "diagnostics": {
+      "truncationDetected": false,
+      "truncationSignals": [],
+      "languageMismatch": false,
+      "languageRatio": 0,
+      "repaired": false,
+      "repairAttempts": 0,
+      "repairReasons": [],
+      "validation": {
+        "codeBlockCount": 0,
+        "syntax": []
+      },
+      "continuity": null,
+      "missingCodeForModification": false,
+      "isModificationRequest": false,
+      "stopReason": "stop",
+      "syntaxIssues": [],
+      "ttftMs": 5635,
+      "totalMs": 5635,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "inputTokens": 1494,
+      "outputTokens": 340,
+      "fallbackUsed": false,
+      "verification": {
+        "results": [
+          {
+            "skillId": "meeting-notes",
+            "risk": "MEDIUM",
+            "failures": [],
+            "evidence": {
+              "actions": [
+                {
+                  "action": "Own/deliver the landing page",
+                  "owner": "Maria",
+                  "deadline": "Not specified",
+                  "sourceEvidence": "own/deliver the landing page",
+                  "explicit": true
+                },
+                {
+                  "action": "Finalize pricing",
+                  "owner": "John",
+                  "deadline": "Friday",
+                  "sourceEvidence": "finalize pricing",
+                  "explicit": true
+                }
+              ],
+              "suggested": [],
+              "sourceFound": false
+            }
+          }
+        ],
+        "hardFailures": [],
+        "passed": true,
+        "repairAttempts": 0,
+        "latencyMs": 1
+      },
+      "liveData": null,
+      "usage": {
+        "initial": {
+          "inputTokens": 1494,
+          "outputTokens": 340
+        },
+        "repairs": [],
+        "total": {
+          "inputTokens": 1494,
+          "outputTokens": 340
+        }
+      },
+      "latency": {
+        "routingMs": 0,
+        "providerMs": 5634,
+        "verificationMs": 1,
+        "repairMs": 0,
+        "totalMs": 5635
+      }
+    },
+    "latencyMs": 5635,
+    "requestAttempts": 1,
+    "model": "opencode:deepseek-v4-flash",
+    "content": "## Meeting Summary\n\n- **Launch date** — Team agreed to launch in June.\n- **Landing page** — Maria is responsible for the landing page.\n- **Pricing** — John will finalize pricing by Friday.\n- **Next sync** — Scheduled for Wednesday.\n\n## Action Items\n\n| Owner | Task | Due Date |\n|-------|------|----------|\n| Maria | Own/deliver the landing page | Not specified |\n| John | Finalize pricing | Friday |\n\n## Schedule\n\n- **Next sync** — Wednesday (no owner assigned)\n\n## Suggested Follow-ups\n\n- Clarify Maria's landing page deadline.\n- Confirm which Friday John's pricing deadline refers to."
+  }
+]

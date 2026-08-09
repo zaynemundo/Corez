@@ -93,7 +93,8 @@ export const VERIFICATION_HARD_FAILURES = [
   'insufficient-transfer-time', 'overlapping-activities', 'missing-travel-buffer',
   'arithmetic-error', 'percentage-error', 'trend-calculation-error',
   'unsupported-forecast', 'critical-safety-issue', 'duplicate-critical-content',
-  'unlabeled-assumption'
+  'unlabeled-assumption', 'malformed-code-fence', 'broken-inline-code',
+  'empty-heading', 'unfinished-sentence'
 ];
 const VERIFICATION_HARD_FAILURE_SET = new Set(VERIFICATION_HARD_FAILURES);
 
@@ -360,10 +361,19 @@ export function profileAspectScores({ content, context, profile }) {
     const research = Array.isArray(verification.results)
       ? verification.results.find((r) => r.skillId === 'research-report')
       : null;
-    const evidence = research?.evidence || {};
-    const grounded = Number(evidence.verifiedSources) || 0;
-    const requested = Number(evidence.requestedSources) || 0;
-    scores.grounding = requested > 0 ? Math.min(1, grounded / requested) : 0.6;
+    const live = Array.isArray(verification.results)
+      ? verification.results.find((r) => r.skillId === 'live-data-utilities')
+      : null;
+    if (research) {
+      const evidence = research.evidence || {};
+      const grounded = Number(evidence.fetchedSources) || 0;
+      const requested = Number(evidence.requestedSources) || 0;
+      scores.grounding = requested > 0 ? Math.min(1, grounded / requested) : 0.6;
+    } else if (live) {
+      scores.grounding = live.evidence?.liveDataUsed && live.failures?.length === 0 ? 1 : 0.4;
+    } else {
+      scores.grounding = 0.6;
+    }
   }
 
   if (dimensionList.includes('factualAccuracy')) {
