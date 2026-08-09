@@ -6,27 +6,27 @@ Every specialist skill driven through the real worker module (worker/swarm-index
 
 ## Case summary
 
-| # | Skill | Status | Score | Latency (ms) | Model | Activated | Failure reasons |
-|---|-------|--------|-------|--------------|-------|-----------|-----------------|
-| 1 | research-report | PASS | 4.7/5 | 117409 | opencode:deepseek-v4-flash | yes | - |
-| 2 | document-generation | PASS | 4.7/5 | 13054 | opencode:deepseek-v4-flash | yes | - |
-| 3 | data-analysis | PASS | 4.7/5 | 8637 | opencode:deepseek-v4-flash | yes | - |
-| 4 | marketing-copywriting | PASS | 4.7/5 | 16639 | opencode:deepseek-v4-flash | yes | - |
-| 5 | translation-localization | PASS | 4.7/5 | 5523 | opencode:deepseek-v4-flash | yes | - |
-| 6 | live-data-utilities | PASS | 4.7/5 | 5701 | opencode:deepseek-v4-flash | yes | - |
-| 7 | education-tutor | PASS | 4.7/5 | 18142 | opencode:deepseek-v4-flash | yes | - |
-| 8 | accessibility-compliance | PASS | 4.7/5 | 37583 | opencode:deepseek-v4-flash | yes | - |
-| 9 | business-planning | PASS | 4.7/5 | 34169 | opencode:deepseek-v4-flash | yes | - |
-| 10 | resume-career | PASS | 4.7/5 | 8960 | opencode:deepseek-v4-flash | yes | - |
-| 11 | creative-writing | PASS | 4.7/5 | 39461 | opencode:deepseek-v4-flash | yes | - |
-| 12 | presentation-design | PASS | 4.7/5 | 17497 | opencode:deepseek-v4-flash | yes | - |
-| 13 | personal-productivity | PASS | 4.7/5 | 9960 | opencode:deepseek-v4-flash | yes | - |
-| 14 | personal-finance | PASS | 4.7/5 | 30041 | opencode:deepseek-v4-flash | yes | - |
-| 15 | travel-planning | PASS | 4.7/5 | 26959 | opencode:deepseek-v4-flash | yes | - |
-| 16 | fitness-nutrition | PASS | 4.7/5 | 15982 | opencode:deepseek-v4-flash | yes | - |
-| 17 | event-planning | PASS | 4.7/5 | 25040 | opencode:deepseek-v4-flash | yes | - |
-| 18 | study-aids | PASS | 4.7/5 | 9248 | opencode:deepseek-v4-flash | yes | - |
-| 19 | meeting-notes | PASS | 4.7/5 | 14293 | opencode:deepseek-v4-flash | yes | - |
+| # | Skill | Risk | Status | Score | Latency (ms) | Model | Activated | Verification | Failure reasons |
+|---|-------|------|--------|-------|--------------|-------|-----------|--------------|-----------------|
+| 1 | research-report | LIVE | PASS | 5/5 | 46712 | opencode:deepseek-v4-flash | yes | PASS | - |
+| 2 | document-generation | LOW | PASS | 4.7/5 | 29752 | opencode:deepseek-v4-flash | yes | PASS | - |
+| 3 | data-analysis | HIGH | PASS | 5/5 | 27488 | opencode:deepseek-v4-flash | yes | PASS | - |
+| 4 | marketing-copywriting | MEDIUM | PASS | 5/5 | 24410 | opencode:deepseek-v4-flash | yes | PASS | - |
+| 5 | translation-localization | LOW | PASS | 5/5 | 10727 | opencode:deepseek-v4-flash | yes | PASS | - |
+| 6 | live-data-utilities | LIVE | PASS | 4.4/5 | 20466 | opencode:deepseek-v4-flash | yes | PASS | - |
+| 7 | education-tutor | LOW | PASS | 4.7/5 | 34507 | opencode:deepseek-v4-flash | yes | PASS | - |
+| 8 | accessibility-compliance | HIGH | PASS | 5/5 | 31749 | opencode:deepseek-v4-flash | yes | PASS | - |
+| 9 | business-planning | MEDIUM | PASS | 5/5 | 40624 | opencode:deepseek-v4-flash | yes | PASS | - |
+| 10 | resume-career | MEDIUM | PASS | 4.7/5 | 20160 | opencode:deepseek-v4-flash | yes | PASS | - |
+| 11 | creative-writing | LOW | PASS | 4.9/5 | 20019 | opencode:deepseek-v4-flash | yes | PASS | - |
+| 12 | presentation-design | MEDIUM | PASS | 5/5 | 16304 | opencode:deepseek-v4-flash | yes | PASS | - |
+| 13 | personal-productivity | MEDIUM | PASS | 4.7/5 | 10225 | opencode:deepseek-v4-flash | yes | PASS | - |
+| 14 | personal-finance | HIGH | PASS | 5/5 | 21138 | opencode:deepseek-v4-flash | yes | PASS | - |
+| 15 | travel-planning | HIGH | PASS | 5/5 | 34197 | opencode:deepseek-v4-flash | yes | PASS | - |
+| 16 | fitness-nutrition | HIGH | PASS | 5/5 | 22396 | opencode:deepseek-v4-flash | yes | PASS | - |
+| 17 | event-planning | LOW | PASS | 4.7/5 | 16967 | opencode:deepseek-v4-flash | yes | PASS | - |
+| 18 | study-aids | LOW | PASS | 4.7/5 | 7309 | opencode:deepseek-v4-flash | yes | PASS | - |
+| 19 | meeting-notes | MEDIUM | PASS | 5/5 | 6649 | opencode:deepseek-v4-flash | yes | PASS | - |
 
 ## Full transcripts
 
@@ -36,102 +36,105 @@ Every specialist skill driven through the real worker module (worker/swarm-index
 
 **Skills activated:** research-report
 
-**Response (117409ms, quality score 4.7/5):**
+**Verification:** risk LIVE | hard failures: none | repair attempts: 0 | 0ms
+**Live data:** required: false | used: true | source: Wikipedia, DuckDuckGo | fetched: 2026-08-09T06:53:42.761Z | freshnessMs: 42465
+**Usage:** initial in/out: 3083/3915 | repairs: 0 | total in/out: 3083/3915
+
+**Response (46712ms, quality score 5/5):**
 
 ```
-# Research Report: The Benefits of Electric Vehicles
+Electric vehicles deliver three core, well-documented benefits: they cut tailpipe greenhouse-gas emissions, reduce dependence on oil, and are gaining global market momentum as charging infrastructure improves. This report synthesizes evidence from eight sources — peer-reviewed research, a systematic literature review, and industry records — retrieved on August 9, 2026. A balanced view is included, because the same literature identifies range anxiety, charging times, and battery technology as the main barriers to widespread adoption.
 
-This report synthesizes evidence from international agencies, national laboratories, life-cycle assessments, and consumer organizations published between 2019 and 2025 on the benefits of battery-electric vehicles (BEVs). The overall finding is consistent across sources: BEVs deliver substantial lifetime climate and air-quality advantages over gasoline vehicles in every market studied, typical owners save money on fuel and maintenance, and adoption reduces oil dependence. Two caveats shape the analysis: the size of the climate benefit depends on how clean the local electricity grid is, and BEVs still carry near-term drawbacks — higher average purchase prices, uneven charging access, and concentrated battery-supply chains. Figures below are date-stamped to the publication year of each cited source and marked with confidence levels.
+## Executive Summary
+
+Transportation currently faces two interlocking problems: rising oil costs and rising carbon emissions. Electric vehicles (EVs) are presented in the literature as a direct response to both, since they are independent of oil and produce no greenhouse gases while driving [1]. A systematic review of 917 Scopus-indexed articles and 23 stakeholder interviews confirms that EVs are central to sustainable-transportation strategy, while also mapping the conditions — infrastructure, technology, policy — that determine adoption success [3].
+
+The headline findings:
+
+- **Environmental benefit** — EVs do not produce greenhouse gas emissions during operation, directly addressing the carbon problem in transportation [1].
+- **Energy benefit** — EVs are independent of oil, insulating drivers and nations from rising oil costs [1].
+- **Market momentum** — EV manufacturing is expanding across the industry, from Tesla's full lineup to legacy automakers pivoting their strategies [5][6][7].
+- **Enabling infrastructure** — Charging networks have grown rapidly worldwide, and cross-manufacturer interoperability is now the norm, which drives consumer adoption [4].
+- **Persistent challenges** — Range anxiety, charging time, and battery technology remain active research priorities [2].
 
 ## Research Outline
 
-| Section | Core question | Key metrics | Primary sources |
-|---|---|---|---|
-| 1. Climate & emissions | How do BEV lifecycle emissions compare to gasoline? | gCO₂/mile, % lifetime reduction | ICCT, UCS, EPA |
-| 2. Air quality & health | What health gains come from removing tailpipe emissions? | Premature deaths, asthma cases, $ value | American Lung Association |
-| 3. Economics | Do owners actually save money? | $/mile fuel cost, maintenance, total cost | DOE, Consumer Reports |
-| 4. Energy & grid | Does electrification help energy security and the grid? | Oil displaced, charging flexibility, demand growth | IEA, NREL |
-| 5. Technology | Are batteries and performance improving fast enough? | $/kWh, range retention, efficiency | BloombergNEF, Recurrent, DOE |
-| 6. Trade-offs | What are the legitimate downsides? | Upfront cost, charging equity, minerals, cold weather | IEA, AAA |
-
-## Executive Summary
-- **Climate**: Life-cycle assessments find BEVs produce roughly 50–70% fewer greenhouse-gas emissions than comparable gasoline cars over their full lifetime, including battery manufacturing — even on today's average grids, and the gap widens as grids decarbonize (High confidence) [4][5].
-- **Health**: A US transition to zero-emission vehicles backed by clean electricity by 2050 would avoid about 110,000 premature deaths and 2.7 million asthma attacks, valued near $1.5 trillion (High confidence that this is the modeled estimate; medium confidence in the exact model) [10].
-- **Ownership cost**: EV drivers typically save roughly $800–$1,000 per year on fuel and about 50% on maintenance and repairs versus comparable gasoline cars (High confidence) [8][9].
-- **Adoption momentum**: EVs reached about 18% of global new-car sales in 2023 and roughly 25% in 2024 (High confidence) [1][2].
-- **Remaining barriers**: Higher average sticker prices, charging access gaps for renters and rural residents, cold-weather range loss, and concentrated critical-mineral supply chains remain real constraints (High confidence) [3][12][14].
-
-## 1. Climate and Emission Benefits
-- **Life-cycle emissions are lower everywhere studied.** The International Council on Clean Transportation compared 2021-registered vehicles across their full life cycle and found battery-electric cars produce about 66–69% lower emissions than gasoline equivalents in Europe, roughly 60–68% lower in the US, 41–53% lower in China, and 23–36% lower in India — meaning even grids with significant coal generation still favor EVs (Medium-to-high confidence; exact figures vary by vehicle size and grid scenario) [5].
-- **The "cradle-to-grave" question is settled.** The Union of Concerned Scientists' 2021 update found that over their lifetime, EVs produce less than half the global-warming emissions of comparable gasoline vehicles on the average US grid, and up to two-thirds less in cleaner regions (High confidence) [4].
-- **No tailpipe emissions, plus a math advantage.** A typical US gasoline car emits about 4.6 metric tons of CO₂ per year (High confidence) [6]. A BEV using roughly 3–4 miles per kWh on a US average grid at about 0.8–0.9 lb CO₂ per kWh carries an equivalent of roughly 0.22–0.30 lb per mile, against roughly 0.85 lb per mile for a 25-mpg gasoline car (Medium confidence; regional grid data vary) [6][7].
-- **The benefit grows over time.** As utilities retire coal and add renewables, the electricity an EV consumes gets cleaner, so a car's lifetime emissions keep falling after purchase — an advantage no gasoline car can capture (High confidence, based on grid-trend analysis) [1][7].
-
-## 2. Air Quality and Public Health
-- **Tailpipe pollutants are a direct health burden.** Gasoline and diesel vehicles emit fine particulate matter (PM2.5), nitrogen oxides, and ozone precursors near where people live, work, and breathe. EVs eliminate these at the tailpipe (High confidence) [8][10].
-- **Quantified national benefit.** The American Lung Association's 2020 study modeled a full transition to zero-emission vehicles with clean electricity by 2050 and projected about 110,000 avoided premature deaths, 2.7 million avoided asthma attacks, and roughly $1.5 trillion in avoided public-health costs in the US (Medium confidence; this is a modeled scenario, not a forecast) [10].
-- **Disproportionate benefits for vulnerable communities.** Air-pollution exposure is concentrated along highways and in dense urban corridors, which often overlap with lower-income and minority neighborhoods, so EV adoption is also an equity intervention (Medium confidence) [10].
-
-## 3. Economic Benefits
-- **Fueling is typically half or less.** The DOE's Alternative Fuels Data Center and related cost tools show per-mile electricity costs of roughly $0.04–$0.06 versus $0.14–$0.18 for gasoline in most US markets, producing annual savings near $800–$1,000 for average drivers (Medium confidence; depends on local electricity and gas prices) [8].
-- **Maintenance is dramatically cheaper.** Consumer Reports' analysis of owner data found EV maintenance and repair costs run about 50% lower over the life of the vehicle, because EVs lack oil changes, spark plugs, exhaust systems, and have far fewer moving parts and less brake wear (High confidence) [9].
-- **Ownership-cost comparison (US, approximate 2024):**
-
-| Cost item | Gasoline car | Electric car |
+| Research question | Evidence sought | Primary sources |
 |---|---|---|
-| Energy cost per mile | $0.14–$0.18 | $0.04–$0.06 |
-| Annual maintenance & repairs | ~$1,200 | ~$600 |
-| Sticker price premium | Baseline | +$3,000–$10,000 typical |
-| Federal/state incentives | None | Often $7,500 federal, varies by state |
+| What are the stated benefits of EVs? | Emissions, oil independence, market growth | [1], [5] |
+| What barriers limit adoption? | Range anxiety, charging times, battery limits | [2], [3] |
+| How is the industry responding? | Automaker strategy, product pipelines | [5], [6], [7] |
+| What role does infrastructure play? | Charging networks, consumer behavior | [4] |
+| What does the research base look like? | Volume and focus of academic literature | [2], [3], [8] |
 
-(Medium confidence; ranges synthesized from DOE and Consumer Reports data, and incentive eligibility changes) [8][9].
-- **Total cost of ownership often already favors EVs.** Despite the higher sticker price, fuel and maintenance savings mean many models are cheaper to own within three to six years, and that breakeven point keeps shrinking as battery prices fall (Medium confidence) [9][11].
+## Findings
 
-## 4. Energy Security and Grid Flexibility
-- **Oil displacement is real but early.** The IEA's Global EV Outlook series credits EVs with displacing on the order of a million or more barrels of oil demand per day globally as of 2023–2024 — small against total consumption but growing quickly (Medium confidence; IEA updates this figure annually) [1][2].
-- **EVs can help, not hurt, the grid.** Load is substantial but manageable: NREL's Electrification Futures Study finds that aggressive vehicle electrification raises total electricity demand significantly, but that managed charging can shift most EV load to off-peak hours and even provide services back to the grid (Medium confidence) [13].
-- **Vehicle-to-grid and smart charging are emerging.** Bidirectional charging lets parked EVs discharge into homes or grids during peaks, turning batteries into distributed storage assets — a benefit the IEA highlights as a key flexibility resource (Medium confidence; technology is real, commercial deployment still early) [2][13].
+### 1. Environmental Benefits
 
-## 5. Technology and Performance
-- **Efficiency advantage.** DOE data show EVs convert roughly 77% of grid energy to motion at the wheels, versus about 12–30% for gasoline vehicles; the rest is lost as heat (High confidence for direction; exact figures vary by source) [8].
-- **Battery costs have crashed.** BloombergNEF's 2024 battery survey reported average pack prices of about $115 per kWh, down roughly 20% year-on-year, with Chinese LFP packs already below $100 per kWh — the level widely cited as the point of purchase-price parity with gasoline cars (Medium-high confidence) [11].
-- **Range and cold weather.** Most 2024–2025 mainstream EVs exceed 250 miles of EPA-rated range, but winter temperatures can cut range 20–30% without preconditioning, per AAA and Recurrent measurements (High confidence) [12][14].
-- **Batteries are lasting longer than feared.** Recurrent Auto's analysis of thousands of used Teslas found most batteries retain roughly 90% of their original capacity beyond 150,000 miles, supporting industry warranty confidence (Medium-high confidence) [12].
+The most frequently cited benefit of EVs is the elimination of operational greenhouse-gas emissions. Peer-reviewed research frames this as a direct counter to one of the two major problems facing modern transportation — increasing carbon emissions [1]. Unlike internal-combustion vehicles, EVs do not produce greenhouse gases while driving [1].
 
-## 6. Limitations and Trade-Offs
-- **Upfront cost remains the main barrier.** Average EV transaction prices still run several thousand dollars above comparable gasoline vehicles in most markets, and the highest-volume affordable models are often small or limited-availability (High confidence) [1][9].
-- **Charging access is uneven.** EV adoption is naturally lower among renters, multi-unit-dwelling residents, and rural drivers without home charging; public fast-charging density and reliability still trail convenience expectations (High confidence) [1][8].
-- **Battery supply chains are concentrated and ethically fraught.** IEA analysis notes heavy concentration of cobalt mining in the DRC and of refining capacity in China, with environmental and labor risks that need governance; recycling and new chemistries are reducing, not eliminating, these concerns (High confidence) [3].
-- **Grid emissions can offset benefits in the short term.** In regions still running on high-carbon electricity, the near-term climate advantage of an EV is smaller — though every major life-cycle assessment still finds a net benefit (High confidence) [5][7].
+- **Confidence: high** — directly stated in the source paper [1].
+- **Nuance:** this claim refers to tailpipe (well-to-wheel operational) emissions; the same literature acknowledges EV life-cycle impacts depend on how electricity is generated.
 
-## Confidence and Uncertainties
-- **High confidence:** EV sales shares; EPA per-car emissions; the direction of lifecycle emission reductions; fuel and maintenance savings; health-model headline estimates; cold-weather loss ranges.
-- **Medium confidence:** exact percentage reductions in ICCT regional comparisons, exact battery-price figures, oil-displacement volumes, and total-cost-of-ownership timelines — all depend on model year, electricity mix, and market prices that shift annually.
-- **What could change the picture:** faster or slower grid decarbonization, battery chemistry breakthroughs, public charging buildout quality, and policy support (incentives, emissions standards, charging mandates) will determine how quickly the benefits compound.
+### 2. Energy Security and Economic Benefits
 
-## How to Use This Report
-- **Consumers:** run a local total-cost-of-ownership calculator (DOE's AFDC tools) using your actual mileage, local electricity rate, and gas price before buying; include available incentives and home-charging access.
-- **Policymakers:** prioritize complementary actions — charging infrastructure for renters and rural areas, grid modernization and time-of-use rates, and critical-mineral supply-chain diversification — since purchase incentives alone do not remove the access barriers.
-- **Analysts:** treat lifecycle emissions and health estimates as scenario-based, not point predictions, and re-check ICCT, IEA, and BloombergNEF figures annually because both battery costs and grid mixes move quickly.
+The second major transportation problem — rising oil costs — is addressed by EVs being independent of oil entirely [1]. This carries economic implications for both individual owners and national energy policy, though the economic case for ownership (purchase price, electricity vs. fuel costs, incentives) varies by market.
+
+- **Confidence: high on the independence claim** [1]; **medium on economic magnitude**, which the retrieved sources do not quantify.
+
+### 3. Industry Momentum and Market Adoption
+
+Market evidence shows an accelerating shift toward EVs:
+
+- **Tesla** — The most valuable automaker in the world since July 2020, producing battery electric vehicles alongside energy storage and solar products. Its model rollout is illustrative of market expansion: Roadster (2008), Model S (2012), Model X (2015), Model 3 (2017), Model Y (2020), Semi (2022), and Cybertruck (2023). The company's valuation reached US$1 trillion between October 2021 and March 2022 [5]. **Confidence: high.**
+- **Honda** — Phasing out natural-gas vehicles to concentrate on a new generation of EVs and hybrids [7]. **Confidence: high.**
+- **Toyota** — A notable counterpoint: publicly skeptical of battery-electric vehicles, slower to add them to its lineup, and instead prioritizing hybrids and hydrogen [6]. This is a useful reminder that industry strategy is not unanimous. **Confidence: high.**
+
+### 4. Infrastructure as the Adoption Enabler
+
+Charging infrastructure is identified as a key influence on consumer behavior in the transition from internal-combustion to electric vehicles [4]. Three structural improvements are documented:
+
+- **Growth** — Public charging infrastructure has grown rapidly worldwide [4].
+- **Interoperability** — Vendors historically offered proprietary networks (e.g., Tesla), but now generally supply energy to vehicles regardless of manufacturer [4].
+- **Usability** — Networks are increasingly shaped by open access, interoperability, and simpler payment systems [4].
+
+Charging-station proliferation is driven by both private providers and government investment, and it is treated in the literature as a decisive factor in whether consumers switch [4]. **Confidence: high.**
+
+### 5. Challenges and Limitations (Balance)
+
+The same research that documents benefits also documents barriers. The systematic review maps critical themes in EV adoption and emphasizes the conditions required for success rather than assuming automatic uptake [3]. Future research priorities make the friction points explicit:
+
+- Improving battery technology
+- Addressing range anxiety
+- Reducing charging times
+
+These three items are named directly as the focus of future research directions for EVs in smart cities [2]. **Confidence: high.**
+
+### 6. The Research Base
+
+Academic attention on EVs is substantial: the ResearchGate topic collection alone hosts over 51,000 PDFs on electric-vehicle design, control, and optimization [8], and the systematic review draws on 917 Scopus-indexed articles supplemented by stakeholder interviews [3]. This breadth indicates a mature but still-evolving evidence base. **Confidence: medium-high** on the volume figure, since it is a live platform count.
 
 ## Sources
-1. International Energy Agency, *Global EV Outlook 2025*, 2025 — https://www.iea.org/reports/global-ev-outlook-2025
-2. International Energy Agency, *Global EV Outlook 2024*, 2024 — https://www.iea.org/reports/global-ev-outlook-2024
-3. International Energy Agency, *The Role of Critical Minerals in Clean Energy Transitions*, 2021 — https://www.iea.org/reports/the-role-of-critical-minerals-in-clean-energy-transitions
-4. Union of Concerned Scientists, *Cleaner Cars from Cradle to Grave*, 2021 — https://www.ucsusa.org/resources/cleaner-cars-cradle-grave
-5. International Council on Clean Transportation, *A Global Comparison of the Life-Cycle Greenhouse Gas Emissions of Combustion Engine and Electric Passenger Cars*, 2021 — https://theicct.org/publication/a-global-comparison-of-the-life-cycle-greenhouse-gas-emissions-of-combustion-engine-and-electric-passenger-cars/
-6. US EPA, *Greenhouse Gas Emissions from a Typical Passenger Vehicle* (updated 2024) — https://www.epa.gov/greenvehicles/greenhouse-gas-emissions-typical-passenger-vehicle
-7. US EPA, *Emissions & Generation Resource Integrated Database (eGRID)* — https://www.epa.gov/egrid
-8. US DOE, Office of Energy Efficiency & Renewable Energy / Alternative Fuels Data Center, *Electric Vehicle Benefits and Cost Tools* — https://afdc.energy.gov/
-9. Consumer Reports, *Electric Vehicle Ownership Costs*, 2020 — https://advocacy.consumerreports.org/wp-content/uploads/2020/10/EV-Ownership-Cost-Final-Report.pdf
-10. American Lung Association, *Zeroing in on Healthy Air*, 2020 — https://www.lung.org/healthy-air/outside/zeroing-in-on-healthy-air
-11. BloombergNEF, *Lithium-ion Battery Pack Prices Fall to $115/kWh in 2024*, 2024 — https://about.bnef.com/
-12. Recurrent Auto, *Range Degradation: What We Measured*, 2024 — https://www.recurrentauto.com/research/range-degradation
-13. National Renewable Energy Laboratory, *Electrification Futures Study* — https://www.nrel.gov/analysis/electrification-futures.html
-14. AAA, *Electric Vehicle Range Testing*, 2019 — https://newsroom.aaa.com/2019/02/aaa-electric-vehicle-range-testing-finds-range-losses-in-cold-temperatures/
+
+| # | Source | URL |
+| [1] | MDPI Applied Sciences — "Electric Vehicles: Benefits, Challenges, and Potential Solutions for Widespread Adaptation" (2023) | https://www.mdpi.com/2076-3417/13/10/6016 |
+| [2] | ResearchGate — "Electric Vehicles: Benefits, Challenges, and Potential Solutions for Widespread Adaptation" (paper mirror) | https://www.researchgate.net/publication/370793834_Electric_Vehicles_Benefits_Challenges_and_Potential_Solutions_for_Widespread_Adaptation |
+| [3] | ScienceDirect / Journal of Environmental Management — "Electric vehicles in transition: Opportunities, challenges, and..." (systematic review) | https://www.sciencedirect.com/science/article/pii/S0301479724034017 |
+| [4] | Wikipedia — "Electric vehicle charging infrastructure" | https://en.wikipedia.org/wiki/Electric_vehicle_charging_infrastructure |
+| [5] | Wikipedia — "Tesla, Inc." | https://en.wikipedia.org/wiki/Tesla%2C_Inc. |
+| [6] | Wikipedia — "Toyota" | https://en.wikipedia.org/wiki/Toyota |
+| [7] | Wikipedia — "Honda" | https://en.wikipedia.org/wiki/Honda |
+| [8] | ResearchGate — "Electric Vehicles" topic publications | https://www.researchgate.net/topic/Electric-Vehicles/publications |
+
+## What to Verify Before Using This Report
+
+- **Regional context** — Every benefit and barrier in this report varies by country, electricity mix, and local incentives. Verify figures against your jurisdiction's data before citing them in policy or investment decisions.
+- **Life-cycle emissions** — The "no greenhouse gases" benefit refers to driving emissions; a full comparison requires factoring in battery production and grid carbon intensity.
+- **Currency of statistics** — All market and industry data (e.g., Tesla's valuation and lineup) reflect sources retrieved on August 9, 2026, and will age.
+- **Primary sources first** — Where a Wikipedia entry supports an industry claim, the underlying company filings or annual reports are the definitive citation for formal use.
 ```
 
-Diagnostics — repaired: false | TTFT: 117384ms | tokens in/out: 1443/11685 | fallback used: false
+Diagnostics — repaired: false | TTFT: 42464ms | tokens in/out: 3083/3915 | fallback used: false
 
 ### document-generation — PASS
 
@@ -139,117 +142,117 @@ Diagnostics — repaired: false | TTFT: 117384ms | tokens in/out: 1443/11685 | f
 
 **Skills activated:** document-generation
 
-**Response (13054ms, quality score 4.7/5):**
+**Verification:** risk LOW | hard failures: none | repair attempts: 0 | 0ms
+**Usage:** initial in/out: 1421/1996 | repairs: 0 | total in/out: 1421/1996
+
+**Response (29752ms, quality score 4.7/5):**
 
 ```
-Here is a standard freelance web design service contract template. It is intentionally neutral and customizable, so you can fill in your own project details, payment terms, and legal jurisdiction. Placeholders are marked like `[brackets]` — replace them before sending to a client.
+Here is a clean, professional freelance web design service contract you can adapt. It covers the essentials every design project needs — scope, timeline, payments, revisions, ownership of the finished work, and legal protections — and uses placeholders so you can fill in your specific details without inventing anything.
 
-## Service Contract for Web Design Services
+## Parties
 
-**This Service Contract ("Agreement") is entered into as of `[Date]`** by and between:
+This Service Contract ("Agreement") is entered into on **[Date]** by and between:
 
-- **Client:** `[Client Name / Company]`, located at `[Client Address]` ("Client")
-- **Designer:** `[Your Name / Studio]`, located at `[Your Address]` ("Designer")
+- **Designer:** [Full Name], [Business Name], [Address], [Email], [Phone]
+- **Client:** [Full Name / Company Name], [Address], [Email], [Phone]
 
 Together referred to as the "Parties."
 
-### 1. Scope of Services
+## 1. Project Scope
 
-Designer agrees to provide the following web design services for Client:
+The Designer agrees to provide the following web design services for the Client:
 
-- `[Describe the deliverable, e.g., a 5-page marketing website]`
-- `[Specific pages or sections]`
-- `[Features: contact form, CMS setup, responsive design, etc.]`
-- `[Hosting setup / domain registration, if applicable]`
-- `[Other deliverables]`
+- **Description of work:** [e.g., Design and development of a responsive marketing website consisting of up to 5 pages: Home, About, Services, Portfolio, Contact.]
+- **Deliverables:** [e.g., Mobile-responsive HTML/CSS/JS files, a design mockup in Figma, and a one-page brand style guide.]
+- **Exclusions:** [e.g., Copywriting, photography, logo design, e-commerce functionality, ongoing maintenance, and content management system setup.]
 
-Any services not explicitly listed above will be quoted separately and require written approval from Client.
+Any work outside this scope will be treated as a change request and billed separately.
 
-### 2. Project Timeline
+## 2. Timeline
 
-- **Estimated start date:** `[Start Date]`
-- **Estimated completion date:** `[Completion Date]`
-- **Key milestones:** `[Optional: e.g., wireframes by ____, design mockup by ____, final delivery by ____]`
+- **Project start date:** [Start Date]
+- **Milestones:** [e.g., Design mockup approval by [Date]; development complete by [Date]; final delivery by [Date].]
+- The timeline is based on the Client providing all required content, feedback, and approvals within **[X] business days** of each milestone. Delays in client input will extend the deadline proportionally.
 
-Timeline may be adjusted if Client delays approvals, feedback, or content delivery by more than `[X]` business days.
+## 3. Payment Terms
 
-### 3. Fees and Payment Terms
+- **Total project fee:** USD $[Amount]
+- **Deposit (due before work begins):** USD $[Amount or %] — non-refundable once work has started.
+- **Milestone payments:** [e.g., $[Amount] due upon mockup approval; $[Amount] due before final delivery.]
+- **Final payment** must be received before the final files are released.
+- **Late payments** accrue interest at **[X]% per month** or the maximum permitted by law.
+- The Designer may pause work if a payment is more than **[X] days** overdue.
 
-- **Total project fee:** `$[Amount]`
-- **Payment schedule:**
-  - `[X]`% deposit upon signing: `$[Amount]`
-  - `[X]`% upon approval of design mockups: `$[Amount]`
-  - `[X]`% upon final delivery: `$[Amount]`
-- **Payment method:** `[Bank transfer / PayPal / Other]`
-- **Late payment:** Invoices unpaid after `[X]` days may incur a late fee of `[X]`% per month and may pause work until payment is received.
+## 4. Revisions and Approval
 
-### 4. Revisions and Change Requests
+- The fee includes **[X] rounds** of revisions per milestone.
+- Each round covers changes requested within **[X] business days** of presenting the work.
+- Feedback beyond the included rounds will be billed at **[hourly rate]** per hour.
+- The Client must formally approve each deliverable in writing (email is acceptable) before work proceeds to the next stage.
 
-- The project fee includes `[X]` rounds of revisions per deliverable stage.
-- Additional revision rounds or new features requested after the scope is finalized will be billed at `[$X / hour]` or as a separate fixed quote.
-- Client must provide consolidated feedback within `[X]` business days of receiving a draft.
+## 5. Intellectual Property
 
-### 5. Intellectual Property Rights
+- **Ownership during the project:** The Designer retains full ownership of all drafts, design files, and source code until the final invoice is paid in full.
+- **Ownership after payment:** Upon receipt of full payment, all rights to the final web design transfer to the Client, including copyright.
+- **Third-party assets:** Any fonts, images, or plugins licensed for the project remain subject to their original licenses, which will be transferred or noted on delivery.
+- **Portfolio use:** The Designer may display the finished project in a portfolio or case study unless the Client opts out in writing before launch.
 
-- **Full ownership** of the final website design and source files transfers to Client upon receipt of full payment.
-- Designer retains the right to display the completed project in their portfolio unless a confidentiality clause is agreed upon.
-- Any third-party assets (fonts, photos, plugins, libraries) remain under their respective licenses.
+## 6. Client Responsibilities
 
-### 6. Confidentiality
+The Client will provide:
 
-Both Parties agree not to disclose confidential business information, strategies, or project materials shared during this engagement, except as required by law.
+- All written content, images, and branding materials by the agreed dates.
+- Prompt feedback within the review windows above.
+- Any access needed to existing accounts, hosting, or domain registrars.
+- A single point of contact to consolidate feedback and approvals.
 
-### 7. Client Responsibilities
+If materials are delayed by more than **[X] business days**, the Designer may adjust the timeline and schedule.
 
-Client agrees to provide, in a timely manner:
+## 7. Confidentiality
 
-- Brand assets (logo, colors, fonts, copy, images)
-- Access to necessary accounts or systems
-- Clear and complete feedback
+The Designer agrees to keep all non-public client business information confidential and to not share client materials, login credentials, or project details with third parties except as needed to complete the project.
 
-### 8. Limitation of Liability
+## 8. Warranties and Limitation of Liability
 
-Designer's liability under this Agreement is limited to the total amount paid by Client for the project. Designer is not liable for indirect, incidental, or consequential damages, including loss of data, revenue, or business interruption.
+- **Warranty:** The Designer warrants that the work is original, does not infringe on third-party rights, and will function as described for **[X] days** after launch.
+- **Limitation:** The Designer's total liability under this agreement will not exceed the total fees paid by the Client.
+- **Exclusion of damages:** Neither party is liable for indirect, incidental, or consequential damages, including lost profits or business interruption.
 
-### 9. Termination
+## 9. Termination
 
-- Either Party may terminate this Agreement with `[X]` days written notice.
-- Client will pay for all work completed up to the date of termination, at the hourly rate of `[$X / hour]`, unless a fixed milestone payment has already been made for that work.
-- Upon termination, Client receives rights to all completed deliverables paid for under this Agreement.
+- Either party may terminate this Agreement with **[X] days** written notice.
+- If terminated, the Client pays for all work completed and approved up to the termination date at the rates set in this Agreement.
+- The Designer will deliver all completed, paid-for work before ownership transfers, per Section 5.
 
-### 10. Governing Law
+## 10. Dispute Resolution and Governing Law
 
-This Agreement shall be governed by the laws of `[State / Country]`, without regard to conflict-of-law principles.
+- This Agreement is governed by the laws of **[State / Country]**.
+- If a dispute arises, the parties agree to first attempt mediation through a mutually agreed mediator before pursuing legal action.
 
-### 11. Entire Agreement
+## Signatures
 
-This Agreement constitutes the entire understanding between the Parties and supersedes all prior discussions and proposals. Changes must be made in writing and signed by both Parties.
+By signing below, both parties agree to the terms of this Agreement.
 
-### 12. Signatures
+**Designer:**
+- Signature: ______________________
+- Printed Name: [Full Name]
+- Date: ______________________
 
-By signing below, both Parties acknowledge that they have read, understood, and agree to the terms of this Agreement.
+**Client:**
+- Signature: ______________________
+- Printed Name: [Full Name / Company]
+- Date: ______________________
 
-**Designer**
+## How to Use This Contract
 
-Signature: __________________________  
-Name: `[Your Name]`  
-Date: `[Date]`
-
-**Client**
-
-Signature: __________________________  
-Name: `[Client Name / Authorized Representative]`  
-Date: `[Date]`
-
-## How to Customize This Contract
-
-- Replace every bracketed item with accurate project details.
-- Adjust the payment schedule to match your normal deposit and milestone approach.
-- If this is a higher-value project, have a local lawyer review the governing law and liability clauses.
-- Use a digital signature tool (DocuSign, HelloSign, Adobe) so both parties can sign the final PDF copy.
+1. **Fill in every placeholder** — blank fields make a contract unenforceable and open to dispute.
+2. **Customize the dollar amounts, revision counts, and deadlines** to match the specific project.
+3. **Have both parties sign and keep a dated copy** for your records.
+4. **For significant projects**, a local lawyer in your jurisdiction should review it — this draft is a template, not legal advice.
 ```
 
-Diagnostics — repaired: false | TTFT: 13053ms | tokens in/out: 1421/1312 | fallback used: false
+Diagnostics — repaired: false | TTFT: 29751ms | tokens in/out: 1421/1996 | fallback used: false
 
 ### data-analysis — PASS
 
@@ -257,44 +260,47 @@ Diagnostics — repaired: false | TTFT: 13053ms | tokens in/out: 1421/1312 | fal
 
 **Skills activated:** data-analysis
 
-**Response (8637ms, quality score 4.7/5):**
+**Verification:** risk HIGH | hard failures: none | repair attempts: 0 | 0ms
+**Usage:** initial in/out: 1456/1005 | repairs: 0 | total in/out: 1456/1005
+
+**Response (27488ms, quality score 5/5):**
 
 ```
-The five months of sales show a clear **overall upward trend**, with a noticeable dip in the third month. Based on a simple linear trend, sales are increasing by roughly **$1,900 per month** on average, from an estimated starting point of $8,900.
+The overall trend is upward, but it is not smooth — sales grew from 12,000 to 21,000 over the five months, yet the series includes one sharp drop in month 3. Average monthly sales are 14,600, and a simple linear trend suggests an increase of about 1,900 per month.
 
-## Summary Statistics
+## Monthly Changes
 
-| Metric | Value |
-|---|---|
-| Total sales | $73,000 |
-| Average monthly sales | $14,600 |
-| Lowest month | $9,000 |
-| Highest month | $21,000 |
-| First month | $12,000 |
-| Last month | $21,000 |
-| Net change | +$9,000 |
+| Month | Sales | Change vs previous |
+|---:|---:|---:|
+| 1 | 12,000 | — |
+| 2 | 15,000 | +3,000 |
+| 3 | 9,000 | -6,000 |
+| 4 | 16,000 | +7,000 |
+| 5 | 21,000 | +5,000 |
 
-## Month-by-Month Trend
+The main features are:
 
-| Month | Sales | Change vs Previous |
-|---|---|---|
-| 1 | $12,000 | — |
-| 2 | $15,000 | +$3,000 |
-| 3 | $9,000 | −$6,000 |
-| 4 | $16,000 | +$7,000 |
-| 5 | $21,000 | +$5,000 |
+- **Overall growth** — sales rose by 9,000 from month 1 to month 5, a 75% increase.
+- **High volatility** — month 3 fell 40% below month 2, then recovered strongly.
+- **Strong recent momentum** — the last two months show the largest consecutive gains (+7,000 and +5,000).
 
-## Key Observations
+## Trend Line Estimate
 
-- **Overall direction is upward** — comparing the first and last months, sales grew by 75%.
-- **The third month is the main outlier** — the $9,000 figure breaks the upward sequence and is the only decline.
-- **Growth accelerated in the second half** — the last three months average $15,333, and the final month reached the highest point.
-- **If the current trend continues**, sales could be expected near $23,000 in the next month based on the linear trendline.
+Using a simple linear fit over the five months, the trend is roughly:
 
-The practical takeaway: the trend is positive, but the month-3 dip is worth investigating for seasonality, promotion timing, or data-entry issues.
+- **Trend equation:** Sales ≈ 8,900 + 1,900 × Month number
+- **Month 6 forecast:** ≈ 21,300 if the current trajectory continues
+
+## Data-Quality Notes
+
+- Only 5 data points, so the trend is sensitive to one unusual month.
+- No month names or year are provided, so seasonality cannot be assessed.
+- The drop in month 3 may indicate a one-off event, promotional gap, or data issue — worth investigating before relying on the forecast.
+
+**Bottom line:** The trend is upward, but the month 3 dip makes it uneven. Watch whether the recent strong recovery continues before treating the forecast as reliable.
 ```
 
-Diagnostics — repaired: false | TTFT: 8636ms | tokens in/out: 1456/912 | fallback used: false
+Diagnostics — repaired: false | TTFT: 27487ms | tokens in/out: 1456/1005 | fallback used: false
 
 ### marketing-copywriting — PASS
 
@@ -302,52 +308,57 @@ Diagnostics — repaired: false | TTFT: 8636ms | tokens in/out: 1456/912 | fallb
 
 **Skills activated:** marketing-copywriting
 
-**Response (16639ms, quality score 4.7/5):**
+**Verification:** risk MEDIUM | hard failures: none | repair attempts: 0 | 0ms
+**Usage:** initial in/out: 1489/806 | repairs: 0 | total in/out: 1489/806
+
+**Response (24410ms, quality score 5/5):**
 
 ```
-Launch copy works best when it names the coffee drinker you're serving, makes a promise they can taste, and gives them a reason to act today. Below is a flexible launch kit you can adapt: five taglines, five headlines, a hero block, a short email sequence, and social posts. Swap in your brand name, adjust the tone, and it's ready to ship. Tell me your brand's name, vibe, and audience and I'll make it fully custom.
+Here is launch copy built around a warm, direct, slightly playful brand voice. It assumes your target audience is urban coffee drinkers who want a quality daily ritual without the pretension. Swap anything in brackets with your real details before publishing.
 
 ## Tagline Options
-- **"First sip. Every morning."** — Focused on the daily ritual and consistency.
-- **"Roasted bold. Built honest."** — Emphasizes quality and transparency.
-- **"[Brand Name]: Coffee worth staying for."** — Invites customers into your story and physical space.
-- **"From small farms to your cup — no shortcuts."** — Highlights sourcing and craft.
-- **"Wake up to something real."** — Simple, anti-corporate, direct.
 
-## Launch Headlines
-- "The coffee your mornings have been waiting for."
-- "Small-batch roasted. Delivered at peak freshness."
-- "Taste the difference between coffee and *your* coffee."
-- "Meet the roast that turned our kitchen into a fan club."
-- "Finally, a brew that matches your ambition."
+- **For quality-focused positioning** — "Crafted slow. Gone fast."
+- **For morning ritual** — "Your first right decision of the day."
+- **For bold flavor** — "Roasted loud. Served proud."
+- **For sustainability angle** — "Good to the last drop. Better for the planet."
 
-## Hero Copy Block
-**Headline:** The coffee your mornings have been waiting for.
+## Launch Copy
 
-**Subheadline:** [Brand Name] sources single-origin beans from [region/farm], roasts them in small batches, and ships them within 48 hours — so every bag lands with full flavor and zero warehouse dust.
+### Headline Options
 
-**CTA:** "Get your first bag — 15% off" (primary) + "Explore the roast lineup" (secondary).
+1. "Finally, a coffee that takes your mornings as seriously as you do."
+2. "The perfect cup isn't luck. It's [brand name]."
+3. "Wake up to a coffee worth staying up for."
 
-**Supporting line:** Free shipping over $30. Subscribe and save 20% every month.
+### Subheadline
 
-## Launch Email Sequence (3 Emails)
-- **Email 1 (Launch Announcement):** Subject: "Your mornings are about to change." Body: introduce the story, the problem (flat, stale coffee), and the promise. CTA: "Claim 15% off."
-- **Email 2 (Social Proof & Education):** Subject: "Why we dump our first batch every week." Body: explain the freshness process, share a customer quote or press mention, and link to the shop. CTA: "Taste the difference."
-- **Email 3 (Urgency/Deadline):** Subject: "Last call: 15% off ends tonight." Body: recap the offer, link to bestseller roasts, and address objections (easy returns, grind options, subscription pause anytime). CTA: "Shop now."
+"Small-batch beans, roasted in [city], delivered fresh to your door. No bitterness, no filler — just a clean, full-bodied cup that makes your morning routine feel like a ritual."
 
-## Social Media Posts (3 Posts)
-- **Instagram (Product shot):** "Every bag you get from us was roasted this week. Not last quarter. Not last season. This week. The difference is in your first cup — taste it for yourself with 15% off your first order. Link in bio. #FreshRoastCoffee #SmallBatch"
-- **Twitter (Launch teaser):** "We spent a year finding the farms. Now we're finding your cup. [Brand Name] launches today. First orders get 15% off." + link
-- **Facebook (Behind the scenes):** Photo of the roastery with caption: "This machine only knows one setting: obsessive. Every batch is cupped twice before it earns the [Brand Name] label. Try it for 15% off — we'll even cover shipping."
+### Body Copy
 
-## How to Use This
-- **Pick one tagline** and one headline for your homepage and ads — don't mix voices.
-- **Keep the CTA identical** across email and social to avoid confusion.
-- **Test two headlines** with a small paid boost to see which resonates.
-- **Tell me your brand's story** (origin, roast style, target customer) and I'll rewrite all of the above in your exact tone.
+"At [brand name], we started with a simple frustration: great coffee shouldn't require a translation guide. So we kept it simple. We source single-origin beans from [origin/farm], roast them in small batches every [week/day], and ship within [X] hours of roasting. The result is a cup that's rich, smooth, and consistent — every single time.
+
+Whether you're brewing a quick pour-over before work or taking a slow Sunday morning in the kitchen, [brand name] is built to fit your rhythm. No complicated brewing theories. No jargon. Just the best-tasting coffee you can make at home."
+
+### Call to Action
+
+"Join the first batch. Get [optional: 15% off] your first order when you sign up for launch access."
+
+### Pre-Launch Social Post (Instagram/TikTok)
+
+"Your future favorite coffee hasn't launched yet. But it's roasting. Sign up for early access to [brand name] and be first in line when we drop. ☕️ [Link in bio]"
+
+### Launch Email Subject Lines
+
+- "Your mornings are about to change"
+- "Meet [brand name] — freshly roasted, finally available"
+- "The coffee you've been waiting for has arrived"
+
+Before publishing, fill in the bracketed details: roast schedule, origin story, shipping window, and any actual launch offer. If you share your brand name, target audience, or a specific angle, I can write a tailored version with your real facts only.
 ```
 
-Diagnostics — repaired: false | TTFT: 16637ms | tokens in/out: 1440/1536 | fallback used: false
+Diagnostics — repaired: false | TTFT: 24409ms | tokens in/out: 1489/806 | fallback used: false
 
 ### translation-localization — PASS
 
@@ -355,15 +366,20 @@ Diagnostics — repaired: false | TTFT: 16637ms | tokens in/out: 1440/1536 | fal
 
 **Skills activated:** translation-localization
 
-**Response (5523ms, quality score 4.7/5):**
+**Verification:** risk LOW | hard failures: none | repair attempts: 0 | 0ms
+**Usage:** initial in/out: 1427/238 | repairs: 0 | total in/out: 1427/238
+
+**Response (10727ms, quality score 5/5):**
 
 ```
-**Bienvenido a nuestro sitio web. Siéntete libre de explorar nuestros productos.**
+**Traducción al español:**  
+"Bienvenido a nuestro sitio web. Siéntete libre de explorar nuestros productos."
 
-**Nota de adaptación** — Elegí *"explorar"* para "browse" porque es el equivalente natural al recorrer productos, aunque *"navegar"* también es válido y se usa más para la navegación web. *"Siéntete libre"* conserva el tono amable y cercano de "feel free", usando el tratamiento informal *tú*, que es el estándar en sitios web comerciales de habla hispana.
+**Nota de adaptación:**  
+Mantuve un tono cálido y directo, equivalente al original. "Feel free" se tradujo como "siéntete libre", que es natural y cercano en español. "Browse" se adaptó como "explorar", que funciona mejor para navegar por productos en un sitio web. Se usa el tuteo ("siéntete") para un tono amigable; si prefieres un registro más formal, podría ser "Siéntase libre de explorar nuestros productos".
 ```
 
-Diagnostics — repaired: false | TTFT: 5522ms | tokens in/out: 1427/489 | fallback used: false
+Diagnostics — repaired: false | TTFT: 10727ms | tokens in/out: 1427/238 | fallback used: false
 
 ### live-data-utilities — PASS
 
@@ -371,25 +387,27 @@ Diagnostics — repaired: false | TTFT: 5522ms | tokens in/out: 1427/489 | fallb
 
 **Skills activated:** live-data-utilities
 
-**Response (5701ms, quality score 4.7/5):**
+**Verification:** risk LIVE | hard failures: none | repair attempts: 0 | 0ms
+**Live data:** required: true | used: true | source: Wikipedia, DuckDuckGo | fetched: 2026-08-09T06:55:59.902Z | freshnessMs: 18175
+**Usage:** initial in/out: 2464/776 | repairs: 0 | total in/out: 2464/776
+
+**Response (20466ms, quality score 4.4/5):**
 
 ```
-As of **December 30, 2025**, at an approximate exchange rate of **1 USD = 58.50 PHP**, converting **25,000 PHP** gives:
+The live conversion rate could not be retrieved from the search results — the indexed pages are currency-converter tools, but none of the returned snippets contain the actual current PHP→USD rate for 25,000 PHP. Per policy, I won't approximate from memory. The fetch timestamp was **2026-08-09T06:55:59.902Z (UTC)**.
 
-## Result
-- **25,000 PHP ÷ 58.50 = 427.35 USD**
-- So, **25,000 PHP ≈ $427.35 USD**
+## What to do next
 
-## Notes
-- **Rate used:** 58.50 PHP per USD (approximate mid-market rate).
-- **Source:** Based on typical interbank rates around this date; actual rates vary by provider.
-- **Timestamp:** Approximate for today, December 30, 2025.
-- **Fluctuation risk:** PHP-USD rates move frequently, so the final amount may differ by a few dollars depending on when and where you convert (banks, remittance services, or forex platforms often add margins).
+- **Check a live converter directly** — any of these tools will show the exact converted amount at the current mid-market rate:
+  - [Wise — 25,000 PHP to USD](https://wise.com/us/currency-converter/php-to-usd-rate?amount=25000)
+  - [Xe — 25,000 PHP to USD](https://www.xe.com/en-us/currencyconverter/convert/?Amount=25000&From=PHP&To=USD)
+  - [OANDA — PHP to USD](https://oandacurrencyconverter.com/php-to-usd)
+  - [CurrencyRate.Today — 25,000 PHP to USD](https://php.currencyrate.today/convert/amount-25000-to-usd.html)
 
-For an exact, real-time figure, check your bank's current rate or a live converter at the moment of conversion.
+- **Note on accuracy** — the peso-dollar rate moves throughout the day, so the exact figure depends on the moment you convert. For a rough sense of magnitude, 25,000 PHP typically lands in the **low-to-mid $400s USD**, but verify the live rate before making any decision or transfer.
 ```
 
-Diagnostics — repaired: false | TTFT: 5701ms | tokens in/out: 1431/492 | fallback used: false
+Diagnostics — repaired: false | TTFT: 18174ms | tokens in/out: 2464/776 | fallback used: false
 
 ### education-tutor — PASS
 
@@ -397,188 +415,155 @@ Diagnostics — repaired: false | TTFT: 5701ms | tokens in/out: 1431/492 | fallb
 
 **Skills activated:** education-tutor
 
-**Response (18142ms, quality score 4.7/5):**
+**Verification:** risk LOW | hard failures: none | repair attempts: 0 | 1ms
+**Usage:** initial in/out: 1415/2215 | repairs: 0 | total in/out: 1415/2215
+
+**Response (34507ms, quality score 4.7/5):**
 
 ```
-I'll teach you Flexbox from zero. We'll start with the core idea, then go through the two main roles (container and items), cover the most useful properties, and finish with a working example and a practice challenge.
+I'll teach you CSS Flexbox step by step. First, quick check: **Are you comfortable with basic CSS syntax** — like `display: block;`, `color: red;`, and class selectors? If not, reply "start from zero" and I'll adjust. Assuming you know the very basics, here's a crash course.
 
-## What Is Flexbox?
+## The One-Sentence Idea
 
-Flexbox (Flexible Box Layout) is a CSS layout mode that helps you arrange elements in a row or column, with full control over alignment, spacing, and how items grow or shrink. It solves common layout problems like centering content, distributing space, and reordering items without using floats or complex margin hacks.
+Flexbox is a CSS layout mode that arranges a container's children in a single line (row or column) and gives you simple controls for spacing, alignment, and sizing — without floats or complex math.
 
-**Key terms before we start:**
-- **Flex container** — the parent element that has `display: flex`.
-- **Flex item** — any direct child of the flex container.
-- **Main axis** — the direction items are laid out (row = horizontal, column = vertical).
-- **Cross axis** — the perpendicular direction.
+## Step 1: Make a Flex Container
 
-## Step 1: Create a Flex Container
-
-Add `display: flex` to the parent:
-
-```css
-.container {
-  display: flex;
-}
-```
-
-That alone makes all direct children line up horizontally (because the default `flex-direction` is `row`).
+Put `display: flex;` on a parent element. Its direct children immediately become "flex items" arranged side by side.
 
 ```html
 <div class="container">
-  <div>Item 1</div>
-  <div>Item 2</div>
-  <div>Item 3</div>
+  <div class="item">A</div>
+  <div class="item">B</div>
+  <div class="item">C</div>
 </div>
 ```
 
-Now the three inner divs sit side by side, instead of stacking vertically.
-
-## Step 2: Choose Direction with `flex-direction`
-
-Control whether items go as a row, a row reversed, a column, or a column reversed:
-
 ```css
 .container {
   display: flex;
-  flex-direction: row;      /* default, left to right */
-  flex-direction: column;   /* top to bottom */
-  flex-direction: row-reverse;
-  flex-direction: column-reverse;
+  background: #eee;
+}
+.item {
+  padding: 20px;
+  background: skyblue;
+  margin: 5px;
 }
 ```
 
-## Step 3: Align Along the Main Axis with `justify-content`
+That's it — you now have a row of three boxes. The magic comes from the next properties.
 
-This positions items **horizontally** when direction is `row` (vertically when direction is `column`).
+## Step 2: Know the Two Axes
+
+Flexbox uses an invisible coordinate system:
+
+- **Main axis** — the direction items flow. By default it's left-to-right (row).
+- **Cross axis** — the perpendicular direction. By default it's top-to-bottom.
+
+Change the direction with `flex-direction`:
 
 ```css
 .container {
-  display: flex;
-  justify-content: flex-start;    /* default, left edge */
-  justify-content: flex-end;      /* right edge */
-  justify-content: center;        /* centered */
-  justify-content: space-between; /* equal space between items, edges flush */
-  justify-content: space-around;  /* equal space around each item */
-  justify-content: space-evenly;  /* fully equal spacing */
+  flex-direction: column; /* now items stack top-to-bottom */
 }
 ```
 
-## Step 4: Align Along the Cross Axis with `align-items`
+Values: `row` (default), `row-reverse`, `column`, `column-reverse`.
 
-This positions items **vertically** when direction is `row` (horizontally when direction is `column`).
+## Step 3: Control Spacing on the Main Axis
+
+`justify-content` aligns items along the **main axis**. Common values:
+
+| Value | What it does |
+|---|---|
+| `flex-start` | Pack items at the start (default) |
+| `flex-end` | Pack items at the end |
+| `center` | Center items |
+| `space-between` | Even space between items, none at the ends |
+| `space-around` | Even space around each item |
+| `space-evenly` | Fully equal space everywhere |
 
 ```css
 .container {
-  display: flex;
-  align-items: stretch;   /* default, items fill container height */
-  align-items: flex-start; /* top of the container */
-  align-items: flex-end;   /* bottom */
-  align-items: center;     /* vertically centered */
-  align-items: baseline;   /* align text baselines */
+  justify-content: space-between;
 }
 ```
 
-**Quick trick:** To perfectly center something, use `justify-content: center; align-items: center;`.
+## Step 4: Control Alignment on the Cross Axis
 
-## Step 5: Add Spacing with `gap`
-
-Instead of margins on child elements, use `gap` on the container:
+`align-items` aligns items along the **cross axis**, and works when items have different heights or you want vertical centering.
 
 ```css
 .container {
-  display: flex;
-  gap: 16px;
+  align-items: center; /* vertically centers if flex-direction: row */
 }
 ```
 
-This adds 16px between every item, but not outside the edge of the container.
+Common values: `stretch` (default), `flex-start`, `flex-end`, `center`, `baseline`.
 
-## Step 6: Control Item Size with `flex` Properties
+**Rule of thumb:** `justify-content` works on the main axis, `align-items` works on the cross axis. Mix them to place items anywhere.
 
-These are applied to **flex items** (the children), not the container.
+## Step 5: Let Items Grow and Shrink
 
-- **`flex-grow`** — how much an item can grow relative to siblings (0 = don't grow, 1+ = grow).
-- **`flex-shrink`** — how much an item can shrink when space is tight.
-- **`flex-basis`** — the starting size before growing or shrinking.
+`flex` controls how items share extra space. It's shorthand for three sub-properties:
 
-Most of the time you'll use the shorthand `flex`:
+- `flex-grow` — how much an item can grow relative to siblings
+- `flex-shrink` — how much it can shrink
+- `flex-basis` — starting size before growing/shrinking
 
 ```css
 .item {
-  flex: 1;          /* grow equally, shrink equally, basis 0 */
-  flex: 0 0 200px;  /* fixed width: no grow, no shrink, basis 200px */
-  flex: 2 1 100px;  /* grow twice as fast as flex: 1, shrink allowed */
+  flex: 1; /* grows equally, shrinks equally, basis 0% */
 }
 ```
 
-## Step 7: Change Order with `order`
+If all three items have `flex: 1`, they share the container width equally. Give one `flex: 2` and it gets twice the space of the others.
 
-Flex items appear in DOM order, but you can reorder visually:
+## Step 6: Wrap and Gap
+
+By default items try to stay on one line. To allow wrapping:
 
 ```css
-.item-1 { order: 3; }
-.item-2 { order: 1; }
-.item-3 { order: 2; }
+.container {
+  flex-wrap: wrap;
+}
 ```
 
-Lower numbers appear first. This is useful for responsive layouts without changing HTML.
+Add breathing room with `gap` (works in both axes):
 
-## Complete Example: Simple Centered Card Layout
-
-Here's a full practice snippet. Copy it to an HTML file and open it in your browser.
-
-```html
-<style>
-  .container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 20px;
-    height: 100vh;
-    background: #f0f0f0;
-  }
-  .card {
-    flex: 1;
-    max-width: 250px;
-    padding: 20px;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    text-align: center;
-  }
-  .card.special {
-    flex: 2; /* this card is wider */
-  }
-</style>
-
-<div class="container">
-  <div class="card">Card 1</div>
-  <div class="card special">Card 2 (wider)</div>
-  <div class="card">Card 3</div>
-</div>
+```css
+.container {
+  gap: 10px;
+}
 ```
 
 ## Practice Exercise
 
-Build a navigation bar with Flexbox that meets these requirements:
+Try building a simple navigation bar: a flex container with three links, space between them, vertically centered, and a 10px gap. Use this starter:
 
-1. A container with a dark background and white text.
-2. Three links: Home, About, Contact.
-3. Links are spaced evenly (`justify-content: space-between`).
-4. The links are vertically centered.
-5. The nav has a fixed height of 60px.
-
-Hint: Put the links inside a flex container, then apply `align-items: center`.
-
-## Checkpoint Question
-
-What is the difference between `justify-content` and `align-items`? Try to explain it in your own words, then verify by testing a small layout. If you can answer that, you're ready to move on to wrapping, `flex-wrap`, and responsive patterns.
-
-Let me know if you want a deeper dive into any of these properties or a walkthrough for your practice exercise!
+```css
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
 ```
 
-Diagnostics — repaired: false | TTFT: 18141ms | tokens in/out: 1415/2229 | fallback used: false
+Add your own HTML with three `<a>` tags inside a `<nav class="navbar">`. Open it in your browser and experiment with changing `justify-content` to see what happens.
+
+## Checkpoint Questions
+
+Answer these to confirm you've got it:
+
+1. What does `justify-content: space-between` do differently from `center`?
+2. If `flex-direction: column`, which axis does `align-items` control — horizontal or vertical?
+3. Three equal-width boxes in a row — what `flex` value would you put on each?
+
+Reply with your answers or ask me to go deeper on any step. For links, I have the latest on the web in mind.
+```
+
+Diagnostics — repaired: false | TTFT: 34506ms | tokens in/out: 1415/2215 | fallback used: false
 
 ### accessibility-compliance — PASS
 
@@ -586,169 +571,87 @@ Diagnostics — repaired: false | TTFT: 18141ms | tokens in/out: 1415/2229 | fal
 
 **Skills activated:** accessibility-compliance
 
-**Response (37583ms, quality score 4.7/5):**
+**Verification:** risk HIGH | hard failures: none | repair attempts: 0 | 1ms
+**Usage:** initial in/out: 1429/1311 | repairs: 0 | total in/out: 1429/1311
+
+**Response (31749ms, quality score 5/5):**
 
 ```
-Making a form accessible for screen readers means every field can be named, described, and operated without vision: the screen reader must announce the label, the control type, its state (required, invalid, expanded), and any associated instructions or errors. The core rule is to use native HTML semantics first — `<label>`, `<fieldset>`, `aria-describedby`, `aria-invalid` — and add ARIA only where HTML cannot express a relationship. The relevant WCAG 2.2 AA criteria are mainly semantic structure (1.3.1), labels and instructions (3.3.2), error identification and suggestion (3.3.1, 3.3.3), keyboard operability (2.1.1), visible and logical focus (2.4.7, 2.4.3), input purpose via `autocomplete` (1.3.5), and name/role/value for custom widgets (4.1.2).
+## Overview
 
-## WCAG criteria that govern forms
+Making a form accessible for screen readers means ensuring every control has a programmatic name, a predictable reading order, and clear guidance that isn’t conveyed by visual cues alone. The core principle is simple: use native HTML elements and associate every input with a label or accessible name. When that foundation is in place, screen reader users can navigate fields, understand the expected input, and recover from errors without guessing.
 
-| Criterion | Level | What it requires in practice |
-|---|---|---|
-| 1.3.1 Info and Relationships | A | Labels, groups, and required state are exposed programmatically |
-| 1.3.5 Identify Input Purpose | AA | `autocomplete` attributes on common fields (name, email, etc.) |
-| 2.1.1 Keyboard | A | Every control operable by keyboard alone, no focus traps |
-| 2.4.3 Focus Order | A | Tab order matches visual order |
-| 2.4.6 Headings and Labels | AA | Labels clearly describe their purpose |
-| 2.4.7 Focus Visible | AA | A clearly visible focus indicator at all times |
-| 3.3.1 Error Identification | A | Errors are identified in text and programmatically |
-| 3.3.2 Labels or Instructions | A | Every field has a label; instructions are associated |
-| 3.3.3 Error Suggestion | AA | Error messages suggest how to fix the input |
-| 4.1.2 Name, Role, Value | A | Custom widgets expose state via ARIA (e.g., `aria-invalid`) |
+## Semantic Structure and Labels
 
-## Core techniques
-
-- **Explicitly pair labels with inputs** — use `<label for="id">` or wrap the input in the label. Never rely on `placeholder` alone; it is not announced reliably, disappears when typing, and frequently fails the 4.5:1 contrast requirement. Mark required fields with `aria-required="true"` and a visible `*`, and explain the `*` in an `sr-only` sentence such as “* required”.
-- **Group related controls** — put radio buttons, checkboxes, or multi-part fields inside `<fieldset>` with a `<legend>`. The screen reader announces the legend before each choice, which is the only reliable way to convey the group question.
-- **Associate help text and errors** — link hints and error messages to the input with `aria-describedby="helpId errorId"`. The screen reader announces them when the field receives focus. Use `aria-invalid="true"` on invalid fields so the state is announced.
-- **Announce and focus errors** — put a form-level error summary in a container with `role="alert"` (or `aria-live="assertive"`), give it `tabindex="-1"`, and move focus to it on submit. This works much better than hoping the user tabs to the first error.
-- **Use native elements whenever possible** — a `<button>`, `<input>`, `<select>`, and `<textarea>` give you correct keyboard behavior and announcements for free. Custom widgets need full ARIA patterns and manual keyboard handling, which are easy to get wrong.
-- **Keep focus visible and logical** — never remove `outline`; use `:focus-visible` to style an obvious indicator. Tab order should follow visual order, and error fields should be reachable in a sensible sequence.
-- **Add `autocomplete` attributes** — `autocomplete="name"`, `"email"`, `"current-password"`, `"tel"`, and similar help users of assistive tech fill forms faster and satisfy 1.3.5.
-
-## Common failures by severity
-
-| Severity | Failure | Fix |
-|---|---|---|
-| Critical | Inputs with no `<label>` or placeholder-only labels | Add explicit `<label for>`; remove placeholder as the sole identifier |
-| Critical | Error messages not associated or announced | Link via `aria-describedby`, set `aria-invalid`, use `role="alert"` for the summary |
-| High | Keyboard traps or focus never moves to errors | Keep native controls; move focus to an error summary on invalid submit |
-| High | Radio/checkbox groups without a group name | Wrap in `<fieldset>` with a `<legend>` |
-| Medium | Help text unrrelated to the field; tab order out of sync with visual layout | Use `aria-describedby`; reorder the DOM to match the visual layout |
-| Low | “Required” shown only as a red asterisk or color change | Add `aria-required` and visible text or an `sr-only` note |
-| Low | Custom dropdowns or date pickers without ARIA | Replace with native `<select>`/`<input type="date">` where possible |
-
-## Accessible form example
-
-The example below demonstrates the patterns: explicit labels, a fieldset for the radio group, `aria-describedby` for help and errors, `aria-invalid`, an alert-based error summary, `autocomplete`, and focus management on validation. The error `<p>` is rendered only when invalid, matching 3.3.1.
+- **Always use native form controls** — `<input>`, `<select>`, `<textarea>`, `<button>` are inherently accessible. Resist replacing them with styled `div`s.
+- **Pair every field with a `<label>`** using the `for` attribute pointing to the input’s `id`. If a visible label isn’t possible, use `aria-label` or `aria-labelledby`, but visible labels improve usability.
+- **Group related fields** with `<fieldset>` and a `<legend>`. This is essential for radio groups and checkboxes that share a question, but also helps for address blocks or date parts.
+- **Use `autocomplete` attributes** on standard fields (name, email, postal code) so screen readers can offer context-specific assistance.
 
 ```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Accessible registration form</title>
-<style>
-  :focus-visible {
-    outline: 3px solid #005fcc;
-    outline-offset: 2px;
-  }
-  .error-text { color: #b00020; margin: 4px 0 0; }
-  .sr-only {
-    position: absolute; width: 1px; height: 1px;
-    clip: rect(0 0 0 0); overflow: hidden; white-space: nowrap;
-  }
-  .error-summary {
-    background: #fee; border: 1px solid #b00020;
-    padding: 12px; margin-bottom: 16px;
-  }
-  input, select, button { font: inherit; }
-  fieldset { margin: 0 0 16px; padding: 0 0 0 12px; border: 0; }
-</style>
-</head>
-<body>
-  <form id="reg-form" novalidate>
-    <div class="error-summary" id="error-summary" role="alert" tabindex="-1" hidden></div>
+<label for="fullName">Full name</label>
+<input type="text" id="fullName" autocomplete="name">
 
-    <div>
-      <label for="name">Full name <span class="sr-only">* required</span></label>
-      <input type="text" id="name" name="name" autocomplete="name"
-             aria-required="true" aria-describedby="name-help name-error">
-      <p id="name-help">Use your legal name as shown on your ID.</p>
-      <p class="error-text" id="name-error" hidden></p>
-    </div>
-
-    <div>
-      <label for="email">Email address <span class="sr-only">* required</span></label>
-      <input type="email" id="email" name="email" autocomplete="email"
-             aria-required="true" aria-describedby="email-error">
-      <p class="error-text" id="email-error" hidden></p>
-    </div>
-
-    <fieldset>
-      <legend>Preferred contact method</legend>
-      <input type="radio" id="contact-email" name="contact" value="email" checked>
-      <label for="contact-email">Email</label>
-      <input type="radio" id="contact-phone" name="contact" value="phone">
-      <label for="contact-phone">Phone</label>
-    </fieldset>
-
-    <div>
-      <button type="submit">Create account</button>
-    </div>
-  </form>
-
-<script>
-  const form = document.getElementById('reg-form');
-  const summary = document.getElementById('error-summary');
-
-  form.addEventListener('submit', function (e) {
-    e.preventDefault();
-
-    const errors = [];
-    const name = document.getElementById('name');
-    const email = document.getElementById('email');
-
-    // Reset prior error state
-    document.querySelectorAll('.error-text').forEach(function (p) { p.hidden = true; });
-    document.querySelectorAll('.error-text').forEach(function (p) { p.textContent = ''; });
-    [name, email].forEach(function (input) { input.removeAttribute('aria-invalid'); });
-
-    if (!name.value.trim()) {
-      errors.push('Full name is required.');
-      setError(name, 'name-error', 'Enter your full name.');
-    }
-    if (!email.value.trim() || !email.checkValidity()) {
-      errors.push('A valid email address is required.');
-      setError(email, 'email-error', 'Enter a valid email address, e.g. you@example.com.');
-    }
-
-    if (errors.length > 0) {
-      summary.hidden = false;
-      summary.textContent = errors.join(' ');
-      summary.focus(); // moves screen reader and keyboard focus to the summary
-    } else {
-      summary.hidden = true;
-      form.reset();
-    }
-  });
-
-  function setError(input, errorId, message) {
-    input.setAttribute('aria-invalid', 'true');
-    const p = document.getElementById(errorId);
-    p.textContent = message;
-    p.hidden = false;
-  }
-</script>
-</body>
-</html>
+<fieldset>
+  <legend>Shipping method</legend>
+  <label><input type="radio" name="shipping" value="standard"> Standard (5–7 days)</label>
+  <label><input type="radio" name="shipping" value="express"> Express (1–2 days)</label>
+</fieldset>
 ```
 
-## How to verify with a screen reader
+## Instructions and Error Messaging
 
-- **Keyboard-only pass** — Tab through the entire form. Focus order must match visual order, the focus ring must be visible on every control, and there must be no keyboard trap.
-- **NVDA, VoiceOver, or JAWS pass** — On each field, the screen reader should announce the label, the control type (“edit”, “radio button”), the group name for radios, and the required state. Typing into an invalid field should announce “invalid entry” when `aria-invalid` is set.
-- **Error pass** — Submit the empty form and confirm the summary is announced aloud and receives focus, then confirm each error is re-read when you tab to the corresponding field via `aria-describedby`.
-- **Contrast check** — All label, help, and error text must meet 4.5:1 against the background; the focus indicator must be at least 3:1 against adjacent colors.
-- **Zoom and text resize** — The form must remain usable at 200% zoom and when the browser font size is increased, without clipping or overlapping fields.
+- **Describe the format in the label or a linked hint**, not as placeholder text alone. Placeholders disappear and often have low contrast. Use `aria-describedby` to associate the hint with the input.
+- **Do not rely on color, icon, or border color alone** to flag errors. Provide text that names the field and explains the problem.
+- **Connect errors to the input** with `aria-describedby` and, when the error is announced, move focus to the first invalid field or use `aria-live="assertive"` in a status region.
+- **Use `aria-invalid="true"`** on the invalid input so screen readers know the field is in an error state.
 
-## Most important takeaways
-
-Build with native `<label>`, `<fieldset>`, and `<legend>` before reaching for ARIA; associate all help and error text with `aria-describedby`; mark errors with `aria-invalid`; announce errors through a focusable `role="alert"` summary; and verify the flow with a real screen reader rather than assuming semantics alone are enough. That combination covers the critical and high-severity failures in the table above and covers the WCAG 2.2 AA form requirements in practice.
+```html
+<label for="email">Email address</label>
+<input type="email" id="email" aria-describedby="emailHint emailError" aria-invalid="true">
+<p id="emailHint">We’ll send a confirmation to this address.</p>
+<p id="emailError" class="error-message">Enter a valid email like name@example.com.</p>
 ```
 
-Diagnostics — repaired: false | TTFT: 37583ms | tokens in/out: 1429/4349 | fallback used: false
+## Roles and ARIA — Only When Needed
+
+Native HTML usually beats ARIA. ARIA should be the fallback, not the default. If you must use custom widgets, follow the WAI-ARIA Authoring Practices pattern.
+
+| Scenario | Native approach | ARIA fallback |
+|---|---|---|
+| Text input | `<label>` + `<input>` | `role="textbox"` + `aria-label` |
+| Listbox | `<select>` + `<option>` | `role="listbox"` + `aria-selected` |
+| Checkbox group | `<fieldset>` + `<legend>` | `role="group"` + `aria-labelledby` |
+| Slider | `<input type="range">` | `role="slider"` + `aria-valuenow` |
+| Error summary | `<ul>` linked to fields | `role="alert"` in a status region |
+
+Avoid these common mistakes:
+- Adding `role="form"` to the `<form>` element — it’s redundant and can cause duplicate announcements.
+- Using `aria-required="true"` when you can simply use the `required` attribute — native buttons and inputs expose this automatically.
+- Putting `tabindex` on read-only text or labels — this creates focus stops where action is impossible.
+
+## Focus and Keyboard Access
+
+- Ensure the tab order follows the visual reading order. Use `tabindex="0"` only for interactive elements that should be reachable, and `tabindex="-1"` for programmatically focusing an element without adding it to the tab sequence.
+- When a modal opens, move focus to it and trap focus inside until closing. Return focus to the triggering element afterward.
+- Show a visible focus indicator (outline) for every focusable control. Do not remove `outline: none` without providing a visible alternative.
+
+## What to Verify
+
+- **Screen reader test** — Use NVDA, JAWS, or VoiceOver to walk through the form. You should hear the label, the control type, and any required state before you reach the control.
+- **Keyboard-only test** — Tab through the form without a mouse. Every field, radio group, checkbox, and button must be reachable and operable.
+- **Error recovery** — Submit an empty form. Confirm the error message is announced or focus is moved, and that you can correct the field and re-submit.
+- **Contrast check** — Ensure labels and error text meet 4.5:1 contrast against their background (WCAG 2.2 AA).
+
+## Key Takeaways
+
+- Start with labels, fieldsets, and native controls — this covers ~80% of form accessibility.
+- Add `aria-describedby` only for hints and error messages.
+- Reserve ARIA for custom widgets that can’t be built from native HTML.
+- Test with a real screen reader — automated tools catch only a fraction of issues.
+```
+
+Diagnostics — repaired: false | TTFT: 31748ms | tokens in/out: 1429/1311 | fallback used: false
 
 ### business-planning — PASS
 
@@ -756,137 +659,134 @@ Diagnostics — repaired: false | TTFT: 37583ms | tokens in/out: 1429/4349 | fal
 
 **Skills activated:** business-planning
 
-**Response (34169ms, quality score 4.7/5):**
+**Verification:** risk MEDIUM | hard failures: none | repair attempts: 0 | 0ms
+**Usage:** initial in/out: 1431/2223 | repairs: 0 | total in/out: 1431/2223
+
+**Response (40624ms, quality score 5/5):**
 
 ```
 ## Overview
 
-A coffee shop succeeds on three levers: a clear concept, a pricing model that covers your cost structure, and a go-to-market plan that gets people in the door before you open. Below is a practical plan covering pricing math, market targeting, and a phased launch — with assumptions stated upfront so you can adjust for your city and concept.
+This plan outlines a practical pricing structure and go-to-market (GTM) strategy for a new specialty coffee shop. The goal is to position the shop as a quality-focused neighborhood hangout that balances premium coffee with accessible price points. All figures below are **illustrative estimates** based on typical U.S. urban costs and should be adjusted to your local market. Pricing is designed to achieve a target food cost of ~25–30% and a blended gross margin of 65–75%.
 
-## 1. Concept & Positioning First
+## Problem & Solution
 
-Before pricing or marketing, decide what type of shop you are. This dictates everything downstream.
+- **Problem** — Most urban coffee spots are either cheap chains with inconsistent quality or overpriced "third-wave" shops that feel intimidating. Busy professionals and remote workers want a reliable, comfortable place with excellent coffee, reasonable prices, and fast service.
+- **Solution** — A neighborhood coffee shop with a "quality without pretense" brand: house-roasted beans, friendly service, flexible seating, and a simple menu that keeps costs predictable.
 
-- **Quick-service / grab-and-go** — high volume, low ticket, near transit or offices. Prices run lower; speed matters.
-- **Specialty / third-wave** — premium beans, manual brew methods, $7+ drinks. Slower service, higher margin, design-forward space.
-- **Hybrid café / workspace** — sells time and space, not just coffee. Longer dwell, food program, wi-fi, sometimes paid seating tiers.
-- **Drive-thru / kiosk** — lowest real estate cost, fastest throughput, limited menu, works well in suburban and commuter corridors.
+## Market & Target Segments
 
-**Assumption for this plan:** a specialty-leaning neighborhood café, ~800–1,200 sq ft, seating for 20–30, with a small food program (pastries, toasts, sandwiches). Adjust the numbers if you choose a different model.
+| Segment | Description | Key Needs | Willing to Pay |
+|---|---|---|---|
+| Daily commuters | 25–45, work nearby, need quick takeaway | Speed, mobile ordering, consistent taste | $4–6 per visit |
+| Remote workers & students | 18–35, stay 1–3 hours | Wi-Fi, power outlets, comfortable seating | $5–9 per visit |
+| Families & weekend crowd | 25–45, weekends, want relaxed outing | Space, non-coffee options, treats | $8–15 per visit |
+| Local businesses | Offices ordering catering/beans | Bulk pricing, reliability | $15–50 per order |
 
-## 2. Pricing Strategy
+## Business Model & Revenue Streams
 
-### Cost structure benchmarks (typical for a small café)
+| Stream | Description | % of Revenue (Illustrative) |
+|---|---|---|
+| In-store beverages | Espresso, drip, cold brew, tea | 55–65% |
+| Food & pastries | Croissants, sandwiches, breakfast items | 15–20% |
+| Whole-bean coffee & merchandise | Retail bags, mugs, tumblers | 10–15% |
+| Catering & corporate accounts | Office coffee delivery, event orders | 5–10% |
 
-| Cost item | % of revenue |
+## Pricing Strategy
+
+Pricing follows a **value-based approach** — slightly above fast-food averages but below premium third-wave shops, using mix-and-match combos and loyalty incentives to raise average order value.
+
+### Beverage Pricing (Illustrative)
+
+| Item | Price Range | Notes |
+| Drip coffee (12/16 oz) | $2.50 – $3.50 | Anchor item, low margin but drives traffic |
+| Espresso / Americano | $3.00 – $4.00 | Standard, competitive |
+| Cappuccino / Latte | $4.00 – $5.50 | Core margin driver |
+| Specialty drinks (seasonal) | $5.50 – $7.00 | Premium, boosts perception |
+| Cold brew / Nitro | $4.50 – $6.50 | High-margin, popular in warmer months |
+| Tea / Chai / Matcha | $3.50 – $5.50 | For non-coffee customers |
+
+### Food & Other Pricing (Illustrative)
+
+- **Pastries** — $3.00 – $4.50 (croissant, muffin, danish)
+- **Breakfast sandwiches** — $5.50 – $8.00 (contributes strongly to food cost target)
+- **Whole-bean coffee (12 oz)** — $14 – $18 per bag (premium retail)
+- **Merchandise** — $12 – $25 (mugs, tumblers, tote bags)
+- **Catering (per person)** — $4 – $7 (coffee service for events)
+
+### Price Positioning vs. Local Competition
+
+| Competition Type | Price Example (Latte) | Your Price | Positioning |
+| National chain | $3.50 – $4.00 | $4.25 – $4.75 | Higher quality justifies slight premium |
+| Independent specialty | $5.50 – $6.50 | $4.25 – $4.75 | More affordable, still premium feel |
+| Convenience store | $1.50 – $2.50 | $4.25 – $4.75 | Emphasize experience and taste |
+
+### Cost & Margin Check (Illustrative)
+
+- **Coffee cost per cup** — $0.35 – $0.75 for espresso-based drinks (beans, milk, cup, lid). Keep beverage cost of goods sold under 25%.
+- **Food cost** — 25–32% for pastries and sandwiches; update menu pricing quarterly to stay in range.
+- **Blended gross margin** — 65–75% if pricing holds and waste is controlled.
+
+## Go-To-Market Plan
+
+### Brand Positioning
+
+Position the shop as **"your everyday coffee upgrade"** — friendly, fast, and unpretentious, with visibly high-quality sourcing and preparation. Use a warm, modern interior with local artist work and a clear "open kitchen" bar that lets customers see the brewing process.
+
+### Pre-Launch (Weeks 0–6)
+
+- **Soft opening** — Invite 50–100 friends, family, and local business owners for free drinks in exchange for feedback and social posts.
+- **Build email list** — Collect emails via a "free drink on your third visit" card during soft opening.
+- **Create Instagram + Google Business Profile** — Post behind-the-scenes bean sourcing, brew guides, and local partnerships at least 3 times per week.
+- **Local partnerships** — Approach nearby offices, gyms, and co-working spaces with sample trays and a "first corporate order 15% off" offer.
+- **Press & influencers** — Pitch one local food blogger and one neighborhood newsletter for a launch story, offering a free tasting.
+
+### Launch Week
+
+- **Grand opening offer** — "First 50 customers get a free pastry with any drink" or "50% off all beverages for the first week."
+- **Happy hour (3–5 PM daily)** — $1 off drip coffee and pastries to drive afternoon traffic.
+- **Loyalty program** — Digital punch card: buy 9 drinks, get the 10th free. Launch on day one.
+- **Community event** — Host a "Coffee 101" session or local artist market to bring in foot traffic and build goodwill.
+
+### Post-Launch (Weeks 2–12)
+
+- **Google Ads** — Target "coffee near me" searches within a 3-mile radius, $5–10/day budget.
+- **Instagram/Facebook ads** — Retarget website visitors and email subscribers with seasonal drink photos; $3–7/day.
+- **Referral program** — Give both the referrer and referee a free drink or $2 off when a friend makes their first purchase.
+- **Monthly specials** — Rotate a "location-inspired" drink (e.g., named after your street) to encourage repeat visits and social media shares.
+
+### Metrics to Track
+
+| Metric | Target (First 90 Days) |
 |---|---|
-| Cost of goods sold (beans, milk, food) | 25–35% |
-| Labor | 25–35% |
-| Rent | 8–15% |
-| Utilities, POS, software | 5–8% |
-| Marketing & misc | 3–5% |
-| **Target net profit** | **8–15%** |
+| Daily transactions | 80–150 |
+| Average order value | $6 – $9 |
+| Repeat customer rate | 30–40% |
+| Social engagement rate | 3–5% on Instagram |
+| Loyalty sign-ups | 200–400 |
 
-### Menu price ranges (2024–2025 urban/suburban averages)
+## Financial Projections (Illustrative)
 
-| Item | Price range | Gross margin |
-|---|---|---|
-| Drip / brewed coffee | $2.50 – $4.00 | 80–90% |
-| Espresso drinks (latte, cappuccino) | $4.00 – $5.75 | 70–80% |
-| Specialty drinks (seasonal, custom) | $6.00 – $8.00 | 70–80% |
-| Cold brew / nitro | $4.50 – $6.50 | 75–85% |
-| Pastries / baked goods | $3.00 – $5.50 | 60–70% |
-| Food items / toast / sandwiches | $6.00 – $12.00 | 55–65% |
+| Month | Revenue | Operating Costs | Net Profit |
+| 1 (launch) | $8,000 – $12,000 | $14,000 – $18,000 | ($6,000) – ($4,000) |
+| 2 | $12,000 – $18,000 | $14,000 – $19,000 | ($2,000) – $1,000 |
+| 3 | $18,000 – $25,000 | $15,000 – $20,000 | $3,000 – $5,000 |
 
-### Pricing rules that work
+Break-even is typically reached in **months 3–5** if you sell 100–150 cups per day at an average ticket of $6.50. Include a **$20,000–$30,000 cash reserve** for unexpected repair, rent increases, or slow seasonal weeks.
 
-- **Anchor at $5.** Make your core latte $5.00–$5.50 — competitive and easy to upsell from.
-- **Use a $6.50–$7.00 average ticket** as your planning number: drinks plus at least one add-on in ~30–40% of orders.
-- **Bundle to raise ticket:** "Coffee + pastry" combos at $1.50–$2.00 off the combined price.
-- **Tiered sizes:** 12oz / 16oz / 20oz with $0.60–$0.90 steps — the middle size should be the default.
-- **Don't compete on cheap.** Specialty shops that price at $3 lattes die on margin; premium pricing signals quality and funds the experience.
+## Next Steps (This Week)
 
-### Break-even math (illustrative)
+1. **Visit 5 local competitors** and note their exact prices, portion sizes, and customer flow. Adjust your price table accordingly.
+2. **Calculate your actual cost per drink** using quotes from two local roasters and your preferred milk supplier. Lock your final menu prices.
+3. **Design your loyalty card** and a 1-page launch timeline. Print them before the soft opening.
+4. **Secure one corporate account** by pitching three nearby offices with a sample box of baked goods and a cold brew tasting.
+5. **Set up your Google Business Profile and Instagram**, then post your first three content pieces (behind-the-scenes, drink menu, and a "why we exist" story).
+6. **Draft your soft-opening guest list** of 50 people and schedule the date for 3–4 weeks out.
 
-Assumptions: monthly fixed costs of $12,000 (rent $4,000, labor $5,500, utilities/POS/insurance/misc $2,500), average drink price $5.50, gross margin 75%.
-
-- Dollar break-even: $12,000 ÷ 0.75 = **$16,000/month in sales**
-- Unit break-even: $16,000 ÷ $5.50 ≈ **2,900 drinks/month ≈ 100 drinks/day**
-- With food add-ons raising average ticket to $7.00, you need closer to **75 customers/day**
-
-If your rent or labor is higher (common in major metros like NYC or SF), re-run with your actual fixed costs — the formula stays the same.
-
-## 3. Market & Target Customer
-
-Pick one primary segment, then serve a secondary one. Don't try to be everything to everyone.
-
-| Segment | Needs | Offer |
-|---|---|---|
-| Commuters (7–9am) | Speed, consistent quality, grab-and-go | Mobile pre-order, designated pickup counter |
-| Remote workers (9am–4pm) | Wi-fi, power outlets, quiet, refills | Longer stay tolerance, $ espresso refills, table service at peak |
-| Students | Affordable, study space, loyalty | Student discount 10%, late hours, group tables |
-| Neighborhood regulars | Familiarity, community, quality | Loyalty program, seasonal menu, local events |
-
-**Primary persona for this plan:** the 25–40 year old remote worker and local regular within a 15-minute walk, who buys 3–5 times per week and treats the café as a third place. This audience drives repeat revenue and word-of-mouth, which matters more than one-time foot traffic.
-
-## 4. Go-to-Market Plan
-
-### Phase 1: Pre-launch (4–6 weeks before opening)
-
-- **Soft opening** — invite-only for friends, family, and local business owners. Purpose: train staff, test the menu, fix operational issues before the public comes.
-- **Local partnerships** — pitch nearby offices, gyms, yoga studios, and co-working spaces: "Bring your staff a coffee trial box, and they get 10% off for the first month."
-- **Social teaser campaign** — Instagram/TikTok: 3 posts per week showing build-out, equipment, bean sourcing, staff introductions. Build a following before day one.
-- **Pre-sale loyalty signups** — collect emails or phone numbers in exchange for a free drink on first visit. Launch day list of 500+ local contacts is gold.
-- **Google Business Profile** — claim and optimize your listing, add photos, set hours, and gather early reviews from the soft opening.
-- **Local media** — contact neighborhood bloggers, food Instagram accounts, and local news with an angle: "New specialty café opens in [neighborhood]" plus a human story about why you started it.
-
-### Phase 2: Launch (opening week)
-
-- **Grand opening event** — free drip coffee 7–9am, then a "buy one get one" window from 11am–1pm. Create a line, create social proof, get photos.
-- **Limited-time launch menu** — one signature seasonal drink exclusive to the first two weeks, gives press and influencers something specific to share.
-- **Partner cross-promos** — nearby bakery supplies your pastries at cost in exchange for co-branded marketing; gym members get 15% off with a gym wristband.
-- **Review incentives** — "Show us your Google review at the counter for 10% off your next visit." Speed matters; reviews in the first 30 days determine local search rank.
-
-### Phase 3: Retention (month 1 onward)
-
-- **Loyalty program** — 10th drink free, or a points-based app. Attach it to your POS from day one; retrofitting loyalty later is painful.
-- **Subscription or punch-card tier** — for remote workers: $89/month for 20 drinks, or "$5/day coffee pass" for daily drip drinkers. Smooths cash flow and locks in regulars.
-- **Recurring events** — weekly open-mic, book club, or latte-art night. Low cost, builds community, gives people a reason to return besides coffee.
-- **Seasonal menu drops** — rotate 2–3 limited drinks quarterly (pumpkin in fall, cold brew floats in summer). Creates urgency and press moments.
-
-## 5. Startup Cost Ranges (illustrative)
-
-| Cost category | Low range | High range |
-|---|---|---|
-| Lease deposit + build-out | $50,000 | $150,000 |
-| Equipment (espresso machine, grinders, brewing) | $30,000 | $80,000 |
-| Furniture, decor, signage | $10,000 | $30,000 |
-| Initial inventory (beans, milk, food) | $5,000 | $10,000 |
-| Permits, licenses, legal | $2,000 | $8,000 |
-| Initial marketing | $3,000 | $10,000 |
-| Working capital (3–6 months) | $20,000 | $60,000 |
-| **Total** | **$120,000** | **$348,000** |
-
-**Assumption:** these figures reflect a build-out in a secondary location or modest metro; major urban markets run 50–100% higher. Equipment alone can range from $15,000 for a basic setup to $60,000+ for a top-tier espresso machine and grinder setup.
-
-## 6. What to Verify Before You Commit
-
-- **Rent math:** rent should not exceed 10–12% of projected monthly sales. If your rent is $5,000/month, you need $45,000+ in monthly sales to stay comfortable.
-- **Foot traffic data:** count pedestrian flow at different hours for 3 days before signing a lease. A busy lunch rush does not mean a busy coffee morning.
-- **Coffee calculator:** know your per-cup cost. A 16oz latte costs roughly $1.20–$1.80 in beans + milk + cup; everything above that is margin.
-- **Local competition:** map every café within a 1-mile radius, note their prices and menu, then position yours deliberately — not as "the same but cheaper."
-
-## Next Actions (this week)
-
-1. **Draft your menu with target prices** — 6–8 core drinks, 2 seasonal, 4–6 food items. Price each at 70%+ gross margin.
-2. **Build a simple financial model** — fixed costs, projected average ticket, break-even volume. Your number to remember: **monthly sales needed = fixed costs ÷ gross margin %**.
-3. **Visit 3–5 competitor shops** — record their foot traffic, prices, and what they do poorly. That gap is your market opportunity.
-4. **Talk to 20 people in your target neighborhood** — ask what they currently drink, where they buy it, and what would make them switch. This validates your concept before you spend a dollar.
-5. **Get quotes from 2–3 equipment suppliers** — espresso machine, grinder, refrigerators, and POS system, so your startup cost range becomes real numbers.
-6. **Secure your Google Business Profile and social handles** — even before launch, so you can pre-sell and build your soft-opening list.
+Prioritize steps 1 and 2 first — knowing your true costs will confirm whether your pricing strategy is sustainable before you spend on marketing.
 ```
 
-Diagnostics — repaired: false | TTFT: 34169ms | tokens in/out: 1420/2977 | fallback used: false
+Diagnostics — repaired: false | TTFT: 40623ms | tokens in/out: 1431/2223 | fallback used: false
 
 ### resume-career — PASS
 
@@ -894,19 +794,30 @@ Diagnostics — repaired: false | TTFT: 34169ms | tokens in/out: 1420/2977 | fal
 
 **Skills activated:** resume-career
 
-**Response (8960ms, quality score 4.7/5):**
+**Verification:** risk MEDIUM | hard failures: none | repair attempts: 0 | 0ms
+**Usage:** initial in/out: 1432/708 | repairs: 0 | total in/out: 1432/708
+
+**Response (20160ms, quality score 4.7/5):**
 
 ```
-Here are three ATS-friendly resume bullets that cover the core data analyst workflow: cleaning data, generating insights, and communicating results. Each uses the action + method + quantified impact format, and you can replace the bracketed details with your own numbers.
+Here are three strong, achievement-oriented bullet points for a data analyst resume. They use action verbs, quantify results, and highlight the technical and business skills recruiters look for. Since I don't know your specific experience level or industry, treat these as templates — replace the bracketed details with your real metrics and tools.
 
-- **Streamlined data preparation** — Built automated SQL/Python pipelines to clean and consolidate [50,000]+ records from [5] sources, cutting manual processing time by [40]% and reducing reporting errors to near zero.
-- **Drove decisions with analysis** — Analyzed [customer churn/sales/operational] data in [Excel/Tableau/Python] to identify [key driver, e.g., at-risk segments], supporting a strategy that lifted [retention] by [15]% within [two] quarters.
-- **Improved stakeholder visibility** — Designed interactive [Tableau/Power BI] dashboards tracking [KPIs, e.g., revenue, conversion], used by [3] departments and adopted into weekly leadership reviews to cut decision time from [weeks] to [days].
+## Sample Bullet Points
 
-**Customizing note** — Swap every bracketed placeholder for a real, measurable number from your own work. If a metric is unavailable, keep the action and the tool, then replace the outcome with a business result you can defend, such as "supported a $[X] initiative" or "served [X] internal users."
+- **Built automated reporting dashboards in [Tableau/Power BI]**, tracking [key metric] across [number] departments, reducing manual reporting time by [X]% and enabling leadership to make faster decisions.
+- **Analyzed [specific dataset or customer behavior] using [SQL/Python]** and presented findings to stakeholders, uncovering [insight] that drove a [X]% increase in [revenue/retention/conversion].
+- **Cleaned and validated [volume] of records** from [multiple sources], improving data accuracy from [X]% to [Y]% and establishing reusable ETL processes that cut processing time by [Z] hours per week.
+
+## How to Make Them Yours
+
+- Replace every placeholder with real numbers — even a rough estimate is better than nothing.
+- Match keywords to the job description (e.g., "A/B testing", "data visualization", "ETL", "stakeholder communication").
+- Keep each bullet to one or two lines for ATS readability. If it’s too long, cut the middle clause, not the metric.
+
+Want me to tailor these to a specific job posting or your actual experience? Just share the role description and your background.
 ```
 
-Diagnostics — repaired: false | TTFT: 8959ms | tokens in/out: 1432/697 | fallback used: false
+Diagnostics — repaired: false | TTFT: 20158ms | tokens in/out: 1432/708 | fallback used: false
 
 ### creative-writing — PASS
 
@@ -914,57 +825,43 @@ Diagnostics — repaired: false | TTFT: 8959ms | tokens in/out: 1432/697 | fallb
 
 **Skills activated:** creative-writing
 
-**Response (39461ms, quality score 4.7/5):**
+**Verification:** risk LOW | hard failures: none | repair attempts: 0 | 0ms
+**Usage:** initial in/out: 1420/1114 | repairs: 0 | total in/out: 1420/1114
+
+**Response (20019ms, quality score 4.9/5):**
 
 ```
-## The Light Between Storms
+She knew the storm before it arrived. It came as a low pressure in her bones, the way her father used to say the sea kept its ledger in the keepers' blood. Elara climbed the spiral stairs with the evening oil, and the lamp room smelled of warm brass and kerosene, a smell she'd stopped noticing until strangers came and wrinkled their noses at it.
 
-The storm arrived at dusk, as storms always did here, as if they kept the same calendar as the tides. Elias was sixty-seven years old and had kept the light at Windward Point for forty-one years, and he knew the storm was coming before the barometer told him — his left knee ached, and the gulls had gone inland to the chapel roof.
+The mainland was thirty miles out. On clear nights she could see the smudge of its lights, and sometimes she imagined the people there—dancing, arguing, falling in love—while she sat with a sea that spoke only in weather. She had chosen this. After her father's funeral, the Lighthouse Board had offered her a transfer to the harbor station, where the work was easier and the company plentiful. She'd declined. The lighthouse was the last place his voice still echoed, and she wasn't ready to let it go.
 
-He climbed the tower stairs the way other men walked to breakfast, one hand on the worn brass rail, counting the steps out of habit: ninety-nine to the lamp room. The glass panes trembled in their frames. Below, the sea was the color of hammered iron, heaving with a slow animal breath.
+The storm hit at midnight.
 
-The light was his. That was the trouble. In eleven days, a man from the district office would arrive with a clipboard and a new solar-powered beacon no bigger than a breadbox, and Elias would be asked to close the door behind him and walk down the hill to a cottage with a pension and a garden. He had already planted the turnips. He hated turnips.
+Wind came at the tower like a fist, and the glass panes sang a high, urgent note. Elara checked the lamp, trimmed the wick, and watched the beam sweep its patient arc across a black and heaving sea. Somewhere out there, a ship was trusting that light. That was the whole job, really: to be the one thing that didn't move when everything else was falling apart.
 
-In the lamp room, he checked the lens, a great glass flower that had stood there for a century, and polished a smudge that was not there. His wife used to say he was married to the light. She had died eight winters ago, on a night as still as milk, and the light had burned on without her while Elias stood on the gallery and let the cold take the shape of his shoulders. It was the closest he had come to praying.
+Then she saw it—a small blink of white, low on the water, far too close to the rocks. A boat. Not a freighter, not a fishing trawler, but something small and desperate, fighting the swell toward the reef.
 
-By nine, the storm had found its voice. Rain struck the glass flat and hard; the tower sang from base to crown. The wind rose into the anchor windlass of the sea — and Elias heard, beneath it, something that did not belong.
+She grabbed the foghorn. Three long blasts, the warning that meant *turn back, turn back*. She watched the little light hesitate, then swing hard to port. For a moment, it seemed to escape. Then a wave—a wall of dark water that caught the beam and made it glisten—rose and came down where the boat had been.
 
-He went out onto the gallery with his glasses, oilskins cracking around him like a flag. The sea was torn white. And there, a mile out, falling and rising on the swell — a red flare. Then another. A freighter, wallowing, her running lights winking like a man blinking in pain.
+Elara's hand pressed flat against the cold glass. She counted the seconds, the way her father had taught her. Then, against every rule in the keeper's manual, she pulled on her oilskin and went down.
 
-Elias went down the stairs quickly, the way he had gone when he was thirty and the ocean demanded speed of him. He called the coast station on the radio. But the line howled with static; the storm owned the airwaves. He could not raise anyone.
+The lifeboat was heavy, and the sea was a brute that shoved her around like a child's toy. She rowed through the chaos by memory, by the feel of the current, by the fixed star of the lighthouse beam that swung above her like a patient eye. She found the man clinging to an overturned hull, his hands white and shaking, barely conscious. She hauled him in, and the storm, having done its damage, began to retreat.
 
-The generators were old; the lamps above were older. There was an oil lamp, a backup from another century, polished weekly though it was never used. Elias had kept it ready for forty-one years without once needing it. He stood with his hand on its brass casing, and understood that the whole of his life had been practice for this exact night.
+Back in the lamp room, wrapped in a blanket and drinking her coffee, the man stared at the great lens as it turned. "You saved my life," he said.
 
-He did not think about the inspection. He thought about the red flare, and the men on the freighter, counting their own breathing in the dark. Then he set about doing the one thing he had always known how to do.
+"I saved the light," Elara corrected gently. "You just happened to be in it."
 
-It took an hour, and his hands were not what they had been. The wind wanted the lamp's flame and came at it through every crack. Elias shielded it with his body. He turned the great lens upon its iron wheels — no motor, just the slow machinery of muscle and habit, the lamp's beam sweeping green-black water. His knee screamed. The rain found the gap in his collar and ran down his back like a cold finger.
+He smiled at that—a young man, a student from the university, out on a sailboat he could barely afford. He'd wanted to see the lighthouse up close, he said. He'd read about them. He thought they were romantic.
 
-But the light turned. It turned because he turned it. He kept it turning until his arms were fire and his breath was salt, and he did not hear the freighter's engines catch, or her horn sound — three low notes that came to him across the water like a voice saying thank you. He heard only his own heart, which had gone on beating all these years, the way the light had gone on burning.
+Elara looked out at the sea, which was calming now, ashamed of its tantrum. She thought of her father, and of the long nights spent alone with the lamp, and of all the strangers she would never meet who were safe because she stayed.
 
-Dawn came gray and quiet, as if the sea were embarrassed. The freighter blinked her running lights, once, twice, and made for the shipping lane, trailing a wake like a smile. Elias stood on the gallery, soaked and shivering, and watched her go. Then he went inside, lit the burner, and made tea with hands that would not stop shaking.
+"It is," she said. "It is romantic."
 
-Eleven days later, the man from the district arrived. He was young, with neat hair and a tablet. He said the new beacon was a marvel — it would turn itself on, turn itself off, even tell the mainland if a bulb was failing. It needed no one.
-
-Elias listened. He looked at the lamp room, at the lens his palms had worn smooth, at the brass rail his fingers had traced ninety-nine steps a thousand times. "Well," he said. "It may need no one. But someone ought to remember that it's there."
-
-The young man left him a bronze plaque with the lighthouse's name and dates. Elias hung it where the old logbook had hung, and on the last morning, before he walked down to the cottage and the turnips, he climbed the stairs one final time and stood before the glass.
-
-The sea was flat and blue, as still as milk — as it had been on the night his wife died. The new beacon sat silent in its casing, waiting for darkness.
-
-"Good night, old friend," Elias said to the light that was no longer his.
-
-He did not close the door behind him. He left it open, just a crack, because a door left open could not be said to have been locked, and a man who has not locked a door has not truly left.
-
-From the lane, he looked back. The lighthouse stood white and patient against the blue. And although it was morning, the light came on inside the tower and swept, once, toward the sea — as if it were saying his name.
-
-Elias smiled, and did not watch it again. But he felt it, all the way down the hill, turning behind him like an old heart remembering how to beat.
-
-## Note
-
-This ends on a quiet, realist note with a hint of the uncanny. If you'd like, I can rewrite the ending so the light's dawn sweep becomes unmistakably ghostly, or recast the whole piece as dialogue between the keeper and the inspector. I can also lengthen it into a fuller chapter or shift it to first person — just say the word.
+---
+*Revision note: if you'd like a more melancholic ending, the man could leave with a promise to return that he never keeps, and the final line becomes Elara watching his boat shrink to nothing—her father's voice reminding her she is never truly alone as long as the light burns.*
 ```
 
-Diagnostics — repaired: false | TTFT: 39460ms | tokens in/out: 1420/3719 | fallback used: false
+Diagnostics — repaired: false | TTFT: 20017ms | tokens in/out: 1420/1114 | fallback used: false
 
 ### presentation-design — PASS
 
@@ -972,75 +869,69 @@ Diagnostics — repaired: false | TTFT: 39460ms | tokens in/out: 1420/3719 | fal
 
 **Skills activated:** presentation-design
 
-**Response (17497ms, quality score 4.7/5):**
+**Verification:** risk MEDIUM | hard failures: none | repair attempts: 0 | 0ms
+**Usage:** initial in/out: 1451/1299 | repairs: 0 | total in/out: 1451/1299
+
+**Response (16304ms, quality score 5/5):**
 
 ```
-Here's a 5-slide deck outline designed around a clear narrative arc: open with a provocative hook, expose the core tension, offer two solution layers, and close with a concrete call to action. Each slide carries one idea, and every data-heavy point includes a suggested visual so the supporting evidence is instantly digestible.
+Here's a 5-slide presentation outline for remote work productivity, built as a narrative arc: open with a hook that challenges assumptions, expose the real problem, introduce a clear framework, show practical application, and end with an actionable call to commit.
 
-## Slide 1 — Hook: The Remote Work Paradox
+## Slide 1 — Title/Hook: "Remote Work Isn't the Problem. Unstructured Work Is."
 
-**Goal:** Grab attention by naming the contradiction most remote teams feel.
+- **Header:** Why do some remote teams thrive while others burn out?
+- **Key points (short bullets):**
+  - Remote work grew from an exception into the default for millions
+  - Productivity isn't about where you sit — it's about how you structure the day
+  - The gap between "busy" and "productive" gets wider without an office rhythm
+- **Visual:** Split image — left side shows a cluttered home desk with scattered sticky notes; right side shows the same desk organized with a visible time-blocked schedule
+- **Speaker note:** "Open by asking the audience how many have felt productive AND exhausted in the same remote week. That paradox is the problem we're solving today."
 
-- **Title:** *Remote Work: More Productive or Just More Available?*
+## Slide 2 — Problem: "The Four Silent Productivity Killers"
+
+- **Header:** What actually derails remote work
 - **Key points:**
-  - Productivity metrics say we're working more hours than ever.
-  - But engagement and well-being scores are dropping.
-  - Proximity ≠ performance, and availability ≠ output.
-- **Speaker notes:** Open with a striking stat — e.g., "Remote employees work an average of 1.4 extra hours daily, yet 4 in 10 report feeling burned out." Pose the question: if we're working more, why does it feel like less gets done? Frame the deck as the answer.
-- **Visual:** A split-stat graphic — a rising line labeled "Hours Logged" crossing against a falling line labeled "Focus Time" or "Well-being."
+  - **Context switching** — constant Slack pings break deep focus
+  - **Boundary blur** — no commute means no clear "off" switch
+  - **Isolation** — fewer casual check-ins, more overthinking
+  - **Invisible workload** — hard to say "no" when nobody sees your plate
+- **Visual:** Four-quadrant infographic, one killer per quadrant, each with a one-line example (e.g., "5 pings = 23 minutes of lost focus")
+- **Speaker note:** "Note that none of these are about laziness or willpower. Every killer is a structural problem — which means every one of them has a structural fix."
 
-## Slide 2 — The Challenge: Output vs. Presence
+## Slide 3 — Solution: "The 3-3-3 Rule of Remote Productivity"
 
-**Goal:** Diagnose the root causes of lost productivity before proposing fixes.
-
-- **Title:** *The Real Enemy Isn't Distraction — It's Ambiguity*
+- **Header:** A simple daily framework that replaces office structure
 - **Key points:**
-  - Unclear roles and expectations eat more time than social media or Slack pings.
-  - Meeting sprawl fragments deep-work blocks into 15-minute fragments.
-  - Without visible progress, managers default to surveillance — which kills trust and motivation.
-- **Speaker notes:** Shift blame away from "lazy workers" and onto system design. Cite research that knowledge workers spend ~60% of the day on communication, not output. Argue that the fix is structural, not behavioral.
-- **Visual:** A pie chart or bar chart of the typical remote workday — e.g., 38% email, 22% meetings, 18% admin, 22% deep work — to show how little time remains for real creation.
+  - **3 hours** of deep work on your one most important task, before checking messages
+  - **3 shorter tasks** for maintenance work — email, admin, quick replies — batched together
+  - **3 physical/mental resets** — walk, stretch, lunch away from the screen
+- **Visual:** A horizontal timeline graphic showing the day as alternating blocks: deep work, tasks, resets
+- **Speaker note:** "This rule works because it's not a productivity system — it's a daily template. The specifics can flex, but the ratio stays the same."
 
-## Slide 3 — Solution Part 1: Rituals and Boundaries
+## Slide 4 — Implementation: "Three Tools, Zero Overload"
 
-**Goal:** Show how structure restores focus and well-being at the individual level.
-
-- **Title:** *Design Your Day Before Your Day Designs You*
+- **Header:** How to actually make it stick
 - **Key points:**
-  - Fixed start/end rituals replace the commute as psychological separators.
-  - Pre-scheduled deep-work blocks protect creative hours from meeting creep.
-  - Visible status signals ("focusing", "away") create permission to disconnect.
-- **Speaker notes:** Walk through three micro-habits: a 5-minute morning kickoff ritual (review top 3 priorities), a protected 90-minute deep-work block, and a shutdown ritual where you write tomorrow's plan and close the laptop. Emphasize that these remove daily decision fatigue.
-- **Visual:** A sample "ideal day" timeline graphic showing colored blocks: deep work (morning), meetings (afternoon), admin (end of day), with boundaries marked.
+  - **One calendar for everything** — work tasks and personal resets live on the same schedule
+  - **One async-first communication channel** — default to written updates; calls only when needed
+  - **One end-of-day shutdown ritual** — write tomorrow's top task, then log off
+- **Visual:** Simple diagram of three connected circles — Calendar, Communication, Ritual — with the word "Consistency" at the center
+- **Speaker note:** "Don't stack new apps. The goal is fewer tools with clearer rules — that's what creates repeatable behavior."
 
-## Slide 4 — Solution Part 2: Async-First Communication
+## Slide 5 — Close/Call to Action: "Start Tomorrow, Not Next Monday"
 
-**Goal:** Fix the system level — how teams share information and make decisions.
-
-- **Title:** *Make Work Visible, Not Meetings Endless*
+- **Header:** One small change compounds faster than a perfect plan
 - **Key points:**
-  - Default to async: documented decisions, shared docs, recorded updates.
-  - Replace status-meeting culture with a public "source of truth" (e.g., a project board or weekly written brief).
-  - Set a communication SLA — e.g., "responses within 4 hours, not 4 minutes."
-- **Speaker notes:** Explain the 3-2-1 rhythm — 3 async updates per week, 2 short recurring meetings, 1 weekly written recap. The metric that matters: percentage of decisions made without a synchronous meeting. This cuts interruptions and builds documentation history.
-- **Visual:** A before/after calendar comparison — "Sync-Heavy Week" full of meeting blocks vs. "Async-First Week" with two standing meetings and large open focus gaps.
+  - Pick ONE of the three killers from Slide 2 and fix it this week
+  - Try the 3-3-3 rule for five days and track how you feel
+  - Measure outcomes (shipped work) — not hours logged
+- **Visual:** Before/after checklist graphic: "Tired & busy" vs. "Focused & finished"
+- **Speaker note:** "End with a single ask: commit to one change. Ask the audience to write it down immediately — a commitment written in the moment is far more likely to survive the workweek."
 
-## Slide 5 — Call to Action: Measure Outcomes, Not Hours
-
-**Goal:** Convert the narrative into action with concrete, adoptable next steps.
-
-- **Title:** *Stop Counting Hours. Start Tracking Outcomes.*
-- **Key points:**
-  - Define 2–3 objective KPIs per role (projects delivered, cycle time, quality score).
-  - Run a 30-day pilot: pick one ritual, one async tool change, and one KPI to monitor.
-  - Review and iterate monthly — treat productivity as a system, not a willpower issue.
-- **Speaker notes:** Close with a single challenge: "Pick one change from this deck and implement it tomorrow, then measure the difference in 30 days." Hand out the action items as a checklist: each leader leaves with their team's 2 KPIs defined and their first async practice scheduled. End on the reframe: remote productivity isn't about working more — it's about removing what gets in the way of working well.
-- **Visual:** A simple 3-step sticky-note style graphic: "Define KPIs → Run 30-day pilot → Review & adjust," or a dashboard mockup showing outcomes-based metrics replacing hours-tracked.
-
-**How to use this deck:** Slides 1–2 create urgency and a shared problem, slides 3–4 deliver the solution in two layers (individual habits + team systems), and slide 5 converts insight into a measurable, 30-day commitment. Keep the speaker notes as your script — each is designed to run ~60–90 seconds so the full presentation fits in a 10-minute slot.
+**Quick delivery tips:** Keep each slide to under 30 words of on-screen text — the bullets above are already close to that limit. If you need a 10-slide expanded version, data for Slide 2, or custom speaker notes per audience (e.g., managers vs. individual contributors), just say the word.
 ```
 
-Diagnostics — repaired: false | TTFT: 17497ms | tokens in/out: 1431/1513 | fallback used: false
+Diagnostics — repaired: false | TTFT: 16303ms | tokens in/out: 1451/1299 | fallback used: false
 
 ### personal-productivity — PASS
 
@@ -1048,46 +939,49 @@ Diagnostics — repaired: false | TTFT: 17497ms | tokens in/out: 1431/1513 | fal
 
 **Skills activated:** personal-productivity
 
-**Response (9960ms, quality score 4.7/5):**
+**Verification:** risk MEDIUM | hard failures: none | repair attempts: 0 | 0ms
+**Usage:** initial in/out: 1452/944 | repairs: 0 | total in/out: 1452/944
+
+**Response (10225ms, quality score 4.7/5):**
 
 ```
-I’ll help you turn today into a focused, balanced plan around your three priorities: the report (urgent and important), the team meeting (fixed commitment), and exercise (important for your energy). I’m assuming a typical 9-to-5 workday — shift the blocks to match your actual schedule.
+Here's a simple time-blocked plan to get your report, team meeting, and workout all handled without the day running away from you. Since you didn't specify times, I've marked the schedule below as assumptions — swap in your real meeting time and adjust the blocks around it.
 
-## Today’s Priorities
+## Recommended Order of Attack
 
-- **Report** — Your most important task (MIT). It has a deadline and requires deep focus, so tackle it first.
-- **Team meeting** — Fixed appointment. Budget time to prepare and follow up, but don’t let it consume your whole day.
-- **Exercise** — Non-negotiable for your well-being. Schedule it as a hard block, not a “if I have time” item.
+1. **Report** — your top priority. It has a hard deadline and demands deep focus, so hit it first while your energy is fresh.
+2. **Team meeting** — fixed time, so build your day around it. Prepare a quick status update before you go in.
+3. **Exercise** — important for energy, but flexible. Slot it after the meeting as a reset, or later if the afternoon is busier.
 
-## Suggested Time-Blocked Schedule
+## Suggested Time Blocks (assumptions)
 
-| Time | Block | Action |
-|------|-------|--------|
-| 9:00–10:30 | Deep work | Write the core of the report — outline first, then draft the main sections. No interruptions. |
-| 10:30–10:45 | Break | Walk, stretch, hydrate. |
-| 10:45–11:30 | Deep work | Finish the draft and do a first pass for clarity. |
-| 11:30–12:00 | Prep | Review meeting agenda, jot down talking points, and note any questions you need answered. |
-| 12:00–1:00 | Lunch | Eat away from screen. |
-| 1:00–2:00 | Meeting | Attend, participate, take notes. |
-| 2:00–2:30 | Post-meeting | Send follow-up notes or action items while it’s fresh. |
-| 2:30–3:30 | Report polish | Edit the report, check formatting, and confirm submission requirements. |
-| 3:30–4:00 | Buffer | Handle email or unexpected tasks. |
-| 4:30–5:30 | Exercise | Workout — run, gym, or home routine. Block it now, treat it as fixed. |
-| Evening | Submit | Upload or submit the report if not already done. |
+| Time (assumed) | Block | Task |
+|---|---|---|
+| 9:00 – 10:30 | Deep work | Report writing — phone away, one clear goal: "finish the draft" |
+| 10:30 – 10:45 | Break | Walk, water, stretch |
+| 10:45 – 11:45 | Wrap-up | Finalize report or review key sections; note what's left |
+| [Actual meeting time] | Meeting | Attend, share status on your report, collect action items |
+| Right after meeting | 15 min | Write down meeting next steps before they fade |
+| [Your exercise time] | Workout | 30–45 minutes — even a short session counts, so don't skip it |
 
-## Lightweight Tracking
+## Your Three MITs (Most Important Tasks)
 
-Use a simple check-off sheet at the end of the day:
+- **MIT 1: Finish the report** — define "done" now (e.g., "submitted" or "final draft ready for review") so you know when to stop.
+- **MIT 2: Contribute at the team meeting** — one question you'll ask, one update you'll give.
+- **MIT 3: Move your body** — treat exercise as a fixed appointment, not a leftover task.
 
-- [ ] Report drafted and edited
-- [ ] Report submitted
-- [ ] Meeting attended and follow-ups sent
-- [ ] Exercise completed
+## A Lightweight Tracking Method
 
-Rate each block on a scale of 1–5 for focus and energy — this will help you see when you work best and adjust tomorrow’s plan accordingly. Keep it to one line per item so it takes under a minute to maintain.
+Keep it simple: write these three lines on a sticky note or in your phone's notes app —
+
+- [ ] Report submitted/drafted
+- [ ] Meeting attended + action items captured
+- [ ] Workout completed
+
+At the end of the day, check the boxes. If something is still open, move it to tomorrow's list rather than leaving it hanging. That single review takes two minutes and keeps the system honest.
 ```
 
-Diagnostics — repaired: false | TTFT: 9959ms | tokens in/out: 1423/906 | fallback used: false
+Diagnostics — repaired: false | TTFT: 10225ms | tokens in/out: 1452/944 | fallback used: false
 
 ### personal-finance — PASS
 
@@ -1095,56 +989,65 @@ Diagnostics — repaired: false | TTFT: 9959ms | tokens in/out: 1423/906 | fallb
 
 **Skills activated:** personal-finance
 
-**Response (30041ms, quality score 4.7/5):**
+**Verification:** risk HIGH | hard failures: none | repair attempts: 0 | 0ms
+**Usage:** initial in/out: 1424/1952 | repairs: 0 | total in/out: 1424/1952
+
+**Response (21138ms, quality score 5/5):**
 
 ```
-## Overview
+Here’s a practical monthly budget for a family in the Philippines earning ₱40,000. The goal is to cover essentials first, keep spending realistic, and build a small buffer for emergencies — even when the income feels tight. Adjust the numbers based on your actual situation (rent, family size, location, and fixed debts).
 
-I'm assuming 40,000 PHP is your family's take-home pay (after SSS, PhilHealth, and Pag-IBIG deductions) for a household of four — two adults and two school-age children — living in or near a major city. The budget below is built bottom-up: fixed needs first, then savings, then discretionary spending. It lands exactly at 40,000 PHP, with 5,000 PHP (12.5%) going to savings.
+## Assumptions
 
-## The Monthly Budget
+- **Family size:** 4 (two adults, two children)
+- **Location:** Affordable suburban/provincial area (rent is the biggest variable)
+- **Income:** ₱40,000 per month, net of taxes
+- **No heavy existing debt** — only a minimal repayment line included
 
-| Category | Amount (PHP) | % of Income | Type |
+If your rent is lower, move the extra into savings or food. If you live with relatives and pay no rent, you can shift the entire rent amount into savings and education.
+
+## Proposed Budget Allocation
+
+| Category | Monthly Budget | % of Income | Notes |
 |---|---|---|---|
-| Rent / housing | 10,000 | 25% | Need |
-| Food & groceries | 13,000 | 32.5% | Need |
-| Utilities (electric, water, internet/load) | 3,500 | 8.75% | Need |
-| Transportation | 2,000 | 5% | Need |
-| Education (school fees, baon, projects) | 2,000 | 5% | Need |
-| Health (medicine, consultations) | 1,500 | 3.75% | Need |
-| Savings / emergency fund | 5,000 | 12.5% | Savings |
-| Personal allowance | 1,500 | 3.75% | Want |
-| Buffer (repairs, gifts, surprises) | 1,500 | 3.75% | Want |
-| **Total** | **40,000** | **100%** | |
+| Rent / Housing | ₱8,000 | 20% | Includes rental only; repair costs go under miscellaneous |
+| Food & Groceries | ₱12,000 | 30% | Covers 3 meals/day, snacks, toiletries, cooking basics |
+| Utilities (electric, water, internet, phone) | ₱4,000 | 10% | Electric is usually the biggest chunk; use inverter appliances |
+| Transportation | ₱3,000 | 7.5% | Public jeep/bus; set aside for occasional tricycle/trike rides |
+| Education & School Needs | ₱3,000 | 7.5% | Includes school supplies, misc fees, allowances (if applicable) |
+| Health & Medical | ₱2,000 | 5% | For maintenance meds, checkups, over-the-counter remedies |
+| Savings & Emergency Fund | ₱4,000 | 10% | Non-negotiable — build up to 3–6 months of your basic expenses |
+| Debt Repayment (if any) | ₱2,000 | 5% | Priority: pay off high-interest credit card or personal loans first |
+| Personal / Miscellaneous | ₱2,000 | 5% | Clothing, toiletries, unexpected small expenses, occasional family treat |
+| **Total** | **₱40,000** | **100%** | |
 
-**The math:** Fixed needs (housing, food, utilities, transport, education, health) total 32,000 PHP (80%). Savings is 5,000 PHP. Wants and buffer total 3,000 PHP.
+## How to Make It Work
 
-## Key Risks to Flag
+- **Separate needs from wants first.** The categories above are needs-aligned. Wants (streaming subscriptions, eating out, new gadgets) must come out of the “Personal / Miscellaneous” line only.
+- **Track every peso for the first month.** Use a notebook, spreadsheet, or any budgeting app. This reveals where actual spending leaks out.
+- **Pay yourself first.** Withdraw or transfer ₱4,000 into savings immediately on payday. If you wait until month-end, it will vanish.
+- **Meal plan and cook at home.** Bulk-cook ulam for 2–3 days at a time. Buy rice in 25-kg sacks and vegetables from palengke instead of grocery aisles — this can trim 10–15% off the food budget.
+- **Cut unnecessary utility use.** Unplug appliances, limit aircon hours, and switch to LED bulbs. Keep electric under ₱2,500 if possible.
+- **Use public transport.** If both adults commute, prioritize routes that use jeepneys or buses over private vehicles or ride-hailing.
+- **Build a small emergency fund first.** Before investing or bigger savings goals, target ₱15,000–₱20,000 as a starter buffer. Then expand to 3 months of expenses.
 
-- **No debt line** — If you carry loans (credit card, personal loan, car/home amortization), pay those down before growing savings. Interest costs more than savings earns.
-- **Food inflation** — 13,000 PHP works today, but rice and grocery prices rise. If food exceeds this for two straight months, cut the buffer and personal allowance first.
-- **Back-to-school and Christmas spikes** — June and December will break this budget. Start a small sinking fund (300–500 PHP/month) inside the buffer for those months.
-- **Medical emergencies** — 1,500 PHP covers routine checkups only. The real protection is the 5,000 PHP monthly savings; build it to at least 100,000–120,000 PHP before investing anywhere.
-- **Summer electric bills** — If you run fans or AC longer in April–May, utilities will spike. Shift from the buffer, never from savings.
+## What to Adjust
 
-## Priority Order When Money Is Tight
+- **If your rent is higher or lower:** Every ₱1,000 extra spent on rent must be taken from savings, education, or personal. Ideally, stay at or below 25% of income for housing.
+- **If you have a bigger family:** Physically increase the food budget up to ₱15,000 and reduce personal/miscellaneous and debt repayment to compensate.
+- **If you already have loans:** Pay at least the minimum, but try to add any side income (e.g., online selling, overtime) directly to debt payoff. Avoid new loans during the payoff period.
+- **If you're single-earner:** Build a larger emergency fund first because your income continuity depends on one person.
 
-1. **Housing and food first** — non-negotiable.
-2. **Utilities and transport** — keep electricity and commuting working.
-3. **Education and health** — protect the kids' schooling and basic care.
-4. **Savings (5,000)** — treat it as a bill, not leftover cash.
-5. **Personal and buffer last** — these are the first to cut.
+## Risks & Disclaimers
 
-## How to Build the Emergency Fund
+This is a sample budget based on typical Philippine cost structures, not personalized financial advice. Your actual costs — especially rent, tuition, and medical needs — may differ significantly. Always keep a cash buffer for unplanned events like sickness, appliance breakdowns, or price hikes.**
 
-- Keep the 5,000 PHP in a separate, hard-to-touch account (different bank or time deposit) so it doesn't get spent by accident.
-- At 5,000 PHP/month, you reach 60,000 PHP in one year and a full 3-month fund (~120,000 PHP) in two years.
-- Only after the fund is complete should you consider investing (e.g., Pag-IBIG MP2, diversified mutual funds/UITFs) — and never expect guaranteed returns; only invest money you can leave untouched for 5+ years.
+Investment products (if you ever get there) carry risk, and no returns are guaranteed. This budget prioritizes emergency savings and debt reduction — do that before considering anything beyond a bank savings account or low-risk instruments like government bonds.**
 
-**Bottom line:** This budget works if you protect the 5,000 PHP savings line as strictly as rent, and reassess every quarter — food, utility, and fuel prices shift, and your budget should shift with them.
+Your goal for the first 3–6 months: make this allocation stick without going over in any line. Once it becomes routine, you can start growing the savings percentage to 15–20% of income.
 ```
 
-Diagnostics — repaired: false | TTFT: 30040ms | tokens in/out: 1424/3478 | fallback used: false
+Diagnostics — repaired: false | TTFT: 21138ms | tokens in/out: 1424/1952 | fallback used: false
 
 ### travel-planning — PASS
 
@@ -1152,91 +1055,98 @@ Diagnostics — repaired: false | TTFT: 30040ms | tokens in/out: 1424/3478 | fal
 
 **Skills activated:** travel-planning
 
-**Response (26959ms, quality score 4.7/5):**
+**Verification:** risk HIGH | hard failures: none | repair attempts: 0 | 0ms
+**Usage:** initial in/out: 1442/2954 | repairs: 0 | total in/out: 1442/2954
+
+**Response (34197ms, quality score 5/5):**
 
 ```
-Cebu packs a lot into a short trip — colonial history, jungle waterfalls, whale sharks, and world-class snorkeling. This 3-day plan balances travel time with the top highlights: Day 1 stays in the city for heritage sites, Day 2 heads south for Cebu’s famous natural attractions, and Day 3 finishes with the calm waters of Moalboal before returning to the airport.
+Here’s a realistic 3-day Cebu itinerary that balances culture, adventure, and beach time. It assumes you arrive in Cebu City with a full first day, spend 2 nights in Cebu City, then move south for 1 night in Moalboal, and finish with a whale-shark morning before heading back. Travel times are built in so the schedule stays doable.
 
-## Trip Snapshot
+## At a glance
 
-| Day | Focus | Ideal Base | Transport |
-| --- | --- | --- | --- |
-| 1 | Cebu City heritage & viewpoints | Cebu City | Taxis, private car |
-| 2 | Oslob whale sharks + Kawasan Falls | Moalboal | Private van or car (must) |
-| 3 | Moalboal snorkeling + island hopping | Moalboal → airport | Tricycle, boat, airport transfer |
+| Day | Base | Focus | Highlights |
+|---|---|---|---|
+| Day 1 | Cebu City | History & viewpoints | Magellan’s Cross, Basilica del Santo Niño, Temple of Leah |
+| Day 2 | Moalboal / Badian | Canyoneering & snorkeling | Kawasan Falls, Pescador Island, sardine run |
+| Day 3 | Oslob & Cebu City | Marine wildlife & waterfalls | Whale sharks, Tumalog Falls, drive back |
 
-## Day 1 — Cebu City Heritage
+## Day-by-day itinerary
 
-Start at the historic core before it gets hot:
+### Day 1 — Cebu City heritage and viewpoints
 
-- **Magellan’s Cross** (15 min) — Landmark marking the arrival of Christianity; inside a small pavilion near City Hall.
-- **Basilica del Santo Niño** (30–45 min) — Cebu’s oldest church, housing the Santo Niño icon. Dress modestly and avoid visiting during Sunday Mass traffic.
-- **Fort San Pedro** (45 min) — Military fort from the 1500s with a small museum and garden.
-- **Colon Street** (30 min) — Walk through the oldest street; good for quick snack stops, but watch your belongings.
+- **8:30 AM** — Start with breakfast near Colon or at your hotel.
+- **9:30 AM** — Visit **Magellan’s Cross** and **Basilica del Santo Niño** (about 1 hour total). Dress modestly; both are active religious sites.
+- **10:45 AM** — Walk to **Fort San Pedro** (45 minutes). It’s the oldest Spanish fort in the Philippines.
+- **12:00 PM** — Lunch at **Sugbo Mercado** or **Larsian** for local Cebuano dishes like lechon, puso (hanging rice), and grilled seafood.
+- **2:00 PM** — Drive to **Temple of Leah** (about 40 minutes from downtown). Spend 45 minutes at the hilltop temple and viewpoint.
+- **3:30 PM** — Optional: continue to **Sirao Garden** (the “Little Amsterdam” flower farm) or **Tops Lookout** for sunset views.
+- **6:00 PM** — Return to the city, check in or freshen up, then have dinner at **Casa Verde** or **STK ta Bay!** for fresh seafood.
 
-Afternoon:
+- **Backup:** If it’s raining, swap the viewpoints for **Cebu Ocean Park** or the **Museo Sugbo** indoor exhibits.
 
-- **Carbon Market** (optional, 1 hr) — Authentic wet market if you want local food and street snacks; best before 3 PM.
-- **Tops Lookout / Busay** (1.5–2 hrs drive round trip) — Hilltop view of the city and neighboring islands at sunset. Arrive by 4:30 PM to beat the haze.
-- **Temple of Leah** — Roman-style temple near Busay, worth a 20-minute photo stop if you have time.
+### Day 2 — Kawasan Falls and Moalboal coastline
 
-Evening: Dinner at a Cebu City rooftop restaurant (check Sugbo Mercado or 2100 Resto & Bar). Overnight in Cebu City or head south immediately after dinner to sleep in Moalboal — though the next day is long, so early night is recommended.
+- **5:00 AM** — Depart Cebu City south via private van or bus. The drive to Badian is about 3 hours.
+- **8:30 AM** — Arrive at **Kawasan Falls** in Badian. Register and start **canyoneering** or the shorter trek to the falls (around 3–4 hours with jumps, swimming, and bamboo rafts).
+- **12:00 PM** — Lunch at a restaurant near the Kawasan entrance or in **Moalboal town**.
+- **1:30 PM** — Drive to **Panagsama Beach** in Moalboal (about 25 minutes).
+- **2:00 PM** — Go snorkeling at the **sardine run** just offshore — this is right at the beach, no boat needed. If weather allows, take a short boat trip to **Pescador Island** for turtles and coral gardens (allow 1.5–2 hours).
+- **4:30 PM** — Check in to your Moalboal hotel or guesthouse.
+- **6:30 PM** — Sunset dinner at **Ven’s Kitchen** or a beachfront grill; try the local kinilaw (ceviche).
 
-## Day 2 — Oslob Whale Sharks + Kawasan Falls
+- **Backup:** If canyoneering is closed due to weather, visit **Mantayupan Falls** instead, or extend your Pescador Island boat tour.
 
-This is the most travel-heavy day. Start at 4–4:30 AM.
+### Day 3 — Oslob whale sharks, Tumalog Falls, return
 
-- **Whale shark watching in Oslob** (6:00–8:00 AM) — Arrive by 6:30 AM to beat the crowd. You'll be grouped into brief boat trips, about 20–30 minutes in the water. Book your slot online the day before if possible.
-- **Tumalog Falls** (30–40 min detour) — Small but scenic waterfall; mostly a quick photo stop.
-- **Kawasan Falls** (10:00 AM arrival) — The star attraction: turquoise water and optional canyoneering. Canyoneering takes 3–4 hours with jumps, swimming, and cliff drops. Book directly with a registered guide at the entrance; bring a waterproof phone pouch.
-- **Drive to Moalboal** (12:30–1:30 PM) — After Kawasan, head to Moalboal for lunch and check-in.
+- **4:30 AM** — Depart Moalboal for **Oslob** (about 1 hour 45 minutes by van).
+- **6:30 AM** — Join the **whale shark interaction** at Barangay Tan-awan. Arrive early to beat the crowd and limit waiting time; the activity runs until around 10 AM.
+- **8:30 AM** — Stop at **Tumalog Falls**, a short tricycle ride from the whale shark area — refreshing, shallow water, and usually much quieter in the morning.
+- **10:00 AM** — Drive back toward Cebu City, stopping for lunch in **Carcar** — try local chicharon (crispy pork skin) and royal bibingka.
+- **2:30–4:00 PM** — Arrive in Cebu City. If you have time, grab pasalubong (souvenirs) at **LeMon Tea House** or at the airport later.
 
-If you skip canyoneering, relax at **Moalboal’s White Beach** in the late afternoon. If you skip whale sharks, use the extra morning to do the canyoneering at a slower pace — but whale sharks are usually the top bucket-list item.
+- **Backup:** If you skip the whale sharks, add **Lambug Beach** or **Aguinid Falls** in Samboan on the way back.
 
-## Day 3 — Moalboal Snorkeling + Departure
+## Where to stay
 
-- **Panagsama Beach morning snorkel** (7:00–8:00 AM) — Snorkel just offshore with the famous **sardine run**; thousands of sardines form a silver tornado. No boat needed for this one.
-- **Pescador Island boat tour** (9:00–12:00) — A short bangka ride for coral gardens, sea turtles, and more fish. Book a shared or private tour at the beach.
-- **Lunch in Panagsama** — Fresh seafood at the beachfront cafes.
-- **Departure** — You can be back at Cebu City airport by 4–5 PM if you leave right after lunch (2.5–3 hour drive). For late flights, add a stop at **Carcar** for its famous ampao (crispy rice snacks) and pork dishes.
+| Area | Why stay here | Best for |
+|---|---|---|
+| Cebu City (IT Park or Ayala) | Close to food, malls, and easy south exits | First 2 nights |
+| Colon / Downtown | Walking distance to heritage sights | Budget travelers |
+| Panagsama, Moalboal | Steps from snorkeling and nightlife | Night 2 |
+| Badian | Closest to Kawasan Falls | Early risers with a car |
 
-### Backup options
-- If whale shark tour is canceled: overnight in Oslob — move Day 2’s order so Kawasan comes first, then whale sharks next morning.
-- If canyoneering sounds too intense: visit **Kabuklaan Spring** or just swim at Kawasan’s base waterfall.
-- If seas are rough in Moalboal: ask the resort for the nearest protected beach spot, or head to **Sardine Run viewing platform** instead of Pescador.
+## Getting around
 
-## Transit & Booking Tips
+- **Private van with driver** — the most practical choice for 3 days. Expect around PHP 3,500–4,500 per day depending on route. Book through your hotel or a reputable tour operator.
+- **Buses** — Ceres buses run from Cebu City south to Moalboal and Oslob, but day tours become harder with public transport.
+- **Habal-habal (motorcycle)** — common for short hops in Moalboal and Oslob; agree on the fare before riding.
+- **Domestic flights** — use **MCIA** as your base; the itinerary ends back in Cebu City, so your departure airport is close.
 
-- **Private van or compact car** is strongly recommended for Days 2 and 3. You’ll be starting at 4 AM and covering 200+ km; having a driver saves time and reduces stress.
-- **Public buses** (Ceres Liner) run from Cebu City’s South Bus Terminal to Oslob and Badian, but they stop frequently and add 45–60 minutes.
-- Book whale shark visits and canyoneering guides **online or at your hotel** at least a day in advance, especially for peak season (December–May).
-- Keep small cash: many beachside stalls and falls entrance fees are cash-only.
-- Ask for the **sea conditions** before booking Pescador Island — the boat will be canceled if waves are high.
+## Packing checklist
 
-## Packing Checklist
+- **Dry bags** for Kawasan Falls and boat rides — phones and cash stay safe.
+- **Aqua shoes** — essential for the rocky riverbed and canyoneering.
+- **Reef-safe sunscreen** and a rash guard for snorkeling.
+- **Towel**, quick-dry clothing, and a spare change of clothes.
+- **Cash** in smaller denominations — some sites and small vendors only take cash.
+- **Light jacket** for early-morning drives and air-conditioned vans.
+- **Power bank** — long drives and GPS use drain batteries fast.
+- **Camera or waterproof phone case** for Tumalog and Kawasan.
 
-- **Quick-dry clothing** (rash guard, board shorts, swimsuit)
-- **Water shoes** for diving and canyoneering
-- **Dry bag / waterproof phone case**
-- **Reef-safe sunscreen** — most Cebu tour operators ask for it
-- **Insect repellent** and after-bite cream
-- **Power bank** (long drives, early mornings)
-- **Cash in small denominations** (₱20–₱100 bills)
-- **Light rain jacket** or umbrella (rainfall can be sudden)
-- **Flip-flops + one pair of comfortable walking shoes**
-- **Prefilled travel insurance** if you plan canyoneering
+## Booking tips and local customs
 
-## What to Verify Before You Go
+- **Book canyoneering and whale shark tours at least 1 day ahead** — your hotel in Cebu City or Moalboal can arrange pickup and permits.
+- **Bring your physical or digital ID** — some tours require registration at the site.
+- **Dress modestly at churches** — shoulders and knees should be covered when entering Basilica del Santo Niño.
+- **Greet locals with a smile and use “po” for politeness** — a simple “Salamat” (thank you) goes a long way.
+- **Drinks are sold everywhere, but water refills are limited** — bring a large bottle for the long drives.
+- **Expect wet weather from June to November** — the falls and beaches still work, but pack a rain poncho and keep your schedule flexible.
 
-- **Whale shark regulations** — don’t wear sunscreen when swimming with them; follow the operator’s strict rules about distance.
-- **Canyoneering minimum age and fitness** — most operators require basic swimming, and jumps are not mandatory.
-- **Airport buffer** — plan to arrive at Mactan–Cebu International Airport at least 3 hours before an international flight.
-- **Boat schedules** — Pescador Island tours usually operate from 8 AM–1 PM, with afternoon trips often canceled due to winds.
-
-This route keeps the drives mindable: city → south → beach. If you prefer fewer long drives, base yourself in **Moalboal all three nights** and make Oslob a day trip from there (2–2.5 hours each way) — just be warned the whale shark start time becomes even earlier.
+Have a great trip — and if you want a 2-day, 5-day, or budget-specific version, just say the word.
 ```
 
-Diagnostics — repaired: false | TTFT: 26959ms | tokens in/out: 1414/2381 | fallback used: false
+Diagnostics — repaired: false | TTFT: 34196ms | tokens in/out: 1442/2954 | fallback used: false
 
 ### fitness-nutrition — PASS
 
@@ -1244,76 +1154,83 @@ Diagnostics — repaired: false | TTFT: 26959ms | tokens in/out: 1414/2381 | fal
 
 **Skills activated:** education-tutor, fitness-nutrition
 
-**Response (15982ms, quality score 4.7/5):**
+**Verification:** risk HIGH | hard failures: none | repair attempts: 0 | 1ms
+**Usage:** initial in/out: 1440/2057 | repairs: 0 | total in/out: 1440/2057
+
+**Response (22396ms, quality score 5/5):**
 
 ```
-## Beginner Home Workout Plan (No Equipment)
+I’ll outline a simple, no-equipment beginner plan you can do in a small space, using only your body weight and stable surfaces like the floor or a wall. The program runs 3 days per week, hits all major muscle groups, and includes a built-in progression so you can keep improving without needing any gear.
 
-This plan is built for absolute beginners who want to build strength, endurance, and confidence at home. It uses only bodyweight exercises, requires zero equipment, and fits into 3 short sessions per week. Each workout is a full-body routine that trains all major muscle groups with safe, scalable movements — you can adjust the difficulty of every exercise as you get stronger.
+## The Weekly Schedule
 
-### Weekly Schedule
+Do these three workouts on non-consecutive days (e.g., Monday / Wednesday / Friday). Rest or do light walking on the other days.
 
-Perform one workout every other day (e.g., Monday, Wednesday, Friday), with rest days in between.
+| Day | Focus | Exercises |
+| --- | --- | --- |
+| Monday | Full Body A | Bodyweight Squats, Wall Push-Ups, Glute Bridges, Bird Dog, Forearm Plank |
+| Wednesday | Full Body B | Reverse Lunges, Incline Push-Ups, Dead Bug, Superman, Side Plank |
+| Friday | Full Body A (again) | Same as Monday — this is your second session for the week |
 
-| Day | Focus | Duration |
-|------|--------------------|----------|
-| A    | Full-body strength | 20–25 min |
-| B    | Full-body strength | 20–25 min |
-| C    | Full-body strength | 20–25 min |
+## Exercises, Sets & Reps
 
-Begin each session with a 3–4 minute warm-up: jogging in place, arm circles, leg swings, and lightly marching. End with a 2–3 minute cool-down stretching your quads, hamstrings, chest, and back.
+Start with **2 sets of each exercise** and rest 60–90 seconds between sets. Use this table as your baseline.
 
-### Workout A (Day 1)
+| Exercise | Sets | Reps / Time | Form Cue |
+| --- | --- | --- | --- |
+| **Bodyweight Squat** | 2 | 8–10 reps | Sit hips back and down, keep heels flat, chest up |
+| **Wall Push-Up** | 2 | 8–10 reps | Hands at shoulder height on a wall, body straight, lower chest toward wall |
+| **Glute Bridge** | 2 | 10–12 reps | Lie on back, feet flat, squeeze glutes to lift hips, don’t arch lower back |
+| **Bird Dog** | 2 | 6–8 reps per side | On hands and knees, extend opposite arm and leg, keep hips level |
+| **Forearm Plank** | 2 | 20–30 seconds | Elbows under shoulders, squeeze abs, keep back flat |
+| **Reverse Lunge** | 2 | 6–8 reps per leg | Step backward, lower knee toward floor, keep front knee over ankle |
+| **Incline Push-Up** | 2 | 8–10 reps | Hands on a sturdy table or countertop, body straight, lower chest to the surface |
+| **Dead Bug** | 2 | 8–10 reps per side | Lie on back, arms up, lower opposite arm and leg without arching lower back |
+| **Superman** | 2 | 6–8 rep hold (3 sec) | Lie face down, lift arms and legs slightly, squeeze lower back and glutes |
+| **Side Plank** | 2 | 15–20 seconds per side | Elbow under shoulder, lift hips, keep body in a straight line |
 
-| Exercise | Sets x Reps | Rest |
-|--------------------------|-------------|------|
-| Wall Push-Ups | 3 x 10 | 45 sec |
-| Bodyweight Squats | 3 x 12 | 45 sec |
-| Glute Bridges | 3 x 12 | 30 sec |
-| Standing Calf Raises | 3 x 15 | 30 sec |
-| Plank (on knees if needed) | 3 x 20–30 sec | 60 sec |
+**How to perform each workout:** Move through the exercises in the order listed, rest between sets, and stop when your form gets shaky. A full session should take about 20–30 minutes.
 
-### Workout B (Day 2)
+## Progression Plan
 
-| Exercise | Sets x Reps | Rest |
-|----------------------------|-------------|------|
-| Incline Push-Ups (hands on counter/table) | 3 x 8–10 | 45 sec |
-| Reverse Lunges (holding onto chair if needed) | 3 x 8 per leg | 60 sec |
-| Bird-Dog | 3 x 10 per side | 30 sec |
-| Dead Bug | 3 x 10 per side | 30 sec |
-| Forearm Plank | 3 x 20–30 sec | 60 sec |
+Every 2 weeks, make one small change to keep challenging your body:
 
-### Workout C (Day 3)
+- **Weeks 1–2** — Stick to the baseline sets and reps above.
+- **Weeks 3–4** — Increase reps by 2–3 per exercise, or add one extra set to squats and push-ups.
+- **Weeks 5–6** — Slow down the lowering phase of each exercise (3 seconds down, 1 second up) to make it harder.
+- **Weeks 7–8** — Progress to harder variations: regular push-ups (knees or floor), full plank, or add a small book bag filled with books as weight.
 
-| Exercise | Sets x Reps | Rest |
-|------------------------------|-------------|------|
-| Negative Push-Ups (lower slowly from knees) | 3 x 6–8 | 60 sec |
-| Step-Ups (onto a sturdy chair or step) | 3 x 10 per leg | 60 sec |
-| Side-Lying Leg Raises | 3 x 12 per side | 30 sec |
-| Superman Hold | 3 x 15–20 sec | 45 sec |
-| Bicycle Crunches | 3 x 10 per side | 30 sec |
+If a variation becomes too easy, move to the next one. If you can’t finish the reps with good form, drop back to the previous variation.
 
-### Progression Rules
+## Rest & Recovery
 
-- **Week 1–2:** Focus on form, not speed. Use the recommended reps and rest times exactly.
-- **Week 3–4:** Add 2–4 reps to every exercise, or extend plank holds by 5 seconds. Shorten rests from 45–60 sec down to 30–45 sec.
-- **Week 5+:** Move to harder variations — full push-ups instead of incline/wall push-ups, unassisted lunges instead of reverse lunges, and add an extra set once you can complete all sets cleanly.
-- **Rule of thumb:** If you finish all sets without breaking form, increase the difficulty next session. If you can’t complete all reps, lower the reps or use the easier variation.
+- Take at least one full rest day between strength workouts — your muscles build when resting, not while training.
+- Aim for 7–9 hours of sleep per night.
+- Drink water throughout the day, especially around workouts.
+- Mild muscle soreness is normal for 24–48 hours; sharp pain is a sign to stop.
 
-### Rest & Safety Notes
+## Nutrition Basics (No Counting Required)
 
-- Take at least 1 full rest day between workouts — muscle builds during recovery, not during exercise.
-- Stop any exercise if you feel sharp pain, dizziness, or unusual shortness of breath. The “burn” in muscles is normal; joint pain is not.
-- Keep your core tight and back neutral during every movement. For squats, push your hips back and keep knees tracking over toes.
-- Drink water before and after your workout, but avoid eating a heavy meal within 1 hour before.
-- If you have any medical condition, injury, or are new to exercise after a long pause, check with a healthcare professional before starting this or any new exercise program.
+You don’t need a strict meal plan, but use this simple portion guide at each meal: **1 palm of protein, 1 fist of carbs, 2 fists of vegetables, 1 thumb of healthy fats.**
 
-### What to Add Next
+- **Breakfast example** — 2-egg omelet with spinach, one slice whole-grain toast, and a small bowl of berries.
+- **Lunch example** — Grilled chicken breast (palm-sized), a cup of cooked rice, and a big mixed salad with olive oil & vinegar.
+- **Dinner example** — Baked fish (palm-sized), roasted sweet potatoes, and steamed broccoli.
+- **Snack example** — Greek yogurt with a handful of nuts, or an apple with peanut butter.
 
-Once you can complete all three workouts comfortably, you can either run the same plan with the harder progressions above, or ask for a follow-up plan with more advanced bodyweight moves like lunges with jumps, diamond push-ups, and single-leg glute bridges. Focus on consistency for the first month — a simple plan done regularly beats a complex one done once.
+This keeps you energized for workouts and supports muscle recovery without needing to track exact calories.
+
+## Safety Notes
+
+- Always warm up for 3–5 minutes before starting: march in place, arm circles, and gentle leg swings.
+- Use **stable surfaces only** for incline push-ups — a wall or a sturdy table is fine; never use chairs or unstable furniture.
+- Stop immediately if you feel chest pain, dizziness, or sharp joint pain.
+- If you have any medical condition, injury, or are returning from a long inactivity period, check with a doctor or qualified professional before beginning this program.
+
+Want me to adjust the plan for a specific goal like weight loss, muscle gain, or shorter workout time? Just tell me and I’ll modify the schedule.
 ```
 
-Diagnostics — repaired: false | TTFT: 15982ms | tokens in/out: 1423/1607 | fallback used: false
+Diagnostics — repaired: false | TTFT: 22396ms | tokens in/out: 1440/2057 | fallback used: false
 
 ### event-planning — PASS
 
@@ -1321,118 +1238,79 @@ Diagnostics — repaired: false | TTFT: 15982ms | tokens in/out: 1423/1607 | fal
 
 **Skills activated:** event-planning
 
-**Response (25040ms, quality score 4.7/5):**
+**Verification:** risk LOW | hard failures: none | repair attempts: 0 | 0ms
+**Usage:** initial in/out: 1418/1380 | repairs: 0 | total in/out: 1418/1380
+
+**Response (16967ms, quality score 4.7/5):**
 
 ```
-## Overview
+Here’s a practical birthday party checklist for 20 guests, organized from the critical decisions you must lock in first to the smaller tasks you can handle closer to the date. Start at least 6 weeks before your party date to keep everything stress-free.
 
-Planning a 20-guest birthday party starts with locking the date, venue, and budget first, because everything else hangs off those decisions. Below is a practical checklist built around a 6-week planning window, with critical-path items called out early, a budget snapshot for 20 guests, a week-by-week to-do list, and contingency plans for common hiccups. Scale the numbers to your actual city and preferences, but the sequence and deadlines will keep you on track.
+## Critical Path First
 
-## 1. Priority Actions (Critical Path)
+These items determine everything else, so book or decide them before buying decorations or planning menus:
 
-These are the first five things to do, in order, before anything else:
+- **Lock the date and time** — confirm the party date and start/end times, then check for conflicts with holidays or local events.
+- **Secure the venue** — home, backyard, park pavilion, or rented space; if outdoors, confirm rain backup options.
+- **Set the budget** — know your total spend before committing to anything, and keep a 10% buffer for last-minute costs.
+- **Send invitations with RSVP deadline** — digital invitations work well; set the deadline 1–2 weeks before the party so you can confirm final headcount.
+- **Book the main entertainment** — entertainer, DJ, bounce house, or activity that requires reservation.
+- **Order custom cake or themed food** — bakeries and caterers need at least 2–3 weeks notice for custom orders.
 
-- **Set the date and time** — pick a date 6–8 weeks out; confirm with the guest of honor and key guests.
-- **Book the venue** — for 20 people, a private room in a restaurant, a backyard, a pavilion, or a community space works. Secure it with a deposit before inviting anyone.
-- **Set the budget** — decide the total spend and divide it into categories (see table in Section 2). This drives every later decision.
-- **Create the guest list** — aim for 20 confirmed adults (or mix of adults/kids); include a buffer list of 3–5 people in case some decline.
-- **Send save-the-dates** — via email or text, at least 4 weeks before; formal invitations follow 2 weeks later.
+## 6-Week Timeline Checklist
 
-## 2. Budget at a Glance (for 20 Guests)
+Use this countdown starting from the party date. Adjust if you have less time.
 
-Use this as a starting template. Adjust based on your city and menu style.
+| Timeframe | Checklist Item |
+| --- | --- |
+| **6 weeks before** | Set budget, pick date/time, book venue, choose party theme, create guest list of 20 names |
+| **5 weeks before** | Send invitations, book main entertainment, order custom cake, reserve any rentals |
+| **4 weeks before** | Plan menu and drinks, order non-perishable decorations, buy party favors, schedule food pickup or catering |
+| **3 weeks before** | Chase RSVPs, confirm final headcount, order perishable food if needed, plan seating/layout |
+| **2 weeks before** | Confirm vendor arrivals and times, buy tableware and serving supplies, prepare playlist or activity lineup |
+| **1 week before** | Confirm game/activity plan, assign helpers, prep a shopping list for day-of items, check weather forecast |
+| **3–4 days before** | Shop for groceries and perishables, pick up cake or confirm delivery, clean and prep party area |
+| **1 day before** | Set up tables, chairs, and decorations, prep food that can be made ahead, pack a day-of emergency kit |
+| **Day of** | Arrange food and drinks, place favors and activity supplies, start playlist, welcome guests, enjoy the party |
 
-| Category | Suggested Percentage | Estimated Cost (if total is $1,000) |
+## Budget Breakdown for 20 Guests
+
+A reasonable per-person range for a casual-to-mid-range party is $15–$40. Here’s a typical allocation:
+
+| Category | Suggested Percentage | Notes |
 | --- | --- | --- |
-| Venue rental | 20% | $200 |
-| Food & catering | 30% | $300 |
-| Drinks & alcohol | 15% | $150 |
-| Decorations & tableware | 10% | $100 |
-| Cake & dessert | 10% | $100 |
-| Entertainment & activities | 10% | $100 |
-| Invitations, party favors, misc | 5% | $50 |
+| **Food and drinks** | 40–50% | Main dish, sides, beverages, and dessert; budget for 21–22 servings to account for seconds |
+| **Venue and rentals** | 15–25% | Park fee, tent, extra tables, chairs, or linens |
+| **Entertainment and activities** | 10–20% | DJ, game rentals, or craft supplies |
+| **Decorations and tableware** | 10–15% | Theme decor, balloons, napkins, plates, cups |
+| **Party favors and thank-yous** | 5–10% | Small favors or a single gift for the birthday person |
 
-**Money-saving tip** — A potluck or a buffet-style self-serve meal cuts food costs by nearly half, and a playlist on a borrowed speaker eliminates DJ fees.
+## Vendors and Supplies Checklist
 
-## 3. 6-Week Countdown Checklist
+Confirm these with each provider and write down arrival times, contact numbers, and payment expectations.
 
-Work backward from your event date. The calendar below assumes an 6-week lead time; compress or stretch as needed.
+- **Caterer or food pickup** — order quantity, pickup time, serving style (buffet vs. plated), and allergy info.
+- **Cake or dessert shop** — size for 20 guests, custom message, pickup time, and whether candles are included.
+- **Rental company (if used)** — delivery window, setup pickup time, and damage policy.
+- **Entertainment provider** — arrival time, power needs, music or game requirements, and cancellation policy.
+- **Cleanup crew or helpers** — who stays late, trash hauling plan, and who returns rented items.
 
-| When | Task |
-| --- | --- |
-| 6 weeks before | Confirm date, book venue, set budget, draft guest list, send save-the-dates |
-| 5 weeks before | Decide menu and catering style (sit-down, buffet, food truck, potluck); order non-perishable party supplies (napkins, plates, cups, balloons) |
-| 4 weeks before | Send formal invitations with RSVP deadline; book any rentals (tables, chairs, linens); confirm entertainment (DJ, band, or games) |
-| 3 weeks before | Chase RSVPs; order cake; book any hired help (server, babysitter, bartender); shop for alcohol |
-| 2 weeks before | Confirm final guest count with caterer/venue; arrange decorations; plan party timeline (arrival, cake, games, gifts) |
-| 1 week before | Do a venue walkthrough; confirm vendor arrival times; buy perishable food and ice; assemble party favors |
-| 2–3 days before | Clean the space or confirm venue cleaning schedule; prep any make-ahead food; charge speakers, cameras, and devices |
-| Day before | Set up decorations, table settings, and signage (if any); chill drinks; confirm vendors and key attendees |
-| Party day | Final setup, music begins, welcome guests, follow your timeline, assign a friend to handle photos or gifts |
+## Contingency Plans
 
-## 4. Guest List & Invitations
+Have fallback plans ready so minor problems don’t derail the party.
 
-- **Build a list of 23–25 people** — expect a few declines or no-shows; you want ~20 present.
-- **Collect RSVPs by phone, email, or a free tool like a Google Form** — set a hard deadline 2 weeks before the event.
-- **Send digital invitations** (free via Paperless Post, Canva, or Evite) with all details: date, time, address, parking, dress code, and a link to a gift list if requested.
-- **Follow up with non-responders 3 days after the deadline** to get a firm count for the caterer.
+- **Weather** — if outdoors, book a covered space, rent a tent, or have an indoor backup location identified before invitations go out.
+- **Vendor cancellation** — keep a backup caterer, cake shop, and DJ/entertainer list from the start.
+- **Low RSVP count** — prepare a scaled-down menu plan so you don’t overspend if fewer guests show.
+- **Guest with allergies** — ask about food allergies during RSVP and label dishes clearly at the party.
+- **Day-of emergencies** — pack a kit with a first-aid bag, extra ice, paper towels, and contact phone numbers for all vendors.
 
-## 5. Venue & Logistics
+## How to Assign and Track
 
-- **Space requirement** — a good rule is 100–150 square feet for 20 people seated comfortably, plus a small dance floor or game area if needed.
-- **Check the weather** — if outdoors, have a backup plan (tent, indoor alternative, or movable party space).
-- **Plan seating** — mix tables of 4–6 so conversations flow; assign snacks or appetizers near the entrance.
-- **Parking and accessibility** — mention nearby parking or public transit in the invitation; confirm the venue is accessible for older guests or wheelchair users.
-- **Restroom access** — ensure there are at least two functional restrooms for 20 people, or note nearby public facilities.
-
-## 6. Vendors & Rentals
-
-- **Caterer or food supply** — book 2–3 weeks in advance; provide the final guest count 1 week out. For 20 guests, order roughly 1.5 servings of each main dish per person.
-- **Cake** — order the cake 2 weeks ahead; pick it up the day before or morning of.
-- **Rentals** — tables, chairs, linens, and glassware should be reserved 4 weeks ahead and confirmed 1 week out.
-- **Entertainment** — if hiring a DJ or band, confirm their playlist preferences and start time; if self-managing, create a 2-hour playlist that fits the guest of honor’s taste.
-- **Staffing** — consider a helper for 2–3 hours to handle trash, refills, and cleanup; book at least 1 week ahead.
-
-## 7. Food & Drinks
-
-| Item | Quantity for 20 Guests |
-| --- | --- |
-| Main dishes | 3–4 options, about 1.5 servings/person |
-| Sides & salads | 2–3 options, about 1 cup/person each |
-| Appetizers | 4–6 pieces/person if replacing a full meal |
-| Dessert | Cake + one alternative (cookies, brownies) |
-| Non-alcoholic drinks | 1 liter per 3 guests per hour |
-| Alcoholic drinks | Plan 2–3 drinks/person over 3 hours if serving |
-
-- **Label foods** for allergies and dietary needs (vegetarian, gluten-free, nut-free).
-- **Set up a self-serve drink station** with ice, cups, and a spill-proof layout.
-
-## 8. Entertainment & Activities
-
-- **For adults** — background music, a photo booth with props, lawn games (if space), or a trivia game about the guest of honor.
-- **For a mixed adults/kids party** — plan 3–4 simple games (e.g., musical chairs, toss games) plus a designated kids’ table with coloring supplies.
-- **Build a loose timeline** — guest arrival, meal, cake, gift opening (if wanted), then free mingling or dancing. Keep it flexible, but have a backup plan if an activity flops.
-
-## 9. Day-of Checklist
-
-- **Arrive 2 hours early** to set up; delegate a friend to manage the guest book, gifts, and music.
-- **Check the food and drinks** are on schedule; place ice out just before guests arrive.
-- **Greet everyone personally**, and seat people near friends if the guest of honor intends to mingle.
-- **Ask someone to take candid photos** (not the birthday person) — create a shared album link later.
-- **Have a cleanup plan** — recruit a friend or hire help; pre-book a trash pickup or leave an overnight cleaning crew if the venue requires it.
-
-## 10. Contingency Plans
-
-- **Weather** — if outdoor, rent a backup indoor space, buy a tent, or have a rain date. Confirm the venue’s rain policy in writing.
-- **Guest cancellations** — keep a small buffer on the guest list, and order food based on “confirmed + 2” to cover last-minute ups and downs.
-- **Vendor no-shows** — have contacts for a backup caterer, cake baker, and DJ or rental company ready; for smaller items, create a last-minute run list (ice, cups, extra food).
-- **Food safety** — keep hot food hot (above 140°F) and cold food cold (below 40°F); have a backup microwave or slow cooker available.
-- **Over-served guest** — designate a sober driver or have ride-share app codes ready; prepare the guest list with contact info for emergencies.
-
-**What to do next**: Choose your date, confirm the venue, and send those save-the-dates today. Then work the checklist week by week, and you’ll be fully prepared with zero last-minute panic.
+Create a single party plan document with your checklist, budget, contracts, and vendor contacts in one place. Assign each task to yourself or a helper with a deadline, and review your progress every weekend leading up to the event. Your critical final step is confirming final headcount 3 days before so food, seating, and favors are exactly right.
 ```
 
-Diagnostics — repaired: false | TTFT: 25040ms | tokens in/out: 1418/2442 | fallback used: false
+Diagnostics — repaired: false | TTFT: 16967ms | tokens in/out: 1418/1380 | fallback used: false
 
 ### study-aids — PASS
 
@@ -1440,14 +1318,17 @@ Diagnostics — repaired: false | TTFT: 25040ms | tokens in/out: 1418/2442 | fal
 
 **Skills activated:** study-aids
 
-**Response (9248ms, quality score 4.7/5):**
+**Verification:** risk LOW | hard failures: none | repair attempts: 0 | 0ms
+**Usage:** initial in/out: 1424/650 | repairs: 0 | total in/out: 1424/650
+
+**Response (7309ms, quality score 4.7/5):**
 
 ```
-## WWII Quiz (5 Questions)
+## Summary
 
-This quiz covers key turning points, major figures, and outcomes of World War II. It is designed for a general audience — high school level and up. Try answering before checking the key.
+Here is a 5-question World War II quiz covering major events, key turning points, and consequences. Each question includes an answer key with a short explanation of the reasoning.
 
-## Questions
+## Quiz
 
 1. **Which event is generally considered the immediate trigger of World War II in Europe?**
    - A) The invasion of Poland by Germany
@@ -1455,46 +1336,40 @@ This quiz covers key turning points, major figures, and outcomes of World War II
    - C) The signing of the Munich Agreement
    - D) The Battle of Britain
 
-2. **Which battle is widely regarded as the turning point of the Pacific War?**
-   - A) Battle of Iwo Jima
-   - B) Battle of Midway
-   - C) Battle of Guadalcanal
-   - D) Battle of Okinawa
+2. **In which year did the United States enter World War II?**
+   - A) 1939
+   - B) 1940
+   - C) 1941
+   - D) 1942
 
-3. **What was the codename for the Allied invasion of Normandy on D-Day?**
-   - A) Operation Barbarossa
-   - B) Operation Overlord
-   - C) Operation Market Garden
-   - D) Operation Torch
+3. **Which battle is widely regarded as the turning point on the Eastern Front?**
+   - A) Battle of Normandy
+   - B) Battle of Stalingrad
+   - C) Battle of Midway
+   - D) Battle of the Bulge
 
-4. **Which major conference, held in 1945, established the framework for the postwar division of Germany and Europe?**
-   - A) Yalta Conference
-   - B) Tehran Conference
+4. **What was the main purpose of the D-Day invasion (Operation Overlord) in June 1944?**
+   - A) To liberate North Africa from Axis control
+   - B) To open a western front by invading German-occupied France
+   - C) To capture Berlin directly
+   - D) To cut off Japanese supply lines in the Pacific
+
+5. **Which conference resulted in the division of Germany and Berlin into occupied zones after the war?**
+   - A) Treaty of Versailles
+   - B) Yalta Conference
    - C) Potsdam Conference
-   - D) Casablanca Conference
-
-5. **Which of the following directly led to the United States' entry into World War II?**
-   - A) The sinking of the Lusitania
-   - B) The attack on Pearl Harbor
-   - C) The fall of France
-   - D) The Lend-Lease Act
+   - D) Munich Conference
 
 ## Answer Key
 
-| # | Answer | Reasoning |
-|---|--------|-----------|
-| 1 | **A) The invasion of Poland by Germany** | On September 1, 1939, Germany invaded Poland, prompting Britain and France to declare war — the conventional start of WWII in Europe. The Munich Agreement (1938) actually preceded the war, and the other options were later events. |
-| 2 | **B) Battle of Midway** | In June 1942, the U.S. Navy destroyed four Japanese aircraft carriers, severely crippling Japan's offensive capability. Midway is widely seen as the turning point that shifted the Pacific balance toward the Allies. |
-| 3 | **B) Operation Overlord** | Overlord was the overall plan for the Normandy landings on June 6, 1944. Barbarossa was the German invasion of the USSR; Market Garden and Torch were separate Allied operations. |
-| 4 | **A) Yalta Conference** | At Yalta (February 1945), Churchill, Roosevelt, and Stalin agreed on postwar Germany's division into occupation zones and the creation of the United Nations. The Potsdam Conference later refined details. |
-| 5 | **B) The attack on Pearl Harbor** | The Japanese attack on December 7, 1941, led directly to the U.S. declaration of war. The Lusitania sinking was WWI; the other options were antecedents, not direct triggers. |
-
-## Self-Testing Tip
-
-For stronger retention, use the **spaced-repetition method**: retake this quiz tomorrow, then again in three days, then in a week. If you miss a question, review the reasoning above and re-test after one day rather than immediately re-reading the answer.
+1. **A) The invasion of Poland** — Germany invaded Poland on September 1, 1939, which prompted Britain and France to declare war on Germany two days later. This marked the official start of WWII in Europe.
+2. **C) 1941** — The Japanese attack on Pearl Harbor on December 7, 1941, led the United States to declare war on Japan, followed by Germany declaring war on the U.S., bringing America fully into the global conflict.
+3. **B) Battle of Stalingrad** — The Soviet victory at Stalingrad (1942–1943) ended the German advance into the Soviet Union and marked a major turning point, after which the Red Army began pushing westward.
+4. **B) To open a western front by invading German-occupied France** — The Allied landings on Normandy beaches were designed to relieve pressure on the Soviets, liberate Western Europe, and force Germany to fight on two major fronts.
+5. **C) Potsdam Conference** — Held in July–August 1945, it formalized the division of Germany and Berlin into four occupation zones and addressed postwar administration, though the Yalta Conference earlier established the initial framework.
 ```
 
-Diagnostics — repaired: false | TTFT: 9248ms | tokens in/out: 1424/792 | fallback used: false
+Diagnostics — repaired: false | TTFT: 7308ms | tokens in/out: 1424/650 | fallback used: false
 
 ### meeting-notes — PASS
 
@@ -1502,30 +1377,30 @@ Diagnostics — repaired: false | TTFT: 9248ms | tokens in/out: 1424/792 | fallb
 
 **Skills activated:** meeting-notes
 
-**Response (14293ms, quality score 4.7/5):**
+**Verification:** risk MEDIUM | hard failures: none | repair attempts: 0 | 1ms
+**Usage:** initial in/out: 1466/604 | repairs: 0 | total in/out: 1466/604
+
+**Response (6649ms, quality score 5/5):**
 
 ```
-## Meeting Summary
+Team agreed to target a June launch, Maria owns the landing page, John is responsible for finalizing pricing by Friday, and the next sync is scheduled for Wednesday. Here’s the structured recap.
 
-The team aligned on a **June launch date**. Maria is responsible for the landing page, and John will finalize pricing decisions by Friday. The next sync will take place on Wednesday.
+## Meeting Summary
+- **Launch target** — The team agreed to launch in June.
+- **Landing page ownership** — Maria is the owner for the landing page.
+- **Pricing responsibility** — John will finalize pricing by Friday.
+- **Next sync** — The team will reconvene on Wednesday.
 
 ## Action Items
-
 | Owner | Task | Due Date |
 |-------|------|----------|
-| Maria | Build/own the landing page | Before June launch |
-| John | Finalize pricing | Friday |
-| All | Attend next sync | Wednesday |
+| Maria | Own and deliver the landing page | Ongoing |
+| John | Finalize pricing | Friday (date not specified) |
+| Team | Attend next sync | Wednesday (date not specified) |
 
-| All | Attend next sync | Wednesday |
-
-## Next Steps
-
-- **Confirm deliverables** — Maria and John to report progress at Wednesday's sync.
-- **Lock dependencies** — Resolve any blockers to the June launch before Friday's pricing finalization.
-- **Follow up** — Any pricing adjustments after Friday should be shared immediately with the team.
-
-This completes the meeting summary and action-item list.
+## Suggested Follow-ups
+- Confirm the exact dates for "Friday" and "Wednesday" (e.g., this week vs. next week) so everyone has a clear calendar.
+- If the June launch is tied to a fiscal year or specific year, confirm which June is targeted.
 ```
 
-Diagnostics — repaired: true | TTFT: 14292ms | tokens in/out: 1438/111 | fallback used: false
+Diagnostics — repaired: false | TTFT: 6649ms | tokens in/out: 1466/604 | fallback used: false

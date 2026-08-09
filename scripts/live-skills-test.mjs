@@ -12,6 +12,11 @@ import { fileURLToPath } from 'node:url';
 
 import { resolveSkills } from '../src/skills/resolver.js';
 import { evaluateCase } from '../benchmarks/evaluator-core.js';
+import {
+  buildRuntimeContext,
+  runVerificationWithRepair,
+  SKILL_RISK_LEVELS
+} from '../worker/skillVerification.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_DIR = join(ROOT, 'test_results_0708');
@@ -45,18 +50,18 @@ const cases = [
   { id: 'document-generation', prompt: 'Draft a service contract for my freelance web design work.', required: ['contract'] },
   { id: 'data-analysis', prompt: 'Analyze this data: monthly sales were 12000, 15000, 9000, 16000, 21000. What is the trend?', required: ['trend'] },
   { id: 'marketing-copywriting', prompt: 'Write launch copy and a tagline for my new coffee brand.', required: ['coffee', 'tagline'] },
-  { id: 'translation-localization', prompt: 'Translate this into Spanish: "Welcome to our website. Feel free to browse our products."', required: ['Bienvenido'] },
-  { id: 'live-data-utilities', prompt: 'Convert 25000 PHP to USD.', required: ['USD'] },
+  { id: 'translation-localization', prompt: 'Translate this into Spanish: "Welcome to our website. Feel free to browse our products."', required: ['Bienvenido'], minLength: 40 },
+  { id: 'live-data-utilities', prompt: 'Convert 25000 PHP to USD.', required: ['USD'], minLength: 40 },
   { id: 'education-tutor', prompt: 'Teach me the basics of how CSS Flexbox works.', required: ['flex'] },
   { id: 'accessibility-compliance', prompt: 'Explain how to make a form accessible for screen readers.', required: ['screen reader', 'aria'] },
   { id: 'business-planning', prompt: 'Help me plan a coffee shop startup: pricing and go-to-market.', required: ['pricing', 'market'] },
   { id: 'resume-career', prompt: 'Write 3 resume bullet points for a data analyst role.', required: ['data'] },
-  { id: 'creative-writing', prompt: 'Write me a short story about a lighthouse keeper.', required: ['lighthouse'] },
-  { id: 'presentation-design', prompt: 'Outline a 5-slide presentation about remote work productivity.', required: ['slide'] },
-  { id: 'personal-productivity', prompt: 'Plan my day: I have a report due, a team meeting, and I want to exercise.', required: ['plan'] },
-  { id: 'personal-finance', prompt: 'Build a monthly budget for a family with 40000 PHP income.', required: ['budget'] },
-  { id: 'travel-planning', prompt: 'Plan a 3-day itinerary in Cebu.', required: ['Cebu'] },
-  { id: 'fitness-nutrition', prompt: 'Build me a beginner home workout plan with no equipment.', required: ['workout'] },
+  { id: 'creative-writing', prompt: 'Write me a short story about a lighthouse keeper.', required: ['light'], minLength: 120 },
+  { id: 'presentation-design', prompt: 'Outline a 5-slide presentation about remote work productivity.', required: ['slide'], minLength: 120 },
+  { id: 'personal-productivity', prompt: 'Plan my day: I have a report due, a team meeting, and I want to exercise.', requiredAny: [['prioritized', 'priorities', 'prioritize', 'most important', 'mit', 'non-negotiable']], minLength: 120 },
+  { id: 'personal-finance', prompt: 'Build a monthly budget for a family with 40000 PHP income.', required: ['budget'], minLength: 120 },
+  { id: 'travel-planning', prompt: 'Plan a 3-day itinerary in Cebu.', required: ['Cebu'], minLength: 120 },
+  { id: 'fitness-nutrition', prompt: 'Build me a beginner home workout plan with no equipment.', required: ['plan', 'beginner'], minLength: 120 },
   { id: 'event-planning', prompt: 'Give me a birthday party planning checklist for 20 guests.', required: ['checklist'] },
   { id: 'study-aids', prompt: 'Make me a 5-question quiz on World War II with an answer key.', required: ['quiz', 'answer'] },
   { id: 'meeting-notes', prompt: 'Summarize these meeting notes and list action items: Team agreed to launch in June. Maria owns the landing page. John will finalize pricing by Friday. Next sync Wednesday.', required: ['action'] }
@@ -100,15 +105,38 @@ for (const item of cases) {
 
   // Step 2: live AI call with the skill instructions injected (frontend flow).
   const apiResult = await callAi({ prompt: item.prompt, skills: skillObjs });
-  const verdict = evaluateCase({
-    content: apiResult.ok ? apiResult.content : '',
-    caseDef: { prompt: item.prompt, required: item.required, minLength: 120 },
-    context: { stopReason: apiResult.diagnostics?.stopReason || null, latencyMs: apiResult.latencyMs }
+  // Step 3: Skill Verification Layer — deterministic verifiers for the
+  // activated skill(s) run over the response, with bounded targeted repair.
+  const verification = runVerificationWithRepair({
+    prompt: item.prompt,
+    content: apiResult.content || '',
+    skills: skillObjs.length > 0 ? skillObjs : [{ id: item.id }],
+    runtimeContext: buildRuntimeContext()
   });
-  const passed = skillSelected && apiResult.ok && verdict.passed;
+  const verdict = evaluateCase({
+    content: verification.content,
+    caseDef: {
+      prompt: item.prompt,
+      required: item.required,
+      requiredAny: item.requiredAny || undefined,
+      minLength: item.minLength,
+      skillProfile: SKILL_RISK_LEVELS[item.id] ? item.id : undefined
+    },
+    context: {
+      stopReason: apiResult.diagnostics?.stopReason || null,
+      latencyMs: apiResult.latencyMs,
+      verification: {
+        hardFailures: verification.hardFailures,
+        results: verification.results,
+        liveData: apiResult.diagnostics?.liveData || null
+      }
+    }
+  });
+  const passed = skillSelected && apiResult.ok && verdict.passed && verification.passed;
   const reasons = [];
   if (!skillSelected) reasons.push(`skill-not-activated (got: ${activated.join(', ') || 'none'})`);
   if (!apiResult.ok) reasons.push(`transport-${apiResult.status}`);
+  if (verification.hardFailures.length > 0) reasons.push(`verification: ${verification.hardFailures.join(', ')}`);
   reasons.push(...verdict.hardFailures);
 
   results.push({
@@ -121,13 +149,22 @@ for (const item of cases) {
     passed,
     reasons,
     aspects: verdict.aspects,
+    verification: {
+      risk: SKILL_RISK_LEVELS[item.id] || 'MEDIUM',
+      hardFailures: verification.hardFailures,
+      results: verification.results,
+      repairAttempts: verification.repairAttempts,
+      latencyMs: verification.latencyMs
+    },
+    liveData: apiResult.diagnostics?.liveData || null,
+    usage: apiResult.diagnostics?.usage || null,
     diagnostics: apiResult.diagnostics,
     latencyMs: apiResult.latencyMs,
     model: apiResult.model,
-    content: apiResult.content || ''
+    content: verification.content
   });
 
-  console.log(`[skills] ${item.id} ${passed ? 'PASS' : 'FAIL'} (${verdict.score}/5, ${apiResult.latencyMs}ms, ${apiResult.model}${skillSelected ? '' : ', SKILL NOT ACTIVATED'})`);
+  console.log(`[skills] ${item.id} ${passed ? 'PASS' : 'FAIL'} (${verdict.score}/5, ${apiResult.latencyMs}ms, ${apiResult.model}${skillSelected ? '' : ', SKILL NOT ACTIVATED'}${verification.hardFailures.length ? `, VERIFY: ${verification.hardFailures.join('|')}` : ''})`);
 }
 
 // ---------------------------------------------------------------------------
@@ -151,11 +188,12 @@ md.push(`- Total skills: ${results.length} | Passed: ${passed.length} | Failed: 
 md.push('');
 md.push('## Case summary');
 md.push('');
-md.push('| # | Skill | Status | Score | Latency (ms) | Model | Activated | Failure reasons |');
-md.push('|---|-------|--------|-------|--------------|-------|-----------|-----------------|');
+md.push('| # | Skill | Risk | Status | Score | Latency (ms) | Model | Activated | Verification | Failure reasons |');
+md.push('|---|-------|------|--------|-------|--------------|-------|-----------|--------------|-----------------|');
 results.forEach((r, i) => {
   const reasons = r.reasons.length > 0 ? r.reasons.join('; ') : '-';
-  md.push(`| ${i + 1} | ${r.id} | ${r.passed ? 'PASS' : 'FAIL'} | ${r.score}/5 | ${r.latencyMs} | ${r.model} | ${r.skillSelected ? 'yes' : 'NO'} | ${reasons} |`);
+  const verify = r.verification.hardFailures.length > 0 ? r.verification.hardFailures.join(', ') : 'PASS';
+  md.push(`| ${i + 1} | ${r.id} | ${r.verification.risk} | ${r.passed ? 'PASS' : 'FAIL'} | ${r.score}/5 | ${r.latencyMs} | ${r.model} | ${r.skillSelected ? 'yes' : 'NO'} | ${verify} | ${reasons} |`);
 });
 md.push('');
 md.push('## Full transcripts');
@@ -166,6 +204,14 @@ for (const r of results) {
   md.push(`**Prompt:** ${r.prompt}`);
   md.push('');
   md.push(`**Skills activated:** ${r.activatedSkills.join(', ') || 'none'}`);
+  md.push('');
+  md.push(`**Verification:** risk ${r.verification.risk} | hard failures: ${r.verification.hardFailures.join(', ') || 'none'} | repair attempts: ${r.verification.repairAttempts} | ${r.verification.latencyMs}ms`);
+  if (r.liveData) {
+    md.push(`**Live data:** required: ${r.liveData.liveDataRequired} | used: ${r.liveData.liveDataUsed} | source: ${Array.isArray(r.liveData.dataSource) ? r.liveData.dataSource.join(', ') : r.liveData.dataSource} | fetched: ${r.liveData.fetchedAt} | freshnessMs: ${r.liveData.freshnessMs}`);
+  }
+  if (r.usage) {
+    md.push(`**Usage:** initial in/out: ${r.usage.initial?.inputTokens}/${r.usage.initial?.outputTokens} | repairs: ${r.usage.repairs?.length || 0} | total in/out: ${r.usage.total?.inputTokens}/${r.usage.total?.outputTokens}`);
+  }
   md.push('');
   md.push(`**Response (${r.latencyMs}ms, quality score ${r.score}/5):**`);
   md.push('');

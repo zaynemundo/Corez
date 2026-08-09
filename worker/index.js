@@ -11,6 +11,12 @@ import {
   buildProjectContextSection,
   serializeProjectState
 } from './projectState.js';
+import {
+  detectLiveDataNeed,
+  buildRuntimeContext,
+  buildRuntimeContextBlock,
+  runVerificationWithRepair
+} from './skillVerification.js';
 
 // Storage key segments are validated identically on every R2-backed endpoint:
 // no slashes, no leading dots (blocks ../ traversal), bounded length.
@@ -346,6 +352,58 @@ async function handleAi(request, env) {
     { role: 'system', content: systemPrompt }
   ];
 
+  // ---------------------------------------------------------------------
+  // Skill Verification Layer — runtime context + live-data grounding.
+  // Requests that need fresh external data (currency, weather, research
+  // with citations) are grounded in a REAL web search BEFORE generation so
+  // the model answers from evidence, never from memory. A search failure is
+  // honest: no live evidence is injected and the verifier flags answers
+  // that still present current values as fabricated.
+  // ---------------------------------------------------------------------
+  const runtimeContext = buildRuntimeContext();
+  const liveDataNeed = detectLiveDataNeed(executionPrompt || prompt);
+  const specialistIds = Array.isArray(skills)
+    ? skills.map((s) => (typeof s === 'string' ? s : s.id)).filter(Boolean)
+    : [];
+  const needsGrounding = liveDataNeed.required || specialistIds.some((id) => ['live-data-utilities', 'research-report'].includes(id));
+  let liveDataEvidence = null;
+  if (needsGrounding && env?.__DISABLE_LIVE_GROUNDING !== 'true') {
+    apiMessages.push({ role: 'system', content: buildRuntimeContextBlock(runtimeContext) });
+    try {
+      const searchRequest = new Request('https://corez.test/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: executionPrompt || prompt, detail: true })
+      });
+      const searchResult = await handleSearch(searchRequest, env);
+      if (searchResult.ok) {
+        const data = await searchResult.json();
+        if (Array.isArray(data?.results) && data.results.length > 0) {
+          liveDataEvidence = {
+            servedAt: data.meta?.servedAt || new Date().toISOString(),
+            fetchedAt: new Date().toISOString(),
+            sources: Array.isArray(data.meta?.sources) ? data.meta.sources : ['web-search'],
+            results: data.results,
+            maxAgeMs: 12 * 60 * 60 * 1000
+          };
+          const snippets = data.results
+            .slice(0, 8)
+            .map((r) => `- ${r.title} | ${r.url} | ${String(r.snippet || '').slice(0, 300)}${r.extract ? ` | ${String(r.extract).slice(0, 1200)}` : ''}`)
+            .join('\n');
+          const liveInstruction = liveDataNeed.required
+            ? `This request needs CURRENT data (${liveDataNeed.kind}). Answer ONLY from the search results below; state the source URL and timestamp. NEVER use remembered values. If the results do not contain the current value, say clearly that live data could not be retrieved.`
+            : `Use the search results below as the research evidence for your answer. Cite the actual source URLs. Do NOT invent citations or claims not supported by these results.`;
+          apiMessages.push({
+            role: 'system',
+            content: `${liveInstruction}\n\nLive search results (fetched at ${liveDataEvidence.fetchedAt}):\n${snippets}`
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('Live grounding search failed (request continues without live evidence):', safeErrorDetail(err));
+    }
+  }
+
   // Fast path for general intents: explanations, writing, and casual chat are
   // answered from the last few turns only, with a capped output, so they come
   // back quickly. Coding, app, game, and swarm requests keep the FULL history
@@ -478,6 +536,7 @@ async function handleAi(request, env) {
               providerId = providerId || event.provider || null;
               providerModel = providerModel || event.model || null;
               // Post-stream validation: truncation/language repair.
+              const repairUsage = [];
               const repair = await processResponse(apiMessages, collected, {
                 userPrompt: prompt,
                 project: activeProject,
@@ -490,6 +549,7 @@ async function handleAi(request, env) {
                     sleep: retrySleepFor(env),
                     maxTokens: null
                   });
+                  if (repaired?.usage) repairUsage.push(repaired.usage);
                   return repaired.content ? repaired : null;
                 },
                 maxRepairs: 2
@@ -502,8 +562,24 @@ async function handleAi(request, env) {
                 }
                 collected = repair.content;
               }
+              // Skill Verification Layer: deterministic targeted patches only.
+              const verification = runVerificationWithRepair({
+                prompt,
+                content: repair.content,
+                skills,
+                runtimeContext,
+                liveDataEvidence
+              });
+              const finalContent = verification.content;
+              if (finalContent !== collected) {
+                const appended = finalContent.slice(collected.length);
+                if (appended) {
+                  controller.enqueue(encoder.encode(sse({ type: 'delta', text: appended })));
+                }
+                collected = finalContent;
+              }
               const returnedProject = activeProject
-                || deriveProjectState([{ role: 'assistant', content: repair.content }]);
+                || deriveProjectState([{ role: 'assistant', content: finalContent }]);
               controller.enqueue(encoder.encode(sse({ type: 'done', final: true, projectState: serializeProjectState(returnedProject) })));
               controller.enqueue(encoder.encode(sse({
                 type: 'diagnostics',
@@ -514,7 +590,40 @@ async function handleAi(request, env) {
                   provider: providerId,
                   model: providerModel,
                   inputTokens,
-                  outputTokens
+                  outputTokens,
+                  verification: {
+                    results: verification.results,
+                    hardFailures: verification.hardFailures,
+                    passed: verification.passed,
+                    repairAttempts: verification.repairAttempts,
+                    latencyMs: verification.latencyMs
+                  },
+                  liveData: liveDataEvidence
+                    ? {
+                        liveDataRequired: liveDataNeed.required || false,
+                        liveDataUsed: true,
+                        dataSource: liveDataEvidence.sources,
+                        fetchedAt: liveDataEvidence.fetchedAt,
+                        sourceTimestamp: liveDataEvidence.servedAt,
+                        freshnessMs: Math.max(0, Date.now() - new Date(liveDataEvidence.servedAt).getTime()),
+                        resultsCount: liveDataEvidence.results.length
+                      }
+                    : (liveDataNeed.required ? { liveDataRequired: true, liveDataUsed: false, liveDataNeed: liveDataNeed.kind } : null),
+                  usage: {
+                    initial: { inputTokens, outputTokens },
+                    repairs: repairUsage,
+                    total: {
+                      inputTokens: [inputTokens, ...repairUsage.map((u) => u.inputTokens)].filter((n) => Number.isFinite(n) && n !== null).reduce((a, b) => a + b, 0),
+                      outputTokens: [outputTokens, ...repairUsage.map((u) => u.outputTokens)].filter((n) => Number.isFinite(n) && n !== null).reduce((a, b) => a + b, 0)
+                    }
+                  },
+                  latency: {
+                    routingMs: 0,
+                    providerMs: event.totalMs || 0,
+                    verificationMs: verification.latencyMs,
+                    repairMs: 0,
+                    totalMs: Date.now() - requestStartedAt
+                  }
                 }
               })));
               controller.close();
@@ -545,6 +654,7 @@ async function handleAi(request, env) {
     });
   }
 
+  const providerStartedAt = Date.now();
   const result = await runProviderChain(apiMessages, {
     env,
     signal: clientDisconnectSignal,
@@ -552,6 +662,7 @@ async function handleAi(request, env) {
     sleep: retrySleepFor(env),
     maxTokens: isFastIntent ? FAST_MAX_TOKENS : null
   });
+  const providerMs = Date.now() - providerStartedAt;
 
   if (result.status === 'retry-scheduled') {
     // The provider could not recover within this request's practical window;
@@ -570,6 +681,8 @@ async function handleAi(request, env) {
   if (result.content) {
     // Reliability pipeline: truncation/language detection, code validation,
     // automatic repair, and diagnostics — before the answer reaches the user.
+    const repairUsage = [];
+    const repairStartedAt = Date.now();
     const processed = await processResponse(apiMessages, result.content, {
       userPrompt: prompt,
       project: activeProject,
@@ -582,16 +695,41 @@ async function handleAi(request, env) {
           sleep: retrySleepFor(env),
           maxTokens: null
         });
+        if (repaired?.usage) repairUsage.push(repaired.usage);
         return repaired.content ? repaired : null;
       },
       maxRepairs: 2
     });
+    const repairMs = Date.now() - repairStartedAt;
+
+    // Skill Verification Layer: every activated skill verifies the response
+    // before it is marked trustworthy. Deterministic targeted patches only —
+    // bounded, never a full regeneration.
+    const verification = runVerificationWithRepair({
+      prompt,
+      content: processed.content,
+      skills,
+      runtimeContext,
+      liveDataEvidence
+    });
+    const finalContent = verification.content;
+    const initialTokens = {
+      inputTokens: result.usage?.inputTokens ?? null,
+      outputTokens: result.usage?.outputTokens ?? null
+    };
+    const totalInput = [initialTokens.inputTokens, ...repairUsage.map((u) => u.inputTokens)]
+      .filter((n) => Number.isFinite(n) && n !== null)
+      .reduce((acc, n) => acc + n, 0);
+    const totalOutput = [initialTokens.outputTokens, ...repairUsage.map((u) => u.outputTokens)]
+      .filter((n) => Number.isFinite(n) && n !== null)
+      .reduce((acc, n) => acc + n, 0);
+
     // Project state returned to the client: the client-provided or
     // conversation-derived state, or — on first creation turns with no prior
     // code — the state derived from the just-generated answer, so the client
     // can persist it and send it back on the next follow-up turn.
     const returnedProject = activeProject
-      || deriveProjectState([{ role: 'assistant', content: processed.content }]);
+      || deriveProjectState([{ role: 'assistant', content: finalContent }]);
     const diagnostics = {
       ...processed.diagnostics,
       ttftMs: Date.now() - requestStartedAt,
@@ -600,10 +738,43 @@ async function handleAi(request, env) {
       model: result.model || null,
       inputTokens: result.usage?.inputTokens ?? null,
       outputTokens: result.usage?.outputTokens ?? null,
-      fallbackUsed: Boolean(result.resumed)
+      fallbackUsed: Boolean(result.resumed),
+      verification: {
+        results: verification.results,
+        hardFailures: verification.hardFailures,
+        passed: verification.passed,
+        repairAttempts: verification.repairAttempts,
+        latencyMs: verification.latencyMs
+      },
+      liveData: liveDataEvidence
+        ? {
+            liveDataRequired: liveDataNeed.required || false,
+            liveDataUsed: true,
+            dataSource: liveDataEvidence.sources,
+            fetchedAt: liveDataEvidence.fetchedAt,
+            sourceTimestamp: liveDataEvidence.servedAt,
+            freshnessMs: Math.max(0, Date.now() - new Date(liveDataEvidence.servedAt).getTime()),
+            resultsCount: liveDataEvidence.results.length
+          }
+        : (liveDataNeed.required ? { liveDataRequired: true, liveDataUsed: false, liveDataNeed: liveDataNeed.kind } : null),
+      usage: {
+        initial: initialTokens,
+        repairs: repairUsage,
+        total: {
+          inputTokens: totalInput || initialTokens.inputTokens,
+          outputTokens: totalOutput || initialTokens.outputTokens
+        }
+      },
+      latency: {
+        routingMs: Math.max(0, providerStartedAt - requestStartedAt),
+        providerMs,
+        verificationMs: verification.latencyMs,
+        repairMs,
+        totalMs: Date.now() - requestStartedAt
+      }
     };
     return jsonResponse(200, {
-      content: processed.content,
+      content: finalContent,
       model: result.model,
       provider: result.provider || null,
       projectState: serializeProjectState(returnedProject) || undefined,

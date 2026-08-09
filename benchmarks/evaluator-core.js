@@ -22,6 +22,81 @@ export const WEIGHTS = {
   efficiency: 0.05
 };
 
+// Per-skill scoring profiles (section 20): different trust dimensions get
+// different weights depending on what a skill must guarantee. A skill's
+// profile is selected via caseDef.skillProfile; the default WEIGHTS table is
+// untouched so existing behaviour stays stable.
+export const SKILL_WEIGHT_PROFILES = {
+  'live-data-utilities': {
+    dimensions: ['grounding', 'factualAccuracy', 'freshness', 'instructionAdherence', 'completeness', 'formatting'],
+    weights: { grounding: 0.3, factualAccuracy: 0.25, freshness: 0.2, instructionAdherence: 0.1, completeness: 0.1, formatting: 0.05 }
+  },
+  'research-report': {
+    dimensions: ['grounding', 'factualAccuracy', 'instructionAdherence', 'completeness', 'formatting'],
+    weights: { grounding: 0.35, factualAccuracy: 0.25, instructionAdherence: 0.15, completeness: 0.15, formatting: 0.1 }
+  },
+  'meeting-notes': {
+    dimensions: ['factualAccuracy', 'assumptionDiscipline', 'instructionAdherence', 'completeness', 'formatting'],
+    weights: { factualAccuracy: 0.3, assumptionDiscipline: 0.25, instructionAdherence: 0.15, completeness: 0.2, formatting: 0.1 }
+  },
+  'marketing-copywriting': {
+    dimensions: ['instructionAdherence', 'factualAccuracy', 'assumptionDiscipline', 'completeness', 'formatting'],
+    weights: { instructionAdherence: 0.3, factualAccuracy: 0.25, assumptionDiscipline: 0.2, completeness: 0.15, formatting: 0.1 }
+  },
+  'presentation-design': {
+    dimensions: ['instructionAdherence', 'factualAccuracy', 'completeness', 'formatting'],
+    weights: { instructionAdherence: 0.3, factualAccuracy: 0.3, completeness: 0.2, formatting: 0.2 }
+  },
+  'data-analysis': {
+    dimensions: ['factualAccuracy', 'functionalCorrectness', 'instructionAdherence', 'completeness', 'formatting'],
+    weights: { factualAccuracy: 0.35, functionalCorrectness: 0.3, instructionAdherence: 0.15, completeness: 0.15, formatting: 0.05 }
+  },
+  'personal-finance': {
+    dimensions: ['factualAccuracy', 'functionalCorrectness', 'assumptionDiscipline', 'completeness', 'formatting'],
+    weights: { factualAccuracy: 0.35, functionalCorrectness: 0.3, assumptionDiscipline: 0.15, completeness: 0.15, formatting: 0.05 }
+  },
+  'business-planning': {
+    dimensions: ['instructionAdherence', 'assumptionDiscipline', 'completeness', 'formatting'],
+    weights: { instructionAdherence: 0.3, assumptionDiscipline: 0.3, completeness: 0.25, formatting: 0.15 }
+  },
+  'travel-planning': {
+    dimensions: ['functionalCorrectness', 'factualAccuracy', 'instructionAdherence', 'completeness', 'formatting'],
+    weights: { functionalCorrectness: 0.3, factualAccuracy: 0.25, instructionAdherence: 0.2, completeness: 0.15, formatting: 0.1 }
+  },
+  'fitness-nutrition': {
+    dimensions: ['safety', 'instructionAdherence', 'completeness', 'formatting'],
+    weights: { safety: 0.4, instructionAdherence: 0.25, completeness: 0.25, formatting: 0.1 }
+  },
+  'accessibility-compliance': {
+    dimensions: ['functionalCorrectness', 'instructionAdherence', 'completeness', 'formatting'],
+    weights: { functionalCorrectness: 0.35, instructionAdherence: 0.3, completeness: 0.2, formatting: 0.15 }
+  },
+  'creative-writing': {
+    dimensions: ['instructionAdherence', 'creativity', 'coherence', 'completeness', 'formatting'],
+    weights: { instructionAdherence: 0.3, creativity: 0.3, coherence: 0.2, completeness: 0.15, formatting: 0.05 }
+  },
+  'translation-localization': {
+    dimensions: ['instructionAdherence', 'factualAccuracy', 'completeness', 'formatting'],
+    weights: { instructionAdherence: 0.35, factualAccuracy: 0.3, completeness: 0.2, formatting: 0.15 }
+  }
+};
+
+// Hard failures produced by the Skill Verification Layer force FAIL
+// regardless of the numerical score (section 21/22).
+export const VERIFICATION_HARD_FAILURES = [
+  'live-data-required-but-not-used', 'stale-live-data', 'fabricated-live-value',
+  'fabricated-current-date', 'fabricated-current-time', 'missing-live-source',
+  'live-source-fetch-failed-but-answer-presented-as-current', 'unsupported-citation',
+  'fabricated-action-item', 'fabricated-owner', 'fabricated-deadline',
+  'duplicate-action-item', 'unsupported-business-claim', 'unsupported-statistic',
+  'fabricated-study-result', 'uncited-data-claim', 'impossible-itinerary-timeline',
+  'insufficient-transfer-time', 'overlapping-activities', 'missing-travel-buffer',
+  'arithmetic-error', 'percentage-error', 'trend-calculation-error',
+  'unsupported-forecast', 'critical-safety-issue', 'duplicate-critical-content',
+  'unlabeled-assumption'
+];
+const VERIFICATION_HARD_FAILURE_SET = new Set(VERIFICATION_HARD_FAILURES);
+
 export const PASS_THRESHOLD = 4.0; // /5
 
 // Hard failure conditions that override any average score.
@@ -30,6 +105,17 @@ export function detectHardFailures({ content, caseDef, project, context }) {
   const failures = [];
   const add = (reason) => { if (!failures.includes(reason)) failures.push(reason); };
   const blocks = extractCodeBlocks(text);
+
+  // Skill Verification Layer failures ride in via context.verification and
+  // always force FAIL — a beautiful response with a fabricated live value,
+  // invented action item, impossible itinerary, or arithmetic error must not
+  // pass merely because it is well written.
+  const verificationFailures = Array.isArray(context?.verification?.hardFailures)
+    ? context.verification.hardFailures
+    : [];
+  for (const failure of verificationFailures) {
+    if (VERIFICATION_HARD_FAILURE_SET.has(failure)) add(failure);
+  }
 
   if (!text.trim()) add('empty-provider-response');
 
@@ -134,9 +220,10 @@ export function scoreAspects({ content, caseDef, project, context }) {
   const forbidden = Array.isArray(caseDef.mustNotContain) ? caseDef.mustNotContain : [];
   const forbiddenPresent = forbidden.filter((term) => text.toLowerCase().includes(term.toLowerCase())).length;
   const anyGroupsFailed = anyGroupsMet.filter((met) => !met).length;
+  const anyGroupsMetCount = anyGroupsMet.filter(Boolean).length;
   const instructionAdherence = (required.length === 0 && requiredAny.length === 0)
     ? (forbiddenPresent === 0 ? 1 : 0)
-    : Math.max(0, (requiredFound / Math.max(1, required.length))
+    : Math.max(0, ((requiredFound + anyGroupsMetCount) / Math.max(1, required.length + requiredAny.length))
       - (forbiddenPresent + anyGroupsFailed) * 0.5);
 
   // --- functional correctness -------------------------------------------------
@@ -228,16 +315,101 @@ export function scoreAspects({ content, caseDef, project, context }) {
 }
 
 // Full case verdict. Returns { score, passed, aspects, hardFailures }.
+// caseDef.skillProfile switches to a skill-specific weight profile when set;
+// otherwise the default WEIGHTS table is used, preserving existing behaviour.
 export function evaluateCase({ content, caseDef, project = null, context = {} }) {
   const hard = detectHardFailures({ content, caseDef, project, context });
   const aspects = scoreAspects({ content, caseDef, project, context });
-  const weighted = Object.entries(aspects).reduce(
-    (total, [aspect, value]) => total + value * (WEIGHTS[aspect] || 0),
-    0
-  );
-  const score = Math.round(weighted * 50) / 10; // 0..5
+  const profile = SKILL_WEIGHT_PROFILES[caseDef?.skillProfile];
+
+  let weighted;
+  let score;
+  if (profile) {
+    // Skill profile dimensions override/add to the base aspects; dimensions
+    // the profile references but the base table already computes (instruction
+    // adherence, functional correctness, completeness, ...) keep their base
+    // values — never silently drop to zero.
+    const profileAspects = { ...aspects, ...profileAspectScores({ content, caseDef, project, context, profile }) };
+    weighted = Object.entries(profile.weights).reduce(
+      (total, [aspect, weight]) => total + (profileAspects[aspect] || 0) * weight,
+      0
+    );
+    score = Math.round(weighted * 50) / 10;
+    Object.assign(aspects, profileAspects);
+  } else {
+    weighted = Object.entries(aspects).reduce(
+      (total, [aspect, value]) => total + value * (WEIGHTS[aspect] || 0),
+      0
+    );
+    score = Math.round(weighted * 50) / 10; // 0..5
+  }
   const passed = !hard.hardFail && score >= PASS_THRESHOLD;
   return { score, passed, aspects, hardFailures: hard.failures, passThreshold: PASS_THRESHOLD };
+}
+
+// Skill-profile dimension scores (0..1) for the dimensions that the default
+// aspects table does not compute: grounding, factualAccuracy, freshness,
+// assumptionDiscipline, safety, formatting, creativity, coherence.
+export function profileAspectScores({ content, context, profile }) {
+  const text = String(content || '');
+  const scores = {};
+  const dimensionList = profile?.dimensions || Object.keys(profile?.weights || {});
+  const verification = context?.verification || {};
+
+  if (dimensionList.includes('grounding')) {
+    const research = Array.isArray(verification.results)
+      ? verification.results.find((r) => r.skillId === 'research-report')
+      : null;
+    const evidence = research?.evidence || {};
+    const grounded = Number(evidence.verifiedSources) || 0;
+    const requested = Number(evidence.requestedSources) || 0;
+    scores.grounding = requested > 0 ? Math.min(1, grounded / requested) : 0.6;
+  }
+
+  if (dimensionList.includes('factualAccuracy')) {
+    const hardFailures = Array.isArray(verification.hardFailures) ? verification.hardFailures : [];
+    const factual = hardFailures.filter((f) => [
+      'fabricated-live-value', 'fabricated-current-date', 'fabricated-current-time',
+      'unsupported-citation', 'unsupported-statistic', 'fabricated-study-result',
+      'arithmetic-error', 'percentage-error', 'trend-calculation-error'
+    ].includes(f));
+    scores.factualAccuracy = factual.length === 0 ? 1 : Math.max(0, 1 - factual.length * 0.5);
+  }
+
+  if (dimensionList.includes('freshness')) {
+    const live = verification.liveData || {};
+    scores.freshness = live.freshnessValid === false || live.stale === true ? 0 : (live.liveDataUsed ? 1 : 0.4);
+  }
+
+  if (dimensionList.includes('assumptionDiscipline')) {
+    const hardFailures = Array.isArray(verification.hardFailures) ? verification.hardFailures : [];
+    scores.assumptionDiscipline = hardFailures.includes('unlabeled-assumption') ? 0.2 : 1;
+  }
+
+  if (dimensionList.includes('safety')) {
+    const hardFailures = Array.isArray(verification.hardFailures) ? verification.hardFailures : [];
+    scores.safety = hardFailures.includes('critical-safety-issue') ? 0 : 1;
+  }
+
+  if (dimensionList.includes('formatting')) {
+    const qualityFailures = Array.isArray(verification.results)
+      ? verification.results.filter((r) => ['malformed-code-fence', 'broken-inline-code', 'duplicate-critical-content', 'empty-heading'].some((f) => (r.failures || []).includes(f))).length
+      : 0;
+    const hasStructure = /\n|[-*]\s|^\|.*\|$|^#{1,3} /m.test(text);
+    scores.formatting = qualityFailures === 0 ? (hasStructure ? 1 : 0.6) : 0.3;
+  }
+
+  if (dimensionList.includes('creativity')) {
+    scores.creativity = text.length > 200 ? 0.9 : 0.7;
+  }
+
+  if (dimensionList.includes('coherence')) {
+    const hardFailureText = Array.isArray(verification.hardFailures) ? verification.hardFailures.join(' ') : '';
+    const truncated = /(?:truncated-response|unfinished-sentence)/i.test(hardFailureText);
+    scores.coherence = truncated ? 0.3 : 1;
+  }
+
+  return scores;
 }
 
 // Follow-up diagnostics: report general quality, continuity, change

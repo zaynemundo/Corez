@@ -327,6 +327,25 @@ for (const r of results) {
   md.push(`- Aspects — instruction: ${r.aspects?.instructionAdherence?.toFixed(2)} | functional: ${r.aspects?.functionalCorrectness?.toFixed(2)} | continuity: ${r.aspects?.conversationContinuity?.toFixed(2)} | execution: ${r.aspects?.executionValidation?.toFixed(2)} | completeness: ${r.aspects?.completeness?.toFixed(2)} | UX: ${r.aspects?.uxQuality?.toFixed(2)} | efficiency: ${r.aspects?.efficiency?.toFixed(2)}`);
   if (r.diagnostics) {
     md.push(`- Diagnostics — truncation: ${r.diagnostics.truncationDetected} | language mismatch: ${r.diagnostics.languageMismatch} | repaired: ${r.diagnostics.repaired} (${r.diagnostics.repairAttempts} attempts) | TTFT: ${r.diagnostics.ttftMs}ms | tokens in/out: ${r.diagnostics.inputTokens}/${r.diagnostics.outputTokens} | fallback used: ${r.diagnostics.fallbackUsed}`);
+    if (r.diagnostics.verification) {
+      const v = r.diagnostics.verification;
+      md.push(`- Verification — passed: ${v.passed} | hard failures: ${(v.hardFailures || []).join(', ') || 'none'} | repair attempts: ${v.repairAttempts} | verification latency: ${v.latencyMs}ms`);
+      for (const result of v.results || []) {
+        md.push(`  - ${result.skillId} (${result.risk}): ${result.failures.length === 0 ? 'PASS' : result.failures.join(', ')}`);
+      }
+    }
+    if (r.diagnostics.liveData) {
+      const l = r.diagnostics.liveData;
+      md.push(`- Live data — required: ${l.liveDataRequired} | used: ${l.liveDataUsed} | source: ${Array.isArray(l.dataSource) ? l.dataSource.join(', ') : l.dataSource} | fetched: ${l.fetchedAt} | freshnessMs: ${l.freshnessMs}`);
+    }
+    if (r.diagnostics.usage) {
+      const u = r.diagnostics.usage;
+      md.push(`- Usage — initial in/out: ${u.initial?.inputTokens}/${u.initial?.outputTokens} | repairs: ${u.repairs?.length || 0} | total in/out: ${u.total?.inputTokens}/${u.total?.outputTokens}`);
+    }
+    if (r.diagnostics.latency) {
+      const lat = r.diagnostics.latency;
+      md.push(`- Latency — routing: ${lat.routingMs}ms | provider: ${lat.providerMs}ms | verification: ${lat.verificationMs}ms | repair: ${lat.repairMs}ms | total: ${lat.totalMs}ms`);
+    }
     if (r.diagnostics.validation) {
       md.push(`- Validation — code blocks: ${r.diagnostics.validation.codeBlockCount} | game signals: ${(r.diagnostics.validation.gameSignals || []).join(', ') || 'n/a'}`);
     }
