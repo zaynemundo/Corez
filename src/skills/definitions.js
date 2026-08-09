@@ -162,7 +162,7 @@ export const COREZ_SPECIALIST_SKILLS = [
     dependencies: [],
     compatibleIntents: ['app'],
     requiresTools: [],
-    instructions: 'Create responsive, visually stunning web UI with dark modes, curated HSL color palettes, modern typography, and smooth CSS micro-interactions.'
+    instructions: 'Create responsive, visually stunning web UI with dark modes, curated HSL color palettes, modern typography, and smooth CSS micro-interactions. Establish the visual direction (palette, type scale, spacing rhythm) before writing markup, then implement with strict z-index layering and explicit container positioning.'
   },
   {
     id: 'game-development',
@@ -174,7 +174,7 @@ export const COREZ_SPECIALIST_SKILLS = [
     dependencies: [],
     compatibleIntents: ['app', 'swarm'],
     requiresTools: [],
-    instructions: 'Build runnable single-file HTML5 canvas games with complete game loops, input management, collision detection, and asset integration.'
+    instructions: 'Build runnable single-file HTML5 canvas games with complete game loops, input management, collision detection, and asset integration. Structure the code around a fixed-timestep loop, keep entity state in refs, and always include scoring, controls, and a restartable game-over state.'
   },
   {
     id: 'visual-creative',
@@ -186,7 +186,7 @@ export const COREZ_SPECIALIST_SKILLS = [
     dependencies: [],
     compatibleIntents: ['app', 'swarm'],
     requiresTools: [],
-    instructions: 'Formulate structured JSON asset manifests for visual requirements and invoke FLUX image generation where appropriate.'
+    instructions: 'Formulate structured JSON asset manifests for visual requirements and invoke FLUX image generation where appropriate. Match every asset to a coherent art direction: consistent palette, style, and resolution across sprites, backgrounds, and UI textures.'
   },
   {
     id: 'research-report',
@@ -198,7 +198,7 @@ export const COREZ_SPECIALIST_SKILLS = [
     dependencies: [],
     compatibleIntents: ['explanation', 'general', 'writing'],
     requiresTools: [],
-    instructions: 'Build a research outline first (items + fields), gather evidence from multiple sources with citations, then synthesize a balanced report with an executive summary, findings, and sources. Never fabricate citations; clearly mark uncertainty.'
+    instructions: 'Build a research outline first (items + fields), then gather evidence from multiple sources, tracking every claim back to a citation. Synthesize a balanced report with an executive summary, findings by section, and a sources list. Never fabricate citations; mark uncertainty explicitly, state confidence per claim, and date-stamp time-sensitive data.'
   },
   {
     id: 'document-generation',
@@ -210,7 +210,7 @@ export const COREZ_SPECIALIST_SKILLS = [
     dependencies: [],
     compatibleIntents: ['writing', 'general', 'explanation'],
     requiresTools: [],
-    instructions: 'Produce clean, professional documents in the requested format (plain text structure, HTML for printable pages, or PDF when requested). Match formal or casual tone to the audience, and fill every section the user asks for without inventing personal facts.'
+    instructions: 'Identify the document type and audience first, then produce clean professional output in the requested format (structured text, printable HTML, or PDF). Use exactly the sections the user asks for; never invent personal facts, legal specifics, or figures. Keep formatting consistent and proofread the final text.'
   },
   {
     id: 'data-analysis',
@@ -222,7 +222,7 @@ export const COREZ_SPECIALIST_SKILLS = [
     dependencies: [],
     compatibleIntents: ['general', 'explanation', 'writing'],
     requiresTools: [],
-    instructions: 'Identify the key variables, compute meaningful summary statistics, and present findings with tables or charts. Show the reasoning behind each conclusion and flag data-quality issues you notice.'
+    instructions: 'Identify the key variables and the question being asked first, then compute meaningful summary statistics: totals, averages, trends, and outliers. Present findings with clear tables or charts, show the reasoning behind each conclusion, and flag data-quality issues such as missing values, inconsistencies, and small sample sizes. Never invent data points that are not in the dataset.'
   },
   {
     id: 'marketing-copywriting',
@@ -234,7 +234,7 @@ export const COREZ_SPECIALIST_SKILLS = [
     dependencies: [],
     compatibleIntents: ['writing', 'general', 'explanation'],
     requiresTools: [],
-    instructions: 'Establish the brand voice first, then write persuasive, audience-matched copy with clear calls to action. Provide multiple headline options and keep SEO keywords natural. No empty fluff — every line earns its place.'
+    instructions: 'Establish the brand voice and target audience first, then write persuasive, specific copy with a clear call to action. Offer multiple headline options, keep SEO keywords natural, and structure longer pieces (campaigns, calendars, email sequences) in scannable sections. No filler — every line must earn its place.'
   },
   {
     id: 'translation-localization',
@@ -246,7 +246,7 @@ export const COREZ_SPECIALIST_SKILLS = [
     dependencies: [],
     compatibleIntents: ['writing', 'general', 'explanation'],
     requiresTools: [],
-    instructions: 'Translate meaning and tone, not just words. Preserve formatting, technical terms, and proper nouns; adapt idioms and cultural references. Provide the translated text first, then a short note on adaptation choices when useful.'
+    instructions: 'Translate meaning, tone, and cultural nuance — not just words. Preserve formatting, technical terms, and proper nouns; adapt idioms and cultural references for the target audience. Provide the translated text first, then a brief note on adaptation choices and terminology consistency across the piece.'
   },
   {
     id: 'live-data-utilities',
@@ -258,7 +258,7 @@ export const COREZ_SPECIALIST_SKILLS = [
     dependencies: [],
     compatibleIntents: ['general', 'explanation'],
     requiresTools: [],
-    instructions: 'For live data (weather, currency, time), give the current value with the source and timestamp, and note when rates change frequently. For calculations, show the steps briefly and round sensibly.'
+    instructions: 'For live data (weather, currency, time zones), give the current value with the source and timestamp, and note when rates or conditions change frequently. For calculations and conversions, show the steps briefly, round sensibly, and state assumptions such as the rate, date, and locale explicitly.'
   },
   {
     id: 'education-tutor',
@@ -270,7 +270,7 @@ export const COREZ_SPECIALIST_SKILLS = [
     dependencies: [],
     compatibleIntents: ['explanation', 'general', 'writing'],
     requiresTools: [],
-    instructions: 'Diagnose the learner level, then teach in small concrete steps with examples and short exercises. Use analogies, avoid jargon without explaining it, and end with a checkpoint question or next-step exercise.'
+    instructions: 'Diagnose the learner level first, then teach in small concrete steps with examples and short practice exercises. Use plain-language analogies, define every technical term before using it, and end with a checkpoint question or next-step exercise to confirm understanding.'
   },
   {
     id: 'accessibility-compliance',
@@ -282,7 +282,7 @@ export const COREZ_SPECIALIST_SKILLS = [
     dependencies: [],
     compatibleIntents: ['app', 'code-help', 'explanation', 'general'],
     requiresTools: [],
-    instructions: 'Audit against WCAG 2.2 AA: semantic structure, focus management, color contrast, form labels, and ARIA. Provide concrete fixes with code when the user shares markup, and rank issues by severity.'
+    instructions: 'Audit against WCAG 2.2 AA: semantic structure, focus management, color contrast, form labels, and ARIA. Rank issues by severity and give concrete fixes with code whenever markup is shared. Verify keyboard-only navigation and screen-reader announcements in the fixes you suggest.'
   },
   {
     id: 'business-planning',
@@ -294,7 +294,7 @@ export const COREZ_SPECIALIST_SKILLS = [
     dependencies: [],
     compatibleIntents: ['general', 'writing', 'explanation'],
     requiresTools: [],
-    instructions: 'Structure answers around problem, solution, market, model, and execution. Make realistic assumptions explicit, provide ranges for financial figures, and always end with prioritized next actions.'
+    instructions: 'Structure answers around problem, solution, market, business model, and execution. Make assumptions explicit, give ranges for financial figures, and clearly separate facts from estimates. Always end with prioritized next actions the user can take within the week.'
   },
   {
     id: 'resume-career',
@@ -306,6 +306,114 @@ export const COREZ_SPECIALIST_SKILLS = [
     dependencies: [],
     compatibleIntents: ['writing', 'general'],
     requiresTools: [],
-    instructions: 'Ask for missing role details when critical, then rewrite with action verbs, quantified achievements, and role-matched keywords. Keep the user\'s real facts — never invent experience, employers, or credentials.'
+    instructions: 'Ask for missing critical details (role, experience level, target industry) when needed, then rewrite with action verbs, quantified achievements, and role-matched keywords. Keep the user\'s real facts — never invent experience, employers, titles, or credentials. Tailor each section to the specific role they are applying for.'
+  },
+  {
+    id: 'creative-writing',
+    name: 'Creative Writing',
+    description: 'Stories, poems, scripts, dialogue, and creative prose in any genre or tone. User scenario: "Write me a short story about a lighthouse keeper" or "Help me write a poem for my wedding."',
+    triggers: ['story', 'poem', 'novel', 'fiction', 'script', 'dialogue', 'creative writing', 'lyrics'],
+    phase: 'IMPLEMENTING',
+    priority: 20,
+    dependencies: [],
+    compatibleIntents: ['writing', 'general', 'explanation'],
+    requiresTools: [],
+    instructions: 'Match the requested form (story, poem, script, dialogue) and tone, then write with concrete sensory detail and natural rhythm. Establish voice, setting, and stakes quickly; show, don\'t tell. Offer a short revision note or alternate ending when useful.'
+  },
+  {
+    id: 'presentation-design',
+    name: 'Presentation & Slide Deck Design',
+    description: 'Deck outlines, slide-by-slide structures, speaker notes, and narrative arcs. User scenario: "Outline a 10-slide pitch for my startup" or "Help me structure my keynote presentation."',
+    triggers: ['presentation', 'slide deck', 'powerpoint', 'google slides', 'speaker notes', 'slideshow'],
+    phase: 'IMPLEMENTING',
+    priority: 20,
+    dependencies: [],
+    compatibleIntents: ['writing', 'general', 'explanation'],
+    requiresTools: [],
+    instructions: 'Design the deck\'s narrative arc first — hook, structure, call to action — then produce a slide-by-slide outline with a title, key points, and speaker notes per slide. Keep one idea per slide, favor short phrases over paragraphs, and suggest a visual for every complex data point.'
+  },
+  {
+    id: 'personal-productivity',
+    name: 'Personal Productivity & Planning',
+    description: 'Daily planning, task prioritization, time management, and habit systems. User scenario: "Plan my day" or "Help me build a habit tracking system."',
+    triggers: ['plan my day', 'task list', 'to-do', 'prioritize', 'time management', 'habit tracker', 'get organized'],
+    phase: 'IMPLEMENTING',
+    priority: 20,
+    dependencies: [],
+    compatibleIntents: ['general', 'writing', 'explanation'],
+    requiresTools: [],
+    instructions: 'Turn goals into a concrete, prioritized action plan with time-boxed tasks. Use simple frameworks such as MITs, the Eisenhower matrix, or time blocking, and adapt to the user\'s energy patterns. End with a lightweight tracking method the user will actually maintain.'
+  },
+  {
+    id: 'personal-finance',
+    name: 'Personal Finance & Budgeting',
+    description: 'Budgets, savings plans, debt payoff strategies, and investing basics. User scenario: "Build a monthly budget for my family" or "How do I start an emergency fund?"',
+    triggers: ['budget', 'savings plan', 'debt payoff', 'investing basics', 'emergency fund', 'financial plan'],
+    phase: 'IMPLEMENTING',
+    priority: 20,
+    dependencies: [],
+    compatibleIntents: ['general', 'explanation', 'writing'],
+    requiresTools: [],
+    instructions: 'Start from the user\'s income, expenses, and goals, then build a realistic budget or plan with specific numbers. Separate needs from wants, show the math behind every recommendation, and flag risks. Give ranges and clear disclaimers for investment advice — never guarantee returns.'
+  },
+  {
+    id: 'travel-planning',
+    name: 'Travel & Trip Planning',
+    description: 'Itineraries, trip logistics, packing lists, and destination guidance. User scenario: "Plan a 5-day Tokyo itinerary" or "What should I pack for a beach vacation?"',
+    triggers: ['itinerary', 'travel plan', 'vacation plan', 'packing list', 'road trip'],
+    phase: 'IMPLEMENTING',
+    priority: 20,
+    dependencies: [],
+    compatibleIntents: ['general', 'explanation', 'writing'],
+    requiresTools: [],
+    instructions: 'Plan around the traveler\'s dates, budget, and interests: recommend a realistic itinerary with travel times, must-see stops, and backup options. Include practical details such as transit, booking tips, and local customs, plus a packing checklist.'
+  },
+  {
+    id: 'fitness-nutrition',
+    name: 'Fitness & Nutrition Planning',
+    description: 'Workout plans, meal planning, calorie targets, and training programs. User scenario: "Build me a home workout plan" or "Plan a week of high-protein meals."',
+    triggers: ['workout plan', 'exercise routine', 'training program', 'meal plan', 'diet plan', 'nutrition', 'fitness goal', 'weight loss plan'],
+    phase: 'IMPLEMENTING',
+    priority: 20,
+    dependencies: [],
+    compatibleIntents: ['general', 'explanation', 'writing'],
+    requiresTools: [],
+    instructions: 'Design a plan matched to the user\'s goal (strength, endurance, weight), current level, equipment, and schedule. Give specific exercises with sets and reps, and meals with portions, plus progression and rest guidance. Add safety notes and recommend consulting a professional for medical conditions.'
+  },
+  {
+    id: 'event-planning',
+    name: 'Event Planning',
+    description: 'Event checklists, party planning, wedding planning, and timelines with deadlines. User scenario: "Plan a birthday party for 20 people" or "Give me a wedding planning checklist."',
+    triggers: ['event planning', 'party planning', 'wedding planning', 'event checklist', 'celebration plan'],
+    phase: 'IMPLEMENTING',
+    priority: 20,
+    dependencies: [],
+    compatibleIntents: ['general', 'writing', 'explanation'],
+    requiresTools: [],
+    instructions: 'Build a complete event plan: date, venue, guest list, budget, timeline, vendors, and a checklist with deadlines. Work backward from the event date and surface the critical-path items first. Provide contingency plans for weather, cancellations, and vendor issues.'
+  },
+  {
+    id: 'study-aids',
+    name: 'Study Aids & Practice Materials',
+    description: 'Quizzes, flashcards, study guides, and practice tests on any topic. User scenario: "Make me a quiz on World War II" or "Create flashcards for Spanish vocabulary."',
+    triggers: ['quiz', 'flashcards', 'study guide', 'practice test', 'revision notes'],
+    phase: 'IMPLEMENTING',
+    priority: 20,
+    dependencies: [],
+    compatibleIntents: ['general', 'explanation', 'writing'],
+    requiresTools: [],
+    instructions: 'Create study materials from the topic: key concepts, concise summaries, practice questions with an answer key, and flashcards. Match the difficulty to the learner\'s level and include spaced-repetition or self-testing guidance. Explain the reasoning behind every answer.'
+  },
+  {
+    id: 'meeting-notes',
+    name: 'Meeting Notes & Summaries',
+    description: 'Meeting summaries, action items, minutes, and decision recaps. User scenario: "Summarize these meeting notes" or "Extract action items from this conversation."',
+    triggers: ['meeting notes', 'meeting summary', 'meeting minutes', 'action items', 'meeting recap'],
+    phase: 'IMPLEMENTING',
+    priority: 20,
+    dependencies: [],
+    compatibleIntents: ['writing', 'general', 'explanation'],
+    requiresTools: [],
+    instructions: 'Extract decisions, discussion points, and owners with deadlines into clear structured notes. Separate facts from opinions, keep names and commitments accurate, and end with an action-item list (owner, task, due date). Ask for clarification when details are ambiguous.'
   }
 ];

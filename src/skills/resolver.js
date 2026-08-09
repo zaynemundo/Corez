@@ -27,20 +27,38 @@ export const SPECIALIST_SKILL_IDS = [
   'education-tutor',
   'accessibility-compliance',
   'business-planning',
-  'resume-career'
+  'resume-career',
+  'creative-writing',
+  'presentation-design',
+  'personal-productivity',
+  'personal-finance',
+  'travel-planning',
+  'fitness-nutrition',
+  'event-planning',
+  'study-aids',
+  'meeting-notes'
 ];
 
 const SPECIALIST_TRIGGER_PATTERNS = [
-  { id: 'research-report', pattern: /\b(research report|research on|literature review|white paper|market research|deep dive|survey of|study of)\b/i },
+  { id: 'research-report', pattern: /\b(research report|research on|literature review|white paper|market research|deep dive|deep research|survey of|study of|case study)\b/i },
   { id: 'document-generation', pattern: /\b(invoice|contract|business letter|formal document|memo|pdf|docx|word document|letterhead)\b/i },
   { id: 'data-analysis', pattern: /\b(analyze\s+(this\s+)?(data|dataset|csv|sales)|spreadsheet|excel|statistics|sales data|metrics|budget tracker|data analysis)\b/i },
-  { id: 'marketing-copywriting', pattern: /\b(marketing|ad copy|advertisement|advertising campaign|campaign|tagline|slogan|landing page copy|seo|blog post|social media|newsletter|email campaign|content plan|brand voice|brand identity|brand strategy|rebrand)\b/i },
+  { id: 'marketing-copywriting', pattern: /\b(marketing|ad copy|advertisement|advertising campaign|campaign|tagline|slogan|landing page copy|seo|blog post|social media|newsletter|email campaign|content plan|content calendar|brand voice|brand identity|brand strategy|brand guidelines|rebrand)\b/i },
   { id: 'translation-localization', pattern: /\b(translate|translation|localize|localization|multilingual)\b|(in|into)\s+(french|spanish|tagalog|japanese|german|korean|chinese|italian|portuguese|arabic|hindi)\b/i },
-  { id: 'live-data-utilities', pattern: /(\bconvert\s+\d+\b|\bcurrency\b|\bexchange rate\b|\bweather\b|\bforecast\b|\btemperature\b|\btime zone\b|\bwhat time\b|\bunit conversion\b|\bcalculate\b|\bcalculator\b)/i },
-  { id: 'education-tutor', pattern: /\b(teach me|tutorial|explain.{0,30}like|from zero|beginner|study plan|lesson|homework|exam prep)\b/i },
+  { id: 'live-data-utilities', pattern: /(\bconvert\s+\d+\b|\bcurrency\b|\bexchange rate\b|\bweather\b|\bforecast\b|\btemperature\b|\btime zone\b|\bwhat time\b|\bunit conversion\b|\bcalculate\b|\bcalculator\b|\btime difference\b|\bdistance between\b|\bwhat'?s the (time|date)\b)/i },
+  { id: 'education-tutor', pattern: /\b(teach me|tutorial|explain.{0,30}like|from zero|beginner|study plan|lesson|homework|exam prep|eli5|practice exercise)\b/i },
   { id: 'accessibility-compliance', pattern: /\b(wcag|accessible|accessibility|screen reader|aria|contrast|keyboard navigation|a11y)\b/i },
-  { id: 'business-planning', pattern: /\b(business plan|go-to-market|pricing strategy|financial projection|pitch deck|business model|revenue model|mvp strategy|market entry)\b/i },
-  { id: 'resume-career', pattern: /\b(resume|cv|cover letter|job application|interview|career|linkedin profile|job posting|portfolio)\b/i }
+  { id: 'business-planning', pattern: /\b(business plan|go-to-market|pricing strategy|financial projection|pitch deck|business model|revenue model|mvp strategy|market entry|swot|business strategy|market sizing)\b/i },
+  { id: 'resume-career', pattern: /\b(resume|cv|cover letter|job application|interview|career|linkedin profile|job posting|portfolio|job search|salary negotiation|career change)\b/i },
+  { id: 'creative-writing', pattern: /\b(story|short story|poem|poetry|novel|fiction|screenplay|script|dialogue|haiku|lyrics|fan fiction|worldbuilding|creative writing)\b/i },
+  { id: 'presentation-design', pattern: /\b(presentation|slide deck|powerpoint|google slides|slide outline|speaker notes|slideshow|\d+-slide|slides?)\b/i },
+  { id: 'personal-productivity', pattern: /\b(to-do|todo|task list|plan my day|daily planner|weekly planner|prioritize\w*|time management|pomodoro|habit tracker|get organized|productivity plan)\b/i },
+  { id: 'personal-finance', pattern: /\b(budget\w*|savings plan|personal finance|debt payoff|emergency fund|investing basics|retirement planning|net worth)\b/i },
+  { id: 'travel-planning', pattern: /\b(itinerary|travel plan|vacation plan|packing list|road trip|trip planning|flight itinerary)\b/i },
+  { id: 'fitness-nutrition', pattern: /\b(workout plan|exercise routine|training program|meal plan|diet plan|nutrition\w*|calorie target|fitness goal|weight loss plan|muscle gain)\b/i },
+  { id: 'event-planning', pattern: /\b(event planning|party planning|wedding planning|event checklist|celebration plan)\b/i },
+  { id: 'study-aids', pattern: /\b(quiz\w*|flashcard\w*|study guide|practice test|revision notes|exam questions|cheat sheet)\b/i },
+  { id: 'meeting-notes', pattern: /\b(meeting (notes|summary|minutes|recap)|action items|summarize\w* (the )?(meeting|call|conversation))\b/i }
 ];
 
 // Runs specialist detection BEFORE the heavy-workflow early return so everyday

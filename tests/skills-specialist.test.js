@@ -13,7 +13,16 @@ const scenarios = [
   { id: 'education-tutor', prompt: 'Teach me JavaScript from zero' },
   { id: 'accessibility-compliance', prompt: 'Make my landing page WCAG 2.2 accessible' },
   { id: 'business-planning', prompt: 'Help me plan a startup: pricing strategy and go-to-market' },
-  { id: 'resume-career', prompt: 'Rewrite my resume for a data science role' }
+  { id: 'resume-career', prompt: 'Rewrite my resume for a data science role' },
+  { id: 'creative-writing', prompt: 'Write me a short story about a lighthouse keeper' },
+  { id: 'presentation-design', prompt: 'Outline a 10-slide pitch deck for my startup' },
+  { id: 'personal-productivity', prompt: 'Plan my day: I have a report due and two meetings' },
+  { id: 'personal-finance', prompt: 'Build a monthly budget for my family' },
+  { id: 'travel-planning', prompt: 'Plan a 5-day Tokyo itinerary under 80000 yen' },
+  { id: 'fitness-nutrition', prompt: 'Build me a home workout plan with no equipment' },
+  { id: 'event-planning', prompt: 'Give me a wedding planning checklist with deadlines' },
+  { id: 'study-aids', prompt: 'Make me a quiz on World War II with an answer key' },
+  { id: 'meeting-notes', prompt: 'Summarize these meeting notes and extract action items' }
 ];
 
 describe('CoreZ Specialist Skills', () => {
@@ -85,5 +94,19 @@ describe('CoreZ Specialist Skills', () => {
 
     const learnMore = resolveSkills({ intent: 'general', prompt: 'I want to learn more about React' });
     expect(learnMore.skills.map(s => s.id)).not.toContain('education-tutor');
+
+    const minutesLater = resolveSkills({ intent: 'general', prompt: 'Remind me in 30 minutes about the meeting' });
+    expect(minutesLater.skills.map(s => s.id)).not.toContain('meeting-notes');
+
+    const politicalParty = resolveSkills({ intent: 'general', prompt: 'Tell me about the political party history in my country' });
+    expect(politicalParty.skills.map(s => s.id)).not.toContain('event-planning');
+  });
+
+  it('keeps new specialists out of engineering workflows', () => {
+    const quizApp = resolveSkills({ intent: 'app', prompt: 'Build me a quiz app with a scoreboard' });
+    expect(quizApp.skills.map(s => s.id)).not.toContain('study-aids');
+
+    const scriptCode = resolveSkills({ intent: 'code-help', prompt: 'My shell script fails on line 12 with an error' });
+    expect(scriptCode.skills.map(s => s.id)).not.toContain('creative-writing');
   });
 });
