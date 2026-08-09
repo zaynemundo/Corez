@@ -44,6 +44,25 @@ describe('Hosted AI fallback behavior', () => {
     expect(response).not.toContain('Share the snippet');
   });
 
+  it('never answers explanation prompts with a meta-template when hosted AI is down', async () => {
+    const fetchMock = vi.fn(async () => Response.json({ error: 'down' }, { status: 503 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await generateAIResponse('What is red?', []);
+
+    expect(response).not.toContain('useful way to think about');
+    expect(response).not.toContain('I understand the goal');
+    expect(response).toMatch(/hosted AI service is currently unavailable/i);
+    expect(response).toMatch(/Core idea/);
+    expect(response).toMatch(/Next step/);
+  });
+
+  it('states the exact hosted error for explanation fallbacks', async () => {
+    const response = await generateLocalAIResponse('What is red?', new Error('Hosted AI request failed: 503'));
+    expect(response).toMatch(/hosted AI service is currently unavailable/i);
+    expect(response).not.toContain('Hereâ€™s the useful way to think about');
+  });
+
   it('answers who created Corez with clickable creator profiles and the why, without self-introducing or mentioning APIs', async () => {
     const response = await generateLocalAIResponse('Who created Corez?', new Error('Hosted AI request failed: 503'));
     expect(response).toContain('[Zayne Mundo](https://www.linkedin.com/in/zayne-mundo/)');
