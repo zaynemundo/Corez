@@ -31,7 +31,7 @@
   --font-heading: var(--font-sans);
   --font-mono: 'JetBrains Mono', monospace;
   
-  --sidebar-width: 260px;
+  --sidebar-width: 240px;
   --sidebar-margin: 0px;
   --sidebar-radius: 0px;
   --sidebar-heading-size: 11px;
@@ -647,7 +647,7 @@ h1, h2, h3, h4, h5, h6 {
 /* Spacious Message Inner Container */
 .messages-inner {
   width: 100%;
-  max-width: 880px;
+  max-width: 800px;
   margin-top: auto;
   padding: 1.5rem 1.5rem 4.5rem;
   display: flex;
@@ -664,7 +664,7 @@ h1, h2, h3, h4, h5, h6 {
   text-align: center;
   padding: 4rem 1rem;
   margin: auto;
-  max-width: 720px;
+  max-width: 680px;
 }
 
 .welcome-logo {
@@ -1774,7 +1774,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .input-box {
   width: 100%;
-  max-width: calc(min(100%, 880px) - 3rem);
+  max-width: calc(min(100%, 800px) - 3rem);
   align-self: center;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
@@ -1793,11 +1793,11 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .chat-pane.canvas-active .messages-inner {
-  max-width: 800px;
+  max-width: 720px;
 }
 
 .chat-pane.canvas-active .input-box {
-  max-width: calc(min(100%, 800px) - 3rem);
+  max-width: calc(min(100%, 720px) - 3rem);
 }
 
 .input-box:focus-within {
