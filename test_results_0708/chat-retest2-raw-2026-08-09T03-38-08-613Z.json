@@ -1,0 +1,458 @@
+[
+  {
+    "id": "game-1",
+    "category": "game",
+    "prompt": "Build me a snake game with a score counter, speed that increases as you eat, and a game over screen.",
+    "ok": true,
+    "error": null,
+    "model": "opencode:deepseek-v4-flash",
+    "provider": "opencode-go",
+    "projectState": {
+      "projectType": "game",
+      "framework": "react",
+      "language": "javascript",
+      "rendering": null,
+      "features": [
+        "game-loop",
+        "controls",
+        "scoring",
+        "collision",
+        "game-over"
+      ],
+      "importantFiles": [],
+      "constraints": [],
+      "recentChanges": []
+    },
+    "diagnostics": {
+      "truncationDetected": false,
+      "truncationSignals": [],
+      "languageMismatch": false,
+      "languageRatio": 0,
+      "repaired": true,
+      "repairAttempts": 2,
+      "repairReasons": [
+        "truncation (open-code-fence, unmatched-(), unmatched-{}, provider-stop-reason-length)",
+        "syntax-failure (jsx:unbalanced brackets (jsx/module code))"
+      ],
+      "validation": {
+        "codeBlockCount": 1,
+        "syntax": [
+          {
+            "lang": "jsx",
+            "ok": true,
+            "issues": []
+          }
+        ],
+        "gameSignals": [
+          "game-loop",
+          "controls",
+          "scoring",
+          "collision"
+        ]
+      },
+      "continuity": null,
+      "missingCodeForModification": false,
+      "isModificationRequest": false,
+      "stopReason": "stop",
+      "syntaxIssues": [
+        "jsx:unbalanced brackets (jsx/module code)"
+      ],
+      "ttftMs": 161529,
+      "totalMs": 161529,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "inputTokens": 1266,
+      "outputTokens": 1500,
+      "fallbackUsed": false
+    },
+    "latencyMs": 161552,
+    "score": 4.6,
+    "maxScore": 5,
+    "passed": true,
+    "hardFailures": [],
+    "aspects": {
+      "instructionAdherence": 1,
+      "functionalCorrectness": 1,
+      "conversationContinuity": 0.6,
+      "executionValidation": 0.8,
+      "completeness": 1,
+      "uxQuality": 1,
+      "efficiency": 1
+    },
+    "breakdown": null,
+    "content": "Here is the complete corrected Snake game. It's a single React component with a fixed grid, score tracking, increasing speed on food pickup, and a restartable game-over overlay. The previous syntax issue has been resolved and the code is fully self-contained.\n\n```jsx\nimport React, { useState, useEffect, useRef, useCallback } from \"react\";\n\nconst GRID_SIZE = 20;\nconst CELL_SIZE = 20;\nconst INITIAL_SPEED = 180;\nconst MIN_SPEED = 60;\nconst SPEED_INCREMENT = 10;\n\nfunction App() {\n  const [snake, setSnake] = useState([\n    { x: 10, y: 10 },\n    { x: 9, y: 10 },\n    { x: 8, y: 10 },\n  ]);\n  const [food, setFood] = useState({ x: 15, y: 10 });\n  const [direction, setDirection] = useState({ x: 1, y: 0 });\n  const [gameOver, setGameOver] = useState(false);\n  const [isRunning, setIsRunning] = useState(false);\n  const [score, setScore] = useState(0);\n\n  const directionRef = useRef(direction);\n  const snakeRef = useRef(snake);\n  const foodRef = useRef(food);\n  const speedRef = useRef(INITIAL_SPEED);\n\n  useEffect(() => {\n    directionRef.current = direction;\n  }, [direction]);\n\n  useEffect(() => {\n    snakeRef.current = snake;\n  }, [snake]);\n\n  useEffect(() => {\n    foodRef.current = food;\n  }, [food]);\n\n  const generateFood = useCallback((currentSnake) => {\n    const freeCells = [];\n    for (let x = 0; x < GRID_SIZE; x++) {\n      for (let y = 0; y < GRID_SIZE; y++) {\n        if (!currentSnake.some((segment) => segment.x === x && segment.y === y)) {\n          freeCells.push({ x, y });\n        }\n      }\n    }\n    if (freeCells.length === 0) return null;\n    return freeCells[Math.floor(Math.random() * freeCells.length)];\n  }, []);\n\n  const resetGame = () => {\n    const initialSnake = [\n      { x: 10, y: 10 },\n      { x: 9, y: 10 },\n      { x: 8, y: 10 },\n    ];\n    snakeRef.current = initialSnake;\n    setSnake(initialSnake);\n    setFood(generateFood(initialSnake) || { x: 15, y: 10 });\n    setDirection({ x: 1, y: 0 });\n    directionRef.current = { x: 1, y: 0 };\n    speedRef.current = INITIAL_SPEED;\n    setScore(0);\n    setGameOver(false);\n    setIsRunning(true);\n  };\n\n  useEffect(() => {\n    const handleKeyDown = (e) => {\n      const key = e.key;\n\n      if (!isRunning || gameOver) return;\n\n      const currentDir = directionRef.current;\n\n      switch (key) {\n        case \"ArrowUp\":\n          if (currentDir.y !== 1) {\n            setDirection({ x: 0, y: -1 });\n            directionRef.current = { x: 0, y: -1 };\n          }\n          break;\n        case \"ArrowDown\":\n          if (currentDir.y !== -1) {\n            setDirection({ x: 0, y: 1 });\n            directionRef.current = { x: 0, y: 1 };\n          }\n          break;\n        case \"ArrowLeft\":\n          if (currentDir.x !== 1) {\n            setDirection({ x: -1, y: 0 });\n            directionRef.current = { x: -1, y: 0 };\n          }\n          break;\n        case \"ArrowRight\":\n          if (currentDir.x !== -1) {\n            setDirection({ x: 1, y: 0 });\n            directionRef.current = { x: 1, y: 0 };\n          }\n          break;\n        default:\n          break;\n      }\n    };\n\n    window.addEventListener(\"keydown\", handleKeyDown);\n    return () => window.removeEventListener(\"keydown\", handleKeyDown);\n  }, [isRunning, gameOver]);\n\n  useEffect(() => {\n    if (!isRunning || gameOver) return;\n\n    const interval = setInterval(() => {\n      const currentSnake = snakeRef.current;\n      const currentDir = directionRef.current;\n      const currentFood = foodRef.current;\n\n      if (!currentFood) return;\n\n      const head = currentSnake[0];\n      const newHead = {\n        x: head.x + currentDir.x,\n        y: head.y + currentDir.y,\n      };\n\n      // Wall collision\n      if (\n        newHead.x < 0 ||\n        newHead.x >= GRID_SIZE ||\n        newHead.y < 0 ||\n        newHead.y >= GRID_SIZE\n      ) {\n        setGameOver(true);\n        setIsRunning(false);\n        return;\n      }\n\n      // Self collision\n      if (\n        currentSnake.some(\n          (segment) => segment.x === newHead.x && segment.y === newHead.y\n        )\n      ) {\n        setGameOver(true);\n        setIsRunning(false);\n        return;\n      }\n\n      const newSnake = [newHead, ...currentSnake];\n\n      if (newHead.x === currentFood.x && newHead.y === currentFood.y) {\n        setScore((prevScore) => prevScore + 1);\n        speedRef.current = Math.max(\n          MIN_SPEED,\n          speedRef.current - SPEED_INCREMENT\n        );\n        const nextFood = generateFood(newSnake);\n        foodRef.current = nextFood;\n        setFood(nextFood);\n      } else {\n        newSnake.pop();\n      }\n\n      snakeRef.current = newSnake;\n      setSnake(newSnake);\n    }, speedRef.current);\n\n    return () => clearInterval(interval);\n  }, [isRunning, gameOver, generateFood]);\n\n  const startScreen = !isRunning && !gameOver;\n  const gameOverScreen = gameOver;\n\n  return (\n    <div style={styles.container}>\n      <h1 style={styles.title}>🐍 Snake Game</h1>\n      <div style={styles.scoreboard}>\n        <span style={styles.scoreItem}>Score: {score}</span>\n        <span style={styles.scoreItem}>\n          Speed:{\" \"}\n          {Math.round((INITIAL_SPEED - speedRef.current) / SPEED_INCREMENT) + 1}x\n        </span>\n      </div>\n\n      <div style={styles.boardWrapper}>\n        <div style={styles.board}>\n          {Array.from({ length: GRID_SIZE * GRID_SIZE }).map((_, i) => {\n            const x = i % GRID_SIZE;\n            const y = Math.floor(i / GRID_SIZE);\n            const isSnakeHead = snake.length > 0 && snake[0].x === x && snake[0].y === y;\n            const isSnakeBody = snake.some(\n              (segment, idx) => idx > 0 && segment.x === x && segment.y === y\n            );\n            const isFood = food && food.x === x && food.y === y;\n\n            let backgroundColor = \"#16213e\";\n            if (isFood) backgroundColor = \"#ff5722\";\n            if (isSnakeBody) backgroundColor = \"#4caf50\";\n            if (isSnakeHead) backgroundColor = \"#8bc34a\";\n\n            return <div key={i} style={{ ...styles.cell, backgroundColor }} />;\n          })}\n        </div>\n\n        {startScreen && (\n          <div style={styles.overlay}>\n            <h2 style={styles.overlayTitle}>Snake Game</h2>\n            <p style={styles.overlayText}>\n              Use the arrow keys to move.\n              <br />\n              Eat the red food to grow and speed up!\n            </p>\n            <button onClick={resetGame} style={styles.button}>\n              Start Game\n            </button>\n          </div>\n        )}\n\n        {gameOverScreen && (\n          <div style={styles.overlay}>\n            <h2 style={styles.overlayTitle}>Game Over</h2>\n            <p style={styles.overlayText}>Final Score: {score}</p>\n            <button onClick={resetGame} style={styles.button}>\n              Play Again\n            </button>\n          </div>\n        )}\n      </div>\n    </div>\n  );\n}\n\nconst styles = {\n  container: {\n    display: \"flex\",\n    flexDirection: \"column\",\n    alignItems: \"center\",\n    justifyContent: \"center\",\n    minHeight: \"100vh\",\n    backgroundColor: \"#0f0f23\",\n    fontFamily: \"Arial, sans-serif\",\n    padding: \"20px\",\n    boxSizing: \"border-box\",\n  },\n  title: {\n    color: \"#4caf50\",\n    fontSize: \"36px\",\n    margin: \"0 0 12px 0\",\n    textShadow: \"0 0 10px rgba(76, 175, 80, 0.5)\",\n  },\n  scoreboard: {\n    display: \"flex\",\n    gap: \"32px\",\n    backgroundColor: \"#1a1a2e\",\n    padding: \"10px 28px\",\n    borderRadius: \"8px\",\n    marginBottom: \"16px\",\n    zIndex: 20,\n    boxShadow: \"0 2px 8px rgba(0, 0, 0, 0.4)\",\n  },\n  scoreItem: {\n    color: \"#e0e0e0\",\n    fontSize: \"18px\",\n    fontWeight: \"bold\",\n  },\n  boardWrapper: {\n    position: \"relative\",\n    border: \"4px solid #4caf50\",\n    borderRadius: \"10px\",\n    boxShadow: \"0 0 30px rgba(76, 175, 80, 0.25)\",\n    overflow: \"hidden\",\n  },\n  board: {\n    display: \"grid\",\n    gridTemplateColumns: `repeat(${GRID_SIZE}, ${CELL_SIZE}px)`,\n    gridTemplateRows: `repeat(${GRID_SIZE}, ${CELL_SIZE}px)`,\n    backgroundColor: \"#16213e\",\n    width: GRID_SIZE * CELL_SIZE,\n    height: GRID_SIZE * CELL_SIZE,\n  },\n  cell: {\n    width: CELL_SIZE,\n    height: CELL_SIZE,\n    border: \"0.5px solid rgba(255, 255, 255, 0.03)\",\n  },\n  overlay: {\n    position: \"absolute\",\n    top: 0,\n    left: 0,\n    width: \"100%\",\n    height: \"100%\",\n    display: \"flex\",\n    flexDirection: \"column\",\n    alignItems: \"center\",\n    justifyContent: \"center\",\n    backgroundColor: \"rgba(0, 0, 0, 0.85)\",\n    zIndex: 40,\n    textAlign: \"center\",\n  },\n  overlayTitle: {\n    color: \"#ff5722\",\n    fontSize: \"42px\",\n    margin: \"0 0 14px 0\",\n    textShadow: \"0 0 12px rgba(255, 87, 34, 0.6)\",\n  },\n  overlayText: {\n    color: \"#e0e0e0\",\n    fontSize: \"17px\",\n    lineHeight: 1.6,\n    margin: \"0 0 26px 0\",\n    padding: \"0 24px\",\n  },\n  button: {\n    padding: \"12px 36px\",\n    fontSize: \"18px\",\n    fontWeight: \"bold\",\n    backgroundColor: \"#4caf50\",\n    color: \"#fff\",\n    border: \"none\",\n    borderRadius: \"8px\",\n    cursor: \"pointer\",\n    transition: \"background-color 0.2s ease, transform 0.2s ease\",\n    boxShadow: \"0 4px 12px rgba(76, 175, 80, 0.4)\",\n  },\n};\n\nexport default App;\n```"
+  },
+  {
+    "id": "general-1",
+    "category": "general",
+    "prompt": "What are some good habits for staying productive when working from home?",
+    "ok": true,
+    "error": null,
+    "model": "opencode:deepseek-v4-flash",
+    "provider": "opencode-go",
+    "projectState": null,
+    "diagnostics": {
+      "truncationDetected": false,
+      "truncationSignals": [],
+      "languageMismatch": false,
+      "languageRatio": 0,
+      "repaired": false,
+      "repairAttempts": 0,
+      "repairReasons": [],
+      "validation": {
+        "codeBlockCount": 0,
+        "syntax": []
+      },
+      "continuity": null,
+      "missingCodeForModification": false,
+      "isModificationRequest": false,
+      "stopReason": "stop",
+      "syntaxIssues": [],
+      "ttftMs": 14070,
+      "totalMs": 14070,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "inputTokens": 1256,
+      "outputTokens": 1068,
+      "fallbackUsed": false
+    },
+    "latencyMs": 14071,
+    "score": 4.7,
+    "maxScore": 5,
+    "passed": true,
+    "hardFailures": [],
+    "aspects": {
+      "instructionAdherence": 1,
+      "functionalCorrectness": 1,
+      "conversationContinuity": 0.6,
+      "executionValidation": 1,
+      "completeness": 1,
+      "uxQuality": 0.9,
+      "efficiency": 1
+    },
+    "breakdown": null,
+    "content": "Working from home removes the office’s natural structure, so productivity depends on creating your own cues, boundaries, and routines. The goal isn't to work longer—it's to make your focus hours more intentional and separate from home life.\n\n## Core Daily Habits\n\n- **Start with a consistent morning routine** — Wake, exercise, eat, and get dressed before opening your laptop. It signals your brain that work has begun.\n- **Set explicit work hours** — Define a start and end time, and stick to them daily. Without boundaries, work will expand into evenings.\n- **Plan your top 3 priorities each morning** — Write them down before checking email; this forces you to work on what matters, not just what's urgent.\n- **Use a \"start-of-day\" ritual** — Review yesterday's notes, set today's goals, and tidy your desk. A 10-minute transition helps you switch into work mode.\n\n## Design Your Workspace\n\n- **Dedicate a specific area for work** — Even a corner of a room works; avoid your bed or couch so your brain associates that spot with focus.\n- **Separate work equipment** — Use a different keyboard or monitor if possible. Closing your work laptop at the end of the day becomes a clear physical signal you're done.\n- **Keep it minimal and organized** — Clutter competes for attention; keep only what you need within reach.\n\n## Manage Time & Focus\n\n- **Time-block your calendar** — Assign specific hours for deep work, meetings, and admin tasks so you don't drift between them.\n- **Single-task one thing at a time** — Shut unrelated tabs and mute notifications; task-switching costs more time than most people realize.\n- **Try the Pomodoro technique** — Work in 25-minute focused sprints with 5-minute breaks to maintain mental freshness.\n\n## Protect Your Energy & Boundaries\n\n- **Take real breaks away from the screen** — Step outside, stretch, or make tea; scrolling social media doesn't restore attention.\n- **Get daylight and movement** — A short walk mid-day improves afternoon focus more than an extra half-hour of work.\n- **Communicate your availability** — Set status indicators and tell family or housemates when you cannot be interrupted.\n- **Avoid working through lunch** — A genuine 30–60 minute break prevents burnout and keeps decision quality high.\n\n## End-of-Day Shutdown Ritual\n\n- **Define a cut-off time and stick to it** — You cannot be \"always on\"; shutdown is when your brain files and consolidates the day.\n- **Write tomorrow's task list** — Getting it out of your head clears mental load and gives you a head start in the morning.\n- **Close all work tabs and documents** — This creates a final boundary and reduces the urge to \"just check one more thing.\"\n- **Review what went well** — Note one win from the day; it builds momentum and motivation over time.\n\n## How to Make It Stick\n\nPick just two or three habits that feel most needed for your situation—trying to implement everything at once will fail. Start with a trustworthy morning routine and a clear end-of-day shutdown; once those feel automatic, layer in time-blocking or workspace changes. Reassess weekly and adjust based on what actually improved your focus."
+  },
+  {
+    "id": "code-help-1",
+    "category": "more",
+    "prompt": "My React button click does nothing. How should I debug it?",
+    "ok": true,
+    "error": null,
+    "model": "opencode:deepseek-v4-flash",
+    "provider": "opencode-go",
+    "projectState": {
+      "projectType": "website",
+      "framework": "react",
+      "language": "javascript",
+      "rendering": null,
+      "features": [],
+      "importantFiles": [],
+      "constraints": [],
+      "recentChanges": []
+    },
+    "diagnostics": {
+      "truncationDetected": false,
+      "truncationSignals": [],
+      "languageMismatch": false,
+      "languageRatio": 0,
+      "repaired": false,
+      "repairAttempts": 0,
+      "repairReasons": [],
+      "validation": {
+        "codeBlockCount": 6,
+        "syntax": [
+          {
+            "lang": "jsx",
+            "ok": true,
+            "issues": []
+          },
+          {
+            "lang": "jsx",
+            "ok": true,
+            "issues": []
+          },
+          {
+            "lang": "jsx",
+            "ok": true,
+            "issues": []
+          },
+          {
+            "lang": "jsx",
+            "ok": true,
+            "issues": []
+          },
+          {
+            "lang": "jsx",
+            "ok": true,
+            "issues": []
+          }
+        ]
+      },
+      "continuity": null,
+      "missingCodeForModification": false,
+      "isModificationRequest": false,
+      "stopReason": "stop",
+      "syntaxIssues": [],
+      "ttftMs": 15039,
+      "totalMs": 15039,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "inputTokens": 1256,
+      "outputTokens": 1296,
+      "fallbackUsed": false
+    },
+    "latencyMs": 15041,
+    "score": 4.7,
+    "maxScore": 5,
+    "passed": true,
+    "hardFailures": [],
+    "aspects": {
+      "instructionAdherence": 1,
+      "functionalCorrectness": 1,
+      "conversationContinuity": 0.6,
+      "executionValidation": 1,
+      "completeness": 1,
+      "uxQuality": 0.9,
+      "efficiency": 1
+    },
+    "breakdown": null,
+    "content": "Start by confirming that your handler is actually wired to the button — not just defined next to it. Most \"button does nothing\" cases come from one of these: the function is accidentally invoked on render, the click event never reaches the button, the state updates but the component doesn't re-render, or an invisible element is blocking the click. Debugging this systematically will take you from \"nothing happens\" to the exact cause in a few minutes.\n\n## Start With the Obvious\n\n- **Check the browser console** for errors (F12 → Console). A typo in the handler name, a missing variable, or a failed import will usually show up there.\n- **Confirm the handler is passed correctly.** A common mistake is calling the function instead of passing a reference:\n\n```jsx\n// ❌ Wrong: click handler runs during render, not on click\n<button onClick={handleClick()}>Click</button>\n\n// ✅ Right: function is passed as a reference\n<button onClick={handleClick}>Click</button>\n```\n\n- **Add a temporary `console.log` inside the handler** to see if it ever fires:\n\n```jsx\nfunction handleClick() {\n  console.log(\"Button clicked!\");\n}\n```\n\nIf you don't see this log, the handler isn't being invoked. If you do see it, the problem is downstream (state, rendering, or DOM).\n\n## Check the Event Itself\n\n- **Verify you're clicking the right element.** Nested buttons or a `<button>` inside another `<button>` can cause weird behaviour. Use `event.target` in your handler to confirm what was clicked.\n- **Watch out for forms and `type=\"button\"`.** Inside a `<form>`, a button defaults to `type=\"submit\"`, which triggers a page reload and makes your handler seem useless. Add `type=\"button\"` to stop that.\n- **Prevent default if the button is an anchor or form element:**\n\n```jsx\n<a href=\"#\" onClick={(event) => { event.preventDefault(); doSomething(); }}>Click</a>\n```\n\n- **Check event propagation and `stopPropagation`.** If a parent element calls `stopPropagation()`, the button's own handler may never fire. Conversely, a global click handler might interfere.\n\n## Inspect State Updates and Rendering\n\n- **If the handler fires but the screen doesn't change**, verify that you're using state correctly:\n\n```jsx\nconst [count, setCount] = useState(0);\n<button onClick={() => setCount(count + 1)}>Count: {count}</button>\n```\n\n- **Watch for stale closures.** If you're using `useEffect`, `useCallback`, or a function that reads state inside a `setInterval` or async call, it might be capturing old values. Use the functional update form:\n\n```jsx\n<button onClick={() => setCount((previousCount) => previousCount + 1)}>Increment</button>\n```\n\n- **Confirm that state is actually changing** using React DevTools (Components tab). If the state value updates but the UI still looks static, the issue is in your conditional rendering or styling, not the click handler.\n\n## Look for Overlapping Elements\n\n- **An invisible element might be covering the button.** Check the parent container's CSS for an overlapping `::before`/`::after`, an absolute-positioned overlay, or a `transform` that shifts a sibling element on top.\n- **Inspect the button in DevTools** (Elements tab) and hover over it — see if the highlighted area matches the visible button. If DevTools selects a different element, you have an overlay issue.\n- **A disabled-looking button may still have `pointer-events: none`** or `display: none` on a child. Enable the click on the button itself:\n\n```css\nbutton { pointer-events: auto; }\n```\n\n## Systematic Debugging Workflow\n\n1. **Reproduce with a minimal case** — strip the button and its handler into a tiny component. If it works there, the issue is in the parent context.\n2. **Isolate by adding logs at each layer** — render, event listener, handler, state update, and effect.\n3. **Use React DevTools** — inspect props, state, and whether the component re-renders after the click.\n4. **Check browser DevTools event listener breakpoints** — click event listener breakpoints will pause code and show the call stack, revealing what's consuming the event.\n\nIf you've gone through all of these and still see nothing, the most productive next step is to post an intentionally minimal reproduction — but 90% of the time the fix is either adding `type=\"button\"`, correcting the `onClick` syntax, or discovering a hidden overlay."
+  },
+  {
+    "id": "explanation-1",
+    "category": "more",
+    "prompt": "Explain how CSS flexbox works like I am new to web development.",
+    "ok": true,
+    "error": null,
+    "model": "opencode:deepseek-v4-flash",
+    "provider": "opencode-go",
+    "projectState": {
+      "projectType": "app",
+      "framework": "unknown",
+      "language": "javascript",
+      "rendering": null,
+      "features": [],
+      "importantFiles": [],
+      "constraints": [],
+      "recentChanges": []
+    },
+    "diagnostics": {
+      "truncationDetected": false,
+      "truncationSignals": [],
+      "languageMismatch": false,
+      "languageRatio": 0,
+      "repaired": true,
+      "repairAttempts": 1,
+      "repairReasons": [
+        "truncation (provider-stop-reason-length)"
+      ],
+      "validation": {
+        "codeBlockCount": 3,
+        "syntax": [
+          {
+            "lang": "html",
+            "ok": true,
+            "issues": []
+          }
+        ]
+      },
+      "continuity": null,
+      "missingCodeForModification": false,
+      "isModificationRequest": false,
+      "stopReason": "stop",
+      "syntaxIssues": [],
+      "ttftMs": 21067,
+      "totalMs": 21067,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "inputTokens": 1257,
+      "outputTokens": 1500,
+      "fallbackUsed": false
+    },
+    "latencyMs": 21067,
+    "score": 4.7,
+    "maxScore": 5,
+    "passed": true,
+    "hardFailures": [],
+    "aspects": {
+      "instructionAdherence": 1,
+      "functionalCorrectness": 1,
+      "conversationContinuity": 0.6,
+      "executionValidation": 1,
+      "completeness": 1,
+      "uxQuality": 0.9,
+      "efficiency": 1
+    },
+    "breakdown": null,
+    "content": "## Flexbox Explained for Beginners\n\nFlexbox (Flexible Box Layout) is a CSS layout model that helps you arrange elements in a row or column with far less code than older techniques like floats or inline-block. Instead of manually calculating widths and margins, you tell the container how to distribute space, and it handles the math for you. Think of it as a \"smart ruler\" that aligns, orders, and resizes your items automatically.\n\n## Core Idea: Parent and Children\n\nThere are always two levels involved:\n\n- **Flex container** — the parent element that gets `display: flex;`.\n- **Flex items** — the direct children inside that container.\n\nOnly the direct children become flexible. Grandchildren are unaffected unless they are inside their own flex container.\n\n## The Two Axes\n\nFlexbox works along two perpendicular lines:\n\n- **Main axis** — the primary direction of layout. By default this is left-to-right (like a row), but you can flip it to vertical.\n- **Cross axis** — the perpendicular direction. If the main axis is horizontal, the cross axis is vertical, and vice versa.\n\nMost flexbox properties depend on these axes, so keep them in mind.\n\n## Setting Up a Flex Container\n\n```css\n.container {\n  display: flex;\n}\n```\n\nThat single line turns the element into a flex container. Its children will automatically sit side by side in a row, instead of stacking vertically as block elements normally would.\n\n## Key Container Properties\n\nThese properties go on the **parent**:\n\n- **`flex-direction`** — defines the main axis direction:\n  - `row` (default): left to right.\n  - `row-reverse`: right to left.\n  - `column`: top to bottom.\n  - `column-reverse`: bottom to top.\n- **`justify-content`** — aligns items **along the main axis**:\n  - `flex-start` (default): pack at the start.\n  - `flex-end`: pack at the end.\n  - `center`: group in the middle.\n  - `space-between`: equal space between items, no space at edges.\n  - `space-around`: equal space around each item.\n  - `space-evenly`: equal space everywhere, including edges.\n- **`align-items`** — aligns items **along the cross axis**:\n  - `stretch` (default): items stretch to fill the track height/width.\n  - `flex-start`: align to the start of the cross axis.\n  - `flex-end`: align to the end.\n  - `center`: center in the middle.\n  - `baseline`: align text baselines.\n- **`flex-wrap`** — controls whether items stay on one line or wrap:\n  - `nowrap` (default): items shrink to fit one line.\n  - `wrap`: items move to new lines as needed.\n  - `wrap-reverse`: wraps in reverse order.\n- **`gap`** — sets the space between items, e.g., `gap: 1rem;`. This is much cleaner than margins.\n\n## Key Item Properties\n\nThese go on the **child** elements:\n\n- **`flex-grow`** — how much an item should grow to fill available space. `0` means no growth (default), `1` means grow evenly.\n- **`flex-shrink`** — how much an item should shrink when space is tight. Default is `1`.\n- **`flex-basis`** — the starting size of an item before growing or shrinking. Can be `auto`, `0`, or a length like `200px`.\n- **`flex` shorthand** — combines the three above: `flex: 1 1 auto;` means grow, shrink, and basis. A common pattern is `flex: 1;` which means `1 1 0%`.\n- **`align-self`** — overrides `align-items` for a single item, e.g., `align-self: flex-end;`.\n- **`order`** — changes the visual order of an item without changing the HTML. Lower numbers appear first.\n\n## A Simple Example\n\n```html\n<div class=\"container\">\n  <div class=\"item\">A</div>\n  <div class=\"item\">B</div>\n  <div class=\"item\">C</div>\n</div>\n```\n\n```css\n.container {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  gap: 16px;\n}\n\n.item {\n  flex: 1;              /* each item grows equally */\n  padding: 20px;\n  background: lightblue;\n  border-radius: 8px;\n}\n```\n\nHere all three items share the available width equally (thanks to `flex: 1`), sit vertically centered, and have even spacing. That would take far more effort with floats or tables.\n\n## When To Use Flexbox\n\n- One-dimensional layouts (a row or a column), such as toolbars, nav bars, cards in a row, or centering content.\n- When you need items to resize automatically based on available space.\n- When you need to change the visual order of items without touching HTML.\n\nFor two-dimensional layouts (rows **and** columns at the same time), CSS Grid is usually the better choice. Flexbox and Grid work beautifully together — Grid for the page structure, Flexbox for the details inside each grid cell.\n\n## What To Try Next\n\nOpen your browser dev tools, create a simple `display: flex` container, and experiment with `justify-content`, `\n\n, `align-items`, and `flex-direction` to see how each changes the layout in real time. Try nesting a flex container inside another flex container, and test how `flex-wrap` behaves when you shrink the browser window.\n\nA good next step is to build a simple navbar: a flex container with a logo, a few links, and a button. Use `justify-content: space-between` to push the logo left and the links right, and `align-items: center` to keep everything vertically balanced.\n\nOnce you feel comfortable with the basics, look into the `flex` shorthand (`flex: 1`, `flex: 0 1 auto`) and the `order` property — those two give you fine control over how items grow, shrink, and reorder themselves without changing a single line of HTML.\n\nFlexbox is a muscle memory skill. The more you play with it, the more natural it becomes. Within a short time, arranging rows, centering elements, and building responsive layouts will feel automatic."
+  },
+  {
+    "id": "writing-1",
+    "category": "more",
+    "prompt": "Write a short product description for a minimalist AI workspace.",
+    "ok": true,
+    "error": null,
+    "model": "opencode:deepseek-v4-flash",
+    "provider": "opencode-go",
+    "projectState": null,
+    "diagnostics": {
+      "truncationDetected": false,
+      "truncationSignals": [],
+      "languageMismatch": false,
+      "languageRatio": 0,
+      "repaired": false,
+      "repairAttempts": 0,
+      "repairReasons": [],
+      "validation": {
+        "codeBlockCount": 0,
+        "syntax": []
+      },
+      "continuity": null,
+      "missingCodeForModification": false,
+      "isModificationRequest": false,
+      "stopReason": "stop",
+      "syntaxIssues": [],
+      "ttftMs": 7128,
+      "totalMs": 7128,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "inputTokens": 1254,
+      "outputTokens": 494,
+      "fallbackUsed": false
+    },
+    "latencyMs": 7129,
+    "score": 4.7,
+    "maxScore": 5,
+    "passed": true,
+    "hardFailures": [],
+    "aspects": {
+      "instructionAdherence": 1,
+      "functionalCorrectness": 1,
+      "conversationContinuity": 0.6,
+      "executionValidation": 1,
+      "completeness": 1,
+      "uxQuality": 0.9,
+      "efficiency": 1
+    },
+    "breakdown": null,
+    "content": "Here's a short product description you can use, written to sound clean and focused, followed by a few optional taglines and a compact feature list if you need them.\n\n## Product Description\n\n**Corez** is a minimalist AI workspace that turns scattered tasks, notes, and ideas into one calm, organized flow. Instead of juggling multiple apps and tabs, you get a single clean canvas where an AI assistant helps you plan projects, draft content, and capture thoughts — so you can focus on the work, not the tooling.\n\n## Key Features\n\n- **Distraction-free interface** — a quiet, uncluttered design that keeps your attention on what matters.\n- **AI-assisted planning** — ask for outlines, summaries, or next steps and get instant, structured help.\n- **Unified notes & tasks** — keep everything in one place, with smart organization handled automatically.\n- **Instant capture** — jot down an idea and let the workspace file, tag, and connect it for you.\n\n## Tagline Options\n\n- \"Think clearly. Work simply.\"\n- \"Your ideas, decluttered.\"\n- \"The calm center of your workflow.\"\n\nIf you want a shorter one-liner for a landing page or a more detailed version for a pitch deck, let me know and I'll adjust the tone and length."
+  },
+  {
+    "id": "game-2-followup",
+    "category": "game",
+    "prompt": "Now make the snake speed up gradually instead of jumping between levels.",
+    "ok": true,
+    "error": null,
+    "model": "opencode:deepseek-v4-flash",
+    "provider": "opencode-go",
+    "projectState": {
+      "projectType": "website",
+      "framework": "react",
+      "language": "javascript",
+      "rendering": null,
+      "features": [
+        "game-loop",
+        "controls",
+        "scoring",
+        "collision",
+        "game-over"
+      ],
+      "importantFiles": [],
+      "constraints": [],
+      "recentChanges": [
+        "Now make the snake speed up gradually instead of jumping between levels."
+      ]
+    },
+    "diagnostics": {
+      "truncationDetected": false,
+      "truncationSignals": [],
+      "languageMismatch": false,
+      "languageRatio": 0,
+      "repaired": true,
+      "repairAttempts": 1,
+      "repairReasons": [
+        "missing-code-for-modification"
+      ],
+      "validation": {
+        "codeBlockCount": 1,
+        "syntax": [
+          {
+            "lang": "jsx",
+            "ok": true,
+            "issues": []
+          }
+        ],
+        "gameSignals": [
+          "game-loop",
+          "controls",
+          "scoring",
+          "collision"
+        ]
+      },
+      "continuity": {
+        "score": 5,
+        "checks": {
+          "used-previous-implementation": true,
+          "preserved-framework": true,
+          "preserved-unrelated-features": true,
+          "implemented-requested-change": true,
+          "avoided-unnecessary-rewrite": true
+        },
+        "codeBlockCount": 1,
+        "retainedLineRatio": 0.9585253456221198
+      },
+      "missingCodeForModification": false,
+      "isModificationRequest": true,
+      "stopReason": "stop",
+      "syntaxIssues": [],
+      "ttftMs": 104158,
+      "totalMs": 104158,
+      "provider": "opencode-go",
+      "model": "opencode:deepseek-v4-flash",
+      "inputTokens": 109,
+      "outputTokens": 496,
+      "fallbackUsed": false
+    },
+    "latencyMs": 104159,
+    "score": 4.9,
+    "maxScore": 5,
+    "passed": true,
+    "hardFailures": [],
+    "aspects": {
+      "instructionAdherence": 1,
+      "functionalCorrectness": 1,
+      "conversationContinuity": 1,
+      "executionValidation": 0.8,
+      "completeness": 1,
+      "uxQuality": 1,
+      "efficiency": 1
+    },
+    "breakdown": {
+      "overall": null,
+      "continuity": 5,
+      "changePrecision": 5,
+      "regressionSafety": 5
+    },
+    "content": "I made the snake speed up gradually by reducing the tick interval by just 2ms per food (capped at 60ms) instead of larger jumps, and I wired the speed into the game-loop effect so each speed change takes effect immediately on the next move. Controls, scoring, game-over overlay, and restart behavior are unchanged.\n\n```jsx\nimport React, { useState, useEffect, useRef, useCallback } from \"react\";\n\nconst GRID_SIZE = 20;\nconst CELL_SIZE = 20;\nconst INITIAL_SPEED = 180;\nconst MIN_SPEED = 60;\nconst SPEED_INCREMENT = 2;\n\nfunction App() {\n  const [snake, setSnake] = useState([\n    { x: 10, y: 10 },\n    { x: 9, y: 10 },\n    { x: 8, y: 10 },\n  ]);\n  const [food, setFood] = useState({ x: 15, y: 10 });\n  const [direction, setDirection] = useState({ x: 1, y: 0 });\n  const [gameOver, setGameOver] = useState(false);\n  const [isRunning, setIsRunning] = useState(false);\n  const [score, setScore] = useState(0);\n  const [speed, setSpeed] = useState(INITIAL_SPEED);\n\n  const directionRef = useRef(direction);\n  const snakeRef = useRef(snake);\n  const foodRef = useRef(food);\n\n  useEffect(() => {\n    directionRef.current = direction;\n  }, [direction]);\n\n  useEffect(() => {\n    snakeRef.current = snake;\n  }, [snake]);\n\n  useEffect(() => {\n    foodRef.current = food;\n  }, [food]);\n\n  const generateFood = useCallback((currentSnake) => {\n    const freeCells = [];\n    for (let x = 0; x < GRID_SIZE; x++) {\n      for (let y = 0; y < GRID_SIZE; y++) {\n        if (!currentSnake.some((segment) => segment.x === x && segment.y === y)) {\n          freeCells.push({ x, y });\n        }\n      }\n    }\n    if (freeCells.length === 0) return null;\n    return freeCells[Math.floor(Math.random() * freeCells.length)];\n  }, []);\n\n  const resetGame = () => {\n    const initialSnake = [\n      { x: 10, y: 10 },\n      { x: 9, y: 10 },\n      { x: 8, y: 10 },\n    ];\n    snakeRef.current = initialSnake;\n    setSnake(initialSnake);\n    setFood(generateFood(initialSnake) || { x: 15, y: 10 });\n    setDirection({ x: 1, y: 0 });\n    directionRef.current = { x: 1, y: 0 };\n    setSpeed(INITIAL_SPEED);\n    setScore(0);\n    setGameOver(false);\n    setIsRunning(true);\n  };\n\n  useEffect(() => {\n    const handleKeyDown = (e) => {\n      const key = e.key;\n\n      if (!isRunning || gameOver) return;\n\n      const currentDir = directionRef.current;\n\n      switch (key) {\n        case \"ArrowUp\":\n          if (currentDir.y !== 1) {\n            setDirection({ x: 0, y: -1 });\n            directionRef.current = { x: 0, y: -1 };\n          }\n          break;\n        case \"ArrowDown\":\n          if (currentDir.y !== -1) {\n            setDirection({ x: 0, y: 1 });\n            directionRef.current = { x: 0, y: 1 };\n          }\n          break;\n        case \"ArrowLeft\":\n          if (currentDir.x !== 1) {\n            setDirection({ x: -1, y: 0 });\n            directionRef.current = { x: -1, y: 0 };\n          }\n          break;\n        case \"ArrowRight\":\n          if (currentDir.x !== -1) {\n            setDirection({ x: 1, y: 0 });\n            directionRef.current = { x: 1, y: 0 };\n          }\n          break;\n        default:\n          break;\n      }\n    };\n\n    window.addEventListener(\"keydown\", handleKeyDown);\n    return () => window.removeEventListener(\"keydown\", handleKeyDown);\n  }, [isRunning, gameOver]);\n\n  useEffect(() => {\n    if (!isRunning || gameOver) return;\n\n    const interval = setInterval(() => {\n      const currentSnake = snakeRef.current;\n      const currentDir = directionRef.current;\n      const currentFood = foodRef.current;\n\n      if (!currentFood) return;\n\n      const head = currentSnake[0];\n      const newHead = {\n        x: head.x + currentDir.x,\n        y: head.y + currentDir.y,\n      };\n\n      // Wall collision\n      if (\n        newHead.x < 0 ||\n        newHead.x >= GRID_SIZE ||\n        newHead.y < 0 ||\n        newHead.y >= GRID_SIZE\n      ) {\n        setGameOver(true);\n        setIsRunning(false);\n        return;\n      }\n\n      // Self collision\n      if (\n        currentSnake.some(\n          (segment) => segment.x === newHead.x && segment.y === newHead.y\n        )\n      ) {\n        setGameOver(true);\n        setIsRunning(false);\n        return;\n      }\n\n      const newSnake = [newHead, ...currentSnake];\n\n      if (newHead.x === currentFood.x && newHead.y === currentFood.y) {\n        setScore((prevScore) => prevScore + 1);\n        setSpeed((prevSpeed) => Math.max(MIN_SPEED, prevSpeed - SPEED_INCREMENT));\n        const nextFood = generateFood(newSnake);\n        foodRef.current = nextFood;\n        setFood(nextFood);\n      } else {\n        newSnake.pop();\n      }\n\n      snakeRef.current = newSnake;\n      setSnake(newSnake);\n    }, speed);\n\n    return () => clearInterval(interval);\n  }, [isRunning, gameOver, speed, generateFood]);\n\n  const startScreen = !isRunning && !gameOver;\n  const gameOverScreen = gameOver;\n\n  return (\n    <div style={styles.container}>\n      <h1 style={styles.title}>🐍 Snake Game</h1>\n      <div style={styles.scoreboard}>\n        <span style={styles.scoreItem}>Score: {score}</span>\n        <span style={styles.scoreItem}>Speed: {speed}ms</span>\n      </div>\n\n      <div style={styles.boardWrapper}>\n        <div style={styles.board}>\n          {Array.from({ length: GRID_SIZE * GRID_SIZE }).map((_, i) => {\n            const x = i % GRID_SIZE;\n            const y = Math.floor(i / GRID_SIZE);\n            const isSnakeHead = snake.length > 0 && snake[0].x === x && snake[0].y === y;\n            const isSnakeBody = snake.some(\n              (segment, idx) => idx > 0 && segment.x === x && segment.y === y\n            );\n            const isFood = food && food.x === x && food.y === y;\n\n            let backgroundColor = \"#16213e\";\n            if (isFood) backgroundColor = \"#ff5722\";\n            if (isSnakeBody) backgroundColor = \"#4caf50\";\n            if (isSnakeHead) backgroundColor = \"#8bc34a\";\n\n            return <div key={i} style={{ ...styles.cell, backgroundColor }} />;\n          })}\n        </div>\n\n        {startScreen && (\n          <div style={styles.overlay}>\n            <h2 style={styles.overlayTitle}>Snake Game</h2>\n            <p style={styles.overlayText}>\n              Use the arrow keys to move.\n              <br />\n              Eat the red food to grow and speed up!\n            </p>\n            <button onClick={resetGame} style={styles.button}>\n              Start Game\n            </button>\n          </div>\n        )}\n\n        {gameOverScreen && (\n          <div style={styles.overlay}>\n            <h2 style={styles.overlayTitle}>Game Over</h2>\n            <p style={styles.overlayText}>Final Score: {score}</p>\n            <button onClick={resetGame} style={styles.button}>\n              Play Again\n            </button>\n          </div>\n        )}\n      </div>\n    </div>\n  );\n}\n\nconst styles = {\n  container: {\n    display: \"flex\",\n    flexDirection: \"column\",\n    alignItems: \"center\",\n    justifyContent: \"center\",\n    minHeight: \"100vh\",\n    backgroundColor: \"#0f0f23\",\n    fontFamily: \"Arial, sans-serif\",\n    padding: \"20px\",\n    boxSizing: \"border-box\",\n  },\n  title: {\n    color: \"#4caf50\",\n    fontSize: \"36px\",\n    margin: \"0 0 12px 0\",\n    textShadow: \"0 0 10px rgba(76, 175, 80, 0.5)\",\n  },\n  scoreboard: {\n    display: \"flex\",\n    gap: \"32px\",\n    backgroundColor: \"#1a1a2e\",\n    padding: \"10px 28px\",\n    borderRadius: \"8px\",\n    marginBottom: \"16px\",\n    zIndex: 20,\n    boxShadow: \"0 2px 8px rgba(0, 0, 0, 0.4)\",\n  },\n  scoreItem: {\n    color: \"#e0e0e0\",\n    fontSize: \"18px\",\n    fontWeight: \"bold\",\n  },\n  boardWrapper: {\n    position: \"relative\",\n    border: \"4px solid #4caf50\",\n    borderRadius: \"10px\",\n    boxShadow: \"0 0 30px rgba(76, 175, 80, 0.25)\",\n    overflow: \"hidden\",\n  },\n  board: {\n    display: \"grid\",\n    gridTemplateColumns: `repeat(${GRID_SIZE}, ${CELL_SIZE}px)`,\n    gridTemplateRows: `repeat(${GRID_SIZE}, ${CELL_SIZE}px)`,\n    backgroundColor: \"#16213e\",\n    width: GRID_SIZE * CELL_SIZE,\n    height: GRID_SIZE * CELL_SIZE,\n  },\n  cell: {\n    width: CELL_SIZE,\n    height: CELL_SIZE,\n    border: \"0.5px solid rgba(255, 255, 255, 0.03)\",\n  },\n  overlay: {\n    position: \"absolute\",\n    top: 0,\n    left: 0,\n    width: \"100%\",\n    height: \"100%\",\n    display: \"flex\",\n    flexDirection: \"column\",\n    alignItems: \"center\",\n    justifyContent: \"center\",\n    backgroundColor: \"rgba(0, 0, 0, 0.85)\",\n    zIndex: 40,\n    textAlign: \"center\",\n  },\n  overlayTitle: {\n    color: \"#ff5722\",\n    fontSize: \"42px\",\n    margin: \"0 0 14px 0\",\n    textShadow: \"0 0 12px rgba(255, 87, 34, 0.6)\",\n  },\n  overlayText: {\n    color: \"#e0e0e0\",\n    fontSize: \"17px\",\n    lineHeight: 1.6,\n    margin: \"0 0 26px 0\",\n    padding: \"0 24px\",\n  },\n  button: {\n    padding: \"12px 36px\",\n    fontSize: \"18px\",\n    fontWeight: \"bold\",\n    backgroundColor: \"#4caf50\",\n    color: \"#fff\",\n    border: \"none\",\n    borderRadius: \"8px\",\n    cursor: \"pointer\",\n    transition: \"background-color 0.2s ease, transform 0.2s ease\",\n    boxShadow: \"0 4px 12px rgba(76, 175, 80, 0.4)\",\n  },\n};\n\nexport default App;\n```"
+  },
+  {
+    "id": "greeting-1",
+    "category": "more",
+    "prompt": "hi",
+    "ok": true,
+    "error": null,
+    "model": "corez-greeting",
+    "provider": null,
+    "projectState": null,
+    "diagnostics": null,
+    "latencyMs": 1,
+    "score": 1,
+    "maxScore": 5,
+    "passed": true,
+    "hardFailures": [],
+    "aspects": null,
+    "breakdown": null,
+    "content": "Hi! What are we building today?"
+  }
+]
