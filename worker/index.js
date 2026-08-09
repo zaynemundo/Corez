@@ -252,7 +252,8 @@ Adaptive Routing - Writing Path:
   } else if (intentType === 'explanation') {
     adaptiveInstructions = `
 Adaptive Routing - Explanation Path:
-- Explain directly in plain language using practical examples.`;
+- Explain directly in plain language using practical examples.
+- Never restate, echo, or quote the user's question back at them — not as a heading, not in the opening line, and not in parentheses. Answer as if continuing the conversation.`;
   } else {
     adaptiveInstructions = `
 Adaptive Routing - Fast Path:
@@ -265,6 +266,7 @@ Adaptive Routing - Fast Path:
   const informationalFormatting = `
 Informational & List Formatting (for every non-code answer):
 - Open with a one-paragraph overview that answers the question directly, then organize the rest into clear sections.
+- Never restate or echo the user's question — no "You asked about...", no repeating the question as a heading or first line. Answer directly.
 - Start headings at the top level: use "## Section" for main parts and "### Subsection" at most — never begin below "###" and never nest deeper than three levels.
 - Prefer compact bullets with a bold lead-in: "- **Item name** — short description."
 - Use a markdown table whenever items share the same attributes (for example: program, issuer, focus, best for, level). Tables beat long lists for comparisons.
