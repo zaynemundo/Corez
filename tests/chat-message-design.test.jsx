@@ -76,29 +76,34 @@ describe('ChatMessage markdown visual design', () => {
     expect(screen.getByRole('heading', { name: 'Sub' }).tagName).toBe('H4');
   });
 
-  it('frames an email block in the table-style card without a table', () => {
-    const content = 'Subject: Launch update\n\nHi Sarah,\n\nHere is the plan.';
+  it('frames an email block in the compose-style card with toolbar and subject', () => {
+    const content = 'Subject: Launch update\nTo: Sarah\n\nHi Sarah,\n\nHere is the plan.';
     render(<ChatMessage message={{ role: 'assistant', content }} />);
 
     const wrapper = document.querySelector('.markdown-email-wrapper');
     expect(wrapper).not.toBeNull();
+    expect(wrapper.querySelector('.email-toolbar')).not.toBeNull();
+    expect(wrapper.querySelector('.email-subject')).not.toBeNull();
+    expect(wrapper.querySelector('.email-subject').textContent).toBe('Launch update');
+    expect(wrapper.querySelector('.email-recipients-value').textContent).toBe('Sarah');
     expect(document.querySelector('table')).toBeNull();
     expect(screen.getByText(/Hi Sarah/)).toBeInTheDocument();
   });
 
   it('frames an email even with a one-line preamble before the subject', () => {
-    const content = "Here's your draft:\n\nSubject: Launch update\n\nHi Sarah,\n\nHere is the plan.";
+    const content = "Here's your draft:\n\nSubject: Launch update\nTo: Sarah\n\nHi Sarah,\n\nHere is the plan.";
     render(<ChatMessage message={{ role: 'assistant', content }} />);
 
     expect(document.querySelector('.markdown-email-wrapper')).not.toBeNull();
-    expect(document.querySelector('table')).toBeNull();
+    expect(document.querySelector('.email-toolbar')).not.toBeNull();
   });
 
-  it('frames an email that opens with a To: header', () => {
-    const content = 'To: sarah@example.com\nFrom: corez@example.com\nSubject: Launch update\n\nHi Sarah,\n\nHere is the plan.';
+  it('omits recipients row when no To: header is present', () => {
+    const content = 'Subject: Quick note\n\nHi there,\n\nJust checking in.';
     render(<ChatMessage message={{ role: 'assistant', content }} />);
 
-    expect(document.querySelector('.markdown-email-wrapper')).not.toBeNull();
+    expect(document.querySelector('.email-recipients')).toBeNull();
+    expect(document.querySelector('.email-subject').textContent).toBe('Quick note');
   });
 
   it('leaves ordinary prose outside the email card', () => {

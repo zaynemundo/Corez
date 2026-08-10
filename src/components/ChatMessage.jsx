@@ -6,7 +6,9 @@ import {
   Wand2,
   ThumbsUp,
   ThumbsDown,
-  Share2
+  Share2,
+  Send,
+  Pencil
 } from 'lucide-react';
 import MarketCard from './MarketCard';
 
@@ -652,15 +654,53 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onRe
         return <CodeSnippetBlock key={idx} code={part.code} lang={part.lang} />;
       }
 
+      const isEmail = looksLikeEmail(part.content);
+
+      if (isEmail) {
+        const emailLines = part.content.split('\n');
+        let subject = '';
+        let recipients = '';
+        let bodyStart = 0;
+
+        for (let j = 0; j < emailLines.length; j++) {
+          const ln = emailLines[j].trim();
+          const subjectMatch = ln.match(/^Subject:\s*(.*)/i);
+          if (subjectMatch) { subject = subjectMatch[1]; bodyStart = j + 1; continue; }
+          const toMatch = ln.match(/^To:\s*(.*)/i);
+          if (toMatch) { recipients = toMatch[1]; bodyStart = j + 1; continue; }
+          if (!subject && !recipients && ln === '') { bodyStart = j + 1; continue; }
+          break;
+        }
+        const bodyText = emailLines.slice(bodyStart).join('\n').trim();
+
+        return (
+          <div key={idx} className="markdown-email-wrapper">
+            <div className="email-toolbar">
+              <div className="email-toolbar-left">
+                <button className="email-action-btn" aria-label="Edit"><Pencil size={13} /></button>
+                <span className="email-action-label">Edit</span>
+              </div>
+              <div className="email-toolbar-right">
+                <button className="email-icon-btn" aria-label="Copy"><Copy size={15} /></button>
+                <button className="email-icon-btn" aria-label="Share"><Share2 size={15} /></button>
+                <button className="email-send-btn" aria-label="Send"><Send size={14} /> Send</button>
+              </div>
+            </div>
+            {recipients && (
+              <div className="email-recipients">
+                <span className="email-recipients-label">Recipients</span>
+                <span className="email-recipients-value">{recipients}</span>
+              </div>
+            )}
+            {subject && <div className="email-subject">{subject}</div>}
+            <div className="email-body">{renderTextAndTables(bodyText)}</div>
+          </div>
+        );
+      }
+
       return (
         <div key={idx} className="markdown-body">
-          {looksLikeEmail(part.content) ? (
-            <div className="markdown-email-wrapper">
-              {renderTextAndTables(part.content)}
-            </div>
-          ) : (
-            renderTextAndTables(part.content)
-          )}
+          {renderTextAndTables(part.content)}
         </div>
       );
     });
