@@ -295,33 +295,10 @@ h1, h2, h3, h4, h5, h6 {
   filter: invert(100%);
 }
 
-.sidebar-action-box,
-.sidebar-chats-nav {
-  padding: 8px 12px 4px 12px;
+.sidebar-action-box {
+  padding: 7.5px 8px;
   display: flex;
-  flex-direction: column;
-}
-
-.sidebar-chats-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 38px;
-  padding: 0 4px;
-}
-
-.chats-label-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-primary);
-}
-
-.chats-title-text {
-  font-weight: 600;
-  font-size: 14px;
-  letter-spacing: -0.01em;
-  color: var(--text-primary);
+  justify-content: stretch;
 }
 
 .sidebar svg,
@@ -354,30 +331,29 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .new-chat-btn {
-  height: 30px;
-  min-height: 30px;
+  width: 100%;
+  height: 38px;
+  min-height: 38px;
   margin: 0;
-  padding: 0 8px;
-  border: 1px solid var(--sidebar-border);
-  background: var(--sidebar-item-hover-bg);
+  padding: 0 0.75rem;
+  border: none;
+  background: transparent;
   color: var(--text-primary);
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 0.6rem;
   cursor: pointer;
-  border-radius: 6px;
   transition: var(--transition-fast);
 }
 
 .new-chat-btn span,
 .footer-action-btn span {
-  font-size: 13px;
+  font-size: 15px;
   white-space: nowrap;
 }
 
 .new-chat-btn:hover {
   color: var(--text-primary);
-  background: var(--sidebar-item-active-bg);
 }
 
 .chat-history-list {
@@ -855,14 +831,6 @@ h1, h2, h3, h4, h5, h6 {
   transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast);
 }
 
-.message-action-btn.copy-action {
-  width: auto;
-  padding: 0 0.55rem;
-  gap: 0.35rem;
-  font: inherit;
-  font-size: 0.75rem;
-}
-
 .message-action-btn:hover {
   color: var(--text-primary);
   background-color: var(--bg-tertiary);
@@ -1302,6 +1270,14 @@ h1, h2, h3, h4, h5, h6 {
 .markdown-callout.callout-danger .callout-label,
 .markdown-callout.callout-important .callout-label {
   color: var(--text-secondary);
+}
+
+/* Horizontal rule divider */
+.markdown-hr {
+  border: none;
+  height: 1px;
+  margin: 0.9rem 0;
+  background: linear-gradient(90deg, transparent, var(--border-color, rgba(255, 255, 255, 0.12)), transparent);
 }
 
 /* Lists with designed markers */

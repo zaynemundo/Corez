@@ -5,8 +5,7 @@ import {
   Moon, 
   PanelLeft,
   MoreVertical,
-  Trash2,
-  Plus
+  Trash2
 } from 'lucide-react';
 import { ChatBubbleIcon } from './icons';
 
@@ -54,23 +53,15 @@ export default function Sidebar({
         </button>
       </div>
 
-      <div className="sidebar-chats-nav">
-        <div className="sidebar-chats-header">
-          <div className="chats-label-group">
-            <ChatBubbleIcon size={15} />
-            <span className="chats-title-text">Chats</span>
-          </div>
-          <button 
-            type="button"
-            className="new-chat-btn" 
-            onClick={onNewChat}
-            title="New Chat Session"
-            aria-label="New Chat Session"
-          >
-            <Plus size={14} strokeWidth={1.75} />
-            <span>New Chat</span>
-          </button>
-        </div>
+      <div className="sidebar-action-box">
+        <button 
+          className="new-chat-btn" 
+          onClick={onNewChat}
+          title="New Chat Session"
+        >
+          <ChatBubbleIcon size={16} />
+          <span>New Chat</span>
+        </button>
       </div>
 
       <div className="chat-history-list">
