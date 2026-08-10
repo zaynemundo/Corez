@@ -1212,6 +1212,10 @@ h1, h2, h3, h4, h5, h6 {
   line-height: 1.35;
 }
 
+.markdown-heading.level-2 {
+  font-size: 1.15rem;
+}
+
 .markdown-heading.level-3 {
   font-size: 1.05rem;
   font-weight: 600;
