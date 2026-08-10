@@ -267,7 +267,6 @@ function MessageActions({ content }) {
         aria-label={copied ? 'Response copied' : 'Copy response'}
       >
         {copied ? <Check size={14} strokeWidth={1.5} /> : <Copy size={14} strokeWidth={1.5} />}
-        <span>{copied ? 'Copied' : 'Copy'}</span>
       </button>
       <div className="rate-wrapper" ref={rateWrapperRef}>
         <button

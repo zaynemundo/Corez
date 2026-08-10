@@ -1209,31 +1209,12 @@ h1, h2, h3, h4, h5, h6 {
   margin: 1rem 0 0.4rem;
   color: var(--text-primary);
   letter-spacing: -0.01em;
-  padding-left: 0.65rem;
   line-height: 1.35;
-}
-
-.markdown-heading::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 1.05em;
-  border-radius: 2px;
-  background: var(--text-secondary);
 }
 
 .markdown-heading.level-3 {
   font-size: 1.05rem;
   font-weight: 600;
-}
-
-.markdown-heading.level-3::before {
-  width: 2px;
-  height: 0.9em;
-  background: var(--border-hover);
 }
 
 /* Callout blocks: blockquotes that open with **Note:**, **Tip:**, etc. */

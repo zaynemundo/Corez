@@ -21,11 +21,11 @@ describe('ChatMessage response actions', () => {
     render(<ChatMessage message={{ role: 'assistant', content }} />);
 
     const copyButton = screen.getByRole('button', { name: 'Copy response' });
-    expect(copyButton).toHaveTextContent('Copy');
+    expect(copyButton).toBeInTheDocument();
 
     fireEvent.click(copyButton);
 
     expect(writeText).toHaveBeenCalledWith(content);
-    expect(screen.getByRole('button', { name: 'Response copied' })).toHaveTextContent('Copied');
+    expect(screen.getByRole('button', { name: 'Response copied' })).toBeInTheDocument();
   });
 });
