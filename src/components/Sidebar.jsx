@@ -65,6 +65,7 @@ export default function Sidebar({
       </div>
 
       <div className="chat-history-list">
+        <div className="sidebar-chats-label">Chats</div>
         {sessions.map((session) => (
           <div
             key={session.id}
