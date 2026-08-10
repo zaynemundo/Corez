@@ -297,40 +297,30 @@ h1, h2, h3, h4, h5, h6 {
 
 .sidebar-action-box,
 .sidebar-chats-nav {
-  padding: 7.5px 8px;
+  padding: 8px 12px 4px 12px;
   display: flex;
   flex-direction: column;
 }
 
-.sidebar-chats-item {
+.sidebar-chats-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 10px;
   min-height: 38px;
-  border-radius: 8px;
-  background: var(--sidebar-item-active-bg);
-  cursor: pointer;
-  user-select: none;
-  transition: var(--transition-fast);
-}
-
-.sidebar-chats-item:hover {
-  background: var(--sidebar-item-hover-bg);
+  padding: 0 4px;
 }
 
 .chats-label-group {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-weight: 600;
-  font-size: 14px;
   color: var(--text-primary);
 }
 
 .chats-title-text {
   font-weight: 600;
-  letter-spacing: 0.01em;
+  font-size: 14px;
+  letter-spacing: -0.01em;
   color: var(--text-primary);
 }
 

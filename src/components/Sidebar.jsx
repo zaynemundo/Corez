@@ -55,34 +55,19 @@ export default function Sidebar({
       </div>
 
       <div className="sidebar-chats-nav">
-        <div 
-          className="sidebar-chats-item"
-          onClick={onNewChat}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              onNewChat();
-            }
-          }}
-          title="Chats - Start a New Chat"
-        >
+        <div className="sidebar-chats-header">
           <div className="chats-label-group">
-            <ChatBubbleIcon size={16} />
+            <ChatBubbleIcon size={15} />
             <span className="chats-title-text">Chats</span>
           </div>
           <button 
             type="button"
             className="new-chat-btn" 
-            onClick={(e) => {
-              e.stopPropagation();
-              onNewChat();
-            }}
+            onClick={onNewChat}
             title="New Chat Session"
             aria-label="New Chat Session"
           >
-            <Plus size={14} strokeWidth={1.5} />
+            <Plus size={14} strokeWidth={1.75} />
             <span>New Chat</span>
           </button>
         </div>
