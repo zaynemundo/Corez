@@ -261,12 +261,13 @@ function MessageActions({ content }) {
     <div className="message-actions" aria-label="Message actions">
       <button
         type="button"
-        className={`message-action-btn ${copied ? 'active' : ''}`}
+        className={`message-action-btn copy-action ${copied ? 'active' : ''}`}
         onClick={handleCopy}
-        title="Copy response"
-        aria-label="Copy response"
+        title={copied ? 'Response copied' : 'Copy response'}
+        aria-label={copied ? 'Response copied' : 'Copy response'}
       >
         {copied ? <Check size={14} strokeWidth={1.5} /> : <Copy size={14} strokeWidth={1.5} />}
+        <span>{copied ? 'Copied' : 'Copy'}</span>
       </button>
       <div className="rate-wrapper" ref={rateWrapperRef}>
         <button
@@ -450,14 +451,6 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onRe
 
       if (!trimmed) {
         elements.push(<div key={`blank-${i}`} style={{ height: '0.35rem' }} />);
-        i++;
-        continue;
-      }
-
-      // Horizontal rule: a line made only of dashes/asterisks/underscores
-      // (e.g. "---", "* * *") becomes a visual divider instead of raw text.
-      if (/^(\s*[-*_]\s*){3,}$/.test(trimmed)) {
-        elements.push(<hr key={`hr-${i}`} className="markdown-hr" />);
         i++;
         continue;
       }
