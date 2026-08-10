@@ -8,7 +8,8 @@ import {
   ThumbsDown,
   Share2,
   Send,
-  Pencil
+  Pencil,
+  X
 } from 'lucide-react';
 import MarketCard from './MarketCard';
 
@@ -317,6 +318,196 @@ function MessageActions({ content }) {
       >
         <Share2 size={14} strokeWidth={1.5} />
       </button>
+    </div>
+  );
+}
+
+function parseEmailContent(content) {
+  const emailLines = String(content || '').split('\n');
+  let subject = '';
+  let recipients = '';
+  let bodyStart = 0;
+
+  for (let j = 0; j < emailLines.length; j++) {
+    const ln = emailLines[j].trim();
+    const subjectMatch = ln.match(/^Subject:\s*(.*)/i);
+    if (subjectMatch) { subject = subjectMatch[1]; bodyStart = j + 1; continue; }
+    const toMatch = ln.match(/^To:\s*(.*)/i);
+    if (toMatch) { recipients = toMatch[1]; bodyStart = j + 1; continue; }
+    if (!subject && !recipients && ln === '') { bodyStart = j + 1; continue; }
+    break;
+  }
+
+  return { subject, recipients, body: emailLines.slice(bodyStart).join('\n').trim() };
+}
+
+function EmailCard({ content, renderBody }) {
+  const initial = parseEmailContent(content);
+  const [editing, setEditing] = useState(false);
+  const [subject, setSubject] = useState(initial.subject);
+  const [recipients, setRecipients] = useState(initial.recipients);
+  const [body, setBody] = useState(initial.body);
+  const [copied, setCopied] = useState(false);
+  const [shared, setShared] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  const fullText = [
+    `Subject: ${subject}`,
+    ...(recipients ? [`To: ${recipients}`] : []),
+    '',
+    body
+  ].join('\n').replace(/\n{3,}/g, '\n\n').trim();
+
+  const handleCopy = async () => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(fullText).catch(() => {});
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleShare = async () => {
+    const shareData = { title: subject || 'COREZ AI Email', text: fullText };
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+        setShared(true);
+        setTimeout(() => setShared(false), 2000);
+      } catch { /* Dismissed by the user */ }
+      return;
+    }
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(fullText).catch(() => {});
+      setShared(true);
+      setTimeout(() => setShared(false), 2000);
+    }
+  };
+
+  const handleSend = () => {
+    const to = /@/.test(recipients) ? recipients : '';
+    const mailto = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = mailto;
+    setSent(true);
+    setTimeout(() => setSent(false), 2500);
+  };
+
+  const startEdit = () => {
+    setEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setSubject(initial.subject);
+    setRecipients(initial.recipients);
+    setBody(initial.body);
+    setEditing(false);
+  };
+
+  const saveEdit = () => {
+    setEditing(false);
+  };
+
+  return (
+    <div className="markdown-email-wrapper">
+      <div className="email-toolbar">
+        <div className="email-toolbar-left">
+          <button
+            type="button"
+            className={`email-action-btn ${editing ? 'active' : ''}`}
+            onClick={editing ? cancelEdit : startEdit}
+            aria-label={editing ? 'Cancel editing' : 'Edit email'}
+            title={editing ? 'Cancel' : 'Edit'}
+          >
+            {editing ? <X size={13} /> : <Pencil size={13} />}
+          </button>
+          <span className="email-action-label">{editing ? 'Cancel' : 'Edit'}</span>
+        </div>
+        <div className="email-toolbar-right">
+          {editing ? (
+            <>
+              <button
+                type="button"
+                className="email-save-btn"
+                onClick={saveEdit}
+                aria-label="Save email"
+              >
+                <Check size={14} /> Save
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className={`email-icon-btn ${copied ? 'active' : ''}`}
+                onClick={handleCopy}
+                aria-label={copied ? 'Email copied' : 'Copy email'}
+                title={copied ? 'Copied' : 'Copy email'}
+              >
+                {copied ? <Check size={15} /> : <Copy size={15} />}
+              </button>
+              <button
+                type="button"
+                className={`email-icon-btn ${shared ? 'active' : ''}`}
+                onClick={handleShare}
+                aria-label={shared ? 'Email shared' : 'Share email'}
+                title={shared ? 'Shared' : 'Share email'}
+              >
+                <Share2 size={15} />
+              </button>
+              <button
+                type="button"
+                className={`email-send-btn ${sent ? 'sent' : ''}`}
+                onClick={handleSend}
+                aria-label={sent ? 'Email sent' : 'Send email'}
+                title="Open in your mail app"
+              >
+                {sent ? <Check size={14} /> : <Send size={14} />} {sent ? 'Sent' : 'Send'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+      {editing ? (
+        <div className="email-edit-fields">
+          <label className="email-edit-field">
+            <span className="email-edit-label">Recipients</span>
+            <input
+              className="email-edit-input"
+              value={recipients}
+              onChange={(e) => setRecipients(e.target.value)}
+              placeholder="name@example.com"
+            />
+          </label>
+          <label className="email-edit-field">
+            <span className="email-edit-label">Subject</span>
+            <input
+              className="email-edit-input"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder="Email subject"
+            />
+          </label>
+          <label className="email-edit-field">
+            <span className="email-edit-label">Message</span>
+            <textarea
+              className="email-edit-textarea"
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={Math.min(10, Math.max(4, body.split('\n').length))}
+            />
+          </label>
+        </div>
+      ) : (
+        <>
+          {recipients && (
+            <div className="email-recipients">
+              <span className="email-recipients-label">Recipients</span>
+              <span className="email-recipients-value">{recipients}</span>
+            </div>
+          )}
+          {subject && <div className="email-subject">{subject}</div>}
+          <div className="email-body">{renderBody(body)}</div>
+        </>
+      )}
     </div>
   );
 }
@@ -657,44 +848,8 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onRe
       const isEmail = looksLikeEmail(part.content);
 
       if (isEmail) {
-        const emailLines = part.content.split('\n');
-        let subject = '';
-        let recipients = '';
-        let bodyStart = 0;
-
-        for (let j = 0; j < emailLines.length; j++) {
-          const ln = emailLines[j].trim();
-          const subjectMatch = ln.match(/^Subject:\s*(.*)/i);
-          if (subjectMatch) { subject = subjectMatch[1]; bodyStart = j + 1; continue; }
-          const toMatch = ln.match(/^To:\s*(.*)/i);
-          if (toMatch) { recipients = toMatch[1]; bodyStart = j + 1; continue; }
-          if (!subject && !recipients && ln === '') { bodyStart = j + 1; continue; }
-          break;
-        }
-        const bodyText = emailLines.slice(bodyStart).join('\n').trim();
-
         return (
-          <div key={idx} className="markdown-email-wrapper">
-            <div className="email-toolbar">
-              <div className="email-toolbar-left">
-                <button className="email-action-btn" aria-label="Edit"><Pencil size={13} /></button>
-                <span className="email-action-label">Edit</span>
-              </div>
-              <div className="email-toolbar-right">
-                <button className="email-icon-btn" aria-label="Copy"><Copy size={15} /></button>
-                <button className="email-icon-btn" aria-label="Share"><Share2 size={15} /></button>
-                <button className="email-send-btn" aria-label="Send"><Send size={14} /> Send</button>
-              </div>
-            </div>
-            {recipients && (
-              <div className="email-recipients">
-                <span className="email-recipients-label">Recipients</span>
-                <span className="email-recipients-value">{recipients}</span>
-              </div>
-            )}
-            {subject && <div className="email-subject">{subject}</div>}
-            <div className="email-body">{renderTextAndTables(bodyText)}</div>
-          </div>
+          <EmailCard key={idx} content={part.content} renderBody={renderTextAndTables} />
         );
       }
 
