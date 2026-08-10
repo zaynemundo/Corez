@@ -1,14 +1,17 @@
 ---
 name: data-documents
-description: Analyses datasets and produces validated spreadsheets, charts, PDFs, Word documents, presentations, CSV, TXT, and other structured deliverables.
+description: Use for deterministic dataset analysis and structured document content; create spreadsheet, PDF, Word, or presentation files only when an available tool can generate and validate the requested format.
 ---
 
 # Data Analysis & Document Production
 
 ## Supported work
 - Dataset inspection, cleaning, transformation, statistics, modelling, calculations, comparisons, backtesting logic, risk metrics, charts, and benchmark interpretation.
-- Spreadsheet formulas, tables, formatting, validation, and Excel-compatible workbooks.
-- Structured Word documents, PDFs, slide decks, reports, proposals, brochures, and exportable CSV or TXT files.
+- Spreadsheet formulas, tables, validation, and CSV output; create an actual
+  workbook only when workbook-generation tooling is available.
+- Structured document and slide content; create an actual PDF through the
+  `pdf` skill, and claim Word or presentation delivery only after a file has
+  been generated and opened or parsed successfully.
 - Extracting and organising information from uploaded files while preserving source meaning.
 
 ## Workflow
@@ -17,7 +20,7 @@ description: Analyses datasets and produces validated spreadsheets, charts, PDFs
 3. Select an output format suited to the user's next action, not merely the analysis process.
 4. Apply clear hierarchy, accessible labels, consistent formatting, and sensible page or sheet structure.
 5. Verify generated files open correctly and that formulas, links, charts, tables, and pagination render as intended.
-6. Provide the finished artefact and a concise summary of assumptions and validation performed.
+6. Provide the finished artifact only when it exists; otherwise provide clearly labelled source content or a format specification.
 
 ## Guardrails
 - Do not fabricate rows, metrics, formulas, citations, or successful file creation.

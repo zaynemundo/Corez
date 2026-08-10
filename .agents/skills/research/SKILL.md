@@ -1,6 +1,6 @@
 ---
 name: research
-description: Structured two-phase deep research. Builds a research outline (items + fields) for a topic, optionally extends it with user input, deep-researches every item via parallel web-fetch subagents, and generates a markdown report. Use for academic surveys, technology comparisons, market research, competitor analysis, and due diligence.
+description: Use for multi-item deep reports such as academic surveys, technology comparisons, market research, competitor analysis, or due diligence; use research-current-information for a focused current question.
 ---
 
 # Deep Research Skill

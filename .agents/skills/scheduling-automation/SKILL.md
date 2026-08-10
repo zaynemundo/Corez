@@ -1,15 +1,17 @@
 ---
 name: scheduling-automation
-description: Creates and manages one-time reminders, recurring deliveries, scheduled research, summaries, and condition-based monitoring with clear timing and notification behaviour.
+description: Use only when a real scheduler or automation tool is available; otherwise produce a precise schedule specification or reminder text without claiming background work was created.
 ---
 
 # Scheduling & Automation
 
-## Supported work
-- One-time and recurring reminders.
-- Daily, weekly, or custom summaries and reports.
-- Scheduled research, inbox or project digests, market or news monitoring, and notifications when a condition becomes true.
-- Run-now, pause, resume, edit, and history-aware automation workflows when supported by COREZ.
+## Capability gate
+
+CoreZ currently has no background reminder or recurring-job API. In this
+repository, this skill can define a schedule, recurrence, notification rule,
+and self-contained future-run prompt, but cannot create a durable automation.
+Only execute scheduling when a concrete scheduler tool is present and returns
+a successful task identifier.
 
 ## Workflow
 1. Extract the task, schedule, timezone, recurrence, end condition, and notification criteria.
@@ -17,7 +19,7 @@ description: Creates and manages one-time reminders, recurring deliveries, sched
 3. Choose exact scheduling for named clock times, flexible scheduling for broad dayparts, and condition monitoring for event-triggered alerts.
 4. Write the future-run instruction as a self-contained imperative with all durable constraints.
 5. For condition monitoring, suppress notifications when the condition is not met.
-6. Confirm the resulting schedule and automation purpose without exposing internal scheduler syntax unless useful.
+6. If a scheduler tool exists, confirm its returned task identifier and normalized schedule. Otherwise label the result as a schedule specification only.
 
 ## Guardrails
 - Do not promise background work unless an automation was successfully created.

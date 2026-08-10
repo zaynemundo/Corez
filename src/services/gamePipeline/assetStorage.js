@@ -1,6 +1,6 @@
 /**
  * Permanent Asset Storage Layer
- * Persists generated FLUX image URLs into durable storage adapters (IndexedDB, LocalStorage, Memory, or Remote S3/R2 API).
+ * Persists generated image URLs into durable storage adapters (IndexedDB, LocalStorage, Memory, or Remote S3/R2 API).
  */
 
 export class MemoryStorageAdapter {
@@ -184,7 +184,7 @@ export class AssetStorageService {
         throw new Error(`Invalid data URI payload for asset ${assetId}: ${err.message}`, { cause: err });
       }
     } else {
-      // 2. Download from remote FLUX URL
+      // 2. Download from the remote generated-image URL.
       const response = await fetch(sourceUrl);
       if (!response.ok) {
         throw new Error(`Failed to download asset from ${sourceUrl}: HTTP ${response.status}`);

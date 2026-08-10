@@ -179,14 +179,14 @@ export const COREZ_SPECIALIST_SKILLS = [
   {
     id: 'visual-creative',
     name: 'Visual Creative Engine',
-    description: 'Image generation via FLUX 1, visual asset manifests, and layout direction via MiMo V2.5.',
+    description: 'Provider-neutral image generation, visual asset manifests, and coherent layout direction.',
     triggers: ['image', 'art', 'background', 'sprite', 'visual asset'],
     phase: 'IMPLEMENTING',
     priority: 22,
     dependencies: [],
     compatibleIntents: ['app', 'swarm'],
     requiresTools: [],
-    instructions: 'Formulate structured JSON asset manifests for visual requirements and invoke FLUX image generation where appropriate. Match every asset to a coherent art direction: consistent palette, style, and resolution across sprites, backgrounds, and UI textures.'
+    instructions: 'Formulate structured JSON asset manifests for visual requirements and invoke the configured image-generation pipeline where appropriate. Report the model returned by the endpoint rather than assuming a provider. Match every asset to a coherent art direction: consistent palette, style, and resolution across sprites, backgrounds, and UI textures.'
   },
   {
     id: 'research-report',

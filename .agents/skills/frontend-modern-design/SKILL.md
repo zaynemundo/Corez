@@ -1,11 +1,11 @@
 ---
 name: frontend-modern-design
-description: Specialized skill for crafting modern, high-aesthetic web interfaces with dark/light design systems, fluid responsive layouts, glassmorphism, micro-interactions, accessibility, and modern CSS architecture.
+description: Use only for an explicitly requested modern design system with responsive layout, motion, and accessibility; use frontend-design for bespoke art direction, preserve existing visual language, and never force dark mode or glass effects.
 ---
 
 # Front-End Modern Design Skill
 
-Use this skill whenever designing, building, or refining web applications, UI layouts, interactive components, widgets, and stylesheets.
+Use this skill for deliberate system-level visual work, not every component or stylesheet edit.
 
 ---
 
@@ -65,7 +65,9 @@ Establish a clean, cohesive design system using CSS custom properties for colors
 
 - **Glass & Depth**: Combine semi-transparent backgrounds with backdrop blur (`backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);`) and subtle inset borders.
 - **Card Elevation**: Use multi-layered elevation shadows (`box-shadow: 0 4px 16px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.1);`) for floating panels and modals.
-- **No Unstyled Placeholders**: Use rich content, SVGs, or generated image assets (in CoreZ, ask the image pipeline — `POST /api/image`, FLUX 1 Schnell — for background artwork) instead of empty frames or broken image placeholders.
+- **No Unstyled Placeholders**: Use rich content, SVGs, or generated image
+  assets through the `image-generation` skill instead of empty frames or
+  broken image placeholders.
 
 ---
 

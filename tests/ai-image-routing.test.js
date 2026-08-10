@@ -8,7 +8,7 @@ import {
   generateAIResponse,
 } from '../src/services/aiService.js';
 
-describe('FLUX image request routing', () => {
+describe('image request routing', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -154,7 +154,7 @@ describe('FLUX image request routing', () => {
     expect(fetchMock).not.toHaveBeenCalledWith('/api/image', expect.anything());
   });
 
-  it('replaces [IMAGE_PROMPT:] tags in hosted AI responses with FLUX images', async () => {
+  it('replaces [IMAGE_PROMPT:] tags in hosted AI responses with generated images', async () => {
     const fetchMock = vi.fn(async (url) => {
       if (url === '/api/ai') {
         return Response.json({ content: 'Here is your image.\n\n[IMAGE_PROMPT: a sunset over the ocean]' });
@@ -173,7 +173,7 @@ describe('FLUX image request routing', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/image', expect.anything());
   });
 
-  it('falls back to a rendered SVG only when the FLUX endpoint is unavailable', async () => {
+  it('uses a clearly labelled local placeholder when the image endpoint is unavailable', async () => {
     const fetchMock = vi.fn(async () => Response.json({ error: 'not configured' }, { status: 503 }));
     vi.stubGlobal('fetch', fetchMock);
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -181,6 +181,7 @@ describe('FLUX image request routing', () => {
     const response = await generateAIResponse('give me an image', []);
 
     expect(response).toContain('data:image/svg+xml');
+    expect(decodeURIComponent(response)).toContain('LOCAL IMAGE PLACEHOLDER');
     expect(fetchMock).toHaveBeenCalledWith('/api/image', expect.anything());
   });
 });

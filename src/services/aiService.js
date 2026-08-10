@@ -25,7 +25,7 @@ import { fetchAwwwardsInspiration } from './inspirationService.js';
 import { synthesizePdfDocumentHtml } from './pdfGenerator.js';
 
 export const PUBLIC_USER_INTENT_PROMPT = `
-Analyze the public user intent behind the request. Corez uses FLUX 1 Schnell for background generation and image rendering.
+Analyze the public user intent behind the request. Corez uses a server-configured image-generation pipeline for background generation and image rendering.
 Identify whether the user wants to create a public-facing website, landing page, dashboard,
 portal, app, game (with full word dictionaries for word games like Scrabble & Wordle), widget, calculator, timer, prototype, tool, code help,
 writing help, an explanation, or general guidance. 
@@ -446,7 +446,7 @@ export function createFallbackSvgDataUrl(prompt) {
 
     <!-- 8-Bit Tag Header -->
     <rect x="136" y="48" width="240" height="28" fill="#12121e" stroke="#f1fa8c" stroke-width="2" />
-    <text x="256" y="67" font-family="'Courier New', monospace" font-size="13" font-weight="bold" fill="#f1fa8c" text-anchor="middle" letter-spacing="2">ITCH.IO 8-BIT ASSET</text>
+    <text x="256" y="67" font-family="'Courier New', monospace" font-size="13" font-weight="bold" fill="#f1fa8c" text-anchor="middle" letter-spacing="2">LOCAL IMAGE PLACEHOLDER</text>
 
     <!-- Sprite Shadow Grid -->
     <rect x="${spriteOffset + 12}" y="${spriteOffset + 12}" width="256" height="256" fill="rgba(0,0,0,0.4)" />
@@ -462,7 +462,7 @@ export function createFallbackSvgDataUrl(prompt) {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
-export async function generateFluxImage(prompt, signal = null) {
+export async function generateImage(prompt, signal = null) {
   try {
     const fetchOptions = {
       method: 'POST',
@@ -478,13 +478,13 @@ export async function generateFluxImage(prompt, signal = null) {
     if (response.ok) {
       const data = await response.json();
       if (data?.image) return data.image;
-      console.warn('Hosted FLUX API responded without an image payload; rendering fallback visual.');
+      console.warn('Hosted image API responded without an image payload; rendering a local placeholder.');
     } else {
-      console.warn(`Hosted FLUX API request failed (HTTP ${response.status}); rendering fallback visual.`);
+      console.warn(`Hosted image API request failed (HTTP ${response.status}); rendering a local placeholder.`);
     }
   } catch (err) {
     if (err?.name === 'AbortError') throw err;
-    console.warn('Hosted FLUX API request failed; rendering fallback visual.', err);
+    console.warn('Hosted image API request failed; rendering a local placeholder.', err);
   }
 
   return createFallbackSvgDataUrl(prompt);
@@ -3350,10 +3350,10 @@ export function generateSessionTitle(prompt) {
 
 export async function handleMixedQuestionImageRequest(prompt, intent, history, signal) {
   const subject = extractImageSubject(prompt);
-  const fluxPrompt = subject ? `an image of ${subject}` : prompt;
+  const imagePrompt = subject ? `an image of ${subject}` : prompt;
 
   // Answer the question with the image request stripped (so the worker's
-  // image-only rule never suppresses the explanation), and generate the FLUX
+  // image-only rule never suppresses the explanation), and generate the
   // image in parallel from the extracted subject.
   const questionPrompt = extractQuestionPrompt(prompt) || prompt;
   const questionHistory = Array.isArray(history) && history.length > 0
@@ -3362,7 +3362,7 @@ export async function handleMixedQuestionImageRequest(prompt, intent, history, s
 
   const [hostedResult, imageResult] = await Promise.allSettled([
     generateHostedAIResponse(questionPrompt, intent, questionHistory, signal),
-    generateFluxImage(fluxPrompt, signal)
+    generateImage(imagePrompt, signal)
   ]);
 
   const hostedResponse = hostedResult.status === 'fulfilled' ? hostedResult.value : null;
@@ -3457,7 +3457,7 @@ export async function generateAIResponse(prompt, history = [], signal = null, on
     }
   }
 
-  // Explicit image requests always route to FLUX image generation, regardless of
+  // Explicit image requests always route to the image-generation endpoint, regardless of
   // conversation length. Previously the history.length <= 1 gate let image requests
   // mid-conversation fall through to the LLM, which answered with raw SVG markup.
   if (isExplicitImageRequest(cleanPrompt)) {
@@ -3472,13 +3472,13 @@ export async function generateAIResponse(prompt, history = [], signal = null, on
       }
     }
     try {
-      const imageUrl = await generateFluxImage(cleanPrompt, signal);
+      const imageUrl = await generateImage(cleanPrompt, signal);
       if (imageUrl) {
         return `![](${imageUrl})`;
       }
     } catch (imgError) {
       if (imgError?.name === 'AbortError') throw imgError;
-      console.warn('FLUX image generation error; falling back to standard text response.', imgError);
+      console.warn('Image generation error; falling back to standard text response.', imgError);
     }
   }
 
@@ -3493,14 +3493,14 @@ export async function generateAIResponse(prompt, history = [], signal = null, on
       if (imageMatch) {
         const imagePrompt = imageMatch[1].trim();
         try {
-          const imageUrl = await generateFluxImage(imagePrompt, signal);
+          const imageUrl = await generateImage(imagePrompt, signal);
           if (imageUrl) {
              // Replace the tag with the actual image markdown
              return hostedAiResponse.replace(imageMatch[0], `![](${imageUrl})`);
           }
         } catch (imgError) {
           if (imgError?.name === 'AbortError') throw imgError;
-          console.warn('FLUX image generation error from AI tag.', imgError);
+          console.warn('Image generation error from AI tag.', imgError);
         }
       }
       return hostedAiResponse;

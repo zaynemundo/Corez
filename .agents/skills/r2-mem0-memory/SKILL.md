@@ -1,6 +1,6 @@
 ---
 name: r2-mem0-memory
-description: Mem0-style persistent long-term memory engine backed by Cloudflare R2 (ASSET_BUCKET) for storing, recalling, searching, and managing user preferences, session state, facts, entities, and conversation history across sessions.
+description: Use for explicit persistent-memory operations through CoreZ R2 endpoints; require an unguessable user identifier, avoid sensitive data, and confirm successful storage or deletion before claiming it occurred.
 ---
 
 # R2 Mem0 Persistent Memory Skill
@@ -8,6 +8,14 @@ description: Mem0-style persistent long-term memory engine backed by Cloudflare 
 Use this skill whenever storing, recalling, updating, searching, or forgetting long-term persistent user facts, preferences, project memory, entity graph state, or context across user sessions.
 
 The memory engine uses Cloudflare R2 object storage (`ASSET_BUCKET`) via `/api/memory` endpoints to guarantee 0-database dependency long-term persistence.
+
+## Security boundary
+
+`/api/memory` is anonymous. The `userId` is the only access credential, so
+anyone who knows it may read or delete that memory. Never use `default_user`
+for durable personal memory. Require an unguessable per-user or per-session
+identifier, never store credentials or sensitive personal data, and do not
+describe this endpoint as authenticated user storage.
 
 > Search is keyword-based (substring match over `text`, `key`, and `category`).
 > The worker reports `embeddingStored: false` — there is no vector store in this
@@ -18,7 +26,9 @@ The memory engine uses Cloudflare R2 object storage (`ASSET_BUCKET`) via `/api/m
 1. **Memory Storage (`POST /api/memory/store`)**:
    - Store structured memory objects with optional `userId`, `key`, `category`, `text`, `tags`, and `metadata`.
    - Examples of categories: `preference`, `fact`, `entity`, `project`, `code_style`, `history`.
-   - Defaults: `userId` -> `default_user`, `key` -> auto-generated, `text` (or `value`) is required.
+   - The API fallback is `userId` -> `default_user`, but callers must not rely
+     on that shared identifier for durable memory. `key` is auto-generated and
+     `text` (or `value`) is required.
 
 2. **Memory Retrieval (`GET /api/memory/:userId`)**:
    - Retrieve all active long-term memories for a user or session.
@@ -79,3 +89,5 @@ const { matches } = await res.json();
 - Worker endpoints are covered by `tests/cloudflare-worker-contract.mjs`
   (store, search, list, delete, and path-traversal rejection). Run it via
   `npm run test:cloudflare`.
+- Treat remember/forget as successful only after a 2xx response with the
+  expected `success`, `userId`, and `key` fields.

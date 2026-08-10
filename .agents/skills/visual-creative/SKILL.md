@@ -1,6 +1,6 @@
 ---
 name: visual-creative
-description: Handles image analysis, AI generation direction (FLUX 1 Schnell), background removal, product visualization, SVG vector creation, brand identity, and visual art direction.
+description: Use for visual inspection, image-generation direction, SVG creation, product visualization, brand identity, and art direction; do not claim unsupported background-removal or image-editing operations.
 ---
 
 # Visual & Creative Production Skill
@@ -11,12 +11,21 @@ Use this skill whenever analyzing visual artwork, designing UI graphics, craftin
 
 ## 1. Engine Delegation & Capabilities
 
-- **DeepSeek V4 Flash (Visual Direction Lead)**: Direct vision inspection, art direction, UI layout design, color palette curation, and SVG vector graphic creation.
-- **FLUX 1 Schnell (Background & Artwork Generation)**: Primary image engine (`black-forest-labs/flux-1-schnell`) exposed by CoreZ through `POST /api/image` for background image generation, high-res texture synthesis, and visual artwork rendering. When `ASSET_BUCKET` is configured the worker returns an R2 URL; without `OPENROUTER_API_KEY` it honestly returns 503 rather than a fake image.
+- **Visual direction**: inspect supplied images only when an image-reading tool
+  has access to their pixels, then define composition, color, typography,
+  lighting, and create self-contained SVG assets. CoreZ chat attachments alone
+  provide only a local thumbnail and metadata; defer to
+  `file-attachment-analysis` for that boundary.
+- **Image generation**: use CoreZ `POST /api/image` through the dedicated
+  `image-generation` skill. The server selects the model and returns its actual
+  model identifier. Do not hard-code a provider name in user-facing claims.
+- **Capability boundary**: CoreZ does not implement background removal or
+  arbitrary raster image editing. Offer an SVG/CSS alternative or an external
+  workflow instead of claiming that operation succeeded.
 
 ---
 
-## 2. AI Image Prompt Engineering (FLUX 1 Schnell via `/api/image`)
+## 2. AI Image Prompt Engineering
 
 Structure prompts with explicit visual dimensions:
 ```

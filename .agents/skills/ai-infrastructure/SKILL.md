@@ -1,11 +1,14 @@
 ---
 name: ai-infrastructure
-description: Evaluates and designs LLM deployments, APIs, model routing, local inference, GPU/server capacity, quantization, RAG, reranking, agent workflows, and token/cost optimization.
+description: Use for AI deployment architecture, provider routing, local inference, GPU capacity, quantization, RAG, reranking, agent workflows, and token or cost optimization; not for ordinary application code changes.
 ---
 
 # AI Infrastructure Skill
 
-Use this skill when designing, building, or optimizing AI model integrations, LLM API proxies, model routing, Workers AI pipelines, RAG vector retrieval, and prompt token efficiency.
+Use this skill when designing, building, or optimizing AI model integrations,
+LLM API proxies, model routing, RAG retrieval, and prompt token efficiency.
+CoreZ does not currently use Cloudflare Workers AI or a vector database; treat
+those topics as generic architecture work unless implementation is requested.
 
 ```
   ┌─────────────────────────────────────────────────────────────┐
@@ -22,19 +25,30 @@ Use this skill when designing, building, or optimizing AI model integrations, LL
 ## 1. Model Routing & Primary/Secondary Failovers
 
 - **Routing Logic**: Direct fast structured classification tasks to lightweight local logic (e.g. the repo's `src/services/intentClassifier.js`) and complex reasoning/art direction to the primary model (DeepSeek V4 Flash, `deepseek-v4-flash`).
-- **Graceful Failover**: CoreZ runs a provider chain (OpenCode Go -> DeepSeek official -> OpenRouter). If the primary API endpoint times out (8–12s) or returns 5xx status codes, automatically degrade to secondary backup providers without throwing unhandled UI errors. Each provider can be disabled via `OPENCODE_GO_DISABLED` / `DEEPSEEK_DISABLED` / `OPENROUTER_DISABLED`.
-- **Image routing**: background artwork and textures go through `POST /api/image` (FLUX 1 Schnell, `black-forest-labs/flux-1-schnell`), rate limited per client IP.
+- **Graceful Failover**: CoreZ runs OpenCode Go -> official DeepSeek ->
+  OpenRouter in `worker/providerChain.js`. Transient failures use bounded
+  per-request retries and persisted retry schedules; permanent authentication,
+  authorization, and invalid-request failures do not retry. Client disconnect
+  is the generation abort signal; do not add an arbitrary provider timeout.
+- **Image routing**: `POST /api/image` uses the server-controlled OpenRouter
+  image model chain. `OPENROUTER_IMAGE_MODEL` may override it with one model,
+  and the response reports the model actually used.
 
 ---
 
 ## 2. Token Budget & Context Window Management
 
-- **Truncation & Summarization**: Keep conversation history bounded by sliding context windows. Summarize older steps when context usage exceeds 70% threshold.
+- **Truncation & Summarization**: preserve current instructions, exact code,
+  errors, and the latest user turn when compaction is required. Do not invent a
+  fixed threshold that is absent from the runtime contract.
 - **System Prompt Compression**: Strip unnecessary markdown boilerplate in automated agent-to-agent payloads while preserving exact JSON contracts.
 
 ---
 
 ## 3. RAG & Vector Retrieval Optimization
+
+This is generic design guidance, not a description of the current CoreZ
+runtime. CoreZ memory search is keyword-based unless a vector store is added.
 
 - **Chunking Strategy**: Chunk documents into 256–512 token segments with 10% overlap to preserve context across boundaries.
 - **Hybrid Search**: Combine vector similarity search (cosine distance) with keyword BM25 search for precise document recall.
@@ -46,3 +60,10 @@ Use this skill when designing, building, or optimizing AI model integrations, LL
 
 - Use Server-Sent Events (`text/event-stream`) for real-time model token streaming.
 - Implement robust client-side `AbortController` listeners so users can interrupt generation at any moment.
+
+## Repository verification
+
+- Provider routing: `tests/provider-chain.test.js` and
+  `tests/workers-ai-provider-contract.sh`.
+- Public AI contracts: `npm run test:cloudflare`.
+- Full static and production checks: `npm run lint` and `npm run build`.

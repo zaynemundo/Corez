@@ -3,9 +3,9 @@ import { useState, useEffect } from 'react';
 const PIPELINE_STEPS = [
   { min: 0, max: 12, label: '1. Intent & Spec Synthesis (DeepSeek Lead)' },
   { min: 12, max: 25, label: '2. Full-Width 8-Bit Progress Loading Track' },
-  { min: 25, max: 40, label: '3. Asset Pipeline (FLUX 1 Art + WebAudio Synth)' },
+  { min: 25, max: 40, label: '3. Asset Pipeline (Generated Art + WebAudio Synth)' },
   { min: 40, max: 58, label: '4. High-Performance Engine & Physics Assembly' },
-  { min: 58, max: 74, label: '5. MiMo V2.5 Visual Inspection & Layering Audit' },
+  { min: 58, max: 74, label: '5. Visual Inspection & Layering Audit' },
   { min: 74, max: 88, label: '6. Multi-Input Controls (WASD / Touch / D-Pad)' },
   { min: 88, max: 96, label: '7. Empirical Runtime & Fallback Verification' },
   { min: 96, max: 100, label: '8. Launching Live Canvas Sandbox' }

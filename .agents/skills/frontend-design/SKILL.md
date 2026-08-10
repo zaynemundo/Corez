@@ -1,6 +1,6 @@
 ---
 name: frontend-design
-description: Guidance for distinctive, intentional visual design when building new UI or reshaping an existing one. Helps with aesthetic direction, typography, and making choices that don't read as templated defaults.
+description: Use for new interfaces or substantial bespoke redesigns requiring distinctive art direction, typography, and layout; use frontend-modern-design for an explicitly requested modern design system, and not for routine CSS fixes.
 ---
 
 # Frontend Design

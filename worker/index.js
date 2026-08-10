@@ -237,7 +237,7 @@ Adaptive Routing - Complex Path:
 
     adaptiveInstructions = `
 Adaptive Routing - App & Game Creation Path (Awwwards Site of the Day Quality):
-- Use FLUX 1 Schnell for fast background image generation and visual graphics.
+- Use the configured image-generation pipeline for background artwork and visual graphics when an image is genuinely needed.
 - ONLINE MULTIPLAYER: When the user asks for online multiplayer, use the COREZ multiplayer protocol: connect with \`new WebSocket(\`wss://\${location.host}/api/game/ws/<roomId>\`)\` where <roomId> is a short lowercase id like "dm-123". Send JSON {type:'join',name}, {type:'input',keys:{up,down,left,right}}, {type:'shoot',dx,dy}. Receive {type:'welcome',playerId,players}, {type:'state',players:[{id,name,x,y,color,score}],bullets:[{x,y,ownerId}]} at 20Hz (normalized 0..1 coordinates), {type:'kill',killerId,victimId}, {type:'player_joined'}, {type:'player_left'}. The server moves players and resolves hits authoritatively; render the received state and map 0..1 coordinates to your canvas. Never invent your own server, socket.io, or third-party backend.
 ${designStyle}
 - Build a complete, rich, runnable experience ready for the preview canvas.
@@ -893,11 +893,11 @@ async function handleImage(request, env) {
     // Honest 503: no image provider is configured. Text providers are never
     // routed as fake image providers.
     return jsonResponse(503, {
-      error: 'Image generation is unavailable: no image provider is configured on this deployment (set OPENROUTER_API_KEY to enable FLUX image generation).'
+      error: 'Image generation is unavailable: no image provider is configured on this deployment (set OPENROUTER_API_KEY to enable image generation).'
     });
   }
 
-  const r2Key = `flux_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.png`;
+  const r2Key = `image_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.png`;
 
   // Image generation runs as long as it needs; only a client disconnect
   // aborts (Stop button, tab close).
@@ -910,10 +910,9 @@ async function handleImage(request, env) {
     return controller.signal;
   })();
 
-  // FLUX 1 Schnell via OpenRouter: images[0].url, content URLs and
-  // data:image payloads are all accepted. OPENROUTER_IMAGE_MODEL overrides
-  // the model chain; otherwise the default chain (Nano Banana 2 first, FLUX
-  // as the legacy fallback) is tried in order.
+  // OpenRouter image responses may use images[0].url, content URLs, or data:
+  // image payloads. OPENROUTER_IMAGE_MODEL overrides the configured default
+  // chain with one model.
   const imageModels = env?.OPENROUTER_IMAGE_MODEL ? [String(env.OPENROUTER_IMAGE_MODEL)] : undefined;
   const imageResult = await callOpenRouterImage(openRouterKey, prompt, imageClientSignal, imageModels);
   if (!imageResult) {

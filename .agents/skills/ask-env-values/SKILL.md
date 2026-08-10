@@ -1,6 +1,6 @@
 ---
 name: ask-env-values
-description: Use whenever a task requires environment variables, env vars, deployment secrets, API keys, Replit Secrets, or runtime configuration values; ask the user what exact values to put in the target environment instead of guessing.
+description: Use when environment variables, deployment secrets, API keys, or runtime configuration values are required and unavailable; identify exact names and placement, then ask rather than guessing values.
 ---
 
 # Ask Env Values
@@ -23,14 +23,23 @@ deployment secrets, API keys, Replit Secrets, or runtime configuration values.
 - If the environment cannot be changed with the available tools, give the exact
   variable names and values the user must add manually.
 
-## Corez Workers AI
+## CoreZ provider configuration
 
-Corez hosted text generation uses the native Cloudflare Workers AI binding.
-Runtime inference requires no runtime API key or account ID.
-Runtime inference requires no model environment variable or provider URL.
-Do not ask for legacy external-provider values.
-Cloudflare deployment credentials are CI/CD credentials, not public AI runtime
-configuration, and must never be committed or exposed to app users.
+CoreZ does not use Cloudflare Workers AI. Hosted text generation uses this
+server-side provider chain:
+
+- `OPENCODE_GO_API_KEY` (or `OPENCODE_API_KEY`) enables the preferred OpenCode
+  Go provider. `OPENCODE_ENDPOINT` and `OPENCODE_MODEL` are optional overrides.
+- `DEEPSEEK_API_KEY` enables the optional official DeepSeek fallback.
+  `DEEPSEEK_ENDPOINT` and `DEEPSEEK_MODEL` are optional overrides.
+- `OPENROUTER_API_KEY` enables the optional OpenRouter text fallback and is
+  required for `POST /api/image`. `OPENROUTER_IMAGE_MODEL` optionally overrides
+  the server-controlled image model.
+- `ASSET_BUCKET` and `GAME_ROOMS` are Cloudflare bindings, not secret strings.
+
+Ask only for providers needed by the requested deployment. Never ask a public
+app user for these values, and never expose them in browser code or responses.
+Cloudflare deployment credentials are CI/CD secrets and must not be committed.
 
 ## Provider wording
 

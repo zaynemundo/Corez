@@ -1,6 +1,6 @@
 ---
 name: research-current-information
-description: Performs live, source-grounded research for current, niche, technical, commercial, legal, travel, product, community, and news questions with citations and date awareness.
+description: Use for focused current or niche questions requiring live, source-grounded citations and date awareness; use research for a multi-item deep report and live-utilities for a narrow deterministic lookup.
 ---
 
 # Research & Current Information

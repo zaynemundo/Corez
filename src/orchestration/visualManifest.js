@@ -1,6 +1,6 @@
 /**
  * CoreZ Visual Manifest Handler
- * Structured JSON asset manifest for visual pipelines (FLUX 1 image generation & MiMo V2.5 layout direction).
+ * Structured JSON asset manifest for provider-neutral image generation and layout direction.
  */
 
 export function createAssetManifest(spec = {}) {

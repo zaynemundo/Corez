@@ -9,7 +9,7 @@ import { createTaskBrief } from './taskBriefGenerator.js';
 import { TaskDependencyGraph, AGENT_LIFECYCLE_STATES } from '../../orchestration/taskGraph.js';
 import { WorkflowState, WORKFLOW_STAGES } from '../../orchestration/workflowState.js';
 
-export async function generateImageWithFlux1(prompt, options = {}) {
+export async function generateGameReferenceImage(prompt, options = {}) {
   const cleanPrompt = (prompt || '').trim();
   const styledPrompt = options.raw
     ? cleanPrompt
@@ -29,12 +29,12 @@ export async function generateImageWithFlux1(prompt, options = {}) {
       }
     } catch (err) {
       if (err?.name === 'AbortError') throw err;
-      console.warn('FLUX 1 image generation failed, returning SVG fallback:', err);
+      console.warn('Image generation failed, returning a labelled local placeholder:', err);
     }
   }
 
   const safePrompt = cleanPrompt.slice(0, 40).replace(/[^a-zA-Z0-9 ]/g, '');
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect width="512" height="512" fill="#09090b"/><text x="256" y="256" fill="#00ffcc" font-family="monospace" font-size="18" text-anchor="middle">FLUX 1: ${safePrompt}</text></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect width="512" height="512" fill="#09090b"/><text x="256" y="238" fill="#00ffcc" font-family="monospace" font-size="18" text-anchor="middle">LOCAL IMAGE PLACEHOLDER</text><text x="256" y="274" fill="#a1a1aa" font-family="monospace" font-size="14" text-anchor="middle">${safePrompt}</text></svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 

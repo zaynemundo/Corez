@@ -147,14 +147,21 @@ describe('live-data verifier', () => {
   });
 
   it('accepts grounded live evidence with a fresh timestamp', () => {
+    const servedAt = new Date();
+    const asOf = servedAt.toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone: 'UTC'
+    });
     const result = verifyLiveData({
       prompt: 'Convert 25000 PHP to USD.',
-      content: 'As of August 9, 2026, 25000 PHP converts to about 427 USD (source: https://example.com/rate).',
-      runtimeContext: buildRuntimeContext(new Date('2026-08-09T12:00:00Z')),
+      content: `As of ${asOf}, 25000 PHP converts to about 427 USD (source: https://example.com/rate).`,
+      runtimeContext: buildRuntimeContext(servedAt),
       liveDataEvidence: {
-        servedAt: '2026-08-09T10:00:00Z',
+        servedAt: servedAt.toISOString(),
         sources: ['example.com'],
-        fetchedAt: '2026-08-09T10:00:00Z',
+        fetchedAt: servedAt.toISOString(),
         results: [{ url: 'https://example.com/rate' }]
       }
     });

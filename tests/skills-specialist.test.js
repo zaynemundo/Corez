@@ -57,6 +57,13 @@ describe('CoreZ Specialist Skills', () => {
     expect(business.reasonSelected).toMatch(/Specialist capability matched/);
   });
 
+  it('keeps visual skill instructions provider-neutral', () => {
+    const visual = defaultSkillRegistry.getSkill('visual-creative');
+    expect(visual.description).not.toMatch(/FLUX|MiMo/i);
+    expect(visual.instructions).not.toMatch(/FLUX|MiMo/i);
+    expect(visual.instructions).toContain('configured image-generation pipeline');
+  });
+
   it('activates multiple specialists when a request spans capabilities', () => {
     const { skills } = resolveSkills({
       intent: 'general',

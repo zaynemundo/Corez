@@ -1,6 +1,6 @@
 ---
 name: personalisation-context
-description: Applies durable user preferences, memory, location, tone, appearance, and contextual adaptation only when relevant, requested, and privacy-preserving.
+description: Use for explicitly requested, privacy-preserving personalization of tone, units, locale, appearance, or durable preferences; never infer sensitive traits or rely on shared anonymous memory identifiers.
 ---
 
 # Personalisation & Context
@@ -21,6 +21,8 @@ description: Applies durable user preferences, memory, location, tone, appearanc
 
 ## Guardrails
 - Do not store sensitive personal data unless the user clearly asks for it and policy permits the action.
+- CoreZ memory is anonymous and identifier-based: never use `default_user` for
+  durable personalization, and never store credentials or sensitive PII.
 - Do not claim to remember, forget, or change a setting unless the operation succeeded.
 - Avoid creepy or unnecessary references to historical context.
 - Never use personalisation to override factual accuracy, safety controls, or the user's current instruction.
