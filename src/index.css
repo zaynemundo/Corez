@@ -31,7 +31,7 @@
   --font-heading: var(--font-sans);
   --font-mono: 'JetBrains Mono', monospace;
   
-  --sidebar-width: 240px;
+  --sidebar-width: 260px;
   --sidebar-margin: 0px;
   --sidebar-radius: 0px;
   --sidebar-heading-size: 11px;
@@ -81,7 +81,7 @@
   --selection-color: #000000;
   --inline-code-color: #7c5e10;
 
-  --sidebar-bg: var(--bg-primary);
+  --sidebar-bg: rgb(252, 252, 252);
   --sidebar-bg-opaque: var(--bg-primary);
   --sidebar-border: rgba(0, 0, 0, 0.08);
   --sidebar-shadow: none;
@@ -295,10 +295,43 @@ h1, h2, h3, h4, h5, h6 {
   filter: invert(100%);
 }
 
-.sidebar-action-box {
+.sidebar-action-box,
+.sidebar-chats-nav {
   padding: 7.5px 8px;
   display: flex;
-  justify-content: stretch;
+  flex-direction: column;
+}
+
+.sidebar-chats-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  min-height: 38px;
+  border-radius: 8px;
+  background: var(--sidebar-item-active-bg);
+  cursor: pointer;
+  user-select: none;
+  transition: var(--transition-fast);
+}
+
+.sidebar-chats-item:hover {
+  background: var(--sidebar-item-hover-bg);
+}
+
+.chats-label-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.chats-title-text {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text-primary);
 }
 
 .sidebar svg,
@@ -331,29 +364,30 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .new-chat-btn {
-  width: 100%;
-  height: 38px;
-  min-height: 38px;
+  height: 30px;
+  min-height: 30px;
   margin: 0;
-  padding: 0 0.75rem;
-  border: none;
-  background: transparent;
+  padding: 0 8px;
+  border: 1px solid var(--sidebar-border);
+  background: var(--sidebar-item-hover-bg);
   color: var(--text-primary);
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 4px;
   cursor: pointer;
+  border-radius: 6px;
   transition: var(--transition-fast);
 }
 
 .new-chat-btn span,
 .footer-action-btn span {
-  font-size: 15px;
+  font-size: 13px;
   white-space: nowrap;
 }
 
 .new-chat-btn:hover {
   color: var(--text-primary);
+  background: var(--sidebar-item-active-bg);
 }
 
 .chat-history-list {
@@ -831,6 +865,14 @@ h1, h2, h3, h4, h5, h6 {
   transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast);
 }
 
+.message-action-btn.copy-action {
+  width: auto;
+  padding: 0 0.55rem;
+  gap: 0.35rem;
+  font: inherit;
+  font-size: 0.75rem;
+}
+
 .message-action-btn:hover {
   color: var(--text-primary);
   background-color: var(--bg-tertiary);
@@ -1270,14 +1312,6 @@ h1, h2, h3, h4, h5, h6 {
 .markdown-callout.callout-danger .callout-label,
 .markdown-callout.callout-important .callout-label {
   color: var(--text-secondary);
-}
-
-/* Horizontal rule divider */
-.markdown-hr {
-  border: none;
-  height: 1px;
-  margin: 0.9rem 0;
-  background: linear-gradient(90deg, transparent, var(--border-color, rgba(255, 255, 255, 0.12)), transparent);
 }
 
 /* Lists with designed markers */

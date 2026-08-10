@@ -5,7 +5,8 @@ import {
   Moon, 
   PanelLeft,
   MoreVertical,
-  Trash2
+  Trash2,
+  Plus
 } from 'lucide-react';
 import { ChatBubbleIcon } from './icons';
 
@@ -53,15 +54,38 @@ export default function Sidebar({
         </button>
       </div>
 
-      <div className="sidebar-action-box">
-        <button 
-          className="new-chat-btn" 
+      <div className="sidebar-chats-nav">
+        <div 
+          className="sidebar-chats-item"
           onClick={onNewChat}
-          title="New Chat Session"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onNewChat();
+            }
+          }}
+          title="Chats - Start a New Chat"
         >
-          <ChatBubbleIcon size={16} />
-          <span>New Chat</span>
-        </button>
+          <div className="chats-label-group">
+            <ChatBubbleIcon size={16} />
+            <span className="chats-title-text">Chats</span>
+          </div>
+          <button 
+            type="button"
+            className="new-chat-btn" 
+            onClick={(e) => {
+              e.stopPropagation();
+              onNewChat();
+            }}
+            title="New Chat Session"
+            aria-label="New Chat Session"
+          >
+            <Plus size={14} strokeWidth={1.5} />
+            <span>New Chat</span>
+          </button>
+        </div>
       </div>
 
       <div className="chat-history-list">
