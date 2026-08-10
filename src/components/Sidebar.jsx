@@ -5,8 +5,7 @@ import {
   Moon, 
   PanelLeft,
   MoreVertical,
-  Trash2,
-  Pencil
+  Trash2
 } from 'lucide-react';
 
 export default function Sidebar({
@@ -59,7 +58,12 @@ export default function Sidebar({
           onClick={onNewChat}
           title="New Chat Session"
         >
-          <Pencil size={16} strokeWidth={1.5} />
+          <img
+            className="new-chat-icon"
+            src="https://cdn-icons-png.flaticon.com/512/1159/1159633.png"
+            alt=""
+            aria-hidden="true"
+          />
           <span>New Chat</span>
         </button>
       </div>

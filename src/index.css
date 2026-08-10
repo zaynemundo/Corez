@@ -346,6 +346,17 @@ h1, h2, h3, h4, h5, h6 {
   transition: var(--transition-fast);
 }
 
+.new-chat-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+[data-theme="dark"] .new-chat-icon {
+  filter: invert(1);
+}
+
 .new-chat-btn span,
 .footer-action-btn span {
   font-size: 15px;
