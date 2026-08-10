@@ -403,6 +403,14 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onRe
     return { headers, bodyRows };
   };
 
+  const EMAIL_HEADER_RE = /^(Subject|To|From|Date|Cc|Bcc|Reply-To|Sender):/i;
+  const looksLikeEmail = (text) => {
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    if (!lines.length) return false;
+    if (/^Subject:/i.test(lines[0])) return true;
+    return EMAIL_HEADER_RE.test(lines[0]) && EMAIL_HEADER_RE.test(lines[1] || '');
+  };
+
   const renderTextAndTables = (textBlock) => {
     const lines = textBlock.split('\n');
     const elements = [];
@@ -645,7 +653,13 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onRe
 
       return (
         <div key={idx} className="markdown-body">
-          {renderTextAndTables(part.content)}
+          {looksLikeEmail(part.content) ? (
+            <div className="markdown-email-wrapper">
+              {renderTextAndTables(part.content)}
+            </div>
+          ) : (
+            renderTextAndTables(part.content)
+          )}
         </div>
       );
     });

@@ -75,4 +75,21 @@ describe('ChatMessage markdown visual design', () => {
     expect(screen.getByRole('heading', { name: 'Section' }).tagName).toBe('H3');
     expect(screen.getByRole('heading', { name: 'Sub' }).tagName).toBe('H4');
   });
+
+  it('frames an email block in the table-style card without a table', () => {
+    const content = 'Subject: Launch update\n\nHi Sarah,\n\nHere is the plan.';
+    render(<ChatMessage message={{ role: 'assistant', content }} />);
+
+    const wrapper = document.querySelector('.markdown-email-wrapper');
+    expect(wrapper).not.toBeNull();
+    expect(document.querySelector('table')).toBeNull();
+    expect(screen.getByText(/Hi Sarah/)).toBeInTheDocument();
+  });
+
+  it('leaves ordinary prose outside the email card', () => {
+    const content = 'Here is a normal paragraph.\n\nNothing special.';
+    render(<ChatMessage message={{ role: 'assistant', content }} />);
+
+    expect(document.querySelector('.markdown-email-wrapper')).toBeNull();
+  });
 });

@@ -1426,6 +1426,20 @@ h1, h2, h3, h4, h5, h6 {
   transition: background 0.2s ease;
 }
 
+/* Emails framed like the table card, but without table markup */
+.markdown-email-wrapper {
+  margin: 0.85rem 0;
+  border-radius: 10px;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+  background: var(--bg-secondary, #18181b);
+  padding: 0.9rem 1rem;
+}
+
+.markdown-email-wrapper .markdown-heading.level-3,
+.markdown-email-wrapper .markdown-heading {
+  margin-top: 0.4rem;
+}
+
 /* Markdown Image & Link Styling */
 .markdown-image-wrapper {
   display: flex;
