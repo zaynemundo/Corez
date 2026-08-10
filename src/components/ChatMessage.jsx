@@ -455,6 +455,13 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onRe
         continue;
       }
 
+      // Drop horizontal-rule lines (e.g. "---", "* * *", "___") entirely:
+      // they render no divider and no literal text.
+      if (/^(\s*[-*_]\s*){3,}$/.test(trimmed)) {
+        i++;
+        continue;
+      }
+
       // Standalone Image ![caption](url)
       const standaloneImgMatch = trimmed.match(/^!\[(.*?)\]\((.*?)\)$/);
       if (standaloneImgMatch) {
