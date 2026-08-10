@@ -86,6 +86,21 @@ describe('ChatMessage markdown visual design', () => {
     expect(screen.getByText(/Hi Sarah/)).toBeInTheDocument();
   });
 
+  it('frames an email even with a one-line preamble before the subject', () => {
+    const content = "Here's your draft:\n\nSubject: Launch update\n\nHi Sarah,\n\nHere is the plan.";
+    render(<ChatMessage message={{ role: 'assistant', content }} />);
+
+    expect(document.querySelector('.markdown-email-wrapper')).not.toBeNull();
+    expect(document.querySelector('table')).toBeNull();
+  });
+
+  it('frames an email that opens with a To: header', () => {
+    const content = 'To: sarah@example.com\nFrom: corez@example.com\nSubject: Launch update\n\nHi Sarah,\n\nHere is the plan.';
+    render(<ChatMessage message={{ role: 'assistant', content }} />);
+
+    expect(document.querySelector('.markdown-email-wrapper')).not.toBeNull();
+  });
+
   it('leaves ordinary prose outside the email card', () => {
     const content = 'Here is a normal paragraph.\n\nNothing special.';
     render(<ChatMessage message={{ role: 'assistant', content }} />);

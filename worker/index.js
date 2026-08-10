@@ -278,6 +278,12 @@ Informational & List Formatting (for every non-code answer):
   const imageRequestInstructions = `
 - IMAGE REQUESTS: If the user explicitly requests an image, picture, photo, illustration, artwork, logo, or wallpaper, respond with EXACTLY ONE line containing \`[IMAGE_PROMPT: concise detailed description of the requested image]\` and nothing else. Never output raw SVG markup for image requests — the platform renders the image for you.`;
 
+  const emailFormatting = `
+EMAIL FORMATTING (whenever the user asks you to write, draft, compose, or rewrite an email):
+- Put a "Subject:" line as the absolute FIRST line of your reply — no preamble, no "Here is your email" intro before it. Optionally add a "To:" line directly after the subject.
+- Leave a blank line after the subject, then write the email body (greeting, paragraphs, sign-off).
+- Never wrap the email in code fences and never lay out an email as a markdown table.`;
+
   // Format full skill instructions: every selected skill passes intact so
   // the model never loses applicable guidance. They are MANDATORY: the
   // resolver selected them specifically for this request, and the model must
@@ -332,7 +338,7 @@ Guidelines for Output:
 - CRITICAL SINGLE-FILE MANDATE: Output all code as ONE SINGLE self-contained file in ONE SINGLE code block.
 - NEVER use "---" or "***" horizontal-rule lines anywhere in your response (they render as stray text in the chat UI); separate sections with "##" headings or blank lines instead.
 - Always start your response with a brief summary explaining your implementation choices before the code block.
-${adaptiveInstructions}${formattingSection}
+${adaptiveInstructions}${formattingSection}${emailFormatting}
 
 Fine-Grained Intent: ${primaryIntent}${secondaryIntent}
 Target Goal: ${intent?.goal || 'Assist user with requested deliverable'}

@@ -406,8 +406,9 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onRe
   const EMAIL_HEADER_RE = /^(Subject|To|From|Date|Cc|Bcc|Reply-To|Sender):/i;
   const looksLikeEmail = (text) => {
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-    if (!lines.length) return false;
-    if (/^Subject:/i.test(lines[0])) return true;
+    if (lines.length < 2) return false;
+    const subjectIdx = lines.findIndex(l => /^Subject:/i.test(l));
+    if (subjectIdx >= 0 && subjectIdx <= 2) return true;
     return EMAIL_HEADER_RE.test(lines[0]) && EMAIL_HEADER_RE.test(lines[1] || '');
   };
 
