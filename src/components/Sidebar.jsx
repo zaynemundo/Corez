@@ -5,9 +5,9 @@ import {
   Moon, 
   PanelLeft,
   MoreVertical,
-  Trash2
+  Trash2,
+  Pencil
 } from 'lucide-react';
-import { ChatBubbleIcon } from './icons';
 
 export default function Sidebar({
   isOpen,
@@ -59,7 +59,7 @@ export default function Sidebar({
           onClick={onNewChat}
           title="New Chat Session"
         >
-          <ChatBubbleIcon size={16} />
+          <Pencil size={16} strokeWidth={1.5} />
           <span>New Chat</span>
         </button>
       </div>
