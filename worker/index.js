@@ -143,6 +143,39 @@ function isBlockedInternalHost(hostname) {
   return false;
 }
 
+// Reference images sent to the image model. The client ships small base64
+// data: payloads (thumbnails capped at 1.5 MB client-side); https URLs are
+// also accepted but must point at public hosts — the same SSRF guard used
+// for provider-returned image URLs. The worker itself never fetches the
+// reference; it is forwarded to the provider only.
+const REFERENCE_IMAGE_MAX_DECODED_BYTES = 8 * 1024 * 1024;
+const REFERENCE_DATA_URL_PATTERN = /^data:image\/(png|jpe?g|webp|gif);base64,([A-Za-z0-9+/]+={0,2})$/i;
+
+function validateReferenceImage(value) {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const candidate = value.trim();
+
+  if (candidate.startsWith('data:')) {
+    const match = candidate.match(REFERENCE_DATA_URL_PATTERN);
+    if (!match) return null;
+    // Decoded base64 size: 3 bytes per 4 base64 chars (padding excluded).
+    const base64Body = match[2];
+    const decodedBytes = Math.floor((base64Body.length * 3) / 4);
+    if (decodedBytes > REFERENCE_IMAGE_MAX_DECODED_BYTES) return null;
+    return candidate;
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== 'https:') return null;
+  if (isBlockedInternalHost(parsed.hostname)) return null;
+  return candidate;
+}
+
 async function handleGameSocket(request, env) {
   const pathname = new URL(request.url).pathname;
   const roomId = decodePathSegment(pathname.replace('/api/game/ws/', ''));
@@ -897,6 +930,16 @@ async function handleImage(request, env) {
     return jsonResponse(400, { error: 'Prompt is required.' });
   }
 
+  // Optional reference image (the user's own image) sent to the image model
+  // as multimodal input. Only validated data: image payloads or public https
+  // URLs are accepted; anything else is rejected before any provider call.
+  const referenceImage = validateReferenceImage(body.referenceImage);
+  if (referenceImage === null && typeof body.referenceImage === 'string' && body.referenceImage) {
+    return jsonResponse(400, {
+      error: 'referenceImage must be a base64 data:image URL or a public https URL.'
+    });
+  }
+
   const openRouterKey = env?.OPENROUTER_API_KEY;
   if (!openRouterKey) {
     // Honest 503: no image provider is configured. Text providers are never
@@ -923,7 +966,7 @@ async function handleImage(request, env) {
   // image payloads. OPENROUTER_IMAGE_MODEL overrides the configured default
   // chain with one model.
   const imageModels = env?.OPENROUTER_IMAGE_MODEL ? [String(env.OPENROUTER_IMAGE_MODEL)] : undefined;
-  const imageResult = await callOpenRouterImage(openRouterKey, prompt, imageClientSignal, imageModels);
+  const imageResult = await callOpenRouterImage(openRouterKey, prompt, imageClientSignal, imageModels, referenceImage);
   if (!imageResult) {
     return jsonResponse(503, {
       error: 'Image generation is unavailable: the image provider did not return an image.'

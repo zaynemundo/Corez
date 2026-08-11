@@ -459,7 +459,7 @@ export default function App() {
     }
 
     const displayAttachments = attachments.map(({ id, name, type, size, thumb }) => ({ id, name, type, size, thumb }));
-    const apiAttachments = attachments.map(({ name, type, size, content }) => ({ name, type, size, content }));
+    const apiAttachments = attachments.map(({ name, type, size, thumb, content }) => ({ name, type, size, thumb, content }));
 
     const displayMsg = { role: 'user', content: displayPrompt, attachments: displayAttachments };
     const apiMsg = { role: 'user', content: apiPrompt, attachments: apiAttachments };
@@ -510,7 +510,7 @@ export default function App() {
       } else {
         const slimMessages = updatedApiMessages.map((message) => ({
           ...message,
-          attachments: (message.attachments || []).map(({ content: _content, ...rest }) => rest)
+          attachments: (message.attachments || []).map(({ content: _content, thumb: _thumb, ...rest }) => rest)
         }));
         localStorage.setItem('corez_pending_request', JSON.stringify({
           ...pendingData,

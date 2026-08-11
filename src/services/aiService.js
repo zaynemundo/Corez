@@ -462,14 +462,20 @@ export function createFallbackSvgDataUrl(prompt) {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
-export async function generateImage(prompt, signal = null) {
+export async function generateImage(prompt, signal = null, referenceImage = null) {
   try {
+    const payload = { prompt };
+    // The user's own reference image (data URL) is forwarded so image models
+    // can use it as visual input instead of generating from text alone.
+    if (typeof referenceImage === 'string' && referenceImage.startsWith('data:image')) {
+      payload.referenceImage = referenceImage;
+    }
     const fetchOptions = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ prompt })
+      body: JSON.stringify(payload)
     };
     if (signal) fetchOptions.signal = signal;
 
@@ -3348,6 +3354,20 @@ export function generateSessionTitle(prompt) {
   }
 }
 
+export function extractReferenceImage(history) {
+  if (!Array.isArray(history)) return null;
+  for (let i = history.length - 1; i >= 0; i -= 1) {
+    const message = history[i];
+    if (!message || message.role !== 'user' || !Array.isArray(message.attachments)) continue;
+    for (const attachment of message.attachments) {
+      if (attachment && typeof attachment.thumb === 'string' && attachment.thumb.startsWith('data:image')) {
+        return attachment.thumb;
+      }
+    }
+  }
+  return null;
+}
+
 export async function handleMixedQuestionImageRequest(prompt, intent, history, signal) {
   const subject = extractImageSubject(prompt);
   const imagePrompt = subject ? `an image of ${subject}` : prompt;
@@ -3362,7 +3382,7 @@ export async function handleMixedQuestionImageRequest(prompt, intent, history, s
 
   const [hostedResult, imageResult] = await Promise.allSettled([
     generateHostedAIResponse(questionPrompt, intent, questionHistory, signal),
-    generateImage(imagePrompt, signal)
+    generateImage(imagePrompt, signal, extractReferenceImage(history))
   ]);
 
   const hostedResponse = hostedResult.status === 'fulfilled' ? hostedResult.value : null;
@@ -3472,7 +3492,7 @@ export async function generateAIResponse(prompt, history = [], signal = null, on
       }
     }
     try {
-      const imageUrl = await generateImage(cleanPrompt, signal);
+      const imageUrl = await generateImage(cleanPrompt, signal, extractReferenceImage(history));
       if (imageUrl) {
         return `![](${imageUrl})`;
       }
@@ -3493,7 +3513,7 @@ export async function generateAIResponse(prompt, history = [], signal = null, on
       if (imageMatch) {
         const imagePrompt = imageMatch[1].trim();
         try {
-          const imageUrl = await generateImage(imagePrompt, signal);
+          const imageUrl = await generateImage(imagePrompt, signal, extractReferenceImage(history));
           if (imageUrl) {
              // Replace the tag with the actual image markdown
              return hostedAiResponse.replace(imageMatch[0], `![](${imageUrl})`);

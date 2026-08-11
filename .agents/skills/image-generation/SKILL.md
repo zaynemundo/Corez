@@ -10,7 +10,12 @@ when code must call, test, or debug the actual CoreZ image endpoint.
 
 ## Endpoint contract
 
-- Send `POST /api/image` with JSON `{ "prompt": "..." }`.
+- Send `POST /api/image` with JSON `{ "prompt": "..." }`. Optional
+  `"referenceImage"` (base64 `data:image/...` URL of the user's own image or a
+  public https URL) is forwarded to the model as multimodal image input, so
+  stylisation and "make it like this" requests use the reference instead of
+  inventing from text alone. The worker rejects malformed or internal-host
+  references with 400.
 - `OPENROUTER_API_KEY` is required. `OPENROUTER_IMAGE_MODEL` may override the
   server-controlled default with one model.
 - Success returns `{ image, model }`. Report the returned `model`; do not assume
@@ -38,8 +43,10 @@ when code must call, test, or debug the actual CoreZ image endpoint.
 
 ## Guardrails
 
-- Do not claim background removal, inpainting, or arbitrary image editing; the
-  endpoint generates new images only.
+- Do not claim background removal, inpainting, or arbitrary image editing
+  beyond what the configured model supports; report the returned `model` and
+  keep expectations honest (reference images guide generation — similarity
+  depends on the provider model).
 - Do not expose provider keys to the browser or accept a client-selected model.
 - Do not claim persistence unless the returned URL is the stored CoreZ asset.
 

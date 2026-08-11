@@ -729,6 +729,106 @@ async function run() {
     globalThis.fetch = overrideImageOriginalFetch;
   }
 
+  // A reference image (the user's own image) is forwarded to the provider as
+  // OpenAI-style multimodal content so the image model edits/stylises the
+  // reference instead of inventing from text alone.
+  const referenceImageOriginalFetch = globalThis.fetch;
+  const referenceImageDataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  try {
+    globalThis.fetch = async (url, init) => {
+      const payload = JSON.parse(init.body);
+      capturedPayloads.push(payload);
+      assert.equal(payload.model, 'google/gemini-3.1-flash-lite-image');
+      assert.deepEqual(payload.messages, [{
+        role: 'user',
+        content: [
+          { type: 'text', text: 'Restyle my photo in watercolour' },
+          { type: 'image_url', image_url: { url: referenceImageDataUrl } }
+        ]
+      }]);
+      return new Response(JSON.stringify({
+        choices: [{ message: { images: [{ url: 'https://img.example.com/restyled.png' }] } }]
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    };
+    const referenceImageResponse = await worker.fetch(
+      new Request('https://corez.test/api/image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: 'Restyle my photo in watercolour', referenceImage: referenceImageDataUrl })
+      }),
+      env({ OPENROUTER_API_KEY: 'sk-openrouter-test' })
+    );
+    assert.equal(referenceImageResponse.status, 200);
+    assert.equal((await json(referenceImageResponse)).image, 'https://img.example.com/restyled.png');
+  } finally {
+    globalThis.fetch = referenceImageOriginalFetch;
+  }
+
+  // A public https reference URL is accepted and forwarded verbatim.
+  const httpsReferenceOriginalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (url, init) => {
+      const payload = JSON.parse(init.body);
+      assert.deepEqual(payload.messages[0].content[1], {
+        type: 'image_url',
+        image_url: { url: 'https://cdn.example.com/user-photo.png' }
+      });
+      return new Response(JSON.stringify({
+        choices: [{ message: { images: [{ url: 'https://img.example.com/https-ref.png' }] } }]
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    };
+    const httpsReferenceResponse = await worker.fetch(
+      new Request('https://corez.test/api/image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: 'Keep this person but change the background', referenceImage: 'https://cdn.example.com/user-photo.png' })
+      }),
+      env({ OPENROUTER_API_KEY: 'sk-openrouter-test' })
+    );
+    assert.equal(httpsReferenceResponse.status, 200);
+  } finally {
+    globalThis.fetch = httpsReferenceOriginalFetch;
+  }
+
+  // Malformed or unsafe reference images are rejected with a 400 before any
+  // provider call: no plain-text data URLs, no http URLs, no internal hosts.
+  const unsafeReferenceOriginalFetch = globalThis.fetch;
+  let unsafeProviderAttempted = false;
+  try {
+    globalThis.fetch = async (_url, _init) => {
+      unsafeProviderAttempted = true;
+      return new Response(JSON.stringify({ choices: [] }), { status: 200 });
+    };
+    for (const badReference of [
+      'data:text/plain;base64,aGVsbG8=',
+      'data:image/png;base64,%%%%',
+      'http://cdn.example.com/user-photo.png',
+      'https://169.254.169.254/latest/meta-data/',
+      'https://localhost/photo.png',
+      'not-a-url'
+    ]) {
+      const badReferenceResponse = await worker.fetch(
+        new Request('https://corez.test/api/image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: 'restyle this', referenceImage: badReference })
+        }),
+        env({ OPENROUTER_API_KEY: 'sk-openrouter-test' })
+      );
+      assert.equal(badReferenceResponse.status, 400, `referenceImage "${badReference}" must be rejected`);
+      assert.match((await json(badReferenceResponse)).error, /referenceImage/);
+    }
+    assert.equal(unsafeProviderAttempted, false, 'no provider call for invalid reference images');
+  } finally {
+    globalThis.fetch = unsafeReferenceOriginalFetch;
+  }
+
   // A provider-returned non-https image URL is rejected (SSRF guard): the
   // response is an honest 502 and no fetch of the http URL is attempted.
   const insecureImageOriginalFetch = globalThis.fetch;

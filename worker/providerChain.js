@@ -755,9 +755,20 @@ export function runStreamingChain(messages, options = {}) {
  * the image. The preferred path parses choices[0].message.images[0].url;
  * content URLs and data:image payloads are also accepted. Returns null when
  * no model produced a usable image.
+ *
+ * referenceImage (optional) is a validated data: URL or public https URL of
+ * the user's own image. When present the message becomes OpenAI-style
+ * multimodal content ([{ type: 'text' }, { type: 'image_url' }]) so image
+ * models use it as visual reference instead of inventing from text alone.
  */
-export async function callOpenRouterImage(apiKey, prompt, parentSignal, imageModels = DEFAULT_IMAGE_MODEL_CHAIN) {
+export async function callOpenRouterImage(apiKey, prompt, parentSignal, imageModels = DEFAULT_IMAGE_MODEL_CHAIN, referenceImage = null) {
   const models = Array.isArray(imageModels) && imageModels.length > 0 ? imageModels : DEFAULT_IMAGE_MODEL_CHAIN;
+  const userContent = (typeof referenceImage === 'string' && referenceImage)
+    ? [
+        { type: 'text', text: prompt },
+        { type: 'image_url', image_url: { url: referenceImage } }
+      ]
+    : prompt;
   for (const model of models) {
     try {
       const response = await fetch(OPENROUTER_DEFAULT_ENDPOINT, {
@@ -770,7 +781,7 @@ export async function callOpenRouterImage(apiKey, prompt, parentSignal, imageMod
         },
         body: JSON.stringify({
           model,
-          messages: [{ role: 'user', content: prompt }]
+          messages: [{ role: 'user', content: userContent }]
         }),
         signal: parentSignal
       });

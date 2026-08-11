@@ -184,4 +184,48 @@ describe('image request routing', () => {
     expect(decodeURIComponent(response)).toContain('LOCAL IMAGE PLACEHOLDER');
     expect(fetchMock).toHaveBeenCalledWith('/api/image', expect.anything());
   });
+
+  it('forwards the user reference image to the image endpoint', async () => {
+    const referenceImage = 'data:image/png;base64,REFERENCE_BASE64';
+    let forwardedBody = null;
+    const fetchMock = vi.fn(async (url, init) => {
+      if (url === '/api/image') {
+        forwardedBody = JSON.parse(init.body);
+        return Response.json({ image: 'data:image/png;base64,FAKE' });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    // A user message carrying an image attachment thumb (the reference the
+    // user gave) followed by an image request routes the reference along.
+    const history = [
+      { role: 'user', content: 'here is my photo', attachments: [{ name: 'me.png', type: 'image/png', thumb: referenceImage }] },
+      { role: 'assistant', content: 'Got it.' },
+    ];
+    const response = await generateAIResponse('give me an image: turn my photo into a cartoon', history);
+
+    expect(forwardedBody).not.toBeNull();
+    expect(forwardedBody.referenceImage).toBe(referenceImage);
+    expect(forwardedBody.prompt).toBeTruthy();
+    expect(response).toContain('![](data:image/png;base64,FAKE)');
+    expect(fetchMock).toHaveBeenCalledWith('/api/image', expect.anything());
+  });
+
+  it('sends no referenceImage when the user gave no image', async () => {
+    const fetchMock = vi.fn(async (url, init) => {
+      if (url === '/api/image') {
+        const body = JSON.parse(init.body);
+        expect(body.referenceImage).toBeUndefined();
+        return Response.json({ image: 'data:image/png;base64,FAKE' });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await generateAIResponse('give me an image of a castle', []);
+
+    expect(response).toContain('![](data:image/png;base64,FAKE)');
+    expect(fetchMock).toHaveBeenCalledWith('/api/image', expect.anything());
+  });
 });
