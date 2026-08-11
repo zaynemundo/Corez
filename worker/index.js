@@ -283,8 +283,9 @@ EMAIL FORMATTING (whenever the user asks you to write, draft, compose, or rewrit
 - Start with "Subject:" as the absolute FIRST line — no preamble, no "Here is your email" text before it.
 - Immediately after the subject line, add "To:" with the recipient name or email (use the name the user gave; if unspecified, use "[Recipient Name]").
 - Leave one blank line, then write the email body: a greeting ("Hi [Name],"), the message paragraphs, and a sign-off ("Best regards," / "Kind regards," / "Sincerely," followed by the sender name on the next line).
-- Never wrap the email in code fences and never lay out an email as a markdown table.
-- Example format:\nSubject: Meeting Request for Friday\nTo: [Boss's Name]\n\nHi [Boss's Name],\n\nI would like to request a meeting on Friday to discuss the project timeline.\n\nPlease let me know if the time works for you.\n\nKind regards,\nZayne`;
+- NEVER use markdown formatting in the email output: no "**" bold, no "*" italic, no "#" headings, no backticks, no "---" horizontal rules, no ">" quotes, and no bullet markers like "- " or "* ". Emails must be PLAIN TEXT with nothing but letters, punctuation, blank lines, and normal characters.
+- Never wrap the email in code fences, never lay out an email as a markdown table, and never add any note, commentary, or "Here is your email" text before or after the email itself.
+- Example format (plain text, no markdown):\nSubject: Meeting Request for Friday\nTo: [Boss's Name]\n\nHi [Boss's Name],\n\nI would like to request a meeting on Friday to discuss the project timeline.\n\nPlease let me know if the time works for you.\n\nKind regards,\nZayne`;
 
   // Format full skill instructions: every selected skill passes intact so
   // the model never loses applicable guidance. They are MANDATORY: the
