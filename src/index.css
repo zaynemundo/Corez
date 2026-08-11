@@ -1606,12 +1606,6 @@ h1, h2, h3, h4, h5, h6 {
   border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
 }
 
-.email-recipients-label {
-  font-size: 0.72rem;
-  color: var(--text-muted, #71717a);
-  flex-shrink: 0;
-}
-
 .email-recipients-value {
   font-size: 0.8rem;
   color: var(--text-primary, #e4e4e7);

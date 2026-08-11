@@ -471,7 +471,6 @@ function EmailCard({ content, renderBody }) {
         <>
           {recipients && (
             <div className="email-recipients">
-              <span className="email-recipients-label">Recipients</span>
               <span className="email-recipients-value">{recipients}</span>
             </div>
           )}
