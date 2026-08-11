@@ -58,22 +58,6 @@ describe('ChatMessage email card actions', () => {
     expect(document.querySelector('.email-subject').textContent).toBe('Launch update');
   });
 
-  it('falls back to clipboard when navigator.share is unavailable', () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, 'clipboard', {
-      configurable: true,
-      value: { writeText }
-    });
-    delete navigator.share;
-
-    render(<ChatMessage message={{ role: 'assistant', content: EMAIL_CONTENT }} />);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Share email' }));
-
-    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('Subject: Launch update'));
-    expect(screen.getByRole('button', { name: 'Email shared' })).toBeInTheDocument();
-  });
-
   it('send opens a mailto link prefilled with subject and body', () => {
     const hrefSetter = vi.fn();
     Object.defineProperty(window, 'location', {
@@ -83,12 +67,24 @@ describe('ChatMessage email card actions', () => {
 
     render(<ChatMessage message={{ role: 'assistant', content: EMAIL_CONTENT }} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Send email' }));
+    fireEvent.click(document.querySelector('.email-send-btn'));
 
     const url = hrefSetter.mock.calls[0][0];
     expect(url.startsWith('mailto:sarah@example.com?')).toBe(true);
     expect(url).toContain('subject=Launch%20update');
     expect(url).toContain('body=');
-    expect(screen.getByRole('button', { name: 'Email sent' })).toBeInTheDocument();
+    expect(document.querySelector('.email-send-btn.sent')).not.toBeNull();
+  });
+
+  it('renders the send button as an icon only, with no share button', () => {
+    render(<ChatMessage message={{ role: 'assistant', content: EMAIL_CONTENT }} />);
+
+    const sendButton = document.querySelector('.email-send-btn');
+    expect(sendButton).not.toBeNull();
+    expect(sendButton.textContent.trim()).toBe('');
+    expect(sendButton.querySelector('svg')).not.toBeNull();
+    expect(sendButton.getAttribute('aria-label')).toBeNull();
+    expect(document.querySelector('.email-icon-btn')).not.toBeNull();
+    expect(screen.queryByRole('button', { name: 'Share email' })).toBeNull();
   });
 });

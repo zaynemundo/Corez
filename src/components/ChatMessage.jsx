@@ -348,7 +348,6 @@ function EmailCard({ content, renderBody }) {
   const [recipients, setRecipients] = useState(initial.recipients);
   const [body, setBody] = useState(initial.body);
   const [copied, setCopied] = useState(false);
-  const [shared, setShared] = useState(false);
   const [sent, setSent] = useState(false);
 
   const fullText = [
@@ -364,23 +363,6 @@ function EmailCard({ content, renderBody }) {
     }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleShare = async () => {
-    const shareData = { title: subject || 'COREZ AI Email', text: fullText };
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-        setShared(true);
-        setTimeout(() => setShared(false), 2000);
-      } catch { /* Dismissed by the user */ }
-      return;
-    }
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(fullText).catch(() => {});
-      setShared(true);
-      setTimeout(() => setShared(false), 2000);
-    }
   };
 
   const handleSend = () => {
@@ -446,21 +428,10 @@ function EmailCard({ content, renderBody }) {
               </button>
               <button
                 type="button"
-                className={`email-icon-btn ${shared ? 'active' : ''}`}
-                onClick={handleShare}
-                aria-label={shared ? 'Email shared' : 'Share email'}
-                title={shared ? 'Shared' : 'Share email'}
-              >
-                <Share2 size={15} />
-              </button>
-              <button
-                type="button"
                 className={`email-send-btn ${sent ? 'sent' : ''}`}
                 onClick={handleSend}
-                aria-label={sent ? 'Email sent' : 'Send email'}
-                title="Open in your mail app"
               >
-                {sent ? <Check size={14} /> : <Send size={14} />} {sent ? 'Sent' : 'Send'}
+                {sent ? <Check size={14} /> : <Send size={14} />}
               </button>
             </>
           )}
