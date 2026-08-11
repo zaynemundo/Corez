@@ -1508,24 +1508,24 @@ h1, h2, h3, h4, h5, h6 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.9rem;
-  height: 1.9rem;
+  width: 30px;
+  height: 30px;
   padding: 0;
-  border-radius: 9999px;
+  border-radius: 8px;
   border: none;
-  background: var(--text-primary, #fff);
-  color: var(--bg-primary, #000);
+  background: transparent;
+  color: var(--text-secondary, #a1a1aa);
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
 
 .email-send-btn:hover {
-  opacity: 0.85;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary, #fff);
 }
 
 .email-send-btn.sent {
-  background: #22c55e;
-  color: #fff;
+  color: #22c55e;
 }
 
 .email-save-btn {
