@@ -89,7 +89,7 @@ describe('buildProjectContextSection', () => {
     expect(section).toContain('Framework: react');
     expect(section).toContain('FOLLOW-UP REQUEST');
     expect(section).toContain('PRESERVE');
-    expect(section).toContain('Do NOT regenerate the entire project from scratch');
+    expect(section).toContain('FOLLOW-UP OVERRIDE');
     expect(section).toContain('- score');
   });
 

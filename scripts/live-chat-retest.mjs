@@ -134,8 +134,8 @@ for (const item of cases) {
   const apiResult = await callAi({ prompt: item.prompt, messages });
 
   // Greeting short-circuit: no LLM call, no diagnostics — verify only.
-  let score = null;
-  let passed = false;
+  let score;
+  let passed;
   let hardFailures = [];
   let aspects = null;
   let breakdown = null;

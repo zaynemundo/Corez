@@ -216,7 +216,7 @@ describe('scoreContinuity', () => {
       features: ['scoring', 'controls', 'game-over', 'restart', 'canvas'],
       latestCode: 'export default function App() { return <canvas />; }'
     };
-    const response = '```jsx\nexport default function App() {\n  const [score, setScore] = useState(0);\n  return <canvas onKeyDown={handleKey} />;\n}\n```';
+    const response = '```jsx\nexport default function App() {\n  const [score, setScore] = useState(0);\n  const [gameOver, setGameOver] = useState(false);\n  function resetGame() { setScore(0); setGameOver(false); }\n  function handleKey(e) { console.log(e.key); }\n  return <canvas onKeyDown={handleKey} />;\n}\n```';
     const result = scoreContinuity({ project, response, userPrompt: 'make the snake speed up gradually' });
     expect(result.checks['preserved-framework']).toBe(true);
     expect(result.checks['preserved-unrelated-features']).toBe(true);
