@@ -1594,6 +1594,7 @@ h1, h2, h3, h4, h5, h6 {
 .email-edit-textarea {
   resize: vertical;
   min-height: 90px;
+  max-height: 220px;
 }
 
 /* Recipients row */
