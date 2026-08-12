@@ -12,6 +12,10 @@ import { verifyCreation, buildRepairPrompt } from './creationVerifier.js';
 
 const MAX_REPAIR_ROUNDS = 5;
 const LEASE_MS = 5 * 60 * 1000;
+// The build lease is refreshed on a timer while the harness runs, so a long
+// generation (uncapped build stream, slow spec/review) never lets the lease
+// expire mid-flight and admit a duplicate concurrent build.
+const HEARTBEAT_INTERVAL_MS = 30 * 1000;
 // Reasoning models spend their OUTPUT budget on internal reasoning before
 // answering: a tight cap is consumed by thinking alone and the content comes
 // back empty (finish_reason "length", content ""). These caps give the model
@@ -66,7 +70,8 @@ export async function* runCreationHarness(options) {
     apiMessages,
     env,
     signal,
-    store
+    store,
+    heartbeatIntervalMs = HEARTBEAT_INTERVAL_MS
   } = options;
 
   const taskId = harnessTaskId(prompt, primaryIntent);
@@ -110,10 +115,39 @@ export async function* runCreationHarness(options) {
     err.retryable = true;
     throw err;
   }
+
+  // Atomic lease acquisition: persist busy + a unique owner token BEFORE any
+  // work, then re-load and verify the record still shows OUR token. If
+  // another invocation wrote its own token in between, it won the race and
+  // this run backs off without touching the record. This shrinks the
+  // read-then-write window (previously the whole planning phase) to a single
+  // store round-trip, so two concurrent identical requests no longer both
+  // plan and build (double provider spend, last-writer-wins clobbering).
+  const leaseOwner = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
   state.busy = true;
-  // Whether THIS invocation acquired the lease: only the owner may release
-  // it, so a busy error (or its finally) never frees another run's lease.
+  state.leaseOwner = leaseOwner;
+  await persist(store, taskId, state);
+  const recheck = await store.load(taskId);
+  if (!recheck || recheck.leaseOwner !== leaseOwner) {
+    const err = new Error('A build for this request is already in progress.');
+    err.status = 429;
+    err.retryable = true;
+    throw err;
+  }
   let leaseOwned = true;
+
+  // Lease heartbeat: refresh the record on a timer for as long as this
+  // invocation owns the lease, so a generation running longer than LEASE_MS
+  // stays protected from duplicate concurrent builds. Cleared in finally.
+  let heartbeatTimer = null;
+  if (heartbeatIntervalMs > 0) {
+    heartbeatTimer = setInterval(() => {
+      if (leaseOwned && state.busy === true) {
+        state.heartbeat = Date.now();
+        store.save(taskId, state).catch(() => {});
+      }
+    }, heartbeatIntervalMs);
+  }
 
   const reportPhase = (phase) => {
     state.phase = phase;
@@ -146,7 +180,13 @@ export async function* runCreationHarness(options) {
         state.busy = false;
         state.status = 'failed';
         await persist(store, taskId, state);
-        throw new Error('The AI returned no build specification for this request.');
+        // A provider outage during planning is a provider failure, never a
+        // silent "the AI produced no spec": surface the real reason so the
+        // client can retry at the right time.
+        const reason = specResult?.status === 'retry-scheduled'
+          ? `The AI providers are temporarily busy (recovery scheduled in ~${specResult.retryAfterSeconds}s).`
+          : (specResult?.error || 'The AI returned no build specification for this request.');
+        throw new Error(reason);
       }
       state.spec = specResult.content;
       state.model = specResult.model || state.model;
@@ -159,7 +199,9 @@ export async function* runCreationHarness(options) {
       content: `Build specification:\n${state.spec}\n\nDeliver ONLY the complete, finished artifact as a single self-contained HTML document.`
     };
     let buildMessages = [...baseSystem, buildContext, ...userMessages];
-    let repairBudget = MAX_REPAIR_ROUNDS;
+    // The repair budget is CUMULATIVE across resumes: a task interrupted
+    // after 3 rounds resumes with 2 left, never a fresh 5.
+    let repairBudget = Math.max(0, MAX_REPAIR_ROUNDS - (state.repairCount || 0));
     while (state.build === null || (state.verification && !state.verification.passed && repairBudget > 0)) {
       const isRepair = state.build !== null;
       if (isRepair) {
@@ -265,25 +307,42 @@ export async function* runCreationHarness(options) {
       await persist(store, taskId, state);
       throw Object.assign(new Error('AI request cancelled.'), { status: 499 });
     }
-    state.review = reviewResult?.content ? parseReview(reviewResult.content) : { approved: true, feedback: '' };
+    // A review that never answered (provider outage, retry-scheduled) is
+    // recorded as SKIPPED — never as a silent approval: the artifact already
+    // passed deterministic verification, but diagnostics must say honestly
+    // that the model review did not run.
+    state.review = reviewResult?.content
+      ? parseReview(reviewResult.content)
+      : {
+          approved: true,
+          feedback: '',
+          skipped: true,
+          reason: reviewResult?.status === 'retry-scheduled'
+            ? `AI providers temporarily busy (recovery scheduled in ~${reviewResult.retryAfterSeconds}s)`
+            : (reviewResult?.error || 'review provider returned no usable response')
+        };
 
     if (!state.review.approved && state.repairCount < MAX_REPAIR_ROUNDS) {
+      state.repairCount += 1;
       yield reportPhase('repairing');
       yield { type: 'clear' };
       const repairPrompt = buildRepairPrompt(
         originalPrompt,
         state.build,
         [{ code: 'review-failure', detail: state.review.feedback }],
-        state.repairCount + 1,
+        state.repairCount,
         MAX_REPAIR_ROUNDS
       );
       const repairMessages = [...baseSystem, buildContext, { role: 'user', content: repairPrompt }];
       let collected = '';
+      let repairStreamFailed = false;
       try {
         for await (const event of runStreamingChain(repairMessages, { env, signal, maxTokens: null })) {
           if (event.type === 'delta') {
             collected += event.text;
             yield { type: 'delta', text: event.text };
+          } else if (event.type === 'error') {
+            repairStreamFailed = true;
           }
         }
       } catch (err) {
@@ -293,21 +352,22 @@ export async function* runCreationHarness(options) {
           await persist(store, taskId, state);
           throw err;
         }
-        throw err;
+        repairStreamFailed = true;
       }
-      state.repairCount += 1;
-      if (collected.trim()) {
+      if (repairStreamFailed || !collected.trim()) {
+        // The repair round could not produce a complete artifact (transient
+        // provider hiccup): keep the last good build. Drop any partial
+        // deltas the failed round streamed, then re-emit the good build so
+        // the client's stream ends with the real artifact — never empty,
+        // never partial-garbage concatenated with the full build.
+        if (collected.trim()) yield { type: 'clear' };
+        yield { type: 'delta', text: state.build };
+      } else {
         state.build = collected;
         await persist(store, taskId, state);
         yield reportPhase('verifying');
         state.verification = verifyCreation(collected, { intentType: state.intentType });
         await persist(store, taskId, state);
-      } else {
-        // The repair stream produced nothing (transient provider hiccup):
-        // keep the last good build and re-emit it as a delta so the
-        // client's stream (cleared for the repair round) is refilled
-        // instead of ending the response empty.
-        yield { type: 'delta', text: state.build };
       }
     }
 
@@ -327,6 +387,7 @@ export async function* runCreationHarness(options) {
           repairRounds: state.repairCount,
           verification: state.verification,
           approved: Boolean(state.review?.approved),
+          reviewSkipped: Boolean(state.review?.skipped),
           model: state.model || null
         }
       }
@@ -339,6 +400,7 @@ export async function* runCreationHarness(options) {
     }
     throw err;
   } finally {
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
     // A cancelled streamed response (client Stop, tab close, or network
     // drop) terminates this generator at its current yield point — the
     // catch above never runs — so release the busy lease here or the same
