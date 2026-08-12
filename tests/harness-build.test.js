@@ -217,4 +217,82 @@ describe('runCreationHarness', () => {
     expect(thrown.status).toBe(429);
     expect(thrown.retryable).toBe(true);
   });
+
+  it('fails loudly instead of finishing when the build is whitespace-only', async () => {
+    const store = createTaskStateStore({});
+    const taskId = harnessTaskId('build a first person shooter game', 'game_creation');
+    // Persisted pre-fix state: status active with a whitespace build and no
+    // verification record. The harness must not stream a contentless done.
+    await store.save(taskId, {
+      taskId,
+      status: 'active',
+      busy: false,
+      phase: 'building',
+      spec: 'spec',
+      build: '   \n  ',
+      verification: null,
+      review: null,
+      repairCount: 0,
+      updatedAt: Date.now()
+    });
+
+    const events = [];
+    let thrown = null;
+    try {
+      for await (const event of runCreationHarness({
+        prompt: 'build a first person shooter game',
+        primaryIntent: 'game_creation',
+        intentType: 'game_creation',
+        apiMessages: BASE_MESSAGES,
+        env: ENV,
+        signal: null,
+        store
+      })) {
+        events.push(event);
+      }
+    } catch (err) {
+      thrown = err;
+    }
+
+    expect(thrown).toBeTruthy();
+    expect(thrown.message).toMatch(/empty build/i);
+    expect(events.some((e) => e.type === 'done')).toBe(false);
+    expect(events.some((e) => e.type === 'delta')).toBe(false);
+    const persisted = await store.load(taskId);
+    expect(persisted.status).toBe('failed');
+  });
+
+  it('reports an honest provider failure when the build stream is whitespace-only', async () => {
+    const provider = buildMockProvider();
+    provider.fetchMock.mockImplementation(async (_url, init) => {
+      const body = JSON.parse(init.body);
+      const messages = JSON.stringify(body.messages || []);
+      if (messages.includes('Produce a concise build specification')) return jsonCompletion('spec');
+      if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('APPROVED');
+      return body.stream === true ? sseDelta(['\n', '   ']) : jsonCompletion('   ');
+    });
+    vi.stubGlobal('fetch', provider.fetchMock);
+
+    const events = [];
+    let thrown = null;
+    try {
+      for await (const event of runCreationHarness({
+        prompt: 'build a first person shooter game',
+        primaryIntent: 'game_creation',
+        intentType: 'game_creation',
+        apiMessages: BASE_MESSAGES,
+        env: ENV,
+        signal: null,
+        store: createTaskStateStore({})
+      })) {
+        events.push(event);
+      }
+    } catch (err) {
+      thrown = err;
+    }
+
+    expect(thrown).toBeTruthy();
+    expect(thrown.message).toMatch(/empty|stream/i);
+    expect(events.some((e) => e.type === 'done')).toBe(false);
+  });
 });

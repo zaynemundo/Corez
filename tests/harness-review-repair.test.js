@@ -1,0 +1,108 @@
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { runCreationHarness } from '../worker/harness.js';
+import { createTaskStateStore } from '../worker/utils.js';
+
+// runStreamingChain is mocked at module level so a review-repair round can
+// be simulated as a done-without-deltas stream (the refill path lives inside
+// the harness, after the provider-chain emptiness recovery has run).
+vi.mock('../worker/providerChain.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    runStreamingChain: vi.fn()
+  };
+});
+
+import { runStreamingChain } from '../worker/providerChain.js';
+
+const GOOD_ARTIFACT = `<!DOCTYPE html>
+<html lang="en"><head><title>G</title></head>
+<body><canvas id="c"></canvas>
+<script>
+function gameLoop(){ update(); render(); }
+function update(){}
+function render(){}
+document.addEventListener('keydown', function(){});
+canvas.addEventListener('mousemove', function(){});
+requestAnimationFrame(gameLoop);
+</script></body></html>`;
+
+const BROKEN_ARTIFACT = '<html><body><p>nothing here</p></body></html>';
+
+function jsonCompletion(content) {
+  return Response.json({ choices: [{ message: { content } }] }, { status: 200 });
+}
+
+function collectDeltas(events) {
+  const parts = [];
+  for (const event of events) {
+    if (event.type === 'clear') parts.length = 0;
+    if (event.type === 'delta') parts.push(event.text);
+  }
+  return parts.join('');
+}
+
+const ENV = { OPENCODE_GO_API_KEY: 'sk-test' };
+const BASE_MESSAGES = [
+  { role: 'system', content: 'You are COREZ AI, a game-building engine.' },
+  { role: 'user', content: 'build a first person shooter game' }
+];
+
+async function runHarness() {
+  const events = [];
+  const iterable = runCreationHarness({
+    prompt: 'build a first person shooter game',
+    primaryIntent: 'game_creation',
+    intentType: 'game_creation',
+    apiMessages: BASE_MESSAGES,
+    env: ENV,
+    signal: null,
+    store: createTaskStateStore({})
+  });
+  for await (const event of iterable) events.push(event);
+  return events;
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.clearAllMocks();
+});
+
+describe('runCreationHarness review-repair refill', () => {
+  it('re-emits the last good build when a review repair stream produces no content', async () => {
+    runStreamingChain.mockImplementation(async function* (messages) {
+      const serialized = JSON.stringify(messages || []);
+      if (serialized.includes('[review-failure]')) {
+        // Review repair: a stream that ends without any delta.
+        yield { type: 'done', finishReason: 'stop' };
+        return;
+      }
+      const chunks = serialized.includes('did not pass functional verification')
+        ? [GOOD_ARTIFACT]
+        : [BROKEN_ARTIFACT];
+      for (const text of chunks) yield { type: 'delta', text };
+      yield { type: 'done', finishReason: 'stop' };
+    });
+
+    // Spec + review go through the real runProviderChain (global fetch).
+    const fetchMock = vi.fn(async (_url, init) => {
+      const messages = JSON.stringify(JSON.parse(init.body).messages || []);
+      if (messages.includes('Produce a concise build specification')) return jsonCompletion('spec');
+      if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('NEEDS_FIX: the button does nothing');
+      return jsonCompletion('');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const events = await runHarness();
+
+    // The cleared stream is refilled with the last good build: the client
+    // never receives a contentless done.
+    const deltas = collectDeltas(events);
+    expect(deltas).toBe(GOOD_ARTIFACT);
+    const clears = events.filter((e) => e.type === 'clear');
+    expect(clears.length).toBe(2);
+    expect(events.some((e) => e.type === 'done')).toBe(true);
+    const phases = events.filter((e) => e.type === 'phase').map((e) => e.phase);
+    expect(phases).toContain('repairing');
+  });
+});

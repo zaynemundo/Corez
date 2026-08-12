@@ -673,7 +673,12 @@ export function runStreamingChain(messages, options = {}) {
           return { text, usage, finishReason };
         }
         let got = yield* tryStream(messages);
-        if (!got.text) {
+        // Whitespace-only output is an empty stream too: under load the
+        // gateway occasionally answers with a stream of blank chunks, which
+        // previously counted as a successful done and reached users as
+        // "no streamed content". Trim-based emptiness sends those through
+        // the same nudge/retry/fallback recovery as a truly empty stream.
+        if (!got.text.trim()) {
           // Reasoning-only or empty stream: two continuation nudges (the
           // gateway occasionally returns an empty stream under load), then
           // ONE full retry of the original request before this provider is
@@ -686,13 +691,13 @@ export function runStreamingChain(messages, options = {}) {
           ];
           for (const candidate of nudgeMessages) {
             got = yield* tryStream(candidate);
-            if (got.text) break;
+            if (got.text.trim()) break;
           }
-          if (!got.text) {
+          if (!got.text.trim()) {
             got = yield* tryStream(messages);
           }
         }
-        if (got.text) {
+        if (got.text.trim()) {
           yield {
             type: 'usage',
             inputTokens: got.usage?.inputTokens ?? 0,

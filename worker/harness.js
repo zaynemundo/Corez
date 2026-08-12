@@ -88,7 +88,7 @@ export async function* runCreationHarness(options) {
   const originalPrompt = prompt;
 
   // Terminal state: replay the finished artifact so a retry never rebuilds.
-  if (state.status === 'done' && state.build) {
+  if (state.status === 'done' && state.build?.trim()) {
     yield { type: 'phase', phase: 'done', attempt: state.repairCount, total: MAX_REPAIR_ROUNDS };
     yield { type: 'delta', text: state.build };
     yield { type: 'done', final: true, projectState: null };
@@ -223,6 +223,17 @@ export async function* runCreationHarness(options) {
       await persist(store, taskId, state);
     }
 
+    // An empty or whitespace-only build is a provider failure, never a
+    // deliverable: fail loudly instead of streaming a done event with zero
+    // deltas (which the client would misread as "no streamed content" and
+    // retry into the same dead end).
+    if (!state.build || !state.build.trim()) {
+      state.busy = false;
+      state.status = 'failed';
+      await persist(store, taskId, state);
+      throw new Error('The AI returned an empty build for this request. Please try again.');
+    }
+
     // 5. REVIEW — the model sanity-checks functionality; one final repair
     // round if it flags a defect and the budget allows.
     yield reportPhase('reviewing');
@@ -280,6 +291,12 @@ export async function* runCreationHarness(options) {
         yield reportPhase('verifying');
         state.verification = verifyCreation(collected, { intentType: state.intentType });
         await persist(store, taskId, state);
+      } else {
+        // The repair stream produced nothing (transient provider hiccup):
+        // keep the last good build and re-emit it as a delta so the
+        // client's stream (cleared for the repair round) is refilled
+        // instead of ending the response empty.
+        yield { type: 'delta', text: state.build };
       }
     }
 

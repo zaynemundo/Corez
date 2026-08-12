@@ -442,4 +442,47 @@ describe('runStreamingChain empty-stream recovery', () => {
     expect(errors).toHaveLength(1);
     expect(errors[0].status).toBe(502);
   });
+
+  it('treats a whitespace-only stream as empty and recovers with content', async () => {
+    let calls = 0;
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      calls += 1;
+      // First invocations: whitespace-only streams (the gateway under load
+      // answers with blank chunks). Later: real content.
+      return calls <= 2
+        ? sseChunks(['\n', '  ', 'done'])
+        : sseChunks(['The ', 'game ', 'works', 'done']);
+    }));
+
+    const events = [];
+    for await (const event of runStreamingChain([{ role: 'user', content: 'build a game' }], {
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode' },
+      signal: null
+    })) {
+      events.push(event);
+    }
+
+    const deltas = events.filter((e) => e.type === 'delta').map((e) => e.text).join('');
+    // Whitespace chunks stream through harmlessly; the emptiness DECISION is
+    // trim-based, so the chain still nudges/retries and delivers the content.
+    expect(deltas.trim()).toBe('The game works');
+    expect(events.some((e) => e.type === 'done')).toBe(true);
+    expect(calls).toBeGreaterThan(1);
+  });
+
+  it('reports an error event when every attempt returns only whitespace', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => sseChunks(['\n', '  ', 'done'])));
+
+    const events = [];
+    for await (const event of runStreamingChain([{ role: 'user', content: 'build a game' }], {
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode' },
+      signal: null
+    })) {
+      events.push(event);
+    }
+
+    const errors = events.filter((e) => e.type === 'error');
+    expect(errors).toHaveLength(1);
+    expect(errors[0].status).toBe(502);
+  });
 });
