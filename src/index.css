@@ -1700,7 +1700,7 @@ h1, h2, h3, h4, h5, h6 {
 .harness-phase {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.45rem;
   font-size: 0.75rem;
   letter-spacing: 0.04em;
   color: var(--text-secondary);
@@ -1710,12 +1710,14 @@ h1, h2, h3, h4, h5, h6 {
   padding: 0.2rem 0.65rem;
   margin-bottom: 0.4rem;
   width: fit-content;
-  animation: harnessPhasePulse 2.2s ease-in-out infinite;
 }
 
-@keyframes harnessPhasePulse {
-  0%, 100% { opacity: 0.75; }
-  50% { opacity: 1; }
+.harness-phase-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--accent, #818cf8);
+  animation: thinkingDotPulse 1.4s infinite ease-in-out both;
 }
 
 @keyframes thinkingDotPulse {

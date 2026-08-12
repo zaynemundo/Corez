@@ -550,12 +550,12 @@ export default function App() {
         const attempt = phaseEvent?.attempt || 0;
         const total = phaseEvent?.total || 0;
         const labels = {
-          planning: 'Planning…',
-          building: 'Building…',
-          repairing: `Repairing (${attempt}/${total})…`,
-          reviewing: 'Reviewing…'
+          planning: 'Planning',
+          building: 'Building',
+          repairing: `Repairing (${attempt}/${total})`,
+          reviewing: 'Reviewing'
         };
-        setHarnessPhase(labels[phase] || `${phase}…`);
+        setHarnessPhase(labels[phase] || `${phase}`);
       }, () => setStreamingContent(''));
       if (response) {
         const aiMsg = toAssistantMessage(response);
@@ -679,6 +679,7 @@ export default function App() {
                             <div className="message-content streaming-text" role="status" aria-label="Corez is responding">
                               {harnessPhase && (
                                 <div className="harness-phase" role="status" aria-live="polite">
+                                  <span className="harness-phase-dot" />
                                   {harnessPhase}
                                 </div>
                               )}
@@ -688,6 +689,7 @@ export default function App() {
                             <div className="thinking-indicator-box thinking-dots" aria-label="Corez is thinking" role="status">
                               {harnessPhase && (
                                 <div className="harness-phase" role="status" aria-live="polite">
+                                  <span className="harness-phase-dot" />
                                   {harnessPhase}
                                 </div>
                               )}
