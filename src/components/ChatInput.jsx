@@ -221,6 +221,7 @@ export default function ChatInput({
                 type="button"
                 role="option"
                 aria-selected={index === activeIndex}
+                aria-label={`/${entry.command}: ${entry.description}`}
                 className={`slash-suggestion-item ${index === activeIndex ? 'active' : ''}`}
                 onMouseEnter={() => setActiveIndex(index)}
                 onClick={() => applySuggestion(entry.command)}
@@ -228,10 +229,7 @@ export default function ChatInput({
                 <span className="slash-suggestion-icon">
                   <Icon size={15} strokeWidth={1.5} />
                 </span>
-                <span className="slash-suggestion-text">
-                  <span className="slash-suggestion-name">{entry.label}</span>
-                  <span className="slash-suggestion-desc">{entry.description}</span>
-                </span>
+                <span className="slash-suggestion-desc">{entry.description}</span>
                 <ChevronRight size={14} strokeWidth={1.5} className="slash-suggestion-chevron" />
               </button>
             );

@@ -31,9 +31,9 @@ describe('ChatInput slash-command suggestions', () => {
   it('shows all suggestions when the user types "/"', () => {
     const t = setup();
     typeInto(t, '/');
-    expect(screen.getByText('/website')).toBeTruthy();
-    expect(screen.getByText('/game')).toBeTruthy();
-    expect(screen.getByText('/research')).toBeTruthy();
+    expect(screen.getByText('Create a website or web page')).toBeTruthy();
+    expect(screen.getByText('Create a playable game')).toBeTruthy();
+    expect(screen.getByText('Deep research: multi-item web search + PDF report')).toBeTruthy();
   });
 
   it('filters suggestions by the typed prefix', () => {
@@ -47,7 +47,7 @@ describe('ChatInput slash-command suggestions', () => {
   it('shows no suggestions for plain text', () => {
     const t = setup();
     typeInto(t, 'build me a website');
-    expect(screen.queryByText('/website')).toBeNull();
+    expect(screen.queryByText('Create a website or web page')).toBeNull();
   });
 
   it('selects a suggestion with Enter and fills only the command token', () => {
@@ -74,9 +74,9 @@ describe('ChatInput slash-command suggestions', () => {
   it('dismisses with Escape', () => {
     const t = setup();
     typeInto(t, '/');
-    expect(screen.getByText('/website')).toBeTruthy();
+    expect(screen.getByText('Create a website or web page')).toBeTruthy();
     fireEvent.keyDown(t.textarea(), { key: 'Escape' });
-    expect(screen.queryByText('/website')).toBeNull();
+    expect(screen.queryByText('Create a website or web page')).toBeNull();
   });
 
   it('selects a suggestion on click', () => {
@@ -86,7 +86,7 @@ describe('ChatInput slash-command suggestions', () => {
     const textarea = utils.container.querySelector('textarea');
     fireEvent.change(textarea, { target: { value: '/' } });
     utils.rerender(<ChatInput input={value} setInput={setter} onSendMessage={() => {}} isStreaming={false} />);
-    fireEvent.click(screen.getByText('/research'));
+    fireEvent.click(screen.getByText('Deep research: multi-item web search + PDF report'));
     expect(value).toBe('/research ');
   });
 });

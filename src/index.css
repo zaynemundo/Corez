@@ -1971,22 +1971,11 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--accent, #818cf8);
 }
 
-.slash-suggestion-text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 1;
-}
-
-.slash-suggestion-name {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
 .slash-suggestion-desc {
-  font-size: 0.72rem;
-  color: var(--text-secondary);
+  flex: 1;
+  min-width: 0;
+  font-size: 0.82rem;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
