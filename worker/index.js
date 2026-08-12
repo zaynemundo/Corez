@@ -412,6 +412,9 @@ async function handleAi(request, env) {
   // session from its first message. A tiny dedicated system prompt and a
   // strict output cap keep this near-free; failures resolve to title: null
   // so the client falls back to its deterministic heuristic naming.
+  // NOTE: the provider is a reasoning model that spends tokens thinking
+  // before answering — a 30-token cap was entirely consumed by reasoning
+  // (content: ""), so the budget must leave room for the actual title.
   if (body.titleOnly === true) {
     const TITLE_SYSTEM_PROMPT = "You name chat conversations. Given the user's first message, reply with ONLY a short descriptive title for the conversation (5 words or fewer, no quotes, no ending punctuation, no markdown, no explanations). Capture the topic or the deliverable the user is asking for.";
     const titleMessages = [
@@ -424,7 +427,7 @@ async function handleAi(request, env) {
         signal: request.signal || null,
         store: null,
         sleep: retrySleepFor(env),
-        maxTokens: 30
+        maxTokens: 300
       });
       let title = typeof titleResult?.content === 'string' ? titleResult.content.trim() : '';
       title = title.replace(/^Title:\s*/i, '').trim();
