@@ -978,94 +978,69 @@ export async function generateHostedAIResponse(
   // user sees content before the generation finishes; the final content is
   // resolved when the done event closes the stream.
   if (options.stream === true) {
-    // Transient provider empties: a completed stream with zero deltas is
-    // retried once before being reported as a failure (the worker also
-    // retries internally). Aborts are never retried.
-    const MAX_EMPTY_STREAM_ATTEMPTS = 2;
-    // Retryable error events (e.g. a build already in progress): the build
-    // is legitimately running on the same durable task, so retry with a
-    // short pause a few times — the identical request resumes the task and
-    // replays the finished artifact instead of failing the flow.
-    const MAX_RETRYABLE_ERROR_ATTEMPTS = 3;
-    const RETRYABLE_ERROR_WAIT_MS = 1500;
-    let emptyStreamAttempts = 0;
-    let retryableErrorAttempts = 0;
-    while (emptyStreamAttempts < MAX_EMPTY_STREAM_ATTEMPTS) {
-      if (signal?.aborted) {
-        const err = new Error('AbortError');
-        err.name = 'AbortError';
-        throw err;
-      }
-      const response = await fetchWithTransportRetry(fetchOptions);
-      if (!response.ok) {
-        let errorText = '';
+    // No built-in recovery: the request is issued exactly once. The worker
+    // owns provider fallback and reports errors as SSE error events, which
+    // are surfaced verbatim. Aborts are never swallowed.
+    if (signal?.aborted) {
+      const err = new Error('AbortError');
+      err.name = 'AbortError';
+      throw err;
+    }
+    const response = await fetchWithTransportRetry(fetchOptions);
+    if (!response.ok) {
+      let errorText = '';
+      try {
+        errorText = await response.text();
+      } catch { /* keep empty */ }
+      throw new Error(`Hosted AI stream failed: HTTP ${response.status} ${errorText.slice(0, 200)}`);
+    }
+    if (!response.body) throw new Error('Hosted AI stream had no body.');
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let streamed = '';
+    let projectState = null;
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+        const payload = trimmed.slice(5).trim();
+        if (!payload) continue;
+        let event;
         try {
-          errorText = await response.text();
-        } catch { /* keep empty */ }
-        throw new Error(`Hosted AI stream failed: HTTP ${response.status} ${errorText.slice(0, 200)}`);
-      }
-      if (!response.body) throw new Error('Hosted AI stream had no body.');
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let streamed = '';
-      let projectState = null;
-      let retryableErrorHappened = false;
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith('data:')) continue;
-          const payload = trimmed.slice(5).trim();
-          if (!payload) continue;
-          let event;
-          try {
-            event = JSON.parse(payload);
-          } catch {
-            continue;
-          }
-          if (event.type === 'delta' && typeof event.text === 'string') {
-            streamed += event.text;
-            options.onDelta?.(event.text);
-          } else if (event.type === 'clear') {
-            streamed = '';
-            options.onClear?.();
-          } else if (event.type === 'phase' && typeof event.phase === 'string') {
-            options.onPhase?.(event);
-          } else if (event.type === 'done' && event.projectState) {
-            projectState = event.projectState;
-          } else if (event.type === 'diagnostics' && typeof event.diagnostics === 'object') {
-            lastHostedDiagnostics = event.diagnostics;
-          } else if (event.type === 'error') {
-            // Retryable failures (e.g. a build already in progress) pause
-            // briefly, then re-issue the identical request so the durable
-            // task can finish and replay its artifact. A user Stop aborts
-            // the pause immediately.
-            if (event.retryable === true && retryableErrorAttempts < MAX_RETRYABLE_ERROR_ATTEMPTS - 1) {
-              retryableErrorAttempts += 1;
-              retryableErrorHappened = true;
-              await sleepResumable(RETRYABLE_ERROR_WAIT_MS, signal);
-              break;
-            }
-            throw new Error(event.message || 'Hosted AI stream error.');
-          }
+          event = JSON.parse(payload);
+        } catch {
+          continue;
+        }
+        if (event.type === 'delta' && typeof event.text === 'string') {
+          streamed += event.text;
+          options.onDelta?.(event.text);
+        } else if (event.type === 'clear') {
+          streamed = '';
+          options.onClear?.();
+        } else if (event.type === 'phase' && typeof event.phase === 'string') {
+          options.onPhase?.(event);
+        } else if (event.type === 'done' && event.projectState) {
+          projectState = event.projectState;
+        } else if (event.type === 'diagnostics' && typeof event.diagnostics === 'object') {
+          lastHostedDiagnostics = event.diagnostics;
+        } else if (event.type === 'error') {
+          // Fail fast: surface the worker's reason verbatim. No retries.
+          throw new Error(event.message || 'Hosted AI stream error.');
         }
       }
-      if (projectState) {
-        persistedProjectState = projectState;
-        onProjectStateChange?.(projectState);
-      }
-      if (streamed.trim()) return streamed;
-      // An attempt ended by a retryable error is not an empty-stream
-      // attempt: the retryable counter already bounds it, and counting it
-      // here would starve the delayed retries of their attempts.
-      if (!retryableErrorHappened) emptyStreamAttempts += 1;
     }
-    throw new Error('Hosted AI returned no streamed content after retry.');
+    if (projectState) {
+      persistedProjectState = projectState;
+      onProjectStateChange?.(projectState);
+    }
+    if (streamed.trim()) return streamed;
+    throw new Error('Hosted AI returned no streamed content.');
   }
 
   // Transport resilience: retry logic lives above with the streaming path

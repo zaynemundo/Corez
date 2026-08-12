@@ -12,14 +12,19 @@ import { verifyCreation, buildRepairPrompt } from './creationVerifier.js';
 
 const MAX_REPAIR_ROUNDS = 5;
 const LEASE_MS = 5 * 60 * 1000;
-const SPEC_MAX_TOKENS = 600;
-const REVIEW_MAX_TOKENS = 800;
+// Reasoning models spend their OUTPUT budget on internal reasoning before
+// answering: a tight cap is consumed by thinking alone and the content comes
+// back empty (finish_reason "length", content ""). These caps give the model
+// room to reason AND produce the actual deliverable on the FIRST attempt —
+// no recovery retries exist to mask a capped-off answer.
+const SPEC_MAX_TOKENS = 3000;
+const REVIEW_MAX_TOKENS = 2400;
 
 const SPEC_INSTRUCTION =
-  'Produce a concise build specification (max 250 words) for the request below: the purpose, the key screens or features, controls (for games), and confirmation that the deliverable is ONE self-contained HTML file. Do not write any code.';
+  'Produce a concise build specification (max 250 words) for the request below: the purpose, the key screens or features, controls (for games), and confirmation that the deliverable is ONE self-contained HTML file. Do not write any code. Answer directly: do not include internal reasoning or thinking.';
 
 const REVIEW_INSTRUCTION =
-  'You are the final reviewer of a finished artifact. Check it for FUNCTIONAL correctness only: does it run, are the core interactions wired up (buttons, controls, game loop, navigation), is any essential feature missing or visibly broken? Reply with ONLY a single line: either "APPROVED" or "NEEDS_FIX: <one sentence describing the functional defect>".';
+  'You are the final reviewer of a finished artifact. Check it for FUNCTIONAL correctness only: does it run, are the core interactions wired up (buttons, controls, game loop, navigation), is any essential feature missing or visibly broken? Reply with ONLY a single line: either "APPROVED" or "NEEDS_FIX: <one sentence describing the functional defect>". Answer directly: do not include internal reasoning or thinking.';
 
 export function harnessTaskId(prompt, primaryIntent) {
   const seed = `${primaryIntent}|${String(prompt || '').trim()}`;

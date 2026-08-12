@@ -135,11 +135,10 @@ describe('AI response speed optimizations', () => {
     expect(generalPayload.model).toBe('deepseek-v4-flash');
     expect(generalPayload.reasoning).toBeUndefined();
     expect(generalPayload.max_completion_tokens).toBeUndefined();
-    // Fast path: capped output tokens so general answers come back quickly.
-    // The cap (1500) is high enough that explanations complete in one pass —
-    // the old 700-token cap truncated frequently, doubling latency with
-    // repair round-trips.
-    expect(generalPayload.max_tokens).toBe(1500);
+    // Fast path: generous output cap so general answers complete in one
+    // pass — reasoning models spend part of the budget on internal thinking
+    // before answering, so the cap must leave room for both.
+    expect(generalPayload.max_tokens).toBe(50000);
 
     // Complex app request: NO output-token cap and no reasoning-effort cap —
     // the model decides how much reasoning/output the task needs.

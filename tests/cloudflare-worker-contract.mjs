@@ -239,7 +239,7 @@ async function run() {
     // Fast path: general requests carry a capped output (max_tokens) so they
     // come back quickly; the model still decides its own reasoning.
     assert.deepEqual(Object.keys(generalPayload), ['model', 'messages', 'max_tokens']);
-    assert.equal(generalPayload.max_tokens, 1500);
+    assert.equal(generalPayload.max_tokens, 50000);
     assert.match(generalPayload.messages[0].content, /Adaptive Routing - Fast Path/);
     assert.match(generalPayload.messages[0].content, /Inferred intent: general/);
   } finally {
@@ -276,7 +276,7 @@ async function run() {
       assert.equal(deepseekPayload.model, 'deepseek-v4-flash');
       assert.equal(deepseekPayload.stream, false);
       // Fast path for general intents: output capped so they respond quickly.
-      assert.equal(deepseekPayload.max_tokens, 1500);
+      assert.equal(deepseekPayload.max_tokens, 50000);
       assert.equal(deepseekPayload.max_completion_tokens, undefined);
       assert.ok(Array.isArray(deepseekPayload.messages));
       assert.equal(deepseekPayload.messages.at(-1).content, 'Explain black roses');
@@ -306,7 +306,7 @@ async function run() {
       assert.equal(opencodeKeyData.model, 'opencode:deepseek-v4-flash');
       assert.equal(opencodePayload.model, 'deepseek-v4-flash');
       // Fast path for general intents: capped output, no reasoning fields.
-      assert.equal(opencodePayload.max_tokens, 1500);
+      assert.equal(opencodePayload.max_tokens, 50000);
       assert.ok(Array.isArray(opencodePayload.messages));
       assert.equal(opencodePayload.messages.at(-1).content, 'Explain black roses');
       assert.equal(opencodePayload.reasoning, undefined);
@@ -328,26 +328,16 @@ async function run() {
       assert.equal(thinkStripResp.status, 200);
       assert.equal((await json(thinkStripResp)).content, 'Here is the revised game.');
 
-      // A thinking-only OpenCode Go reply is retried once with a continuation
-      // nudge so the actual answer is produced instead of raw reasoning.
+      // A thinking-only OpenCode Go reply is reasoning, never the answer:
+      // with no built-in recovery the provider fails honestly (no second
+      // call with a continuation nudge) and the request returns 502.
       let opencodeGoCalls = 0;
       globalThis.fetch = async (_url, init) => {
         const payload = JSON.parse(init.body);
         capturedPayloads.push(payload);
         opencodeGoCalls += 1;
-        if (opencodeGoCalls === 1) {
-          return new Response(JSON.stringify({
-            choices: [{ message: { content: '', reasoning_content: 'Let me think about the gun model.' } }]
-          }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' }
-          });
-        }
-        assert.equal(payload.model, 'deepseek-v4-flash');
-        const nudge = payload.messages[payload.messages.length - 1];
-        assert.match(nudge.content, /only internal reasoning/i);
         return new Response(JSON.stringify({
-          choices: [{ message: { content: 'Here is the revised FPS with a gun.' } }]
+          choices: [{ message: { content: '', reasoning_content: 'Let me think about the gun model.' } }]
         }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
@@ -361,31 +351,22 @@ async function run() {
         env({ AI: undefined, OPENCODE_GO_API_KEY: 'sk-opencode-test' }),
         '198.51.100.105'
       );
-      assert.equal(opencodeNudgeResp.status, 200);
+      assert.equal(opencodeNudgeResp.status, 502);
       const opencodeNudgeData = await opencodeNudgeResp.json();
-      assert.equal(opencodeNudgeData.content, 'Here is the revised FPS with a gun.');
-      assert.equal(opencodeNudgeData.model, 'opencode:deepseek-v4-flash');
-      assert.equal(opencodeGoCalls, 2);
+      assert.match(opencodeNudgeData.error, /Unable to generate AI response/);
+      assert.match(opencodeNudgeData.detail, /empty or reasoning-only/);
+      assert.equal(opencodeGoCalls, 1);
 
       // A truncated thinking-only reply (unclosed <think> marker, no closing
-      // tag) is reasoning too: it must never surface, and the continuation
-      // nudge applies exactly like an empty reply.
+      // tag) is reasoning too: it must never surface, and the provider fails
+      // honestly instead of being nudged.
       let opencodeTruncatedCalls = 0;
       globalThis.fetch = async (_url, init) => {
         const payload = JSON.parse(init.body);
         capturedPayloads.push(payload);
         opencodeTruncatedCalls += 1;
-        if (opencodeTruncatedCalls === 1) {
-          return new Response(JSON.stringify({
-            choices: [{ message: { content: '<think>I will plan the shop layout carefully so the action bar is always visible' } }]
-          }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' }
-          });
-        }
-        assert.match(payload.messages[payload.messages.length - 1].content, /only internal reasoning/i);
         return new Response(JSON.stringify({
-          choices: [{ message: { content: 'Here is the revised game with the shop and action bar.' } }]
+          choices: [{ message: { content: '<think>I will plan the shop layout carefully so the action bar is always visible' } }]
         }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
@@ -399,10 +380,10 @@ async function run() {
         env({ AI: undefined, OPENCODE_GO_API_KEY: 'sk-opencode-test' }),
         '198.51.100.109'
       );
-      assert.equal(opencodeTruncatedResp.status, 200);
+      assert.equal(opencodeTruncatedResp.status, 502);
       const opencodeTruncatedData = await opencodeTruncatedResp.json();
-      assert.equal(opencodeTruncatedData.content, 'Here is the revised game with the shop and action bar.');
-      assert.equal(opencodeTruncatedCalls, 2);
+      assert.match(opencodeTruncatedData.error, /Unable to generate AI response/);
+      assert.equal(opencodeTruncatedCalls, 1);
 
       // OpenCode Go wins when BOTH opencode and DeepSeek keys are configured
       globalThis.fetch = async (url, init) => {
@@ -1275,7 +1256,7 @@ async function run() {
   // exactly the fast-path cap (1500) so casual chat comes back quickly.
   for (const payload of capturedPayloads) {
     if (payload.max_tokens !== undefined) {
-      assert.equal(payload.max_tokens, 1500);
+      assert.equal(payload.max_tokens, 50000);
     }
     assert.equal(payload.max_completion_tokens, undefined);
   }

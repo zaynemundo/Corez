@@ -559,11 +559,11 @@ async function handleAi(request, env) {
     && !['bug_fix', 'code_refactor', 'feature_implementation', 'simple_edit', 'code_question', 'app', 'website_creation', 'game_creation', 'design_task', 'swarm'].includes(primaryIntent)
     && intentType !== 'app'
     && specialistSkills.length === 0;
-  // Capped but generous: 1500 output tokens so explanations and writing
-  // answers complete in one pass (the 700-token cap frequently truncated
-  // mid-sentence, forcing a repair round-trip and doubling latency). The
-  // repair loop remains the safety net, not the primary path.
-  const FAST_MAX_TOKENS = 1500;
+  // Generous output cap so explanations and writing answers always complete
+  // in one pass: reasoning models spend part of the budget on internal
+  // thinking before answering, so the cap must leave room for both. A cap
+  // is a ceiling, not a target — the model stops when the answer is done.
+  const FAST_MAX_TOKENS = 50000;
   const fastHistoryWindow = Math.max(2, Math.min(8, body.fastHistoryWindow || 8));
 
   const fastMessages = isFastIntent

@@ -43,11 +43,6 @@ const MAX_SINGLE_SLEEP_MS = 30_000;
 const DEFAULT_REQUEST_RETRY_MS = 30_000;
 const SLEEP_CHUNK_MS = 250;
 
-export const CONTINUATION_NUDGE = {
-  role: 'user',
-  content: 'Your previous reply contained only internal reasoning and no final answer. Now respond with the actual complete final answer to the user\'s request (the code, explanation, or text itself). Do not include thinking, reasoning, or <think> blocks.'
-};
-
 function extractContentText(content) {
   if (typeof content === 'string') return content;
   // Multimodal responses can wrap text in content parts: [{ type, text }]
@@ -550,58 +545,11 @@ export async function runProviderChain(messages, options = {}) {
       };
     }
 
-    // Reasoning-only or empty reply: up to two continuation nudges per
-    // provider so the actual answer is produced instead of raw thought.
-    // Under load the gateway occasionally returns an empty completion for
-    // the first (or second) call; a second nudge with a minimal message
-    // recovers most of those without touching the user-visible answer.
+    // Reasoning-only or empty reply: no built-in recovery — record the
+    // failure and let the next provider in the chain try. If no provider
+    // produces a usable answer the request fails honestly.
     if (!result || !result.failure) {
-      let nudged = null;
-      const nudgeMessages = [
-        [...messages, CONTINUATION_NUDGE],
-        [{ role: 'user', content: 'Now answer completely: provide the final response to the original request now (the code or text itself). No reasoning. No thinking.' }]
-      ];
-      for (const candidate of nudgeMessages) {
-        result = await provider.call(candidate, { signal, attempt, maxTokens });
-        if (result?.content) {
-          nudged = result;
-          break;
-        }
-        if (result?.failure) {
-          const cls = result.classified || classifyProviderFailure(result.failure);
-          recordFailure(provider.label, result.failure);
-          lastErrorStatus = Number(result.failure?.status) > 0 ? Number(result.failure.status) : lastErrorStatus;
-          if (cls.kind === 'permanent' && store) {
-            try {
-              await clearRetrySchedule(store, retryKey, taskId);
-            } catch {
-              // Best effort.
-            }
-          }
-          break;
-        }
-      }
-      if (nudged?.content) {
-        if (store) {
-          try {
-            await clearRetrySchedule(store, retryKey, taskId);
-          } catch {
-            // Best effort.
-          }
-        }
-        return {
-          content: nudged.content,
-          model: nudged.model || `${provider.label}:${provider.model}`,
-          provider: provider.id,
-          taskId,
-          resumed,
-          usage: nudged.usage || null,
-          stopReason: nudged.stopReason || null
-        };
-      }
-      if (!result?.failure) {
-        recordFailure(provider.label, 'empty or reasoning-only response after continuation nudges');
-      }
+      recordFailure(provider.label, 'empty or reasoning-only response');
       if (signal?.aborted) return { taskId, status: 'cancelled' };
     }
   }
@@ -626,8 +574,9 @@ export async function runProviderChain(messages, options = {}) {
  * The same provider fallback order applies; a provider that fails mid-stream
  * falls through to the next one, and the client sees one meta event per
  * provider actually attempted. TTFT is measured per provider from request
- * start to its first delta. Reasoning-only streams get one continuation
- * nudge before the provider is abandoned.
+ * start to its first delta. Empty or reasoning-only streams are failures of
+ * that provider: there is no built-in recovery, the next provider is tried
+ * and the request fails honestly if none produces content.
  */
 export function runStreamingChain(messages, options = {}) {
   const env = options.env || {};
@@ -645,7 +594,6 @@ export function runStreamingChain(messages, options = {}) {
       return;
     }
 
-    let resumed = false;
     for (const provider of providers) {
       yield { type: 'meta', provider: provider.id, model: provider.model };
       const ttftHolder = { ms: 0 };
@@ -673,28 +621,15 @@ export function runStreamingChain(messages, options = {}) {
           return { text, usage, finishReason };
         }
         let got = yield* tryStream(messages);
-        // Whitespace-only output is an empty stream too: under load the
-        // gateway occasionally answers with a stream of blank chunks, which
-        // previously counted as a successful done and reached users as
-        // "no streamed content". Trim-based emptiness sends those through
-        // the same nudge/retry/fallback recovery as a truly empty stream.
+        // No built-in recovery: an empty or whitespace-only stream is a
+        // failure of this provider, surfaced honestly. The provider chain
+        // (opencode-go -> DeepSeek -> OpenRouter) is the only fallback, and
+        // if no provider produces content the client gets a clear error.
         if (!got.text.trim()) {
-          // Reasoning-only or empty stream: two continuation nudges (the
-          // gateway occasionally returns an empty stream under load), then
-          // ONE full retry of the original request before this provider is
-          // abandoned — transient gateway empties must not sink the request.
-          resumed = true;
           failureMessages.push(`${provider.label}: empty or reasoning-only stream`);
-          const nudgeMessages = [
-            [...messages, CONTINUATION_NUDGE],
-            [{ role: 'user', content: 'Now answer completely: provide the final response to the original request now (the code or text itself). No reasoning. No thinking.' }]
-          ];
-          for (const candidate of nudgeMessages) {
-            got = yield* tryStream(candidate);
-            if (got.text.trim()) break;
-          }
-          if (!got.text.trim()) {
-            got = yield* tryStream(messages);
+          if (signal?.aborted) {
+            yield { type: 'error', message: 'AI request cancelled.', status: 499 };
+            return;
           }
         }
         if (got.text.trim()) {
@@ -709,8 +644,7 @@ export function runStreamingChain(messages, options = {}) {
             ttftMs: ttftHolder.ms || 0,
             totalMs: clock() - startedAt,
             provider: provider.id,
-            model: provider.model,
-            resumed
+            model: provider.model
           };
           return;
         }
