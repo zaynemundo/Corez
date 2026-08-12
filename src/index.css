@@ -1697,6 +1697,27 @@ h1, h2, h3, h4, h5, h6 {
   width: fit-content;
 }
 
+.harness-phase {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill);
+  padding: 0.2rem 0.65rem;
+  margin-bottom: 0.4rem;
+  width: fit-content;
+  animation: harnessPhasePulse 2.2s ease-in-out infinite;
+}
+
+@keyframes harnessPhasePulse {
+  0%, 100% { opacity: 0.75; }
+  50% { opacity: 1; }
+}
+
 @keyframes thinkingDotPulse {
   0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
   40% { opacity: 1; transform: scale(1.1); }

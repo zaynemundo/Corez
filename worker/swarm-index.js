@@ -1439,6 +1439,12 @@ export default {
         }
       }
 
+      // Creation harness requests take the direct route: the harness runs
+      // its own multi-phase loop and must never be pre-empted by the swarm.
+      if (body?.harness === true) {
+        return baseWorker.fetch(baseRequest, env, ctx);
+      }
+
       const intentType = normalizeIntentType(body?.intent?.type);
       const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : '';
       const hasMedia = containsMedia(body?.messages);

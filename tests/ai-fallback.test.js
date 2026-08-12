@@ -127,6 +127,69 @@ describe('Hosted AI fallback behavior', () => {
     expect(aiCalls).toBe(2);
   });
 
+  it('forwards harness phase and clear events and returns only the final artifact', async () => {
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/inspiration') return Response.json({ sites: [] });
+      return new Response(
+        [
+          'data: {"type":"meta"}',
+          'data: {"type":"phase","phase":"planning","attempt":0,"total":5}',
+          'data: {"type":"phase","phase":"building","attempt":0,"total":5}',
+          'data: {"type":"delta","text":"BROKEN build"}',
+          'data: {"type":"phase","phase":"verifying","attempt":0,"total":5}',
+          'data: {"type":"phase","phase":"repairing","attempt":1,"total":5}',
+          'data: {"type":"clear"}',
+          'data: {"type":"delta","text":"FIXED build"}',
+          'data: {"type":"phase","phase":"done","attempt":1,"total":5}',
+          'data: {"type":"done","final":true}',
+          'data: {"type":"diagnostics","diagnostics":{"harness":{"repairRounds":1}}}'
+        ].join('\n\n'),
+        { status: 200 }
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const phases = [];
+    let cleared = 0;
+    const response = await generateHostedAIResponse('Build a game', undefined, [], null, {
+      stream: true,
+      onDelta: () => {},
+      onPhase: (event) => phases.push(event.phase),
+      onClear: () => { cleared += 1; }
+    });
+
+    expect(response).toBe('FIXED build');
+    expect(phases).toEqual(['planning', 'building', 'verifying', 'repairing', 'done']);
+    expect(cleared).toBe(1);
+  });
+
+  it('retries once when the worker reports a retryable build-in-progress error', async () => {
+    let aiCalls = 0;
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/inspiration') return Response.json({ sites: [] });
+      aiCalls += 1;
+      if (aiCalls === 1) {
+        return new Response(
+          'data: {"type":"error","status":429,"retryable":true,"message":"A build for this request is already in progress."}',
+          { status: 200 }
+        );
+      }
+      return new Response(
+        'data: {"type":"delta","text":"The game. "}\n\ndata: {"type":"done","final":true}\n\n',
+        { status: 200 }
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await generateHostedAIResponse('Build a game', undefined, [], null, {
+      stream: true,
+      onDelta: () => {}
+    });
+
+    expect(response).toBe('The game. ');
+    expect(aiCalls).toBe(2);
+  });
+
   it('delivers the full streamed answer to the chat flow without hitting the local fallback', async () => {
     const fetchMock = vi.fn(async () => new Response(
       'data: {"type":"meta"}\n\ndata: {"type":"delta","text":"Red is the color of blood and apples."}\n\ndata: {"type":"done","final":true}\n\n',

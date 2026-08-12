@@ -213,6 +213,7 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [streamingContent, setStreamingContent] = useState(null);
+  const [harnessPhase, setHarnessPhase] = useState(null);
   const [refreshingMarketKeys, setRefreshingMarketKeys] = useState(() => new Set());
   const [theme, setTheme] = useState(() => {
     try {
@@ -536,9 +537,26 @@ export default function App() {
 
     try {
       setStreamingContent('');
+      setHarnessPhase(null);
       const response = await generateAIResponse(apiPrompt, updatedApiMessages, controller.signal, (delta) => {
         setStreamingContent(prev => (prev || '') + delta);
-      });
+      }, (phaseEvent) => {
+        const phase = phaseEvent?.phase;
+        if (!phase) return;
+        if (phase === 'done' || phase === 'verifying') {
+          setHarnessPhase(null);
+          return;
+        }
+        const attempt = phaseEvent?.attempt || 0;
+        const total = phaseEvent?.total || 0;
+        const labels = {
+          planning: 'Planning…',
+          building: 'Building…',
+          repairing: `Repairing (${attempt}/${total})…`,
+          reviewing: 'Reviewing…'
+        };
+        setHarnessPhase(labels[phase] || `${phase}…`);
+      }, () => setStreamingContent(''));
       if (response) {
         const aiMsg = toAssistantMessage(response);
         if (aiMsg.type !== 'market') {
@@ -568,6 +586,7 @@ export default function App() {
         localStorage.removeItem('corez_pending_request');
         setIsThinking(false);
         setStreamingContent(null);
+        setHarnessPhase(null);
         abortControllerRef.current = null;
       }
     }
@@ -658,10 +677,20 @@ export default function App() {
                         <div className="message-body">
                           {streamingContent ? (
                             <div className="message-content streaming-text" role="status" aria-label="Corez is responding">
+                              {harnessPhase && (
+                                <div className="harness-phase" role="status" aria-live="polite">
+                                  {harnessPhase}
+                                </div>
+                              )}
                               {streamingContent}
                             </div>
                           ) : (
                             <div className="thinking-indicator-box thinking-dots" aria-label="Corez is thinking" role="status">
+                              {harnessPhase && (
+                                <div className="harness-phase" role="status" aria-live="polite">
+                                  {harnessPhase}
+                                </div>
+                              )}
                               <span className="thinking-dot" />
                               <span className="thinking-dot" />
                               <span className="thinking-dot" />

@@ -886,6 +886,17 @@ export async function generateHostedAIResponse(
     ? await improveCodingPrompt(prompt, intent)
     : prompt;
 
+  // Creation requests (games, websites, apps) run through the agentic
+  // creation harness so the artifact is verified and repaired before
+  // delivery. Revisions of existing code and non-streaming calls keep the
+  // direct single-generation path.
+  const finePrimary = fineIntent?.primaryIntent || fineIntent?.type;
+  const useCreationHarness = options.stream === true
+    && intent?.type === 'app'
+    && !isRevisionContextPrompt(prompt)
+    && !String(prompt).includes('```')
+    && ['game_creation', 'website_creation', 'design_task', 'app'].includes(intent?.primaryIntent || finePrimary);
+
   // 2. Skill resolution with fine-grained intent. Classification patterns run
   // against the RAW user prompt — never the model-enriched coding prompt,
   // whose generic boilerplate ("accessibility contrast standards", design
@@ -921,7 +932,8 @@ export async function generateHostedAIResponse(
       complexity,
       mode: executionMode,
       project: persistedProjectState || undefined,
-      stream: options.stream === true
+      stream: options.stream === true,
+      harness: useCreationHarness
     }),
   };
   if (signal) fetchOptions.signal = signal;
@@ -1010,11 +1022,21 @@ export async function generateHostedAIResponse(
           if (event.type === 'delta' && typeof event.text === 'string') {
             streamed += event.text;
             options.onDelta?.(event.text);
+          } else if (event.type === 'clear') {
+            streamed = '';
+            options.onClear?.();
+          } else if (event.type === 'phase' && typeof event.phase === 'string') {
+            options.onPhase?.(event);
           } else if (event.type === 'done' && event.projectState) {
             projectState = event.projectState;
           } else if (event.type === 'diagnostics' && typeof event.diagnostics === 'object') {
             lastHostedDiagnostics = event.diagnostics;
           } else if (event.type === 'error') {
+            // Retryable failures (e.g. a build already in progress) re-issue
+            // the identical request once instead of failing the whole flow.
+            if (event.retryable === true && attempt < MAX_EMPTY_STREAM_ATTEMPTS) {
+              break;
+            }
             throw new Error(event.message || 'Hosted AI stream error.');
           }
         }
@@ -2209,7 +2231,7 @@ export function isExplicitImageRequest(prompt) {
   return false;
 }
 
-export async function generateAIResponse(prompt, history = [], signal = null, onDelta = null) {
+export async function generateAIResponse(prompt, history = [], signal = null, onDelta = null, onPhase = null, onClear = null) {
   // Explicit slash commands first: /website, /game, /research. The command
   // token is stripped before any model sees the prompt, so the AI is never
   // confused by it.
@@ -2297,7 +2319,9 @@ export async function generateAIResponse(prompt, history = [], signal = null, on
   try {
     const hostedAiResponse = await generateHostedAIResponse(cleanPrompt, intent, history, signal, {
       stream: typeof onDelta === 'function',
-      onDelta
+      onDelta,
+      onPhase,
+      onClear
     });
     if (hostedAiResponse) {
       // Check if the AI decided to generate an image

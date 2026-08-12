@@ -3,6 +3,7 @@ import { handleSearch } from './search.js';
 import { fetchAwwwardsInspiration, handleInspiration } from './inspiration.js';
 import { safeErrorDetail, readBoundedJson, jsonResponse, createTaskStateStore, createRateLimiter } from './utils.js';
 import { runProviderChain, runStreamingChain, callOpenRouterImage } from './providerChain.js';
+import { runCreationHarness } from './harness.js';
 import { processResponse } from './responseProcessor.js';
 import {
   parseProjectState,
@@ -641,6 +642,56 @@ async function handleAi(request, env) {
   })();
 
   const requestStartedAt = Date.now();
+
+  // Creation Harness: plan -> build -> verify -> repair -> review, with
+  // durable R2 state so a disconnected build resumes. Replaces the single
+  // generation for creation requests; SSE events (phase/delta/done) keep the
+  // client informed while the loop takes as long as it needs.
+  if (body.harness === true) {
+    if (body.stream !== true) {
+      return jsonResponse(400, { error: 'Harness builds require a streaming request.' });
+    }
+    const encoder = new TextEncoder();
+    const sse = (event) => `data: ${JSON.stringify(event)}\n\n`;
+    const readable = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const event of runCreationHarness({
+            prompt,
+            primaryIntent: intent?.primaryIntent || intentType,
+            intentType,
+            apiMessages,
+            env,
+            signal: clientDisconnectSignal,
+            store: createTaskStateStore(env)
+          })) {
+            controller.enqueue(encoder.encode(sse(event)));
+          }
+        } catch (err) {
+          const payload = {
+            type: 'error',
+            message: err?.retryable
+              ? err.message
+              : `Creation harness failed: ${safeErrorDetail(err)}`,
+            status: err?.status || 502,
+            ...(err?.retryable ? { retryable: true } : {})
+          };
+          controller.enqueue(encoder.encode(sse(payload)));
+        }
+        controller.close();
+      }
+    });
+    return new Response(readable, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'X-Accel-Buffering': 'no'
+      }
+    });
+  }
 
   // Streaming path: SSE through provider -> worker -> client, so the user
   // sees content quickly (TTFT is a headline UX metric). The stream is
