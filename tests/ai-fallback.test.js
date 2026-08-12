@@ -105,14 +105,26 @@ describe('Hosted AI fallback behavior', () => {
     expect(response).not.toMatch(/api|API|model|provider/i);
   });
 
-  it('still synthesizes a new app locally for genuine creation prompts when hosted AI is down', async () => {
+  it('never substitutes a canned game when the hosted AI is down', async () => {
     const fetchMock = vi.fn(async () => Response.json({ error: 'down' }, { status: 503 }));
     vi.stubGlobal('fetch', fetchMock);
 
     const response = await generateAIResponse('Build me a chess game', []);
 
-    expect(response).toContain('```html');
-    expect(response).not.toContain('I can see the code you want to revise');
+    expect(response).toContain("I'd love to build that game for you");
+    expect(response).not.toContain('```html');
+    expect(response).not.toMatch(/COREZ (Chess|Retro Space|Wordle|Scrabble|FPS|Super Mario|Bot Enemy)/);
+  });
+
+  it('routes first-person shooter requests to the hosted AI, never a generic space game', async () => {
+    const fetchMock = vi.fn(async () => Response.json({ error: 'down' }, { status: 503 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await generateAIResponse('build a first person shooter game', []);
+
+    expect(response).toContain("I'd love to build that game for you");
+    expect(response).not.toContain('Retro Space');
+    expect(response).not.toContain('```html');
   });
 
   it('never fabricates an unrelated app for app types the local fallback cannot synthesize', async () => {
