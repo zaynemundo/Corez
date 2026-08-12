@@ -95,7 +95,10 @@ export async function* runCreationHarness(options) {
     return;
   }
 
-  // Lease: only one invocation may build a given request at a time.
+  // Lease: only one invocation may build a given request at a time. The
+  // busy error is retryable and never touches the persisted state: the
+  // CONCURRENT run owns the record, and a retry that lands after it
+  // finishes resumes/replays instead of clobbering its progress.
   if (isBusy(state, now)) {
     const err = new Error('A build for this request is already in progress.');
     err.status = 429;
@@ -103,6 +106,9 @@ export async function* runCreationHarness(options) {
     throw err;
   }
   state.busy = true;
+  // Whether THIS invocation acquired the lease: only the owner may release
+  // it, so a busy error (or its finally) never frees another run's lease.
+  let leaseOwned = true;
 
   const reportPhase = (phase) => {
     state.phase = phase;
@@ -321,11 +327,23 @@ export async function* runCreationHarness(options) {
       }
     };
   } catch (err) {
-    if (err?.status !== 499 && state.status !== 'interrupted') {
+    if (err?.status !== 499 && err?.status !== 429 && state.status !== 'interrupted') {
       state.busy = false;
       state.status = 'failed';
       await persist(store, taskId, state).catch(() => {});
     }
     throw err;
+  } finally {
+    // A cancelled streamed response (client Stop, tab close, or network
+    // drop) terminates this generator at its current yield point — the
+    // catch above never runs — so release the busy lease here or the same
+    // request is locked out for the whole lease window. Normal completion
+    // and the catch path already cleared the lease, and a busy error never
+    // touches it (another run owns it).
+    if (leaseOwned && state.busy === true && state.status === 'active') {
+      state.busy = false;
+      state.status = state.build && state.build.trim() ? 'interrupted' : 'failed';
+      await persist(store, taskId, state).catch(() => {});
+    }
   }
 }

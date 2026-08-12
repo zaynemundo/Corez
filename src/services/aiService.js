@@ -982,7 +982,15 @@ export async function generateHostedAIResponse(
     // retried once before being reported as a failure (the worker also
     // retries internally). Aborts are never retried.
     const MAX_EMPTY_STREAM_ATTEMPTS = 2;
-    for (let attempt = 1; attempt <= MAX_EMPTY_STREAM_ATTEMPTS; attempt += 1) {
+    // Retryable error events (e.g. a build already in progress): the build
+    // is legitimately running on the same durable task, so retry with a
+    // short pause a few times — the identical request resumes the task and
+    // replays the finished artifact instead of failing the flow.
+    const MAX_RETRYABLE_ERROR_ATTEMPTS = 3;
+    const RETRYABLE_ERROR_WAIT_MS = 1500;
+    let emptyStreamAttempts = 0;
+    let retryableErrorAttempts = 0;
+    while (emptyStreamAttempts < MAX_EMPTY_STREAM_ATTEMPTS) {
       if (signal?.aborted) {
         const err = new Error('AbortError');
         err.name = 'AbortError';
@@ -1002,6 +1010,7 @@ export async function generateHostedAIResponse(
       let buffer = '';
       let streamed = '';
       let projectState = null;
+      let retryableErrorHappened = false;
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -1032,9 +1041,14 @@ export async function generateHostedAIResponse(
           } else if (event.type === 'diagnostics' && typeof event.diagnostics === 'object') {
             lastHostedDiagnostics = event.diagnostics;
           } else if (event.type === 'error') {
-            // Retryable failures (e.g. a build already in progress) re-issue
-            // the identical request once instead of failing the whole flow.
-            if (event.retryable === true && attempt < MAX_EMPTY_STREAM_ATTEMPTS) {
+            // Retryable failures (e.g. a build already in progress) pause
+            // briefly, then re-issue the identical request so the durable
+            // task can finish and replay its artifact. A user Stop aborts
+            // the pause immediately.
+            if (event.retryable === true && retryableErrorAttempts < MAX_RETRYABLE_ERROR_ATTEMPTS - 1) {
+              retryableErrorAttempts += 1;
+              retryableErrorHappened = true;
+              await sleepResumable(RETRYABLE_ERROR_WAIT_MS, signal);
               break;
             }
             throw new Error(event.message || 'Hosted AI stream error.');
@@ -1046,6 +1060,10 @@ export async function generateHostedAIResponse(
         onProjectStateChange?.(projectState);
       }
       if (streamed.trim()) return streamed;
+      // An attempt ended by a retryable error is not an empty-stream
+      // attempt: the retryable counter already bounds it, and counting it
+      // here would starve the delayed retries of their attempts.
+      if (!retryableErrorHappened) emptyStreamAttempts += 1;
     }
     throw new Error('Hosted AI returned no streamed content after retry.');
   }

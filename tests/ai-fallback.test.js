@@ -188,7 +188,53 @@ describe('Hosted AI fallback behavior', () => {
 
     expect(response).toBe('The game. ');
     expect(aiCalls).toBe(2);
-  });
+  }, 10000);
+
+  it('keeps retrying a busy build a few times before giving up', async () => {
+    let aiCalls = 0;
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/inspiration') return Response.json({ sites: [] });
+      aiCalls += 1;
+      if (aiCalls <= 2) {
+        return new Response(
+          'data: {"type":"error","status":429,"retryable":true,"message":"A build for this request is already in progress."}\n\n',
+          { status: 200 }
+        );
+      }
+      return new Response(
+        'data: {"type":"delta","text":"The game. "}\n\ndata: {"type":"done","final":true}\n\n',
+        { status: 200 }
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await generateHostedAIResponse('Build a game', undefined, [], null, {
+      stream: true,
+      onDelta: () => {}
+    });
+
+    expect(response).toBe('The game. ');
+    expect(aiCalls).toBe(3);
+  }, 15000);
+
+  it('fails honestly when a build stays in progress across every retry', async () => {
+    let aiCalls = 0;
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/inspiration') return Response.json({ sites: [] });
+      aiCalls += 1;
+      return new Response(
+        'data: {"type":"error","status":429,"retryable":true,"message":"A build for this request is already in progress."}\n\n',
+        { status: 200 }
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(generateHostedAIResponse('Build a game', undefined, [], null, {
+      stream: true,
+      onDelta: () => {}
+    })).rejects.toThrow('A build for this request is already in progress.');
+    expect(aiCalls).toBe(3);
+  }, 15000);
 
   it('delivers the full streamed answer to the chat flow without hitting the local fallback', async () => {
     const fetchMock = vi.fn(async () => new Response(

@@ -216,6 +216,48 @@ describe('runCreationHarness', () => {
     expect(thrown).toBeTruthy();
     expect(thrown.status).toBe(429);
     expect(thrown.retryable).toBe(true);
+    // The busy run owns the lease: the record must remain untouched so the
+    // concurrent build can finish and the next retry replays it.
+    const persisted = await store.load(taskId);
+    expect(persisted.busy).toBe(true);
+    expect(persisted.status).toBe('active');
+  });
+
+  it('releases the busy lease when the build is cancelled mid-stream', async () => {
+    const provider = buildMockProvider();
+    vi.stubGlobal('fetch', provider.fetchMock);
+    const store = createTaskStateStore({});
+    const taskId = harnessTaskId('build a first person shooter game', 'game_creation');
+
+    const iterable = runCreationHarness({
+      prompt: 'build a first person shooter game',
+      primaryIntent: 'game_creation',
+      intentType: 'game_creation',
+      apiMessages: BASE_MESSAGES,
+      env: ENV,
+      signal: null,
+      store
+    });
+
+    // Run until the first event (planning), then cancel the generator the
+    // same way a cancelled streamed response does (iterator.return()).
+    const first = await iterable.next();
+    expect(first.done).toBe(false);
+    expect(first.value.type).toBe('phase');
+    await iterable.return();
+
+    // The lease must be released and the task resumable, not locked out
+    // for the whole lease window.
+    const persisted = await store.load(taskId);
+    expect(persisted.busy).toBe(false);
+    expect(persisted.status).toBe('failed');
+
+    // An identical request now proceeds and completes instead of throwing
+    // a busy error.
+    const { events } = await runHarness({ store });
+    const deltas = collectDeltas(events);
+    expect(deltas).toBe(GOOD_ARTIFACT);
+    expect(events.some((e) => e.type === 'done')).toBe(true);
   });
 
   it('fails loudly instead of finishing when the build is whitespace-only', async () => {
