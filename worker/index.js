@@ -428,7 +428,7 @@ async function handleAi(request, env) {
         signal: request.signal || null,
         store: null,
         sleep: retrySleepFor(env),
-        maxTokens: 300
+        maxTokens: null
       });
       let title = typeof titleResult?.content === 'string' ? titleResult.content.trim() : '';
       title = title.replace(/^Title:\s*/i, '').trim();
@@ -546,11 +546,10 @@ async function handleAi(request, env) {
   }
 
   // Fast path for general intents: explanations, writing, and casual chat are
-  // answered from the last few turns only, with a capped output, so they come
-  // back quickly. Coding, app, game, and swarm requests keep the FULL history
-  // and NO output cap — the model takes as long as it wants. Requests that
-  // resolved a specialist skill (research reports, business plans, document
-  // generation, ...) also escape the cap: those deliverables need room to run.
+  // answered from the last few turns only, so they come back quickly. Coding,
+  // app, game, and swarm requests keep the FULL history. NO output caps exist
+  // anywhere: every provider call runs uncapped, so reasoning models can think
+  // as long as they need and deliverables are never cut off mid-generation.
   const primaryIntent = intent?.primaryIntent || legacyIntent || intentType;
   const specialistSkills = Array.isArray(skills) && skills.length > 0
     ? skills.map((s) => (typeof s === 'string' ? s : s.id)).filter(Boolean)
@@ -559,11 +558,6 @@ async function handleAi(request, env) {
     && !['bug_fix', 'code_refactor', 'feature_implementation', 'simple_edit', 'code_question', 'app', 'website_creation', 'game_creation', 'design_task', 'swarm'].includes(primaryIntent)
     && intentType !== 'app'
     && specialistSkills.length === 0;
-  // Generous output cap so explanations and writing answers always complete
-  // in one pass: reasoning models spend part of the budget on internal
-  // thinking before answering, so the cap must leave room for both. A cap
-  // is a ceiling, not a target — the model stops when the answer is done.
-  const FAST_MAX_TOKENS = 50000;
   const fastHistoryWindow = Math.max(2, Math.min(8, body.fastHistoryWindow || 8));
 
   const fastMessages = isFastIntent
@@ -700,7 +694,7 @@ async function handleAi(request, env) {
     const chainOptions = {
       env,
       signal: clientDisconnectSignal,
-      maxTokens: isFastIntent ? FAST_MAX_TOKENS : null
+      maxTokens: null
     };
     const encoder = new TextEncoder();
     const sse = (event) => `data: ${JSON.stringify(event)}\n\n`;
@@ -858,7 +852,7 @@ async function handleAi(request, env) {
     signal: clientDisconnectSignal,
     store: createTaskStateStore(env),
     sleep: retrySleepFor(env),
-    maxTokens: isFastIntent ? FAST_MAX_TOKENS : null
+    maxTokens: null
   });
   const providerMs = Date.now() - providerStartedAt;
 

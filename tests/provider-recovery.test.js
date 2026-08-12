@@ -325,7 +325,7 @@ describe('provider fallback chain recovery', () => {
     }
   });
 
-  it('sends max_tokens only when maxTokens is passed (fast general path)', async () => {
+  it('sends max_tokens only when maxTokens is passed explicitly (no caller passes it anymore)', async () => {
     const payloads = [];
     vi.stubGlobal('fetch', vi.fn(async (url, init) => {
       const payload = JSON.parse(init.body);

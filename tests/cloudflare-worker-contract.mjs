@@ -236,10 +236,10 @@ async function run() {
       env({ OPENCODE_GO_API_KEY: 'sk-opencode-test' })
     );
     assert.equal(generalResponse.status, 200);
-    // Fast path: general requests carry a capped output (max_tokens) so they
-    // come back quickly; the model still decides its own reasoning.
-    assert.deepEqual(Object.keys(generalPayload), ['model', 'messages', 'max_tokens']);
-    assert.equal(generalPayload.max_tokens, 50000);
+    // No output-token caps anywhere: every request is uncapped so reasoning
+    // models can think as long as they need.
+    assert.deepEqual(Object.keys(generalPayload), ['model', 'messages']);
+    assert.equal(generalPayload.max_tokens, undefined);
     assert.match(generalPayload.messages[0].content, /Adaptive Routing - Fast Path/);
     assert.match(generalPayload.messages[0].content, /Inferred intent: general/);
   } finally {
@@ -275,8 +275,8 @@ async function run() {
       assert.equal(deepseekData.model, 'deepseek:deepseek-v4-flash');
       assert.equal(deepseekPayload.model, 'deepseek-v4-flash');
       assert.equal(deepseekPayload.stream, false);
-      // Fast path for general intents: output capped so they respond quickly.
-      assert.equal(deepseekPayload.max_tokens, 50000);
+      // No output-token caps anywhere: general requests are uncapped too.
+      assert.equal(deepseekPayload.max_tokens, undefined);
       assert.equal(deepseekPayload.max_completion_tokens, undefined);
       assert.ok(Array.isArray(deepseekPayload.messages));
       assert.equal(deepseekPayload.messages.at(-1).content, 'Explain black roses');
@@ -305,8 +305,8 @@ async function run() {
       assert.equal(opencodeKeyData.content, 'OpenCode Go response');
       assert.equal(opencodeKeyData.model, 'opencode:deepseek-v4-flash');
       assert.equal(opencodePayload.model, 'deepseek-v4-flash');
-      // Fast path for general intents: capped output, no reasoning fields.
-      assert.equal(opencodePayload.max_tokens, 50000);
+      // No output-token caps anywhere: general requests are uncapped too.
+      assert.equal(opencodePayload.max_tokens, undefined);
       assert.ok(Array.isArray(opencodePayload.messages));
       assert.equal(opencodePayload.messages.at(-1).content, 'Explain black roses');
       assert.equal(opencodePayload.reasoning, undefined);
@@ -1251,13 +1251,11 @@ async function run() {
   assert.equal(svgGet.status, 200);
   assert.ok(String(svgGet.headers.get('content-security-policy') || '').includes('sandbox'));
 
-  // Coding, app, and image payloads never carry an output-token cap: the
-  // model takes as long as it wants. General/fast-intent payloads carry
-  // exactly the fast-path cap (1500) so casual chat comes back quickly.
+  // No payload ever carries an output-token cap: every request is uncapped,
+  // so reasoning models can think as long as they need and deliverables are
+  // never cut off mid-generation.
   for (const payload of capturedPayloads) {
-    if (payload.max_tokens !== undefined) {
-      assert.equal(payload.max_tokens, 50000);
-    }
+    assert.equal(payload.max_tokens, undefined);
     assert.equal(payload.max_completion_tokens, undefined);
   }
 

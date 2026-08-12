@@ -406,9 +406,9 @@ export function buildProviderChain(env = {}) {
  *
  * Options: { env, signal, sleep, clock, jitter, store, maxRequestRetryMs,
  * taskHash, taskId, maxTokens } — sleep/clock/jitter are injectable for
- * deterministic tests. `maxTokens` caps the output for fast/general requests;
- * coding and creation requests pass none so the model takes as long as it
- * wants.
+ * deterministic tests. `maxTokens` is a hard output ceiling used only when a
+ * caller passes it explicitly; no production caller does — every request is
+ * uncapped so the model takes as long as it wants.
  */
 export async function runProviderChain(messages, options = {}) {
   const env = options.env || {};

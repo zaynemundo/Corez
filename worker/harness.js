@@ -16,13 +16,6 @@ const LEASE_MS = 5 * 60 * 1000;
 // generation (uncapped build stream, slow spec/review) never lets the lease
 // expire mid-flight and admit a duplicate concurrent build.
 const HEARTBEAT_INTERVAL_MS = 30 * 1000;
-// Reasoning models spend their OUTPUT budget on internal reasoning before
-// answering: a tight cap is consumed by thinking alone and the content comes
-// back empty (finish_reason "length", content ""). These caps give the model
-// room to reason AND produce the actual deliverable on the FIRST attempt —
-// no recovery retries exist to mask a capped-off answer.
-const SPEC_MAX_TOKENS = 3000;
-const REVIEW_MAX_TOKENS = 2400;
 
 const SPEC_INSTRUCTION =
   'Produce a concise build specification (max 250 words) for the request below: the purpose, the key screens or features, controls (for games), and confirmation that the deliverable is ONE self-contained HTML file. Do not write any code. Answer directly: do not include internal reasoning or thinking.';
@@ -168,7 +161,7 @@ export async function* runCreationHarness(options) {
         env,
         signal,
         store: null,
-        maxTokens: SPEC_MAX_TOKENS
+        maxTokens: null
       });
       if (signal?.aborted || specResult?.status === 'cancelled') {
         state.busy = false;
@@ -299,7 +292,7 @@ export async function* runCreationHarness(options) {
       env,
       signal,
       store: null,
-      maxTokens: REVIEW_MAX_TOKENS
+      maxTokens: null
     });
     if (signal?.aborted || reviewResult?.status === 'cancelled') {
       state.busy = false;
