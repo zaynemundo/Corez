@@ -725,6 +725,18 @@ async function handleAi(request, env) {
               }
               const returnedProject = activeProject
                 || deriveProjectState([{ role: 'assistant', content: finalContent }]);
+              if (!finalContent.trim()) {
+                // Nothing was produced after the provider stream, nudges,
+                // retries, and repair: report the real failure instead of a
+                // contentless success, so the client can surface the reason.
+                controller.enqueue(encoder.encode(sse({
+                  type: 'error',
+                  message: 'The AI provider returned no content for this request after retries. Please try again.',
+                  status: 502
+                })));
+                controller.close();
+                return;
+              }
               controller.enqueue(encoder.encode(sse({ type: 'done', final: true, projectState: serializeProjectState(returnedProject) })));
               controller.enqueue(encoder.encode(sse({
                 type: 'diagnostics',

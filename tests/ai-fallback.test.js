@@ -81,6 +81,52 @@ describe('Hosted AI fallback behavior', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('retries a stream that completes with zero deltas', async () => {
+    let aiCalls = 0;
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/inspiration') return Response.json({ sites: [] });
+      aiCalls += 1;
+      if (aiCalls === 1) {
+        return new Response(
+          'data: {"type":"meta"}\n\ndata: {"type":"done","final":true}\n\n',
+          { status: 200 }
+        );
+      }
+      return new Response(
+        'data: {"type":"meta"}\n\ndata: {"type":"delta","text":"Game ready. "}\n\ndata: {"type":"done","final":true}\n\n',
+        { status: 200 }
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await generateHostedAIResponse('Build a game', undefined, [], null, {
+      stream: true,
+      onDelta: () => {}
+    });
+
+    expect(response).toBe('Game ready. ');
+    expect(aiCalls).toBe(2);
+  });
+
+  it('fails honestly when a stream stays empty across the retry', async () => {
+    let aiCalls = 0;
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/inspiration') return Response.json({ sites: [] });
+      aiCalls += 1;
+      return new Response(
+        'data: {"type":"meta"}\n\ndata: {"type":"done","final":true}\n\n',
+        { status: 200 }
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(generateHostedAIResponse('Build a game', undefined, [], null, {
+      stream: true,
+      onDelta: () => {}
+    })).rejects.toThrow('Hosted AI returned no streamed content after retry');
+    expect(aiCalls).toBe(2);
+  });
+
   it('delivers the full streamed answer to the chat flow without hitting the local fallback', async () => {
     const fetchMock = vi.fn(async () => new Response(
       'data: {"type":"meta"}\n\ndata: {"type":"delta","text":"Red is the color of blood and apples."}\n\ndata: {"type":"done","final":true}\n\n',

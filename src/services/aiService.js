@@ -966,57 +966,66 @@ export async function generateHostedAIResponse(
   // user sees content before the generation finishes; the final content is
   // resolved when the done event closes the stream.
   if (options.stream === true) {
-    const response = await fetchWithTransportRetry(fetchOptions);
-    if (!response.ok) {
-      let errorText = '';
-      try {
-        errorText = await response.text();
-      } catch { /* keep empty */ }
-      throw new Error(`Hosted AI stream failed: HTTP ${response.status} ${errorText.slice(0, 200)}`);
-    }
-    if (!response.body) throw new Error('Hosted AI stream had no body.');
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let streamed = '';
-    let projectState = null;
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith('data:')) continue;
-        const payload = trimmed.slice(5).trim();
-        if (!payload) continue;
-        let event;
+    // Transient provider empties: a completed stream with zero deltas is
+    // retried once before being reported as a failure (the worker also
+    // retries internally). Aborts are never retried.
+    const MAX_EMPTY_STREAM_ATTEMPTS = 2;
+    for (let attempt = 1; attempt <= MAX_EMPTY_STREAM_ATTEMPTS; attempt += 1) {
+      if (signal?.aborted) {
+        const err = new Error('AbortError');
+        err.name = 'AbortError';
+        throw err;
+      }
+      const response = await fetchWithTransportRetry(fetchOptions);
+      if (!response.ok) {
+        let errorText = '';
         try {
-          event = JSON.parse(payload);
-        } catch {
-          continue;
-        }
-        if (event.type === 'delta' && typeof event.text === 'string') {
-          streamed += event.text;
-          options.onDelta?.(event.text);
-        } else if (event.type === 'done' && event.projectState) {
-          projectState = event.projectState;
-        } else if (event.type === 'diagnostics' && typeof event.diagnostics === 'object') {
-          lastHostedDiagnostics = event.diagnostics;
-        } else if (event.type === 'error') {
-          throw new Error(event.message || 'Hosted AI stream error.');
+          errorText = await response.text();
+        } catch { /* keep empty */ }
+        throw new Error(`Hosted AI stream failed: HTTP ${response.status} ${errorText.slice(0, 200)}`);
+      }
+      if (!response.body) throw new Error('Hosted AI stream had no body.');
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let streamed = '';
+      let projectState = null;
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data:')) continue;
+          const payload = trimmed.slice(5).trim();
+          if (!payload) continue;
+          let event;
+          try {
+            event = JSON.parse(payload);
+          } catch {
+            continue;
+          }
+          if (event.type === 'delta' && typeof event.text === 'string') {
+            streamed += event.text;
+            options.onDelta?.(event.text);
+          } else if (event.type === 'done' && event.projectState) {
+            projectState = event.projectState;
+          } else if (event.type === 'diagnostics' && typeof event.diagnostics === 'object') {
+            lastHostedDiagnostics = event.diagnostics;
+          } else if (event.type === 'error') {
+            throw new Error(event.message || 'Hosted AI stream error.');
+          }
         }
       }
+      if (projectState) {
+        persistedProjectState = projectState;
+        onProjectStateChange?.(projectState);
+      }
+      if (streamed.trim()) return streamed;
     }
-    if (projectState) {
-      persistedProjectState = projectState;
-      onProjectStateChange?.(projectState);
-    }
-    if (!streamed.trim()) {
-      throw new Error('Hosted AI returned no streamed content.');
-    }
-    return streamed;
+    throw new Error('Hosted AI returned no streamed content after retry.');
   }
 
   // Transport resilience: retry logic lives above with the streaming path

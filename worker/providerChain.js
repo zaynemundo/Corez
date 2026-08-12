@@ -650,77 +650,57 @@ export function runStreamingChain(messages, options = {}) {
       yield { type: 'meta', provider: provider.id, model: provider.model };
       const ttftHolder = { ms: 0 };
       try {
-        const iter = provider.stream(messages, {
-          signal,
-          maxTokens,
-          onTtft: (ms) => { ttftHolder.ms = ms; }
-        });
-        let receivedText = false;
-        let usage = null;
-        let finishReason = null;
-        for await (const chunk of iter) {
-          if (chunk.text) {
-            receivedText = true;
-            yield { type: 'delta', text: chunk.text };
-          }
-          if (chunk.usage) usage = chunk.usage;
-          if (chunk.finishReason) finishReason = chunk.finishReason;
-        }
-        if (receivedText) {
-          yield {
-            type: 'usage',
-            inputTokens: usage?.inputTokens ?? 0,
-            outputTokens: usage?.outputTokens ?? 0
-          };
-          yield {
-            type: 'done',
-            finishReason: finishReason || 'stop',
-            ttftMs: ttftHolder.ms || 0,
-            totalMs: clock() - startedAt,
-            provider: provider.id,
-            model: provider.model,
-            resumed
-          };
-          return;
-        }
-        // Reasoning-only or empty stream: two continuation nudges (the
-        // gateway occasionally returns an empty stream under load).
-        resumed = true;
-        failureMessages.push(`${provider.label}: empty or reasoning-only stream`);
-        const nudgeMessages = [
-          [...messages, CONTINUATION_NUDGE],
-          [{ role: 'user', content: 'Now answer completely: provide the final response to the original request now (the code or text itself). No reasoning. No thinking.' }]
-        ];
-        let nudged = false;
-        let nudgeUsage = null;
-        let nudgeFinish = null;
-        for (const candidate of nudgeMessages) {
-          const nudgeIter = provider.stream(candidate, {
+        // Streams a candidate message set, yielding deltas and returning the
+        // accumulated text/usage/finish. Built as a generator so deltas flow
+        // through to the client immediately.
+        async function* tryStream(msgs) {
+          const iter = provider.stream(msgs, {
             signal,
             maxTokens,
             onTtft: (ms) => { ttftHolder.ms = ttftHolder.ms || ms; }
           });
-          let gotText = false;
-          for await (const chunk of nudgeIter) {
+          let text = '';
+          let usage = null;
+          let finishReason = null;
+          for await (const chunk of iter) {
             if (chunk.text) {
-              gotText = true;
-              nudged = true;
+              text += chunk.text;
               yield { type: 'delta', text: chunk.text };
             }
-            if (chunk.usage) nudgeUsage = chunk.usage;
-            if (chunk.finishReason) nudgeFinish = chunk.finishReason;
+            if (chunk.usage) usage = chunk.usage;
+            if (chunk.finishReason) finishReason = chunk.finishReason;
           }
-          if (gotText) break;
+          return { text, usage, finishReason };
         }
-        if (nudged) {
+        let got = yield* tryStream(messages);
+        if (!got.text) {
+          // Reasoning-only or empty stream: two continuation nudges (the
+          // gateway occasionally returns an empty stream under load), then
+          // ONE full retry of the original request before this provider is
+          // abandoned — transient gateway empties must not sink the request.
+          resumed = true;
+          failureMessages.push(`${provider.label}: empty or reasoning-only stream`);
+          const nudgeMessages = [
+            [...messages, CONTINUATION_NUDGE],
+            [{ role: 'user', content: 'Now answer completely: provide the final response to the original request now (the code or text itself). No reasoning. No thinking.' }]
+          ];
+          for (const candidate of nudgeMessages) {
+            got = yield* tryStream(candidate);
+            if (got.text) break;
+          }
+          if (!got.text) {
+            got = yield* tryStream(messages);
+          }
+        }
+        if (got.text) {
           yield {
             type: 'usage',
-            inputTokens: nudgeUsage?.inputTokens ?? 0,
-            outputTokens: nudgeUsage?.outputTokens ?? 0
+            inputTokens: got.usage?.inputTokens ?? 0,
+            outputTokens: got.usage?.outputTokens ?? 0
           };
           yield {
             type: 'done',
-            finishReason: nudgeFinish || 'stop',
+            finishReason: got.finishReason || 'stop',
             ttftMs: ttftHolder.ms || 0,
             totalMs: clock() - startedAt,
             provider: provider.id,

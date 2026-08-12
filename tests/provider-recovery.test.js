@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { buildProviderChain, runProviderChain, TASK_STATUS_STORE_PREFIX } from '../worker/providerChain.js';
+import { buildProviderChain, runProviderChain, runStreamingChain, TASK_STATUS_STORE_PREFIX } from '../worker/providerChain.js';
 import { createTaskStateStore } from '../worker/utils.js';
 
 const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/chat/completions';
@@ -387,5 +387,59 @@ describe('provider fallback chain recovery', () => {
       jitter: () => 0
     });
     expect(openrouterResult.model).toBe('openrouter:deepseek-v4-flash');
+  });
+});
+
+describe('runStreamingChain empty-stream recovery', () => {
+  function sseChunks(pieces) {
+    let body = '';
+    for (const piece of pieces) {
+      if (piece === 'done') {
+        body += 'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":5,"completion_tokens":1,"total_tokens":6}}\n\ndata: [DONE]\n\n';
+      } else {
+        body += `data: {"choices":[{"delta":{"content":${JSON.stringify(piece)}},"finish_reason":null}]}\n\n`;
+      }
+    }
+    return new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+  }
+
+  it('retries the original request when the provider stream is empty', async () => {
+    let calls = 0;
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      calls += 1;
+      // First invocation: completely empty stream. Later ones: real content.
+      return calls === 1
+        ? sseChunks(['done'])
+        : sseChunks(['The ', 'game ', 'works', 'done']);
+    }));
+
+    const events = [];
+    for await (const event of runStreamingChain([{ role: 'user', content: 'build a game' }], {
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode' },
+      signal: null
+    })) {
+      events.push(event);
+    }
+
+    const deltas = events.filter((e) => e.type === 'delta').map((e) => e.text).join('');
+    expect(deltas).toBe('The game works');
+    expect(events.some((e) => e.type === 'done')).toBe(true);
+    expect(calls).toBeGreaterThan(1);
+  });
+
+  it('reports an error event when every attempt returns nothing', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => sseChunks(['done'])));
+
+    const events = [];
+    for await (const event of runStreamingChain([{ role: 'user', content: 'build a game' }], {
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode' },
+      signal: null
+    })) {
+      events.push(event);
+    }
+
+    const errors = events.filter((e) => e.type === 'error');
+    expect(errors).toHaveLength(1);
+    expect(errors[0].status).toBe(502);
   });
 });
