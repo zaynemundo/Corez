@@ -3354,6 +3354,31 @@ export function generateSessionTitle(prompt) {
   }
 }
 
+/**
+ * Ask the hosted AI to name a conversation from its first user message.
+ * The worker answers with a tiny, capped title-only generation; any failure
+ * falls back to the deterministic heuristic so a title is always produced.
+ */
+export async function generateAISessionTitle(prompt) {
+  const clean = String(prompt || '').trim();
+  if (!clean) return generateSessionTitle(clean);
+  try {
+    const response = await fetch(AI_PROXY_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ prompt: clean.slice(0, 400), titleOnly: true })
+    });
+    if (!response.ok) throw new Error(`Session title request failed with status ${response.status}.`);
+    const data = await response.json();
+    const title = typeof data?.title === 'string' ? data.title.trim() : '';
+    return title ? title.slice(0, 60) : generateSessionTitle(clean);
+  } catch {
+    return generateSessionTitle(clean);
+  }
+}
+
 export function extractReferenceImage(history) {
   if (!Array.isArray(history)) return null;
   for (let i = history.length - 1; i >= 0; i -= 1) {

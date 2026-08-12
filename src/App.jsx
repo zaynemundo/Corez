@@ -5,7 +5,7 @@ import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
 import CanvasPreview from './components/CanvasPreview';
 import SettingsModal from './components/SettingsModal';
-import { generateAIResponse, extractCodeFromMessage, generateSessionTitle } from './services/aiService';
+import { generateAIResponse, extractCodeFromMessage, generateSessionTitle, generateAISessionTitle } from './services/aiService';
 import { fetchMarketData, unavailableMarket } from './services/marketService';
 import { storeAppInR2, deleteSessionAppsInR2 } from './services/appStorageService';
 
@@ -465,6 +465,18 @@ export default function App() {
     const apiMsg = { role: 'user', content: apiPrompt, attachments: apiAttachments };
 
     const updatedApiMessages = [...draftMessages, apiMsg];
+
+    // Fresh conversations are named by the hosted AI (async, best-effort):
+    // the deterministic title stands in instantly and the AI title replaces
+    // it when the worker answers.
+    const isFreshSession = draftMessages.length === 0;
+    if (isFreshSession && (promptText || displayAttachments[0]?.name)) {
+      generateAISessionTitle(promptText || displayAttachments[0]?.name)
+        .then((aiTitle) => {
+          if (!aiTitle) return;
+          setSessions(prev => prev.map(s => s.id === targetSessionId ? { ...s, title: aiTitle } : s));
+        });
+    }
 
     setSessions(prev => {
       const existing = prev.find(s => s.id === targetSessionId);

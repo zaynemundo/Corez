@@ -408,6 +408,41 @@ async function handleAi(request, env) {
     return jsonResponse(400, { error: 'Prompt is required.' });
   }
 
+  // Title-only fast path: the client asks the model to name a new chat
+  // session from its first message. A tiny dedicated system prompt and a
+  // strict output cap keep this near-free; failures resolve to title: null
+  // so the client falls back to its deterministic heuristic naming.
+  if (body.titleOnly === true) {
+    const TITLE_SYSTEM_PROMPT = "You name chat conversations. Given the user's first message, reply with ONLY a short descriptive title for the conversation (5 words or fewer, no quotes, no ending punctuation, no markdown, no explanations). Capture the topic or the deliverable the user is asking for.";
+    const titleMessages = [
+      { role: 'system', content: TITLE_SYSTEM_PROMPT },
+      { role: 'user', content: prompt.slice(0, 400) }
+    ];
+    try {
+      const titleResult = await runProviderChain(titleMessages, {
+        env,
+        signal: request.signal || null,
+        store: null,
+        sleep: retrySleepFor(env),
+        maxTokens: 30
+      });
+      let title = typeof titleResult?.content === 'string' ? titleResult.content.trim() : '';
+      title = title.replace(/^Title:\s*/i, '').trim();
+      title = title.replace(/^["'\s]+|["'\s]+$/g, '').replace(/[.!?]+$/, '').trim();
+      if (title.length > 60) title = title.slice(0, 60).trim();
+      if (!title) {
+        return jsonResponse(200, { title: null });
+      }
+      return jsonResponse(200, {
+        title,
+        model: titleResult?.model || titleResult?.provider || null
+      });
+    } catch (err) {
+      console.warn('AI session title generation failed (client falls back to heuristic):', safeErrorDetail(err));
+      return jsonResponse(200, { title: null });
+    }
+  }
+
   // Greeting fast-path: common greetings get the mandated persona reply
   // instantly without paying an LLM round-trip. Replies are short, natural
   // variants selected deterministically (no large LLM for tiny requests).

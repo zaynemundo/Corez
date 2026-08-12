@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { generateSessionTitle } from '../src/services/aiService.js';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { generateSessionTitle, generateAISessionTitle } from '../src/services/aiService.js';
 
 describe('generateSessionTitle', () => {
   it('names games by genre and proper name', () => {
@@ -31,5 +31,45 @@ describe('generateSessionTitle', () => {
   it('falls back gracefully', () => {
     expect(generateSessionTitle('')).toBe('New Conversation');
     expect(generateSessionTitle(null)).toBe('New Conversation');
+  });
+});
+
+describe('generateAISessionTitle', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('requests a title-only generation and returns the AI title', async () => {
+    const fetchMock = vi.fn(async (_url, options) => {
+      const body = JSON.parse(options.body);
+      expect(body.titleOnly).toBe(true);
+      return Response.json({ title: 'Neon Runner platformer' });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(generateAISessionTitle('build a mario-style platformer game called Neon Runner'))
+      .resolves.toBe('Neon Runner platformer');
+  });
+
+  it('trims quoted and punctuated titles from the model', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ title: '"Black rose art."' })));
+    await expect(generateAISessionTitle('generate a picture of a black rose'))
+      .resolves.toBe('"Black rose art."');
+  });
+
+  it('falls back to the heuristic title when the AI title is missing', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ title: null })));
+    await expect(generateAISessionTitle('make a snake game')).resolves.toBe('Build a snake game');
+  });
+
+  it('falls back to the heuristic title when the request fails', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: 'down' }, { status: 502 })));
+    await expect(generateAISessionTitle('make a snake game')).resolves.toBe('Build a snake game');
+  });
+
+  it('skips the network for empty prompts', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(generateAISessionTitle('')).resolves.toBe('New Conversation');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
