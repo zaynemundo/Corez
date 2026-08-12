@@ -39,8 +39,8 @@
   --sidebar-body-size: 14px;
   --sidebar-icon-size: 20px;
   --sidebar-item-min-height: 38px;
-  --sidebar-bg: var(--bg-primary);
-  --sidebar-bg-opaque: var(--bg-primary);
+  --sidebar-bg: #0a0a0a;
+  --sidebar-bg-opaque: #0a0a0a;
   --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-shadow: none;
   --sidebar-item-hover-bg: rgba(255, 255, 255, 0.05);
@@ -81,8 +81,8 @@
   --selection-color: #000000;
   --inline-code-color: #7c5e10;
 
-  --sidebar-bg: rgb(252, 252, 252);
-  --sidebar-bg-opaque: var(--bg-primary);
+  --sidebar-bg: #fafafa;
+  --sidebar-bg-opaque: #fafafa;
   --sidebar-border: rgba(0, 0, 0, 0.08);
   --sidebar-shadow: none;
   --sidebar-item-hover-bg: rgba(0, 0, 0, 0.035);
@@ -173,8 +173,6 @@ h1, h2, h3, h4, h5, h6 {
   margin: var(--sidebar-margin);
   padding: 0;
   background-color: var(--sidebar-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   border: none;
   border-right: 1px solid var(--sidebar-border);
   border-radius: var(--sidebar-radius);
@@ -196,12 +194,6 @@ h1, h2, h3, h4, h5, h6 {
   transform: translateX(-100%);
   overflow: hidden;
   visibility: hidden;
-}
-
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  aside.sidebar {
-    background-color: var(--sidebar-bg-opaque);
-  }
 }
 
 .sidebar-backdrop {
