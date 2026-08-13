@@ -846,11 +846,14 @@ export async function generateHostedAIResponse(
     const decoder = new TextDecoder();
     let buffer = '';
     let streamed = '';
+    let rawBody = '';
     let projectState = null;
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
-      buffer += decoder.decode(value, { stream: true });
+      const chunk = decoder.decode(value, { stream: true });
+      if (rawBody.length < 200 * 1024) rawBody += chunk;
+      buffer += chunk;
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
       for (const line of lines) {
@@ -887,6 +890,31 @@ export async function generateHostedAIResponse(
       onProjectStateChange?.(projectState);
     }
     if (streamed.trim()) return streamed;
+    // The stream completed with zero deltas and no error event: the response
+    // was NOT valid SSE. Diagnose the body so the user sees the real cause
+    // instead of a generic "no streamed content" (a Cloudflare challenge
+    // page, a proxy error page, or a JSON fast-path answer).
+    const rawTrimmed = rawBody.trim();
+    if (!rawTrimmed) {
+      throw new Error('The hosted AI returned an empty response. Please try again.');
+    }
+    if (/<!doctype\s+html|<html[\s>]/i.test(rawTrimmed.slice(0, 2000))) {
+      throw new Error('The hosted AI request was intercepted by a security challenge page instead of reaching the worker. Please retry in a moment.');
+    }
+    if (rawTrimmed.startsWith('{') || rawTrimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(rawTrimmed);
+        if (typeof parsed?.content === 'string' && parsed.content.trim()) {
+          return parsed.content;
+        }
+        if (typeof parsed?.error === 'string') {
+          throw new Error(`Hosted AI request failed: ${parsed.error}`);
+        }
+      } catch (jsonErr) {
+        if (jsonErr instanceof Error && jsonErr.message.startsWith('Hosted AI request failed:')) throw jsonErr;
+        // Fall through to the generic error below.
+      }
+    }
     throw new Error('Hosted AI returned no streamed content.');
   }
 

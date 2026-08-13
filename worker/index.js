@@ -443,6 +443,9 @@ async function handleAi(request, env) {
   // Greeting fast-path: common greetings get the mandated persona reply
   // instantly without paying an LLM round-trip. Replies are short, natural
   // variants selected deterministically (no large LLM for tiny requests).
+  // The reply honors the streaming contract: a streamed request gets a
+  // real SSE stream with one delta, never a JSON body the client's SSE
+  // parser would misread as an empty stream.
   const GREETING_PATTERN = /^(hi|hello|hey|yo|sup|howdy|greetings|good\s+(morning|afternoon|evening|day)|who\s+(are|r)\s+you|what\s+(are|r)\s+you|whats?\s+(is\s+)?your\s+name)\b[.?!]*$/i;
   if (prompt.length <= 60 && GREETING_PATTERN.test(prompt)) {
     const isIdentityQuestion = /who\s+(are|r)\s+you|what\s+(are|r)\s+you|whats?\s+(is\s+)?your\s+name/i.test(prompt);
@@ -457,8 +460,31 @@ async function handleAi(request, env) {
           'Hi! What are we building today?'
         ];
     const index = [...prompt.toLowerCase()].reduce((acc, char) => acc + char.charCodeAt(0), 0) % greetingReplies.length;
+    const greetingContent = greetingReplies[index];
+    if (body.stream === true) {
+      const encoder = new TextEncoder();
+      const sse = (event) => `data: ${JSON.stringify(event)}\n\n`;
+      const readable = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(sse({ type: 'meta', provider: 'corez', model: 'corez-greeting' })));
+          controller.enqueue(encoder.encode(sse({ type: 'delta', text: greetingContent })));
+          controller.enqueue(encoder.encode(sse({ type: 'done', final: true, projectState: null })));
+          controller.close();
+        }
+      });
+      return new Response(readable, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          'Access-Control-Allow-Origin': '*',
+          'X-Accel-Buffering': 'no'
+        }
+      });
+    }
     return jsonResponse(200, {
-      content: greetingReplies[index],
+      content: greetingContent,
       model: 'corez-greeting'
     });
   }

@@ -101,6 +101,55 @@ describe('Hosted AI fallback behavior', () => {
     expect(aiCalls).toBe(1);
   });
 
+  it('diagnoses a JSON answer delivered as a non-SSE body instead of reporting an empty stream', async () => {
+    // A JSON 200 body (e.g. a fast-path answer) has zero `data:` lines; the
+    // stream parser must surface the real content, never a fake empty stream.
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/inspiration') return Response.json({ sites: [] });
+      return new Response(
+        JSON.stringify({ content: 'Greeting from the fast path.', model: 'corez-greeting' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await generateHostedAIResponse('hi', undefined, [], null, {
+      stream: true,
+      onDelta: () => {}
+    });
+
+    expect(response).toBe('Greeting from the fast path.');
+  });
+
+  it('reports a security-challenge page verbatim instead of a fake empty stream', async () => {
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/inspiration') return Response.json({ sites: [] });
+      return new Response(
+        '<!DOCTYPE html><html><head><title>Just a moment...</title></head><body>challenge</body></html>',
+        { status: 200, headers: { 'Content-Type': 'text/html' } }
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(generateHostedAIResponse('Build a game', undefined, [], null, {
+      stream: true,
+      onDelta: () => {}
+    })).rejects.toThrow(/security challenge page/i);
+  });
+
+  it('reports an empty body honestly instead of a fake empty stream', async () => {
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/inspiration') return Response.json({ sites: [] });
+      return new Response('', { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(generateHostedAIResponse('Build a game', undefined, [], null, {
+      stream: true,
+      onDelta: () => {}
+    })).rejects.toThrow(/empty response/i);
+  });
+
   it('forwards harness phase and clear events and returns only the final artifact', async () => {
     const fetchMock = vi.fn(async (url) => {
       if (url === '/api/inspiration') return Response.json({ sites: [] });
