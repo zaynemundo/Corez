@@ -208,6 +208,20 @@ describe('E2E /api/ai pipeline', () => {
     expect(allowed.headers.get('Access-Control-Allow-Origin')).toBe('https://corez.pro');
   });
 
+  it('restricts the direct hostname when Cloudflare rewrites request.url to a configured route', async () => {
+    const rewritten = new Request('https://corez.pro/api/ai', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Host': 'ai.zayne-mayo.workers.dev',
+        'Origin': 'https://attacker.example'
+      },
+      body: JSON.stringify({ prompt: 'hello', stream: true })
+    });
+    const response = await swarmWorker.fetch(rewritten, env);
+    expect(response.status).toBe(403);
+  });
+
   it('rate-limits abusive clients at the auth layer', async () => {
     const fetchMock = vi.fn(async () => mockOpenAI('answer'));
     vi.stubGlobal('fetch', fetchMock);

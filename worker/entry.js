@@ -30,7 +30,9 @@ export default {
     // url.hostname alone would loop every dev request through a self 301.
     const clientHost = String(request.headers.get('Host') || '').toLowerCase();
     const isLocalClient = clientHost.includes('localhost') || clientHost.includes('127.0.0.1') || clientHost.includes('::1');
-    const isDirectAiHost = url.hostname === 'ai.zayne-mayo.workers.dev';
+    const normalizedClientHost = clientHost.replace(/:\d+$/, '');
+    const isDirectAiHost = normalizedClientHost === 'ai.zayne-mayo.workers.dev'
+      || url.hostname === 'ai.zayne-mayo.workers.dev';
     const requestOrigin = request.headers.get('Origin') || '';
     if (isDirectAiHost && url.pathname !== '/api/ai') {
       return new Response(JSON.stringify({ error: 'Route not found.' }), {
