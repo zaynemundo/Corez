@@ -347,9 +347,9 @@ EMAIL FORMATTING (whenever the user asks you to write, draft, compose, or rewrit
   const formattedPlan = executionPlan ? `\n\n${String(executionPlan)}` : '';
 
   // Non-code intents (explanations and informational chat answers) also
-  // receive the scannable formatting rules; code, app, swarm, and writing
-  // paths keep their own dedicated guidance.
-  const formattingIncluded = intentType === 'explanation' || !['code-help', 'app', 'swarm', 'writing'].includes(intentType);
+  // receive the scannable formatting rules; code, app, and writing paths
+  // keep their own dedicated guidance.
+  const formattingIncluded = intentType === 'explanation' || !['code-help', 'app', 'writing'].includes(intentType);
   const formattingSection = formattingIncluded ? informationalFormatting : '';
 
   return `You are COREZ AI.
@@ -541,7 +541,7 @@ async function handleAi(request, env) {
 
   // Fast path for general intents: explanations, writing, and casual chat are
   // answered from the last few turns only, so they come back quickly. Coding,
-  // app, game, and swarm requests keep the FULL history. NO output caps exist
+  // app, and game requests keep the FULL history. NO output caps exist
   // anywhere: every provider call runs uncapped, so reasoning models can think
   // as long as they need and deliverables are never cut off mid-generation.
   const primaryIntent = intent?.primaryIntent || legacyIntent || intentType;
@@ -549,7 +549,7 @@ async function handleAi(request, env) {
     ? skills.map((s) => (typeof s === 'string' ? s : s.id)).filter(Boolean)
     : [];
   const isFastIntent = ['explanation', 'general', 'writing'].includes(intentType)
-    && !['bug_fix', 'code_refactor', 'feature_implementation', 'simple_edit', 'code_question', 'app', 'website_creation', 'game_creation', 'design_task', 'swarm'].includes(primaryIntent)
+    && !['bug_fix', 'code_refactor', 'feature_implementation', 'simple_edit', 'code_question', 'app', 'website_creation', 'game_creation', 'design_task'].includes(primaryIntent)
     && intentType !== 'app'
     && specialistSkills.length === 0;
   const fastHistoryWindow = Math.max(2, Math.min(8, body.fastHistoryWindow || 8));
