@@ -164,7 +164,7 @@ export function resolveSkills({ intent, prompt = '', availableTools = [], regist
 
     if (/\b(game|gamedev|canvas|arcade|snake|pong|scrabble|wordle)\b/i.test(cleanPrompt) || primaryIntent === 'game_creation') {
       selectionMap.set('game-development', 'HTML5 Canvas & game loop logic');
-      selectionMap.set('visual-creative', '8-bit SVG sprite & visual asset direction');
+      selectionMap.set('visual-creative', 'Genre-appropriate visual asset direction');
     }
     if (/\b(design|modern|glassmorphism|ui|aesthetic|theme)\b/i.test(cleanPrompt) || primaryIntent === 'design_task') {
       selectionMap.set('frontend-modern-design', 'Modern dark mode & responsive UI styling');

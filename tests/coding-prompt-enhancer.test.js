@@ -11,6 +11,27 @@ describe('Coding Prompt Enhancer', () => {
     expect(enhanced.toLowerCase()).toMatch(/single-file|react|playable|browser game|spec/i);
   });
 
+  it('keeps generic game creation style-neutral', async () => {
+    const enhanced = await improveCodingPrompt('Build a playable chess game', {
+      type: 'app',
+      primaryIntent: 'game_creation'
+    });
+
+    expect(enhanced).toContain('do NOT default to retro, pixel art, neon, or any other fixed aesthetic');
+    expect(enhanced).not.toContain('8-bit retro pixel art style for visuals');
+  });
+
+  it('preserves an explicitly requested retro game style', async () => {
+    const raw = 'Build an 8-bit retro platformer game';
+    const enhanced = await improveCodingPrompt(raw, {
+      type: 'app',
+      primaryIntent: 'game_creation'
+    });
+
+    expect(enhanced).toContain(raw);
+    expect(enhanced).toContain('Follow any visual style the user explicitly requests');
+  });
+
   it('enhances code fix and debug prompts with root-cause and safe fix specifications', async () => {
     const raw = 'Fix React state update error in component';
     const enhanced = await improveCodingPrompt(raw, { type: 'code-help' });

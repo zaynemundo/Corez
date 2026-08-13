@@ -107,5 +107,5 @@ ${testResult.warnings.length > 0 ? `Warnings:\n${testResult.warnings.map(w => `-
 Original Game Request:
 "${originalPrompt}"
 
-Please fix all detected errors and output ONLY the revised, production-ready, complete single-file HTML inside a single \`\`\`html ... \`\`\` code block. Ensure a valid <canvas> element, game loop, pixel-art rendering rules (ctx.imageSmoothingEnabled = false), and complete input handling are included.`;
+Please fix all detected errors and output ONLY the revised, production-ready, complete single-file HTML inside a single \`\`\`html ... \`\`\` code block. Ensure a valid <canvas> element, game loop, rendering behavior appropriate to the requested visual style, and complete input handling are included. Do not introduce retro or pixel-art styling unless the original request specifies it.`;
 }

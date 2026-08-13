@@ -240,14 +240,14 @@ Output your specialized contribution matching the task objective. If this task i
       {
         taskId: 'task-asset-bg',
         role: 'asset-worker',
-        objective: '8-bit retro pixel art game background',
+        objective: 'Game background matching the art director\'s selected style',
         dependencies: ['task-art-director'],
         ownedResources: ['assets/bg.png']
       },
       {
         taskId: 'task-asset-player',
         role: 'asset-worker',
-        objective: '8-bit retro pixel art player character sprite',
+        objective: 'Player character matching the art director\'s selected style',
         dependencies: ['task-art-director'],
         ownedResources: ['assets/player.png']
       },

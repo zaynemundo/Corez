@@ -68,6 +68,6 @@ Original Prompt:
 "${assetDef.prompt}"
 
 Revised Image Prompt:
-Generate a clean, strict 8-bit retro pixel art image for ${assetDef.type} "${assetDef.id}".
-Style: Authentic pixel art, crisp edges, no antialiasing, hard pixel outlines, ${assetDef.transparent ? 'isolated object on transparent background, no text.' : 'vibrant 8-bit palette, crisp background.'}`;
+Generate a clean, production-ready image for ${assetDef.type} "${assetDef.id}" that preserves the original prompt's art direction.
+Style: Keep the game's established palette, rendering style, and mood consistent; do not introduce retro or pixel art unless the original prompt requests it. ${assetDef.transparent ? 'Isolated object on transparent background, no text.' : 'Complete background composition with no unintended text.'}`;
 }

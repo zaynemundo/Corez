@@ -1,6 +1,6 @@
 /**
  * Asset-Independent Game Engine Skeleton Generator
- * Constructs high-performance boilerplate for Canvas, Input, Audio, Collision, Entities, State, and Pixel Art CSS.
+ * Constructs high-performance boilerplate for Canvas, Input, Audio, Collision, Entities, State, and responsive presentation.
  */
 
 export function generateEngineSkeleton(gameSpec = {}) {
@@ -22,9 +22,6 @@ export function generateEngineSkeleton(gameSpec = {}) {
       width: 100%;
       height: 100%;
       display: block;
-      image-rendering: pixelated;
-      image-rendering: crisp-edges;
-      image-rendering: -moz-crisp-edges;
     }
     .touch-controls { position: absolute; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); left: 0; right: 0; display: none; justify-content: space-between; align-items: flex-end; padding: 0 18px; pointer-events: none; }
     .touch-btn { width: 62px; height: 62px; background: rgba(255,255,255,0.16); border: 2px solid rgba(255,255,255,0.45); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 20px; color: #fff; pointer-events: auto; touch-action: manipulation; -webkit-user-select: none; }

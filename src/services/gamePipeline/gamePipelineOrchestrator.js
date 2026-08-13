@@ -53,17 +53,17 @@ export class GamePipelineOrchestrator {
     "difficultyCurve": ["Easy", "Medium", "Hard"]
   },
   "artDirection": {
-    "style": "8-bit retro pixel art",
-    "palette": ["#1a1c2c", "#f4b41b", "#e43b44", "#2ce8f5"],
+    "style": "User-requested style, or a genre-appropriate original direction when unspecified",
+    "palette": ["Colors chosen to support the selected art direction"],
     "camera": "side-view|top-down|fixed",
-    "renderingRules": ["shape-rendering=crispEdges", "imageSmoothingEnabled=false"]
+    "renderingRules": ["Rendering rules appropriate to the selected visual style"]
   },
   "assetManifest": {
     "assets": [
       {
         "id": "background",
         "type": "background",
-        "prompt": "8-bit pixel art retro dungeon backdrop, NES palette, crisp pixel grid",
+        "prompt": "Game backdrop matching the selected setting, mood, and art direction",
         "width": 960,
         "height": 540,
         "transparent": false
@@ -71,7 +71,7 @@ export class GamePipelineOrchestrator {
       {
         "id": "player",
         "type": "player",
-        "prompt": "8-bit pixel art knight sprite, isolated on transparent background, crisp outline",
+        "prompt": "Player character matching the selected art direction, isolated on transparent background",
         "width": 64,
         "height": 64,
         "transparent": true
@@ -193,7 +193,7 @@ ${engineSkeleton}
 
 Instructions:
 1. Combine the HTML layout, canvas rendering loop, input handling, and Web Audio sounds.
-2. Ensure canvas rendering calls \`configurePixelArtCanvas(ctx)\` and sets \`ctx.imageSmoothingEnabled = false\`.
+2. Configure canvas interpolation and rendering behavior to match the manifest's selected visual style.
 3. Preload all assets using \`loadAllAssets()\`, showing loading progress, and start the game loop inside the resolved \`.then()\`.
 4. Output ONLY the complete runnable HTML document wrapped inside a single \`\`\`html ... \`\`\` code block.`;
 

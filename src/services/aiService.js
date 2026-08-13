@@ -508,8 +508,9 @@ export async function improveCodingPrompt(prompt, intent = null) {
   // Build the Awwwards design spec + live inspiration once for app requests.
   // The live references are best-effort: failure never blocks and never
   // fabricates sites.
-  const designSpec = isAppIntent ? buildAwwwardsDesignPrompt(cleanPrompt) : '';
-  const liveInspiration = isAppIntent ? await (async () => {
+  const useWebDesignReferences = isAppIntent && !isGameRequest;
+  const designSpec = useWebDesignReferences ? buildAwwwardsDesignPrompt(cleanPrompt) : '';
+  const liveInspiration = useWebDesignReferences ? await (async () => {
     try {
       const { sites } = await fetchAwwwardsInspiration(cleanPrompt, null);
       if (sites.length === 0) return '';
@@ -529,8 +530,8 @@ export async function improveCodingPrompt(prompt, intent = null) {
     });
 
     if (pipelineResult && pipelineResult.executionPrompt && pipelineResult.executionPrompt !== cleanPrompt) {
-      // Append the design spec + live inspiration to the enriched prompt so
-      // the model always receives the Awwwards visual direction.
+      // Website/app builds may use live web-design references. Games derive
+      // their visual direction from the user request and genre instead.
       return isAppIntent
         ? `${pipelineResult.executionPrompt}\n\n${designSpec}${liveInspiration}`
         : pipelineResult.executionPrompt;
@@ -545,7 +546,7 @@ export async function improveCodingPrompt(prompt, intent = null) {
 
 [SINGLE-FILE GAME SPECIFICATION]:
 - Begin your response with a SHORT brief of AT MOST 1-2 short sentences: the game title and its controls. Example: "Here's Neon Pong — move with the Arrow keys, Space to launch." NEVER write a long feature list, architecture summary, or "I built..." paragraph.
-- GAME ART DIRECTION: Design the game's own art and UI — retro pixel art or thematically matched visuals, a designed start screen and game-over screen, HUD, color palette, and typography that fit the game world. NEVER apply generic web "dark glassmorphism", glass panels, or luxury web-app styling to games.
+- GAME ART DIRECTION: Follow any visual style the user explicitly requests. Otherwise infer a distinctive style from the game's genre, setting, mechanics, and audience; do NOT default to retro, pixel art, neon, or any other fixed aesthetic. Include a designed start screen and game-over screen, HUD, color palette, and typography that fit the game world. NEVER apply generic web "dark glassmorphism", glass panels, or luxury web-app styling to games.
 - Build a complete, runnable, self-contained single-file HTML canvas game inside ONE SINGLE \`\`\`html ... \`\`\` code block with inline <style> and <script> tags.
 - FULLSCREEN GAME REQUIREMENT: The game MUST fill the entire preview viewport — html/body with width:100%, height:100%, margin:0, overflow:hidden; a full-viewport canvas (width:100%, height:100%, display:block) with NO max-width, NO bordered box, NO rounded container around the game. Keep a fixed internal game resolution (e.g. 960x540) and scale it to the viewport with ctx.setTransform + a resize listener so the game always fills the screen.
 - MOBILE: size the canvas from visualViewport (not just innerHeight) and listen for orientationchange; include on-screen touch controls (left/right/jump/action buttons) shown only on touch or coarse-pointer devices, bound with touchstart/touchend/touchcancel.

@@ -612,6 +612,8 @@ describe('Prompt Architect', () => {
     expect(result).toContain('game loop');
     expect(result).toContain('requestAnimationFrame');
     expect(result).toContain('collision detection');
+    expect(result).toContain('without defaulting to retro or pixel art');
+    expect(result).not.toContain('8-bit retro pixel art style for visuals');
   });
 
   it('generates bug fix prompts with root cause focus', () => {

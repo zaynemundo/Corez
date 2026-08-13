@@ -258,7 +258,7 @@ Adaptive Routing - Coding Path:
     const isExplicitDesignRequest = skills.some(s => s.id === 'frontend-modern-design') || /\b(glassmorphism|dark mode|awwwards|luxury|neon|aesthetic)\b/i.test(intent?.goal || '');
     const isGameCreation = primaryIntent === 'game_creation' || /\bgame\b/i.test(`${intent?.goal || ''} ${intent?.summary || ''}`);
     const designStyle = isGameCreation
-      ? '- VISUAL DESIGN (GAME): Build authentic game-appropriate art and UI — retro pixel art, themed color palettes, a designed in-game start screen, HUD, and typography that match the game world. NEVER apply generic web "dark glassmorphism", glass panels, luxury-app aesthetics, or Outfit/Inter web typography to games.'
+      ? '- VISUAL DESIGN (GAME): Honor an explicitly requested visual style. If none is given, derive a distinctive art direction from the genre, setting, mechanics, and audience; do NOT default to retro, pixel art, neon, or another fixed aesthetic. Build a designed in-game start screen, HUD, palette, and typography that match the game world. NEVER apply generic web "dark glassmorphism", glass panels, luxury-app aesthetics, or Outfit/Inter web typography to games.'
       : isExplicitDesignRequest
         ? '- VISUAL DESIGN: Build with luxury dark mode glassmorphism (background: #090A0F, surface: rgba(18, 20, 29, 0.75), glowing borders, Outfit/Inter typography).'
         : '- VISUAL DESIGN: Follow clean, responsive, user-specified design instructions; preserve user explicit styling preferences.';
@@ -588,7 +588,8 @@ async function handleAi(request, env) {
   // model has concrete visual direction. Best-effort: failure never blocks
   // the request and never fabricates references.
   const appIntent = intent?.type === 'app' || legacyIntent === 'app';
-  if (appIntent) {
+  const gameIntent = intent?.primaryIntent === 'game_creation';
+  if (appIntent && !gameIntent) {
     try {
       const inspiration = await fetchAwwwardsInspiration(prompt, env?.__INSPIRATION_FETCH);
       if (Array.isArray(inspiration?.sites) && inspiration.sites.length > 0) {

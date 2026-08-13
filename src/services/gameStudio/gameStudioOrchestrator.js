@@ -9,35 +9,6 @@ import { createTaskBrief } from './taskBriefGenerator.js';
 import { TaskDependencyGraph, AGENT_LIFECYCLE_STATES } from '../../orchestration/taskGraph.js';
 import { WorkflowState, WORKFLOW_STAGES } from '../../orchestration/workflowState.js';
 
-export async function generateGameReferenceImage(prompt, options = {}) {
-  const cleanPrompt = (prompt || '').trim();
-  const styledPrompt = options.raw
-    ? cleanPrompt
-    : `8-bit retro pixel art game reference backdrop, ${cleanPrompt}, crisp pixel edges, retro game artwork`;
-  
-  if (typeof fetch === 'function') {
-    try {
-      const response = await fetch('/api/image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: styledPrompt }),
-        signal: options.signal
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data?.image) return data.image;
-      }
-    } catch (err) {
-      if (err?.name === 'AbortError') throw err;
-      console.warn('Image generation failed, returning a labelled local placeholder:', err);
-    }
-  }
-
-  const safePrompt = cleanPrompt.slice(0, 40).replace(/[^a-zA-Z0-9 ]/g, '');
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect width="512" height="512" fill="#09090b"/><text x="256" y="238" fill="#00ffcc" font-family="monospace" font-size="18" text-anchor="middle">LOCAL IMAGE PLACEHOLDER</text><text x="256" y="274" fill="#a1a1aa" font-family="monospace" font-size="14" text-anchor="middle">${safePrompt}</text></svg>`;
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-}
-
 export class GameStudioOrchestrator {
   constructor(options = {}) {
     this.agentRegistry = options.agentRegistry || defaultAgentRegistry;
@@ -166,7 +137,7 @@ export class GameStudioOrchestrator {
     }
 
     return {
-      title: 'COREZ 8-Bit Retro Knight Platformer',
+      title: 'COREZ Knight Platformer',
       genre: 'platformer',
       platform: 'browser',
       coreLoop: 'Move, jump, attack enemies, collect coins, reach level exit',
@@ -181,23 +152,23 @@ export class GameStudioOrchestrator {
     };
   }
 
-  async runArtDirectionPass(_userPrompt, _gameSpec, _options) {
+  async runArtDirectionPass(userPrompt, gameSpec, _options) {
     return {
-      visualTheme: '8-Bit Retro Pixel Art',
-      colorPalette: 'PICO-8 Retro (Dark Slate #09090b, Gold #ffcc00, Crimson #ff0055, Emerald #00ffcc)',
-      spriteStyle: 'Authentic 8-bit vector SVG (32x32 pixel grid with crispEdges)',
-      environmentStyle: 'Dungeon & Castle Brick Tilemaps',
-      uiTheme: 'Dark glassmorphic HUD overlay'
+      visualTheme: `Genre-appropriate art direction for ${gameSpec.genre || 'the game'}; preserve explicit style requests from: ${userPrompt}`,
+      colorPalette: 'A coherent palette selected for the game setting, mood, readability, and audience',
+      spriteStyle: 'Character rendering consistent with the selected art direction',
+      environmentStyle: 'Environment artwork consistent with the game setting and camera',
+      uiTheme: 'Readable in-game HUD and menus integrated with the selected art direction'
     };
   }
 
   async runAssetManifestPass(_gameSpec, _artDirection, _options) {
     return {
       assets: [
-        { id: 'knight-idle', type: 'sprite', dimensions: '32x32', prompt: '8-bit retro knight standing idle' },
-        { id: 'knight-run', type: 'sprite', dimensions: '32x32', prompt: '8-bit retro knight running frame' },
-        { id: 'goblin-enemy', type: 'sprite', dimensions: '32x32', prompt: '8-bit retro goblin enemy' },
-        { id: 'castle-background', type: 'backdrop', dimensions: '1536x1024', prompt: '8-bit pixel art castle background' }
+        { id: 'knight-idle', type: 'sprite', dimensions: '128x128', prompt: 'Knight standing idle, matching the selected art direction' },
+        { id: 'knight-run', type: 'sprite', dimensions: '128x128', prompt: 'Knight running animation frame, matching the selected art direction' },
+        { id: 'goblin-enemy', type: 'sprite', dimensions: '128x128', prompt: 'Goblin enemy, matching the selected art direction' },
+        { id: 'castle-background', type: 'backdrop', dimensions: '1536x1024', prompt: 'Castle environment matching the selected art direction' }
       ]
     };
   }

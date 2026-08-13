@@ -223,7 +223,7 @@ function buildGamePrompt(rawPrompt, _intent, requirements, _context) {
   result += `- 60 FPS stable performance\n`;
   result += `- responsive canvas rendering\n`;
   result += `- self-contained HTML/CSS/JS output ready for the preview canvas\n`;
-  result += `- 8-bit retro pixel art style for visuals\n\n`;
+  result += `- preserve any visual style explicitly requested by the user; otherwise derive an original art direction from the genre and setting without defaulting to retro or pixel art\n\n`;
 
   if (forbidden.length > 0) {
     result += `Do not:\n`;

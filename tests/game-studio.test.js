@@ -15,7 +15,7 @@ import {
   createTaskBrief, 
   validateTaskBriefScope 
 } from '../src/services/gameStudio/taskBriefGenerator.js';
-import { GameStudioOrchestrator, generateGameReferenceImage } from '../src/services/gameStudio/gameStudioOrchestrator.js';
+import { GameStudioOrchestrator } from '../src/services/gameStudio/gameStudioOrchestrator.js';
 import { WORKFLOW_STAGES } from '../src/orchestration/workflowState.js';
 
 describe('CoreZ AI Game Studio Engine (OpenCode Go Native)', () => {
@@ -118,7 +118,7 @@ describe('CoreZ AI Game Studio Engine (OpenCode Go Native)', () => {
 
       expect(result.complexity).toBe(GAME_COMPLEXITY.MEDIUM);
       expect(result.gameSpec.title).toContain('Knight Platformer');
-      expect(result.artDirection.visualTheme).toContain('8-Bit Retro');
+      expect(result.artDirection.visualTheme).toMatch(/8-bit retro/i);
       expect(result.assetManifest.assets.length).toBeGreaterThan(0);
       expect(result.verificationRecord.exitCode).toBe(0);
       expect(result.workflow.currentStage).toBe(WORKFLOW_STAGES.COMPLETE);
@@ -147,14 +147,6 @@ describe('CoreZ AI Game Studio Engine (OpenCode Go Native)', () => {
       expect(result.completed).toBe(false);
       expect(result.verificationRecord.exitCode).not.toBe(0);
       expect(result.trace).toBeDefined();
-    });
-
-    it('generates game reference background images through the configured endpoint', async () => {
-      const imageUrl = await generateGameReferenceImage('dungeon entrance background');
-      expect(imageUrl).toBeDefined();
-      expect(typeof imageUrl).toBe('string');
-      expect(imageUrl.length).toBeGreaterThan(0);
-      expect(decodeURIComponent(imageUrl)).toContain('LOCAL IMAGE PLACEHOLDER');
     });
   });
 

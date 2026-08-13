@@ -1,6 +1,6 @@
 /**
  * Central Asset Registry & Preloader Snippet Generator
- * Builds centralized ASSET_MANIFEST structures and preloader code with pixel-art rendering rules and procedural fallbacks.
+ * Builds centralized ASSET_MANIFEST structures and preloader code with neutral procedural fallbacks.
  */
 
 export function buildAssetRegistry(assetsMap) {
@@ -31,8 +31,6 @@ function createProceduralFallback(id, type, width = 64, height = 64) {
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d');
-  ctx.imageSmoothingEnabled = false;
-
   ctx.fillStyle = type === 'background' ? '#1e1e2f' : type === 'enemy' ? '#e74c3c' : '#3498db';
   ctx.fillRect(0, 0, width, height);
 
@@ -73,7 +71,7 @@ function loadAllAssets(onProgress) {
       };
 
       img.onerror = () => {
-        console.warn(\`Asset "\${key}" failed to load from \${item.src}. Using procedural pixel fallback.\`);
+        console.warn(\`Asset "\${key}" failed to load from \${item.src}. Using procedural fallback.\`);
         const fallbackImg = createProceduralFallback(key, item.type, item.width, item.height);
         LOADED_ASSETS[key] = fallbackImg;
         loadedCount++;
@@ -89,14 +87,5 @@ function loadAllAssets(onProgress) {
   return Promise.all(promises).then(() => LOADED_ASSETS);
 }
 
-// Pixel Art Canvas Setup Utility
-function configurePixelArtCanvas(canvasCtx) {
-  if (canvasCtx) {
-    canvasCtx.imageSmoothingEnabled = false;
-    canvasCtx.mozImageSmoothingEnabled = false;
-    canvasCtx.webkitImageSmoothingEnabled = false;
-    canvasCtx.msImageSmoothingEnabled = false;
-  }
-}
 `;
 }
