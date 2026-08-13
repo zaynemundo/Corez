@@ -2,6 +2,7 @@
 set -u
 
 worker="worker/index.js"
+entry="worker/entry.js"
 providerChain="worker/providerChain.js"
 service="src/services/aiService.js"
 failures=0
@@ -44,7 +45,9 @@ check 'Worker accepts DEEPSEEK_API_KEY' 'DEEPSEEK_API_KEY' "$providerChain"
 check 'Worker uses the OpenCode Go endpoint' 'opencode[.]ai' "$providerChain"
 check 'Worker keeps OpenCode Go as the preferred provider' 'OPENCODE_GO_API_KEY' "$providerChain"
 check 'Worker recognises canonical code-help intent' "'code-help'" "$worker"
-check 'Worker recognises canonical swarm intent' "'swarm'" "$worker"
+check 'Public AI entrypoint routes /api/ai POST requests through the inline Worker' 'return baseWorker[.]fetch\(baseRequest, env, ctx\)' "$entry"
+check_absent 'Public AI entrypoint no longer invokes retired swarm execution' 'runSwarm|executeSwarm|handleSwarm' "$entry"
+check_absent 'Worker no longer branches on retired swarm intent' "intentType === 'swarm'" "$worker"
 check_absent 'Worker no longer branches on retired coding intent' "intentType === 'coding'" "$worker"
 check_absent 'Worker no longer branches on retired complex intent' "intentType === 'complex'" "$worker"
 check_absent 'Worker no longer branches on retired fast-path labels' "intentType === 'math'|intentType === 'chat'|intentType === 'simple'" "$worker"
