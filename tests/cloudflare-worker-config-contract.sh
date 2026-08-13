@@ -50,6 +50,10 @@ check 'README documents the build command' 'npm run build' "$readme"
 check 'README documents the deploy command' 'npx wrangler deploy' "$readme"
 check 'GitHub Actions uses the current setup-node action' 'actions/setup-node@v4' "$workflow"
 check 'deployment runs the hosted AI contract suite' 'npm run test:cloudflare' "$workflow"
+check 'deployment uploads a tagged Worker version without resyncing routes' 'wrangler versions upload --tag' "$workflow"
+check 'deployment promotes the tagged Worker version' 'wrangler versions deploy --version-tag' "$workflow"
+check 'deployment tags reruns uniquely' 'GITHUB_RUN_ATTEMPT' "$workflow"
+check_absent 'deployment does not use route-syncing wrangler deploy' 'run:[[:space:]]*(npx[[:space:]]+)?wrangler deploy([[:space:]]|$)|run:[[:space:]]*npm run deploy([[:space:]]|$)|cloudflare/wrangler-action' "$workflow"
 
 if (( failures > 0 )); then
   printf '%d Cloudflare Worker configuration contract check(s) failed.\n' "$failures" >&2
