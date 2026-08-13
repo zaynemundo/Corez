@@ -422,8 +422,7 @@ async function handleAi(request, env) {
         signal: request.signal || null,
         store: null,
         sleep: retrySleepFor(env),
-        maxTokens: null
-      });
+          });
       let title = typeof titleResult?.content === 'string' ? titleResult.content.trim() : '';
       title = title.replace(/^Title:\s*/i, '').trim();
       title = title.replace(/^["'\s]+|["'\s]+$/g, '').replace(/[.!?]+$/, '').trim();
@@ -688,8 +687,7 @@ async function handleAi(request, env) {
     const chainOptions = {
       env,
       signal: clientDisconnectSignal,
-      maxTokens: null
-    };
+      };
     const encoder = new TextEncoder();
     const sse = (event) => `data: ${JSON.stringify(event)}\n\n`;
     const bufferForSkillVerification = specialistSkills.length > 0;
@@ -727,8 +725,7 @@ async function handleAi(request, env) {
                     signal: clientDisconnectSignal,
                     store: createTaskStateStore(env),
                     sleep: retrySleepFor(env),
-                    maxTokens: null
-                  });
+                                  });
                   if (repaired?.usage) repairUsage.push(repaired.usage);
                   return repaired.content ? repaired : null;
                 },
@@ -846,7 +843,6 @@ async function handleAi(request, env) {
     signal: clientDisconnectSignal,
     store: createTaskStateStore(env),
     sleep: retrySleepFor(env),
-    maxTokens: null
   });
   const providerMs = Date.now() - providerStartedAt;
 
@@ -879,8 +875,7 @@ async function handleAi(request, env) {
           signal: clientDisconnectSignal,
           store: createTaskStateStore(env),
           sleep: retrySleepFor(env),
-          maxTokens: null
-        });
+              });
         if (repaired?.usage) repairUsage.push(repaired.usage);
         return repaired.content ? repaired : null;
       },

@@ -319,14 +319,12 @@ export function buildProviderChain(env = {}) {
       call: (messages, options = {}) => callChatEndpoint({
         ...callOptions(),
         messages,
-        signal: options.signal,
-        bodyExtra: options.maxTokens ? { max_tokens: options.maxTokens } : {}
+        signal: options.signal
       }),
       stream: (messages, options = {}) => streamChatEndpoint({
         ...callOptions(),
         messages,
         signal: options.signal,
-        bodyExtra: options.maxTokens ? { max_tokens: options.maxTokens } : {},
         onTtft: options.onTtft
       })
     });
@@ -349,13 +347,12 @@ export function buildProviderChain(env = {}) {
         ...callOptions(),
         messages,
         signal: options.signal,
-        bodyExtra: options.maxTokens ? { stream: false, max_tokens: options.maxTokens } : { stream: false }
+        bodyExtra: { stream: false }
       }),
       stream: (messages, options = {}) => streamChatEndpoint({
         ...callOptions(),
         messages,
         signal: options.signal,
-        bodyExtra: options.maxTokens ? { max_tokens: options.maxTokens } : {},
         onTtft: options.onTtft
       })
     });
@@ -378,14 +375,12 @@ export function buildProviderChain(env = {}) {
       call: (messages, options = {}) => callChatEndpoint({
         ...callOptions(),
         messages,
-        signal: options.signal,
-        bodyExtra: options.maxTokens ? { max_tokens: options.maxTokens } : {}
+        signal: options.signal
       }),
       stream: (messages, options = {}) => streamChatEndpoint({
         ...callOptions(),
         messages,
         signal: options.signal,
-        bodyExtra: options.maxTokens ? { max_tokens: options.maxTokens } : {},
         onTtft: options.onTtft
       })
     });
@@ -405,10 +400,9 @@ export function buildProviderChain(env = {}) {
  * of failing with a 502.
  *
  * Options: { env, signal, sleep, clock, jitter, store, maxRequestRetryMs,
- * taskHash, taskId, maxTokens } — sleep/clock/jitter are injectable for
- * deterministic tests. `maxTokens` is a hard output ceiling used only when a
- * caller passes it explicitly; no production caller does — every request is
- * uncapped so the model takes as long as it wants.
+ * taskHash, taskId } — sleep/clock/jitter are injectable for deterministic
+ * tests. Every request is uncapped: the provider decides how long it
+ * generates, and no output ceiling is ever sent.
  */
 export async function runProviderChain(messages, options = {}) {
   const env = options.env || {};
@@ -417,7 +411,6 @@ export async function runProviderChain(messages, options = {}) {
   const sleep = options.sleep || defaultSleep;
   const jitter = options.jitter || Math.random;
   const store = options.store !== undefined ? options.store : createTaskStateStore(env);
-  const maxTokens = Number.isFinite(options.maxTokens) && options.maxTokens > 0 ? Math.round(options.maxTokens) : null;
   const maxRequestRetryMs = Number.isFinite(options.maxRequestRetryMs) && options.maxRequestRetryMs >= 0
     ? options.maxRequestRetryMs
     : DEFAULT_REQUEST_RETRY_MS;
@@ -467,7 +460,7 @@ export async function runProviderChain(messages, options = {}) {
       }
     }
 
-    let result = await provider.call(messages, { signal, attempt, maxTokens });
+    let result = await provider.call(messages, { signal, attempt });
 
     while (result?.failure) {
       const cls = result.classified || classifyProviderFailure(result.failure);
@@ -523,7 +516,7 @@ export async function runProviderChain(messages, options = {}) {
 
       await sleepInterruptible(backoffMs, signal, sleep);
       if (signal?.aborted) return { taskId, status: 'cancelled' };
-      result = await provider.call(messages, { signal, attempt, maxTokens });
+      result = await provider.call(messages, { signal, attempt });
     }
 
     if (result?.content) {
@@ -582,7 +575,6 @@ export function runStreamingChain(messages, options = {}) {
   const env = options.env || {};
   const signal = options.signal || null;
   const clock = options.clock || defaultClock;
-  const maxTokens = Number.isFinite(options.maxTokens) && options.maxTokens > 0 ? Math.round(options.maxTokens) : null;
 
   const startedAt = clock();
   const providers = buildProviderChain(env);
@@ -604,7 +596,6 @@ export function runStreamingChain(messages, options = {}) {
         async function* tryStream(msgs) {
           const iter = provider.stream(msgs, {
             signal,
-            maxTokens,
             onTtft: (ms) => { ttftHolder.ms = ttftHolder.ms || ms; }
           });
           let text = '';

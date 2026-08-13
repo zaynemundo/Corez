@@ -161,8 +161,7 @@ export async function* runCreationHarness(options) {
         env,
         signal,
         store: null,
-        maxTokens: null
-      });
+          });
       if (signal?.aborted || specResult?.status === 'cancelled') {
         state.busy = false;
         state.status = 'interrupted';
@@ -223,7 +222,7 @@ export async function* runCreationHarness(options) {
       let inputTokens = null;
       let outputTokens = null;
       try {
-        for await (const event of runStreamingChain(buildMessages, { env, signal, maxTokens: null })) {
+        for await (const event of runStreamingChain(buildMessages, { env, signal })) {
           if (event.type === 'delta') {
             collected += event.text;
             yield { type: 'delta', text: event.text };
@@ -292,8 +291,7 @@ export async function* runCreationHarness(options) {
       env,
       signal,
       store: null,
-      maxTokens: null
-    });
+      });
     if (signal?.aborted || reviewResult?.status === 'cancelled') {
       state.busy = false;
       state.status = 'interrupted';
@@ -330,7 +328,7 @@ export async function* runCreationHarness(options) {
       let collected = '';
       let repairStreamFailed = false;
       try {
-        for await (const event of runStreamingChain(repairMessages, { env, signal, maxTokens: null })) {
+        for await (const event of runStreamingChain(repairMessages, { env, signal })) {
           if (event.type === 'delta') {
             collected += event.text;
             yield { type: 'delta', text: event.text };
