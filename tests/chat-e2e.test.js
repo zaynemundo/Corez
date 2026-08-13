@@ -8,7 +8,7 @@
 // runs live against the real provider through scripts/evaluate-benchmark.mjs.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import swarmWorker from '../worker/swarm-index.js';
+import swarmWorker from '../worker/entry.js';
 
 const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/chat/completions';
 const env = { OPENCODE_GO_API_KEY: 'sk-test', __COREZ_RETRY_SLEEP_MS: '0' };

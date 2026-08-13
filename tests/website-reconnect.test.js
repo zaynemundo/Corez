@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import worker from '../worker/swarm-index.js';
+import worker from '../worker/entry.js';
 
 function memoryBucket({ failGets = 0 } = {}) {
   const map = new Map();

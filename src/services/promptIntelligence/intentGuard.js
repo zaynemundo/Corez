@@ -86,7 +86,6 @@ export function guardIntent(rawPrompt, contract, enrichedPrompt, intent) {
     const complexitySignals = [
       /orchestrat/i,
       /multi-agent/i,
-      /swarm/i,
       /complex/i,
       /enterprise/i,
       /production-ready/i,

@@ -224,9 +224,9 @@ describe('Intent Engine — classifyIntent', () => {
     expect(result.type).toBe(INTENT_TYPES.DESIGN_TASK);
   });
 
-  it('classifies "orchestrate a multi-agent system" → swarm', () => {
+  it('classifies "orchestrate a multi-agent system" → general_question (no swarm intent)', () => {
     const result = classifyIntent('orchestrate a multi-agent system');
-    expect(result.type).toBe(INTENT_TYPES.SWARM);
+    expect(result.type).toBe(INTENT_TYPES.GENERAL_QUESTION);
   });
 
   it('returns general_question with low confidence for gibberish', () => {
@@ -876,16 +876,16 @@ describe('Intent Guard — deEscalate', () => {
 // 12. Task Router
 // =========================================================================
 describe('Task Router', () => {
-  it('routes website_creation → website_swarm', () => {
+  it('routes website_creation → website_build', () => {
     const intent = { type: INTENT_TYPES.WEBSITE_CREATION, complexity: COMPLEXITY_LEVELS.MEDIUM };
     const result = route(intent, { explicit: [], inferred: [], forbidden: [] });
-    expect(result.mode).toBe(EXECUTION_MODES.WEBSITE_SWARM);
+    expect(result.mode).toBe(EXECUTION_MODES.WEBSITE_BUILD);
   });
 
-  it('routes game_creation → game_swarm', () => {
+  it('routes game_creation → game_build', () => {
     const intent = { type: INTENT_TYPES.GAME_CREATION, complexity: COMPLEXITY_LEVELS.MEDIUM };
     const result = route(intent, { explicit: [], inferred: [], forbidden: [] });
-    expect(result.mode).toBe(EXECUTION_MODES.GAME_SWARM);
+    expect(result.mode).toBe(EXECUTION_MODES.GAME_BUILD);
   });
 
   it('routes simple_edit → direct', () => {
@@ -969,10 +969,6 @@ describe('Legacy Intent Mapping', () => {
     expect(toLegacyIntentType(INTENT_TYPES.GENERAL_QUESTION)).toBe('general');
   });
 
-  it('maps swarm → swarm', () => {
-    expect(toLegacyIntentType(INTENT_TYPES.SWARM)).toBe('swarm');
-  });
-
   it('maps unknown → general', () => {
     expect(toLegacyIntentType(INTENT_TYPES.UNKNOWN)).toBe('general');
     expect(toLegacyIntentType('nonexistent')).toBe('general');
@@ -988,7 +984,7 @@ describe('Full Pipeline — process()', () => {
     const result = await process({ prompt: 'make me a website for office chairs', dryRun: true });
     expect(result.intent.type).toBe(INTENT_TYPES.WEBSITE_CREATION);
     expect(result.intent.complexity).toBe(COMPLEXITY_LEVELS.MEDIUM);
-    expect(result.routing.mode).toBe(EXECUTION_MODES.WEBSITE_SWARM);
+    expect(result.routing.mode).toBe(EXECUTION_MODES.WEBSITE_BUILD);
     // Execution prompt should be about office chairs
     expect(result.executionPrompt).toContain('office');
     expect(result.executionPrompt).toContain('chair');
@@ -1033,11 +1029,11 @@ describe('Full Pipeline — process()', () => {
   });
 
   // ─── ACCEPTANCE TEST 5 ───
-  it('acceptance test 5: "build me a complete multiplayer browser game" → high complexity, game_swarm', async () => {
+  it('acceptance test 5: "build me a complete multiplayer browser game" → high complexity, game_build', async () => {
     const result = await process({ prompt: 'build me a complete multiplayer browser game', dryRun: true });
     expect(result.intent.type).toBe(INTENT_TYPES.GAME_CREATION);
     expect(result.intent.complexity).toBe(COMPLEXITY_LEVELS.HIGH);
-    expect(result.routing.mode).toBe(EXECUTION_MODES.GAME_SWARM);
+    expect(result.routing.mode).toBe(EXECUTION_MODES.GAME_BUILD);
   });
 
   // ─── Additional: "fix the crash" → bug_fix, debug agent ───
@@ -1057,7 +1053,7 @@ describe('Full Pipeline — process()', () => {
   it('"refactor" → code_refactor', async () => {
     const result = await process({ prompt: 'refactor the user service', dryRun: true });
     expect(result.intent.type).toBe(INTENT_TYPES.CODE_REFACTOR);
-    expect(result.routing.mode).toBe(EXECUTION_MODES.CODING_SWARM);
+    expect(result.routing.mode).toBe(EXECUTION_MODES.CODING_WORKFLOW);
   });
 
   // ─── Empty prompt ───
@@ -1188,7 +1184,6 @@ describe('Extensibility', () => {
       { prompt: 'generate an image', expectedType: INTENT_TYPES.IMAGE_GENERATION },
       { prompt: 'write a blog post', expectedType: INTENT_TYPES.CONTENT_CREATION },
       { prompt: 'change the color', expectedType: INTENT_TYPES.SIMPLE_EDIT },
-      { prompt: 'orchestrate a swarm', expectedType: INTENT_TYPES.SWARM },
     ];
 
     for (const { prompt, expectedType } of testCases) {

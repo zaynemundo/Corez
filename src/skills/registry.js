@@ -29,7 +29,7 @@ export class SkillRegistry {
       phase: skill.phase || 'IMPLEMENTING',
       priority: skill.priority || 50,
       dependencies: Array.isArray(skill.dependencies) ? skill.dependencies : [],
-      compatibleIntents: Array.isArray(skill.compatibleIntents) ? skill.compatibleIntents : ['app', 'code-help', 'swarm', 'writing', 'explanation', 'general'],
+      compatibleIntents: Array.isArray(skill.compatibleIntents) ? skill.compatibleIntents : ['app', 'code-help', 'writing', 'explanation', 'general'],
       requiresTools: Array.isArray(skill.requiresTools) ? skill.requiresTools : [],
       instructions: skill.instructions || ''
     };

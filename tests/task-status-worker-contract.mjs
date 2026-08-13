@@ -3,7 +3,7 @@
 // is persisted. The record is mirrored by providerChain under
 // task-status/<taskId> (R2 key corez-tasks/task-status_<taskId>.json).
 import assert from 'node:assert/strict';
-import worker from '../worker/swarm-index.js';
+import worker from '../worker/entry.js';
 import { createTaskStateStore } from '../worker/utils.js';
 
 function bucketEnv(seedRecords = {}) {

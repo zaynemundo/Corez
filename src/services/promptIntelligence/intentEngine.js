@@ -158,17 +158,6 @@ const INTENT_HANDLERS = [
       };
     },
   },
-  {
-    type: INTENT_TYPES.SWARM,
-    pattern: /\b(swarm|multi-agent|agents|orchestrate|orchestration|complex|architect|plan|system design|full stack|complete.*app|production.*app|SaaS|enterprise)\b/i,
-    signals: ['swarm', 'multi-agent', 'orchestrate', 'system design', 'full stack', 'saas', 'enterprise'],
-    extract(_prompt, _lower) {
-      return {
-        goal: `coordinate a complex multi-agent task`,
-        deliverable: 'orchestrated solution',
-      };
-    },
-  },
 ];
 
 // ——— Helpers ———
@@ -486,10 +475,6 @@ export function classifyComplexity(prompt, intent) {
     if (/\b(multiplayer|mmo|rpg|role playing|complex|large|production)\b/i.test(lower)) return COMPLEXITY_LEVELS.HIGH;
     if (/\b(snake|pong|tictactoe|quiz|memory|simple|basic)\b/i.test(lower)) return COMPLEXITY_LEVELS.LOW;
     return COMPLEXITY_LEVELS.MEDIUM;
-  }
-
-  if (type === INTENT_TYPES.SWARM) {
-    return COMPLEXITY_LEVELS.HIGH;
   }
 
   return COMPLEXITY_LEVELS.LOW;

@@ -2,7 +2,7 @@
 // COREZ live chat retest driver — mirrors the test_results_0708 methodology.
 //
 // Runs the same 7 chat cases used in the original 0708 live test against the
-// real worker module (worker/swarm-index.js) through the full /api/ai code
+// real worker module (worker/entry.js) through the full /api/ai code
 // path, with a real provider key, and writes:
 //   test_results_0708/chat-retest2-raw-<date>.json
 //   test_results_0708/chat-retest2-report-<date>.md
@@ -35,7 +35,7 @@ if (!key) {
   process.exit(1);
 }
 
-const worker = (await import('../worker/swarm-index.js')).default;
+const worker = (await import('../worker/entry.js')).default;
 const env = {
   ASSETS: { fetch: async () => new Response('asset') },
   __COREZ_RETRY_SLEEP_MS: '0',
@@ -211,7 +211,7 @@ const md = [];
 md.push(`# CoreZ Chat Live Retest — ${today} (test_results_0708)`);
 md.push('');
 md.push(`Re-run of the same 7 chat cases from the original 0708 live test, against the current worker.`);
-md.push('- Driver: real worker module (worker/swarm-index.js), full /api/ai code path');
+md.push('- Driver: real worker module (worker/entry.js), full /api/ai code path');
 md.push(`- Provider: OpenCode Go (deepseek-v4-flash) via OPENCODE_GO_API_KEY`);
 md.push(`- Total cases: ${results.length} | Passed: ${passed.length} | Failed: ${results.length - passed.length}`);
 md.push('');

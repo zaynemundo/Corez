@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ContextStore, compactMessages, estimateTokens } from '../packages/agent-core/persistence/ContextStore.js';
-import worker from '../worker/swarm-index.js';
+import worker from '../worker/entry.js';
 
 function memoryBucket() {
   const map = new Map();

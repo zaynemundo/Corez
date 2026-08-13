@@ -29,7 +29,6 @@ export const INTENT_TYPES = Object.freeze({
   CONTENT_CREATION: 'content_creation',
   GENERAL_QUESTION: 'general_question',
   SIMPLE_EDIT: 'simple_edit',
-  SWARM: 'swarm',
   MARKET: 'market',
   UNKNOWN: 'unknown',
 });
@@ -45,12 +44,11 @@ export const COMPLEXITY_LEVELS = Object.freeze({
 export const EXECUTION_MODES = Object.freeze({
   DIRECT: 'direct',
   DIRECT_AGENT: 'direct_agent',
-  CODING_SWARM: 'coding_swarm',
-  WEBSITE_SWARM: 'website_swarm',
-  GAME_SWARM: 'game_swarm',
+  CODING_WORKFLOW: 'coding_workflow',
+  WEBSITE_BUILD: 'website_build',
+  GAME_BUILD: 'game_build',
   DEBUG_AGENT: 'debug_agent',
   RESEARCH_AGENT: 'research_agent',
-  FULL_SWARM: 'full_swarm',
 });
 
 export const CLARITY_LEVELS = Object.freeze({

@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { repairResponse } from '../src/services/reflectionEngine.js';
 import worker from '../worker/index.js';
-import { runAdaptiveAgentPool, buildSwarmAgentSpecs } from '../worker/swarm-index.js';
 import { ContextEngine } from '../packages/agent-core/context/index.js';
 import { DEFAULT_CONFIG } from '../packages/agent-core/config/index.js';
 import { compactConversationForRequest } from '../src/services/aiService.js';
@@ -46,48 +45,24 @@ describe('CoreZ imposes no artificial AI limits', () => {
     }
   });
 
-  it('long tasks continue across many provider calls: swarm pool completes all specs', async () => {
-    const specs = buildSwarmAgentSpecs('app',
-      Array.from({ length: 12 }, (_, i) => `- Requirement ${i + 1}: implement independent component ${i + 1}`).join('\n'));
-    expect(specs.length).toBeGreaterThan(10);
+  it('long tasks continue across many provider calls: the inline chain completes all work', async () => {
+    const originalFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = async () => new Response(JSON.stringify({
+        choices: [{ message: { content: 'ok' } }]
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
 
-    const executed = [];
-    const result = await runAdaptiveAgentPool(
-      specs,
-      async (spec) => {
-        executed.push(spec.agentId);
-        return `${spec.role}-output`;
-      },
-      {}
-    );
-
-    expect(result.completed.length).toBe(specs.length);
-    expect(result.failed.length).toBe(0);
-    expect(result.skipped.length).toBe(0);
-    expect(executed.length).toBe(specs.length);
+      for (let i = 0; i < 10; i++) {
+        const response = await postAi(
+          { prompt: `long task ${i}`, intent: { type: 'app' } },
+          { OPENCODE_GO_API_KEY: 'sk-test' }
+        );
+        expect(response.status).toBe(200);
+      }
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
-
-  it('a provider 429 resumes the task with adaptive backoff instead of dropping it', async () => {
-    const attempts = new Map();
-    const result = await runAdaptiveAgentPool(
-      [{ agentId: 'a' }, { agentId: 'b' }],
-      async (spec, attempt) => {
-        attempts.set(spec.agentId, attempt);
-        if (attempt < 2) {
-          const error = new Error('429 rate limit');
-          error.status = 429;
-          throw error;
-        }
-        return `${spec.agentId}-done`;
-      },
-      {}
-    );
-
-    expect(result.completed.length).toBe(2);
-    expect(result.failed.length).toBe(0);
-    expect(attempts.get('a')).toBe(2);
-    expect(attempts.get('b')).toBe(2);
-  }, 30_000);
 
   it('repeated repairs continue while measurable progress is occurring', () => {
     const contract = { mustNotChange: ['Do not change usage limits'], mustAchieve: [] };

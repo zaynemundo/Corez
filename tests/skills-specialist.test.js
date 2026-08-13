@@ -83,8 +83,10 @@ describe('CoreZ Specialist Skills', () => {
     const bug = resolveSkills({ intent: 'code-help', prompt: 'My React component crashes when I click save.' });
     expect(bug.skills.map(s => s.id)).toContain('systematic-debugging');
 
-    const swarm = resolveSkills({ intent: 'swarm', prompt: 'Build authentication, billing, dashboard and admin panel.' });
-    expect(swarm.skills.map(s => s.id)).toContain('subagent-driven-development');
+    // No swarm intent exists: a multi-agent-flavoured engineering request is
+    // treated as ordinary app work and resolves the standard heavy workflow.
+    const multiAgent = resolveSkills({ intent: 'app', prompt: 'Build authentication, billing, dashboard and admin panel.' });
+    expect(multiAgent.skills.map(s => s.id)).toContain('writing-plans');
   });
 
   it('keeps plain conversational questions on the direct path', () => {

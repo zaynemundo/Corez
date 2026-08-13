@@ -80,7 +80,7 @@ async function callApi({ prompt, intent, messages, project, stream }) {
   }
 
   // Module mode: drive the real worker entrypoint.
-  const worker = (await import('../worker/swarm-index.js')).default;
+  const worker = (await import('../worker/entry.js')).default;
   const env = {
     ASSETS: { fetch: async () => new Response('asset') },
     __COREZ_RETRY_SLEEP_MS: '0'

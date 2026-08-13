@@ -33,16 +33,6 @@ describe('CoreZ Superpowers Integration', () => {
       expect(skillIds).toContain('verification-before-completion');
     });
 
-    it('maps swarm intent to subagent workflow', () => {
-      const { skills } = resolveSkills({
-        intent: 'swarm',
-        prompt: 'Build authentication, billing, dashboard and admin panel.'
-      });
-      const skillIds = skills.map(s => s.id);
-      expect(skillIds).toContain('subagent-driven-development');
-      expect(skillIds).toContain('dispatching-parallel-agents');
-    });
-
     it('bypasses heavy Superpowers engineering workflow for simple explanations', () => {
       const { skills } = resolveSkills({
         intent: 'explanation',

@@ -553,6 +553,8 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onRe
     });
   };
 
+  const isTableDelimiter = (line) => /^\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?$/.test(line.trim());
+
   const parseTableBlock = (tableLines) => {
     if (tableLines.length < 2) return null;
     const parseRow = (line) => {
@@ -561,7 +563,8 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onRe
     };
 
     const headers = parseRow(tableLines[0]);
-    const bodyRows = tableLines.slice(2).map(parseRow);
+    const bodyLines = isTableDelimiter(tableLines[1]) ? tableLines.slice(2) : tableLines.slice(1);
+    const bodyRows = bodyLines.filter(line => !isTableDelimiter(line)).map(parseRow);
 
     return { headers, bodyRows };
   };
@@ -584,39 +587,49 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onRe
       const line = lines[i];
       const trimmed = line.trim();
 
-      // Table detection: line starting with | and next line is delimiter |---|
-      if (trimmed.startsWith('|') && i + 1 < lines.length && /^\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?$/.test(lines[i + 1].trim())) {
-        const tableLines = [lines[i], lines[i + 1]];
-        i += 2;
-        while (i < lines.length && lines[i].trim().startsWith('|')) {
-          tableLines.push(lines[i]);
-          i++;
+      // Table detection: line starting with |
+      if (trimmed.startsWith('|')) {
+        const tableLines = [];
+        let j = i;
+        while (j < lines.length) {
+          const lTrim = lines[j].trim();
+          if (lTrim.startsWith('|')) {
+            tableLines.push(lTrim);
+            j++;
+          } else if (lTrim === '' && j + 1 < lines.length && lines[j + 1].trim().startsWith('|')) {
+            j++; // skip blank line between table rows
+          } else {
+            break;
+          }
         }
-        const tableData = parseTableBlock(tableLines);
-        if (tableData) {
-          elements.push(
-            <div key={`table-${i}`} className="markdown-table-wrapper">
-              <table className="markdown-table">
-                <thead>
-                  <tr>
-                    {tableData.headers.map((h, hIdx) => (
-                      <th key={hIdx}>{renderInlineFormattedText(h)}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {tableData.bodyRows.map((row, rIdx) => (
-                    <tr key={rIdx}>
-                      {row.map((cell, cIdx) => (
-                        <td key={cIdx}>{renderInlineFormattedText(cell)}</td>
+        if (tableLines.length >= 2) {
+          const tableData = parseTableBlock(tableLines);
+          if (tableData) {
+            elements.push(
+              <div key={`table-${i}`} className="markdown-table-wrapper">
+                <table className="markdown-table">
+                  <thead>
+                    <tr>
+                      {tableData.headers.map((h, hIdx) => (
+                        <th key={hIdx}>{renderInlineFormattedText(h)}</th>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          );
-          continue;
+                  </thead>
+                  <tbody>
+                    {tableData.bodyRows.map((row, rIdx) => (
+                      <tr key={rIdx}>
+                        {row.map((cell, cIdx) => (
+                          <td key={cIdx}>{renderInlineFormattedText(cell)}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+            i = j;
+            continue;
+          }
         }
       }
 

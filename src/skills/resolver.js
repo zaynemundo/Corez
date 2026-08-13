@@ -98,11 +98,11 @@ export function resolveSkills({ intent, prompt = '', availableTools = [], regist
 
   // Specialist capabilities apply to everyday conversational requests even on
   // the fast path — but they must never hijack engineering workflows (apps,
-  // games, websites, code, swarms). Those intents keep their dedicated heavy
+  // games, websites, code). Those intents keep their dedicated heavy
   // workflow below; specialists only fire for non-engineering intents and are
   // matched against the raw user prompt, never the enriched coding prompt.
   const ENGINEERING_INTENTS = new Set([
-    'app', 'code-help', 'swarm', 'bug_fix', 'code_refactor', 'feature_implementation',
+    'app', 'code-help', 'bug_fix', 'code_refactor', 'feature_implementation',
     'simple_edit', 'code_question', 'website_creation', 'game_creation', 'design_task'
   ]);
   const isEngineeringIntent = ENGINEERING_INTENTS.has(legacyIntent) || ENGINEERING_INTENTS.has(primaryIntent);
@@ -172,12 +172,6 @@ export function resolveSkills({ intent, prompt = '', availableTools = [], regist
     if (/\b(wcag|accessible|accessibility|screen reader|aria|contrast|keyboard navigation|a11y)\b/i.test(cleanPrompt)) {
       selectionMap.set('accessibility-compliance', 'WCAG 2.2 AA compliance for the requested build');
     }
-  } else if (legacyIntent === 'swarm' || primaryIntent === 'swarm') {
-    selectionMap.set('brainstorming', 'High-level multi-agent orchestration architecture');
-    selectionMap.set('writing-plans', 'DAG task graph decomposition');
-    selectionMap.set('subagent-driven-development', 'Isolated subagent task briefs');
-    selectionMap.set('dispatching-parallel-agents', 'Concurrently execute independent tasks');
-    selectionMap.set('verification-before-completion', 'Empirical verification gate');
   } else if (legacyIntent === 'code-help' || ['feature_implementation', 'code_refactor'].includes(primaryIntent)) {
     selectionMap.set('writing-plans', 'Plan targeted implementation changes');
     selectionMap.set('verification-before-completion', 'Verify code changes');

@@ -513,12 +513,14 @@ async function run() {
   assert.match(codeHelpPrompt, /Adaptive Routing - Coding Path/);
   assert.match(codeHelpPrompt, /Inferred intent: code-help/);
 
-  const swarmPrompt = await captureSystemPrompt({
-    type: 'swarm',
-    summary: 'Coordinate multiple agents.'
+  const complexPrompt = await captureSystemPrompt({
+    type: 'app',
+    summary: 'Build a complex multiplayer game.',
+    primaryIntent: 'game_creation'
   });
-  assert.match(swarmPrompt, /Adaptive Routing - Complex Path/);
-  assert.match(swarmPrompt, /Inferred intent: swarm/);
+  assert.match(complexPrompt, /Adaptive Routing - App & Game Creation Path/);
+  assert.match(complexPrompt, /Inferred intent: app/);
+  assert.doesNotMatch(complexPrompt, /Complex Path/);
 
   const retiredIntentPrompt = await captureSystemPrompt({
     type: 'coding',

@@ -49,8 +49,7 @@ const INTENT_PATTERNS = {
   app: /\b(build|make|create|generate|design|launch|prototype|develop|ship)\b.*\b(app|tool|website|site|landing page|dashboard|portal|widget|calculator|timer|game|simulator|preview|html|bot|enemy)\b|\b(app|tool|website|site|landing page|dashboard|portal|widget|calculator|timer|game|simulator|bot|enemy)\b.*\b(build|make|create|generate|design|launch|prototype|develop|ship)\b|\b(game|play|chess|snake|pong|shooter|quiz|puzzle|simulator|canvas|bot|enemy)\b/i,
   code: /\b(code|debug|bug|fix|error|javascript|typescript|python|react|css|html|component|function|api|compile|stack trace)\b/i,
   writing: /\b(write|rewrite|copy|caption|email|post|bio|headline|script|summarize|summary|proposal|description|landing copy)\b/i,
-  explanation: /\b(explain|what is|what are|how does|why does|teach me|break down|understand|compare)\b/i,
-  swarm: /\b(swarm|multi-agent|agents|orchestrate|orchestration|superpowers|plan|architect|complex)\b/i
+  explanation: /\b(explain|what is|what are|how does|why does|teach me|break down|understand|compare)\b/i
 };
 
 
@@ -87,14 +86,6 @@ function analyzeIntentWithRules(cleanPrompt) {
       type: 'explanation',
       summary: 'Explain the topic in plain language.',
       responseStrategy: 'Give a direct answer with the minimum useful context.'
-    };
-  }
-
-  if (INTENT_PATTERNS.swarm.test(lower)) {
-    return {
-      type: 'swarm',
-      summary: 'Coordinate multiple agents for a complex task.',
-      responseStrategy: 'Provide a robust architectural overview and step-by-step reasoning.'
     };
   }
 
@@ -146,7 +137,6 @@ export function analyzePublicUserIntent(prompt) {
       'code-help': 'Help the user understand, debug, or improve code.',
       'writing': 'Help the user shape public-facing words or content.',
       'explanation': 'Explain the topic in plain language.',
-      'swarm': 'Coordinate multiple agents for a complex task.',
       'general': 'Understand the public user goal and give a useful next step.',
     };
     const strategies = {
@@ -154,7 +144,6 @@ export function analyzePublicUserIntent(prompt) {
       'code-help': 'Ask for the relevant snippet when the code is missing; otherwise explain the fix clearly.',
       'writing': 'Offer a concise draft or rewrite with a clear tone.',
       'explanation': 'Give a direct answer with the minimum useful context.',
-      'swarm': 'Provide a robust architectural overview and step-by-step reasoning.',
       'general': 'Clarify the likely intent, answer directly, and invite the next concrete detail.',
     };
 
@@ -678,59 +667,7 @@ export function compactConversationForRequest(messages) {
   return compacted;
 }
 
-// --- Resumable swarm status client ----------------------------------------
-// A multi-wave swarm task keeps running server-side after the browser
-// disconnects. The task id is persisted in localStorage so a refreshed page
-// can reconnect to the in-flight task. Polling has NO fixed ceiling: it
-// continues with adaptive intervals (start 1500 ms, grow to 10000 ms, shrink
-// on progress) until the task completes, is cancelled, is blocked, the caller
-// aborts, or transient network failures are exhausted.
-
-const SWARM_TASK_KEY = 'corez_swarm_task';
-const SWARM_POLL_START_MS = 1500;
-const SWARM_POLL_MIN_MS = 1500;
-const SWARM_POLL_MAX_MS = 10000;
-const SWARM_NETWORK_RETRY_LIMIT = 3;
-
-function swarmStorage() {
-  if (typeof window !== 'undefined' && window.localStorage) return window.localStorage;
-  if (typeof globalThis !== 'undefined' && globalThis.localStorage) return globalThis.localStorage;
-  return null;
-}
-
-export function getStoredSwarmTaskId() {
-  const storage = swarmStorage();
-  if (!storage) return null;
-  try {
-    const raw = storage.getItem(SWARM_TASK_KEY);
-    const parsed = raw ? JSON.parse(raw) : null;
-    return parsed && typeof parsed.taskId === 'string' && parsed.taskId ? parsed.taskId : null;
-  } catch {
-    return null;
-  }
-}
-
-export function clearStoredSwarmTaskId() {
-  const storage = swarmStorage();
-  if (!storage) return;
-  try {
-    storage.removeItem(SWARM_TASK_KEY);
-  } catch {
-    // Best effort.
-  }
-}
-
-function storeSwarmTaskId(taskId) {
-  const storage = swarmStorage();
-  if (!storage) return;
-  try {
-    storage.setItem(SWARM_TASK_KEY, JSON.stringify({ taskId, storedAt: Date.now() }));
-  } catch {
-    // Persisting the resume handle is best-effort; polling still works.
-  }
-}
-
-function swarmAbortError() {
+function abortError() {
   const error = new Error('cancelled by user');
   error.name = 'AbortError';
   return error;
@@ -739,12 +676,12 @@ function swarmAbortError() {
 function sleepResumable(ms, signal) {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
-      reject(swarmAbortError());
+      reject(abortError());
       return;
     }
     const onAbort = () => {
       clearTimeout(timer);
-      reject(swarmAbortError());
+      reject(abortError());
     };
     const timer = setTimeout(() => {
       signal?.removeEventListener('abort', onAbort);
@@ -752,96 +689,6 @@ function sleepResumable(ms, signal) {
     }, ms);
     signal?.addEventListener('abort', onAbort, { once: true });
   });
-}
-
-let lastCompletedSwarmResult = null;
-
-export function getLastCompletedSwarmResult() {
-  return lastCompletedSwarmResult;
-}
-
-/**
- * Reconnect to a running swarm task and wait for its final result.
- *
- * Polls /api/swarm/status/:taskId with adaptive intervals until completion.
- * Never counts polls — it stops only on a terminal status, an abort signal
- * (AbortError), or an honest error after transient network failures are
- * retried (a browser disconnection is not a task failure: the task keeps
- * running server-side). On completion the stored task id is cleared and the
- * final result is retained for the session.
- *
- * options (mainly for tests): startDelayMs, minDelayMs, maxDelayMs.
- */
-export async function resumeSwarmTask(taskId, signal = null, options = {}) {
-  if (!taskId || typeof taskId !== 'string') {
-    throw new Error('Invalid swarm task id.');
-  }
-  const startMs = Number.isFinite(options.startDelayMs) ? options.startDelayMs : SWARM_POLL_START_MS;
-  const minMs = Number.isFinite(options.minDelayMs) ? options.minDelayMs : SWARM_POLL_MIN_MS;
-  const maxMs = Number.isFinite(options.maxDelayMs) ? options.maxDelayMs : SWARM_POLL_MAX_MS;
-
-  let delay = Math.min(Math.max(startMs, minMs), maxMs);
-  let networkFailures = 0;
-  let lastProgress = null;
-
-  for (;;) {
-    if (signal?.aborted) throw swarmAbortError();
-    await sleepResumable(delay, signal);
-
-    let response;
-    try {
-      response = await fetch(`/api/swarm/status/${encodeURIComponent(taskId)}`, { signal });
-    } catch (err) {
-      if (err?.name === 'AbortError' || signal?.aborted) throw swarmAbortError();
-      networkFailures += 1;
-      if (networkFailures >= SWARM_NETWORK_RETRY_LIMIT) {
-        // Transient network failures exhausted: report honestly instead of
-        // treating the task as failed. The task keeps running server-side.
-        throw new Error(`Hosted AI swarm status request failed after ${networkFailures} network retries.`, { cause: err });
-      }
-      delay = Math.min(delay * 2, maxMs);
-      continue;
-    }
-    networkFailures = 0;
-
-    let status;
-    try {
-      status = await response.json();
-    } catch {
-      status = {};
-    }
-
-    if (status?.status === 'completed' && typeof status?.content === 'string' && status.content.trim()) {
-      clearStoredSwarmTaskId();
-      lastCompletedSwarmResult = { taskId, content: status.content, model: status.model || 'swarm' };
-      return { content: status.content, model: status.model || 'swarm', taskId };
-    }
-    if (status?.status === 'cancelled') {
-      clearStoredSwarmTaskId();
-      throw new Error('Hosted AI swarm task was cancelled.');
-    }
-    if (status?.status === 'blocked') {
-      clearStoredSwarmTaskId();
-      throw new Error('Hosted AI swarm task is blocked with no usable specialist output.');
-    }
-    if (response.status !== 200 && response.status !== 202) {
-      throw new Error(`Hosted AI swarm status request failed: HTTP ${response.status}`);
-    }
-    if (status?.status !== 'active' && status?.status !== 'processing') {
-      clearStoredSwarmTaskId();
-      throw new Error(`Hosted AI swarm task ended unexpectedly (status: ${String(status?.status || 'unknown')}).`);
-    }
-
-    // Adaptive pacing: shrink the interval when the task made progress since
-    // the last poll; otherwise grow towards the ceiling.
-    const progress = `${status.waveCount ?? 0}:${status.completed ?? 0}:${status.remaining ?? -1}`;
-    if (lastProgress !== null && progress !== lastProgress) {
-      delay = Math.max(minMs, Math.round(delay * 0.75));
-    } else {
-      delay = Math.min(delay * 1.5, maxMs);
-    }
-    lastProgress = progress;
-  }
 }
 
 // Persisted project memory: the worker returns a lightweight structured
@@ -1111,20 +958,7 @@ export async function generateHostedAIResponse(
     throw new Error('The hosted AI service is temporarily busy and its recovery is still scheduled. Please try again shortly.');
   }
 
-  // Multi-wave swarm task: the worker returned 202 with a taskId and more
-  // waves are still queued. Poll the status endpoint through the resumable
-  // client until the final result arrives (each wave runs in its own Worker
-  // invocation). The task id is persisted so a page refresh can reconnect;
-  // browser disconnection is never treated as task failure, and polling has
-  // no fixed ceiling.
-  if (response.status === 202 && data?.taskId) {
-    const taskId = data.taskId;
-    storeSwarmTaskId(taskId);
-    const resumed = await resumeSwarmTask(taskId, signal);
-    data = { content: resumed.content, model: resumed.model || 'swarm' };
-  }
-
-  if (!response.ok && !(response.status === 202 && data?.content)) {
+  if (!response.ok) {
     const serverMsg = typeof data?.error === 'string' ? data.error : (data?.error?.message || data?.message || `HTTP ${response.status}`);
     const detail = typeof data?.detail === 'string' && data.detail.trim() ? ` (${data.detail.trim()})` : '';
     throw new Error(`Hosted AI request failed: ${serverMsg}${detail}`);

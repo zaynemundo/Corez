@@ -28,7 +28,7 @@ check_absent() {
 }
 
 check 'Worker name matches the deployed Worker' '"name"[[:space:]]*:[[:space:]]*"ai"' "$config"
-check 'Swarm Worker entrypoint is configured' '"main"[[:space:]]*:[[:space:]]*"[.]/worker/swarm-index[.]js"' "$config"
+check 'Worker entrypoint is configured' '"main"[[:space:]]*:[[:space:]]*"[.]/worker/entry[.]js"' "$config"
 check 'Vite dist is the asset directory' '"directory"[[:space:]]*:[[:space:]]*"[.]/dist"' "$config"
 check 'ASSETS binding is configured' '"binding"[[:space:]]*:[[:space:]]*"ASSETS"' "$config"
 check 'SPA fallback is configured' '"not_found_handling"[[:space:]]*:[[:space:]]*"single-page-application"' "$config"
@@ -38,7 +38,7 @@ check 'GameRoom Durable Object binding is configured' '"name"[[:space:]]*:[[:spa
 check 'GameRoom Durable Object class is configured' '"class_name"[[:space:]]*:[[:space:]]*"GameRoom"' "$config"
 check 'GameRoom migration is declared' 'new_sqlite_classes["[:space:]]*:[[:space:]]*\[[[:space:]]*"GameRoom"\]' "$config"
 check 'Cloudflare contract script exists' 'cloudflare-worker-contract[.]mjs' "$package"
-check 'live Worker swarm contract runs in the standard suite' 'worker-live-swarm-contract[.]mjs' "$package"
+check_absent 'inline-only routing: no worker swarm contract in the suite' 'worker-live-swarm-contract[.]mjs' "$package"
 check 'Workers AI provider contract runs in the standard suite' 'workers-ai-provider-contract[.]sh' "$package"
 check 'public AI proxy contract runs in the standard suite' 'public-ai-proxy-contract[.]sh' "$package"
 check 'live AI contracts run in the standard suite' 'ai-live-intent-eval-contract[.]sh.*ai-live-intent-eval-response-contract[.]mjs' "$package"

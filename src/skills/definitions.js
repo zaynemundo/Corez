@@ -9,11 +9,11 @@ export const SUPERPOWERS_SKILLS = [
     id: 'using-superpowers',
     name: 'Using Superpowers',
     description: 'Bootstrap & workflow engine entry point for engineering and application building.',
-    triggers: ['build', 'develop', 'debug', 'create', 'fix', 'refactor', 'swarm'],
+    triggers: ['build', 'develop', 'debug', 'create', 'fix', 'refactor'],
     phase: 'BOOTSTRAP',
     priority: 1,
     dependencies: [],
-    compatibleIntents: ['app', 'code-help', 'swarm'],
+    compatibleIntents: ['app', 'code-help'],
     requiresTools: [],
     instructions: `Before answering or writing code for complex engineering tasks, analyze the intent, determine task type, resolve applicable skills, construct the workflow state machine, and execute each stage systematically.`
   },
@@ -25,7 +25,7 @@ export const SUPERPOWERS_SKILLS = [
     phase: 'BRAINSTORMING',
     priority: 10,
     dependencies: [],
-    compatibleIntents: ['app', 'swarm'],
+    compatibleIntents: ['app'],
     requiresTools: [],
     instructions: `Step back before writing code. Clarify user objectives, outline visual and architectural design, explore trade-offs, and produce a clear, validated specification chunk by chunk.`
   },
@@ -37,7 +37,7 @@ export const SUPERPOWERS_SKILLS = [
     phase: 'PLANNING',
     priority: 20,
     dependencies: ['brainstorming'],
-    compatibleIntents: ['app', 'code-help', 'swarm'],
+    compatibleIntents: ['app', 'code-help'],
     requiresTools: [],
     instructions: `Break engineering work into granular tasks (2-5 minutes each). Specify target files, exact code requirements, verification steps, and dependency relationships (DAG format).`
   },
@@ -45,11 +45,11 @@ export const SUPERPOWERS_SKILLS = [
     id: 'subagent-driven-development',
     name: 'Subagent Driven Development',
     description: 'Dispatches fresh subagents per task brief with isolated context and two-stage review gates.',
-    triggers: ['multi-agent', 'subagents', 'parallel execution', 'large request', 'swarm'],
+    triggers: ['multi-agent', 'subagents', 'parallel execution', 'large request'],
     phase: 'IMPLEMENTING',
     priority: 30,
     dependencies: ['writing-plans'],
-    compatibleIntents: ['app', 'swarm', 'code-help'],
+    compatibleIntents: ['app', 'code-help'],
     requiresTools: [],
     instructions: `Dispatch isolated subagent execution calls using task briefs containing goal, constraints, relevant files, and verification goals. Avoid context contamination.`
   },
@@ -61,7 +61,7 @@ export const SUPERPOWERS_SKILLS = [
     phase: 'IMPLEMENTING',
     priority: 31,
     dependencies: ['writing-plans'],
-    compatibleIntents: ['app', 'code-help', 'swarm'],
+    compatibleIntents: ['app', 'code-help'],
     requiresTools: [],
     instructions: `Execute plan tasks in DAG order. Track completion status in real-time, enforcing RED-GREEN-REFACTOR for each engineering task.`
   },
@@ -69,11 +69,11 @@ export const SUPERPOWERS_SKILLS = [
     id: 'dispatching-parallel-agents',
     name: 'Dispatching Parallel Agents',
     description: 'Concurrently executes non-overlapping independent tasks across specialist agents.',
-    triggers: ['parallel', 'concurrent', 'independent tasks', 'swarm'],
+    triggers: ['parallel', 'concurrent', 'independent tasks'],
     phase: 'IMPLEMENTING',
     priority: 35,
     dependencies: ['subagent-driven-development'],
-    compatibleIntents: ['swarm', 'app'],
+    compatibleIntents: ['app'],
     requiresTools: [],
     instructions: `Identify independent DAG nodes with no shared resource locks and dispatch them concurrently. Sequence dependent nodes.`
   },
@@ -97,7 +97,7 @@ export const SUPERPOWERS_SKILLS = [
     phase: 'IMPLEMENTING',
     priority: 40,
     dependencies: ['writing-plans'],
-    compatibleIntents: ['app', 'code-help', 'swarm'],
+    compatibleIntents: ['app', 'code-help'],
     requiresTools: [],
     instructions: `Write failing test (RED), verify failure, write minimal code to satisfy test (GREEN), verify test passes, refactor code while keeping tests green.`
   },
@@ -109,7 +109,7 @@ export const SUPERPOWERS_SKILLS = [
     phase: 'REVIEWING',
     priority: 50,
     dependencies: ['test-driven-development'],
-    compatibleIntents: ['app', 'code-help', 'swarm'],
+    compatibleIntents: ['app', 'code-help'],
     requiresTools: [],
     instructions: `Evaluate implementation output against specification and code quality criteria (security, performance, maintainability, accessibility). Send critical issues to REPAIRING.`
   },
@@ -121,7 +121,7 @@ export const SUPERPOWERS_SKILLS = [
     phase: 'REPAIRING',
     priority: 55,
     dependencies: ['requesting-code-review'],
-    compatibleIntents: ['app', 'code-help', 'swarm'],
+    compatibleIntents: ['app', 'code-help'],
     requiresTools: [],
     instructions: `Address critical review findings with minimal corrective edits, re-run tests, and return to review gate.`
   },
@@ -133,7 +133,7 @@ export const SUPERPOWERS_SKILLS = [
     phase: 'VERIFYING',
     priority: 60,
     dependencies: ['requesting-code-review'],
-    compatibleIntents: ['app', 'code-help', 'swarm'],
+    compatibleIntents: ['app', 'code-help'],
     requiresTools: [],
     instructions: `No completion claim without empirical verification evidence records (command, exit code, test pass/fail counts). Explicitly report if tools were unavailable.`
   },
@@ -145,7 +145,7 @@ export const SUPERPOWERS_SKILLS = [
     phase: 'COMPLETE',
     priority: 70,
     dependencies: ['verification-before-completion'],
-    compatibleIntents: ['app', 'code-help', 'swarm'],
+    compatibleIntents: ['app', 'code-help'],
     requiresTools: ['git'],
     instructions: `Verify branch cleanliness, confirm pass baseline, summarize verification evidence, and finalize task deliverable.`
   }
@@ -172,7 +172,7 @@ export const COREZ_SPECIALIST_SKILLS = [
     phase: 'IMPLEMENTING',
     priority: 25,
     dependencies: [],
-    compatibleIntents: ['app', 'swarm'],
+    compatibleIntents: ['app'],
     requiresTools: [],
     instructions: 'Build runnable single-file HTML5 canvas games with complete game loops, input management, collision detection, and asset integration. Structure the code around a fixed-timestep loop, keep entity state in refs, and always include scoring, controls, and a restartable game-over state.'
   },
@@ -184,7 +184,7 @@ export const COREZ_SPECIALIST_SKILLS = [
     phase: 'IMPLEMENTING',
     priority: 22,
     dependencies: [],
-    compatibleIntents: ['app', 'swarm'],
+    compatibleIntents: ['app'],
     requiresTools: [],
     instructions: 'Formulate structured JSON asset manifests for visual requirements and invoke the configured image-generation pipeline where appropriate. Report the model returned by the endpoint rather than assuming a provider. Match every asset to a coherent art direction: consistent palette, style, and resolution across sprites, backgrounds, and UI textures.'
   },

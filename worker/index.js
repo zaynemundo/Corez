@@ -227,8 +227,7 @@ const CANONICAL_INTENT_TYPES = new Set([
   'code-help',
   'writing',
   'explanation',
-  'general',
-  'swarm'
+  'general'
 ]);
 
 function normalizeIntentType(intentType) {
@@ -255,11 +254,6 @@ Adaptive Routing - Coding Path:
 - Preserve existing public API contracts, method signatures, and component props.
 - Do NOT modify usage limits, rate limits, token limits, subscription plans, billing, or provider routing.
 - Include exact files changed, a reasoning summary, and clear verification steps.`;
-  } else if (intentType === 'swarm' || primaryIntent === 'swarm') {
-    adaptiveInstructions = `
-Adaptive Routing - Complex Path:
-- Use step-by-step reasoning and careful task graph planning.
-- Provide a robust architectural overview before diving into specific code.`;
   } else if (intentType === 'app' || ['website_creation', 'game_creation', 'design_task'].includes(primaryIntent)) {
     const isExplicitDesignRequest = skills.some(s => s.id === 'frontend-modern-design') || /\b(glassmorphism|dark mode|awwwards|luxury|neon|aesthetic)\b/i.test(intent?.goal || '');
     const isGameCreation = primaryIntent === 'game_creation' || /\bgame\b/i.test(`${intent?.goal || ''} ${intent?.summary || ''}`);

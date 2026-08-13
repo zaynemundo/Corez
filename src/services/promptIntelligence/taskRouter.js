@@ -50,23 +50,19 @@ const ROUTING_TABLE = {
     agents: ['debugger'],
   },
   [INTENT_TYPES.CODE_REFACTOR]: {
-    mode: EXECUTION_MODES.CODING_SWARM,
+    mode: EXECUTION_MODES.CODING_WORKFLOW,
     agents: ['refactor_specialist', 'reviewer'],
   },
   [INTENT_TYPES.FEATURE_IMPLEMENTATION]: {
-    mode: EXECUTION_MODES.CODING_SWARM,
+    mode: EXECUTION_MODES.CODING_WORKFLOW,
     agents: ['architect', 'implementer', 'reviewer'],
   },
   [INTENT_TYPES.WEBSITE_CREATION]: {
-    mode: EXECUTION_MODES.WEBSITE_SWARM,
+    mode: EXECUTION_MODES.WEBSITE_BUILD,
     agents: [],
   },
   [INTENT_TYPES.GAME_CREATION]: {
-    mode: EXECUTION_MODES.GAME_SWARM,
-    agents: [],
-  },
-  [INTENT_TYPES.SWARM]: {
-    mode: EXECUTION_MODES.FULL_SWARM,
+    mode: EXECUTION_MODES.GAME_BUILD,
     agents: [],
   },
   [INTENT_TYPES.UNKNOWN]: {
@@ -76,7 +72,7 @@ const ROUTING_TABLE = {
 };
 
 /**
- * Complexity-based agent compositions for website and game swarms.
+ * Complexity-based agent compositions for website and game builds.
  */
 const WEBSITE_AGENTS_BY_COMPLEXITY = {
   [COMPLEXITY_LEVELS.LOW]: ['frontend_developer'],
@@ -108,7 +104,7 @@ export function route(intent, requirements, context = {}) {
   result.complexity = complexity;
   result.reason = `Routed to ${entry.mode} based on intent type '${type}' at complexity '${complexity}'`;
 
-  // For swarms, select agents based on complexity
+  // Select agents based on complexity
   if (type === INTENT_TYPES.WEBSITE_CREATION) {
     result.recommendedAgents = WEBSITE_AGENTS_BY_COMPLEXITY[complexity] || WEBSITE_AGENTS_BY_COMPLEXITY[COMPLEXITY_LEVELS.MEDIUM];
     result.reason = `Website creation routed to ${result.mode} with ${result.recommendedAgents.length} agents at ${complexity} complexity`;
@@ -165,8 +161,8 @@ export function shouldUseFullPipeline(intent) {
 
 /**
  * Backward-compatible mapping to existing CoreZ intent types.
- * This bridges the new fine-grained types to the existing 6-type system
- * (app, code-help, writing, explanation, general, swarm).
+ * This bridges the new fine-grained types to the existing 5-type system
+ * (app, code-help, writing, explanation, general).
  */
 export function toLegacyIntentType(intentType) {
   switch (intentType) {
@@ -189,8 +185,6 @@ export function toLegacyIntentType(intentType) {
       return 'writing';
     case INTENT_TYPES.GENERAL_QUESTION:
       return 'general';
-    case INTENT_TYPES.SWARM:
-      return 'swarm';
     default:
       return 'general';
   }
