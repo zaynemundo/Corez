@@ -16,9 +16,6 @@ export { GameRoom } from './gameRoom.js';
 // /api/ai POST, so a single client must not be able to run up the bill.
 const aiRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 20 });
 const DIRECT_AI_ORIGINS = new Set([
-  'https://corez.pro',
-  'https://www.corez.pro',
-  'https://sandbox.corez.pro',
   'https://chat.corez.pro'
 ]);
 

@@ -199,13 +199,12 @@ describe('E2E /api/ai pipeline', () => {
     }), env);
     expect(missingOrigin.status).toBe(403);
 
-    const allowed = await swarmWorker.fetch(new Request('https://ai.zayne-mayo.workers.dev/api/ai', {
+    const oldDomainBlocked = await swarmWorker.fetch(new Request('https://ai.zayne-mayo.workers.dev/api/ai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Origin': 'https://corez.pro' },
       body: JSON.stringify({ prompt: 'hello', stream: true })
     }), env);
-    expect(allowed.status).toBe(200);
-    expect(allowed.headers.get('Access-Control-Allow-Origin')).toBe('https://corez.pro');
+    expect(oldDomainBlocked.status).toBe(403);
 
     const allowedChatDomain = await swarmWorker.fetch(new Request('https://ai.zayne-mayo.workers.dev/api/ai', {
       method: 'POST',
