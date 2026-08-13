@@ -839,6 +839,12 @@ export async function generateHostedAIResponse(
       try {
         errorText = await response.text();
       } catch { /* keep empty */ }
+      // A 403 with the Cloudflare challenge page ("Just a moment...") means
+      // the WAF intercepted the request before it reached the worker — the
+      // API needs a WAF bypass rule, not a retry.
+      if (response.status === 403 && /<!doctype\s+html|<html[\s>]/i.test(errorText.slice(0, 2000))) {
+        throw new Error('The hosted AI request was intercepted by a security challenge page before reaching the worker. The site needs a WAF bypass rule for /api/* — please retry in a moment.');
+      }
       throw new Error(`Hosted AI stream failed: HTTP ${response.status} ${errorText.slice(0, 200)}`);
     }
     if (!response.body) throw new Error('Hosted AI stream had no body.');

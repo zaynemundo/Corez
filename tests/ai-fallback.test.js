@@ -150,6 +150,22 @@ describe('Hosted AI fallback behavior', () => {
     })).rejects.toThrow(/empty response/i);
   });
 
+  it('diagnoses a 403 challenge page as a WAF interception instead of a generic HTTP failure', async () => {
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/inspiration') return Response.json({ sites: [] });
+      return new Response(
+        '<!DOCTYPE html><html><head><title>Just a moment...</title></head><body>challenge</body></html>',
+        { status: 403, headers: { 'Content-Type': 'text/html' } }
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(generateHostedAIResponse('Build a game', undefined, [], null, {
+      stream: true,
+      onDelta: () => {}
+    })).rejects.toThrow(/WAF bypass rule for \/api\//i);
+  });
+
   it('forwards harness phase and clear events and returns only the final artifact', async () => {
     const fetchMock = vi.fn(async (url) => {
       if (url === '/api/inspiration') return Response.json({ sites: [] });
