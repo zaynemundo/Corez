@@ -34,7 +34,8 @@
   "routes": [
     { "pattern": "corez.pro", "custom_domain": true },
     { "pattern": "www.corez.pro", "custom_domain": true },
-    { "pattern": "sandbox.corez.pro", "custom_domain": true }
+    { "pattern": "sandbox.corez.pro", "custom_domain": true },
+    { "pattern": "chat.corez.pro", "custom_domain": true }
   ],
   "observability": {
     "enabled": true
