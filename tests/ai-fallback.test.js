@@ -164,6 +164,66 @@ describe('Hosted AI fallback behavior', () => {
       stream: true,
       onDelta: () => {}
     })).rejects.toThrow(/WAF bypass rule for \/api\//i);
+    const aiCalls = fetchMock.mock.calls.filter(([url]) => url !== '/api/inspiration');
+    expect(aiCalls).toHaveLength(2);
+    expect(aiCalls[1][0]).toBe('https://ai.zayne-mayo.workers.dev/api/ai');
+  });
+
+  it('retries a Cloudflare challenge through the direct Worker hostname', async () => {
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/inspiration') return Response.json({ sites: [] });
+      if (url === '/api/ai') {
+        return new Response(
+          '<!DOCTYPE html><html><head><title>Just a moment...</title></head><body>challenge</body></html>',
+          { status: 403, headers: { 'Content-Type': 'text/html', 'cf-mitigated': 'challenge' } }
+        );
+      }
+      expect(url).toBe('https://ai.zayne-mayo.workers.dev/api/ai');
+      return new Response(
+        'data: {"type":"delta","text":"Playable game HTML"}\n\ndata: {"type":"done","final":true}\n\n',
+        { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await generateHostedAIResponse('Build a game', undefined, [], null, {
+      stream: true,
+      onDelta: () => {}
+    });
+
+    expect(response).toBe('Playable game HTML');
+    expect(fetchMock.mock.calls.filter(([url]) => url !== '/api/inspiration')).toHaveLength(2);
+  });
+
+  it('does not bypass the primary endpoint for ordinary 403 errors', async () => {
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/inspiration') return Response.json({ sites: [] });
+      return Response.json({ error: 'Forbidden' }, { status: 403 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(generateHostedAIResponse('Build a game', undefined, [], null, {
+      stream: true,
+      onDelta: () => {}
+    })).rejects.toThrow(/HTTP 403/i);
+    expect(fetchMock.mock.calls.filter(([url]) => url !== '/api/inspiration')).toHaveLength(1);
+  });
+
+  it('does not bypass an explicit Cloudflare block page', async () => {
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/inspiration') return Response.json({ sites: [] });
+      return new Response('<!DOCTYPE html><html><body>Access denied</body></html>', {
+        status: 403,
+        headers: { 'Content-Type': 'text/html', 'cf-mitigated': 'block' }
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(generateHostedAIResponse('Build a game', undefined, [], null, {
+      stream: true,
+      onDelta: () => {}
+    })).rejects.toThrow(/HTTP 403/i);
+    expect(fetchMock.mock.calls.filter(([url]) => url !== '/api/inspiration')).toHaveLength(1);
   });
 
   it('forwards harness phase and clear events and returns only the final artifact', async () => {

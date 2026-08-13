@@ -29,6 +29,7 @@ check_absent() {
 
 check 'Worker name matches the deployed Worker' '"name"[[:space:]]*:[[:space:]]*"ai"' "$config"
 check 'Worker entrypoint is configured' '"main"[[:space:]]*:[[:space:]]*"[.]/worker/entry[.]js"' "$config"
+check 'Direct Worker hostname remains available for WAF-intercepted API requests' '"workers_dev"[[:space:]]*:[[:space:]]*true' "$config"
 check 'Vite dist is the asset directory' '"directory"[[:space:]]*:[[:space:]]*"[.]/dist"' "$config"
 check 'ASSETS binding is configured' '"binding"[[:space:]]*:[[:space:]]*"ASSETS"' "$config"
 check 'SPA fallback is configured' '"not_found_handling"[[:space:]]*:[[:space:]]*"single-page-application"' "$config"

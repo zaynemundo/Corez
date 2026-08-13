@@ -15,6 +15,11 @@ export { GameRoom } from './gameRoom.js';
 // Per-client AI request rate bound: paid provider tokens are spent on every
 // /api/ai POST, so a single client must not be able to run up the bill.
 const aiRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 20 });
+const DIRECT_AI_ORIGINS = new Set([
+  'https://corez.pro',
+  'https://www.corez.pro',
+  'https://sandbox.corez.pro'
+]);
 
 export default {
   async fetch(request, env, ctx) {
@@ -25,6 +30,34 @@ export default {
     // url.hostname alone would loop every dev request through a self 301.
     const clientHost = String(request.headers.get('Host') || '').toLowerCase();
     const isLocalClient = clientHost.includes('localhost') || clientHost.includes('127.0.0.1') || clientHost.includes('::1');
+    const isDirectAiHost = url.hostname === 'ai.zayne-mayo.workers.dev';
+    const requestOrigin = request.headers.get('Origin') || '';
+    if (isDirectAiHost && url.pathname !== '/api/ai') {
+      return new Response(JSON.stringify({ error: 'Route not found.' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json', 'X-Content-Type-Options': 'nosniff' }
+      });
+    }
+    const directAiOrigin = isDirectAiHost && url.pathname === '/api/ai'
+      ? (DIRECT_AI_ORIGINS.has(requestOrigin) ? requestOrigin : null)
+      : null;
+    if (isDirectAiHost && url.pathname === '/api/ai' && !directAiOrigin) {
+      return new Response(JSON.stringify({ error: 'Direct AI access requires an approved CoreZ origin.' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json', 'X-Content-Type-Options': 'nosniff' }
+      });
+    }
+    const withDirectAiCors = (response) => {
+      if (!directAiOrigin) return response;
+      const headers = new Headers(response.headers);
+      headers.set('Access-Control-Allow-Origin', directAiOrigin);
+      headers.set('Vary', 'Origin');
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers
+      });
+    };
     if (url.protocol === 'http:' && !isLocalClient) {
       url.protocol = 'https:';
       return Response.redirect(url.toString(), 301);
@@ -33,7 +66,7 @@ export default {
     const store = createTaskStateStore(env);
     const jsonHeaders = {
       'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': directAiOrigin || '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       'X-Content-Type-Options': 'nosniff',
@@ -107,18 +140,18 @@ export default {
       try {
         body = await readBoundedJson(request);
       } catch {
-        return baseWorker.fetch(baseRequest, env, ctx);
+        return withDirectAiCors(await baseWorker.fetch(baseRequest, env, ctx));
       }
 
       // Creation harness requests take the direct route: the harness runs
       // its own multi-phase loop.
       if (body?.harness === true) {
-        return baseWorker.fetch(baseRequest, env, ctx);
+        return withDirectAiCors(await baseWorker.fetch(baseRequest, env, ctx));
       }
 
-      return baseWorker.fetch(baseRequest, env, ctx);
+      return withDirectAiCors(await baseWorker.fetch(baseRequest, env, ctx));
     }
 
-    return baseWorker.fetch(request, env, ctx);
+    return withDirectAiCors(await baseWorker.fetch(request, env, ctx));
   }
 };

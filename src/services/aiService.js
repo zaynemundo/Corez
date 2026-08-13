@@ -7,6 +7,8 @@ export const MODEL = {
 };
 
 export const AI_PROXY_ENDPOINT = '/api/ai';
+const AI_WAF_FALLBACK_ENDPOINT = 'https://ai.zayne-mayo.workers.dev/api/ai';
+const CLOUDFLARE_CHALLENGE_PATTERN = /Just a moment|challenge-platform|__cf_chl_/i;
 export const IMAGE_PROXY_ENDPOINT = '/api/image';
 
 import { defaultSkillRegistry } from '../skills/registry.js';
@@ -793,7 +795,7 @@ export async function generateHostedAIResponse(
   // and a const referenced before its initializer would throw a temporal
   // dead zone error on every streamed request.
   const TRANSPORT_FAILURE_PATTERN = /networkerror|failed to fetch|load failed|fetch failed|connection (refused|reset|timed out)|network is unreachable|err_connection/i;
-  const fetchWithTransportRetry = async (options) => {
+  const fetchWithTransportRetry = async (options, endpoint = AI_PROXY_ENDPOINT) => {
     const attempts = [null, 3000];
     for (let i = 0; i < attempts.length; i += 1) {
       if (signal?.aborted) {
@@ -802,7 +804,7 @@ export async function generateHostedAIResponse(
         throw err;
       }
       try {
-        return await fetch(AI_PROXY_ENDPOINT, options);
+        return await fetch(endpoint, options);
       } catch (err) {
         if (err?.name === 'AbortError' || signal?.aborted) throw err;
         const message = `${err?.message || ''} ${err?.cause?.message || ''}`;
@@ -820,6 +822,25 @@ export async function generateHostedAIResponse(
     throw new Error('Hosted AI request failed to reach the AI worker.');
   };
 
+  const fetchHostedResponse = async (options) => {
+    const response = await fetchWithTransportRetry(options);
+    if (response.status !== 403) return response;
+
+    let challengePage = response.headers.get('cf-mitigated') === 'challenge';
+    if (!challengePage) {
+      try {
+        const body = await response.clone().text();
+        challengePage = CLOUDFLARE_CHALLENGE_PATTERN.test(body.slice(0, 4000));
+      } catch { /* keep header-based result */ }
+    }
+    if (!challengePage) return response;
+
+    // Zone-level security can challenge same-origin API traffic before the
+    // Worker runs. Retry only that interception through the Worker's direct
+    // hostname; provider errors and ordinary HTTP failures stay on /api/ai.
+    return fetchWithTransportRetry(options, AI_WAF_FALLBACK_ENDPOINT);
+  };
+
   // Streaming path: the worker answers with SSE events (meta/delta/usage/
   // done/diagnostics). Deltas are delivered to onDelta as they arrive so the
   // user sees content before the generation finishes; the final content is
@@ -833,7 +854,7 @@ export async function generateHostedAIResponse(
       err.name = 'AbortError';
       throw err;
     }
-    const response = await fetchWithTransportRetry(fetchOptions);
+    const response = await fetchHostedResponse(fetchOptions);
     if (!response.ok) {
       let errorText = '';
       try {
@@ -842,7 +863,7 @@ export async function generateHostedAIResponse(
       // A 403 with the Cloudflare challenge page ("Just a moment...") means
       // the WAF intercepted the request before it reached the worker — the
       // API needs a WAF bypass rule, not a retry.
-      if (response.status === 403 && /<!doctype\s+html|<html[\s>]/i.test(errorText.slice(0, 2000))) {
+      if (response.status === 403 && CLOUDFLARE_CHALLENGE_PATTERN.test(errorText.slice(0, 4000))) {
         throw new Error('The hosted AI request was intercepted by a security challenge page before reaching the worker. The site needs a WAF bypass rule for /api/* — please retry in a moment.');
       }
       throw new Error(`Hosted AI stream failed: HTTP ${response.status} ${errorText.slice(0, 200)}`);
@@ -904,7 +925,7 @@ export async function generateHostedAIResponse(
     if (!rawTrimmed) {
       throw new Error('The hosted AI returned an empty response. Please try again.');
     }
-    if (/<!doctype\s+html|<html[\s>]/i.test(rawTrimmed.slice(0, 2000))) {
+    if (CLOUDFLARE_CHALLENGE_PATTERN.test(rawTrimmed.slice(0, 4000))) {
       throw new Error('The hosted AI request was intercepted by a security challenge page instead of reaching the worker. Please retry in a moment.');
     }
     if (rawTrimmed.startsWith('{') || rawTrimmed.startsWith('[')) {
@@ -926,7 +947,7 @@ export async function generateHostedAIResponse(
 
   // Transport resilience: retry logic lives above with the streaming path
   // (fetchWithTransportRetry). Non-streaming request:
-  let response = await fetchWithTransportRetry(fetchOptions);
+  let response = await fetchHostedResponse(fetchOptions);
 
   let data;
   try {
@@ -979,7 +1000,7 @@ export async function generateHostedAIResponse(
     }
     const waitMs = Math.max(RETRY_SCHEDULED_MIN_WAIT_MS, Math.min(statusWaitSeconds * 1000, RETRY_SCHEDULED_MAX_WAIT_MS));
     await sleepResumable(waitMs, signal);
-    response = await fetchWithTransportRetry(fetchOptions);
+    response = await fetchHostedResponse(fetchOptions);
     try {
       data = await response.json();
     } catch (err) {
