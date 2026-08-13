@@ -105,14 +105,8 @@ async function run() {
       assert.equal(url, 'https://opencode.ai/zen/go/v1/chat/completions');
       const payload = JSON.parse(init.body);
       openCodeRequests.push(payload);
-
-      const systemPrompt = payload.messages?.[0]?.content || '';
-      const content = systemPrompt.includes('lead synthesis agent')
-        ? 'Integrated live swarm response'
-        : `Specialist contribution ${openCodeRequests.length}`;
-
       return new Response(JSON.stringify({
-        choices: [{ message: { content } }]
+        choices: [{ message: { content: 'Inline direct answer' } }]
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
@@ -138,41 +132,18 @@ async function run() {
       SWARM_SYNTHESIS_TIMEOUT_MS: '2000'
     }));
 
+    // Swarm routing is disabled: even a high-complexity /api/ai request runs
+    // INLINE through the direct path, so a streamed client always receives
+    // SSE (never a JSON body the stream parser would misread as an empty
+    // stream and report as 'Hosted AI returned no streamed content.').
     assert.equal(response.status, 200);
     const data = await response.json();
-    const expectedAgentCount = buildSwarmAgentSpecs('app', body.prompt).length;
+    assert.equal(data.content, 'Inline direct answer');
+    assert.equal(data.swarm, undefined);
+    assert.equal(openCodeRequests.length, 1);
 
-    assert.equal(data.content, 'Integrated live swarm response');
-    assert.match(data.model, /opencode/i);
-    assert.equal(data.swarm.enabled, true);
-    assert.equal(data.swarm.created, expectedAgentCount);
-    assert.equal(data.swarm.completed, expectedAgentCount);
-    assert.equal(data.swarm.failed, 0);
-    assert.equal(data.swarm.skipped, 0);
-
-    // 7 completed outputs (4 core + 3 requirements) exceed the collapse
-    // threshold, so the hierarchy runs: specialists + one wave summary per
-    // wave + one domain summary per domain + the final synthesis call.
-    assert.ok(openCodeRequests.length >= expectedAgentCount + 1);
-    const synthesisPayload = openCodeRequests.find(
-      (payload) => payload.messages?.[0]?.content.includes("You are COREZ AI's lead synthesis agent.")
-    );
-    assert.ok(synthesisPayload, 'final synthesis call must exist');
-    const synthesisUser = synthesisPayload.messages.at(-1).content;
-    assert.match(synthesisUser, /Domain summary/);
-    assert.doesNotMatch(synthesisUser, /### Contribution/);
-    assert.match(synthesisUser, new RegExp(`Hierarchy coverage: ${expectedAgentCount} specialist outputs`));
-    assert.ok(openCodeRequests.some((payload) => payload.messages?.[0]?.content.includes('wave summary')));
-    assert.ok(openCodeRequests.some((payload) => payload.messages?.[0]?.content.includes('domain summary')));
-
-    for (const payload of openCodeRequests) {
-      assert.match(payload.model, /deepseek/i);
-      assert.equal(payload.reasoning, undefined);
-      assert.equal(payload.provider, undefined);
-      assert.equal(payload.max_tokens, undefined);
-    }
-
-    // runSwarmTask keeps the documented response shape.
+    // runSwarmTask stays exported and functional for direct unit use, but it
+    // is no longer routed to automatically by /api/ai.
     const direct = await runSwarmTask(
       { prompt: body.prompt, intent: body.intent, complexity: 'high' },
       { OPENCODE_GO_API_KEY: 'sk-opencode-test' },
@@ -180,31 +151,31 @@ async function run() {
       { drain: true, store: createTaskStateStore({}) }
     );
     assert.equal(typeof direct.content, 'string');
-    assert.equal(direct.content, 'Integrated live swarm response');
     assert.equal(typeof direct.model, 'string');
     assert.equal(typeof direct.taskId, 'string');
     assert.equal(direct.taskStatus, 'completed');
     assert.equal(typeof direct.telemetry, 'object');
-    assert.equal(direct.telemetry.completed, expectedAgentCount);
   } finally {
     globalThis.fetch = originalFetch;
   }
 
   // OpenCode Go is the only provider: a DeepSeek key is ignored and the
-  // swarm still routes through OpenCode Go (or fails honestly without it).
+  // inline route still goes through OpenCode Go (or fails honestly without
+  // it). Swarm routing is disabled — even with both keys present the
+  // request runs inline through the direct path.
   {
     const originalFetch = globalThis.fetch;
-    const deepSeekRequests = [];
+    const openCodeRequests = [];
     try {
       globalThis.fetch = async (url, init) => {
         assert.equal(url, 'https://opencode.ai/zen/go/v1/chat/completions');
         const payload = JSON.parse(init.body);
-        deepSeekRequests.push(payload);
+        openCodeRequests.push(payload);
 
         const systemPrompt = payload.messages?.[0]?.content || '';
         const content = systemPrompt.includes('lead synthesis agent')
           ? 'Integrated OpenCode swarm response'
-          : `Specialist contribution ${deepSeekRequests.length}`;
+          : `Inline answer ${openCodeRequests.length}`;
 
         return new Response(JSON.stringify({
           choices: [{ message: { content } }]
@@ -236,12 +207,12 @@ async function run() {
 
       assert.equal(response.status, 200);
       const data = await response.json();
-      assert.equal(data.content, 'Integrated OpenCode swarm response');
-      assert.equal(data.swarm.enabled, true);
-      assert.ok(deepSeekRequests.length > 1);
+      assert.equal(data.content, 'Inline answer 1');
+      assert.equal(data.swarm, undefined);
+      // Inline routing: exactly one provider call, no specialist fan-out.
+      assert.equal(openCodeRequests.length, 1);
 
-      for (const payload of deepSeekRequests) {
-        assert.match(payload.model, /deepseek/i);
+      for (const payload of openCodeRequests) {
         assert.equal(payload.reasoning, undefined);
         assert.equal(payload.provider, undefined);
         assert.equal(payload.max_tokens, undefined);
@@ -251,10 +222,11 @@ async function run() {
     }
   }
 
-  // Without an OpenCode Go key the swarm reports an honest error instead of
-  // pretending another provider exists. The provider chain fallback (official
-  // DeepSeek API) is stubbed deterministically: a permanent 401 means the
-  // worker must return 502 with no live network access.
+  // Without an OpenCode Go key the inline route reports an honest error
+  // instead of pretending another provider exists. The provider chain
+  // fallback (official DeepSeek API) is stubbed deterministically: a
+  // permanent 401 means the worker must return 502 with no live network
+  // access.
   {
     const originalFetch = globalThis.fetch;
     const deepSeekRequests = [];
@@ -275,8 +247,7 @@ async function run() {
       );
       assert.equal(response.status, 502);
       const payload = await response.json();
-      assert.match(String(payload.error), /blocked with no usable specialist output/);
-      assert.match(String(payload.detail), /No specialist can ever complete/);
+      assert.match(String(payload.error), /Unable to generate AI response/);
       assert.ok(deepSeekRequests.length > 0);
     } finally {
       globalThis.fetch = originalFetch;

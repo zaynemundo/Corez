@@ -1368,10 +1368,18 @@ export default {
         return baseWorker.fetch(baseRequest, env, ctx);
       }
 
+      // Swarm routing is disabled: every /api/ai request runs INLINE through
+      // the direct/harness path (baseWorker). Swarmed responses are plain
+      // JSON, which a streamed client parses as SSE with zero `data:` lines
+      // and reports as 'Hosted AI returned no streamed content.' — an
+      // honest-looking failure from a healthy service. Inline generation
+      // always answers with SSE (or an honest error event), so the client
+      // never misreads a valid response.
+      const SWARM_ROUTING_DISABLED = true;
       // Swarm continuation: resume a persisted multi-wave task. The state
       // store (R2-backed) survives separate invocations, so a task resumes
       // from its stored queue instead of restarting.
-      if (typeof body?.swarmContinue === 'string' && body.swarmContinue) {
+      if (!SWARM_ROUTING_DISABLED && typeof body?.swarmContinue === 'string' && body.swarmContinue) {
         try {
           const result = await continueSwarmTask({
             taskId: body.swarmContinue,
@@ -1449,7 +1457,7 @@ export default {
       const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : '';
       const hasMedia = containsMedia(body?.messages);
 
-      if (shouldUseSwarm(intentType, prompt, {
+      if (!SWARM_ROUTING_DISABLED && shouldUseSwarm(intentType, prompt, {
         hasMedia,
         explicitSwarm: body?.swarm === true
           || body?.intent?.primaryIntent === 'swarm'

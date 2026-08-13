@@ -86,23 +86,16 @@ describe('AI response speed optimizations', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('routes high-complexity app requests through the swarm', async () => {
+  it('routes high-complexity app requests inline (no swarm intercept, single LLM call)', async () => {
     const fetchMock = vi.fn(async (url) => {
       expect(url).toBe(OPENCODE_URL);
-      const payload = JSON.parse(fetchMock.mock.calls[fetchMock.mock.calls.length - 1][1].body);
-      const systemPrompt = payload.messages?.[0]?.content || '';
-      const content = systemPrompt.includes('lead synthesis agent')
-        ? 'synthesized game'
-        : `specialist ${fetchMock.mock.calls.length}`;
-      return Response.json({ choices: [{ message: { content } }] });
+      return Response.json({ choices: [{ message: { content: 'inline game answer' } }] });
     });
     vi.stubGlobal('fetch', fetchMock);
 
     const response = await post(swarmWorker, {
       OPENCODE_GO_API_KEY: 'test',
-      SWARM_AGENT_TIMEOUT_MS: '2000',
-      SWARM_RESPONSE_DEADLINE_MS: '2000',
-      SWARM_SYNTHESIS_TIMEOUT_MS: '2000'
+      __INSPIRATION_FETCH: async () => ({ sites: [], category: 'gaming', source: 'Awwwards' })
     }, {
       prompt: 'Build a complete multiplayer RPG with persistent saves',
       intent: { type: 'app', summary: 'Complex game' },
@@ -111,9 +104,12 @@ describe('AI response speed optimizations', () => {
 
     expect(response.status).toBe(200);
     const data = await response.json();
-    expect(data.content).toBe('synthesized game');
-    expect(data.swarm.enabled).toBe(true);
-    expect(fetchMock.mock.calls.length).toBeGreaterThan(1);
+    // Swarm routing is disabled: the request runs inline through the direct
+    // path, so a streamed client always receives SSE (never a JSON body the
+    // stream parser would misread as an empty stream).
+    expect(data.content).toBe('inline game answer');
+    expect(data.swarm).toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('routes both simple and complex requests to OpenCode Go with no artificial reasoning-effort caps', async () => {
