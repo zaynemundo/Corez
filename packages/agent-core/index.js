@@ -37,3 +37,7 @@ export { CompactionEngine } from './context/CompactionEngine.js';
 export { McpClient } from './tools/mcp/McpClient.js';
 export { McpToolBridge } from './tools/mcp/McpToolBridge.js';
 export { UserQuestionService, createAskQuestionTool } from './tools/interactive/UserQuestions.js';
+export { SkillRegistry, parseSkillFrontmatter, createSkillTool } from './skills/SkillRegistry.js';
+export { TodoTracker, createTodoTool } from './todos/TodoTracker.js';
+export { SessionQueryEngine, createSessionQueryTool } from './session-query/SessionQueryEngine.js';
+export { PersistentTerminalManager, PersistentTerminalSession, createPersistentCommandTool } from './terminal/PersistentTerminalManager.js';

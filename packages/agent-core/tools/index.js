@@ -7,6 +7,10 @@ import { RepeatToolGuard } from '../guards/RepeatToolGuard.js';
 import { ToolResultPruner } from './ToolResultPruner.js';
 import { OutputSpillManager } from './OutputSpillManager.js';
 import { UserQuestionService, createAskQuestionTool } from './interactive/UserQuestions.js';
+import { SkillRegistry, createSkillTool } from '../skills/SkillRegistry.js';
+import { TodoTracker, createTodoTool } from '../todos/TodoTracker.js';
+import { SessionQueryEngine, createSessionQueryTool } from '../session-query/SessionQueryEngine.js';
+import { PersistentTerminalManager, createPersistentCommandTool } from '../terminal/PersistentTerminalManager.js';
 
 // No fixed command timeout: valid builds, tests, and long-running commands
 // must never be terminated prematurely. An operator may set an explicit
@@ -23,6 +27,10 @@ export class ToolRegistry {
     this.spillManager = options.spillManager !== undefined ? options.spillManager : new OutputSpillManager({ inMemory: true });
     this.pruner = options.pruner !== undefined ? options.pruner : new ToolResultPruner({ spillManager: this.spillManager });
     this.userQuestionService = options.userQuestionService || new UserQuestionService();
+    this.skillRegistry = options.skillRegistry || new SkillRegistry();
+    this.todoTracker = options.todoTracker || new TodoTracker();
+    this.sessionQueryEngine = options.sessionQueryEngine || new SessionQueryEngine();
+    this.terminalManager = options.terminalManager || new PersistentTerminalManager();
     this.registerCoreTools();
   }
 
@@ -75,11 +83,11 @@ export class ToolRegistry {
 
     try {
       const result = await tool.execute(args, runtimeOptions);
-      if (context) {
+      if (context && typeof context.recordToolExecution === 'function') {
         context.recordToolExecution(name, args, result);
-        if (['write_file', 'edit_file'].includes(name) && args.filePath) {
+        if (['write_file', 'edit_file'].includes(name) && args.filePath && typeof context.recordModifiedFile === 'function') {
           context.recordModifiedFile(args.filePath);
-        } else if (['read_file', 'edit_file'].includes(name) && args.filePath) {
+        } else if (['read_file', 'edit_file'].includes(name) && args.filePath && typeof context.recordInspectedFile === 'function') {
           context.recordInspectedFile(args.filePath);
         }
       }
@@ -667,6 +675,26 @@ export class ToolRegistry {
     // 19. ask_question — interactive clarification and decision tool
     if (this.userQuestionService) {
       this.registerTool(createAskQuestionTool(this.userQuestionService));
+    }
+
+    // 20. skill — dynamic skill discovery, search, and instructions loader
+    if (this.skillRegistry) {
+      this.registerTool(createSkillTool(this.skillRegistry));
+    }
+
+    // 21. todo_write — multi-step execution checklist tracker
+    if (this.todoTracker) {
+      this.registerTool(createTodoTool(this.todoTracker));
+    }
+
+    // 22. session_query — historical event and tool output search
+    if (this.sessionQueryEngine) {
+      this.registerTool(createSessionQueryTool(this.sessionQueryEngine));
+    }
+
+    // 23. exec_persistent_command — persistent stateful terminal command execution
+    if (this.terminalManager) {
+      this.registerTool(createPersistentCommandTool(this.terminalManager));
     }
   }
 }
