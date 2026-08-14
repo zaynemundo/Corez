@@ -27,7 +27,7 @@ check_absent() {
   fi
 }
 
-check 'Worker name matches the deployed Worker' '"name"[[:space:]]*:[[:space:]]*"ai"' "$config"
+check 'Worker name matches the deployed Worker' '"name"[[:space:]]*:[[:space:]]*"chat"' "$config"
 check 'Worker entrypoint is configured' '"main"[[:space:]]*:[[:space:]]*"[.]/worker/entry[.]js"' "$config"
 check 'Direct Worker hostname remains available for WAF-intercepted API requests' '"workers_dev"[[:space:]]*:[[:space:]]*true' "$config"
 check 'Vite dist is the asset directory' '"directory"[[:space:]]*:[[:space:]]*"[.]/dist"' "$config"

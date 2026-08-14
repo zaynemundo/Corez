@@ -178,28 +178,28 @@ describe('E2E /api/ai pipeline', () => {
   });
 
   it('restricts the direct Worker hostname to approved CoreZ origins', async () => {
-    const unrelatedRoute = await swarmWorker.fetch(new Request('https://ai.zayne-mayo.workers.dev/api/image', {
+    const unrelatedRoute = await swarmWorker.fetch(new Request('https://chat.zayne-mayo.workers.dev/api/image', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Origin': 'https://corez.pro' },
       body: JSON.stringify({ prompt: 'paid image' })
     }), env);
     expect(unrelatedRoute.status).toBe(404);
 
-    const blocked = await swarmWorker.fetch(new Request('https://ai.zayne-mayo.workers.dev/api/ai', {
+    const blocked = await swarmWorker.fetch(new Request('https://chat.zayne-mayo.workers.dev/api/ai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Origin': 'https://attacker.example' },
       body: JSON.stringify({ prompt: 'hello', stream: true })
     }), env);
     expect(blocked.status).toBe(403);
 
-    const missingOrigin = await swarmWorker.fetch(new Request('https://ai.zayne-mayo.workers.dev/api/ai', {
+    const missingOrigin = await swarmWorker.fetch(new Request('https://chat.zayne-mayo.workers.dev/api/ai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt: 'hello', stream: true })
     }), env);
     expect(missingOrigin.status).toBe(403);
 
-    const allowedCorezDomain = await swarmWorker.fetch(new Request('https://ai.zayne-mayo.workers.dev/api/ai', {
+    const allowedCorezDomain = await swarmWorker.fetch(new Request('https://chat.zayne-mayo.workers.dev/api/ai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Origin': 'https://corez.pro' },
       body: JSON.stringify({ prompt: 'hello', stream: true })
@@ -207,7 +207,7 @@ describe('E2E /api/ai pipeline', () => {
     expect(allowedCorezDomain.status).toBe(200);
     expect(allowedCorezDomain.headers.get('Access-Control-Allow-Origin')).toBe('https://corez.pro');
 
-    const allowedChatDomain = await swarmWorker.fetch(new Request('https://ai.zayne-mayo.workers.dev/api/ai', {
+    const allowedChatDomain = await swarmWorker.fetch(new Request('https://chat.zayne-mayo.workers.dev/api/ai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Origin': 'https://chat.corez.pro' },
       body: JSON.stringify({ prompt: 'hello', stream: true })
@@ -221,7 +221,7 @@ describe('E2E /api/ai pipeline', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Host': 'ai.zayne-mayo.workers.dev',
+        'Host': 'chat.zayne-mayo.workers.dev',
         'Origin': 'https://attacker.example'
       },
       body: JSON.stringify({ prompt: 'hello', stream: true })

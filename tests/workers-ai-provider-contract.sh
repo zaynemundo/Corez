@@ -54,7 +54,7 @@ check_absent 'Worker no longer branches on retired fast-path labels' "intentType
 check_absent 'Worker does not use the paid-only GLM-5.2 model' '@cf/zai-org/glm-5[.]2' "$worker"
 check 'frontend calls the public AI route' "fetch\(AI_PROXY_ENDPOINT" "$service"
 check 'frontend configures the public AI route' "AI_PROXY_ENDPOINT = '/api/ai'" "$service"
-check 'frontend has a direct Worker fallback for zone WAF challenges' 'ai[.]zayne-mayo[.]workers[.]dev/api/ai' "$service"
+check 'frontend has a direct Worker fallback for zone WAF challenges' 'chat[.]zayne-mayo[.]workers[.]dev/api/ai' "$service"
 check 'frontend retains local fallback' 'generateLocalAIResponse' "$service"
 check_absent 'frontend has no model override storage' 'corez_openrouter_model|VITE_OPENROUTER_MODEL' "$service"
 

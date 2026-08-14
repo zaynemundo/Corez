@@ -7,7 +7,7 @@ export const MODEL = {
 };
 
 export const AI_PROXY_ENDPOINT = '/api/ai';
-const AI_WAF_FALLBACK_ENDPOINT = 'https://ai.zayne-mayo.workers.dev/api/ai';
+const AI_WAF_FALLBACK_ENDPOINT = 'https://chat.zayne-mayo.workers.dev/api/ai';
 const CLOUDFLARE_CHALLENGE_PATTERN = /Just a moment|challenge-platform|__cf_chl_/i;
 export const IMAGE_PROXY_ENDPOINT = '/api/image';
 

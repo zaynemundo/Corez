@@ -166,7 +166,7 @@ describe('Hosted AI fallback behavior', () => {
     })).rejects.toThrow(/WAF bypass rule for \/api\//i);
     const aiCalls = fetchMock.mock.calls.filter(([url]) => url !== '/api/inspiration');
     expect(aiCalls).toHaveLength(2);
-    expect(aiCalls[1][0]).toBe('https://ai.zayne-mayo.workers.dev/api/ai');
+    expect(aiCalls[1][0]).toBe('https://chat.zayne-mayo.workers.dev/api/ai');
   });
 
   it('retries a Cloudflare challenge through the direct Worker hostname', async () => {
@@ -178,7 +178,7 @@ describe('Hosted AI fallback behavior', () => {
           { status: 403, headers: { 'Content-Type': 'text/html', 'cf-mitigated': 'challenge' } }
         );
       }
-      expect(url).toBe('https://ai.zayne-mayo.workers.dev/api/ai');
+      expect(url).toBe('https://chat.zayne-mayo.workers.dev/api/ai');
       return new Response(
         'data: {"type":"delta","text":"Playable game HTML"}\n\ndata: {"type":"done","final":true}\n\n',
         { status: 200, headers: { 'Content-Type': 'text/event-stream' } }

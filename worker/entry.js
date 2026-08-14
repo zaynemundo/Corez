@@ -17,7 +17,8 @@ export { GameRoom } from './gameRoom.js';
 const aiRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 20 });
 const DIRECT_AI_ORIGINS = new Set([
   'https://corez.pro',
-  'https://chat.corez.pro'
+  'https://chat.corez.pro',
+  'https://web.corez.pro'
 ]);
 
 export default {
@@ -30,8 +31,8 @@ export default {
     const clientHost = String(request.headers.get('Host') || '').toLowerCase();
     const isLocalClient = clientHost.includes('localhost') || clientHost.includes('127.0.0.1') || clientHost.includes('::1');
     const normalizedClientHost = clientHost.replace(/:\d+$/, '');
-    const isDirectAiHost = normalizedClientHost === 'ai.zayne-mayo.workers.dev'
-      || url.hostname === 'ai.zayne-mayo.workers.dev';
+    const isDirectAiHost = normalizedClientHost === 'chat.zayne-mayo.workers.dev'
+      || url.hostname === 'chat.zayne-mayo.workers.dev';
     const requestOrigin = request.headers.get('Origin') || '';
     if (isDirectAiHost && url.pathname !== '/api/ai') {
       return new Response(JSON.stringify({ error: 'Route not found.' }), {
