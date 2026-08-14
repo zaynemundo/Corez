@@ -3,7 +3,7 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**', 'artifacts/**', '.agents/skills/**', '.wrangler/**']
+    ignores: ['dist/**', 'node_modules/**', 'artifacts/**', '.agents/skills/**', '.wrangler/**', 'deepseek-harness/**']
   },
   js.configs.recommended,
   {

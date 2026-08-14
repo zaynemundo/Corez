@@ -15,6 +15,7 @@ import { TaskManager } from './TaskManager.js';
 import { abortableSleep } from './utils.js';
 import { RetryScheduler } from '../providers/retryScheduler.js';
 import { ProviderChain } from '../providers/providerChain.js';
+import { CompactionEngine } from '../context/CompactionEngine.js';
 
 export class AgentHarness {
   constructor(options = {}) {
@@ -22,6 +23,7 @@ export class AgentHarness {
     this.cancellations = options.cancellationManager || new CancellationManager();
     this.sessions = options.sessionManager || new SessionManager();
     this.store = options.taskStore || null;
+    this.compactionEngine = options.compactionEngine || new CompactionEngine();
     this.taskManager = options.taskManager || new TaskManager({
       store: this.store,
       eventBus: this.eventBus,
@@ -300,6 +302,25 @@ export class AgentHarness {
           }
         } catch {
           // transient read failure; keep going
+        }
+      }
+
+      // Proactive context compaction under token pressure
+      if (this.compactionEngine && messages.length > 4) {
+        try {
+          const compactRes = await this.compactionEngine.compact(messages);
+          if (compactRes.compacted) {
+            messages.length = 0;
+            messages.push(...compactRes.messages);
+            task.messages = messages;
+            this.eventBus.emit({
+              type: 'context.compacted',
+              taskId: task.taskId,
+              savedTokens: compactRes.savedTokens
+            });
+          }
+        } catch {
+          // Compaction is best-effort; keep running with existing messages
         }
       }
 

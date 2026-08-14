@@ -3,6 +3,11 @@ import path from 'node:path';
 import { execSync, spawnSync } from 'node:child_process';
 import { PERMISSION_CATEGORIES } from '../permissions/index.js';
 import { resolveWorkspacePath } from '../runtime/pathResolver.js';
+import { RepeatToolGuard } from '../guards/RepeatToolGuard.js';
+import { ToolResultPruner } from './ToolResultPruner.js';
+import { OutputSpillManager } from './OutputSpillManager.js';
+import { UserQuestionService, createAskQuestionTool } from './interactive/UserQuestions.js';
+
 // No fixed command timeout: valid builds, tests, and long-running commands
 // must never be terminated prematurely. An operator may set an explicit
 // hang guard via COREZ_COMMAND_TIMEOUT_MS; 0 means unlimited (default).
@@ -12,8 +17,12 @@ function commandTimeout() {
 }
 
 export class ToolRegistry {
-  constructor() {
+  constructor(options = {}) {
     this.tools = new Map();
+    this.repeatToolGuard = options.repeatToolGuard !== undefined ? options.repeatToolGuard : new RepeatToolGuard();
+    this.spillManager = options.spillManager !== undefined ? options.spillManager : new OutputSpillManager({ inMemory: true });
+    this.pruner = options.pruner !== undefined ? options.pruner : new ToolResultPruner({ spillManager: this.spillManager });
+    this.userQuestionService = options.userQuestionService || new UserQuestionService();
     this.registerCoreTools();
   }
 
@@ -45,8 +54,15 @@ export class ToolRegistry {
     }
 
     const { context, permissionManager, autoApprove } = runtimeOptions;
+    const scopeId = runtimeOptions.taskId || runtimeOptions.sessionId || 'default';
 
-    // Check permissions
+    // 1. Guard check: detect repetitive runaway loops
+    const guardCheck = this.repeatToolGuard?.evaluate(name, args, scopeId);
+    if (guardCheck?.status === 'blocked') {
+      return { error: guardCheck.error, blocked: true };
+    }
+
+    // 2. Check permissions
     if (permissionManager) {
       const category = tool.category || PERMISSION_CATEGORIES.READ;
       const detail = args?.command || args?.filePath || args?.path || name;
@@ -67,7 +83,22 @@ export class ToolRegistry {
           context.recordInspectedFile(args.filePath);
         }
       }
-      return result;
+
+      // 3. Model-free pruning of oversized tool output
+      let finalResult = result;
+      if (this.pruner) {
+        const pruneRes = this.pruner.prune(result, { toolName: name, args, scopeId });
+        finalResult = pruneRes.result;
+      }
+
+      // Attach advisory warning if guard detected repetition
+      if (guardCheck?.status === 'advisory' || guardCheck?.status === 'diagnostic') {
+        if (typeof finalResult === 'object' && finalResult !== null) {
+          finalResult._guardWarning = guardCheck.message;
+        }
+      }
+
+      return finalResult;
     } catch (err) {
       return { error: `Tool "${name}" execution error: ${err.message}` };
     }
@@ -632,6 +663,11 @@ export class ToolRegistry {
         };
       }
     });
+
+    // 19. ask_question — interactive clarification and decision tool
+    if (this.userQuestionService) {
+      this.registerTool(createAskQuestionTool(this.userQuestionService));
+    }
   }
 }
 

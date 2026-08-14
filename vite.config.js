@@ -19,6 +19,7 @@ export default defineConfig({
     }
   },
   test: {
-    setupFiles: ['./tests/setup.js']
+    setupFiles: ['./tests/setup.js'],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/deepseek-harness/**']
   }
 })
