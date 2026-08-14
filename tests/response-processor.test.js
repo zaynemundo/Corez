@@ -60,10 +60,21 @@ describe('detectTruncation', () => {
     expect(detectTruncation(urls).truncated).toBe(false);
   });
 
-  it('flags provider stop reason length', () => {
+  it('does not flag provider stop reason length at a clean boundary', () => {
+    // A 'length' stop ending at a complete sentence/tag/fence is a clean cap
+    // hit, not truncation — flagging it spent up to 12 repair calls per hit.
     const result = detectTruncation('A complete looking answer that ends properly.', { stopReason: 'length' });
-    expect(result.truncated).toBe(true);
-    expect(result.signals).toContain('provider-stop-reason-length');
+    expect(result.truncated).toBe(false);
+    const closedBlock = detectTruncation('```html\n<div>done</div>\n```', { stopReason: 'length' });
+    expect(closedBlock.truncated).toBe(false);
+  });
+
+  it('flags provider stop reason length when the text ends mid-word or mid-structure', () => {
+    const midWord = detectTruncation('A complete looking answer that ends proper', { stopReason: 'length' });
+    expect(midWord.truncated).toBe(true);
+    expect(midWord.signals).toContain('provider-stop-reason-length');
+    const midStructure = detectTruncation('const grid = new Array(rows).fill(() => {', { stopReason: 'length' });
+    expect(midStructure.truncated).toBe(true);
   });
 
   it('flags an unfinished numbered list item', () => {

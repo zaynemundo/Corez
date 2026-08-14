@@ -8,7 +8,7 @@
 // route; the harness only changes HOW the work is sequenced.
 
 import { runProviderChain, runStreamingChain } from './providerChain.js';
-import { verifyCreation, buildRepairPrompt } from './creationVerifier.js';
+import { verifyCreation, verifySpecCoverage, buildRepairPrompt } from './creationVerifier.js';
 import {
   detectTruncation,
   stitchContinuationChunk,
@@ -75,7 +75,29 @@ function parseReview(text) {
   if (/^APPROVED\b/i.test(value)) return { approved: true, feedback: '' };
   const match = value.match(/^NEEDS_FIX\s*:\s*(.+)$/i);
   if (match) return { approved: false, feedback: match[1].trim() };
-  return { approved: true, feedback: '' };
+  // Unparseable verdict: never a silent approval. The artifact already
+  // passed deterministic verification, so it is delivered, but the review is
+  // recorded as inconclusive so diagnostics stay honest and no blind repair
+  // is triggered on an unknown verdict.
+  return { approved: false, feedback: '', inconclusive: true };
+}
+
+// Structural verification plus spec-coverage: the planning spec's distinctive
+// feature words must mostly appear in the artifact, so a game that is
+// structurally complete but silently missing requested features (score,
+// levels, enemies) is repaired instead of shipped.
+function verifyBuildState(spec, build, intentType) {
+  const verification = verifyCreation(build, { intentType });
+  const coverage = spec ? verifySpecCoverage(spec, build) : { passed: true, covered: 0, total: 0, ratio: 1, missing: [] };
+  verification.specCoverage = coverage;
+  if (!coverage.passed && coverage.missing.length > 0) {
+    verification.passed = false;
+    verification.failures.push({
+      code: 'missing-spec-features',
+      detail: `The artifact does not cover the requested features (${coverage.covered}/${coverage.total} present; missing: ${coverage.missing.slice(0, 8).join(', ')}).`
+    });
+  }
+  return verification;
 }
 
 /**
@@ -144,7 +166,7 @@ export async function* runCreationHarness(options) {
 
   // Re-verify existing build with the current verifier rules if resuming
   if (state.build && state.verification && !state.verification.passed) {
-    state.verification = verifyCreation(state.build, { intentType: state.intentType });
+    state.verification = verifyBuildState(state.spec, state.build, state.intentType);
   }
 
   // Lease: only one invocation may build a given request at a time. The
@@ -273,6 +295,7 @@ export async function* runCreationHarness(options) {
       let model = null;
       let inputTokens = null;
       let outputTokens = null;
+      let buildFinishReason = null;
       try {
         for await (const event of runStreamingChain(buildMessages, { env, signal })) {
           if (event.type === 'delta') {
@@ -287,6 +310,7 @@ export async function* runCreationHarness(options) {
           } else if (event.type === 'done') {
             provider = provider || event.provider || null;
             model = model || event.model || null;
+            buildFinishReason = buildFinishReason || event.finishReason || null;
           } else if (event.type === 'error') {
             const err = new Error(event.message || 'Harness build stream failed.');
             err.status = event.status || 502;
@@ -317,7 +341,9 @@ export async function* runCreationHarness(options) {
       const MAX_CONTINUATION_PASSES = 10;
       while (continuationPass < MAX_CONTINUATION_PASSES && collected.trim()) {
         ensureWithinDeadline();
-        const truncation = detectTruncation(collected);
+        // The provider's finish reason ('length') is evidence of truncation
+        // only when the text does not end at a clean boundary.
+        const truncation = detectTruncation(collected, { stopReason: buildFinishReason });
         const creationCheck = verifyCreation(collected, { intentType: state.intentType });
         const isCutoff = truncation.truncated || creationCheck.failures.some((f) => f.code === 'truncated-block' || f.code === 'incomplete-html');
         if (!isCutoff) break;
@@ -343,6 +369,8 @@ export async function* runCreationHarness(options) {
               continuationChunk += event.text;
             } else if (event.type === 'usage' && event.outputTokens) {
               outputTokens = (outputTokens || 0) + event.outputTokens;
+            } else if (event.type === 'done') {
+              buildFinishReason = event.finishReason || buildFinishReason;
             }
           }
         } catch (contErr) {
@@ -377,7 +405,7 @@ export async function* runCreationHarness(options) {
       await persist(store, taskId, state);
 
       yield reportPhase('verifying');
-      state.verification = verifyCreation(collected, { intentType: state.intentType });
+      state.verification = verifyBuildState(state.spec, collected, state.intentType);
       await persist(store, taskId, state);
     }
 
@@ -392,44 +420,54 @@ export async function* runCreationHarness(options) {
       throw new Error('The AI returned an empty build for this request. Please try again.');
     }
 
-    // 5. REVIEW — the model sanity-checks functionality; one final repair
-    // round if it flags a defect and the budget allows.
-    ensureWithinDeadline();
-    yield reportPhase('reviewing');
-    const reviewMessages = [
-      ...baseSystem,
-      { role: 'system', content: REVIEW_INSTRUCTION },
-      { role: 'user', content: `Artifact to review:\n\n${state.build}` }
-    ];
-    const reviewResult = await runProviderChain(reviewMessages, {
-      env,
-      signal,
-      store: null,
-      sleep
-    });
-    if (signal?.aborted || reviewResult?.status === 'cancelled') {
-      state.busy = false;
-      state.status = 'interrupted';
-      await persist(store, taskId, state);
-      throw Object.assign(new Error('AI request cancelled.'), { status: 499 });
-    }
-    // A review that never answered (provider outage, retry-scheduled) is
-    // recorded as SKIPPED — never as a silent approval: the artifact already
-    // passed deterministic verification, but diagnostics must say honestly
-    // that the model review did not run.
-    state.review = reviewResult?.content
-      ? parseReview(reviewResult.content)
-      : {
-          approved: true,
-          feedback: '',
-          skipped: true,
-          reason: reviewResult?.status === 'retry-scheduled'
-            ? `AI providers temporarily busy (recovery scheduled in ~${reviewResult.retryAfterSeconds}s)`
-            : (reviewResult?.error || 'review provider returned no usable response')
-        };
-
-    if (!state.review.approved && state.repairCount < MAX_REPAIR_ROUNDS) {
+    // 5. REVIEW — the model sanity-checks functionality. Explicit
+    // NEEDS_FIX verdicts trigger targeted repair rounds (bounded); a
+    // repaired build is reviewed again so a fix that missed defects is
+    // caught instead of shipped. Unparseable or missing reviews are never
+    // treated as approval and never trigger blind repairs.
+    const MAX_REVIEW_CYCLES = 2;
+    let reviewCycles = 0;
+    while (reviewCycles < MAX_REVIEW_CYCLES) {
       ensureWithinDeadline();
+      yield reportPhase('reviewing');
+      const reviewMessages = [
+        ...baseSystem,
+        { role: 'system', content: REVIEW_INSTRUCTION },
+        { role: 'user', content: `Artifact to review:\n\n${state.build}` }
+      ];
+      const reviewResult = await runProviderChain(reviewMessages, {
+        env,
+        signal,
+        store: null,
+        sleep
+      });
+      if (signal?.aborted || reviewResult?.status === 'cancelled') {
+        state.busy = false;
+        state.status = 'interrupted';
+        await persist(store, taskId, state);
+        throw Object.assign(new Error('AI request cancelled.'), { status: 499 });
+      }
+      // A review that never answered (provider outage, retry-scheduled) is
+      // recorded as SKIPPED — never as a silent approval: the artifact
+      // already passed deterministic verification, but diagnostics must say
+      // honestly that the model review did not run.
+      state.review = reviewResult?.content
+        ? parseReview(reviewResult.content)
+        : {
+            approved: false,
+            feedback: '',
+            skipped: true,
+            inconclusive: true,
+            reason: reviewResult?.status === 'retry-scheduled'
+              ? `AI providers temporarily busy (recovery scheduled in ~${reviewResult.retryAfterSeconds}s)`
+              : (reviewResult?.error || 'review provider returned no usable response')
+          };
+      // Inconclusive/skipped: deliver (already verified) with honest
+      // diagnostics — never a blind repair on an unknown verdict.
+      if (state.review.skipped || state.review.inconclusive) break;
+      if (state.review.approved || state.repairCount >= MAX_REPAIR_ROUNDS) break;
+
+      reviewCycles += 1;
       state.repairCount += 1;
       yield reportPhase('repairing');
       yield { type: 'clear' };
@@ -469,13 +507,14 @@ export async function* runCreationHarness(options) {
         // never partial-garbage concatenated with the full build.
         if (collected.trim()) yield { type: 'clear' };
         yield { type: 'delta', text: state.build };
-      } else {
-        state.build = collected;
-        await persist(store, taskId, state);
-        yield reportPhase('verifying');
-        state.verification = verifyCreation(collected, { intentType: state.intentType });
-        await persist(store, taskId, state);
+        break;
       }
+      state.build = collected;
+      await persist(store, taskId, state);
+      yield reportPhase('verifying');
+      state.verification = verifyBuildState(state.spec, collected, state.intentType);
+      await persist(store, taskId, state);
+      // Loop continues: re-review the repaired build.
     }
 
     // Honest-failure gate: an artifact that is STILL structurally incomplete
@@ -517,6 +556,7 @@ export async function* runCreationHarness(options) {
           verification: state.verification,
           approved: Boolean(state.review?.approved),
           reviewSkipped: Boolean(state.review?.skipped),
+          reviewInconclusive: Boolean(state.review?.inconclusive),
           model: state.model || null
         }
       }

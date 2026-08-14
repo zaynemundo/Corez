@@ -96,7 +96,16 @@ export function detectTruncation(content, options = {}) {
     signals.push('dangling-expression-operator');
   }
 
-  if (stopReason === 'length') signals.push('provider-stop-reason-length');
+  if (stopReason === 'length') {
+    // A provider 'length' stop is only truncation evidence when the text
+    // ends mid-structure or mid-sentence. Ending at a clean boundary (final
+    // punctuation, closing tag, or closed fence) means the output cap was
+    // hit exactly at a complete unit — treating that as truncation spent up
+    // to 12 continuation/repair calls on every clean cap hit.
+    const tail = text.trimEnd();
+    const endsClean = /[.!?"')\]}>\n]$/.test(tail) || /```\s*$/.test(text);
+    if (!endsClean) signals.push('provider-stop-reason-length');
+  }
   return { truncated: signals.length > 0, signals };
 }
 

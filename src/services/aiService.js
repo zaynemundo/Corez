@@ -549,6 +549,7 @@ export async function improveCodingPrompt(prompt, intent = null) {
 - Build a complete, runnable, self-contained single-file HTML canvas game inside ONE SINGLE \`\`\`html ... \`\`\` code block with inline <style> and <script> tags.
 - FULLSCREEN GAME REQUIREMENT: The game MUST fill the entire preview viewport — html/body with width:100%, height:100%, margin:0, overflow:hidden; a full-viewport canvas (width:100%, height:100%, display:block) with NO max-width, NO bordered box, NO rounded container around the game. Keep a fixed internal game resolution (e.g. 960x540) and scale it to the viewport with ctx.setTransform + a resize listener so the game always fills the screen.
 - MOBILE: size the canvas from visualViewport (not just innerHeight) and listen for orientationchange; include on-screen touch controls (left/right/jump/action buttons) shown only on touch or coarse-pointer devices, bound with touchstart/touchend/touchcancel.
+- COMPLETENESS CHECK before you finish: implement EVERY feature and rule you promise in the brief — score, lives, levels, enemies, collisions, win/lose states, menus — with no stubs, no TODOs, and no placeholder functions; the game must be fully playable end-to-end.
 - Output ONLY the brief followed by the code block — NO feature summary, NO step-by-step guide, NO closing paragraph after the code.`;
     }
 
@@ -570,6 +571,7 @@ ${designSpec}${liveInspiration}
   Link pages with PLAIN RELATIVE anchors ONLY: <a href="about.html">About</a>. Never use a leading slash or absolute URL for internal links (never "/about.html", "https://...", or "corez.pro/...") — the preview and the published site serve every page under its own folder (corez.pro/<slug>/about.html), so only bare relative filenames resolve to the right URL. Keep filenames lowercase like index.html, about.html, contact.html (max 12 pages). COMPLETENESS CHECK before you finish: ALWAYS output an index.html home page, make every <a href="..."> point to a page you actually output (a link to a page you never created is a broken site), and keep every page a complete standalone HTML document.
 - ONE-SHOT MODE: ONLY when the user explicitly asked for "oneshot" (or "one shot", "single page", "one page"), output ONE single page only (no sub-pages, no markers).
 - Build a complete, responsive, standalone experience ready for the preview canvas.
+- IMPLEMENTATION CHECK before you finish: implement EVERY feature you describe in the overview and every control the user asked for — no stubs, no TODOs, no placeholder functions; every button, form, and interactive element must actually work.
 - ALWAYS end your response with a step-by-step user guide and feature summary after the code block! Never output ONLY a bare code block.`;
     }
 
@@ -589,6 +591,7 @@ ${designSpec}${liveInspiration}
   <!DOCTYPE html>... complete page ...
   Link pages with PLAIN RELATIVE anchors ONLY: <a href="about.html">About</a>. Never use a leading slash or absolute URL for internal links (never "/about.html", "https://...", or "corez.pro/...") — the preview and the published site serve every page under its own folder (corez.pro/<slug>/about.html), so only bare relative filenames resolve to the right URL. Keep filenames lowercase like index.html, about.html, contact.html (max 12 pages). COMPLETENESS CHECK before you finish: ALWAYS output an index.html home page, make every <a href="..."> point to a page you actually output (a link to a page you never created is a broken site), and keep every page a complete standalone HTML document.
 - ONE-SHOT MODE: ONLY when the user explicitly asked for "oneshot" (or "one shot", "single page", "one page"), output a single React component exactly as described above (no sub-pages, no markers).
+- IMPLEMENTATION CHECK before you finish: implement EVERY feature you describe in the overview and every control the user asked for — no stubs, no TODOs, no placeholder functions; every button and interactive element must actually work.
 - ALWAYS end your response with a step-by-step user guide and feature summary after the code block! Never output ONLY a bare code block.`;
   }
 
@@ -597,6 +600,7 @@ ${designSpec}${liveInspiration}
 [CODE DIAGNOSIS & FIX SPECIFICATION]:
 - Systematically inspect the root cause before writing code.
 - Produce clean, modern, production-ready code preserving existing API signatures and component props.
+- After writing the fix, re-read your answer for completeness: include the COMPLETE corrected code — never ellipses ("..."), "rest unchanged", or "same as before" placeholders.
 - Include a concise explanation of the changes and test verification steps.`;
 }
 
@@ -721,6 +725,10 @@ export async function generateHostedAIResponse(
   signal = null,
   options = {}
 ) {
+  // Diagnostics are per-request: reset so a stale record from a previous
+  // generation is never attached to this one (e.g. after a local fallback).
+  lastHostedDiagnostics = null;
+
   // 1. Fine-grained intent classification & contract generation
   const fineIntent = classifyIntentNew(prompt);
   const legacyIntentType = toLegacyIntentType(fineIntent?.primaryIntent || fineIntent?.type);

@@ -105,4 +105,72 @@ describe('runCreationHarness review-repair refill', () => {
     const phases = events.filter((e) => e.type === 'phase').map((e) => e.phase);
     expect(phases).toContain('repairing');
   });
+
+  it('re-reviews a repaired build and ships it only after an explicit approval', async () => {
+    let reviewCalls = 0;
+    runStreamingChain.mockImplementation(async function* (messages) {
+      const serialized = JSON.stringify(messages || []);
+      if (serialized.includes('[review-failure]')) {
+        // Review-driven repair produces a good artifact.
+        yield { type: 'delta', text: GOOD_ARTIFACT };
+        yield { type: 'done', finishReason: 'stop' };
+        return;
+      }
+      const chunks = serialized.includes('did not pass functional verification')
+        ? [GOOD_ARTIFACT]
+        : [BROKEN_ARTIFACT];
+      for (const text of chunks) yield { type: 'delta', text };
+      yield { type: 'done', finishReason: 'stop' };
+    });
+
+    const fetchMock = vi.fn(async (_url, init) => {
+      const messages = JSON.stringify(JSON.parse(init.body).messages || []);
+      if (messages.includes('Produce a concise build specification')) return jsonCompletion('spec');
+      if (messages.includes('final reviewer of a finished artifact')) {
+        reviewCalls += 1;
+        return jsonCompletion(reviewCalls === 1 ? 'NEEDS_FIX: the score does not update' : 'APPROVED');
+      }
+      return jsonCompletion('');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const events = await runHarness();
+
+    // The repaired build was reviewed again and only shipped after the
+    // second review explicitly approved it.
+    expect(reviewCalls).toBe(2);
+    expect(collectDeltas(events)).toBe(GOOD_ARTIFACT);
+    expect(events.some((e) => e.type === 'done')).toBe(true);
+    const reviewing = events.filter((e) => e.type === 'phase' && e.phase === 'reviewing');
+    expect(reviewing.length).toBe(2);
+  });
+
+  it('an unparseable review verdict is inconclusive: delivered but never claimed as approved', async () => {
+    runStreamingChain.mockImplementation(async function* (messages) {
+      const serialized = JSON.stringify(messages || []);
+      const chunks = serialized.includes('did not pass functional verification')
+        ? [GOOD_ARTIFACT]
+        : [BROKEN_ARTIFACT];
+      for (const text of chunks) yield { type: 'delta', text };
+      yield { type: 'done', finishReason: 'stop' };
+    });
+    const fetchMock = vi.fn(async (_url, init) => {
+      const messages = JSON.stringify(JSON.parse(init.body).messages || []);
+      if (messages.includes('Produce a concise build specification')) return jsonCompletion('spec');
+      if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('looks fine to me'); // not APPROVED / NEEDS_FIX
+      return jsonCompletion('');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const events = await runHarness();
+
+    expect(collectDeltas(events)).toBe(GOOD_ARTIFACT);
+    expect(events.some((e) => e.type === 'done')).toBe(true);
+    // No blind repair was triggered by the unparseable verdict.
+    const repairing = events.filter((e) => e.type === 'phase' && e.phase === 'repairing');
+    expect(repairing.length).toBe(1); // only the structural repair round
+    const diagnostics = events.find((e) => e.type === 'diagnostics')?.diagnostics;
+    expect(diagnostics?.harness?.reviewInconclusive).toBe(true);
+    expect(diagnostics?.harness?.approved).toBe(false);
+  });
 });

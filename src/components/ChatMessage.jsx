@@ -21,6 +21,44 @@ function safeImageUrl(url) {
   return '';
 }
 
+// Compact one-line summary of the harness diagnostics the worker attached to
+// a creation response: verification result, repair rounds, review verdict,
+// and the model that produced the artifact.
+function harnessSummary(harness) {
+  const parts = [];
+  if (harness.verification) {
+    parts.push(harness.verification.passed ? 'verified' : `${(harness.verification.failures || []).length} issue(s) flagged`);
+  }
+  if (harness.repairRounds > 0) {
+    parts.push(`${harness.repairRounds} repair${harness.repairRounds > 1 ? 's' : ''}`);
+  }
+  if (harness.reviewSkipped) parts.push('review skipped');
+  else if (harness.reviewInconclusive) parts.push('review inconclusive');
+  else if (harness.approved !== undefined) parts.push(harness.approved ? 'review approved' : 'review flagged issues');
+  if (harness.model) parts.push(harness.model);
+  return parts.join(' · ') || 'generated';
+}
+
+function GenerationMeta({ harness }) {
+  return (
+    <div style={{
+      marginTop: '0.5rem',
+      padding: '0.3rem 0.6rem',
+      borderRadius: 'var(--radius-sm)',
+      backgroundColor: 'rgba(127,127,127,0.08)',
+      border: '1px solid var(--border-color)',
+      color: 'var(--text-secondary)',
+      fontSize: '0.72rem',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '0.35rem'
+    }}>
+      <span>⚙</span>
+      <span>{harnessSummary(harness)}</span>
+    </div>
+  );
+}
+
 function safeHref(url) {
   if (!url || typeof url !== 'string') return '';
   if (url.startsWith('https://') || url.startsWith('http://') || url.startsWith('mailto:') || url.startsWith('#')) return url;
@@ -850,6 +888,9 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
           {isUser && renderAttachments(message.attachments)}
           {renderFormattedText(message.content)}
         </div>
+        {!isUser && message.diagnostics?.harness && (
+          <GenerationMeta harness={message.diagnostics.harness} />
+        )}
         {!isUser && (
           <MessageActions content={message.content || ''} />
         )}

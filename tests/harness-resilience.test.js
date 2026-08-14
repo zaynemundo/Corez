@@ -304,7 +304,8 @@ describe('runCreationHarness resilience', () => {
     await drain(runCreationHarness(harnessOptions(shared)), events2);
     const record = await shared.load(harnessTaskId('build a first person shooter game', 'game_creation'));
     expect(record.review.skipped).toBe(true);
-    expect(record.review.approved).toBe(true);
+    // A skipped review is never claimed as approval: diagnostics stay honest.
+    expect(record.review.approved).toBe(false);
   });
 
   it('M2: a spec provider outage surfaces the real provider failure', async () => {

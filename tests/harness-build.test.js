@@ -188,6 +188,43 @@ describe('runCreationHarness', () => {
     expect(persisted.repairCount).toBe(0);
   });
 
+  it('repairs a structurally complete build that misses requested spec features', async () => {
+    // The artifact passes structural verification but covers none of the
+    // spec's distinctive features — the spec-coverage gate must flag it and
+    // the repair round must add the missing features.
+    const COVERED_ARTIFACT = GOOD_ARTIFACT.replace(
+      '<script>',
+      '<script>\nconst score = 0; const levels = 3; const enemy = {};'
+    );
+    const provider = buildMockProvider();
+    let repairCalls = 0;
+    let buildCalls = 0;
+    provider.fetchMock.mockImplementation(async (_url, init) => {
+      const body = JSON.parse(init.body);
+      const messages = JSON.stringify(body.messages || []);
+      if (messages.includes('Produce a concise build specification')) return jsonCompletion('A game with a score, three levels, and an enemy.');
+      if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('APPROVED');
+      if (messages.includes('did not pass functional verification')) {
+        repairCalls += 1;
+        return body.stream === true ? sseDelta([COVERED_ARTIFACT]) : jsonCompletion(COVERED_ARTIFACT);
+      }
+      buildCalls += 1;
+      return body.stream === true ? sseDelta([GOOD_ARTIFACT]) : jsonCompletion(GOOD_ARTIFACT);
+    });
+    vi.stubGlobal('fetch', provider.fetchMock);
+
+    const { events } = await runHarness();
+    const phases = events.filter((e) => e.type === 'phase').map((e) => e.phase);
+    expect(phases).toContain('repairing');
+    expect(phases).toContain('done');
+    // The repair round was triggered by the coverage failure, not a rebuild.
+    expect(repairCalls).toBe(1);
+    expect(buildCalls).toBe(1);
+    const deltas = collectDeltas(events);
+    expect(deltas).toBe(COVERED_ARTIFACT);
+    expect(events.some((e) => e.type === 'done')).toBe(true);
+  });
+
   it('resumes from persisted state on an identical request', async () => {
     const { fetchMock, counts } = buildMockProvider();
     vi.stubGlobal('fetch', fetchMock);

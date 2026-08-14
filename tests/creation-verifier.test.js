@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { verifyCreation, buildRepairPrompt } from '../worker/creationVerifier.js';
+import { verifyCreation, verifySpecCoverage, buildRepairPrompt } from '../worker/creationVerifier.js';
 
 const GOOD_GAME = `<!DOCTYPE html>
 <html lang="en">
@@ -88,5 +88,37 @@ describe('buildRepairPrompt', () => {
     expect(prompt).toContain('[missing-loop] no loop');
     expect(prompt).toContain('[missing-input] no input');
     expect(prompt).toContain('make a snake game');
+  });
+});
+
+describe('verifySpecCoverage', () => {
+  it('passes when the artifact covers the spec features', () => {
+    const spec = 'A snake game with a score and an enemy.';
+    const artifact = '<html><body><canvas></canvas><script>const snake = 0; const score = 0; const enemy = { x: 0 };</script></body></html>';
+    const result = verifySpecCoverage(spec, artifact);
+    expect(result.passed).toBe(true);
+  });
+
+  it('fails when most requested features are missing from the artifact', () => {
+    const spec = 'A snake game with a score, three levels, and an enemy.';
+    const artifact = '<html><body><canvas></canvas><script>const snake = 0;</script></body></html>';
+    const result = verifySpecCoverage(spec, artifact);
+    expect(result.passed).toBe(false);
+    expect(result.missing.length).toBeGreaterThanOrEqual(3);
+    expect(result.missing).toContain('score');
+    expect(result.missing).toContain('enemy');
+    expect(result.missing).toContain('levels');
+  });
+
+  it('never fails tiny or generic specs', () => {
+    expect(verifySpecCoverage('A game.', '<html></html>').passed).toBe(true);
+    expect(verifySpecCoverage('Build a game with a loop.', '<html></html>').passed).toBe(true);
+  });
+
+  it('tolerates a few paraphrased or missing features', () => {
+    const spec = 'A game with a score counter, a health bar, a pause menu, and a final boss.';
+    const artifact = '<html><body><canvas></canvas><script>const score=0; const boss={}; const menu = null; const final = true;</script></body></html>';
+    const result = verifySpecCoverage(spec, artifact);
+    expect(result.passed).toBe(true);
   });
 });

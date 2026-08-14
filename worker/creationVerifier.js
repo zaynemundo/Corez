@@ -119,6 +119,45 @@ export function isTruncated(html) {
   return verifyCreation(html).failures.some((f) => f.code === 'truncated-block' || f.code === 'incomplete-html');
 }
 
+// Deterministic spec-coverage check: distinctive content words from the
+// planning spec must mostly appear in the finished artifact. The spec is a
+// short model-written brief, so only content words (>= 4 chars, not generic
+// build vocabulary) count; synonyms and paraphrases are tolerated via a
+// lenient ratio, and tiny specs are never failed.
+const SPEC_STOPWORDS = new Set([
+  'the', 'and', 'for', 'with', 'that', 'this', 'from', 'your', 'have', 'will',
+  'would', 'should', 'could', 'their', 'they', 'them', 'there', 'were', 'been',
+  'being', 'into', 'over', 'under', 'about', 'after', 'before', 'between',
+  'during', 'while', 'when', 'where', 'which', 'what', 'then', 'than', 'also',
+  'only', 'just', 'very', 'more', 'most', 'some', 'such', 'each', 'both',
+  'other', 'make', 'made', 'build', 'built', 'create', 'created', 'design',
+  'designed', 'using', 'used', 'use', 'game', 'app', 'site', 'website', 'page',
+  'screen', 'canvas', 'html', 'css', 'js', 'code', 'user', 'player', 'single',
+  'file', 'simple', 'basic', 'need', 'want', 'like', 'include', 'includes',
+  'including', 'feature', 'features', 'support', 'supports', 'must', 'may',
+  'might', 'within', 'across', 'through', 'together', 'however', 'although',
+  'because', 'since', 'until', 'unless', 'without', 'version', 'style',
+  'styles', 'color', 'colors', 'colour', 'colours', 'control', 'controls',
+  'button', 'buttons', 'keyboard', 'mouse', 'touch', 'display', 'window'
+]);
+
+export function verifySpecCoverage(spec, artifact, options = {}) {
+  const minRatio = options.minRatio ?? 0.5;
+  const specText = String(spec || '');
+  const artifactText = String(artifact || '').toLowerCase();
+  const tokens = [...new Set((specText.toLowerCase().match(/[a-z][a-z0-9-]{2,}/g) || []))]
+    .filter((t) => t.length >= 4 && !SPEC_STOPWORDS.has(t));
+  if (tokens.length < 3) {
+    return { passed: true, covered: tokens.length, total: tokens.length, ratio: 1, missing: [] };
+  }
+  const missing = tokens.filter((t) => !artifactText.includes(t));
+  const ratio = (tokens.length - missing.length) / tokens.length;
+  // Lenient: fewer than 3 absent spec words is treated as covered (models
+  // legitimately paraphrase), and a small spec is never a hard fail.
+  const passed = ratio >= minRatio || missing.length < 3;
+  return { passed, covered: tokens.length - missing.length, total: tokens.length, ratio, missing };
+}
+
 export function buildRepairPrompt(originalPrompt, currentArtifact, failures, attempt, maxAttempts) {
   const lines = [
     `Your previous build did not pass functional verification (attempt ${attempt}/${maxAttempts}).`,
