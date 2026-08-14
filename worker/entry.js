@@ -21,6 +21,18 @@ const DIRECT_AI_ORIGINS = new Set([
   'https://web.corez.pro'
 ]);
 
+export function isApprovedDirectAiOrigin(origin) {
+  if (!origin) return false;
+  if (DIRECT_AI_ORIGINS.has(origin)) return true;
+  // Localhost development origins (any port)
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) return true;
+  // Cloudflare Pages deployments (*.pages.dev)
+  if (/^https:\/\/[a-z0-9-]+\.pages\.dev$/i.test(origin)) return true;
+  // GitHub Codespaces (*.app.github.dev)
+  if (/^https:\/\/[a-z0-9-]+\.app\.github\.dev$/i.test(origin)) return true;
+  return false;
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -41,12 +53,23 @@ export default {
       });
     }
     const directAiOrigin = isDirectAiHost && url.pathname === '/api/ai'
-      ? (DIRECT_AI_ORIGINS.has(requestOrigin) ? requestOrigin : null)
+      ? (isApprovedDirectAiOrigin(requestOrigin) ? requestOrigin : null)
       : null;
     if (isDirectAiHost && url.pathname === '/api/ai' && !directAiOrigin) {
       return new Response(JSON.stringify({ error: 'Direct AI access requires an approved CoreZ origin.' }), {
         status: 403,
         headers: { 'Content-Type': 'application/json', 'X-Content-Type-Options': 'nosniff' }
+      });
+    }
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': directAiOrigin || '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          'Access-Control-Max-Age': '86400'
+        }
       });
     }
     const withDirectAiCors = (response) => {

@@ -214,6 +214,21 @@ describe('E2E /api/ai pipeline', () => {
     }), env);
     expect(allowedChatDomain.status).toBe(200);
     expect(allowedChatDomain.headers.get('Access-Control-Allow-Origin')).toBe('https://chat.corez.pro');
+
+    const allowedLocalhost = await swarmWorker.fetch(new Request('https://chat.zayne-mayo.workers.dev/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Origin': 'http://localhost:3000' },
+      body: JSON.stringify({ prompt: 'hello', stream: true })
+    }), env);
+    expect(allowedLocalhost.status).toBe(200);
+    expect(allowedLocalhost.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:3000');
+
+    const optionsPreflight = await swarmWorker.fetch(new Request('https://chat.zayne-mayo.workers.dev/api/ai', {
+      method: 'OPTIONS',
+      headers: { 'Origin': 'http://localhost:3000' }
+    }), env);
+    expect(optionsPreflight.status).toBe(204);
+    expect(optionsPreflight.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:3000');
   });
 
   it('restricts the direct hostname when Cloudflare rewrites request.url to a configured route', async () => {
