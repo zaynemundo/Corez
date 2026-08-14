@@ -12,6 +12,7 @@ import {
   analyzeProjectState,
   isModificationRequest,
   scoreContinuity,
+  stitchContinuationChunk,
   mergeResponse,
   processResponse
 } from '../worker/responseProcessor.js';
@@ -328,5 +329,62 @@ describe('processResponse', () => {
     expect(result.diagnostics.repaired).toBe(true);
     expect(result.diagnostics.repairReasons).toContain('missing-code-for-modification');
     expect(result.content).toContain('jsx');
+  });
+
+  it('stitches a truncated game response across continuation passes until fully closed', async () => {
+    // Simulates the user's Neon Labyrinth raycaster game that was cut off at `const srd = (my *`
+    const part1 = "Here's **NEON LABYRINTH**:\n```html\n<!DOCTYPE html><html><body><canvas id=\"g\"></canvas><script>let x = 0;\nconst srd = (my *";
+    const part2 = "Math.sin(angle));\nfunction update() { requestAnimationFrame(update); }\nupdate();\n</script></body></html>\n```";
+
+    const generate = vi.fn(async () => ({
+      content: part2,
+      stopReason: 'stop'
+    }));
+
+    const result = await processResponse([{ role: 'user', content: 'build a 3d raycaster maze game' }], part1, {
+      userPrompt: 'build a 3d raycaster maze game',
+      generate,
+      maxRepairs: 4
+    });
+
+    expect(result.diagnostics.repaired).toBe(true);
+    expect(result.diagnostics.truncationDetected).toBe(false);
+    expect(result.content).toContain('const srd = (my *Math.sin(angle));');
+    expect(result.content).toContain('</html>');
+  });
+});
+
+describe('stitchContinuationChunk', () => {
+  it('stitches text when continuation continues inline mid-expression', () => {
+    const orig = 'const srd = (my *';
+    const cont = ' Math.sin(angle));';
+    const { stitched, deltaText } = stitchContinuationChunk(orig, cont);
+    expect(stitched).toBe('const srd = (my * Math.sin(angle));');
+    expect(deltaText).toBe(' Math.sin(angle));');
+  });
+
+  it('deduplicates prefix overlap when model repeats the last token slice', () => {
+    const orig = 'function loop() { const srd = (my *';
+    const cont = 'const srd = (my * Math.sin(angle)); }';
+    const { stitched, deltaText, overlapLength } = stitchContinuationChunk(orig, cont);
+    expect(overlapLength).toBeGreaterThan(0);
+    expect(stitched).toBe('function loop() { const srd = (my * Math.sin(angle)); }');
+    expect(deltaText).toBe(' Math.sin(angle)); }');
+  });
+
+  it('strips redundant code fences if model restarts with ```html inside an open fence', () => {
+    const orig = '```html\n<!DOCTYPE html><html><body><script>const a = 1;';
+    const cont = '```html\nconst b = 2;\n</script></body></html>\n```';
+    const { stitched, deltaText } = stitchContinuationChunk(orig, cont);
+    expect(stitched).toBe('```html\n<!DOCTYPE html><html><body><script>const a = 1;const b = 2;\n</script></body></html>\n```');
+    expect(deltaText).toBe('const b = 2;\n</script></body></html>\n```');
+  });
+
+  it('strips continuation chatter preamble', () => {
+    const orig = 'const speed = 5;';
+    const cont = 'Continuing the code:\nconst score = 10;';
+    const { stitched } = stitchContinuationChunk(orig, cont);
+    expect(stitched).toContain('const score = 10;');
+    expect(stitched).not.toContain('Continuing the code:');
   });
 });

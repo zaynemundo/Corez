@@ -9,6 +9,7 @@
 
 import { runProviderChain, runStreamingChain } from './providerChain.js';
 import { verifyCreation, buildRepairPrompt } from './creationVerifier.js';
+import { detectTruncation, stitchContinuationChunk } from './responseProcessor.js';
 
 const MAX_REPAIR_ROUNDS = 5;
 const LEASE_MS = 5 * 60 * 1000;
@@ -255,6 +256,56 @@ export async function* runCreationHarness(options) {
         if (isRepair && collected.trim()) state.build = collected;
         await persist(store, taskId, state);
         throw err;
+      }
+
+      // Auto-continuation loop: if the generation was truncated mid-syntax
+      // (token limit reached, unclosed script/tags, unclosed fences), stream
+      // continuation chunks seamlessly until the artifact is complete.
+      let continuationPass = 0;
+      const MAX_CONTINUATION_PASSES = 10;
+      while (continuationPass < MAX_CONTINUATION_PASSES && collected.trim()) {
+        const truncation = detectTruncation(collected);
+        const creationCheck = verifyCreation(collected, { intentType: state.intentType });
+        const isCutoff = truncation.truncated || creationCheck.failures.some((f) => f.code === 'truncated-block' || f.code === 'incomplete-html');
+        if (!isCutoff) break;
+
+        continuationPass += 1;
+        yield { type: 'phase', phase: 'continuing', attempt: continuationPass, total: MAX_CONTINUATION_PASSES };
+
+        const continuationMessages = [
+          ...baseSystem,
+          buildContext,
+          ...userMessages,
+          { role: 'assistant', content: collected },
+          {
+            role: 'user',
+            content: '[CONTINUATION] Do NOT restart from the beginning. Do NOT repeat previous lines. Continue writing from the exact stopping point until the entire file/document is complete. Ensure all <script>, <body>, and <html> tags and markdown code blocks are properly closed.'
+          }
+        ];
+
+        let continuationChunk = '';
+        try {
+          for await (const event of runStreamingChain(continuationMessages, { env, signal })) {
+            if (event.type === 'delta') {
+              continuationChunk += event.text;
+            } else if (event.type === 'usage' && event.outputTokens) {
+              outputTokens = (outputTokens || 0) + event.outputTokens;
+            }
+          }
+        } catch (contErr) {
+          if (signal?.aborted) throw contErr;
+          break;
+        }
+
+        if (!continuationChunk.trim()) break;
+        const { stitched, deltaText } = stitchContinuationChunk(collected, continuationChunk);
+        if (deltaText) {
+          yield { type: 'delta', text: deltaText };
+        }
+        if (stitched.length <= collected.length) break;
+        collected = stitched;
+        state.build = collected;
+        await persist(store, taskId, state);
       }
 
       state.build = collected;

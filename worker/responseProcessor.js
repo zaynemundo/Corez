@@ -32,6 +32,21 @@ export function detectTruncation(content, options = {}) {
     if (opens > closes) signals.push(`unmatched-${open}${close}`);
   }
 
+  // Check for unclosed script and style blocks
+  const scriptOpens = (text.match(/<script\b[^>]*>/gi) || []).length;
+  const scriptCloses = (text.match(/<\/script>/gi) || []).length;
+  if (scriptOpens > scriptCloses) signals.push('unclosed-script-tag');
+
+  const styleOpens = (text.match(/<style\b[^>]*>/gi) || []).length;
+  const styleCloses = (text.match(/<\/style>/gi) || []).length;
+  if (styleOpens > styleCloses) signals.push('unclosed-style-tag');
+
+  // Check for document-like HTML missing its closing html tag
+  const isHtmlDoc = /<!doctype\s+html|<html[\s>]/i.test(text);
+  if (isHtmlDoc && !/<\/html>/i.test(text)) {
+    signals.push('unclosed-html-root');
+  }
+
   const proseView = text
     .replace(/```[\s\S]*?(```|$)/g, (m) => ' '.repeat(m.length))
     .replace(/`[^`\n]*`/g, (m) => ' '.repeat(m.length));
@@ -67,6 +82,12 @@ export function detectTruncation(content, options = {}) {
     if (TRAILING_CONJUNCTIONS.test(prose)) signals.push('ends-with-conjunction');
     else if (/:\s*$/.test(prose)) signals.push('unfinished-list-intro');
     else if (TRAILING_OPENERS.test(prose)) signals.push('mid-sentence-cutoff');
+  }
+
+  // Dangling JS arithmetic, assignment or logical operators at the end of the text
+  const trimmed = text.trim();
+  if (/[+\-*\/%=&|^~?:;,(\[{]\s*$/.test(trimmed) && !/-->\s*$/.test(trimmed) && !/\/>\s*$/.test(trimmed)) {
+    signals.push('dangling-expression-operator');
   }
 
   if (stopReason === 'length') signals.push('provider-stop-reason-length');
@@ -356,6 +377,59 @@ export function scoreContinuity({ project, response, userPrompt }) {
   return { score, checks, codeBlockCount: blocks.length, retainedLineRatio: retentionRatio };
 }
 
+export function stitchContinuationChunk(original, continuation) {
+  const orig = String(original || '');
+  let cont = String(continuation || '');
+
+  if (!cont.trim()) {
+    return { stitched: orig, deltaText: '', overlapLength: 0 };
+  }
+
+  // 1. Strip redundant model introductory chatter if any
+  cont = cont.replace(/^(?:Here is the continuation|Continuing from where it stopped|Continuing the code|Continuing code|Continuing|Here's the rest|Continued):\s*\n?/i, '');
+
+  // 2. If original is inside an open markdown code block, and continuation opens a redundant markdown fence
+  const origHasOpenFence = countFences(orig) % 2 === 1;
+  if (origHasOpenFence) {
+    // If continuation starts with a code fence like ```html or ```js, remove that opening fence line
+    cont = cont.replace(/^```[a-zA-Z0-9_-]*\s*\n/, '');
+  }
+
+  // 3. Sliding window prefix overlap deduplication
+  let overlapLength = 0;
+  const maxSearch = Math.min(200, orig.length, cont.length);
+  for (let len = maxSearch; len >= 3; len -= 1) {
+    const endSlice = orig.slice(-len);
+    if (cont.startsWith(endSlice)) {
+      overlapLength = len;
+      break;
+    }
+  }
+
+  if (overlapLength === 0) {
+    const origTrimmed = orig.replace(/\s+$/, '');
+    const maxTrimmedSearch = Math.min(200, origTrimmed.length, cont.length);
+    for (let len = maxTrimmedSearch; len >= 4; len -= 1) {
+      const endSlice = origTrimmed.slice(-len);
+      if (cont.startsWith(endSlice)) {
+        overlapLength = len;
+        cont = cont.slice(overlapLength);
+        const stitched = origTrimmed + cont;
+        return { stitched, deltaText: cont, overlapLength };
+      }
+    }
+    // If no overlap and joining prose outside code, ensure word boundary spacing
+    if (!origHasOpenFence && /[a-zA-Z0-9,;:]$/.test(orig) && !/^\s/.test(cont) && !/^[.?!]/.test(cont)) {
+      cont = ' ' + cont;
+    }
+  } else {
+    cont = cont.slice(overlapLength);
+  }
+
+  const stitched = orig + cont;
+  return { stitched, deltaText: cont, overlapLength };
+}
+
 function buildContinuationMessages(messages, originalContent, reason) {
   let reasonInstruction;
   if (reason.includes('missing-code')) {
@@ -363,7 +437,7 @@ function buildContinuationMessages(messages, originalContent, reason) {
   } else if (reason.includes('syntax-failure')) {
     reasonInstruction = `The code in your previous answer has a syntax error (${reason}). Return the COMPLETE corrected answer with the fixed code — same content, same framework, only the syntax corrected.`;
   } else {
-    reasonInstruction = 'Do NOT restart. Continue from the exact point where it stopped and finish it completely, preserving the language, code and structure already present.';
+    reasonInstruction = 'Do NOT restart from the beginning. Do NOT repeat previous lines. Continue writing from the exact stopping point until the entire file/document is complete. Ensure all <script>, <body>, and <html> tags and markdown code blocks are properly closed.';
   }
   return [
     ...messages.filter((m) => m?.role === 'system'),
@@ -382,6 +456,11 @@ export function mergeResponse(original, repair, reason) {
   if (reason === 'wrong-language' || reason === 'language mismatch'
     || reason.startsWith('syntax-failure') || reason === 'missing-code-for-modification') return repairText;
   if (originalText.endsWith(repairText.slice(0, 30))) return originalText;
+
+  if (typeof reason === 'string' && reason.startsWith('truncation')) {
+    return stitchContinuationChunk(originalText, repairText).stitched;
+  }
+
   if (countFences(originalText) % 2 === 1) {
     if (repairText.startsWith('```')) {
       const lastFenceStart = originalText.lastIndexOf('```');

@@ -4,7 +4,7 @@ import { fetchAwwwardsInspiration, handleInspiration } from './inspiration.js';
 import { safeErrorDetail, readBoundedJson, jsonResponse, createTaskStateStore, createRateLimiter } from './utils.js';
 import { runProviderChain, runStreamingChain, callOpenRouterImage } from './providerChain.js';
 import { runCreationHarness } from './harness.js';
-import { processResponse } from './responseProcessor.js';
+import { processResponse, detectTruncation, stitchContinuationChunk } from './responseProcessor.js';
 import {
   parseProjectState,
   deriveProjectState,
@@ -751,23 +751,69 @@ async function handleAi(request, env) {
             } else if (event.type === 'done') {
               providerId = providerId || event.provider || null;
               providerModel = providerModel || event.model || null;
+
+              // Streaming auto-continuation: if output ended mid-generation (token limit, unclosed blocks)
+              let continuationCount = 0;
+              const MAX_STREAM_CONTINUATIONS = 8;
+              let currentStopReason = event.finishReason || null;
+              while (continuationCount < MAX_STREAM_CONTINUATIONS && collected.trim()) {
+                const streamTruncation = detectTruncation(collected, { stopReason: currentStopReason });
+                if (!streamTruncation.truncated) break;
+                continuationCount += 1;
+                controller.enqueue(encoder.encode(sse({ type: 'phase', phase: 'continuing', attempt: continuationCount, total: MAX_STREAM_CONTINUATIONS })));
+
+                const streamContMessages = [
+                  ...apiMessages,
+                  { role: 'assistant', content: collected },
+                  {
+                    role: 'user',
+                    content: '[CONTINUATION] Do NOT restart from the beginning. Do NOT repeat previous lines. Continue writing from the exact stopping point until the entire file/document is complete. Ensure all <script>, <body>, and <html> tags and markdown code blocks are properly closed.'
+                  }
+                ];
+
+                let contChunk = '';
+                let nextStopReason = null;
+                try {
+                  for await (const contEvent of runStreamingChain(streamContMessages, chainOptions)) {
+                    if (contEvent.type === 'delta') {
+                      contChunk += contEvent.text;
+                    } else if (contEvent.type === 'usage' && contEvent.outputTokens) {
+                      outputTokens = (outputTokens || 0) + contEvent.outputTokens;
+                    } else if (contEvent.type === 'done') {
+                      nextStopReason = contEvent.finishReason || null;
+                    }
+                  }
+                } catch {
+                  break;
+                }
+
+                if (!contChunk.trim()) break;
+                const { stitched, deltaText } = stitchContinuationChunk(collected, contChunk);
+                if (deltaText && !bufferForSkillVerification) {
+                  controller.enqueue(encoder.encode(sse({ type: 'delta', text: deltaText })));
+                }
+                if (stitched.length <= collected.length) break;
+                collected = stitched;
+                currentStopReason = nextStopReason;
+              }
+
               // Post-stream validation: truncation/language repair.
               const repairUsage = [];
               const repair = await processResponse(apiMessages, collected, {
                 userPrompt: prompt,
                 project: activeProject,
-                stopReason: event.finishReason || null,
+                stopReason: currentStopReason,
                 generate: async (repairMessages) => {
                   const repaired = await runProviderChain(repairMessages, {
                     env,
                     signal: clientDisconnectSignal,
                     store: createTaskStateStore(env),
                     sleep: retrySleepFor(env),
-                                  });
+                  });
                   if (repaired?.usage) repairUsage.push(repaired.usage);
                   return repaired.content ? repaired : null;
                 },
-                maxRepairs: 2
+                maxRepairs: 4
               });
               if (repair.diagnostics.repaired && repair.diagnostics.repairReasons.length > 0) {
                 controller.enqueue(encoder.encode(sse({ type: 'validation', action: 'repaired', reasons: repair.diagnostics.repairReasons })));

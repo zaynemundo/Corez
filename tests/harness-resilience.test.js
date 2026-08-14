@@ -371,4 +371,41 @@ describe('runCreationHarness resilience', () => {
     // Budget exhausted: harness still completes (best-effort delivery).
     expect(events.some((e) => e.type === 'done')).toBe(true);
   });
+
+  it('H6: auto-continues a truncated build stream until the HTML and script blocks are fully closed', async () => {
+    const part1 = `<!DOCTYPE html><html><body><canvas id="c"></canvas><script>let x = 0;\nfunction gameLoop() { update(); render(); }\nconst srd = (my *`;
+    const part2 = `Math.sin(angle));\nfunction update(){}\nfunction render(){}\ndocument.addEventListener('keydown', function(){});\ncanvas.addEventListener('mousemove', function(){});\nrequestAnimationFrame(gameLoop);\n</script></body></html>`;
+
+    runStreamingChain.mockImplementation(async function* (messages) {
+      const serialized = JSON.stringify(messages || []);
+      if (serialized.includes('[CONTINUATION]')) {
+        yield { type: 'delta', text: part2 };
+        yield { type: 'done', finishReason: 'stop' };
+        return;
+      }
+      yield { type: 'delta', text: part1 };
+      yield { type: 'done', finishReason: 'length' };
+    });
+
+    const fetchMock = vi.fn(async (_url, init) => {
+      const messages = JSON.stringify(JSON.parse(init.body).messages || []);
+      if (messages.includes('Produce a concise build specification')) return jsonCompletion('spec');
+      if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('APPROVED');
+      return jsonCompletion('');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const events = [];
+    await drain(runCreationHarness(harnessOptions()), events);
+
+    // The continuing phase event must be emitted
+    const continuing = events.filter((e) => e.type === 'phase' && e.phase === 'continuing');
+    expect(continuing.length).toBeGreaterThan(0);
+
+    // The full artifact must contain the stitched completion
+    const finalBuild = collectDeltas(events);
+    expect(finalBuild).toContain('const srd = (my *Math.sin(angle));');
+    expect(finalBuild).toContain('</html>');
+    expect(events.some((e) => e.type === 'done')).toBe(true);
+  });
 });
