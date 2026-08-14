@@ -653,10 +653,13 @@ async function handleAi(request, env) {
   // to every provider, so a fallback resumes the same task — completed work
   // is never restarted.
   //
-  // Generations run as long as the model needs and may use as many tokens as
-  // it wants: no timeouts and no output caps on the provider calls. The only
-  // abort is the client disconnecting (Stop button, tab close), which must
-  // not leave paid generations running.
+  // Generations run uncapped (no output ceilings): the provider decides how
+  // long it generates. The only hard time limits are the per-provider
+  // deadline guards in providerChain.js (first-token / mid-stream silence /
+  // non-stream total) and the harness total budget — both fail loudly with an
+  // SSE error event instead of letting a hung upstream get killed by the
+  // platform wall-clock limit, which truncated the stream silently and made
+  // the client report "Hosted AI returned no streamed content."
   const clientDisconnectSignal = (() => {
     const controller = new AbortController();
     if (request.signal) {
@@ -688,7 +691,8 @@ async function handleAi(request, env) {
             apiMessages,
             env,
             signal: clientDisconnectSignal,
-            store: createTaskStateStore(env)
+            store: createTaskStateStore(env),
+            sleep: retrySleepFor(env)
           })) {
             controller.enqueue(encoder.encode(sse(event)));
           }
@@ -901,7 +905,19 @@ async function handleAi(request, env) {
               return;
             }
           }
-          controller.enqueue(encoder.encode(sse({ type: 'done', final: true, projectState: null })));
+          // Belt-and-braces: the provider chain always ends with a terminal
+          // event, but if it ever ends here without content, report an
+          // explicit error instead of a bare done with zero deltas (which the
+          // client would misread as "no streamed content").
+          if (!collected.trim()) {
+            controller.enqueue(encoder.encode(sse({
+              type: 'error',
+              message: 'The AI provider returned no content for this request after retries. Please try again.',
+              status: 502
+            })));
+          } else {
+            controller.enqueue(encoder.encode(sse({ type: 'done', final: true, projectState: null })));
+          }
           controller.close();
         } catch (err) {
           controller.enqueue(encoder.encode(sse({ type: 'error', message: safeErrorDetail(err), status: 502 })));

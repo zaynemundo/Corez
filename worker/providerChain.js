@@ -43,6 +43,24 @@ const MAX_SINGLE_SLEEP_MS = 30_000;
 const DEFAULT_REQUEST_RETRY_MS = 30_000;
 const SLEEP_CHUNK_MS = 250;
 
+// Timeout guards for upstream provider calls. A provider that hangs before
+// its first token (or stalls mid-stream, or never answers a non-stream call)
+// previously made the worker wait until Cloudflare killed the request at the
+// platform wall-clock limit — truncating the SSE stream before any delta or
+// error event reached the client, which then reported "Hosted AI returned no
+// streamed content." for a failure it could not see. The guards fail the
+// provider loudly instead: the failure is classified transient (504), the
+// chain retries or falls back, and the client always receives an explicit
+// SSE error event with the real reason.
+const DEFAULT_TTFT_TIMEOUT_MS = 120_000;     // first byte / first token
+const DEFAULT_IDLE_TIMEOUT_MS = 60_000;      // silence mid-stream
+const DEFAULT_NONSTREAM_TIMEOUT_MS = 90_000; // non-streaming call total
+
+function envTimeoutMs(env, key, fallback) {
+  const value = Number(env?.[key]);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
 function extractContentText(content) {
   if (typeof content === 'string') return content;
   // Multimodal responses can wrap text in content parts: [{ type, text }]
@@ -115,86 +133,126 @@ function parseSseData(line) {
  * final chunk carrying usage/finish_reason when the provider sends them.
  * Provider fallback is NOT handled here: runProviderChain owns the chain.
  */
-async function* streamChatEndpoint({ endpoint, key, model, label, messages, signal, extraHeaders = {}, bodyExtra = {}, onTtft }) {
+async function* streamChatEndpoint({ endpoint, key, model, label, messages, signal, extraHeaders = {}, bodyExtra = {}, onTtft, ttftTimeoutMs = DEFAULT_TTFT_TIMEOUT_MS, idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS }) {
   const requestStartedAt = Date.now();
-  let ttftEmitted = false;
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${key}`,
-      'Content-Type': 'application/json',
-      ...extraHeaders
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      stream: true,
-      ...bodyExtra
-    }),
-    signal
-  });
 
-  if (!response.ok) {
-    const detail = (await response.text().catch(() => '')).slice(0, 200);
-    const failure = new Error(`HTTP ${response.status}: ${safeErrorDetail(detail)}`);
-    failure.status = response.status;
-    const retryAfter = Number(response.headers.get('Retry-After') || 0);
-    if (Number.isFinite(retryAfter) && retryAfter > 0) failure.retryAfter = retryAfter;
-    throw failure;
+  // Deadline machinery: the client signal plus two timers — a first-token
+  // timeout and a mid-stream silence timeout. On timeout the fetch is aborted
+  // and a classified 504 is thrown so the chain retries/falls back instead of
+  // letting the request hang until the platform kills it mid-stream.
+  const controller = new AbortController();
+  const forwardAbort = () => controller.abort();
+  if (signal) {
+    if (signal.aborted) controller.abort();
+    else signal.addEventListener('abort', forwardAbort, { once: true });
   }
-
-  if (!response.body) throw new Error(`${label} streaming response had no body`);
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let usage = null;
-  let finishReason = null;
-  let sawDone = false;
+  let deadlineHit = false;
+  let firstChunk = true;
+  let ttftTimer = setTimeout(() => { deadlineHit = true; controller.abort(); }, ttftTimeoutMs);
+  let idleTimer = null;
+  const clearTimers = () => { clearTimeout(ttftTimer); clearTimeout(idleTimer); };
 
   try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-      for (const line of lines) {
-        const parsed = parseSseData(line.trim());
-        if (!parsed) continue;
-        if (parsed.done) {
-          sawDone = true;
-          continue;
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        ...extraHeaders
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: true,
+        ...bodyExtra
+      }),
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      const detail = (await response.text().catch(() => '')).slice(0, 200);
+      const failure = new Error(`HTTP ${response.status}: ${safeErrorDetail(detail)}`);
+      failure.status = response.status;
+      const retryAfter = Number(response.headers.get('Retry-After') || 0);
+      if (Number.isFinite(retryAfter) && retryAfter > 0) failure.retryAfter = retryAfter;
+      throw failure;
+    }
+
+    if (!response.body) throw new Error(`${label} streaming response had no body`);
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let usage = null;
+    let finishReason = null;
+    let sawDone = false;
+    let ttftEmitted = false;
+
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        // First chunk clears the TTFT timer; the idle timer re-arms per
+        // chunk so mid-stream silence also aborts the request.
+        if (firstChunk) {
+          firstChunk = false;
+          clearTimeout(ttftTimer);
         }
-        if (parsed.usage) usage = parsed.usage;
-        const choice = parsed.choices && parsed.choices[0];
-        if (choice?.finish_reason) finishReason = choice.finish_reason;
-        if (choice?.delta) {
-          const delta = extractContentText(choice.delta.content);
-          if (delta) {
-            if (!ttftEmitted) {
-              ttftEmitted = true;
-              const ttftMs = Date.now() - requestStartedAt;
-              if (typeof onTtft === 'function') onTtft(ttftMs);
-              yield { text: delta, ttftMs };
-            } else {
-              yield { text: delta };
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => { deadlineHit = true; controller.abort(); }, idleTimeoutMs);
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          const parsed = parseSseData(line.trim());
+          if (!parsed) continue;
+          if (parsed.done) {
+            sawDone = true;
+            continue;
+          }
+          if (parsed.usage) usage = parsed.usage;
+          const choice = parsed.choices && parsed.choices[0];
+          if (choice?.finish_reason) finishReason = choice.finish_reason;
+          if (choice?.delta) {
+            const delta = extractContentText(choice.delta.content);
+            if (delta) {
+              if (!ttftEmitted) {
+                ttftEmitted = true;
+                const ttftMs = Date.now() - requestStartedAt;
+                if (typeof onTtft === 'function') onTtft(ttftMs);
+                yield { text: delta, ttftMs };
+              } else {
+                yield { text: delta };
+              }
             }
           }
         }
       }
+      if (!sawDone && finishReason === null && !ttftEmitted) {
+        // No chunks at all: treat as empty response.
+        throw new Error('empty streaming response');
+      }
+      yield { text: '', usage, finishReason };
+    } finally {
+      try {
+        reader.releaseLock();
+      } catch {
+        // Already released.
+      }
     }
-    if (!sawDone && finishReason === null && !ttftEmitted) {
-      // No chunks at all: treat as empty response.
-      throw new Error('empty streaming response');
+  } catch (err) {
+    if (deadlineHit) {
+      const failure = new Error(
+        `${label} provider timed out (${firstChunk ? `no response within ${Math.ceil(ttftTimeoutMs / 1000)}s` : `no data for ${Math.ceil(idleTimeoutMs / 1000)}s mid-stream`}). The provider may be overloaded — please try again in a moment.`
+      );
+      failure.status = 504;
+      failure.retryable = true;
+      throw failure;
     }
-    yield { text: '', usage, finishReason };
+    throw err;
   } finally {
-    try {
-      reader.releaseLock();
-    } catch {
-      // Already released.
-    }
+    clearTimers();
+    if (signal) signal.removeEventListener('abort', forwardAbort);
   }
 }
 
@@ -241,7 +299,18 @@ async function sleepInterruptible(ms, signal, sleep) {
   }
 }
 
-async function callChatEndpoint({ endpoint, key, model, label, messages, signal, extraHeaders = {}, bodyExtra = {} }) {
+async function callChatEndpoint({ endpoint, key, model, label, messages, signal, extraHeaders = {}, bodyExtra = {}, timeoutMs = DEFAULT_NONSTREAM_TIMEOUT_MS }) {
+  // Deadline guard: same rationale as the streaming endpoint — a hung
+  // non-stream call must fail (504, transient) so the chain retries or falls
+  // back instead of hanging the whole request until the platform kills it.
+  const controller = new AbortController();
+  const forwardAbort = () => controller.abort();
+  if (signal) {
+    if (signal.aborted) controller.abort();
+    else signal.addEventListener('abort', forwardAbort, { once: true });
+  }
+  let deadlineHit = false;
+  const timer = setTimeout(() => { deadlineHit = true; controller.abort(); }, timeoutMs);
   try {
     // Every provider gets its own Authorization header from its own key:
     // credentials are never merged or forwarded between providers.
@@ -257,7 +326,7 @@ async function callChatEndpoint({ endpoint, key, model, label, messages, signal,
         messages,
         ...bodyExtra
       }),
-      signal
+      signal: controller.signal
     });
 
     if (!response.ok) {
@@ -284,11 +353,20 @@ async function callChatEndpoint({ endpoint, key, model, label, messages, signal,
       stopReason: data?.choices?.[0]?.finish_reason || null
     };
   } catch (err) {
+    if (deadlineHit) {
+      const failure = new Error(`${label} provider timed out after ${Math.ceil(timeoutMs / 1000)}s. The provider may be overloaded — please try again in a moment.`);
+      failure.status = 504;
+      failure.retryable = true;
+      return { failure, classified: classifyProviderFailure(failure) };
+    }
     console.warn(`${label} model ${model} request failed:`, safeErrorDetail(err));
     const failure = err instanceof Error ? err : new Error(safeErrorDetail(err));
     if (failure.status === undefined && Number(err?.status)) failure.status = Number(err.status);
     if (err?.retryAfter) failure.retryAfter = err.retryAfter;
     return { failure, classified: classifyProviderFailure(failure) };
+  } finally {
+    clearTimeout(timer);
+    if (signal) signal.removeEventListener('abort', forwardAbort);
   }
 }
 
@@ -301,6 +379,9 @@ async function callChatEndpoint({ endpoint, key, model, label, messages, signal,
  */
 export function buildProviderChain(env = {}) {
   const chain = [];
+  const ttftTimeoutMs = envTimeoutMs(env, 'AI_TTFT_TIMEOUT_MS', DEFAULT_TTFT_TIMEOUT_MS);
+  const idleTimeoutMs = envTimeoutMs(env, 'AI_IDLE_TIMEOUT_MS', DEFAULT_IDLE_TIMEOUT_MS);
+  const nonstreamTimeoutMs = envTimeoutMs(env, 'AI_NONSTREAM_TIMEOUT_MS', DEFAULT_NONSTREAM_TIMEOUT_MS);
 
   const opencodeKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY;
   if (opencodeKey && !isDisabled(env?.OPENCODE_GO_DISABLED)) {
@@ -310,7 +391,10 @@ export function buildProviderChain(env = {}) {
       key: opencodeKey,
       model,
       label: 'opencode',
-      extraHeaders: { 'HTTP-Referer': 'https://corez.ai', 'X-Title': 'COREZ AI' }
+      extraHeaders: { 'HTTP-Referer': 'https://corez.ai', 'X-Title': 'COREZ AI' },
+      ttftTimeoutMs,
+      idleTimeoutMs,
+      timeoutMs: nonstreamTimeoutMs
     });
     chain.push({
       id: 'opencode-go',
@@ -337,7 +421,10 @@ export function buildProviderChain(env = {}) {
       endpoint: envOverrides.endpoint || env?.DEEPSEEK_ENDPOINT || DEEPSEEK_DEFAULT_ENDPOINT,
       key: deepseekKey,
       model,
-      label: 'deepseek'
+      label: 'deepseek',
+      ttftTimeoutMs,
+      idleTimeoutMs,
+      timeoutMs: nonstreamTimeoutMs
     });
     chain.push({
       id: 'deepseek',
@@ -366,7 +453,10 @@ export function buildProviderChain(env = {}) {
       key: openrouterKey,
       model,
       label: 'openrouter',
-      extraHeaders: { 'HTTP-Referer': 'https://corez.ai', 'X-Title': 'COREZ AI' }
+      extraHeaders: { 'HTTP-Referer': 'https://corez.ai', 'X-Title': 'COREZ AI' },
+      ttftTimeoutMs,
+      idleTimeoutMs,
+      timeoutMs: nonstreamTimeoutMs
     });
     chain.push({
       id: 'openrouter',
@@ -680,6 +770,15 @@ export async function callOpenRouterImage(apiKey, prompt, parentSignal, imageMod
       ]
     : prompt;
   for (const model of models) {
+    // Deadline guard: a hung image generation must not hang the request.
+    const controller = new AbortController();
+    const forwardAbort = () => controller.abort();
+    if (parentSignal) {
+      if (parentSignal.aborted) controller.abort();
+      else parentSignal.addEventListener('abort', forwardAbort, { once: true });
+    }
+    let deadlineHit = false;
+    const timer = setTimeout(() => { deadlineHit = true; controller.abort(); }, 60_000);
     try {
       const response = await fetch(OPENROUTER_DEFAULT_ENDPOINT, {
         method: 'POST',
@@ -693,7 +792,7 @@ export async function callOpenRouterImage(apiKey, prompt, parentSignal, imageMod
           model,
           messages: [{ role: 'user', content: userContent }]
         }),
-        signal: parentSignal
+        signal: controller.signal
       });
 
       if (response.ok) {
@@ -715,7 +814,12 @@ export async function callOpenRouterImage(apiKey, prompt, parentSignal, imageMod
         if (content.startsWith('data:image')) return { url: content, model };
       }
     } catch (err) {
-      console.warn(`OpenRouter image generation attempt failed (${model}):`, safeErrorDetail(err));
+      if (!deadlineHit) {
+        console.warn(`OpenRouter image generation attempt failed (${model}):`, safeErrorDetail(err));
+      }
+    } finally {
+      clearTimeout(timer);
+      if (parentSignal) parentSignal.removeEventListener('abort', forwardAbort);
     }
   }
   return null;

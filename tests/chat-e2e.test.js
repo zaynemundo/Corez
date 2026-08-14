@@ -230,6 +230,128 @@ describe('E2E /api/ai pipeline', () => {
     expect(response.status).toBe(403);
   });
 
+  // ---------------------------------------------------------------------
+  // Provider deadline guards. A hung upstream (no first token, mid-stream
+  // silence, or a never-answering non-stream call) previously made the
+  // worker wait until the platform killed the request mid-stream — the
+  // client then saw a truncated SSE body with zero deltas and zero error
+  // events and reported "Hosted AI returned no streamed content." The
+  // guards must fail the provider loudly instead: an explicit error event
+  // (streaming) or a retry schedule (non-streaming).
+  // NOTE: these must run BEFORE the rate-limit test below, which exhausts
+  // the per-client AI request budget for the whole test file.
+  // ---------------------------------------------------------------------
+
+  function parseSseEvents(text) {
+    return [...text.matchAll(/data: (\{.*?\})\n\n/g)].map((m) => JSON.parse(m[1]));
+  }
+
+  // Mirrors real fetch semantics: the request promise rejects with an
+  // AbortError when the caller's AbortSignal fires (the deadline timers
+  // abort the signal) — just like a fetch to a provider that never answers.
+  function hungFetchMock() {
+    return vi.fn((url, init) => new Promise((resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => {
+        reject(new DOMException('Aborted', 'AbortError'));
+      }, { once: true });
+    }));
+  }
+
+  it('emits an explicit error event when a provider hangs before the first token', async () => {
+    vi.stubGlobal('fetch', hungFetchMock());
+    const timeoutEnv = {
+      OPENCODE_GO_API_KEY: 'sk-test',
+      __COREZ_RETRY_SLEEP_MS: '0',
+      AI_TTFT_TIMEOUT_MS: '50'
+    };
+    const response = await post(swarmWorker, {
+      prompt: 'Build me a 3d game',
+      intent: { type: 'app', summary: 'Create a 3d game.' },
+      stream: true
+    }, timeoutEnv);
+    expect(response.status).toBe(200);
+    const events = parseSseEvents(await response.text());
+    const error = events.find((e) => e.type === 'error');
+    expect(error).toBeTruthy();
+    expect(error.message).toContain('timed out');
+    // The stream must never end with zero deltas and no error event.
+    expect(events.filter((e) => e.type === 'delta')).toHaveLength(0);
+    expect(events.find((e) => e.type === 'done')).toBeUndefined();
+  });
+
+  it('emits an explicit error event when a provider stalls mid-stream', async () => {
+    let abortStream = null;
+    vi.stubGlobal('fetch', vi.fn((url, init) => {
+      let push;
+      const stream = new ReadableStream({
+        start(controller) {
+          push = controller;
+          controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"hi"}}]}\n\n'));
+        }
+      });
+      abortStream = () => push.error(new DOMException('Aborted', 'AbortError'));
+      init?.signal?.addEventListener('abort', abortStream, { once: true });
+      return new Response(stream, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+    }));
+    const timeoutEnv = {
+      OPENCODE_GO_API_KEY: 'sk-test',
+      __COREZ_RETRY_SLEEP_MS: '0',
+      AI_IDLE_TIMEOUT_MS: '50'
+    };
+    const response = await post(swarmWorker, {
+      prompt: 'Explain the internet',
+      intent: { type: 'explanation', summary: 'Explain a concept.' },
+      stream: true
+    }, timeoutEnv);
+    expect(response.status).toBe(200);
+    const events = parseSseEvents(await response.text());
+    const error = events.find((e) => e.type === 'error');
+    expect(error).toBeTruthy();
+    expect(error.message).toContain('timed out');
+  });
+
+  it('schedules a retry when a non-streaming provider call hangs', async () => {
+    vi.stubGlobal('fetch', hungFetchMock());
+    const timeoutEnv = {
+      OPENCODE_GO_API_KEY: 'sk-test',
+      __COREZ_RETRY_SLEEP_MS: '0',
+      AI_NONSTREAM_TIMEOUT_MS: '50'
+    };
+    const response = await post(swarmWorker, {
+      prompt: 'Explain the internet',
+      intent: { type: 'explanation', summary: 'Explain a concept.' }
+    }, timeoutEnv);
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    // The provider could not recover inside this request's window: the
+    // request is deferred with a retry schedule instead of a silent failure.
+    expect(data.status).toBe('retry-scheduled');
+    expect(data.retryAfterSeconds).toBeGreaterThan(0);
+  });
+
+  it('fails a hung harness build with an explicit error event', async () => {
+    vi.stubGlobal('fetch', hungFetchMock());
+    const timeoutEnv = {
+      OPENCODE_GO_API_KEY: 'sk-test',
+      __COREZ_RETRY_SLEEP_MS: '0',
+      AI_NONSTREAM_TIMEOUT_MS: '50',
+      AI_TTFT_TIMEOUT_MS: '50',
+      AI_HARNESS_TIMEOUT_MS: '1000'
+    };
+    const response = await post(swarmWorker, {
+      prompt: 'Build me a 3d game',
+      intent: { type: 'app', summary: 'Create a 3d game.' },
+      harness: true,
+      stream: true
+    }, timeoutEnv);
+    expect(response.status).toBe(200);
+    const events = parseSseEvents(await response.text());
+    const error = events.find((e) => e.type === 'error');
+    expect(error).toBeTruthy();
+    expect(error.message).toMatch(/timed out|temporarily busy/i);
+    expect(error.status).toBe(502);
+  });
+
   it('rate-limits abusive clients at the auth layer', async () => {
     const fetchMock = vi.fn(async () => mockOpenAI('answer'));
     vi.stubGlobal('fetch', fetchMock);

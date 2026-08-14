@@ -17,6 +17,12 @@ const LEASE_MS = 5 * 60 * 1000;
 // generation (uncapped build stream, slow spec/review) never lets the lease
 // expire mid-flight and admit a duplicate concurrent build.
 const HEARTBEAT_INTERVAL_MS = 30 * 1000;
+// Total wall-clock budget for one harness run (env AI_HARNESS_TIMEOUT_MS
+// overrides). Each provider call is separately deadline-guarded in the chain;
+// this cap additionally guarantees the whole multi-phase build always ends
+// with a terminal SSE event (error or done) well before Cloudflare's platform
+// wall-clock limit could kill the request mid-stream and truncate it silently.
+const DEFAULT_HARNESS_TIMEOUT_MS = 240_000;
 
 const SPEC_INSTRUCTION =
   'Produce a concise build specification (max 250 words) for the request below: the purpose, the key screens or features, controls (for games), and confirmation that the deliverable is ONE self-contained HTML file. Do not write any code. Answer directly: do not include internal reasoning or thinking.';
@@ -65,6 +71,7 @@ export async function* runCreationHarness(options) {
     env,
     signal,
     store,
+    sleep,
     heartbeatIntervalMs = HEARTBEAT_INTERVAL_MS
   } = options;
 
@@ -72,6 +79,22 @@ export async function* runCreationHarness(options) {
   const baseSystem = apiMessages.filter((m) => m.role === 'system');
   const userMessages = apiMessages.filter((m) => m.role !== 'system');
   const now = Date.now();
+
+  const configuredTimeout = Number(env?.AI_HARNESS_TIMEOUT_MS);
+  const totalTimeoutMs = options.totalTimeoutMs
+    || (Number.isFinite(configuredTimeout) && configuredTimeout > 0 ? configuredTimeout : DEFAULT_HARNESS_TIMEOUT_MS);
+  const deadlineAt = now + totalTimeoutMs;
+  // Throws a retryable 504 when the whole build has run past its budget, so
+  // the client gets an explicit error event instead of a stream killed by the
+  // platform wall-clock limit (which would read as "no streamed content").
+  const ensureWithinDeadline = () => {
+    if (Date.now() > deadlineAt) {
+      const err = new Error(`This build took longer than ${Math.ceil(totalTimeoutMs / 1000)}s. The AI providers may be overloaded — please try again in a moment.`);
+      err.status = 504;
+      err.retryable = true;
+      throw err;
+    }
+  };
 
   const state = (await store.load(taskId)) || {
     taskId,
@@ -152,6 +175,7 @@ export async function* runCreationHarness(options) {
   try {
     // 1. PLANNING — a compact spec (resumable, buffered, not streamed).
     if (!state.spec) {
+      ensureWithinDeadline();
       yield reportPhase('planning');
       const specMessages = [
         ...baseSystem,
@@ -162,7 +186,8 @@ export async function* runCreationHarness(options) {
         env,
         signal,
         store: null,
-          });
+        sleep
+      });
       if (signal?.aborted || specResult?.status === 'cancelled') {
         state.busy = false;
         state.status = 'interrupted';
@@ -196,6 +221,7 @@ export async function* runCreationHarness(options) {
     // after 3 rounds resumes with 2 left, never a fresh 5.
     let repairBudget = Math.max(0, MAX_REPAIR_ROUNDS - (state.repairCount || 0));
     while (state.build === null || (state.verification && !state.verification.passed && repairBudget > 0)) {
+      ensureWithinDeadline();
       const isRepair = state.build !== null;
       if (isRepair) {
         repairBudget -= 1;
@@ -264,6 +290,7 @@ export async function* runCreationHarness(options) {
       let continuationPass = 0;
       const MAX_CONTINUATION_PASSES = 10;
       while (continuationPass < MAX_CONTINUATION_PASSES && collected.trim()) {
+        ensureWithinDeadline();
         const truncation = detectTruncation(collected);
         const creationCheck = verifyCreation(collected, { intentType: state.intentType });
         const isCutoff = truncation.truncated || creationCheck.failures.some((f) => f.code === 'truncated-block' || f.code === 'incomplete-html');
@@ -332,6 +359,7 @@ export async function* runCreationHarness(options) {
 
     // 5. REVIEW — the model sanity-checks functionality; one final repair
     // round if it flags a defect and the budget allows.
+    ensureWithinDeadline();
     yield reportPhase('reviewing');
     const reviewMessages = [
       ...baseSystem,
@@ -342,7 +370,8 @@ export async function* runCreationHarness(options) {
       env,
       signal,
       store: null,
-      });
+      sleep
+    });
     if (signal?.aborted || reviewResult?.status === 'cancelled') {
       state.busy = false;
       state.status = 'interrupted';
@@ -365,6 +394,7 @@ export async function* runCreationHarness(options) {
         };
 
     if (!state.review.approved && state.repairCount < MAX_REPAIR_ROUNDS) {
+      ensureWithinDeadline();
       state.repairCount += 1;
       yield reportPhase('repairing');
       yield { type: 'clear' };
