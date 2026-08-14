@@ -5,7 +5,6 @@ css="src/index.css"
 app="src/App.jsx"
 canvas="src/components/CanvasPreview.jsx"
 sidebar="src/components/Sidebar.jsx"
-market_card="src/components/MarketCard.jsx"
 failures=0
 
 check() {
@@ -254,30 +253,6 @@ check 'reduced motion query disables sidebar animation' '@media \(prefers-reduce
 check_top_level_media 'sidebar prefers-reduced-motion at top level' '@media \(prefers-reduced-motion: reduce\)' "$css"
 check 'mobile sidebar uses safe-area insets' 'env\(safe-area-inset-'
 
-# Market Card Responsive and Accessibility Contract Checks
-check_block_property 'market card has a responsive grid' '.market-controls' 'grid-template-columns' 'repeat(2, minmax(0, 1fr))' "$css"
-check_block_property_in_media 'market card mobile controls collapse inside the mobile breakpoint' '@media (max-width: 767px)' '.market-controls' 'grid-template-columns' '1fr;' "$css"
-check_block_property 'market card chart remains width-fluid' '.market-chart' 'width' '100%' "$css"
-check_block_property 'market card chart cannot exceed its container' '.market-chart' 'max-width' '100%' "$css"
-check_block_property 'market card chart wrapper can shrink without overflow' '.market-chart-block' 'min-width' '0' "$css"
-check_block_property 'market card stays within its chat message' '.market-card' 'max-width' '100%' "$css"
-check_block_property 'market refresh has a touch-sized target' '.market-refresh,' 'min-height' '44px' "$css"
-check_block_property 'market retry has a touch-sized target' '.market-retry,' 'min-height' '44px' "$css"
-check_block_property 'market ranges have touch-sized targets' '.market-ranges button' 'min-height' '44px' "$css"
-check_block_property 'market inputs have touch-sized targets' '.market-controls input,' 'min-height' '44px' "$css"
-check_block_property 'market selects have touch-sized targets' '.market-controls select' 'min-height' '44px' "$css"
-check 'market card has explicit focus-visible treatment' '\.market-card[^\{]*:focus-visible' "$css"
-check 'market card has restrained positive theme color' '--market-positive:' "$css"
-check 'market card has restrained negative theme color' '--market-negative:' "$css"
-check_block_property 'light theme overrides market positive color' '[data-theme="light"]' '--market-positive' '#15803d' "$css"
-check_block_property 'light theme overrides market negative color' '[data-theme="light"]' '--market-negative' '#b91c1c' "$css"
-check_block_property 'market refresh state uses contrast-safe secondary text' '.market-refresh-state' 'color' 'var(--text-secondary)' "$css"
-check_block_property 'market empty chart text uses contrast-safe secondary text' '.market-chart-empty' 'color' 'var(--text-secondary)' "$css"
-check_block_property 'market card respects reduced motion' '.market-refresh svg' 'animation' 'none !important' "$css"
-check 'market card exposes a labelled region' 'role="region"' "$market_card"
-check 'market chart stretches its viewBox to the fluid chart bounds' 'preserveAspectRatio="none"' "$market_card"
-check 'market movement includes words in addition to color' "movingUp \? 'Up' : 'Down'" "$market_card"
-check 'market disclosure identifies indicative data' 'Indicative data' "$market_card"
 
 if (( failures > 0 )); then
   printf '%d responsive UI contract check(s) failed.\n' "$failures" >&2

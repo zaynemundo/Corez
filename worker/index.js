@@ -1,4 +1,3 @@
-import { handleMarket } from './market.js';
 import { handleSearch } from './search.js';
 import { fetchAwwwardsInspiration, handleInspiration } from './inspiration.js';
 import { safeErrorDetail, readBoundedJson, jsonResponse, createTaskStateStore, createRateLimiter } from './utils.js';
@@ -1893,9 +1892,6 @@ export default {
     }
     if (pathname === '/api/image') {
       return handleImage(request, env);
-    }
-    if (pathname === '/api/market') {
-      return handleMarket(request, env);
     }
     if (pathname === '/api/search') {
       return handleSearch(request, env);

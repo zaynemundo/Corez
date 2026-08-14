@@ -11,7 +11,6 @@ import {
   Pencil,
   X
 } from 'lucide-react';
-import MarketCard from './MarketCard';
 
 function safeImageUrl(url) {
   if (!url || typeof url !== 'string') return '';
@@ -482,7 +481,7 @@ function EmailCard({ content, renderBody }) {
   );
 }
 
-export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onRefreshMarket, marketRefreshing = false }) {
+export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
   const isUser = message.role === 'user';
 
   const renderAttachments = (attachments) => {
@@ -848,19 +847,8 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onRe
     <div className={`message-wrapper ${isUser ? 'user' : 'ai'}`}>
       <div className="message-body">
         <div className="message-content">
-          {message.type === 'market' ? (
-            <MarketCard
-              market={message.market}
-              request={message.request}
-              onRefresh={onRefreshMarket}
-              refreshing={marketRefreshing}
-            />
-          ) : (
-            <>
-              {isUser && renderAttachments(message.attachments)}
-              {renderFormattedText(message.content)}
-            </>
-          )}
+          {isUser && renderAttachments(message.attachments)}
+          {renderFormattedText(message.content)}
         </div>
         {!isUser && (
           <MessageActions content={message.content || ''} />

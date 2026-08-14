@@ -8,14 +8,13 @@ const REQUIRED_CAPABILITY_SKILLS = [
   'creation-preview-publishing',
   'durable-task-context',
   'file-attachment-analysis',
-  'image-generation',
-  'live-market-data'
+  'image-generation'
 ];
 
 function parseSkill(directory) {
   const file = join(SKILLS_ROOT, directory, 'SKILL.md');
   const source = readFileSync(file, 'utf8');
-  const frontmatter = source.match(/^---\n([\s\S]*?)\n---\n/);
+  const frontmatter = source.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
   const name = frontmatter?.[1].match(/^name:\s*(.+)$/m)?.[1].trim();
   const description = frontmatter?.[1].match(/^description:\s*(.+)$/m)?.[1].trim();
   return { directory, file, source, frontmatter, name, description };

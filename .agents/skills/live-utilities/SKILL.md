@@ -1,6 +1,6 @@
 ---
 name: live-utilities
-description: Use for narrow deterministic calculations or current weather, time, date, holiday, currency, unit, or sports lookups; use live-market-data for supported quotes and research for multi-source reports.
+description: Use for narrow deterministic calculations or current weather, time, date, holiday, currency, unit, or sports lookups; use research for multi-source reports.
 ---
 
 # Live Utilities
@@ -9,11 +9,7 @@ description: Use for narrow deterministic calculations or current weather, time,
 - Arithmetic, percentages, compound calculations, and unit conversions.
 - Current local time, timezone conversion, dates, and holiday lookups.
 - Weather conditions and forecasts.
-- Currency conversion and current foreign-exchange rates: use
-  `live-market-data` for its supported USD, AED, EUR, GBP, and JPY pairs; use a
-  grounded live source or report unavailability for other currencies.
-- Current supported market quotes and short price series through the separate
-  `live-market-data` skill.
+- Currency conversion and foreign-exchange rates with grounded live sources.
 - Sports scores, fixtures, schedules, and standings.
 
 ## Workflow

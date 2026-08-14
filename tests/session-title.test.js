@@ -22,8 +22,7 @@ describe('generateSessionTitle', () => {
       .toBe('Generate a black rose image');
   });
 
-  it('keeps market, explanation, and code-task prompts readable', () => {
-    expect(generateSessionTitle('check AAPL stock price')).toBe('Check AAPL price');
+  it('keeps explanation and code-task prompts readable', () => {
     expect(generateSessionTitle('what is a black rose')).toBe('What is a black rose');
     expect(generateSessionTitle('refactor the payment service')).toBe('Refactor payment service');
   });

@@ -6,152 +6,23 @@ import ChatInput from './components/ChatInput';
 import CanvasPreview from './components/CanvasPreview';
 import SettingsModal from './components/SettingsModal';
 import { generateAIResponse, extractCodeFromMessage, generateSessionTitle, generateAISessionTitle } from './services/aiService';
-import { fetchMarketData, unavailableMarket } from './services/marketService';
 import { storeAppInR2, deleteSessionAppsInR2 } from './services/appStorageService';
-
 function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-export function createMarketMessageId() {
-  if (typeof globalThis.crypto?.randomUUID === 'function') {
-    return `market-${globalThis.crypto.randomUUID()}`;
-  }
-  const bytes = new Uint8Array(16);
-  globalThis.crypto.getRandomValues(bytes);
-  return `market-${Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
-}
-
-function nextUniqueMarketMessageId(usedIds, createId) {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    const id = createId();
-    if (typeof id === 'string' && id && !usedIds.has(id)) {
-      usedIds.add(id);
-      return id;
-    }
-  }
-  throw new Error('Unable to create a unique market message ID.');
-}
-
-export function toAssistantMessage(response, createId = createMarketMessageId) {
+export function toAssistantMessage(response) {
   if (typeof response === 'string') {
     return { role: 'assistant', content: response };
   }
-  if (isObject(response)
-    && response.type === 'market'
-    && isObject(response.request)
-    && isObject(response.market)) {
-    return {
-      id: createId(),
-      role: 'assistant',
-      type: 'market',
-      content: '',
-      request: response.request,
-      market: response.market
-    };
+  if (isObject(response)) {
+    return { role: 'assistant', content: typeof response.content === 'string' ? response.content : '' };
   }
   return { role: 'assistant', content: '' };
 }
 
-export function normalizeMarketMessageIds(sessions, createId = createMarketMessageId) {
-  if (!Array.isArray(sessions)) return [];
-  const usedIds = new Set(
-    sessions.flatMap((session) => Array.isArray(session?.messages) ? session.messages : [])
-      .filter((message) => message?.type === 'market' && typeof message.id === 'string' && message.id)
-      .map((message) => message.id)
-  );
-  const seenExistingIds = new Set();
-  return sessions.map((session) => {
-    if (!Array.isArray(session?.messages)) return session;
-    let changed = false;
-    const messages = session.messages.map((message) => {
-      if (message?.type !== 'market') return message;
-      if (typeof message.id === 'string' && message.id && !seenExistingIds.has(message.id)) {
-        seenExistingIds.add(message.id);
-        return message;
-      }
-      changed = true;
-      return { ...message, id: nextUniqueMarketMessageId(usedIds, createId) };
-    });
-    return changed ? { ...session, messages } : session;
-  });
-}
-
-export function replaceMarketMessageInSession(sessions, sessionId, messageId, request, market) {
-  return sessions.map((session) => {
-    if (session.id !== sessionId) return session;
-    const messageIndex = session.messages.findIndex((message) => (
-      message?.type === 'market' && message.id === messageId
-    ));
-    if (messageIndex === -1) return session;
-    return {
-      ...session,
-      messages: session.messages.map((message, index) => (
-        index === messageIndex ? { ...message, request, market } : message
-      ))
-    };
-  });
-}
-
 function isDuplicateAssistantMessage(message, candidate) {
-  if (candidate.type !== 'market') {
-    return message?.role === 'assistant' && message?.content === candidate.content;
-  }
-  return message?.role === 'assistant'
-    && message?.type === 'market'
-    && JSON.stringify(message.request) === JSON.stringify(candidate.request)
-    && JSON.stringify(message.market) === JSON.stringify(candidate.market);
-}
-
-export function marketRefreshKey(sessionId, messageId) {
-  return JSON.stringify([sessionId, messageId]);
-}
-
-export async function runMarketRefresh({
-  sessionId,
-  messageId,
-  nextRequest,
-  refreshTokens,
-  tokenSequence,
-  setRefreshingMarketKeys,
-  setSessions,
-  fetchMarket = fetchMarketData,
-  toUnavailable = unavailableMarket
-}) {
-  const key = marketRefreshKey(sessionId, messageId);
-  const token = ++tokenSequence.current;
-  refreshTokens.set(key, token);
-  setRefreshingMarketKeys((previous) => new Set(previous).add(key));
-
-  try {
-    const market = await fetchMarket(nextRequest);
-    if (refreshTokens.get(key) !== token) return;
-    setSessions((previous) => replaceMarketMessageInSession(
-      previous,
-      sessionId,
-      messageId,
-      nextRequest,
-      market
-    ));
-  } catch (error) {
-    if (error?.name === 'AbortError' || refreshTokens.get(key) !== token) return;
-    setSessions((previous) => replaceMarketMessageInSession(
-      previous,
-      sessionId,
-      messageId,
-      nextRequest,
-      toUnavailable(error)
-    ));
-  } finally {
-    if (refreshTokens.get(key) === token) {
-      refreshTokens.delete(key);
-      setRefreshingMarketKeys((previous) => {
-        const next = new Set(previous);
-        next.delete(key);
-        return next;
-      });
-    }
-  }
+  return message?.role === 'assistant' && message?.content === candidate.content;
 }
 
 const INITIAL_SESSIONS = [
@@ -188,10 +59,8 @@ export default function App() {
       if (!saved) return INITIAL_SESSIONS;
       const parsed = JSON.parse(saved);
       if (!Array.isArray(parsed) || parsed.length === 0) return INITIAL_SESSIONS;
-      // Drop corrupted session records (e.g. interrupted writes) that would
-      // crash the message list, mirroring the Sidebar's own guard.
       const conforming = parsed.filter((session) => session && Array.isArray(session.messages));
-      return conforming.length > 0 ? normalizeMarketMessageIds(conforming) : INITIAL_SESSIONS;
+      return conforming.length > 0 ? conforming : INITIAL_SESSIONS;
     } catch {
       return INITIAL_SESSIONS;
     }
@@ -213,7 +82,6 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [streamingContent, setStreamingContent] = useState(null);
-  const [refreshingMarketKeys, setRefreshingMarketKeys] = useState(() => new Set());
   const [theme, setTheme] = useState(() => {
     try {
       return localStorage.getItem('corez_theme') || 'dark';
@@ -229,8 +97,6 @@ export default function App() {
   const messagesEndRef = useRef(null);
   const chatInputRef = useRef(null);
   const abortControllerRef = useRef(null);
-  const marketRefreshTokensRef = useRef(new Map());
-  const marketRefreshSequenceRef = useRef(0);
   const saveTimeoutRef = useRef(null);
   const focusTimeoutRef = useRef(null);
   const resumeStartedRef = useRef(false);
@@ -323,12 +189,10 @@ export default function App() {
               .then(response => {
                 if (!response) return;
                 const aiMsg = toAssistantMessage(response);
-                if (aiMsg.type !== 'market') {
-                  const extractedCode = extractCodeFromMessage(aiMsg.content);
-                  if (extractedCode) {
-                    setActiveCanvasCode(extractedCode);
-                    setCanvasOpen(true);
-                  }
+                const extractedCode = extractCodeFromMessage(aiMsg.content);
+                if (extractedCode) {
+                  setActiveCanvasCode(extractedCode);
+                  setCanvasOpen(true);
                 }
                 setSessions(prev => prev.map(s => {
                   if (s.id === pendingData.sessionId) {
@@ -560,12 +424,10 @@ export default function App() {
       });
       if (response) {
         const aiMsg = toAssistantMessage(response);
-        if (aiMsg.type !== 'market') {
-          const extractedCode = extractCodeFromMessage(aiMsg.content);
-          if (extractedCode) {
-            setActiveCanvasCode(extractedCode);
-            setCanvasOpen(true);
-          }
+        const extractedCode = extractCodeFromMessage(aiMsg.content);
+        if (extractedCode) {
+          setActiveCanvasCode(extractedCode);
+          setCanvasOpen(true);
         }
         
         setSessions(prev => prev.map(s => {
@@ -656,20 +518,10 @@ export default function App() {
                   <div className="messages-inner">
                     {activeSession?.messages.map((msg, idx) => (
                       <ChatMessage
-                        key={msg.type === 'market' ? msg.id : idx}
+                        key={idx}
                         message={msg}
                         onRunInCanvas={handleRunInCanvas}
                         onReviseCode={handleReviseCode}
-                        onRefreshMarket={(nextRequest) => runMarketRefresh({
-                          sessionId: activeSession.id,
-                          messageId: msg.id,
-                          nextRequest,
-                          refreshTokens: marketRefreshTokensRef.current,
-                          tokenSequence: marketRefreshSequenceRef,
-                          setRefreshingMarketKeys,
-                          setSessions
-                        })}
-                        marketRefreshing={refreshingMarketKeys.has(marketRefreshKey(activeSession.id, msg.id))}
                       />
                     ))}
                     {isThinking && (

@@ -83,16 +83,6 @@ async function run() {
     error: 'API route not found.'
   });
 
-  const marketRouteResponse = await worker.fetch(
-    new Request('https://corez.test/api/market', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({})
-    }),
-    env()
-  );
-  assert.equal(marketRouteResponse.status, 503);
-  assert.equal((await marketRouteResponse.json()).error.code, 'not_configured');
 
   const legacyRouteResponse = await worker.fetch(
     new Request('https://corez.test/api/openrouter'),
