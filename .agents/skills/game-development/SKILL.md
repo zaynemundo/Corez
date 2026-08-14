@@ -386,9 +386,9 @@ When building Wordle, Scrabble, Anagrams, or Crossword games:
 
 ---
 
-## 7. 8-Bit Pixel Art SVG Sprite Guidelines (itch.io Style)
+## 7. Style-Specific Sprite Guidelines
 
-When rendering retro 2D sprites or SVG icons:
+Choose the rendering method from the user's requested style or the game's genre, setting, and audience. Do not default to pixel art. When the selected direction is explicitly retro pixel art:
 - Always use `shape-rendering="crispEdges"` on SVG containers.
 - Align rects to crisp grid dimensions ($16 \times 16$, $24 \times 24$, or $32 \times 32$).
 - Use dark 1-pixel outlines (`#09090b`) and PICO-8 / NES color palettes (`#ff004d`, `#00e756`, `#29adff`, `#fff1e8`).
@@ -1509,9 +1509,9 @@ for a 2D game. If 3D levels are added later, they can be a separate canvas.
 
 ---
 
-# PART 5: game-art-direction — Art Direction (Palettes, Themes, art-direction.json)
+# PART 5: game-art-direction — Art Direction (Styles, Palettes, Themes, art-direction.json)
 
-Generates `game-project/design/art-direction.json` establishing visual aesthetic, color palettes (PICO-8, NES, Game Boy), and 8-bit sprite guidelines.
+Generates `game-project/design/art-direction.json` establishing a coherent visual aesthetic from the user's explicit style or, when unspecified, from the game's genre, setting, mechanics, and audience. Retro palettes and pixel-art rules are optional references only.
 
 ---
 
@@ -1520,10 +1520,10 @@ Generates `game-project/design/art-direction.json` establishing visual aesthetic
 ```typescript
 interface ArtDirection {
   project: string;
-  theme: 'cyberpunk' | 'fantasy' | 'retro' | 'minimalist' | 'custom';
+  theme: 'cyberpunk' | 'fantasy' | 'retro' | 'minimalist' | 'hand-drawn' | 'stylized-3d' | 'custom';
   palette: {
-    source: 'PICO-8' | 'NES' | 'GAME_BOY' | 'CUSTOM';
-    colors: string[];       // hex codes, max 16 for PICO-8
+    source: 'PICO-8' | 'NES' | 'GAME_BOY' | 'CUSTOM'; // retro sources only when selected
+    colors: string[];       // hex codes appropriate to the selected style
     background: string;     // primary bg hex
     primary: string;        // main fg hex
     secondary: string;      // accent hex
@@ -1552,8 +1552,8 @@ interface ArtDirection {
     };
   };
   svg: {
-    shape_rendering: 'crispEdges';
-    image_rendering: 'pixelated';
+    shape_rendering: 'auto' | 'geometricPrecision' | 'crispEdges';
+    image_rendering: 'auto' | 'smooth' | 'pixelated';
     viewbox_strategy: 'fixed' | 'responsive';
   };
 }
@@ -1561,7 +1561,9 @@ interface ArtDirection {
 
 ---
 
-### Color Palette Reference Tables
+### Optional Retro Color Palette Reference Tables
+
+Use these tables only when the user requests retro/pixel art or the approved art direction explicitly selects it.
 
 #### PICO-8 Palette (16 colors)
 
@@ -1608,7 +1610,9 @@ interface ArtDirection {
 
 ---
 
-### Visual Theme Guides
+### Visual Theme Examples
+
+These are examples, not defaults. The Art Director may define any coherent style that fits the request.
 
 #### Cyberpunk
 - **Background**: near-black (`#0a0a1a`), dark navy
@@ -1638,7 +1642,7 @@ interface ArtDirection {
 
 ---
 
-### Sprite Dimension Guidelines
+### Optional Pixel-Art Sprite Dimensions
 
 | Size   | Best For              | Canvas (px) | Grid Snap |
 |--------|-----------------------|-------------|-----------|
@@ -1646,7 +1650,7 @@ interface ArtDirection {
 | 24x24  | Medium characters, enemies         | 384x384 tileset | Yes |
 | 32x32  | Large characters, bosses, UI icons | 512x512 tileset | Yes |
 
-- Always use integer scaling (1x, 2x, 3x, 4x) for pixel art.
+- Use integer scaling (1x, 2x, 3x, 4x) only when pixel art is the selected style.
 - Set `shape-rendering: crispEdges` and `image-rendering: pixelated` in CSS.
 - Maintain 1px visible separation between sprite cells in spritesheet/tileset layouts.
 

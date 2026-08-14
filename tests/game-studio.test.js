@@ -124,6 +124,14 @@ describe('CoreZ AI Game Studio Engine (OpenCode Go Native)', () => {
       expect(result.workflow.currentStage).toBe(WORKFLOW_STAGES.COMPLETE);
     });
 
+    it('does not default a generic game art direction to retro', async () => {
+      const orchestrator = new GameStudioOrchestrator();
+      const artDirection = await orchestrator.runArtDirectionPass('Build a platformer game', { genre: 'platformer' }, {});
+
+      expect(artDirection.visualTheme).toContain('genre-appropriate');
+      expect(artDirection.visualTheme).not.toMatch(/retro|pixel/i);
+    });
+
     it('executes the entire specialist task DAG, not just the first ready task', async () => {
       const orchestrator = new GameStudioOrchestrator();
       const result = await orchestrator.buildGame('Build an 8-bit retro platformer with a knight');

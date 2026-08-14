@@ -234,15 +234,25 @@ function normalizeIntentType(intentType) {
   return CANONICAL_INTENT_TYPES.has(intentType) ? intentType : 'general';
 }
 
+function isGameCreationRequest(prompt, intent, fineIntent) {
+  return intent?.primaryIntent === 'game_creation'
+    || fineIntent?.primaryIntent === 'game_creation'
+    || fineIntent?.type === 'game_creation'
+    || /\b(build|create|make|generate|design|develop|code)\b.{0,80}\b(game|platformer|shooter|pong|snake|tetris|rpg|simulator|chess|puzzle|racing|fighter|wordle|flappy)\b/i.test(String(prompt || ''));
+}
+
 function buildSystemPrompt(options = {}) {
   const intent = typeof options.intent === 'object' ? options.intent : null;
+  const fineIntent = typeof options.fineIntent === 'object' ? options.fineIntent : null;
   const legacyIntent = options.legacyIntent || (typeof options.intent === 'string' ? options.intent : intent?.type);
   const skills = Array.isArray(options.skills) ? options.skills : [];
   const contract = options.contract && typeof options.contract === 'object' ? options.contract : null;
   const executionPlan = typeof options.executionPlan === 'string' ? options.executionPlan : null;
 
   const intentType = normalizeIntentType(legacyIntent || intent?.type);
-  const primaryIntent = intent?.primaryIntent || intent?.type || intentType;
+  const primaryIntent = isGameCreationRequest(options.prompt, intent, fineIntent)
+    ? 'game_creation'
+    : (intent?.primaryIntent || fineIntent?.primaryIntent || fineIntent?.type || intent?.type || intentType);
   const secondaryIntent = intent?.secondaryIntent ? ` (secondary: ${intent.secondaryIntent})` : '';
 
   let adaptiveInstructions;
@@ -264,7 +274,7 @@ Adaptive Routing - Coding Path:
         : '- VISUAL DESIGN: Follow clean, responsive, user-specified design instructions; preserve user explicit styling preferences.';
 
     adaptiveInstructions = `
-Adaptive Routing - App & Game Creation Path (Awwwards Site of the Day Quality):
+    Adaptive Routing - App & Game Creation Path:
 - Use the configured image-generation pipeline for background artwork and visual graphics when an image is genuinely needed.
 - ONLINE MULTIPLAYER: When the user asks for online multiplayer, use the COREZ multiplayer protocol: connect with \`new WebSocket(\`wss://\${location.host}/api/game/ws/<roomId>\`)\` where <roomId> is a short lowercase id like "dm-123". Send JSON {type:'join',name}, {type:'input',keys:{up,down,left,right}}, {type:'shoot',dx,dy}. Receive {type:'welcome',playerId,players}, {type:'state',players:[{id,name,x,y,color,score}],bullets:[{x,y,ownerId}]} at 20Hz (normalized 0..1 coordinates), {type:'kill',killerId,victimId}, {type:'player_joined'}, {type:'player_left'}. The server moves players and resolves hits authoritatively; render the received state and map 0..1 coordinates to your canvas. Never invent your own server, socket.io, or third-party backend.
 ${designStyle}
@@ -490,6 +500,7 @@ async function handleAi(request, env) {
   }
 
   const intent = body.intent && typeof body.intent === 'object' && !Array.isArray(body.intent) ? body.intent : null;
+  const fineIntent = body.fineIntent && typeof body.fineIntent === 'object' && !Array.isArray(body.fineIntent) ? body.fineIntent : null;
   const legacyIntent = body.legacyIntent || (typeof intent === 'string' ? intent : intent?.type);
   const intentType = normalizeIntentType(legacyIntent || intent?.type);
   const contract = body.contract && typeof body.contract === 'object' ? body.contract : null;
@@ -503,7 +514,7 @@ async function handleAi(request, env) {
     : null;
 
   const messages = Array.isArray(body.messages) ? body.messages : [];
-  const systemPrompt = buildSystemPrompt({ intent, legacyIntent, skills, contract, executionPlan });
+  const systemPrompt = buildSystemPrompt({ prompt, intent, fineIntent, legacyIntent, skills, contract, executionPlan });
   const apiMessages = [
     { role: 'system', content: systemPrompt }
   ];
@@ -583,12 +594,12 @@ async function handleAi(request, env) {
     ? messages.filter(m => m.role && m.content).slice(-fastHistoryWindow)
     : messages;
 
-  // Live Awwwards inspiration for app/site/game requests: real award-winning
+  // Live Awwwards inspiration for app/site requests: real award-winning
   // site references (title + URL) are injected into the system prompt so the
   // model has concrete visual direction. Best-effort: failure never blocks
   // the request and never fabricates references.
   const appIntent = intent?.type === 'app' || legacyIntent === 'app';
-  const gameIntent = intent?.primaryIntent === 'game_creation';
+  const gameIntent = isGameCreationRequest(prompt, intent, fineIntent);
   if (appIntent && !gameIntent) {
     try {
       const inspiration = await fetchAwwwardsInspiration(prompt, env?.__INSPIRATION_FETCH);

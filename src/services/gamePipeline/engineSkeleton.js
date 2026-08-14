@@ -79,9 +79,6 @@ export function generateEngineSkeleton(gameSpec = {}) {
       },
       beginFrame(ctx) {
         ctx.setTransform(this.scale, 0, 0, this.scale, this.ox, this.oy);
-        ctx.imageSmoothingEnabled = false;
-        ctx.mozImageSmoothingEnabled = false;
-        ctx.webkitImageSmoothingEnabled = false;
       }
     };
     const viewResizeListener = () => View.resize();

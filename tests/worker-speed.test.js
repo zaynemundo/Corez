@@ -112,6 +112,55 @@ describe('AI response speed optimizations', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('does not fetch web-design inspiration for a plain typed game request', async () => {
+    const inspirationFetch = vi.fn(async () => ({
+      sites: [{ title: 'Web Design Reference', url: 'https://example.com' }],
+      category: 'gaming',
+      source: 'Awwwards'
+    }));
+    let providerPayload;
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+      providerPayload = JSON.parse(init.body);
+      return Response.json({ choices: [{ message: { content: 'game answer' } }] });
+    }));
+
+    const response = await post(swarmWorker, {
+      OPENCODE_GO_API_KEY: 'test',
+      __INSPIRATION_FETCH: inspirationFetch
+    }, {
+      prompt: 'Build a playable snake game',
+      intent: { type: 'app', summary: 'Create an interactive application.' }
+    });
+
+    expect(response.status).toBe(200);
+    expect(inspirationFetch).not.toHaveBeenCalled();
+    expect(providerPayload.messages[0].content).toContain('do NOT default to retro, pixel art, neon, or another fixed aesthetic');
+    expect(providerPayload.messages.some((message) => /Live design inspiration from Awwwards/.test(message.content))).toBe(false);
+  });
+
+  it('keeps web-design inspiration for non-game app requests', async () => {
+    const inspirationFetch = vi.fn(async () => ({
+      sites: [{ title: 'App Reference', url: 'https://example.com' }],
+      category: 'websites',
+      source: 'Awwwards'
+    }));
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+      choices: [{ message: { content: 'app answer' } }]
+    })));
+
+    const response = await post(swarmWorker, {
+      OPENCODE_GO_API_KEY: 'test',
+      __INSPIRATION_FETCH: inspirationFetch
+    }, {
+      prompt: 'Build a timer app',
+      intent: { type: 'app', summary: 'Create a timer app.' },
+      fineIntent: { type: 'app', primaryIntent: 'app' }
+    });
+
+    expect(response.status).toBe(200);
+    expect(inspirationFetch).toHaveBeenCalledTimes(1);
+  });
+
   it('routes both simple and complex requests to OpenCode Go with no artificial reasoning-effort caps', async () => {
     // General (explanation) request: fast path with a capped output.
     let generalPayload = null;

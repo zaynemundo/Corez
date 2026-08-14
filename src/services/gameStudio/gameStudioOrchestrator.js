@@ -153,8 +153,9 @@ export class GameStudioOrchestrator {
   }
 
   async runArtDirectionPass(userPrompt, gameSpec, _options) {
+    const explicitStyle = String(userPrompt || '').match(/\b(?:8-bit retro|16-bit retro|pixel art|low-poly|hand-drawn|watercolor|cel-shaded|photorealistic|8-bit|16-bit|retro|cartoon|minimalist|cyberpunk|fantasy|noir)\b/i)?.[0] || null;
     return {
-      visualTheme: `Genre-appropriate art direction for ${gameSpec.genre || 'the game'}; preserve explicit style requests from: ${userPrompt}`,
+      visualTheme: explicitStyle || `Original genre-appropriate art direction for ${gameSpec.genre || 'the game'}`,
       colorPalette: 'A coherent palette selected for the game setting, mood, readability, and audience',
       spriteStyle: 'Character rendering consistent with the selected art direction',
       environmentStyle: 'Environment artwork consistent with the game setting and camera',

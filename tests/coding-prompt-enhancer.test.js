@@ -17,7 +17,7 @@ describe('Coding Prompt Enhancer', () => {
       primaryIntent: 'game_creation'
     });
 
-    expect(enhanced).toContain('do NOT default to retro, pixel art, neon, or any other fixed aesthetic');
+    expect(enhanced).toContain('without defaulting to retro or pixel art');
     expect(enhanced).not.toContain('8-bit retro pixel art style for visuals');
   });
 
@@ -29,7 +29,7 @@ describe('Coding Prompt Enhancer', () => {
     });
 
     expect(enhanced).toContain(raw);
-    expect(enhanced).toContain('Follow any visual style the user explicitly requests');
+    expect(enhanced).toContain('preserve any visual style explicitly requested by the user');
   });
 
   it('enhances code fix and debug prompts with root-cause and safe fix specifications', async () => {
