@@ -25,7 +25,8 @@ export default function CanvasPreview({
   onClose, 
   isFullScreen, 
   onToggleFullScreen,
-  sessionId = null
+  sessionId = null,
+  isStreaming = false
 }) {
   const [activeTab, setActiveTab] = useState('preview');
   const [deviceMode, setDeviceMode] = useState('desktop'); // 'desktop' | 'laptop' | 'tablet' | 'mobile'
@@ -216,8 +217,21 @@ export default function CanvasPreview({
             </button>
           </div>
 
+          {/* Live Streaming Badge */}
+          {isStreaming ? (
+            <div className="canvas-live-badge" title="AI is actively designing and streaming code in real-time">
+              <span className="canvas-live-dot" />
+              <span>LIVE BUILDING</span>
+            </div>
+          ) : editableCode ? (
+            <div className="canvas-ready-badge" title="Application is ready and active">
+              <span className="canvas-ready-dot" />
+              <span>READY</span>
+            </div>
+          ) : null}
+
           {/* Publish: share the creation with anyone via a short link */}
-          {activeTab === 'preview' && editableCode && (
+          {activeTab === 'preview' && editableCode && !isStreaming && (
             <button
               type="button"
               className="code-btn publish-btn"
@@ -331,30 +345,38 @@ export default function CanvasPreview({
                   <span className="device-spec-tag">{deviceSpecs[deviceMode].label} • {deviceSpecs[deviceMode].res}</span>
                 </div>
               )}
-              <iframe
-                key={`${key}-${activePage}`}
-                ref={iframeRef}
-                title={`Live Application Preview (${deviceSpecs[deviceMode].label})`}
-                srcDoc={formattedSrcDoc}
-                className="preview-iframe"
-                sandbox="allow-scripts allow-forms allow-pointer-lock allow-downloads allow-popups"
-                style={
-                  deviceMode !== 'desktop'
-                    ? {
-                        // Fixed device width, real device aspect ratio, and
-                        // height derived from it — the frame never stretches
-                        // to the pane height or clips. margin:auto centers
-                        // while remaining scrollable when the pane is small.
-                        width: deviceSpecs[deviceMode].width,
-                        maxWidth: '100%',
-                        aspectRatio: deviceSpecs[deviceMode].ratio,
-                        height: 'auto',
-                        margin: 'auto',
-                        borderRadius: deviceMode === 'mobile' ? '20px' : '12px'
-                      }
-                    : {}
-                }
-              />
+              <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                <iframe
+                  key={`${key}-${activePage}`}
+                  ref={iframeRef}
+                  title={`Live Application Preview (${deviceSpecs[deviceMode].label})`}
+                  srcDoc={formattedSrcDoc}
+                  className="preview-iframe"
+                  sandbox="allow-scripts allow-forms allow-pointer-lock allow-downloads allow-popups"
+                  style={
+                    deviceMode !== 'desktop'
+                      ? {
+                          // Fixed device width, real device aspect ratio, and
+                          // height derived from it — the frame never stretches
+                          // to the pane height or clips. margin:auto centers
+                          // while remaining scrollable when the pane is small.
+                          width: deviceSpecs[deviceMode].width,
+                          maxWidth: '100%',
+                          aspectRatio: deviceSpecs[deviceMode].ratio,
+                          height: 'auto',
+                          margin: 'auto',
+                          borderRadius: deviceMode === 'mobile' ? '20px' : '12px'
+                        }
+                      : {}
+                  }
+                />
+                {isStreaming && (
+                  <div className="canvas-live-stream-overlay">
+                    <span className="canvas-live-dot" />
+                    <span>Streaming live updates...</span>
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <textarea
@@ -364,6 +386,21 @@ export default function CanvasPreview({
               onChange={(e) => setEditableCode(e.target.value)}
             />
           )
+        ) : isStreaming ? (
+          <div className="canvas-empty-state canvas-building-state">
+            <div className="canvas-building-spinner">
+              <Loader2 size={28} className="spin-icon" style={{ color: 'var(--accent, #6366f1)' }} />
+            </div>
+            <h3 style={{ fontSize: '1rem', margin: '0.5rem 0 0.25rem', fontWeight: 500 }}>Live Designing & Building...</h3>
+            <p style={{ maxWidth: '300px', fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 1.25rem' }}>
+              Streaming visual components, layout shaders & logic into preview canvas.
+            </p>
+            <div className="canvas-building-steps">
+              <div className="canvas-step active"><span className="step-num">1</span> Architecting Layout & Scene</div>
+              <div className="canvas-step active"><span className="step-num">2</span> Applying CSS & 3D Shaders</div>
+              <div className="canvas-step active"><span className="step-num">3</span> Initializing Interactive Loop</div>
+            </div>
+          </div>
         ) : (
           <div className="canvas-empty-state">
             <div className="canvas-empty-icon">

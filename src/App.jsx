@@ -534,11 +534,30 @@ export default function App() {
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
+    const isCreationIntent = /^\s*\/(game|website|app)\b/i.test(prompt)
+      || /\b(build|create|make|generate|design|develop|code)\b.{0,80}\b(game|app|website|tool|dashboard|calculator|canvas|platformer|pong|shooter|snake|rpg|3d)\b/i.test(prompt);
+
+    if (isCreationIntent) {
+      setActiveCanvasCode('');
+      setCanvasOpen(true);
+    }
+
     try {
       setStreamingContent('');
       const response = await generateAIResponse(apiPrompt, updatedApiMessages, controller.signal, (delta) => {
-        setStreamingContent(prev => (prev || '') + delta);
-      }, null, () => setStreamingContent(''));
+        setStreamingContent(prev => {
+          const next = (prev || '') + delta;
+          const liveCode = extractCodeFromMessage(next);
+          if (liveCode) {
+            setActiveCanvasCode(liveCode);
+            setCanvasOpen(true);
+          }
+          return next;
+        });
+      }, null, () => {
+        setStreamingContent('');
+        if (isCreationIntent) setActiveCanvasCode('');
+      });
       if (response) {
         const aiMsg = toAssistantMessage(response);
         if (aiMsg.type !== 'market') {
@@ -693,6 +712,7 @@ export default function App() {
                 isFullScreen={canvasFullScreen}
                 onToggleFullScreen={() => setCanvasFullScreen(prev => !prev)}
                 sessionId={activeSession?.id || null}
+                isStreaming={isThinking}
               />
             )}
           </>
