@@ -86,7 +86,7 @@ export function detectTruncation(content, options = {}) {
 
   // Dangling JS arithmetic, assignment or logical operators at the end of the text
   const trimmed = text.trim();
-  if (/[+\-*\/%=&|^~?:;,(\[{]\s*$/.test(trimmed) && !/-->\s*$/.test(trimmed) && !/\/>\s*$/.test(trimmed)) {
+  if (/[+\-*%=&|^~?:;,([{/]\s*$/.test(trimmed) && !/-->\s*$/.test(trimmed) && !/\/>\s*$/.test(trimmed)) {
     signals.push('dangling-expression-operator');
   }
 
