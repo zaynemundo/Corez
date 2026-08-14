@@ -1,4 +1,4 @@
-﻿// Corez AI Service Engine - Universal Public Conversational Engine
+// Corez AI Service Engine - Universal Public Conversational Engine
 
 export const MODEL = {
   id: 'corez',
@@ -824,22 +824,41 @@ export async function generateHostedAIResponse(
   };
 
   const fetchHostedResponse = async (options) => {
-    const response = await fetchWithTransportRetry(options);
-    if (response.status !== 403) return response;
-
-    let challengePage = response.headers.get('cf-mitigated') === 'challenge';
-    if (!challengePage) {
-      try {
-        const body = await response.clone().text();
-        challengePage = CLOUDFLARE_CHALLENGE_PATTERN.test(body.slice(0, 4000));
-      } catch { /* keep header-based result */ }
+    let response;
+    try {
+      response = await fetchWithTransportRetry(options, AI_PROXY_ENDPOINT);
+    } catch (err) {
+      if (err?.name === 'AbortError' || signal?.aborted) throw err;
+      // If same-origin /api/ai failed to reach (e.g. dev server proxy offline),
+      // seamlessly retry through the Worker's direct live endpoint.
+      return fetchWithTransportRetry(options, AI_WAF_FALLBACK_ENDPOINT);
     }
-    if (!challengePage) return response;
 
-    // Zone-level security can challenge same-origin API traffic before the
-    // Worker runs. Retry only that interception through the Worker's direct
-    // hostname; provider errors and ordinary HTTP failures stay on /api/ai.
-    return fetchWithTransportRetry(options, AI_WAF_FALLBACK_ENDPOINT);
+    if (response.status === 403) {
+      let challengePage = response.headers.get('cf-mitigated') === 'challenge';
+      if (!challengePage) {
+        try {
+          const body = await response.clone().text();
+          challengePage = CLOUDFLARE_CHALLENGE_PATTERN.test(body.slice(0, 4000));
+        } catch { /* keep header-based result */ }
+      }
+      if (challengePage) {
+        return fetchWithTransportRetry(options, AI_WAF_FALLBACK_ENDPOINT);
+      }
+    }
+
+    // If local dev server proxy returned a 502/503/504 gateway failure,
+    // retry through the direct live Cloudflare Worker.
+    if ([502, 503, 504].includes(response.status)) {
+      try {
+        const fallback = await fetchWithTransportRetry(options, AI_WAF_FALLBACK_ENDPOINT);
+        if (fallback && (fallback.ok || fallback.status < 500)) return fallback;
+      } catch (fallbackErr) {
+        if (fallbackErr?.name === 'AbortError' || signal?.aborted) throw fallbackErr;
+      }
+    }
+
+    return response;
   };
 
   // Streaming path: the worker answers with SSE events (meta/delta/usage/

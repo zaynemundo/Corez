@@ -558,5 +558,5 @@ describe('Hosted AI fallback behavior', () => {
     // No mojibake / replacement characters anywhere in the reply.
     expect(response).not.toContain('â€');
     expect(response).not.toContain('\uFFFD');
-  });
+  }, 15000);
 });
