@@ -8,10 +8,20 @@ const MAX_PAGES = 12;
 const GAME_LOOP_PATTERNS = /\b(requestAnimationFrame|setInterval)\b/i;
 const GAME_UPDATE_PATTERNS = /\b(gameLoop|update|render|loop)\b/i;
 const INPUT_PATTERNS = /\b(addEventListener\s*\(\s*['"](keydown|keyup|mousedown|mouseup|mousemove|click|touchstart)['"])/i;
-const EXTERNAL_SCRIPT_PATTERN = /<script[^>]*\bsrc\s*=\s*["']https?:\/\//i;
+export const DEFAULT_APPROVED_CDNS = [
+  'cdnjs.cloudflare.com',
+  'cdn.jsdelivr.net',
+  'unpkg.com',
+  'cdn.tailwindcss.com',
+  'esm.sh',
+  'cdn.skypack.dev',
+  'cdn.babylonjs.com',
+  'threejs.org',
+  'fonts.googleapis.com'
+];
 
 export function verifyCreation(html, options = {}) {
-  const { intentType = 'app', allowedExternalScripts = [] } = options;
+  const { intentType = 'app', allowedExternalScripts = DEFAULT_APPROVED_CDNS } = options;
   const content = String(html || '');
   const failures = [];
 
@@ -36,11 +46,24 @@ export function verifyCreation(html, options = {}) {
     failures.push({ code: 'truncated-block', detail: 'The artifact has an unclosed <script> or <style> block — output was likely cut off.' });
   }
 
-  if (EXTERNAL_SCRIPT_PATTERN.test(content)) {
-    const external = content.match(/<script[^>]*\bsrc\s*=\s*["']https?:\/\//i);
-    const host = external ? external[0] : '';
-    if (!allowedExternalScripts.some((prefix) => host.includes(prefix))) {
-      failures.push({ code: 'external-script', detail: 'The artifact loads an external http(s) script, which is blocked in the preview sandbox.' });
+  const scriptTags = content.match(/<script\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/gi) || [];
+  const allowedList = Array.isArray(allowedExternalScripts) && allowedExternalScripts.length > 0
+    ? allowedExternalScripts
+    : DEFAULT_APPROVED_CDNS;
+
+  for (const tag of scriptTags) {
+    const srcMatch = tag.match(/src\s*=\s*["']([^"']+)["']/i);
+    if (!srcMatch) continue;
+    const src = srcMatch[1].trim();
+    if (/^https?:\/\//i.test(src)) {
+      const isAllowed = allowedList.some((domain) => src.toLowerCase().includes(domain.toLowerCase()));
+      if (!isAllowed) {
+        failures.push({
+          code: 'external-script',
+          detail: `The artifact loads an untrusted external script (${src}), which is blocked in the preview sandbox.`
+        });
+        break;
+      }
     }
   }
 

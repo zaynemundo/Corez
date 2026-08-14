@@ -122,6 +122,11 @@ export async function* runCreationHarness(options) {
     return;
   }
 
+  // Re-verify existing build with the current verifier rules if resuming
+  if (state.build && state.verification && !state.verification.passed) {
+    state.verification = verifyCreation(state.build, { intentType: state.intentType });
+  }
+
   // Lease: only one invocation may build a given request at a time. The
   // busy error is retryable and never touches the persisted state: the
   // CONCURRENT run owns the record, and a retry that lands after it
