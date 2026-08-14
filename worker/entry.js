@@ -40,8 +40,8 @@ export default {
     // wrangler dev rewrites request.url to the first route host (corez.pro)
     // even when the browser connected to localhost:8787, so gating on
     // url.hostname alone would loop every dev request through a self 301.
-    const clientHost = String(request.headers.get('Host') || '').toLowerCase();
-    const isLocalClient = clientHost.includes('localhost') || clientHost.includes('127.0.0.1') || clientHost.includes('::1');
+    const clientHost = String(request.headers.get('Host') || url.host || '').toLowerCase();
+    const isLocalClient = clientHost.includes('localhost') || clientHost.includes('127.0.0.1') || clientHost.includes('::1') || url.hostname === 'localhost' || url.hostname === '127.0.0.1';
     const normalizedClientHost = clientHost.replace(/:\d+$/, '');
     const isDirectAiHost = normalizedClientHost === 'chat.zayne-mayo.workers.dev'
       || url.hostname === 'chat.zayne-mayo.workers.dev';
