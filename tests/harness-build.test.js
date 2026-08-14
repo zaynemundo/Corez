@@ -140,7 +140,7 @@ describe('runCreationHarness', () => {
     expect(phases).not.toContain('repairing');
   });
 
-  it('caps repairs at 5 rounds and still completes', async () => {
+  it('fails honestly when the artifact is still incomplete after 5 repair rounds', async () => {
     const stubbornProvider = buildMockProvider();
     stubbornProvider.fetchMock.mockImplementation(async (_url, init) => {
       const body = JSON.parse(init.body);
@@ -152,11 +152,40 @@ describe('runCreationHarness', () => {
     });
     vi.stubGlobal('fetch', stubbornProvider.fetchMock);
 
-    const { events } = await runHarness();
+    const store = createTaskStateStore({});
+    const taskId = harnessTaskId('build a first person shooter game', 'game_creation');
+    const events = [];
+    let thrown = null;
+    try {
+      for await (const event of runCreationHarness({
+        prompt: 'build a first person shooter game',
+        primaryIntent: 'game_creation',
+        intentType: 'game_creation',
+        apiMessages: BASE_MESSAGES,
+        env: ENV,
+        signal: null,
+        store
+      })) {
+        events.push(event);
+      }
+    } catch (err) {
+      thrown = err;
+    }
 
     const repairing = events.filter((e) => e.type === 'phase' && e.phase === 'repairing');
     expect(repairing).toHaveLength(5);
-    expect(events.some((e) => e.type === 'done')).toBe(true);
+    // A structurally incomplete artifact is NEVER delivered as a successful
+    // done — the client gets an explicit, retryable error instead.
+    expect(thrown).toBeTruthy();
+    expect(thrown.message).toMatch(/could not produce a complete artifact/);
+    expect(thrown.status).toBe(502);
+    expect(thrown.retryable).toBe(true);
+    expect(events.some((e) => e.type === 'done')).toBe(false);
+    // A retry gets a fresh repair budget so it repairs forward from the
+    // persisted partial build instead of erroring instantly.
+    const persisted = await store.load(taskId);
+    expect(persisted.status).toBe('failed');
+    expect(persisted.repairCount).toBe(0);
   });
 
   it('resumes from persisted state on an identical request', async () => {

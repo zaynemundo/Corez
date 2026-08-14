@@ -3,6 +3,12 @@
 
 import { safeErrorDetail } from './utils.js';
 
+export const CONTINUATION_INSTRUCTION =
+  '[CONTINUATION] Do NOT restart from the beginning. Do NOT repeat previous lines. Continue writing from the exact stopping point until the entire file/document is complete. Ensure all <script>, <body>, and <html> tags and markdown code blocks are properly closed.';
+
+export const ANTI_REPEAT_CONTINUATION_INSTRUCTION =
+  '[CONTINUATION] Your previous continuation repeated content from the beginning instead of continuing. The COMPLETE artifact so far is the assistant message above. APPEND ONLY the missing ending, continuing from the exact stopping point. Do NOT re-emit, restate, or summarize ANY part of the existing artifact. Output only the new ending, and close every open tag, brace, and markdown code block.';
+
 const TRAILING_CONJUNCTIONS = /\b(and|but|or|so|because|then|that|which|with|while|when|if|after|before|by|to|of|in|on|for|as|at|from|into|onto|upon|using|via|plus|also|however|therefore|meanwhile|although|though|whereas)\s*$/i;
 const TRAILING_OPENERS = /\b(such as|for example|for instance|in order to|so that|as well as|along with|together with|the following|in particular|including|especially|in addition|on the other hand|which means|meaning|using|inside|outside|across|through|towards?|during|among|between|under|above|below|around|within|without|unless|until|where|when|how|what|why|excluding|plus|about|beyond|despite|instead|regardless|to:|the:)\s*$/i;
 const UNFINISHED_WORD = /[a-z0-9]$/i;
@@ -437,7 +443,7 @@ function buildContinuationMessages(messages, originalContent, reason) {
   } else if (reason.includes('syntax-failure')) {
     reasonInstruction = `The code in your previous answer has a syntax error (${reason}). Return the COMPLETE corrected answer with the fixed code — same content, same framework, only the syntax corrected.`;
   } else {
-    reasonInstruction = 'Do NOT restart from the beginning. Do NOT repeat previous lines. Continue writing from the exact stopping point until the entire file/document is complete. Ensure all <script>, <body>, and <html> tags and markdown code blocks are properly closed.';
+    reasonInstruction = CONTINUATION_INSTRUCTION;
   }
   return [
     ...messages.filter((m) => m?.role === 'system'),

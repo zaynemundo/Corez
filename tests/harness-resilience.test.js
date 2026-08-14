@@ -363,13 +363,26 @@ describe('runCreationHarness resilience', () => {
     });
 
     const events = [];
-    await drain(runCreationHarness(harnessOptions(store)), events);
+    let thrown = null;
+    try {
+      await drain(runCreationHarness(harnessOptions(store)), events);
+    } catch (err) {
+      thrown = err;
+    }
 
     const repairing = events.filter((e) => e.type === 'phase' && e.phase === 'repairing');
     expect(repairing).toHaveLength(2);
     expect(repairing.map((e) => e.attempt)).toEqual([4, 5]);
-    // Budget exhausted: harness still completes (best-effort delivery).
-    expect(events.some((e) => e.type === 'done')).toBe(true);
+    // Budget exhausted with the artifact still structurally incomplete: the
+    // harness fails honestly instead of best-effort-delivering the broken
+    // build as a successful done.
+    expect(thrown).toBeTruthy();
+    expect(thrown.message).toMatch(/could not produce a complete artifact/);
+    expect(events.some((e) => e.type === 'done')).toBe(false);
+    // A retry gets a fresh budget so it can repair forward.
+    const persisted = await store.load(taskId);
+    expect(persisted.status).toBe('failed');
+    expect(persisted.repairCount).toBe(0);
   });
 
   it('H6: auto-continues a truncated build stream until the HTML and script blocks are fully closed', async () => {
@@ -406,6 +419,57 @@ describe('runCreationHarness resilience', () => {
     const finalBuild = collectDeltas(events);
     expect(finalBuild).toContain('const srd = (my *Math.sin(angle));');
     expect(finalBuild).toContain('</html>');
+    expect(events.some((e) => e.type === 'done')).toBe(true);
+  });
+
+  it('H7: retries with an anti-repetition instruction when a continuation repeats the beginning instead of continuing', async () => {
+    // Short truncated build (< 200 chars) so a full identical repeat
+    // produces no growth and triggers the anti-repeat path.
+    const part1 = '<html><body><canvas id="c"></canvas><script>const srd = (my *';
+    const part2 = `Math.sin(angle));\nfunction update(){}\nfunction render(){}\ndocument.addEventListener('keydown', function(){});\ncanvas.addEventListener('mousemove', function(){});\nrequestAnimationFrame(gameLoop);\n</script></body></html>`;
+
+    let continuationCalls = 0;
+    runStreamingChain.mockImplementation(async function* (messages) {
+      const serialized = JSON.stringify(messages || []);
+      if (serialized.includes('[CONTINUATION]')) {
+        continuationCalls += 1;
+        if (serialized.includes('APPEND ONLY')) {
+          // Second attempt with the anti-repetition instruction: the model
+          // finally continues instead of repeating.
+          yield { type: 'delta', text: part2 };
+          yield { type: 'done', finishReason: 'stop' };
+          return;
+        }
+        // First attempt: the model restarts from the beginning (repeat).
+        yield { type: 'delta', text: part1 };
+        yield { type: 'done', finishReason: 'length' };
+        return;
+      }
+      yield { type: 'delta', text: part1 };
+      yield { type: 'done', finishReason: 'length' };
+    });
+
+    const fetchMock = vi.fn(async (_url, init) => {
+      const messages = JSON.stringify(JSON.parse(init.body).messages || []);
+      if (messages.includes('Produce a concise build specification')) return jsonCompletion('spec');
+      if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('APPROVED');
+      return jsonCompletion('');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const events = [];
+    await drain(runCreationHarness(harnessOptions()), events);
+
+    // Two continuation passes: the plain continuation (repeated) and the
+    // anti-repetition retry that completed the artifact.
+    expect(continuationCalls).toBe(2);
+    const continuing = events.filter((e) => e.type === 'phase' && e.phase === 'continuing');
+    expect(continuing.length).toBe(2);
+
+    const finalBuild = collectDeltas(events);
+    expect(finalBuild).toContain('const srd = (my *Math.sin(angle));');
+    expect(finalBuild).toContain('</html>');
+    expect(finalBuild).not.toContain('const srd = (my *const srd = (my *');
     expect(events.some((e) => e.type === 'done')).toBe(true);
   });
 });

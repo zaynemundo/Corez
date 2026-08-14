@@ -3,7 +3,7 @@ import { fetchAwwwardsInspiration, handleInspiration } from './inspiration.js';
 import { safeErrorDetail, readBoundedJson, jsonResponse, createTaskStateStore, createRateLimiter } from './utils.js';
 import { runProviderChain, runStreamingChain, callOpenRouterImage } from './providerChain.js';
 import { runCreationHarness } from './harness.js';
-import { processResponse, detectTruncation, stitchContinuationChunk } from './responseProcessor.js';
+import { processResponse, detectTruncation, stitchContinuationChunk, CONTINUATION_INSTRUCTION, ANTI_REPEAT_CONTINUATION_INSTRUCTION } from './responseProcessor.js';
 import {
   parseProjectState,
   deriveProjectState,
@@ -759,18 +759,22 @@ async function handleAi(request, env) {
               let continuationCount = 0;
               const MAX_STREAM_CONTINUATIONS = 8;
               let currentStopReason = event.finishReason || null;
+              let antiRepeatTried = false;
               while (continuationCount < MAX_STREAM_CONTINUATIONS && collected.trim()) {
                 const streamTruncation = detectTruncation(collected, { stopReason: currentStopReason });
                 if (!streamTruncation.truncated) break;
                 continuationCount += 1;
                 controller.enqueue(encoder.encode(sse({ type: 'phase', phase: 'continuing', attempt: continuationCount, total: MAX_STREAM_CONTINUATIONS })));
 
+                // If the previous continuation repeated the beginning instead
+                // of continuing, switch to an explicit anti-repetition
+                // instruction.
                 const streamContMessages = [
                   ...apiMessages,
                   { role: 'assistant', content: collected },
                   {
                     role: 'user',
-                    content: '[CONTINUATION] Do NOT restart from the beginning. Do NOT repeat previous lines. Continue writing from the exact stopping point until the entire file/document is complete. Ensure all <script>, <body>, and <html> tags and markdown code blocks are properly closed.'
+                    content: antiRepeatTried ? ANTI_REPEAT_CONTINUATION_INSTRUCTION : CONTINUATION_INSTRUCTION
                   }
                 ];
 
@@ -795,7 +799,16 @@ async function handleAi(request, env) {
                 if (deltaText && !bufferForSkillVerification) {
                   controller.enqueue(encoder.encode(sse({ type: 'delta', text: deltaText })));
                 }
-                if (stitched.length <= collected.length) break;
+                if (stitched.length <= collected.length) {
+                  // The model restarted from the beginning instead of
+                  // continuing: give it ONE retry with the anti-repetition
+                  // instruction before giving up on this pass.
+                  if (!antiRepeatTried) {
+                    antiRepeatTried = true;
+                    continue;
+                  }
+                  break;
+                }
                 collected = stitched;
                 currentStopReason = nextStopReason;
               }
@@ -826,6 +839,25 @@ async function handleAi(request, env) {
                 }
                 collected = repair.content;
               }
+
+              // Honest-failure gate: if the answer is STILL cut off after the
+              // provider stream, streaming continuations, and every repair
+              // round, surface an explicit error instead of a clean "done"
+              // over truncated content (the client would otherwise render a
+              // reply that just stops mid-way).
+              if (repair.diagnostics.truncationDetected) {
+                const signals = (repair.diagnostics.truncationSignals || []).slice(0, 3).join(', ');
+                controller.enqueue(encoder.encode(sse({
+                  type: 'error',
+                  message: signals
+                    ? `The AI reply was cut off (${signals}) and could not be completed automatically. Please try again.`
+                    : 'The AI reply was cut off and could not be completed automatically. Please try again.',
+                  status: 502
+                })));
+                controller.close();
+                return;
+              }
+
               // Skill Verification Layer: deterministic targeted patches only.
               const verification = runVerificationWithRepair({
                 prompt,
@@ -981,6 +1013,17 @@ async function handleAi(request, env) {
       maxRepairs: 2
     });
     const repairMs = Date.now() - repairStartedAt;
+
+    // Honest-failure gate: a reply that is STILL cut off after the provider
+    // call and every repair round is never returned as a successful 200 —
+    // the client would otherwise render a message that stops mid-way.
+    if (processed.diagnostics.truncationDetected) {
+      return jsonResponse(502, {
+        error: 'The AI reply was cut off and could not be completed automatically. Please try again.',
+        detail: (processed.diagnostics.truncationSignals || []).slice(0, 3).join(', ') || undefined,
+        diagnostics: processed.diagnostics
+      });
+    }
 
     // Skill Verification Layer: every activated skill verifies the response
     // before it is marked trustworthy. Deterministic targeted patches only —

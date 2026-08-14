@@ -9,9 +9,29 @@
 
 import { runProviderChain, runStreamingChain } from './providerChain.js';
 import { verifyCreation, buildRepairPrompt } from './creationVerifier.js';
-import { detectTruncation, stitchContinuationChunk } from './responseProcessor.js';
+import {
+  detectTruncation,
+  stitchContinuationChunk,
+  CONTINUATION_INSTRUCTION,
+  ANTI_REPEAT_CONTINUATION_INSTRUCTION
+} from './responseProcessor.js';
 
 const MAX_REPAIR_ROUNDS = 5;
+
+// Structural-incompleteness failure codes: an artifact carrying any of these
+// is NOT a deliverable — it was cut off mid-block, its root document is
+// missing, or its skeleton (canvas/loop/input) is broken. Policy failures
+// (external-script, too-many-pages) do not truncate the artifact and are
+// reported through diagnostics instead of failing the build.
+export const HARD_FAILURE_CODES = new Set([
+  'empty-output',
+  'incomplete-html',
+  'truncated-block',
+  'unbalanced-braces',
+  'missing-canvas',
+  'missing-loop',
+  'missing-input'
+]);
 const LEASE_MS = 5 * 60 * 1000;
 // The build lease is refreshed on a timer while the harness runs, so a long
 // generation (uncapped build stream, slow spec/review) never lets the lease
@@ -293,6 +313,7 @@ export async function* runCreationHarness(options) {
       // (token limit reached, unclosed script/tags, unclosed fences), stream
       // continuation chunks seamlessly until the artifact is complete.
       let continuationPass = 0;
+      let antiRepeatTried = false;
       const MAX_CONTINUATION_PASSES = 10;
       while (continuationPass < MAX_CONTINUATION_PASSES && collected.trim()) {
         ensureWithinDeadline();
@@ -304,15 +325,15 @@ export async function* runCreationHarness(options) {
         continuationPass += 1;
         yield { type: 'phase', phase: 'continuing', attempt: continuationPass, total: MAX_CONTINUATION_PASSES };
 
+        // If the previous continuation repeated the beginning instead of
+        // continuing, switch to an explicit anti-repetition instruction.
+        const instruction = antiRepeatTried ? ANTI_REPEAT_CONTINUATION_INSTRUCTION : CONTINUATION_INSTRUCTION;
         const continuationMessages = [
           ...baseSystem,
           buildContext,
           ...userMessages,
           { role: 'assistant', content: collected },
-          {
-            role: 'user',
-            content: '[CONTINUATION] Do NOT restart from the beginning. Do NOT repeat previous lines. Continue writing from the exact stopping point until the entire file/document is complete. Ensure all <script>, <body>, and <html> tags and markdown code blocks are properly closed.'
-          }
+          { role: 'user', content: instruction }
         ];
 
         let continuationChunk = '';
@@ -334,7 +355,16 @@ export async function* runCreationHarness(options) {
         if (deltaText) {
           yield { type: 'delta', text: deltaText };
         }
-        if (stitched.length <= collected.length) break;
+        if (stitched.length <= collected.length) {
+          // The model restarted from the beginning instead of continuing:
+          // give it ONE retry with the anti-repetition instruction before
+          // giving up on this pass.
+          if (!antiRepeatTried) {
+            antiRepeatTried = true;
+            continue;
+          }
+          break;
+        }
         collected = stitched;
         state.build = collected;
         await persist(store, taskId, state);
@@ -445,6 +475,28 @@ export async function* runCreationHarness(options) {
         yield reportPhase('verifying');
         state.verification = verifyCreation(collected, { intentType: state.intentType });
         await persist(store, taskId, state);
+      }
+    }
+
+    // Honest-failure gate: an artifact that is STILL structurally incomplete
+    // (cut off mid-block, missing root document, broken game skeleton) after
+    // every continuation and repair round is NEVER delivered as a successful
+    // build — the client gets an explicit error instead of a clean "done"
+    // over truncated content. Policy failures (external-script,
+    // too-many-pages) do not truncate the artifact, keep the review path,
+    // and surface through diagnostics.
+    if (state.verification && !state.verification.passed) {
+      const hardFailures = state.verification.failures.filter((f) => HARD_FAILURE_CODES.has(f.code));
+      if (hardFailures.length > 0) {
+        // A retry deserves a fresh budget: the previous rounds were spent on
+        // the same incomplete artifact, so a retry should repair forward
+        // from the persisted partial build instead of erroring instantly.
+        state.repairCount = 0;
+        const detail = hardFailures.map((f) => f.detail).join(' ');
+        throw Object.assign(
+          new Error(`The AI could not produce a complete artifact (${detail}). Please try again.`),
+          { status: 502, retryable: true }
+        );
       }
     }
 
