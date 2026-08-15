@@ -5,7 +5,7 @@ import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
 import CanvasPreview from './components/CanvasPreview';
 import SettingsModal from './components/SettingsModal';
-import { generateAIResponse, extractCodeFromMessage, generateSessionTitle, generateAISessionTitle, getLastHostedDiagnostics } from './services/aiService';
+import { generateAIResponse, extractCodeFromMessage, generateSessionTitle, generateAISessionTitle } from './services/aiService';
 import { storeAppInR2, deleteSessionAppsInR2 } from './services/appStorageService';
 function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -189,7 +189,6 @@ export default function App() {
               .then(response => {
                 if (!response) return;
                 const aiMsg = toAssistantMessage(response);
-                aiMsg.diagnostics = getLastHostedDiagnostics();
                 const extractedCode = extractCodeFromMessage(aiMsg.content);
                 if (extractedCode) {
                   setActiveCanvasCode(extractedCode);
@@ -425,7 +424,6 @@ export default function App() {
       });
       if (response) {
         const aiMsg = toAssistantMessage(response);
-        aiMsg.diagnostics = getLastHostedDiagnostics();
         const extractedCode = extractCodeFromMessage(aiMsg.content);
         if (extractedCode) {
           setActiveCanvasCode(extractedCode);

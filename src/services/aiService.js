@@ -704,10 +704,6 @@ function sleepResumable(ms, signal) {
 // overwritten when a new project is created.
 let persistedProjectState = null;
 let onProjectStateChange = null;
-let lastHostedDiagnostics = null;
-export function getLastHostedDiagnostics() {
-  return lastHostedDiagnostics;
-}
 export function setProjectStateListener(listener) {
   onProjectStateChange = typeof listener === 'function' ? listener : null;
 }
@@ -725,10 +721,6 @@ export async function generateHostedAIResponse(
   signal = null,
   options = {}
 ) {
-  // Diagnostics are per-request: reset so a stale record from a previous
-  // generation is never attached to this one (e.g. after a local fallback).
-  lastHostedDiagnostics = null;
-
   // 1. Fine-grained intent classification & contract generation
   const fineIntent = classifyIntentNew(prompt);
   const legacyIntentType = toLegacyIntentType(fineIntent?.primaryIntent || fineIntent?.type);
@@ -931,8 +923,6 @@ export async function generateHostedAIResponse(
           options.onPhase?.(event);
         } else if (event.type === 'done' && event.projectState) {
           projectState = event.projectState;
-        } else if (event.type === 'diagnostics' && typeof event.diagnostics === 'object') {
-          lastHostedDiagnostics = event.diagnostics;
         } else if (event.type === 'error') {
           // Fail fast: surface the worker's reason verbatim. No retries.
           throw new Error(event.message || 'Hosted AI stream error.');
@@ -1065,9 +1055,6 @@ export async function generateHostedAIResponse(
   if (data?.projectState && typeof data.projectState === 'object') {
     persistedProjectState = data.projectState;
     onProjectStateChange?.(data.projectState);
-  }
-  if (data?.diagnostics && typeof data.diagnostics === 'object') {
-    lastHostedDiagnostics = data.diagnostics;
   }
 
   // 3. Local Reflection & Bounded Repair Loop
