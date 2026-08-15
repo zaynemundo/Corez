@@ -18,6 +18,7 @@
  */
 
 import { jsonResponse, readBoundedJson } from './utils.js';
+import { WORKERS_AI_RERANK_MODEL, WORKERS_AI_EMBED_MODEL, hasWorkersAIBinding } from './aiModels.js';
 
 const MAX_QUERY_CHARS = 200;
 const MAX_RESULTS = 12;
@@ -478,9 +479,17 @@ async function rankWithEmbeddingsProvider(query, results, provider) {
 
 // Rank merged results across every configured provider: rerank first,
 // embeddings similarity as the fallback. Never throws — returns null when
-// neither can rank. Rerank is tried on each provider before embeddings so
-// the strongest ranking wins; a provider that cannot serve either is skipped.
+// neither can rank. The free Workers AI path (bge-reranker-base rerank then
+// bge-m3 embeddings, both inside the daily neuron allocation) is tried
+// BEFORE the keyed providers so search ranking never costs a third-party
+// API call when the account's own AI binding can serve it. Rerank is tried
+// on each provider before embeddings so the strongest ranking wins; a
+// provider that cannot serve either is skipped.
 async function rankSearchResults(query, results, env) {
+  const workersAIReranked = await rerankWithWorkersAI(query, results, env);
+  if (workersAIReranked) return workersAIReranked;
+  const workersAIEmbedded = await rankWithEmbeddingsWorkersAI(query, results, env);
+  if (workersAIEmbedded) return workersAIEmbedded;
   const providers = rankingProviders(env);
   for (const provider of providers) {
     const reranked = await rerankWithProvider(query, results, provider);
@@ -491,6 +500,85 @@ async function rankSearchResults(query, results, env) {
     if (embedded) return embedded;
   }
   return null;
+}
+
+/**
+ * Re-rank merged search results with the account's own Workers AI
+ * bge-reranker-base model: query + each result text -> relevance scores that
+ * reorder the list. Best effort — any failure returns null and the caller
+ * keeps the original order, exactly like the keyed providers. Disable with
+ * WORKERS_AI_RERANK_DISABLED=true.
+ */
+async function rerankWithWorkersAI(query, results, env) {
+  if (env?.WORKERS_AI_RERANK_DISABLED === 'true') return null;
+  if (!hasWorkersAIBinding(env)) return null;
+
+  let data;
+  try {
+    data = await env.AI.run(WORKERS_AI_RERANK_MODEL, {
+      query,
+      contexts: results.map((result) => ({ text: resultText(result) }))
+    });
+  } catch {
+    return null;
+  }
+
+  const scored = Array.isArray(data?.results) ? data.results : [];
+  // A partial response is treated as a failure: reordering on incomplete
+  // scores would scramble the merged order.
+  if (scored.length < results.length) return null;
+
+  const scoreByIndex = new Map(
+    scored
+      .filter((entry) => Number.isFinite(entry?.index) && Number.isFinite(entry?.score))
+      .map((entry) => [entry.index, entry.score])
+  );
+  if (scoreByIndex.size < results.length) return null;
+
+  return {
+    method: 'rerank',
+    provider: 'workers-ai',
+    results: [...results]
+      .map((result, index) => ({ result, score: scoreByIndex.get(index) }))
+      .sort((a, b) => b.score - a.score)
+      .map((entry) => entry.result)
+  };
+}
+
+/**
+ * Fallback ranking with the account's own Workers AI bge-m3 embeddings:
+ * cosine similarity between the query vector and each result vector. Best
+ * effort — any failure returns null and the original order is kept. Disable
+ * with WORKERS_AI_EMBED_DISABLED=true.
+ */
+async function rankWithEmbeddingsWorkersAI(query, results, env) {
+  if (env?.WORKERS_AI_EMBED_DISABLED === 'true') return null;
+  if (!hasWorkersAIBinding(env)) return null;
+
+  let data;
+  try {
+    data = await env.AI.run(WORKERS_AI_EMBED_MODEL, {
+      text: [query, ...results.map((result) => resultText(result))]
+    });
+  } catch {
+    return null;
+  }
+
+  const vectors = Array.isArray(data?.data) ? data.data : [];
+  if (vectors.length < results.length + 1) return null;
+
+  const queryVector = vectors[0];
+  const docVectors = vectors.slice(1, results.length + 1);
+  if (!Array.isArray(queryVector) || docVectors.length < results.length) return null;
+
+  return {
+    method: 'embeddings',
+    provider: 'workers-ai',
+    results: [...results]
+      .map((result, index) => ({ result, score: cosineSimilarity(queryVector, docVectors[index]) }))
+      .sort((a, b) => b.score - a.score)
+      .map((entry) => entry.result)
+  };
 }
 
 /**

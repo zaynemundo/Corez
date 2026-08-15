@@ -26,7 +26,7 @@
     "test:reliability": "vitest run tests/response-processor.test.js tests/project-state.test.js tests/benchmark-evaluator.test.js tests/chat-e2e.test.js tests/worker-speed.test.js",
     "test:game": "vitest run tests/game-manifest.test.js tests/game-asset-storage.test.js tests/game-pipeline-state.test.js tests/game-iframe-bridge.test.js",
     "test:swarm": "vitest run tests/swarm-task-graph.test.js tests/swarm-adaptive-queue.test.js tests/swarm-large-synthesis.test.js tests/swarm-orchestrator.test.js",
-    "test:cloudflare": "node tests/cloudflare-worker-contract.mjs && node tests/search-worker-contract.mjs && node tests/inspiration-worker-contract.mjs && node tests/task-status-worker-contract.mjs && bash tests/cloudflare-worker-config-contract.sh && bash tests/workers-ai-provider-contract.sh && bash tests/public-ai-proxy-contract.sh && bash tests/ai-live-intent-eval-contract.sh && node tests/ai-live-intent-eval-response-contract.mjs && bash tests/env-question-skill-contract.sh",
+    "test:cloudflare": "node tests/cloudflare-worker-contract.mjs && node tests/search-worker-contract.mjs && node tests/workers-ai-rerank-embed-contract.mjs && node tests/inspiration-worker-contract.mjs && node tests/task-status-worker-contract.mjs && bash tests/cloudflare-worker-config-contract.sh && bash tests/workers-ai-provider-contract.sh && bash tests/public-ai-proxy-contract.sh && bash tests/ai-live-intent-eval-contract.sh && node tests/ai-live-intent-eval-response-contract.mjs && bash tests/env-question-skill-contract.sh",
     "dev:worker": "npm run build && wrangler dev --host localhost",
     "deploy": "npm run build && wrangler deploy"
   },

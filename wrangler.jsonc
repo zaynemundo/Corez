@@ -28,7 +28,11 @@
     ]
   },
   // Workers AI binding: powers the /api/image/cf endpoint (FLUX.2 klein-4b
-  // text-to-image) on the account's own Workers AI — no third-party key.
+  // text-to-image), the /api/rerank endpoint (bge-reranker-base) and the
+  // /api/embed endpoint (bge-m3) on the account's own Workers AI — no
+  // third-party key, billed inside the daily free neuron allocation. Search
+  // ranking also uses it first (rerank then embeddings) before keyed
+  // providers; disable with WORKERS_AI_RERANK_DISABLED / WORKERS_AI_EMBED_DISABLED.
   "ai": {
     "binding": "AI"
   },
