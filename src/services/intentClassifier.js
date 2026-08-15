@@ -1,5 +1,19 @@
 import model from '../data/intent-classifier-model.json' with { type: 'json' };
 
+// MUST stay byte-identical to scripts/train-intents.mjs tokenize(): the
+// runtime classifier and the training pipeline share the same tokenizer so
+// the committed model's vocabulary matches what runs in the browser.
+const INTENT_STOPWORDS = new Set([
+  'the', 'a', 'an', 'and', 'or', 'but', 'if', 'then', 'else', 'for', 'with', 'to', 'of', 'in', 'on', 'at', 'by', 'from',
+  'is', 'are', 'was', 'were', 'be', 'been', 'being', 'it', 'its', 'this', 'that', 'these', 'those', 'i', 'you', 'your',
+  'we', 'they', 'he', 'she', 'me', 'my', 'mine', 'our', 'their', 'them', 'us', 'as', 'so', 'do', 'does', 'did', 'have',
+  'has', 'had', 'will', 'would', 'can', 'could', 'should', 'may', 'might', 'must', 'not', 'no', 'yes', 'up', 'down',
+  'out', 'off', 'over', 'under', 'again', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'any', 'both',
+  'each', 'few', 'more', 'most', 'other', 'some', 'such', 'only', 'own', 'same', 'than', 'too', 'very', 'just', 'about',
+  'into', 'through', 'during', 'before', 'after', 'above', 'below', 'between', 'per', 'via', 'please', 'am', 'im',
+  'u', 'ur', 'dont', 'cant', 'wont', 'ive', 'ill', 'lets', 'em', 'ya'
+]);
+
 export function tokenize(text) {
   if (typeof text !== 'string') return [];
   const normalized = text.normalize('NFKC').toLowerCase();
@@ -9,6 +23,9 @@ export function tokenize(text) {
   const bigrams = [];
 
   for (let i = 0; i < unigrams.length - 1; i++) {
+    // Drop pure glue-word pairs ("the_and", "for_the"): noise with no class
+    // signal that only dilutes the vocabulary (v2 tokenizer).
+    if (INTENT_STOPWORDS.has(unigrams[i]) && INTENT_STOPWORDS.has(unigrams[i + 1])) continue;
     bigrams.push(`bi:${unigrams[i]}_${unigrams[i + 1]}`);
   }
 

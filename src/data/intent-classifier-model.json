@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "modelVersion": "1.0.0",
+  "modelVersion": "1.1.0",
   "algorithm": "multinomial-naive-bayes",
-  "tokenizer": "corez-intent-nfkc-unigram-bigram-v1",
+  "tokenizer": "corez-intent-nfkc-unigram-bigram-v2",
   "alpha": 1,
   "labels": [
     "app",
@@ -39,21 +39,16 @@
     "bi:a_quick",
     "bi:a_rough",
     "bi:a_simple",
-    "bi:after_a",
     "bi:an_interactive",
     "bi:and_build",
-    "bi:and_how",
     "bi:api_response",
     "bi:app_for",
     "bi:app_with",
     "bi:arcade_game",
-    "bi:are_some",
     "bi:break_down",
     "bi:build_a",
     "bi:bullet_points",
     "bi:calculator_tool",
-    "bi:can_i",
-    "bi:can_you",
     "bi:captions_for",
     "bi:code_and",
     "bi:copy_for",
@@ -64,9 +59,6 @@
     "bi:develop_a",
     "bi:diagnose_why",
     "bi:difference_between",
-    "bi:do_i",
-    "bi:does_my",
-    "bi:down_how",
     "bi:draft_a",
     "bi:draft_an",
     "bi:edit_this",
@@ -78,42 +70,23 @@
     "bi:explain_why",
     "bi:fails_to",
     "bi:fix_this",
-    "bi:for_a",
-    "bi:for_me",
-    "bi:for_my",
-    "bi:for_our",
     "bi:for_product",
-    "bi:for_this",
     "bi:game_for",
     "bi:generate_a",
     "bi:generator_tool",
-    "bi:have_a",
     "bi:help_debug",
     "bi:help_me",
-    "bi:how_can",
-    "bi:how_do",
-    "bi:how_does",
     "bi:how_web",
-    "bi:i_am",
-    "bi:i_have",
     "bi:i_need",
     "bi:in_javascript",
-    "bi:in_my",
     "bi:in_plain",
     "bi:in_simple",
-    "bi:in_the",
     "bi:indexes_in",
-    "bi:is_my",
-    "bi:is_the",
-    "bi:is_your",
     "bi:landing_page",
     "bi:launch_email",
     "bi:letter_for",
     "bi:machine_learning",
     "bi:make_a",
-    "bi:me_a",
-    "bi:me_how",
-    "bi:me_the",
     "bi:memory_leak",
     "bi:message_for",
     "bi:my_python",
@@ -144,7 +117,6 @@
     "bi:this_broken",
     "bi:this_react",
     "bi:this_technical",
-    "bi:to_be",
     "bi:to_sound",
     "bi:to_start",
     "bi:tool_app",
@@ -153,11 +125,6 @@
     "bi:website_with",
     "bi:what_are",
     "bi:what_is",
-    "bi:why_do",
-    "bi:why_does",
-    "bi:why_is",
-    "bi:why_my",
-    "bi:why_this",
     "bi:widget_with",
     "bi:with_drag",
     "bi:write_a",
@@ -400,2601 +367,2370 @@
   },
   "tokenLogLikelihoods": {
     "a": {
-      "app": -3.01972777911,
-      "code-help": -4.662090476241,
-      "explanation": -4.922896379788,
-      "general": -4.066693030892,
-      "writing": -3.568123252978
+      "app": -2.957882049423,
+      "code-help": -4.571761123857,
+      "explanation": -4.825108606353,
+      "general": -3.97200571003,
+      "writing": -3.494991260949
     },
     "about": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -4.855150391256,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -4.760463070394,
+      "writing": -5.797576353943
     },
     "addresses": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "after": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "am": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.07829394257,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -4.983606621708,
+      "writing": -6.490723534503
     },
     "an": {
-      "app": -4.783316371372,
-      "code-help": -5.914853444736,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -4.617945377477
+      "app": -4.721470641684,
+      "code-help": -5.824524092352,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -4.544813385447
     },
     "and": {
-      "app": -4.965637928166,
-      "code-help": -4.816241156068,
-      "explanation": -3.967384934761,
-      "general": -5.07829394257,
-      "writing": -4.617945377477
+      "app": -4.903792198478,
+      "code-help": -4.725911803684,
+      "explanation": -3.869597161326,
+      "general": -4.983606621708,
+      "writing": -4.544813385447
     },
     "announcement": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "answer": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.77144112313,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.676753802268,
+      "writing": -5.797576353943
     },
     "any": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -6.490723534503
     },
     "api": {
-      "app": -6.5750758406,
-      "code-help": -4.998562712862,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -4.908233360478,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "app": {
-      "app": -4.010126483138,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -3.948280753451,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "application": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "arcade": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "are": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.146039931102,
-      "general": -4.38514676201,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.048252157668,
+      "general": -4.290459441148,
+      "writing": -6.490723534503
     },
     "article": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "at": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -5.77144112313,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -5.676753802268,
+      "writing": -6.490723534503
     },
     "be": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "between": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -4.586424143167,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -4.488636369732,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:a_customer": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -5.820082930352,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "bi:a_landing": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:a_lot": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -6.490723534503
     },
     "bi:a_modern": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:a_prototype": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:a_quick": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -5.820082930352,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "bi:a_rough": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -6.490723534503
     },
     "bi:a_simple": {
-      "app": -4.965637928166,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
-    },
-    "bi:after_a": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -4.903792198478,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:an_interactive": {
-      "app": -5.18878147948,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.126935749792,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:and_build": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
-    },
-    "bi:and_how": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.146039931102,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:api_response": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:app_for": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:app_with": {
-      "app": -4.965637928166,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -4.903792198478,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:arcade_game": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
-    },
-    "bi:are_some": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:break_down": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -4.922896379788,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -4.825108606353,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:build_a": {
-      "app": -4.49563429892,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -4.433788569232,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:bullet_points": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "bi:calculator_tool": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
-    },
-    "bi:can_i": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -6.532334292222,
-      "general": -5.77144112313,
-      "writing": -6.563855526532
-    },
-    "bi:can_you": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -5.839187111662,
-      "general": -5.365976015022,
-      "writing": -5.870708345972
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:captions_for": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "bi:code_and": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:copy_for": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.177561165412
+      "app": -5.820082930352,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.104429173383
     },
     "bi:create_a": {
-      "app": -4.629165691544,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -4.567319961857,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:database_indexes": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:debug_why": {
-      "app": -6.5750758406,
-      "code-help": -5.221706264176,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.131376911792,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:design_a": {
-      "app": -4.965637928166,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -4.903792198478,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:develop_a": {
-      "app": -5.18878147948,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.126935749792,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:diagnose_why": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:difference_between": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -4.586424143167,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
-    },
-    "bi:do_i": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
-    },
-    "bi:does_my": {
-      "app": -6.5750758406,
-      "code-help": -4.816241156068,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
-    },
-    "bi:down_how": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -4.922896379788,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -4.488636369732,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:draft_a": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -4.772096057304
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -4.698964065274
     },
     "bi:draft_an": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.177561165412
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.104429173383
     },
     "bi:edit_this": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "bi:email_to": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "bi:error_in": {
-      "app": -6.5750758406,
-      "code-help": -5.221706264176,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.131376911792,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:explain_database": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:explain_how": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:explain_the": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:explain_why": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "bi:fails_to": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:fix_this": {
-      "app": -6.5750758406,
-      "code-help": -5.221706264176,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
-    },
-    "bi:for_a": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.77144112313,
-      "writing": -4.484413984852
-    },
-    "bi:for_me": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.77144112313,
-      "writing": -6.563855526532
-    },
-    "bi:for_my": {
-      "app": -4.629165691544,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.77144112313,
-      "writing": -5.870708345972
-    },
-    "bi:for_our": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.177561165412
+      "app": -6.513230110912,
+      "code-help": -5.131376911792,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:for_product": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
-    },
-    "bi:for_this": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.820082930352,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "bi:game_for": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:generate_a": {
-      "app": -4.965637928166,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -4.903792198478,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:generator_tool": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
-    },
-    "bi:have_a": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -4.855150391256,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:help_debug": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:help_me": {
-      "app": -6.5750758406,
-      "code-help": -5.221706264176,
-      "explanation": -6.532334292222,
-      "general": -5.77144112313,
-      "writing": -5.870708345972
-    },
-    "bi:how_can": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -6.532334292222,
-      "general": -5.77144112313,
-      "writing": -6.563855526532
-    },
-    "bi:how_do": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -5.146039931102,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
-    },
-    "bi:how_does": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -4.740574822994,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.131376911792,
+      "explanation": -6.434546518787,
+      "general": -5.676753802268,
+      "writing": -5.797576353943
     },
     "bi:how_web": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
-    },
-    "bi:i_am": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.07829394257,
-      "writing": -6.563855526532
-    },
-    "bi:i_have": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.07829394257,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:i_need": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.77144112313,
-      "writing": -6.563855526532
+      "app": -5.820082930352,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.676753802268,
+      "writing": -6.490723534503
     },
     "bi:in_javascript": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
-    },
-    "bi:in_my": {
-      "app": -6.5750758406,
-      "code-help": -5.221706264176,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:in_plain": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "bi:in_simple": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
-    },
-    "bi:in_the": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:indexes_in": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
-    },
-    "bi:is_my": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
-    },
-    "bi:is_the": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -4.740574822994,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
-    },
-    "bi:is_your": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:landing_page": {
-      "app": -4.965637928166,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -4.903792198478,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "bi:launch_email": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "bi:letter_for": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.177561165412
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.104429173383
     },
     "bi:machine_learning": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:make_a": {
-      "app": -4.965637928166,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
-    },
-    "bi:me_a": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
-    },
-    "bi:me_how": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
-    },
-    "bi:me_the": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -4.903792198478,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:memory_leak": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:message_for": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "bi:my_python": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:page_for": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:plain_english": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "bi:polish_this": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.177561165412
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.104429173383
     },
     "bi:portal_with": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:python_script": {
-      "app": -6.5750758406,
-      "code-help": -5.221706264176,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.131376911792,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:remote_work": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.77144112313,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.676753802268,
+      "writing": -5.797576353943
     },
     "bi:rest_api": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:returns_null": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:review_this": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "bi:rewrite_this": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -4.484413984852
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -4.411281992823
     },
     "bi:script_that": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:server_side": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:ship_a": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:side_rendering": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:simple_terms": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:some_general": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -6.490723534503
     },
     "bi:stack_trace": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:summarize_this": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.177561165412
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.104429173383
     },
     "bi:teach_me": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -4.740574822994,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -4.642787049559,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:tell_me": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -6.532334292222,
-      "general": -5.77144112313,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -6.434546518787,
+      "general": -5.676753802268,
+      "writing": -6.490723534503
     },
     "bi:text_to": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "bi:thank_you": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -6.490723534503
     },
     "bi:thanks_a": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -6.490723534503
     },
     "bi:the_difference": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -4.586424143167,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -4.488636369732,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:this_broken": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:this_react": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:this_technical": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
-    },
-    "bi:to_be": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "bi:to_sound": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "bi:to_start": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -6.490723534503
     },
     "bi:tool_app": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:web_app": {
-      "app": -5.18878147948,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.126935749792,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:web_application": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:website_with": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:what_are": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.146039931102,
-      "general": -4.672828834462,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.048252157668,
+      "general": -4.5781415136,
+      "writing": -6.490723534503
     },
     "bi:what_is": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -4.452892750543,
-      "general": -5.77144112313,
-      "writing": -6.563855526532
-    },
-    "bi:why_do": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.146039931102,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
-    },
-    "bi:why_does": {
-      "app": -6.5750758406,
-      "code-help": -4.528559083616,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
-    },
-    "bi:why_is": {
-      "app": -6.5750758406,
-      "code-help": -5.221706264176,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
-    },
-    "bi:why_my": {
-      "app": -6.5750758406,
-      "code-help": -5.221706264176,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
-    },
-    "bi:why_this": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -4.355104977108,
+      "general": -5.676753802268,
+      "writing": -6.490723534503
     },
     "bi:widget_with": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:with_drag": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bi:write_a": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.177561165412
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.104429173383
     },
     "bi:write_an": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "break": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -4.922896379788,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -4.825108606353,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "broken": {
-      "app": -6.5750758406,
-      "code-help": -5.221706264176,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.131376911792,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "browser": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.820082930352,
+      "code-help": -6.517671272912,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "bug": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "build": {
-      "app": -4.272490747606,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -5.77144112313,
-      "writing": -6.563855526532
+      "app": -4.210645017918,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -5.676753802268,
+      "writing": -6.490723534503
     },
     "bullet": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "business": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -5.820082930352,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "by": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "calculator": {
-      "app": -4.783316371372,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -4.721470641684,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "call": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "can": {
-      "app": -5.476463551932,
-      "code-help": -5.914853444736,
-      "explanation": -5.839187111662,
-      "general": -4.855150391256,
-      "writing": -5.870708345972
+      "app": -5.414617822244,
+      "code-help": -5.824524092352,
+      "explanation": -5.741399338228,
+      "general": -4.760463070394,
+      "writing": -5.797576353943
     },
     "canvas": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "captions": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "card": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.820082930352,
+      "code-help": -6.517671272912,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "clean": {
-      "app": -5.88192866004,
-      "code-help": -5.914853444736,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.820082930352,
+      "code-help": -5.824524092352,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "code": {
-      "app": -6.5750758406,
-      "code-help": -4.998562712862,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -4.908233360478,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "coffee": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -5.820082930352,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "color": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.820082930352,
+      "code-help": -6.517671272912,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "compare": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.146039931102,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.048252157668,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "component": {
-      "app": -6.5750758406,
-      "code-help": -5.221706264176,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.131376911792,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "concept": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.839187111662,
-      "general": -5.77144112313,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.741399338228,
+      "general": -5.676753802268,
+      "writing": -6.490723534503
     },
     "concise": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "converter": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "copy": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -4.617945377477
+      "app": -5.820082930352,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -4.544813385447
     },
     "counter": {
-      "app": -5.476463551932,
-      "code-help": -5.914853444736,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -5.824524092352,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "create": {
-      "app": -4.629165691544,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -4.567319961857,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "css": {
-      "app": -6.5750758406,
-      "code-help": -5.221706264176,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.131376911792,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "customer": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.177561165412
+      "app": -5.820082930352,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.104429173383
     },
     "daily": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.77144112313,
-      "writing": -6.563855526532
+      "app": -5.820082930352,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.676753802268,
+      "writing": -6.490723534503
     },
     "dashboard": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "data": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "database": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "day": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -6.490723534503
     },
     "debug": {
-      "app": -6.5750758406,
-      "code-help": -4.662090476241,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -4.571761123857,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "design": {
-      "app": -4.629165691544,
-      "code-help": -6.608000625296,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -4.567319961857,
+      "code-help": -6.517671272912,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "develop": {
-      "app": -4.965637928166,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -4.903792198478,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "diagnose": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "difference": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -4.586424143167,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -4.488636369732,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "do": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -4.586424143167,
-      "general": -4.855150391256,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -4.488636369732,
+      "general": -4.760463070394,
+      "writing": -6.490723534503
     },
     "does": {
-      "app": -6.5750758406,
-      "code-help": -4.528559083616,
-      "explanation": -4.586424143167,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -4.438229731232,
+      "explanation": -4.488636369732,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "down": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -4.922896379788,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -4.825108606353,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "draft": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -3.85580532543
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -3.7826733334
     },
     "drag": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "edit": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.177561165412
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.104429173383
     },
     "email": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -4.165960253734
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -4.092828261704
     },
     "engaging": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "english": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "error": {
-      "app": -6.5750758406,
-      "code-help": -4.662090476241,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -4.571761123857,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "errors": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "event": {
-      "app": -5.88192866004,
-      "code-help": -5.509388336628,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -5.820082930352,
+      "code-help": -5.419058984244,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "executive": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "explain": {
-      "app": -5.88192866004,
-      "code-help": -5.221706264176,
-      "explanation": -4.229749199228,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -5.820082930352,
+      "code-help": -5.131376911792,
+      "explanation": -4.131961425793,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "fail": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "fails": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "feedback": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -5.820082930352,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "file": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "fix": {
-      "app": -6.5750758406,
-      "code-help": -3.899950424194,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -3.80962107181,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "for": {
-      "app": -4.010126483138,
-      "code-help": -5.221706264176,
-      "explanation": -5.839187111662,
-      "general": -4.162003210696,
-      "writing": -3.568123252978
+      "app": -3.948280753451,
+      "code-help": -5.131376911792,
+      "explanation": -5.741399338228,
+      "general": -4.067315889834,
+      "writing": -3.494991260949
     },
     "from": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "function": {
-      "app": -6.5750758406,
-      "code-help": -4.816241156068,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -4.725911803684,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "game": {
-      "app": -4.965637928166,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -4.903792198478,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "general": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -4.162003210696,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -4.067315889834,
+      "writing": -6.490723534503
     },
     "generate": {
-      "app": -4.965637928166,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -4.903792198478,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "generator": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "git": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "going": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -6.490723534503
     },
     "good": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.07829394257,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -4.983606621708,
+      "writing": -6.490723534503
     },
     "graphql": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "great": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -6.490723534503
     },
     "have": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -4.855150391256,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -4.760463070394,
+      "writing": -6.490723534503
     },
     "hello": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.07829394257,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -4.983606621708,
+      "writing": -6.490723534503
     },
     "help": {
-      "app": -6.5750758406,
-      "code-help": -4.816241156068,
-      "explanation": -6.532334292222,
-      "general": -5.07829394257,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -4.725911803684,
+      "explanation": -6.434546518787,
+      "general": -4.983606621708,
+      "writing": -5.797576353943
     },
     "hey": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -6.490723534503
     },
     "hi": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -6.490723534503
     },
     "hobbies": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -6.490723534503
     },
     "hook": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "how": {
-      "app": -6.5750758406,
-      "code-help": -5.221706264176,
-      "explanation": -3.641962534326,
-      "general": -4.672828834462,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.131376911792,
+      "explanation": -3.544174760891,
+      "general": -4.5781415136,
+      "writing": -6.490723534503
     },
     "html": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "i": {
-      "app": -5.88192866004,
-      "code-help": -5.509388336628,
-      "explanation": -5.839187111662,
-      "general": -3.979681653902,
-      "writing": -6.563855526532
+      "app": -5.820082930352,
+      "code-help": -5.419058984244,
+      "explanation": -5.741399338228,
+      "general": -3.88499433304,
+      "writing": -6.490723534503
     },
     "ideas": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -6.490723534503
     },
     "in": {
-      "app": -5.476463551932,
-      "code-help": -3.968943295681,
-      "explanation": -4.047427642434,
-      "general": -5.77144112313,
-      "writing": -5.870708345972
+      "app": -5.414617822244,
+      "code-help": -3.878613943297,
+      "explanation": -3.949639868999,
+      "general": -5.676753802268,
+      "writing": -5.797576353943
     },
     "index": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "indexes": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "interactive": {
-      "app": -5.18878147948,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.126935749792,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "into": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -4.954417614098
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -4.881285622068
     },
     "invitation": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "is": {
-      "app": -6.5750758406,
-      "code-help": -4.816241156068,
-      "explanation": -4.229749199228,
-      "general": -5.07829394257,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -4.725911803684,
+      "explanation": -4.131961425793,
+      "general": -4.983606621708,
+      "writing": -6.490723534503
     },
     "it": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -5.839187111662,
-      "general": -5.77144112313,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -5.741399338228,
+      "general": -5.676753802268,
+      "writing": -5.392111245834
     },
     "javascript": {
-      "app": -5.88192866004,
-      "code-help": -5.221706264176,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.820082930352,
+      "code-help": -5.131376911792,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "js": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "json": {
-      "app": -6.5750758406,
-      "code-help": -5.221706264176,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.131376911792,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "key": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.839187111662,
-      "general": -5.77144112313,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.741399338228,
+      "general": -5.676753802268,
+      "writing": -5.797576353943
     },
     "landing": {
-      "app": -4.965637928166,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -4.903792198478,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "launch": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -4.954417614098
+      "app": -5.820082930352,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -4.881285622068
     },
     "leak": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "learning": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -5.433722003554,
-      "general": -5.77144112313,
-      "writing": -6.563855526532
+      "app": -5.820082930352,
+      "code-help": -6.517671272912,
+      "explanation": -5.335934230119,
+      "general": -5.676753802268,
+      "writing": -6.490723534503
     },
     "letter": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -4.954417614098
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -4.881285622068
     },
     "list": {
-      "app": -5.88192866004,
-      "code-help": -5.914853444736,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.820082930352,
+      "code-help": -5.824524092352,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "looking": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -6.490723534503
     },
     "loop": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "lot": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -6.490723534503
     },
     "machine": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "make": {
-      "app": -4.629165691544,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -4.567319961857,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "me": {
-      "app": -5.476463551932,
-      "code-help": -4.998562712862,
-      "explanation": -4.740574822994,
-      "general": -4.672828834462,
-      "writing": -5.465243237864
+      "app": -5.414617822244,
+      "code-help": -4.908233360478,
+      "explanation": -4.642787049559,
+      "general": -4.5781415136,
+      "writing": -5.392111245834
     },
     "memory": {
-      "app": -5.88192866004,
-      "code-help": -5.509388336628,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.820082930352,
+      "code-help": -5.419058984244,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "message": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.177561165412
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.104429173383
     },
     "mobile": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "modern": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "more": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.77144112313,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.676753802268,
+      "writing": -5.392111245834
     },
     "morning": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -6.490723534503
     },
     "my": {
-      "app": -4.629165691544,
-      "code-help": -3.7176288674,
-      "explanation": -6.532334292222,
-      "general": -4.855150391256,
-      "writing": -5.465243237864
+      "app": -4.567319961857,
+      "code-help": -3.627299515016,
+      "explanation": -6.434546518787,
+      "general": -4.760463070394,
+      "writing": -5.392111245834
     },
     "need": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -5.820082930352,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -6.490723534503
     },
     "nested": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "new": {
-      "app": -5.88192866004,
-      "code-help": -5.914853444736,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -5.870708345972
+      "app": -5.820082930352,
+      "code-help": -5.824524092352,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -5.797576353943
     },
     "next": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "nice": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -6.490723534503
     },
     "not": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -5.77144112313,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -5.676753802268,
+      "writing": -6.490723534503
     },
     "null": {
-      "app": -6.5750758406,
-      "code-help": -5.221706264176,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.131376911792,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "o": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "of": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -4.922896379788,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -4.825108606353,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "office": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.77144112313,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.676753802268,
+      "writing": -5.797576353943
     },
     "on": {
-      "app": -6.5750758406,
-      "code-help": -4.816241156068,
-      "explanation": -6.532334292222,
-      "general": -5.07829394257,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -4.725911803684,
+      "explanation": -6.434546518787,
+      "general": -4.983606621708,
+      "writing": -6.490723534503
     },
     "online": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.77144112313,
-      "writing": -6.563855526532
+      "app": -5.820082930352,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.676753802268,
+      "writing": -6.490723534503
     },
     "our": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -4.954417614098
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -4.881285622068
     },
     "out": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.77144112313,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.676753802268,
+      "writing": -5.797576353943
     },
     "page": {
-      "app": -4.629165691544,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -4.567319961857,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "plain": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "please": {
-      "app": -5.88192866004,
-      "code-help": -5.914853444736,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.820082930352,
+      "code-help": -5.824524092352,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "points": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "polish": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -4.954417614098
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -4.881285622068
     },
     "portal": {
-      "app": -4.965637928166,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -4.903792198478,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "position": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "post": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "prepare": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -6.490723534503
     },
     "preview": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "product": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "productivity": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -5.797576353943
     },
     "professional": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "project": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.77144112313,
-      "writing": -5.870708345972
+      "app": -5.820082930352,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.676753802268,
+      "writing": -5.797576353943
     },
     "prototype": {
-      "app": -5.476463551932,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "public": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.839187111662,
-      "general": -5.77144112313,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.741399338228,
+      "general": -5.676753802268,
+      "writing": -6.490723534503
     },
     "python": {
-      "app": -6.5750758406,
-      "code-help": -4.998562712862,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -4.908233360478,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "query": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "quick": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -5.820082930352,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "react": {
-      "app": -5.88192866004,
-      "code-help": -4.998562712862,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.820082930352,
+      "code-help": -4.908233360478,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "regex": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "release": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.177561165412
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.104429173383
     },
     "remote": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.77144112313,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.676753802268,
+      "writing": -5.797576353943
     },
     "rendering": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "response": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "rest": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "returns": {
-      "app": -6.5750758406,
-      "code-help": -5.221706264176,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.131376911792,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "review": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -4.954417614098
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -4.881285622068
     },
     "rewrite": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -4.366630949196
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -4.293498957166
     },
     "rough": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -6.490723534503
     },
     "script": {
-      "app": -6.5750758406,
-      "code-help": -5.221706264176,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -5.131376911792,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "server": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "servers": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "ship": {
-      "app": -5.18878147948,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.126935749792,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "short": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "side": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "simple": {
-      "app": -4.965637928166,
-      "code-help": -6.608000625296,
-      "explanation": -5.146039931102,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -4.903792198478,
+      "code-help": -6.517671272912,
+      "explanation": -5.048252157668,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "site": {
-      "app": -5.18878147948,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.126935749792,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "so": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -5.797576353943
     },
     "software": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.77144112313,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.676753802268,
+      "writing": -5.797576353943
     },
     "some": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -4.855150391256,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -4.760463070394,
+      "writing": -6.490723534503
     },
     "sound": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "sounds": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.77144112313,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.676753802268,
+      "writing": -5.797576353943
     },
     "source": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "sql": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "stack": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "start": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -6.490723534503
     },
     "state": {
-      "app": -5.476463551932,
-      "code-help": -5.221706264176,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.414617822244,
+      "code-help": -5.131376911792,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "status": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "step": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "store": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.820082930352,
+      "code-help": -6.517671272912,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "suggestions": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -6.490723534503
     },
     "summarize": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -4.772096057304
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -4.698964065274
     },
     "summary": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -5.820082930352,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "systems": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "task": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.77144112313,
-      "writing": -6.563855526532
+      "app": -5.820082930352,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.676753802268,
+      "writing": -6.490723534503
     },
     "teach": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -4.740574822994,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -4.642787049559,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "technical": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.465243237864
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.392111245834
     },
     "tell": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -6.532334292222,
-      "general": -5.77144112313,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -6.434546518787,
+      "general": -5.676753802268,
+      "writing": -6.490723534503
     },
     "terms": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "text": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -4.772096057304
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -4.698964065274
     },
     "thank": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -6.490723534503
     },
     "thanks": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -4.855150391256,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -4.760463070394,
+      "writing": -6.490723534503
     },
     "that": {
-      "app": -5.88192866004,
-      "code-help": -5.221706264176,
-      "explanation": -6.532334292222,
-      "general": -4.855150391256,
-      "writing": -6.563855526532
+      "app": -5.820082930352,
+      "code-help": -5.131376911792,
+      "explanation": -6.434546518787,
+      "general": -4.760463070394,
+      "writing": -6.490723534503
     },
     "the": {
-      "app": -5.476463551932,
-      "code-help": -4.998562712862,
-      "explanation": -3.893276962607,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -5.414617822244,
+      "code-help": -4.908233360478,
+      "explanation": -3.795489189172,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "this": {
-      "app": -6.5750758406,
-      "code-help": -3.77478728124,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -3.730642182476
+      "app": -6.513230110912,
+      "code-help": -3.684457928856,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -3.657510190446
     },
     "thoughts": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -6.490723534503
     },
     "thread": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "throwing": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "time": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "timer": {
-      "app": -5.18878147948,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.126935749792,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "tips": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -5.797576353943
     },
     "to": {
-      "app": -6.5750758406,
-      "code-help": -4.528559083616,
-      "explanation": -4.740574822994,
-      "general": -3.979681653902,
-      "writing": -4.165960253734
+      "app": -6.513230110912,
+      "code-help": -4.438229731232,
+      "explanation": -4.642787049559,
+      "general": -3.88499433304,
+      "writing": -4.092828261704
     },
     "today": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.365976015022,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.27128869416,
+      "writing": -6.490723534503
     },
     "tool": {
-      "app": -4.49563429892,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -4.433788569232,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "trace": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "two": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "typescript": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "u": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -5.77144112313,
-      "writing": -6.563855526532
+      "app": -5.820082930352,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -5.676753802268,
+      "writing": -6.490723534503
     },
     "undefined": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "unit": {
-      "app": -5.88192866004,
-      "code-help": -5.914853444736,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.820082930352,
+      "code-help": -5.824524092352,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "up": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "update": {
-      "app": -6.5750758406,
-      "code-help": -5.914853444736,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -5.824524092352,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "using": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -5.839187111662,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -5.820082930352,
+      "code-help": -6.517671272912,
+      "explanation": -5.741399338228,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "versus": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.433722003554,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.335934230119,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "web": {
-      "app": -4.629165691544,
-      "code-help": -5.914853444736,
-      "explanation": -4.922896379788,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -4.567319961857,
+      "code-help": -5.824524092352,
+      "explanation": -4.825108606353,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "website": {
-      "app": -4.965637928166,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -4.903792198478,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "what": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -4.047427642434,
-      "general": -4.066693030892,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -3.949639868999,
+      "general": -3.97200571003,
+      "writing": -6.490723534503
     },
     "when": {
-      "app": -6.5750758406,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -5.77144112313,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -5.676753802268,
+      "writing": -6.490723534503
     },
     "why": {
-      "app": -6.5750758406,
-      "code-help": -3.7176288674,
-      "explanation": -4.586424143167,
-      "general": -6.46458830369,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -3.627299515016,
+      "explanation": -4.488636369732,
+      "general": -6.369900982828,
+      "writing": -5.797576353943
     },
     "widget": {
-      "app": -4.629165691544,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -6.563855526532
+      "app": -4.567319961857,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -6.490723534503
     },
     "with": {
-      "app": -4.090169190812,
-      "code-help": -6.608000625296,
-      "explanation": -5.839187111662,
-      "general": -5.07829394257,
-      "writing": -5.870708345972
+      "app": -4.028323461124,
+      "code-help": -6.517671272912,
+      "explanation": -5.741399338228,
+      "general": -4.983606621708,
+      "writing": -5.797576353943
     },
     "work": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -5.146039931102,
-      "general": -5.365976015022,
-      "writing": -5.870708345972
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -5.048252157668,
+      "general": -5.27128869416,
+      "writing": -5.797576353943
     },
     "write": {
-      "app": -5.88192866004,
-      "code-help": -5.509388336628,
-      "explanation": -6.532334292222,
-      "general": -6.46458830369,
-      "writing": -4.165960253734
+      "app": -5.820082930352,
+      "code-help": -5.419058984244,
+      "explanation": -6.434546518787,
+      "general": -6.369900982828,
+      "writing": -4.092828261704
     },
     "you": {
-      "app": -5.88192866004,
-      "code-help": -6.608000625296,
-      "explanation": -5.839187111662,
-      "general": -4.066693030892,
-      "writing": -5.870708345972
+      "app": -5.820082930352,
+      "code-help": -6.517671272912,
+      "explanation": -5.741399338228,
+      "general": -3.97200571003,
+      "writing": -5.797576353943
     },
     "your": {
-      "app": -6.5750758406,
-      "code-help": -6.608000625296,
-      "explanation": -6.532334292222,
-      "general": -4.518678154635,
-      "writing": -6.563855526532
+      "app": -6.513230110912,
+      "code-help": -6.517671272912,
+      "explanation": -6.434546518787,
+      "general": -4.423990833773,
+      "writing": -6.490723534503
     }
   },
   "minConfidence": 0.55,

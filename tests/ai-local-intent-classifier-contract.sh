@@ -30,7 +30,7 @@ if grep -q '/workspaces/' "$model"; then fail "model must not contain absolute w
 # Check required schema fields in model
 grep -q '"schemaVersion": 1' "$model" || fail "model schemaVersion must be 1"
 grep -q '"algorithm": "multinomial-naive-bayes"' "$model" || fail "model algorithm must be multinomial-naive-bayes"
-grep -q '"tokenizer": "corez-intent-nfkc-unigram-bigram-v1"' "$model" || fail "model tokenizer must match spec"
+grep -q '"tokenizer": "corez-intent-nfkc-unigram-bigram-v2"' "$model" || fail "model tokenizer must match spec"
 grep -q '"minConfidence": 0.55' "$model" || fail "minConfidence must be 0.55"
 grep -q '"maxOovRatio": 0.7' "$model" || fail "maxOovRatio must be 0.7"
 grep -q '"trainingDataSha256"' "$model" || fail "trainingDataSha256 must be present"
