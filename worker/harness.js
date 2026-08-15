@@ -9,6 +9,7 @@
 
 import { runProviderChain, runStreamingChain } from './providerChain.js';
 import { verifyCreation, verifySpecCoverage, buildRepairPrompt } from './creationVerifier.js';
+import { estimateCostUsd } from './utils.js';
 import {
   detectTruncation,
   stitchContinuationChunk,
@@ -114,8 +115,17 @@ export async function* runCreationHarness(options) {
     signal,
     store,
     sleep,
+    complexity,
     heartbeatIntervalMs = HEARTBEAT_INTERVAL_MS
   } = options;
+
+  // Fast path: trivial/low-complexity requests (client-side classified and
+  // re-validated here) skip the planning provider call and the review round
+  // — the prompt itself serves as the spec, and structural + spec-coverage
+  // verification still gate the artifact. Short prompts only, so a large
+  // request can never sneak through the lighter path.
+  const fastPath = ['trivial', 'low'].includes(String(complexity || '').toLowerCase())
+    && String(prompt || '').length <= 400;
 
   const taskId = harnessTaskId(prompt, primaryIntent);
   const baseSystem = apiMessages.filter((m) => m.role === 'system');
@@ -221,9 +231,16 @@ export async function* runCreationHarness(options) {
 
   try {
     // 1. PLANNING — a compact spec (resumable, buffered, not streamed).
+    // Fast path: for trivial/low-complexity requests the user prompt itself
+    // is the spec — no planning provider call, one less round-trip and the
+    // largest single latency saving for simple builds.
     if (!state.spec) {
       ensureWithinDeadline();
       yield reportPhase('planning');
+      if (fastPath) {
+        state.spec = String(prompt || '').trim();
+        await persist(store, taskId, state);
+      } else {
       const specMessages = [
         ...baseSystem,
         { role: 'system', content: SPEC_INSTRUCTION },
@@ -266,6 +283,7 @@ export async function* runCreationHarness(options) {
       state.spec = specResult.content;
       state.model = specResult.model || state.model;
       await persist(store, taskId, state);
+      }
     }
 
     // 2/3/4. BUILD -> VERIFY -> REPAIR (adaptive, capped).
@@ -449,10 +467,24 @@ export async function* runCreationHarness(options) {
     // NEEDS_FIX verdicts trigger targeted repair rounds (bounded); a
     // repaired build is reviewed again so a fix that missed defects is
     // caught instead of shipped. Unparseable or missing reviews are never
-    // treated as approval and never trigger blind repairs.
+    // treated as approval and never trigger blind repairs. The fast path
+    // (trivial/low complexity) skips the review round entirely: structural
+    // + spec-coverage verification already gated the artifact.
     const MAX_REVIEW_CYCLES = 2;
     let reviewCycles = 0;
-    while (reviewCycles < MAX_REVIEW_CYCLES) {
+    if (fastPath) {
+      // A skipped review is never claimed as approval (same rule as a
+      // provider-outage skip): the artifact passed deterministic
+      // verification, and the reason explains why the review did not run.
+      state.review = {
+        approved: false,
+        feedback: '',
+        skipped: true,
+        inconclusive: false,
+        reason: 'complexity-gate: review skipped for a trivial/low-complexity request'
+      };
+    }
+    while (!fastPath && reviewCycles < MAX_REVIEW_CYCLES) {
       ensureWithinDeadline();
       yield reportPhase('reviewing');
       const reviewMessages = [
@@ -582,7 +614,13 @@ export async function* runCreationHarness(options) {
           approved: Boolean(state.review?.approved),
           reviewSkipped: Boolean(state.review?.skipped),
           reviewInconclusive: Boolean(state.review?.inconclusive),
-          model: state.model || null
+          model: state.model || null,
+          usage: state.lastBuildUsage || null,
+          estimatedCostUsd: estimateCostUsd(
+            state.lastBuildUsage?.inputTokens,
+            state.lastBuildUsage?.outputTokens,
+            env
+          )
         }
       }
     };

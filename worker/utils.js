@@ -3,6 +3,18 @@
 // own request limit is 100 MB), so normal AI tasks are never squeezed.
 export const MAX_BODY_BYTES = 24 * 1024 * 1024;
 
+// Estimated USD cost of a generation, based on per-1M-token rates that are
+// env-overridable (defaults roughly match deepseek-v4-flash direct pricing:
+// $0.14/M input, $0.28/M output). An estimate only — the authoritative
+// number lives in the provider's billing dashboard.
+export function estimateCostUsd(inputTokens, outputTokens, env) {
+  const inputRate = Number(env?.AI_COST_PER_M_INPUT_USD) || 0.14;
+  const outputRate = Number(env?.AI_COST_PER_M_OUTPUT_USD) || 0.28;
+  const input = Number.isFinite(inputTokens) && inputTokens > 0 ? inputTokens : 0;
+  const output = Number.isFinite(outputTokens) && outputTokens > 0 ? outputTokens : 0;
+  return Math.round(((input / 1e6) * inputRate + (output / 1e6) * outputRate) * 1e6) / 1e6;
+}
+
 export const SECURITY_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',

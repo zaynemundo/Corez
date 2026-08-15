@@ -225,6 +225,53 @@ describe('runCreationHarness', () => {
     expect(events.some((e) => e.type === 'done')).toBe(true);
   });
 
+  it('skips planning and review on the low-complexity fast path', async () => {
+    const provider = buildMockProvider();
+    // Build directly with the GOOD artifact (no repair needed).
+    provider.fetchMock.mockImplementation(async (_url, init) => {
+      const body = JSON.parse(init.body);
+      const messages = JSON.stringify(body.messages || []);
+      if (messages.includes('Produce a concise build specification')) return jsonCompletion('spec');
+      if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('APPROVED');
+      return body.stream === true ? sseDelta([GOOD_ARTIFACT]) : jsonCompletion(GOOD_ARTIFACT);
+    });
+    vi.stubGlobal('fetch', provider.fetchMock);
+
+    const { events } = await runHarness({
+      prompt: 'build a simple canvas game',
+      complexity: 'low'
+    });
+
+    // No planning provider call (the prompt is the spec) and no review
+    // round — the fast path streams straight to build + verify + done.
+    expect(provider.counts.specCalls).toBe(0);
+    expect(provider.counts.reviewCalls).toBe(0);
+    const phases = events.filter((e) => e.type === 'phase').map((e) => e.phase);
+    expect(phases).toEqual(['planning', 'building', 'verifying', 'done']);
+    expect(collectDeltas(events)).toBe(GOOD_ARTIFACT);
+    const diagnostics = events.find((e) => e.type === 'diagnostics')?.diagnostics;
+    expect(diagnostics?.harness?.reviewSkipped).toBe(true);
+    // The review skip is never claimed as approval.
+    expect(diagnostics?.harness?.approved).toBe(false);
+    // Cost meter rides in the harness diagnostics.
+    expect(diagnostics?.harness?.estimatedCostUsd).toBeGreaterThan(0);
+  });
+
+  it('keeps planning and review for medium-complexity requests', async () => {
+    const provider = buildMockProvider();
+    vi.stubGlobal('fetch', provider.fetchMock);
+
+    const { events } = await runHarness({
+      prompt: 'build a simple canvas game',
+      complexity: 'medium'
+    });
+
+    expect(provider.counts.specCalls).toBe(1);
+    expect(provider.counts.reviewCalls).toBe(1);
+    const phases = events.filter((e) => e.type === 'phase').map((e) => e.phase);
+    expect(phases).toContain('reviewing');
+  });
+
   it('resumes from persisted state on an identical request', async () => {
     const { fetchMock, counts } = buildMockProvider();
     vi.stubGlobal('fetch', fetchMock);

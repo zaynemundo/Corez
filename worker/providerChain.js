@@ -210,7 +210,15 @@ async function* streamChatEndpoint({ endpoint, key, model, label, messages, sign
             sawDone = true;
             continue;
           }
-          if (parsed.usage) usage = parsed.usage;
+          if (parsed.usage) {
+            // Map the provider's usage shape (prompt_tokens/completion_tokens)
+            // to the chain's inputTokens/outputTokens contract — without this
+            // every streamed response reported 0/0 token usage.
+            usage = {
+              inputTokens: Number(parsed.usage.prompt_tokens) || 0,
+              outputTokens: Number(parsed.usage.completion_tokens) || 0
+            };
+          }
           const choice = parsed.choices && parsed.choices[0];
           if (choice?.finish_reason) finishReason = choice.finish_reason;
           if (choice?.delta) {

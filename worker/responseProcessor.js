@@ -392,6 +392,30 @@ export function scoreContinuity({ project, response, userPrompt }) {
   return { score, checks, codeBlockCount: blocks.length, retainedLineRatio: retentionRatio };
 }
 
+// Self-referential continuation meta-commentary that models sometimes emit
+// when asked to continue an already-complete answer ("My previous reply was
+// already complete — it was a single greeting sentence..."). Any such text
+// is noise: strip from the first meta phrase to the end of the chunk.
+const META_COMMENTARY_PATTERN =
+  /(?:My (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|The (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|Your (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|(?:The|This) (?:response|reply|answer) is already (?:complete|finished)|There (?:is|was) (?:no|nothing) (?:dangling|open|more) (?:file|code|tag|expression|block|content)|No continuation (?:is )?needed|Nothing (?:to|left to|more to) continu)[^]*$/i;
+
+export function stripMetaCommentary(text) {
+  const value = String(text || '');
+  const stripped = value.replace(META_COMMENTARY_PATTERN, '');
+  // Only trim when a match was removed: untouched text stays byte-identical
+  // (leading whitespace of a continuation chunk must survive for stitching).
+  return stripped === value ? value : stripped.replace(/\s+$/, '');
+}
+
+// A repair that is ONLY self-referential meta-commentary (no code, no
+// substantive content) means the original answer was already complete and
+// the truncation flag was a false positive — never stitch it into the reply.
+export function isMetaOnlyReply(text) {
+  const value = String(text || '').trim();
+  if (!value || value.length >= 400 || value.includes('```')) return false;
+  return META_COMMENTARY_PATTERN.test(value);
+}
+
 export function stitchContinuationChunk(original, continuation) {
   const orig = String(original || '');
   let cont = String(continuation || '');
@@ -402,6 +426,10 @@ export function stitchContinuationChunk(original, continuation) {
 
   // 1. Strip redundant model introductory chatter if any
   cont = cont.replace(/^(?:Here is the continuation|Continuing from where it stopped|Continuing the code|Continuing code|Continuing|Here's the rest|Continued):\s*\n?/i, '');
+
+  // 1b. Strip trailing self-referential meta-commentary ("My previous reply
+  // was already complete...") so it never pollutes the stitched answer.
+  cont = stripMetaCommentary(cont);
 
   // 2. If original is inside an open markdown code block, and continuation opens a redundant markdown fence
   const origHasOpenFence = countFences(orig) % 2 === 1;
@@ -579,6 +607,16 @@ export async function processResponse(messages, content, options = {}) {
     try {
       const repairResult = await generate(buildContinuationMessages(messages, answer, reason));
       if (!repairResult || typeof repairResult.content !== 'string' || !repairResult.content.trim()) break;
+      if (isMetaOnlyReply(repairResult.content)) {
+        // The model responded with self-referential meta-commentary ("My
+        // previous reply was already complete...") instead of a continuation:
+        // the original answer was complete and the truncation flag was a
+        // false positive. Keep the original and stop repairing instead of
+        // stitching the noise into the reply.
+        answer = String(answer || '').trim();
+        finalStopReason = 'stop';
+        break;
+      }
       answer = mergeResponse(answer, repairResult.content, reason);
       diagnostics.repaired = true;
       // A successful continuation supersedes the original stop reason. Keeping
@@ -589,6 +627,10 @@ export async function processResponse(messages, content, options = {}) {
       break;
     }
   }
+
+  // Belt-and-braces: never deliver trailing self-referential continuation
+  // meta-commentary in the final answer.
+  answer = stripMetaCommentary(answer);
 
   const finalTruncation = detectTruncation(answer, { stopReason: finalStopReason });
   diagnostics.truncationDetected = finalTruncation.truncated;

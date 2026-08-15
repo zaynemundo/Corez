@@ -14,7 +14,9 @@ import {
   scoreContinuity,
   stitchContinuationChunk,
   mergeResponse,
-  processResponse
+  processResponse,
+  stripMetaCommentary,
+  isMetaOnlyReply
 } from '../worker/responseProcessor.js';
 
 describe('detectTruncation', () => {
@@ -288,6 +290,45 @@ describe('processResponse', () => {
     expect(generate).not.toHaveBeenCalled();
     expect(result.diagnostics.repaired).toBe(false);
     expect(result.content).toBe(complete);
+  });
+
+  it('discards a meta-only repair instead of stitching self-referential commentary', async () => {
+    // The model answered the continuation request with "My previous reply was
+    // already complete..." — the guard must keep the original and stop
+    // repairing rather than pollute the reply with the meta text.
+    const generate = vi.fn(async () => ({ content: 'My previous reply was already complete — it was a single greeting sentence with nothing to continue.' }));
+    const original = 'This is a reasonably long sentence that starts fine but ends with';
+    const result = await processResponse([{ role: 'user', content: 'x' }], original, {
+      userPrompt: 'x',
+      generate,
+      maxRepairs: 2
+    });
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(result.diagnostics.repaired).toBe(false);
+    expect(result.content).toBe(original.trim());
+    expect(result.content).not.toContain('already complete');
+  });
+
+  it('never delivers trailing continuation meta-commentary in the final answer', async () => {
+    const cleaned = stripMetaCommentary('Hello there.My previous response was already complete and no continuation is needed.');
+    expect(cleaned).toBe('Hello there.');
+    expect(stripMetaCommentary('The previous reply was already complete — nothing to continue.')).toBe('');
+    const code = '```html\n<div>done</div>\n```\nThat covers it.';
+    expect(stripMetaCommentary(code)).toBe(code);
+  });
+
+  it('classifies short meta-commentary replies as meta-only', () => {
+    expect(isMetaOnlyReply('My previous reply was already complete — nothing to continue.')).toBe(true);
+    expect(isMetaOnlyReply('The response is already complete, no continuation needed.')).toBe(true);
+    expect(isMetaOnlyReply('<html><body>real content</body></html>')).toBe(false);
+    // A longer reply with substantive content is not meta-only.
+    const longReply = 'Here is the full updated implementation. '.repeat(30);
+    expect(isMetaOnlyReply(`${longReply}My previous reply was already complete.`)).toBe(false);
+  });
+
+  it('strips trailing meta-commentary during continuation stitching', () => {
+    const stitched = stitchContinuationChunk('The game ends here.', 'The game ends here.My previous reply was already complete — nothing left to continue.');
+    expect(stitched.stitched).toBe('The game ends here.');
   });
 
   it('respects the repair attempt ceiling', async () => {

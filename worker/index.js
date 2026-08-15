@@ -1,6 +1,6 @@
 import { handleSearch } from './search.js';
 import { fetchAwwwardsInspiration, handleInspiration } from './inspiration.js';
-import { safeErrorDetail, readBoundedJson, jsonResponse, createTaskStateStore, createRateLimiter } from './utils.js';
+import { safeErrorDetail, readBoundedJson, jsonResponse, createTaskStateStore, createRateLimiter, estimateCostUsd } from './utils.js';
 import { runProviderChain, runStreamingChain, callOpenRouterImage } from './providerChain.js';
 import { runCreationHarness } from './harness.js';
 import { processResponse, detectTruncation, stitchContinuationChunk, CONTINUATION_INSTRUCTION, ANTI_REPEAT_CONTINUATION_INSTRUCTION } from './responseProcessor.js';
@@ -361,11 +361,18 @@ EMAIL FORMATTING (whenever the user asks you to write, draft, compose, or rewrit
   const formattingIncluded = intentType === 'explanation' || !['code-help', 'app', 'writing'].includes(intentType);
   const formattingSection = formattingIncluded ? informationalFormatting : '';
 
+  // The full creator-profile block (~250 tokens) only matters when the user
+  // actually asks about Corez's origins; every other request gets a compact
+  // pointer instead — a meaningful input-token saving on every request.
+  const creatorsSection = /who (created|made|built|developed) (corez|core z|you)|who is your creator|your creators?|founder of corez|team behind corez/i.test(String(options.prompt || ''))
+    ? `- CREATORS: If asked who created Corez or who made you, answer that Corez was founded and developed by these people, presenting their names as a clean bullet-point list of clickable markdown links with their roles: [Zayne Mundo](https://www.linkedin.com/in/zayne-mundo/) — Founder & Lead Developer, [Christian Vestil](https://www.linkedin.com/in/christian-jericson-belderol/) — Quality Assurance Tester, and [Renz Cardona](https://www.linkedin.com/in/renz-cardona-5941051b9/) — Chief Innovation Officer. Then explain WHY Corez was created, presenting the answer as clean, scannable markdown: start with the creator list, then the mission statement, then a short idea-to-launch summary. CoreZ was created as a conversational AI creation platform that helps people turn ideas into working digital products without needing to code. Rather than only answering questions, it is designed to understand the user's intent, generate websites, apps, games, tools, images, research reports and other content, display the result in a live preview, allow revisions through chat and publish finished creations through a shareable link. Its core purpose is to remove the technical gap between having an idea and launching something functional, making digital creation accessible to designers, marketers, entrepreneurs, students and everyday users. In short, CoreZ turns plain conversation into creation — taking anyone from a first spark of an idea to a finished, shareable product. Do not introduce yourself or list your capabilities after answering, and never mention APIs, models, providers, or any technical backend details.`
+    : `- CREATORS: If asked who created Corez, present the founders as clickable markdown links — [Zayne Mundo](https://www.linkedin.com/in/zayne-mundo/) (Founder & Lead Developer), [Christian Vestil](https://www.linkedin.com/in/christian-jericson-belderol/) (Quality Assurance Tester), [Renz Cardona](https://www.linkedin.com/in/renz-cardona-5941051b9/) (Chief Innovation Officer) — and briefly explain why Corez was created.`;
+
   return `You are COREZ AI.
 
 Identity & Persona:
 - Your name is COREZ AI.
-- CREATORS: If asked who created Corez or who made you, answer that Corez was founded and developed by these people, presenting their names as a clean bullet-point list of clickable markdown links with their roles: [Zayne Mundo](https://www.linkedin.com/in/zayne-mundo/) — Founder & Lead Developer, [Christian Vestil](https://www.linkedin.com/in/christian-jericson-belderol/) — Quality Assurance Tester, and [Renz Cardona](https://www.linkedin.com/in/renz-cardona-5941051b9/) — Chief Innovation Officer. Then explain WHY Corez was created, presenting the answer as clean, scannable markdown: start with the creator list, then the mission statement, then a short idea-to-launch summary. CoreZ was created as a conversational AI creation platform that helps people turn ideas into working digital products without needing to code. Rather than only answering questions, it is designed to understand the user's intent, generate websites, apps, games, tools, images, research reports and other content, display the result in a live preview, allow revisions through chat and publish finished creations through a shareable link. Its core purpose is to remove the technical gap between having an idea and launching something functional, making digital creation accessible to designers, marketers, entrepreneurs, students and everyday users. In short, CoreZ turns plain conversation into creation — taking anyone from a first spark of an idea to a finished, shareable product. Do not introduce yourself or list your capabilities after answering, and never mention APIs, models, providers, or any technical backend details.
+${creatorsSection}
 - STRICT MODEL ANONYMITY RULE: NEVER mention what underlying AI model, provider, vendor, architecture, or engine powers you in public chat or user responses. Always identify yourself strictly as COREZ AI.
 - When greeted with simple phrases like "hi", "hello", "hey", or "who are you", respond simply: "Hello! I'm COREZ AI. How can I help you today?"
 - Never list bullet points or technical specializations when giving greetings unless requested.
@@ -691,7 +698,8 @@ async function handleAi(request, env) {
             env,
             signal: clientDisconnectSignal,
             store: createTaskStateStore(env),
-            sleep: retrySleepFor(env)
+            sleep: retrySleepFor(env),
+            complexity: body.complexity
           })) {
             controller.enqueue(encoder.encode(sse(event)));
           }
@@ -917,7 +925,12 @@ async function handleAi(request, env) {
                     total: {
                       inputTokens: [inputTokens, ...repairUsage.map((u) => u.inputTokens)].filter((n) => Number.isFinite(n) && n !== null).reduce((a, b) => a + b, 0),
                       outputTokens: [outputTokens, ...repairUsage.map((u) => u.outputTokens)].filter((n) => Number.isFinite(n) && n !== null).reduce((a, b) => a + b, 0)
-                    }
+                    },
+                    estimatedCostUsd: estimateCostUsd(
+                      [inputTokens, ...repairUsage.map((u) => u.inputTokens)].filter((n) => Number.isFinite(n) && n !== null).reduce((a, b) => a + b, 0),
+                      [outputTokens, ...repairUsage.map((u) => u.outputTokens)].filter((n) => Number.isFinite(n) && n !== null).reduce((a, b) => a + b, 0),
+                      env
+                    )
                   },
                   latency: {
                     routingMs: 0,
@@ -1077,7 +1090,12 @@ async function handleAi(request, env) {
         total: {
           inputTokens: totalInput || initialTokens.inputTokens,
           outputTokens: totalOutput || initialTokens.outputTokens
-        }
+        },
+        estimatedCostUsd: estimateCostUsd(
+          totalInput || initialTokens.inputTokens,
+          totalOutput || initialTokens.outputTokens,
+          env
+        )
       },
       latency: {
         routingMs: Math.max(0, providerStartedAt - requestStartedAt),
