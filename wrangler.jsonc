@@ -5,6 +5,12 @@
   "compatibility_date": "2026-07-18",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
+  // NOTE: CPU limits (limits.cpu_ms) cannot be set on the Free plan — the
+  // API rejects them with code 100328. The Free plan hard-caps invocations
+  // at 10ms CPU, which medium/complex harness builds can exceed (recurring
+  // exceededCpu stream deaths). After upgrading to Workers Paid, add:
+  //   "limits": { "cpu_ms": 30000 }
+  // to raise the cap to 30s (up to 5 minutes).
   "durable_objects": {
     "bindings": [
       {
