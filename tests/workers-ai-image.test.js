@@ -33,11 +33,17 @@ function mockAI(overrides = {}) {
   };
 }
 
-// Read a field from the FormData the handler builds for the binding.
-function formField(inputs, field) {
+// The handler serializes the FormData through a Response (the documented
+// klein-4b pattern), so the binding receives a multipart ReadableStream.
+async function multipartText(inputs) {
   const body = inputs?.multipart?.body;
-  if (typeof body?.get === 'function') return body.get(field);
-  return undefined;
+  if (body && typeof body.getReader === 'function') return new Response(body).text();
+  if (typeof body === 'string') return body;
+  return '';
+}
+
+function hasField(text, field, value) {
+  return text.includes(`name="${field}"\r\n\r\n${value}\r\n`);
 }
 
 afterEach(() => {
@@ -75,26 +81,30 @@ describe('/api/image/cf (Workers AI FLUX.2 klein-4b)', () => {
     const data = await response.json();
     expect(data.image).toBe(`data:image/png;base64,${FAKE_IMAGE_B64}`);
     expect(data.model).toBe('@cf/black-forest-labs/flux-2-klein-4b');
-    // The binding is called with a multipart/form-data body (the model
+    // The binding is called with a serialized multipart stream (the model
     // rejects JSON bodies) carrying the prompt.
     expect(ai.run).toHaveBeenCalledTimes(1);
     const [model, inputs] = ai.run.mock.calls[0];
     expect(model).toBe('@cf/black-forest-labs/flux-2-klein-4b');
-    expect(formField(inputs, 'prompt')).toBe('a red castle on a hill');
-    expect(inputs.multipart.contentType).toMatch(/^multipart\/form-data/);
+    const text = await multipartText(inputs);
+    expect(hasField(text, 'prompt', 'a red castle on a hill')).toBe(true);
+    // The content type carries the boundary the runner requires.
+    expect(inputs.multipart.contentType).toMatch(/^multipart\/form-data; boundary=/);
   });
 
   it('passes width/height/seed through with bounds', async () => {
     const ai = mockAI();
     await post(swarmWorker, { prompt: 'x', width: 512, height: 512, seed: 7 }, { ...BASE_ENV, AI: ai });
-    expect(formField(ai.run.mock.calls[0][1], 'width')).toBe('512');
-    expect(formField(ai.run.mock.calls[0][1], 'height')).toBe('512');
-    expect(formField(ai.run.mock.calls[0][1], 'seed')).toBe('7');
+    const first = await multipartText(ai.run.mock.calls[0][1]);
+    expect(hasField(first, 'width', '512')).toBe(true);
+    expect(hasField(first, 'height', '512')).toBe(true);
+    expect(hasField(first, 'seed', '7')).toBe(true);
 
     ai.run.mockClear();
     await post(swarmWorker, { prompt: 'x', width: 9999, height: 1 }, { ...BASE_ENV, AI: ai });
-    expect(formField(ai.run.mock.calls[0][1], 'width')).toBe('1920');
-    expect(formField(ai.run.mock.calls[0][1], 'height')).toBe('256');
+    const second = await multipartText(ai.run.mock.calls[0][1]);
+    expect(hasField(second, 'width', '1920')).toBe(true);
+    expect(hasField(second, 'height', '256')).toBe(true);
   });
 
   it('detects the output mime from the image magic bytes (JPEG)', async () => {

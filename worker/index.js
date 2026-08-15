@@ -1348,6 +1348,11 @@ async function handleWorkersAIImage(request, env) {
 
   let result;
   try {
+    // The model consumes multipart/form-data. Serialize the FormData through
+    // a Response so the binding receives a proper multipart stream PLUS its
+    // derived Content-Type with the boundary (the documented klein-4b
+    // pattern): passing a raw FormData with a custom Content-Type strips the
+    // boundary (runner 3030), and string/byte bodies are rejected (8001).
     const form = new FormData();
     form.append('prompt', prompt);
     const width = boundedInt(body.width, 256, 1920);
@@ -1356,15 +1361,11 @@ async function handleWorkersAIImage(request, env) {
     if (width !== null) form.append('width', String(width));
     if (height !== null) form.append('height', String(height));
     if (seed !== null) form.append('seed', String(seed));
-    // workerd's FormData exposes .headers; other runtimes (tests) fall back
-    // to the plain media type — the binding needs the boundary in production.
-    const contentType = typeof form.headers?.get === 'function'
-      ? form.headers.get('content-type')
-      : null;
+    const formResponse = new Response(form);
     const inputs = {
       multipart: {
-        body: form,
-        contentType: contentType || 'multipart/form-data'
+        body: formResponse.body,
+        contentType: formResponse.headers.get('content-type')
       }
     };
     result = await ai.run(WORKERS_AI_IMAGE_MODEL, inputs, clientSignal ? { signal: clientSignal } : undefined);
