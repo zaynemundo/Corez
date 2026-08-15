@@ -264,6 +264,10 @@ export async function* runCreationHarness(options) {
       content: `Build specification:\n${state.spec}\n\nDeliver ONLY the complete, finished artifact as a single self-contained HTML document.`
     };
     let buildMessages = [...baseSystem, buildContext, ...userMessages];
+    // Tracks whether this run streamed build content (build/continuation
+    // deltas); a resumed run that skips the build phase re-emits the
+    // persisted artifact before review.
+    let buildStreamed = false;
     // The repair budget is CUMULATIVE across resumes: a task interrupted
     // after 3 rounds resumes with 2 left, never a fresh 5.
     let repairBudget = Math.max(0, MAX_REPAIR_ROUNDS - (state.repairCount || 0));
@@ -300,6 +304,7 @@ export async function* runCreationHarness(options) {
         for await (const event of runStreamingChain(buildMessages, { env, signal })) {
           if (event.type === 'delta') {
             collected += event.text;
+            buildStreamed = true;
             yield { type: 'delta', text: event.text };
           } else if (event.type === 'meta') {
             provider = provider || event.provider || null;
@@ -381,6 +386,7 @@ export async function* runCreationHarness(options) {
         if (!continuationChunk.trim()) break;
         const { stitched, deltaText } = stitchContinuationChunk(collected, continuationChunk);
         if (deltaText) {
+          buildStreamed = true;
           yield { type: 'delta', text: deltaText };
         }
         if (stitched.length <= collected.length) {
@@ -418,6 +424,15 @@ export async function* runCreationHarness(options) {
       state.status = 'failed';
       await persist(store, taskId, state);
       throw new Error('The AI returned an empty build for this request. Please try again.');
+    }
+
+    // Resume without a rebuild: an interrupted run whose persisted build
+    // already passed verification skips the build phase above — re-emit the
+    // stored artifact so the resumed stream delivers the content instead of
+    // a bare done event (which the client would read as "no streamed
+    // content" and give up on).
+    if (!buildStreamed && state.build && state.build.trim()) {
+      yield { type: 'delta', text: state.build };
     }
 
     // 5. REVIEW — the model sanity-checks functionality. Explicit

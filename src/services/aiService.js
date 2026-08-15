@@ -865,53 +865,73 @@ export async function generateHostedAIResponse(
   // user sees content before the generation finishes; the final content is
   // resolved when the done event closes the stream.
   if (options.stream === true) {
-    // No built-in recovery: the request is issued exactly once. The worker
-    // owns provider fallback and reports errors as SSE error events, which
-    // are surfaced verbatim. Aborts are never swallowed.
-    if (signal?.aborted) {
-      const err = new Error('AbortError');
-      err.name = 'AbortError';
-      throw err;
-    }
-    const response = await fetchHostedResponse(fetchOptions);
-    if (!response.ok) {
-      let errorText = '';
-      try {
-        errorText = await response.text();
-      } catch { /* keep empty */ }
-      // A 403 with the Cloudflare challenge page ("Just a moment...") means
-      // the WAF intercepted the request before it reached the worker — the
-      // API needs a WAF bypass rule, not a retry.
-      if (response.status === 403 && CLOUDFLARE_CHALLENGE_PATTERN.test(errorText.slice(0, 4000))) {
-        throw new Error('The hosted AI request was intercepted by a security challenge page before reaching the worker. The site needs a WAF bypass rule for /api/* — please retry in a moment.');
+    // Harness builds are resumable server-side: the worker persists its task
+    // state (planning/build/verify/review) and an identical request resumes
+    // or replays it. A stream that dies mid-flight (connection drop, platform
+    // kill, provider outage, busy lease) is therefore retried with backoff
+    // instead of being reported as a dead end. Plain chat streams are issued
+    // exactly once and keep the fail-fast diagnosis below.
+    const MAX_STREAM_ATTEMPTS = useCreationHarness ? 4 : 1;
+    // Test hook: tests pass tiny delays so retry behavior is exercised
+    // without waiting minutes.
+    const STREAM_RETRY_DELAYS_MS = Array.isArray(options.retryDelaysMs)
+      ? options.retryDelaysMs
+      : [15_000, 60_000, 240_000];
+    const waitWithAbort = async (ms) => {
+      await new Promise((resolve) => {
+        const timer = setTimeout(resolve, ms);
+        signal?.addEventListener('abort', () => {
+          clearTimeout(timer);
+          resolve();
+        }, { once: true });
+      });
+    };
+
+    for (let attempt = 0; attempt < MAX_STREAM_ATTEMPTS; attempt += 1) {
+      if (signal?.aborted) {
+        const err = new Error('AbortError');
+        err.name = 'AbortError';
+        throw err;
       }
-      throw new Error(`Hosted AI stream failed: HTTP ${response.status} ${errorText.slice(0, 200)}`);
-    }
-    if (!response.body) throw new Error('Hosted AI stream had no body.');
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let streamed = '';
-    let rawBody = '';
-    let projectState = null;
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      const chunk = decoder.decode(value, { stream: true });
-      if (rawBody.length < 200 * 1024) rawBody += chunk;
-      buffer += chunk;
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-      for (const line of lines) {
+      // A retry restarts the accumulation: the worker resumes the persisted
+      // task and re-streams the artifact, so any partial deltas from the
+      // failed attempt must not be concatenated with the resumed stream.
+      if (attempt > 0) options.onClear?.();
+
+      const response = await fetchHostedResponse(fetchOptions);
+      if (!response.ok) {
+        let errorText = '';
+        try {
+          errorText = await response.text();
+        } catch { /* keep empty */ }
+        // A 403 with the Cloudflare challenge page ("Just a moment...") means
+        // the WAF intercepted the request before it reached the worker — the
+        // API needs a WAF bypass rule, not a retry.
+        if (response.status === 403 && CLOUDFLARE_CHALLENGE_PATTERN.test(errorText.slice(0, 4000))) {
+          throw new Error('The hosted AI request was intercepted by a security challenge page before reaching the worker. The site needs a WAF bypass rule for /api/* — please retry in a moment.');
+        }
+        throw new Error(`Hosted AI stream failed: HTTP ${response.status} ${errorText.slice(0, 200)}`);
+      }
+      if (!response.body) throw new Error('Hosted AI stream had no body.');
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let streamed = '';
+      let rawBody = '';
+      let projectState = null;
+      let sawDone = false;
+      let sawPhase = false;
+      let retryableError = null;
+      const handleSseLine = (line) => {
         const trimmed = line.trim();
-        if (!trimmed.startsWith('data:')) continue;
+        if (!trimmed.startsWith('data:')) return;
         const payload = trimmed.slice(5).trim();
-        if (!payload) continue;
+        if (!payload) return;
         let event;
         try {
           event = JSON.parse(payload);
         } catch {
-          continue;
+          return;
         }
         if (event.type === 'delta' && typeof event.text === 'string') {
           streamed += event.text;
@@ -920,46 +940,83 @@ export async function generateHostedAIResponse(
           streamed = '';
           options.onClear?.();
         } else if (event.type === 'phase' && typeof event.phase === 'string') {
+          sawPhase = true;
           options.onPhase?.(event);
-        } else if (event.type === 'done' && event.projectState) {
-          projectState = event.projectState;
+        } else if (event.type === 'done') {
+          sawDone = true;
+          if (event.projectState) projectState = event.projectState;
         } else if (event.type === 'error') {
-          // Fail fast: surface the worker's reason verbatim. No retries.
-          throw new Error(event.message || 'Hosted AI stream error.');
+          // Surface the worker's reason verbatim, except: a retryable
+          // harness error (busy lease, overloaded providers) means the
+          // persisted task can still be resumed — back off and retry.
+          if (useCreationHarness && event.retryable === true && attempt < MAX_STREAM_ATTEMPTS - 1) {
+            retryableError = event;
+          } else {
+            throw new Error(event.message || 'Hosted AI stream error.');
+          }
+        }
+      };
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) {
+          // Flush a final SSE line that arrived without a trailing newline
+          // (a truncated or edge-case response must not lose its last event).
+          if (buffer.trim()) handleSseLine(buffer);
+          break;
+        }
+        const chunk = decoder.decode(value, { stream: true });
+        if (rawBody.length < 200 * 1024) rawBody += chunk;
+        buffer += chunk;
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) handleSseLine(line);
+        if (retryableError) break;
+      }
+      if (retryableError) {
+        await reader.cancel().catch(() => {});
+      }
+      if (projectState) {
+        persistedProjectState = projectState;
+        onProjectStateChange?.(projectState);
+      }
+
+      const rawTrimmed = rawBody.trim();
+      const interrupted = useCreationHarness && !sawDone && (sawPhase || !rawTrimmed || streamed.trim());
+      if ((retryableError || interrupted) && attempt < MAX_STREAM_ATTEMPTS - 1 && !signal?.aborted) {
+        await waitWithAbort(STREAM_RETRY_DELAYS_MS[attempt] ?? 240_000);
+        continue;
+      }
+      if (retryableError) {
+        throw new Error(retryableError.message || 'Hosted AI stream error.');
+      }
+      if (streamed.trim()) return streamed;
+
+      // The stream completed with zero deltas and no error event: the response
+      // was NOT valid SSE. Diagnose the body so the user sees the real cause
+      // instead of a generic "no streamed content" (a Cloudflare challenge
+      // page, a proxy error page, or a JSON fast-path answer).
+      if (!rawTrimmed) {
+        throw new Error('The hosted AI returned an empty response. Please try again.');
+      }
+      if (CLOUDFLARE_CHALLENGE_PATTERN.test(rawTrimmed.slice(0, 4000))) {
+        throw new Error('The hosted AI request was intercepted by a security challenge page instead of reaching the worker. Please retry in a moment.');
+      }
+      if (rawTrimmed.startsWith('{') || rawTrimmed.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(rawTrimmed);
+          if (typeof parsed?.content === 'string' && parsed.content.trim()) {
+            return parsed.content;
+          }
+          if (typeof parsed?.error === 'string') {
+            throw new Error(`Hosted AI request failed: ${parsed.error}`);
+          }
+        } catch (jsonErr) {
+          if (jsonErr instanceof Error && jsonErr.message.startsWith('Hosted AI request failed:')) throw jsonErr;
+          // Fall through to the generic error below.
         }
       }
+      throw new Error('Hosted AI returned no streamed content.');
     }
-    if (projectState) {
-      persistedProjectState = projectState;
-      onProjectStateChange?.(projectState);
-    }
-    if (streamed.trim()) return streamed;
-    // The stream completed with zero deltas and no error event: the response
-    // was NOT valid SSE. Diagnose the body so the user sees the real cause
-    // instead of a generic "no streamed content" (a Cloudflare challenge
-    // page, a proxy error page, or a JSON fast-path answer).
-    const rawTrimmed = rawBody.trim();
-    if (!rawTrimmed) {
-      throw new Error('The hosted AI returned an empty response. Please try again.');
-    }
-    if (CLOUDFLARE_CHALLENGE_PATTERN.test(rawTrimmed.slice(0, 4000))) {
-      throw new Error('The hosted AI request was intercepted by a security challenge page instead of reaching the worker. Please retry in a moment.');
-    }
-    if (rawTrimmed.startsWith('{') || rawTrimmed.startsWith('[')) {
-      try {
-        const parsed = JSON.parse(rawTrimmed);
-        if (typeof parsed?.content === 'string' && parsed.content.trim()) {
-          return parsed.content;
-        }
-        if (typeof parsed?.error === 'string') {
-          throw new Error(`Hosted AI request failed: ${parsed.error}`);
-        }
-      } catch (jsonErr) {
-        if (jsonErr instanceof Error && jsonErr.message.startsWith('Hosted AI request failed:')) throw jsonErr;
-        // Fall through to the generic error below.
-      }
-    }
-    throw new Error('Hosted AI returned no streamed content.');
   }
 
   // Transport resilience: retry logic lives above with the streaming path

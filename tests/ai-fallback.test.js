@@ -144,10 +144,15 @@ describe('Hosted AI fallback behavior', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
+    // A harness request retries the resumable task (delays zeroed for the
+    // test); after the bounded attempts are exhausted the honest empty-body
+    // diagnosis still surfaces.
     await expect(generateHostedAIResponse('Build a game', undefined, [], null, {
       stream: true,
-      onDelta: () => {}
+      onDelta: () => {},
+      retryDelaysMs: [0, 0, 0]
     })).rejects.toThrow(/empty response/i);
+    expect(fetchMock.mock.calls.filter(([url]) => url !== '/api/inspiration')).toHaveLength(4);
   });
 
   it('diagnoses a 403 challenge page as a WAF interception instead of a generic HTTP failure', async () => {
@@ -262,7 +267,7 @@ describe('Hosted AI fallback behavior', () => {
     expect(cleared).toBe(1);
   });
 
-  it('fails immediately when the worker reports a build-in-progress error', async () => {
+  it('backs off and retries a build-in-progress error, then surfaces it', async () => {
     let aiCalls = 0;
     const fetchMock = vi.fn(async (url) => {
       if (url === '/api/inspiration') return Response.json({ sites: [] });
@@ -274,13 +279,57 @@ describe('Hosted AI fallback behavior', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    // No built-in recovery: the worker's reason is surfaced verbatim on the
-    // first attempt.
+    // A retryable harness error (busy lease) means the persisted task can
+    // still be resumed: the client backs off and retries (delays zeroed for
+    // the test), and only surfaces the worker's reason after the bounded
+    // attempts are exhausted.
     await expect(generateHostedAIResponse('Build a game', undefined, [], null, {
       stream: true,
-      onDelta: () => {}
+      onDelta: () => {},
+      retryDelaysMs: [0, 0, 0]
     })).rejects.toThrow('A build for this request is already in progress.');
-    expect(aiCalls).toBe(1);
+    expect(aiCalls).toBe(4);
+  }, 10000);
+
+  it('resumes an interrupted harness stream on the next attempt', async () => {
+    let aiCalls = 0;
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/inspiration') return Response.json({ sites: [] });
+      aiCalls += 1;
+      if (aiCalls === 1) {
+        // First attempt: the stream dies mid-harness (phase events only,
+        // no deltas, no terminal event) — e.g. a connection drop.
+        return new Response(
+          'data: {"type":"meta"}\n\ndata: {"type":"phase","phase":"planning","attempt":0,"total":5}\n\ndata: {"type":"phase","phase":"building","attempt":0,"total":5}\n\n',
+          { status: 200 }
+        );
+      }
+      // Second attempt: the worker resumed the persisted task and replays
+      // the completed artifact.
+      return new Response(
+        [
+          'data: {"type":"phase","phase":"building","attempt":0,"total":5}',
+          'data: {"type":"delta","text":"<!DOCTYPE html><html><body><canvas></canvas></body></html>"}',
+          'data: {"type":"phase","phase":"verifying","attempt":0,"total":5}',
+          'data: {"type":"phase","phase":"done","attempt":0,"total":5}',
+          'data: {"type":"done","final":true}'
+        ].join('\n\n'),
+        { status: 200 }
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const phases = [];
+    const response = await generateHostedAIResponse('Build a game', undefined, [], null, {
+      stream: true,
+      onDelta: () => {},
+      onPhase: (event) => phases.push(event.phase),
+      retryDelaysMs: [0]
+    });
+
+    expect(aiCalls).toBe(2);
+    expect(response).toBe('<!DOCTYPE html><html><body><canvas></canvas></body></html>');
+    expect(phases).toEqual(['planning', 'building', 'building', 'verifying', 'done']);
   }, 10000);
 
   it('delivers the full streamed answer to the chat flow without hitting the local fallback', async () => {
