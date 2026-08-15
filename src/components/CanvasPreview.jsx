@@ -218,17 +218,12 @@ export default function CanvasPreview({
           </div>
 
           {/* Live Streaming Badge */}
-          {isStreaming ? (
+          {isStreaming && (
             <div className="canvas-live-badge" title="AI is actively designing and streaming code in real-time">
               <span className="canvas-live-dot" />
               <span>LIVE BUILDING</span>
             </div>
-          ) : editableCode ? (
-            <div className="canvas-ready-badge" title="Application is ready and active">
-              <span className="canvas-ready-dot" />
-              <span>READY</span>
-            </div>
-          ) : null}
+          )}
 
           {/* Publish: share the creation with anyone via a short link */}
           {activeTab === 'preview' && editableCode && !isStreaming && (
