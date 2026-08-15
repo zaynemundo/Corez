@@ -247,11 +247,21 @@ export async function* runCreationHarness(options) {
         await persist(store, taskId, state);
         // A provider outage during planning is a provider failure, never a
         // silent "the AI produced no spec": surface the real reason so the
-        // client can retry at the right time.
-        const reason = specResult?.status === 'retry-scheduled'
+        // client can retry at the right time. A retry-scheduled result is
+        // TRANSIENT — the retry schedule is persisted and the identical
+        // request resumes it — so mark it retryable (503) and let the
+        // client's harness auto-resume back off and re-issue the request
+        // instead of treating it as a permanent failure.
+        const isRetryScheduled = specResult?.status === 'retry-scheduled';
+        const reason = isRetryScheduled
           ? `The AI providers are temporarily busy (recovery scheduled in ~${specResult.retryAfterSeconds}s).`
           : (specResult?.error || 'The AI returned no build specification for this request.');
-        throw new Error(reason);
+        const err = new Error(reason);
+        if (isRetryScheduled) {
+          err.retryable = true;
+          err.status = 503;
+        }
+        throw err;
       }
       state.spec = specResult.content;
       state.model = specResult.model || state.model;

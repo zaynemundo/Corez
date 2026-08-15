@@ -364,7 +364,11 @@ describe('E2E /api/ai pipeline', () => {
     const error = events.find((e) => e.type === 'error');
     expect(error).toBeTruthy();
     expect(error.message).toMatch(/timed out|temporarily busy/i);
-    expect(error.status).toBe(502);
+    // A hung planning provider persists a retry schedule: the error is
+    // retryable (503) so the client's harness auto-resume re-issues the
+    // identical request instead of treating it as a permanent failure.
+    expect(error.status).toBe(503);
+    expect(error.retryable).toBe(true);
   });
 
   it('rate-limits abusive clients at the auth layer', async () => {

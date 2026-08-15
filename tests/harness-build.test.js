@@ -403,4 +403,46 @@ describe('runCreationHarness', () => {
     expect(thrown.message).toMatch(/empty|stream/i);
     expect(events.some((e) => e.type === 'done')).toBe(false);
   });
+
+  it('surfaces a provider retry-schedule during planning as a retryable 503', async () => {
+    // The spec provider never answers: the chain persists a retry schedule
+    // and the harness must fail RETRYABLE so the client's harness
+    // auto-resume re-issues the identical request instead of giving up.
+    const hungFetch = vi.fn((_url, init) => new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => {
+        reject(new DOMException('Aborted', 'AbortError'));
+      }, { once: true });
+    }));
+    vi.stubGlobal('fetch', hungFetch);
+
+    const events = [];
+    let thrown = null;
+    try {
+      for await (const event of runCreationHarness({
+        prompt: 'build a first person shooter game',
+        primaryIntent: 'game_creation',
+        intentType: 'game_creation',
+        apiMessages: BASE_MESSAGES,
+        env: {
+          OPENCODE_GO_API_KEY: 'sk-test',
+          __COREZ_RETRY_SLEEP_MS: '0',
+          AI_NONSTREAM_TIMEOUT_MS: '50',
+          AI_TTFT_TIMEOUT_MS: '50'
+        },
+        sleep: () => Promise.resolve(),
+        signal: null,
+        store: createTaskStateStore({})
+      })) {
+        events.push(event);
+      }
+    } catch (err) {
+      thrown = err;
+    }
+
+    expect(thrown).toBeTruthy();
+    expect(thrown.message).toMatch(/temporarily busy|recovery scheduled/i);
+    expect(thrown.retryable).toBe(true);
+    expect(thrown.status).toBe(503);
+    expect(events.some((e) => e.type === 'done')).toBe(false);
+  }, 15000);
 });
