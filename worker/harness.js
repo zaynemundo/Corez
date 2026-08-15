@@ -452,11 +452,15 @@ export async function* runCreationHarness(options) {
       state.model = model || state.model;
       state.provider = provider || state.provider;
       state.lastBuildUsage = { inputTokens, outputTokens };
+      // Persist the new build ONCE (mandatory for crash-resume). The
+      // verification/review results are deterministic or re-runnable, so
+      // skipping the intermediate full-state persists (each re-serializes
+      // the whole artifact — a big CPU cost on the free plan's 10ms cap)
+      // costs only a re-verify/re-review after a crash between phases.
       await persist(store, taskId, state);
 
       yield reportPhase('verifying');
       state.verification = verifyBuildState(state.spec, collected, state.intentType);
-      await persist(store, taskId, state);
     }
 
     // An empty or whitespace-only build is a provider failure, never a
@@ -583,10 +587,11 @@ export async function* runCreationHarness(options) {
         break;
       }
       state.build = collected;
+      // Persist the repaired build once (resume needs the latest artifact);
+      // the re-verification below is deterministic and persisted at the end.
       await persist(store, taskId, state);
       yield reportPhase('verifying');
       state.verification = verifyBuildState(state.spec, collected, state.intentType);
-      await persist(store, taskId, state);
       // Loop continues: re-review the repaired build.
     }
 
