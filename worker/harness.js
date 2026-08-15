@@ -328,12 +328,25 @@ export async function* runCreationHarness(options) {
       let inputTokens = null;
       let outputTokens = null;
       let buildFinishReason = null;
+      // Delta coalescing: the provider emits tiny per-token deltas (3000+
+      // events for a big build). Each event costs a JSON parse + stringify
+      // + enqueue in the worker — the dominant CPU expense on the free
+      // plan's 10ms invocation cap. Buffering and flushing chunkier deltas
+      // keeps the client's stream live while cutting worker CPU hard.
+      let deltaBuffer = '';
+      let lastDeltaFlush = 0;
       try {
         for await (const event of runStreamingChain(buildMessages, { env, signal })) {
           if (event.type === 'delta') {
             collected += event.text;
+            deltaBuffer += event.text;
             buildStreamed = true;
-            yield { type: 'delta', text: event.text };
+            const now = Date.now();
+            if (deltaBuffer.length >= 2048 || now - lastDeltaFlush >= 80) {
+              yield { type: 'delta', text: deltaBuffer };
+              deltaBuffer = '';
+              lastDeltaFlush = now;
+            }
           } else if (event.type === 'meta') {
             provider = provider || event.provider || null;
             model = model || event.model || null;
@@ -351,6 +364,7 @@ export async function* runCreationHarness(options) {
             throw err;
           }
         }
+        if (deltaBuffer) yield { type: 'delta', text: deltaBuffer };
       } catch (err) {
         if (err?.status === 499 || signal?.aborted) {
           // Client disconnected mid-build: keep the previous good build (if
@@ -375,11 +389,13 @@ export async function* runCreationHarness(options) {
       while (continuationPass < MAX_CONTINUATION_PASSES && collected.trim()) {
         ensureWithinDeadline();
         // The provider's finish reason ('length') is evidence of truncation
-        // only when the text does not end at a clean boundary.
+        // only when the text does not end at a clean boundary. detectTruncation
+        // already covers unclosed fences/tags/brackets, so a full verifyCreation
+        // pass here is redundant — and each pass rescans the whole artifact
+        // with ~20 regexes, a big CPU cost on the free plan's 10ms cap. Full
+        // structural verification runs once after the loop.
         const truncation = detectTruncation(collected, { stopReason: buildFinishReason });
-        const creationCheck = verifyCreation(collected, { intentType: state.intentType });
-        const isCutoff = truncation.truncated || creationCheck.failures.some((f) => f.code === 'truncated-block' || f.code === 'incomplete-html');
-        if (!isCutoff) break;
+        if (!truncation.truncated) break;
 
         continuationPass += 1;
         yield { type: 'phase', phase: 'continuing', attempt: continuationPass, total: MAX_CONTINUATION_PASSES };
