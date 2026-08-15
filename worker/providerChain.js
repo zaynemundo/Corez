@@ -673,10 +673,12 @@ export function runStreamingChain(messages, options = {}) {
   const env = options.env || {};
   const signal = options.signal || null;
   const clock = options.clock || defaultClock;
+  const sleep = options.sleep || defaultSleep;
 
   const startedAt = clock();
   const providers = buildProviderChain(env);
   const failureMessages = [];
+  let onlyEmptyFailures = true;
 
   async function* events() {
     if (providers.length === 0) {
@@ -687,41 +689,49 @@ export function runStreamingChain(messages, options = {}) {
     for (const provider of providers) {
       yield { type: 'meta', provider: provider.id, model: provider.model };
       const ttftHolder = { ms: 0 };
-      try {
-        // Streams a candidate message set, yielding deltas and returning the
-        // accumulated text/usage/finish. Built as a generator so deltas flow
-        // through to the client immediately.
-        async function* tryStream(msgs) {
-          const iter = provider.stream(msgs, {
-            signal,
-            onTtft: (ms) => { ttftHolder.ms = ttftHolder.ms || ms; }
-          });
-          let text = '';
-          let usage = null;
-          let finishReason = null;
-          for await (const chunk of iter) {
-            if (chunk.text) {
-              text += chunk.text;
-              yield { type: 'delta', text: chunk.text };
+      let emptyAttempts = 0;
+      const MAX_EMPTY_ATTEMPTS = 3;
+      while (true) {
+        try {
+          // Streams a candidate message set, yielding deltas and returning the
+          // accumulated text/usage/finish. Built as a generator so deltas flow
+          // through to the client immediately.
+          async function* tryStream(msgs) {
+            const iter = provider.stream(msgs, {
+              signal,
+              onTtft: (ms) => { ttftHolder.ms = ttftHolder.ms || ms; }
+            });
+            let text = '';
+            let usage = null;
+            let finishReason = null;
+            for await (const chunk of iter) {
+              if (chunk.text) {
+                text += chunk.text;
+                yield { type: 'delta', text: chunk.text };
+              }
+              if (chunk.usage) usage = chunk.usage;
+              if (chunk.finishReason) finishReason = chunk.finishReason;
             }
-            if (chunk.usage) usage = chunk.usage;
-            if (chunk.finishReason) finishReason = chunk.finishReason;
+            return { text, usage, finishReason };
           }
-          return { text, usage, finishReason };
-        }
-        let got = yield* tryStream(messages);
-        // No built-in recovery: an empty or whitespace-only stream is a
-        // failure of this provider, surfaced honestly. The provider chain
-        // (opencode-go -> DeepSeek -> OpenRouter) is the only fallback, and
-        // if no provider produces content the client gets a clear error.
-        if (!got.text.trim()) {
-          failureMessages.push(`${provider.label}: empty or reasoning-only stream`);
-          if (signal?.aborted) {
-            yield { type: 'error', message: 'AI request cancelled.', status: 499 };
-            return;
+          let got = yield* tryStream(messages);
+          if (!got.text.trim()) {
+            emptyAttempts += 1;
+            // Reasoning models occasionally emit only thinking with no
+            // content. That is transient, not permanent: retry the SAME
+            // provider a bounded number of times (short backoff) before
+            // falling through to the next provider.
+            if (emptyAttempts < MAX_EMPTY_ATTEMPTS && !signal?.aborted) {
+              await sleep(750 * emptyAttempts);
+              continue;
+            }
+            failureMessages.push(`${provider.label}: empty or reasoning-only stream`);
+            if (signal?.aborted) {
+              yield { type: 'error', message: 'AI request cancelled.', status: 499 };
+              return;
+            }
+            break;
           }
-        }
-        if (got.text.trim()) {
           yield {
             type: 'usage',
             inputTokens: got.usage?.inputTokens ?? 0,
@@ -736,20 +746,28 @@ export function runStreamingChain(messages, options = {}) {
             model: provider.model
           };
           return;
-        }
-      } catch (err) {
-        const failure = err instanceof Error ? err : new Error(safeErrorDetail(err));
-        failureMessages.push(`${provider.label}: ${safeErrorDetail(failure)}`);
-        if (signal?.aborted) {
-          yield { type: 'error', message: 'AI request cancelled.', status: 499 };
-          return;
+        } catch (err) {
+          onlyEmptyFailures = false;
+          const failure = err instanceof Error ? err : new Error(safeErrorDetail(err));
+          failureMessages.push(`${provider.label}: ${safeErrorDetail(failure)}`);
+          if (signal?.aborted) {
+            yield { type: 'error', message: 'AI request cancelled.', status: 499 };
+            return;
+          }
+          break;
         }
       }
     }
+    // Empty/reasoning-only streams are TRANSIENT by nature (the model just
+    // thought without answering): when every provider failed that way, the
+    // error is retryable (503) so the client's harness auto-resume re-issues
+    // the identical request instead of treating it as permanent. Hard
+    // provider errors (auth, validation) stay non-retryable 502.
     yield {
       type: 'error',
       message: failureMessages.slice(0, 3).join(' | ').slice(0, 300) || 'all providers returned no usable stream',
-      status: 502
+      status: onlyEmptyFailures ? 503 : 502,
+      ...(onlyEmptyFailures ? { retryable: true } : {})
     };
   }
 

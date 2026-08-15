@@ -398,7 +398,12 @@ describe('runStreamingChain empty-stream behavior', () => {
     return new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
   }
 
-  it('fails with an error event when the provider stream is empty (no retry)', async () => {
+  // Empty streams are retried on the SAME provider (short backoff) before
+  // falling through, and when every provider fails empty the error is
+  // retryable 503 so the client's harness auto-resume re-issues the request.
+  const fast = { sleep: async () => {} };
+
+  it('retries an empty stream up to 3 times on the same provider, then fails retryable 503', async () => {
     let calls = 0;
     vi.stubGlobal('fetch', vi.fn(async () => {
       calls += 1;
@@ -408,21 +413,24 @@ describe('runStreamingChain empty-stream behavior', () => {
     const events = [];
     for await (const event of runStreamingChain([{ role: 'user', content: 'build a game' }], {
       env: { OPENCODE_GO_API_KEY: 'sk-opencode' },
-      signal: null
+      signal: null,
+      ...fast
     })) {
       events.push(event);
     }
 
     const errors = events.filter((e) => e.type === 'error');
     expect(errors).toHaveLength(1);
-    expect(errors[0].status).toBe(502);
+    // Empty/reasoning-only on every provider is transient: retryable 503.
+    expect(errors[0].status).toBe(503);
+    expect(errors[0].retryable).toBe(true);
     expect(errors[0].message).toMatch(/empty or reasoning-only/);
     expect(events.some((e) => e.type === 'done')).toBe(false);
-    // No built-in recovery: the provider is never called again.
-    expect(calls).toBe(1);
+    // Bounded retry: the provider is called exactly MAX_EMPTY_ATTEMPTS times.
+    expect(calls).toBe(3);
   });
 
-  it('treats a whitespace-only stream as empty and fails honestly', async () => {
+  it('treats a whitespace-only stream as empty and retries before failing honestly', async () => {
     let calls = 0;
     vi.stubGlobal('fetch', vi.fn(async () => {
       calls += 1;
@@ -432,30 +440,33 @@ describe('runStreamingChain empty-stream behavior', () => {
     const events = [];
     for await (const event of runStreamingChain([{ role: 'user', content: 'build a game' }], {
       env: { OPENCODE_GO_API_KEY: 'sk-opencode' },
-      signal: null
+      signal: null,
+      ...fast
     })) {
       events.push(event);
     }
 
     const errors = events.filter((e) => e.type === 'error');
     expect(errors).toHaveLength(1);
-    expect(errors[0].status).toBe(502);
+    expect(errors[0].status).toBe(503);
+    expect(errors[0].retryable).toBe(true);
     expect(events.some((e) => e.type === 'done')).toBe(false);
-    expect(calls).toBe(1);
+    expect(calls).toBe(3);
   });
 
-  it('falls through to the next provider when the preferred one streams nothing', async () => {
+  it('recovers when a later retry of the same provider yields content', async () => {
     let calls = 0;
-    vi.stubGlobal('fetch', vi.fn(async (_url) => {
+    vi.stubGlobal('fetch', vi.fn(async () => {
       calls += 1;
-      if (calls === 1) return sseChunks(['done']);
+      if (calls < 2) return sseChunks(['done']);
       return sseChunks(['The ', 'game ', 'works', 'done']);
     }));
 
     const events = [];
     for await (const event of runStreamingChain([{ role: 'user', content: 'build a game' }], {
-      env: { OPENCODE_GO_API_KEY: 'sk-opencode', DEEPSEEK_API_KEY: 'sk-deepseek' },
-      signal: null
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode' },
+      signal: null,
+      ...fast
     })) {
       events.push(event);
     }
@@ -463,6 +474,59 @@ describe('runStreamingChain empty-stream behavior', () => {
     const deltas = events.filter((e) => e.type === 'delta').map((e) => e.text).join('');
     expect(deltas).toBe('The game works');
     expect(events.some((e) => e.type === 'done')).toBe(true);
+    expect(events.filter((e) => e.type === 'error')).toHaveLength(0);
     expect(calls).toBe(2);
+  });
+
+  it('falls through to the next provider when the preferred one streams nothing three times', async () => {
+    let calls = 0;
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      calls += 1;
+      if (String(url).includes(OPENCODE_URL)) return sseChunks(['done']);
+      return sseChunks(['The ', 'game ', 'works', 'done']);
+    }));
+
+    const events = [];
+    for await (const event of runStreamingChain([{ role: 'user', content: 'build a game' }], {
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode', DEEPSEEK_API_KEY: 'sk-deepseek' },
+      signal: null,
+      ...fast
+    })) {
+      events.push(event);
+    }
+
+    const deltas = events.filter((e) => e.type === 'delta').map((e) => e.text).join('');
+    expect(deltas).toBe('The game works');
+    expect(events.some((e) => e.type === 'done')).toBe(true);
+    expect(events.filter((e) => e.type === 'error')).toHaveLength(0);
+    // 3 empty retries on opencode-go, then deepseek answered.
+    expect(calls).toBe(4);
+  });
+
+  it('stays non-retryable 502 when a hard provider failure is mixed in', async () => {
+    let calls = 0;
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      calls += 1;
+      if (String(url).includes(OPENCODE_URL)) return errorResponse(500, 'upstream exploded');
+      return sseChunks(['done']);
+    }));
+
+    const events = [];
+    for await (const event of runStreamingChain([{ role: 'user', content: 'build a game' }], {
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode', DEEPSEEK_API_KEY: 'sk-deepseek' },
+      signal: null,
+      ...fast
+    })) {
+      events.push(event);
+    }
+
+    const errors = events.filter((e) => e.type === 'error');
+    expect(errors).toHaveLength(1);
+    expect(errors[0].status).toBe(502);
+    expect(errors[0].retryable).toBeUndefined();
+    expect(errors[0].message).toMatch(/upstream exploded/);
+    expect(events.some((e) => e.type === 'done')).toBe(false);
+    // 1 hard failure + 3 empty retries on deepseek.
+    expect(calls).toBe(4);
   });
 });
