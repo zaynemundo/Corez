@@ -12,6 +12,13 @@
   "limits": {
     "cpu_ms": 30000
   },
+  // Smart Placement: run this Worker at the Cloudflare PoP closest to the
+  // OpenCode Zen origin (US-hosted) instead of closest to each visitor, so
+  // the worker -> opencode.ai fetch (the long pole of every AI response)
+  // stays on the shortest intra-Cloudflare hop.
+  "placement": {
+    "mode": "smart"
+  },
   "durable_objects": {
     "bindings": [
       {
