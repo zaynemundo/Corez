@@ -33,6 +33,13 @@ function mockAI(overrides = {}) {
   };
 }
 
+// Read a field from the FormData the handler builds for the binding.
+function formField(inputs, field) {
+  const body = inputs?.multipart?.body;
+  if (typeof body?.get === 'function') return body.get(field);
+  return undefined;
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -68,22 +75,34 @@ describe('/api/image/cf (Workers AI FLUX.2 klein-4b)', () => {
     const data = await response.json();
     expect(data.image).toBe(`data:image/png;base64,${FAKE_IMAGE_B64}`);
     expect(data.model).toBe('@cf/black-forest-labs/flux-2-klein-4b');
-    // The binding is called with the multipart input shape.
+    // The binding is called with a multipart/form-data body (the model
+    // rejects JSON bodies) carrying the prompt.
     expect(ai.run).toHaveBeenCalledTimes(1);
     const [model, inputs] = ai.run.mock.calls[0];
     expect(model).toBe('@cf/black-forest-labs/flux-2-klein-4b');
-    expect(inputs.multipart.body.prompt).toBe('a red castle on a hill');
-    expect(inputs.multipart.contentType).toBe('application/json');
+    expect(formField(inputs, 'prompt')).toBe('a red castle on a hill');
+    expect(inputs.multipart.contentType).toMatch(/^multipart\/form-data/);
   });
 
-  it('passes steps through and bounds them to 1-50', async () => {
+  it('passes width/height/seed through with bounds', async () => {
     const ai = mockAI();
-    await post(swarmWorker, { prompt: 'x', steps: 12 }, { ...BASE_ENV, AI: ai });
-    expect(ai.run.mock.calls[0][1].multipart.body.steps).toBe(12);
+    await post(swarmWorker, { prompt: 'x', width: 512, height: 512, seed: 7 }, { ...BASE_ENV, AI: ai });
+    expect(formField(ai.run.mock.calls[0][1], 'width')).toBe('512');
+    expect(formField(ai.run.mock.calls[0][1], 'height')).toBe('512');
+    expect(formField(ai.run.mock.calls[0][1], 'seed')).toBe('7');
 
     ai.run.mockClear();
-    await post(swarmWorker, { prompt: 'x', steps: 999 }, { ...BASE_ENV, AI: ai });
-    expect(ai.run.mock.calls[0][1].multipart.body.steps).toBe(50);
+    await post(swarmWorker, { prompt: 'x', width: 9999, height: 1 }, { ...BASE_ENV, AI: ai });
+    expect(formField(ai.run.mock.calls[0][1], 'width')).toBe('1920');
+    expect(formField(ai.run.mock.calls[0][1], 'height')).toBe('256');
+  });
+
+  it('detects the output mime from the image magic bytes (JPEG)', async () => {
+    const ai = mockAI({ image: '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA==' });
+    const response = await post(swarmWorker, { prompt: 'x' }, { ...BASE_ENV, AI: ai });
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.image).toBe('data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA==');
   });
 
   it('persists the image to R2 when the bucket is available', async () => {
@@ -142,10 +161,11 @@ describe('generateWorkersAIImage client helper', () => {
       return Response.json({ image: 'data:image/png;base64,OK', model: '@cf/black-forest-labs/flux-2-klein-4b' });
     }));
 
-    const image = await generateWorkersAIImage('a castle', null, { steps: 8 });
+    const image = await generateWorkersAIImage('a castle', null, { width: 640, height: 480 });
     expect(image).toBe('data:image/png;base64,OK');
     expect(forwardedBody.prompt).toBe('a castle');
-    expect(forwardedBody.steps).toBe(8);
+    expect(forwardedBody.width).toBe(640);
+    expect(forwardedBody.height).toBe(480);
   });
 
   it('returns null on failure so callers can fall back', async () => {

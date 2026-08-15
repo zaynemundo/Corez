@@ -1282,7 +1282,25 @@ async function handleImage(request, env) {
 // on the account's OWN Workers AI (env.AI binding) — no third-party key, and
 // billed inside the daily free neuron allocation. Same response contract as
 // /api/image: { image: <r2 url | data url>, model }.
+//
+// Input contract: prompt (required) + optional width/height (256-1920) and
+// seed. The model consumes multipart/form-data (the JSON body shape is
+// rejected by the runner), so the binding call builds a FormData part.
 const WORKERS_AI_IMAGE_MODEL = '@cf/black-forest-labs/flux-2-klein-4b';
+
+function boundedInt(value, min, max) {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : null;
+}
+
+// Detect the image mime from the base64 magic bytes (FLUX.2 klein returns
+// JPEG by default); PNG fallback for providers that return PNG.
+function mimeFromBase64(base64) {
+  if (base64.startsWith('/9j/')) return 'image/jpeg';
+  if (base64.startsWith('iVBOR')) return 'image/png';
+  if (base64.startsWith('UklGR')) return 'image/webp';
+  return 'image/png';
+}
 
 async function handleWorkersAIImage(request, env) {
   if (request.method !== 'POST') {
@@ -1317,11 +1335,6 @@ async function handleWorkersAIImage(request, env) {
     });
   }
 
-  // Optional generation steps (bounded); the model default applies when
-  // absent. Other generation parameters are intentionally not exposed.
-  const rawSteps = Number(body.steps);
-  const steps = Number.isFinite(rawSteps) ? Math.min(50, Math.max(1, Math.round(rawSteps))) : null;
-
   // Only a client disconnect aborts (Stop button, tab close).
   const clientSignal = (() => {
     const controller = new AbortController();
@@ -1334,10 +1347,23 @@ async function handleWorkersAIImage(request, env) {
 
   let result;
   try {
+    const form = new FormData();
+    form.append('prompt', prompt);
+    const width = boundedInt(body.width, 256, 1920);
+    const height = boundedInt(body.height, 256, 1920);
+    const seed = boundedInt(body.seed, 0, 2147483647);
+    if (width !== null) form.append('width', String(width));
+    if (height !== null) form.append('height', String(height));
+    if (seed !== null) form.append('seed', String(seed));
+    // workerd's FormData exposes .headers; other runtimes (tests) fall back
+    // to the plain media type — the binding needs the boundary in production.
+    const contentType = typeof form.headers?.get === 'function'
+      ? form.headers.get('content-type')
+      : null;
     const inputs = {
       multipart: {
-        body: steps ? { prompt, steps } : { prompt },
-        contentType: 'application/json'
+        body: form,
+        contentType: contentType || 'multipart/form-data'
       }
     };
     result = await ai.run(WORKERS_AI_IMAGE_MODEL, inputs, clientSignal ? { signal: clientSignal } : undefined);
@@ -1356,11 +1382,13 @@ async function handleWorkersAIImage(request, env) {
 
   // Persist to R2 when available; otherwise return the inline data URL. The
   // data URL is always the safe fallback — it is never fetched again.
-  const r2Key = `image_cf_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.png`;
-  let imageUrl = `data:image/png;base64,${base64}`;
+  const mimeType = mimeFromBase64(base64);
+  const extension = mimeType === 'image/jpeg' ? 'jpg' : mimeType === 'image/webp' ? 'webp' : 'png';
+  const r2Key = `image_cf_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${extension}`;
+  let imageUrl = `data:${mimeType};base64,${base64}`;
   try {
     const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
-    const r2Url = await saveToR2IfAvailable(env, r2Key, bytes.buffer, 'image/png');
+    const r2Url = await saveToR2IfAvailable(env, r2Key, bytes.buffer, mimeType);
     if (r2Url) imageUrl = r2Url;
   } catch {
     // R2 is optional: the data URL is returned when storage fails.

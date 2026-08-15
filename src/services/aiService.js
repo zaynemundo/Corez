@@ -500,17 +500,20 @@ export async function generateImage(prompt, signal = null, referenceImage = null
 
 // Workers AI text-to-image: runs @cf/black-forest-labs/flux-2-klein-4b on
 // the account's own Workers AI (no third-party key). Returns the image URL
-// (R2 or data URL) or null on failure. options.steps (1-50) is optional.
+// (R2 or data URL) or null on failure. options: width/height (256-1920),
+// seed (integer).
 export const WORKERS_AI_IMAGE_MODEL = '@cf/black-forest-labs/flux-2-klein-4b';
 export const WORKERS_AI_IMAGE_ENDPOINT = '/api/image/cf';
 
 export async function generateWorkersAIImage(prompt, signal = null, options = {}) {
   try {
     const payload = { prompt };
-    const rawSteps = Number(options.steps);
-    if (Number.isFinite(rawSteps)) {
-      payload.steps = Math.min(50, Math.max(1, Math.round(rawSteps)));
-    }
+    const width = Number(options.width);
+    const height = Number(options.height);
+    const seed = Number(options.seed);
+    if (Number.isFinite(width)) payload.width = Math.min(1920, Math.max(256, Math.round(width)));
+    if (Number.isFinite(height)) payload.height = Math.min(1920, Math.max(256, Math.round(height)));
+    if (Number.isFinite(seed)) payload.seed = Math.max(0, Math.round(seed));
     const fetchOptions = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
