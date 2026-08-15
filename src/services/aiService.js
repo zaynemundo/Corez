@@ -6,8 +6,20 @@ export const MODEL = {
   description: 'Minimalist AI assistant for concise conversation, reasoning, and live app creation.'
 };
 
-export const AI_PROXY_ENDPOINT = '/api/ai';
-const AI_WAF_FALLBACK_ENDPOINT = 'https://chat.zayne-mayo.workers.dev/api/ai';
+// AI traffic order. The raw workers.dev host (chat.zayne-mayo.workers.dev)
+// is a dedicated direct-AI endpoint: it serves ONLY /api/ai, requires an
+// approved CoreZ origin, and answers CORS — so deployed clients call it
+// FIRST and bypass the custom domain's WAF rules and challenge pages.
+// Same-origin /api/ai stays primary for local dev (the Vite proxy targets
+// the local worker) and doubles as the deployed fallback.
+const isPublicHost = typeof window !== 'undefined'
+  && !['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+export const AI_PROXY_ENDPOINT = isPublicHost
+  ? 'https://chat.zayne-mayo.workers.dev/api/ai'
+  : '/api/ai';
+const AI_FALLBACK_ENDPOINT = isPublicHost
+  ? '/api/ai'
+  : 'https://chat.zayne-mayo.workers.dev/api/ai';
 const CLOUDFLARE_CHALLENGE_PATTERN = /Just a moment|challenge-platform|__cf_chl_/i;
 export const IMAGE_PROXY_ENDPOINT = '/api/image';
 
@@ -828,9 +840,9 @@ export async function generateHostedAIResponse(
       response = await fetchWithTransportRetry(options, AI_PROXY_ENDPOINT);
     } catch (err) {
       if (err?.name === 'AbortError' || signal?.aborted) throw err;
-      // If same-origin /api/ai failed to reach (e.g. dev server proxy offline),
-      // seamlessly retry through the Worker's direct live endpoint.
-      return fetchWithTransportRetry(options, AI_WAF_FALLBACK_ENDPOINT);
+      // If the primary endpoint failed to reach (e.g. dev server proxy
+      // offline, or the direct host unreachable), retry through the other.
+      return fetchWithTransportRetry(options, AI_FALLBACK_ENDPOINT);
     }
 
     if (response.status === 403) {
@@ -842,15 +854,15 @@ export async function generateHostedAIResponse(
         } catch { /* keep header-based result */ }
       }
       if (challengePage) {
-        return fetchWithTransportRetry(options, AI_WAF_FALLBACK_ENDPOINT);
+        return fetchWithTransportRetry(options, AI_FALLBACK_ENDPOINT);
       }
     }
 
-    // If local dev server proxy returned a 502/503/504 gateway failure,
-    // retry through the direct live Cloudflare Worker.
+    // If the primary endpoint returned a 502/503/504 gateway failure, retry
+    // through the other endpoint.
     if ([502, 503, 504].includes(response.status)) {
       try {
-        const fallback = await fetchWithTransportRetry(options, AI_WAF_FALLBACK_ENDPOINT);
+        const fallback = await fetchWithTransportRetry(options, AI_FALLBACK_ENDPOINT);
         if (fallback && (fallback.ok || fallback.status < 500)) return fallback;
       } catch (fallbackErr) {
         if (fallbackErr?.name === 'AbortError' || signal?.aborted) throw fallbackErr;
@@ -1646,11 +1658,11 @@ Its core purpose is to remove the technical gap between having an idea and launc
       const reason = describeHostedUnavailable(hostedError).replace(/^ The hosted AI service is unavailable/, '');
       return `I can see the code you shared, but the hosted AI service is currently unavailable${reason}, so I couldn't analyse or revise it. Please check the AI service configuration and try again — your code has not been changed.`;
     }
-    return `I understand the goal: ${intent.summary}\n\nShare the snippet, error message, or file you are working on. Iâ€™ll walk through what is happening, identify the likely cause, propose a fix, and explain how to verify it so you can move forward without guessing.`;
+    return `I understand the goal: ${intent.summary}\n\nShare the snippet, error message, or file you are working on. I'll walk through what is happening, identify the likely cause, propose a fix, and explain how to verify it so you can move forward without guessing.`;
   }
 
   if (intent.type === 'writing') {
-    return `I understand the goal: ${intent.summary}\n\nSend me the rough text, audience, and tone you want. Iâ€™ll turn it into clear public-facing copy, tighten the message, and give you a polished version plus a short explanation of why it works.`;
+    return `I understand the goal: ${intent.summary}\n\nSend me the rough text, audience, and tone you want. I'll turn it into clear public-facing copy, tighten the message, and give you a polished version plus a short explanation of why it works.`;
   }
 
   if (intent.type === 'explanation') {
