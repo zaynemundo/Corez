@@ -48,6 +48,15 @@ const DEFAULT_HARNESS_TIMEOUT_MS = 240_000;
 const SPEC_INSTRUCTION =
   'Produce a concise build specification (max 250 words) for the request below: the purpose, the key screens or features, controls (for games), and confirmation that the deliverable is ONE self-contained HTML file. Do not write any code. Answer directly: do not include internal reasoning or thinking.';
 
+// The planning call uses a COMPACT system prompt instead of the full
+// identity/formatting prompt. The spec is a 250-word internal brief that
+// needs none of the chat-facing guidance, and OpenCode Go's non-stream
+// endpoint was observed hanging/timing out on long system prompts — a
+// compact prompt makes planning both faster and reliable, and saves ~1600
+// input tokens per build.
+const SPEC_SYSTEM_PROMPT =
+  'You are COREZ AI, an AI creation platform that builds websites, apps, and games. Answer directly with the requested output only.';
+
 const REVIEW_INSTRUCTION =
   'You are the final reviewer of a finished artifact. Check it for FUNCTIONAL correctness only: does it run, are the core interactions wired up (buttons, controls, game loop, navigation), is any essential feature missing or visibly broken? Reply with ONLY a single line: either "APPROVED" or "NEEDS_FIX: <one sentence describing the functional defect>". Answer directly: do not include internal reasoning or thinking.';
 
@@ -241,16 +250,25 @@ export async function* runCreationHarness(options) {
         state.spec = String(prompt || '').trim();
         await persist(store, taskId, state);
       } else {
+      // Planning uses a compact system prompt (see SPEC_SYSTEM_PROMPT) and a
+      // tighter non-stream deadline: the spec is a short internal brief, so a
+      // hung provider should surface as a retryable 503 in ~20s instead of
+      // burning the full 90s non-stream timeout. AI_SPEC_TIMEOUT_MS overrides;
+      // an explicit AI_NONSTREAM_TIMEOUT_MS (e.g. in tests) is respected.
       const specMessages = [
-        ...baseSystem,
+        { role: 'system', content: SPEC_SYSTEM_PROMPT },
         { role: 'system', content: SPEC_INSTRUCTION },
         ...userMessages
       ];
+      const explicitNonstreamMs = Number(env?.AI_NONSTREAM_TIMEOUT_MS);
+      const specTimeoutMs = Number(env?.AI_SPEC_TIMEOUT_MS)
+        || (explicitNonstreamMs > 0 ? explicitNonstreamMs : 20_000);
       const specResult = await runProviderChain(specMessages, {
-        env,
+        env: { ...env, AI_NONSTREAM_TIMEOUT_MS: String(specTimeoutMs) },
         signal,
         store: null,
-        sleep
+        sleep,
+        maxRequestRetryMs: specTimeoutMs
       });
       if (signal?.aborted || specResult?.status === 'cancelled') {
         state.busy = false;
