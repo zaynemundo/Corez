@@ -45,7 +45,7 @@ const BASE_MESSAGES = [
   { role: 'user', content: 'build a first person shooter game' }
 ];
 
-function harnessOptions(store) {
+function harnessOptions(store, overrides = {}) {
   return {
     prompt: 'build a first person shooter game',
     primaryIntent: 'game_creation',
@@ -53,9 +53,18 @@ function harnessOptions(store) {
     apiMessages: BASE_MESSAGES,
     env: ENV,
     signal: null,
-    store: store || createTaskStateStore({})
+    store: store || createTaskStateStore({}),
+    ...overrides
   };
 }
+
+// Website creation keeps the full pipeline (planning + review), so
+// review-round tests exercise it through a website intent.
+const websiteOptions = {
+  prompt: 'build a portfolio website',
+  primaryIntent: 'website_creation',
+  intentType: 'website_creation'
+};
 
 async function drain(iterable, events) {
   for await (const event of iterable) events.push(event);
@@ -244,7 +253,7 @@ describe('runCreationHarness resilience', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const events = [];
-    await drain(runCreationHarness(harnessOptions()), events);
+    await drain(runCreationHarness(harnessOptions(undefined, websiteOptions)), events);
 
     // The client's accumulated stream is the good artifact: partial repair
     // output is dropped via a clear before the refill.
@@ -275,7 +284,7 @@ describe('runCreationHarness resilience', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const events = [];
-    await drain(runCreationHarness(harnessOptions()), events);
+    await drain(runCreationHarness(harnessOptions(undefined, websiteOptions)), events);
     expect(collectDeltas(events)).toBe(GOOD_ARTIFACT);
     expect(events.some((e) => e.type === 'done')).toBe(true);
   });
@@ -293,7 +302,7 @@ describe('runCreationHarness resilience', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const events = [];
-    await drain(runCreationHarness(harnessOptions()), events);
+    await drain(runCreationHarness(harnessOptions(undefined, websiteOptions)), events);
 
     expect(events.some((e) => e.type === 'done')).toBe(true);
     const diagnostics = events.find((e) => e.type === 'diagnostics')?.diagnostics;
@@ -301,8 +310,8 @@ describe('runCreationHarness resilience', () => {
     // Re-run with a shared store to inspect the persisted review record.
     const shared = createTaskStateStore({});
     const events2 = [];
-    await drain(runCreationHarness(harnessOptions(shared)), events2);
-    const record = await shared.load(harnessTaskId('build a first person shooter game', 'game_creation'));
+    await drain(runCreationHarness(harnessOptions(shared, websiteOptions)), events2);
+    const record = await shared.load(harnessTaskId('build a portfolio website', 'website_creation'));
     expect(record.review.skipped).toBe(true);
     // A skipped review is never claimed as approval: diagnostics stay honest.
     expect(record.review.approved).toBe(false);
@@ -320,7 +329,7 @@ describe('runCreationHarness resilience', () => {
     const events = [];
     let thrown = null;
     try {
-      await drain(runCreationHarness(harnessOptions()), events);
+      await drain(runCreationHarness(harnessOptions(undefined, websiteOptions)), events);
     } catch (err) {
       thrown = err;
     }

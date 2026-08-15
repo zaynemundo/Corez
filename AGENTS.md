@@ -21,25 +21,21 @@
 4. DeepSeek V4 Flash critically reviews the response and diff.
 5. DeepSeek V4 Flash makes the final engineering decision and performs independent verification.
 
-## CoreZ AI Game Studio Hierarchy & OpenCode Go Models
+## CoreZ Game Creation & OpenCode Go Models
 
-When handling browser game requests, CoreZ activates the **AI Game Studio** orchestrator:
+Browser game requests are deliberately SIMPLE: they run the creation harness
+on its one-pass fast path (no planning spec call, no review round) — one
+streamed build through the OpenCode Go provider, structural verification
+(complete document, canvas, animation loop, input listeners), and done.
+Websites and apps keep the full harness pipeline (planning -> build ->
+verify -> repair -> review).
 
-### High-Precision Engineering Architecture Map (DeepSeek V4 Flash Single Model Executor)
+### Execution Model (DeepSeek V4 Flash Single Model Executor)
 
 > **Primary Model Rule**: **DeepSeek V4 Flash** operates as the single primary executor for all code execution, component building, UI work, task graph routing, architectural guidance, code review, and empirical verification.
 
-| Studio Role | AI Model | Provider | Mode / Authority | Responsibilities |
-| :--- | :--- | :--- | :--- | :--- |
-| `primary-executor` | `deepseek-v4-flash` | `opencode-go` | Coder / Tester | **Primary Executor**: writes code, builds components, edits files, runs tests |
-| `game-studio-producer` | `deepseek-v4-flash` | `opencode-go` | Coordinator | Workflow state, task briefs, context isolation, rapid routing |
-| `ui-programmer` | `deepseek-v4-flash` | `opencode-go` | Coder | Responsive browser HUDs, pause screens, game-over overlays, JSX components |
-| `level-designer` | `deepseek-v4-flash` | `opencode-go` | Coder | Map layouts, tilemaps, platform placement, level pacing |
-| `qa-tester` | `deepseek-v4-flash` | `openrouter` | Tester | Rapid smoke tests, control validation, bug reproduction |
-| `architect-guide` | `deepseek-v4-flash` | `opencode-go` | Spec Lead | **Guidance & Architecture**: High-level specs, task graph decomposition, code review |
-| `code-reviewer` | `deepseek-v4-flash` | `opencode-go` | Read-only Reviewer | Safety audit, specification compliance, code quality review |
-| `physics-advisor` | `deepseek-v4-flash` | `opencode-go` | Read-only Advisor | **Physics & Math Advisor**: High-frequency physics math, spatial hashing formulas, canvas loop algorithms |
-| `art-director` | `flux-1-schnell` | `cloudflare-workers-ai` | Creative Lead | Visual direction, color palettes, background textures, art assets |
+- `primary-executor` — `deepseek-v4-flash` / `opencode-go` — Coder / Tester: writes code, builds components, edits files, runs tests.
+- `art-director` — `flux-1-schnell` / `cloudflare-workers-ai` — Creative Lead: visual direction, color palettes, background textures, art assets.
 
 ### File Ownership & Context Rules
 - **Context Isolation**: Each specialist subagent receives only its specific task brief (`task`, `role`, `goal`, `allowedFiles`, `acceptanceCriteria`). Monolithic conversation history dumps are forbidden.

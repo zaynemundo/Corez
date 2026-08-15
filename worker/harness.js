@@ -95,10 +95,14 @@ function parseReview(text) {
 // Structural verification plus spec-coverage: the planning spec's distinctive
 // feature words must mostly appear in the artifact, so a game that is
 // structurally complete but silently missing requested features (score,
-// levels, enemies) is repaired instead of shipped.
-function verifyBuildState(spec, build, intentType) {
+// levels, enemies) is repaired instead of shipped. skipCoverage disables the
+// word gate (the game fast path uses the raw prompt as spec, which is a poor
+// coverage target).
+function verifyBuildState(spec, build, intentType, options = {}) {
   const verification = verifyCreation(build, { intentType });
-  const coverage = spec ? verifySpecCoverage(spec, build) : { passed: true, covered: 0, total: 0, ratio: 1, missing: [] };
+  const coverage = !options.skipCoverage && spec
+    ? verifySpecCoverage(spec, build)
+    : { passed: true, covered: 0, total: 0, ratio: 1, missing: [] };
   verification.specCoverage = coverage;
   if (!coverage.passed && coverage.missing.length > 0) {
     verification.passed = false;
@@ -128,13 +132,22 @@ export async function* runCreationHarness(options) {
     heartbeatIntervalMs = HEARTBEAT_INTERVAL_MS
   } = options;
 
-  // Fast path: trivial/low-complexity requests (client-side classified and
-  // re-validated here) skip the planning provider call and the review round
-  // — the prompt itself serves as the spec, and structural + spec-coverage
-  // verification still gate the artifact. Short prompts only, so a large
-  // request can never sneak through the lighter path.
-  const fastPath = ['trivial', 'low'].includes(String(complexity || '').toLowerCase())
-    && String(prompt || '').length <= 400;
+  // Fast path: game requests ALWAYS take the lighter path — game creation is
+  // deliberately basic: the user prompt serves as the spec (no planning
+  // provider call) and the review round is skipped, so a game is one streamed
+  // build + structural verification + done. The complexity fast path (below)
+  // additionally covers trivial/low-complexity website/app requests; the
+  // client-side complexity is re-validated here, and short prompts only, so a
+  // large request can never sneak through the lighter path.
+  const isGameRequest = primaryIntent === 'game_creation';
+  const fastPath = isGameRequest
+    || (['trivial', 'low'].includes(String(complexity || '').toLowerCase())
+        && String(prompt || '').length <= 400);
+  // The raw user prompt is a poor spec-coverage target ("first person
+  // shooter" words need not appear verbatim in the code), so games on the
+  // fast path are gated by STRUCTURAL verification only (complete document,
+  // canvas, loop, input) — never by word-matching the prompt.
+  const skipCoverage = isGameRequest && fastPath;
 
   const taskId = harnessTaskId(prompt, primaryIntent);
   const baseSystem = apiMessages.filter((m) => m.role === 'system');
@@ -185,7 +198,7 @@ export async function* runCreationHarness(options) {
 
   // Re-verify existing build with the current verifier rules if resuming
   if (state.build && state.verification && !state.verification.passed) {
-    state.verification = verifyBuildState(state.spec, state.build, state.intentType);
+    state.verification = verifyBuildState(state.spec, state.build, state.intentType, { skipCoverage });
   }
 
   // Lease: only one invocation may build a given request at a time. The
@@ -240,9 +253,9 @@ export async function* runCreationHarness(options) {
 
   try {
     // 1. PLANNING — a compact spec (resumable, buffered, not streamed).
-    // Fast path: for trivial/low-complexity requests the user prompt itself
-    // is the spec — no planning provider call, one less round-trip and the
-    // largest single latency saving for simple builds.
+    // Fast path: for games (and trivial/low-complexity requests) the user
+    // prompt itself is the spec — no planning provider call, one less
+    // round-trip and the largest single latency saving for simple builds.
     if (!state.spec) {
       ensureWithinDeadline();
       yield reportPhase('planning');
@@ -478,7 +491,7 @@ export async function* runCreationHarness(options) {
       await persist(store, taskId, state);
 
       yield reportPhase('verifying');
-      state.verification = verifyBuildState(state.spec, collected, state.intentType);
+      state.verification = verifyBuildState(state.spec, collected, state.intentType, { skipCoverage });
     }
 
     // An empty or whitespace-only build is a provider failure, never a
@@ -506,8 +519,8 @@ export async function* runCreationHarness(options) {
     // repaired build is reviewed again so a fix that missed defects is
     // caught instead of shipped. Unparseable or missing reviews are never
     // treated as approval and never trigger blind repairs. The fast path
-    // (trivial/low complexity) skips the review round entirely: structural
-    // + spec-coverage verification already gated the artifact.
+    // (games, and trivial/low-complexity requests) skips the review round
+    // entirely: structural verification already gated the artifact.
     const MAX_REVIEW_CYCLES = 2;
     let reviewCycles = 0;
     if (fastPath) {
@@ -519,7 +532,9 @@ export async function* runCreationHarness(options) {
         feedback: '',
         skipped: true,
         inconclusive: false,
-        reason: 'complexity-gate: review skipped for a trivial/low-complexity request'
+        reason: isGameRequest
+          ? 'game-simple-path: review skipped — game creation runs one fast pass'
+          : 'complexity-gate: review skipped for a trivial/low-complexity request'
       };
     }
     while (!fastPath && reviewCycles < MAX_REVIEW_CYCLES) {
@@ -609,7 +624,7 @@ export async function* runCreationHarness(options) {
       // the re-verification below is deterministic and persisted at the end.
       await persist(store, taskId, state);
       yield reportPhase('verifying');
-      state.verification = verifyBuildState(state.spec, collected, state.intentType);
+      state.verification = verifyBuildState(state.spec, collected, state.intentType, { skipCoverage });
       // Loop continues: re-review the repaired build.
     }
 

@@ -27,7 +27,9 @@ canvas.addEventListener('mousemove', function(){});
 requestAnimationFrame(gameLoop);
 </script></body></html>`;
 
-const BROKEN_ARTIFACT = '<html><body><p>nothing here</p></body></html>';
+// Structurally broken for ANY intent: an unclosed <script> block trips the
+// truncation guard even without game-specific (canvas/loop/input) checks.
+const BROKEN_ARTIFACT = '<html><body><script>const x = 1;</body></html>';
 
 function jsonCompletion(content) {
   return Response.json({ choices: [{ message: { content } }] }, { status: 200 });
@@ -44,16 +46,16 @@ function collectDeltas(events) {
 
 const ENV = { OPENCODE_GO_API_KEY: 'sk-test' };
 const BASE_MESSAGES = [
-  { role: 'system', content: 'You are COREZ AI, a game-building engine.' },
-  { role: 'user', content: 'build a first person shooter game' }
+  { role: 'system', content: 'You are COREZ AI, a website-building engine.' },
+  { role: 'user', content: 'build a portfolio website' }
 ];
 
 async function runHarness() {
   const events = [];
   const iterable = runCreationHarness({
-    prompt: 'build a first person shooter game',
-    primaryIntent: 'game_creation',
-    intentType: 'game_creation',
+    prompt: 'build a portfolio website',
+    primaryIntent: 'website_creation',
+    intentType: 'website_creation',
     apiMessages: BASE_MESSAGES,
     env: ENV,
     signal: null,

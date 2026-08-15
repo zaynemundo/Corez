@@ -345,7 +345,19 @@ describe('E2E /api/ai pipeline', () => {
   });
 
   it('fails a hung harness build with an explicit error event', async () => {
-    vi.stubGlobal('fetch', hungFetchMock());
+    // The provider never answers; the Awwwards inspiration fetch (app
+    // intents) resolves empty so the request reaches the harness planning.
+    const hungFetch = vi.fn((url, init) => {
+      if (String(url).includes('awwwards.com')) {
+        return Promise.resolve(Response.json({ sites: [] }));
+      }
+      return new Promise((resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          reject(new DOMException('Aborted', 'AbortError'));
+        }, { once: true });
+      });
+    });
+    vi.stubGlobal('fetch', hungFetch);
     const timeoutEnv = {
       OPENCODE_GO_API_KEY: 'sk-test',
       __COREZ_RETRY_SLEEP_MS: '0',
@@ -353,9 +365,12 @@ describe('E2E /api/ai pipeline', () => {
       AI_TTFT_TIMEOUT_MS: '50',
       AI_HARNESS_TIMEOUT_MS: '1000'
     };
+    // A website request keeps the planning round (games run the simple path
+    // and never hit the spec provider), so the hung planning provider
+    // persists a retry schedule.
     const response = await post(swarmWorker, {
-      prompt: 'Build me a 3d game',
-      intent: { type: 'app', summary: 'Create a 3d game.' },
+      prompt: 'Build me a landing page website',
+      intent: { type: 'app', summary: 'Create a landing page.' },
       harness: true,
       stream: true
     }, timeoutEnv);

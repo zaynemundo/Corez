@@ -275,12 +275,10 @@ Adaptive Routing - Coding Path:
     adaptiveInstructions = `
     Adaptive Routing - App & Game Creation Path:
 - Use the configured image-generation pipeline for background artwork and visual graphics when an image is genuinely needed.
-- ONLINE MULTIPLAYER: When the user asks for online multiplayer, use the COREZ multiplayer protocol: connect with \`new WebSocket(\`wss://\${location.host}/api/game/ws/<roomId>\`)\` where <roomId> is a short lowercase id like "dm-123". Send JSON {type:'join',name}, {type:'input',keys:{up,down,left,right}}, {type:'shoot',dx,dy}. Receive {type:'welcome',playerId,players}, {type:'state',players:[{id,name,x,y,color,score}],bullets:[{x,y,ownerId}]} at 20Hz (normalized 0..1 coordinates), {type:'kill',killerId,victimId}, {type:'player_joined'}, {type:'player_left'}. The server moves players and resolves hits authoritatively; render the received state and map 0..1 coordinates to your canvas. Never invent your own server, socket.io, or third-party backend.
 ${designStyle}
-- Build a complete, rich, runnable experience ready for the preview canvas.
+- Build a complete, runnable experience ready for the preview canvas.
 - SHORT BRIEF FOR GAMES: When the request is a game, begin your response with a SMALL brief of at most 1-2 short sentences (the game title and its controls — e.g. "Here's Neon Pong — move with the Arrow keys, Space to launch."). NEVER write a long feature list, implementation summary, or "I built..." paragraph before or after the code.
-- FULLSCREEN GAME REQUIREMENT: Games MUST fill the entire preview viewport — html/body with width:100%, height:100%, margin:0, overflow:hidden; a full-viewport canvas (width:100%, height:100%, display:block) with NO max-width, NO bordered box, NO rounded container around the game. Never wrap the canvas in a bordered/max-width "block". Keep a fixed internal game resolution (e.g. 960x540) and scale it to the viewport with ctx.setTransform + a resize listener so the game always fills the screen. On mobile, size the canvas from visualViewport, listen for orientationchange, and include on-screen touch controls shown only on touch devices.
-- Word Games Requirement: When generating word games (Scrabble, Wordle, Crosswords, etc.), embed a full dictionary of valid English words and implement strict word validation logic.`;
+- FULLSCREEN GAME REQUIREMENT: Games MUST fill the entire preview viewport — html/body with width:100%, height:100%, margin:0, overflow:hidden; a full-viewport canvas (width:100%, height:100%, display:block) with NO max-width, NO bordered box, NO rounded container around the game. Never wrap the canvas in a bordered/max-width "block". Keep a fixed internal game resolution (e.g. 960x540) and scale it to the viewport with ctx.setTransform + a resize listener so the game always fills the screen. On mobile, size the canvas from visualViewport, listen for orientationchange, and include on-screen touch controls shown only on touch devices.`;
   } else if (intentType === 'writing') {
     adaptiveInstructions = `
 Adaptive Routing - Writing Path:
@@ -680,11 +678,19 @@ async function handleAi(request, env) {
   // Creation Harness: plan -> build -> verify -> repair -> review, with
   // durable R2 state so a disconnected build resumes. Replaces the single
   // generation for creation requests; SSE events (phase/delta/done) keep the
-  // client informed while the loop takes as long as it needs.
+  // client informed while the loop takes as long as it needs. Game requests
+  // resolve to game_creation (prompt-based, same rule as the system prompt)
+  // so the harness takes the simple one-pass game path.
   if (body.harness === true) {
     if (body.stream !== true) {
       return jsonResponse(400, { error: 'Harness builds require a streaming request.' });
     }
+    const resolvedPrimary = isGameCreationRequest(prompt, intent, fineIntent)
+      ? 'game_creation'
+      : (intent?.primaryIntent || fineIntent?.primaryIntent || fineIntent?.type || intentType);
+    const harnessIntentType = ['app', 'game_creation', 'website_creation', 'design_task'].includes(resolvedPrimary)
+      ? resolvedPrimary
+      : intentType;
     const encoder = new TextEncoder();
     const sse = (event) => `data: ${JSON.stringify(event)}\n\n`;
     const readable = new ReadableStream({
@@ -692,8 +698,8 @@ async function handleAi(request, env) {
         try {
           for await (const event of runCreationHarness({
             prompt,
-            primaryIntent: intent?.primaryIntent || intentType,
-            intentType,
+            primaryIntent: resolvedPrimary,
+            intentType: harnessIntentType,
             apiMessages,
             env,
             signal: clientDisconnectSignal,

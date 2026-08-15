@@ -112,8 +112,10 @@ describe('runCreationHarness', () => {
     const { events } = await runHarness();
 
     const phases = events.filter((e) => e.type === 'phase').map((e) => e.phase);
-    expect(phases).toEqual(['planning', 'building', 'verifying', 'repairing', 'verifying', 'reviewing', 'done']);
-    expect(counts.specCalls).toBe(1);
+    // Games take the simple path: no planning provider call, no review round.
+    expect(phases).toEqual(['planning', 'building', 'verifying', 'repairing', 'verifying', 'done']);
+    expect(counts.specCalls).toBe(0);
+    expect(counts.reviewCalls).toBe(0);
     expect(counts.buildCalls).toBe(1);
     expect(counts.repairCalls).toBe(1);
 
@@ -136,7 +138,8 @@ describe('runCreationHarness', () => {
     const { events } = await runHarness();
 
     const phases = events.filter((e) => e.type === 'phase').map((e) => e.phase);
-    expect(phases).toEqual(['planning', 'building', 'verifying', 'reviewing', 'done']);
+    // Game fast path: one build pass, no review round.
+    expect(phases).toEqual(['planning', 'building', 'verifying', 'done']);
     expect(phases).not.toContain('repairing');
   });
 
@@ -191,7 +194,9 @@ describe('runCreationHarness', () => {
   it('repairs a structurally complete build that misses requested spec features', async () => {
     // The artifact passes structural verification but covers none of the
     // spec's distinctive features — the spec-coverage gate must flag it and
-    // the repair round must add the missing features.
+    // the repair round must add the missing features. Website intents keep
+    // the full pipeline (the planning spec drives the coverage gate); games
+    // always take the simple path and are never word-gated against the prompt.
     const COVERED_ARTIFACT = GOOD_ARTIFACT.replace(
       '<script>',
       '<script>\nconst score = 0; const levels = 3; const enemy = {};'
@@ -213,7 +218,10 @@ describe('runCreationHarness', () => {
     });
     vi.stubGlobal('fetch', provider.fetchMock);
 
-    const { events } = await runHarness();
+    const { events } = await runHarness({
+      primaryIntent: 'website_creation',
+      intentType: 'website_creation'
+    });
     const phases = events.filter((e) => e.type === 'phase').map((e) => e.phase);
     expect(phases).toContain('repairing');
     expect(phases).toContain('done');
@@ -257,12 +265,14 @@ describe('runCreationHarness', () => {
     expect(diagnostics?.harness?.estimatedCostUsd).toBeGreaterThan(0);
   });
 
-  it('keeps planning and review for medium-complexity requests', async () => {
+  it('keeps planning and review for medium-complexity website requests', async () => {
     const provider = buildMockProvider();
     vi.stubGlobal('fetch', provider.fetchMock);
 
     const { events } = await runHarness({
       prompt: 'build a simple canvas game',
+      primaryIntent: 'website_creation',
+      intentType: 'website_creation',
       complexity: 'medium'
     });
 
@@ -270,6 +280,31 @@ describe('runCreationHarness', () => {
     expect(provider.counts.reviewCalls).toBe(1);
     const phases = events.filter((e) => e.type === 'phase').map((e) => e.phase);
     expect(phases).toContain('reviewing');
+  });
+
+  it('games always take the simple path even for long, high-complexity prompts', async () => {
+    const provider = buildMockProvider();
+    vi.stubGlobal('fetch', provider.fetchMock);
+
+    const longGamePrompt = 'build me an epic space shooter game with five levels, boss fights, power-ups, a shop between levels, and a persistent high-score leaderboard stored in local storage, with polished sound effects and particle explosions'.repeat(3);
+    expect(longGamePrompt.length).toBeGreaterThan(400);
+
+    const { events } = await runHarness({
+      prompt: longGamePrompt,
+      complexity: 'high'
+    });
+
+    // No planning call and no review round regardless of complexity/length.
+    expect(provider.counts.specCalls).toBe(0);
+    expect(provider.counts.reviewCalls).toBe(0);
+    const phases = events.filter((e) => e.type === 'phase').map((e) => e.phase);
+    expect(phases).not.toContain('reviewing');
+    expect(phases).toContain('building');
+    expect(phases).toContain('verifying');
+    expect(collectDeltas(events)).toBe(GOOD_ARTIFACT);
+    const diagnostics = events.find((e) => e.type === 'diagnostics')?.diagnostics;
+    expect(diagnostics?.harness?.reviewSkipped).toBe(true);
+    expect(diagnostics?.harness?.approved).toBe(false);
   });
 
   it('resumes from persisted state on an identical request', async () => {
@@ -287,7 +322,7 @@ describe('runCreationHarness', () => {
     const secondDeltas = collectDeltas(second.events);
     expect(secondDeltas).toBe(GOOD_ARTIFACT);
     expect(counts.buildCalls).toBe(1);
-    expect(counts.specCalls).toBe(1);
+    expect(counts.specCalls).toBe(0);
     expect(counts.repairCalls).toBe(1);
   });
 
@@ -455,6 +490,7 @@ describe('runCreationHarness', () => {
     // The spec provider never answers: the chain persists a retry schedule
     // and the harness must fail RETRYABLE so the client's harness
     // auto-resume re-issues the identical request instead of giving up.
+    // Website intents keep the planning round (games skip it entirely).
     const hungFetch = vi.fn((_url, init) => new Promise((_resolve, reject) => {
       init?.signal?.addEventListener('abort', () => {
         reject(new DOMException('Aborted', 'AbortError'));
@@ -466,9 +502,9 @@ describe('runCreationHarness', () => {
     let thrown = null;
     try {
       for await (const event of runCreationHarness({
-        prompt: 'build a first person shooter game',
-        primaryIntent: 'game_creation',
-        intentType: 'game_creation',
+        prompt: 'build a portfolio website',
+        primaryIntent: 'website_creation',
+        intentType: 'website_creation',
         apiMessages: BASE_MESSAGES,
         env: {
           OPENCODE_GO_API_KEY: 'sk-test',
