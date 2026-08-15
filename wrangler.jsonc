@@ -27,6 +27,11 @@
       }
     ]
   },
+  // Workers AI binding: powers the /api/image/cf endpoint (FLUX.2 klein-4b
+  // text-to-image) on the account's own Workers AI — no third-party key.
+  "ai": {
+    "binding": "AI"
+  },
   "migrations": [
     {
       "tag": "v1-game-rooms",

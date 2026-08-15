@@ -1278,6 +1278,96 @@ async function handleImage(request, env) {
   return jsonResponse(200, { image: imageUrl, model: imageModel });
 }
 
+// Workers AI text-to-image endpoint: runs @cf/black-forest-labs/flux-2-klein-4b
+// on the account's OWN Workers AI (env.AI binding) — no third-party key, and
+// billed inside the daily free neuron allocation. Same response contract as
+// /api/image: { image: <r2 url | data url>, model }.
+const WORKERS_AI_IMAGE_MODEL = '@cf/black-forest-labs/flux-2-klein-4b';
+
+async function handleWorkersAIImage(request, env) {
+  if (request.method !== 'POST') {
+    return jsonResponse(405, { error: 'Method not allowed.' });
+  }
+
+  const retryAfter = imageRateLimiter(request);
+  if (retryAfter !== null) {
+    return jsonResponse(429, { error: 'Too many image requests. Try again shortly.' }, { 'Retry-After': String(retryAfter) });
+  }
+
+  let body;
+  try {
+    body = await readBoundedJson(request);
+  } catch (bodyErr) {
+    const message = bodyErr?.message || 'Invalid JSON payload.';
+    return jsonResponse(400, { error: `Request body rejected: ${message}` });
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    body = {};
+  }
+
+  const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
+  if (!prompt) {
+    return jsonResponse(400, { error: 'Prompt is required.' });
+  }
+
+  const ai = env?.AI;
+  if (!ai || typeof ai.run !== 'function') {
+    return jsonResponse(503, {
+      error: 'Workers AI image generation is unavailable: no AI binding is configured on this deployment.'
+    });
+  }
+
+  // Optional generation steps (bounded); the model default applies when
+  // absent. Other generation parameters are intentionally not exposed.
+  const rawSteps = Number(body.steps);
+  const steps = Number.isFinite(rawSteps) ? Math.min(50, Math.max(1, Math.round(rawSteps))) : null;
+
+  // Only a client disconnect aborts (Stop button, tab close).
+  const clientSignal = (() => {
+    const controller = new AbortController();
+    if (request.signal) {
+      if (request.signal.aborted) controller.abort();
+      else request.signal.addEventListener('abort', () => controller.abort(), { once: true });
+    }
+    return controller.signal;
+  })();
+
+  let result;
+  try {
+    const inputs = {
+      multipart: {
+        body: steps ? { prompt, steps } : { prompt },
+        contentType: 'application/json'
+      }
+    };
+    result = await ai.run(WORKERS_AI_IMAGE_MODEL, inputs, clientSignal ? { signal: clientSignal } : undefined);
+  } catch (err) {
+    if (clientSignal?.aborted || err?.name === 'AbortError') {
+      return jsonResponse(499, { error: 'Image request cancelled.' });
+    }
+    console.warn('Workers AI image generation failed:', safeErrorDetail(err));
+    return jsonResponse(502, { error: 'Image generation failed: the Workers AI provider returned an error.' });
+  }
+
+  const base64 = result?.image;
+  if (typeof base64 !== 'string' || base64.length === 0) {
+    return jsonResponse(502, { error: 'Image generation failed: the Workers AI provider returned no image.' });
+  }
+
+  // Persist to R2 when available; otherwise return the inline data URL. The
+  // data URL is always the safe fallback — it is never fetched again.
+  const r2Key = `image_cf_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.png`;
+  let imageUrl = `data:image/png;base64,${base64}`;
+  try {
+    const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+    const r2Url = await saveToR2IfAvailable(env, r2Key, bytes.buffer, 'image/png');
+    if (r2Url) imageUrl = r2Url;
+  } catch {
+    // R2 is optional: the data URL is returned when storage fails.
+  }
+  return jsonResponse(200, { image: imageUrl, model: WORKERS_AI_IMAGE_MODEL });
+}
+
 async function handleR2Assets(request, env) {
   if (!env.ASSET_BUCKET || typeof env.ASSET_BUCKET.put !== 'function') {
     return jsonResponse(503, { error: 'Cloudflare R2 ASSET_BUCKET is not configured.' });
@@ -1959,6 +2049,9 @@ export default {
     }
     if (pathname === '/api/image') {
       return handleImage(request, env);
+    }
+    if (pathname === '/api/image/cf') {
+      return handleWorkersAIImage(request, env);
     }
     if (pathname === '/api/search') {
       return handleSearch(request, env);

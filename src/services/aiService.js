@@ -498,6 +498,41 @@ export async function generateImage(prompt, signal = null, referenceImage = null
   return createFallbackSvgDataUrl(prompt);
 }
 
+// Workers AI text-to-image: runs @cf/black-forest-labs/flux-2-klein-4b on
+// the account's own Workers AI (no third-party key). Returns the image URL
+// (R2 or data URL) or null on failure. options.steps (1-50) is optional.
+export const WORKERS_AI_IMAGE_MODEL = '@cf/black-forest-labs/flux-2-klein-4b';
+export const WORKERS_AI_IMAGE_ENDPOINT = '/api/image/cf';
+
+export async function generateWorkersAIImage(prompt, signal = null, options = {}) {
+  try {
+    const payload = { prompt };
+    const rawSteps = Number(options.steps);
+    if (Number.isFinite(rawSteps)) {
+      payload.steps = Math.min(50, Math.max(1, Math.round(rawSteps)));
+    }
+    const fetchOptions = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    };
+    if (signal) fetchOptions.signal = signal;
+
+    const response = await fetch(WORKERS_AI_IMAGE_ENDPOINT, fetchOptions);
+    if (response.ok) {
+      const data = await response.json();
+      if (data?.image) return data.image;
+      console.warn('Workers AI image API responded without an image payload.');
+    } else {
+      console.warn(`Workers AI image API request failed (HTTP ${response.status}).`);
+    }
+  } catch (err) {
+    if (err?.name === 'AbortError') throw err;
+    console.warn('Workers AI image API request failed.', err);
+  }
+  return null;
+}
+
 export async function improveCodingPrompt(prompt, intent = null) {
   const cleanPrompt = typeof prompt === 'string' ? prompt.trim() : '';
   if (!cleanPrompt) return cleanPrompt;
