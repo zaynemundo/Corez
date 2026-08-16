@@ -48,9 +48,23 @@ describe('live-data detection', () => {
     expect(detectLiveDataNeed('What are the opening hours of the museum?').kind).toBe('schedules');
   });
 
+  it('flags music and entertainment release questions as media-releases', () => {
+    expect(detectLiveDataNeed("What are LOOM's latest singles?").required).toBe(true);
+    expect(detectLiveDataNeed("What are LOOM's latest singles?").kind).toBe('media-releases');
+    expect(detectLiveDataNeed('Did LOOM release anything new?').required).toBe(true);
+    expect(detectLiveDataNeed('Is there any new music from LOOM?').required).toBe(true);
+    expect(detectLiveDataNeed('Have they dropped a new album recently?').required).toBe(true);
+    expect(detectLiveDataNeed('Has Vite released a new version?').required).toBe(true);
+  });
+
   it('does not flag static questions', () => {
     expect(detectLiveDataNeed('Explain how CSS flexbox works.').required).toBe(false);
     expect(detectLiveDataNeed('Write me a poem about the ocean.').required).toBe(false);
+    // Writing requests mentioning "new song" must not trigger a search.
+    expect(detectLiveDataNeed('Write me a new song about the ocean.').required).toBe(false);
+    expect(detectLiveDataNeed('Can you write a poem about new songs?').required).toBe(false);
+    // Second-person product questions ("did you release the fix?") stay local.
+    expect(detectLiveDataNeed('Did you release the fix for the bug?').required).toBe(false);
   });
 });
 

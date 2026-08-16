@@ -104,7 +104,16 @@ export const LIVE_DATA_KINDS = [
   { kind: 'pricing', patterns: [/\b(price of|prices? of|how much (is|does|are))\b.{0,40}\b(iphone|car|house|laptop|console|ticket|fare)\b/i] },
   { kind: 'travel-info', patterns: [/\b(current (visa|entry|quarantine) (rules|requirements)|travel restrictions|visa requirements\s+(now|currently|this year))\b/i] },
   { kind: 'laws', patterns: [/\b(current (law|regulation|legal age|tax rate)|minimum wage\s+(now|currently)|what is the legal age)\b/i] },
-  { kind: 'availability', patterns: [/\b(in stock|in stock now|available now|still available|release date|next release)\b/i] }
+  { kind: 'availability', patterns: [/\b(in stock|in stock now|available now|still available|release date|next release)\b/i] },
+  // Music / entertainment releases: "LOOM's latest singles", "did they drop
+  // anything new?" must be answered from search, never from model memory.
+  // Bare "song"/"music" are deliberately excluded from the first pattern so
+  // writing requests ("write me a new song") never trigger a search.
+  { kind: 'media-releases', patterns: [
+    /\b(latest|newest|recent|upcoming|next)\s+(singles?|albums?|tracks?|ep|mixtapes?|music videos?|releases?)\b/i,
+    /\b(?:any|what|which|have|has|did|is|are)\b.{0,30}\bnew\s+(?:songs?|singles?|albums?|music)\b/i,
+    /\b(?:released?|dropped?|put\s+out)\b.{0,35}\b(?:anything|something|new|recently|lately|yet)\b/i
+  ] }
 ];
 
 export function detectLiveDataNeed(prompt) {

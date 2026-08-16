@@ -555,6 +555,53 @@ async function run() {
     ['Earlier question', 'Earlier answer', 'Current question']
   );
 
+  // Live grounding: a media-release question ("LOOM's latest singles") MUST
+  // trigger a real web search and inject the results into the model payload
+  // — it is never answered from memory. The internal /api/search call runs
+  // through the injected __SEARCH_FETCH stub.
+  {
+    const liveGroundingOriginalFetch = globalThis.fetch;
+    try {
+      let livePayload;
+      globalThis.fetch = async (url, init) => {
+        assert.equal(url, OPENCODE_URL);
+        livePayload = JSON.parse(init.body);
+        return new Response(JSON.stringify({
+          choices: [{ message: { content: 'Grounded answer' } }]
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      };
+      const liveResponse = await post(
+        JSON.stringify({ prompt: "What are LOOM's latest singles?" }),
+        env({
+          OPENCODE_GO_API_KEY: 'sk-opencode-test',
+          __SEARCH_FETCH: async (url) => {
+            const u = new URL(url);
+            if (u.hostname === 'en.wikipedia.org') {
+              return Response.json({
+                query: { search: [{ title: 'LOOM (band)', snippet: 'LOOM is an indie rock band.', wordcount: 5 }] }
+              });
+            }
+            return Response.json({ AbstractText: '', RelatedTopics: [] });
+          }
+        })
+      );
+      assert.equal(liveResponse.status, 200);
+      assert.equal((await json(liveResponse)).content, 'Grounded answer');
+      const systemContent = livePayload.messages
+        .filter((message) => message.role === 'system')
+        .map((message) => message.content)
+        .join('\n');
+      assert.match(systemContent, /media-releases/);
+      assert.match(systemContent, /Live search results/);
+      assert.match(systemContent, /LOOM \(band\)/);
+    } finally {
+      globalThis.fetch = liveGroundingOriginalFetch;
+    }
+  }
+
   // Online multiplayer routing: WebSocket upgrades go to the GameRoom Durable
   // Object; invalid ids, missing upgrade headers, and missing bindings are
   // rejected before any DO call.
