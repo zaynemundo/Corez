@@ -105,12 +105,17 @@ export const LIVE_DATA_KINDS = [
   { kind: 'travel-info', patterns: [/\b(current (visa|entry|quarantine) (rules|requirements)|travel restrictions|visa requirements\s+(now|currently|this year))\b/i] },
   { kind: 'laws', patterns: [/\b(current (law|regulation|legal age|tax rate)|minimum wage\s+(now|currently)|what is the legal age)\b/i] },
   { kind: 'availability', patterns: [/\b(in stock|in stock now|available now|still available|release date|next release)\b/i] },
-  // Music / entertainment releases: "LOOM's latest singles", "did they drop
-  // anything new?" must be answered from search, never from model memory.
-  // Bare "song"/"music" are deliberately excluded from the first pattern so
-  // writing requests ("write me a new song") never trigger a search.
+  // Music / entertainment releases: "LOOM's latest singles", "the latest
+  // music Imagine Dragons created", "did they drop anything new?" must be
+  // answered from search, never from model memory. The first pattern allows
+  // an entity between the adjective and the noun ("newest Imagine Dragons
+  // song") and includes bare "music"; writing requests ("write me a new
+  // song") never match because "new" is not an adjective here and the noun
+  // list excludes bare "song" when unqualified. "next" is intentionally
+  // absent ("next song in my playlist" is local context; "next release" is
+  // already covered by the availability kind).
   { kind: 'media-releases', patterns: [
-    /\b(latest|newest|recent|upcoming|next)\s+(singles?|albums?|tracks?|ep|mixtapes?|music videos?|releases?)\b/i,
+    /\b(latest|newest|recent|upcoming)\s+(?:[A-Za-z][\w'-]*\s+){0,3}(?:singles?|albums?|tracks?|ep|mixtapes?|music|music videos?|releases?|songs?)\b/i,
     /\b(?:any|what|which|have|has|did|is|are)\b.{0,30}\bnew\s+(?:songs?|singles?|albums?|music)\b/i,
     /\b(?:released?|dropped?|put\s+out)\b.{0,35}\b(?:anything|something|new|recently|lately|yet)\b/i
   ] },

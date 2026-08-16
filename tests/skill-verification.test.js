@@ -55,6 +55,13 @@ describe('live-data detection', () => {
     expect(detectLiveDataNeed('Is there any new music from LOOM?').required).toBe(true);
     expect(detectLiveDataNeed('Have they dropped a new album recently?').required).toBe(true);
     expect(detectLiveDataNeed('Has Vite released a new version?').required).toBe(true);
+    // The Imagine Dragons case: bare "music" and an entity between the
+    // adjective and the noun ("newest Imagine Dragons song").
+    expect(detectLiveDataNeed("What's the latest music Imagine Dragons created?").required).toBe(true);
+    expect(detectLiveDataNeed("What's the latest music Imagine Dragons created?").kind).toBe('media-releases');
+    expect(detectLiveDataNeed('What is the latest music from Imagine Dragons?').required).toBe(true);
+    expect(detectLiveDataNeed("What's the newest Imagine Dragons song?").required).toBe(true);
+    expect(detectLiveDataNeed('Recent album from LOOM?').required).toBe(true);
   });
 
   it('flags generic freshness and status questions as freshness', () => {

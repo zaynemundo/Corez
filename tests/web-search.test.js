@@ -19,6 +19,9 @@ describe('Web search detection', () => {
     expect(isWebSearchRequest("What's the latest iPhone?")).toBe(true);
     expect(isWebSearchRequest('Is LOOM still active?')).toBe(true);
     expect(isWebSearchRequest('Are they still together?')).toBe(true);
+    expect(isWebSearchRequest("What's the latest music Imagine Dragons created?")).toBe(true);
+    expect(isWebSearchRequest('What is the latest music from Imagine Dragons?')).toBe(true);
+    expect(isWebSearchRequest("What's the newest Imagine Dragons song?")).toBe(true);
   });
 
   it('does not search for knowledge questions without a recency signal', () => {
@@ -31,6 +34,7 @@ describe('Web search detection', () => {
     expect(isWebSearchRequest("What's new in my game?")).toBe(false);
     expect(isWebSearchRequest("What's new in the app?")).toBe(false);
     expect(isWebSearchRequest('Are you still making games?')).toBe(false);
+    expect(isWebSearchRequest('Play the next song in my playlist')).toBe(false);
   });
 });
 

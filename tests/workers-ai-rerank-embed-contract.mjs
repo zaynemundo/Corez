@@ -150,6 +150,9 @@ async function run() {
     assert.equal(inputs.query, 'red turtles');
     assert.ok(Array.isArray(inputs.contexts) && inputs.contexts.length === 2);
     assert.equal(typeof inputs.contexts[0].text, 'string');
+    // Rerank input stays compact (<=160 chars per doc) so the whole result
+    // list fits the ~512-token input window of bge-reranker-base.
+    assert.ok(inputs.contexts.every((entry) => entry.text.length <= 160));
     // Reverse scores: Beta is more relevant.
     return { results: [{ index: 1, score: 3.0 }, { index: 0, score: 0.5 }] };
   });

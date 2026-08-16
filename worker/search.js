@@ -321,6 +321,12 @@ function resultText(result) {
   return `${result.title || ''}. ${result.snippet || ''}`.replace(/\s+/g, ' ').trim().slice(0, 500);
 }
 
+// Compact variant for the Workers AI reranker, whose input context is ~512
+// tokens: keeps the whole merged result list (up to 12) inside the limit.
+function rerankText(result) {
+  return `${result.title || ''}. ${result.snippet || ''}`.replace(/\s+/g, ' ').trim().slice(0, 160);
+}
+
 function openRouterKey(env) {
   return env?.OPENROUTER_API_KEY || null;
 }
@@ -517,7 +523,11 @@ async function rerankWithWorkersAI(query, results, env) {
   try {
     data = await env.AI.run(WORKERS_AI_RERANK_MODEL, {
       query,
-      contexts: results.map((result) => ({ text: resultText(result) }))
+      // bge-reranker-base accepts ~512 input tokens per call, so each
+      // document is trimmed hard: 12 results × 160 chars stays comfortably
+      // under the limit and the reranker actually runs instead of falling
+      // back to embedding similarity.
+      contexts: results.map((result) => ({ text: rerankText(result) }))
     });
   } catch {
     return null;
