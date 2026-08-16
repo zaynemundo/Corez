@@ -36,6 +36,17 @@
   "ai": {
     "binding": "AI"
   },
+  // AI Search namespace binding: powers the /api/ai-search endpoint
+  // (retrieval-only, instance "corez" — bge-m3 embeddings + bge-reranker-base
+  // reranking). Chat generation is NOT used here: all text generation goes
+  // through the OpenCode Go gateway (deepseek-v4-flash) in providerChain.js.
+  "ai_search_namespaces": [
+    {
+      "binding": "AI_SEARCH",
+      "namespace": "default",
+      "remote": true
+    }
+  ],
   "migrations": [
     {
       "tag": "v1-game-rooms",

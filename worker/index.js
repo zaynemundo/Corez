@@ -1,5 +1,6 @@
 import { handleSearch } from './search.js';
 import { handleRerank, handleEmbed } from './aiModels.js';
+import { handleAISearch } from './aiSearch.js';
 import { fetchAwwwardsInspiration, handleInspiration } from './inspiration.js';
 import { safeErrorDetail, readBoundedJson, jsonResponse, createTaskStateStore, createRateLimiter, estimateCostUsd } from './utils.js';
 import { runProviderChain, runStreamingChain, callOpenRouterImage } from './providerChain.js';
@@ -2091,6 +2092,9 @@ export default {
     }
     if (pathname === '/api/embed') {
       return handleEmbed(request, env);
+    }
+    if (pathname === '/api/ai-search') {
+      return handleAISearch(request, env);
     }
     if (pathname === '/api/inspiration') {
       return handleInspiration(request, env);

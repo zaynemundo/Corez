@@ -59,6 +59,10 @@ check 'Worker routes /api/embed' "pathname === '/api/embed'" "$worker"
 check 'Search prefers the free Workers AI rerank first' 'rerankWithWorkersAI' worker/search.js
 check 'Search falls back to Workers AI embeddings' 'rankWithEmbeddingsWorkersAI' worker/search.js
 check 'Workers AI ranking can be disabled' 'WORKERS_AI_RERANK_DISABLED' worker/search.js
+check 'Worker routes /api/ai-search' "pathname === '/api/ai-search'" "$worker"
+check 'Worker uses AI Search for retrieval' 'AI_SEARCH[.]get' worker/aiSearch.js
+check_absent 'Worker never invokes AI Search chat generation' 'chatCompletions' "$worker"
+check_absent 'AI Search endpoint never invokes chat generation' 'chatCompletions' worker/aiSearch.js
 check 'frontend calls the public AI route' "fetch\(AI_PROXY_ENDPOINT" "$service"
 check 'frontend configures the public AI route' "AI_PROXY_ENDPOINT = isPublicHost" "$service"
 check 'frontend keeps the same-origin /api/ai fallback' "'/api/ai'" "$service"
