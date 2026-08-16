@@ -59,6 +59,14 @@ describe('ChatMessage code block actions', () => {
     expect(screen.queryByRole('button', { name: /Revise/i })).not.toBeInTheDocument();
   });
 
+  it('does not show preview actions for an embed snippet echoed in an informational answer', () => {
+    const content = 'You can embed it like this:\n\n```html\n<div id="player"></div>\n<script src="https://www.youtube.com/iframe_api"></script>\n<script>\n  new YT.Player("player");\n</script>\n```\n\nHope that helps!';
+    renderAssistant(content);
+
+    expect(screen.queryByRole('button', { name: /Open Canvas Preview/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Revise/i })).not.toBeInTheDocument();
+  });
+
   it('shows preview actions for an HTML app whose block has no language tag', () => {
     const content = 'Here you go:\n\n```\n<!DOCTYPE html>\n<html>\n<body><h1>App</h1></body>\n</html>\n```';
     renderAssistant(content);

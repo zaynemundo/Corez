@@ -29,27 +29,23 @@ function safeHref(url) {
 
 // A code block only gets "Open Canvas Preview" / "Revise" actions when it is a
 // genuine runnable deliverable (a full HTML page or a React/JSX component).
-// Generic Q&A snippets — small functions, imports, data samples, or fragments
-// shown as examples in an informational answer — stay as plain copyable code.
+// Generic Q&A snippets — small functions, imports, data samples, fragments,
+// or embed markup echoed inside an informational answer — stay as plain
+// copyable code.
 function isExecutableCodeBlock(lang, code) {
   const normalizedLang = (lang || '').toLowerCase();
   const text = code || '';
 
-  // Full HTML documents, with or without an explicit language tag.
+  // Full HTML documents, with or without an explicit language tag. A block
+  // must be a DOCUMENT to be a deliverable: an <html> root or a doctype.
+  // Fragments that merely contain <style>/<script>/<body> tags (embeds,
+  // page excerpts from search results, markup examples) are NOT runnable
+  // pages and must not get preview actions.
   if (/^\s*<!DOCTYPE html/i.test(text) || /^\s*<html[\s>]/i.test(text)) return true;
 
   // React/JSX blocks are app deliverables by output contract.
   if (['jsx', 'tsx', 'react'].includes(normalizedLang)) {
     return true;
-  }
-
-  // HTML blocks only count as pages when they carry document structure
-  // (inline <style>/<script>/<body>), not when they are small markup
-  // examples inside a general answer.
-  if (normalizedLang === 'html') {
-    return (/<style[\s>]/i.test(text) && /<\/style>/i.test(text))
-      || (/<script[\s>]/i.test(text) && /<\/script>/i.test(text))
-      || /<body[\s>]/i.test(text);
   }
 
   // Plain JS is executable only when it mounts React or renders to the DOM
