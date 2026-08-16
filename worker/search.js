@@ -533,15 +533,21 @@ async function rerankWithWorkersAI(query, results, env) {
     return null;
   }
 
-  const scored = Array.isArray(data?.results) ? data.results : [];
+  // The provider returns the scored list under `response` with `id` fields
+  // ({ response: [{ id, score }] }); accept `results`/`index` too.
+  const scored = Array.isArray(data?.response)
+    ? data.response
+    : Array.isArray(data?.results)
+      ? data.results
+      : [];
   // A partial response is treated as a failure: reordering on incomplete
   // scores would scramble the merged order.
   if (scored.length < results.length) return null;
 
   const scoreByIndex = new Map(
     scored
-      .filter((entry) => Number.isFinite(entry?.index) && Number.isFinite(entry?.score))
-      .map((entry) => [entry.index, entry.score])
+      .filter((entry) => Number.isFinite(entry?.score) && (Number.isFinite(entry?.index) || Number.isFinite(entry?.id)))
+      .map((entry) => [Number.isFinite(entry.index) ? entry.index : entry.id, entry.score])
   );
   if (scoreByIndex.size < results.length) return null;
 

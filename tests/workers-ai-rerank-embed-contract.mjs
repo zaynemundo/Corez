@@ -65,7 +65,8 @@ async function run() {
     assert.equal(inputs.query, 'Which one is cooler?');
     assert.deepEqual(inputs.contexts, [{ text: 'a cyberpunk lizard' }, { text: 'a cyberpunk cat' }]);
     assert.equal(inputs.top_k, 1);
-    return { results: [{ index: 1, score: 2.4 }, { index: 0, score: 1.1 }] };
+    // The real provider shape: { response: [{ id, score }] }.
+    return { response: [{ id: 1, score: 2.4 }, { id: 0, score: 1.1 }] };
   });
   const rerankOk = await post('/api/rerank', {
     query: 'Which one is cooler?',
@@ -78,22 +79,26 @@ async function run() {
   assert.equal(rerankData.model, RERANK_MODEL);
   assert.deepEqual(rerankData.results, [{ index: 1, score: 2.4 }, { index: 0, score: 1.1 }]);
 
+  // The legacy { results: [{ index, score }] } shape is tolerated too.
+  ai.run = async () => ({ results: [{ index: 0, score: 1 }] });
+  assert.equal((await post('/api/rerank', { query: 'q', contexts: ['x'] }, { AI: ai })).status, 200);
+
   // top_k is clamped into [1, 50].
   ai.run = async (model, inputs) => {
     assert.equal(inputs.top_k, 50);
-    return { results: [{ index: 0, score: 1 }] };
+    return { response: [{ id: 0, score: 1 }] };
   };
   assert.equal((await post('/api/rerank', { query: 'q', contexts: ['x'], top_k: 999 }, { AI: ai })).status, 200);
   ai.run = async (model, inputs) => {
     assert.equal(inputs.top_k, 1);
-    return { results: [{ index: 0, score: 1 }] };
+    return { response: [{ id: 0, score: 1 }] };
   };
   assert.equal((await post('/api/rerank', { query: 'q', contexts: ['x'], top_k: -5 }, { AI: ai })).status, 200);
 
   // Provider failures and empty score lists are honest 502s.
   const failing = await post('/api/rerank', { query: 'q', contexts: ['x'] }, { AI: mockAI(async () => { throw new Error('boom'); }) });
   assert.equal(failing.status, 502);
-  const emptyScores = await post('/api/rerank', { query: 'q', contexts: ['x'] }, { AI: mockAI(async () => ({ results: [] })) });
+  const emptyScores = await post('/api/rerank', { query: 'q', contexts: ['x'] }, { AI: mockAI(async () => ({ response: [] })) });
   assert.equal(emptyScores.status, 502);
 
   // ---------- /api/embed ----------
@@ -153,8 +158,8 @@ async function run() {
     // Rerank input stays compact (<=160 chars per doc) so the whole result
     // list fits the ~512-token input window of bge-reranker-base.
     assert.ok(inputs.contexts.every((entry) => entry.text.length <= 160));
-    // Reverse scores: Beta is more relevant.
-    return { results: [{ index: 1, score: 3.0 }, { index: 0, score: 0.5 }] };
+    // Reverse scores: Beta is more relevant. Real provider shape.
+    return { response: [{ id: 1, score: 3.0 }, { id: 0, score: 0.5 }] };
   });
   const searchResponse = await post('/api/search', { query: 'red turtles' }, {
     AI: searchAi,
@@ -170,7 +175,7 @@ async function run() {
 
   // Rerank returning garbage falls back to bge-m3 embedding similarity.
   const embedSearchAi = mockAI(async (model, inputs) => {
-    if (model === RERANK_MODEL) return { results: [] }; // partial -> failure
+    if (model === RERANK_MODEL) return { response: [] }; // partial -> failure
     assert.equal(model, EMBED_MODEL);
     assert.deepEqual(inputs.text, ['red turtles', 'Alpha. Alpha snippet.', 'Beta. Beta snippet.']);
     return {

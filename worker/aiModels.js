@@ -128,14 +128,19 @@ export async function handleRerank(request, env) {
     return jsonResponse(502, { error: 'Reranking failed: the Workers AI provider returned an error.' });
   }
 
-  const scored = Array.isArray(result?.results)
-    ? result.results
-    : Array.isArray(result)
-      ? result
-      : [];
+  // The provider returns the scored list under `response` with `id` fields
+  // ({ response: [{ id, score }] }); accept that shape plus `results`/`index`
+  // and a bare array defensively.
+  const scored = Array.isArray(result?.response)
+    ? result.response
+    : Array.isArray(result?.results)
+      ? result.results
+      : Array.isArray(result)
+        ? result
+        : [];
   const results = scored
-    .filter((entry) => Number.isFinite(entry?.index) && Number.isFinite(entry?.score))
-    .map((entry) => ({ index: entry.index, score: entry.score }));
+    .filter((entry) => Number.isFinite(entry?.score) && (Number.isFinite(entry?.index) || Number.isFinite(entry?.id)))
+    .map((entry) => ({ index: Number.isFinite(entry.index) ? entry.index : entry.id, score: entry.score }));
   if (results.length === 0) {
     return jsonResponse(502, { error: 'Reranking failed: the Workers AI provider returned no scores.' });
   }
