@@ -567,8 +567,16 @@ async function handleAi(request, env) {
             .slice(0, 8)
             .map((r) => `- ${r.title} | ${r.url} | ${String(r.snippet || '').slice(0, 300)}${r.extract ? ` | ${String(r.extract).slice(0, 1200)}` : ''}`)
             .join('\n');
+          // Enumerated live-data kinds are STRICT: the answer must come only
+          // from the search results. The generic 'freshness' kind is SOFT:
+          // results are used when they answer the question, otherwise the
+          // model answers from knowledge and notes it could not verify —
+          // a miss degrades gracefully instead of forcing a refusal.
+          const softLiveKinds = new Set(['freshness']);
           const liveInstruction = liveDataNeed.required
-            ? `This request needs CURRENT data (${liveDataNeed.kind}). Answer ONLY from the search results below; state the source URL and timestamp. NEVER use remembered values. If the results do not contain the current value, say clearly that live data could not be retrieved.`
+            ? softLiveKinds.has(liveDataNeed.kind)
+              ? `This request may need CURRENT data. Use the search results below when they contain current information for the request, and cite the source URLs you used. If the results do NOT answer the question, answer from your knowledge and note that you could not verify current information.`
+              : `This request needs CURRENT data (${liveDataNeed.kind}). Answer ONLY from the search results below; state the source URL and timestamp. NEVER use remembered values. If the results do not contain the current value, say clearly that live data could not be retrieved.`
             : `Use the search results below as the research evidence for your answer. Cite the actual source URLs. Do NOT invent citations or claims not supported by these results.`;
           apiMessages.push({
             role: 'system',

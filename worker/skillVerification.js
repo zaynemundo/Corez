@@ -113,6 +113,19 @@ export const LIVE_DATA_KINDS = [
     /\b(latest|newest|recent|upcoming|next)\s+(singles?|albums?|tracks?|ep|mixtapes?|music videos?|releases?)\b/i,
     /\b(?:any|what|which|have|has|did|is|are)\b.{0,30}\bnew\s+(?:songs?|singles?|albums?|music)\b/i,
     /\b(?:released?|dropped?|put\s+out)\b.{0,35}\b(?:anything|something|new|recently|lately|yet)\b/i
+  ] },
+  // Generic freshness / status questions that no enumerated kind covers:
+  // "what's new in AI?", "anything new from Vite?", "the latest iPhone",
+  // "is LOOM still active?". This kind uses a SOFT grounding instruction
+  // (see worker/index.js): search results are used when they answer the
+  // question, otherwise the model answers from knowledge — a miss degrades
+  // gracefully instead of forcing a refusal. Local-context questions
+  // ("what's new in my game?", "are you still making games?") are excluded.
+  { kind: 'freshness', patterns: [
+    /\bwhat('s| is| are)\s+new\s+(?:in|with|from|about)\s+(?!(?:my|our|your|the)\s+(?:app|game|site|code|website|project)\b)\b[A-Za-z0-9][\w .'-]{0,30}\b/i,
+    /\b(?:anything|something)\s+new\b.{0,40}\b(?:from|with|about)\b/i,
+    /\b(latest|newest|current)\s+(?:model|version|iphone|smartphone|console|device|software|update|release|album|single|song)\b/i,
+    /\b(?:is|are|has|have)\s+(?!(?:you|your|we|our|i)\b)[A-Za-z][\w']*(?:\s+[A-Za-z][\w']*)?\s+still\s+(?:active|around|together|releasing|making|performing|touring)\b/i
   ] }
 ];
 

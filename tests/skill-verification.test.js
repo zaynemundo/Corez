@@ -57,6 +57,18 @@ describe('live-data detection', () => {
     expect(detectLiveDataNeed('Has Vite released a new version?').required).toBe(true);
   });
 
+  it('flags generic freshness and status questions as freshness', () => {
+    expect(detectLiveDataNeed("What's new in AI?").required).toBe(true);
+    expect(detectLiveDataNeed("What's new in AI?").kind).toBe('freshness');
+    expect(detectLiveDataNeed("What's new with LOOM?").required).toBe(true);
+    expect(detectLiveDataNeed('Anything new from Vite?').required).toBe(true);
+    expect(detectLiveDataNeed("What's the latest iPhone?").required).toBe(true);
+    expect(detectLiveDataNeed('What is the current version of React?').required).toBe(true);
+    expect(detectLiveDataNeed('Is LOOM still active?').required).toBe(true);
+    expect(detectLiveDataNeed('Are they still together?').required).toBe(true);
+    expect(detectLiveDataNeed('Is the band still touring?').required).toBe(true);
+  });
+
   it('does not flag static questions', () => {
     expect(detectLiveDataNeed('Explain how CSS flexbox works.').required).toBe(false);
     expect(detectLiveDataNeed('Write me a poem about the ocean.').required).toBe(false);
@@ -65,6 +77,10 @@ describe('live-data detection', () => {
     expect(detectLiveDataNeed('Can you write a poem about new songs?').required).toBe(false);
     // Second-person product questions ("did you release the fix?") stay local.
     expect(detectLiveDataNeed('Did you release the fix for the bug?').required).toBe(false);
+    // Local-context freshness questions stay local too.
+    expect(detectLiveDataNeed("What's new in my game?").required).toBe(false);
+    expect(detectLiveDataNeed("What's new in the app?").required).toBe(false);
+    expect(detectLiveDataNeed('Are you still making games?').required).toBe(false);
   });
 });
 

@@ -12,12 +12,25 @@ describe('Web search detection', () => {
     expect(isWebSearchRequest('Google the latest iPhone release date')).toBe(true);
   });
 
+  it('detects generic freshness and status questions', () => {
+    expect(isWebSearchRequest("What's new in AI?")).toBe(true);
+    expect(isWebSearchRequest("What's new with LOOM?")).toBe(true);
+    expect(isWebSearchRequest('Anything new from Vite?')).toBe(true);
+    expect(isWebSearchRequest("What's the latest iPhone?")).toBe(true);
+    expect(isWebSearchRequest('Is LOOM still active?')).toBe(true);
+    expect(isWebSearchRequest('Are they still together?')).toBe(true);
+  });
+
   it('does not search for knowledge questions without a recency signal', () => {
     expect(isWebSearchRequest('Explain black roses')).toBe(false);
     expect(isWebSearchRequest('What is photosynthesis?')).toBe(false);
     expect(isWebSearchRequest('Build me a chess game')).toBe(false);
     expect(isWebSearchRequest('Help me fix this JavaScript error')).toBe(false);
     expect(isWebSearchRequest('Write a poem about the ocean')).toBe(false);
+    // Local-context freshness questions never trigger a search.
+    expect(isWebSearchRequest("What's new in my game?")).toBe(false);
+    expect(isWebSearchRequest("What's new in the app?")).toBe(false);
+    expect(isWebSearchRequest('Are you still making games?')).toBe(false);
   });
 });
 

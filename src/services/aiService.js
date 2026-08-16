@@ -1266,6 +1266,16 @@ export function isWebSearchRequest(prompt) {
   const factualRecency = /\b(what|who|which|where|when|how)\b[\s\S]{0,80}\b(happened|occurred|happening|won|winner|released|launched|announced|published|updated|changed|result|score|price|rate|weather|temperature|stock|cases)\b/i;
   if (searchPhrase.test(text) || factualRecency.test(text)) return true;
 
+  // Generic freshness / status questions the enumerated rules above miss:
+  // "what's new in AI?", "anything new from Vite?", "the latest iPhone",
+  // "is LOOM still active?". Local-context questions ("what's new in my
+  // game?", "are you still making games?") never trigger a search.
+  const whatIsNew = /\bwhat('s| is| are)\s+new\s+(?:in|with|from|about)\s+(?!(?:my|our|your|the)\s+(?:app|game|site|code|website|project)\b)\b[A-Za-z0-9][\w .'-]{0,30}\b/i;
+  const anythingNew = /\b(?:anything|something)\s+new\b[\s\S]{0,40}\b(?:from|with|about)\b/i;
+  const productFreshness = /\b(latest|newest|current)\s+(?:model|version|iphone|smartphone|console|device|software|update|release|album|single|song)\b/i;
+  const statusFreshness = /\b(?:is|are|has|have)\s+(?!(?:you|your|we|our|i)\b)[A-Za-z][\w']*(?:\s+[A-Za-z][\w']*)?\s+still\s+(?:active|around|together|releasing|making|performing|touring)\b/i;
+  if (whatIsNew.test(text) || anythingNew.test(text) || productFreshness.test(text) || statusFreshness.test(text)) return true;
+
   const recency = /\b(latest|current|recent|today|yesterday|this (week|month|year)|right now|as of|breaking|live|newly|up[- ]to[- ]date|202[4-9]|20\d\d)\b/i;
   if (!recency.test(text)) return false;
 
