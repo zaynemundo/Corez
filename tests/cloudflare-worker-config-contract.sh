@@ -36,8 +36,6 @@ check 'SPA fallback is configured' '"not_found_handling"[[:space:]]*:[[:space:]]
 check 'API routes run Worker-first' '"run_worker_first"[[:space:]]*:[[:space:]]*\[[[:space:]]*"/[*]"' "$config"
 check 'Workers AI binding is configured' '"ai"[[:space:]]*:[[:space:]]*\{' "$config"
 check 'Workers AI binding name is AI' '"binding"[[:space:]]*:[[:space:]]*"AI"' "$config"
-check 'AI Search namespace binding is configured' '"ai_search_namespaces"' "$config"
-check 'AI Search binding name is AI_SEARCH' '"binding"[[:space:]]*:[[:space:]]*"AI_SEARCH"' "$config"
 check 'GameRoom Durable Object binding is configured' '"name"[[:space:]]*:[[:space:]]*"GAME_ROOMS"' "$config"
 check 'GameRoom Durable Object class is configured' '"class_name"[[:space:]]*:[[:space:]]*"GameRoom"' "$config"
 check 'GameRoom migration is declared' 'new_sqlite_classes["[:space:]]*:[[:space:]]*\[[[:space:]]*"GameRoom"\]' "$config"
