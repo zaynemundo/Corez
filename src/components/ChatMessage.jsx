@@ -814,14 +814,10 @@ export function extractClarificationOptions(content) {
   return [];
 }
 
-// Removes the lines/tags that were extracted into clarification options so
-// the rendered message body does not duplicate the suggestions card below it.
-// Matching uses the same normalization as extraction (list markers, markdown
-// emphasis, separator variants) so every supported format is deduped exactly.
-export function stripClarificationOptionLines(content, options) {
-  if (!content || !Array.isArray(options) || options.length === 0) return content;
-
-  const normalize = (s) => String(s || '')
+// Normalizes an option line the same way extraction does (list markers,
+// markdown emphasis, separator variants) so dedupe matching is exact.
+function normalizeClarificationOptionText(value) {
+  return String(value || '')
     .replace(/^[-*•]\s+/, '')
     .replace(/^\d+[.)]\s+/, '')
     .replace(/^[A-Za-z][.)]\s+/, '')
@@ -830,23 +826,50 @@ export function stripClarificationOptionLines(content, options) {
     .replace(/[*_~`]/g, '')
     .replace(/\s*[-:—–]\s+/g, ' — ')
     .trim();
+}
 
-  const texts = new Set(options.map((o) => normalize(o?.text)).filter(Boolean));
-  if (texts.size === 0) return content;
+// Splits the content at the exact spot where the extracted clarification
+// options were written, so the suggestions card can be rendered there:
+//   { before, after }  — before ends where the first option line was,
+//                        after is everything after the last option line.
+// Option lines/tags are removed from both parts; [option: ...] tags are
+// removed inline and then count as the removal point.
+export function splitClarificationOptionLines(content, options) {
+  if (!content || !Array.isArray(options) || options.length === 0) {
+    return { before: content, after: '' };
+  }
+  const texts = new Set(options.map((o) => normalizeClarificationOptionText(o?.text)).filter(Boolean));
+  if (texts.size === 0) return { before: content, after: '' };
 
-  // [option: ...] / [choice: ...] tags are removed inline.
-  let cleaned = content.replace(/\[(?:choice|option):\s*([^\]]+)\]/gi, (match, inner) => (
-    texts.has(normalize(inner)) ? '' : match
+  const cleaned = content.replace(/\[(?:choice|option):\s*([^\]]+)\]/gi, (match, inner) => (
+    texts.has(normalizeClarificationOptionText(inner)) ? '' : match
   ));
 
   const lines = cleaned.split('\n');
-  const kept = [];
-  for (const rawLine of lines) {
-    if (texts.has(normalize(rawLine))) continue;
-    kept.push(rawLine);
+  const isOptionLine = (line) => texts.has(normalizeClarificationOptionText(line));
+  const firstRemoved = lines.findIndex(isOptionLine);
+
+  if (firstRemoved === -1) {
+    // Tag-only options (no standalone lines): the whole cleaned content is
+    // "before" and the card renders at the end.
+    return { before: cleaned.trimEnd(), after: '' };
   }
-  // Collapse blank-line runs left where the option lines were removed.
-  return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+
+  const before = lines.slice(0, firstRemoved).join('\n').trimEnd();
+  const after = lines
+    .slice(firstRemoved)
+    .filter((line) => !isOptionLine(line))
+    .join('\n')
+    .trim();
+  return { before, after };
+}
+
+// Removes the extracted option lines/tags so the rendered message body does
+// not duplicate the suggestions card. Used where only the text matters;
+// splitClarificationOptionLines additionally reports the insertion point.
+export function stripClarificationOptionLines(content, options) {
+  const { before, after } = splitClarificationOptionLines(content, options);
+  return [before, after].filter((part) => part && part.trim()).join('\n\n');
 }
 
 export function ClarificationSuggestions({ options, onSelectOption }) {
@@ -1047,12 +1070,13 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onSe
   const [imageCopied, setImageCopied] = useState(false);
   const modalRef = useRef(null);
   const clarificationOptions = !isUser ? extractClarificationOptions(message.content) : [];
-  // The options are shown in the clickable suggestions card below, so the
-  // message body renders without the duplicated option lines (copy/download
-  // still use the full original content).
-  const displayedContent = clarificationOptions.length > 0
-    ? stripClarificationOptionLines(message.content, clarificationOptions)
-    : message.content;
+  // The options are shown in the clickable suggestions card, rendered exactly
+  // where the model wrote them (between the lead-in and any closing line), so
+  // the body no longer duplicates them. Copy/download keep the full original.
+  const clarificationSplit = clarificationOptions.length > 0
+    ? splitClarificationOptionLines(message.content, clarificationOptions)
+    : null;
+  const displayedContent = clarificationSplit ? clarificationSplit.before : message.content;
 
   useEffect(() => {
     if (!fullscreenImage) return;
@@ -1550,6 +1574,7 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onSe
               onSelectOption={onSelectOption}
             />
           )}
+          {clarificationSplit && clarificationSplit.after.trim() && renderFormattedText(clarificationSplit.after)}
         </div>
         {!isUser && (
           <MessageActions content={message.content || ''} />

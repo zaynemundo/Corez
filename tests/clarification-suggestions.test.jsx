@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import ChatMessage, { ClarificationSuggestions, extractClarificationOptions, stripClarificationOptionLines } from '../src/components/ChatMessage.jsx';
+import ChatMessage, { ClarificationSuggestions, extractClarificationOptions, splitClarificationOptionLines, stripClarificationOptionLines } from '../src/components/ChatMessage.jsx';
 
 afterEach(() => {
   cleanup();
@@ -188,5 +188,60 @@ Option C — Asking for feedback or scheduling a meeting`;
     expect(screen.getAllByText('Casual / Personal')).toHaveLength(1);
     // The question still renders in the body.
     expect(screen.getByText(/Which direction do you want\?/)).toBeInTheDocument();
+  });
+});
+
+describe('splitClarificationOptionLines', () => {
+  const emailContent = `I'd be happy to write that email for you! To make sure it comes out right, could you give me a couple of quick details?
+
+What is the purpose of the email? (e.g., requesting something, following up, apologizing, inviting, etc.)
+Who is the recipient? (e.g., a boss, client, colleague, professor, friend)
+If you're not sure where to start, here are some common directions:
+- **Business / Professional** — a formal email to a client, boss, or partner (e.g., meeting request, follow-up, proposal)
+- **Academic** — an email to a professor or school administrator (e.g., asking for a recommendation, deadline extension)
+- **Job Application / Networking** — a cover-style email or cold outreach to a recruiter
+- **Casual / Personal** — a friendly email to a friend or family member
+Just share the details (and any specific tone you want), and I'll draft it for you right away!`;
+
+  it('splits at the first option line so the card sits after the lead-in', () => {
+    const options = extractClarificationOptions(emailContent);
+    expect(options).toHaveLength(4);
+    const { before, after } = splitClarificationOptionLines(emailContent, options);
+    // The lead-in is the last thing before the card.
+    expect(before.trimEnd().endsWith('here are some common directions:')).toBe(true);
+    expect(before).not.toContain('Business / Professional');
+    // The closing line comes after the card.
+    expect(after).toContain("Just share the details (and any specific tone you want), and I'll draft it for you right away!");
+    expect(after).not.toContain('Academic');
+  });
+
+  it('renders the card between the lead-in and the closing line', () => {
+    const message = { role: 'assistant', content: emailContent };
+    const { container } = render(<ChatMessage message={message} />);
+    const html = container.innerHTML;
+    const leadIn = html.indexOf('here are some common directions:');
+    const card = html.indexOf('Suggestions');
+    const closing = html.indexOf('Just share the details');
+    expect(leadIn).toBeGreaterThan(-1);
+    expect(card).toBeGreaterThan(leadIn);
+    expect(closing).toBeGreaterThan(card);
+    // Labels still appear exactly once (in the card only).
+    expect(screen.getAllByText('Business / Professional')).toHaveLength(1);
+    expect(screen.getAllByText('Academic')).toHaveLength(1);
+  });
+
+  it('returns the whole content as before when there are no options', () => {
+    expect(splitClarificationOptionLines('plain answer', [])).toEqual({ before: 'plain answer', after: '' });
+    expect(splitClarificationOptionLines('plain answer', null)).toEqual({ before: 'plain answer', after: '' });
+  });
+
+  it('keeps everything as before for tag-only options', () => {
+    const content = 'Please choose one:\n[option: Dark Mode: dark glassmorphism]\n[option: Light Mode: clean editorial]';
+    const options = extractClarificationOptions(content);
+    expect(options).toHaveLength(2);
+    const { before, after } = splitClarificationOptionLines(content, options);
+    expect(before).toContain('Please choose one:');
+    expect(before).not.toContain('[option:');
+    expect(after).toBe('');
   });
 });
