@@ -12,6 +12,7 @@ import {
   Maximize2,
   Minimize2,
   Download,
+  Sparkles,
   X
 } from 'lucide-react';
 
@@ -564,11 +565,87 @@ function EmailCard({ content, renderBody }) {
   );
 }
 
-export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
+export function extractClarificationOptions(content) {
+  if (!content || typeof content !== 'string') return [];
+  // Exclude code-heavy responses
+  if (/```(?:html|jsx|tsx|javascript|js)\b[\s\S]*?(?:export default|<!DOCTYPE|<html)/i.test(content)) {
+    return [];
+  }
+
+  // Check if content poses a question or asks to choose
+  const hasQuestion = /\?|which\s+(would|option|direction|do\s+you)|what\s+(type|kind|style|features?)|choose\s+(from|one|between)|let\s+me\s+know|select\s+an?\s+option/i.test(content);
+  if (!hasQuestion) return [];
+
+  // Match explicit choices: [choice: ...] or [option: ...]
+  const explicitMatches = [...content.matchAll(/\[(?:choice|option):\s*([^\]]+)\]/gi)];
+  if (explicitMatches.length >= 2) {
+    return explicitMatches.map((m) => {
+      const full = m[1].trim();
+      const parts = full.split(/[:—–-]\s+/);
+      return {
+        label: parts[0].trim(),
+        detail: parts.slice(1).join(' - ').trim(),
+        text: full
+      };
+    });
+  }
+
+  const lines = content.split('\n');
+  const options = [];
+  let inOptionZone = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line.includes('?') || /\b(choose|options?|directions?|preferences?|would you prefer|which of these|here are (?:a few|some) options)\b/i.test(line)) {
+      inOptionZone = true;
+      continue;
+    }
+
+    if (inOptionZone) {
+      const listMatch = line.match(/^[-*•]\s+(.+)$/) || line.match(/^\d+\.\s+(.+)$/);
+      if (listMatch) {
+        const itemText = listMatch[1].trim();
+        const boldMatch = itemText.match(/^\*\*([^*]+)\*\*(?:\s*[:—–-]\s*(.*))?$/);
+        if (boldMatch) {
+          options.push({
+            label: boldMatch[1].trim(),
+            detail: (boldMatch[2] || '').trim(),
+            text: itemText.replace(/\*\*/g, '')
+          });
+        } else {
+          const split = itemText.split(/[:—–]\s+/);
+          if (split.length > 1 && split[0].length <= 40) {
+            options.push({
+              label: split[0].replace(/\*\*/g, '').trim(),
+              detail: split.slice(1).join(' - ').replace(/\*\*/g, '').trim(),
+              text: itemText.replace(/\*\*/g, '')
+            });
+          } else {
+            options.push({
+              label: itemText.replace(/\*\*/g, '').trim(),
+              detail: '',
+              text: itemText.replace(/\*\*/g, '')
+            });
+          }
+        }
+      } else if (line && options.length > 0 && !line.startsWith('#')) {
+        break;
+      }
+    }
+  }
+
+  if (options.length >= 2 && options.length <= 6) {
+    return options;
+  }
+  return [];
+}
+
+export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onSelectOption }) {
   const isUser = message.role === 'user';
   const [fullscreenImage, setFullscreenImage] = useState(null);
   const [imageCopied, setImageCopied] = useState(false);
   const modalRef = useRef(null);
+  const clarificationOptions = !isUser ? extractClarificationOptions(message.content) : [];
 
   useEffect(() => {
     if (!fullscreenImage) return;
@@ -1061,6 +1138,29 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
         <div className="message-content">
           {isUser && renderAttachments(message.attachments)}
           {renderFormattedText(message.content)}
+          {!isUser && clarificationOptions.length > 0 && (
+            <div className="clarification-options-box" role="group" aria-label="Clarification options">
+              <div className="clarification-options-header">
+                <Sparkles size={13} strokeWidth={2} className="clarification-options-icon" />
+                <span>Suggested options:</span>
+              </div>
+              <div className="clarification-options-list">
+                {clarificationOptions.map((opt, oIdx) => (
+                  <button
+                    key={oIdx}
+                    type="button"
+                    className="clarification-option-btn"
+                    onClick={() => onSelectOption && onSelectOption(opt.text || opt.label)}
+                    title={`Select "${opt.label}"`}
+                    aria-label={`Select option: ${opt.label}`}
+                  >
+                    <span className="clarification-option-label">{opt.label}</span>
+                    {opt.detail && <span className="clarification-option-detail">{opt.detail}</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         {!isUser && (
           <MessageActions content={message.content || ''} />

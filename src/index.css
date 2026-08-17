@@ -859,6 +859,102 @@ h1, h2, h3, h4, h5, h6 {
   border-color: var(--border-color);
 }
 
+/* Clarification & Interactive Option Chips */
+.clarification-options-box {
+  margin-top: 0.85rem;
+  padding: 0.75rem 0.85rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md, 12px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.clarification-options-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.clarification-options-icon {
+  color: var(--text-primary);
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.clarification-options-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.clarification-option-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill, 9999px);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+  line-height: 1.25;
+}
+
+.clarification-option-btn:hover {
+  background: var(--bg-card, var(--bg-tertiary));
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.clarification-option-btn:active {
+  transform: translateY(0);
+}
+
+.clarification-option-label {
+  font-weight: 600;
+}
+
+.clarification-option-detail {
+  font-weight: 400;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  border-left: 1px solid var(--border-color);
+  padding-left: 0.4rem;
+  margin-left: 0.1rem;
+}
+
+[data-theme='light'] .clarification-options-box {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme='light'] .clarification-option-btn {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.12);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme='light'] .clarification-option-btn:hover {
+  background: #f8f9fa;
+  border-color: rgba(0, 0, 0, 0.25);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
 /* Copy action shows an icon plus a label, so it needs room to breathe */
 .message-action-btn.copy-action {
   width: auto;
