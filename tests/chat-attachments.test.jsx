@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach } from 'vitest';
-import { render, fireEvent, screen, cleanup } from '@testing-library/react';
+import { render, fireEvent, screen, cleanup, waitFor } from '@testing-library/react';
 import ChatInput from '../src/components/ChatInput.jsx';
 
 afterEach(() => {
@@ -89,8 +89,12 @@ describe('ChatInput file attachment feature', () => {
     const t = setup();
     const file = new File(['line one\nline two'], 'sample.txt', { type: 'text/plain' });
     selectFiles(t, [file]);
-    await new Promise((resolve) => setTimeout(resolve, 30));
     t.type('please analyze this file');
+    await waitFor(() => {
+      expect(screen.getByText('sample.txt')).toBeTruthy();
+    });
+    // Wait for text file reader to populate content
+    await new Promise((resolve) => setTimeout(resolve, 80));
     fireEvent.submit(t.textarea().closest('form'));
     expect(t.sentText()).toBe('please analyze this file');
     expect(t.sentAttachments()).toHaveLength(1);
