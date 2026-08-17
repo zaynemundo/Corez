@@ -38,12 +38,21 @@ const LEASE_MS = 5 * 60 * 1000;
 // generation (uncapped build stream, slow spec/review) never lets the lease
 // expire mid-flight and admit a duplicate concurrent build.
 const HEARTBEAT_INTERVAL_MS = 30 * 1000;
-// Total wall-clock budget for one harness run (env AI_HARNESS_TIMEOUT_MS
-// overrides). Each provider call is separately deadline-guarded in the chain;
-// this cap additionally guarantees the whole multi-phase build always ends
-// with a terminal SSE event (error or done) well before Cloudflare's platform
-// wall-clock limit could kill the request mid-stream and truncate it silently.
-const DEFAULT_HARNESS_TIMEOUT_MS = 240_000;
+// Total wall-clock budget for one harness invocation (env
+// AI_HARNESS_TIMEOUT_MS overrides). Cloudflare imposes NO wall-clock limit on
+// incoming HTTP requests while the client stays connected (only a 30s CPU
+// cap, which the harness uses a tiny fraction of), so this is a generous
+// self-imposed envelope rather than a platform constraint: a build may take
+// as long as it needs. Each provider call is separately deadline-guarded in
+// the chain; this cap additionally guarantees the whole multi-phase build
+// always ends with a terminal event (error or done) instead of hanging.
+const DEFAULT_HARNESS_TIMEOUT_MS = 600_000;
+// Long-build checkpoint interval: the partial artifact is persisted every
+// AI_HARNESS_CHECKPOINT_MS (default 10s) while the build stream runs, so an
+// interrupted build resumes forward (re-verify -> repair) instead of
+// restarting from zero. The end-of-build persist at the close of the stream
+// remains the authoritative final record.
+const DEFAULT_BUILD_CHECKPOINT_MS = 10_000;
 
 const SPEC_INSTRUCTION =
   'Produce a concise build specification (max 250 words) for the request below: the purpose, the key screens or features, controls (for games), and confirmation that the deliverable is ONE self-contained HTML file. Do not write any code. Answer directly: do not include internal reasoning or thinking.';
@@ -129,7 +138,10 @@ export async function* runCreationHarness(options) {
     store,
     sleep,
     complexity,
-    heartbeatIntervalMs = HEARTBEAT_INTERVAL_MS
+    heartbeatIntervalMs = HEARTBEAT_INTERVAL_MS,
+    checkpointIntervalMs = Number(env?.AI_HARNESS_CHECKPOINT_MS) > 0
+      ? Number(env?.AI_HARNESS_CHECKPOINT_MS)
+      : DEFAULT_BUILD_CHECKPOINT_MS
   } = options;
 
   // Fast path: game requests ALWAYS take the lighter path — game creation is
@@ -196,8 +208,13 @@ export async function* runCreationHarness(options) {
     return;
   }
 
-  // Re-verify existing build with the current verifier rules if resuming
-  if (state.build && state.verification && !state.verification.passed) {
+  // Re-verify an existing build when resuming: a build persisted by an
+  // incremental checkpoint (mid-stream) or by an interrupted run has either
+  // no verification record yet or one from older verifier rules — verify it
+  // now so an incomplete artifact is caught by the repair loop instead of
+  // skipping verification. Whitespace-only builds are never "verified": they
+  // fall through to the empty-build guard below and fail loudly.
+  if (state.build && state.build.trim() && (!state.verification || !state.verification.passed)) {
     state.verification = verifyBuildState(state.spec, state.build, state.intentType, { skipCoverage });
   }
 
@@ -366,6 +383,7 @@ export async function* runCreationHarness(options) {
       // keeps the client's stream live while cutting worker CPU hard.
       let deltaBuffer = '';
       let lastDeltaFlush = 0;
+      let lastCheckpointAt = 0;
       try {
         for await (const event of runStreamingChain(buildMessages, { env, signal })) {
           if (event.type === 'delta') {
@@ -377,6 +395,16 @@ export async function* runCreationHarness(options) {
               yield { type: 'delta', text: deltaBuffer };
               deltaBuffer = '';
               lastDeltaFlush = now;
+            }
+            // Long-build checkpoint: persist the partial artifact
+            // periodically so an interrupted request resumes forward
+            // (re-verify -> repair) instead of rebuilding from zero. Wall
+            // time is unlimited while the client stays connected; the
+            // checkpoint only costs a serialize on a timer.
+            if (collected && now - lastCheckpointAt >= checkpointIntervalMs) {
+              state.build = collected;
+              await persist(store, taskId, state);
+              lastCheckpointAt = now;
             }
           } else if (event.type === 'meta') {
             provider = provider || event.provider || null;

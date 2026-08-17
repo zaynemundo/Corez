@@ -555,6 +555,50 @@ async function run() {
     ['Earlier question', 'Earlier answer', 'Current question']
   );
 
+  // Non-streaming creation harness: the client may skip SSE entirely — the
+  // worker runs the ENTIRE build loop and answers with the finished artifact
+  // as a single JSON body (corez.pro -> provider -> wait -> full response).
+  {
+    const harnessArtifact = '<!DOCTYPE html>\n<html lang="en"><head><title>G</title></head>\n<body><canvas id="c"></canvas>\n<script>\nfunction gameLoop(){ update(); render(); }\nfunction update(){}\nfunction render(){}\ndocument.addEventListener(\'keydown\', function(){});\ncanvas.addEventListener(\'mousemove\', function(){});\nrequestAnimationFrame(gameLoop);\n</script></body></html>';
+    const harnessOriginalFetch = globalThis.fetch;
+    try {
+      let harnessProviderCalls = 0;
+      globalThis.fetch = async (url, init) => {
+        assert.equal(url, OPENCODE_URL);
+        harnessProviderCalls += 1;
+        const body = JSON.parse(init.body);
+        // The harness always streams FROM the provider; only the
+        // client-facing delivery is non-streaming.
+        assert.equal(body.stream, true);
+        const sse = (event) => `data: ${JSON.stringify(event)}\n\n`;
+        return new Response(
+          sse({ choices: [{ delta: { content: harnessArtifact }, finish_reason: null }] })
+          + sse({ choices: [{ delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 10, completion_tokens: 10, total_tokens: 20 } })
+          + 'data: [DONE]\n\n',
+          { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+        );
+      };
+      const harnessResponse = await post(
+        JSON.stringify({
+          prompt: 'Build a game',
+          intent: { type: 'app', primaryIntent: 'game_creation' },
+          harness: true,
+          stream: false
+        }),
+        env({ OPENCODE_GO_API_KEY: 'sk-opencode-test' })
+      );
+      assert.equal(harnessResponse.status, 200);
+      assert.match(harnessResponse.headers.get('content-type'), /application\/json/);
+      const harnessBody = await json(harnessResponse);
+      assert.equal(typeof harnessBody.content, 'string');
+      assert.match(harnessBody.content, /<!DOCTYPE html>/);
+      assert.ok(harnessBody.diagnostics?.harness, 'harness diagnostics ride in the JSON body');
+      assert.ok(harnessProviderCalls >= 1);
+    } finally {
+      globalThis.fetch = harnessOriginalFetch;
+    }
+  }
+
   // Live grounding: a media-release question ("LOOM's latest singles") MUST
   // trigger a real web search and inject the results into the model payload
   // — it is never answered from memory. The internal /api/search call runs

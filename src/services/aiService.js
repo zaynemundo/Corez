@@ -793,11 +793,12 @@ export async function generateHostedAIResponse(
 
   // Creation requests (games, websites, apps) run through the agentic
   // creation harness so the artifact is verified and repaired before
-  // delivery. Revisions of existing code and non-streaming calls keep the
-  // direct single-generation path.
+  // delivery. Revisions of existing code keep the direct single-generation
+  // path. The harness runs identically streamed or not: the worker answers
+  // with the finished artifact either way (SSE deltas vs. a single JSON
+  // body after the whole build loop completes).
   const finePrimary = fineIntent?.primaryIntent || fineIntent?.type;
-  const useCreationHarness = options.stream === true
-    && intent?.type === 'app'
+  const useCreationHarness = intent?.type === 'app'
     && !isRevisionContextPrompt(prompt)
     && !String(prompt).includes('```')
     && ['game_creation', 'website_creation', 'design_task', 'app'].includes(intent?.primaryIntent || finePrimary);
@@ -2076,8 +2077,12 @@ export async function generateAIResponse(prompt, history = [], signal = null, on
   }
 
   try {
+    // Deliberate product decision: every request is issued NON-streaming so
+    // the flow is always corez.pro -> provider (wait until the response /
+    // build is done) -> full answer back in one JSON body. The worker still
+    // supports SSE for direct API clients, but the app never asks for it.
     const hostedAiResponse = await generateHostedAIResponse(cleanPrompt, intent, history, signal, {
-      stream: typeof onDelta === 'function',
+      stream: false,
       onDelta,
       onPhase,
       onClear

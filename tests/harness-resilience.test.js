@@ -193,6 +193,51 @@ describe('runCreationHarness resilience', () => {
     expect(done.busy).toBe(false);
   });
 
+  it('H1.5: a mid-build checkpoint lets an interrupted long build resume via verify->repair instead of restarting', async () => {
+    streamMock();
+    const store = createTaskStateStore({});
+    const taskId = harnessTaskId('build a first person shooter game', 'game_creation');
+
+    // Run A: the build stream emits a partial artifact, the checkpoint
+    // persists it, then the stream dies (provider/network drop mid-build).
+    runStreamingChain.mockImplementationOnce(async function* () {
+      yield { type: 'delta', text: BROKEN_ARTIFACT };
+      const err = new Error('build stream dropped');
+      err.status = 502;
+      throw err;
+    });
+
+    const eventsA = [];
+    let thrownA = null;
+    try {
+      await drain(runCreationHarness({ ...harnessOptions(store), checkpointIntervalMs: 1 }), eventsA);
+    } catch (err) {
+      thrownA = err;
+    }
+    expect(thrownA?.status).toBe(502);
+    // The incremental checkpoint must have persisted the partial artifact
+    // BEFORE the stream died — this is what makes long builds resumable.
+    const checkpointed = await store.load(taskId);
+    expect(checkpointed.build).toBe(BROKEN_ARTIFACT);
+    expect(checkpointed.status).toBe('failed');
+
+    // Run B: an identical request resumes from the checkpoint. The partial
+    // build has no verification record yet, so it is re-verified, fails, and
+    // is repaired FORWARD — never shipped unverified, never rebuilt from
+    // zero.
+    const eventsB = [];
+    await drain(runCreationHarness(harnessOptions(store)), eventsB);
+    const phasesB = eventsB.filter((e) => e.type === 'phase').map((e) => e.phase);
+    expect(phasesB).toContain('repairing');
+    expect(phasesB).toContain('verifying');
+    expect(collectDeltas(eventsB)).toBe(GOOD_ARTIFACT);
+    expect(eventsB.some((e) => e.type === 'done')).toBe(true);
+    const final = await store.load(taskId);
+    expect(final.status).toBe('done');
+    expect(final.busy).toBe(false);
+    expect(final.build).toBe(GOOD_ARTIFACT);
+  });
+
   it('H2: the lease heartbeat is refreshed while a long build streams', async () => {
     streamMock();
     const fetchMock = vi.fn(async (_url, init) => {

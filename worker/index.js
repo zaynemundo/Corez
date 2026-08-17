@@ -699,57 +699,92 @@ async function handleAi(request, env) {
   // resolve to game_creation (prompt-based, same rule as the system prompt)
   // so the harness takes the simple one-pass game path.
   if (body.harness === true) {
-    if (body.stream !== true) {
-      return jsonResponse(400, { error: 'Harness builds require a streaming request.' });
-    }
     const resolvedPrimary = isGameCreationRequest(prompt, intent, fineIntent)
       ? 'game_creation'
       : (intent?.primaryIntent || fineIntent?.primaryIntent || fineIntent?.type || intentType);
     const harnessIntentType = ['app', 'game_creation', 'website_creation', 'design_task'].includes(resolvedPrimary)
       ? resolvedPrimary
       : intentType;
-    const encoder = new TextEncoder();
-    const sse = (event) => `data: ${JSON.stringify(event)}\n\n`;
-    const readable = new ReadableStream({
-      async start(controller) {
-        try {
-          for await (const event of runCreationHarness({
-            prompt,
-            primaryIntent: resolvedPrimary,
-            intentType: harnessIntentType,
-            apiMessages,
-            env,
-            signal: clientDisconnectSignal,
-            store: createTaskStateStore(env),
-            sleep: retrySleepFor(env),
-            complexity: body.complexity
-          })) {
-            controller.enqueue(encoder.encode(sse(event)));
+    const harnessOptions = {
+      prompt,
+      primaryIntent: resolvedPrimary,
+      intentType: harnessIntentType,
+      apiMessages,
+      env,
+      signal: clientDisconnectSignal,
+      store: createTaskStateStore(env),
+      sleep: retrySleepFor(env),
+      complexity: body.complexity
+    };
+    if (body.stream === true) {
+      // Streaming harness: SSE events (phase/delta/done) keep the client
+      // informed while the loop takes as long as it needs.
+      const encoder = new TextEncoder();
+      const sse = (event) => `data: ${JSON.stringify(event)}\n\n`;
+      const readable = new ReadableStream({
+        async start(controller) {
+          try {
+            for await (const event of runCreationHarness(harnessOptions)) {
+              controller.enqueue(encoder.encode(sse(event)));
+            }
+          } catch (err) {
+            const payload = {
+              type: 'error',
+              message: err?.retryable
+                ? err.message
+                : `Creation harness failed: ${safeErrorDetail(err)}`,
+              status: err?.status || 502,
+              ...(err?.retryable ? { retryable: true } : {})
+            };
+            controller.enqueue(encoder.encode(sse(payload)));
           }
-        } catch (err) {
-          const payload = {
-            type: 'error',
-            message: err?.retryable
-              ? err.message
-              : `Creation harness failed: ${safeErrorDetail(err)}`,
-            status: err?.status || 502,
-            ...(err?.retryable ? { retryable: true } : {})
-          };
-          controller.enqueue(encoder.encode(sse(payload)));
+          controller.close();
         }
-        controller.close();
+      });
+      return new Response(readable, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          'Access-Control-Allow-Origin': '*',
+          'X-Accel-Buffering': 'no'
+        }
+      });
+    }
+
+    // Non-streaming harness: run the ENTIRE build loop (plan -> build ->
+    // verify -> repair -> review) inside this request, then answer with the
+    // finished artifact in a single JSON body. The client waits until the
+    // build is done — no live deltas. The generator replays the persisted
+    // terminal artifact on re-issue, so interrupted builds still resume.
+    try {
+      let content = '';
+      let projectState = null;
+      let diagnostics = null;
+      for await (const event of runCreationHarness(harnessOptions)) {
+        if (event.type === 'clear') {
+          content = '';
+        } else if (event.type === 'delta' && typeof event.text === 'string') {
+          content += event.text;
+        } else if (event.type === 'done') {
+          projectState = event.projectState ?? projectState;
+        } else if (event.type === 'diagnostics') {
+          diagnostics = event.diagnostics;
+        }
       }
-    });
-    return new Response(readable, {
-      status: 200,
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-        'Access-Control-Allow-Origin': '*',
-        'X-Accel-Buffering': 'no'
+      return jsonResponse(200, { content, projectState, diagnostics });
+    } catch (err) {
+      if (err?.status === 499) {
+        return jsonResponse(499, { error: 'AI request cancelled.' });
       }
-    });
+      return jsonResponse(err?.status || 502, {
+        error: err?.retryable
+          ? err.message
+          : `Creation harness failed: ${safeErrorDetail(err)}`,
+        ...(err?.retryable ? { retryable: true } : {})
+      });
+    }
   }
 
   // Streaming path: SSE through provider -> worker -> client, so the user
