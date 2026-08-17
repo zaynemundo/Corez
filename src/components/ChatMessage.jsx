@@ -198,17 +198,93 @@ function ExecutableCodeBlock({ code, onRunInCanvas, onReviseCode }) {
   );
 }
 
+export async function fetchImageAsPngBlob(url) {
+  if (!url || typeof url !== 'string') throw new Error('Invalid image URL');
+
+  if (url.startsWith('data:image/png')) {
+    try {
+      const res = await fetch(url);
+      return await res.blob();
+    } catch { /* Fallback to canvas */ }
+  }
+
+  try {
+    const res = await fetch(url);
+    if (res.ok) {
+      const blob = await res.blob();
+      if (blob.type === 'image/png') {
+        return blob;
+      }
+    }
+  } catch {
+    // Cross-origin or network error, fallback to Canvas below
+  }
+
+  return new Promise((resolve, reject) => {
+    if (typeof Image === 'undefined') {
+      return reject(new Error('Image constructor unavailable'));
+    }
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || img.width || 300;
+        canvas.height = img.naturalHeight || img.height || 300;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Canvas context unavailable');
+        ctx.drawImage(img, 0, 0);
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error('Canvas toBlob failed'));
+        }, 'image/png');
+      } catch (err) {
+        reject(err);
+      }
+    };
+    img.onerror = () => reject(new Error('Image failed to load for clipboard copy'));
+    img.src = url;
+  });
+}
+
+export async function copyImageToClipboard(url) {
+  if (!url) return false;
+  const fullUrl = url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')
+    ? url
+    : (typeof window !== 'undefined' ? new URL(url, window.location.origin).href : url);
+
+  if (typeof navigator !== 'undefined' && navigator.clipboard && typeof window !== 'undefined' && window.ClipboardItem && navigator.clipboard.write) {
+    try {
+      const blob = await fetchImageAsPngBlob(fullUrl);
+      if (blob) {
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob })
+        ]);
+        return true;
+      }
+    } catch (err) {
+      console.warn('Direct image clipboard write failed, falling back to text URL:', err);
+    }
+  }
+
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(fullUrl);
+    return true;
+  }
+  return false;
+}
+
 function MessageActions({ content }) {
   const [copied, setCopied] = useState(false);
+  const [rating, setRating] = useState(null); // 'like' | 'dislike' | null
   const [rateOpen, setRateOpen] = useState(false);
-  const [rating, setRating] = useState(null);
   const [shared, setShared] = useState(false);
   const rateWrapperRef = useRef(null);
 
   useEffect(() => {
     if (!rateOpen) return;
-    const handleOutsideClick = (event) => {
-      if (rateWrapperRef.current && !rateWrapperRef.current.contains(event.target)) {
+    const handleOutsideClick = (e) => {
+      if (rateWrapperRef.current && !rateWrapperRef.current.contains(e.target)) {
         setRateOpen(false);
       }
     };
@@ -218,14 +294,22 @@ function MessageActions({ content }) {
 
   const handleCopy = async () => {
     if (!content) return;
-    if (!navigator.clipboard) return;
-    // A standalone image message copies as its absolute image URL so pasting
-    // shows the picture link instead of raw markdown like ![](/api/assets/...).
     const imgMatch = content.match(/^!\[(.*?)\]\((.*?)\)\s*$/);
-    const text = imgMatch ? new URL(imgMatch[2], window.location.origin).href : content;
-    navigator.clipboard.writeText(text).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (imgMatch) {
+      const fullUrl = imgMatch[2].startsWith('data:') || imgMatch[2].startsWith('http')
+        ? imgMatch[2]
+        : (typeof window !== 'undefined' ? new URL(imgMatch[2], window.location.origin).href : imgMatch[2]);
+      await copyImageToClipboard(fullUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      return;
+    }
+
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(content).catch(() => {});
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const handleRateToggle = () => {
@@ -483,10 +567,13 @@ function EmailCard({ content, renderBody }) {
 export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
   const isUser = message.role === 'user';
   const [fullscreenImage, setFullscreenImage] = useState(null);
+  const [imageCopied, setImageCopied] = useState(false);
+  const [cardCopiedId, setCardCopiedId] = useState(null);
   const modalRef = useRef(null);
 
   useEffect(() => {
     if (!fullscreenImage) return;
+    setImageCopied(false);
     const onKeyDown = (e) => {
       if (e.key === 'Escape') {
         if (typeof document !== 'undefined' && document.fullscreenElement) {
@@ -506,6 +593,17 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
       document.exitFullscreen?.().catch?.(() => {});
     }
     setFullscreenImage(null);
+  };
+
+  const handleCopyImage = async (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (!fullscreenImage?.url) return;
+    await copyImageToClipboard(fullscreenImage.url);
+    setImageCopied(true);
+    setTimeout(() => setImageCopied(false), 2000);
   };
 
   const handleDownloadImage = async (e) => {
@@ -754,6 +852,23 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
                 <button
                   type="button"
                   className="image-action-badge"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    if (safeUrl) {
+                      await copyImageToClipboard(safeUrl);
+                      setCardCopiedId(i);
+                      setTimeout(() => setCardCopiedId(null), 2000);
+                    }
+                  }}
+                  aria-label="Copy image"
+                  title="Copy image to clipboard"
+                >
+                  {cardCopiedId === i ? <Check size={13} strokeWidth={2} /> : <Copy size={13} strokeWidth={2} />}
+                  <span>{cardCopiedId === i ? 'Copied' : 'Copy'}</span>
+                </button>
+                <button
+                  type="button"
+                  className="image-action-badge"
                   onClick={(e) => {
                     e.stopPropagation();
                     if (safeUrl) setFullscreenImage({ url: safeUrl, alt: altText });
@@ -984,6 +1099,16 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
             <div className="image-fullscreen-toolbar">
               <span className="image-fullscreen-title">{fullscreenImage.alt || 'Generated Image'}</span>
               <div className="image-fullscreen-actions">
+                <button
+                  type="button"
+                  className="image-fullscreen-btn"
+                  onClick={handleCopyImage}
+                  title={imageCopied ? "Image copied to clipboard" : "Copy image to clipboard"}
+                  aria-label={imageCopied ? "Image copied to clipboard" : "Copy image"}
+                >
+                  {imageCopied ? <Check size={15} strokeWidth={1.75} /> : <Copy size={15} strokeWidth={1.75} />}
+                  <span>{imageCopied ? 'Copied Image' : 'Copy Image'}</span>
+                </button>
                 <button
                   type="button"
                   className="image-fullscreen-btn"

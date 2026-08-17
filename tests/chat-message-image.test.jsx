@@ -112,6 +112,30 @@ describe('ChatMessage image rendering', () => {
     fireEvent.click(downloadBtn);
   });
 
+  it('provides a Copy Image button in the fullscreen modal', async () => {
+    const content = '![neon car](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==)';
+    render(<ChatMessage message={{ role: 'assistant', content }} />);
+
+    const { fireEvent, within } = require('@testing-library/react');
+    fireEvent.click(screen.getByRole('button', { name: 'View fullscreen' }));
+    const modalDialog = screen.getByRole('dialog');
+    expect(modalDialog).toBeTruthy();
+
+    const copyBtn = within(modalDialog).getByRole('button', { name: 'Copy image' });
+    expect(copyBtn).toBeTruthy();
+    fireEvent.click(copyBtn);
+  });
+
+  it('copies image from the card overlay copy button', () => {
+    const content = '![retro robot](https://example.com/robot.png)';
+    render(<ChatMessage message={{ role: 'assistant', content }} />);
+
+    const { fireEvent } = require('@testing-library/react');
+    const copyBtn = screen.getByRole('button', { name: 'Copy image' });
+    expect(copyBtn).toBeTruthy();
+    fireEvent.click(copyBtn);
+  });
+
   it('closes fullscreen image modal on Escape key', () => {
     const content = '![cyberpunk](https://example.com/cyber.png)';
     render(<ChatMessage message={{ role: 'assistant', content }} />);
