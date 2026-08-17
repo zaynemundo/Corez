@@ -89,12 +89,27 @@ describe('ChatMessage image rendering', () => {
     const dialog = screen.getByRole('dialog', { name: 'a futuristic city' });
     expect(dialog).toBeTruthy();
     expect(screen.getAllByText('a futuristic city').length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByRole('link', { name: 'Download image' })).toHaveAttribute('href', 'https://example.com/city.png');
+    expect(screen.getByRole('button', { name: 'Download image' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Exit fullscreen' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
 
-    // Close button dismisses modal
-    const closeBtn = screen.getByRole('button', { name: 'Close' });
-    fireEvent.click(closeBtn);
+    // Exit Fullscreen button dismisses modal
+    const exitBtn = screen.getByRole('button', { name: 'Exit fullscreen' });
+    fireEvent.click(exitBtn);
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('triggers download when clicking the download button', () => {
+    const content = '![neon car](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==)';
+    render(<ChatMessage message={{ role: 'assistant', content }} />);
+
+    const { fireEvent } = require('@testing-library/react');
+    fireEvent.click(screen.getByRole('button', { name: 'View fullscreen' }));
+    expect(screen.getByRole('dialog')).toBeTruthy();
+
+    const downloadBtn = screen.getByRole('button', { name: 'Download image' });
+    expect(downloadBtn).toBeTruthy();
+    fireEvent.click(downloadBtn);
   });
 
   it('closes fullscreen image modal on Escape key', () => {

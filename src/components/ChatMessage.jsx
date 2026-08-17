@@ -483,7 +483,6 @@ function EmailCard({ content, renderBody }) {
 export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
   const isUser = message.role === 'user';
   const [fullscreenImage, setFullscreenImage] = useState(null);
-  const [isNativeFullscreen, setIsNativeFullscreen] = useState(false);
   const modalRef = useRef(null);
 
   useEffect(() => {
@@ -496,31 +495,59 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
         setFullscreenImage(null);
       }
     };
-    const onFullscreenChange = () => {
-      setIsNativeFullscreen(Boolean(typeof document !== 'undefined' && document.fullscreenElement));
-    };
     window.addEventListener('keydown', onKeyDown);
-    if (typeof document !== 'undefined') {
-      document.addEventListener('fullscreenchange', onFullscreenChange);
-    }
     return () => {
       window.removeEventListener('keydown', onKeyDown);
-      if (typeof document !== 'undefined') {
-        document.removeEventListener('fullscreenchange', onFullscreenChange);
-      }
     };
   }, [fullscreenImage]);
 
-  const toggleNativeFullscreen = () => {
-    if (typeof document === 'undefined') return;
-    if (!document.fullscreenElement) {
-      if (modalRef.current?.requestFullscreen) {
-        modalRef.current.requestFullscreen().catch(() => {});
+  const handleExitFullscreen = () => {
+    if (typeof document !== 'undefined' && document.fullscreenElement) {
+      document.exitFullscreen?.().catch?.(() => {});
+    }
+    setFullscreenImage(null);
+  };
+
+  const handleDownloadImage = async (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (!fullscreenImage?.url) return;
+    const filename = fullscreenImage.alt
+      ? `${fullscreenImage.alt.replace(/[^a-z0-9_-]/gi, '_').toLowerCase().slice(0, 40)}.png`
+      : 'corez_generated_image.png';
+
+    try {
+      if (fullscreenImage.url.startsWith('data:')) {
+        const a = document.createElement('a');
+        a.href = fullscreenImage.url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        return;
       }
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen().catch(() => {});
-      }
+      const res = await fetch(fullscreenImage.url);
+      if (!res.ok) throw new Error('Fetch failed');
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    } catch {
+      const a = document.createElement('a');
+      a.href = fullscreenImage.url;
+      a.download = filename;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     }
   };
 
@@ -957,35 +984,25 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
             <div className="image-fullscreen-toolbar">
               <span className="image-fullscreen-title">{fullscreenImage.alt || 'Generated Image'}</span>
               <div className="image-fullscreen-actions">
-                <a
-                  href={fullscreenImage.url}
-                  download={fullscreenImage.alt ? `${fullscreenImage.alt.replace(/[^a-z0-9]/gi, '_')}.png` : 'corez_image.png'}
+                <button
+                  type="button"
                   className="image-fullscreen-btn"
+                  onClick={handleDownloadImage}
                   title="Download image"
                   aria-label="Download image"
-                  target="_blank"
-                  rel="noopener noreferrer"
                 >
                   <Download size={15} strokeWidth={1.75} />
                   <span>Download</span>
-                </a>
-                <button
-                  type="button"
-                  className="image-fullscreen-btn"
-                  onClick={toggleNativeFullscreen}
-                  title={isNativeFullscreen ? "Exit full screen" : "Enter full screen"}
-                  aria-label={isNativeFullscreen ? "Exit full screen" : "Enter full screen"}
-                >
-                  {isNativeFullscreen ? <Minimize2 size={15} strokeWidth={1.75} /> : <Maximize2 size={15} strokeWidth={1.75} />}
                 </button>
                 <button
                   type="button"
-                  className="image-fullscreen-btn close-btn"
-                  onClick={() => setFullscreenImage(null)}
-                  title="Close (Esc)"
-                  aria-label="Close"
+                  className="image-fullscreen-btn exit-fullscreen-btn"
+                  onClick={handleExitFullscreen}
+                  title="Exit fullscreen (Esc)"
+                  aria-label="Exit fullscreen"
                 >
-                  <X size={16} strokeWidth={1.75} />
+                  <Minimize2 size={15} strokeWidth={1.75} />
+                  <span>Exit Fullscreen</span>
                 </button>
               </div>
             </div>
