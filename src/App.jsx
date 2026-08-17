@@ -522,11 +522,6 @@ export default function App() {
                         message={msg}
                         onRunInCanvas={handleRunInCanvas}
                         onReviseCode={handleReviseCode}
-                        onSelectOption={(optionText) => {
-                          if (!isThinking) {
-                            handleSendMessage(optionText);
-                          }
-                        }}
                       />
                     ))}
                     {isThinking && (
