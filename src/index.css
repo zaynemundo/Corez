@@ -860,6 +860,17 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Clarification Suggestions Card (styled like slash-suggestions) */
+@keyframes suggestionIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .clarification-suggestions-container {
   margin-top: 0.85rem;
   background-color: var(--bg-secondary);
@@ -893,6 +904,26 @@ h1, h2, h3, h4, h5, h6 {
   flex-shrink: 0;
 }
 
+.clarification-show-all-btn {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent, #818cf8);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast), opacity var(--transition-fast);
+}
+
+.clarification-show-all-btn:hover {
+  background: var(--bg-tertiary);
+  opacity: 0.9;
+}
+
 .clarification-suggestions-list {
   display: flex;
   flex-direction: column;
@@ -911,12 +942,26 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: var(--radius-md);
   cursor: pointer;
   text-align: left;
+  animation: suggestionIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--i, 0) * 35ms);
   transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
 }
 
 .clarification-suggestion-item:hover {
   background: var(--bg-tertiary);
   transform: translateX(2px);
+}
+
+.clarification-suggestion-item:active {
+  transform: translateX(2px) scale(0.992);
+}
+
+.clarification-suggestion-item:focus-visible,
+.clarification-show-all-btn:focus-visible,
+.clarification-other-send-btn:focus-visible,
+.clarification-other-cancel-btn:focus-visible {
+  outline: 2px solid var(--accent, #818cf8);
+  outline-offset: 1px;
 }
 
 .clarification-suggestion-icon {
@@ -995,6 +1040,11 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 0.84rem;
   color: var(--text-primary);
   padding: 0.2rem 0.3rem;
+  border-radius: var(--radius-sm);
+}
+
+.clarification-other-input:focus-visible {
+  box-shadow: 0 0 0 1.5px var(--accent, #818cf8) inset;
 }
 
 .clarification-other-send-btn,

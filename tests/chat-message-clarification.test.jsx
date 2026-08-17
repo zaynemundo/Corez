@@ -123,7 +123,7 @@ describe('ChatMessage Clarification Suggestions UI', () => {
       />
     );
 
-    expect(screen.getByRole('region', { name: 'Suggested options' })).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Suggested options' })).toBeTruthy();
     expect(screen.getByText('Suggestions')).toBeTruthy();
 
     const storeBtn = screen.getByRole('option', { name: 'Select: E-Commerce Store - product catalog, cart and checkout' });

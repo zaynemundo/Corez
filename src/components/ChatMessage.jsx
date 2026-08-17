@@ -817,14 +817,36 @@ export function extractClarificationOptions(content) {
 export function ClarificationSuggestions({ options, onSelectOption }) {
   const [isTypingCustom, setIsTypingCustom] = useState(false);
   const [customText, setCustomText] = useState('');
+  const [showAll, setShowAll] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const inputRef = useRef(null);
-  const displayedOptions = (options || []).slice(0, 3);
+  const itemRefs = useRef([]);
+
+  const allOptions = options || [];
+  const visibleOptions = showAll ? allOptions.slice(0, 8) : allOptions.slice(0, 3);
+  const totalItems = visibleOptions.length + 1; // + the "Other..." row
+
+  const selectOption = (opt) => {
+    if (onSelectOption) onSelectOption(opt.text || opt.label);
+  };
 
   useEffect(() => {
     if (isTypingCustom && inputRef.current) {
       inputRef.current.focus();
     }
   }, [isTypingCustom]);
+
+  // Keyboard navigation: the container is a real listbox with roving focus.
+  // Arrow keys / Home / End move between items; Enter selects (native button
+  // behaviour fires the click); Escape leaves the list.
+  useEffect(() => {
+    if (activeIndex < 0) return;
+    const el = itemRefs.current[activeIndex];
+    if (el) {
+      el.focus({ preventScroll: true });
+      el.scrollIntoView?.({ block: 'nearest' });
+    }
+  }, [activeIndex]);
 
   const handleCustomSubmit = (e) => {
     e?.preventDefault();
@@ -841,24 +863,72 @@ export function ClarificationSuggestions({ options, onSelectOption }) {
     if (e.key === 'Escape') {
       e.preventDefault();
       setIsTypingCustom(false);
+      setActiveIndex(-1);
     }
   };
 
+  const handleContainerKeyDown = (e) => {
+    if (isTypingCustom) return; // the input owns its keys while typing
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex((prev) => {
+        const dir = e.key === 'ArrowDown' ? 1 : -1;
+        if (prev === -1) return dir === 1 ? 0 : totalItems - 1;
+        return (prev + dir + totalItems) % totalItems;
+      });
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      setActiveIndex(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      setActiveIndex(totalItems - 1);
+    } else if (e.key === 'Escape') {
+      setActiveIndex(-1);
+    }
+  };
+
+  // Roving tabindex: exactly one item is tabbable at a time. When nothing is
+  // active (focus left the list), the first item re-arms so Tab can re-enter.
+  const itemTabIndex = (idx) => (activeIndex === idx || (activeIndex === -1 && idx === 0) ? 0 : -1);
+
   return (
-    <div className="clarification-suggestions-container" role="region" aria-label="Suggested options">
+    <div
+      className="clarification-suggestions-container"
+      role="group"
+      aria-label="Suggested options"
+      onKeyDown={handleContainerKeyDown}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) setActiveIndex(-1);
+      }}
+    >
       <div className="clarification-suggestions-header">
         <Sparkles size={13} strokeWidth={2} className="clarification-header-icon" />
         <span>Suggestions</span>
+        {allOptions.length > 3 && !showAll && (
+          <button
+            type="button"
+            className="clarification-show-all-btn"
+            onClick={() => setShowAll(true)}
+            aria-label={`Show all ${allOptions.length} suggestions`}
+          >
+            Show all ({allOptions.length})
+          </button>
+        )}
       </div>
 
       <div className="clarification-suggestions-list" role="listbox" aria-label="Suggestions list">
-        {displayedOptions.map((opt, idx) => (
+        {visibleOptions.map((opt, idx) => (
           <button
             key={idx}
             type="button"
             role="option"
+            ref={(el) => { itemRefs.current[idx] = el; }}
+            tabIndex={itemTabIndex(idx)}
+            aria-selected={activeIndex === idx}
             className="clarification-suggestion-item"
-            onClick={() => onSelectOption && onSelectOption(opt.text || opt.label)}
+            style={{ '--i': idx }}
+            onClick={() => selectOption(opt)}
+            onFocus={() => setActiveIndex(idx)}
             title={`Select ${opt.label}`}
             aria-label={`Select: ${opt.label}${opt.detail ? ` - ${opt.detail}` : ''}`}
           >
@@ -874,12 +944,17 @@ export function ClarificationSuggestions({ options, onSelectOption }) {
             <ChevronRight size={14} strokeWidth={1.5} className="clarification-suggestion-chevron" />
           </button>
         ))}
+      </div>
 
-        {!isTypingCustom ? (
+      {!isTypingCustom ? (
           <button
             type="button"
+            ref={(el) => { itemRefs.current[visibleOptions.length] = el; }}
+            tabIndex={activeIndex === visibleOptions.length || (activeIndex === -1 && visibleOptions.length === 0) ? 0 : -1}
             className="clarification-suggestion-item clarification-other-item"
+            style={{ '--i': visibleOptions.length }}
             onClick={() => setIsTypingCustom(true)}
+            onFocus={() => setActiveIndex(visibleOptions.length)}
             title="Type a custom response"
             aria-label="Other: Type your own custom response"
           >
@@ -927,7 +1002,6 @@ export function ClarificationSuggestions({ options, onSelectOption }) {
             </button>
           </form>
         )}
-      </div>
     </div>
   );
 }
