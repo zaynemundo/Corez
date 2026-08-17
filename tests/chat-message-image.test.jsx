@@ -76,15 +76,15 @@ describe('ChatMessage image rendering', () => {
     expect(document.querySelectorAll('.linkedin-icon').length).toBe(0);
   });
 
-  it('opens a fullscreen image modal when clicking an image or fullscreen button', () => {
+  it('opens a fullscreen image modal when clicking an image card', () => {
     const content = '![a futuristic city](https://example.com/city.png)';
     render(<ChatMessage message={{ role: 'assistant', content }} />);
 
-    const fullscreenBtn = screen.getByRole('button', { name: 'View fullscreen' });
-    expect(fullscreenBtn).toBeTruthy();
+    const imageCard = screen.getByRole('button', { name: 'View fullscreen: a futuristic city' });
+    expect(imageCard).toBeTruthy();
 
     const { fireEvent } = require('@testing-library/react');
-    fireEvent.click(fullscreenBtn);
+    fireEvent.click(imageCard);
 
     const dialog = screen.getByRole('dialog', { name: 'a futuristic city' });
     expect(dialog).toBeTruthy();
@@ -99,12 +99,12 @@ describe('ChatMessage image rendering', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('triggers download when clicking the download button', () => {
+  it('triggers download when clicking the download button in fullscreen modal', () => {
     const content = '![neon car](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==)';
     render(<ChatMessage message={{ role: 'assistant', content }} />);
 
     const { fireEvent } = require('@testing-library/react');
-    fireEvent.click(screen.getByRole('button', { name: 'View fullscreen' }));
+    fireEvent.click(screen.getByRole('button', { name: 'View fullscreen: neon car' }));
     expect(screen.getByRole('dialog')).toBeTruthy();
 
     const downloadBtn = screen.getByRole('button', { name: 'Download image' });
@@ -117,7 +117,7 @@ describe('ChatMessage image rendering', () => {
     render(<ChatMessage message={{ role: 'assistant', content }} />);
 
     const { fireEvent, within } = require('@testing-library/react');
-    fireEvent.click(screen.getByRole('button', { name: 'View fullscreen' }));
+    fireEvent.click(screen.getByRole('button', { name: 'View fullscreen: neon car' }));
     const modalDialog = screen.getByRole('dialog');
     expect(modalDialog).toBeTruthy();
 
@@ -126,12 +126,12 @@ describe('ChatMessage image rendering', () => {
     fireEvent.click(copyBtn);
   });
 
-  it('copies image from the card overlay copy button', () => {
+  it('copies image from the message actions copy button', () => {
     const content = '![retro robot](https://example.com/robot.png)';
     render(<ChatMessage message={{ role: 'assistant', content }} />);
 
     const { fireEvent } = require('@testing-library/react');
-    const copyBtn = screen.getByRole('button', { name: 'Copy image' });
+    const copyBtn = screen.getByRole('button', { name: 'Copy response' });
     expect(copyBtn).toBeTruthy();
     fireEvent.click(copyBtn);
   });
@@ -141,7 +141,7 @@ describe('ChatMessage image rendering', () => {
     render(<ChatMessage message={{ role: 'assistant', content }} />);
 
     const { fireEvent } = require('@testing-library/react');
-    fireEvent.click(screen.getByRole('button', { name: 'View fullscreen' }));
+    fireEvent.click(screen.getByRole('button', { name: 'View fullscreen: cyberpunk' }));
     expect(screen.getByRole('dialog')).toBeTruthy();
 
     fireEvent.keyDown(window, { key: 'Escape' });
