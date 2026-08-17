@@ -2,12 +2,12 @@ import { useRef, useEffect, useState } from 'react';
 import { Send, Square, ChevronRight, Globe, Gamepad2, Search, Image as ImageIcon, X } from 'lucide-react';
 import { PlusIcon } from './icons';
 
-// Slash commands offered as suggestions when the user types "/".
+// Commands offered as suggestions when the user types "@" or "/".
 // Keep in sync with parseSlashCommand in services/aiService.js.
-const SLASH_COMMANDS = [
+const COMMANDS = [
   {
     command: 'website',
-    label: '/website',
+    label: '@website',
     name: 'Website',
     description: 'Create a website or web page',
     icon: Globe,
@@ -15,7 +15,7 @@ const SLASH_COMMANDS = [
   },
   {
     command: 'game',
-    label: '/game',
+    label: '@game',
     name: 'Game',
     description: 'Create a playable game',
     icon: Gamepad2,
@@ -23,7 +23,7 @@ const SLASH_COMMANDS = [
   },
   {
     command: 'research',
-    label: '/research',
+    label: '@research',
     name: 'Research',
     description: 'Deep research: multi-item web search + PDF report',
     icon: Search,
@@ -31,13 +31,15 @@ const SLASH_COMMANDS = [
   },
   {
     command: 'image',
-    label: '/image',
+    label: '@image',
     name: 'Image',
     description: 'Generate an AI image or artwork',
     icon: ImageIcon,
     placeholder: 'Describe the image you want to generate...'
   }
 ];
+
+const SLASH_COMMANDS = COMMANDS;
 
 const MAX_IMAGE_THUMB_BYTES = 1.5 * 1024 * 1024;
 const MAX_TEXT_CONTENT_BYTES = 200 * 1024;
@@ -84,7 +86,7 @@ export default function ChatInput({
 }) {
   const internalRef = useRef(null);
   const refToUse = textareaRef || internalRef;
-  const [showSuggestions, setShowSuggestions] = useState(() => String(input || '').startsWith('/'));
+  const [showSuggestions, setShowSuggestions] = useState(() => String(input || '').startsWith('@') || String(input || '').startsWith('/'));
   const [activeIndex, setActiveIndex] = useState(0);
   const [activeMode, setActiveMode] = useState(null);
   const suggestionsRef = useRef(null);
@@ -98,16 +100,17 @@ export default function ChatInput({
     }
   }, [input]);
 
-  // Show suggestions when the input starts with "/" (optionally followed by
+  // Show suggestions when the input starts with "@" or "/" (optionally followed by
   // partial command text) and is not streaming.
-  const match = !isStreaming && input.startsWith('/') ? input.match(/^\/([a-z]*)$/i) : null;
+  const match = !isStreaming && (input.startsWith('@') || input.startsWith('/')) ? input.match(/^([@/])([a-z]*)$/i) : null;
+  const prefix = match ? match[1] : '@';
   const show = showSuggestions && match !== null;
-  const typed = match ? match[1].toLowerCase() : '';
+  const typed = match ? match[2].toLowerCase() : '';
   const filtered = typed
-    ? SLASH_COMMANDS.filter((c) => c.command.startsWith(typed))
-    : SLASH_COMMANDS;
+    ? COMMANDS.filter((c) => c.command.startsWith(typed))
+    : COMMANDS;
 
-  const activeModeInfo = SLASH_COMMANDS.find((m) => m.command === activeMode);
+  const activeModeInfo = COMMANDS.find((m) => m.command === activeMode);
 
   // Reset selection whenever the filtered list changes.
   useEffect(() => {
@@ -135,15 +138,14 @@ export default function ChatInput({
   };
 
   const applySuggestion = (command) => {
-    // Fill only the command token (with a trailing space so the user can
-    // continue typing the description) — never example text like
-    // "/game space shooter".
-    setInput(`/${command} `);
+    // Fill the command token with a trailing space
+    const usedPrefix = prefix === '/' ? '/' : '@';
+    setInput(`${usedPrefix}${command} `);
     setShowSuggestions(false);
     setActiveIndex(0);
     if (refToUse.current) {
       refToUse.current.focus();
-      const pos = `/${command} `.length;
+      const pos = `${usedPrefix}${command} `.length;
       refToUse.current.setSelectionRange(pos, pos);
     }
   };
@@ -193,8 +195,8 @@ export default function ChatInput({
     }
     if (!input.trim() && attachments.length === 0 && !activeMode) return;
     let textToSend = input.trim();
-    if (activeMode && !textToSend.startsWith('/')) {
-      textToSend = textToSend ? `/${activeMode} ${textToSend}` : `/${activeMode}`;
+    if (activeMode && !textToSend.startsWith('@') && !textToSend.startsWith('/')) {
+      textToSend = textToSend ? `@${activeMode} ${textToSend}` : `@${activeMode}`;
     }
     if (!textToSend && attachments.length === 0) return;
     onSendMessage(textToSend, attachments);
@@ -270,7 +272,7 @@ export default function ChatInput({
 
       <form onSubmit={handleSubmit} className="input-box">
         {show && filtered.length > 0 && (
-          <div className="slash-suggestions" ref={suggestionsRef} role="listbox" aria-label="Slash commands">
+          <div className="slash-suggestions" ref={suggestionsRef} role="listbox" aria-label="Commands">
             {filtered.map((entry, index) => {
               const Icon = entry.icon;
               return (
@@ -279,7 +281,7 @@ export default function ChatInput({
                   type="button"
                   role="option"
                   aria-selected={index === activeIndex}
-                  aria-label={`/${entry.command}: ${entry.description}`}
+                  aria-label={`${entry.label}: ${entry.description}`}
                   className={`slash-suggestion-item ${index === activeIndex ? 'active' : ''}`}
                   onMouseEnter={() => setActiveIndex(index)}
                   onClick={() => applySuggestion(entry.command)}

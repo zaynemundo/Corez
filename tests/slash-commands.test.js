@@ -72,17 +72,39 @@ describe('parseSlashCommand', () => {
     });
   });
 
+  it('parses @ commands (@website, @game, @research, @image)', () => {
+    expect(parseSlashCommand('@website build me a landing page')).toEqual({
+      command: 'website',
+      rest: 'build me a landing page'
+    });
+    expect(parseSlashCommand('@game make a platformer')).toEqual({
+      command: 'game',
+      rest: 'make a platformer'
+    });
+    expect(parseSlashCommand('@research quantum computing')).toEqual({
+      command: 'research',
+      rest: 'quantum computing'
+    });
+    expect(parseSlashCommand('@image sunset over the mountains')).toEqual({
+      command: 'image',
+      rest: 'sunset over the mountains'
+    });
+  });
+
   it('is case-insensitive', () => {
     expect(parseSlashCommand('/WEBSITE Homepage')).toEqual({ command: 'website', rest: 'Homepage' });
-    expect(parseSlashCommand('/IMAGE Cyberpunk City')).toEqual({ command: 'image', rest: 'Cyberpunk City' });
+    expect(parseSlashCommand('@IMAGE Cyberpunk City')).toEqual({ command: 'image', rest: 'Cyberpunk City' });
   });
 
   it('returns no command for plain prompts or unknown tokens', () => {
     expect(parseSlashCommand('create a website')).toEqual({ command: null, rest: 'create a website' });
     expect(parseSlashCommand('/unknown do something')).toEqual({ command: null, rest: '/unknown do something' });
+    expect(parseSlashCommand('@unknown do something')).toEqual({ command: null, rest: '@unknown do something' });
     expect(isSlashCommand('plain text')).toBe(false);
     expect(isSlashCommand('/research AI safety')).toBe(true);
+    expect(isSlashCommand('@research AI safety')).toBe(true);
     expect(isSlashCommand('/image sunset')).toBe(true);
+    expect(isSlashCommand('@image sunset')).toBe(true);
   });
 });
 

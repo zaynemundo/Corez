@@ -1,13 +1,13 @@
 # New-Corez
 
-## Slash commands
+## Commands
 
-Type a command at the start of any chat message for an explicit, unambiguous intent — the command token is stripped before the prompt reaches any model, so the AI is never confused by it:
+Type a command (`@` or `/`) at the start of any chat message for an explicit, unambiguous intent — the command token is stripped before the prompt reaches any model, so the AI is never confused by it:
 
-- **`/website <description>`** — creates a website or web page (forces the app/website creation path with Awwwards design inspiration).
-- **`/game <description>`** — creates a game (forces the game creation path).
-- **`/research <topic>`** — runs a full research pipeline: searches the web (DuckDuckGo + Wikipedia through the worker), writes a comprehensive report grounded in the real results with cited sources, and delivers it as a downloadable PDF in the preview canvas (`Download .pdf` / `Print / Save as PDF`). The PDF is generated client-side with no API keys; if no reliable results come back, CoreZ reports honestly instead of inventing content.
-- **`/image <prompt>`** — generates an AI image or artwork from the description using the configured image generation model (e.g. FLUX), supporting optional reference images from attachments or conversation history.
+- **`@website <description>`** (or `/website`) — creates a website or web page (forces the app/website creation path with Awwwards design inspiration).
+- **`@game <description>`** (or `/game`) — creates a game (forces the game creation path).
+- **`@research <topic>`** (or `/research`) — runs a full research pipeline: searches the web (DuckDuckGo + Wikipedia through the worker), writes a comprehensive report grounded in the real results with cited sources, and delivers it as a downloadable PDF in the preview canvas (`Download .pdf` / `Print / Save as PDF`). The PDF is generated client-side with no API keys; if no reliable results come back, CoreZ reports honestly instead of inventing content.
+- **`@image <prompt>`** (or `/image`) — generates an AI image or artwork from the description using the configured image generation model (e.g. FLUX), supporting optional reference images from attachments or conversation history.
 
 ## Hosted AI routing
 
