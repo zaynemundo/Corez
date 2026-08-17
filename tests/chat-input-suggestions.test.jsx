@@ -121,70 +121,9 @@ describe('ChatInput @ command suggestions', () => {
     fireEvent.click(screen.getByText('Generate an AI image or artwork'));
     expect(value).toBe('@image ');
   });
-});
 
-describe('ChatInput Quick Action Mode Pills', () => {
-  it('renders creation mode pills (Website, Game, Research, Image)', () => {
+  it('does not render a quick actions bar', () => {
     render(<ChatInput input="" setInput={() => {}} onSendMessage={() => {}} isStreaming={false} />);
-    expect(screen.getByRole('button', { name: 'Mode: Website' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Mode: Game' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Mode: Research' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Mode: Image' })).toBeTruthy();
-  });
-
-  it('activates a mode when clicked and displays the active mode chip', () => {
-    render(<ChatInput input="" setInput={() => {}} onSendMessage={() => {}} isStreaming={false} />);
-    const gamePill = screen.getByRole('button', { name: 'Mode: Game' });
-    fireEvent.click(gamePill);
-
-    expect(screen.getByLabelText('Active mode: Game')).toBeTruthy();
-    expect(screen.getByPlaceholderText('Describe the game you want to build...')).toBeTruthy();
-
-    // Clicking again toggles off
-    fireEvent.click(gamePill);
-    expect(screen.queryByLabelText('Active mode: Game')).toBeNull();
-    expect(screen.getByPlaceholderText('Ask Corez...')).toBeTruthy();
-  });
-
-  it('prefixes the message with the active mode command on submit', () => {
-    let sentMessage = '';
-    let input = 'retro platformer';
-    const setInput = (v) => { input = v; };
-    const utils = render(
-      <ChatInput
-        input={input}
-        setInput={setInput}
-        onSendMessage={(text) => { sentMessage = text; }}
-        isStreaming={false}
-      />
-    );
-
-    const gamePill = screen.getByRole('button', { name: 'Mode: Game' });
-    fireEvent.click(gamePill);
-
-    const form = utils.container.querySelector('form');
-    fireEvent.submit(form);
-
-    expect(sentMessage).toBe('@game retro platformer');
-    expect(input).toBe('');
-  });
-
-  it('clears active mode when clicking the remove button on chip', () => {
-    render(<ChatInput input="" setInput={() => {}} onSendMessage={() => {}} isStreaming={false} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Mode: Image' }));
-    expect(screen.getByLabelText('Active mode: Image')).toBeTruthy();
-
-    fireEvent.click(screen.getByLabelText('Remove Image mode'));
-    expect(screen.queryByLabelText('Active mode: Image')).toBeNull();
-  });
-
-  it('clears active mode on Backspace when input is empty', () => {
-    const utils = render(<ChatInput input="" setInput={() => {}} onSendMessage={() => {}} isStreaming={false} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Mode: Research' }));
-    expect(screen.getByLabelText('Active mode: Research')).toBeTruthy();
-
-    const textarea = utils.container.querySelector('textarea');
-    fireEvent.keyDown(textarea, { key: 'Backspace' });
-    expect(screen.queryByLabelText('Active mode: Research')).toBeNull();
+    expect(screen.queryByRole('toolbar', { name: 'Creation modes' })).toBeNull();
   });
 });

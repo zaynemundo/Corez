@@ -2,7 +2,7 @@ import { useRef, useEffect, useState } from 'react';
 import { Send, Square, ChevronRight, Globe, Gamepad2, Search, Image as ImageIcon, X } from 'lucide-react';
 import { PlusIcon } from './icons';
 
-// Commands offered as suggestions when the user types "@" or "/".
+// Commands offered as suggestions when the user types "@".
 // Keep in sync with parseSlashCommand in services/aiService.js.
 const COMMANDS = [
   {
@@ -38,8 +38,6 @@ const COMMANDS = [
     placeholder: 'Describe the image you want to generate...'
   }
 ];
-
-const SLASH_COMMANDS = COMMANDS;
 
 const MAX_IMAGE_THUMB_BYTES = 1.5 * 1024 * 1024;
 const MAX_TEXT_CONTENT_BYTES = 200 * 1024;
@@ -88,7 +86,6 @@ export default function ChatInput({
   const refToUse = textareaRef || internalRef;
   const [showSuggestions, setShowSuggestions] = useState(() => String(input || '').startsWith('@'));
   const [activeIndex, setActiveIndex] = useState(0);
-  const [activeMode, setActiveMode] = useState(null);
   const suggestionsRef = useRef(null);
   const fileInputRef = useRef(null);
   const [attachments, setAttachments] = useState([]);
@@ -109,8 +106,6 @@ export default function ChatInput({
     ? COMMANDS.filter((c) => c.command.startsWith(typed))
     : COMMANDS;
 
-  const activeModeInfo = COMMANDS.find((m) => m.command === activeMode);
-
   // Reset selection whenever the filtered list changes.
   useEffect(() => {
     setActiveIndex(0);
@@ -128,13 +123,6 @@ export default function ChatInput({
     document.addEventListener('mousedown', onClick);
     return () => document.removeEventListener('mousedown', onClick);
   }, [show, refToUse]);
-
-  const toggleMode = (command) => {
-    setActiveMode(prev => prev === command ? null : command);
-    if (refToUse.current) {
-      refToUse.current.focus();
-    }
-  };
 
   const applySuggestion = (command) => {
     // Fill the @command token with a trailing space
@@ -191,16 +179,11 @@ export default function ChatInput({
       if (onStopMessage) onStopMessage();
       return;
     }
-    if (!input.trim() && attachments.length === 0 && !activeMode) return;
-    let textToSend = input.trim();
-    if (activeMode && !textToSend.startsWith('@')) {
-      textToSend = textToSend ? `@${activeMode} ${textToSend}` : `@${activeMode}`;
-    }
+    const textToSend = input.trim();
     if (!textToSend && attachments.length === 0) return;
     onSendMessage(textToSend, attachments);
     setInput('');
     setAttachments([]);
-    setActiveMode(null);
     setShowSuggestions(false);
     if (refToUse.current) {
       refToUse.current.style.height = 'auto';
@@ -208,11 +191,6 @@ export default function ChatInput({
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Backspace' && !input && activeMode) {
-      e.preventDefault();
-      setActiveMode(null);
-      return;
-    }
     if (show && filtered.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -246,28 +224,6 @@ export default function ChatInput({
 
   return (
     <div className="input-container">
-      <div className="quick-actions-bar" role="toolbar" aria-label="Creation modes">
-        {SLASH_COMMANDS.map((entry) => {
-          const Icon = entry.icon;
-          const isActive = activeMode === entry.command;
-          return (
-            <button
-              key={entry.command}
-              type="button"
-              className={`quick-action-pill ${isActive ? 'active' : ''}`}
-              onClick={() => toggleMode(entry.command)}
-              title={entry.description}
-              aria-pressed={isActive}
-              aria-label={`Mode: ${entry.name}`}
-              disabled={isStreaming}
-            >
-              <Icon size={13} strokeWidth={1.75} className="quick-action-icon" />
-              <span className="quick-action-label">{entry.name}</span>
-            </button>
-          );
-        })}
-      </div>
-
       <form onSubmit={handleSubmit} className="input-box">
         {show && filtered.length > 0 && (
           <div className="slash-suggestions" ref={suggestionsRef} role="listbox" aria-label="Commands">
@@ -330,25 +286,6 @@ export default function ChatInput({
           <PlusIcon size={18} strokeWidth={2} />
         </button>
 
-        {activeModeInfo && (
-          <span className="active-mode-chip" aria-label={`Active mode: ${activeModeInfo.name}`}>
-            <activeModeInfo.icon size={13} strokeWidth={2} className="active-mode-icon" />
-            <span className="active-mode-label">{activeModeInfo.name}</span>
-            <button
-              type="button"
-              className="clear-mode-btn"
-              onClick={() => {
-                setActiveMode(null);
-                if (refToUse.current) refToUse.current.focus();
-              }}
-              aria-label={`Remove ${activeModeInfo.name} mode`}
-              title="Remove mode"
-            >
-              <X size={11} strokeWidth={2} />
-            </button>
-          </span>
-        )}
-
         <input
           ref={fileInputRef}
           type="file"
@@ -367,7 +304,7 @@ export default function ChatInput({
             setShowSuggestions(true);
           }}
           onKeyDown={handleKeyDown}
-          placeholder={isStreaming ? "Corez is generating..." : (activeModeInfo ? activeModeInfo.placeholder : "Ask Corez...")}
+          placeholder={isStreaming ? "Corez is generating..." : "Ask Corez..."}
           aria-label={isStreaming ? "Corez is generating" : "Message Corez"}
           rows={1}
         />
@@ -385,7 +322,7 @@ export default function ChatInput({
             <button
               type="submit"
               className="send-btn"
-              disabled={!input.trim() && attachments.length === 0 && !activeMode}
+              disabled={!input.trim() && attachments.length === 0}
               title="Send Message"
             >
               <Send size={15} strokeWidth={1.5} />
