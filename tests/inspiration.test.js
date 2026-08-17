@@ -93,14 +93,16 @@ describe('Worker inspiration parsing', () => {
     expect(result.category).toBe('portfolio');
   });
 
-  it('visits site pages to extract liveUrl, description, and tags when available', async () => {
+  it('visits site pages to extract liveUrl, description, screenshotUrl, videoUrls, and tags when available', async () => {
     const categoryHtml = '<html><body><a href="/sites/partake-foods">Partake</a></body></html>';
     const siteHtml = `<!DOCTYPE html><html>
       <head>
         <meta name="description" content="Custom storefront &amp; brand experience" />
+        <meta property="og:image" content="https://assets.awwwards.com/awards/submissions/preview.png" />
       </head>
       <body>
         <a href="https://partakefoods.com" class="visit-site">Visit Site</a>
+        <video src="https://assets.awwwards.com/awards/element/animation.mp4"></video>
         <a href="/websites/animation/">Animation</a>
         <a href="/websites/colorful/">Colorful</a>
       </body>
@@ -117,6 +119,8 @@ describe('Worker inspiration parsing', () => {
       url: 'https://www.awwwards.com/sites/partake-foods',
       liveUrl: 'https://partakefoods.com',
       description: 'Custom storefront & brand experience',
+      screenshotUrl: 'https://assets.awwwards.com/awards/submissions/preview.png',
+      videoUrls: ['https://assets.awwwards.com/awards/element/animation.mp4'],
       tags: ['Animation', 'Colorful']
     });
   });

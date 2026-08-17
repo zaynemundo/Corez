@@ -28,6 +28,8 @@ function normalizeSites(payload) {
       };
       if (typeof site.liveUrl === 'string' && site.liveUrl) item.liveUrl = site.liveUrl;
       if (typeof site.description === 'string' && site.description) item.description = site.description;
+      if (typeof site.screenshotUrl === 'string' && site.screenshotUrl) item.screenshotUrl = site.screenshotUrl;
+      if (Array.isArray(site.videoUrls) && site.videoUrls.length > 0) item.videoUrls = site.videoUrls.filter((v) => typeof v === 'string');
       if (Array.isArray(site.tags) && site.tags.length > 0) item.tags = site.tags.filter((t) => typeof t === 'string');
       return item;
     })

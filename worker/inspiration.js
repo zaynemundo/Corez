@@ -94,6 +94,13 @@ export async function fetchSiteDetails(slug, fetchImpl = fetch) {
     const liveMatch = html.match(/<a[^>]+href="(https?:\/\/(?!www\.awwwards\.com)[^"]+)"[^>]*>(?:[^<]*(?:Visit|Live|View|Launch)[^<]*)/i);
     const liveUrl = liveMatch ? liveMatch[1].trim() : '';
 
+    const ogImageMatch = html.match(/<meta\s+(?:name|property)="og:image"\s+content="([^"]+)"/i);
+    const screenshotUrl = ogImageMatch ? ogImageMatch[1].trim() : '';
+
+    const videoMatches = [...html.matchAll(/(?:src|data-src)="([^"]*\/awards\/element\/[^"]+\.mp4)"/gi)]
+      .map((m) => m[1].trim());
+    const videoUrls = [...new Set(videoMatches)].slice(0, 3);
+
     const tagMatches = [...html.matchAll(/href="\/websites\/([a-z0-9-]+)\/"[^>]*>([^<]+)<\/a>/gi)]
       .map((m) => m[2].trim())
       .filter((t) => t && !['Nominees', 'Sites of the Day', 'Honorable Mention', 'Winners'].includes(t));
@@ -102,6 +109,8 @@ export async function fetchSiteDetails(slug, fetchImpl = fetch) {
     return {
       description,
       liveUrl,
+      screenshotUrl: screenshotUrl || undefined,
+      videoUrls: videoUrls.length > 0 ? videoUrls : undefined,
       tags
     };
   } catch {
@@ -111,8 +120,8 @@ export async function fetchSiteDetails(slug, fetchImpl = fetch) {
 
 /**
  * Fetch real award-winning site references for a category.
- * Visits the top sites to extract their design approach, live URL, and tags.
- * Returns { sites: [{ title, url, liveUrl?, description?, tags? }], category, source: 'Awwwards' }.
+ * Visits the top sites to extract their design approach, live URL, screenshots, videos, and tags.
+ * Returns { sites: [{ title, url, liveUrl?, description?, screenshotUrl?, videoUrls?, tags? }], category, source: 'Awwwards' }.
  * Returns an empty sites array on any failure — never fabricated data.
  */
 export async function fetchAwwwardsInspiration(query, fetchImpl = fetch) {
@@ -146,6 +155,8 @@ export async function fetchAwwwardsInspiration(query, fetchImpl = fetch) {
     if (detail) {
       if (detail.liveUrl) siteObj.liveUrl = detail.liveUrl;
       if (detail.description) siteObj.description = detail.description;
+      if (detail.screenshotUrl) siteObj.screenshotUrl = detail.screenshotUrl;
+      if (detail.videoUrls && detail.videoUrls.length > 0) siteObj.videoUrls = detail.videoUrls;
       if (detail.tags && detail.tags.length > 0) siteObj.tags = detail.tags;
     }
     return siteObj;
