@@ -645,6 +645,7 @@ export function ClarificationSuggestions({ options, onSelectOption }) {
   const [isTypingCustom, setIsTypingCustom] = useState(false);
   const [customText, setCustomText] = useState('');
   const inputRef = useRef(null);
+  const displayedOptions = (options || []).slice(0, 3);
 
   useEffect(() => {
     if (isTypingCustom && inputRef.current) {
@@ -678,7 +679,7 @@ export function ClarificationSuggestions({ options, onSelectOption }) {
       </div>
 
       <div className="clarification-suggestions-list" role="listbox" aria-label="Suggestions list">
-        {options.map((opt, idx) => (
+        {displayedOptions.map((opt, idx) => (
           <button
             key={idx}
             type="button"

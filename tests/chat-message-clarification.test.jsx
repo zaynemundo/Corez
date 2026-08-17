@@ -144,6 +144,24 @@ describe('ChatMessage Clarification Suggestions UI', () => {
     expect(screen.getByRole('button', { name: 'Other: Type your own custom response' })).toBeTruthy();
   });
 
+  it('caps suggestion options to maximum of 3 plus 1 typable Other option', () => {
+    const message = {
+      role: 'assistant',
+      content: `What kind of dashboard would you like?
+- **Analytics** — metrics and KPIs
+- **Finance** — ledger and revenue
+- **Operations** — server status and logs
+- **Marketing** — campaign performance
+- **Sales** — pipeline and deals`
+    };
+
+    render(<ChatMessage message={message} />);
+
+    const options = screen.getAllByRole('option');
+    expect(options).toHaveLength(3); // Exactly 3 suggestions
+    expect(screen.getByRole('button', { name: 'Other: Type your own custom response' })).toBeTruthy(); // Plus 1 typable Other
+  });
+
   it('does not render clarification suggestions on user messages', () => {
     const message = {
       role: 'user',
