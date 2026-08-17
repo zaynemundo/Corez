@@ -75,4 +75,37 @@ describe('ChatMessage image rendering', () => {
 
     expect(document.querySelectorAll('.linkedin-icon').length).toBe(0);
   });
+
+  it('opens a fullscreen image modal when clicking an image or fullscreen button', () => {
+    const content = '![a futuristic city](https://example.com/city.png)';
+    render(<ChatMessage message={{ role: 'assistant', content }} />);
+
+    const fullscreenBtn = screen.getByRole('button', { name: 'View fullscreen' });
+    expect(fullscreenBtn).toBeTruthy();
+
+    const { fireEvent } = require('@testing-library/react');
+    fireEvent.click(fullscreenBtn);
+
+    const dialog = screen.getByRole('dialog', { name: 'a futuristic city' });
+    expect(dialog).toBeTruthy();
+    expect(screen.getAllByText('a futuristic city').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByRole('link', { name: 'Download image' })).toHaveAttribute('href', 'https://example.com/city.png');
+
+    // Close button dismisses modal
+    const closeBtn = screen.getByRole('button', { name: 'Close' });
+    fireEvent.click(closeBtn);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('closes fullscreen image modal on Escape key', () => {
+    const content = '![cyberpunk](https://example.com/cyber.png)';
+    render(<ChatMessage message={{ role: 'assistant', content }} />);
+
+    const { fireEvent } = require('@testing-library/react');
+    fireEvent.click(screen.getByRole('button', { name: 'View fullscreen' }));
+    expect(screen.getByRole('dialog')).toBeTruthy();
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
 });

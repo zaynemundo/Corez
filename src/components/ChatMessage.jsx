@@ -9,6 +9,9 @@ import {
   Share2,
   Send,
   Pencil,
+  Maximize2,
+  Minimize2,
+  Download,
   X
 } from 'lucide-react';
 
@@ -479,6 +482,47 @@ function EmailCard({ content, renderBody }) {
 
 export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
   const isUser = message.role === 'user';
+  const [fullscreenImage, setFullscreenImage] = useState(null);
+  const [isNativeFullscreen, setIsNativeFullscreen] = useState(false);
+  const modalRef = useRef(null);
+
+  useEffect(() => {
+    if (!fullscreenImage) return;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (typeof document !== 'undefined' && document.fullscreenElement) {
+          document.exitFullscreen?.().catch?.(() => {});
+        }
+        setFullscreenImage(null);
+      }
+    };
+    const onFullscreenChange = () => {
+      setIsNativeFullscreen(Boolean(typeof document !== 'undefined' && document.fullscreenElement));
+    };
+    window.addEventListener('keydown', onKeyDown);
+    if (typeof document !== 'undefined') {
+      document.addEventListener('fullscreenchange', onFullscreenChange);
+    }
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('fullscreenchange', onFullscreenChange);
+      }
+    };
+  }, [fullscreenImage]);
+
+  const toggleNativeFullscreen = () => {
+    if (typeof document === 'undefined') return;
+    if (!document.fullscreenElement) {
+      if (modalRef.current?.requestFullscreen) {
+        modalRef.current.requestFullscreen().catch(() => {});
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+  };
 
   const renderAttachments = (attachments) => {
     if (!Array.isArray(attachments) || attachments.length === 0) return null;
@@ -511,9 +555,25 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
       // Image token ![alt](url)
       const imgMatch = token.match(/^!\[(.*?)\]\((.*?)\)$/);
       if (imgMatch) {
+        const rawUrl = imgMatch[2];
+        const safeUrl = safeImageUrl(rawUrl);
+        const altText = imgMatch[1] || '';
         return (
-          <span key={i} className="markdown-inline-img-wrapper">
-            <img src={safeImageUrl(imgMatch[2])} alt={imgMatch[1]} className="markdown-inline-img" />
+          <span
+            key={i}
+            className="markdown-inline-img-wrapper"
+            role="button"
+            tabIndex={0}
+            aria-label={`View fullscreen: ${altText || 'image'}`}
+            onClick={() => safeUrl && setFullscreenImage({ url: safeUrl, alt: altText })}
+            onKeyDown={(e) => {
+              if ((e.key === 'Enter' || e.key === ' ') && safeUrl) {
+                e.preventDefault();
+                setFullscreenImage({ url: safeUrl, alt: altText });
+              }
+            }}
+          >
+            <img src={safeUrl} alt={altText} className="markdown-inline-img" />
           </span>
         );
       }
@@ -644,10 +704,42 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
       // Standalone Image ![caption](url)
       const standaloneImgMatch = trimmed.match(/^!\[(.*?)\]\((.*?)\)$/);
       if (standaloneImgMatch) {
+        const rawUrl = standaloneImgMatch[2];
+        const safeUrl = safeImageUrl(rawUrl);
+        const altText = standaloneImgMatch[1] || '';
         elements.push(
           <div key={`img-${i}`} className="markdown-image-wrapper">
-            <img src={safeImageUrl(standaloneImgMatch[2])} alt={standaloneImgMatch[1]} className="markdown-image" />
-            {standaloneImgMatch[1] && <span className="markdown-image-caption">{standaloneImgMatch[1]}</span>}
+            <div
+              className="markdown-image-card"
+              role="button"
+              tabIndex={0}
+              aria-label={`View fullscreen: ${altText || 'image'}`}
+              onClick={() => safeUrl && setFullscreenImage({ url: safeUrl, alt: altText })}
+              onKeyDown={(e) => {
+                if ((e.key === 'Enter' || e.key === ' ') && safeUrl) {
+                  e.preventDefault();
+                  setFullscreenImage({ url: safeUrl, alt: altText });
+                }
+              }}
+            >
+              <img src={safeUrl} alt={altText} className="markdown-image" />
+              <div className="markdown-image-overlay">
+                <button
+                  type="button"
+                  className="image-action-badge"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (safeUrl) setFullscreenImage({ url: safeUrl, alt: altText });
+                  }}
+                  aria-label="View fullscreen"
+                  title="View fullscreen"
+                >
+                  <Maximize2 size={13} strokeWidth={2} />
+                  <span>Fullscreen</span>
+                </button>
+              </div>
+            </div>
+            {altText && <span className="markdown-image-caption">{altText}</span>}
           </div>
         );
         i++;
@@ -850,6 +942,64 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
           <MessageActions content={message.content || ''} />
         )}
       </div>
+
+      {fullscreenImage && (
+        <div
+          ref={modalRef}
+          className="image-fullscreen-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label={fullscreenImage.alt || 'Fullscreen Image Preview'}
+          onClick={() => setFullscreenImage(null)}
+        >
+          <div className="image-fullscreen-backdrop" />
+          <div className="image-fullscreen-container" onClick={(e) => e.stopPropagation()}>
+            <div className="image-fullscreen-toolbar">
+              <span className="image-fullscreen-title">{fullscreenImage.alt || 'Generated Image'}</span>
+              <div className="image-fullscreen-actions">
+                <a
+                  href={fullscreenImage.url}
+                  download={fullscreenImage.alt ? `${fullscreenImage.alt.replace(/[^a-z0-9]/gi, '_')}.png` : 'corez_image.png'}
+                  className="image-fullscreen-btn"
+                  title="Download image"
+                  aria-label="Download image"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Download size={15} strokeWidth={1.75} />
+                  <span>Download</span>
+                </a>
+                <button
+                  type="button"
+                  className="image-fullscreen-btn"
+                  onClick={toggleNativeFullscreen}
+                  title={isNativeFullscreen ? "Exit full screen" : "Enter full screen"}
+                  aria-label={isNativeFullscreen ? "Exit full screen" : "Enter full screen"}
+                >
+                  {isNativeFullscreen ? <Minimize2 size={15} strokeWidth={1.75} /> : <Maximize2 size={15} strokeWidth={1.75} />}
+                </button>
+                <button
+                  type="button"
+                  className="image-fullscreen-btn close-btn"
+                  onClick={() => setFullscreenImage(null)}
+                  title="Close (Esc)"
+                  aria-label="Close"
+                >
+                  <X size={16} strokeWidth={1.75} />
+                </button>
+              </div>
+            </div>
+            <div className="image-fullscreen-content" onClick={() => setFullscreenImage(null)}>
+              <img
+                src={fullscreenImage.url}
+                alt={fullscreenImage.alt || 'Generated Image'}
+                className="image-fullscreen-img"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
