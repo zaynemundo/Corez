@@ -8,26 +8,34 @@ const SLASH_COMMANDS = [
   {
     command: 'website',
     label: '/website',
+    name: 'Website',
     description: 'Create a website or web page',
-    icon: Globe
+    icon: Globe,
+    placeholder: 'Describe the website you want to build...'
   },
   {
     command: 'game',
     label: '/game',
+    name: 'Game',
     description: 'Create a playable game',
-    icon: Gamepad2
+    icon: Gamepad2,
+    placeholder: 'Describe the game you want to build...'
   },
   {
     command: 'research',
     label: '/research',
+    name: 'Research',
     description: 'Deep research: multi-item web search + PDF report',
-    icon: Search
+    icon: Search,
+    placeholder: 'Enter a research topic or question...'
   },
   {
     command: 'image',
     label: '/image',
+    name: 'Image',
     description: 'Generate an AI image or artwork',
-    icon: ImageIcon
+    icon: ImageIcon,
+    placeholder: 'Describe the image you want to generate...'
   }
 ];
 
@@ -78,6 +86,7 @@ export default function ChatInput({
   const refToUse = textareaRef || internalRef;
   const [showSuggestions, setShowSuggestions] = useState(() => String(input || '').startsWith('/'));
   const [activeIndex, setActiveIndex] = useState(0);
+  const [activeMode, setActiveMode] = useState(null);
   const suggestionsRef = useRef(null);
   const fileInputRef = useRef(null);
   const [attachments, setAttachments] = useState([]);
@@ -98,6 +107,8 @@ export default function ChatInput({
     ? SLASH_COMMANDS.filter((c) => c.command.startsWith(typed))
     : SLASH_COMMANDS;
 
+  const activeModeInfo = SLASH_COMMANDS.find((m) => m.command === activeMode);
+
   // Reset selection whenever the filtered list changes.
   useEffect(() => {
     setActiveIndex(0);
@@ -115,6 +126,13 @@ export default function ChatInput({
     document.addEventListener('mousedown', onClick);
     return () => document.removeEventListener('mousedown', onClick);
   }, [show, refToUse]);
+
+  const toggleMode = (command) => {
+    setActiveMode(prev => prev === command ? null : command);
+    if (refToUse.current) {
+      refToUse.current.focus();
+    }
+  };
 
   const applySuggestion = (command) => {
     // Fill only the command token (with a trailing space so the user can
@@ -173,10 +191,16 @@ export default function ChatInput({
       if (onStopMessage) onStopMessage();
       return;
     }
-    if (!input.trim() && attachments.length === 0) return;
-    onSendMessage(input.trim(), attachments);
+    if (!input.trim() && attachments.length === 0 && !activeMode) return;
+    let textToSend = input.trim();
+    if (activeMode && !textToSend.startsWith('/')) {
+      textToSend = textToSend ? `/${activeMode} ${textToSend}` : `/${activeMode}`;
+    }
+    if (!textToSend && attachments.length === 0) return;
+    onSendMessage(textToSend, attachments);
     setInput('');
     setAttachments([]);
+    setActiveMode(null);
     setShowSuggestions(false);
     if (refToUse.current) {
       refToUse.current.style.height = 'auto';
@@ -184,6 +208,11 @@ export default function ChatInput({
   };
 
   const handleKeyDown = (e) => {
+    if (e.key === 'Backspace' && !input && activeMode) {
+      e.preventDefault();
+      setActiveMode(null);
+      return;
+    }
     if (show && filtered.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -216,33 +245,56 @@ export default function ChatInput({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="input-box">
-      {show && filtered.length > 0 && (
-        <div className="slash-suggestions" ref={suggestionsRef} role="listbox" aria-label="Slash commands">
-          {filtered.map((entry, index) => {
-            const Icon = entry.icon;
-            return (
-              <button
-                key={entry.command}
-                type="button"
-                role="option"
-                aria-selected={index === activeIndex}
-                aria-label={`/${entry.command}: ${entry.description}`}
-                className={`slash-suggestion-item ${index === activeIndex ? 'active' : ''}`}
-                onMouseEnter={() => setActiveIndex(index)}
-                onClick={() => applySuggestion(entry.command)}
-              >
-                <span className="slash-suggestion-icon">
-                  <Icon size={15} strokeWidth={1.5} />
-                </span>
-                <span className="slash-suggestion-desc">{entry.description}</span>
-                <ChevronRight size={14} strokeWidth={1.5} className="slash-suggestion-chevron" />
-              </button>
-            );
-          })}
-        </div>
-      )}
-      {attachments.length > 0 && (
+    <div className="input-container">
+      <div className="quick-actions-bar" role="toolbar" aria-label="Creation modes">
+        {SLASH_COMMANDS.map((entry) => {
+          const Icon = entry.icon;
+          const isActive = activeMode === entry.command;
+          return (
+            <button
+              key={entry.command}
+              type="button"
+              className={`quick-action-pill ${isActive ? 'active' : ''}`}
+              onClick={() => toggleMode(entry.command)}
+              title={entry.description}
+              aria-pressed={isActive}
+              aria-label={`Mode: ${entry.name}`}
+              disabled={isStreaming}
+            >
+              <Icon size={13} strokeWidth={1.75} className="quick-action-icon" />
+              <span className="quick-action-label">{entry.name}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <form onSubmit={handleSubmit} className="input-box">
+        {show && filtered.length > 0 && (
+          <div className="slash-suggestions" ref={suggestionsRef} role="listbox" aria-label="Slash commands">
+            {filtered.map((entry, index) => {
+              const Icon = entry.icon;
+              return (
+                <button
+                  key={entry.command}
+                  type="button"
+                  role="option"
+                  aria-selected={index === activeIndex}
+                  aria-label={`/${entry.command}: ${entry.description}`}
+                  className={`slash-suggestion-item ${index === activeIndex ? 'active' : ''}`}
+                  onMouseEnter={() => setActiveIndex(index)}
+                  onClick={() => applySuggestion(entry.command)}
+                >
+                  <span className="slash-suggestion-icon">
+                    <Icon size={15} strokeWidth={1.5} />
+                  </span>
+                  <span className="slash-suggestion-desc">{entry.description}</span>
+                  <ChevronRight size={14} strokeWidth={1.5} className="slash-suggestion-chevron" />
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {attachments.length > 0 && (
           <div className="attachment-chips-bar" aria-label="Attached files">
             {attachments.map((attachment) => (
               <span key={attachment.id} className="attachment-chip">
@@ -266,6 +318,7 @@ export default function ChatInput({
             ))}
           </div>
         )}
+
         <button
           type="button"
           className="attach-btn"
@@ -276,6 +329,26 @@ export default function ChatInput({
         >
           <PlusIcon size={18} strokeWidth={2} />
         </button>
+
+        {activeModeInfo && (
+          <span className="active-mode-chip" aria-label={`Active mode: ${activeModeInfo.name}`}>
+            <activeModeInfo.icon size={13} strokeWidth={2} className="active-mode-icon" />
+            <span className="active-mode-label">{activeModeInfo.name}</span>
+            <button
+              type="button"
+              className="clear-mode-btn"
+              onClick={() => {
+                setActiveMode(null);
+                if (refToUse.current) refToUse.current.focus();
+              }}
+              aria-label={`Remove ${activeModeInfo.name} mode`}
+              title="Remove mode"
+            >
+              <X size={11} strokeWidth={2} />
+            </button>
+          </span>
+        )}
+
         <input
           ref={fileInputRef}
           type="file"
@@ -294,7 +367,7 @@ export default function ChatInput({
             setShowSuggestions(true);
           }}
           onKeyDown={handleKeyDown}
-          placeholder={isStreaming ? "Corez is generating..." : "Ask Corez..."}
+          placeholder={isStreaming ? "Corez is generating..." : (activeModeInfo ? activeModeInfo.placeholder : "Ask Corez...")}
           aria-label={isStreaming ? "Corez is generating" : "Message Corez"}
           rows={1}
         />
@@ -312,13 +385,14 @@ export default function ChatInput({
             <button
               type="submit"
               className="send-btn"
-              disabled={!input.trim() && attachments.length === 0}
+              disabled={!input.trim() && attachments.length === 0 && !activeMode}
               title="Send Message"
             >
               <Send size={15} strokeWidth={1.5} />
             </button>
           )}
         </div>
-    </form>
+      </form>
+    </div>
   );
 }
