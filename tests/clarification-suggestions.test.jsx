@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ClarificationSuggestions } from '../src/components/ChatMessage.jsx';
+import ChatMessage, { ClarificationSuggestions, extractClarificationOptions, stripClarificationOptionLines } from '../src/components/ChatMessage.jsx';
 
 afterEach(() => {
   cleanup();
@@ -87,5 +87,106 @@ describe('ClarificationSuggestions', () => {
     fireEvent.keyDown(input, { key: 'Escape' });
     expect(screen.queryByLabelText('Type your custom response')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Other: Type your own/ })).toBeInTheDocument();
+  });
+});
+
+describe('stripClarificationOptionLines', () => {
+  it('removes extracted bullet options so the card is not duplicated', () => {
+    const content = `I'd be happy to write that email for you! Which direction do you want?
+- **Business / Professional** — a formal email to a client, boss, or partner
+- **Academic** — an email to a professor or school administrator
+- **Job Application / Networking** — a cover-style email or cold outreach
+- **Casual / Personal** — a friendly email to a friend or family member
+Just share the details and I'll draft it right away!`;
+
+    const options = extractClarificationOptions(content);
+    expect(options).toHaveLength(4);
+    const stripped = stripClarificationOptionLines(content, options);
+    expect(stripped).not.toContain('Business / Professional');
+    expect(stripped).not.toContain('Academic');
+    expect(stripped).not.toContain('Job Application');
+    expect(stripped).not.toContain('Casual / Personal');
+    // The question and the closing line survive.
+    expect(stripped).toContain('Which direction do you want?');
+    expect(stripped).toContain("I'll draft it right away!");
+  });
+
+  it('removes numbered options', () => {
+    const content = `What kind of layout would you like for your portfolio?
+1. **Minimalist** — clean typography and lots of whitespace
+2. **Modern Grid** — dynamic cards with hover effects
+3. **Interactive 3D** — WebGL effects and smooth scrolling`;
+    const options = extractClarificationOptions(content);
+    expect(options).toHaveLength(3);
+    const stripped = stripClarificationOptionLines(content, options);
+    expect(stripped).toContain('What kind of layout');
+    expect(stripped).not.toContain('Minimalist');
+    expect(stripped).not.toContain('Modern Grid');
+    expect(stripped).not.toContain('Interactive 3D');
+  });
+
+  it('removes Option A/B/C/D lines', () => {
+    const content = `What's the purpose of this email?
+
+Option A — Requesting something (time off, approval, resources, etc.)
+Option B — Providing an update or status report on a project/task
+Option C — Asking for feedback or scheduling a meeting`;
+    const options = extractClarificationOptions(content);
+    expect(options).toHaveLength(3);
+    const stripped = stripClarificationOptionLines(content, options);
+    expect(stripped).toContain("What's the purpose of this email?");
+    expect(stripped).not.toContain('Option A');
+    expect(stripped).not.toContain('Option B');
+    expect(stripped).not.toContain('Option C');
+  });
+
+  it('removes explicit [option: ...] tags inline', () => {
+    const content = `Please choose one of the following directions:
+[option: Dark Mode Dashboard: dark glassmorphism with real-time charts]
+[option: Light Mode Minimal: clean white editorial aesthetic]`;
+    const options = extractClarificationOptions(content);
+    expect(options).toHaveLength(2);
+    const stripped = stripClarificationOptionLines(content, options);
+    expect(stripped).toContain('Please choose one of the following directions:');
+    expect(stripped).not.toContain('[option:');
+    expect(stripped).not.toContain('Dark Mode Dashboard');
+    expect(stripped).not.toContain('Light Mode Minimal');
+  });
+
+  it('handles separator variants (colon, hyphen) used in the source', () => {
+    const content = `Which style do you want?
+- **Space Shooter**: classic 2D retro arcade action
+- **Platformer** - jump and run with coins`;
+    const options = extractClarificationOptions(content);
+    expect(options).toHaveLength(2);
+    const stripped = stripClarificationOptionLines(content, options);
+    expect(stripped).not.toContain('Space Shooter');
+    expect(stripped).not.toContain('Platformer');
+    expect(stripped).toContain('Which style do you want?');
+  });
+
+  it('leaves content untouched when there are no options', () => {
+    const content = 'Just a normal answer with no options.';
+    expect(stripClarificationOptionLines(content, [])).toBe(content);
+    expect(stripClarificationOptionLines(content, null)).toBe(content);
+    const noQuestion = `Here is a summary:\n- Item 1\n- Item 2`;
+    expect(stripClarificationOptionLines(noQuestion, extractClarificationOptions(noQuestion))).toBe(noQuestion);
+  });
+
+  it('renders the message body without duplicating the card options', () => {
+    const message = {
+      role: 'assistant',
+      content: `I'd be happy to write that email for you! Which direction do you want?
+- **Business / Professional** — a formal email to a client, boss, or partner
+- **Academic** — an email to a professor or school administrator
+- **Casual / Personal** — a friendly email to a friend or family member`
+    };
+    render(<ChatMessage message={message} />);
+    // Each label appears exactly once — in the suggestions card, not the body.
+    expect(screen.getAllByText('Business / Professional')).toHaveLength(1);
+    expect(screen.getAllByText('Academic')).toHaveLength(1);
+    expect(screen.getAllByText('Casual / Personal')).toHaveLength(1);
+    // The question still renders in the body.
+    expect(screen.getByText(/Which direction do you want\?/)).toBeInTheDocument();
   });
 });

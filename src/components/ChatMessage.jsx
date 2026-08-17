@@ -814,6 +814,41 @@ export function extractClarificationOptions(content) {
   return [];
 }
 
+// Removes the lines/tags that were extracted into clarification options so
+// the rendered message body does not duplicate the suggestions card below it.
+// Matching uses the same normalization as extraction (list markers, markdown
+// emphasis, separator variants) so every supported format is deduped exactly.
+export function stripClarificationOptionLines(content, options) {
+  if (!content || !Array.isArray(options) || options.length === 0) return content;
+
+  const normalize = (s) => String(s || '')
+    .replace(/^[-*•]\s+/, '')
+    .replace(/^\d+[.)]\s+/, '')
+    .replace(/^[A-Za-z][.)]\s+/, '')
+    .replace(/^\([A-Za-z0-9]+\)\s+/, '')
+    .replace(/^\[[A-Za-z0-9]+\]\s+/, '')
+    .replace(/[*_~`]/g, '')
+    .replace(/\s*[-:—–]\s+/g, ' — ')
+    .trim();
+
+  const texts = new Set(options.map((o) => normalize(o?.text)).filter(Boolean));
+  if (texts.size === 0) return content;
+
+  // [option: ...] / [choice: ...] tags are removed inline.
+  let cleaned = content.replace(/\[(?:choice|option):\s*([^\]]+)\]/gi, (match, inner) => (
+    texts.has(normalize(inner)) ? '' : match
+  ));
+
+  const lines = cleaned.split('\n');
+  const kept = [];
+  for (const rawLine of lines) {
+    if (texts.has(normalize(rawLine))) continue;
+    kept.push(rawLine);
+  }
+  // Collapse blank-line runs left where the option lines were removed.
+  return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 export function ClarificationSuggestions({ options, onSelectOption }) {
   const [isTypingCustom, setIsTypingCustom] = useState(false);
   const [customText, setCustomText] = useState('');
@@ -1012,6 +1047,12 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onSe
   const [imageCopied, setImageCopied] = useState(false);
   const modalRef = useRef(null);
   const clarificationOptions = !isUser ? extractClarificationOptions(message.content) : [];
+  // The options are shown in the clickable suggestions card below, so the
+  // message body renders without the duplicated option lines (copy/download
+  // still use the full original content).
+  const displayedContent = clarificationOptions.length > 0
+    ? stripClarificationOptionLines(message.content, clarificationOptions)
+    : message.content;
 
   useEffect(() => {
     if (!fullscreenImage) return;
@@ -1502,7 +1543,7 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onSe
       <div className="message-body">
         <div className="message-content">
           {isUser && renderAttachments(message.attachments)}
-          {renderFormattedText(message.content)}
+          {renderFormattedText(displayedContent)}
           {!isUser && clarificationOptions.length > 0 && (
             <ClarificationSuggestions
               options={clarificationOptions}
