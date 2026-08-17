@@ -87,4 +87,46 @@ describe('ChatMessage email card actions', () => {
     expect(document.querySelector('.email-icon-btn')).not.toBeNull();
     expect(screen.queryByRole('button', { name: 'Share email' })).toBeNull();
   });
+
+  it('renders embedded email card inside a message with intro questions and outro text', () => {
+    const complexMessage = `Got it — you want to request time off. To write the email properly, I need a couple of specifics:
+
+What dates do you plan to be out? (start and end dates, or total number of days)
+Is there a reason you want to include? (e.g., vacation, personal, family event — optional but often helpful)
+Do you need to mention anything about coverage? (e.g., "I'll make sure my tasks are covered" or "I've asked [Name] to handle urgent items")
+If you don't have all of that yet, here's a clean template you can fill in right away:
+
+Subject: Time Off Request – [Your Name]
+
+To: [Boss's Name]
+
+Hi [Boss's Name],
+
+I would like to request time off from [start date] to [end date] (or [number] days on [specific date(s)]). The reason is [vacation / personal / family event – optional].
+
+I’ll make sure my current tasks are up to date before I leave, and I can arrange coverage for any urgent items while I'm out.
+
+Please let me know if this works or if you need any more details.
+
+Best regards,
+
+[Your Name]
+
+If you give me the dates and any other details, I’ll tailor it exactly to your situation.`;
+
+    render(<ChatMessage message={{ role: 'assistant', content: complexMessage }} />);
+
+    // Intro text is rendered in markdown
+    expect(screen.getByText(/Got it — you want to request time off/)).toBeInTheDocument();
+    expect(screen.getByText(/If you don't have all of that yet/)).toBeInTheDocument();
+
+    // Email card is rendered
+    expect(document.querySelector('.markdown-email-wrapper')).not.toBeNull();
+    expect(document.querySelector('.email-subject').textContent).toContain('Time Off Request – [Your Name]');
+    expect(document.querySelector('.email-recipients-value').textContent).toContain("[Boss's Name]");
+    expect(screen.getByText(/I would like to request time off/)).toBeInTheDocument();
+
+    // Outro text is rendered
+    expect(screen.getByText(/If you give me the dates and any other details/)).toBeInTheDocument();
+  });
 });

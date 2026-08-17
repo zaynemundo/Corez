@@ -406,7 +406,7 @@ function MessageActions({ content }) {
   );
 }
 
-function parseEmailContent(content) {
+export function parseEmailContent(content) {
   const emailLines = String(content || '').split('\n');
   let subject = '';
   let recipients = '';
@@ -414,15 +414,125 @@ function parseEmailContent(content) {
 
   for (let j = 0; j < emailLines.length; j++) {
     const ln = emailLines[j].trim();
-    const subjectMatch = ln.match(/^Subject:\s*(.*)/i);
-    if (subjectMatch) { subject = subjectMatch[1]; bodyStart = j + 1; continue; }
-    const toMatch = ln.match(/^To:\s*(.*)/i);
-    if (toMatch) { recipients = toMatch[1]; bodyStart = j + 1; continue; }
-    if (!subject && !recipients && ln === '') { bodyStart = j + 1; continue; }
+    const subjectMatch = ln.match(/^(?:\*\*)?Subject:\s*(.*?)(?:\*\*)?$/i);
+    if (subjectMatch) {
+      subject = subjectMatch[1].replace(/\*\*/g, '').trim();
+      bodyStart = j + 1;
+      continue;
+    }
+    const toMatch = ln.match(/^(?:\*\*)?To:\s*(.*?)(?:\*\*)?$/i);
+    if (toMatch) {
+      recipients = toMatch[1].replace(/\*\*/g, '').trim();
+      bodyStart = j + 1;
+      continue;
+    }
+    const fromMatch = ln.match(/^(?:\*\*)?From:\s*(.*?)(?:\*\*)?$/i);
+    if (fromMatch) {
+      bodyStart = j + 1;
+      continue;
+    }
+    const ccMatch = ln.match(/^(?:\*\*)?Cc:\s*(.*?)(?:\*\*)?$/i);
+    if (ccMatch) {
+      bodyStart = j + 1;
+      continue;
+    }
+    const dateMatch = ln.match(/^(?:\*\*)?Date:\s*(.*?)(?:\*\*)?$/i);
+    if (dateMatch) {
+      bodyStart = j + 1;
+      continue;
+    }
+    if (ln === '') {
+      // Check if subsequent lines have another header
+      const nextLines = emailLines.slice(j + 1);
+      const nextHeader = nextLines.find(l => l.trim() !== '');
+      if (nextHeader && /^(?:\*\*)?(?:Subject|To|From|Cc|Bcc|Date):\s*/i.test(nextHeader.trim())) {
+        bodyStart = j + 1;
+        continue;
+      }
+      bodyStart = j + 1;
+      break;
+    }
+    bodyStart = j;
     break;
   }
 
   return { subject, recipients, body: emailLines.slice(bodyStart).join('\n').trim() };
+}
+
+const EMAIL_HEADER_START_RE = /^(?:\*\*)?(?:Subject|To|From):\s*(.+)$/i;
+const EMAIL_SIGNOFF_RE = /^(?:Best regards|Warm regards|Kind regards|With regards|Regards|Sincerely|Thanks|Thank you|Best|Cheers|Respectfully|Yours truly|With appreciation)[,\s]*$/i;
+
+export function splitTextAndEmail(text) {
+  if (!text || typeof text !== 'string') return [{ type: 'text', content: '' }];
+  
+  const lines = text.split('\n');
+  let headerStartIdx = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (EMAIL_HEADER_START_RE.test(trimmed)) {
+      let hasFollowup = false;
+      let checkLimit = Math.min(lines.length, i + 6);
+      for (let k = i + 1; k < checkLimit; k++) {
+        const nextTrimmed = lines[k].trim();
+        if (
+          /^(?:\*\*)?(?:Subject|To|From|Cc|Bcc|Date):\s*/i.test(nextTrimmed) ||
+          /^(?:Hi|Dear|Hello|Hey|Good morning|Good afternoon|To whom|Team)[,\s]/i.test(nextTrimmed) ||
+          (nextTrimmed.length > 0 && !nextTrimmed.startsWith('#'))
+        ) {
+          hasFollowup = true;
+          break;
+        }
+      }
+      if (hasFollowup) {
+        headerStartIdx = i;
+        break;
+      }
+    }
+  }
+
+  if (headerStartIdx === -1) {
+    return [{ type: 'text', content: text }];
+  }
+
+  let emailEndIdx = lines.length;
+  for (let i = headerStartIdx + 1; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (EMAIL_SIGNOFF_RE.test(trimmed)) {
+      let sigEnd = i + 1;
+      while (sigEnd < lines.length && sigEnd <= i + 3 && lines[sigEnd].trim() !== '') {
+        sigEnd++;
+      }
+      emailEndIdx = sigEnd;
+      break;
+    }
+    if (i > headerStartIdx + 3 && (trimmed.startsWith('##') || trimmed === '---' || trimmed === '***')) {
+      emailEndIdx = i;
+      break;
+    }
+  }
+
+  const beforeText = lines.slice(0, headerStartIdx).join('\n').trim();
+  const emailText = lines.slice(headerStartIdx, emailEndIdx).join('\n').trim();
+  const afterText = lines.slice(emailEndIdx).join('\n').trim();
+
+  const parsed = parseEmailContent(emailText);
+  if (!parsed.subject && !parsed.recipients) {
+    return [{ type: 'text', content: text }];
+  }
+  if (!parsed.body || parsed.body.length < 10) {
+    return [{ type: 'text', content: text }];
+  }
+
+  const result = [];
+  if (beforeText) {
+    result.push({ type: 'text', content: beforeText });
+  }
+  result.push({ type: 'email', content: emailText });
+  if (afterText) {
+    result.push({ type: 'text', content: afterText });
+  }
+  return result;
 }
 
 function EmailCard({ content, renderBody }) {
@@ -944,15 +1054,6 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onSe
     return { headers, bodyRows };
   };
 
-  const EMAIL_HEADER_RE = /^(Subject|To|From|Date|Cc|Bcc|Reply-To|Sender):/i;
-  const looksLikeEmail = (text) => {
-    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-    if (lines.length < 2) return false;
-    const subjectIdx = lines.findIndex(l => /^Subject:/i.test(l));
-    if (subjectIdx >= 0 && subjectIdx <= 2) return true;
-    return EMAIL_HEADER_RE.test(lines[0]) && EMAIL_HEADER_RE.test(lines[1] || '');
-  };
-
   const renderTextAndTables = (textBlock) => {
     const lines = textBlock.split('\n');
     const elements = [];
@@ -1198,7 +1299,17 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onSe
       });
     }
 
-    return parts.map((part, idx) => {
+    const expandedParts = [];
+    for (const p of parts) {
+      if (p.type === 'text') {
+        const subParts = splitTextAndEmail(p.content);
+        expandedParts.push(...subParts);
+      } else {
+        expandedParts.push(p);
+      }
+    }
+
+    return expandedParts.map((part, idx) => {
       if (part.type === 'code') {
         if (part.isExecutable && !isUser) {
           return (
@@ -1235,9 +1346,7 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onSe
         return <CodeSnippetBlock key={idx} code={part.code} lang={part.lang} />;
       }
 
-      const isEmail = looksLikeEmail(part.content);
-
-      if (isEmail) {
+      if (part.type === 'email') {
         return (
           <EmailCard key={idx} content={part.content} renderBody={renderTextAndTables} />
         );
