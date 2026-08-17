@@ -13,6 +13,7 @@ import {
   Minimize2,
   Download,
   Sparkles,
+  ChevronRight,
   X
 } from 'lucide-react';
 
@@ -640,6 +641,123 @@ export function extractClarificationOptions(content) {
   return [];
 }
 
+export function ClarificationSuggestions({ options, onSelectOption }) {
+  const [isTypingCustom, setIsTypingCustom] = useState(false);
+  const [customText, setCustomText] = useState('');
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (isTypingCustom && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isTypingCustom]);
+
+  const handleCustomSubmit = (e) => {
+    e?.preventDefault();
+    const trimmed = customText.trim();
+    if (!trimmed) return;
+    if (onSelectOption) {
+      onSelectOption(trimmed);
+    }
+    setCustomText('');
+    setIsTypingCustom(false);
+  };
+
+  const handleCustomKeyDown = (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsTypingCustom(false);
+    }
+  };
+
+  return (
+    <div className="clarification-suggestions-container" role="region" aria-label="Suggested options">
+      <div className="clarification-suggestions-header">
+        <Sparkles size={13} strokeWidth={2} className="clarification-header-icon" />
+        <span>Suggestions</span>
+      </div>
+
+      <div className="clarification-suggestions-list" role="listbox" aria-label="Suggestions list">
+        {options.map((opt, idx) => (
+          <button
+            key={idx}
+            type="button"
+            role="option"
+            className="clarification-suggestion-item"
+            onClick={() => onSelectOption && onSelectOption(opt.text || opt.label)}
+            title={`Select ${opt.label}`}
+            aria-label={`Select: ${opt.label}${opt.detail ? ` - ${opt.detail}` : ''}`}
+          >
+            <span className="clarification-suggestion-icon">
+              <Sparkles size={14} strokeWidth={1.5} />
+            </span>
+            <div className="clarification-suggestion-content">
+              <span className="clarification-suggestion-title">{opt.label}</span>
+              {opt.detail && (
+                <span className="clarification-suggestion-subtext">{opt.detail}</span>
+              )}
+            </div>
+            <ChevronRight size={14} strokeWidth={1.5} className="clarification-suggestion-chevron" />
+          </button>
+        ))}
+
+        {!isTypingCustom ? (
+          <button
+            type="button"
+            className="clarification-suggestion-item clarification-other-item"
+            onClick={() => setIsTypingCustom(true)}
+            title="Type a custom response"
+            aria-label="Other: Type your own custom response"
+          >
+            <span className="clarification-suggestion-icon other-icon">
+              <Pencil size={13} strokeWidth={1.75} />
+            </span>
+            <div className="clarification-suggestion-content">
+              <span className="clarification-suggestion-title">Other...</span>
+              <span className="clarification-suggestion-subtext">Type your own custom response or instructions</span>
+            </div>
+            <ChevronRight size={14} strokeWidth={1.5} className="clarification-suggestion-chevron" />
+          </button>
+        ) : (
+          <form onSubmit={handleCustomSubmit} className="clarification-other-form" aria-label="Custom response form">
+            <input
+              ref={inputRef}
+              type="text"
+              className="clarification-other-input"
+              value={customText}
+              onChange={(e) => setCustomText(e.target.value)}
+              onKeyDown={handleCustomKeyDown}
+              placeholder="Type your custom response..."
+              aria-label="Type your custom response"
+            />
+            <button
+              type="submit"
+              className="clarification-other-send-btn"
+              disabled={!customText.trim()}
+              title="Submit custom response"
+              aria-label="Send custom response"
+            >
+              <Send size={13} strokeWidth={2} />
+            </button>
+            <button
+              type="button"
+              className="clarification-other-cancel-btn"
+              onClick={() => {
+                setIsTypingCustom(false);
+                setCustomText('');
+              }}
+              title="Cancel"
+              aria-label="Cancel"
+            >
+              <X size={13} strokeWidth={2} />
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onSelectOption }) {
   const isUser = message.role === 'user';
   const [fullscreenImage, setFullscreenImage] = useState(null);
@@ -1139,27 +1257,10 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode, onSe
           {isUser && renderAttachments(message.attachments)}
           {renderFormattedText(message.content)}
           {!isUser && clarificationOptions.length > 0 && (
-            <div className="clarification-options-box" role="group" aria-label="Clarification options">
-              <div className="clarification-options-header">
-                <Sparkles size={13} strokeWidth={2} className="clarification-options-icon" />
-                <span>Suggested options:</span>
-              </div>
-              <div className="clarification-options-list">
-                {clarificationOptions.map((opt, oIdx) => (
-                  <button
-                    key={oIdx}
-                    type="button"
-                    className="clarification-option-btn"
-                    onClick={() => onSelectOption && onSelectOption(opt.text || opt.label)}
-                    title={`Select "${opt.label}"`}
-                    aria-label={`Select option: ${opt.label}`}
-                  >
-                    <span className="clarification-option-label">{opt.label}</span>
-                    {opt.detail && <span className="clarification-option-detail">{opt.detail}</span>}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <ClarificationSuggestions
+              options={clarificationOptions}
+              onSelectOption={onSelectOption}
+            />
           )}
         </div>
         {!isUser && (

@@ -65,8 +65,8 @@ export default function App() {
   });
 });
 
-describe('ChatMessage Clarification Chips UI', () => {
-  it('renders clickable clarification option chips and triggers onSelectOption', () => {
+describe('ChatMessage Clarification Suggestions UI', () => {
+  it('renders suggestions list and triggers onSelectOption on option click', () => {
     const onSelectOption = vi.fn();
     const message = {
       role: 'assistant',
@@ -83,10 +83,10 @@ describe('ChatMessage Clarification Chips UI', () => {
       />
     );
 
-    expect(screen.getByRole('group', { name: 'Clarification options' })).toBeTruthy();
-    expect(screen.getByText('Suggested options:')).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Suggested options' })).toBeTruthy();
+    expect(screen.getByText('Suggestions')).toBeTruthy();
 
-    const storeBtn = screen.getByRole('button', { name: 'Select option: E-Commerce Store' });
+    const storeBtn = screen.getByRole('option', { name: 'Select: E-Commerce Store - product catalog, cart and checkout' });
     expect(storeBtn).toBeTruthy();
 
     fireEvent.click(storeBtn);
@@ -94,7 +94,57 @@ describe('ChatMessage Clarification Chips UI', () => {
     expect(onSelectOption).toHaveBeenCalledWith('E-Commerce Store — product catalog, cart and checkout');
   });
 
-  it('does not render clarification options on user messages', () => {
+  it('provides a typable Other option to send custom responses', () => {
+    const onSelectOption = vi.fn();
+    const message = {
+      role: 'assistant',
+      content: `Which style of game do you want?
+- **Space Shooter** — arcade shooter
+- **Platformer** — jump and run`
+    };
+
+    render(
+      <ChatMessage
+        message={message}
+        onSelectOption={onSelectOption}
+      />
+    );
+
+    const otherBtn = screen.getByRole('button', { name: 'Other: Type your own custom response' });
+    expect(otherBtn).toBeTruthy();
+
+    fireEvent.click(otherBtn);
+
+    const input = screen.getByPlaceholderText('Type your custom response...');
+    expect(input).toBeTruthy();
+
+    fireEvent.change(input, { target: { value: 'A 3D flying simulator with cockpit view' } });
+    const sendBtn = screen.getByRole('button', { name: 'Send custom response' });
+    fireEvent.click(sendBtn);
+
+    expect(onSelectOption).toHaveBeenCalledTimes(1);
+    expect(onSelectOption).toHaveBeenCalledWith('A 3D flying simulator with cockpit view');
+  });
+
+  it('allows cancelling the typable Other input', () => {
+    const message = {
+      role: 'assistant',
+      content: `Which game do you want?
+- **Game A** — details
+- **Game B** — details`
+    };
+
+    render(<ChatMessage message={message} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Other: Type your own custom response' }));
+    expect(screen.getByPlaceholderText('Type your custom response...')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByPlaceholderText('Type your custom response...')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Other: Type your own custom response' })).toBeTruthy();
+  });
+
+  it('does not render clarification suggestions on user messages', () => {
     const message = {
       role: 'user',
       content: `What should I build?
@@ -103,6 +153,6 @@ describe('ChatMessage Clarification Chips UI', () => {
     };
 
     render(<ChatMessage message={message} />);
-    expect(screen.queryByRole('group', { name: 'Clarification options' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Suggested options' })).toBeNull();
   });
 });
