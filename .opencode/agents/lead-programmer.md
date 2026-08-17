@@ -1,7 +1,7 @@
 ---
 description: Converts game specs into modular software engineering architecture, task decomposition, and code review coordination.
 mode: subagent
-model: opencode-go/kimi-k3
+model: opencode-go/mimo-v2.5
 temperature: 0.1
 
 permission:

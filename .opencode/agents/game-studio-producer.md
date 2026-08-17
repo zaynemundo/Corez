@@ -1,7 +1,7 @@
 ---
 description: Central Game Studio Producer coordinating departments, workflow state, task graph decomposition, and context isolation.
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: opencode-go/mimo-v2.5
 temperature: 0.2
 
 permission:

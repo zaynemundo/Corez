@@ -34,8 +34,8 @@ verify -> repair -> review).
 
 > **Primary Model Rule**: **DeepSeek V4 Flash** operates as the single primary executor for all code execution, component building, UI work, task graph routing, architectural guidance, code review, and empirical verification.
 
-- `primary-executor` — `deepseek-v4-flash` / `opencode-go` — Coder / Tester: writes code, builds components, edits files, runs tests.
-- `art-director` — `flux-1-schnell` / `cloudflare-workers-ai` — Creative Lead: visual direction, color palettes, background textures, art assets.
+- `primary-executor` — `mimo-v2.5` / `opencode-go` — Coder / Tester: writes code, builds components, edits files, runs tests.
+- `art-director` — `flux-2-klein-4b` / `cloudflare-workers-ai` — Creative Lead: visual direction, color palettes, background textures, art assets.
 
 ### File Ownership & Context Rules
 - **Context Isolation**: Each specialist subagent receives only its specific task brief (`task`, `role`, `goal`, `allowedFiles`, `acceptanceCriteria`). Monolithic conversation history dumps are forbidden.

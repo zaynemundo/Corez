@@ -1,7 +1,7 @@
 ---
 description: Bridges art and code by producing coherent game assets, particle effects, and background graphics.
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: opencode-go/mimo-v2.5
 temperature: 0.2
 
 permission:

@@ -1,7 +1,7 @@
 ---
 description: Establishes visual style, color palettes, sprite directions, environment themes, and UI aesthetic guidelines.
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: cloudflare-workers-ai/@cf/black-forest-labs/flux-2-klein-4b
 temperature: 0.3
 
 permission:
