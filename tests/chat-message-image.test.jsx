@@ -76,15 +76,17 @@ describe('ChatMessage image rendering', () => {
     expect(document.querySelectorAll('.linkedin-icon').length).toBe(0);
   });
 
-  it('opens a fullscreen image modal when clicking an image card', () => {
+  it('opens a fullscreen image modal when clicking an image card or fullscreen badge', () => {
     const content = '![a futuristic city](https://example.com/city.png)';
     render(<ChatMessage message={{ role: 'assistant', content }} />);
 
     const imageCard = screen.getByRole('button', { name: 'View fullscreen: a futuristic city' });
     expect(imageCard).toBeTruthy();
+    const fullscreenBadge = screen.getByRole('button', { name: 'View fullscreen' });
+    expect(fullscreenBadge).toBeTruthy();
 
     const { fireEvent } = require('@testing-library/react');
-    fireEvent.click(imageCard);
+    fireEvent.click(fullscreenBadge);
 
     const dialog = screen.getByRole('dialog', { name: 'a futuristic city' });
     expect(dialog).toBeTruthy();

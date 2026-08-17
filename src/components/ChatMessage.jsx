@@ -9,6 +9,7 @@ import {
   Share2,
   Send,
   Pencil,
+  Maximize2,
   Minimize2,
   Download,
   X
@@ -846,6 +847,21 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
               }}
             >
               <img src={safeUrl} alt={altText} className="markdown-image" />
+              <div className="markdown-image-overlay">
+                <button
+                  type="button"
+                  className="image-action-badge"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (safeUrl) setFullscreenImage({ url: safeUrl, alt: altText });
+                  }}
+                  aria-label="View fullscreen"
+                  title="View fullscreen"
+                >
+                  <Maximize2 size={13} strokeWidth={2} />
+                  <span>Fullscreen</span>
+                </button>
+              </div>
             </div>
             {altText && <span className="markdown-image-caption">{altText}</span>}
           </div>
