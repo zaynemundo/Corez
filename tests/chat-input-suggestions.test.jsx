@@ -27,7 +27,7 @@ function typeInto(test, text) {
   test.rerender();
 }
 
-describe('ChatInput @ and / command suggestions', () => {
+describe('ChatInput @ command suggestions', () => {
   it('shows all suggestions when the user types "@"', () => {
     const t = setup();
     typeInto(t, '@');
@@ -37,13 +37,13 @@ describe('ChatInput @ and / command suggestions', () => {
     expect(screen.getByText('Generate an AI image or artwork')).toBeTruthy();
   });
 
-  it('shows all suggestions when the user types "/"', () => {
+  it('shows no suggestions when the user types "/"', () => {
     const t = setup();
     typeInto(t, '/');
-    expect(screen.getByText('Create a website or web page')).toBeTruthy();
-    expect(screen.getByText('Create a playable game')).toBeTruthy();
-    expect(screen.getByText('Deep research: multi-item web search + PDF report')).toBeTruthy();
-    expect(screen.getByText('Generate an AI image or artwork')).toBeTruthy();
+    expect(screen.queryByText('Create a website or web page')).toBeNull();
+    expect(screen.queryByText('Create a playable game')).toBeNull();
+    expect(screen.queryByText('Deep research: multi-item web search + PDF report')).toBeNull();
+    expect(screen.queryByText('Generate an AI image or artwork')).toBeNull();
   });
 
   it('filters suggestions by the typed @ prefix', () => {

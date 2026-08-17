@@ -398,7 +398,7 @@ export default function App() {
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
-    const isCreationIntent = /^\s*[/@](game|website|app)\b/i.test(prompt)
+    const isCreationIntent = /^\s*@(game|website|app)\b/i.test(prompt)
       || /\b(build|create|make|generate|design|develop|code)\b.{0,80}\b(game|app|website|tool|dashboard|calculator|canvas|platformer|pong|shooter|snake|rpg|3d)\b/i.test(prompt);
 
     if (isCreationIntent) {

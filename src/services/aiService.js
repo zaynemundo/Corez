@@ -1242,17 +1242,17 @@ function synthesizeCustomApp() {
 // left to the model's own knowledge.
 // Slash commands typed in the chat box give CoreZ an explicit, unambiguous
 // intent — the AI is never asked to guess. The command token is stripped
-// Explicit commands (@website, @game, @research, @image, or slash-prefixed /...)
+// Explicit commands (@website, @game, @research, @image)
 // The command token is stripped before the prompt reaches any model, so the
 // model sees only the clean request.
-const SLASH_COMMANDS = new Set(['website', 'game', 'research', 'image']);
+const AT_COMMANDS = new Set(['website', 'game', 'research', 'image']);
 
 export function parseSlashCommand(prompt) {
   const text = String(prompt || '').trim();
-  const match = text.match(/^[/@]([a-z]+)\b/i);
+  const match = text.match(/^@([a-z]+)\b/i);
   if (!match) return { command: null, rest: text };
   const command = match[1].toLowerCase();
-  if (!SLASH_COMMANDS.has(command)) return { command: null, rest: text };
+  if (!AT_COMMANDS.has(command)) return { command: null, rest: text };
   return { command, rest: text.slice(match[0].length).trim() };
 }
 
@@ -1981,7 +1981,7 @@ export function isExplicitImageRequest(prompt) {
   const clean = String(prompt || '').trim();
   if (!clean) return false;
   const lower = clean.toLowerCase();
-  if (lower.startsWith('image:') || lower.startsWith('flux:') || lower.startsWith('/image') || lower.startsWith('@image')) return true;
+  if (lower.startsWith('image:') || lower.startsWith('flux:') || lower.startsWith('@image')) return true;
   if (IMAGE_PATTERNS.test(clean)) return true;
   try {
     const fine = classifyIntentNew(clean);
@@ -1993,7 +1993,7 @@ export function isExplicitImageRequest(prompt) {
 }
 
 export async function generateAIResponse(prompt, history = [], signal = null, onDelta = null, onPhase = null, onClear = null) {
-  // Explicit slash commands first: /website, /game, /research, /image. The command
+  // Explicit commands first: @website, @game, @research, @image. The command
   // token is stripped before any model sees the prompt, so the AI is never
   // confused by it.
   const { command, rest } = parseSlashCommand(prompt);
@@ -2008,7 +2008,7 @@ export async function generateAIResponse(prompt, history = [], signal = null, on
   if (!cleanPrompt) cleanPrompt = command === 'game' ? 'Build a game' : 'Build a website';
   const intent = analyzePublicUserIntent(cleanPrompt);
 
-  // /website and /game force the exact intent the user asked for instead of
+  // @website and @game force the exact intent the user asked for instead of
   // letting the classifier guess.
   if (command === 'website') {
     intent.type = 'app';

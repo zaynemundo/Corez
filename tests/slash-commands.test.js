@@ -53,26 +53,7 @@ describe('deep research source aggregation', () => {
 });
 
 describe('parseSlashCommand', () => {
-  it('parses known commands and strips the token', () => {
-    expect(parseSlashCommand('/website build me a landing page')).toEqual({
-      command: 'website',
-      rest: 'build me a landing page'
-    });
-    expect(parseSlashCommand('/game make a platformer')).toEqual({
-      command: 'game',
-      rest: 'make a platformer'
-    });
-    expect(parseSlashCommand('/research quantum computing')).toEqual({
-      command: 'research',
-      rest: 'quantum computing'
-    });
-    expect(parseSlashCommand('/image sunset over the mountains')).toEqual({
-      command: 'image',
-      rest: 'sunset over the mountains'
-    });
-  });
-
-  it('parses @ commands (@website, @game, @research, @image)', () => {
+  it('parses @ commands (@website, @game, @research, @image) and strips the token', () => {
     expect(parseSlashCommand('@website build me a landing page')).toEqual({
       command: 'website',
       rest: 'build me a landing page'
@@ -92,29 +73,32 @@ describe('parseSlashCommand', () => {
   });
 
   it('is case-insensitive', () => {
-    expect(parseSlashCommand('/WEBSITE Homepage')).toEqual({ command: 'website', rest: 'Homepage' });
+    expect(parseSlashCommand('@WEBSITE Homepage')).toEqual({ command: 'website', rest: 'Homepage' });
     expect(parseSlashCommand('@IMAGE Cyberpunk City')).toEqual({ command: 'image', rest: 'Cyberpunk City' });
   });
 
-  it('returns no command for plain prompts or unknown tokens', () => {
+  it('returns no command for slash commands, plain prompts or unknown tokens', () => {
+    expect(parseSlashCommand('/website build me a landing page')).toEqual({ command: null, rest: '/website build me a landing page' });
+    expect(parseSlashCommand('/game make a platformer')).toEqual({ command: null, rest: '/game make a platformer' });
+    expect(parseSlashCommand('/research quantum computing')).toEqual({ command: null, rest: '/research quantum computing' });
+    expect(parseSlashCommand('/image sunset')).toEqual({ command: null, rest: '/image sunset' });
     expect(parseSlashCommand('create a website')).toEqual({ command: null, rest: 'create a website' });
-    expect(parseSlashCommand('/unknown do something')).toEqual({ command: null, rest: '/unknown do something' });
     expect(parseSlashCommand('@unknown do something')).toEqual({ command: null, rest: '@unknown do something' });
     expect(isSlashCommand('plain text')).toBe(false);
-    expect(isSlashCommand('/research AI safety')).toBe(true);
+    expect(isSlashCommand('/research AI safety')).toBe(false);
     expect(isSlashCommand('@research AI safety')).toBe(true);
-    expect(isSlashCommand('/image sunset')).toBe(true);
+    expect(isSlashCommand('/image sunset')).toBe(false);
     expect(isSlashCommand('@image sunset')).toBe(true);
   });
 });
 
-describe('/website and /game routing', () => {
-  it('forces the app intent and sends a clean prompt for /website', async () => {
+describe('@website and @game routing', () => {
+  it('forces the app intent and sends a clean prompt for @website', async () => {
     const fetchMock = vi.fn(async (url, init) => {
       if (url === '/api/ai') {
         const payload = JSON.parse(init.body);
-        // The model receives the clean prompt, never the slash token.
-        expect(payload.prompt).not.toContain('/website');
+        // The model receives the clean prompt, never the @ token.
+        expect(payload.prompt).not.toContain('@website');
         expect(payload.prompt).toContain('Build a website');
         expect(payload.intent.type).toBe('app');
         return Response.json({ content: '```html\n<!DOCTYPE html><html><body><h1>Site</h1></body></html>\n```' });
@@ -126,23 +110,23 @@ describe('/website and /game routing', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    const response = await generateAIResponse('/website premium headphones store', []);
+    const response = await generateAIResponse('@website premium headphones store', []);
     expect(response).toContain('<!DOCTYPE html>');
     vi.unstubAllGlobals();
   });
 
-  it('forces the game intent for /game', async () => {
+  it('forces the game intent for @game', async () => {
     const fetchMock = vi.fn(async (url, init) => {
       if (url === '/api/ai') {
         const payload = JSON.parse(init.body);
         expect(payload.prompt).toContain('Build a game');
-        expect(payload.prompt).not.toContain('/game');
+        expect(payload.prompt).not.toContain('@game');
         expect(payload.intent.type).toBe('app');
         expect(payload.intent.primaryIntent).toBe('game_creation');
         // Game requests run through the agentic creation harness.
         expect(payload.harness).toBe(true);
         // The skill resolver must select the game-development skill for
-        // /game so the model receives its instructions (direct route and
+        // @game so the model receives its instructions (direct route and
         // swarm route).
         expect(Array.isArray(payload.skills)).toBe(true);
         expect(payload.skills.some((s) => s.id === 'game-development')).toBe(true);
@@ -158,13 +142,13 @@ describe('/website and /game routing', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    const response = await generateAIResponse('/game space shooter', [], null, () => {});
+    const response = await generateAIResponse('@game space shooter', [], null, () => {});
     expect(response).toContain('<canvas>');
     vi.unstubAllGlobals();
   });
 });
 
-describe('/research command', () => {
+describe('@research command', () => {
   it('runs the deep research pipeline: outline, per-item search, synthesis and review', async () => {
     const fetchMock = vi.fn(async (url, init) => {
       if (url === '/api/search') {
@@ -219,7 +203,7 @@ describe('/research command', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    const response = await generateAIResponse('/research quantum computing', []);
+    const response = await generateAIResponse('@research quantum computing', []);
     expect(response).toContain('Download .pdf');
     expect(response).toContain('```html');
     expect(response).toContain('deep-researched across');
@@ -246,7 +230,7 @@ describe('/research command', () => {
       }
       throw new Error('unexpected');
     });
-    const response = await generateAIResponse('/research quantum computing', []);
+    const response = await generateAIResponse('@research quantum computing', []);
     expect(response).toContain('Download .pdf');
     // Real sources are presented directly — nothing is fabricated.
     expect(response).toContain('presented directly');
@@ -261,32 +245,32 @@ describe('/research command', () => {
       }
       throw new Error('unexpected');
     });
-    const response = await generateAIResponse('/research zzzzqqq', []);
+    const response = await generateAIResponse('@research zzzzqqq', []);
     expect(response).toMatch(/couldn't research|no reliable results/i);
     expect(response).not.toContain('Download .pdf');
     vi.unstubAllGlobals();
   });
 
   it('asks for a topic when none is given', async () => {
-    const response = await generateAIResponse('/research', []);
+    const response = await generateAIResponse('@research', []);
     expect(response).toMatch(/what to research/i);
   });
 });
 
-describe('/image command', () => {
+describe('@image command', () => {
   it('generates an image and returns markdown with clean prompt', async () => {
     const fetchMock = vi.fn(async (url, init) => {
       if (url === '/api/image') {
         const payload = JSON.parse(init.body);
         expect(payload.prompt).toBe('a futuristic neon city at night');
-        expect(payload.prompt).not.toContain('/image');
+        expect(payload.prompt).not.toContain('@image');
         return Response.json({ image: 'https://example.com/neon-city.png' });
       }
       throw new Error(`Unexpected fetch: ${url}`);
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    const response = await generateAIResponse('/image a futuristic neon city at night', []);
+    const response = await generateAIResponse('@image a futuristic neon city at night', []);
     expect(response).toBe('![](https://example.com/neon-city.png)');
     expect(fetchMock).toHaveBeenCalledWith('/api/image', expect.anything());
     vi.unstubAllGlobals();
@@ -309,7 +293,7 @@ describe('/image command', () => {
       { role: 'assistant', content: 'Received!' }
     ];
 
-    const response = await generateAIResponse('/image render this in oil painting style', history);
+    const response = await generateAIResponse('@image render this in oil painting style', history);
     expect(response).toBe('![](data:image/png;base64,RESULT)');
     expect(capturedBody).not.toBeNull();
     expect(capturedBody.prompt).toBe('render this in oil painting style');
@@ -318,7 +302,7 @@ describe('/image command', () => {
   });
 
   it('asks for an image description when none is given', async () => {
-    const response = await generateAIResponse('/image', []);
+    const response = await generateAIResponse('@image', []);
     expect(response).toMatch(/what image to generate/i);
   });
 
@@ -327,7 +311,7 @@ describe('/image command', () => {
     vi.stubGlobal('fetch', fetchMock);
     vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    const response = await generateAIResponse('/image a magical forest', []);
+    const response = await generateAIResponse('@image a magical forest', []);
     expect(response).toContain('data:image/svg+xml');
     expect(decodeURIComponent(response)).toContain('LOCAL IMAGE PLACEHOLDER');
     vi.unstubAllGlobals();

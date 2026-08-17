@@ -86,7 +86,7 @@ export default function ChatInput({
 }) {
   const internalRef = useRef(null);
   const refToUse = textareaRef || internalRef;
-  const [showSuggestions, setShowSuggestions] = useState(() => String(input || '').startsWith('@') || String(input || '').startsWith('/'));
+  const [showSuggestions, setShowSuggestions] = useState(() => String(input || '').startsWith('@'));
   const [activeIndex, setActiveIndex] = useState(0);
   const [activeMode, setActiveMode] = useState(null);
   const suggestionsRef = useRef(null);
@@ -100,12 +100,11 @@ export default function ChatInput({
     }
   }, [input]);
 
-  // Show suggestions when the input starts with "@" or "/" (optionally followed by
+  // Show suggestions when the input starts with "@" (optionally followed by
   // partial command text) and is not streaming.
-  const match = !isStreaming && (input.startsWith('@') || input.startsWith('/')) ? input.match(/^([@/])([a-z]*)$/i) : null;
-  const prefix = match ? match[1] : '@';
+  const match = !isStreaming && input.startsWith('@') ? input.match(/^@([a-z]*)$/i) : null;
   const show = showSuggestions && match !== null;
-  const typed = match ? match[2].toLowerCase() : '';
+  const typed = match ? match[1].toLowerCase() : '';
   const filtered = typed
     ? COMMANDS.filter((c) => c.command.startsWith(typed))
     : COMMANDS;
@@ -138,14 +137,13 @@ export default function ChatInput({
   };
 
   const applySuggestion = (command) => {
-    // Fill the command token with a trailing space
-    const usedPrefix = prefix === '/' ? '/' : '@';
-    setInput(`${usedPrefix}${command} `);
+    // Fill the @command token with a trailing space
+    setInput(`@${command} `);
     setShowSuggestions(false);
     setActiveIndex(0);
     if (refToUse.current) {
       refToUse.current.focus();
-      const pos = `${usedPrefix}${command} `.length;
+      const pos = `@${command} `.length;
       refToUse.current.setSelectionRange(pos, pos);
     }
   };
@@ -195,7 +193,7 @@ export default function ChatInput({
     }
     if (!input.trim() && attachments.length === 0 && !activeMode) return;
     let textToSend = input.trim();
-    if (activeMode && !textToSend.startsWith('@') && !textToSend.startsWith('/')) {
+    if (activeMode && !textToSend.startsWith('@')) {
       textToSend = textToSend ? `@${activeMode} ${textToSend}` : `@${activeMode}`;
     }
     if (!textToSend && attachments.length === 0) return;
