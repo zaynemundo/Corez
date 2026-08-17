@@ -684,7 +684,7 @@ export function extractClarificationOptions(content) {
   }
 
   // Check if content poses a question or asks to choose
-  const hasQuestion = /\?|which\s+(would|option|direction|do\s+you)|what\s+(type|kind|style|features?)|choose\s+(from|one|between)|let\s+me\s+know|select\s+an?\s+option/i.test(content);
+  const hasQuestion = /\?|which\s+(would|option|direction|do\s+you)|what\s+(type|kind|style|features?|is|'s|purpose)|choose\s+(from|one|between)|let\s+me\s+know|select\s+an?\s+option|options?:/i.test(content);
   if (!hasQuestion) return [];
 
   // Match explicit choices: [choice: ...] or [option: ...]
@@ -692,7 +692,7 @@ export function extractClarificationOptions(content) {
   if (explicitMatches.length >= 2) {
     return explicitMatches.map((m) => {
       const full = m[1].trim();
-      const parts = full.split(/[:—–-]\s+/);
+      const parts = full.split(/[-:—–]\s+/);
       return {
         label: parts[0].trim(),
         detail: parts.slice(1).join(' - ').trim(),
@@ -706,46 +706,77 @@ export function extractClarificationOptions(content) {
   let inOptionZone = false;
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (line.includes('?') || /\b(choose|options?|directions?|preferences?|would you prefer|which of these|here are (?:a few|some) options)\b/i.test(line)) {
+    const rawLine = lines[i];
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    const isOptionLine =
+      /^[-*•]\s+/i.test(line) ||
+      /^\d+[.)]\s+/i.test(line) ||
+      /^[A-Za-z][.)]\s+/i.test(line) ||
+      /^\([A-Za-z0-9]+\)\s+/i.test(line) ||
+      /^\[[A-Za-z0-9]+\]\s+/i.test(line) ||
+      /^Option\s+[A-Za-z0-9]+\b/i.test(line);
+
+    if (!isOptionLine && (
+      line.includes('?') ||
+      /^(?:which|what|choose|select|here are|let me know|please select|purpose)\b/i.test(line) ||
+      /:\s*$/i.test(line)
+    )) {
       inOptionZone = true;
       continue;
     }
 
-    if (inOptionZone) {
-      const listMatch = line.match(/^[-*•]\s+(.+)$/) || line.match(/^\d+\.\s+(.+)$/);
-      if (listMatch) {
-        const itemText = listMatch[1].trim();
-        const boldMatch = itemText.match(/^\*\*([^*]+)\*\*(?:\s*[:—–-]\s*(.*))?$/);
-        if (boldMatch) {
+    if (inOptionZone && isOptionLine) {
+      // Strip leading list marker (- / * / 1. / A. / (A) / [A])
+      const stripped = line
+        .replace(/^[-*•]\s+/, '')
+        .replace(/^\d+[.)]\s+/, '')
+        .replace(/^[A-Za-z][.)]\s+/, '')
+        .replace(/^\([A-Za-z0-9]+\)\s+/, '')
+        .replace(/^\[[A-Za-z0-9]+\]\s+/, '');
+
+      const boldMatch = stripped.match(/^\*\*([^*]+)\*\*(?:\s*[-:—–]\s*(.*))?$/);
+      if (boldMatch) {
+        const lbl = boldMatch[1].trim();
+        const dtl = (boldMatch[2] || '').trim();
+        options.push({
+          label: lbl,
+          detail: dtl,
+          text: dtl ? `${lbl} — ${dtl}` : lbl
+        });
+      } else {
+        const clean = stripped.replace(/[*_~`]/g, '').trim();
+        const sepMatch = clean.match(/^((?:Option\s+[A-Za-z0-9]+|[A-Za-z0-9\s]+?))\s*[-:—–]\s*(.+)$/i);
+        if (sepMatch && sepMatch[1].length <= 50) {
           options.push({
-            label: boldMatch[1].trim(),
-            detail: (boldMatch[2] || '').trim(),
-            text: itemText.replace(/\*\*/g, '')
+            label: sepMatch[1].trim(),
+            detail: sepMatch[2].trim(),
+            text: clean
           });
         } else {
-          const split = itemText.split(/[:—–]\s+/);
-          if (split.length > 1 && split[0].length <= 40) {
+          const parenMatch = clean.match(/^([^(]+)\s*\((.+)\)$/);
+          if (parenMatch && parenMatch[1].length <= 40) {
             options.push({
-              label: split[0].replace(/\*\*/g, '').trim(),
-              detail: split.slice(1).join(' - ').replace(/\*\*/g, '').trim(),
-              text: itemText.replace(/\*\*/g, '')
+              label: parenMatch[1].trim(),
+              detail: `(${parenMatch[2].trim()})`,
+              text: clean
             });
           } else {
             options.push({
-              label: itemText.replace(/\*\*/g, '').trim(),
+              label: clean,
               detail: '',
-              text: itemText.replace(/\*\*/g, '')
+              text: clean
             });
           }
         }
-      } else if (line && options.length > 0 && !line.startsWith('#')) {
-        break;
       }
+    } else if (inOptionZone && options.length > 0 && !line.startsWith('#')) {
+      break;
     }
   }
 
-  if (options.length >= 2 && options.length <= 6) {
+  if (options.length >= 2 && options.length <= 8) {
     return options;
   }
   return [];

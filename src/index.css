@@ -956,12 +956,11 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .clarification-suggestion-subtext {
-  font-size: 0.75rem;
+  font-size: 0.775rem;
   color: var(--text-secondary);
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.35;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .clarification-suggestion-chevron {

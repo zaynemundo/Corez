@@ -47,6 +47,23 @@ describe('extractClarificationOptions', () => {
     expect(options[1].label).toBe('Light Mode Minimal');
   });
 
+  it('extracts Option A/B/C/D formats without bullet prefixes', () => {
+    const text = `What's the purpose of this email?
+
+Option A — Requesting something (time off, approval, resources, etc.)
+Option B — Providing an update or status report on a project/task
+Option C — Asking for feedback or scheduling a meeting
+Option D — Something else (you can describe it in one line)`;
+
+    const options = extractClarificationOptions(text);
+    expect(options).toHaveLength(4);
+    expect(options[0].label).toBe('Option A');
+    expect(options[0].detail).toBe('Requesting something (time off, approval, resources, etc.)');
+    expect(options[1].label).toBe('Option B');
+    expect(options[2].label).toBe('Option C');
+    expect(options[3].label).toBe('Option D');
+  });
+
   it('returns empty array when content contains a full code build or has no question', () => {
     const codeResponse = `Here is your code:
 \`\`\`jsx
