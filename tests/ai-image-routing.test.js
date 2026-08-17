@@ -92,6 +92,7 @@ describe('image request routing', () => {
       ['create a logo for my startup', true],
       ['make an image of a castle for my game', true],
       ['i want an image of a sunset', true],
+      ['/image a futuristic hovercraft', true],
       ['what is a black rose', false],
       ['explain how image generation works', false],
       ['write an email about images', false],

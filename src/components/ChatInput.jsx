@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
-import { Send, Square, ChevronRight, Globe, Gamepad2, Search, X } from 'lucide-react';
+import { Send, Square, ChevronRight, Globe, Gamepad2, Search, Image as ImageIcon, X } from 'lucide-react';
 import { PlusIcon } from './icons';
 
 // Slash commands offered as suggestions when the user types "/".
@@ -22,6 +22,12 @@ const SLASH_COMMANDS = [
     label: '/research',
     description: 'Deep research: multi-item web search + PDF report',
     icon: Search
+  },
+  {
+    command: 'image',
+    label: '/image',
+    description: 'Generate an AI image or artwork',
+    icon: ImageIcon
   }
 ];
 

@@ -34,6 +34,7 @@ describe('ChatInput slash-command suggestions', () => {
     expect(screen.getByText('Create a website or web page')).toBeTruthy();
     expect(screen.getByText('Create a playable game')).toBeTruthy();
     expect(screen.getByText('Deep research: multi-item web search + PDF report')).toBeTruthy();
+    expect(screen.getByText('Generate an AI image or artwork')).toBeTruthy();
   });
 
   it('filters suggestions by the typed prefix', () => {
@@ -42,12 +43,23 @@ describe('ChatInput slash-command suggestions', () => {
     expect(screen.getByText('Create a playable game')).toBeTruthy();
     expect(screen.queryByText('Create a website or web page')).toBeNull();
     expect(screen.queryByText('Full research with web search + PDF report')).toBeNull();
+    expect(screen.queryByText('Generate an AI image or artwork')).toBeNull();
+  });
+
+  it('filters suggestions for /image prefix', () => {
+    const t = setup();
+    typeInto(t, '/im');
+    expect(screen.getByText('Generate an AI image or artwork')).toBeTruthy();
+    expect(screen.queryByText('Create a website or web page')).toBeNull();
+    expect(screen.queryByText('Create a playable game')).toBeNull();
+    expect(screen.queryByText('Deep research: multi-item web search + PDF report')).toBeNull();
   });
 
   it('shows no suggestions for plain text', () => {
     const t = setup();
     typeInto(t, 'build me a website');
     expect(screen.queryByText('Create a website or web page')).toBeNull();
+    expect(screen.queryByText('Generate an AI image or artwork')).toBeNull();
   });
 
   it('selects a suggestion with Enter and fills only the command token', () => {
@@ -88,5 +100,16 @@ describe('ChatInput slash-command suggestions', () => {
     utils.rerender(<ChatInput input={value} setInput={setter} onSendMessage={() => {}} isStreaming={false} />);
     fireEvent.click(screen.getByText('Deep research: multi-item web search + PDF report'));
     expect(value).toBe('/research ');
+  });
+
+  it('selects the image suggestion on click', () => {
+    let value = '/';
+    const setter = (v) => { value = v; };
+    const utils = render(<ChatInput input={value} setInput={setter} onSendMessage={() => {}} isStreaming={false} />);
+    const textarea = utils.container.querySelector('textarea');
+    fireEvent.change(textarea, { target: { value: '/' } });
+    utils.rerender(<ChatInput input={value} setInput={setter} onSendMessage={() => {}} isStreaming={false} />);
+    fireEvent.click(screen.getByText('Generate an AI image or artwork'));
+    expect(value).toBe('/image ');
   });
 });

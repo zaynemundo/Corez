@@ -66,10 +66,15 @@ describe('parseSlashCommand', () => {
       command: 'research',
       rest: 'quantum computing'
     });
+    expect(parseSlashCommand('/image sunset over the mountains')).toEqual({
+      command: 'image',
+      rest: 'sunset over the mountains'
+    });
   });
 
   it('is case-insensitive', () => {
     expect(parseSlashCommand('/WEBSITE Homepage')).toEqual({ command: 'website', rest: 'Homepage' });
+    expect(parseSlashCommand('/IMAGE Cyberpunk City')).toEqual({ command: 'image', rest: 'Cyberpunk City' });
   });
 
   it('returns no command for plain prompts or unknown tokens', () => {
@@ -77,6 +82,7 @@ describe('parseSlashCommand', () => {
     expect(parseSlashCommand('/unknown do something')).toEqual({ command: null, rest: '/unknown do something' });
     expect(isSlashCommand('plain text')).toBe(false);
     expect(isSlashCommand('/research AI safety')).toBe(true);
+    expect(isSlashCommand('/image sunset')).toBe(true);
   });
 });
 
@@ -242,6 +248,67 @@ describe('/research command', () => {
   it('asks for a topic when none is given', async () => {
     const response = await generateAIResponse('/research', []);
     expect(response).toMatch(/what to research/i);
+  });
+});
+
+describe('/image command', () => {
+  it('generates an image and returns markdown with clean prompt', async () => {
+    const fetchMock = vi.fn(async (url, init) => {
+      if (url === '/api/image') {
+        const payload = JSON.parse(init.body);
+        expect(payload.prompt).toBe('a futuristic neon city at night');
+        expect(payload.prompt).not.toContain('/image');
+        return Response.json({ image: 'https://example.com/neon-city.png' });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await generateAIResponse('/image a futuristic neon city at night', []);
+    expect(response).toBe('![](https://example.com/neon-city.png)');
+    expect(fetchMock).toHaveBeenCalledWith('/api/image', expect.anything());
+    vi.unstubAllGlobals();
+  });
+
+  it('forwards reference images from conversation history', async () => {
+    const referenceImage = 'data:image/png;base64,REF_DATA';
+    let capturedBody = null;
+    const fetchMock = vi.fn(async (url, init) => {
+      if (url === '/api/image') {
+        capturedBody = JSON.parse(init.body);
+        return Response.json({ image: 'data:image/png;base64,RESULT' });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const history = [
+      { role: 'user', content: 'here is a sketch', attachments: [{ name: 'sketch.png', type: 'image/png', thumb: referenceImage }] },
+      { role: 'assistant', content: 'Received!' }
+    ];
+
+    const response = await generateAIResponse('/image render this in oil painting style', history);
+    expect(response).toBe('![](data:image/png;base64,RESULT)');
+    expect(capturedBody).not.toBeNull();
+    expect(capturedBody.prompt).toBe('render this in oil painting style');
+    expect(capturedBody.referenceImage).toBe(referenceImage);
+    vi.unstubAllGlobals();
+  });
+
+  it('asks for an image description when none is given', async () => {
+    const response = await generateAIResponse('/image', []);
+    expect(response).toMatch(/what image to generate/i);
+  });
+
+  it('falls back to a labelled placeholder when the image endpoint fails', async () => {
+    const fetchMock = vi.fn(async () => Response.json({ error: 'unavailable' }, { status: 503 }));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const response = await generateAIResponse('/image a magical forest', []);
+    expect(response).toContain('data:image/svg+xml');
+    expect(decodeURIComponent(response)).toContain('LOCAL IMAGE PLACEHOLDER');
+    vi.unstubAllGlobals();
   });
 });
 
