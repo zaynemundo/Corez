@@ -1861,12 +1861,13 @@ h1, h2, h3, h4, h5, h6 {
   cursor: default;
 }
 
-.publish-modal-card {
-  max-width: 520px;
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .spin-icon {
-  animation: market-refresh-spin 0.8s linear infinite;
+  animation: spin 0.8s linear infinite;
 }
 
 .code-content {
@@ -2593,23 +2594,6 @@ h1, h2, h3, h4, h5, h6 {
     padding: 0.85rem 1rem;
   }
 
-  .market-card {
-    gap: 0.75rem;
-  }
-
-  .market-controls {
-    grid-template-columns: 1fr;
-  }
-
-  .market-price-row {
-    align-items: flex-start;
-  }
-
-  .market-refresh,
-  .market-retry {
-    width: 100%;
-  }
-
   .input-box {
     border-radius: var(--radius-md);
     padding: 0.55rem 0.55rem 0.55rem 0.85rem;
@@ -2796,13 +2780,8 @@ h1, h2, h3, h4, h5, h6 {
   .new-chat-btn,
   .history-item,
   .message-content,
-  .input-box,
-  .market-refresh svg {
+  .input-box {
     transition: none !important;
-  }
-
-  .market-refresh svg {
-    animation: none !important;
   }
 }
 

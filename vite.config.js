@@ -13,7 +13,7 @@ const apiProxyConfig = {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 150);
-      const res = await fetch(`${LOCAL_WORKER_TARGET}/api/market`, { signal: controller.signal });
+      const res = await fetch(`${LOCAL_WORKER_TARGET}/api/ai`, { signal: controller.signal });
       clearTimeout(timeout);
       if (res.ok || res.status < 500) return LOCAL_WORKER_TARGET;
     } catch {

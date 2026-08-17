@@ -29,7 +29,6 @@ export const INTENT_TYPES = Object.freeze({
   CONTENT_CREATION: 'content_creation',
   GENERAL_QUESTION: 'general_question',
   SIMPLE_EDIT: 'simple_edit',
-  MARKET: 'market',
   UNKNOWN: 'unknown',
 });
 

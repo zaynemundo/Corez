@@ -182,12 +182,6 @@ describe('Intent Engine — classifyIntent', () => {
     expect(result.type).toBe(INTENT_TYPES.FEATURE_IMPLEMENTATION);
   });
 
-  it('classifies market price queries → market', () => {
-    expect(classifyIntent('check AAPL stock price').type).toBe(INTENT_TYPES.MARKET);
-    expect(classifyIntent('what is the price of bitcoin').type).toBe(INTENT_TYPES.MARKET);
-    expect(classifyIntent('convert 100 usd to php').type).toBe(INTENT_TYPES.MARKET);
-  });
-
   it('classifies tetris/flappy requests → game_creation', () => {
     expect(classifyIntent('build a tetris game').type).toBe(INTENT_TYPES.GAME_CREATION);
     expect(classifyIntent('make a flappy bird clone').type).toBe(INTENT_TYPES.GAME_CREATION);

@@ -15,7 +15,7 @@ CoreZ is a Vite SPA + Cloudflare Worker. Two ways to verify locally:
 ### 1. Fully local (no Cloudflare)
 
 ```bash
-# Terminal A: worker on :8787 (serves /api/ai, /api/image, /api/market,
+# Terminal A: worker on :8787 (serves /api/ai, /api/image,
 # /api/apps, /api/memory, /api/assets, /api/publish, /api/game/ws)
 # --host localhost is REQUIRED: the custom-domain routes in wrangler.jsonc
 # otherwise make wrangler dev redirect every request (301 to itself).
@@ -53,8 +53,6 @@ npm run deploy   # deploys worker + dist assets to Cloudflare
   Nano Banana 2 first, legacy FLUX last; `OPENROUTER_IMAGE_MODEL` overrides)
   and reports the model that served the image (R2 URL when `ASSET_BUCKET`
   is configured; honest 503 without `OPENROUTER_API_KEY`).
-- Market: `POST /api/market` requires `TWELVE_DATA_API_KEY` (returns 503
-  `not_configured` without it).
 - Memory/apps: `/api/memory/*` and `/api/apps/*` require the `ASSET_BUCKET`
   binding (503/530 without it); `wrangler dev` only provides real R2 with
   `--remote` and a deployed bucket.

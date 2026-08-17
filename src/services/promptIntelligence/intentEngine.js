@@ -22,17 +22,6 @@ import { INTENT_TYPES, COMPLEXITY_LEVELS, createIntentResult } from './schemas.j
 
 const INTENT_HANDLERS = [
   {
-    type: INTENT_TYPES.MARKET,
-    pattern: /\b(price|prices|stock|stocks|ticker|quote|how much is|convert|to usd|to eur|to php|exchange rate|bitcoin|ethereum|crypto)\b/i,
-    signals: ['price', 'stock', 'quote', 'convert', 'ticker', 'crypto', 'bitcoin', 'ethereum', 'usd', 'eur', 'php', 'how much'],
-    extract(_prompt, _lower) {
-      return {
-        goal: `check the current market price`,
-        deliverable: 'live market data',
-      };
-    },
-  },
-  {
     type: INTENT_TYPES.WEBSITE_CREATION,
     pattern: /\b(build|make|create|generate|design|code|develop)\b.*\b(website|site|landing page|webpage|web app|web application|homepage|portfolio site)\b|\b(website|site|landing page|portfolio)\b.*\b(build|make|create|generate|design|code|develop)\b/i,
     signals: ['website', 'landing page', 'homepage', 'web app', 'web application', 'site', 'portfolio site'],
