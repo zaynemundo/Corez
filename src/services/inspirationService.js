@@ -20,11 +20,17 @@ function normalizeSites(payload) {
   if (!isObject(payload) || !Array.isArray(payload.sites)) return [];
   return payload.sites
     .filter((site) => isObject(site) && (typeof site.title === 'string' || typeof site.url === 'string'))
-    .map((site) => ({
-      title: typeof site.title === 'string' ? site.title : '',
-      url: typeof site.url === 'string' ? site.url : '',
-      source: 'Awwwards'
-    }))
+    .map((site) => {
+      const item = {
+        title: typeof site.title === 'string' ? site.title : '',
+        url: typeof site.url === 'string' ? site.url : '',
+        source: 'Awwwards'
+      };
+      if (typeof site.liveUrl === 'string' && site.liveUrl) item.liveUrl = site.liveUrl;
+      if (typeof site.description === 'string' && site.description) item.description = site.description;
+      if (Array.isArray(site.tags) && site.tags.length > 0) item.tags = site.tags.filter((t) => typeof t === 'string');
+      return item;
+    })
     .slice(0, MAX_SITES);
 }
 

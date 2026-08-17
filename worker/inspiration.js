@@ -65,9 +65,54 @@ function humanizeSlug(slug) {
     .slice(0, 80);
 }
 
+function decodeHtmlEntities(str) {
+  if (!str) return '';
+  return str
+    .replace(/&#039;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ');
+}
+
+export async function fetchSiteDetails(slug, fetchImpl = fetch) {
+  if (!slug || typeof slug !== 'string') return null;
+  try {
+    const siteUrl = `https://www.awwwards.com/sites/${slug}`;
+    const response = await fetchImpl(siteUrl, {
+      headers: { 'User-Agent': UA, 'Accept': 'text/html' },
+      signal: AbortSignal.timeout(4_000)
+    });
+    if (!response.ok) return null;
+    const html = await response.text();
+
+    const descMatch = html.match(/<meta\s+(?:name|property)="(?:og:description|description)"\s+content="([^"]+)"/i);
+    const rawDesc = descMatch ? descMatch[1].trim() : '';
+    const description = decodeHtmlEntities(rawDesc).slice(0, 240);
+
+    const liveMatch = html.match(/<a[^>]+href="(https?:\/\/(?!www\.awwwards\.com)[^"]+)"[^>]*>(?:[^<]*(?:Visit|Live|View|Launch)[^<]*)/i);
+    const liveUrl = liveMatch ? liveMatch[1].trim() : '';
+
+    const tagMatches = [...html.matchAll(/href="\/websites\/([a-z0-9-]+)\/"[^>]*>([^<]+)<\/a>/gi)]
+      .map((m) => m[2].trim())
+      .filter((t) => t && !['Nominees', 'Sites of the Day', 'Honorable Mention', 'Winners'].includes(t));
+    const tags = [...new Set(tagMatches)].slice(0, 6);
+
+    return {
+      description,
+      liveUrl,
+      tags
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Fetch real award-winning site references for a category.
- * Returns { sites: [{ title, url }], category, source: 'Awwwards' }.
+ * Visits the top sites to extract their design approach, live URL, and tags.
+ * Returns { sites: [{ title, url, liveUrl?, description?, tags? }], category, source: 'Awwwards' }.
  * Returns an empty sites array on any failure — never fabricated data.
  */
 export async function fetchAwwwardsInspiration(query, fetchImpl = fetch) {
@@ -85,10 +130,27 @@ export async function fetchAwwwardsInspiration(query, fetchImpl = fetch) {
   }
 
   const slugs = [...new Set([...html.matchAll(/\/sites\/([a-z0-9-]{3,60})/g)].map((m) => m[1]))];
-  const sites = slugs.slice(0, MAX_SITES).map((slug) => ({
-    title: humanizeSlug(slug),
-    url: `https://www.awwwards.com/sites/${slug}`
-  }));
+  const candidateSlugs = slugs.slice(0, MAX_SITES);
+
+  // Visit the top award-winning sites concurrently to inspect design details
+  const siteDetailsResults = await Promise.allSettled(
+    candidateSlugs.slice(0, 3).map((slug) => fetchSiteDetails(slug, fetchImpl))
+  );
+
+  const sites = candidateSlugs.map((slug, idx) => {
+    const detail = siteDetailsResults[idx]?.status === 'fulfilled' ? siteDetailsResults[idx].value : null;
+    const siteObj = {
+      title: humanizeSlug(slug),
+      url: `https://www.awwwards.com/sites/${slug}`
+    };
+    if (detail) {
+      if (detail.liveUrl) siteObj.liveUrl = detail.liveUrl;
+      if (detail.description) siteObj.description = detail.description;
+      if (detail.tags && detail.tags.length > 0) siteObj.tags = detail.tags;
+    }
+    return siteObj;
+  });
+
   return { sites, category: category.key, source: 'Awwwards' };
 }
 

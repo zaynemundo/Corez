@@ -87,12 +87,38 @@ describe('Worker inspiration parsing', () => {
   it('extracts and normalizes real site slugs from HTML', async () => {
     const html = '<html><body><a href="/sites/acid-crunch">x</a><a href="/sites/paul-kalkbrenner">y</a></body></html>';
     const result = await workerFetch('portfolio', async () => new Response(html, { status: 200 }));
-    expect(result.sites[0]).toEqual({
-      title: 'Acid Crunch',
-      url: 'https://www.awwwards.com/sites/acid-crunch'
-    });
+    expect(result.sites[0].title).toBe('Acid Crunch');
+    expect(result.sites[0].url).toBe('https://www.awwwards.com/sites/acid-crunch');
     expect(result.sites[1].title).toBe('Paul Kalkbrenner');
     expect(result.category).toBe('portfolio');
+  });
+
+  it('visits site pages to extract liveUrl, description, and tags when available', async () => {
+    const categoryHtml = '<html><body><a href="/sites/partake-foods">Partake</a></body></html>';
+    const siteHtml = `<!DOCTYPE html><html>
+      <head>
+        <meta name="description" content="Custom storefront &amp; brand experience" />
+      </head>
+      <body>
+        <a href="https://partakefoods.com" class="visit-site">Visit Site</a>
+        <a href="/websites/animation/">Animation</a>
+        <a href="/websites/colorful/">Colorful</a>
+      </body>
+    </html>`;
+
+    const result = await workerFetch('food-drink', async (url) => {
+      if (url.includes('/websites/')) return new Response(categoryHtml, { status: 200 });
+      if (url.includes('/sites/')) return new Response(siteHtml, { status: 200 });
+      return new Response('not found', { status: 404 });
+    });
+
+    expect(result.sites[0]).toMatchObject({
+      title: 'Partake Foods',
+      url: 'https://www.awwwards.com/sites/partake-foods',
+      liveUrl: 'https://partakefoods.com',
+      description: 'Custom storefront & brand experience',
+      tags: ['Animation', 'Colorful']
+    });
   });
 
   it('returns empty sites on fetch failure — never fabricated', async () => {

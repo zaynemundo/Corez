@@ -564,8 +564,14 @@ export async function improveCodingPrompt(prompt, intent = null) {
       const { sites } = await fetchAwwwardsInspiration(cleanPrompt, null);
       if (sites.length === 0) return '';
       return `\n\n--- Live Awwwards Design Inspiration (real references) ---\n${sites
-        .map((site) => `- ${site.title} — ${site.url}`)
-        .join('\n')}\nUse these award-winning sites as visual direction for layout, typography, colour, and interaction quality.`;
+        .map((site) => {
+          let text = `- ${site.title} — ${site.url}`;
+          if (site.liveUrl) text += ` (Live site: ${site.liveUrl})`;
+          if (site.description) text += `\n  Design approach: ${site.description}`;
+          if (site.tags && site.tags.length > 0) text += `\n  Visual elements: ${site.tags.join(', ')}`;
+          return text;
+        })
+        .join('\n\n')}\n\nUse these award-winning sites as visual direction for layout, typography, colour, and interaction quality.`;
     } catch {
       return '';
     }

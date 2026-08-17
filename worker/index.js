@@ -620,11 +620,17 @@ async function handleAi(request, env) {
       const inspiration = await fetchAwwwardsInspiration(prompt, env?.__INSPIRATION_FETCH);
       if (Array.isArray(inspiration?.sites) && inspiration.sites.length > 0) {
         const refs = inspiration.sites
-          .map((site) => `- ${site.title} — ${site.url}`)
-          .join('\n');
+          .map((site) => {
+            let line = `- ${site.title} — ${site.url}`;
+            if (site.liveUrl) line += ` (Live site: ${site.liveUrl})`;
+            if (site.description) line += `\n  Design approach: ${site.description}`;
+            if (site.tags && site.tags.length > 0) line += `\n  Visual elements: ${site.tags.join(', ')}`;
+            return line;
+          })
+          .join('\n\n');
         apiMessages.push({
           role: 'system',
-          content: `Live design inspiration from Awwwards (${inspiration.category} category):\n${refs}\n\nUse these award-winning sites as visual references for layout, typography, colour, and interaction quality. Do NOT claim you visited them; use them as design direction.`
+          content: `Live design inspiration from Awwwards (${inspiration.category} category):\n${refs}\n\nUse these award-winning sites as visual references for layout, typography, colour, and interaction quality. Use them as design direction.`
         });
       }
     } catch (error) {
