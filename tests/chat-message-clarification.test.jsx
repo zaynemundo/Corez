@@ -64,6 +64,29 @@ Option D — Something else (you can describe it in one line)`;
     expect(options[3].label).toBe('Option D');
   });
 
+  it('correctly prioritizes Option A/B/C/D when message also has conversational field questions', () => {
+    const text = `I'd be happy to help you draft an email! To make sure it's exactly what you need, could you tell me a bit more about it?
+
+Email purpose — What's the email about? (e.g., a follow-up, meeting request, introduction, apology, job application, or something else)
+Recipient — Who is it going to? (e.g., a boss, client, professor, colleague, or someone else)
+Tone — What tone should it strike? (e.g., professional and formal, friendly and casual, persuasive, or empathetic)
+Feel free to pick from these options or describe your situation in your own words:
+
+Option A — Professional follow-up: A polite reminder or status check sent to a client, boss, or team member.
+Option B — Meeting/request email: Asking for time to meet, a favor, or information from a colleague or vendor.
+Option C — Formal announcement: An update, policy change, or news delivered to a team or organization.
+Option D — Friendly/casual note: An informal message to a coworker, contact, or acquaintance.
+Once you share a few details, I'll write it right away!`;
+
+    const options = extractClarificationOptions(text);
+    expect(options).toHaveLength(4);
+    expect(options[0].label).toBe('Option A: Professional follow-up');
+    expect(options[0].detail).toContain('A polite reminder or status check');
+    expect(options[1].label).toBe('Option B: Meeting/request email');
+    expect(options[2].label).toBe('Option C: Formal announcement');
+    expect(options[3].label).toBe('Option D: Friendly/casual note');
+  });
+
   it('returns empty array when content contains a full code build or has no question', () => {
     const codeResponse = `Here is your code:
 \`\`\`jsx

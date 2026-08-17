@@ -702,6 +702,36 @@ export function extractClarificationOptions(content) {
   }
 
   const lines = content.split('\n');
+
+  // 2. Explicit "Option A", "Option B", "Option C" lines anywhere in the message
+  const optionALines = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    const match = line.match(/^(?:[-*•]\s+)?Option\s+([A-Za-z0-9]+)\s*[-:—–]\s*(.+)$/i);
+    if (match) {
+      const optId = `Option ${match[1].toUpperCase()}`;
+      const rest = match[2].trim();
+      const subSplit = rest.split(/[-:—–]\s+/);
+      if (subSplit.length > 1 && subSplit[0].length <= 35) {
+        optionALines.push({
+          label: `${optId}: ${subSplit[0].trim()}`,
+          detail: subSplit.slice(1).join(' - ').trim(),
+          text: `${optId} — ${rest}`
+        });
+      } else {
+        optionALines.push({
+          label: optId,
+          detail: rest,
+          text: `${optId} — ${rest}`
+        });
+      }
+    }
+  }
+  if (optionALines.length >= 2) {
+    return optionALines;
+  }
+
+  // 3. Question & Choice Zone Scanning
   const options = [];
   let inOptionZone = false;
 
@@ -715,19 +745,21 @@ export function extractClarificationOptions(content) {
       /^\d+[.)]\s+/i.test(line) ||
       /^[A-Za-z][.)]\s+/i.test(line) ||
       /^\([A-Za-z0-9]+\)\s+/i.test(line) ||
-      /^\[[A-Za-z0-9]+\]\s+/i.test(line) ||
-      /^Option\s+[A-Za-z0-9]+\b/i.test(line);
+      /^\[[A-Za-z0-9]+\]\s+/i.test(line);
+
+    // Skip lines that are questions (e.g. "What is the email about?")
+    const isQuestionLine = line.includes('?') || /^(?:what|who|when|where|why|how)\s+/i.test(line);
 
     if (!isOptionLine && (
       line.includes('?') ||
-      /^(?:which|what|choose|select|here are|let me know|please select|purpose)\b/i.test(line) ||
+      /^(?:which|what|choose|select|here are|let me know|please select|feel free to pick|purpose)\b/i.test(line) ||
       /:\s*$/i.test(line)
     )) {
       inOptionZone = true;
       continue;
     }
 
-    if (inOptionZone && isOptionLine) {
+    if (inOptionZone && isOptionLine && !isQuestionLine) {
       // Strip leading list marker (- / * / 1. / A. / (A) / [A])
       const stripped = line
         .replace(/^[-*•]\s+/, '')
@@ -747,7 +779,7 @@ export function extractClarificationOptions(content) {
         });
       } else {
         const clean = stripped.replace(/[*_~`]/g, '').trim();
-        const sepMatch = clean.match(/^((?:Option\s+[A-Za-z0-9]+|[A-Za-z0-9\s]+?))\s*[-:—–]\s*(.+)$/i);
+        const sepMatch = clean.match(/^([A-Za-z0-9\s]+?)\s*[-:—–]\s*(.+)$/i);
         if (sepMatch && sepMatch[1].length <= 50) {
           options.push({
             label: sepMatch[1].trim(),
