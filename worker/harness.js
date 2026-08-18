@@ -10,6 +10,7 @@
 import { runProviderChain, runStreamingChain } from './providerChain.js';
 import { verifyCreation, verifySpecCoverage, buildRepairPrompt } from './creationVerifier.js';
 import { estimateCostUsd } from './utils.js';
+import { swarmEnabledFor, runSwarmSpecialists, buildSwarmContext } from './swarm.js';
 import {
   detectTruncation,
   stitchContinuationChunk,
@@ -341,10 +342,50 @@ export async function* runCreationHarness(options) {
       }
     }
 
+    // 1.5 SWARM PRE-PASS — non-fast-path builds only (games and
+    // trivial/low-complexity requests keep the light path). A small swarm of
+    // PARALLEL specialist briefs (architecture, art direction) contributes
+    // focused, short design input; the streamed build below then synthesizes
+    // them into the single-file artifact. A better-informed first build means
+    // fewer truncations and repair rounds — the dominant wall-time and worker
+    // CPU cost. The swarm is NEVER a gate: failed specialists are dropped, and
+    // if none answer the build runs with the plain spec context. Persisted so
+    // a resumed run reuses the contributions instead of re-running them.
+    const swarmWanted = !fastPath && swarmEnabledFor(env);
+    if (swarmWanted && !state.swarm) {
+      ensureWithinDeadline();
+      yield reportPhase('swarm-planning');
+      const swarmResult = await runSwarmSpecialists({
+        prompt: originalPrompt,
+        spec: state.spec,
+        env,
+        signal,
+        sleep
+      });
+      if (signal?.aborted || swarmResult.cancelled) {
+        state.busy = false;
+        state.status = 'interrupted';
+        await persist(store, taskId, state);
+        throw Object.assign(new Error('AI request cancelled.'), { status: 499 });
+      }
+      state.swarm = swarmResult.contributions.length > 0
+        ? {
+            enabled: true,
+            contributions: swarmResult.contributions,
+            elapsedMs: swarmResult.elapsedMs
+          }
+        : { enabled: false, reason: swarmResult.reason || 'no specialist contributions' };
+      await persist(store, taskId, state);
+    }
+
     // 2/3/4. BUILD -> VERIFY -> REPAIR (adaptive, capped).
     const buildContext = {
       role: 'system',
-      content: `Build specification:\n${state.spec}\n\nDeliver ONLY the complete, finished artifact as a single self-contained HTML document.`
+      content: state.swarm?.enabled
+        && Array.isArray(state.swarm.contributions)
+        && state.swarm.contributions.length > 0
+        ? buildSwarmContext(state.spec, state.swarm.contributions)
+        : `Build specification:\n${state.spec}\n\nDeliver ONLY the complete, finished artifact as a single self-contained HTML document.`
     };
     let buildMessages = [...baseSystem, buildContext, ...userMessages];
     // Tracks whether this run streamed build content (build/continuation
@@ -697,12 +738,20 @@ export async function* runCreationHarness(options) {
       diagnostics: {
         harness: {
           taskId,
-          phases: ['planning', 'building', 'verifying', 'reviewing'],
+          phases: ['planning', ...(state.swarm?.enabled ? ['swarm-planning'] : []), 'building', 'verifying', 'reviewing'],
           repairRounds: state.repairCount,
           verification: state.verification,
           approved: Boolean(state.review?.approved),
           reviewSkipped: Boolean(state.review?.skipped),
           reviewInconclusive: Boolean(state.review?.inconclusive),
+          swarm: state.swarm
+            ? {
+                enabled: state.swarm.enabled,
+                specialists: (state.swarm.contributions || []).map((c) => c.role),
+                elapsedMs: state.swarm.elapsedMs || null,
+                reason: state.swarm.reason || null
+              }
+            : { enabled: false },
           model: state.model || null,
           usage: state.lastBuildUsage || null,
           estimatedCostUsd: estimateCostUsd(
