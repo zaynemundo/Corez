@@ -224,21 +224,6 @@ export default function CanvasPreview({
               <span>LIVE BUILDING</span>
             </div>
           )}
-
-          {/* Publish: share the creation with anyone via a short link */}
-          {activeTab === 'preview' && editableCode && !isStreaming && (
-            <button
-              type="button"
-              className="code-btn publish-btn"
-              onClick={handlePublish}
-              disabled={publishing}
-              title="Publish this creation and share the link"
-              style={{ padding: '4px 10px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-            >
-              {publishing ? <Loader2 size={14} className="spin-icon" /> : <Share2 size={14} />}
-              <span>{publishing ? 'Publishing...' : 'Publish'}</span>
-            </button>
-          )}
         </div>
 
         {/* Device Viewport Selector (Desktop vs Laptop vs Tablet vs Mobile Icon-only) */}
@@ -283,6 +268,21 @@ export default function CanvasPreview({
             corez-nav message, so no external tab bar is needed. */}
 
         <div className="canvas-controls">
+          {/* Publish: share the creation with anyone via a short link */}
+          {editableCode && !isStreaming && (
+            <button
+              type="button"
+              className="code-btn publish-btn"
+              onClick={handlePublish}
+              disabled={publishing}
+              title="Publish this creation and share the link"
+              aria-label={publishing ? 'Publishing...' : 'Publish'}
+            >
+              {publishing ? <Loader2 size={13} className="spin-icon" /> : <Share2 size={13} />}
+              <span>{publishing ? 'Publishing...' : 'Publish'}</span>
+            </button>
+          )}
+
           <button className="icon-btn" onClick={handleRefresh} title="Reload Preview">
             <RotateCw size={14} strokeWidth={1.5} />
           </button>

@@ -1847,18 +1847,30 @@ h1, h2, h3, h4, h5, h6 {
 .publish-btn {
   background-color: var(--text-primary);
   color: var(--bg-primary);
-  border-color: var(--text-primary);
+  border: 1px solid var(--text-primary);
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+  font-size: 0.75rem;
+  padding: 4px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+  transition: var(--transition-fast);
 }
 
 .publish-btn:hover {
   background-color: var(--text-primary);
   color: var(--bg-primary);
-  opacity: 0.85;
+  opacity: 0.9;
+  transform: translateY(-1px);
 }
 
 .publish-btn:disabled {
   opacity: 0.55;
   cursor: default;
+  transform: none;
 }
 
 @keyframes spin {
@@ -2680,17 +2692,16 @@ h1, h2, h3, h4, h5, h6 {
     display: none;
   }
 
-  .canvas-title .publish-btn {
-    padding: 4px 9px;
-  }
-
-  .canvas-title .publish-btn span {
-    display: none;
+  .publish-btn {
+    padding: 3px 9px;
+    font-size: 0.72rem;
   }
 
   .canvas-controls {
     gap: 0.3rem;
     margin-left: auto;
+    display: flex;
+    align-items: center;
   }
 
   .canvas-controls .icon-btn {
