@@ -25,7 +25,7 @@ export const SWARM_SPECIALIST_BRIEFS = Object.freeze([
   {
     role: 'architect',
     instruction:
-      'Analyze the build specification below and produce a concise implementation brief: overall page structure, key sections, state and data flow, and the components that must exist. At most 200 words. Do not write code.'
+      'Analyze the build specification below and produce a concise implementation brief: overall page structure, key sections, state and data flow, and the components that must exist. If multi-page navigation is requested, outline page routes (e.g. index.html, about.html). At most 200 words. Do not write code.'
   },
   {
     role: 'art-director',
@@ -33,6 +33,33 @@ export const SWARM_SPECIALIST_BRIEFS = Object.freeze([
       'Produce a concise visual direction brief grounded in modern design principles (Open-Design / Awwwards standards): active color palette with hex/HSL tokens, typography hierarchy (Google Fonts), spacing scale, and 2-3 signature micro-interactions. Avoid purple-on-dark cliches and flat textureless cards. At most 175 words. Do not write code.'
   }
 ]);
+
+export const EXTENDED_SPECIALIST_BRIEFS = Object.freeze({
+  accessibility: {
+    role: 'accessibility',
+    instruction:
+      'Produce a concise accessibility & usability brief: semantic HTML5 landmarks (<header>, <nav>, <main>, <footer>), keyboard focus rings, WCAG 2.2 AA contrast rules, and ARIA labels. At most 150 words. Do not write code.'
+  },
+  performance: {
+    role: 'performance',
+    instruction:
+      'Produce a concise performance brief: critical rendering path, asset containment, efficient CSS selectors, and script execution order. At most 150 words. Do not write code.'
+  }
+});
+
+export function resolveSpecialistBriefs(promptText = '') {
+  const text = String(promptText || '').toLowerCase();
+  const briefs = [...SWARM_SPECIALIST_BRIEFS];
+
+  if (/\b(accessibility|wcag|a11y|screen reader|aria|contrast|accessible)\b/i.test(text)) {
+    briefs.push(EXTENDED_SPECIALIST_BRIEFS.accessibility);
+  }
+  if (/\b(performance|optimize|speed|fast|lighthouse|latency|fps)\b/i.test(text)) {
+    briefs.push(EXTENDED_SPECIALIST_BRIEFS.performance);
+  }
+
+  return briefs;
+}
 
 const DEFAULT_SWARM_TIMEOUT_MS = 25_000;
 
@@ -69,9 +96,10 @@ export async function runSwarmSpecialists({ prompt, spec, env = {}, signal = nul
 
   const archetype = detectDesignArchetype(`${originalRequest} ${brief}`);
   const tokensSample = generateTokensCss(archetype);
+  const activeBriefs = resolveSpecialistBriefs(`${originalRequest} ${brief}`);
 
   const results = await Promise.allSettled(
-    SWARM_SPECIALIST_BRIEFS.map((specialist) => {
+    activeBriefs.map((specialist) => {
       const isArtDirector = specialist.role === 'art-director';
       const specialistInstruction = isArtDirector
         ? `${specialist.instruction}\n\nRecommended Archetype Tokens (${archetype.name}):\n${tokensSample}`
@@ -101,19 +129,20 @@ export async function runSwarmSpecialists({ prompt, spec, env = {}, signal = nul
 
   const contributions = [];
   const failures = [];
-  results.forEach((settled, index) => {
-    const role = SWARM_SPECIALIST_BRIEFS[index].role;
-    if (settled.status === 'fulfilled' && settled.value?.content) {
+  for (let index = 0; index < results.length; index += 1) {
+    const outcome = results[index];
+    const role = activeBriefs[index].role;
+    if (outcome.status === 'fulfilled' && outcome.value?.content) {
       contributions.push({
         role,
-        content: settled.value.content,
-        model: settled.value.model || null
+        content: outcome.value.content,
+        model: outcome.value.model || null
       });
     } else {
-      const result = settled.status === 'fulfilled' ? settled.value : null;
-      failures.push(`${role}: ${result?.error || (settled.status === 'rejected' ? String(settled.reason) : 'no usable response')}`);
+      const result = outcome.status === 'fulfilled' ? outcome.value : null;
+      failures.push(`${role}: ${result?.error || (outcome.status === 'rejected' ? String(outcome.reason) : 'no usable response')}`);
     }
-  });
+  }
 
   return {
     contributions,

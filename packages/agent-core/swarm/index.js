@@ -25,7 +25,9 @@ export const SWARM_ROLES = Object.freeze({
   REVIEWER: 'reviewer',
   SECURITY: 'security',
   INTEGRATION: 'integration',
-  ART_DIRECTOR: 'art-director'
+  ART_DIRECTOR: 'art-director',
+  ACCESSIBILITY: 'accessibility',
+  PERFORMANCE: 'performance'
 });
 
 export const SWARM_MODE = Object.freeze({
@@ -37,7 +39,7 @@ export const SWARM_MODE = Object.freeze({
 // Briefs mentioning any of these scopes go to the full specialist DAG.
 // Small, surgical edits (a typo fix, a single component change) take the fast path.
 const FULL_SWARM_SIGNALS =
-  /\b(website|web app|app|game|api|apis?|backend|database|db\b|auth|authentication|server|endpoint|migration|refactor|microservice|multi-page|deploy|docker|kubernetes|realtime|websocket|design system)\b/i;
+  /\b(website|web app|app|game|api|apis?|backend|database|db\b|auth|authentication|server|endpoint|migration|refactor|microservice|multi-page|deploy|docker|kubernetes|realtime|websocket|design system|accessibility|wcag|a11y|performance|optimize|audit)\b/i;
 
 // Long briefs are assumed complex even without explicit scope signals.
 const FULL_SWARM_MIN_TOKENS = 100;

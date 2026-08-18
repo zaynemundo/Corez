@@ -42,3 +42,12 @@ export { SkillRegistry, parseSkillFrontmatter, createSkillTool } from './skills/
 export { TodoTracker, createTodoTool } from './todos/TodoTracker.js';
 export { SessionQueryEngine, createSessionQueryTool } from './session-query/SessionQueryEngine.js';
 export { PersistentTerminalManager, PersistentTerminalSession, createPersistentCommandTool } from './terminal/PersistentTerminalManager.js';
+export {
+  STANDARD_SUBPAGE_PRESETS,
+  normalizePageName,
+  generatePageNavbar,
+  generatePageFooter,
+  generateSubPageTemplate,
+  scaffoldMultiPageSite,
+  analyzeSiteGraph
+} from './scaffolding/multiPageScaffold.js';

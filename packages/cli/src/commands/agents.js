@@ -14,7 +14,10 @@ export async function handleAgentsCommand(args, _options = {}, ui) {
     { role: SWARM_ROLES.TESTER, desc: 'Runs vitest/jest test suites and builds verification specs' },
     { role: SWARM_ROLES.REVIEWER, desc: 'Audits diffs for security, correctness, and maintainability' },
     { role: SWARM_ROLES.SECURITY, desc: 'Enforces OWASP standards, permissions, and input validation' },
-    { role: SWARM_ROLES.INTEGRATION, desc: 'Manages multi-agent workflow state and git branch integration' }
+    { role: SWARM_ROLES.INTEGRATION, desc: 'Manages multi-agent workflow state and git branch integration' },
+    { role: SWARM_ROLES.ART_DIRECTOR, desc: 'Directs color palettes, typography, micro-interactions, and visual harmony' },
+    { role: SWARM_ROLES.ACCESSIBILITY, desc: 'Enforces WCAG 2.2 AA accessibility, color contrast, keyboard navigation, and ARIA semantics' },
+    { role: SWARM_ROLES.PERFORMANCE, desc: 'Audits DOM complexity, rendering smoothness, bundle size, and asset caching' }
   ];
 
   for (const a of agentDescriptions) {
