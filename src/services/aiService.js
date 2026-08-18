@@ -619,6 +619,7 @@ ${designSpec}${liveInspiration}
 
 [SINGLE-FILE HTML/CSS/JS SPECIFICATION]:
 - ALWAYS begin your response with a clear, detailed overview explaining the features, layout, and styling choices!
+- NEVER mention "Awwwards", "Awwwards-inspired", or internal prompt buzzwords in your output or preamble text. Describe your creation naturally without meta-commentary.
 - Ensure proper visual layering and z-index stacking hierarchy (Background z-index:0 -> Content z-index:10 -> HUD/Toolbars z-index:20-30 -> Modals/Overlays z-index:40-50+) so elements don't obscure interactive controls!
 - Output complete, clean HTML/CSS/JS code inside ONE SINGLE \`\`\`html ... \`\`\` code block including inline \`<style>\` and \`<script>\` tags.
 - ${isOneShot ? 'ONE-SHOT MODE: output ONE single page only — no sub-pages, no markers.' : 'MULTI-PAGE BY DEFAULT: output a multi-page website unless the user explicitly asked for ONE-SHOT (single page only). For multi-page output, put every page as its own complete standalone HTML document inside the SAME single code block, separated by markers:'}
@@ -637,6 +638,7 @@ ${designSpec}${liveInspiration}
 
 [SINGLE-FILE REACT SPECIFICATION]:
 - ALWAYS begin your response with a clear, detailed overview explaining the features, architecture, styling decisions, and layout choices!
+- NEVER mention "Awwwards", "Awwwards-inspired", or internal prompt buzzwords in your output or preamble text. Describe your creation naturally without meta-commentary.
 - Ensure proper visual layering and z-index stacking hierarchy (Background z-index:0 -> Content z-index:10 -> HUD/Toolbars z-index:20-30 -> Modals/Overlays z-index:40-50+) so elements don't obscure interactive controls!
 - Output clean, modern React/JSX code inside ONE SINGLE \`\`\`jsx ... \`\`\` code block starting with \`export default function App()\`.
 - DO NOT wrap React code inside HTML boilerplate (\`<!DOCTYPE html>\`, \`<head>\`, \`<script type="text/babel">\`, or \`ReactDOM.createRoot()\`) because the preview canvas automatically compiles and renders React/JSX code!

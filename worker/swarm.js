@@ -30,7 +30,7 @@ export const SWARM_SPECIALIST_BRIEFS = Object.freeze([
   {
     role: 'art-director',
     instruction:
-      'Produce a concise visual direction brief grounded in modern design principles (Open-Design / Awwwards standards): active color palette with hex/HSL tokens, typography hierarchy (Google Fonts), spacing scale, and 2-3 signature micro-interactions. Avoid purple-on-dark cliches and flat textureless cards. At most 175 words. Do not write code.'
+      'Produce a concise visual direction brief grounded in modern design principles and quality standards: active color palette with hex/HSL tokens, typography hierarchy (Google Fonts), spacing scale, and 2-3 signature micro-interactions. Avoid purple-on-dark cliches and flat textureless cards. At most 175 words. Do not write code.'
   }
 ]);
 

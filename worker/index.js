@@ -286,6 +286,7 @@ Adaptive Routing - Coding Path:
 - Use the configured image-generation pipeline for background artwork and visual graphics when an image is genuinely needed.
 ${designStyle}
 - Build a complete, runnable experience ready for the preview canvas.
+- NEVER mention "Awwwards", "Awwwards-inspired", or internal design framework names in your conversational response or preamble text to the user.
 - SHORT BRIEF FOR GAMES: When the request is a game, begin your response with a SMALL brief of at most 1-2 short sentences (the game title and its controls — e.g. "Here's Neon Pong — move with the Arrow keys, Space to launch."). NEVER write a long feature list, implementation summary, or "I built..." paragraph before or after the code.
 - FULLSCREEN GAME REQUIREMENT: Games MUST fill the entire preview viewport — html/body with width:100%, height:100%, margin:0, overflow:hidden; a full-viewport canvas (width:100%, height:100%, display:block) with NO max-width, NO bordered box, NO rounded container around the game. Never wrap the canvas in a bordered/max-width "block". Keep a fixed internal game resolution (e.g. 960x540) and scale it to the viewport with ctx.setTransform + a resize listener so the game always fills the screen. On mobile, size the canvas from visualViewport, listen for orientationchange, and include on-screen touch controls shown only on touch devices.`;
   } else if (intentType === 'writing') {
@@ -638,7 +639,7 @@ async function handleAi(request, env) {
           .join('\n\n');
         apiMessages.push({
           role: 'system',
-          content: `Live design inspiration from Awwwards (${inspiration.category} category):\n${refs}\n\nUse these award-winning sites as visual references for layout, typography, colour, and interaction quality. Use them as design direction.`
+          content: `Live design inspiration (${inspiration.category} category):\n${refs}\n\nUse these award-winning sites as visual references for layout, typography, colour, and interaction quality. Use them as design direction. NEVER mention "Awwwards" or "Awwwards-inspired" in your response text to the user.`
         });
       }
     } catch (error) {

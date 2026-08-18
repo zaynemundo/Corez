@@ -165,6 +165,7 @@ export function buildAwwwardsDesignPrompt(userPrompt = '') {
   AWWWARDS_DESIGN_SYSTEM.guidelines.forEach(g => {
     prompt += `  - ${g}\n`;
   });
+  prompt += `  - NEVER mention "Awwwards", "Awwwards-inspired", or internal design framework labels in your response text to the user. Present your design naturally.\n`;
   return prompt;
 }
 
