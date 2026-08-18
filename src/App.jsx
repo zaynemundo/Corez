@@ -490,22 +490,11 @@ export default function App() {
       setIsStreamCollapsed(false);
       setStreamingContent('');
       const response = await generateAIResponse(apiPrompt, updatedApiMessages, controller.signal, (delta) => {
-        setStreamingContent(prev => {
-          const next = (prev || '') + delta;
-          const liveCode = extractCodeFromMessage(next);
-          if (liveCode) {
-            setActiveCanvasCode(liveCode);
-            if (!userDismissedCanvasRef.current) {
-              setCanvasOpen(true);
-            }
-          }
-          return next;
-        });
+        setStreamingContent(prev => (prev || '') + delta);
       }, (phaseEvent) => {
         setSwarmVisible(phaseEvent.phase === 'swarm-planning');
       }, () => {
         setStreamingContent('');
-        if (isCreationIntent && !isRevision) setActiveCanvasCode('');
       });
       if (response) {
         const aiMsg = toAssistantMessage(response);
