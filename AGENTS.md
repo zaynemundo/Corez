@@ -21,18 +21,19 @@
 4. Mimo V2.5 critically reviews the response and diff.
 5. Mimo V2.5 makes the final engineering decision and performs independent verification.
 
-## CoreZ Game Creation & OpenCode Go Models
+## Automatic Swarm & Multi-Agent Execution for Coding
 
-Browser game requests are deliberately SIMPLE: they run the creation harness
-on its one-pass fast path (no planning spec call, no review round) — one
-streamed build through the OpenCode Go provider, structural verification
-(complete document, canvas, animation loop, input listeners), and done.
-Websites and apps keep the full harness pipeline (planning -> build ->
-verify -> repair -> review).
+Swarm multi-agent orchestration and specialist tooling are **AUTOMATICALLY ACTIVATED** for all coding, development, and implementation tasks (websites, web apps, browser games, widgets, tools, refactoring, and bug fixes).
+
+When a coding task is processed, the execution graph automatically coordinates specialist roles:
+- **`architect`**: Analyzes the brief, structures the dependency graph, establishes state model, and selects design tokens.
+- **`engineer`** (`primary-executor`): Implements production-grade components, event listeners, canvas loops, and logic.
+- **`art-director`**: Enforces visual hierarchy, typography, color palettes, micro-animations, and responsive breakpoints.
+- **`reviewer` / `qa`**: Performs empirical verification, syntax checks, accessibility audits (WCAG AA), and regression prevention.
 
 ### Execution Model (Mimo V2.5 Single Model Executor)
 
-> **Primary Model Rule**: **Mimo V2.5** operates as the single primary executor for all code execution, component building, UI work, task graph routing, architectural guidance, code review, and empirical verification.
+> **Primary Model Rule**: **Mimo V2.5** operates as the lead primary executor for all code execution, component building, UI work, task graph routing, architectural guidance, code review, and empirical verification.
 
 - `primary-executor` — `mimo-v2.5` / `opencode-go` — Coder / Tester: writes code, builds components, edits files, runs tests.
 - `art-director` — `flux-2-klein-4b` / `cloudflare-workers-ai` — Creative Lead: visual direction, color palettes, background textures, art assets.
@@ -43,7 +44,7 @@ verify -> repair -> review).
 - **Director Privileges**: Directors (`creative-director`, `technical-director`, `art-director`, `qa-lead`, `code-reviewer`, `visual-specialist`) are read-only (`edit: deny`) by default.
 - **Visual Inspection Workflow**: Actual game screenshots are saved in project review directories and passed to `visual-specialist` for visual specification matching.
 - **Visual Layering Mandate**: All UI and canvas components must follow strict z-index stacking context layering (Background `z:0` -> Content `z:10` -> HUD/Controls `z:20-30` -> Overlays/Modals `z:40-50+`) with explicit container positioning before outputting code.
-- **Verification Gate**: No game deliverable is marked `COMPLETE` without empirical test execution evidence (`exitCode === 0`).
+- **Verification Gate**: No deliverable is marked `COMPLETE` without empirical test execution evidence (`exitCode === 0`).
 
 ## Commands
 
