@@ -8,6 +8,7 @@
 // route; the harness only changes HOW the work is sequenced.
 
 import { runProviderChain, runStreamingChain } from './providerChain.js';
+import { selectModelForRequest } from './modelRouter.js';
 import { verifyCreation, verifySpecCoverage, buildRepairPrompt } from './creationVerifier.js';
 import { estimateCostUsd } from './utils.js';
 import { swarmEnabledFor, runSwarmSpecialists, buildSwarmContext } from './swarm.js';
@@ -145,12 +146,9 @@ export async function* runCreationHarness(options) {
       : DEFAULT_BUILD_CHECKPOINT_MS
   } = options;
 
-  // Build phase model: the agentic build (and its continuations/repairs) runs
-  // on mimo-v2.5 by default — the repo's designated primary executor for
-  // writing code and building components. Planning, review, chat, and titles
-  // keep the general OPENCODE_MODEL. OPENCODE_BUILD_MODEL overrides the build
-  // model per deployment.
-  const buildModel = env?.OPENCODE_BUILD_MODEL || 'mimo-v2.5';
+  // Build phase model: routes visual tasks (UI/UX, CSS, images, SVGs, canvas)
+  // to mimo-v2.5, and all other tasks (logic, backend, general chat, data) to deepseek-v4-flash.
+  const buildModel = options.model || selectModelForRequest({ prompt, primaryIntent, complexity }, env);
 
   // Fast path: game requests ALWAYS take the lighter path — game creation is
   // deliberately basic: the user prompt serves as the spec (no planning

@@ -4,6 +4,7 @@ import { fetchAwwwardsInspiration, handleInspiration } from './inspiration.js';
 import { safeErrorDetail, readBoundedJson, jsonResponse, createTaskStateStore, createRateLimiter, estimateCostUsd } from './utils.js';
 import { runProviderChain, runStreamingChain, callOpenRouterImage } from './providerChain.js';
 import { runCreationHarness } from './harness.js';
+import { selectModelForRequest } from './modelRouter.js';
 import { processResponse, detectTruncation, stitchContinuationChunk, CONTINUATION_INSTRUCTION, ANTI_REPEAT_CONTINUATION_INSTRUCTION } from './responseProcessor.js';
 import {
   parseProjectState,
@@ -716,6 +717,14 @@ async function handleAi(request, env) {
 
   const requestStartedAt = Date.now();
 
+  const selectedModel = selectModelForRequest({
+    prompt: executionPrompt || prompt,
+    intent,
+    fineIntent,
+    skills,
+    messages: body.messages
+  }, env);
+
   // Creation Harness: plan -> build -> verify -> repair -> review, with
   // durable R2 state so a disconnected build resumes. Replaces the single
   // generation for creation requests; SSE events (phase/delta/done) keep the
@@ -738,7 +747,8 @@ async function handleAi(request, env) {
       signal: clientDisconnectSignal,
       store: createTaskStateStore(env),
       sleep: retrySleepFor(env),
-      complexity: body.complexity
+      complexity: body.complexity,
+      model: selectedModel
     };
     if (body.stream === true) {
       // Streaming harness: SSE events (phase/delta/done) keep the client
@@ -818,7 +828,8 @@ async function handleAi(request, env) {
     const chainOptions = {
       env,
       signal: clientDisconnectSignal,
-      };
+      model: selectedModel
+    };
     const encoder = new TextEncoder();
     const sse = (event) => `data: ${JSON.stringify(event)}\n\n`;
     const readable = new ReadableStream({
@@ -1065,6 +1076,7 @@ async function handleAi(request, env) {
     signal: clientDisconnectSignal,
     store: createTaskStateStore(env),
     sleep: retrySleepFor(env),
+    model: selectedModel
   });
   const providerMs = Date.now() - providerStartedAt;
 
