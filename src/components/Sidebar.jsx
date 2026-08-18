@@ -19,7 +19,9 @@ export default function Sidebar({
   activeView,
   theme,
   onToggleTheme,
-  onCloseSidebar
+  onCloseSidebar,
+  accountProfile = null,
+  onOpenAccount = null
 }) {
   const [openMenuId, setOpenMenuId] = useState(null);
 
@@ -33,7 +35,7 @@ export default function Sidebar({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
   return (
-    <aside className={`sidebar ${isOpen ? '' : 'collapsed'}`} aria-hidden={!isOpen} inert={!isOpen}>
+    <aside className={`sidebar ${isOpen ? '' : 'collapsed'}`} aria-hidden={!isOpen} inert={!isOpen ? '' : undefined}>
       <div className="sidebar-header">
         <button 
           className="brand-icon-toggle" 
@@ -133,22 +135,89 @@ export default function Sidebar({
       </div>
 
       <div className="sidebar-footer">
-        <button 
-          className="footer-action-btn" 
-          onClick={onToggleTheme}
-          title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+        {/* User Account Profile Pill */}
+        <button
+          type="button"
+          className="sidebar-account-pill"
+          onClick={onOpenAccount}
+          title="Account & Profile Settings"
+          aria-label={`Account profile for ${accountProfile?.displayName || 'Creator'}`}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            width: '100%',
+            padding: '8px 10px',
+            marginBottom: '8px',
+            background: 'var(--bg-tertiary, #181922)',
+            border: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.08))',
+            borderRadius: 'var(--radius-md, 8px)',
+            color: 'var(--text-primary, #ffffff)',
+            cursor: 'pointer',
+            textAlign: 'left',
+            transition: 'all 0.15s ease'
+          }}
         >
-          {theme === 'dark' ? <Sun size={16} strokeWidth={1.5} /> : <Moon size={16} strokeWidth={1.5} />}
-          <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+          <div
+            style={{
+              width: '26px',
+              height: '26px',
+              borderRadius: '50%',
+              backgroundColor: accountProfile?.avatarColor || '#3b82f6',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#ffffff',
+              fontWeight: 700,
+              fontSize: '0.75rem',
+              flexShrink: 0
+            }}
+          >
+            {(accountProfile?.displayName || 'C').slice(0, 1).toUpperCase()}
+          </div>
+          <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 600, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {accountProfile?.displayName || 'Creator'}
+            </span>
+            <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary, #9ca3af)', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {accountProfile?.handle || '@creator'}
+            </span>
+          </div>
+          <span
+            style={{
+              fontSize: '0.65rem',
+              padding: '2px 6px',
+              borderRadius: '10px',
+              background: 'rgba(99, 102, 241, 0.2)',
+              color: 'var(--accent, #818cf8)',
+              fontWeight: 600,
+              flexShrink: 0
+            }}
+          >
+            {accountProfile?.tier || 'Pro'}
+          </span>
         </button>
-        <button 
-          className="footer-action-btn" 
-          onClick={onOpenSettings}
-          title="Corez Settings"
-        >
-          <Settings size={16} strokeWidth={1.5} />
-          <span>Settings</span>
-        </button>
+
+        <div style={{ display: 'flex', gap: '6px', width: '100%' }}>
+          <button 
+            className="footer-action-btn" 
+            onClick={onToggleTheme}
+            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            style={{ flex: 1 }}
+          >
+            {theme === 'dark' ? <Sun size={16} strokeWidth={1.5} /> : <Moon size={16} strokeWidth={1.5} />}
+            <span>{theme === 'dark' ? 'Light' : 'Dark'}</span>
+          </button>
+          <button 
+            className="footer-action-btn" 
+            onClick={onOpenSettings}
+            title="Corez Settings"
+            style={{ flex: 1 }}
+          >
+            <Settings size={16} strokeWidth={1.5} />
+            <span>Settings</span>
+          </button>
+        </div>
       </div>
     </aside>
   );

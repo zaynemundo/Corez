@@ -5,8 +5,10 @@ import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
 import CanvasPreview from './components/CanvasPreview';
 import SettingsModal from './components/SettingsModal';
+import AccountModal from './components/AccountModal';
 import { generateAIResponse, extractCodeFromMessage, generateSessionTitle, generateAISessionTitle } from './services/aiService';
 import { storeAppInR2, deleteSessionAppsInR2 } from './services/appStorageService';
+import { loadAccountProfile } from './services/accountService';
 function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -80,6 +82,8 @@ export default function App() {
   const [canvasFullScreen, setCanvasFullScreen] = useState(false);
   const [activeCanvasCode, setActiveCanvasCode] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [accountProfile, setAccountProfile] = useState(() => loadAccountProfile());
   const [isThinking, setIsThinking] = useState(false);
   const [streamingContent, setStreamingContent] = useState(null);
   // Swarm visibility: while the harness runs the parallel specialist
@@ -494,6 +498,8 @@ export default function App() {
         theme={theme}
         onToggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
         onCloseSidebar={() => setSidebarOpen(false)}
+        accountProfile={accountProfile}
+        onOpenAccount={() => setAccountOpen(true)}
       />
 
       {isMobileViewport && sidebarOpen && (
@@ -588,6 +594,15 @@ export default function App() {
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         onClearAllHistory={handleClearAllHistory}
+        onOpenAccount={() => setAccountOpen(true)}
+      />
+
+      <AccountModal
+        isOpen={accountOpen}
+        onClose={() => setAccountOpen(false)}
+        profile={accountProfile}
+        onProfileUpdate={(updated) => setAccountProfile(updated)}
+        sessions={sessions}
       />
     </div>
   );
