@@ -2196,21 +2196,62 @@ async function handleEmailVerification(request, env) {
     // Live dispatch via Resend if RESEND_API_KEY is configured
     if (env?.RESEND_API_KEY) {
       try {
-        const resendRes = await fetch('https://api.resend.com/emails', {
+        const emailHtml = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"/><title>CoreZ Verification Code</title></head>
+<body style="margin:0;padding:0;background:#090a0f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#f3f4f6;">
+  <div style="max-width:480px;margin:40px auto;background:#12131a;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:32px;text-align:left;">
+    <div style="font-size:20px;font-weight:800;letter-spacing:-0.5px;color:#ffffff;margin-bottom:20px;">COREZ</div>
+    <h2 style="font-size:18px;font-weight:600;color:#ffffff;margin:0 0 12px;">Verify your email address</h2>
+    <p style="font-size:14px;line-height:1.5;color:#9ca3af;margin:0 0 24px;">Your 6-digit confirmation code for <strong>${email}</strong> is:</p>
+    <div style="background:rgba(59,130,246,0.12);border:1px solid rgba(59,130,246,0.3);border-radius:8px;padding:18px;text-align:center;margin-bottom:24px;">
+      <span style="font-size:32px;font-weight:700;letter-spacing:8px;color:#60a5fa;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,monospace;">${code}</span>
+    </div>
+    <p style="font-size:13px;line-height:1.5;color:#9ca3af;margin:0 0 20px;">This code expires in <strong>10 minutes</strong>. If you did not request this, you can safely ignore this email.</p>
+    <hr style="border:none;border-top:1px solid rgba(255,255,255,0.08);margin:20px 0;" />
+    <p style="font-size:11px;color:#6b7280;margin:0;">Sent by CoreZ Security • AI-Native Creative Development Platform</p>
+  </div>
+</body>
+</html>`;
+
+        let fromSender = env.RESEND_FROM_EMAIL || 'CoreZ Security <verification@corez.pro>';
+        let resendRes = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${env.RESEND_API_KEY}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            from: 'CoreZ Security <verification@corez.pro>',
+            from: fromSender,
             to: [email],
             subject: `CoreZ Verification Code: ${code}`,
-            html: `<div style="font-family:sans-serif;padding:20px;background:#090a0f;color:#fff;"><h2>CoreZ Verification Code</h2><p>Your 6-digit verification code is:</p><h1 style="color:#60a5fa;letter-spacing:6px;">${code}</h1><p>Expires in 10 minutes.</p></div>`
+            html: emailHtml
           })
         });
+
+        // If custom domain is not yet verified on Resend, fallback to Resend testing sender
+        if (!resendRes.ok && fromSender.includes('corez.pro')) {
+          fromSender = 'CoreZ <onboarding@resend.dev>';
+          resendRes = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              from: fromSender,
+              to: [email],
+              subject: `CoreZ Verification Code: ${code}`,
+              html: emailHtml
+            })
+          });
+        }
+
         if (resendRes.ok) {
           simulated = false;
+        } else {
+          const errBody = await resendRes.text();
+          console.warn('Resend email response error:', resendRes.status, errBody);
         }
       } catch (err) {
         console.warn('Resend email dispatch error:', safeErrorDetail(err));
