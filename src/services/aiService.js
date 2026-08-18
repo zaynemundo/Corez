@@ -1244,6 +1244,30 @@ export function extractCodeFromMessage(text) {
     }
   }
 
+  // 3. Unfenced multi-page site or HTML document (when model emits code without ``` fences)
+  const multiPageIdx = text.search(/<!--\s*(?:PAGE|CORESITE-PAGES):\s*[^\s>]+\s*-->/i);
+  if (multiPageIdx !== -1) {
+    const candidate = text.slice(multiPageIdx).trim();
+    if (candidate.includes('<html') || candidate.includes('<!DOCTYPE') || candidate.includes('</html>') || candidate.includes('<body') || candidate.includes('<head')) {
+      return candidate;
+    }
+  }
+
+  const htmlDocIdx = text.search(/(?:<!DOCTYPE\s+html|<html[\s>])/i);
+  if (htmlDocIdx !== -1) {
+    const candidate = text.slice(htmlDocIdx).trim();
+    if (candidate.includes('</html>') || candidate.includes('<body') || candidate.includes('<head') || candidate.includes('<style') || candidate.includes('<script')) {
+      return candidate;
+    }
+  }
+
+  // 4. Standalone canvas game with context/loop
+  const canvasIdx = text.search(/<canvas[\s>]/i);
+  if (canvasIdx !== -1 && (/\.getContext\s*\(/i.test(text) || /requestAnimationFrame/i.test(text))) {
+    const candidate = text.slice(canvasIdx).trim();
+    return candidate;
+  }
+
   return null;
 }
 

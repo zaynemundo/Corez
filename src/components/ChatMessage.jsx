@@ -72,6 +72,35 @@ function isExecutableCodeBlock(lang, code) {
   return false;
 }
 
+function extractUnfencedDeliverable(text) {
+  if (!text || typeof text !== 'string') return null;
+
+  // Check for multi-page site marker or document root
+  let matchIdx = text.search(/<!--\s*(?:PAGE|CORESITE-PAGES):\s*[^\s>]+\s*-->/i);
+  if (matchIdx === -1) {
+    matchIdx = text.search(/(?:<!DOCTYPE\s+html|<html[\s>])/i);
+    if (matchIdx !== -1) {
+      const remaining = text.slice(matchIdx);
+      if (!remaining.includes('</html>') && !remaining.includes('</body>') && !remaining.includes('</head>') && !remaining.includes('<style') && !remaining.includes('<script')) {
+        matchIdx = -1;
+      }
+    }
+  }
+
+  if (matchIdx === -1) return null;
+
+  let preamble = text.slice(0, matchIdx).trim();
+  // Strip trailing "Fullscreen" or "Preview" single-word labels if present at end of preamble
+  preamble = preamble.replace(/(?:\r?\n|^)\s*(?:Fullscreen|Preview)\s*$/i, '').trim();
+
+  const code = text.slice(matchIdx).trim();
+  const isExecutable = isExecutableCodeBlock('html', code);
+
+  if (!isExecutable) return null;
+
+  return { preamble, code };
+}
+
 function CodeSnippetBlock({ code, lang, onRunInCanvas, onReviseCode }) {
   const [copied, setCopied] = useState(false);
 
@@ -1132,8 +1161,31 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
       }
     }
 
-    const expandedParts = [];
+    const processedParts = [];
     for (const p of parts) {
+      if (p.type === 'text') {
+        const unfenced = extractUnfencedDeliverable(p.content);
+        if (unfenced) {
+          if (unfenced.preamble) {
+            processedParts.push({ type: 'text', content: unfenced.preamble });
+          }
+          processedParts.push({
+            type: 'code',
+            lang: 'html',
+            code: unfenced.code,
+            isExecutable: true,
+            index: blockCount++
+          });
+        } else {
+          processedParts.push(p);
+        }
+      } else {
+        processedParts.push(p);
+      }
+    }
+
+    const expandedParts = [];
+    for (const p of processedParts) {
       if (p.type === 'text') {
         const subParts = splitTextAndEmail(p.content);
         expandedParts.push(...subParts);

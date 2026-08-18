@@ -562,6 +562,27 @@ describe('Hosted AI fallback behavior', () => {
     expect(extractCodeFromMessage('Use <div> tags in React.')).toBeNull();
   });
 
+  it('extracts unfenced multi-page site deliverables and HTML documents', () => {
+    const unfencedMultiPage = `I will build Christian's portfolio. Let me create this.
+
+Fullscreen
+<!-- PAGE: index.html -->
+<!DOCTYPE html>
+<html><body><h1>Home</h1></body></html>
+<!-- PAGE: about.html -->
+<!DOCTYPE html>
+<html><body><h1>About</h1></body></html>`;
+
+    const multiCode = extractCodeFromMessage(unfencedMultiPage);
+    expect(multiCode).toContain('<!-- PAGE: index.html -->');
+    expect(multiCode).toContain('<!-- PAGE: about.html -->');
+
+    const unfencedHtml = `Here is your app:\n\n<!DOCTYPE html>\n<html lang="en"><head><title>App</title></head><body><h1>App</h1></body></html>`;
+    const htmlCode = extractCodeFromMessage(unfencedHtml);
+    expect(htmlCode).toContain('<!DOCTYPE html>');
+    expect(htmlCode).toContain('<h1>App</h1>');
+  });
+
   it('gives actionable backend guidance for network failures regardless of hostname', () => {
     // Simulate a transport failure (the browser never got an HTTP response)
     // on a LAN IP / custom host, not strict localhost.

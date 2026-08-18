@@ -138,4 +138,55 @@ describe('ChatMessage code block actions', () => {
     expect(screen.getByRole('button', { name: /Open Canvas Preview/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Revise/i })).toBeInTheDocument();
   });
+
+  it('shows Open Canvas Preview and Revise for an unfenced multi-page portfolio site', () => {
+    let ranCode = null;
+    const content = `I'll extract Christian's information from the resume and build an Awwwards-inspired dark glassmorphism portfolio. Let me create this.
+
+Fullscreen
+<!-- PAGE: index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head><title>Portfolio</title></head>
+<body><h1>Christian Vestil</h1></body>
+</html>
+<!-- PAGE: about.html -->
+<!DOCTYPE html>
+<html><body><h1>About</h1></body></html>`;
+
+    render(
+      <ChatMessage
+        message={{ role: 'assistant', content }}
+        onRunInCanvas={(code) => { ranCode = code; }}
+        onReviseCode={() => {}}
+      />
+    );
+
+    expect(screen.getByText(/I'll extract Christian's information/i)).toBeInTheDocument();
+    const previewBtn = screen.getByRole('button', { name: /Open Canvas Preview/i });
+    expect(previewBtn).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Revise/i })).toBeInTheDocument();
+
+    previewBtn.click();
+    expect(ranCode).toContain('<!-- PAGE: index.html -->');
+    expect(ranCode).toContain('<!-- PAGE: about.html -->');
+  });
+
+  it('shows Open Canvas Preview and Revise for an unfenced full HTML document', () => {
+    let ranCode = null;
+    const content = `Here is your website:\n\n<!DOCTYPE html>\n<html lang="en"><head><title>Site</title></head><body><h1>Hello World</h1></body></html>`;
+
+    render(
+      <ChatMessage
+        message={{ role: 'assistant', content }}
+        onRunInCanvas={(code) => { ranCode = code; }}
+        onReviseCode={() => {}}
+      />
+    );
+
+    const previewBtn = screen.getByRole('button', { name: /Open Canvas Preview/i });
+    expect(previewBtn).toBeInTheDocument();
+    previewBtn.click();
+    expect(ranCode).toContain('<!DOCTYPE html>');
+  });
 });
