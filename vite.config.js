@@ -3,19 +3,20 @@ import react from '@vitejs/plugin-react';
 import fs from 'node:fs';
 import path from 'node:path';
 
-// Load .dev.vars into process.env if present
-try {
-  const devVarsPath = path.resolve(process.cwd(), '.dev.vars');
-  if (fs.existsSync(devVarsPath)) {
-    const lines = fs.readFileSync(devVarsPath, 'utf8').split('\n');
-    for (const line of lines) {
-      const match = line.match(/^([^=]+)=(.*)$/);
-      if (match && !process.env[match[1].trim()]) {
-        process.env[match[1].trim()] = match[2].trim();
+function getLocalResendApiKey() {
+  if (process.env.RESEND_API_KEY) return process.env.RESEND_API_KEY;
+  try {
+    const devVarsPath = path.resolve(process.cwd(), '.dev.vars');
+    if (fs.existsSync(devVarsPath)) {
+      const lines = fs.readFileSync(devVarsPath, 'utf8').split('\n');
+      for (const line of lines) {
+        const match = line.match(/^RESEND_API_KEY=(.*)$/);
+        if (match) return match[1].trim();
       }
     }
-  }
-} catch {}
+  } catch {}
+  return null;
+}
 
 const LOCAL_VERIFICATION_STORE = new Map();
 
@@ -44,7 +45,7 @@ function localVerifyPlugin() {
               LOCAL_VERIFICATION_STORE.set(email, { code, expiresAt, attempts: 0 });
 
               let simulated = true;
-              const resendApiKey = process.env.RESEND_API_KEY;
+              const resendApiKey = getLocalResendApiKey();
 
               if (resendApiKey) {
                 try {
