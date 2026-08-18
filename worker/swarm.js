@@ -133,14 +133,16 @@ export async function runSwarmSpecialists({ prompt, spec, env = {}, signal = nul
  */
 export function buildSwarmContext(spec, contributions, options = {}) {
   const parts = [`Build specification:\n${String(spec || '').trim()}`];
-  for (const contribution of contributions || []) {
-    if (contribution?.role && contribution?.content) {
-      parts.push(`## ${contribution.role}\n${contribution.content}`);
+  if (Array.isArray(contributions) && contributions.length > 0) {
+    for (const contribution of contributions) {
+      if (contribution?.role && contribution?.content) {
+        parts.push(`## ${contribution.role}\n${contribution.content}`);
+      }
     }
-  }
-  const designPrompt = buildDesignSystemPrompt(options.prompt || spec, options);
-  if (designPrompt) {
-    parts.push(designPrompt);
+    const designPrompt = buildDesignSystemPrompt(options.prompt || spec, options);
+    if (designPrompt) {
+      parts.push(designPrompt);
+    }
   }
   parts.push('Deliver ONLY the complete, finished artifact as a single self-contained HTML document.');
   return parts.join('\n\n');

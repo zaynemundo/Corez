@@ -124,7 +124,7 @@ describe('R2 Multi-App Storage & Chat Deletion Cleanup Contract', () => {
 
       const result = await publishAppInR2({ html: '<h1>Game</h1>', title: 'FPS Game' });
 
-      expect(result).toEqual({ success: true, slug: 'asyag23-123', url: '/asyag23-123' });
+      expect(result).toEqual({ success: true, slug: 'asyag23-123', url: '/asyag23-123', customized: false });
       expect(fetchMock).toHaveBeenCalledWith('/api/publish', expect.objectContaining({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -166,14 +166,14 @@ describe('R2 Multi-App Storage & Chat Deletion Cleanup Contract', () => {
       }
     });
 
-    it('returns null when content is missing or the publish request fails', async () => {
+    it('returns null when content is missing or error object when the publish request fails', async () => {
       const fetchMock = vi.fn(async () => new Response(JSON.stringify({ error: 'down' }), { status: 400 }));
       vi.stubGlobal('fetch', fetchMock);
 
       expect(await publishAppInR2({ html: '' })).toBeNull();
       expect(fetchMock).not.toHaveBeenCalled();
 
-      expect(await publishAppInR2({ html: '<h1>Game</h1>' })).toBeNull();
+      expect(await publishAppInR2({ html: '<h1>Game</h1>' })).toEqual({ success: false, error: 'down' });
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
