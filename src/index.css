@@ -817,57 +817,6 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Live streaming assistant text: rendered as it arrives, subtle blur until
    the generation completes so partial tokens never look final. */
-.streaming-container {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  width: 100%;
-}
-
-.streaming-header {
-  display: inline-flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.3rem 0.6rem;
-  border-radius: var(--radius-pill);
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  width: fit-content;
-  max-width: 100%;
-}
-
-.streaming-status-label {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-.streaming-collapse-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 2px 7px;
-  border-radius: var(--radius-pill);
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  font-size: 0.7rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: var(--transition-fast);
-}
-
-.streaming-collapse-btn:hover {
-  background: var(--bg-card);
-  border-color: var(--border-hover);
-  transform: scale(1.03);
-}
-
 .streaming-text {
   white-space: pre-wrap;
   word-break: break-word;
@@ -1724,6 +1673,21 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
+}
+
+.thinking-dots-toggle {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  margin-bottom: 0.4rem;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.thinking-dots-toggle:hover {
+  background: var(--bg-card);
+  border-color: var(--border-hover);
+  transform: scale(1.04);
 }
 
 .thinking-dot {

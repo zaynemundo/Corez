@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { PanelLeft, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { PanelLeft } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
@@ -655,38 +655,23 @@ export default function App() {
                     {isThinking && (
                       <div className="message-wrapper ai">
                         <div className="message-body">
-                          {streamingContent ? (
-                            <div className="streaming-container" role="status" aria-label="Corez is responding">
-                              <div className="streaming-header">
-                                <div className="streaming-status-label">
-                                  <Loader2 size={12} className="spin-icon" style={{ color: 'var(--accent, #6366f1)' }} />
-                                  <span>{swarmVisible ? 'Swarm planning & generating…' : 'Generating response…'}</span>
-                                </div>
-                                <button
-                                  type="button"
-                                  className="streaming-collapse-btn"
-                                  onClick={() => setIsStreamCollapsed(prev => !prev)}
-                                  title={isStreamCollapsed ? 'Expand response stream' : 'Collapse response stream'}
-                                  aria-label={isStreamCollapsed ? 'Expand response stream' : 'Collapse response stream'}
-                                >
-                                  <span>{isStreamCollapsed ? 'Expand' : 'Collapse'}</span>
-                                  {isStreamCollapsed ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
-                                </button>
-                              </div>
-                              {!isStreamCollapsed && (
-                                <div className="message-content streaming-text">
-                                  {streamingContent}
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="thinking-indicator-box thinking-dots" aria-label="Corez is thinking" role="status">
-                              {swarmVisible && (
-                                <span className="thinking-phase-label">Swarm planning…</span>
-                              )}
-                              <span className="thinking-dot" />
-                              <span className="thinking-dot" />
-                              <span className="thinking-dot" />
+                          <button
+                            type="button"
+                            className="thinking-indicator-box thinking-dots thinking-dots-toggle"
+                            onClick={() => setIsStreamCollapsed(prev => !prev)}
+                            title={isStreamCollapsed ? 'Click to expand response stream' : 'Click to collapse response stream'}
+                            aria-label={isStreamCollapsed ? 'Expand response' : 'Collapse response'}
+                          >
+                            {swarmVisible && (
+                              <span className="thinking-phase-label">Swarm planning…</span>
+                            )}
+                            <span className="thinking-dot" />
+                            <span className="thinking-dot" />
+                            <span className="thinking-dot" />
+                          </button>
+                          {streamingContent && !isStreamCollapsed && (
+                            <div className="message-content streaming-text" role="status" aria-label="Corez is responding">
+                              {streamingContent}
                             </div>
                           )}
                         </div>
