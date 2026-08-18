@@ -1,6 +1,6 @@
-import { X, Settings, Trash2, User } from 'lucide-react';
+import { X, Settings, Trash2 } from 'lucide-react';
 
-export default function SettingsModal({ isOpen, onClose, onClearAllHistory, onOpenAccount }) {
+export default function SettingsModal({ isOpen, onClose, onClearAllHistory }) {
   if (!isOpen) return null;
 
   return (
@@ -20,24 +20,10 @@ export default function SettingsModal({ isOpen, onClose, onClearAllHistory, onOp
           Corez automatically routes text, code and visual requests through configured hosted AI services with resilient fallbacks. Model selection is managed server-side.
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '1rem' }}>
-          {onOpenAccount && (
-            <button
-              className="footer-action-btn"
-              style={{ width: '100%', justifyContent: 'flex-start', padding: '8px 12px' }}
-              onClick={() => {
-                onClose();
-                onOpenAccount();
-              }}
-            >
-              <User size={15} strokeWidth={1.5} />
-              <span>Manage Account & Profile</span>
-            </button>
-          )}
-
+        <div style={{ marginTop: '0.5rem' }}>
           <button
             className="footer-action-btn"
-            style={{ width: '100%', color: '#ef4444', justifyContent: 'flex-start', padding: '8px 12px' }}
+            style={{ width: '100%', color: '#ef4444' }}
             onClick={onClearAllHistory}
           >
             <Trash2 size={15} strokeWidth={1.5} />
