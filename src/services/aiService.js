@@ -1214,7 +1214,16 @@ export function extractCodeFromMessage(text) {
       }
     }
     if (validCodes.length > 0) {
-      return validCodes.join('\n\n');
+      // Salvage orphaned HTML closing tags that trail the last code block
+      // (the harness occasionally emits them outside the fence).
+      const lastFenceIdx = text.lastIndexOf('```');
+      const trailing = lastFenceIdx > -1 ? text.slice(lastFenceIdx + 3).trim() : '';
+      const ORPHANED_CLOSE = /^\s*(?:<\/(?:script|style|body|html)>\s*)+$/i;
+      const joined = validCodes.join('\n\n');
+      if (trailing && ORPHANED_CLOSE.test(trailing)) {
+        return joined + '\n' + trailing;
+      }
+      return joined;
     }
   }
 

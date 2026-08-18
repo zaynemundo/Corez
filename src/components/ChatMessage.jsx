@@ -1109,6 +1109,24 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
       });
     }
 
+    // Post-process: orphaned HTML closing tags (e.g. </body></html>) that
+    // trail the last code block should be merged INTO that block rather than
+    // rendered as raw plain text.  The harness occasionally emits them outside
+    // the fenced code block due to continuation stitching.
+    const ORPHANED_TAG_RE = /^\s*(?:<\/(?:script|style|body|html|div|section|main|head|head)>\s*)+$/i;
+    for (let i = parts.length - 1; i > 0; i--) {
+      if (parts[i].type === 'text' && ORPHANED_TAG_RE.test(parts[i].content)) {
+        // Find the preceding code block.
+        for (let j = i - 1; j >= 0; j--) {
+          if (parts[j].type === 'code') {
+            parts[j].code += '\n' + parts[i].content.trim();
+            parts.splice(i, 1);
+            break;
+          }
+        }
+      }
+    }
+
     const expandedParts = [];
     for (const p of parts) {
       if (p.type === 'text') {
