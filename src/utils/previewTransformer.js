@@ -336,22 +336,6 @@ export function formatCodeForPreview(rawCode) {
       return false;
     };
     window.addEventListener('mousedown', function() { window.focus(); });
-    // Navigation guard: same-frame navigation would leave the srcdoc and
-    // blank the preview to white, so external links (http(s), mailto, tel)
-    // open in a real new tab instead of navigating the iframe. Hash and
-    // javascript: links keep default behaviour.
-    document.addEventListener('submit', function(e) { e.preventDefault(); }, true);
-    document.addEventListener('click', function(e) {
-      var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
-      if (!a) return;
-      var href = (a.getAttribute('href') || '').trim();
-      if (href === '' || href.charAt(0) === '#') return;
-      if (/^javascript:/i.test(href)) return;
-      e.preventDefault();
-      if (/^(https?:|mailto:|tel:)/i.test(href)) {
-        window.open(href, '_blank', 'noopener');
-      }
-    }, true);
   </script>
 </head>
 <body>
@@ -481,22 +465,6 @@ export function formatCodeForPreview(rawCode) {
       return false;
     };
     window.addEventListener('mousedown', function() { window.focus(); });
-    // Navigation guard: same-frame navigation would leave the srcdoc and
-    // blank the preview to white, so external links (http(s), mailto, tel)
-    // open in a real new tab instead of navigating the iframe. Hash and
-    // javascript: links keep default behaviour.
-    document.addEventListener('submit', function(e) { e.preventDefault(); }, true);
-    document.addEventListener('click', function(e) {
-      var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
-      if (!a) return;
-      var href = (a.getAttribute('href') || '').trim();
-      if (href === '' || href.charAt(0) === '#') return;
-      if (/^javascript:/i.test(href)) return;
-      e.preventDefault();
-      if (/^(https?:|mailto:|tel:)/i.test(href)) {
-        window.open(href, '_blank', 'noopener');
-      }
-    }, true);
   </script>
 </head>
 <body>
@@ -736,6 +704,7 @@ export function formatCodeForPreview(rawCode) {
     }
   </script>
   <script>${FULLSCREEN_GAME_PATCH}</script>
+  <script>${NAVIGATION_GUARD_SCRIPT}</script>
 </body>
 </html>`;
 }

@@ -127,6 +127,53 @@ describe('CanvasPreview multi-page sites', () => {
     expect(screen.getByText(/incomplete: index\.html links to missing page pricing\.html/i)).toBeTruthy();
   });
 
+  it('flags a single-page site whose nav links to pages that were never shipped', () => {
+    // The model often emits one fence per page with markers between fences;
+    // when those markers are lost the site collapses to a single page whose
+    // nav links point at pages that do not exist. That must be caught here
+    // instead of published as a broken link.
+    renderPreview('<!DOCTYPE html><html><body><nav><a href="about.html">About</a></nav><h1>Home</h1></body></html>');
+    expect(screen.getByText(/Incomplete site/)).toBeTruthy();
+    expect(screen.getByText(/missing page about\.html/)).toBeTruthy();
+  });
+
+  it('blocks publishing a single-page site with dead internal .html links', () => {
+    renderPreview('<!DOCTYPE html><html><body><a href="contact.html">Contact</a></body></html>');
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
+    expect(publishAppInR2).not.toHaveBeenCalled();
+    expect(screen.getByText(/incomplete: index\.html links to missing page contact\.html/i)).toBeTruthy();
+  });
+
+  it('still publishes a single-page site with no internal .html links', async () => {
+    renderPreview('<!DOCTYPE html><html><body><h1>Single</h1></body></html>');
+    expect(screen.queryByText(/Incomplete site/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
+    await act(async () => {});
+    expect(publishAppInR2).toHaveBeenCalledTimes(1);
+  });
+
+  it('allows single-page self-links to index.html', () => {
+    renderPreview('<!DOCTYPE html><html><body><a href="index.html">Home</a><h1>Single</h1></body></html>');
+    expect(screen.queryByText(/Incomplete site/)).toBeNull();
+  });
+
+  it('publishes the index page as the home document even after navigating inside the preview', async () => {
+    const { container } = renderPreview();
+    const fakeWindow = withFakeIframeWindow(container);
+    const event = new MessageEvent('message', {
+      source: fakeWindow,
+      data: { type: 'corez-nav', page: 'about.html' }
+    });
+    act(() => {
+      window.dispatchEvent(event);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
+    await act(async () => {});
+    const payload = publishAppInR2.mock.calls[0][0];
+    expect(payload.html).toContain('<h1>Home</h1>');
+    expect(payload.html).not.toContain('<h1>About Us</h1>');
+  });
+
   it('publishes a complete multi-page site normally', async () => {
     renderPreview();
     fireEvent.click(screen.getByRole('button', { name: 'Publish' }));

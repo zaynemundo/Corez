@@ -92,6 +92,45 @@ describe('ChatMessage code block actions', () => {
     expect(screen.getByRole('button', { name: /Revise/i })).toBeInTheDocument();
   });
 
+  it('merges marker-separated page fences into ONE multi-page block for preview', () => {
+    // The model often emits one fence per page with the PAGE markers
+    // BETWEEN the fences. The chat must merge them into a single block so
+    // Open Canvas Preview runs the whole site (a lone page would render
+    // with dead nav links -> blank pages).
+    const content = `Here is your portfolio:
+
+<!-- PAGE: index.html -->
+\`\`\`html
+<!DOCTYPE html>
+<html><body><nav><a href="about.html">About</a></nav><h1>Home</h1></body></html>
+\`\`\`
+
+<!-- PAGE: about.html -->
+\`\`\`html
+<!DOCTYPE html>
+<html><body><h1>About Us</h1></body></html>
+\`\`\`
+`;
+    let ranCode = null;
+    render(
+      <ChatMessage
+        message={{ role: 'assistant', content }}
+        onRunInCanvas={(code) => { ranCode = code; }}
+        onReviseCode={() => {}}
+      />
+    );
+
+    // Exactly ONE preview action bar for the merged site.
+    expect(screen.getAllByRole('button', { name: /Open Canvas Preview/i })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /Revise/i })).toHaveLength(1);
+
+    screen.getByRole('button', { name: /Open Canvas Preview/i }).click();
+    expect(ranCode).toContain('<!-- PAGE: index.html -->');
+    expect(ranCode).toContain('<!-- PAGE: about.html -->');
+    expect(ranCode).toContain('<h1>Home</h1>');
+    expect(ranCode).toContain('<h1>About Us</h1>');
+  });
+
   it('still renders the Copy button for non-executable snippets', () => {
     const content = 'Example:\n\n```js\nfunction greet(name) { return `Hello ${name}`; }\n```';
     renderAssistant(content);

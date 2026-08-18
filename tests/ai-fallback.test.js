@@ -583,6 +583,72 @@ Fullscreen
     expect(htmlCode).toContain('<h1>App</h1>');
   });
 
+  it('preserves PAGE markers the model places BETWEEN separate fenced blocks', () => {
+    // The model frequently emits ONE fence per page with the multi-page
+    // markers sitting between the fences. Dropping those markers collapsed
+    // the site into a single page with dead nav links — blank preview pages
+    // and broken published links. Every marker line must survive extraction.
+    const fenced = `Here is your multi-page portfolio:
+
+<!-- PAGE: index.html -->
+\`\`\`html
+<!DOCTYPE html>
+<html><body><nav><a href="about.html">About</a></nav><h1>Home</h1></body></html>
+\`\`\`
+
+<!-- PAGE: about.html -->
+\`\`\`html
+<!DOCTYPE html>
+<html><body><h1>About Us</h1></body></html>
+\`\`\`
+
+<!-- PAGE: contact.html -->
+\`\`\`html
+<!DOCTYPE html>
+<html><body><h1>Contact</h1></body></html>
+\`\`\``;
+
+    const code = extractCodeFromMessage(fenced);
+    expect(code).toContain('<!-- PAGE: index.html -->');
+    expect(code).toContain('<!-- PAGE: about.html -->');
+    expect(code).toContain('<!-- PAGE: contact.html -->');
+    expect(code.indexOf('<!-- PAGE: index.html -->')).toBeLessThan(code.indexOf('<!-- PAGE: about.html -->'));
+    expect(code.indexOf('<!-- PAGE: about.html -->')).toBeLessThan(code.indexOf('<!-- PAGE: contact.html -->'));
+    expect(code).toContain('<h1>Home</h1>');
+    expect(code).toContain('<h1>About Us</h1>');
+    expect(code).toContain('<h1>Contact</h1>');
+  });
+
+  it('preserves a lone leading marker before the first fenced block', () => {
+    const fenced = `<!-- PAGE: index.html -->
+\`\`\`html
+<!DOCTYPE html>
+<html><body><h1>Home</h1></body></html>
+\`\`\``;
+    const code = extractCodeFromMessage(fenced);
+    expect(code).toContain('<!-- PAGE: index.html -->');
+    expect(code).toContain('<h1>Home</h1>');
+  });
+
+  it('keeps markers when a multi-page output is truncated mid-way', () => {
+    const truncated = `Here is your site:
+
+<!-- PAGE: index.html -->
+\`\`\`html
+<!DOCTYPE html>
+<html><body><h1>Home</h1></body></html>
+\`\`\`
+
+<!-- PAGE: about.html -->
+\`\`\`html
+<!DOCTYPE html>
+<html><body><h1>About (cut off`;
+    const code = extractCodeFromMessage(truncated);
+    expect(code).toContain('<!-- PAGE: index.html -->');
+    expect(code).toContain('<!-- PAGE: about.html -->');
+    expect(code).toContain('<h1>Home</h1>');
+  });
+
   it('gives actionable backend guidance for network failures regardless of hostname', () => {
     // Simulate a transport failure (the browser never got an HTTP response)
     // on a LAN IP / custom host, not strict localhost.

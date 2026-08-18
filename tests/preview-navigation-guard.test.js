@@ -28,9 +28,17 @@ describe('preview navigation guard', () => {
     expect(html).toContain("closest('a[href]')");
   });
 
-  it('keeps already-complete HTML documents unchanged', () => {
+  it('injects the navigation guard into already-complete HTML documents too', () => {
+    // Full documents used to pass through untouched; a single-page site
+    // whose nav links to about.html/contact.html would then navigate the
+    // sandboxed iframe away from its srcdoc and blank the preview. The
+    // guard is now injected into complete documents as well, while the
+    // document's own content stays byte-for-byte intact.
     const doc = '<!DOCTYPE html><html><body><h1>hi</h1></body></html>';
-    expect(formatCodeForPreview(doc)).toBe(doc);
+    const formatted = formatCodeForPreview(doc);
+    expect(formatted).toContain('<h1>hi</h1>');
+    expect(formatted).toContain("closest('a[href]')");
+    expect(formatted).toContain("document.addEventListener('submit', function(e) { e.preventDefault(); }, true)");
   });
 
   it('prevents form submissions from blanking the preview', () => {

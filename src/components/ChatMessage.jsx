@@ -1166,13 +1166,27 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
     // blocks are merged back into a single multi-page code block so "Open
     // Canvas Preview" runs the WHOLE site — a lone page would render with
     // dead nav links (blank pages on click) and a broken published link.
-    // Marker text with no surrounding code is attached to the next block.
-    const MARKER_ONLY_TEXT_RE = /^\s*(?:<!--\s*(?:PAGE|CORESITE-PAGES):[^\n]*-->\s*)+$/;
+    // Marker lines are pulled out of any text part (prose around them is
+    // kept as its own text) and attached to the following code block, or
+    // spliced into the previous block when the text sat between two blocks.
+    const MARKER_LINE_RE = /^\s*<!--\s*(?:PAGE|CORESITE-PAGES):[^\n]*-->\s*$/gm;
     const mergeableParts = [];
     let pendingMarkers = null;
     for (const p of parts) {
-      if (p.type === 'text' && MARKER_ONLY_TEXT_RE.test(p.content)) {
-        pendingMarkers = pendingMarkers ? `${pendingMarkers}\n${p.content.trim()}` : p.content.trim();
+      if (p.type === 'text') {
+        // A text part that already contains the documents themselves (an
+        // unfenced deliverable) keeps its markers — the later
+        // extractUnfencedDeliverable pass preserves them. Only marker text
+        // BETWEEN fenced blocks (no document content) is spliced here.
+        const containsDocuments = /<!DOCTYPE\s+html|<html[\s>]/.test(p.content);
+        const markerLines = containsDocuments ? [] : (p.content.match(MARKER_LINE_RE) || []).map((m) => m.trim());
+        if (markerLines.length > 0) {
+          const prose = p.content.replace(MARKER_LINE_RE, '').trim();
+          if (prose) mergeableParts.push({ type: 'text', content: prose });
+          pendingMarkers = pendingMarkers ? `${pendingMarkers}\n${markerLines.join('\n')}` : markerLines.join('\n');
+          continue;
+        }
+        mergeableParts.push(p);
         continue;
       }
       if (p.type === 'code' && pendingMarkers) {
@@ -1181,11 +1195,12 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
           prev.code = `${prev.code}\n\n${pendingMarkers}\n\n${p.code}`;
           prev.lang = 'html';
           prev.isExecutable = true;
-        } else {
-          p.code = `${pendingMarkers}\n\n${p.code}`;
-          p.lang = 'html';
-          p.isExecutable = true;
+          pendingMarkers = null;
+          continue;
         }
+        p.code = `${pendingMarkers}\n\n${p.code}`;
+        p.lang = 'html';
+        p.isExecutable = true;
         pendingMarkers = null;
       }
       mergeableParts.push(p);

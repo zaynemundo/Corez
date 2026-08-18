@@ -1,10 +1,36 @@
 import { describe, it, expect } from 'vitest';
-import { formatCodeForPreview, parseMultiPageSite, injectMultiPageRouter, validateMultiPageSite, MULTI_PAGE_NAME_PATTERN } from '../src/utils/previewTransformer.js';
+import { formatCodeForPreview, parseMultiPageSite, injectMultiPageRouter, validateMultiPageSite, MULTI_PAGE_NAME_PATTERN, NAVIGATION_GUARD_SCRIPT } from '../src/utils/previewTransformer.js';
 
 describe('previewTransformer', () => {
-  it('passes through pure HTML documents untouched', () => {
+  it('passes through pure HTML documents with only the safety patches added', () => {
     const html = '<!DOCTYPE html><html><body><h1>Hello</h1></body></html>';
-    expect(formatCodeForPreview(html)).toBe(html);
+    const formatted = formatCodeForPreview(html);
+    expect(formatted).toContain('<h1>Hello</h1>');
+    // The navigation guard is injected so a link click can never blank the
+    // sandboxed preview iframe (same-frame navigation away from srcdoc).
+    expect(formatted).toContain(NAVIGATION_GUARD_SCRIPT.trim().slice(0, 60));
+    expect(formatted).toContain("addEventListener('click'");
+  });
+
+  it('injects the navigation guard into documents without a closing body tag', () => {
+    const html = '<!DOCTYPE html><html><head></head><body><a href="about.html">About</a>';
+    const formatted = formatCodeForPreview(html);
+    expect(formatted).toContain(NAVIGATION_GUARD_SCRIPT.trim().slice(0, 60));
+    expect(formatted).toContain('about.html');
+  });
+
+  it('keeps the multi-page router as the first-registered click handler ahead of the guard', () => {
+    const page = '<!DOCTYPE html><html><head></head><body><a href="about.html">About</a></body></html>';
+    const formatted = injectMultiPageRouter(formatCodeForPreview(page), ['index.html', 'about.html']);
+    const routerIdx = formatted.indexOf("type: 'corez-nav'");
+    const guardIdx = formatted.indexOf('NAVIGATION_GUARD_SCRIPT') === -1
+      ? formatted.indexOf("if (/^(https?:|mailto:|tel:)/i.test(href))")
+      : -1;
+    // The router lives in <head> (registered before the body guard), so its
+    // capture-phase listener runs first and routes internal .html links.
+    expect(routerIdx).toBeGreaterThan(-1);
+    expect(guardIdx).toBeGreaterThan(-1);
+    expect(routerIdx).toBeLessThan(guardIdx);
   });
 
   it('wraps raw JSX code into a runnable HTML document with React & Babel', () => {
