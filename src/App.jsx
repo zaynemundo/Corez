@@ -7,7 +7,7 @@ import CanvasPreview from './components/CanvasPreview';
 import SettingsModal from './components/SettingsModal';
 import DropZoneOverlay from './components/DropZoneOverlay';
 import { formatBytes, processFiles, hasFiles } from './utils/fileAttachmentUtils';
-import { generateAIResponse, extractCodeFromMessage, generateSessionTitle, generateAISessionTitle } from './services/aiService';
+import { generateAIResponse, extractCodeFromMessage, generateSessionTitle, generateAISessionTitle, isRevisionContextPrompt } from './services/aiService';
 import { storeAppInR2, deleteSessionAppsInR2 } from './services/appStorageService';
 function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -462,11 +462,16 @@ export default function App() {
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
-    const isCreationIntent = /^\s*@(game|website|app)\b/i.test(prompt)
-      || /\b(build|create|make|generate|design|develop|code)\b.{0,80}\b(game|app|website|tool|dashboard|calculator|canvas|platformer|pong|shooter|snake|rpg|3d)\b/i.test(prompt);
+    const isRevision = Boolean(revisionContextCode) || isRevisionContextPrompt(apiPrompt) || /^\s*(?:@\w+\s+)?(?:revise|update|change|fix|modify|refactor)\b/i.test(promptText);
+
+    const isCreationIntent = isRevision
+      || /^\s*@(game|website|app)\b/i.test(promptText)
+      || /\b(build|create|make|generate|design|develop|code|revise|update|fix|modify|refactor)\b.{0,80}\b(game|app|website|tool|dashboard|calculator|canvas|platformer|pong|shooter|snake|rpg|3d|code)\b/i.test(promptText);
 
     if (isCreationIntent) {
-      setActiveCanvasCode('');
+      if (!isRevision) {
+        setActiveCanvasCode('');
+      }
       setCanvasOpen(true);
     }
 
@@ -486,7 +491,7 @@ export default function App() {
         setSwarmVisible(phaseEvent.phase === 'swarm-planning');
       }, () => {
         setStreamingContent('');
-        if (isCreationIntent) setActiveCanvasCode('');
+        if (isCreationIntent && !isRevision) setActiveCanvasCode('');
       });
       if (response) {
         const aiMsg = toAssistantMessage(response);
@@ -523,6 +528,10 @@ export default function App() {
 
   const handleReviseCode = (code) => {
     setRevisionContextCode(code);
+    if (!activeCanvasCode && code) {
+      setActiveCanvasCode(code);
+    }
+    setCanvasFullScreen(false);
     const revisionPrompt = `Revise code: `;
     setChatInput(revisionPrompt);
     if (chatInputRef.current) {
@@ -669,6 +678,7 @@ export default function App() {
                 code={activeCanvasCode}
                 title={activeSession?.title || 'Untitled Application'}
                 onClose={() => setCanvasOpen(false)}
+                onRevise={handleReviseCode}
                 isFullScreen={canvasFullScreen}
                 onToggleFullScreen={() => setCanvasFullScreen(prev => !prev)}
                 sessionId={activeSession?.id || null}

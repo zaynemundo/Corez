@@ -52,6 +52,11 @@ function isExecutableCodeBlock(lang, code) {
   // pages and must not get preview actions.
   if (/^<!DOCTYPE html/i.test(stripped) || /^<html[\s>]/i.test(stripped)) return true;
 
+  // Standalone canvas games with a 2D context or animation frame loop
+  if (/<canvas[\s>]/i.test(stripped) && (/\.getContext\s*\(/i.test(text) || /requestAnimationFrame/i.test(text))) {
+    return true;
+  }
+
   // React/JSX blocks are app deliverables by output contract.
   if (['jsx', 'tsx', 'react'].includes(normalizedLang)) {
     return true;

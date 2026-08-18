@@ -98,4 +98,44 @@ describe('ChatMessage code block actions', () => {
 
     expect(screen.getByRole('button', { name: /^Copy$/i })).toBeInTheDocument();
   });
+
+  it('triggers onRunInCanvas when Open Canvas Preview button is clicked', () => {
+    let ranCode = null;
+    const content = '```html\n<!DOCTYPE html>\n<html><body><h1>App</h1></body></html>\n```';
+    render(
+      <ChatMessage
+        message={{ role: 'assistant', content }}
+        onRunInCanvas={(code) => { ranCode = code; }}
+        onReviseCode={() => {}}
+      />
+    );
+
+    const previewBtn = screen.getByRole('button', { name: /Open Canvas Preview/i });
+    previewBtn.click();
+    expect(ranCode).toContain('<!DOCTYPE html>');
+  });
+
+  it('triggers onReviseCode when Revise button is clicked', () => {
+    let revisedCode = null;
+    const content = '```html\n<!DOCTYPE html>\n<html><body><h1>App</h1></body></html>\n```';
+    render(
+      <ChatMessage
+        message={{ role: 'assistant', content }}
+        onRunInCanvas={() => {}}
+        onReviseCode={(code) => { revisedCode = code; }}
+      />
+    );
+
+    const reviseBtn = screen.getByRole('button', { name: /Revise/i });
+    reviseBtn.click();
+    expect(revisedCode).toContain('<!DOCTYPE html>');
+  });
+
+  it('shows Open Canvas Preview and Revise for canvas games with getContext', () => {
+    const content = 'Here is your game:\n\n```html\n<canvas id="game" width="800" height="600"></canvas>\n<script>\nconst ctx = document.getElementById("game").getContext("2d");\nfunction loop() { requestAnimationFrame(loop); }\nloop();\n</script>\n```';
+    renderAssistant(content);
+
+    expect(screen.getByRole('button', { name: /Open Canvas Preview/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Revise/i })).toBeInTheDocument();
+  });
 });

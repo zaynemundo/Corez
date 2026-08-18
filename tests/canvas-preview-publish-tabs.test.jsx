@@ -46,4 +46,23 @@ describe('CanvasPreview Publish Tabs (Link, QR Code, Embed)', () => {
     expect(screen.getByLabelText('Embed iframe HTML')).toBeDefined();
     expect(screen.getByRole('button', { name: /Copy Embed Code/i })).toBeDefined();
   });
+
+  it('renders Revise button in canvas controls and triggers onRevise callback', () => {
+    const handleRevise = vi.fn();
+    render(
+      <CanvasPreview
+        code="<h1>My App</h1>"
+        title="My App"
+        onClose={() => {}}
+        onRevise={handleRevise}
+        isFullScreen={false}
+        onToggleFullScreen={() => {}}
+      />
+    );
+
+    const reviseBtn = screen.getByRole('button', { name: 'Revise with AI' });
+    expect(reviseBtn).toBeDefined();
+    fireEvent.click(reviseBtn);
+    expect(handleRevise).toHaveBeenCalledWith('<h1>My App</h1>');
+  });
 });

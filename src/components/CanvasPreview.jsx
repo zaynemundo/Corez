@@ -21,7 +21,8 @@ import {
   Layers,
   QrCode,
   Code,
-  Link2
+  Link2,
+  Wand2
 } from 'lucide-react';
 import { formatCodeForPreview, parseMultiPageSite, injectMultiPageRouter, validateMultiPageSite } from '../utils/previewTransformer';
 import { publishAppInR2 } from '../services/appStorageService';
@@ -34,6 +35,7 @@ export default function CanvasPreview({
   code, 
   title = 'Untitled Application',
   onClose, 
+  onRevise,
   isFullScreen, 
   onToggleFullScreen,
   sessionId = null,
@@ -383,6 +385,33 @@ export default function CanvasPreview({
               onSelectArchetype={(id) => setActiveArchetypeId(id)}
               compact={true}
             />
+          )}
+
+          {/* Revise: request changes to this creation directly in chat */}
+          {editableCode && !isStreaming && typeof onRevise === 'function' && (
+            <button
+              type="button"
+              className="code-btn revise-canvas-btn"
+              onClick={() => onRevise(editableCode)}
+              title="Revise this creation with AI"
+              aria-label="Revise with AI"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '0.35rem 0.65rem',
+                fontSize: '0.75rem',
+                borderRadius: 'var(--radius-pill)',
+                background: 'var(--bg-tertiary)',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-primary)',
+                cursor: 'pointer',
+                transition: 'var(--transition-fast)'
+              }}
+            >
+              <Wand2 size={13} strokeWidth={1.5} />
+              <span>Revise</span>
+            </button>
           )}
 
           {/* Publish: share the creation with anyone via a short link */}
