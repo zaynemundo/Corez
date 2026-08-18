@@ -101,4 +101,50 @@ describe('AuthModal Component', () => {
       expect(handleAuthSuccess).toHaveBeenCalled();
     });
   });
+
+  it('handles the Forgot and Reset Password flow', async () => {
+    const handleAuthSuccess = vi.fn();
+    render(<AuthModal isOpen={true} onClose={() => {}} onAuthSuccess={handleAuthSuccess} initialMode="signin" />);
+
+    // Click Forgot?
+    const forgotBtn = screen.getByRole('button', { name: /Forgot\?/i });
+    await act(async () => {
+      fireEvent.click(forgotBtn);
+    });
+
+    expect(screen.getByText(/Reset Your Password/i)).toBeDefined();
+    const emailInput = screen.getByLabelText(/Account Email/i);
+    fireEvent.change(emailInput, { target: { value: 'user@corez.pro' } });
+
+    const sendCodeBtn = screen.getByRole('button', { name: /Send Reset Code/i });
+    await act(async () => {
+      fireEvent.click(sendCodeBtn);
+    });
+
+    // Reset password view should appear
+    await waitFor(() => {
+      expect(screen.getByText(/Set New Password/i)).toBeDefined();
+      expect(screen.getByLabelText(/6-Digit Reset Code/i)).toBeDefined();
+      expect(screen.getByLabelText(/New Password \(min 6 characters\)/i)).toBeDefined();
+    });
+
+    // Use Dev Mode autofill helper
+    const devAutofill = screen.getAllByText(/Click to Autofill/i)[0];
+    await act(async () => {
+      fireEvent.click(devAutofill);
+    });
+
+    const newPassInput = screen.getByLabelText(/New Password \(min 6 characters\)/i);
+    fireEvent.change(newPassInput, { target: { value: 'newsecurepass123' } });
+
+    const updateBtn = screen.getByRole('button', { name: /Update Password & Sign In/i });
+    await act(async () => {
+      fireEvent.click(updateBtn);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Password updated successfully!/i)).toBeDefined();
+      expect(handleAuthSuccess).toHaveBeenCalled();
+    });
+  });
 });

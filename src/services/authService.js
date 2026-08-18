@@ -165,6 +165,64 @@ export async function logInWithVerifiedEmail(email) {
 }
 
 /**
+ * Resets the password for a user account and creates an active session.
+ */
+export async function resetPassword({ email, newPassword, code, adminSecret }) {
+  if (!email || !newPassword || newPassword.length < 6) {
+    throw new Error('Valid email and a 6+ character new password are required.');
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+
+  if (typeof fetch === 'function' && typeof window !== 'undefined' && window.location?.origin) {
+    try {
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, newPassword, code, adminSecret })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.user) {
+          return createSession(data.user);
+        }
+      }
+    } catch {
+      // Backend offline; continue to local update
+    }
+  }
+
+  const users = getRegisteredUsers();
+  let user = users.find(u => u.email === cleanEmail);
+  const passwordHash = await hashPassword(newPassword);
+
+  if (user) {
+    user.passwordHash = passwordHash;
+    user.updatedAt = new Date().toISOString();
+    saveRegisteredUsers(users);
+  } else {
+    const displayName = cleanEmail.split('@')[0];
+    user = {
+      id: `user_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      displayName: displayName.charAt(0).toUpperCase() + displayName.slice(1),
+      email: cleanEmail,
+      handle: `@${displayName.replace(/[^a-z0-9_]/g, '')}`,
+      bio: 'CoreZ Creative Member',
+      avatarColor: '#3b82f6',
+      passwordHash,
+      tier: 'Pro Creator',
+      emailVerified: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    users.push(user);
+    saveRegisteredUsers(users);
+  }
+
+  return createSession(user);
+}
+
+/**
  * Creates an active auth session for the user.
  */
 export function createSession(user) {

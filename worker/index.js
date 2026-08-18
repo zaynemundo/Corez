@@ -2312,6 +2312,44 @@ async function handleEmailVerification(request, env) {
 const AUTH_USERS = new Map();
 const AUTH_TOKENS = new Map();
 
+async function saveUserToR2(env, user) {
+  if (!user?.email) return;
+  const cleanEmail = user.email.toLowerCase().trim();
+  AUTH_USERS.set(cleanEmail, user);
+  if (env?.ASSET_BUCKET && typeof env.ASSET_BUCKET.put === 'function') {
+    try {
+      await env.ASSET_BUCKET.put(`accounts/${encodeURIComponent(cleanEmail)}.json`, JSON.stringify(user, null, 2), {
+        httpMetadata: { contentType: 'application/json' }
+      });
+    } catch (err) {
+      console.warn('Failed to save account to Cloudflare R2:', safeErrorDetail(err));
+    }
+  }
+}
+
+async function getUserFromR2OrMemory(env, email) {
+  if (!email) return null;
+  const cleanEmail = email.toLowerCase().trim();
+  if (AUTH_USERS.has(cleanEmail)) {
+    return AUTH_USERS.get(cleanEmail);
+  }
+  if (env?.ASSET_BUCKET && typeof env.ASSET_BUCKET.get === 'function') {
+    try {
+      const obj = await env.ASSET_BUCKET.get(`accounts/${encodeURIComponent(cleanEmail)}.json`);
+      if (obj) {
+        const user = await obj.json();
+        if (user) {
+          AUTH_USERS.set(cleanEmail, user);
+          return user;
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to read account from Cloudflare R2:', safeErrorDetail(err));
+    }
+  }
+  return null;
+}
+
 async function handleAuth(request, env) {
   const url = new URL(request.url);
   const pathname = url.pathname;
@@ -2331,7 +2369,8 @@ async function handleAuth(request, env) {
       return jsonResponse(400, { error: 'Display name, valid email, and 6+ character password are required.' });
     }
 
-    if (AUTH_USERS.has(email)) {
+    const existingUser = await getUserFromR2OrMemory(env, email);
+    if (existingUser) {
       return jsonResponse(400, { error: 'An account with this email already exists.' });
     }
 
@@ -2345,9 +2384,10 @@ async function handleAuth(request, env) {
       password,
       tier: 'Pro Creator',
       emailVerified: Boolean(body?.emailVerified ?? true),
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
-    AUTH_USERS.set(email, user);
+    await saveUserToR2(env, user);
 
     const token = `sess_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     AUTH_TOKENS.set(token, user);
@@ -2378,7 +2418,7 @@ async function handleAuth(request, env) {
     const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
     const password = typeof body?.password === 'string' ? body.password : '';
 
-    const user = AUTH_USERS.get(email);
+    const user = await getUserFromR2OrMemory(env, email);
     if (!user || user.password !== password) {
       return jsonResponse(401, { error: 'Invalid email or password.' });
     }
@@ -2389,6 +2429,154 @@ async function handleAuth(request, env) {
     return jsonResponse(200, {
       success: true,
       token,
+      user: {
+        id: user.id,
+        displayName: user.displayName,
+        email: user.email,
+        handle: user.handle,
+        bio: user.bio,
+        avatarColor: user.avatarColor,
+        tier: user.tier,
+        emailVerified: user.emailVerified
+      }
+    });
+  }
+
+  if (pathname === '/api/auth/forgot-password' && request.method === 'POST') {
+    let body;
+    try {
+      body = await readBoundedJson(request);
+    } catch {
+      return jsonResponse(400, { error: 'Invalid JSON payload.' });
+    }
+    const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return jsonResponse(400, { error: 'Valid email address required.' });
+    }
+
+    const user = await getUserFromR2OrMemory(env, email);
+    if (!user) {
+      return jsonResponse(200, { success: true, message: 'If this account exists, a reset code was sent.' });
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 10 * 60 * 1000;
+    VERIFICATION_SESSIONS.set(email, { code, expiresAt, attempts: 0, purpose: 'reset-password' });
+
+    const resendApiKey = env?.RESEND_API_KEY || (typeof process !== 'undefined' ? process.env?.RESEND_API_KEY : null);
+    let simulated = true;
+
+    if (resendApiKey) {
+      try {
+        const emailHtml = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"/><title>CoreZ Password Reset</title></head>
+<body style="margin:0;padding:0;background:#090a0f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#f3f4f6;">
+  <div style="max-width:480px;margin:40px auto;background:#12131a;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:32px;text-align:left;">
+    <div style="font-size:20px;font-weight:800;letter-spacing:-0.5px;color:#ffffff;margin-bottom:20px;">COREZ</div>
+    <h2 style="font-size:18px;font-weight:600;color:#ffffff;margin:0 0 12px;">Reset Your Password</h2>
+    <p style="font-size:14px;line-height:1.5;color:#9ca3af;margin:0 0 24px;">We received a request to change the password for <strong>${email}</strong>. Your 6-digit confirmation code is:</p>
+    <div style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:18px;text-align:center;margin-bottom:24px;">
+      <span style="font-size:32px;font-weight:700;letter-spacing:8px;color:#f87171;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,monospace;">${code}</span>
+    </div>
+    <p style="font-size:13px;line-height:1.5;color:#9ca3af;margin:0 0 20px;">This reset code expires in <strong>10 minutes</strong>. If you did not request a password change, you can safely ignore this email.</p>
+    <hr style="border:none;border-top:1px solid rgba(255,255,255,0.08);margin:20px 0;" />
+    <p style="font-size:11px;color:#6b7280;margin:0;">Sent by CoreZ Security • AI-Native Creative Development Platform</p>
+  </div>
+</body>
+</html>`;
+
+        const fromSender = env?.RESEND_FROM_EMAIL || 'CoreZ Security <verification@corez.pro>';
+        const resendRes = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${resendApiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            from: fromSender,
+            to: [email],
+            subject: `CoreZ Password Reset Code: ${code}`,
+            html: emailHtml
+          })
+        });
+        if (resendRes.ok) {
+          simulated = false;
+        }
+      } catch (err) {
+        console.warn('Resend password reset dispatch error:', safeErrorDetail(err));
+      }
+    }
+
+    return jsonResponse(200, {
+      success: true,
+      email,
+      simulated,
+      code: simulated ? code : undefined,
+      expiresAt,
+      message: 'Password reset code sent.'
+    });
+  }
+
+  if (pathname === '/api/auth/reset-password' && request.method === 'POST') {
+    let body;
+    try {
+      body = await readBoundedJson(request);
+    } catch {
+      return jsonResponse(400, { error: 'Invalid JSON payload.' });
+    }
+    const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
+    const newPassword = typeof body?.newPassword === 'string' ? body.newPassword : '';
+    const code = typeof body?.code === 'string' ? body.code.trim() : '';
+    const adminSecret = typeof body?.adminSecret === 'string' ? body.adminSecret.trim() : '';
+
+    if (!email || !newPassword || newPassword.length < 6) {
+      return jsonResponse(400, { error: 'Valid email and a 6+ character new password are required.' });
+    }
+
+    const user = await getUserFromR2OrMemory(env, email);
+    if (!user) {
+      return jsonResponse(404, { error: 'Account not found.' });
+    }
+
+    // Verify via code or admin secret
+    const isAdmin = Boolean(env?.ADMIN_SECRET && adminSecret && adminSecret === env.ADMIN_SECRET);
+    if (!isAdmin) {
+      const session = VERIFICATION_SESSIONS.get(email);
+      if (!session) {
+        return jsonResponse(400, { error: 'No active password reset session found. Please request a new code.' });
+      }
+      if (Date.now() > session.expiresAt) {
+        VERIFICATION_SESSIONS.delete(email);
+        return jsonResponse(400, { error: 'Reset code has expired. Please request a new code.' });
+      }
+      if (session.code !== code) {
+        session.attempts = (session.attempts || 0) + 1;
+        if (session.attempts >= 5) {
+          VERIFICATION_SESSIONS.delete(email);
+          return jsonResponse(400, { error: 'Too many incorrect attempts.' });
+        }
+        return jsonResponse(400, { error: 'Invalid verification code.' });
+      }
+      VERIFICATION_SESSIONS.delete(email);
+    }
+
+    user.password = newPassword;
+    user.updatedAt = new Date().toISOString();
+    await saveUserToR2(env, user);
+
+    // Invalidate old tokens for this user
+    for (const [t, u] of AUTH_TOKENS.entries()) {
+      if (u.email === email) AUTH_TOKENS.delete(t);
+    }
+
+    const token = `sess_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    AUTH_TOKENS.set(token, user);
+
+    return jsonResponse(200, {
+      success: true,
+      token,
+      message: 'Password successfully updated.',
       user: {
         id: user.id,
         displayName: user.displayName,

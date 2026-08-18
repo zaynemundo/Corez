@@ -14,7 +14,7 @@ import {
   AlertCircle,
   ShieldCheck
 } from 'lucide-react';
-import { signUp, logIn, logInWithVerifiedEmail } from '../services/authService.js';
+import { signUp, logIn, logInWithVerifiedEmail, resetPassword } from '../services/authService.js';
 import { requestEmailVerification, confirmEmailVerification } from '../services/emailVerificationService.js';
 
 export default function AuthModal({
@@ -23,7 +23,7 @@ export default function AuthModal({
   onAuthSuccess,
   initialMode = 'signin' // 'signin' | 'signup'
 }) {
-  const [mode, setMode] = useState(initialMode); // 'signin' | 'signup' | 'otp' | 'otp_signup'
+  const [mode, setMode] = useState(initialMode); // 'signin' | 'signup' | 'otp' | 'otp_signup' | 'forgot_password' | 'reset_password'
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -195,7 +195,64 @@ export default function AuthModal({
     }
   };
 
-  const isOtpMode = mode === 'otp' || mode === 'otp_signup';
+  const handleStartForgotPassword = async (e) => {
+    e.preventDefault();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError('Please enter your email address to receive a password reset code.');
+      return;
+    }
+    setError(null);
+    setLoading(true);
+    try {
+      const res = await requestEmailVerification(email.trim());
+      if (res.simulated && res.previewCode) {
+        setPreviewCode(res.previewCode);
+      }
+      setOtpCode('');
+      setPassword('');
+      setResendCooldown(60);
+      setMode('reset_password');
+      setSuccess(`Password reset code sent to ${email.trim()} from verification@corez.pro`);
+    } catch (err) {
+      setError(err.message || 'Failed to send password reset code.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConfirmResetPassword = async (e) => {
+    e.preventDefault();
+    if (!otpCode || otpCode.trim().length !== 6) {
+      setError('Please enter the 6-digit verification code.');
+      return;
+    }
+    if (!password || password.length < 6) {
+      setError('New password must be at least 6 characters.');
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+    try {
+      await confirmEmailVerification(email.trim(), otpCode.trim());
+      const session = await resetPassword({
+        email: email.trim(),
+        newPassword: password,
+        code: otpCode.trim()
+      });
+      setSuccess(`Password updated successfully! Welcome, ${session.user.displayName}.`);
+      setTimeout(() => {
+        if (onAuthSuccess) onAuthSuccess(session.user);
+        onClose();
+      }, 800);
+    } catch (err) {
+      setError(err.message || 'Failed to reset password. Please check your code.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isOtpMode = mode === 'otp' || mode === 'otp_signup' || mode === 'forgot_password' || mode === 'reset_password';
 
   return (
     <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Sign In or Sign Up">
@@ -322,13 +379,26 @@ export default function AuthModal({
                 <label htmlFor="auth-signin-password" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
                   Password
                 </label>
-                <button
-                  type="button"
-                  onClick={handleRequestMagicOtp}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--accent, #60a5fa)', fontSize: '0.7rem', cursor: 'pointer', padding: 0 }}
-                >
-                  Sign in with Code
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode('forgot_password');
+                      setError(null);
+                      setSuccess(null);
+                    }}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', fontSize: '0.7rem', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                  >
+                    Forgot?
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRequestMagicOtp}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--accent, #60a5fa)', fontSize: '0.7rem', cursor: 'pointer', padding: 0 }}
+                  >
+                    Sign in with Code
+                  </button>
+                </div>
               </div>
               <div style={{ position: 'relative' }}>
                 <input
@@ -700,6 +770,207 @@ export default function AuthModal({
                 style={{ flex: 2, padding: '8px', background: 'var(--accent, #3b82f6)', color: '#ffffff' }}
               >
                 {loading ? 'Verifying...' : 'Confirm & Log In'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* FORGOT PASSWORD - REQUEST RESET CODE */}
+        {mode === 'forgot_password' && (
+          <form onSubmit={handleStartForgotPassword} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div>
+              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <KeyRound size={16} style={{ color: 'var(--accent, #3b82f6)' }} />
+                Reset Your Password
+              </span>
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+                Enter your account email to receive a 6-digit password reset code from <b>verification@corez.pro</b>:
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="auth-forgot-email" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                Account Email
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  id="auth-forgot-email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  style={{
+                    width: '100%',
+                    background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '8px 10px 8px 32px',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.82rem'
+                  }}
+                />
+                <Mail size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-secondary)' }} />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                className="code-btn"
+                onClick={() => setMode('signin')}
+                style={{ flex: 1, padding: '8px' }}
+              >
+                Back to Sign In
+              </button>
+              <button
+                type="submit"
+                disabled={loading || !email}
+                className="code-btn"
+                style={{ flex: 2, padding: '8px', background: 'var(--accent, #3b82f6)', color: '#ffffff' }}
+              >
+                {loading ? <RotateCw size={14} className="spin-icon" /> : <Sparkles size={14} />}
+                <span>{loading ? 'Sending Code...' : 'Send Reset Code'}</span>
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* RESET PASSWORD - ENTER OTP AND NEW PASSWORD */}
+        {mode === 'reset_password' && (
+          <form onSubmit={handleConfirmResetPassword} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div>
+              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <ShieldCheck size={16} style={{ color: '#38bdf8' }} />
+                Set New Password
+              </span>
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+                Enter the 6-digit code sent to <b>{email}</b> and choose a new password:
+              </p>
+            </div>
+
+            {previewCode && (
+              <div
+                onClick={() => setOtpCode(previewCode)}
+                style={{
+                  fontSize: '0.74rem',
+                  color: '#60a5fa',
+                  background: 'rgba(59, 130, 246, 0.12)',
+                  border: '1px solid rgba(59, 130, 246, 0.35)',
+                  borderRadius: '8px',
+                  padding: '8px 12px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontWeight: 600 }}>Zero-Config Code: <strong style={{ letterSpacing: '1px' }}>{previewCode}</strong></span>
+                  <span style={{ textDecoration: 'underline', fontSize: '0.7rem', fontWeight: 600 }}>Click to Autofill</span>
+                </div>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
+                  Local Dev Mode: Click to autofill your reset code.
+                </span>
+              </div>
+            )}
+
+            <div>
+              <label htmlFor="auth-reset-otp" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                6-Digit Reset Code
+              </label>
+              <input
+                id="auth-reset-otp"
+                type="text"
+                required
+                maxLength={6}
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
+                placeholder="123456"
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  fontSize: '1rem',
+                  fontWeight: 700,
+                  letterSpacing: '5px',
+                  textAlign: 'center',
+                  fontFamily: 'var(--font-mono)',
+                  background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'var(--text-primary)'
+                }}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="auth-reset-newpass" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                New Password (min 6 characters)
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  id="auth-reset-newpass"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  style={{
+                    width: '100%',
+                    background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '8px 32px 8px 32px',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.82rem'
+                  }}
+                />
+                <Lock size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-secondary)' }} />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  style={{ position: 'absolute', right: '10px', top: '8px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: 0 }}
+                >
+                  {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem' }}>
+              <button
+                type="button"
+                onClick={handleStartForgotPassword}
+                disabled={resendCooldown > 0 || loading}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: resendCooldown > 0 ? 'var(--text-secondary)' : 'var(--accent, #60a5fa)',
+                  cursor: resendCooldown > 0 ? 'default' : 'pointer',
+                  padding: 0,
+                  fontSize: '0.72rem'
+                }}
+              >
+                {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend Reset Code'}
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                className="code-btn"
+                onClick={() => setMode('forgot_password')}
+                style={{ flex: 1, padding: '8px' }}
+              >
+                Back
+              </button>
+              <button
+                type="submit"
+                disabled={loading || otpCode.length !== 6 || password.length < 6}
+                className="code-btn"
+                style={{ flex: 2, padding: '8px', background: 'var(--accent, #3b82f6)', color: '#ffffff' }}
+              >
+                {loading ? 'Updating...' : 'Update Password & Sign In'}
               </button>
             </div>
           </form>

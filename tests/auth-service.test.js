@@ -7,6 +7,7 @@ import {
   getCurrentSession,
   getCurrentUser,
   logOut,
+  resetPassword,
   getRegisteredUsers,
   hashPassword,
   AUTH_USERS_KEY,
@@ -77,6 +78,19 @@ describe('Authentication Service', () => {
     const session = await logIn({ email: 'dev@corez.pro', password: 'mypassword' });
     expect(session.user.email).toBe('dev@corez.pro');
     expect(getCurrentUser()?.email).toBe('dev@corez.pro');
+  });
+
+  it('resets password and logs user in with new credentials', async () => {
+    await signUp({ displayName: 'Sam', email: 'sam@corez.pro', password: 'oldpassword' });
+    logOut();
+
+    const session = await resetPassword({ email: 'sam@corez.pro', newPassword: 'brandnewpassword123' });
+    expect(session.user.email).toBe('sam@corez.pro');
+
+    logOut();
+    await expect(logIn({ email: 'sam@corez.pro', password: 'oldpassword' })).rejects.toThrow();
+    const newSession = await logIn({ email: 'sam@corez.pro', password: 'brandnewpassword123' });
+    expect(newSession.user.email).toBe('sam@corez.pro');
   });
 
   it('authenticates and creates verified account via logInWithVerifiedEmail', async () => {
