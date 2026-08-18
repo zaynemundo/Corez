@@ -29,8 +29,8 @@ check_absent() {
   fi
 }
 
-check 'Worker routes text through OpenCode Go with the DeepSeek V4 Flash build' 'deepseek-v4-flash' "$providerChain"
-check_absent 'Worker no longer routes through MiMo V2.5' 'xiaomi/mimo-v2[.]5' "$worker"
+check 'Worker routes text through OpenCode Go with the Mimo V2.5 build' 'mimo-v2[.]5' "$providerChain"
+check_absent 'Worker never hardcodes OpenRouter-prefixed model ids' 'xiaomi/mimo-v2[.]5' "$worker"
 check_absent 'Worker imposes no AI generation timeouts' 'AbortSignal[.]timeout' "$worker"
 check_absent 'Worker imposes no AI output token caps' 'max_tokens' "$worker"
 check 'Worker reports provider failure details' 'recordFailure' "$providerChain"

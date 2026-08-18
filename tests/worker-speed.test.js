@@ -177,7 +177,7 @@ describe('AI response speed optimizations', () => {
     });
 
     expect(generalPayload).not.toBeNull();
-    expect(generalPayload.model).toBe('deepseek-v4-flash');
+    expect(generalPayload.model).toBe('mimo-v2.5');
     expect(generalPayload.reasoning).toBeUndefined();
     expect(generalPayload.max_completion_tokens).toBeUndefined();
     // No output-token caps anywhere: general answers run uncapped so
@@ -200,7 +200,7 @@ describe('AI response speed optimizations', () => {
     });
 
     expect(complexPayload).not.toBeNull();
-    expect(complexPayload.model).toBe('deepseek-v4-flash');
+    expect(complexPayload.model).toBe('mimo-v2.5');
     expect(complexPayload.reasoning).toBeUndefined();
     expect(complexPayload.max_tokens).toBeUndefined();
     expect(complexPayload.max_completion_tokens).toBeUndefined();

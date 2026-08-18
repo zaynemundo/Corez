@@ -3,7 +3,7 @@ import { classifyProviderFailure, createTaskStateStore, safeErrorDetail } from '
 export const OPENCODE_DEFAULT_ENDPOINT = 'https://opencode.ai/zen/go/v1/chat/completions';
 export const DEEPSEEK_DEFAULT_ENDPOINT = 'https://api.deepseek.com/chat/completions';
 export const OPENROUTER_DEFAULT_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
-export const DEFAULT_MODEL = 'deepseek-v4-flash';
+export const DEFAULT_MODEL = 'mimo-v2.5';
 
 // OpenRouter retired black-forest-labs/flux-1-schnell, so image generation
 // uses Google's Nano Banana 2 lite (Gemini 3.1 Flash Lite Image) only.

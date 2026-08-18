@@ -8,7 +8,8 @@ import { TaskDependencyGraph, AGENT_LIFECYCLE_STATES } from './taskGraph.js';
 import { AdaptiveConcurrencyQueue } from './adaptiveQueue.js';
 
 export const OPENROUTER_SWARM_ROUTING = {
-  model: 'deepseek/deepseek-v4-flash',
+  // Mimo V2.5 is the cheapest capable model — the site-wide default.
+  model: 'xiaomi/mimo-v2.5',
   provider: {
     sort: 'throughput',
     allow_fallbacks: true,

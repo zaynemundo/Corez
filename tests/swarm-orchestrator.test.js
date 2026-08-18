@@ -3,7 +3,7 @@ import { AgentSwarmOrchestrator, OPENROUTER_SWARM_ROUTING } from '../src/service
 
 describe('Unlimited Dynamic Swarm: Agent Swarm Orchestrator', () => {
   it('includes exact OpenRouter model routing parameters', () => {
-    expect(OPENROUTER_SWARM_ROUTING.model).toBe('deepseek/deepseek-v4-flash');
+    expect(OPENROUTER_SWARM_ROUTING.model).toBe('xiaomi/mimo-v2.5');
     expect(OPENROUTER_SWARM_ROUTING.provider).toEqual({
       sort: 'throughput',
       allow_fallbacks: true,

@@ -2,7 +2,7 @@
 
 ## Roles and authority
 
-- **DeepSeek V4 Flash** (`deepseek/deepseek-v4-flash`) is the lead engineering agent, handling orchestration, development, vision, visual inspection, UI layout, game design, SVG creation, and overall implementation strategy.
+- **Mimo V2.5** (`mimo-v2.5` / opencode-go) is the lead engineering agent, handling orchestration, development, vision, visual inspection, UI layout, game design, SVG creation, and overall implementation strategy.
 - **FLUX 1 Schnell** (`@cf/black-forest-labs/flux-1-schnell`) is used for fast, free background image generation and visual artwork.
 
 ## Verification & Git completion policy
@@ -15,11 +15,11 @@
 
 ## Standard sequence
 
-1. DeepSeek V4 Flash defines a bounded task and identifies files that subagents may inspect or, if explicitly authorised, edit.
-2. DeepSeek V4 Flash delegates with analysis-only mode unless implementation is necessary and authorised.
+1. Mimo V2.5 defines a bounded task and identifies files that subagents may inspect or, if explicitly authorised, edit.
+2. Mimo V2.5 delegates with analysis-only mode unless implementation is necessary and authorised.
 3. Subagents return findings or changes.
-4. DeepSeek V4 Flash critically reviews the response and diff.
-5. DeepSeek V4 Flash makes the final engineering decision and performs independent verification.
+4. Mimo V2.5 critically reviews the response and diff.
+5. Mimo V2.5 makes the final engineering decision and performs independent verification.
 
 ## CoreZ Game Creation & OpenCode Go Models
 
@@ -30,9 +30,9 @@ streamed build through the OpenCode Go provider, structural verification
 Websites and apps keep the full harness pipeline (planning -> build ->
 verify -> repair -> review).
 
-### Execution Model (DeepSeek V4 Flash Single Model Executor)
+### Execution Model (Mimo V2.5 Single Model Executor)
 
-> **Primary Model Rule**: **DeepSeek V4 Flash** operates as the single primary executor for all code execution, component building, UI work, task graph routing, architectural guidance, code review, and empirical verification.
+> **Primary Model Rule**: **Mimo V2.5** operates as the single primary executor for all code execution, component building, UI work, task graph routing, architectural guidance, code review, and empirical verification.
 
 - `primary-executor` — `mimo-v2.5` / `opencode-go` — Coder / Tester: writes code, builds components, edits files, runs tests.
 - `art-director` — `flux-2-klein-4b` / `cloudflare-workers-ai` — Creative Lead: visual direction, color palettes, background textures, art assets.

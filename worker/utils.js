@@ -4,9 +4,9 @@
 export const MAX_BODY_BYTES = 24 * 1024 * 1024;
 
 // Estimated USD cost of a generation, based on per-1M-token rates that are
-// env-overridable (defaults roughly match deepseek-v4-flash direct pricing:
-// $0.14/M input, $0.28/M output). An estimate only — the authoritative
-// number lives in the provider's billing dashboard.
+// env-overridable (defaults are approximate: $0.14/M input, $0.28/M output).
+// An estimate only — the authoritative number lives in the provider's
+// billing dashboard.
 export function estimateCostUsd(inputTokens, outputTokens, env) {
   const inputRate = Number(env?.AI_COST_PER_M_INPUT_USD) || 0.14;
   const outputRate = Number(env?.AI_COST_PER_M_OUTPUT_USD) || 0.28;
