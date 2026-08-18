@@ -14,6 +14,7 @@ import {
   Download,
   X
 } from 'lucide-react';
+import { extractCodeFromMessage } from '../services/aiService';
 
 function safeImageUrl(url) {
   if (!url || typeof url !== 'string') return '';
@@ -1240,18 +1241,25 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
       }
     }
 
+    const fullDeliverableCode = !isUser ? extractCodeFromMessage(content) : null;
+    let hasRenderedExecutableBar = false;
+
     return expandedParts.map((part, idx) => {
       if (part.type === 'code') {
         if (part.isExecutable && !isUser) {
-          return (
-            <ExecutableCodeBlock
-              key={idx}
-              code={part.code}
-              lang={part.lang}
-              onRunInCanvas={onRunInCanvas}
-              onReviseCode={onReviseCode}
-            />
-          );
+          if (!hasRenderedExecutableBar) {
+            hasRenderedExecutableBar = true;
+            return (
+              <ExecutableCodeBlock
+                key={idx}
+                code={fullDeliverableCode || part.code}
+                lang={part.lang}
+                onRunInCanvas={onRunInCanvas}
+                onReviseCode={onReviseCode}
+              />
+            );
+          }
+          return <CodeSnippetBlock key={idx} code={part.code} lang={part.lang} />;
         }
         
         if (isUser) {
