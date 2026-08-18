@@ -233,7 +233,7 @@ export async function publishAppInR2({ html, title = 'Untitled Application', slu
         lineage[sessionId] = { slug: data.slug, contentHash: hash, title: title.slice(0, 120), updatedAt: new Date().toISOString() };
         savePublishLineage(lineage);
       }
-      return { success: true, slug: data.slug, url: data.url };
+      return { success: true, slug: data.slug, url: data.url, customized: Boolean(data.customized) };
     }
     return { success: false, error: data?.error || `Publish failed with status ${res.status}.` };
   } catch (err) {

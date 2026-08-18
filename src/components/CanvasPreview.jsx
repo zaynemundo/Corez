@@ -14,7 +14,8 @@ import {
   Smartphone,
   Share2,
   ExternalLink,
-  Loader2
+  Loader2,
+  Lock
 } from 'lucide-react';
 import { formatCodeForPreview, parseMultiPageSite, injectMultiPageRouter, validateMultiPageSite } from '../utils/previewTransformer';
 import { publishAppInR2 } from '../services/appStorageService';
@@ -124,7 +125,7 @@ export default function CanvasPreview({
         ...(Object.keys(pagesPayload).length > 0 ? { pages: pagesPayload } : {})
       });
       if (result && result.url) {
-        setPublishResult({ slug: result.slug, url: result.url });
+        setPublishResult({ slug: result.slug, url: result.url, customized: Boolean(result.customized) });
         setPublishError(null);
       } else {
         setPublishError('Publishing failed. The hosted service may be unavailable — try again.');
@@ -175,7 +176,7 @@ export default function CanvasPreview({
       });
 
       if (result && result.url && result.success !== false) {
-        setPublishResult({ slug: result.slug, url: result.url });
+        setPublishResult({ slug: result.slug, url: result.url, customized: true });
         setSlugSuccess('URL updated successfully!');
       } else {
         setSlugError(result?.error || 'Slug already in use or unavailable. Try another.');
@@ -547,45 +548,73 @@ export default function CanvasPreview({
               </a>
             </div>
 
-            {/* Custom Slug Editor */}
-            <form onSubmit={handleUpdateSlug} className="publish-slug-form" style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              <label htmlFor="custom-slug-input" style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
-                Customize URL slug:
-              </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0, background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 8px' }}>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', userSelect: 'none' }}>corez.pro/</span>
-                  <input
-                    id="custom-slug-input"
-                    type="text"
-                    value={customSlug}
-                    onChange={(e) => {
-                      setCustomSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''));
-                      setSlugError(null);
-                      setSlugSuccess(null);
-                    }}
-                    placeholder="my-custom-slug"
-                    aria-label="Custom slug"
-                    style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-primary)', fontSize: '0.8rem', fontFamily: 'var(--font-mono)', padding: '7px 4px' }}
-                  />
+            {/* Slug Customization / 1-Time Change */}
+            {publishResult.customized || (publishResult.slug && !/^[a-z0-9]{4,8}-[0-9]{1,6}$/.test(publishResult.slug)) ? (
+              <div
+                className="publish-slug-locked"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '7px 10px',
+                  background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 'var(--radius-md)'
+                }}
+              >
+                <Lock size={13} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: '0.74rem', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>
+                    Custom slug locked (1-time change used)
+                  </p>
+                  <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: '1px 0 0' }}>
+                    Republishing automatically updates this link.
+                  </p>
                 </div>
-                <button
-                  type="submit"
-                  className="code-btn"
-                  onClick={handleUpdateSlug}
-                  disabled={isUpdatingSlug || !customSlug || customSlug === publishResult.slug}
-                  style={{ whiteSpace: 'nowrap', padding: '6px 12px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                >
-                  {isUpdatingSlug ? <Loader2 size={13} className="spin-icon" /> : 'Save Slug'}
-                </button>
               </div>
-              {slugError && (
-                <p role="alert" style={{ fontSize: '0.74rem', color: '#f87171', margin: '2px 0 0' }}>{slugError}</p>
-              )}
-              {slugSuccess && (
-                <p role="status" style={{ fontSize: '0.74rem', color: '#4ade80', margin: '2px 0 0' }}>{slugSuccess}</p>
-              )}
-            </form>
+            ) : (
+              <form onSubmit={handleUpdateSlug} className="publish-slug-form" style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <label htmlFor="custom-slug-input" style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                    Customize URL slug:
+                  </label>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>1-time change</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0, background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 8px' }}>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', userSelect: 'none' }}>corez.pro/</span>
+                    <input
+                      id="custom-slug-input"
+                      type="text"
+                      value={customSlug}
+                      onChange={(e) => {
+                        setCustomSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''));
+                        setSlugError(null);
+                        setSlugSuccess(null);
+                      }}
+                      placeholder="my-custom-slug"
+                      aria-label="Custom slug"
+                      style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-primary)', fontSize: '0.8rem', fontFamily: 'var(--font-mono)', padding: '7px 4px' }}
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="code-btn"
+                    onClick={handleUpdateSlug}
+                    disabled={isUpdatingSlug || !customSlug || customSlug === publishResult.slug}
+                    style={{ whiteSpace: 'nowrap', padding: '6px 12px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    {isUpdatingSlug ? <Loader2 size={13} className="spin-icon" /> : 'Save Slug'}
+                  </button>
+                </div>
+                {slugError && (
+                  <p role="alert" style={{ fontSize: '0.74rem', color: '#f87171', margin: '2px 0 0' }}>{slugError}</p>
+                )}
+                {slugSuccess && (
+                  <p role="status" style={{ fontSize: '0.74rem', color: '#4ade80', margin: '2px 0 0' }}>{slugSuccess}</p>
+                )}
+              </form>
+            )}
 
             <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0 }}>
               Only this app is shared — your chat stays private.

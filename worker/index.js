@@ -1922,7 +1922,7 @@ function publishedPageHeaders() {
 
 // Published links are public shareable URLs backed by R2 storage: bound the
 // creation rate per client so the store cannot be spammed with slugs.
-const publishRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 10 });
+const publishRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 30 });
 
 // Paid image generations are expensive (provider cost + R2 writes): bound
 // them per client like every other costly endpoint.
@@ -1984,6 +1984,7 @@ async function handlePublish(request, env) {
 
     const rawRequestedSlug = typeof body?.slug === 'string' ? body.slug.trim().toLowerCase() : null;
     let slug = null;
+    let isCustomized;
 
     if (rawRequestedSlug) {
       if (!PUBLISH_SLUG_PATTERN.test(rawRequestedSlug) || rawRequestedSlug.includes('--')) {
@@ -1993,12 +1994,40 @@ async function handlePublish(request, env) {
         return jsonResponse(400, { error: `The slug "${rawRequestedSlug}" is reserved. Please choose a different URL.` });
       }
 
+      // 1-time change check: if renaming from previous slug, ensure previous was not already customized
+      if (body?.previousSlug && body.previousSlug !== rawRequestedSlug) {
+        if (PUBLISH_SLUG_PATTERN.test(body.previousSlug)) {
+          const prevObject = await env.ASSET_BUCKET.get(`publish/${body.previousSlug}.json`);
+          if (prevObject) {
+            try {
+              const prevRecord = JSON.parse(await prevObject.text());
+              if (prevRecord?.customized) {
+                return jsonResponse(400, { error: 'The URL slug for this creation has already been customized once and cannot be changed again.' });
+              }
+            } catch {
+              // ignore
+            }
+          }
+        }
+      }
+
       // Check collision / ownership
       const existingObject = await env.ASSET_BUCKET.get(`publish/${rawRequestedSlug}.json`);
       if (existingObject && body?.previousSlug && body.previousSlug !== rawRequestedSlug) {
         return jsonResponse(409, { error: `The slug "${rawRequestedSlug}" is already taken. Please choose a different URL.` });
       }
       slug = rawRequestedSlug;
+
+      if (existingObject && (!body?.previousSlug || body.previousSlug === rawRequestedSlug)) {
+        try {
+          const existingRecord = JSON.parse(await existingObject.text());
+          isCustomized = Boolean(existingRecord?.customized || !GENERATED_SLUG_PATTERN.test(rawRequestedSlug));
+        } catch {
+          isCustomized = !GENERATED_SLUG_PATTERN.test(rawRequestedSlug);
+        }
+      } else {
+        isCustomized = !GENERATED_SLUG_PATTERN.test(rawRequestedSlug) || Boolean(body?.previousSlug && body.previousSlug !== rawRequestedSlug);
+      }
     } else {
       for (let attempt = 0; attempt < 5; attempt++) {
         const candidate = generatePublishSlug();
@@ -2008,6 +2037,7 @@ async function handlePublish(request, env) {
           break;
         }
       }
+      isCustomized = false;
     }
     if (!slug) {
       return jsonResponse(503, { error: 'Could not allocate a unique publish slug. Try again.' });
@@ -2017,6 +2047,7 @@ async function handlePublish(request, env) {
       slug,
       title,
       html,
+      customized: isCustomized,
       createdAt: new Date().toISOString()
     };
     if (Object.keys(pages).length > 0) {
@@ -2036,7 +2067,7 @@ async function handlePublish(request, env) {
       httpMetadata: { contentType: 'application/json' }
     });
 
-    return jsonResponse(200, { success: true, slug, url: `/${slug}` });
+    return jsonResponse(200, { success: true, slug, url: `/${slug}`, customized: isCustomized });
   }
 
   // GET /<slug>/<page>.html - serve one page of a published multi-page

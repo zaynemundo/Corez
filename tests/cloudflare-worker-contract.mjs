@@ -1114,12 +1114,12 @@ async function run() {
   assert.equal(republishedPage.status, 200);
   assert.equal(await republishedPage.text(), '<h1>v2</h1>');
 
-  // Custom slug publishing
+  // 1-time custom slug migration: moves creation from auto-generated slug to custom slug
   const customSlugRes = await worker.fetch(
     new Request('https://corez.test/api/publish', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug: 'my-custom-portfolio', html: '<h1>Custom Portfolio</h1>', sessionId: 'user-1' })
+      body: JSON.stringify({ slug: 'my-custom-portfolio', previousSlug: publishData.slug, html: '<h1>Custom Portfolio</h1>', sessionId: 'user-1' })
     }),
     memoryEnv()
   );
@@ -1127,6 +1127,7 @@ async function run() {
   const customSlugData = await json(customSlugRes);
   assert.equal(customSlugData.slug, 'my-custom-portfolio');
   assert.equal(customSlugData.url, '/my-custom-portfolio');
+  assert.equal(customSlugData.customized, true);
 
   // Reserved slug rejection
   const reservedSlugRes = await worker.fetch(
@@ -1161,19 +1162,29 @@ async function run() {
   );
   assert.equal(collisionRes.status, 409);
 
-  // Slug renaming: moves creation to new slug and removes old slug
-  const renameRes = await worker.fetch(
+  // Attempting a second custom slug change is rejected (1-time change limit)
+  const secondRenameRes = await worker.fetch(
     new Request('https://corez.test/api/publish', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug: 'my-renamed-portfolio', previousSlug: 'my-custom-portfolio', html: '<h1>Renamed Portfolio</h1>' })
+      body: JSON.stringify({ slug: 'my-second-portfolio', previousSlug: 'my-custom-portfolio', html: '<h1>Second</h1>' })
     }),
     memoryEnv()
   );
-  assert.equal(renameRes.status, 200);
-  const renameData = await json(renameRes);
-  assert.equal(renameData.slug, 'my-renamed-portfolio');
-  assert.equal(renameData.url, '/my-renamed-portfolio');
+  assert.equal(secondRenameRes.status, 400);
+  const secondRenameError = await json(secondRenameRes);
+  assert.match(secondRenameError.error, /already been customized once/i);
+
+  // Updating content under the SAME custom slug is permitted
+  const sameSlugRes = await worker.fetch(
+    new Request('https://corez.test/api/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug: 'my-custom-portfolio', previousSlug: 'my-custom-portfolio', html: '<h1>Updated Content</h1>' })
+    }),
+    memoryEnv()
+  );
+  assert.equal(sameSlugRes.status, 200);
 
   // Multi-page publishes: a validated pages map is stored alongside the home
   // document and each page is served at /<slug>/<page>.html with sandbox
@@ -1297,7 +1308,7 @@ async function run() {
   assert.equal(publishWithJunk.status, 200);
   const junkData = await json(publishWithJunk);
   const junkRecord = JSON.parse(memoryStore.get(`publish/${junkData.slug}.json`).value);
-  assert.deepEqual(Object.keys(junkRecord).sort(), ['createdAt', 'html', 'slug', 'title']);
+  assert.deepEqual(Object.keys(junkRecord).sort(), ['createdAt', 'customized', 'html', 'slug', 'title']);
   assert.equal(junkRecord.html, '<h1>App Only</h1>');
   assert.equal(junkRecord.sessionId, undefined);
   assert.equal(junkRecord.messages, undefined);

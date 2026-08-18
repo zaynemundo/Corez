@@ -138,8 +138,8 @@ describe('CanvasPreview multi-page sites', () => {
     expect(payload.pages['index.html']).toContain("type: 'corez-nav'");
   });
 
-  it('allows customizing and updating the URL slug in the share modal', async () => {
-    publishAppInR2.mockResolvedValueOnce({ success: true, slug: 'test-123', url: '/test-123' });
+  it('allows customizing and updating the URL slug in the share modal (1-time change)', async () => {
+    publishAppInR2.mockResolvedValueOnce({ success: true, slug: 'test-123', url: '/test-123', customized: false });
     renderPreview();
     fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
     await act(async () => {});
@@ -148,7 +148,7 @@ describe('CanvasPreview multi-page sites', () => {
     const slugInput = screen.getByLabelText(/Custom slug/i);
     expect(slugInput.value).toBe('test-123');
 
-    publishAppInR2.mockResolvedValueOnce({ success: true, slug: 'my-cool-site', url: '/my-cool-site' });
+    publishAppInR2.mockResolvedValueOnce({ success: true, slug: 'my-cool-site', url: '/my-cool-site', customized: true });
     await act(async () => {
       fireEvent.change(slugInput, { target: { value: 'my-cool-site' } });
     });
@@ -159,7 +159,17 @@ describe('CanvasPreview multi-page sites', () => {
     expect(publishAppInR2).toHaveBeenCalledTimes(2);
     expect(publishAppInR2.mock.calls[1][0].slug).toBe('my-cool-site');
     expect(publishAppInR2.mock.calls[1][0].previousSlug).toBe('test-123');
-    expect(screen.getByText(/URL updated successfully!/i)).toBeTruthy();
+    expect(screen.getByText(/Custom slug locked/i)).toBeTruthy();
+  });
+
+  it('renders locked slug state when the creation was already customized', async () => {
+    publishAppInR2.mockResolvedValueOnce({ success: true, slug: 'already-custom', url: '/already-custom', customized: true });
+    renderPreview();
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
+    await act(async () => {});
+
+    expect(screen.getByText(/Custom slug locked \(1-time change used\)/i)).toBeTruthy();
+    expect(screen.queryByLabelText(/Custom slug/i)).toBeNull();
   });
 
   it('downloads multi-page creations as a .zip archive', () => {
