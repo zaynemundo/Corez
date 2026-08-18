@@ -658,6 +658,9 @@ ${designSpec}${liveInspiration}
 [CODE DIAGNOSIS & FIX SPECIFICATION]:
 - Systematically inspect the root cause before writing code.
 - Produce clean, modern, production-ready code preserving existing API signatures and component props.
+- If the user asks to fix "incomplete site" or "links to missing page" validation errors in HTML:
+  1) If repairing a single-page site: replace external .html links (<a href="about.html">, <a href="projects.html">, etc.) with in-page section anchors (<a href="#about">, <a href="#projects">, <a href="#contact">).
+  2) If repairing a multi-page site: output all referenced pages inside the same code block using <!-- PAGE: index.html -->, <!-- PAGE: about.html -->, etc. markers.
 - After writing the fix, re-read your answer for completeness: include the COMPLETE corrected code — never ellipses ("..."), "rest unchanged", or "same as before" placeholders.
 - Include a concise explanation of the changes and test verification steps.`;
 }

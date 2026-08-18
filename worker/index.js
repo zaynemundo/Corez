@@ -270,6 +270,7 @@ Adaptive Routing - Coding Path:
 - Inspect relevant architecture and naming conventions before providing code.
 - Do NOT hallucinate file paths or modify unrelated files.
 - Preserve existing public API contracts, method signatures, and component props.
+- If repairing or revising HTML code with links to sub-pages (e.g. about.html, projects.html, contact.html) where sub-pages are missing: either output all sub-pages using \`<!-- PAGE: page.html -->\` markers, or convert the navigation links to in-page section anchors (e.g. \`href="#about"\`, \`href="#projects"\`, \`href="#contact"\`) so there are no broken links or missing page validation errors.
 - Do NOT modify usage limits, rate limits, token limits, subscription plans, billing, or provider routing.
 - Include exact files changed, a reasoning summary, and clear verification steps.`;
   } else if (intentType === 'app' || ['website_creation', 'game_creation', 'design_task'].includes(primaryIntent)) {
