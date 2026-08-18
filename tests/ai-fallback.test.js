@@ -332,10 +332,13 @@ describe('Hosted AI fallback behavior', () => {
     expect(phases).toEqual(['planning', 'building', 'building', 'verifying', 'done']);
   }, 10000);
 
-  it('delivers the full non-streaming answer to the chat flow without hitting the local fallback', async () => {
-    // The app issues non-streaming requests: the worker answers with one JSON
-    // body after the provider finishes — never SSE deltas.
-    const fetchMock = vi.fn(async () => Response.json({ content: 'Red is the color of blood and apples.' }));
+  it('delivers the full streamed answer to the chat flow without hitting the local fallback', async () => {
+    // The app requests streaming: the worker answers with SSE deltas and the
+    // client accumulates them until the done event closes the stream.
+    const fetchMock = vi.fn(async () => new Response(
+      'data: {"type":"meta"}\n\ndata: {"type":"delta","text":"Red is the color of blood and apples."}\n\ndata: {"type":"done","final":true}\n\n',
+      { status: 200 }
+    ));
     vi.stubGlobal('fetch', fetchMock);
 
     const response = await generateAIResponse('What is red?', [], null, () => {});

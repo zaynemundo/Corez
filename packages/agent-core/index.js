@@ -29,7 +29,7 @@ export {
 } from './harness/index.js';
 export { TaskStore, MemoryTaskStore } from './persistence/TaskStore.js';
 export { RemoteRunner } from './runners/RemoteRunner.js';
-export { GenericSwarmOrchestrator, SWARM_ROLES, TaskDependencyGraph, AdaptiveConcurrencyQueue, SharedProjectState, HierarchicalSynthesis, chunkByTokens, DEFAULT_CHUNK_MAX_TOKENS } from './swarm/index.js';
+export { GenericSwarmOrchestrator, SWARM_ROLES, SWARM_MODE, decideSwarmMode, buildDefaultTasks, TaskDependencyGraph, AdaptiveConcurrencyQueue, SharedProjectState, HierarchicalSynthesis, chunkByTokens, DEFAULT_CHUNK_MAX_TOKENS } from './swarm/index.js';
 export { RepeatToolGuard, canonicalizeJson } from './guards/RepeatToolGuard.js';
 export { ToolResultPruner } from './tools/ToolResultPruner.js';
 export { OutputSpillManager } from './tools/OutputSpillManager.js';

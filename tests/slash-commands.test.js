@@ -123,17 +123,20 @@ describe('@website and @game routing', () => {
         expect(payload.prompt).not.toContain('@game');
         expect(payload.intent.type).toBe('app');
         expect(payload.intent.primaryIntent).toBe('game_creation');
-        // Game requests run through the agentic creation harness — but the
-        // app asks for NO streaming, so the worker answers with the finished
-        // artifact in one JSON body after the whole build loop.
+        // Game requests run through the agentic creation harness and ask
+        // for STREAMING: the worker answers with SSE phase/delta events as
+        // the build progresses, finishing with a done event.
         expect(payload.harness).toBe(true);
-        expect(payload.stream).toBe(false);
+        expect(payload.stream).toBe(true);
         // The skill resolver must select the game-development skill for
         // @game so the model receives its instructions (direct route and
         // swarm route).
         expect(Array.isArray(payload.skills)).toBe(true);
         expect(payload.skills.some((s) => s.id === 'game-development')).toBe(true);
-        return Response.json({ content: '<canvas></canvas>' });
+        return new Response(
+          'data: {"type":"meta"}\n\ndata: {"type":"phase","phase":"building","attempt":0,"total":5}\n\ndata: {"type":"delta","text":"<canvas></canvas>"}\n\ndata: {"type":"phase","phase":"done","attempt":0,"total":5}\n\ndata: {"type":"done","final":true}\n\n',
+          { status: 200 }
+        );
       }
       if (url === '/api/inspiration') {
         return Response.json({ kind: 'inspiration', category: 'websites', sites: [] });
