@@ -187,9 +187,12 @@ export class ProviderAdapter {
 export class OpenCodeGoAdapter extends ProviderAdapter {
   constructor(options = {}) {
     const keys = PROVIDER_ENV_KEYS[PROVIDER_IDS.OPENCODE_GO];
+    const apiKey = options.opencodeApiKey !== undefined
+      ? options.opencodeApiKey
+      : (options.apiKey !== undefined ? options.apiKey : firstEnv(keys));
     super({
       id: PROVIDER_IDS.OPENCODE_GO,
-      apiKey: options.opencodeApiKey ?? options.apiKey ?? firstEnv(keys),
+      apiKey,
       endpoint: options.endpoint ?? process.env.OPENCODE_ENDPOINT ?? PROVIDER_ENDPOINTS[PROVIDER_IDS.OPENCODE_GO],
       model: options.model ?? process.env.OPENCODE_MODEL ?? 'deepseek-v4-flash',
       referer: 'https://corez.ai',
@@ -200,9 +203,12 @@ export class OpenCodeGoAdapter extends ProviderAdapter {
 
 export class DeepSeekAdapter extends ProviderAdapter {
   constructor(options = {}) {
+    const apiKey = options.deepseekApiKey !== undefined
+      ? options.deepseekApiKey
+      : (options.apiKey !== undefined ? options.apiKey : firstEnv(PROVIDER_ENV_KEYS[PROVIDER_IDS.DEEPSEEK]));
     super({
       id: PROVIDER_IDS.DEEPSEEK,
-      apiKey: options.deepseekApiKey ?? options.apiKey ?? firstEnv(PROVIDER_ENV_KEYS[PROVIDER_IDS.DEEPSEEK]),
+      apiKey,
       endpoint: options.endpoint ?? process.env.DEEPSEEK_ENDPOINT ?? PROVIDER_ENDPOINTS[PROVIDER_IDS.DEEPSEEK],
       model: options.model ?? process.env.DEEPSEEK_MODEL ?? 'deepseek-v4-flash'
     });
@@ -215,9 +221,12 @@ export class DeepSeekAdapter extends ProviderAdapter {
 
 export class OpenRouterAdapter extends ProviderAdapter {
   constructor(options = {}) {
+    const apiKey = options.openrouterApiKey !== undefined
+      ? options.openrouterApiKey
+      : (options.apiKey !== undefined ? options.apiKey : firstEnv(PROVIDER_ENV_KEYS[PROVIDER_IDS.OPENROUTER]));
     super({
       id: PROVIDER_IDS.OPENROUTER,
-      apiKey: options.openrouterApiKey ?? options.apiKey ?? firstEnv(PROVIDER_ENV_KEYS[PROVIDER_IDS.OPENROUTER]),
+      apiKey,
       endpoint: options.endpoint ?? process.env.OPENROUTER_ENDPOINT ?? PROVIDER_ENDPOINTS[PROVIDER_IDS.OPENROUTER],
       model: options.model ?? process.env.OPENROUTER_MODEL ?? 'deepseek-v4-flash',
       referer: 'https://corez.ai',
