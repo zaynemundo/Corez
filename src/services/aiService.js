@@ -36,6 +36,7 @@ import { persistAndSummarize } from './contextStore.js';
 import { fetchWebSearch } from './searchService.js';
 import { fetchAwwwardsInspiration } from './inspirationService.js';
 import { synthesizePdfDocumentHtml } from './pdfGenerator.js';
+import { retrieveSemanticCodePatterns, formatRetrievedPatternsForPrompt } from './semanticCodeRetrieval.js';
 
 export const PUBLIC_USER_INTENT_PROMPT = `
 Analyze the public user intent behind the request. Corez uses a server-configured image-generation pipeline for background generation and image rendering.
@@ -577,9 +578,19 @@ export async function improveCodingPrompt(prompt, intent = null) {
     }
   })() : '';
 
+  // Retrieve relevant code patterns via semantic embedding search
+  const semanticPatternsPrompt = await (async () => {
+    try {
+      const patterns = await retrieveSemanticCodePatterns(cleanPrompt, { topK: 1, minSimilarity: 0.15 });
+      return formatRetrievedPatternsForPrompt(patterns);
+    } catch {
+      return '';
+    }
+  })();
+
   // Dedicated handling for code revisions: locate and modify only requested changes
   if (isRevisionContextPrompt(cleanPrompt)) {
-    return `${cleanPrompt}
+    return `${cleanPrompt}${semanticPatternsPrompt}
 
 [SURGICAL CODE REVISION SPECIFICATION]:
 - You are performing a targeted, surgical revision on the existing codebase provided in the context above.
@@ -605,7 +616,7 @@ export async function improveCodingPrompt(prompt, intent = null) {
       // Website/app builds may use live web-design references. Games derive
       // their visual direction from the user request and genre instead.
       return isAppIntent
-        ? `${pipelineResult.executionPrompt}\n\n${designSpec}${liveInspiration}`
+        ? `${pipelineResult.executionPrompt}\n\n${designSpec}${liveInspiration}${semanticPatternsPrompt}`
         : pipelineResult.executionPrompt;
     }
   } catch {
@@ -632,7 +643,7 @@ export async function improveCodingPrompt(prompt, intent = null) {
     if (isExplicitNonJsx) {
       return `${cleanPrompt}
 
-${designSpec}${liveInspiration}
+${designSpec}${liveInspiration}${semanticPatternsPrompt}
 
 [SINGLE-FILE HTML/CSS/JS SPECIFICATION]:
 - ALWAYS begin your response with a clear, detailed overview explaining the features, layout, and styling choices!
@@ -651,7 +662,7 @@ ${designSpec}${liveInspiration}
 
     return `${cleanPrompt}
 
-${designSpec}${liveInspiration}
+${designSpec}${liveInspiration}${semanticPatternsPrompt}
 
 [SINGLE-FILE REACT SPECIFICATION]:
 - ALWAYS begin your response with a clear, detailed overview explaining the features, architecture, styling decisions, and layout choices!
