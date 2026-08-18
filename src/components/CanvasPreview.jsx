@@ -239,13 +239,6 @@ export default function CanvasPreview({
               Source
             </button>
           </div>
-
-          {/* Live Streaming Badge */}
-          {isStreaming && (
-            <div className="canvas-live-badge" title="AI is actively designing and streaming code in real-time">
-              <span>LIVE BUILDING</span>
-            </div>
-          )}
         </div>
 
         {/* Device Viewport Selector (Desktop vs Laptop vs Tablet vs Mobile Icon-only) */}
@@ -387,11 +380,6 @@ export default function CanvasPreview({
                       : {}
                   }
                 />
-                {isStreaming && (
-                  <div className="canvas-live-stream-overlay">
-                    <span>Streaming live updates...</span>
-                  </div>
-                )}
               </div>
             </div>
           ) : (
