@@ -806,7 +806,6 @@ async function handleAi(request, env) {
       };
     const encoder = new TextEncoder();
     const sse = (event) => `data: ${JSON.stringify(event)}\n\n`;
-    const bufferForSkillVerification = specialistSkills.length > 0;
     const readable = new ReadableStream({
       async start(controller) {
         let collected = '';
@@ -818,7 +817,7 @@ async function handleAi(request, env) {
           for await (const event of runStreamingChain(apiMessages, chainOptions)) {
             if (event.type === 'delta') {
               collected += event.text;
-              if (!bufferForSkillVerification) controller.enqueue(encoder.encode(sse(event)));
+              controller.enqueue(encoder.encode(sse(event)));
             } else if (event.type === 'meta') {
               providerId = providerId || event.provider || null;
               providerModel = providerModel || event.model || null;
@@ -871,7 +870,7 @@ async function handleAi(request, env) {
 
                 if (!contChunk.trim()) break;
                 const { stitched, deltaText } = stitchContinuationChunk(collected, contChunk);
-                if (deltaText && !bufferForSkillVerification) {
+                if (deltaText) {
                   controller.enqueue(encoder.encode(sse({ type: 'delta', text: deltaText })));
                 }
                 if (stitched.length <= collected.length) {
@@ -909,7 +908,7 @@ async function handleAi(request, env) {
               if (repair.diagnostics.repaired && repair.diagnostics.repairReasons.length > 0) {
                 controller.enqueue(encoder.encode(sse({ type: 'validation', action: 'repaired', reasons: repair.diagnostics.repairReasons })));
                 const appended = repair.content.slice(collected.length);
-                if (appended && !bufferForSkillVerification) {
+                if (appended) {
                   controller.enqueue(encoder.encode(sse({ type: 'delta', text: appended })));
                 }
                 collected = repair.content;
@@ -943,10 +942,7 @@ async function handleAi(request, env) {
                 searchEvidence: liveDataEvidence
               });
               const finalContent = verification.content;
-              if (bufferForSkillVerification) {
-                controller.enqueue(encoder.encode(sse({ type: 'delta', text: finalContent })));
-                collected = finalContent;
-              } else if (finalContent !== collected) {
+              if (finalContent !== collected) {
                 const appended = finalContent.slice(collected.length);
                 if (appended) {
                   controller.enqueue(encoder.encode(sse({ type: 'delta', text: appended })));
