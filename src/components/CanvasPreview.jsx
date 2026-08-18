@@ -37,6 +37,10 @@ export default function CanvasPreview({
   const [publishing, setPublishing] = useState(false);
   const [publishResult, setPublishResult] = useState(null); // { slug, url }
   const [publishError, setPublishError] = useState(null);
+  const [customSlug, setCustomSlug] = useState('');
+  const [isUpdatingSlug, setIsUpdatingSlug] = useState(false);
+  const [slugError, setSlugError] = useState(null);
+  const [slugSuccess, setSlugSuccess] = useState(null);
   const [activePage, setActivePage] = useState('index.html');
   const iframeRef = useRef(null);
 
@@ -130,6 +134,56 @@ export default function CanvasPreview({
       setPublishError('Publishing failed. Please try again.');
     } finally {
       setPublishing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (publishResult?.slug) {
+      setCustomSlug(publishResult.slug);
+    }
+  }, [publishResult?.slug]);
+
+  const handleUpdateSlug = async (e) => {
+    if (e) e.preventDefault();
+    const cleaned = (customSlug || '').trim().toLowerCase();
+    if (!cleaned || cleaned === publishResult?.slug || isUpdatingSlug) return;
+
+    if (!/^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/.test(cleaned) || cleaned.includes('--')) {
+      setSlugError('Slug must be 3-50 characters with lowercase letters, numbers, and single hyphens.');
+      setSlugSuccess(null);
+      return;
+    }
+
+    setIsUpdatingSlug(true);
+    setSlugError(null);
+    setSlugSuccess(null);
+
+    try {
+      const pagesPayload = {};
+      if (multiPage.isMultiPage) {
+        for (const page of multiPage.pages) {
+          pagesPayload[page.name] = injectMultiPageRouter(formatCodeForPreview(page.html), multiPage.pages.map((p) => p.name));
+        }
+      }
+      const result = await publishAppInR2({
+        html: formattedSrcDoc,
+        title,
+        slug: cleaned,
+        previousSlug: publishResult?.slug || null,
+        sessionId,
+        ...(Object.keys(pagesPayload).length > 0 ? { pages: pagesPayload } : {})
+      });
+
+      if (result && result.url && result.success !== false) {
+        setPublishResult({ slug: result.slug, url: result.url });
+        setSlugSuccess('URL updated successfully!');
+      } else {
+        setSlugError(result?.error || 'Slug already in use or unavailable. Try another.');
+      }
+    } catch {
+      setSlugError('Failed to update slug. Please try again.');
+    } finally {
+      setIsUpdatingSlug(false);
     }
   };
 
@@ -493,11 +547,45 @@ export default function CanvasPreview({
               </a>
             </div>
 
-            {publishResult.slug && (
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0 }}>
-                Slug: <code>{publishResult.slug}</code> · Publishing again updates this same link.
-              </p>
-            )}
+            {/* Custom Slug Editor */}
+            <form onSubmit={handleUpdateSlug} className="publish-slug-form" style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              <label htmlFor="custom-slug-input" style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                Customize URL slug:
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0, background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 8px' }}>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', userSelect: 'none' }}>corez.pro/</span>
+                  <input
+                    id="custom-slug-input"
+                    type="text"
+                    value={customSlug}
+                    onChange={(e) => {
+                      setCustomSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''));
+                      setSlugError(null);
+                      setSlugSuccess(null);
+                    }}
+                    placeholder="my-custom-slug"
+                    aria-label="Custom slug"
+                    style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-primary)', fontSize: '0.8rem', fontFamily: 'var(--font-mono)', padding: '7px 4px' }}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="code-btn"
+                  onClick={handleUpdateSlug}
+                  disabled={isUpdatingSlug || !customSlug || customSlug === publishResult.slug}
+                  style={{ whiteSpace: 'nowrap', padding: '6px 12px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                >
+                  {isUpdatingSlug ? <Loader2 size={13} className="spin-icon" /> : 'Save Slug'}
+                </button>
+              </div>
+              {slugError && (
+                <p role="alert" style={{ fontSize: '0.74rem', color: '#f87171', margin: '2px 0 0' }}>{slugError}</p>
+              )}
+              {slugSuccess && (
+                <p role="status" style={{ fontSize: '0.74rem', color: '#4ade80', margin: '2px 0 0' }}>{slugSuccess}</p>
+              )}
+            </form>
 
             <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0 }}>
               Only this app is shared — your chat stays private.

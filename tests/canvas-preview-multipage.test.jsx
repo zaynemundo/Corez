@@ -5,7 +5,7 @@ import CanvasPreview from '../src/components/CanvasPreview.jsx';
 import { formatCodeForPreview, injectMultiPageRouter } from '../src/utils/previewTransformer.js';
 
 vi.mock('../src/services/appStorageService', () => ({
-  publishAppInR2: vi.fn(() => Promise.resolve({ slug: 'test-123', url: '/test-123' }))
+  publishAppInR2: vi.fn(() => Promise.resolve({ success: true, slug: 'test-123', url: '/test-123' }))
 }));
 
 import { publishAppInR2 } from '../src/services/appStorageService';
@@ -138,13 +138,28 @@ describe('CanvasPreview multi-page sites', () => {
     expect(payload.pages['index.html']).toContain("type: 'corez-nav'");
   });
 
-  it('passes the chat session id to the publish service so revisions update the same link', async () => {
-    render(
-      <CanvasPreview code={MULTI_PAGE_CODE} title="Test Site" onClose={() => {}} isFullScreen={false} onToggleFullScreen={() => {}} sessionId="session-42" />
-    );
+  it('allows customizing and updating the URL slug in the share modal', async () => {
+    publishAppInR2.mockResolvedValueOnce({ success: true, slug: 'test-123', url: '/test-123' });
+    renderPreview();
     fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
     await act(async () => {});
-    expect(publishAppInR2.mock.calls[0][0].sessionId).toBe('session-42');
+
+    expect(screen.getByLabelText(/Custom slug/i)).toBeTruthy();
+    const slugInput = screen.getByLabelText(/Custom slug/i);
+    expect(slugInput.value).toBe('test-123');
+
+    publishAppInR2.mockResolvedValueOnce({ success: true, slug: 'my-cool-site', url: '/my-cool-site' });
+    await act(async () => {
+      fireEvent.change(slugInput, { target: { value: 'my-cool-site' } });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Save Slug/i }));
+    });
+
+    expect(publishAppInR2).toHaveBeenCalledTimes(2);
+    expect(publishAppInR2.mock.calls[1][0].slug).toBe('my-cool-site');
+    expect(publishAppInR2.mock.calls[1][0].previousSlug).toBe('test-123');
+    expect(screen.getByText(/URL updated successfully!/i)).toBeTruthy();
   });
 
   it('downloads multi-page creations as a .zip archive', () => {

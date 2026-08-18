@@ -27,16 +27,17 @@ import {
 // no slashes, no leading dots (blocks ../ traversal), bounded length.
 const SAFE_STORAGE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$/;
 
-// Published creations get a short, human-shareable slug like "asyag23-123"
+// Published creations get a short, human-shareable slug or custom slug (e.g. "asyag23-123" or "my-portfolio")
 // served at the bare root path corez.pro/<slug>. Multi-page creations are
 // served with the home page at corez.pro/<slug>/ and each page at
 // corez.pro/<slug>/<page>.html so relative links always resolve inside the
 // slug directory; the bare /<slug> path redirects there.
-const PUBLISH_SLUG_PATTERN = /^[a-z0-9]{4,8}-[0-9]{1,6}$/;
+const PUBLISH_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/;
+const GENERATED_SLUG_PATTERN = /^[a-z0-9]{4,8}-[0-9]{1,6}$/;
 
 // Sub-page paths inside a published multi-page creation: /<slug>/<page>.html
 // where <page> is a validated file name (no slashes, no ".." traversal).
-const PUBLISH_PAGE_PATTERN = /^([a-z0-9]{4,8}-[0-9]{1,6})\/([a-z0-9][a-z0-9_-]{0,63}\.html)$/;
+const PUBLISH_PAGE_PATTERN = /^([a-z0-9][a-z0-9-]{1,48}[a-z0-9])\/([a-z0-9][a-z0-9_-]{0,63}\.html)$/;
 const PUBLISH_PAGE_NAME_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}\.html$/i;
 const MAX_PUBLISH_PAGES = 12;
 
@@ -45,7 +46,14 @@ const MAX_PUBLISH_PAGES = 12;
 // slug directory (corez.pro/<slug>/about.html) instead of the site root
 // (corez.pro/about.html). Multi-page creations redirect the bare /<slug>
 // path here for the same reason.
-const PUBLISH_SLUG_ROOT_PATTERN = /^\/([a-z0-9]{4,8}-[0-9]{1,6})\/$/;
+const PUBLISH_SLUG_ROOT_PATTERN = /^\/([a-z0-9][a-z0-9-]{1,48}[a-z0-9])\/$/;
+
+const RESERVED_SLUGS = Object.freeze(new Set([
+  'api', 'app', 'apps', 'auth', 'admin', 'assets', 'static', 'dist',
+  'favicon', 'robots', 'sitemap', 'health', 'metrics', 'login',
+  'register', 'dashboard', 'settings', 'publish', 'preview', 'search',
+  'ws', 'worker', 'null', 'undefined', 'index', 'home'
+]));
 
 // Online multiplayer rooms: short lowercase ids used in the WebSocket URL.
 const SAFE_ROOM_ID = /^[a-z0-9][a-z0-9-]{2,31}$/;
@@ -1974,8 +1982,24 @@ async function handlePublish(request, env) {
       }
     }
 
-    let slug = typeof body?.slug === 'string' && PUBLISH_SLUG_PATTERN.test(body.slug) ? body.slug : null;
-    if (!slug) {
+    const rawRequestedSlug = typeof body?.slug === 'string' ? body.slug.trim().toLowerCase() : null;
+    let slug = null;
+
+    if (rawRequestedSlug) {
+      if (!PUBLISH_SLUG_PATTERN.test(rawRequestedSlug) || rawRequestedSlug.includes('--')) {
+        return jsonResponse(400, { error: 'Slug must be 3-50 characters with lowercase letters, numbers, and single hyphens.' });
+      }
+      if (RESERVED_SLUGS.has(rawRequestedSlug)) {
+        return jsonResponse(400, { error: `The slug "${rawRequestedSlug}" is reserved. Please choose a different URL.` });
+      }
+
+      // Check collision / ownership
+      const existingObject = await env.ASSET_BUCKET.get(`publish/${rawRequestedSlug}.json`);
+      if (existingObject && body?.previousSlug && body.previousSlug !== rawRequestedSlug) {
+        return jsonResponse(409, { error: `The slug "${rawRequestedSlug}" is already taken. Please choose a different URL.` });
+      }
+      slug = rawRequestedSlug;
+    } else {
       for (let attempt = 0; attempt < 5; attempt++) {
         const candidate = generatePublishSlug();
         const existing = await env.ASSET_BUCKET.get(`publish/${candidate}.json`);
@@ -1997,6 +2021,15 @@ async function handlePublish(request, env) {
     };
     if (Object.keys(pages).length > 0) {
       record.pages = pages;
+    }
+
+    // Clean up previous slug if renamed
+    if (body?.previousSlug && body.previousSlug !== slug && PUBLISH_SLUG_PATTERN.test(body.previousSlug)) {
+      try {
+        await env.ASSET_BUCKET.delete(`publish/${body.previousSlug}.json`);
+      } catch {
+        // ignore
+      }
     }
 
     await env.ASSET_BUCKET.put(`publish/${slug}.json`, JSON.stringify(record), {
@@ -2070,14 +2103,17 @@ async function handlePublish(request, env) {
   // Multi-page creations redirect to /<slug>/ so their relative links keep
   // resolving inside the slug directory; single-page creations (no pages map)
   // are served directly since they contain no internal .html navigation.
-  if (request.method === 'GET' && PUBLISH_SLUG_PATTERN.test(pathname.slice(1))) {
+  if (request.method === 'GET' && !RESERVED_SLUGS.has(pathname.slice(1)) && PUBLISH_SLUG_PATTERN.test(pathname.slice(1))) {
     if (!env?.ASSET_BUCKET) {
-      return jsonResponse(530, { error: 'R2 storage (ASSET_BUCKET) is not configured.' });
+      return typeof env.ASSETS?.fetch === 'function' ? env.ASSETS.fetch(request) : jsonResponse(530, { error: 'R2 storage (ASSET_BUCKET) is not configured.' });
     }
     const slug = pathname.slice(1);
     const object = await env.ASSET_BUCKET.get(`publish/${slug}.json`);
     if (!object) {
-      return jsonResponse(404, { error: 'Published creation not found.' });
+      if (GENERATED_SLUG_PATTERN.test(slug)) {
+        return jsonResponse(404, { error: 'Published creation not found.' });
+      }
+      return typeof env.ASSETS?.fetch === 'function' ? env.ASSETS.fetch(request) : jsonResponse(404, { error: 'Published creation not found.' });
     }
     let record;
     try {
@@ -2157,6 +2193,7 @@ export default {
     }
     if (pathname === '/api/publish' ||
         (request.method === 'GET' &&
+          !RESERVED_SLUGS.has(pathname.slice(1)) &&
           (PUBLISH_SLUG_PATTERN.test(pathname.slice(1)) ||
             PUBLISH_PAGE_PATTERN.test(pathname.slice(1)) ||
             PUBLISH_SLUG_ROOT_PATTERN.test(pathname)))) {

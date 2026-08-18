@@ -188,7 +188,7 @@ export async function deleteAppInR2(sessionId, appId) {
  *  - A new slug is only allocated for genuinely new content from a session
  *    that has not published yet.
  */
-export async function publishAppInR2({ html, title = 'Untitled Application', slug = null, pages = null, sessionId = null }) {
+export async function publishAppInR2({ html, title = 'Untitled Application', slug = null, previousSlug = null, pages = null, sessionId = null }) {
   if (!html || typeof html !== 'string' || !html.trim()) return null;
 
   const pagesPayload = (() => {
@@ -212,6 +212,8 @@ export async function publishAppInR2({ html, title = 'Untitled Application', slu
     html: html.trim(),
     title: title.slice(0, 120),
     ...(effectiveSlug ? { slug: effectiveSlug } : {}),
+    ...(previousSlug ? { previousSlug } : {}),
+    ...(sessionId ? { sessionId } : {}),
     ...(pagesPayload ? { pages: pagesPayload } : {})
   };
   try {
@@ -220,24 +222,22 @@ export async function publishAppInR2({ html, title = 'Untitled Application', slu
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.slug) {
-        const next = [
-          { contentHash: hash, slug: data.slug, url: data.url, title: title.slice(0, 120), updatedAt: new Date().toISOString() },
-          ...registry.filter((entry) => entry.slug !== data.slug)
-        ];
-        savePublishRegistry(next);
-        if (typeof sessionId === 'string' && sessionId) {
-          lineage[sessionId] = { slug: data.slug, contentHash: hash, title: title.slice(0, 120), updatedAt: new Date().toISOString() };
-          savePublishLineage(lineage);
-        }
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.slug) {
+      const next = [
+        { contentHash: hash, slug: data.slug, url: data.url, title: title.slice(0, 120), updatedAt: new Date().toISOString() },
+        ...registry.filter((entry) => entry.slug !== data.slug && (!previousSlug || entry.slug !== previousSlug))
+      ];
+      savePublishRegistry(next);
+      if (typeof sessionId === 'string' && sessionId) {
+        lineage[sessionId] = { slug: data.slug, contentHash: hash, title: title.slice(0, 120), updatedAt: new Date().toISOString() };
+        savePublishLineage(lineage);
       }
-      return data;
+      return { success: true, slug: data.slug, url: data.url };
     }
-    console.warn(`Publish failed with HTTP ${res.status}.`);
+    return { success: false, error: data?.error || `Publish failed with status ${res.status}.` };
   } catch (err) {
     console.warn('Publish request failed:', err);
+    return { success: false, error: 'Publish request failed. Please check network connection.' };
   }
-  return null;
 }

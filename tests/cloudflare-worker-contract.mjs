@@ -1114,6 +1114,67 @@ async function run() {
   assert.equal(republishedPage.status, 200);
   assert.equal(await republishedPage.text(), '<h1>v2</h1>');
 
+  // Custom slug publishing
+  const customSlugRes = await worker.fetch(
+    new Request('https://corez.test/api/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug: 'my-custom-portfolio', html: '<h1>Custom Portfolio</h1>', sessionId: 'user-1' })
+    }),
+    memoryEnv()
+  );
+  assert.equal(customSlugRes.status, 200);
+  const customSlugData = await json(customSlugRes);
+  assert.equal(customSlugData.slug, 'my-custom-portfolio');
+  assert.equal(customSlugData.url, '/my-custom-portfolio');
+
+  // Reserved slug rejection
+  const reservedSlugRes = await worker.fetch(
+    new Request('https://corez.test/api/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug: 'admin', html: '<h1>Admin</h1>' })
+    }),
+    memoryEnv()
+  );
+  assert.equal(reservedSlugRes.status, 400);
+
+  // Invalid slug rejection (e.g., consecutive hyphens)
+  const invalidSlugRes = await worker.fetch(
+    new Request('https://corez.test/api/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug: 'bad--slug', html: '<h1>Bad</h1>' })
+    }),
+    memoryEnv()
+  );
+  assert.equal(invalidSlugRes.status, 400);
+
+  // Slug collision rejection when renaming to an already-taken slug
+  const collisionRes = await worker.fetch(
+    new Request('https://corez.test/api/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug: 'my-custom-portfolio', previousSlug: 'other-existing-site', html: '<h1>Hijack</h1>' })
+    }),
+    memoryEnv()
+  );
+  assert.equal(collisionRes.status, 409);
+
+  // Slug renaming: moves creation to new slug and removes old slug
+  const renameRes = await worker.fetch(
+    new Request('https://corez.test/api/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug: 'my-renamed-portfolio', previousSlug: 'my-custom-portfolio', html: '<h1>Renamed Portfolio</h1>' })
+    }),
+    memoryEnv()
+  );
+  assert.equal(renameRes.status, 200);
+  const renameData = await json(renameRes);
+  assert.equal(renameData.slug, 'my-renamed-portfolio');
+  assert.equal(renameData.url, '/my-renamed-portfolio');
+
   // Multi-page publishes: a validated pages map is stored alongside the home
   // document and each page is served at /<slug>/<page>.html with sandbox
   // headers plus a CORS allow-origin (sandboxed pages fetch-swap across the
