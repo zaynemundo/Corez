@@ -577,14 +577,9 @@ export default function CanvasPreview({
               <Loader2 size={28} className="spin-icon" style={{ color: 'var(--accent, #6366f1)' }} />
             </div>
             <h3 style={{ fontSize: '1rem', margin: '0.5rem 0 0.25rem', fontWeight: 500 }}>Live Designing & Building...</h3>
-            <p style={{ maxWidth: '300px', fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 1.25rem' }}>
+            <p style={{ maxWidth: '300px', fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
               Streaming visual components, layout shaders & logic into preview canvas.
             </p>
-            <div className="canvas-building-steps">
-              <div className="canvas-step active"><span className="step-num">1</span> Architecting Layout & Scene</div>
-              <div className="canvas-step active"><span className="step-num">2</span> Applying CSS & 3D Shaders</div>
-              <div className="canvas-step active"><span className="step-num">3</span> Initializing Interactive Loop</div>
-            </div>
           </div>
         ) : (
           <div className="canvas-empty-state">
