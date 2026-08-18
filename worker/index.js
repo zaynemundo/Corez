@@ -2192,9 +2192,10 @@ async function handleEmailVerification(request, env) {
     VERIFICATION_SESSIONS.set(email, { code, expiresAt, attempts: 0 });
 
     let simulated = true;
+    const resendApiKey = env?.RESEND_API_KEY || (typeof process !== 'undefined' ? process.env?.RESEND_API_KEY : null);
 
-    // Live dispatch via Resend if RESEND_API_KEY is configured
-    if (env?.RESEND_API_KEY) {
+    // Live dispatch via Resend if configured
+    if (resendApiKey) {
       try {
         const emailHtml = `<!DOCTYPE html>
 <html>
@@ -2214,11 +2215,11 @@ async function handleEmailVerification(request, env) {
 </body>
 </html>`;
 
-        let fromSender = env.RESEND_FROM_EMAIL || 'CoreZ Security <verification@corez.pro>';
+        let fromSender = env?.RESEND_FROM_EMAIL || 'CoreZ Security <verification@corez.pro>';
         let resendRes = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+            'Authorization': `Bearer ${resendApiKey}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
@@ -2235,7 +2236,7 @@ async function handleEmailVerification(request, env) {
           resendRes = await fetch('https://api.resend.com/emails', {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+              'Authorization': `Bearer ${resendApiKey}`,
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
