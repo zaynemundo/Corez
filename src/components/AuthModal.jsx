@@ -125,7 +125,7 @@ export default function AuthModal({
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '1.1rem', fontWeight: 800, letterSpacing: '-0.5px', color: '#ffffff' }}>
+            <span style={{ fontSize: '1.1rem', fontWeight: 800, letterSpacing: '-0.5px', color: 'var(--text-primary)' }}>
               COREZ
             </span>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>• Authentication</span>
