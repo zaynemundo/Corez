@@ -2263,6 +2263,9 @@ async function handleEmailVerification(request, env) {
     });
   }
 
+  return jsonResponse(404, { error: 'Verification endpoint not found.' });
+}
+
 // Auth Storage Map for Worker
 const AUTH_USERS = new Map();
 const AUTH_TOKENS = new Map();
