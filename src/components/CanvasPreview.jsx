@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { formatCodeForPreview, parseMultiPageSite, injectMultiPageRouter, validateMultiPageSite } from '../utils/previewTransformer';
 import { publishAppInR2 } from '../services/appStorageService';
+import { createZipBlob } from '../utils/zipPackager';
 
 export default function CanvasPreview({ 
   code, 
@@ -153,15 +154,37 @@ export default function CanvasPreview({
   };
 
   const handleDownload = () => {
-    const blob = new Blob([editableCode], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'corez-app.html';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    if (!editableCode) return;
+
+    if (multiPage.isMultiPage && multiPage.pages.length > 0) {
+      // Multi-page site export: package all individual HTML files into a ZIP archive
+      const filesToZip = multiPage.pages.map((p) => ({
+        name: p.name,
+        content: formatCodeForPreview(p.html)
+      }));
+      const blob = createZipBlob(filesToZip);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const fileSlug = (title || 'corez-site').toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/(^-|-$)/g, '') || 'corez-site';
+      a.download = `${fileSlug}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } else {
+      // Single-file HTML deliverable export
+      const blob = new Blob([formatCodeForPreview(editableCode)], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const fileSlug = (title || 'corez-app').toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/(^-|-$)/g, '') || 'corez-app';
+      a.download = `${fileSlug}.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
   };
 
   const handleRefresh = () => {
@@ -288,7 +311,7 @@ export default function CanvasPreview({
           <button className="icon-btn" onClick={handleCopy} title="Copy Source Code">
             {copied ? <Check size={14} strokeWidth={1.5} style={{ color: '#ffffff' }} /> : <Copy size={14} strokeWidth={1.5} />}
           </button>
-          <button className="icon-btn" onClick={handleDownload} title="Download .html file">
+          <button className="icon-btn" onClick={handleDownload} title={multiPage.isMultiPage ? 'Download Website (.zip)' : 'Download .html file'}>
             <Download size={14} strokeWidth={1.5} />
           </button>
           <button className="icon-btn" onClick={onToggleFullScreen} title="Toggle Fullscreen">

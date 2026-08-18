@@ -146,6 +146,52 @@ describe('CanvasPreview multi-page sites', () => {
     await act(async () => {});
     expect(publishAppInR2.mock.calls[0][0].sessionId).toBe('session-42');
   });
+
+  it('downloads multi-page creations as a .zip archive', () => {
+    const origCreate = URL.createObjectURL;
+    const origRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = vi.fn().mockReturnValue('blob:mock-zip');
+    URL.revokeObjectURL = vi.fn();
+    const appendSpy = vi.spyOn(document.body, 'appendChild');
+
+    render(
+      <CanvasPreview code={MULTI_PAGE_CODE} title="Portfolio Site" onClose={() => {}} isFullScreen={false} onToggleFullScreen={() => {}} />
+    );
+
+    const downloadBtn = screen.getByTitle(/Download/i);
+    fireEvent.click(downloadBtn);
+
+    const anchor = appendSpy.mock.calls.map((c) => c[0]).find((el) => el.tagName === 'A' && el.download?.endsWith('.zip'));
+    expect(anchor).toBeTruthy();
+    expect(anchor.download).toBe('portfolio-site.zip');
+
+    appendSpy.mockRestore();
+    URL.createObjectURL = origCreate;
+    URL.revokeObjectURL = origRevoke;
+  });
+
+  it('downloads single-page creations as a .html file', () => {
+    const origCreate = URL.createObjectURL;
+    const origRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = vi.fn().mockReturnValue('blob:mock-html');
+    URL.revokeObjectURL = vi.fn();
+    const appendSpy = vi.spyOn(document.body, 'appendChild');
+
+    render(
+      <CanvasPreview code="<!DOCTYPE html><html><body><h1>Single</h1></body></html>" title="Calculator App" onClose={() => {}} isFullScreen={false} onToggleFullScreen={() => {}} />
+    );
+
+    const downloadBtn = screen.getByTitle('Download .html file');
+    fireEvent.click(downloadBtn);
+
+    const anchor = appendSpy.mock.calls.map((c) => c[0]).find((el) => el.tagName === 'A' && el.download?.endsWith('.html'));
+    expect(anchor).toBeTruthy();
+    expect(anchor.download).toBe('calculator-app.html');
+
+    appendSpy.mockRestore();
+    URL.createObjectURL = origCreate;
+    URL.revokeObjectURL = origRevoke;
+  });
 });
 
 describe('multi-page router script', () => {
