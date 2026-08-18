@@ -103,6 +103,20 @@ export default function CanvasPreview({
     return () => window.removeEventListener('message', handleNavMessage);
   }, [multiPage]);
 
+  // Exit fullscreen on Escape key press
+  useEffect(() => {
+    if (!isFullScreen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (typeof onToggleFullScreen === 'function') {
+          onToggleFullScreen();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullScreen, onToggleFullScreen]);
+
   const handlePublish = async () => {
     if (publishing || !editableCode) return;
     // Completeness gate: never publish an incomplete multi-page site. The
