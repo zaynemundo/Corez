@@ -17,8 +17,6 @@ import {
   Loader2,
   Lock,
   Printer,
-  FileText,
-  Layers,
   QrCode,
   Code,
   Link2,
@@ -478,53 +476,6 @@ export default function CanvasPreview({
               {' '}
               Publishing is blocked until fixed.
             </span>
-          </div>
-        )}
-        {multiPage.isMultiPage && (
-          <div
-            className="canvas-multipage-nav"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 12px',
-              background: 'var(--bg-secondary)',
-              borderBottom: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.08))',
-              overflowX: 'auto',
-              fontSize: '0.78rem',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-muted, #9ca3af)', fontWeight: 500, marginRight: '4px' }}>
-              <Layers size={13} />
-              <span>Pages ({multiPage.pages.length}):</span>
-            </span>
-            {multiPage.pages.map((page) => (
-              <button
-                key={page.name}
-                type="button"
-                className={`page-pill ${activePage === page.name ? 'active' : ''}`}
-                onClick={() => setActivePage(page.name)}
-                aria-label={`Switch to ${page.name}`}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '3px 9px',
-                  borderRadius: '12px',
-                  border: activePage === page.name ? '1px solid var(--accent, #3b82f6)' : '1px solid var(--border-subtle, rgba(255, 255, 255, 0.08))',
-                  background: activePage === page.name ? 'rgba(59, 130, 246, 0.15)' : 'var(--bg-tertiary, #181922)',
-                  color: activePage === page.name ? 'var(--text-primary, #ffffff)' : 'var(--text-secondary, #9ca3af)',
-                  cursor: 'pointer',
-                  fontSize: '0.75rem',
-                  fontWeight: activePage === page.name ? 600 : 400,
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <FileText size={11} style={{ opacity: activePage === page.name ? 1 : 0.6 }} />
-                <span>{page.name}</span>
-              </button>
-            ))}
           </div>
         )}
         {editableCode ? (
