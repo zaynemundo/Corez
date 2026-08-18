@@ -102,6 +102,7 @@ export default function App() {
   const focusTimeoutRef = useRef(null);
   const resumeStartedRef = useRef(false);
   const dragCounterRef = useRef(0);
+  const userDismissedCanvasRef = useRef(false);
 
   const activeSession = useMemo(() => sessions.find(s => s.id === activeSessionId) || null, [sessions, activeSessionId]);
 
@@ -336,7 +337,14 @@ export default function App() {
     setSettingsOpen(false);
   };
 
+  const handleCloseCanvas = () => {
+    userDismissedCanvasRef.current = true;
+    setCanvasOpen(false);
+    setCanvasFullScreen(false);
+  };
+
   const handleRunInCanvas = (code) => {
+    userDismissedCanvasRef.current = false;
     setActiveCanvasCode(code);
     setCanvasOpen(true);
     if (activeSessionId && code) {
@@ -469,6 +477,8 @@ export default function App() {
       || /^\s*@(game|website|app)\b/i.test(promptText)
       || /\b(build|create|make|generate|design|develop|code|revise|update|fix|modify|refactor)\b.{0,80}\b(game|app|website|tool|dashboard|calculator|canvas|platformer|pong|shooter|snake|rpg|3d|code)\b/i.test(promptText);
 
+    userDismissedCanvasRef.current = false;
+
     if (isCreationIntent) {
       if (!isRevision) {
         setActiveCanvasCode('');
@@ -485,7 +495,9 @@ export default function App() {
           const liveCode = extractCodeFromMessage(next);
           if (liveCode) {
             setActiveCanvasCode(liveCode);
-            setCanvasOpen(true);
+            if (!userDismissedCanvasRef.current) {
+              setCanvasOpen(true);
+            }
           }
           return next;
         });
@@ -500,7 +512,9 @@ export default function App() {
         const extractedCode = extractCodeFromMessage(aiMsg.content);
         if (extractedCode) {
           setActiveCanvasCode(extractedCode);
-          setCanvasOpen(true);
+          if (!userDismissedCanvasRef.current) {
+            setCanvasOpen(true);
+          }
         }
         
         setSessions(prev => prev.map(s => {
@@ -699,7 +713,7 @@ export default function App() {
               <CanvasPreview
                 code={activeCanvasCode}
                 title={activeSession?.title || 'Untitled Application'}
-                onClose={() => setCanvasOpen(false)}
+                onClose={handleCloseCanvas}
                 onRevise={handleReviseCode}
                 isFullScreen={canvasFullScreen}
                 onToggleFullScreen={() => setCanvasFullScreen(prev => !prev)}
