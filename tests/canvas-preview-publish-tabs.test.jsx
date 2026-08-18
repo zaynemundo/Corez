@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, fireEvent, screen, cleanup, act } from '@testing-library/react';
-import React from 'react';
 import CanvasPreview from '../src/components/CanvasPreview.jsx';
 
 vi.mock('../src/services/appStorageService', () => ({

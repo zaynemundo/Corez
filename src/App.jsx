@@ -5,6 +5,8 @@ import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
 import CanvasPreview from './components/CanvasPreview';
 import SettingsModal from './components/SettingsModal';
+import DropZoneOverlay from './components/DropZoneOverlay';
+import { formatBytes, processFiles, hasFiles } from './utils/fileAttachmentUtils';
 import { generateAIResponse, extractCodeFromMessage, generateSessionTitle, generateAISessionTitle } from './services/aiService';
 import { storeAppInR2, deleteSessionAppsInR2 } from './services/appStorageService';
 function isObject(value) {
@@ -32,13 +34,6 @@ const INITIAL_SESSIONS = [
     messages: []
   }
 ];
-
-function formatBytes(bytes) {
-  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 function buildAttachmentPrompt(attachments) {
   if (!Array.isArray(attachments) || attachments.length === 0) return '';
@@ -73,7 +68,7 @@ export default function App() {
   const [activeView, setActiveView] = useState('chat');
 
   const [sidebarOpen, setSidebarOpen] = useState(() => {
-    if (typeof window === 'undefined') return true;
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return true;
     return !window.matchMedia('(max-width: 767px)').matches;
   });
   const [canvasOpen, setCanvasOpen] = useState(false);
@@ -93,9 +88,11 @@ export default function App() {
     }
   });
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
-    if (typeof window === 'undefined') return false;
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
     return window.matchMedia('(max-width: 767px)').matches;
   });
+  const [attachments, setAttachments] = useState([]);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   const messagesEndRef = useRef(null);
   const chatInputRef = useRef(null);
@@ -103,10 +100,68 @@ export default function App() {
   const saveTimeoutRef = useRef(null);
   const focusTimeoutRef = useRef(null);
   const resumeStartedRef = useRef(false);
+  const dragCounterRef = useRef(0);
 
   const activeSession = useMemo(() => sessions.find(s => s.id === activeSessionId) || null, [sessions, activeSessionId]);
 
   useEffect(() => {
+    const handleWindowDragEnter = (e) => {
+      if (!hasFiles(e.dataTransfer)) return;
+      e.preventDefault();
+      dragCounterRef.current += 1;
+      if (dragCounterRef.current === 1) {
+        setIsDraggingOver(true);
+      }
+    };
+
+    const handleWindowDragLeave = (e) => {
+      if (!hasFiles(e.dataTransfer)) return;
+      e.preventDefault();
+      dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+      if (dragCounterRef.current === 0) {
+        setIsDraggingOver(false);
+      }
+    };
+
+    const handleWindowDragOver = (e) => {
+      if (!hasFiles(e.dataTransfer)) return;
+      e.preventDefault();
+      if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = 'copy';
+      }
+    };
+
+    const handleWindowDrop = (e) => {
+      if (!hasFiles(e.dataTransfer)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      dragCounterRef.current = 0;
+      setIsDraggingOver(false);
+
+      const files = e.dataTransfer.files;
+      if (files && files.length > 0) {
+        processFiles(files, setAttachments);
+        if (chatInputRef.current) {
+          chatInputRef.current.focus();
+        }
+      }
+    };
+
+    window.addEventListener('dragenter', handleWindowDragEnter);
+    window.addEventListener('dragleave', handleWindowDragLeave);
+    window.addEventListener('dragover', handleWindowDragOver);
+    window.addEventListener('drop', handleWindowDrop);
+
+    return () => {
+      window.removeEventListener('dragenter', handleWindowDragEnter);
+      window.removeEventListener('dragleave', handleWindowDragLeave);
+      window.removeEventListener('dragover', handleWindowDragOver);
+      window.removeEventListener('drop', handleWindowDrop);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
     const mobileQuery = window.matchMedia('(max-width: 767px)');
     const syncSidebarWithViewport = (event) => {
       setIsMobileViewport(event.matches);
@@ -116,8 +171,8 @@ export default function App() {
     };
 
     setIsMobileViewport(mobileQuery.matches);
-    mobileQuery.addEventListener('change', syncSidebarWithViewport);
-    return () => mobileQuery.removeEventListener('change', syncSidebarWithViewport);
+    mobileQuery.addEventListener?.('change', syncSidebarWithViewport);
+    return () => mobileQuery.removeEventListener?.('change', syncSidebarWithViewport);
   }, []);
 
   useEffect(() => {
@@ -311,6 +366,7 @@ export default function App() {
 
   const handleSendMessage = async (promptText, attachments = []) => {
     if (isThinking) return;
+    setAttachments([]);
 
     let targetSessionId = activeSessionId;
     const draftMessages = activeSession?.messages || [];
@@ -480,8 +536,44 @@ export default function App() {
     }
   };
 
+  const handleOverlayDrop = (e) => {
+    if (!hasFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+    setIsDraggingOver(false);
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      processFiles(files, setAttachments);
+      if (chatInputRef.current) {
+        chatInputRef.current.focus();
+      }
+    }
+  };
+
+  const handleOverlayDragLeave = (e) => {
+    e.preventDefault();
+    dragCounterRef.current = 0;
+    setIsDraggingOver(false);
+  };
+
+  const handleOverlayDragOver = (e) => {
+    if (!hasFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  };
+
   return (
     <div className="app-container">
+      <DropZoneOverlay
+        isDragging={isDraggingOver}
+        onDrop={handleOverlayDrop}
+        onDragLeave={handleOverlayDragLeave}
+        onDragOver={handleOverlayDragOver}
+      />
+
       <Sidebar
         isOpen={sidebarOpen}
         sessions={sessions.filter(s => Array.isArray(s.messages) && s.messages.length > 0)}
@@ -567,6 +659,8 @@ export default function App() {
                 onSendMessage={handleSendMessage}
                 onStopMessage={handleStopMessage}
                 isStreaming={isThinking}
+                attachments={attachments}
+                setAttachments={setAttachments}
               />
             </div>
 

@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { Send, Square, ChevronRight, Globe, Gamepad2, Search, Image as ImageIcon, X } from 'lucide-react';
 import { PlusIcon } from './icons';
+import { processFiles, formatBytes, hasFiles } from '../utils/fileAttachmentUtils';
 
 // Commands offered as suggestions when the user types "@".
 // Keep in sync with parseSlashCommand in services/aiService.js.
@@ -39,48 +40,16 @@ const COMMANDS = [
   }
 ];
 
-const MAX_IMAGE_THUMB_BYTES = 1.5 * 1024 * 1024;
-const MAX_TEXT_CONTENT_BYTES = 200 * 1024;
-const TEXT_EXTENSIONS = new Set([
-  'txt', 'md', 'markdown', 'json', 'js', 'jsx', 'ts', 'tsx', 'css', 'html', 'xml',
-  'svg', 'csv', 'log', 'py', 'yml', 'yaml', 'sh', 'sql', 'ini', 'toml', 'env',
-  'gitignore', 'config', 'rst', 'tex', 'bat', 'ps1'
-]);
-
-function extensionOf(name) {
-  const dot = String(name || '').lastIndexOf('.');
-  return dot > 0 && dot < name.length - 1 ? name.slice(dot + 1).toLowerCase() : '';
-}
-
-function isTextLike(file) {
-  return Boolean(file?.type?.startsWith('text/'))
-    || (file?.type === 'application/json')
-    || TEXT_EXTENSIONS.has(extensionOf(file?.name));
-}
-
-function formatBytes(bytes) {
-  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function readFileAsText(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
-    reader.onerror = () => reject(reader.error);
-    reader.readAsText(file);
-  });
-}
-
 export default function ChatInput({ 
   input, 
   setInput, 
   onSendMessage, 
   onStopMessage, 
   isStreaming, 
-  textareaRef 
+  textareaRef,
+  attachments: externalAttachments,
+  setAttachments: externalSetAttachments,
+  onAddFiles
 }) {
   const internalRef = useRef(null);
   const refToUse = textareaRef || internalRef;
@@ -88,7 +57,13 @@ export default function ChatInput({
   const [activeIndex, setActiveIndex] = useState(0);
   const suggestionsRef = useRef(null);
   const fileInputRef = useRef(null);
-  const [attachments, setAttachments] = useState([]);
+
+  const [internalAttachments, setInternalAttachments] = useState([]);
+  const attachments = externalAttachments !== undefined ? externalAttachments : internalAttachments;
+  const setAttachments = externalSetAttachments || setInternalAttachments;
+
+  const [isDragOverInput, setIsDragOverInput] = useState(false);
+  const dragInputCounterRef = useRef(0);
 
   useEffect(() => {
     if (refToUse.current) {
@@ -137,40 +112,57 @@ export default function ChatInput({
   };
 
   const handleFileSelect = (event) => {
-    const files = Array.from(event.target.files || []);
-    if (files.length === 0) return;
-
-    const created = files.map((file, index) => {
-      const id = `attach-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`;
-      return { id, name: file.name, type: file.type || '', size: file.size, file };
-    });
-
-    setAttachments(prev => [
-      ...prev,
-      ...created.map(({ id, name, type, size }) => ({ id, name, type, size }))
-    ]);
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    processFiles(files, setAttachments);
     if (fileInputRef.current) fileInputRef.current.value = '';
-
-    created.forEach((entry) => {
-      if (entry.file.type.startsWith('image/') && entry.file.size <= MAX_IMAGE_THUMB_BYTES) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          if (reader.result && typeof reader.result === 'string') {
-            setAttachments(prev => prev.map(a => a.id === entry.id ? { ...a, thumb: reader.result } : a));
-          }
-        };
-        reader.readAsDataURL(entry.file);
-      }
-      if (isTextLike(entry.file) && entry.file.size <= MAX_TEXT_CONTENT_BYTES) {
-        readFileAsText(entry.file).then(content => {
-          setAttachments(prev => prev.map(a => a.id === entry.id ? { ...a, content } : a));
-        }).catch(() => {});
-      }
-    });
+    if (refToUse.current) {
+      refToUse.current.focus();
+    }
   };
 
   const removeAttachment = (id) => {
-    setAttachments(prev => prev.filter(a => a.id !== id));
+    setAttachments(prev => (prev || []).filter(a => a.id !== id));
+  };
+
+  const handleInputDragEnter = (e) => {
+    if (!hasFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    dragInputCounterRef.current += 1;
+    setIsDragOverInput(true);
+  };
+
+  const handleInputDragLeave = (e) => {
+    if (!hasFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    dragInputCounterRef.current = Math.max(0, dragInputCounterRef.current - 1);
+    if (dragInputCounterRef.current === 0) {
+      setIsDragOverInput(false);
+    }
+  };
+
+  const handleInputDragOver = (e) => {
+    if (!hasFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  };
+
+  const handleInputDrop = (e) => {
+    if (!hasFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragInputCounterRef.current = 0;
+    setIsDragOverInput(false);
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      processFiles(files, setAttachments);
+      if (onAddFiles) onAddFiles(files);
+      if (refToUse.current) {
+        refToUse.current.focus();
+      }
+    }
   };
 
   const handleSubmit = (e) => {
@@ -224,7 +216,14 @@ export default function ChatInput({
 
   return (
     <div className="input-container">
-      <form onSubmit={handleSubmit} className="input-box">
+      <form
+        onSubmit={handleSubmit}
+        className={`input-box ${isDragOverInput ? 'drag-over' : ''}`}
+        onDragEnter={handleInputDragEnter}
+        onDragOver={handleInputDragOver}
+        onDragLeave={handleInputDragLeave}
+        onDrop={handleInputDrop}
+      >
         {show && filtered.length > 0 && (
           <div className="slash-suggestions" ref={suggestionsRef} role="listbox" aria-label="Commands">
             {filtered.map((entry, index) => {

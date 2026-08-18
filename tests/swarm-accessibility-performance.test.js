@@ -1,8 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { SWARM_ROLES, decideSwarmMode, SWARM_MODE } from '../packages/agent-core/swarm/index.js';
 import {
-  SWARM_SPECIALIST_BRIEFS,
-  EXTENDED_SPECIALIST_BRIEFS,
   resolveSpecialistBriefs,
   buildSwarmContext
 } from '../worker/swarm.js';

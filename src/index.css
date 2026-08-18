@@ -3023,6 +3023,132 @@ h1, h2, h3, h4, h5, h6 {
   max-width: 100%;
 }
 
+/* Drag and Drop File Ingestion Overlay */
+.file-drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 10, 14, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 1.5rem;
+  animation: fileDropFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: all;
+}
+
+[data-theme="light"] .file-drop-overlay {
+  background: rgba(245, 245, 250, 0.82);
+}
+
+.file-drop-card {
+  pointer-events: none;
+  background: var(--bg-secondary);
+  border: 2px dashed var(--border-hover);
+  border-radius: var(--radius-xl, 16px);
+  padding: 2.5rem 3rem;
+  max-width: 500px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.85rem;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  animation: fileDropScaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-theme="light"] .file-drop-card {
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.12);
+}
+
+.file-drop-icon-wrapper {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+  animation: fileDropPulse 2s ease-in-out infinite;
+}
+
+.file-drop-title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.015em;
+}
+
+.file-drop-subtitle {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  max-width: 380px;
+}
+
+.file-drop-types {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+}
+
+.file-drop-type-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.input-box.drag-over {
+  border-color: var(--text-primary);
+  background-color: var(--bg-card);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+}
+
+@keyframes fileDropFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fileDropScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes fileDropPulse {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
 .generator-label {
   font-size: 0.75rem;
   color: var(--text-primary);

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Palette, Check, Sparkles, X, ChevronDown, Info } from 'lucide-react';
+import { useState } from 'react';
+import { Palette, Check, Sparkles, X, ChevronDown } from 'lucide-react';
 import { DESIGN_ARCHETYPES } from '../../packages/agent-core/designSystems/archetypes.js';
 
 export default function DesignArchetypeSelector({

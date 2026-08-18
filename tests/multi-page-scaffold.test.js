@@ -5,8 +5,7 @@ import {
   generatePageFooter,
   generateSubPageTemplate,
   scaffoldMultiPageSite,
-  analyzeSiteGraph,
-  STANDARD_SUBPAGE_PRESETS
+  analyzeSiteGraph
 } from '../packages/agent-core/scaffolding/multiPageScaffold.js';
 import { parseMultiPageSite, validateMultiPageSite } from '../src/utils/previewTransformer.js';
 

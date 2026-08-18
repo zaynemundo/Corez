@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, fireEvent, screen, cleanup } from '@testing-library/react';
-import React from 'react';
 import DesignArchetypeSelector from '../src/components/DesignArchetypeSelector.jsx';
 
 afterEach(cleanup);
