@@ -39,12 +39,18 @@ function isExecutableCodeBlock(lang, code) {
   const normalizedLang = (lang || '').toLowerCase();
   const text = code || '';
 
+  // Multi-page site marker detection (<!-- PAGE: index.html --> or <!-- CORESITE-PAGES: ... -->)
+  if (/<!--\s*(?:PAGE|CORESITE-PAGES):\s*[^\s>]+\s*-->/i.test(text)) return true;
+
+  // Strip leading HTML comments or whitespace before checking for document root
+  const stripped = text.replace(/^(?:\s*<!--[\s\S]*?-->\s*)+/i, '').trim();
+
   // Full HTML documents, with or without an explicit language tag. A block
   // must be a DOCUMENT to be a deliverable: an <html> root or a doctype.
   // Fragments that merely contain <style>/<script>/<body> tags (embeds,
   // page excerpts from search results, markup examples) are NOT runnable
   // pages and must not get preview actions.
-  if (/^\s*<!DOCTYPE html/i.test(text) || /^\s*<html[\s>]/i.test(text)) return true;
+  if (/^<!DOCTYPE html/i.test(stripped) || /^<html[\s>]/i.test(stripped)) return true;
 
   // React/JSX blocks are app deliverables by output contract.
   if (['jsx', 'tsx', 'react'].includes(normalizedLang)) {

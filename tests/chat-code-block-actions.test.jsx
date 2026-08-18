@@ -74,6 +74,24 @@ describe('ChatMessage code block actions', () => {
     expect(screen.getByRole('button', { name: /Open Canvas Preview/i })).toBeInTheDocument();
   });
 
+  it('shows Open Canvas Preview and Revise for a multi-page website with PAGE markers', () => {
+    const content = 'Here is your multi-page website:\n\n```html\n<!-- PAGE: index.html -->\n<!DOCTYPE html>\n<html><body><h1>Home</h1></body></html>\n<!-- PAGE: about.html -->\n<!DOCTYPE html>\n<html><body><h1>About</h1></body></html>\n```';
+    renderAssistant(content);
+
+    expect(screen.getByRole('button', { name: /Open Canvas Preview/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Revise/i })).toBeInTheDocument();
+    // Does NOT render the raw code pre block
+    expect(screen.queryByText(/Home/i)?.tagName).not.toBe('CODE');
+  });
+
+  it('shows Open Canvas Preview and Revise for an HTML app with leading comments', () => {
+    const content = 'Here is your app:\n\n```html\n<!-- Single page concept -->\n<!DOCTYPE html>\n<html><body><h1>App</h1></body></html>\n```';
+    renderAssistant(content);
+
+    expect(screen.getByRole('button', { name: /Open Canvas Preview/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Revise/i })).toBeInTheDocument();
+  });
+
   it('still renders the Copy button for non-executable snippets', () => {
     const content = 'Example:\n\n```js\nfunction greet(name) { return `Hello ${name}`; }\n```';
     renderAssistant(content);

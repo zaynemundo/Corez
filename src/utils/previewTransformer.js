@@ -269,9 +269,10 @@ export function injectFullscreenGamePatch(html) {
 export function formatCodeForPreview(rawCode) {
   if (!rawCode || typeof rawCode !== 'string') return '';
   const trimmed = rawCode.trim();
+  const stripped = trimmed.replace(/^(?:\s*<!--[\s\S]*?-->\s*)+/i, '').trim();
 
   // 1. If it's already a full HTML document, return as-is
-  if (/^\s*<!DOCTYPE html/i.test(trimmed) || /^\s*<html/i.test(trimmed)) {
+  if (/^<!DOCTYPE html/i.test(stripped) || /^<html/i.test(stripped)) {
     return injectFullscreenGamePatch(trimmed);
   }
 
