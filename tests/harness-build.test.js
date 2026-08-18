@@ -208,6 +208,7 @@ describe('runCreationHarness', () => {
       const body = JSON.parse(init.body);
       const messages = JSON.stringify(body.messages || []);
       if (messages.includes('Produce a concise build specification')) return jsonCompletion('A game with a score, three levels, and an enemy.');
+      if (messages.includes('Analyze the build specification below') || messages.includes('Produce a concise visual direction brief')) return jsonCompletion('Brief');
       if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('APPROVED');
       if (messages.includes('did not pass functional verification')) {
         repairCalls += 1;

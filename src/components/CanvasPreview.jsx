@@ -220,7 +220,6 @@ export default function CanvasPreview({
           {/* Live Streaming Badge */}
           {isStreaming && (
             <div className="canvas-live-badge" title="AI is actively designing and streaming code in real-time">
-              <span className="canvas-live-dot" />
               <span>LIVE BUILDING</span>
             </div>
           )}
@@ -367,7 +366,6 @@ export default function CanvasPreview({
                 />
                 {isStreaming && (
                   <div className="canvas-live-stream-overlay">
-                    <span className="canvas-live-dot" />
                     <span>Streaming live updates...</span>
                   </div>
                 )}
