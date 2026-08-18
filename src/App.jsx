@@ -82,6 +82,9 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [streamingContent, setStreamingContent] = useState(null);
+  // Swarm visibility: while the harness runs the parallel specialist
+  // pre-pass it emits phase 'swarm-planning' — surface that to the user.
+  const [swarmVisible, setSwarmVisible] = useState(false);
   const [theme, setTheme] = useState(() => {
     try {
       return localStorage.getItem('corez_theme') || 'dark';
@@ -180,11 +183,14 @@ export default function App() {
           const targetSession = storedSessions.find(s => s.id === pendingData.sessionId);
           if (targetSession) {
             setIsThinking(true);
+            setSwarmVisible(false);
             const controller = new AbortController();
             abortControllerRef.current = controller;
 
             generateAIResponse(pendingData.apiPrompt, pendingData.messages, controller.signal, (delta) => {
               setStreamingContent(prev => (prev || '') + delta);
+            }, (phaseEvent) => {
+              setSwarmVisible(phaseEvent.phase === 'swarm-planning');
             })
               .then(response => {
                 if (!response) return;
@@ -211,6 +217,7 @@ export default function App() {
               .finally(() => {
                 localStorage.removeItem('corez_pending_request');
                 setIsThinking(false);
+                setSwarmVisible(false);
                 setStreamingContent(null);
                 if (abortControllerRef.current === controller) abortControllerRef.current = null;
               });
@@ -367,6 +374,7 @@ export default function App() {
     }
 
     setIsThinking(true);
+    setSwarmVisible(false);
 
     // Save pending request to localStorage for background execution across
     // page refresh. Large file payloads are stripped when the record would
@@ -418,7 +426,9 @@ export default function App() {
           }
           return next;
         });
-      }, null, () => {
+      }, (phaseEvent) => {
+        setSwarmVisible(phaseEvent.phase === 'swarm-planning');
+      }, () => {
         setStreamingContent('');
         if (isCreationIntent) setActiveCanvasCode('');
       });
@@ -448,6 +458,7 @@ export default function App() {
       if (abortControllerRef.current === controller) {
         localStorage.removeItem('corez_pending_request');
         setIsThinking(false);
+        setSwarmVisible(false);
         setStreamingContent(null);
         abortControllerRef.current = null;
       }
@@ -533,6 +544,9 @@ export default function App() {
                             </div>
                           ) : (
                             <div className="thinking-indicator-box thinking-dots" aria-label="Corez is thinking" role="status">
+                              {swarmVisible && (
+                                <span className="thinking-phase-label">Swarm planning…</span>
+                              )}
                               <span className="thinking-dot" />
                               <span className="thinking-dot" />
                               <span className="thinking-dot" />

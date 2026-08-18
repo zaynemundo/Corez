@@ -1683,6 +1683,13 @@ h1, h2, h3, h4, h5, h6 {
   animation: thinkingDotPulse 1.4s infinite ease-in-out both;
 }
 
+.thinking-phase-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-right: 10px;
+  white-space: nowrap;
+}
+
 .thinking-dot:nth-child(1) { animation-delay: -0.32s; }
 .thinking-dot:nth-child(2) { animation-delay: -0.16s; }
 
