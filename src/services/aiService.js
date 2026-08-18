@@ -2083,12 +2083,24 @@ export async function handleMixedQuestionImageRequest(prompt, intent, history, s
 export function isExplicitImageRequest(prompt) {
   const clean = String(prompt || '').trim();
   if (!clean) return false;
+
+  // Code revisions, code blocks, and HTML/CSS deliverables are NEVER image generation requests
+  if (/^\s*(?:revise(?:\s+code)?|update(?:\s+code)?|fix(?:\s+code)?|refactor(?:\s+code)?)\b/i.test(clean)) return false;
+  if (isRevisionContextPrompt(clean)) return false;
+  if (clean.includes('```') || /<!DOCTYPE\s+html|<html|<style|<script/i.test(clean)) return false;
+  if (/\b(?:css|stylesheet|html|javascript|code|function|component|script)\b/i.test(clean) && !/\b(?:image|picture|photo|illustration|wallpaper|artwork|drawing)\b/i.test(clean)) return false;
+
   const lower = clean.toLowerCase();
   if (lower.startsWith('image:') || lower.startsWith('flux:') || lower.startsWith('@image')) return true;
-  if (IMAGE_PATTERNS.test(clean)) return true;
+
+  // For multi-line prompts or prompts containing context, test only the first instruction line
+  const firstLine = clean.split('\n')[0].trim();
+  if (IMAGE_PATTERNS.test(firstLine)) return true;
+  if (clean.length < 300 && IMAGE_PATTERNS.test(clean)) return true;
+
   try {
     const fine = classifyIntentNew(clean);
-    if (fine?.type === 'image_generation' && (fine.confidence || 0) >= 0.2) return true;
+    if (fine?.type === 'image_generation' && (fine.confidence || 0) >= 0.5) return true;
   } catch {
     // Classifier unavailable; rely on pattern checks above.
   }
