@@ -1676,18 +1676,16 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .thinking-dots-toggle {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-pill);
+  background: transparent;
+  border: none;
+  padding: 4px 0;
   cursor: pointer;
-  margin-bottom: 0.4rem;
-  transition: transform var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast);
+  margin-bottom: 0.35rem;
+  transition: opacity var(--transition-fast);
 }
 
 .thinking-dots-toggle:hover {
-  background: var(--bg-card);
-  border-color: var(--border-hover);
-  transform: scale(1.04);
+  opacity: 0.75;
 }
 
 .thinking-dot {
