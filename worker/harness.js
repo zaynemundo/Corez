@@ -384,7 +384,7 @@ export async function* runCreationHarness(options) {
       content: state.swarm?.enabled
         && Array.isArray(state.swarm.contributions)
         && state.swarm.contributions.length > 0
-        ? buildSwarmContext(state.spec, state.swarm.contributions)
+        ? buildSwarmContext(state.spec, state.swarm.contributions, { prompt: originalPrompt })
         : `Build specification:\n${state.spec}\n\nDeliver ONLY the complete, finished artifact as a single self-contained HTML document.`
     };
     let buildMessages = [...baseSystem, buildContext, ...userMessages];

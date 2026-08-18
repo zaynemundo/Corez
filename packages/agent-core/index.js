@@ -2,6 +2,7 @@ export { loadCorezConfig, saveCorezConfig, DEFAULT_CONFIG } from './config/index
 export { PermissionManager, PERMISSION_CATEGORIES, BLOCKED_DANGEROUS_COMMANDS } from './permissions/index.js';
 export { ContextEngine } from './context/index.js';
 export { AWWWARDS_DESIGN_SYSTEM, AWWWARDS_CATEGORIES, detectAwwwardsCategory, buildAwwwardsDesignPrompt } from './context/designTokens.js';
+export { DESIGN_ARCHETYPES, FORBIDDEN_DESIGN_TROPES, QUALITY_DESIGN_STANDARDS, formatAntiSlopPrompt, detectDesignArchetype, generateTokensCss, buildDesignSystemPrompt } from './designSystems/index.js';
 export { ToolRegistry } from './tools/index.js';
 export { ModelProviderRouter, MODEL_CATALOG, cosineSimilarity } from './providers/index.js';
 export { ProviderChain } from './providers/providerChain.js';

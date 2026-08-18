@@ -15,7 +15,8 @@ import {
   Share2,
   ExternalLink,
   Loader2,
-  Lock
+  Lock,
+  Printer
 } from 'lucide-react';
 import { formatCodeForPreview, parseMultiPageSite, injectMultiPageRouter, validateMultiPageSite } from '../utils/previewTransformer';
 import { publishAppInR2 } from '../services/appStorageService';
@@ -242,6 +243,19 @@ export default function CanvasPreview({
     }
   };
 
+  const handlePrint = () => {
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      try {
+        iframeRef.current.contentWindow.focus();
+        iframeRef.current.contentWindow.print();
+        return;
+      } catch {
+        // fall through
+      }
+    }
+    window.print();
+  };
+
   const handleRefresh = () => {
     setKey(prev => prev + 1);
   };
@@ -361,6 +375,9 @@ export default function CanvasPreview({
           </button>
           <button className="icon-btn" onClick={handleDownload} title={multiPage.isMultiPage ? 'Download Website (.zip)' : 'Download .html file'}>
             <Download size={14} strokeWidth={1.5} />
+          </button>
+          <button className="icon-btn" onClick={handlePrint} title="Export to PDF / Print">
+            <Printer size={14} strokeWidth={1.5} />
           </button>
           <button className="icon-btn" onClick={onToggleFullScreen} title="Toggle Fullscreen">
             {isFullScreen ? <Minimize2 size={14} strokeWidth={1.5} /> : <Maximize2 size={14} strokeWidth={1.5} />}

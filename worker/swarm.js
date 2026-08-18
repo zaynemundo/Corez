@@ -14,6 +14,7 @@
 // the build stream itself is unchanged and uncapped.
 
 import { runProviderChain } from './providerChain.js';
+import { detectDesignArchetype, buildDesignSystemPrompt, generateTokensCss } from './designSystems.js';
 
 const SPEC_SYSTEM_PROMPT =
   'You are COREZ AI, an AI creation platform that builds websites, apps, and games. Answer directly with the requested output only.';
@@ -29,7 +30,7 @@ export const SWARM_SPECIALIST_BRIEFS = Object.freeze([
   {
     role: 'art-director',
     instruction:
-      'Produce a concise visual direction brief: a color palette with hex values, typography, spacing rhythm, and 2-3 signature micro-interactions suited to the audience. At most 150 words. Do not write code.'
+      'Produce a concise visual direction brief grounded in modern design principles (Open-Design / Awwwards standards): active color palette with hex/HSL tokens, typography hierarchy (Google Fonts), spacing scale, and 2-3 signature micro-interactions. Avoid purple-on-dark cliches and flat textureless cards. At most 175 words. Do not write code.'
   }
 ]);
 
@@ -66,11 +67,19 @@ export async function runSwarmSpecialists({ prompt, spec, env = {}, signal = nul
   const brief = String(spec || '').trim();
   const originalRequest = String(prompt || '').trim();
 
+  const archetype = detectDesignArchetype(`${originalRequest} ${brief}`);
+  const tokensSample = generateTokensCss(archetype);
+
   const results = await Promise.allSettled(
     SWARM_SPECIALIST_BRIEFS.map((specialist) => {
+      const isArtDirector = specialist.role === 'art-director';
+      const specialistInstruction = isArtDirector
+        ? `${specialist.instruction}\n\nRecommended Archetype Tokens (${archetype.name}):\n${tokensSample}`
+        : specialist.instruction;
+
       const messages = [
         { role: 'system', content: SPEC_SYSTEM_PROMPT },
-        { role: 'system', content: specialist.instruction },
+        { role: 'system', content: specialistInstruction },
         {
           role: 'user',
           content: `Original request:\n${originalRequest}\n\nBuild specification:\n${brief}`
@@ -108,6 +117,7 @@ export async function runSwarmSpecialists({ prompt, spec, env = {}, signal = nul
 
   return {
     contributions,
+    archetype: archetype.id,
     elapsedMs: Date.now() - startedAt,
     cancelled: false,
     reason: contributions.length === 0
@@ -121,12 +131,16 @@ export async function runSwarmSpecialists({ prompt, spec, env = {}, signal = nul
  * original single-file contract and appends each specialist contribution in
  * stable role order.
  */
-export function buildSwarmContext(spec, contributions) {
+export function buildSwarmContext(spec, contributions, options = {}) {
   const parts = [`Build specification:\n${String(spec || '').trim()}`];
   for (const contribution of contributions || []) {
     if (contribution?.role && contribution?.content) {
       parts.push(`## ${contribution.role}\n${contribution.content}`);
     }
+  }
+  const designPrompt = buildDesignSystemPrompt(options.prompt || spec, options);
+  if (designPrompt) {
+    parts.push(designPrompt);
   }
   parts.push('Deliver ONLY the complete, finished artifact as a single self-contained HTML document.');
   return parts.join('\n\n');

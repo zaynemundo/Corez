@@ -217,6 +217,26 @@ describe('CanvasPreview multi-page sites', () => {
     URL.createObjectURL = origCreate;
     URL.revokeObjectURL = origRevoke;
   });
+
+  it('triggers print/PDF export when clicking the Print button', () => {
+    let printed = false;
+    const origPrint = window.print;
+    window.print = () => { printed = true; };
+    const { container } = render(
+      <CanvasPreview code="<!DOCTYPE html><html><body><h1>Doc</h1></body></html>" title="Doc" onClose={() => {}} isFullScreen={false} onToggleFullScreen={() => {}} />
+    );
+
+    const iframe = container.querySelector('iframe');
+    if (iframe && iframe.contentWindow) {
+      iframe.contentWindow.print = () => { printed = true; };
+    }
+
+    const printBtn = screen.getByTitle('Export to PDF / Print');
+    expect(printBtn).toBeTruthy();
+    fireEvent.click(printBtn);
+    expect(printed).toBe(true);
+    window.print = origPrint;
+  });
 });
 
 describe('multi-page router script', () => {
