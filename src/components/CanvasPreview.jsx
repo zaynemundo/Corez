@@ -60,11 +60,16 @@ export default function CanvasPreview({
   // Completeness gate: before the creation is shown or published, check that
   // a multi-page output has an index.html, no empty pages, and no broken
   // internal links. Errors block publishing; warnings are shown as quality
-  // notes. Single-page creations always pass (validation is skipped).
+  // notes. Single-page outputs are validated against their own page too
+  // (named index.html): a lone page whose nav links to about.html/contact.html
+  // — pages the model referenced but never shipped — is an incomplete site,
+  // not a publishable link, and is caught here instead of being published
+  // broken.
   const multiPageValidation = useMemo(() => {
-    if (!multiPage.isMultiPage) return null;
-    return validateMultiPageSite(multiPage.pages);
-  }, [multiPage]);
+    if (multiPage.isMultiPage) return validateMultiPageSite(multiPage.pages);
+    if (!editableCode) return null;
+    return validateMultiPageSite([{ name: 'index.html', html: editableCode }]);
+  }, [multiPage, editableCode]);
 
   const currentPage = useMemo(() => {
     return multiPage.pages.find((p) => p.name === activePage) || multiPage.pages[0] || { name: 'index.html', html: '' };
@@ -119,16 +124,17 @@ export default function CanvasPreview({
 
   const handlePublish = async () => {
     if (publishing || !editableCode) return;
-    // Completeness gate: never publish an incomplete multi-page site. The
-    // user sees exactly which pages are missing or broken and can ask Corez
-    // to fix the output instead of sharing a broken link.
+    // Completeness gate: never publish an incomplete site (multi-page or a
+    // single page with links to pages that were never shipped). The user
+    // sees exactly which pages are missing or broken and can ask Corez to
+    // fix the output instead of sharing a broken link.
     if (multiPageValidation && !multiPageValidation.valid) {
       const errors = multiPageValidation.issues
         .filter((issue) => issue.severity === 'error')
         .map((issue) => issue.message)
         .slice(0, 3);
       setPublishError(
-        `This multi-page site is incomplete: ${errors.join('; ')}. Ask Corez to fix it before publishing.`
+        `This site is incomplete: ${errors.join('; ')}. Ask Corez to fix it before publishing.`
       );
       return;
     }
@@ -141,8 +147,14 @@ export default function CanvasPreview({
           pagesPayload[page.name] = injectMultiPageRouter(formatCodeForPreview(page.html), multiPage.pages.map((p) => p.name));
         }
       }
+      // The published home page is always the site's index page — never
+      // whatever page the user happened to be viewing when they hit
+      // Publish (the preview's active page is not the site's home).
+      const homeHtml = multiPage.isMultiPage && pagesPayload['index.html']
+        ? pagesPayload['index.html']
+        : formattedSrcDoc;
       const result = await publishAppInR2({
-        html: formattedSrcDoc,
+        html: homeHtml,
         title,
         slug: publishResult?.slug || null,
         sessionId,
@@ -190,8 +202,12 @@ export default function CanvasPreview({
           pagesPayload[page.name] = injectMultiPageRouter(formatCodeForPreview(page.html), multiPage.pages.map((p) => p.name));
         }
       }
+      // The published home page is always the site's index page.
+      const homeHtml = multiPage.isMultiPage && pagesPayload['index.html']
+        ? pagesPayload['index.html']
+        : formattedSrcDoc;
       const result = await publishAppInR2({
-        html: formattedSrcDoc,
+        html: homeHtml,
         title,
         slug: cleaned,
         previousSlug: publishResult?.slug || null,

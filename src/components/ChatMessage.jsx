@@ -1108,7 +1108,7 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
     if (!content) return null;
 
     const codeBlockRegex = /```(\w+)?\s*([\s\S]*?)```/g;
-    const parts = [];
+    let parts = [];
     let lastIndex = 0;
     let match;
     let blockCount = 0;
@@ -1160,6 +1160,37 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
         }
       }
     }
+
+    // Multi-page sites are often emitted as ONE fence per page with the
+    // <!-- PAGE: name.html --> markers sitting BETWEEN the fences. Those
+    // blocks are merged back into a single multi-page code block so "Open
+    // Canvas Preview" runs the WHOLE site — a lone page would render with
+    // dead nav links (blank pages on click) and a broken published link.
+    // Marker text with no surrounding code is attached to the next block.
+    const MARKER_ONLY_TEXT_RE = /^\s*(?:<!--\s*(?:PAGE|CORESITE-PAGES):[^\n]*-->\s*)+$/;
+    const mergeableParts = [];
+    let pendingMarkers = null;
+    for (const p of parts) {
+      if (p.type === 'text' && MARKER_ONLY_TEXT_RE.test(p.content)) {
+        pendingMarkers = pendingMarkers ? `${pendingMarkers}\n${p.content.trim()}` : p.content.trim();
+        continue;
+      }
+      if (p.type === 'code' && pendingMarkers) {
+        if (mergeableParts.length > 0 && mergeableParts[mergeableParts.length - 1].type === 'code') {
+          const prev = mergeableParts[mergeableParts.length - 1];
+          prev.code = `${prev.code}\n\n${pendingMarkers}\n\n${p.code}`;
+          prev.lang = 'html';
+          prev.isExecutable = true;
+        } else {
+          p.code = `${pendingMarkers}\n\n${p.code}`;
+          p.lang = 'html';
+          p.isExecutable = true;
+        }
+        pendingMarkers = null;
+      }
+      mergeableParts.push(p);
+    }
+    parts = mergeableParts;
 
     const processedParts = [];
     for (const p of parts) {

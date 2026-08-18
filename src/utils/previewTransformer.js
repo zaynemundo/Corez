@@ -266,6 +266,39 @@ export function injectFullscreenGamePatch(html) {
   return `${html}\n${script}`;
 }
 
+/**
+ * Navigation guard injected into every preview/published document (full HTML
+ * documents included). Inside the sandboxed preview iframe, a same-frame
+ * navigation would leave the srcdoc and blank the preview to white, so every
+ * link click is intercepted: external links (http(s), mailto, tel) open in a
+ * real new tab, and every other relative navigation is prevented. Hash and
+ * javascript: links keep their default behaviour. The multi-page router is
+ * injected separately and registered first (head), so internal .html links
+ * are routed to pages before this guard sees them.
+ */
+export const NAVIGATION_GUARD_SCRIPT = `
+  (function () {
+    document.addEventListener('submit', function(e) { e.preventDefault(); }, true);
+    document.addEventListener('click', function(e) {
+      var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+      if (!a) return;
+      var href = (a.getAttribute('href') || '').trim();
+      if (href === '' || href.charAt(0) === '#') return;
+      if (/^javascript:/i.test(href)) return;
+      e.preventDefault();
+      if (/^(https?:|mailto:|tel:)/i.test(href)) {
+        window.open(href, '_blank', 'noopener');
+      }
+    }, true);
+  })();`;
+
+export function injectNavigationGuard(html) {
+  if (!html || typeof html !== 'string') return html;
+  const script = `<script>${NAVIGATION_GUARD_SCRIPT}</script>`;
+  if (/<\/body>/i.test(html)) return html.replace(/<\/body>/i, `${script}\n</body>`);
+  return `${html}\n${script}`;
+}
+
 export function formatCodeForPreview(rawCode) {
   if (!rawCode || typeof rawCode !== 'string') return '';
   const trimmed = rawCode.trim();
@@ -273,7 +306,7 @@ export function formatCodeForPreview(rawCode) {
 
   // 1. If it's already a full HTML document, return as-is
   if (/^<!DOCTYPE html/i.test(stripped) || /^<html/i.test(stripped)) {
-    return injectFullscreenGamePatch(trimmed);
+    return injectNavigationGuard(injectFullscreenGamePatch(trimmed));
   }
 
   // 2. If it's pure HTML/CSS/JS without React/JSX syntax, wrap into a clean preview HTML document
@@ -303,12 +336,10 @@ export function formatCodeForPreview(rawCode) {
       return false;
     };
     window.addEventListener('mousedown', function() { window.focus(); });
-    // Navigation guard: form submissions and anchor navigations inside the
-    // sandboxed iframe would leave the srcdoc and blank the preview to
-    // Links: same-frame navigation would blank the preview to white, so
-    // external links (http(s), mailto, tel) open in a real new tab instead
-    // of navigating the iframe. Hash and javascript: links keep default
-    // behaviour.
+    // Navigation guard: same-frame navigation would leave the srcdoc and
+    // blank the preview to white, so external links (http(s), mailto, tel)
+    // open in a real new tab instead of navigating the iframe. Hash and
+    // javascript: links keep default behaviour.
     document.addEventListener('submit', function(e) { e.preventDefault(); }, true);
     document.addEventListener('click', function(e) {
       var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
@@ -326,6 +357,7 @@ export function formatCodeForPreview(rawCode) {
 <body>
   ${trimmed}
   <script>${FULLSCREEN_GAME_PATCH}</script>
+  <script>${NAVIGATION_GUARD_SCRIPT}</script>
 </body>
 </html>`;
   }
@@ -449,12 +481,10 @@ export function formatCodeForPreview(rawCode) {
       return false;
     };
     window.addEventListener('mousedown', function() { window.focus(); });
-    // Navigation guard: form submissions and anchor navigations inside the
-    // sandboxed iframe would leave the srcdoc and blank the preview to
-    // Links: same-frame navigation would blank the preview to white, so
-    // external links (http(s), mailto, tel) open in a real new tab instead
-    // of navigating the iframe. Hash and javascript: links keep default
-    // behaviour.
+    // Navigation guard: same-frame navigation would leave the srcdoc and
+    // blank the preview to white, so external links (http(s), mailto, tel)
+    // open in a real new tab instead of navigating the iframe. Hash and
+    // javascript: links keep default behaviour.
     document.addEventListener('submit', function(e) { e.preventDefault(); }, true);
     document.addEventListener('click', function(e) {
       var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;

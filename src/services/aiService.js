@@ -1200,6 +1200,13 @@ export async function generateHostedAIResponse(
   return finalContent;
 }
 
+// Multi-page markers the model may place INSIDE a fence or BETWEEN
+// separate fenced blocks (one fence per page). Both placements must reach
+// the preview as one multi-page artifact, so every extraction path below
+// preserves these marker lines verbatim.
+const MULTI_PAGE_MARKER_LINE_PATTERN = /^\s*<!--\s*(?:PAGE|CORESITE-PAGES):\s*[^\n>]+-->\s*$/gm;
+const MULTI_PAGE_MARKER_ANY_PATTERN = /<!--\s*(?:PAGE|CORESITE-PAGES):\s*[^\s>]+\s*-->/i;
+
 export function extractCodeFromMessage(text) {
   if (!text) return null;
 
@@ -1216,12 +1223,53 @@ export function extractCodeFromMessage(text) {
       }
     }
     if (validCodes.length > 0) {
+      // Rebuild the extracted artifact from the ORIGINAL text so the
+      // <!-- PAGE: name.html --> markers the model puts BETWEEN fenced
+      // blocks (one fence per page) survive extraction. Dropping them
+      // collapsed multi-page sites into a single page whose nav links
+      // pointed at pages that no longer exist — blank preview pages and
+      // broken published links. Markers inside fences are kept by the
+      // block capture above; markers between fences are spliced back here.
+      const blocks = [];
+      const gaps = [];
+      let scanIdx = 0;
+      const FENCE_BLOCK_PATTERN = /```(?:html|xml|jsx|tsx|js|javascript|react)?\s*[\s\S]*?```/gi;
+      let blockMatch;
+      while ((blockMatch = FENCE_BLOCK_PATTERN.exec(text)) !== null) {
+        const gap = text.slice(scanIdx, blockMatch.index);
+        gaps.push((gap.match(MULTI_PAGE_MARKER_LINE_PATTERN) || []).map((m) => m.trim()));
+        const inner = blockMatch[0].match(/```(?:html|xml|jsx|tsx|js|javascript|react)?\s*([\s\S]*?)```/i);
+        blocks.push(inner && inner[1].trim() ? inner[1].trim() : '');
+        scanIdx = blockMatch.index + blockMatch[0].length;
+      }
+      // Markers that appear after the last fence (a trailing page marker
+      // whose page block was truncated away) are kept too.
+      const tailMarkers = (text.slice(scanIdx).match(MULTI_PAGE_MARKER_LINE_PATTERN) || []).map((m) => m.trim());
+
+      const joinedParts = [];
+      for (let i = 0; i < blocks.length; i += 1) {
+        // The leading gap's markers (e.g. a lone <!-- PAGE: index.html -->
+        // before the first fence) belong to the site too.
+        if (gaps[i] && gaps[i].length > 0 && (i === 0 || blocks[i])) {
+          joinedParts.push(gaps[i].join('\n'));
+        }
+        if (blocks[i]) {
+          const blockCode = blocks[i];
+          if (blockCode.includes('<') || blockCode.includes('export default') || blockCode.includes('function ') || blockCode.includes('import ') || blockCode.includes('const ')) {
+            joinedParts.push(blockCode);
+          }
+        }
+      }
+      if (tailMarkers.length > 0 && joinedParts.length > 0) {
+        joinedParts.push(tailMarkers.join('\n'));
+      }
+      const joined = joinedParts.filter(Boolean).join('\n\n') || validCodes.join('\n\n');
+
       // Salvage orphaned HTML closing tags that trail the last code block
       // (the harness occasionally emits them outside the fence).
       const lastFenceIdx = text.lastIndexOf('```');
       const trailing = lastFenceIdx > -1 ? text.slice(lastFenceIdx + 3).trim() : '';
       const ORPHANED_CLOSE = /^\s*(?:<\/(?:script|style|body|html)>\s*)+$/i;
-      const joined = validCodes.join('\n\n');
       if (trailing && ORPHANED_CLOSE.test(trailing)) {
         return joined + '\n' + trailing;
       }
@@ -1237,10 +1285,22 @@ export function extractCodeFromMessage(text) {
   // Salvage truncated responses: a long generated app is often cut off
   // mid-code-block (no closing ```), so the strict matchers above miss it.
   // Extract everything after the last recognized fence when it still looks
-  // like code, so the preview canvas can open anyway.
+  // like code, so the preview canvas can open anyway. Multi-page output
+  // truncated mid-way keeps ALL pages: start from the first page marker
+  // (when present) instead of the last fence, which would isolate the final
+  // page and drop every earlier page's markers.
   const truncatedBlock = text.match(/```(?:html|xml|jsx|tsx|js|javascript|react)?\s*([\s\S]*)$/i);
   if (truncatedBlock && truncatedBlock[1].trim()) {
-    const code = truncatedBlock[1].trim();
+    let code = truncatedBlock[1].trim();
+    if (MULTI_PAGE_MARKER_ANY_PATTERN.test(code) || MULTI_PAGE_MARKER_ANY_PATTERN.test(text)) {
+      const markerIdx = text.search(MULTI_PAGE_MARKER_ANY_PATTERN);
+      if (markerIdx !== -1) {
+        const fromFirstMarker = text.slice(markerIdx).trim();
+        if (fromFirstMarker.includes('<html') || fromFirstMarker.includes('<!DOCTYPE') || fromFirstMarker.includes('</html>')) {
+          code = fromFirstMarker;
+        }
+      }
+    }
     if (code.includes('<') || code.includes('export default') || code.includes('function ') || code.includes('import ') || code.includes('const ')) {
       return code;
     }
