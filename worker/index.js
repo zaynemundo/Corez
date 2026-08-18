@@ -263,8 +263,22 @@ function buildSystemPrompt(options = {}) {
     : (intent?.primaryIntent || fineIntent?.primaryIntent || fineIntent?.type || intent?.type || intentType);
   const secondaryIntent = intent?.secondaryIntent ? ` (secondary: ${intent.secondaryIntent})` : '';
 
+  const isRevisionPrompt = /\[(?:SURGICAL REVISION CONTEXT|Context: The user is requesting a revision)/i.test(options.prompt || '')
+    || /^\s*(?:revise|update|modify|patch|fix)\s+code\b/i.test(options.prompt || '');
+
   let adaptiveInstructions;
-  if (intentType === 'code-help' || ['bug_fix', 'code_refactor', 'feature_implementation', 'simple_edit'].includes(primaryIntent)) {
+  if (isRevisionPrompt) {
+    adaptiveInstructions = `
+Adaptive Routing - Surgical Code Revision Path:
+- You are revising an existing, working codebase. Locate EXACTLY what the user wants to change.
+- Modify only the requested areas with surgical precision (like a targeted find-and-replace).
+- PRESERVE 100% of all existing HTML markup, CSS styling, particle effects, animations, interactive logic, event listeners, and multi-page structure.
+- NEVER redesign or start over from scratch.
+- If repairing missing sub-page links:
+  - If single-page: convert <a href="page.html"> to in-page anchors (<a href="#section">).
+  - If multi-page: include all referenced pages with \`<!-- PAGE: page.html -->\` markers.
+- Output the complete, working updated file inside a single code block so the live canvas preview immediately updates.`;
+  } else if (intentType === 'code-help' || ['bug_fix', 'code_refactor', 'feature_implementation', 'simple_edit'].includes(primaryIntent)) {
     adaptiveInstructions = `
 Adaptive Routing - Coding Path:
 - Inspect relevant architecture and naming conventions before providing code.

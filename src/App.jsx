@@ -390,7 +390,7 @@ export default function App() {
       : promptText;
 
     if (revisionContextCode) {
-      apiPrompt = `[Context: The user is requesting a revision for the following code block]\n\`\`\`\n${revisionContextCode}\n\`\`\`\n\nUser Request: ${apiPrompt}`;
+      apiPrompt = `[SURGICAL REVISION CONTEXT: The user wants to modify specific parts of this existing code]:\n\`\`\`\n${revisionContextCode}\n\`\`\`\n\nUser Revision Request: ${apiPrompt}\n\n[INSTRUCTION]: Locate the exact section or elements the user wants changed. Keep all other code, styles, scripts, multi-page markers, and features intact. Output the complete revised code with the exact requested changes applied.`;
       setRevisionContextCode('');
     }
 

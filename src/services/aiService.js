@@ -577,6 +577,23 @@ export async function improveCodingPrompt(prompt, intent = null) {
     }
   })() : '';
 
+  // Dedicated handling for code revisions: locate and modify only requested changes
+  if (isRevisionContextPrompt(cleanPrompt)) {
+    return `${cleanPrompt}
+
+[SURGICAL CODE REVISION SPECIFICATION]:
+- You are performing a targeted, surgical revision on the existing codebase provided in the context above.
+- LOCATE AND MODIFY ONLY WHAT THE USER ASKS TO CHANGE:
+  1. Identify the EXACT target elements, styles, copy, or logic requested by the user.
+  2. Apply the requested changes with surgical precision (like a find-and-replace).
+  3. PRESERVE 100% of all other existing HTML markup, CSS styling, particle effects, animations, JavaScript logic, event listeners, and multi-page markers (<!-- PAGE: ... -->) completely untouched.
+  4. DO NOT redesign, re-architect, or start over from scratch.
+  5. If fixing "incomplete site" or missing page links:
+     - For single-page: replace external .html links (<a href="page.html">) with in-page anchors (<a href="#section">).
+     - For multi-page: include all referenced pages using <!-- PAGE: page.html --> markers.
+  6. Output the COMPLETE updated file with the requested changes applied inside a single code block so the live canvas preview immediately updates.`;
+  }
+
   // Use the Prompt Intelligence Engine for structured enrichment
   try {
     const pipelineResult = await processPromptIntelligence({
@@ -1847,7 +1864,7 @@ Its core purpose is to remove the technical gap between having an idea and launc
 const IMAGE_PATTERNS = /\b(generate|create|draw|make|render|show|give me|give us|want|need|produce)\b.*\b(image|picture|photo|logo|illustration|artwork|wallpaper|drawing|graphic|icon)\b|\b(image|picture|photo|logo|illustration|artwork|wallpaper|drawing|graphic|icon)\b.*\b(generate|create|draw|make|render|flux)\b/i;
 
 export function isRevisionContextPrompt(prompt) {
-  return /\[Context: The user is requesting a revision for the following code block\]/i.test(String(prompt || ''));
+  return /\[(?:SURGICAL REVISION CONTEXT|Context: The user is requesting a revision)/i.test(String(prompt || ''));
 }
 
 const IMAGE_TITLE_SMALL_WORDS = new Set(['a', 'an', 'the', 'and', 'or', 'but', 'for', 'with', 'of', 'in', 'on', 'at', 'to', 'from', 'by', 'as', 'via', 'vs']);
