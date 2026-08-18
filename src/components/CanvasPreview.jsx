@@ -18,11 +18,17 @@ import {
   Lock,
   Printer,
   FileText,
-  Layers
+  Layers,
+  QrCode,
+  Code,
+  Link2
 } from 'lucide-react';
 import { formatCodeForPreview, parseMultiPageSite, injectMultiPageRouter, validateMultiPageSite } from '../utils/previewTransformer';
 import { publishAppInR2 } from '../services/appStorageService';
 import { createZipBlob } from '../utils/zipPackager';
+import { generateQrCodeSvg, generateEmbedSnippet } from '../utils/qrCode';
+import DesignArchetypeSelector from './DesignArchetypeSelector';
+import { detectDesignArchetype } from '../../packages/agent-core/designSystems/selector.js';
 
 export default function CanvasPreview({ 
   code, 
@@ -46,6 +52,15 @@ export default function CanvasPreview({
   const [slugError, setSlugError] = useState(null);
   const [slugSuccess, setSlugSuccess] = useState(null);
   const [activePage, setActivePage] = useState('index.html');
+  const [publishTab, setPublishTab] = useState('link'); // 'link' | 'qr' | 'embed'
+  const [embedCopied, setEmbedCopied] = useState(false);
+  const detectedArchetype = useMemo(() => detectDesignArchetype(`${title} ${editableCode}`), [title, editableCode]);
+  const [activeArchetypeId, setActiveArchetypeId] = useState(detectedArchetype.id);
+
+  useEffect(() => {
+    setActiveArchetypeId(detectedArchetype.id);
+  }, [detectedArchetype.id]);
+
   const iframeRef = useRef(null);
 
   const multiPage = useMemo(() => parseMultiPageSite(editableCode), [editableCode]);
@@ -245,6 +260,14 @@ export default function CanvasPreview({
     }
   };
 
+  const handleCopyEmbed = () => {
+    if (!publishLink) return;
+    const snippet = generateEmbedSnippet(publishLink, { title });
+    navigator.clipboard?.writeText(snippet);
+    setEmbedCopied(true);
+    setTimeout(() => setEmbedCopied(false), 2000);
+  };
+
   const handlePrint = () => {
     if (iframeRef.current && iframeRef.current.contentWindow) {
       try {
@@ -354,6 +377,14 @@ export default function CanvasPreview({
             corez-nav message, so no external tab bar is needed. */}
 
         <div className="canvas-controls">
+          {editableCode && !isStreaming && (
+            <DesignArchetypeSelector
+              activeArchetypeId={activeArchetypeId}
+              onSelectArchetype={(id) => setActiveArchetypeId(id)}
+              compact={true}
+            />
+          )}
+
           {/* Publish: share the creation with anyone via a short link */}
           {editableCode && !isStreaming && (
             <button
@@ -569,117 +600,262 @@ export default function CanvasPreview({
               Anyone with this link can open <b style={{ color: 'var(--text-primary)' }}>{title.slice(0, 60)}</b>:
             </p>
 
+            {/* Share Modal Tabs: Link | QR Code | Embed */}
             <div
-              className="publish-link-box"
+              className="publish-modal-tabs"
               style={{
                 display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                background: 'var(--bg-tertiary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: 'var(--radius-md)',
-                padding: '8px 10px'
+                gap: '6px',
+                margin: '8px 0 12px',
+                borderBottom: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.08))',
+                paddingBottom: '8px'
               }}
             >
-              <input
-                readOnly
-                value={publishLink}
-                onFocus={(e) => e.target.select()}
-                aria-label="Published share link"
+              <button
+                type="button"
+                className={`publish-tab-btn ${publishTab === 'link' ? 'active' : ''}`}
+                onClick={() => setPublishTab('link')}
                 style={{
-                  flex: 1,
-                  minWidth: 0,
-                  background: 'transparent',
-                  border: 'none',
-                  outline: 'none',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.8rem',
-                  fontFamily: 'monospace'
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '4px 10px',
+                  borderRadius: 'var(--radius-sm, 6px)',
+                  border: publishTab === 'link' ? '1px solid var(--accent, #3b82f6)' : '1px solid transparent',
+                  background: publishTab === 'link' ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
+                  color: publishTab === 'link' ? 'var(--text-primary, #ffffff)' : 'var(--text-secondary, #9ca3af)',
+                  fontSize: '0.75rem',
+                  fontWeight: publishTab === 'link' ? 600 : 400,
+                  cursor: 'pointer'
                 }}
-              />
-              <button type="button" className="code-btn" onClick={handleCopyLink} title="Copy link">
-                {copied ? <Check size={14} /> : <Copy size={14} />}
-                <span>{copied ? 'Copied' : 'Copy'}</span>
-              </button>
-              <a
-                className="code-btn"
-                href={publishLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Open in new tab"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
               >
-                <ExternalLink size={14} />
-                <span>Open</span>
-              </a>
+                <Link2 size={13} />
+                <span>Share Link</span>
+              </button>
+              <button
+                type="button"
+                className={`publish-tab-btn ${publishTab === 'qr' ? 'active' : ''}`}
+                onClick={() => setPublishTab('qr')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '4px 10px',
+                  borderRadius: 'var(--radius-sm, 6px)',
+                  border: publishTab === 'qr' ? '1px solid var(--accent, #3b82f6)' : '1px solid transparent',
+                  background: publishTab === 'qr' ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
+                  color: publishTab === 'qr' ? 'var(--text-primary, #ffffff)' : 'var(--text-secondary, #9ca3af)',
+                  fontSize: '0.75rem',
+                  fontWeight: publishTab === 'qr' ? 600 : 400,
+                  cursor: 'pointer'
+                }}
+              >
+                <QrCode size={13} />
+                <span>QR Code</span>
+              </button>
+              <button
+                type="button"
+                className={`publish-tab-btn ${publishTab === 'embed' ? 'active' : ''}`}
+                onClick={() => setPublishTab('embed')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '4px 10px',
+                  borderRadius: 'var(--radius-sm, 6px)',
+                  border: publishTab === 'embed' ? '1px solid var(--accent, #3b82f6)' : '1px solid transparent',
+                  background: publishTab === 'embed' ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
+                  color: publishTab === 'embed' ? 'var(--text-primary, #ffffff)' : 'var(--text-secondary, #9ca3af)',
+                  fontSize: '0.75rem',
+                  fontWeight: publishTab === 'embed' ? 600 : 400,
+                  cursor: 'pointer'
+                }}
+              >
+                <Code size={13} />
+                <span>Embed Code</span>
+              </button>
             </div>
 
-            {/* Slug Customization / 1-Time Change */}
-            {publishResult.customized || (publishResult.slug && !/^[a-z0-9]{4,8}-[0-9]{1,6}$/.test(publishResult.slug)) ? (
+            {publishTab === 'link' && (
+              <>
+                <div
+                  className="publish-link-box"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '8px 10px'
+                  }}
+                >
+                  <input
+                    readOnly
+                    value={publishLink}
+                    onFocus={(e) => e.target.select()}
+                    aria-label="Published share link"
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      background: 'transparent',
+                      border: 'none',
+                      outline: 'none',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.8rem',
+                      fontFamily: 'monospace'
+                    }}
+                  />
+                  <button type="button" className="code-btn" onClick={handleCopyLink} title="Copy link">
+                    {copied ? <Check size={14} /> : <Copy size={14} />}
+                    <span>{copied ? 'Copied' : 'Copy'}</span>
+                  </button>
+                  <a
+                    className="code-btn"
+                    href={publishLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Open in new tab"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
+                  >
+                    <ExternalLink size={14} />
+                    <span>Open</span>
+                  </a>
+                </div>
+
+                {/* Slug Customization / 1-Time Change */}
+                {publishResult.customized || (publishResult.slug && !/^[a-z0-9]{4,8}-[0-9]{1,6}$/.test(publishResult.slug)) ? (
+                  <div
+                    className="publish-slug-locked"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '7px 10px',
+                      background: 'var(--bg-tertiary)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: 'var(--radius-md)'
+                    }}
+                  >
+                    <Lock size={13} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: '0.74rem', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>
+                        Custom slug locked (1-time change used)
+                      </p>
+                      <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: '1px 0 0' }}>
+                        Republishing automatically updates this link.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <form onSubmit={handleUpdateSlug} className="publish-slug-form" style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <label htmlFor="custom-slug-input" style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                        Customize URL slug:
+                      </label>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>1-time change</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0, background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 8px' }}>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', userSelect: 'none' }}>corez.pro/</span>
+                        <input
+                          id="custom-slug-input"
+                          type="text"
+                          value={customSlug}
+                          onChange={(e) => {
+                            setCustomSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''));
+                            setSlugError(null);
+                            setSlugSuccess(null);
+                          }}
+                          placeholder="my-custom-slug"
+                          aria-label="Custom slug"
+                          style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-primary)', fontSize: '0.8rem', fontFamily: 'var(--font-mono)', padding: '7px 4px' }}
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        className="code-btn"
+                        onClick={handleUpdateSlug}
+                        disabled={isUpdatingSlug || !customSlug || customSlug === publishResult.slug}
+                        style={{ whiteSpace: 'nowrap', padding: '6px 12px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        {isUpdatingSlug ? <Loader2 size={13} className="spin-icon" /> : 'Save Slug'}
+                      </button>
+                    </div>
+                    {slugError && (
+                      <p role="alert" style={{ fontSize: '0.74rem', color: '#f87171', margin: '2px 0 0' }}>{slugError}</p>
+                    )}
+                    {slugSuccess && (
+                      <p role="status" style={{ fontSize: '0.74rem', color: '#4ade80', margin: '2px 0 0' }}>{slugSuccess}</p>
+                    )}
+                  </form>
+                )}
+              </>
+            )}
+
+            {publishTab === 'qr' && (
               <div
-                className="publish-slug-locked"
+                className="publish-qr-view"
                 style={{
                   display: 'flex',
+                  flexDirection: 'column',
                   alignItems: 'center',
-                  gap: '8px',
-                  padding: '7px 10px',
-                  background: 'var(--bg-tertiary)',
+                  justifyContent: 'center',
+                  padding: '16px 12px',
+                  background: 'var(--bg-tertiary, #181922)',
                   border: '1px solid var(--border-color)',
-                  borderRadius: 'var(--radius-md)'
+                  borderRadius: 'var(--radius-md, 10px)',
+                  gap: '10px'
                 }}
               >
-                <Lock size={13} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: '0.74rem', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>
-                    Custom slug locked (1-time change used)
-                  </p>
-                  <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: '1px 0 0' }}>
-                    Republishing automatically updates this link.
-                  </p>
-                </div>
+                <div
+                  className="qr-code-svg-container"
+                  style={{
+                    background: '#ffffff',
+                    padding: '8px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  dangerouslySetInnerHTML={{ __html: generateQrCodeSvg(publishLink, { size: 140, fgColor: '#090a0f', bgColor: '#ffffff' }) }}
+                />
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #9ca3af)', margin: 0, textAlign: 'center' }}>
+                  Scan with your phone's camera to preview live on mobile.
+                </p>
               </div>
-            ) : (
-              <form onSubmit={handleUpdateSlug} className="publish-slug-form" style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <label htmlFor="custom-slug-input" style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
-                    Customize URL slug:
-                  </label>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>1-time change</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0, background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 8px' }}>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', userSelect: 'none' }}>corez.pro/</span>
-                    <input
-                      id="custom-slug-input"
-                      type="text"
-                      value={customSlug}
-                      onChange={(e) => {
-                        setCustomSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''));
-                        setSlugError(null);
-                        setSlugSuccess(null);
-                      }}
-                      placeholder="my-custom-slug"
-                      aria-label="Custom slug"
-                      style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-primary)', fontSize: '0.8rem', fontFamily: 'var(--font-mono)', padding: '7px 4px' }}
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    className="code-btn"
-                    onClick={handleUpdateSlug}
-                    disabled={isUpdatingSlug || !customSlug || customSlug === publishResult.slug}
-                    style={{ whiteSpace: 'nowrap', padding: '6px 12px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                  >
-                    {isUpdatingSlug ? <Loader2 size={13} className="spin-icon" /> : 'Save Slug'}
-                  </button>
-                </div>
-                {slugError && (
-                  <p role="alert" style={{ fontSize: '0.74rem', color: '#f87171', margin: '2px 0 0' }}>{slugError}</p>
-                )}
-                {slugSuccess && (
-                  <p role="status" style={{ fontSize: '0.74rem', color: '#4ade80', margin: '2px 0 0' }}>{slugSuccess}</p>
-                )}
-              </form>
+            )}
+
+            {publishTab === 'embed' && (
+              <div className="publish-embed-view" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <textarea
+                  readOnly
+                  value={generateEmbedSnippet(publishLink, { title })}
+                  onFocus={(e) => e.target.select()}
+                  aria-label="Embed iframe HTML"
+                  style={{
+                    width: '100%',
+                    height: '80px',
+                    background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '8px 10px',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.75rem',
+                    fontFamily: 'monospace',
+                    resize: 'none'
+                  }}
+                />
+                <button
+                  type="button"
+                  className="code-btn"
+                  onClick={handleCopyEmbed}
+                  style={{ alignSelf: 'flex-end', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                >
+                  {embedCopied ? <Check size={13} /> : <Copy size={13} />}
+                  <span>{embedCopied ? 'Copied Embed Code' : 'Copy Embed Code'}</span>
+                </button>
+              </div>
             )}
 
             <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0 }}>
