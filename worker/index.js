@@ -2168,6 +2168,104 @@ async function handlePublish(request, env) {
   return jsonResponse(405, { error: 'Method not allowed.' });
 }
 
+// Verification Sessions Store for OTP verification
+const VERIFICATION_SESSIONS = new Map();
+
+async function handleEmailVerification(request, env) {
+  const url = new URL(request.url);
+  const pathname = url.pathname;
+
+  if (pathname === '/api/verify/send-code' && request.method === 'POST') {
+    let body;
+    try {
+      body = await readBoundedJson(request);
+    } catch {
+      return jsonResponse(400, { error: 'Invalid JSON payload.' });
+    }
+    const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return jsonResponse(400, { error: 'Valid email address required.' });
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 10 * 60 * 1000;
+    VERIFICATION_SESSIONS.set(email, { code, expiresAt, attempts: 0 });
+
+    let simulated = true;
+
+    // Live dispatch via Resend if RESEND_API_KEY is configured
+    if (env?.RESEND_API_KEY) {
+      try {
+        const resendRes = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            from: 'CoreZ Security <verification@corez.pro>',
+            to: [email],
+            subject: `CoreZ Verification Code: ${code}`,
+            html: `<div style="font-family:sans-serif;padding:20px;background:#090a0f;color:#fff;"><h2>CoreZ Verification Code</h2><p>Your 6-digit verification code is:</p><h1 style="color:#60a5fa;letter-spacing:6px;">${code}</h1><p>Expires in 10 minutes.</p></div>`
+          })
+        });
+        if (resendRes.ok) {
+          simulated = false;
+        }
+      } catch (err) {
+        console.warn('Resend email dispatch error:', safeErrorDetail(err));
+      }
+    }
+
+    return jsonResponse(200, {
+      success: true,
+      email,
+      simulated,
+      code: simulated ? code : undefined,
+      expiresAt,
+      message: 'Verification code sent from verification@corez.pro'
+    });
+  }
+
+  if (pathname === '/api/verify/check-code' && request.method === 'POST') {
+    let body;
+    try {
+      body = await readBoundedJson(request);
+    } catch {
+      return jsonResponse(400, { error: 'Invalid JSON payload.' });
+    }
+    const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
+    const code = typeof body?.code === 'string' ? body.code.trim() : '';
+
+    const session = VERIFICATION_SESSIONS.get(email);
+    if (!session) {
+      return jsonResponse(400, { error: 'No verification session found for this email.' });
+    }
+    if (Date.now() > session.expiresAt) {
+      VERIFICATION_SESSIONS.delete(email);
+      return jsonResponse(400, { error: 'Verification code has expired.' });
+    }
+    if (session.code !== code) {
+      session.attempts += 1;
+      if (session.attempts >= 5) {
+        VERIFICATION_SESSIONS.delete(email);
+        return jsonResponse(400, { error: 'Too many incorrect attempts.' });
+      }
+      return jsonResponse(400, { error: 'Invalid verification code.' });
+    }
+
+    VERIFICATION_SESSIONS.delete(email);
+    return jsonResponse(200, {
+      success: true,
+      verified: true,
+      email,
+      verifiedAt: new Date().toISOString()
+    });
+  }
+
+  return jsonResponse(404, { error: 'Verification endpoint not found.' });
+}
+
 async function runJsonSafe(operation) {
   try {
     return await operation();
@@ -2221,6 +2319,9 @@ export default {
     }
     if (pathname.startsWith('/api/memory')) {
       return runJsonSafe(() => handleR2Memory(request, env));
+    }
+    if (pathname.startsWith('/api/verify')) {
+      return runJsonSafe(() => handleEmailVerification(request, env));
     }
     if (pathname === '/api/publish' ||
         (request.method === 'GET' &&

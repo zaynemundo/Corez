@@ -24,6 +24,9 @@ export const DEFAULT_ACCOUNT_PROFILE = Object.freeze({
   avatarUrl: '',
   avatarColor: '#3b82f6',
   email: '',
+  emailVerified: false,
+  emailVerifiedAt: null,
+  verifiedEmail: '',
   tier: 'Pro Creator', // 'Free' | 'Pro Creator' | 'Team'
   preferences: {
     defaultArchetype: 'linear-dark',

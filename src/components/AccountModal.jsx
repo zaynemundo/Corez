@@ -10,7 +10,14 @@ import {
   Trash2,
   Palette,
   Sparkles,
-  ExternalLink
+  ExternalLink,
+  Mail,
+  CheckCircle,
+  AlertCircle,
+  Clock,
+  KeyRound,
+  RotateCw,
+  Send
 } from 'lucide-react';
 import {
   saveAccountProfile,
@@ -19,6 +26,12 @@ import {
   resetAccountProfile,
   DEFAULT_AVATAR_COLORS
 } from '../services/accountService.js';
+import {
+  requestEmailVerification,
+  confirmEmailVerification,
+  getActiveVerificationSession,
+  VERIFICATION_SENDER
+} from '../services/emailVerificationService.js';
 import { DESIGN_ARCHETYPES } from '../../packages/agent-core/designSystems/archetypes.js';
 
 export default function AccountModal({
@@ -42,6 +55,77 @@ export default function AccountModal({
   });
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [exportSuccess, setExportSuccess] = useState(false);
+
+  // Email verification states
+  const [isVerifyingEmail, setIsVerifyingEmail] = useState(false);
+  const [otpInput, setOtpInput] = useState('');
+  const [isSendingCode, setIsSendingCode] = useState(false);
+  const [isConfirmingCode, setIsConfirmingCode] = useState(false);
+  const [verifyError, setVerifyError] = useState(null);
+  const [verifySuccess, setVerifySuccess] = useState(null);
+  const [previewOtpCode, setPreviewOtpCode] = useState(null);
+  const [cooldownSec, setCooldownSec] = useState(0);
+
+  const isEmailVerified = Boolean(
+    profile?.emailVerified &&
+    profile?.verifiedEmail &&
+    profile.verifiedEmail === formData.email.trim().toLowerCase()
+  );
+
+  const handleSendVerificationCode = async () => {
+    setVerifyError(null);
+    setVerifySuccess(null);
+    setIsSendingCode(true);
+    try {
+      const res = await requestEmailVerification(formData.email);
+      setIsVerifyingEmail(true);
+      if (res.simulated && res.previewCode) {
+        setPreviewOtpCode(res.previewCode);
+      }
+      setVerifySuccess(res.message || 'Verification code sent from verification@corez.pro');
+      setCooldownSec(60);
+      const interval = setInterval(() => {
+        setCooldownSec((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } catch (err) {
+      setVerifyError(err.message || 'Failed to send verification code.');
+    } finally {
+      setIsSendingCode(false);
+    }
+  };
+
+  const handleConfirmVerificationCode = async (e) => {
+    if (e) e.preventDefault();
+    setVerifyError(null);
+    setIsConfirmingCode(true);
+    try {
+      const res = await confirmEmailVerification(formData.email, otpInput);
+      if (res.verified) {
+        const updated = saveAccountProfile({
+          email: formData.email.trim().toLowerCase(),
+          emailVerified: true,
+          emailVerifiedAt: res.verifiedAt || new Date().toISOString(),
+          verifiedEmail: formData.email.trim().toLowerCase()
+        });
+        if (onProfileUpdate) onProfileUpdate(updated);
+        setIsVerifyingEmail(false);
+        setOtpInput('');
+        setPreviewOtpCode(null);
+        setVerifySuccess('Email verified successfully!');
+        setTimeout(() => setVerifySuccess(null), 3000);
+      }
+    } catch (err) {
+      setVerifyError(err.message || 'Failed to confirm verification code.');
+    } finally {
+      setIsConfirmingCode(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -364,25 +448,211 @@ export default function AccountModal({
               </div>
 
               <div>
-                <label htmlFor="account-email" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                  Email Address (Optional)
-                </label>
-                <input
-                  id="account-email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="you@example.com"
-                  style={{
-                    width: '100%',
-                    background: 'var(--bg-tertiary)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: '8px 10px',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.82rem'
-                  }}
-                />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <label htmlFor="account-email" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                    Email Address
+                  </label>
+                  {formData.email && (
+                    <div>
+                      {isEmailVerified ? (
+                        <span
+                          style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 600,
+                            color: '#4ade80',
+                            background: 'rgba(74, 222, 128, 0.12)',
+                            border: '1px solid rgba(74, 222, 128, 0.3)',
+                            borderRadius: '12px',
+                            padding: '2px 8px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <CheckCircle size={11} /> Verified
+                        </span>
+                      ) : (
+                        <span
+                          style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 600,
+                            color: '#fbbf24',
+                            background: 'rgba(251, 191, 36, 0.12)',
+                            border: '1px solid rgba(251, 191, 36, 0.3)',
+                            borderRadius: '12px',
+                            padding: '2px 8px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <AlertCircle size={11} /> Unverified
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    id="account-email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => {
+                      setFormData({ ...formData, email: e.target.value });
+                      setVerifyError(null);
+                      setVerifySuccess(null);
+                    }}
+                    placeholder="you@example.com"
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      background: 'var(--bg-tertiary)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: 'var(--radius-md)',
+                      padding: '8px 10px',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.82rem'
+                    }}
+                  />
+
+                  {formData.email && !isEmailVerified && !isVerifyingEmail && (
+                    <button
+                      type="button"
+                      className="code-btn"
+                      onClick={handleSendVerificationCode}
+                      disabled={isSendingCode}
+                      style={{
+                        whiteSpace: 'nowrap',
+                        padding: '7px 12px',
+                        fontSize: '0.75rem',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        background: 'rgba(59, 130, 246, 0.15)',
+                        color: '#60a5fa',
+                        borderColor: 'rgba(59, 130, 246, 0.3)'
+                      }}
+                    >
+                      {isSendingCode ? <RotateCw size={13} className="spin-icon" /> : <Mail size={13} />}
+                      <span>{isSendingCode ? 'Sending...' : 'Verify Email'}</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Verification Box / OTP Input Area */}
+                {isVerifyingEmail && (
+                  <div
+                    className="email-verification-panel"
+                    style={{
+                      marginTop: '8px',
+                      padding: '12px',
+                      background: 'var(--bg-tertiary)',
+                      border: '1px solid var(--accent, #3b82f6)',
+                      borderRadius: 'var(--radius-md)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <KeyRound size={13} style={{ color: 'var(--accent, #3b82f6)' }} />
+                        Enter 6-Digit Verification Code
+                      </span>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                        From: <b style={{ color: 'var(--text-primary)' }}>verification@corez.pro</b>
+                      </span>
+                    </div>
+
+                    {previewOtpCode && (
+                      <div
+                        onClick={() => setOtpInput(previewOtpCode)}
+                        style={{
+                          fontSize: '0.72rem',
+                          color: '#60a5fa',
+                          background: 'rgba(59, 130, 246, 0.1)',
+                          border: '1px dashed rgba(59, 130, 246, 0.3)',
+                          borderRadius: '6px',
+                          padding: '4px 8px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between'
+                        }}
+                        title="Click to autofill code"
+                      >
+                        <span>Zero-Config Dev Mode: <strong>{previewOtpCode}</strong></span>
+                        <span style={{ fontSize: '0.68rem', textDecoration: 'underline' }}>Click to Autofill</span>
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        value={otpInput}
+                        maxLength={6}
+                        onChange={(e) => setOtpInput(e.target.value.replace(/[^0-9]/g, ''))}
+                        placeholder="123456"
+                        aria-label="6-digit verification code"
+                        style={{
+                          width: '130px',
+                          padding: '7px 10px',
+                          fontSize: '0.95rem',
+                          fontWeight: 700,
+                          letterSpacing: '4px',
+                          textAlign: 'center',
+                          fontFamily: 'var(--font-mono)',
+                          background: 'rgba(0, 0, 0, 0.25)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: 'var(--radius-sm, 6px)',
+                          color: 'var(--text-primary)'
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="code-btn"
+                        onClick={handleConfirmVerificationCode}
+                        disabled={isConfirmingCode || otpInput.length !== 6}
+                        style={{
+                          padding: '7px 14px',
+                          fontSize: '0.75rem',
+                          background: 'var(--accent, #3b82f6)',
+                          color: '#ffffff',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px'
+                        }}
+                      >
+                        {isConfirmingCode ? <RotateCw size={13} className="spin-icon" /> : <Check size={13} />}
+                        <span>Confirm Code</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        onClick={handleSendVerificationCode}
+                        disabled={cooldownSec > 0 || isSendingCode}
+                        title={cooldownSec > 0 ? `Resend available in ${cooldownSec}s` : 'Resend Code'}
+                        style={{ fontSize: '0.72rem', padding: '6px 10px', color: cooldownSec > 0 ? 'var(--text-muted)' : 'var(--text-secondary)' }}
+                      >
+                        <RotateCw size={13} />
+                        <span style={{ marginLeft: '4px' }}>{cooldownSec > 0 ? `${cooldownSec}s` : 'Resend'}</span>
+                      </button>
+                    </div>
+
+                    {verifyError && (
+                      <p role="alert" style={{ fontSize: '0.72rem', color: '#f87171', margin: '2px 0 0' }}>
+                        {verifyError}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {verifySuccess && !isVerifyingEmail && (
+                  <p role="status" style={{ fontSize: '0.72rem', color: '#4ade80', margin: '4px 0 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <CheckCircle size={12} /> {verifySuccess}
+                  </p>
+                )}
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
