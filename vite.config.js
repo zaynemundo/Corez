@@ -21,35 +21,32 @@ function getLocalResendApiKey() {
 const LOCAL_VERIFICATION_STORE = new Map();
 
 function localVerifyPlugin() {
-  return {
-    name: 'local-verify-handler',
-    configureServer(server) {
-      server.middlewares.use(async (req, res, next) => {
-        const url = new URL(req.url, 'http://localhost:3000');
-        if (url.pathname === '/api/verify/send-code' && req.method === 'POST') {
-          let bodyStr = '';
-          req.on('data', chunk => { bodyStr += chunk; });
-          req.on('end', async () => {
+  const handler = async (req, res, next) => {
+    const url = new URL(req.url, 'http://localhost:3000');
+    if (url.pathname === '/api/verify/send-code' && req.method === 'POST') {
+      let bodyStr = '';
+      req.on('data', chunk => { bodyStr += chunk; });
+      req.on('end', async () => {
+        try {
+          const body = JSON.parse(bodyStr || '{}');
+          const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+          if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Valid email required' }));
+            return;
+          }
+
+          const code = Math.floor(100000 + Math.random() * 900000).toString();
+          const expiresAt = Date.now() + 10 * 60 * 1000;
+          LOCAL_VERIFICATION_STORE.set(email, { code, expiresAt, attempts: 0 });
+
+          let simulated = true;
+          const resendApiKey = getLocalResendApiKey();
+
+          if (resendApiKey) {
             try {
-              const body = JSON.parse(bodyStr || '{}');
-              const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
-              if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                res.statusCode = 400;
-                res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ error: 'Valid email required' }));
-                return;
-              }
-
-              const code = Math.floor(100000 + Math.random() * 900000).toString();
-              const expiresAt = Date.now() + 10 * 60 * 1000;
-              LOCAL_VERIFICATION_STORE.set(email, { code, expiresAt, attempts: 0 });
-
-              let simulated = true;
-              const resendApiKey = getLocalResendApiKey();
-
-              if (resendApiKey) {
-                try {
-                  const emailHtml = `<!DOCTYPE html>
+              const emailHtml = `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"/><title>CoreZ Verification Code</title></head>
 <body style="margin:0;padding:0;background:#090a0f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#f3f4f6;">
@@ -67,108 +64,116 @@ function localVerifyPlugin() {
 </body>
 </html>`;
 
-                  let fromSender = process.env.RESEND_FROM_EMAIL || 'CoreZ Security <verification@corez.pro>';
-                  let resendRes = await fetch('https://api.resend.com/emails', {
-                    method: 'POST',
-                    headers: {
-                      'Authorization': `Bearer ${resendApiKey}`,
-                      'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                      from: fromSender,
-                      to: [email],
-                      subject: `CoreZ Verification Code: ${code}`,
-                      html: emailHtml
-                    })
-                  });
+              let fromSender = process.env.RESEND_FROM_EMAIL || 'CoreZ Security <verification@corez.pro>';
+              let resendRes = await fetch('https://api.resend.com/emails', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${resendApiKey}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  from: fromSender,
+                  to: [email],
+                  subject: `CoreZ Verification Code: ${code}`,
+                  html: emailHtml
+                })
+              });
 
-                  if (resendRes.ok) {
-                    simulated = false;
-                  } else {
-                    console.warn('Resend dispatch error in dev server:', resendRes.status, await resendRes.text());
-                  }
-                } catch (err) {
-                  console.warn('Resend email dispatch error:', err);
-                }
+              if (resendRes.ok) {
+                simulated = false;
+              } else {
+                console.warn('Resend dispatch error in dev server:', resendRes.status, await resendRes.text());
               }
-
-              res.statusCode = 200;
-              res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify({
-                success: true,
-                email,
-                simulated,
-                code: simulated ? code : undefined,
-                expiresAt,
-                message: 'Verification code sent from verification@corez.pro'
-              }));
             } catch (err) {
-              res.statusCode = 500;
-              res.end(JSON.stringify({ error: err.message }));
+              console.warn('Resend email dispatch error:', err);
             }
-          });
-          return;
+          }
+
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({
+            success: true,
+            email,
+            simulated,
+            code: simulated ? code : undefined,
+            expiresAt,
+            message: 'Verification code sent from verification@corez.pro'
+          }));
+        } catch (err) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: err.message }));
         }
-
-        if (url.pathname === '/api/verify/check-code' && req.method === 'POST') {
-          let bodyStr = '';
-          req.on('data', chunk => { bodyStr += chunk; });
-          req.on('end', () => {
-            try {
-              const body = JSON.parse(bodyStr || '{}');
-              const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
-              const code = typeof body.code === 'string' ? body.code.trim() : '';
-
-              const session = LOCAL_VERIFICATION_STORE.get(email);
-              if (!session) {
-                res.statusCode = 400;
-                res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ error: 'No verification session found.' }));
-                return;
-              }
-
-              if (Date.now() > session.expiresAt) {
-                LOCAL_VERIFICATION_STORE.delete(email);
-                res.statusCode = 400;
-                res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ error: 'Verification code has expired.' }));
-                return;
-              }
-
-              if (session.code !== code) {
-                session.attempts += 1;
-                if (session.attempts >= 5) {
-                  LOCAL_VERIFICATION_STORE.delete(email);
-                  res.statusCode = 400;
-                  res.setHeader('Content-Type', 'application/json');
-                  res.end(JSON.stringify({ error: 'Too many incorrect attempts.' }));
-                  return;
-                }
-                res.statusCode = 400;
-                res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ error: 'Invalid verification code.' }));
-                return;
-              }
-
-              LOCAL_VERIFICATION_STORE.delete(email);
-              res.statusCode = 200;
-              res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify({
-                success: true,
-                verified: true,
-                email,
-                verifiedAt: new Date().toISOString()
-              }));
-            } catch (err) {
-              res.statusCode = 500;
-              res.end(JSON.stringify({ error: err.message }));
-            }
-          });
-          return;
-        }
-
-        next();
       });
+      return;
+    }
+
+    if (url.pathname === '/api/verify/check-code' && req.method === 'POST') {
+      let bodyStr = '';
+      req.on('data', chunk => { bodyStr += chunk; });
+      req.on('end', () => {
+        try {
+          const body = JSON.parse(bodyStr || '{}');
+          const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+          const code = typeof body.code === 'string' ? body.code.trim() : '';
+
+          const session = LOCAL_VERIFICATION_STORE.get(email);
+          if (!session) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'No verification session found.' }));
+            return;
+          }
+
+          if (Date.now() > session.expiresAt) {
+            LOCAL_VERIFICATION_STORE.delete(email);
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Verification code has expired.' }));
+            return;
+          }
+
+          if (session.code !== code) {
+            session.attempts += 1;
+            if (session.attempts >= 5) {
+              LOCAL_VERIFICATION_STORE.delete(email);
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'Too many incorrect attempts.' }));
+              return;
+            }
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Invalid verification code.' }));
+            return;
+          }
+
+          LOCAL_VERIFICATION_STORE.delete(email);
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({
+            success: true,
+            verified: true,
+            email,
+            verifiedAt: new Date().toISOString()
+          }));
+        } catch (err) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: err.message }));
+        }
+      });
+      return;
+    }
+
+    next();
+  };
+
+  return {
+    name: 'local-verify-handler',
+    configureServer(server) {
+      server.middlewares.use(handler);
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(handler);
     }
   };
 }
@@ -180,6 +185,12 @@ const apiProxyConfig = {
   target: process.env.API_BACKEND_URL || LOCAL_WORKER_TARGET,
   changeOrigin: true,
   secure: false,
+  bypass: (req) => {
+    const url = req.url || '';
+    if (url.startsWith('/api/verify') || url.startsWith('/api/auth/forgot-password') || url.startsWith('/api/auth/reset-password')) {
+      return req.url;
+    }
+  },
   router: async () => {
     if (process.env.API_BACKEND_URL) return process.env.API_BACKEND_URL;
     try {
