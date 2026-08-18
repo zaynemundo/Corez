@@ -520,20 +520,25 @@ export default function AuthModal({
               <div
                 onClick={() => setOtpCode(previewCode)}
                 style={{
-                  fontSize: '0.72rem',
+                  fontSize: '0.74rem',
                   color: '#60a5fa',
-                  background: 'rgba(59, 130, 246, 0.1)',
-                  border: '1px dashed rgba(59, 130, 246, 0.3)',
-                  borderRadius: '6px',
-                  padding: '5px 8px',
+                  background: 'rgba(59, 130, 246, 0.12)',
+                  border: '1px solid rgba(59, 130, 246, 0.35)',
+                  borderRadius: '8px',
+                  padding: '8px 12px',
                   cursor: 'pointer',
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between'
+                  flexDirection: 'column',
+                  gap: '4px'
                 }}
               >
-                <span>Zero-Config Dev Mode: <strong>{previewCode}</strong></span>
-                <span style={{ textDecoration: 'underline' }}>Click to Autofill</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontWeight: 600 }}>Zero-Config Code: <strong style={{ letterSpacing: '1px' }}>{previewCode}</strong></span>
+                  <span style={{ textDecoration: 'underline', fontSize: '0.7rem', fontWeight: 600 }}>Click to Autofill</span>
+                </div>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
+                  Local Dev Mode: No live mail server connected yet. Click here to autofill and verify instantly!
+                </span>
               </div>
             )}
 
@@ -616,20 +621,25 @@ export default function AuthModal({
               <div
                 onClick={() => setOtpCode(previewCode)}
                 style={{
-                  fontSize: '0.72rem',
+                  fontSize: '0.74rem',
                   color: '#60a5fa',
-                  background: 'rgba(59, 130, 246, 0.1)',
-                  border: '1px dashed rgba(59, 130, 246, 0.3)',
-                  borderRadius: '6px',
-                  padding: '5px 8px',
+                  background: 'rgba(59, 130, 246, 0.12)',
+                  border: '1px solid rgba(59, 130, 246, 0.35)',
+                  borderRadius: '8px',
+                  padding: '8px 12px',
                   cursor: 'pointer',
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between'
+                  flexDirection: 'column',
+                  gap: '4px'
                 }}
               >
-                <span>Zero-Config Dev Mode: <strong>{previewCode}</strong></span>
-                <span style={{ textDecoration: 'underline' }}>Click to Autofill</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontWeight: 600 }}>Zero-Config Code: <strong style={{ letterSpacing: '1px' }}>{previewCode}</strong></span>
+                  <span style={{ textDecoration: 'underline', fontSize: '0.7rem', fontWeight: 600 }}>Click to Autofill</span>
+                </div>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
+                  Local Dev Mode: No live mail server connected yet. Click here to autofill and verify instantly!
+                </span>
               </div>
             )}
 
