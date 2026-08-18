@@ -570,6 +570,8 @@ async function run() {
         // The harness always streams FROM the provider; only the
         // client-facing delivery is non-streaming.
         assert.equal(body.stream, true);
+        // The build phase runs on mimo-v2.5 (the designated build executor).
+        assert.equal(body.model, 'mimo-v2.5');
         const sse = (event) => `data: ${JSON.stringify(event)}\n\n`;
         return new Response(
           sse({ choices: [{ delta: { content: harnessArtifact }, finish_reason: null }] })

@@ -411,13 +411,15 @@ export function buildProviderChain(env = {}) {
       call: (messages, options = {}) => callChatEndpoint({
         ...callOptions(),
         messages,
-        signal: options.signal
+        signal: options.signal,
+        ...(options.model ? { model: options.model } : {})
       }),
       stream: (messages, options = {}) => streamChatEndpoint({
         ...callOptions(),
         messages,
         signal: options.signal,
-        onTtft: options.onTtft
+        onTtft: options.onTtft,
+        ...(options.model ? { model: options.model } : {})
       })
     });
   }
@@ -442,13 +444,15 @@ export function buildProviderChain(env = {}) {
         ...callOptions(),
         messages,
         signal: options.signal,
-        bodyExtra: { stream: false }
+        bodyExtra: { stream: false },
+        ...(options.model ? { model: options.model } : {})
       }),
       stream: (messages, options = {}) => streamChatEndpoint({
         ...callOptions(),
         messages,
         signal: options.signal,
-        onTtft: options.onTtft
+        onTtft: options.onTtft,
+        ...(options.model ? { model: options.model } : {})
       })
     });
   }
@@ -473,13 +477,15 @@ export function buildProviderChain(env = {}) {
       call: (messages, options = {}) => callChatEndpoint({
         ...callOptions(),
         messages,
-        signal: options.signal
+        signal: options.signal,
+        ...(options.model ? { model: options.model } : {})
       }),
       stream: (messages, options = {}) => streamChatEndpoint({
         ...callOptions(),
         messages,
         signal: options.signal,
-        onTtft: options.onTtft
+        onTtft: options.onTtft,
+        ...(options.model ? { model: options.model } : {})
       })
     });
   }
@@ -498,9 +504,11 @@ export function buildProviderChain(env = {}) {
  * of failing with a 502.
  *
  * Options: { env, signal, sleep, clock, jitter, store, maxRequestRetryMs,
- * taskHash, taskId } — sleep/clock/jitter are injectable for deterministic
- * tests. Every request is uncapped: the provider decides how long it
- * generates, and no output ceiling is ever sent.
+ * taskHash, taskId, model } — sleep/clock/jitter are injectable for
+ * deterministic tests. `model` overrides the provider's configured model for
+ * this call (e.g. the harness build phase pins mimo-v2.5). Every request is
+ * uncapped: the provider decides how long it generates, and no output
+ * ceiling is ever sent.
  */
 export async function runProviderChain(messages, options = {}) {
   const env = options.env || {};
@@ -558,7 +566,7 @@ export async function runProviderChain(messages, options = {}) {
       }
     }
 
-    let result = await provider.call(messages, { signal, attempt });
+    let result = await provider.call(messages, { signal, attempt, model: options.model });
 
     while (result?.failure) {
       const cls = result.classified || classifyProviderFailure(result.failure);
@@ -614,7 +622,7 @@ export async function runProviderChain(messages, options = {}) {
 
       await sleepInterruptible(backoffMs, signal, sleep);
       if (signal?.aborted) return { taskId, status: 'cancelled' };
-      result = await provider.call(messages, { signal, attempt });
+      result = await provider.call(messages, { signal, attempt, model: options.model });
     }
 
     if (result?.content) {
@@ -674,6 +682,10 @@ export function runStreamingChain(messages, options = {}) {
   const signal = options.signal || null;
   const clock = options.clock || defaultClock;
   const sleep = options.sleep || defaultSleep;
+  // Optional per-call model override (e.g. the harness build phase pins its
+  // own model): applied to whichever provider serves the request, and
+  // reported in meta/done events instead of the provider's default model.
+  const model = options.model || null;
 
   const startedAt = clock();
   const providers = buildProviderChain(env);
@@ -687,7 +699,7 @@ export function runStreamingChain(messages, options = {}) {
     }
 
     for (const provider of providers) {
-      yield { type: 'meta', provider: provider.id, model: provider.model };
+      yield { type: 'meta', provider: provider.id, model: model || provider.model };
       const ttftHolder = { ms: 0 };
       let emptyAttempts = 0;
       const MAX_EMPTY_ATTEMPTS = 3;
@@ -699,7 +711,8 @@ export function runStreamingChain(messages, options = {}) {
           async function* tryStream(msgs) {
             const iter = provider.stream(msgs, {
               signal,
-              onTtft: (ms) => { ttftHolder.ms = ttftHolder.ms || ms; }
+              onTtft: (ms) => { ttftHolder.ms = ttftHolder.ms || ms; },
+              model
             });
             let text = '';
             let usage = null;
@@ -743,7 +756,7 @@ export function runStreamingChain(messages, options = {}) {
             ttftMs: ttftHolder.ms || 0,
             totalMs: clock() - startedAt,
             provider: provider.id,
-            model: provider.model
+            model: model || provider.model
           };
           return;
         } catch (err) {

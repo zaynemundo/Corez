@@ -238,6 +238,32 @@ describe('runCreationHarness resilience', () => {
     expect(final.build).toBe(GOOD_ARTIFACT);
   });
 
+  it('H1.6: the build phase streams with mimo-v2.5 by default and honors OPENCODE_BUILD_MODEL', async () => {
+    const buildCalls = [];
+    runStreamingChain.mockImplementation(async function* (messages, options) {
+      buildCalls.push({ serialized: JSON.stringify(messages || []), options });
+      yield { type: 'delta', text: GOOD_ARTIFACT };
+      yield { type: 'done', finishReason: 'stop' };
+    });
+
+    const isBuildCall = (c) => c.serialized.includes('Deliver ONLY the complete, finished artifact');
+
+    // Default build model: mimo-v2.5 (planning/review keep the general model).
+    const storeDefault = createTaskStateStore({});
+    await drain(runCreationHarness(harnessOptions(storeDefault)), []);
+    const defaultBuild = buildCalls.find(isBuildCall);
+    expect(defaultBuild?.options.model).toBe('mimo-v2.5');
+
+    // Explicit per-deployment override wins.
+    buildCalls.length = 0;
+    const storeOverride = createTaskStateStore({});
+    await drain(runCreationHarness(harnessOptions(storeOverride, {
+      env: { ...ENV, OPENCODE_BUILD_MODEL: 'deepseek-v4-pro' }
+    })), []);
+    const overrideBuild = buildCalls.find(isBuildCall);
+    expect(overrideBuild?.options.model).toBe('deepseek-v4-pro');
+  });
+
   it('H2: the lease heartbeat is refreshed while a long build streams', async () => {
     streamMock();
     const fetchMock = vi.fn(async (_url, init) => {

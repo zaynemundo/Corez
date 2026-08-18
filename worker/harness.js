@@ -144,6 +144,13 @@ export async function* runCreationHarness(options) {
       : DEFAULT_BUILD_CHECKPOINT_MS
   } = options;
 
+  // Build phase model: the agentic build (and its continuations/repairs) runs
+  // on mimo-v2.5 by default — the repo's designated primary executor for
+  // writing code and building components. Planning, review, chat, and titles
+  // keep the general OPENCODE_MODEL. OPENCODE_BUILD_MODEL overrides the build
+  // model per deployment.
+  const buildModel = env?.OPENCODE_BUILD_MODEL || 'mimo-v2.5';
+
   // Fast path: game requests ALWAYS take the lighter path — game creation is
   // deliberately basic: the user prompt serves as the spec (no planning
   // provider call) and the review round is skipped, so a game is one streamed
@@ -385,7 +392,7 @@ export async function* runCreationHarness(options) {
       let lastDeltaFlush = 0;
       let lastCheckpointAt = 0;
       try {
-        for await (const event of runStreamingChain(buildMessages, { env, signal })) {
+        for await (const event of runStreamingChain(buildMessages, { env, signal, model: buildModel })) {
           if (event.type === 'delta') {
             collected += event.text;
             deltaBuffer += event.text;
@@ -472,7 +479,7 @@ export async function* runCreationHarness(options) {
 
         let continuationChunk = '';
         try {
-          for await (const event of runStreamingChain(continuationMessages, { env, signal })) {
+          for await (const event of runStreamingChain(continuationMessages, { env, signal, model: buildModel })) {
             if (event.type === 'delta') {
               continuationChunk += event.text;
             } else if (event.type === 'usage' && event.outputTokens) {
