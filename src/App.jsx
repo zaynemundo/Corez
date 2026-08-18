@@ -7,10 +7,12 @@ import CanvasPreview from './components/CanvasPreview';
 import SettingsModal from './components/SettingsModal';
 import AccountModal from './components/AccountModal';
 import AuthModal from './components/AuthModal';
+import QuotaLimitModal from './components/QuotaLimitModal';
 import { generateAIResponse, extractCodeFromMessage, generateSessionTitle, generateAISessionTitle } from './services/aiService';
 import { storeAppInR2, deleteSessionAppsInR2 } from './services/appStorageService';
 import { loadAccountProfile } from './services/accountService';
 import { getCurrentUser, logOut as authLogOut } from './services/authService';
+import { checkActionQuota, recordActionUsage, getGuestUsage } from './services/quotaService';
 function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -86,18 +88,28 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
+  const [authInitialMode, setAuthInitialMode] = useState('signin');
+  const [quotaModalOpen, setQuotaModalOpen] = useState(false);
+  const [quotaLimitAction, setQuotaLimitAction] = useState('message');
+  const [guestUsageVersion, setGuestUsageVersion] = useState(0);
   const [currentUser, setCurrentUser] = useState(() => getCurrentUser());
   const [accountProfile, setAccountProfile] = useState(() => loadAccountProfile());
+
+  const guestQuota = useMemo(() => {
+    return checkActionQuota('message', Boolean(currentUser));
+  }, [currentUser, guestUsageVersion]);
 
   const handleAuthSuccess = (user) => {
     setCurrentUser(user);
     setAccountProfile(user);
+    setGuestUsageVersion(v => v + 1);
   };
 
   const handleLogout = () => {
     authLogOut();
     setCurrentUser(null);
     setAccountProfile(loadAccountProfile());
+    setGuestUsageVersion(v => v + 1);
   };
   const [isThinking, setIsThinking] = useState(false);
   const [streamingContent, setStreamingContent] = useState(null);
@@ -330,6 +342,16 @@ export default function App() {
 
   const handleSendMessage = async (promptText, attachments = []) => {
     if (isThinking) return;
+
+    // Check guest usage limit for unauthenticated users
+    const quota = checkActionQuota('message', Boolean(currentUser));
+    if (!quota.allowed) {
+      setQuotaLimitAction('message');
+      setQuotaModalOpen(true);
+      return;
+    }
+    recordActionUsage('message', Boolean(currentUser));
+    setGuestUsageVersion(v => v + 1);
 
     let targetSessionId = activeSessionId;
     const draftMessages = activeSession?.messages || [];
@@ -590,6 +612,11 @@ export default function App() {
                 onSendMessage={handleSendMessage}
                 onStopMessage={handleStopMessage}
                 isStreaming={isThinking}
+                guestQuota={guestQuota}
+                onOpenAuth={() => {
+                  setAuthInitialMode('signup');
+                  setAuthOpen(true);
+                }}
               />
             </div>
 
@@ -602,6 +629,11 @@ export default function App() {
                 onToggleFullScreen={() => setCanvasFullScreen(prev => !prev)}
                 sessionId={activeSession?.id || null}
                 isStreaming={isThinking}
+                isAuthenticated={Boolean(currentUser)}
+                onRequireAuth={(action) => {
+                  setQuotaLimitAction(action || 'publish');
+                  setQuotaModalOpen(true);
+                }}
               />
             )}
           </>
@@ -621,13 +653,31 @@ export default function App() {
         onProfileUpdate={(updated) => setAccountProfile(updated)}
         sessions={sessions}
         onLogout={handleLogout}
-        onOpenAuth={() => setAuthOpen(true)}
+        onOpenAuth={() => {
+          setAuthInitialMode('signin');
+          setAuthOpen(true);
+        }}
       />
 
       <AuthModal
         isOpen={authOpen}
         onClose={() => setAuthOpen(false)}
         onAuthSuccess={handleAuthSuccess}
+        initialMode={authInitialMode}
+      />
+
+      <QuotaLimitModal
+        isOpen={quotaModalOpen}
+        onClose={() => setQuotaModalOpen(false)}
+        action={quotaLimitAction}
+        onOpenSignUp={() => {
+          setAuthInitialMode('signup');
+          setAuthOpen(true);
+        }}
+        onOpenSignIn={() => {
+          setAuthInitialMode('signin');
+          setAuthOpen(true);
+        }}
       />
     </div>
   );

@@ -80,7 +80,9 @@ export default function ChatInput({
   onSendMessage, 
   onStopMessage, 
   isStreaming, 
-  textareaRef 
+  textareaRef,
+  guestQuota = null,
+  onOpenAuth = null
 }) {
   const internalRef = useRef(null);
   const refToUse = textareaRef || internalRef;
@@ -224,6 +226,44 @@ export default function ChatInput({
 
   return (
     <div className="input-container">
+      {guestQuota?.isGuest && (
+        <div
+          className="guest-quota-pill"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            fontSize: '0.72rem',
+            color: 'var(--text-secondary)',
+            marginBottom: '6px',
+            padding: '3px 10px',
+            borderRadius: '12px',
+            background: 'var(--bg-tertiary, #181922)',
+            border: '1px solid var(--border-color)'
+          }}
+        >
+          <span>
+            Guest Mode: <b>{guestQuota.remaining} of {guestQuota.limit} free prompts</b> remaining today.
+          </span>
+          <button
+            type="button"
+            onClick={onOpenAuth}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--accent, #60a5fa)',
+              cursor: 'pointer',
+              padding: 0,
+              fontSize: '0.72rem',
+              fontWeight: 600,
+              textDecoration: 'underline'
+            }}
+          >
+            Sign up for unlimited
+          </button>
+        </div>
+      )}
       <form onSubmit={handleSubmit} className="input-box">
         {show && filtered.length > 0 && (
           <div className="slash-suggestions" ref={suggestionsRef} role="listbox" aria-label="Commands">

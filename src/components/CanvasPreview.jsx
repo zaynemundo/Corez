@@ -29,6 +29,7 @@ import { createZipBlob } from '../utils/zipPackager';
 import { generateQrCodeSvg, generateEmbedSnippet } from '../utils/qrCode';
 import DesignArchetypeSelector from './DesignArchetypeSelector';
 import { detectDesignArchetype } from '../../packages/agent-core/designSystems/selector.js';
+import { checkActionQuota, recordActionUsage } from '../services/quotaService.js';
 
 export default function CanvasPreview({ 
   code, 
@@ -37,7 +38,9 @@ export default function CanvasPreview({
   isFullScreen, 
   onToggleFullScreen,
   sessionId = null,
-  isStreaming = false
+  isStreaming = false,
+  isAuthenticated = false,
+  onRequireAuth = null
 }) {
   const [activeTab, setActiveTab] = useState('preview');
   const [deviceMode, setDeviceMode] = useState('desktop'); // 'desktop' | 'laptop' | 'tablet' | 'mobile'
@@ -113,6 +116,19 @@ export default function CanvasPreview({
 
   const handlePublish = async () => {
     if (publishing || !editableCode) return;
+
+    if (!isAuthenticated) {
+      const quota = checkActionQuota('publish', false);
+      if (!quota.allowed) {
+        if (onRequireAuth) {
+          onRequireAuth('publish');
+        } else {
+          setPublishError('Guest publishing limit reached (1 app/day). Please sign up or log in to publish unlimited creations.');
+        }
+        return;
+      }
+    }
+
     // Completeness gate: never publish an incomplete multi-page site. The
     // user sees exactly which pages are missing or broken and can ask Corez
     // to fix the output instead of sharing a broken link.
@@ -143,6 +159,9 @@ export default function CanvasPreview({
         ...(Object.keys(pagesPayload).length > 0 ? { pages: pagesPayload } : {})
       });
       if (result && result.url) {
+        if (!isAuthenticated) {
+          recordActionUsage('publish', false);
+        }
         setPublishResult({ slug: result.slug, url: result.url, customized: Boolean(result.customized) });
         setPublishError(null);
       } else {
