@@ -26,8 +26,6 @@ import { formatCodeForPreview, parseMultiPageSite, injectMultiPageRouter, valida
 import { publishAppInR2 } from '../services/appStorageService';
 import { createZipBlob } from '../utils/zipPackager';
 import { generateQrCodeSvg, generateEmbedSnippet } from '../utils/qrCode';
-import DesignArchetypeSelector from './DesignArchetypeSelector';
-import { detectDesignArchetype } from '../../packages/agent-core/designSystems/selector.js';
 
 export default function CanvasPreview({ 
   code, 
@@ -54,12 +52,6 @@ export default function CanvasPreview({
   const [activePage, setActivePage] = useState('index.html');
   const [publishTab, setPublishTab] = useState('link'); // 'link' | 'qr' | 'embed'
   const [embedCopied, setEmbedCopied] = useState(false);
-  const detectedArchetype = useMemo(() => detectDesignArchetype(`${title} ${editableCode}`), [title, editableCode]);
-  const [activeArchetypeId, setActiveArchetypeId] = useState(detectedArchetype.id);
-
-  useEffect(() => {
-    setActiveArchetypeId(detectedArchetype.id);
-  }, [detectedArchetype.id]);
 
   const iframeRef = useRef(null);
 
@@ -377,14 +369,6 @@ export default function CanvasPreview({
             corez-nav message, so no external tab bar is needed. */}
 
         <div className="canvas-controls">
-          {editableCode && !isStreaming && (
-            <DesignArchetypeSelector
-              activeArchetypeId={activeArchetypeId}
-              onSelectArchetype={(id) => setActiveArchetypeId(id)}
-              compact={true}
-            />
-          )}
-
           {/* Revise: request changes to this creation directly in chat */}
           {editableCode && !isStreaming && typeof onRevise === 'function' && (
             <button
