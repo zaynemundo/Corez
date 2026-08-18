@@ -2302,7 +2302,7 @@ async function handleAuth(request, env) {
       avatarColor: '#3b82f6',
       password,
       tier: 'Pro Creator',
-      emailVerified: false,
+      emailVerified: Boolean(body?.emailVerified ?? true),
       createdAt: new Date().toISOString()
     };
     AUTH_USERS.set(email, user);

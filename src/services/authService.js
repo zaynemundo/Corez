@@ -64,7 +64,7 @@ function saveRegisteredUsers(users) {
 /**
  * Registers a new user account.
  */
-export async function signUp({ displayName, email, password }) {
+export async function signUp({ displayName, email, password, emailVerified = true }) {
   if (!displayName || !displayName.trim()) {
     throw new Error('Display name is required.');
   }
@@ -94,7 +94,8 @@ export async function signUp({ displayName, email, password }) {
     avatarColor: '#3b82f6',
     passwordHash,
     tier: 'Pro Creator',
-    emailVerified: false,
+    emailVerified: Boolean(emailVerified),
+    emailVerifiedAt: emailVerified ? new Date().toISOString() : null,
     createdAt: new Date().toISOString()
   };
 
