@@ -24,12 +24,21 @@ const INCOMPLETE_MULTI_PAGE_CODE = `<!-- PAGE: index.html -->
 afterEach(cleanup);
 
 beforeEach(() => {
+  localStorage.clear();
   publishAppInR2.mockClear();
 });
 
-function renderPreview(code = MULTI_PAGE_CODE) {
+function renderPreview(code = MULTI_PAGE_CODE, props = {}) {
   return render(
-    <CanvasPreview code={code} title="Test Site" onClose={() => {}} isFullScreen={false} onToggleFullScreen={() => {}} />
+    <CanvasPreview
+      code={code}
+      title="Test Site"
+      onClose={() => {}}
+      isFullScreen={false}
+      onToggleFullScreen={() => {}}
+      isAuthenticated={true}
+      {...props}
+    />
   );
 }
 
