@@ -2263,7 +2263,130 @@ async function handleEmailVerification(request, env) {
     });
   }
 
-  return jsonResponse(404, { error: 'Verification endpoint not found.' });
+// Auth Storage Map for Worker
+const AUTH_USERS = new Map();
+const AUTH_TOKENS = new Map();
+
+async function handleAuth(request, env) {
+  const url = new URL(request.url);
+  const pathname = url.pathname;
+
+  if (pathname === '/api/auth/signup' && request.method === 'POST') {
+    let body;
+    try {
+      body = await readBoundedJson(request);
+    } catch {
+      return jsonResponse(400, { error: 'Invalid JSON payload.' });
+    }
+    const displayName = typeof body?.displayName === 'string' ? body.displayName.trim() : '';
+    const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
+    const password = typeof body?.password === 'string' ? body.password : '';
+
+    if (!displayName || !email || !password || password.length < 6) {
+      return jsonResponse(400, { error: 'Display name, valid email, and 6+ character password are required.' });
+    }
+
+    if (AUTH_USERS.has(email)) {
+      return jsonResponse(400, { error: 'An account with this email already exists.' });
+    }
+
+    const user = {
+      id: `user_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      displayName,
+      email,
+      handle: `@${displayName.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 15)}`,
+      bio: 'CoreZ Creative Member',
+      avatarColor: '#3b82f6',
+      password,
+      tier: 'Pro Creator',
+      emailVerified: false,
+      createdAt: new Date().toISOString()
+    };
+    AUTH_USERS.set(email, user);
+
+    const token = `sess_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    AUTH_TOKENS.set(token, user);
+
+    return jsonResponse(200, {
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        displayName: user.displayName,
+        email: user.email,
+        handle: user.handle,
+        bio: user.bio,
+        avatarColor: user.avatarColor,
+        tier: user.tier,
+        emailVerified: user.emailVerified
+      }
+    });
+  }
+
+  if (pathname === '/api/auth/login' && request.method === 'POST') {
+    let body;
+    try {
+      body = await readBoundedJson(request);
+    } catch {
+      return jsonResponse(400, { error: 'Invalid JSON payload.' });
+    }
+    const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
+    const password = typeof body?.password === 'string' ? body.password : '';
+
+    const user = AUTH_USERS.get(email);
+    if (!user || user.password !== password) {
+      return jsonResponse(401, { error: 'Invalid email or password.' });
+    }
+
+    const token = `sess_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    AUTH_TOKENS.set(token, user);
+
+    return jsonResponse(200, {
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        displayName: user.displayName,
+        email: user.email,
+        handle: user.handle,
+        bio: user.bio,
+        avatarColor: user.avatarColor,
+        tier: user.tier,
+        emailVerified: user.emailVerified
+      }
+    });
+  }
+
+  if (pathname === '/api/auth/logout' && request.method === 'POST') {
+    const authHeader = request.headers.get('Authorization') || '';
+    const token = authHeader.replace(/^Bearer\s+/i, '');
+    if (token) AUTH_TOKENS.delete(token);
+    return jsonResponse(200, { success: true });
+  }
+
+  if (pathname === '/api/auth/me' && request.method === 'GET') {
+    const authHeader = request.headers.get('Authorization') || '';
+    const token = authHeader.replace(/^Bearer\s+/i, '');
+    const user = AUTH_TOKENS.get(token);
+    if (!user) {
+      return jsonResponse(401, { error: 'Unauthorized.' });
+    }
+    return jsonResponse(200, {
+      success: true,
+      user: {
+        id: user.id,
+        displayName: user.displayName,
+        email: user.email,
+        handle: user.handle,
+        bio: user.bio,
+        avatarColor: user.avatarColor,
+        tier: user.tier,
+        emailVerified: user.emailVerified
+      }
+    });
+  }
+
+  return jsonResponse(404, { error: 'Auth endpoint not found.' });
 }
 
 async function runJsonSafe(operation) {
@@ -2322,6 +2445,9 @@ export default {
     }
     if (pathname.startsWith('/api/verify')) {
       return runJsonSafe(() => handleEmailVerification(request, env));
+    }
+    if (pathname.startsWith('/api/auth')) {
+      return runJsonSafe(() => handleAuth(request, env));
     }
     if (pathname === '/api/publish' ||
         (request.method === 'GET' &&

@@ -21,7 +21,9 @@ export default function Sidebar({
   onToggleTheme,
   onCloseSidebar,
   accountProfile = null,
-  onOpenAccount = null
+  onOpenAccount = null,
+  isAuthenticated = false,
+  onOpenAuth = null
 }) {
   const [openMenuId, setOpenMenuId] = useState(null);
 
@@ -139,8 +141,8 @@ export default function Sidebar({
         <button
           type="button"
           className="sidebar-account-pill"
-          onClick={onOpenAccount}
-          title="Account & Profile Settings"
+          onClick={isAuthenticated ? onOpenAccount : (onOpenAuth || onOpenAccount)}
+          title={isAuthenticated ? "Account & Profile Settings" : "Sign In or Create Account"}
           aria-label={`Account profile for ${accountProfile?.displayName || 'Creator'}`}
           style={{
             display: 'flex',
@@ -194,7 +196,7 @@ export default function Sidebar({
               flexShrink: 0
             }}
           >
-            {accountProfile?.tier || 'Pro'}
+            {isAuthenticated ? (accountProfile?.tier || 'Pro') : 'Sign In'}
           </span>
         </button>
 

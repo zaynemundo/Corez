@@ -17,7 +17,8 @@ import {
   Clock,
   KeyRound,
   RotateCw,
-  Send
+  Send,
+  LogOut
 } from 'lucide-react';
 import {
   saveAccountProfile,
@@ -39,7 +40,9 @@ export default function AccountModal({
   onClose,
   profile,
   onProfileUpdate,
-  sessions = []
+  sessions = [],
+  onLogout = null,
+  onOpenAuth = null
 }) {
   const [activeTab, setActiveTab] = useState('profile'); // 'profile' | 'preferences' | 'usage' | 'data'
   const [formData, setFormData] = useState({
@@ -856,6 +859,48 @@ export default function AccountModal({
                   Reset Profile
                 </button>
               </div>
+
+              {(onLogout || onOpenAuth) && (
+                <div style={{ padding: '12px 14px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                    <LogOut size={15} />
+                    Account Session & Authentication
+                  </span>
+                  <p style={{ fontSize: '0.73rem', color: 'var(--text-secondary)', margin: '0 0 10px', lineHeight: 1.4 }}>
+                    Sign out or switch between registered CoreZ accounts.
+                  </p>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {onLogout && (
+                      <button
+                        type="button"
+                        className="code-btn"
+                        onClick={() => {
+                          onLogout();
+                          onClose();
+                        }}
+                        style={{ fontSize: '0.78rem', padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                      >
+                        <LogOut size={13} />
+                        <span>Sign Out</span>
+                      </button>
+                    )}
+                    {onOpenAuth && (
+                      <button
+                        type="button"
+                        className="code-btn"
+                        onClick={() => {
+                          onClose();
+                          onOpenAuth();
+                        }}
+                        style={{ fontSize: '0.78rem', padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: '5px', background: 'var(--accent, #3b82f6)', color: '#ffffff' }}
+                      >
+                        <User size={13} />
+                        <span>Switch / Add Account</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
