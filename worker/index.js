@@ -99,22 +99,31 @@ function patchLocalImageSrc(html, messages) {
       const context = patched.slice(Math.max(0, idx - 500), idx + 500).toLowerCase();
       const nearbyChristian = /christian\s+vestil/.test(context);
       if (isChristianImg || nearbyChristian) {
-        const isData = src.startsWith('data:');
-        const isApi = src.startsWith('/api/');
-        if (isData || isApi) return match;
-        // For Christian, patch even unsplash/https placeholders
-        if (src && (isPlaceholderUrl(src) || !src.startsWith('https://images.unsplash.com/photo-1507003211169') || true)) {
-          // Only patch if src is not already the correct attached URL
-          if (urls.includes(src)) return match;
+        const isCorrectUrl = urls.includes(src);
+        if (isCorrectUrl) return match;
+        // For Christian, patch ANY src that is not already the correct URL —
+        // includes local filenames, Unsplash placeholders, AND hallucinated R2 URLs
+        // like /api/assets/user-upload_1716041183016.jpg which is missing timestamp/random
+        if (src) {
           const replacement = urls[urlIndex++];
           replacedChristian = true;
           let newTag = match.replace(src, replacement);
+          // Remove erroneous display:none that hides the portrait (reported bug)
+          newTag = newTag.replace(/\s*display\s*:\s*none\s*;?/gi, '');
+          // Clean up style attribute if it becomes empty or has trailing ;
+          newTag = newTag.replace(/style=["']\s*["']/i, '');
+          newTag = newTag.replace(/style=["']\s*;\s*["']/i, 'style=""');
           if (!/onerror/i.test(newTag)) {
             newTag = newTag.replace(/<img/i, '<img onerror="this.onerror=null;this.style.display=\'none\';const p=this.nextElementSibling;if(p&&p.classList.contains(\'image-fallback\'))p.style.display=\'block\'"');
           }
           if (!/alt=/i.test(newTag) || /alt=["']\s*["']/i.test(newTag)) {
             newTag = newTag.replace(/alt=["'][^"']*["']/i, 'alt="Christian Vestil"');
             if (!/alt=/i.test(newTag)) newTag = newTag.replace(/<img/i, '<img alt="Christian Vestil"');
+          }
+          // Ensure object-fit:cover is present and display is not none
+          if (!/object-fit/i.test(newTag)) {
+            newTag = newTag.replace(/style=["']/i, 'style="object-fit:cover;');
+            if (!/style=/i.test(newTag)) newTag = newTag.replace(/<img/i, '<img style="width:100%;height:100%;object-fit:cover"');
           }
           return newTag;
         }
@@ -124,20 +133,39 @@ function patchLocalImageSrc(html, messages) {
     if (replacedChristian) return patched;
   }
 
-  // Second pass: patch local filenames (no data:, no https, no /api) — e.g. 1716041183016.jpg
-  // and, when shouldPatchUnsplash, also patch external placeholders like unsplash
+  // Second pass: patch local filenames, placeholder Unsplash, and hallucinated R2 URLs
   patched = patched.replace(/<img\s+[^>]*src=["']([^"']+)["'][^>]*>/gi, (match, src) => {
     const isData = src.startsWith('data:');
     const isApi = src.startsWith('/api/');
     const isHttps = src.startsWith('https://') || src.startsWith('http://');
     const isPlaceholder = isPlaceholderUrl(src);
-    // Leave data/api as is; leave https unless it's a placeholder and we should patch
-    if (isData || isApi) return match;
+    const isHallucinatedR2 = isApi && !urls.includes(src);
+    // If src is already the correct attached URL, leave it
+    if (urls.includes(src)) return match;
+    // Leave correct data URLs as is
+    if (isData) return match;
+    // For hallucinated R2 URLs (e.g. /api/assets/user-upload_1716041183016.jpg missing timestamp), patch when we have a real attached URL
+    if (isHallucinatedR2 && urlIndex < urls.length) {
+      const replacement = urls[urlIndex++];
+      let newTag = match.replace(src, replacement);
+      newTag = newTag.replace(/\s*display\s*:\s*none\s*;?/gi, '');
+      newTag = newTag.replace(/style=["']\s*["']/i, '');
+      if (!/onerror/i.test(newTag)) {
+        newTag = newTag.replace(/<img/i, '<img onerror="this.onerror=null;this.style.display=\'none\';const p=this.nextElementSibling;if(p&&p.classList.contains(\'image-fallback\'))p.style.display=\'block\'"');
+      }
+      if (!/alt=/i.test(newTag)) {
+        newTag = newTag.replace(/<img/i, '<img alt="Attached image"');
+      }
+      return newTag;
+    }
+    // Leave correct /api/assets URLs (already handled) and non-placeholder https unless we should patch
+    if (isApi) return match;
     if (isHttps && !isPlaceholder && !shouldPatchUnsplash) return match;
     // For placeholder/unsplash when we have an attached image for a change-image request, patch it
     if (isHttps && isPlaceholder && shouldPatchUnsplash && urlIndex < urls.length) {
       const replacement = urls[urlIndex++];
       let newTag = match.replace(src, replacement);
+      newTag = newTag.replace(/\s*display\s*:\s*none\s*;?/gi, '');
       if (!/onerror/i.test(newTag)) {
         newTag = newTag.replace(/<img/i, '<img onerror="this.onerror=null;this.style.display=\'none\';const p=this.nextElementSibling;if(p&&p.classList.contains(\'image-fallback\'))p.style.display=\'block\'"');
       }
@@ -151,6 +179,7 @@ function patchLocalImageSrc(html, messages) {
       if (urlIndex < urls.length) {
         const replacement = urls[urlIndex++];
         let newTag = match.replace(src, replacement);
+        newTag = newTag.replace(/\s*display\s*:\s*none\s*;?/gi, '');
         if (!/onerror/i.test(newTag)) {
           newTag = newTag.replace(/<img/i, '<img onerror="this.onerror=null;this.style.display=\'none\';const p=this.nextElementSibling;if(p&&p.classList.contains(\'image-fallback\'))p.style.display=\'block\'"');
         }

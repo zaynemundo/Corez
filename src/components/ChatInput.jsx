@@ -64,7 +64,7 @@ export default function ChatInput({
 
   const [isDragOverInput, setIsDragOverInput] = useState(false);
   const dragInputCounterRef = useRef(0);
-  const hasPendingImage = attachments.some(a => a.type?.startsWith('image/') && !a.thumb && a.size <= MAX_IMAGE_THUMB_BYTES);
+  const hasPendingImage = attachments.some(a => (a.type?.startsWith('image/') && !a.thumb && a.size <= MAX_IMAGE_THUMB_BYTES) || a.uploading);
 
   useEffect(() => {
     if (refToUse.current) {
@@ -259,16 +259,18 @@ export default function ChatInput({
         {attachments.length > 0 && (
           <div className="attachment-chips-bar" aria-label="Attached files">
             {attachments.map((attachment) => {
-              const isPendingImage = attachment.type?.startsWith('image/') && !attachment.thumb && attachment.size <= MAX_IMAGE_THUMB_BYTES;
+              const isPendingThumb = attachment.type?.startsWith('image/') && !attachment.thumb && attachment.size <= MAX_IMAGE_THUMB_BYTES;
+              const isUploading = Boolean(attachment.uploading);
+              const isPending = isPendingThumb || isUploading;
               return (
                 <span key={attachment.id} className="attachment-chip">
                   {attachment.thumb ? (
-                    <img src={attachment.thumb} alt="" className="attachment-chip-thumb" />
-                  ) : isPendingImage ? (
+                    <img src={attachment.thumb} alt="" className="attachment-chip-thumb" style={isUploading ? { opacity: 0.6 } : undefined} />
+                  ) : isPendingThumb ? (
                     <span className="attachment-chip-thumb" style={{ display: 'inline-block', width: 24, height: 24, background: '#333', borderRadius: 4, textAlign: 'center', lineHeight: '24px', fontSize: 10, color: '#888' }}>…</span>
                   ) : null}
                   <span className="chip-filename" title={`${attachment.name} (${formatBytes(attachment.size)})`}>
-                    {attachment.name} {isPendingImage ? '(loading...)' : ''}
+                    {attachment.name} {isPending ? (isUploading ? '(uploading...)' : '(loading...)') : attachment.assetUrl ? '✓' : ''}
                   </span>
                   <button
                     type="button"

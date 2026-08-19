@@ -60,7 +60,7 @@ export function processFiles(fileList, setAttachments) {
 
   setAttachments((prev) => [
     ...(prev || []),
-    ...created.map(({ id, name, type, size }) => ({ id, name, type, size }))
+    ...created.map(({ id, name, type, size }) => ({ id, name, type, size, uploading: type.startsWith('image/') && size <= MAX_IMAGE_THUMB_BYTES }))
   ]);
 
   created.forEach((entry) => {
@@ -69,7 +69,7 @@ export function processFiles(fileList, setAttachments) {
       reader.onload = () => {
         if (reader.result && typeof reader.result === 'string') {
           const thumb = reader.result;
-          setAttachments((prev) => (prev || []).map((a) => (a.id === entry.id ? { ...a, thumb } : a)));
+          setAttachments((prev) => (prev || []).map((a) => (a.id === entry.id ? { ...a, thumb, uploading: true } : a)));
           // Also upload to R2 for persistent URL (used in generated HTML and publishing)
           // Fire-and-forget: store assetUrl when upload succeeds, keep thumb as fallback
           const ext = extensionOf(entry.name) || 'jpg';
@@ -82,12 +82,19 @@ export function processFiles(fileList, setAttachments) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ key, dataUrl: thumb, mimeType })
           }).then(async (res) => {
-            if (!res.ok) return;
+            if (!res.ok) {
+              setAttachments((prev) => (prev || []).map((a) => (a.id === entry.id ? { ...a, uploading: false } : a)));
+              return;
+            }
             const data = await res.json().catch(() => null);
             if (data?.url) {
-              setAttachments((prev) => (prev || []).map((a) => (a.id === entry.id ? { ...a, assetUrl: data.url, assetKey: data.key } : a)));
+              setAttachments((prev) => (prev || []).map((a) => (a.id === entry.id ? { ...a, assetUrl: data.url, assetKey: data.key, uploading: false } : a)));
+            } else {
+              setAttachments((prev) => (prev || []).map((a) => (a.id === entry.id ? { ...a, uploading: false } : a)));
             }
-          }).catch(() => {/* R2 not configured or upload failed — keep thumb as fallback */});
+          }).catch(() => {
+            setAttachments((prev) => (prev || []).map((a) => (a.id === entry.id ? { ...a, uploading: false } : a)));
+          });
         }
       };
       reader.readAsDataURL(entry.file);
