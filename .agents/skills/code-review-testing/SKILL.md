@@ -29,10 +29,13 @@ Use this skill whenever analyzing, auditing, reviewing code changes, debugging, 
 
 ## 2. Code Quality & Security Audit Checklist
 
+> **Canonical security:** Detailed secret/injection/XSS/destructive-op checks live in `cursor-security-rules` (canonical). This checklist references that contract and adds only review-specific gates. Run the canonical verification in `cursor-security-rules: Verification` for every review.
+
 ### Security & Privacy
-- [ ] No API keys, credentials, or environment secrets exposed in public code, client bundles, or response logs.
-- [ ] User inputs sanitized before database queries, shell execution, or DOM insertion (`dangerouslySetInnerHTML`).
-- [ ] Public error payloads sanitized (`safeErrorMessage`) to prevent stack trace disclosures.
+- [ ] No API keys, credentials, or environment secrets exposed in public code, client bundles, or response logs — see `cursor-security-rules: §1`.
+- [ ] User inputs sanitized before database queries, shell execution, or DOM insertion (`dangerouslySetInnerHTML`) — see `cursor-security-rules: §2 & §4`.
+- [ ] Public error payloads sanitized (`safeErrorMessage` / `safeErrorDetail`) to prevent stack trace disclosures — see `backend-architecture: Level 1 §2`.
+- [ ] Web/API safety (CORS, rate limiting, request size limits, HTTPS) verified — see `cursor-security-rules: §4` + `backend-architecture: Level 1 §3- §4`.
 
 ### Logic & Performance
 - [ ] Asynchronous operations properly handled (`async/await`, `try/catch`, `AbortController` cancellation).

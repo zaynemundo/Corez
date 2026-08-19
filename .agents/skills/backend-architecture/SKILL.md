@@ -23,24 +23,26 @@ Use this skill whenever designing, building, reviewing, or refactoring APIs, ser
 
 ## Level 1: Security (Highest Priority)
 
+> **Canonical security:** General secret, injection, destructive-op, and supply-chain rules live in `cursor-security-rules` (canonical). This Level deduplicates that contract and adds only backend-specific enforcement. When general rules change, update `cursor-security-rules`; when backend API rules change, update here and keep cross-links in sync.
+
 ### 1. Input Validation & Schema Sanitization
 - Validate all incoming parameters, query strings, headers, and request bodies before executing database or upstream service calls.
 - Enforce strict JSON schema parsing and reject unexpected properties or malformed types (`400 Bad Request`).
-- Escape or sanitize input strings to eliminate SQL injection, XSS, command injection, and SSRF vulnerabilities.
+- Escape or sanitize input strings to eliminate SQL injection, XSS, command injection, and SSRF vulnerabilities — see `cursor-security-rules: §2 & §4` for injection/XSS canonical checks.
 
 ### 2. Secret Isolation & Zero-Leakage Logs
-- Store environment keys, database URIs, API tokens, and secrets strictly in server/worker environment variables or secret vaults.
+- Store environment keys, database URIs, API tokens, and secrets strictly in server/worker environment variables or secret vaults — canonical rules in `cursor-security-rules: §1`.
 - Never mirror raw request headers, bearer tokens, authorization headers, or database strings into public response payloads or client-facing logs.
-- Use explicit error sanitization wrappers (`safeErrorMessage(err)`) to suppress stack traces and database internal error details in production responses.
+- Use explicit error sanitization wrappers (`safeErrorMessage(err)` / `safeErrorDetail`) to suppress stack traces and database internal error details in production responses (see `worker/utils.js`).
 
 ### 3. Authentication, Authorization & Rate Limiting
 - Authenticate requests using stateless tokens (JWT, OAuth2, signed API keys) with time-bound expirations.
 - Enforce tenant isolation in all database queries (`WHERE tenant_id = ?`) to prevent unauthorized cross-tenant data access.
-- Implement rate limiting per IP / API key (e.g., token bucket algorithm using KV or Redis) to protect endpoints from denial-of-service or brute force attacks.
+- Implement rate limiting per IP / API key (e.g., `createRateLimiter` via KV, as used on `/api/ai`, `/api/image`, `/api/publish`) to protect endpoints from denial-of-service or brute force attacks — see `cursor-security-rules: §4`.
 
 ### 4. CORS & Network Defense
 - Enforce explicit CORS origins (`Access-Control-Allow-Origin: https://yourdomain.com`). Avoid wildcard `*` headers on sensitive write/mutational routes.
-- Restrict permitted HTTP methods (`GET`, `POST`, `OPTIONS`) and request headers (`Content-Type`, `Authorization`).
+- Restrict permitted HTTP methods (`GET`, `POST`, `OPTIONS`) and request headers (`Content-Type`, `Authorization`) — canonical web safety in `cursor-security-rules: §4`.
 
 ---
 

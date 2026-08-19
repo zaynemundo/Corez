@@ -5,6 +5,8 @@ description: Essential security rules and safety guardrails for AI coding agents
 
 # Security Rules for AI Coding Agents
 
+> **Canonical Security Contract:** This file is the **single canonical source** for secret, injection, destructive-op, web/API, and supply-chain guardrails. `backend-architecture: Level 1` and `code-review-testing: §2 Security & Privacy` reference this file instead of duplicating checks. When updating a rule, update here only and keep cross-links in sync.
+
 Mandatory security guardrails applied to ALL code written in this workspace. These rules prevent secret exposure, command injection, destructive operations, and unsafe dependency patterns. Violations must be fixed before any code is committed.
 
 ---
@@ -60,20 +62,21 @@ Mandatory security guardrails applied to ALL code written in this workspace. The
 
 ## Verification
 
-After writing code, run:
+After writing code, run (uses `rg` when available, falls back to `grep -r`):
 
 ```bash
 # Secret scan: look for key-like patterns in tracked files
-rg -i "(api[_-]?key|secret|password|token)\s*[:=]\s*['\"][A-Za-z0-9_\-]{16,}" --glob '!node_modules/**' --glob '!dist/**' .
-
-# Shell injection scan
-rg -n "child_process\.(exec|execSync)\(" --glob '!node_modules/**' .
-
-# XSS scan
-rg -n "\.innerHTML\s*=" --glob '!node_modules/**' --glob '!dist/**' src || true
-
-# Check no env files are tracked
-git ls-files | rg "(\.env|\.dev\.vars|\.pem)$" || true
+if command -v rg >/dev/null 2>&1; then
+  rg -i "(api[_-]?key|secret|password|token)\s*[:=]\s*['\"][A-Za-z0-9_\-]{16,}" --glob '!node_modules/**' --glob '!dist/**' .
+  rg -n "child_process\.(exec|execSync)\(" --glob '!node_modules/**' .
+  rg -n "\.innerHTML\s*=" --glob '!node_modules/**' --glob '!dist/**' src || true
+  git ls-files | rg "(\.env|\.dev\.vars|\.pem)$" || true
+else
+  grep -R -i -E "(api[_-]?key|secret|password|token)\s*[:=]\s*['\"][A-Za-z0-9_\-]{16,}" --exclude-dir=node_modules --exclude-dir=dist . || true
+  grep -R -n "child_process\.\(exec\|execSync\)(" --exclude-dir=node_modules . || true
+  grep -R -n "\.innerHTML\s*=" --exclude-dir=node_modules --exclude-dir=dist src || true
+  git ls-files | grep -E "(\.env|\.dev\.vars|\.pem)$" || true
+fi
 ```
 
-Any hits must be resolved (or justified with an explicit comment) before the change is committed.
+Any hits must be resolved (or justified with an explicit comment) before the change is committed. Backend and review tasks should run this same canonical scan — see `backend-architecture: Level 1` and `code-review-testing: §2` which reference here.

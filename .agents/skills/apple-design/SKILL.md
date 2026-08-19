@@ -5,6 +5,8 @@ description: Apple's approach to interface design and fluid, physical motion, tr
 
 # Apple Design
 
+> **Supplement — not a standalone:** This skill layers *gesture / spring / momentum* physics onto a primary design skill. Always pair with `frontend-modern-design` (system) **or** `frontend-design` (bespoke) as the base. Never use alone for a full page layout. Tokens and z-index remain canonical in `frontend-modern-design: §1 & §5`. See `capability-orchestrator: §1.1` decision tree.
+
 How Apple builds interfaces that stop feeling like a computer and start feeling like an extension of you. This knowledge comes from Apple's WWDC design talks — chiefly *Designing Fluid Interfaces* (WWDC 2018) — distilled and translated into the web platform (CSS, Pointer Events, `requestAnimationFrame`, spring libraries like Motion/Framer Motion).
 
 The through-line: **an interface feels alive when motion starts from the current on-screen value, inherits the user's velocity, projects momentum forward, and can be grabbed and reversed at any instant.** Springs are the tool that makes all of this natural, because they are inherently interruptible and velocity-aware.
@@ -150,3 +152,7 @@ Apple motion is physical but never gratuitous — every animation serves feedbac
 - Keep the gesture *state* fully functional (drag still commits/cancels) even when the animated *translation* is skipped.
 - Do not disable scroll, focus, or state-change feedback — only the decorative motion.
 - Where a spring library is used, map `reducedMotion: 'reduce'` (Framer Motion) or a `useReducedMotion()` guard (Motion) instead of hand-rolled media queries.
+
+## 10. Integration with CoreZ layering
+
+Follow the canonical stacking order in `frontend-modern-design: §5` (Background `0` → Content `10` → HUD `20-30` → Overlays `40-50+`). Springs that move panels/modals must animate *within* that layer — never break stacking context during a gesture.

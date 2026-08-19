@@ -7,6 +7,8 @@ description: Use only for an explicitly requested modern design system with resp
 
 Use this skill for deliberate system-level visual work, not every component or stylesheet edit.
 
+> **Canonical Design Contract:** This file is the **canonical source** for design tokens (`§1`) and z-index layering (`§5`). `frontend-design`, `apple-design`, and `accessibility-expert` reference these sections — do not duplicate tables. For bespoke brand identity, use `frontend-design` as primary instead (see `capability-orchestrator: §1.1`).
+
 ---
 
 ## 1. Design Token Architecture (`index.css`)
