@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, fireEvent, screen, cleanup, waitFor } from '@testing-library/react';
 import ChatInput from '../src/components/ChatInput.jsx';
 import DropZoneOverlay from '../src/components/DropZoneOverlay.jsx';
@@ -223,7 +223,22 @@ describe('fileAttachmentUtils', () => {
 
 describe('App-level window drag and drop integration', () => {
   it('opens drop overlay on window dragenter with files and processes drop', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).includes('/api/auth/me')) {
+        return new Response(JSON.stringify({ user: { id: 'dev', email: 'dev@corez.pro' } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      return new Response(null, { status: 404 });
+    });
+
     const { unmount } = render(<App />);
+
+    // Wait for auth to resolve and render Main app
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('Ask Corez...')).toBeTruthy();
+    });
 
     const droppedFile = new File(['console.log("hello world");'], 'index.js', { type: 'application/javascript' });
 

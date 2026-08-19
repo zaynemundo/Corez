@@ -49,15 +49,7 @@ function buildAttachmentPrompt(attachments) {
   return `\n\n[Attached files]\n${sections.join('\n')}\n`;
 }
 
-function AppInner() {
-  const { user, loading } = useAuth();
-  if (loading) {
-    return <div className="auth-loading"><span className="auth-logo-word">COREZ</span><span className="auth-logo-sub">Loading…</span></div>;
-  }
-  if (!user) {
-    return <Login />;
-  }
-
+function MainApp() {
   const [sessions, setSessions] = useState(() => {
     try {
       const saved = localStorage.getItem('corez_sessions');
@@ -716,6 +708,22 @@ function AppInner() {
     </div>
   );
 }
+function AppInner() {
+  const { user, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="auth-loading">
+        <span className="auth-logo-word">COREZ</span>
+        <span className="auth-logo-sub">Loading…</span>
+      </div>
+    );
+  }
+  if (!user) {
+    return <Login />;
+  }
+  return <MainApp />;
+}
+
 export default function App() {
   return (
     <AuthProvider>

@@ -120,28 +120,30 @@ export function createTodoTool(todoTracker) {
   return {
     name: 'todo_write',
     category: PERMISSION_CATEGORIES.READ,
-    description: 'Track and update the multi-step execution checklist for the current task.',
+    description: 'Record and update a structured task list for the current work. Send the ENTIRE list every call — it REPLACES the previous list (there are no partial updates, no per-item edits). For backward compat, action-based calls (set/add/update/list) are also accepted.',
     parameters: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
           enum: ['set', 'add', 'update', 'list'],
-          description: 'Action to perform: set full checklist, add a single task, update task status, or list todos'
+          description: 'Legacy action: set full checklist, add a single task, update task status, or list todos. Omit for DSH whole-list mode.'
         },
         todos: {
           type: 'array',
+          description: 'The COMPLETE task list, replacing any previous list. Each item has content + status.',
           items: {
             type: 'object',
+            additionalProperties: false,
             properties: {
+              content: { type: 'string', description: 'What the task is — a short imperative line.' },
+              title: { type: 'string', description: 'Alias for content (legacy)' },
               id: { type: 'string' },
-              title: { type: 'string' },
-              status: { type: 'string', enum: ['todo', 'in_progress', 'completed', 'cancelled'] },
+              status: { type: 'string', enum: ['pending', 'in_progress', 'completed', 'todo', 'cancelled'], description: 'pending (not started) | in_progress (now) | completed (done).' },
               priority: { type: 'string', enum: ['low', 'medium', 'high'] }
             },
-            required: ['title']
-          },
-          description: 'List of todo items (used when action is "set")'
+            required: []
+          }
         },
         item: {
           type: 'object',
@@ -165,12 +167,39 @@ export function createTodoTool(todoTracker) {
           description: 'Update fields for existing todo item (used when action is "update")'
         }
       },
-      required: ['action']
+      required: []
     },
     execute: async ({ action, todos, item, update }, runtimeOptions = {}) => {
       const scopeId = runtimeOptions.taskId || runtimeOptions.sessionId || 'default';
 
-      if (action === 'list') {
+      // DSH whole-list mode: no action, just todos with content/status (last-write-wins, durable todo/write)
+      const isDshWholeList = !action && Array.isArray(todos) && todos.length > 0 && todos.some((t) => t.content !== undefined || t.title === undefined);
+      // also support DSH when action is undefined but todos is array of {content, status}
+      if (isDshWholeList || (!action && Array.isArray(todos) && todos.length && todos[0]?.content !== undefined)) {
+        // DSH validation: whole-list replacement, pending/in_progress/completed
+        const normalized = [];
+        const seen = new Set();
+        for (const t of todos) {
+          const content = String(t.content ?? t.title ?? '').trim();
+          if (!content) return { success: false, error: 'invalid todo: content must be non-empty string' };
+          if (seen.has(content)) return { success: false, error: `invalid todos: duplicate content ${JSON.stringify(content)}` };
+          seen.add(content);
+          const status = t.status || 'pending';
+          if (!['pending', 'in_progress', 'completed', 'todo', 'cancelled'].includes(status)) {
+            return { success: false, error: `invalid status ${status}` };
+          }
+          // map DSH to internal: pending->todo, in_progress stays, completed, cancelled
+          const mapped = status === 'pending' ? 'todo' : status;
+          normalized.push({ id: `todo_${normalized.length + 1}`, title: content, content, status: mapped });
+        }
+        // allowParallel check: if more than one in_progress and caller didn't allow, could deny
+        // For now, store as is (DSH plugin would handle allowParallel)
+        const data = todoTracker.setTodos(scopeId, normalized.map((n) => ({ id: n.id, title: n.title, status: n.status })));
+        // also return DSH-shaped response
+        return { success: true, todos: normalized.map((n) => ({ content: n.title, status: n.status === 'todo' ? 'pending' : n.status })), ...data };
+      }
+
+      if (action === 'list' || (!action && !todos && !item && !update)) {
         const data = todoTracker.getTodos(scopeId);
         return { success: true, ...data };
       }
@@ -203,6 +232,12 @@ export function createTodoTool(todoTracker) {
         } catch (err) {
           return { success: false, error: err.message };
         }
+      }
+
+      // fallback: if todos provided without action, treat as set (legacy)
+      if (Array.isArray(todos) && todos.length) {
+        const data = todoTracker.setTodos(scopeId, todos);
+        return { success: true, ...data };
       }
 
       return { success: false, error: `Unknown action: "${action}"` };

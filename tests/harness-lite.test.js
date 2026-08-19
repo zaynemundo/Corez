@@ -335,3 +335,106 @@ describe('DSH-lite harness: HarnessContext + ProfileRegistry', () => {
     expect(blocked.gate).toBe('blocked');
   });
 });
+
+describe('Phase C — CordisContext, LlmService, Fs/Shell/Subagent seams', () => {
+  it('HarnessContext inject defers until deps exist (Cordis topology)', async () => {
+    const ctx = new HarnessContext({});
+    let called = false;
+    ctx.inject(['llm'], () => { called = true; });
+    expect(called).toBe(false);
+    // now register llm
+    const { LlmService } = await import('../packages/agent-core/llm/LlmService.js');
+    const llm = new LlmService({ providerChain: { adapters: [] } });
+    ctx.registerService('llm', llm);
+    expect(called).toBe(true);
+  });
+
+  it('HarnessContext child isolate shadows parent but inherits via get', () => {
+    const parent = new HarnessContext({});
+    parent.registerService('custom', { value: 1 });
+    const child = parent.isolate({ id: 'agent-1' });
+    expect(child.get('custom').value).toBe(1);
+    child.registerService('custom2', { value: 2 });
+    expect(parent.get('custom2')).toBeNull();
+    expect(child.get('custom2').value).toBe(2);
+  });
+
+  it('LlmService prepareCall resolves and streams via BlockAssembler', async () => {
+    const { LlmService } = await import('../packages/agent-core/llm/LlmService.js');
+    const mockChain = {
+      adapters: [{ id: 'test', defaultModel: 'm', contextWindow: 5000 }],
+      async generate() { return { status: 'completed', content: 'hello llm', toolCalls: [], provider: 'test', model: 'm' }; }
+    };
+    const llm = new LlmService({ providerChain: mockChain });
+    const prep = await llm.prepareCall({ provider: 'test', model: 'm' });
+    expect(prep.config.provider).toBe('test');
+    expect(prep.context.contextWindow).toBe(5000);
+    const chunks = [];
+    for await (const ch of prep.stream({ provider: 'test', model: 'm', messages: [{ role: 'user', content: 'hi' }] })) chunks.push(ch);
+    expect(chunks.some((c) => c.type === 'text-delta')).toBe(true);
+    expect(chunks.some((c) => c.type === 'finish')).toBe(true);
+  });
+
+  it('FsService respects workspace policy via resolveWorkspacePath', async () => {
+    const { FsService } = await import('../packages/agent-core/capabilities/FsService.js');
+    const fsService = new FsService({ cwd: process.cwd() });
+    // should read existing file
+    const content = fsService.readFile('package.json');
+    expect(content).toContain('"name"');
+    // should block traversal outside workspace
+    expect(() => fsService.readFile('../../etc/passwd')).toThrow();
+  });
+
+  it('ShellService exec delegates via subprocess seam (single execution world)', async () => {
+    const { ShellService } = await import('../packages/agent-core/capabilities/ShellService.js');
+    const { SubprocessService } = await import('../packages/agent-core/capabilities/SubprocessService.js');
+    const subprocess = new SubprocessService({ cwd: process.cwd() });
+    const shell = new ShellService({ cwd: process.cwd(), subprocess });
+    const res = shell.exec('echo hello');
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain('hello');
+  });
+
+  it('SubagentService fork-in-process creates child session via SessionManager', async () => {
+    const { SubagentService } = await import('../packages/agent-core/capabilities/SubagentService.js');
+    const sm = new (await import('../packages/agent-core/harness/SessionManager.js')).SessionManager();
+    sm.createSession({ userId: 'u1', sessionId: 'parent' });
+    const svc = new SubagentService({ sessionManager: sm, cwd: process.cwd() });
+    const fork = svc.forkSession({ userId: 'u1', sourceSessionId: 'parent', childSessionId: 'child1' });
+    expect(fork.sessionId).toBe('child1');
+    expect(fork.parentSessionKey).toBe('u1::parent');
+  });
+
+  it('TodoTracker supports DSH whole-list replacement (content/status)', async () => {
+    const { TodoTracker, createTodoTool } = await import('../packages/agent-core/todos/TodoTracker.js');
+    const tracker = new TodoTracker();
+    const tool = createTodoTool(tracker);
+    const registry = new ToolRegistry();
+    registry.registerTool(tool);
+    const res = await registry.executeTool('todo_write', { todos: [{ content: 'first task', status: 'pending' }, { content: 'second task', status: 'in_progress' }] }, { taskId: 't-dsh' });
+    expect(res.success).toBe(true);
+    expect(res.todos.some((t) => t.content === 'first task')).toBe(true);
+    // second call replaces whole list
+    const res2 = await registry.executeTool('todo_write', { todos: [{ content: 'only task', status: 'completed' }] }, { taskId: 't-dsh' });
+    expect(res2.todos).toHaveLength(1);
+    expect(res2.todos[0].content).toBe('only task');
+  });
+
+  it('HarnessContext ctx.llm is LlmService with stream/prepareCall (not raw ProviderChain)', () => {
+    const harness = new AgentHarness({ taskStore: new MemoryTaskStore(), providerChain: { adapters: [], async generate() { return { status: 'completed', content: 'ok', toolCalls: [], provider: 't', model: 'm' }; } } });
+    const llm = harness.ctx.llm;
+    expect(typeof llm.prepareCall).toBe('function');
+    expect(typeof llm.stream).toBe('function');
+    expect(typeof llm.generate).toBe('function');
+  });
+
+  it('AgentHarness core capabilities are mounted (fs/shell/subprocess/terminals/subagents)', () => {
+    const harness = new AgentHarness({ taskStore: new MemoryTaskStore(), providerChain: { adapters: [], async generate() { return { status: 'completed', content: 'ok', toolCalls: [], provider: 't', model: 'm' }; } } });
+    expect(harness.ctx.get('fs')).toBeTruthy();
+    expect(harness.ctx.get('shell')).toBeTruthy();
+    expect(harness.ctx.get('subprocess')).toBeTruthy();
+    expect(harness.ctx.get('terminals')).toBeTruthy();
+    expect(harness.ctx.get('subagents')).toBeTruthy();
+    expect(harness.ctx.get('compaction')).toBeTruthy();
+  });
+});
