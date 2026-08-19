@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import mercuryBg from '../../assets/Mercury_5.jpeg';
 
 export default function Login() {
   const { login, signup } = useAuth();
@@ -142,10 +143,9 @@ export default function Login() {
         <div className="auth-visual" aria-hidden="true">
           <img
             className="auth-visual-img"
-            src="https://images.unsplash.com/photo-1451187580459-43490279c429?auto=format&fit=crop&w=1200&q=80"
+            src={mercuryBg}
             alt=""
             loading="eager"
-            referrerPolicy="no-referrer"
           />
           <div className="auth-visual-overlay" />
           <div className="auth-visual-content">
