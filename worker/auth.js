@@ -380,7 +380,7 @@ export async function handleAuth(request, env) {
                 from,
                 to: email,
                 subject: 'Reset your CoreZ password',
-                html: `<p>You requested a password reset for <strong>${email}</strong>.</p><p><a href="${resetUrl}">Click here to reset your password</a> (expires in 1 hour).</p><p>If you did not request this, ignore this email.</p><p>Token: <code>${token}</code></p>`
+                html: `<p>You requested a password reset for <strong>${email}</strong>.</p><p><a href="${resetUrl}">Click here to reset your password</a> (expires in 1 hour).</p><p>If you did not request this, ignore this email.</p>`
               })
             });
           } catch (e) {

@@ -340,17 +340,6 @@ export default function Login() {
           {mode === 'reset' && (
             <>
               <label>
-                <span>Reset Token</span>
-                <input
-                  type="text"
-                  value={resetToken}
-                  onChange={e => setResetToken(e.target.value)}
-                  placeholder="Paste token from email"
-                  required
-                  autoComplete="off"
-                />
-              </label>
-              <label>
                 <span>New Password</span>
                 <div className="auth-password-wrapper">
                   <input
