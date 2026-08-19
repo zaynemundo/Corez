@@ -43,18 +43,19 @@ export default function Login() {
     const img = new Image();
     img.src = mercuryBg;
     let imgLoaded = false;
-    img.onload = () => { imgLoaded = true; if (!raf) raf = requestAnimationFrame(draw); };
+    img.onload = () => { imgLoaded = true; if (started && !raf) raf = requestAnimationFrame(draw); };
 
     let raf = 0;
     const ripples = [];
     let w = 0;
     let h = 0;
-    let dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    let dpr = 1;
     let time = 0;
+    let started = false;
 
-    // grid for water flow that actually distorts the Mercury image
-    const cols = 56;
-    const rows = 32;
+    // grid for water flow - reduced for performance (was 56x32=1792 cells, now 28x16=448 ~4x faster)
+    const cols = 28;
+    const rows = 16;
 
     const resize = () => {
       const rect = page.getBoundingClientRect();
@@ -81,13 +82,21 @@ export default function Login() {
       if (!raf) raf = requestAnimationFrame(draw);
     };
 
-    // gentle auto flow
-    const autoTimer = setInterval(() => {
-      if (ripples.length > 10) return;
-      addRipple(Math.random() * w, Math.random() * h, Math.random() > 0.75);
-    }, 900);
+    // gentle auto flow - throttled and delayed
+    let autoTimer = null;
+    const startAuto = () => {
+      autoTimer = setInterval(() => {
+        if (ripples.length > 6) return;
+        if (!started) return;
+        addRipple(Math.random() * w, Math.random() * h, Math.random() > 0.8);
+      }, 2200);
+    };
 
-    const draw = () => {
+    let lastDraw = 0;
+    const draw = (now = 0) => {
+      // throttle to ~30fps for smoothness without lag
+      if (now - lastDraw < 32) { raf = requestAnimationFrame(draw); return; }
+      lastDraw = now;
       time += 0.016;
       ctx.clearRect(0, 0, w, h);
 
@@ -173,18 +182,29 @@ export default function Login() {
       // keep flowing even without ripples for the gentle wave
       raf = requestAnimationFrame(draw);
     };
-    raf = requestAnimationFrame(draw);
+    // delay start by 900ms to avoid initial lag on page load
+    setTimeout(() => {
+      started = true;
+      startAuto();
+      if (imgLoaded && !raf) raf = requestAnimationFrame(draw);
+      setTimeout(() => addRipple(w * 0.52, h * 0.48, true), 300);
+    }, 900);
 
     let lastX = 0;
     let lastY = 0;
+    let lastMove = 0;
     const onMove = (e) => {
+      const now = Date.now();
+      if (now - lastMove < 90) return; // throttle 90ms
       const rect = page.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
-      if (Math.hypot(x - lastX, y - lastY) < 12) return;
+      const dist = Math.hypot(x - lastX, y - lastY);
+      if (dist < 18) return;
+      lastMove = now;
       lastX = x; lastY = y;
       addRipple(x, y);
-      if (Math.hypot(x - lastX, y - lastY) > 32) addRipple(x, y, true);
+      if (dist > 42) addRipple(x, y, true);
     };
     const onClick = (e) => {
       const rect = page.getBoundingClientRect();
@@ -193,7 +213,6 @@ export default function Login() {
 
     page.addEventListener('mousemove', onMove);
     page.addEventListener('click', onClick);
-    setTimeout(() => addRipple(w * 0.52, h * 0.48, true), 500);
 
     return () => {
       window.removeEventListener('resize', resize);
