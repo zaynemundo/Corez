@@ -434,18 +434,16 @@ function buildSystemPrompt(options = {}) {
     : (intent?.primaryIntent || fineIntent?.primaryIntent || fineIntent?.type || intent?.type || intentType);
   const secondaryIntent = intent?.secondaryIntent ? ` (secondary: ${intent.secondaryIntent})` : '';
 
-  const isRevisionPrompt = /\[(?:SURGICAL REVISION CONTEXT|Context: The user is requesting a revision)/i.test(options.prompt || '')
-    || /^\s*(?:revise|update|modify|patch|fix)\s+code\b/i.test(options.prompt || '');
+  const isRevisionPrompt = /^\s*(?:revise|update|modify|patch|fix)\s+code\b/i.test(options.prompt || '');
 
   let adaptiveInstructions;
   if (isRevisionPrompt) {
     adaptiveInstructions = `
-Adaptive Routing - Surgical Code Revision Path:
-- You are revising an existing, working codebase. Locate EXACTLY what the user wants to change.
-- Modify only the requested areas with surgical precision (like a targeted find-and-replace).
-- PRESERVE 100% of all existing HTML markup, CSS styling, particle effects, animations, interactive logic, event listeners, and multi-page structure.
-- NEVER redesign or start over from scratch.
-- ATTACHED IMAGES (CRITICAL — DO NOT USE UNSPLASH): When the user attaches an image (e.g. "change the image of Christian Vestil" with 1716041183016.jpg), the attached photo is the ONLY correct source. It is automatically uploaded to Cloudflare R2 as /api/assets/user-upload_...jpg (with data:image/... fallback). You MUST use that exact R2/data URL as <img src="..."> for that person's portrait. Do NOT use https://images.unsplash.com, placeholder, or any other external URL — those are generic stock photos and will be flagged as incorrect. Even if you use a placeholder like 1716041183016.jpg, the system will auto-replace it, but you should directly output the correct R2 URL: <img src="/api/assets/user-upload_...jpg" alt="Christian Vestil" style="width:100%;height:100%;object-fit:cover" onerror="this.onerror=null;this.style.display='none'">. Always include meaningful alt text, object-fit:cover, and onerror fallback. For Christian Vestil specifically, ensure the portrait uses the attached image, not an Unsplash stock photo.
+Adaptive Routing - Code Revision Path:
+- Apply the requested change directly to the provided code and output the complete updated file.
+- Keep all other code, styles, scripts and structure unchanged unless the request explicitly says to change them.
+- When the user attaches an image (e.g. for Christian Vestil), use that exact image — it is available as /api/assets/user-upload_...jpg (or data:image/...). Do NOT use Unsplash or invented URLs. Example: <img src="/api/assets/user-upload_...jpg" alt="Christian Vestil" style="width:100%;height:100%;object-fit:cover"> with alt and onerror fallback.
+- If the existing code is HTML, output the full HTML document inside one \`\`\`html block.
 - If repairing missing sub-page links:
   - If single-page: convert <a href="page.html"> to in-page anchors (<a href="#section">).
   - If multi-page: include all referenced pages with \`<!-- PAGE: page.html -->\` markers.

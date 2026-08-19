@@ -588,21 +588,9 @@ export async function improveCodingPrompt(prompt, intent = null) {
     }
   })();
 
-  // Dedicated handling for code revisions: locate and modify only requested changes
+  // Simple revision handling: just return the prompt with code as-is, no surgical spec
   if (isRevisionContextPrompt(cleanPrompt)) {
-    return `${cleanPrompt}${semanticPatternsPrompt}
-
-[SURGICAL CODE REVISION SPECIFICATION]:
-- You are performing a targeted, surgical revision on the existing codebase provided in the context above.
-- LOCATE AND MODIFY ONLY WHAT THE USER ASKS TO CHANGE:
-  1. Identify the EXACT target elements, styles, copy, or logic requested by the user.
-  2. Apply the requested changes with surgical precision (like a find-and-replace).
-  3. PRESERVE 100% of all other existing HTML markup, CSS styling, particle effects, animations, JavaScript logic, event listeners, and multi-page markers (<!-- PAGE: ... -->) completely untouched.
-  4. DO NOT redesign, re-architect, or start over from scratch.
-  5. If fixing "incomplete site" or missing page links:
-     - For single-page: replace external .html links (<a href="page.html">) with in-page anchors (<a href="#section">).
-     - For multi-page: include all referenced pages using <!-- PAGE: page.html --> markers.
-  6. Output the COMPLETE updated file with the requested changes applied inside a single code block so the live canvas preview immediately updates.`;
+    return `${cleanPrompt}${semanticPatternsPrompt}`;
   }
 
   // Use the Prompt Intelligence Engine for structured enrichment
