@@ -711,12 +711,7 @@ function MainApp() {
 function AppInner() {
   const { user, loading } = useAuth();
   if (loading) {
-    return (
-      <div className="auth-loading">
-        <span className="auth-logo-word">COREZ</span>
-        <span className="auth-logo-sub">Loading…</span>
-      </div>
-    );
+    return null;
   }
   if (!user) {
     return <Login />;
