@@ -36,7 +36,7 @@ describe('Login / Signup Component', () => {
     fireEvent.click(signupTab);
 
     expect(screen.getByText('Closed Beta Registration')).toBeTruthy();
-    expect(screen.getByPlaceholderText('COREZ-INVITE-2026')).toBeTruthy();
+    expect(screen.getByText('Invite Code')).toBeTruthy();
     expect(screen.getByRole('button', { name: /^Create Account$/i })).toBeTruthy();
   });
 

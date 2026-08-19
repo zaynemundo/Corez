@@ -289,7 +289,7 @@ export default function Login() {
                 type="text"
                 value={inviteCode}
                 onChange={e => setInviteCode(e.target.value)}
-                placeholder="COREZ-INVITE-2026"
+                placeholder=""
                 required
                 autoComplete="off"
                 spellCheck="false"
