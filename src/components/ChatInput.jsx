@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { Send, Square, ChevronRight, Globe, Gamepad2, Search, Image as ImageIcon, X } from 'lucide-react';
 import { PlusIcon } from './icons';
-import { processFiles, formatBytes, hasFiles } from '../utils/fileAttachmentUtils';
+import { processFiles, formatBytes, hasFiles, MAX_IMAGE_THUMB_BYTES } from '../utils/fileAttachmentUtils';
 
 // Commands offered as suggestions when the user types "@".
 // Keep in sync with parseSlashCommand in services/aiService.js.
@@ -64,6 +64,7 @@ export default function ChatInput({
 
   const [isDragOverInput, setIsDragOverInput] = useState(false);
   const dragInputCounterRef = useRef(0);
+  const hasPendingImage = attachments.some(a => a.type?.startsWith('image/') && !a.thumb && a.size <= MAX_IMAGE_THUMB_BYTES);
 
   useEffect(() => {
     if (refToUse.current) {
@@ -173,6 +174,12 @@ export default function ChatInput({
     }
     const textToSend = input.trim();
     if (!textToSend && attachments.length === 0) return;
+    const hasPendingImage = attachments.some(a => a.type?.startsWith('image/') && !a.thumb && a.size <= MAX_IMAGE_THUMB_BYTES);
+    if (hasPendingImage) {
+      // Image thumb still generating — wait briefly then retry; the chip shows loading
+      setTimeout(() => handleSubmit(e), 150);
+      return;
+    }
     onSendMessage(textToSend, attachments);
     setInput('');
     setAttachments([]);
@@ -251,26 +258,31 @@ export default function ChatInput({
         )}
         {attachments.length > 0 && (
           <div className="attachment-chips-bar" aria-label="Attached files">
-            {attachments.map((attachment) => (
-              <span key={attachment.id} className="attachment-chip">
-                {attachment.thumb && (
-                  <img src={attachment.thumb} alt="" className="attachment-chip-thumb" />
-                )}
-                <span className="chip-filename" title={`${attachment.name} (${formatBytes(attachment.size)})`}>
-                  {attachment.name}
+            {attachments.map((attachment) => {
+              const isPendingImage = attachment.type?.startsWith('image/') && !attachment.thumb && attachment.size <= MAX_IMAGE_THUMB_BYTES;
+              return (
+                <span key={attachment.id} className="attachment-chip">
+                  {attachment.thumb ? (
+                    <img src={attachment.thumb} alt="" className="attachment-chip-thumb" />
+                  ) : isPendingImage ? (
+                    <span className="attachment-chip-thumb" style={{ display: 'inline-block', width: 24, height: 24, background: '#333', borderRadius: 4, textAlign: 'center', lineHeight: '24px', fontSize: 10, color: '#888' }}>…</span>
+                  ) : null}
+                  <span className="chip-filename" title={`${attachment.name} (${formatBytes(attachment.size)})`}>
+                    {attachment.name} {isPendingImage ? '(loading...)' : ''}
+                  </span>
+                  <button
+                    type="button"
+                    className="remove-chip-btn"
+                    onClick={() => removeAttachment(attachment.id)}
+                    aria-label={`Remove ${attachment.name}`}
+                    title="Remove attachment"
+                    disabled={isStreaming}
+                  >
+                    <X size={12} strokeWidth={1.5} />
+                  </button>
                 </span>
-                <button
-                  type="button"
-                  className="remove-chip-btn"
-                  onClick={() => removeAttachment(attachment.id)}
-                  aria-label={`Remove ${attachment.name}`}
-                  title="Remove attachment"
-                  disabled={isStreaming}
-                >
-                  <X size={12} strokeWidth={1.5} />
-                </button>
-              </span>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -321,8 +333,8 @@ export default function ChatInput({
             <button
               type="submit"
               className="send-btn"
-              disabled={!input.trim() && attachments.length === 0}
-              title="Send Message"
+              disabled={(!input.trim() && attachments.length === 0) || hasPendingImage}
+              title={hasPendingImage ? "Image still loading..." : "Send Message"}
             >
               <Send size={15} strokeWidth={1.5} />
             </button>
