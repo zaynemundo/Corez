@@ -31,10 +31,10 @@ export default function Login() {
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-split">
-        <div className="auth-panel">
-          <div className="auth-card">
+    <div className="auth-page" style={{ backgroundImage: `url(${mercuryBg})` }}>
+      <div className="auth-bg-overlay" aria-hidden="true" />
+      <div className="auth-center">
+        <div className="auth-card">
         <div className="auth-logo">
           <span className="auth-logo-word">COREZ</span>
           <span className="auth-logo-sub">
@@ -138,21 +138,6 @@ export default function Login() {
             {mode === 'login' ? 'Sign up' : 'Login'}
           </button>
         </p>
-          </div>
-        </div>
-        <div className="auth-visual" aria-hidden="true">
-          <img
-            className="auth-visual-img"
-            src={mercuryBg}
-            alt=""
-            loading="eager"
-          />
-          <div className="auth-visual-overlay" />
-          <div className="auth-visual-content">
-            <span className="auth-visual-kicker">COREZ — Turn ideas into products</span>
-            <h2 className="auth-visual-title">Build. Preview.<br />Publish.</h2>
-            <p className="auth-visual-desc">Chat to create websites, apps, games and tools — preview live, refine in chat, ship to a shareable link.</p>
-          </div>
         </div>
       </div>
     </div>

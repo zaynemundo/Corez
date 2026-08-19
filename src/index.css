@@ -2011,9 +2011,33 @@ h1, h2, h3, h4, h5, h6 {
 .auth-page {
   min-height: 100vh;
   display: flex;
-  background: transparent;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: #000;
   color: var(--text-primary);
+  overflow: hidden;
 }
+.auth-bg-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0.58) 100%);
+  z-index: 0;
+}
+.auth-center {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 100vh;
+  padding: 24px;
+}
+/* legacy split layout kept for reference */
 .auth-split {
   display: flex;
   width: 100%;
