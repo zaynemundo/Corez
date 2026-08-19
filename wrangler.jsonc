@@ -33,6 +33,7 @@
   // third-party key, billed inside the daily free neuron allocation. Search
   // ranking also uses it first (rerank then embeddings) before keyed
   // providers; disable with WORKERS_AI_RERANK_DISABLED / WORKERS_AI_EMBED_DISABLED.
+  // D1 removed 2026-08-19: was blocking deploy with invalid database_id "corez-auth" (10021). Auth falls back to dev mode.
   "ai": {
     "binding": "AI"
   },
