@@ -42,7 +42,6 @@
       "new_sqlite_classes": ["GameRoom"]
     }
   ],
-  "d1_databases": [{ "binding": "DB", "database_name": "corez-auth", "database_id": "corez-auth" }],
   "r2_buckets": [
     {
       "binding": "ASSET_BUCKET",
