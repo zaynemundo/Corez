@@ -219,7 +219,7 @@ export default function Login() {
         <div className="auth-logo">
           <span className="auth-logo-word">COREZ</span>
           <span className="auth-logo-sub">
-            {mode === 'login' ? 'Sign in to your account' : 'Closed Beta Registration'}
+            {mode === 'login' ? 'Sign in to your account' : 'Create your account'}
           </span>
         </div>
 
@@ -294,7 +294,7 @@ export default function Login() {
                 autoComplete="off"
                 spellCheck="false"
               />
-              <small className="auth-hint">CoreZ is currently invite-only. Enter an active beta code.</small>
+              <small className="auth-hint">Enter your invite code to continue.</small>
             </label>
           )}
 

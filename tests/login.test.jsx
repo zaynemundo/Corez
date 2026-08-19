@@ -35,7 +35,7 @@ describe('Login / Signup Component', () => {
     const signupTab = screen.getByRole('tab', { name: /^Sign Up$/i });
     fireEvent.click(signupTab);
 
-    expect(screen.getByText('Closed Beta Registration')).toBeTruthy();
+    expect(screen.getByText('Create your account')).toBeTruthy();
     expect(screen.getByText('Invite Code')).toBeTruthy();
     expect(screen.getByRole('button', { name: /^Create Account$/i })).toBeTruthy();
   });
