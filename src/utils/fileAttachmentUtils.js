@@ -68,7 +68,26 @@ export function processFiles(fileList, setAttachments) {
       const reader = new FileReader();
       reader.onload = () => {
         if (reader.result && typeof reader.result === 'string') {
-          setAttachments((prev) => (prev || []).map((a) => (a.id === entry.id ? { ...a, thumb: reader.result } : a)));
+          const thumb = reader.result;
+          setAttachments((prev) => (prev || []).map((a) => (a.id === entry.id ? { ...a, thumb } : a)));
+          // Also upload to R2 for persistent URL (used in generated HTML and publishing)
+          // Fire-and-forget: store assetUrl when upload succeeds, keep thumb as fallback
+          const ext = extensionOf(entry.name) || 'jpg';
+          const safeName = entry.name.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 80) || `image.${ext}`;
+          const key = `user-upload_${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeName}`;
+          const mimeType = entry.file.type || `image/${ext}`;
+          // Use data URL directly for upload; worker will validate and store
+          fetch('/api/assets/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key, dataUrl: thumb, mimeType })
+          }).then(async (res) => {
+            if (!res.ok) return;
+            const data = await res.json().catch(() => null);
+            if (data?.url) {
+              setAttachments((prev) => (prev || []).map((a) => (a.id === entry.id ? { ...a, assetUrl: data.url, assetKey: data.key } : a)));
+            }
+          }).catch(() => {/* R2 not configured or upload failed — keep thumb as fallback */});
         }
       };
       reader.readAsDataURL(entry.file);

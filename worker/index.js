@@ -46,26 +46,29 @@ function toMultimodalMessage(message) {
 // attached data URL so the portrait always displays.
 function patchLocalImageSrc(html, messages) {
   if (typeof html !== 'string' || !html.includes('<img')) return html;
-  const thumbs = [];
+  const urls = [];
   for (const m of Array.isArray(messages) ? messages : []) {
     for (const a of Array.isArray(m?.attachments) ? m.attachments : []) {
-      if (typeof a?.thumb === 'string' && a.thumb.startsWith('data:image/')) thumbs.push(a.thumb);
+      // Prefer persistent R2 assetUrl (uploaded via /api/assets/upload) — smaller HTML and survives publish.
+      // Fallback to thumb data URL if asset upload failed or R2 not configured.
+      if (typeof a?.assetUrl === 'string' && a.assetUrl.startsWith('/api/assets/')) urls.push(a.assetUrl);
+      else if (typeof a?.thumb === 'string' && a.thumb.startsWith('data:image/')) urls.push(a.thumb);
     }
   }
-  if (thumbs.length === 0) return html;
+  if (urls.length === 0) return html;
   // Only patch src values that look like local filenames (no data:, no https://, no /api/)
   // e.g. src="1716041183016.jpg" or src="images/photo.jpg"
   let patched = html;
-  let thumbIndex = 0;
+  let urlIndex = 0;
   patched = patched.replace(/<img\s+[^>]*src=["']([^"']+)["'][^>]*>/gi, (match, src) => {
     const isData = src.startsWith('data:');
     const isHttps = src.startsWith('https://') || src.startsWith('http://');
     const isApi = src.startsWith('/api/');
     // If src is already a data URL or absolute https/api, leave it
     if (isData || isHttps || isApi) return match;
-    // Local filename or relative path — replace with attached thumb if available
-    if (thumbIndex < thumbs.length) {
-      const replacement = thumbs[thumbIndex++];
+    // Local filename or relative path — replace with attached R2 URL or thumb if available
+    if (urlIndex < urls.length) {
+      const replacement = urls[urlIndex++];
       // Preserve other attributes, replace only src value and ensure onerror fallback
       let newTag = match.replace(src, replacement);
       if (!/onerror/i.test(newTag)) {
@@ -332,7 +335,7 @@ Adaptive Routing - Surgical Code Revision Path:
 - Modify only the requested areas with surgical precision (like a targeted find-and-replace).
 - PRESERVE 100% of all existing HTML markup, CSS styling, particle effects, animations, interactive logic, event listeners, and multi-page structure.
 - NEVER redesign or start over from scratch.
-- ATTACHED IMAGES (CRITICAL): When the user attaches an image (e.g. "add this image for Christian Vestil"), the image is provided as a multimodal vision input with a data URL (data:image/...;base64,...). You MUST use that EXACT data URL directly as the <img src="..."> value in the revised code. Do NOT use local filenames like 1716041183016.jpg, placeholder paths, or external URLs — those fail to load in preview. Example: <img src="data:image/jpeg;base64,...." alt="Christian Vestil" style="width:100%;height:100%;object-fit:cover" onerror="this.onerror=null;this.src='data:image/svg+xml;utf8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=&quot;400&quot; height=&quot;400&quot;><rect width=&quot;100%&quot; height=&quot;100%&quot; fill=&quot;%23222&quot;/><text x=&quot;50%&quot; y=&quot;50%&quot; fill=&quot;white&quot; text-anchor=&quot;middle&quot; dy=&quot;.3em&quot;>No Image</text></svg>'">. Always include meaningful alt text, object-fit:cover, and an onerror fallback.
+- ATTACHED IMAGES (CRITICAL): When the user attaches an image (e.g. "add this image for Christian Vestil"), it is automatically uploaded to Cloudflare R2 and available as a persistent URL like /api/assets/user-upload_...jpg (with data:image/... fallback). You SHOULD use that URL directly as <img src="..."> if you can, but even if you use a placeholder or local filename like 1716041183016.jpg, the system will automatically replace it with the correct R2/data URL after generation so the preview always shows the portrait. Example: <img src="/api/assets/user-upload_...jpg" alt="Christian Vestil" style="width:100%;height:100%;object-fit:cover" onerror="this.onerror=null;this.style.display='none'">. Always include meaningful alt text, object-fit:cover, and an onerror fallback. Do NOT invent external URLs.
 - If repairing missing sub-page links:
   - If single-page: convert <a href="page.html"> to in-page anchors (<a href="#section">).
   - If multi-page: include all referenced pages with \`<!-- PAGE: page.html -->\` markers.
@@ -467,7 +470,7 @@ Reasoning & Response Quality (Muse Spark 1.2 — hidden chain-of-thought):
 
 Guidelines for Output:
 - FOLLOW THE USER'S REQUEST EXACTLY: deliver precisely what the user asked for — implement everything they requested and add nothing they did not ask for. When the user's instruction conflicts with any default or template behaviour, the user's explicit instruction wins.
-- ATTACHED IMAGES: If the user's message includes an attached image (provided as vision input with a data:image/...;base64,... URL), you MUST use that exact data URL directly in the code when the task requires an image (e.g. <img src="data:image/jpeg;base64,..." alt="Christian Vestil">). Do NOT use local filenames like 1716041183016.jpg, placeholder paths, or invented URLs — those fail to load in the sandboxed preview. Always include meaningful alt text, object-fit:cover, and an onerror fallback.
+- ATTACHED IMAGES: If the user attaches an image, it is automatically uploaded to Cloudflare R2 (persistent URL like /api/assets/user-upload_...jpg) with a data:image/... fallback. When the task requires that image (e.g. portrait for Christian Vestil), use the R2 URL if you know it, otherwise use the data URL verbatim in <img src="..."> — do NOT use local filenames like 1716041183016.jpg or invented URLs. The system also auto-patches any local filename to the correct R2/data URL after generation, so preview always shows the portrait. Always include meaningful alt text, object-fit:cover, and onerror fallback.
 - AMBIGUOUS REQUESTS: When a user's prompt is ambiguous, underspecified, or missing essential details (e.g. they say "make a game", "build a website", "create a plan", or give a vague prompt with multiple conflicting interpretations), do NOT ask clarifying questions and do NOT present choice menus or option lists. Instead, choose the most sensible default interpretation, state the key assumption you made in ONE short sentence, and deliver the complete result. The user can refine it in a follow-up message.
 - DEFAULT FORMAT (React/JSX): When writing code or building apps, components, tools, dashboards, or games without an explicitly requested format, default to clean, modern React/JSX components (using \`\`\`jsx ... \`\`\` code blocks). ALWAYS name your main top-level component "export default function App()".
 - REQUESTED FORMATS (HTML/CSS/JS): If the user explicitly requests HTML, CSS, vanilla JS, or plain web code, output complete single-file HTML/CSS/JS inside ONE SINGLE \`\`\`html ... \`\`\` code block.
