@@ -6,6 +6,8 @@ import ChatInput from './components/ChatInput';
 import CanvasPreview from './components/CanvasPreview';
 import SettingsModal from './components/SettingsModal';
 import DropZoneOverlay from './components/DropZoneOverlay';
+import Login from './pages/Login';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { formatBytes, processFiles, hasFiles } from './utils/fileAttachmentUtils';
 import { generateAIResponse, extractCodeFromMessage, generateSessionTitle, generateAISessionTitle, isRevisionContextPrompt } from './services/aiService';
 import { storeAppInR2, deleteSessionAppsInR2 } from './services/appStorageService';
@@ -47,7 +49,15 @@ function buildAttachmentPrompt(attachments) {
   return `\n\n[Attached files]\n${sections.join('\n')}\n`;
 }
 
-export default function App() {
+function AppInner() {
+  const { user, loading } = useAuth();
+  if (loading) {
+    return <div className="auth-loading"><span className="auth-logo-word">COREZ</span><span className="auth-logo-sub">Loading…</span></div>;
+  }
+  if (!user) {
+    return <Login />;
+  }
+
   const [sessions, setSessions] = useState(() => {
     try {
       const saved = localStorage.getItem('corez_sessions');
@@ -704,5 +714,12 @@ export default function App() {
         onClearAllHistory={handleClearAllHistory}
       />
     </div>
+  );
+}
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
   );
 }

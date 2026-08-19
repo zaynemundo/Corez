@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { 
   Settings, 
   Sun, 
@@ -133,6 +134,7 @@ export default function Sidebar({
       </div>
 
       <div className="sidebar-footer">
+        <AuthFooter />
         <button 
           className="footer-action-btn" 
           onClick={onToggleTheme}
@@ -151,5 +153,19 @@ export default function Sidebar({
         </button>
       </div>
     </aside>
+  );
+}
+
+function AuthFooter() {
+  let auth;
+  try { auth = useAuth(); } catch { return null; }
+  if (!auth?.user) return null;
+  return (
+    <div className="sidebar-auth-footer">
+      <span className="sidebar-user-email" title={auth.user.email}>{auth.user.email}</span>
+      <button className="footer-action-btn" onClick={auth.logout} title="Logout">
+        <span>Logout</span>
+      </button>
+    </div>
   );
 }

@@ -10,6 +10,7 @@ import baseWorker from './index.js';
 import { readBoundedJson, createTaskStateStore, createRateLimiter } from './utils.js';
 import { TASK_STATUS_STORE_PREFIX } from './providerChain.js';
 import { handleTaskApi } from './taskApi.js';
+import { handleAuth, verifySession } from './auth.js';
 export { GameRoom } from './gameRoom.js';
 
 // Per-client AI request rate bound: paid provider tokens are spent on every
@@ -88,6 +89,11 @@ export default {
       return Response.redirect(url.toString(), 301);
     }
 
+    // Auth routes - always handle before rate limiting
+    if (url.pathname.startsWith('/api/auth/')) {
+      const authRes = await handleAuth(request, env);
+      if (authRes) return authRes;
+    }
     const store = createTaskStateStore(env);
     const jsonHeaders = {
       'Content-Type': 'application/json',
@@ -99,6 +105,16 @@ export default {
       'Referrer-Policy': 'no-referrer'
     };
 
+    // Auth gate - protect AI and app APIs when AUTH_SECRET is set
+    const authPaths = ['/api/ai', '/api/image', '/api/apps', '/api/memory', '/api/publish', '/api/assets'];
+    const needsAuth = authPaths.some(p => url.pathname === p || url.pathname.startsWith(p + '/')) || url.pathname.startsWith('/api/game/');
+    if (needsAuth) {
+      const sess = await verifySession(request, env);
+      if (!sess && env.AUTH_SECRET) {
+        return new Response(JSON.stringify({ error: 'Authentication required. Please log in.' }), { status: 401, headers: jsonHeaders });
+      }
+    }
+    // SPA gate - redirect unauthenticated browser navigations to login (client also gates, this is defense)
     // Every /api/ai call spends paid provider tokens: bound the per-client
     // rate (20/min per IP) so one client cannot burn the deployment budget.
     if (url.pathname === '/api/ai' && request.method === 'POST') {
