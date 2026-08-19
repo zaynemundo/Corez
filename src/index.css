@@ -2014,12 +2014,19 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   justify-content: center;
   position: relative;
+  background-color: #000;
+  color: var(--text-primary);
+  overflow: hidden;
+}
+.auth-bg {
+  position: absolute;
+  inset: -28px;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
   background-color: #000;
-  color: var(--text-primary);
-  overflow: hidden;
+  will-change: transform;
+  transform: translate3d(0,0,0) scale(1.08);
 }
 .auth-bg-overlay {
   position: absolute;

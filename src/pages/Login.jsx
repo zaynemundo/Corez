@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import mercuryBg from '../../assets/Mercury_5.jpeg';
@@ -30,8 +30,55 @@ export default function Login() {
     }
   };
 
+  const pageRef = useRef(null);
+  const bgRef = useRef(null);
+
+  useEffect(() => {
+    const page = pageRef.current;
+    const bg = bgRef.current;
+    if (!page || !bg) return;
+    let raf = 0;
+    let targetX = 0;
+    let targetY = 0;
+    let curX = 0;
+    let curY = 0;
+
+    const onMove = (e) => {
+      const rect = page.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / rect.width - 0.5;
+      const y = (e.clientY - rect.top) / rect.height - 0.5;
+      targetX = x * 28;
+      targetY = y * 28;
+      if (!raf) raf = requestAnimationFrame(tick);
+    };
+    const tick = () => {
+      curX += (targetX - curX) * 0.08;
+      curY += (targetY - curY) * 0.08;
+      bg.style.transform = `translate3d(${curX}px, ${curY}px, 0) scale(1.08)`;
+      if (Math.abs(targetX - curX) > 0.05 || Math.abs(targetY - curY) > 0.05) {
+        raf = requestAnimationFrame(tick);
+      } else {
+        raf = 0;
+      }
+    };
+    const onLeave = () => {
+      targetX = 0;
+      targetY = 0;
+      if (!raf) raf = requestAnimationFrame(tick);
+    };
+
+    page.addEventListener('mousemove', onMove);
+    page.addEventListener('mouseleave', onLeave);
+    return () => {
+      page.removeEventListener('mousemove', onMove);
+      page.removeEventListener('mouseleave', onLeave);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
+
   return (
-    <div className="auth-page" style={{ backgroundImage: `url(${mercuryBg})` }}>
+    <div className="auth-page" ref={pageRef}>
+      <div ref={bgRef} className="auth-bg" style={{ backgroundImage: `url(${mercuryBg})` }} aria-hidden="true" />
       <div className="auth-bg-overlay" aria-hidden="true" />
       <div className="auth-center">
         <div className="auth-card">
