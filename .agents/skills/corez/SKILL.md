@@ -1,9 +1,9 @@
 ---
-name: j-space-lite
-description: Lightweight J-Space workspace for Corez - selective ledger + ship checks for long-horizon tasks. Extracted from Tiger380/J-Space-Cognition-Suite-V3.6 (Apache-2.0).
+name: corez
+description: Corez workspace for long-horizon tasks - selective ledger + ship checks. Extracted from Tiger380/J-Space-Cognition-Suite-V3.6 (Apache-2.0).
 ---
 
-# J-Space Lite for Corez
+# Corez Workspace
 
 **Source:** [Tiger380/J-Space-Cognition-Suite-V3.6](https://github.com/Tiger3807861189/J-Space-Cognition-Suite-V3.6) (Apache-2.0) - extracted `ship` + ledger template only. Full suite has 9 modules; Corez already has `harness`, `intentContract`, `skillVerification` - so we take just these two.
 
@@ -30,13 +30,13 @@ description: Lightweight J-Space workspace for Corez - selective ledger + ship c
 - `Open`: `?NN ... — settled by: cheapest test` (closes against a checkpoint)
 - `Next`: single next action, never empty
 
-**File:** `.jspace/WORKSPACE.md` (or in-conversation if no filesystem). See `packages/agent-core/verification/j-space/ledger.md`.
+**File:** `.jspace/WORKSPACE.md` (or in-conversation if no filesystem). See `packages/agent-core/verification/corez/ledger.md`.
 
 **Seams:** sub-task done, tool about to be called, file about to be written, checkpoint verified, topic change, or anything addressed to user. At each seam, re-read the ledger.
 
 ## Ship (register check before delivery)
 
-Run `node packages/agent-core/verification/j-space/ship.js <file>` or `shipText(text)` in code. Checks:
+Run `node packages/agent-core/verification/corez/ship.js <file>` or `shipText(text)` in code. Checks:
 
 - Inner-only symbols `⇒ ⟹ ⟸ ∴ ∵ ⊆ ⊇ ∋ ?? ?! 💀` (dense track leakage)
 - State markers `GRRR GAAAH PHEW I see meltdown DATA DATA I'M DROWNING`
@@ -45,7 +45,7 @@ Run `node packages/agent-core/verification/j-space/ship.js <file>` or `shipText(
 
 Clean -> `clean — the outgoing register holds.` Findings -> expand to plain language before shipping.
 
-See `packages/agent-core/verification/j-space/ship.js` (port of `jspace.py ship`).
+See `packages/agent-core/verification/corez/ship.js` (port of `jspace.py ship`).
 
 ## Controller (optional)
 
