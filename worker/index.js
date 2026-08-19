@@ -50,6 +50,28 @@ function toMultimodalMessage(message) {
   return { role: message.role, content: hinted };
 }
 
+// Fix common JS syntax errors introduced when model copies large base64 data URLs
+// (e.g. missing * in particle system: Math.random()canvas.width -> Math.random()*canvas.width)
+function fixCommonJSInHtml(html) {
+  if (typeof html !== 'string' || !html.includes('<script')) return html;
+  return html
+    // Particle system: Math.random()canvas.width → Math.random()*canvas.width
+    .replace(/Math\.random\(\)\s*canvas\.width/g, 'Math.random()*canvas.width')
+    .replace(/Math\.random\(\)\s*canvas\.height/g, 'Math.random()*canvas.height')
+    .replace(/Math\.random\(\)\s*2/g, 'Math.random()*2')
+    .replace(/\(Math\.random\(\)\s*-\s*0\.5\)\s*0\.3/g, '(Math.random()-0.5)*0.3')
+    .replace(/\(Math\.random\(\)\s*-\s*0\.5\)\s*0\.3/g, '(Math.random()-0.5)*0.3')
+    // rgba with template literal inside string (missing backticks)
+    .replace(/ctx\.fillStyle\s*=\s*rgba\(/g, 'ctx.fillStyle=`rgba(')
+    .replace(/\$\{this\.opacity\}\)\s*;/g, '${this.opacity})`;')
+    // Fix missing * in other common patterns: 0.05(1-... ) → 0.05*(1-... )
+    .replace(/0\.05\s*\(/g, '0.05*(')
+    .replace(/0\.08\s*\(/g, '0.08*(')
+    // Fix canvas.width/height missing * in other places
+    .replace(/Math\.random\(\)\s*([a-zA-Z_][a-zA-Z0-9_]*\.width)/g, 'Math.random()*$1')
+    .replace(/Math\.random\(\)\s*([a-zA-Z_][a-zA-Z0-9_]*\.height)/g, 'Math.random()*$1');
+}
+
 // Safety-net: if the model still emits a local filename like 1716041183016.jpg
 // or a generic Unsplash placeholder (https://images.unsplash.com/...) instead
 // of using the attached image, replace it with the attached image.
@@ -1164,7 +1186,10 @@ async function handleAi(request, env) {
                 liveDataEvidence,
                 searchEvidence: liveDataEvidence
               });
-              const verificationContentPatched = patchLocalImageSrc(verificationRaw.content, [...messages, ...apiMessages]);
+              const patchedImage = patchLocalImageSrc(verificationRaw.content, [...messages, ...apiMessages]);
+              const fixedJs = fixCommonJSInHtml(patchedImage);
+              const finalPatched = fixedJs !== patchedImage ? fixedJs : patchedImage;
+              const verificationContentPatched = finalPatched;
               const verification = verificationRaw.content !== verificationContentPatched ? { ...verificationRaw, content: verificationContentPatched } : verificationRaw;
               const finalContent = verification.content;
               if (finalContent !== collected) {
@@ -1341,7 +1366,10 @@ async function handleAi(request, env) {
       liveDataEvidence,
       searchEvidence: liveDataEvidence
     });
-    const verificationContentPatchedNonStream = patchLocalImageSrc(verificationRawNonStream.content, [...messages, ...apiMessages]);
+    const patchedNonStream = patchLocalImageSrc(verificationRawNonStream.content, [...messages, ...apiMessages]);
+    const fixedNonStream = fixCommonJSInHtml(patchedNonStream);
+    const finalPatchedNonStream = fixedNonStream !== patchedNonStream ? fixedNonStream : patchedNonStream;
+    const verificationContentPatchedNonStream = finalPatchedNonStream;
     const verification = verificationRawNonStream.content !== verificationContentPatchedNonStream ? { ...verificationRawNonStream, content: verificationContentPatchedNonStream } : verificationRawNonStream;
     const finalContent = verification.content;
     const initialTokens = {
