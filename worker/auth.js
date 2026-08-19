@@ -380,7 +380,32 @@ export async function handleAuth(request, env) {
                 from,
                 to: email,
                 subject: 'Reset your CoreZ password',
-                html: `<p>You requested a password reset for <strong>${email}</strong>.</p><p><a href="${resetUrl}">Click here to reset your password</a> (expires in 1 hour).</p><p>If you did not request this, ignore this email.</p>`
+                html: `<!doctype html><html><body style="margin:0;padding:0;background:#f4f4f5;">
+<div style="background:#f4f4f5;padding:32px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+  <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e4e4e7;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
+    <div style="padding:28px 32px 20px;text-align:center;border-bottom:1px solid #e4e4e7;">
+      <div style="font-size:22px;font-weight:800;letter-spacing:0.14em;color:#09090b;">COREZ</div>
+      <div style="margin-top:6px;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#71717a;font-weight:600;">Turn ideas into products</div>
+    </div>
+    <div style="padding:32px 32px 28px;">
+      <h1 style="margin:0 0 10px;font-size:20px;font-weight:700;color:#18181b;line-height:1.3;">Reset your password</h1>
+      <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#3f3f46;">Hi there — you requested a password reset for <strong style="color:#18181b;">${email}</strong>.</p>
+      <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#3f3f46;">Click the button below to set a new password. This link <strong>expires in 1 hour</strong> and can only be used once.</p>
+      <div style="text-align:center;margin:28px 0;">
+        <a href="${resetUrl}" style="display:inline-block;padding:13px 30px;background:#09090b;color:#ffffff;text-decoration:none;border-radius:9px;font-size:14px;font-weight:700;letter-spacing:0.02em;">Reset Password</a>
+      </div>
+      <div style="background:#fafafa;border:1px solid #e4e4e7;border-radius:8px;padding:12px 14px;margin:0 0 18px;">
+        <p style="margin:0;font-size:11px;line-height:1.5;color:#71717a;word-break:break-all;">Or copy this link:<br><a href="${resetUrl}" style="color:#09090b;word-break:break-all;">${resetUrl}</a></p>
+      </div>
+      <p style="margin:0;font-size:12px;line-height:1.6;color:#71717a;">If you didn't request this, you can safely ignore this email — your password won't change.</p>
+    </div>
+    <div style="padding:18px 32px;background:#fafafa;border-top:1px solid #e4e4e7;text-align:center;">
+      <p style="margin:0;font-size:11px;line-height:1.5;color:#a1a1aa;">© ${new Date().getFullYear()} CoreZ • Sent from no-support@corez.pro • Automated message, please don't reply.</p>
+    </div>
+  </div>
+  <p style="max-width:560px;margin:16px auto 0;text-align:center;font-size:11px;color:#a1a1aa;line-height:1.5;">Mercury • CoreZ auth</p>
+</div>
+</body></html>`
               })
             });
           } catch (e) {
