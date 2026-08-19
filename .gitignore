@@ -17,3 +17,6 @@ __pycache__/
 
 # Reference repositories
 deepseek-harness/
+
+# J-Space ledger (working state)
+.jspace/
