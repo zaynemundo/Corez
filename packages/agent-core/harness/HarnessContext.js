@@ -19,6 +19,7 @@
 import { EventBus } from './EventBus.js';
 import { SessionLog } from './SessionLog.js';
 import { SessionManager } from './SessionManager.js';
+import { LlmService } from '../llm/LlmService.js';
 
 export class HarnessContext {
   constructor(options = {}) {

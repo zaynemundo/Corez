@@ -35,7 +35,8 @@ export class AgentHarness {
   constructor(options = {}) {
     this.eventBus = options.eventBus || new EventBus();
     this.cancellations = options.cancellationManager || new CancellationManager();
-    this.sessions = options.sessionManager || new SessionManager();
+    const persistDir = options.persistDir || (options.persistSessions === false ? null : `${options.cwd || process.cwd()}/artifacts/sessions`);
+    this.sessions = options.sessionManager || new SessionManager({ persistDir });
     this.store = options.taskStore || null;
     this.compactionEngine = options.compactionEngine || new CompactionEngine();
     this.taskManager = options.taskManager || new TaskManager({

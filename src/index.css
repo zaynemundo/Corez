@@ -1998,6 +1998,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 0.82rem;
   color: var(--text-primary);
   white-space: nowrap;
+}
 
 /* ===== Auth Gate ===== */
 .auth-loading, .auth-page {
@@ -2028,6 +2029,10 @@ h1, h2, h3, h4, h5, h6 {
 .auth-form label span { font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; font-size: 11px; }
 .auth-form input { padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-tertiary); color: var(--text-primary); font-size: 14px; outline: none; }
 .auth-form input:focus { border-color: var(--text-primary); }
+.auth-password-wrapper { position: relative; display: flex; align-items: center; }
+.auth-password-wrapper input { width: 100%; padding-right: 42px; }
+.auth-password-toggle { position: absolute; right: 10px; background: none; border: none; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; border-radius: var(--radius-sm); transition: color 0.15s ease; }
+.auth-password-toggle:hover { color: var(--text-primary); }
 .auth-hint { font-size: 11px; color: var(--text-muted); }
 .auth-error { padding: 10px 12px; border-radius: var(--radius-sm); background: rgba(248,113,113,0.12); border: 1px solid rgba(248,113,113,0.3); color: #fca5a5; font-size: 13px; }
 .auth-submit { margin-top: 6px; padding: 12px; border-radius: var(--radius-sm); border: none; background: var(--text-primary); color: var(--bg-primary); font-weight: 700; cursor: pointer; font-size: 14px; }
