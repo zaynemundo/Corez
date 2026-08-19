@@ -7,6 +7,7 @@
 // execution through the ToolRegistry pipeline.
 
 import { SessionLog } from './SessionLog.js';
+import { BlockAssembler } from '../llm/BlockAssembler.js';
 
 export class Inbox {
   constructor(sessionLog, { onSpliced } = {}) {

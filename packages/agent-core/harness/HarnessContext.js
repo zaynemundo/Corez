@@ -45,7 +45,14 @@ export class HarnessContext {
     if (!this._parent) {
       if (this.toolRegistry) this._services.set('tools', this.toolRegistry);
       if (this.sessionManager) this._services.set('sessions', this.sessionManager);
-      if (this.providerChain) this._services.set('llm', this.providerChain);
+      if (this.providerChain) {
+        // DSH: llm seam is a Service Definition with adapter seam — wrap ProviderChain in LlmService
+        const llmService = options.llmService || new LlmService({ providerChain: this.providerChain });
+        this.llmService = llmService;
+        this._services.set('llm', llmService);
+      } else if (options.llmService) {
+        this._services.set('llm', options.llmService);
+      }
       if (this.systemPrompt) this._services.set('systemPrompt', this.systemPrompt);
       if (this.fsProvider) this._services.set('fs', this.fsProvider);
       if (this.shellProvider) this._services.set('shell', this.shellProvider);
