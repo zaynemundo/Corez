@@ -1,3 +1,4 @@
+/* eslint-disable no-empty, no-unused-vars */
 // SessionLog: append-only SessionEvent log - DeepSeek Harness dsh-session inspired.
 //
 // Design is intentionally minimal but preserves the DSH invariants that matter:

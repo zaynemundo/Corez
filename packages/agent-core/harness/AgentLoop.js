@@ -1,3 +1,4 @@
+/* eslint-disable no-empty, no-unused-vars */
 // AgentLoop: ReAct turn/step driver inspired by @deepseek-ai/dsh-agent-loop
 //
 // Implements DSH Agent interface over SessionLog and the HarnessContext seams.

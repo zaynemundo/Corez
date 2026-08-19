@@ -103,6 +103,7 @@ $Task
         $effectiveTask = @"
 You are MiMo V2.5, a subordinate specialist working on a task explicitly authorised by DeepSeek V4 Flash.
 Modify only the files and scope named below. Do not access secrets, environment files, or credentials.
+You MUST test before saying its done: after making changes, run verification commands (git diff --check, npm run build, npm test with a relevant filter) and report their exit codes and evidence. Call the finalize_task tool with constraints/reviewFindings evidence only after verification succeeds. The harness blocks completion when verification is missing.
 Report every file changed and every verification command run. Stop if the scope is ambiguous.
 
 AUTHORISED TASK:
@@ -201,6 +202,66 @@ if ($agyExitCode -ne 0) {
 }
 if ([string]::IsNullOrWhiteSpace($agyOutputText) -or $agyOutputText -match 'no output produced') {
     throw "AGY did not produce a usable response. Output was preserved at '$OutputPath'. SessionLog: $sessionLogPath"
+}
+
+# --- Verification gate: agy must test before saying its done (Implement only) ---
+if ($Mode -eq 'Implement') {
+    Write-Host "Verification: agy must test before saying its done — running checks..." -ForegroundColor Cyan
+    $verifyFailed = $false
+    $verifyLog = "$OutputPath.verify.log"
+    "" | Set-Content -Path $verifyLog -Encoding UTF8
+    # 1) git diff --check
+    Write-Host "-> git diff --check"
+    $diffCheck = (& git diff --check 2>&1 | Out-String)
+    $diffCheck | Add-Content -Path $verifyLog
+    $diffCheck | Add-Content -Path $OutputPath
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "FAIL: git diff --check found issues" -ForegroundColor Red
+        "FAIL: git diff --check found issues" | Add-Content -Path $verifyLog
+        $verifyFailed = $true
+    }
+    # 2) build
+    Write-Host "-> npm run build"
+    $buildOut = (& npm run build 2>&1 | Out-String)
+    $buildOut | Add-Content -Path $verifyLog
+    $buildOut | Add-Content -Path $OutputPath
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "FAIL: npm run build failed" -ForegroundColor Red
+        "FAIL: npm run build failed" | Add-Content -Path $verifyLog
+        $verifyFailed = $true
+    }
+    # 3) focused tests
+    Write-Host "-> npm run test (harness verification)"
+    $testOut = (& npm run test -- --run tests/harness-lite.test.js tests/agent-harness.test.js tests/session-forking.test.js 2>&1 | Out-String)
+    $testOut | Add-Content -Path $verifyLog
+    $testOut | Add-Content -Path $OutputPath
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "FAIL: harness verification tests failed" -ForegroundColor Red
+        "FAIL: harness verification tests failed" | Add-Content -Path $verifyLog
+        $verifyFailed = $true
+    }
+    # 4) wrapper contract
+    Write-Host "-> bash tests/agy-wrapper-contract.sh"
+    $contractOut = (& bash tests/agy-wrapper-contract.sh 2>&1 | Out-String)
+    $contractOut | Add-Content -Path $verifyLog
+    $contractOut | Add-Content -Path $OutputPath
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "FAIL: agy wrapper contract failed" -ForegroundColor Red
+        "FAIL: agy wrapper contract failed" | Add-Content -Path $verifyLog
+        $verifyFailed = $true
+    }
+    # record evidence into session log
+    try {
+        $vfyContent = (Get-Content $verifyLog -Raw -ErrorAction SilentlyContinue)
+        if (-not $vfyContent) { $vfyContent = "no output" }
+        $vfyContent = $vfyContent.Substring(0, [Math]::Min(6000, $vfyContent.Length))
+        $vfyEvent = @{ type = 'tool/result'; seq = 8; time = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds(); data = @{ turn = 1; step = 1; message = @{ role = 'tool'; tool_call_id = 'verify'; content = $vfyContent } }; surfaceOp = 'append' } | ConvertTo-Json -Compress
+        Add-Content -Path $sessionLogPath -Value $vfyEvent -Encoding UTF8
+    } catch {}
+    if ($verifyFailed) {
+        throw "Verification failed — agy must test before saying its done. See $verifyLog and $OutputPath. SessionLog: $sessionLogPath. Missing: build/tests must succeed after file changes."
+    }
+    Write-Host "Verification passed — build/tests/diff-check succeeded." -ForegroundColor Green
 }
 
 Write-Host "AGY completed. Review its output at: $OutputPath SessionLog: $sessionLogPath"

@@ -9,3 +9,4 @@ export { SessionLog, SESSION_FORMAT_VERSION } from './SessionLog.js';
 export { AgentLoop, Inbox } from './AgentLoop.js';
 export { HarnessContext } from './HarnessContext.js';
 export { ProfileRegistry } from './ProfileRegistry.js';
+export { verifyTaskCompletion, runLiveVerification } from './VerificationGate.js';

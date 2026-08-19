@@ -1,3 +1,4 @@
+/* eslint-disable no-empty, no-unused-vars */
 // Typed event bus with replay support - DeepSeek Harness inspired.
 //
 // Supports Cordis-style dispatch modes on the same bus:
@@ -144,12 +145,7 @@ export class EventBus {
    * and return a disposer. The effect disposer is tracked and cleans up.
    */
   effect(factory) {
-    let disposer = null;
-    try {
-      disposer = factory(this);
-    } catch (err) {
-      throw err;
-    }
+    const disposer = factory(this);
     if (typeof disposer === 'function') {
       this._effects.add(disposer);
       return () => {

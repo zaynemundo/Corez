@@ -119,6 +119,7 @@ $TASK"
         AGY_MODE="accept-edits"
         EFFECTIVE_TASK="You are MiMo V2.5, a subordinate specialist working on a task explicitly authorised by DeepSeek V4 Flash.
 Modify only the files and scope named below. Do not access secrets, environment files, or credentials.
+You MUST test before saying its done: after making changes, run verification commands (git diff --check, npm run build, npm test with a relevant filter) and report their exit codes and evidence. Call the finalize_task tool with constraints/reviewFindings evidence only after verification succeeds. The harness blocks completion when verification is missing.
 Report every file changed and every verification command run. Stop if the scope is ambiguous.
 
 AUTHORISED TASK:
@@ -198,6 +199,49 @@ if [[ -z "$AGY_OUTPUT_TEXT" || "$AGY_OUTPUT_TEXT" == *"no output produced"* ]]; 
     echo "ERROR: AGY did not produce a usable response. Output was preserved at '$OUTPUT_PATH'. SessionLog: $SESSION_LOG_PATH" >&2
     rm -f "$AGY_LOG_PATH"
     exit 1
+fi
+
+# --- Verification gate: agy must test before saying its done (Implement only) ---
+if [[ "$MODE" == "Implement" ]]; then
+    echo "Verification: agy must test before saying its done — running checks..." >&2
+    VERIFY_FAILED=0
+    VERIFY_LOG="$OUTPUT_PATH.verify.log"
+    : > "$VERIFY_LOG"
+    # 1) git diff --check (whitespace / conflict markers)
+    echo "-> git diff --check" | tee -a "$VERIFY_LOG" >&2
+    if ! git diff --check 2>&1 | tee -a "$VERIFY_LOG"; then
+        echo "FAIL: git diff --check found issues" | tee -a "$VERIFY_LOG" >&2
+        VERIFY_FAILED=1
+    fi
+    # 2) build (vite build)
+    echo "-> npm run build" | tee -a "$VERIFY_LOG" >&2
+    if ! npm run build 2>&1 | tee -a "$VERIFY_LOG"; then
+        echo "FAIL: npm run build failed" | tee -a "$VERIFY_LOG" >&2
+        VERIFY_FAILED=1
+    fi
+    # 3) relevant tests (quick harness + project-state). Full suite is heavy; delegate runs focused subset.
+    # If the agy output mentions a specific file, we also run that file's tests when present.
+    echo "-> npm run test -- --run tests/harness-lite.test.js tests/agent-harness.test.js tests/session-forking.test.js tests/agy-wrapper-contract.sh" | tee -a "$VERIFY_LOG" >&2
+    if ! npm run test -- --run tests/harness-lite.test.js tests/agent-harness.test.js tests/session-forking.test.js 2>&1 | tee -a "$VERIFY_LOG"; then
+        echo "FAIL: harness verification tests failed" | tee -a "$VERIFY_LOG" >&2
+        VERIFY_FAILED=1
+    fi
+    if ! bash tests/agy-wrapper-contract.sh 2>&1 | tee -a "$VERIFY_LOG"; then
+        echo "FAIL: agy wrapper contract failed" | tee -a "$VERIFY_LOG" >&2
+        VERIFY_FAILED=1
+    fi
+    # append evidence to session log and main output
+    cat "$VERIFY_LOG" >> "$OUTPUT_PATH" || true
+    TS_VFY=$(date +%s%3N 2>/dev/null || date +%s000)
+    ESCAPED_VFY=$(head -c 6000 "$VERIFY_LOG" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))' 2>/dev/null || printf '""')
+    printf '%s\n' "{\"type\":\"tool/result\",\"seq\":8,\"time\":$TS_VFY,\"data\":{\"turn\":1,\"step\":1,\"message\":{\"role\":\"tool\",\"tool_call_id\":\"verify\",\"content\":$ESCAPED_VFY}},\"surfaceOp\":\"append\"}" >> "$SESSION_LOG_PATH" || true
+    if [[ $VERIFY_FAILED -ne 0 ]]; then
+        echo "ERROR: Verification failed — agy must test before saying its done. See $VERIFY_LOG and $OUTPUT_PATH. SessionLog: $SESSION_LOG_PATH" >&2
+        echo "Missing: run_build and run_tests must succeed after file changes. Re-run the failed checks and ensure they pass before marking done." >> "$OUTPUT_PATH"
+        rm -f "$AGY_LOG_PATH"
+        exit 1
+    fi
+    echo "Verification passed — build/tests/diff-check succeeded." | tee -a "$VERIFY_LOG" >&2
 fi
 
 rm -f "$AGY_LOG_PATH"

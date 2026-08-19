@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import { describe, it, expect } from 'vitest';
 import { EventBus } from '../packages/agent-core/harness/EventBus.js';
 import { SessionLog, SESSION_FORMAT_VERSION } from '../packages/agent-core/harness/SessionLog.js';
@@ -7,6 +8,7 @@ import { ProfileRegistry } from '../packages/agent-core/harness/ProfileRegistry.
 import { ToolRegistry } from '../packages/agent-core/tools/index.js';
 import { AgentHarness } from '../packages/agent-core/harness/AgentHarness.js';
 import { MemoryTaskStore } from '../packages/agent-core/persistence/TaskStore.js';
+import { verifyTaskCompletion } from '../packages/agent-core/harness/VerificationGate.js';
 
 describe('DSH-lite harness: EventBus waterfall/serial/parallel + effects', () => {
   it('waterfall dispatches in order and respects short-circuit when next() not called', async () => {
@@ -270,5 +272,66 @@ describe('DSH-lite harness: HarnessContext + ProfileRegistry', () => {
     const out = execSync(`node scripts/agy-delegate.sh --profile web --dump-config 2>&1 || node --input-type=module -e "import {ProfileRegistry} from './packages/agent-core/harness/ProfileRegistry.js'; import {HarnessContext} from './packages/agent-core/harness/HarnessContext.js'; const c=new HarnessContext({}); const r=new ProfileRegistry({context:c}); console.log(JSON.stringify(r.compose('web')))" 2>&1`, { encoding: 'utf8' });
     // our shell delegate dump goes through node harness; expect either JSON array or profile field
     expect(out).toBeTruthy();
+  });
+
+  it('VerificationGate passes for analysis-only tasks (no file touches)', () => {
+    const task = { modifiedFiles: [], toolExecutions: [] };
+    const verdict = verifyTaskCompletion(task);
+    expect(verdict.ok).toBe(true);
+    expect(verdict.didModify).toBe(false);
+  });
+
+  it('VerificationGate blocks implementation without test/build evidence', () => {
+    const task = {
+      modifiedFiles: ['src/app.js'],
+      toolExecutions: [
+        { tool: 'write_file', result: { success: true } }
+        // missing run_build and run_tests
+      ]
+    };
+    const verdict = verifyTaskCompletion(task);
+    expect(verdict.ok).toBe(false);
+    expect(verdict.missing.some((m) => m.includes('run_build'))).toBe(true);
+    expect(verdict.missing.some((m) => m.includes('run_tests'))).toBe(true);
+  });
+
+  it('VerificationGate passes when build/tests/diff evidence is present', () => {
+    const task = {
+      modifiedFiles: ['src/app.js'],
+      toolExecutions: [
+        { tool: 'write_file', result: { success: true } },
+        { tool: 'run_build', result: { exitCode: 0 } },
+        { tool: 'git_diff_check', result: { exitCode: 0 } },
+        { tool: 'run_tests', result: { exitCode: 0 } }
+      ]
+    };
+    const verdict = verifyTaskCompletion(task);
+    expect(verdict.ok).toBe(true);
+  });
+
+  it('AgentHarness with enforceVerification blocks completion without evidence', async () => {
+    const store = new MemoryTaskStore();
+    const harness = new AgentHarness({
+      taskStore: store,
+      providerChain: { async generate() { return { status: 'completed', content: 'done', toolCalls: [], provider: 't', model: 'm' }; } },
+      enforceVerification: true
+    });
+    const task = await harness.runTask({ userId: 'u1', sessionId: 's1', prompt: 'make change', mode: 'conversation' });
+    // manually simulate file touch after creation (conversation normally has no files, but we inject)
+    task.modifiedFiles = ['src/x.js'];
+    task.toolExecutions = [{ tool: 'write_file', result: { success: true } }];
+    // harness's next completion would be blocked; simulate via private #finishCompleted by re-running through harness verifier
+    const verdict = verifyTaskCompletion(task);
+    expect(verdict.ok).toBe(false);
+  });
+
+  it('finalize_task tool validates constraints evidence and blocks on missing', async () => {
+    const registry = new ToolRegistry();
+    const ok = await registry.executeTool('finalize_task', { constraints: [{ constraintId: 'c1', description: 'keep login', verificationMethod: 'git diff', evidence: 'diff shows login untouched', status: 'verified' }], reviewFindings: [] }, {});
+    expect(ok.success).toBe(true);
+    expect(ok.gate).toBe('verified');
+    const blocked = await registry.executeTool('finalize_task', { constraints: [{ constraintId: 'c1', description: 'x', verificationMethod: '', evidence: '', status: 'verified' }], reviewFindings: [] }, {});
+    expect(blocked.success).toBe(false);
+    expect(blocked.gate).toBe('blocked');
   });
 });

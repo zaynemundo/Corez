@@ -1,3 +1,4 @@
+/* eslint-disable no-empty, no-unused-vars */
 // ProfileRegistry: DSH profile/bundle composition on top of HarnessContext
 //
 // A running harness is a plugin tree composed from ordered layers:

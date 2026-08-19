@@ -28,6 +28,7 @@ import { SessionLog } from './SessionLog.js';
 import { AgentLoop } from './AgentLoop.js';
 import { HarnessContext } from './HarnessContext.js';
 import { ProfileRegistry } from './ProfileRegistry.js';
+import { verifyTaskCompletion } from './VerificationGate.js';
 import { ToolRegistry } from '../tools/index.js';
 
 export class AgentHarness {
@@ -76,6 +77,12 @@ export class AgentHarness {
     // Keep default false for test parity; callers can enable via options.enableAgentLoop
     this.enableAgentLoop = options.enableAgentLoop === true || options.harnessMode === 'dsh';
     this.activeProfile = this.profileRegistry.activeProfile?.name || initialProfile;
+    // Verification gate: agy must test before saying its done
+    // When true, any task that touched files must have build/test/diff-check evidence
+    // before it can be marked COMPLETED (checked via VerificationGate).
+    this.enforceVerification = options.enforceVerification === true || options.requireVerification === true;
+    // allow per-task override via task.contract?.requireVerification
+    this.verificationOptions = options.verificationOptions || {};
 
     // Repository-mode delegation target (Node CLI AgentRuntime). Without it,
     // repository tasks are honestly blocked in the browser runtime.
@@ -352,6 +359,23 @@ export class AgentHarness {
       if (signal.aborted) return this.#finishCancelled(task);
       if (result?.success === true || result?.status === 'completed') {
         const response = result?.response || result?.result || 'Task completed.';
+        // Mirror any file activity the runner reports into task state so
+        // verification can inspect it (runner may have touched files via tools)
+        if (Array.isArray(result.modifiedFiles)) task.modifiedFiles = result.modifiedFiles;
+        if (Array.isArray(result.toolExecutions)) task.toolExecutions = result.toolExecutions;
+        // agy must test before saying done — gate here too
+        const needsVerify = this.enforceVerification || task.contract?.requireVerification === true;
+        if (needsVerify) {
+          const verdict = verifyTaskCompletion(task, this.verificationOptions);
+          if (!verdict.ok) {
+            const msg = `Verification failed: agy must test before saying its done. Missing: ${verdict.missing.join('; ')}`;
+            task.markTerminal(TASK_STATUSES.FAILED, null, msg);
+            this.eventBus.emit({ type: 'task.failed', taskId: task.taskId, error: msg, missing: verdict.missing });
+            await this.#persist(task);
+            return task;
+          }
+          this.eventBus.emit({ type: 'task.verified', taskId: task.taskId, evidence: verdict.evidence });
+        }
         task.markTerminal(TASK_STATUSES.COMPLETED, response, null);
         this.eventBus.emit({ type: 'task.completed', taskId: task.taskId, response });
         await this.#persist(task);
@@ -577,6 +601,23 @@ export class AgentHarness {
   }
 
   async #finishCompleted(task, response) {
+    // Verification gate: agy must test before saying its done
+    // Only enforced when the harness was created with enforceVerification
+    // or the task contract opts in. Analysis-only tasks (no file touches) pass
+    // without checks; any workspace modification requires build/test/diff evidence.
+    const needsVerify = this.enforceVerification || task.contract?.requireVerification === true;
+    if (needsVerify) {
+      const verdict = verifyTaskCompletion(task, this.verificationOptions);
+      if (!verdict.ok) {
+        const msg = `Verification failed: agy must test before saying its done. Missing: ${verdict.missing.join('; ')}. Evidence: ${verdict.evidence.join(', ') || 'none'}. Re-run the required checks (run_build, run_tests, git diff --check) and retry.`;
+        task.markTerminal(TASK_STATUSES.FAILED, null, msg);
+        this.eventBus.emit({ type: 'task.failed', taskId: task.taskId, error: msg, missing: verdict.missing });
+        await this.#persist(task);
+        this.cancellations.dispose(task.taskId);
+        return task;
+      }
+      this.eventBus.emit({ type: 'task.verified', taskId: task.taskId, evidence: verdict.evidence });
+    }
     task.markTerminal(TASK_STATUSES.COMPLETED, response, null);
     this.eventBus.emit({ type: 'task.completed', taskId: task.taskId, response });
     await this.#persist(task);
