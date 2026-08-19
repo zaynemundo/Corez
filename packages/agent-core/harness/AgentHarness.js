@@ -29,6 +29,7 @@ import { AgentLoop } from './AgentLoop.js';
 import { HarnessContext } from './HarnessContext.js';
 import { ProfileRegistry } from './ProfileRegistry.js';
 import { verifyTaskCompletion } from './VerificationGate.js';
+import { registerCoreCapabilities } from '../capabilities/index.js';
 import { ToolRegistry } from '../tools/index.js';
 
 export class AgentHarness {
@@ -65,6 +66,15 @@ export class AgentHarness {
       toolRegistry: this.toolRegistry,
       providerChain: this.providerChain
     });
+    // DSH: everything is a plugin — mount core capability seams (fs/shell/subprocess/terminals/subagents/todo/skill/compaction/guard)
+    try {
+      registerCoreCapabilities(this.harnessContext, {
+        cwd: options.cwd || process.cwd(),
+        harness: this,
+        compactionEngine: this.compactionEngine,
+        terminalManager: this.toolRegistry?.terminalManager || null
+      });
+    } catch {}
 
     // Profile composition (web / headless / agy) - DSH layers
     this.profileRegistry = options.profileRegistry || new ProfileRegistry({ context: this.harnessContext, cwd: options.cwd || process.cwd() });
