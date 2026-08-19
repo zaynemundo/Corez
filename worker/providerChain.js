@@ -219,9 +219,15 @@ async function* streamChatEndpoint({ endpoint, key, model, label, messages, sign
               outputTokens: Number(parsed.usage.completion_tokens) || 0
             };
           }
-          const choice = parsed.choices && parsed.choices[0];
+           const choice = parsed.choices && parsed.choices[0];
           if (choice?.finish_reason) finishReason = choice.finish_reason;
           if (choice?.delta) {
+            // Reasoning deltas (reasoning_content / reasoning) are tracked for diagnostics
+            // but never yielded as user-visible content. TTFT measures time to first *content*.
+            const reasoningDelta = extractContentText(choice.delta.reasoning_content || choice.delta.reasoning);
+            if (reasoningDelta && typeof onTtft === 'function' && !ttftEmitted) {
+              // Do not emit TTFT for reasoning-only deltas — wait for real content.
+            }
             const delta = extractContentText(choice.delta.content);
             if (delta) {
               if (!ttftEmitted) {
@@ -232,6 +238,10 @@ async function* streamChatEndpoint({ endpoint, key, model, label, messages, sign
               } else {
                 yield { text: delta };
               }
+            } else if (reasoningDelta) {
+              // Yield internal reasoning signal for diagnostics (not user-visible)
+              // Keep TTFT pending until real content arrives.
+              yield { text: '', reasoning: reasoningDelta };
             }
           }
         }
@@ -404,6 +414,12 @@ export function buildProviderChain(env = {}) {
       idleTimeoutMs,
       timeoutMs: nonstreamTimeoutMs
     });
+    const buildBodyExtra = (options = {}) => {
+      const extra = { ...(options.bodyExtra || {}) };
+      if (options.reasoning) extra.reasoning = options.reasoning;
+      if (Number.isFinite(options.temperature)) extra.temperature = options.temperature;
+      return extra;
+    };
     chain.push({
       id: 'opencode-go',
       label: 'opencode',
@@ -412,6 +428,7 @@ export function buildProviderChain(env = {}) {
         ...callOptions(),
         messages,
         signal: options.signal,
+        bodyExtra: buildBodyExtra(options),
         ...(options.model ? { model: options.model } : {})
       }),
       stream: (messages, options = {}) => streamChatEndpoint({
@@ -419,6 +436,7 @@ export function buildProviderChain(env = {}) {
         messages,
         signal: options.signal,
         onTtft: options.onTtft,
+        bodyExtra: buildBodyExtra(options),
         ...(options.model ? { model: options.model } : {})
       })
     });
@@ -436,6 +454,18 @@ export function buildProviderChain(env = {}) {
       idleTimeoutMs,
       timeoutMs: nonstreamTimeoutMs
     });
+    const buildCallBodyExtra = (options = {}) => {
+      const extra = { stream: false, ...(options.bodyExtra || {}) };
+      if (options.reasoning) extra.reasoning = options.reasoning;
+      if (Number.isFinite(options.temperature)) extra.temperature = options.temperature;
+      return extra;
+    };
+    const buildStreamBodyExtra = (options = {}) => {
+      const extra = { ...(options.bodyExtra || {}) };
+      if (options.reasoning) extra.reasoning = options.reasoning;
+      if (Number.isFinite(options.temperature)) extra.temperature = options.temperature;
+      return extra;
+    };
     chain.push({
       id: 'deepseek',
       label: 'deepseek',
@@ -444,7 +474,7 @@ export function buildProviderChain(env = {}) {
         ...callOptions(),
         messages,
         signal: options.signal,
-        bodyExtra: { stream: false },
+        bodyExtra: buildCallBodyExtra(options),
         ...(options.model ? { model: options.model } : {})
       }),
       stream: (messages, options = {}) => streamChatEndpoint({
@@ -452,6 +482,7 @@ export function buildProviderChain(env = {}) {
         messages,
         signal: options.signal,
         onTtft: options.onTtft,
+        bodyExtra: buildStreamBodyExtra(options),
         ...(options.model ? { model: options.model } : {})
       })
     });
@@ -470,6 +501,12 @@ export function buildProviderChain(env = {}) {
       idleTimeoutMs,
       timeoutMs: nonstreamTimeoutMs
     });
+    const buildBodyExtra = (options = {}) => {
+      const extra = { ...(options.bodyExtra || {}) };
+      if (options.reasoning) extra.reasoning = options.reasoning;
+      if (Number.isFinite(options.temperature)) extra.temperature = options.temperature;
+      return extra;
+    };
     chain.push({
       id: 'openrouter',
       label: 'openrouter',
@@ -478,6 +515,7 @@ export function buildProviderChain(env = {}) {
         ...callOptions(),
         messages,
         signal: options.signal,
+        bodyExtra: buildBodyExtra(options),
         ...(options.model ? { model: options.model } : {})
       }),
       stream: (messages, options = {}) => streamChatEndpoint({
@@ -485,6 +523,7 @@ export function buildProviderChain(env = {}) {
         messages,
         signal: options.signal,
         onTtft: options.onTtft,
+        bodyExtra: buildBodyExtra(options),
         ...(options.model ? { model: options.model } : {})
       })
     });
@@ -504,10 +543,11 @@ export function buildProviderChain(env = {}) {
  * of failing with a 502.
  *
  * Options: { env, signal, sleep, clock, jitter, store, maxRequestRetryMs,
- * taskHash, taskId, model } — sleep/clock/jitter are injectable for
+ * taskHash, taskId, model, reasoning, temperature, bodyExtra } — sleep/clock/jitter are injectable for
  * deterministic tests. `model` overrides the provider's configured model for
- * this call (e.g. the harness build phase pins muse-spark-1.2). Every request is
- * uncapped: the provider decides how long it generates, and no output
+ * this call (e.g. the harness build phase pins muse-spark-1.2). `reasoning`
+ * and `temperature` are forwarded as body fields for reasoning models (Muse Spark 1.2).
+ * Every request is uncapped: the provider decides how long it generates, and no output
  * ceiling is ever sent.
  */
 export async function runProviderChain(messages, options = {}) {
@@ -566,7 +606,7 @@ export async function runProviderChain(messages, options = {}) {
       }
     }
 
-    let result = await provider.call(messages, { signal, attempt, model: options.model });
+    let result = await provider.call(messages, { signal, attempt, model: options.model, reasoning: options.reasoning, temperature: options.temperature, bodyExtra: options.bodyExtra });
 
     while (result?.failure) {
       const cls = result.classified || classifyProviderFailure(result.failure);
@@ -622,7 +662,7 @@ export async function runProviderChain(messages, options = {}) {
 
       await sleepInterruptible(backoffMs, signal, sleep);
       if (signal?.aborted) return { taskId, status: 'cancelled' };
-      result = await provider.call(messages, { signal, attempt, model: options.model });
+      result = await provider.call(messages, { signal, attempt, model: options.model, reasoning: options.reasoning, temperature: options.temperature, bodyExtra: options.bodyExtra });
     }
 
     if (result?.content) {
@@ -686,6 +726,9 @@ export function runStreamingChain(messages, options = {}) {
   // own model): applied to whichever provider serves the request, and
   // reported in meta/done events instead of the provider's default model.
   const model = options.model || null;
+  const reasoning = options.reasoning || null;
+  const temperature = Number.isFinite(options.temperature) ? options.temperature : null;
+  const bodyExtra = options.bodyExtra || null;
 
   const startedAt = clock();
   const providers = buildProviderChain(env);
@@ -712,7 +755,10 @@ export function runStreamingChain(messages, options = {}) {
             const iter = provider.stream(msgs, {
               signal,
               onTtft: (ms) => { ttftHolder.ms = ttftHolder.ms || ms; },
-              model
+              model,
+              reasoning,
+              temperature,
+              bodyExtra
             });
             let text = '';
             let usage = null;

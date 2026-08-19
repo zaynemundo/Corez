@@ -20,11 +20,13 @@ export class ModelProviderRouter {
     }));
   }
 
-  async generate({ model = this.defaultModel, messages = [], tools = [], _reasoning = 'high', signal }) {
+  async generate({ model = this.defaultModel, messages = [], tools = [], reasoning = { effort: 'high', exclude: true }, temperature = 0.42, signal }) {
     const activeKey = this.opencodeApiKey;
 
     // If the API key is present, execute HTTP request against OpenCode Go
     // (the only configured provider; direct OpenRouter integration removed).
+    // Muse Spark 1.2 benefits from hidden reasoning: high effort for complex
+    // tasks, medium for general, low for trivial — all excluded from output.
     if (activeKey) {
       try {
         const endpoint = 'https://opencode.ai/zen/go/v1/chat/completions';
@@ -33,7 +35,8 @@ export class ModelProviderRouter {
           model,
           messages,
           tools: tools.length > 0 ? tools : undefined,
-          temperature: 0.2
+          temperature: Number.isFinite(temperature) ? temperature : 0.42,
+          reasoning: reasoning && typeof reasoning === 'object' ? reasoning : { effort: String(reasoning || 'high'), exclude: true }
         };
 
         const res = await fetch(endpoint, {

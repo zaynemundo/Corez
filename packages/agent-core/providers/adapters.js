@@ -151,12 +151,14 @@ export class ProviderAdapter {
     this.configured = Boolean(this.apiKey);
   }
 
-  buildBody({ model, messages, tools }) {
+  buildBody({ model, messages, tools, reasoning, temperature }) {
     const body = {
       model: model || this.defaultModel,
       messages,
-      temperature: 0.2
+      temperature: Number.isFinite(temperature) ? temperature : 0.42
     };
+    if (reasoning && typeof reasoning === 'object') body.reasoning = reasoning;
+    else if (reasoning) body.reasoning = { effort: String(reasoning), exclude: true };
     if (Array.isArray(tools) && tools.length > 0) body.tools = tools;
     return body;
   }
@@ -171,14 +173,14 @@ export class ProviderAdapter {
     return headers;
   }
 
-  async generate({ model, messages, tools, signal }) {
+  async generate({ model, messages, tools, signal, reasoning, temperature }) {
     if (!this.configured) {
       return { ok: false, status: null, detail: `${this.id} is not configured` };
     }
     return requestProvider({
       endpoint: this.endpoint,
       headers: this.buildHeaders(),
-      body: this.buildBody({ model, messages, tools }),
+      body: this.buildBody({ model, messages, tools, reasoning, temperature }),
       signal
     });
   }
@@ -216,6 +218,10 @@ export class DeepSeekAdapter extends ProviderAdapter {
 
   buildBody(options) {
     return { ...super.buildBody(options), stream: false };
+  }
+
+  async generate(options = {}) {
+    return super.generate(options);
   }
 }
 

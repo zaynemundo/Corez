@@ -161,8 +161,8 @@ describe('AI response speed optimizations', () => {
     expect(inspirationFetch).toHaveBeenCalledTimes(1);
   });
 
-  it('routes both simple and complex requests to OpenCode Go with no artificial reasoning-effort caps', async () => {
-    // General (explanation) request: fast path with a capped output.
+  it('routes both simple and complex requests to OpenCode Go with adaptive reasoning effort and no output-token caps', async () => {
+    // General (explanation) request: low reasoning effort for speed, uncapped output.
     let generalPayload = null;
     vi.stubGlobal('fetch', vi.fn(async (url, init) => {
       expect(url).toBe(OPENCODE_URL);
@@ -178,14 +178,14 @@ describe('AI response speed optimizations', () => {
 
     expect(generalPayload).not.toBeNull();
     expect(generalPayload.model).toBe('muse-spark-1.2');
-    expect(generalPayload.reasoning).toBeUndefined();
+    expect(generalPayload.reasoning).toEqual({ effort: 'low', exclude: true });
+    expect(generalPayload.temperature).toBeDefined();
     expect(generalPayload.max_completion_tokens).toBeUndefined();
     // No output-token caps anywhere: general answers run uncapped so
     // reasoning models can think as long as they need.
     expect(generalPayload.max_tokens).toBeUndefined();
 
-    // Complex app request: NO output-token cap and no reasoning-effort cap —
-    // the model decides how much reasoning/output the task needs.
+    // Complex app request: high reasoning effort for thoroughness, still uncapped.
     let complexPayload = null;
     vi.stubGlobal('fetch', vi.fn(async (url, init) => {
       expect(url).toBe(OPENCODE_URL);
@@ -201,7 +201,8 @@ describe('AI response speed optimizations', () => {
 
     expect(complexPayload).not.toBeNull();
     expect(complexPayload.model).toBe('muse-spark-1.2');
-    expect(complexPayload.reasoning).toBeUndefined();
+    expect(complexPayload.reasoning).toEqual({ effort: 'high', exclude: true });
+    expect(complexPayload.temperature).toBeDefined();
     expect(complexPayload.max_tokens).toBeUndefined();
     expect(complexPayload.max_completion_tokens).toBeUndefined();
   });

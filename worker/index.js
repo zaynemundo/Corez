@@ -4,7 +4,7 @@ import { fetchAwwwardsInspiration, handleInspiration } from './inspiration.js';
 import { safeErrorDetail, readBoundedJson, jsonResponse, createTaskStateStore, createRateLimiter, estimateCostUsd } from './utils.js';
 import { runProviderChain, runStreamingChain, callOpenRouterImage } from './providerChain.js';
 import { runCreationHarness } from './harness.js';
-import { selectModelForRequest } from './modelRouter.js';
+import { selectModelForRequest, selectReasoningConfig } from './modelRouter.js';
 import { processResponse, detectTruncation, stitchContinuationChunk, CONTINUATION_INSTRUCTION, ANTI_REPEAT_CONTINUATION_INSTRUCTION } from './responseProcessor.js';
 import {
   parseProjectState,
@@ -392,7 +392,7 @@ EMAIL FORMATTING (whenever the user asks you to write, draft, compose, or rewrit
     ? `- CREATORS: If asked who created Corez or who made you, answer that Corez was founded and developed by these people, presenting their names as a clean bullet-point list of clickable markdown links with their roles: [Zayne Mundo](https://www.linkedin.com/in/zayne-mundo/) — Founder & Lead Developer, [Christian Vestil](https://www.linkedin.com/in/christian-jericson-belderol/) — Quality Assurance Tester, and [Renz Cardona](https://www.linkedin.com/in/renz-cardona-5941051b9/) — Chief Innovation Officer. Then explain WHY Corez was created, presenting the answer as clean, scannable markdown: start with the creator list, then the mission statement, then a short idea-to-launch summary. CoreZ was created as a conversational AI creation platform that helps people turn ideas into working digital products without needing to code. Rather than only answering questions, it is designed to understand the user's intent, generate websites, apps, games, tools, images, research reports and other content, display the result in a live preview, allow revisions through chat and publish finished creations through a shareable link. Its core purpose is to remove the technical gap between having an idea and launching something functional, making digital creation accessible to designers, marketers, entrepreneurs, students and everyday users. In short, CoreZ turns plain conversation into creation — taking anyone from a first spark of an idea to a finished, shareable product. Do not introduce yourself or list your capabilities after answering, and never mention APIs, models, providers, or any technical backend details.`
     : `- CREATORS: If asked who created Corez, present the founders as clickable markdown links — [Zayne Mundo](https://www.linkedin.com/in/zayne-mundo/) (Founder & Lead Developer), [Christian Vestil](https://www.linkedin.com/in/christian-jericson-belderol/) (Quality Assurance Tester), [Renz Cardona](https://www.linkedin.com/in/renz-cardona-5941051b9/) (Chief Innovation Officer) — and briefly explain why Corez was created.`;
 
-  return `You are COREZ AI.
+  return `You are COREZ AI — powered by Muse Spark 1.2 for deep reasoning and high-quality generation.
 
 Identity & Persona:
 - Your name is COREZ AI.
@@ -400,6 +400,12 @@ ${creatorsSection}
 - STRICT MODEL ANONYMITY RULE: NEVER mention what underlying AI model, provider, vendor, architecture, or engine powers you in public chat or user responses. Always identify yourself strictly as COREZ AI.
 - When greeted with simple phrases like "hi", "hello", "hey", or "who are you", respond simply: "Hello! I'm COREZ AI. How can I help you today?"
 - Never list bullet points or technical specializations when giving greetings unless requested.
+
+Reasoning & Response Quality (Muse Spark 1.2 — hidden chain-of-thought):
+- Think step by step INTERNALLY before answering: decompose the problem, consider alternatives and edge cases, plan the structure, and verify logic. Do NOT reveal your thinking, do NOT use <think> or <thinking> tags, do NOT say "I am thinking step by step" — just deliver the final polished answer.
+- Be thorough and accurate: for factual/live data, cite sources from the provided search results; for code/apps, deliver complete, runnable code with no placeholder TODOs, handle edge cases, and include clear verification steps.
+- For complex or high-stakes requests (apps, games, research, data analysis), ensure deep reasoning: check requirements against the deliverable, validate completeness, and anticipate follow-up needs.
+- Prefer concise but complete explanations: use tables for comparisons, bold lead-ins for bullets, and an actionable closing section. Every sentence must carry information; avoid filler, emojis, or generic closers.
 
 Guidelines for Output:
 - FOLLOW THE USER'S REQUEST EXACTLY: deliver precisely what the user asked for — implement everything they requested and add nothing they did not ask for. When the user's instruction conflicts with any default or template behaviour, the user's explicit instruction wins.
@@ -724,6 +730,15 @@ async function handleAi(request, env) {
     skills,
     messages: body.messages
   }, env);
+  const selectedReasoning = selectReasoningConfig({
+    prompt: executionPrompt || prompt,
+    intent,
+    fineIntent,
+    skills,
+    messages: body.messages,
+    complexity: body.complexity || intent?.complexity,
+    primaryIntent: intent?.primaryIntent || fineIntent?.primaryIntent
+  }, env);
 
   // Creation Harness: plan -> build -> verify -> repair -> review, with
   // durable R2 state so a disconnected build resumes. Replaces the single
@@ -748,7 +763,9 @@ async function handleAi(request, env) {
       store: createTaskStateStore(env),
       sleep: retrySleepFor(env),
       complexity: body.complexity,
-      model: selectedModel
+      model: selectedModel,
+      reasoning: selectedReasoning.reasoning,
+      temperature: selectedReasoning.temperature
     };
     if (body.stream === true) {
       // Streaming harness: SSE events (phase/delta/done) keep the client
@@ -828,7 +845,9 @@ async function handleAi(request, env) {
     const chainOptions = {
       env,
       signal: clientDisconnectSignal,
-      model: selectedModel
+      model: selectedModel,
+      reasoning: selectedReasoning.reasoning,
+      temperature: selectedReasoning.temperature
     };
     const encoder = new TextEncoder();
     const sse = (event) => `data: ${JSON.stringify(event)}\n\n`;
@@ -925,6 +944,9 @@ async function handleAi(request, env) {
                     signal: clientDisconnectSignal,
                     store: createTaskStateStore(env),
                     sleep: retrySleepFor(env),
+                    model: selectedModel,
+                    reasoning: selectedReasoning.reasoning,
+                    temperature: selectedReasoning.temperature
                   });
                   if (repaired?.usage) repairUsage.push(repaired.usage);
                   return repaired.content ? repaired : null;
@@ -1076,7 +1098,9 @@ async function handleAi(request, env) {
     signal: clientDisconnectSignal,
     store: createTaskStateStore(env),
     sleep: retrySleepFor(env),
-    model: selectedModel
+    model: selectedModel,
+    reasoning: selectedReasoning.reasoning,
+    temperature: selectedReasoning.temperature
   });
   const providerMs = Date.now() - providerStartedAt;
 
@@ -1109,7 +1133,10 @@ async function handleAi(request, env) {
           signal: clientDisconnectSignal,
           store: createTaskStateStore(env),
           sleep: retrySleepFor(env),
-              });
+          model: selectedModel,
+          reasoning: selectedReasoning.reasoning,
+          temperature: selectedReasoning.temperature
+        });
         if (repaired?.usage) repairUsage.push(repaired.usage);
         return repaired.content ? repaired : null;
       },

@@ -8,7 +8,7 @@
 // route; the harness only changes HOW the work is sequenced.
 
 import { runProviderChain, runStreamingChain } from './providerChain.js';
-import { selectModelForRequest } from './modelRouter.js';
+import { selectModelForRequest, selectReasoningConfig } from './modelRouter.js';
 import { verifyCreation, verifySpecCoverage, buildRepairPrompt } from './creationVerifier.js';
 import { estimateCostUsd } from './utils.js';
 import { swarmEnabledFor, runSwarmSpecialists, buildSwarmContext } from './swarm.js';
@@ -57,19 +57,19 @@ const DEFAULT_HARNESS_TIMEOUT_MS = 600_000;
 const DEFAULT_BUILD_CHECKPOINT_MS = 10_000;
 
 const SPEC_INSTRUCTION =
-  'Produce a concise build specification (max 250 words) for the request below: the purpose, the key screens or features, controls (for games), and confirmation that the deliverable is ONE self-contained HTML file. Do not write any code. Answer directly: do not include internal reasoning or thinking.';
+  'Think step by step internally to identify the complete purpose, key screens/features, controls (for games), and deliverable constraints, then Produce a concise build specification (max 250 words) for the request below. State the purpose, the key screens or features, controls (for games), and confirmation that the deliverable is ONE self-contained HTML file. Do not write any code. Answer directly with the spec only: do not include internal reasoning, thinking, or <think> blocks.';
 
-// The planning call uses a COMPACT system prompt instead of the full
+ // The planning call uses a COMPACT system prompt instead of the full
 // identity/formatting prompt. The spec is a 250-word internal brief that
 // needs none of the chat-facing guidance, and OpenCode Go's non-stream
 // endpoint was observed hanging/timing out on long system prompts — a
 // compact prompt makes planning both faster and reliable, and saves ~1600
 // input tokens per build.
 const SPEC_SYSTEM_PROMPT =
-  'You are COREZ AI, an AI creation platform that builds websites, apps, and games. Answer directly with the requested output only.';
+  'You are COREZ AI, an AI creation platform that builds websites, apps, and games. Think step by step internally, then answer directly with the requested output only. Do not reveal your thinking or use <think> tags.';
 
 const REVIEW_INSTRUCTION =
-  'You are the final reviewer of a finished artifact. Check it for FUNCTIONAL correctness only: does it run, are the core interactions wired up (buttons, controls, game loop, navigation), is any essential feature missing or visibly broken? Reply with ONLY a single line: either "APPROVED" or "NEEDS_FIX: <one sentence describing the functional defect>". Answer directly: do not include internal reasoning or thinking.';
+  'Think step by step internally to verify functional correctness, then answer. You are the final reviewer of a finished artifact. Check it for FUNCTIONAL correctness only: does it run, are the core interactions wired up (buttons, controls, game loop, navigation), is any essential feature missing or visibly broken? Reply with ONLY a single line: either "APPROVED" or "NEEDS_FIX: <one sentence describing the functional defect>". Do not include internal reasoning or thinking.';
 
 export function harnessTaskId(prompt, primaryIntent) {
   const seed = `${primaryIntent}|${String(prompt || '').trim()}`;
@@ -150,6 +150,10 @@ export async function* runCreationHarness(options) {
   // as the unified site-wide model. OPENCODE_BUILD_MODEL overrides per
   // deployment and is checked first so it wins for any task type.
   const buildModel = options.model || env?.OPENCODE_BUILD_MODEL || selectModelForRequest({ prompt, primaryIntent, complexity }, env);
+  // Reasoning config: harness computes complexity-aware reasoning & temperature
+  // so Muse Spark 1.2 can think thoroughly for builds but cheaply for trivial.
+  const buildReasoning = options.reasoning || selectReasoningConfig({ prompt, primaryIntent, complexity }, env).reasoning;
+  const buildTemperature = Number.isFinite(options.temperature) ? options.temperature : selectReasoningConfig({ prompt, primaryIntent, complexity }, env).temperature;
 
   // Fast path: game requests ALWAYS take the lighter path — game creation is
   // deliberately basic: the user prompt serves as the spec (no planning
@@ -305,7 +309,9 @@ export async function* runCreationHarness(options) {
         signal,
         store: null,
         sleep,
-        maxRequestRetryMs: specTimeoutMs
+        maxRequestRetryMs: specTimeoutMs,
+        reasoning: { effort: 'high', exclude: true },
+        temperature: 0.25
       });
       if (signal?.aborted || specResult?.status === 'cancelled') {
         state.busy = false;
@@ -432,7 +438,7 @@ export async function* runCreationHarness(options) {
       let lastDeltaFlush = 0;
       let lastCheckpointAt = 0;
       try {
-        for await (const event of runStreamingChain(buildMessages, { env, signal, model: buildModel })) {
+        for await (const event of runStreamingChain(buildMessages, { env, signal, model: buildModel, reasoning: buildReasoning, temperature: buildTemperature })) {
           if (event.type === 'delta') {
             collected += event.text;
             deltaBuffer += event.text;
@@ -519,7 +525,7 @@ export async function* runCreationHarness(options) {
 
         let continuationChunk = '';
         try {
-          for await (const event of runStreamingChain(continuationMessages, { env, signal, model: buildModel })) {
+          for await (const event of runStreamingChain(continuationMessages, { env, signal, model: buildModel, reasoning: buildReasoning, temperature: buildTemperature })) {
             if (event.type === 'delta') {
               continuationChunk += event.text;
             } else if (event.type === 'usage' && event.outputTokens) {
@@ -624,7 +630,9 @@ export async function* runCreationHarness(options) {
         env,
         signal,
         store: null,
-        sleep
+        sleep,
+        reasoning: { effort: 'low', exclude: true },
+        temperature: 0.22
       });
       if (signal?.aborted || reviewResult?.status === 'cancelled') {
         state.busy = false;
@@ -667,7 +675,7 @@ export async function* runCreationHarness(options) {
       let collected = '';
       let repairStreamFailed = false;
       try {
-        for await (const event of runStreamingChain(repairMessages, { env, signal })) {
+        for await (const event of runStreamingChain(repairMessages, { env, signal, model: buildModel, reasoning: buildReasoning, temperature: buildTemperature })) {
           if (event.type === 'delta') {
             collected += event.text;
             yield { type: 'delta', text: event.text };

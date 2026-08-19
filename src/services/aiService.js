@@ -2122,7 +2122,7 @@ export function isExplicitImageRequest(prompt) {
   if (/\b(?:css|stylesheet|html|javascript|code|function|component|script)\b/i.test(clean) && !/\b(?:image|picture|photo|illustration|wallpaper|artwork|drawing)\b/i.test(clean)) return false;
 
   const lower = clean.toLowerCase();
-  if (lower.startsWith('image:') || lower.startsWith('flux:') || lower.startsWith('@image')) return true;
+  if (lower.startsWith('image:') || lower.startsWith('flux:') || lower.startsWith('@image') || lower.startsWith('/image') || lower.startsWith('/flux')) return true;
 
   // For multi-line prompts or prompts containing context, test only the first instruction line
   const firstLine = clean.split('\n')[0].trim();

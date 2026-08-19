@@ -202,7 +202,18 @@ async function run() {
     assert.equal(successBody.diagnostics.repaired, false);
     assert.equal(typeof successBody.diagnostics.ttftMs, 'number');
     assert.equal(invocation.payload.model, 'muse-spark-1.2');
-    assert.deepEqual(Object.keys(invocation.payload), ['model', 'messages']);
+    assert.ok(Array.isArray(invocation.payload.messages));
+    assert.ok(['model', 'messages', 'reasoning', 'temperature'].includes(Object.keys(invocation.payload)[0]) || Object.keys(invocation.payload).includes('model'));
+    // Payload must contain model + messages and may include reasoning/temperature for Muse Spark 1.2
+    assert.ok(Object.keys(invocation.payload).includes('model'));
+    assert.ok(Object.keys(invocation.payload).includes('messages'));
+    assert.equal(invocation.payload.max_tokens, undefined);
+    assert.equal(invocation.payload.max_completion_tokens, undefined);
+    if (invocation.payload.reasoning !== undefined) {
+      assert.ok(typeof invocation.payload.reasoning === 'object');
+      assert.ok(['low', 'medium', 'high', 'xhigh'].includes(invocation.payload.reasoning.effort));
+      assert.equal(invocation.payload.reasoning.exclude, true);
+    }
     // The execution prompt (with the Awwwards design spec) reaches the model
     // as the user message instead of the bare prompt.
     assert.equal(invocation.payload.messages[1].content, 'Build a timer\n\n--- Awwwards Visual Design Principles ---\nStyle Target: Luxury Dark Mode');
@@ -227,8 +238,14 @@ async function run() {
     );
     assert.equal(generalResponse.status, 200);
     // No output-token caps anywhere: every request is uncapped so reasoning
-    // models can think as long as they need.
-    assert.deepEqual(Object.keys(generalPayload), ['model', 'messages']);
+    // models can think as long as they need. Reasoning/temperature may be present for Muse Spark 1.2.
+    assert.ok(Object.keys(generalPayload).includes('model'));
+    assert.ok(Object.keys(generalPayload).includes('messages'));
+    assert.equal(generalPayload.max_tokens, undefined);
+    assert.equal(generalPayload.max_completion_tokens, undefined);
+    if (generalPayload.reasoning !== undefined) {
+      assert.ok(['low', 'medium', 'high', 'xhigh'].includes(generalPayload.reasoning.effort));
+    }
     assert.equal(generalPayload.max_tokens, undefined);
     assert.match(generalPayload.messages[0].content, /Adaptive Routing - Fast Path/);
     assert.match(generalPayload.messages[0].content, /Inferred intent: general/);
@@ -270,11 +287,13 @@ async function run() {
       assert.equal(deepseekPayload.max_completion_tokens, undefined);
       assert.ok(Array.isArray(deepseekPayload.messages));
       assert.equal(deepseekPayload.messages.at(-1).content, 'Explain black roses');
-      assert.equal(deepseekPayload.reasoning, undefined);
+      assert.ok(deepseekPayload.reasoning && typeof deepseekPayload.reasoning === 'object');
+      assert.ok(['low', 'medium', 'high', 'xhigh'].includes(deepseekPayload.reasoning.effort));
+      assert.equal(deepseekPayload.reasoning.exclude, true);
       assert.equal(deepseekPayload.provider, undefined);
 
       // With OPENCODE_GO_API_KEY configured, the request succeeds and the
-      // payload carries no provider-specific or reasoning-effort fields.
+      // payload carries reasoning for Muse Spark 1.2 but no provider-specific fields.
       globalThis.fetch = async (url, init) => {
         assert.equal(url, OPENCODE_URL);
         opencodePayload = JSON.parse(init.body);
@@ -299,7 +318,9 @@ async function run() {
       assert.equal(opencodePayload.max_tokens, undefined);
       assert.ok(Array.isArray(opencodePayload.messages));
       assert.equal(opencodePayload.messages.at(-1).content, 'Explain black roses');
-      assert.equal(opencodePayload.reasoning, undefined);
+      assert.ok(opencodePayload.reasoning && typeof opencodePayload.reasoning === 'object');
+      assert.ok(['low', 'medium', 'high', 'xhigh'].includes(opencodePayload.reasoning.effort));
+      assert.equal(opencodePayload.reasoning.exclude, true);
       assert.equal(opencodePayload.provider, undefined);
 
       // Inline <think> blocks in the content field are stripped before the
@@ -381,7 +402,8 @@ async function run() {
         const payload = JSON.parse(init.body);
         capturedPayloads.push(payload);
         assert.equal(payload.model, 'muse-spark-1.2');
-        assert.equal(payload.reasoning, undefined);
+        assert.ok(payload.reasoning && typeof payload.reasoning === 'object');
+        assert.ok(['low', 'medium', 'high', 'xhigh'].includes(payload.reasoning.effort));
         return new Response(JSON.stringify({
           choices: [{ message: { content: 'OpenCode Go preferred response' } }]
         }), {
