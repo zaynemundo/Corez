@@ -11,6 +11,7 @@ import { readBoundedJson, createTaskStateStore, createRateLimiter } from './util
 import { TASK_STATUS_STORE_PREFIX } from './providerChain.js';
 import { handleTaskApi } from './taskApi.js';
 import { handleAuth, verifySession } from './auth.js';
+import { handleChats } from './chats.js';
 export { GameRoom } from './gameRoom.js';
 
 // Per-client AI request rate bound: paid provider tokens are spent on every
@@ -105,8 +106,14 @@ export default {
       'Referrer-Policy': 'no-referrer'
     };
 
+    // Chat routes — handle before generic auth gate so they can use verifySession directly
+    if (url.pathname === '/api/chats' || url.pathname.startsWith('/api/chats/')) {
+      const chatsRes = await handleChats(request, env);
+      if (chatsRes) return withDirectAiCors(chatsRes);
+    }
+
     // Auth gate - protect AI and app APIs when AUTH_SECRET is set
-    const authPaths = ['/api/ai', '/api/image', '/api/apps', '/api/memory', '/api/publish', '/api/assets'];
+    const authPaths = ['/api/ai', '/api/image', '/api/apps', '/api/memory', '/api/publish', '/api/assets', '/api/chats'];
     const needsAuth = authPaths.some(p => url.pathname === p || url.pathname.startsWith(p + '/')) || url.pathname.startsWith('/api/game/');
     if (needsAuth) {
       const sess = await verifySession(request, env);
