@@ -32,38 +32,73 @@ export default function Login() {
 
   const pageRef = useRef(null);
   const bgRef = useRef(null);
+  const orbRef = useRef(null);
+  const spotlightRef = useRef(null);
 
   useEffect(() => {
     const page = pageRef.current;
     const bg = bgRef.current;
+    const orb = orbRef.current;
+    const spot = spotlightRef.current;
     if (!page || !bg) return;
+
     let raf = 0;
     let targetX = 0;
     let targetY = 0;
     let curX = 0;
     let curY = 0;
+    let orbX = 0;
+    let orbY = 0;
+    let orbCurX = 0;
+    let orbCurY = 0;
 
     const onMove = (e) => {
       const rect = page.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / rect.width - 0.5;
-      const y = (e.clientY - rect.top) / rect.height - 0.5;
-      targetX = x * 28;
-      targetY = y * 28;
+      const nx = (e.clientX - rect.left) / rect.width;
+      const ny = (e.clientY - rect.top) / rect.height;
+      const x = nx - 0.5;
+      const y = ny - 0.5;
+
+      targetX = x * 36;
+      targetY = y * 36;
+      orbX = e.clientX;
+      orbY = e.clientY;
+
+      page.style.setProperty('--mx', `${nx * 100}%`);
+      page.style.setProperty('--my', `${ny * 100}%`);
+
+      if (spot) {
+        spot.style.opacity = '1';
+      }
+
       if (!raf) raf = requestAnimationFrame(tick);
     };
+
     const tick = () => {
-      curX += (targetX - curX) * 0.08;
-      curY += (targetY - curY) * 0.08;
-      bg.style.transform = `translate3d(${curX}px, ${curY}px, 0) scale(1.08)`;
-      if (Math.abs(targetX - curX) > 0.05 || Math.abs(targetY - curY) > 0.05) {
+      curX += (targetX - curX) * 0.07;
+      curY += (targetY - curY) * 0.07;
+      orbCurX += (orbX - orbCurX) * 0.12;
+      orbCurY += (orbY - orbCurY) * 0.12;
+
+      const rotY = curX * 0.18;
+      const rotX = -curY * 0.18;
+      bg.style.transform = `perspective(1200px) rotateX(${rotX}deg) rotateY(${rotY}deg) translate3d(${curX}px, ${curY}px, 0) scale(1.12)`;
+
+      if (orb) {
+        orb.style.transform = `translate3d(${orbCurX}px, ${orbCurY}px, 0) translate(-50%, -50%)`;
+      }
+
+      if (Math.abs(targetX - curX) > 0.04 || Math.abs(targetY - curY) > 0.04) {
         raf = requestAnimationFrame(tick);
       } else {
         raf = 0;
       }
     };
+
     const onLeave = () => {
       targetX = 0;
       targetY = 0;
+      if (spot) spot.style.opacity = '0';
       if (!raf) raf = requestAnimationFrame(tick);
     };
 
@@ -79,7 +114,9 @@ export default function Login() {
   return (
     <div className="auth-page" ref={pageRef}>
       <div ref={bgRef} className="auth-bg" style={{ backgroundImage: `url(${mercuryBg})` }} aria-hidden="true" />
+      <div ref={spotlightRef} className="auth-spotlight" aria-hidden="true" />
       <div className="auth-bg-overlay" aria-hidden="true" />
+      <div ref={orbRef} className="auth-orb" aria-hidden="true" />
       <div className="auth-center">
         <div className="auth-card">
         <div className="auth-logo">
