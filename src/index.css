@@ -2017,58 +2017,34 @@ h1, h2, h3, h4, h5, h6 {
   background-color: #000;
   color: var(--text-primary);
   overflow: hidden;
-  perspective: 1200px;
-  --mx: 50%;
-  --my: 50%;
 }
 .auth-bg {
   position: absolute;
-  inset: -40px;
+  inset: 0;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
   background-color: #000;
-  will-change: transform;
-  transform: translate3d(0,0,0) scale(1.12);
-  filter: saturate(1.05) contrast(1.08);
+  filter: saturate(1.03) contrast(1.04) brightness(0.95);
+}
+.auth-water {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.95;
 }
 .auth-bg-overlay {
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(900px circle at var(--mx) var(--my), rgba(255,255,255,0.08), transparent 62%),
-    linear-gradient(180deg, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.62) 100%);
+  background: linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.52) 100%);
   z-index: 1;
-}
-.auth-spotlight {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(680px circle at var(--mx) var(--my), rgba(255,255,255,0.16), rgba(168,85,247,0.06) 28%, transparent 66%);
-  opacity: 0;
-  transition: opacity 0.35s ease;
-  pointer-events: none;
-  z-index: 2;
-  mix-blend-mode: overlay;
-}
-.auth-orb {
-  position: fixed;
-  left: 0;
-  top: 0;
-  width: 520px;
-  height: 520px;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle, rgba(255,255,255,0.09) 0%, rgba(168,85,247,0.13) 18%, rgba(56,189,248,0.09) 36%, transparent 70%);
-  filter: blur(20px);
-  pointer-events: none;
-  z-index: 2;
-  opacity: 0.95;
-  mix-blend-mode: screen;
-  will-change: transform;
 }
 .auth-center {
   position: relative;
-  z-index: 3;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: center;

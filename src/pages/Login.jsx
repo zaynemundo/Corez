@@ -31,92 +31,134 @@ export default function Login() {
   };
 
   const pageRef = useRef(null);
-  const bgRef = useRef(null);
-  const orbRef = useRef(null);
-  const spotlightRef = useRef(null);
+  const waterRef = useRef(null);
 
   useEffect(() => {
     const page = pageRef.current;
-    const bg = bgRef.current;
-    const orb = orbRef.current;
-    const spot = spotlightRef.current;
-    if (!page || !bg) return;
+    const canvas = waterRef.current;
+    if (!page || !canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
     let raf = 0;
-    let targetX = 0;
-    let targetY = 0;
-    let curX = 0;
-    let curY = 0;
-    let orbX = 0;
-    let orbY = 0;
-    let orbCurX = 0;
-    let orbCurY = 0;
+    const ripples = [];
+    let w = 0;
+    let h = 0;
+    let dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-    const onMove = (e) => {
+    const resize = () => {
       const rect = page.getBoundingClientRect();
-      const nx = (e.clientX - rect.left) / rect.width;
-      const ny = (e.clientY - rect.top) / rect.height;
-      const x = nx - 0.5;
-      const y = ny - 0.5;
+      w = rect.width;
+      h = rect.height;
+      canvas.width = Math.floor(w * dpr);
+      canvas.height = Math.floor(h * dpr);
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    resize();
+    window.addEventListener('resize', resize);
 
-      targetX = x * 36;
-      targetY = y * 36;
-      orbX = e.clientX;
-      orbY = e.clientY;
-
-      page.style.setProperty('--mx', `${nx * 100}%`);
-      page.style.setProperty('--my', `${ny * 100}%`);
-
-      if (spot) {
-        spot.style.opacity = '1';
-      }
-
-      if (!raf) raf = requestAnimationFrame(tick);
+    const addRipple = (x, y, big = false) => {
+      ripples.push({
+        x,
+        y,
+        r: 0,
+        maxR: big ? 140 + Math.random() * 40 : 68 + Math.random() * 42,
+        speed: big ? 1.7 : 1.35 + Math.random() * 0.6,
+        opacity: 0.42,
+        line: big ? 1.4 : 1.1,
+      });
+      // second inner ripple for water depth
+      ripples.push({
+        x: x + (Math.random() - 0.5) * 6,
+        y: y + (Math.random() - 0.5) * 6,
+        r: 0,
+        maxR: big ? 86 : 38,
+        speed: big ? 1.1 : 0.95,
+        opacity: 0.22,
+        line: 0.9,
+      });
+      if (!raf) raf = requestAnimationFrame(draw);
     };
 
-    const tick = () => {
-      curX += (targetX - curX) * 0.07;
-      curY += (targetY - curY) * 0.07;
-      orbCurX += (orbX - orbCurX) * 0.12;
-      orbCurY += (orbY - orbCurY) * 0.12;
+    // auto gentle ripples like water surface
+    const autoTimer = setInterval(() => {
+      if (ripples.length > 12) return;
+      addRipple(Math.random() * w, Math.random() * h * 0.9 + h * 0.05, Math.random() > 0.7);
+    }, 1400);
 
-      const rotY = curX * 0.18;
-      const rotX = -curY * 0.18;
-      bg.style.transform = `perspective(1200px) rotateX(${rotX}deg) rotateY(${rotY}deg) translate3d(${curX}px, ${curY}px, 0) scale(1.12)`;
-
-      if (orb) {
-        orb.style.transform = `translate3d(${orbCurX}px, ${orbCurY}px, 0) translate(-50%, -50%)`;
+    const draw = () => {
+      ctx.clearRect(0, 0, w, h);
+      let alive = false;
+      for (let i = ripples.length - 1; i >= 0; i--) {
+        const p = ripples[i];
+        p.r += p.speed;
+        p.opacity = Math.max(0, 0.42 * (1 - p.r / p.maxR));
+        if (p.r >= p.maxR || p.opacity <= 0.01) {
+          ripples.splice(i, 1);
+          continue;
+        }
+        alive = true;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255,255,255,${p.opacity})`;
+        ctx.lineWidth = p.line;
+        ctx.stroke();
+        // soft inner glow
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * 0.72, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(180,210,255,${p.opacity * 0.18})`;
+        ctx.lineWidth = p.line * 0.7;
+        ctx.stroke();
       }
-
-      if (Math.abs(targetX - curX) > 0.04 || Math.abs(targetY - curY) > 0.04) {
-        raf = requestAnimationFrame(tick);
+      if (alive || ripples.length) {
+        raf = requestAnimationFrame(draw);
       } else {
         raf = 0;
       }
     };
 
-    const onLeave = () => {
-      targetX = 0;
-      targetY = 0;
-      if (spot) spot.style.opacity = '0';
-      if (!raf) raf = requestAnimationFrame(tick);
+    let lastX = 0;
+    let lastY = 0;
+    const onMove = (e) => {
+      const rect = page.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const dist = Math.hypot(x - lastX, y - lastY);
+      if (dist < 14) return;
+      lastX = x;
+      lastY = y;
+      addRipple(x, y);
+      // extra splash on fast move
+      if (dist > 38) addRipple(x, y, true);
+    };
+
+    const onClick = (e) => {
+      const rect = page.getBoundingClientRect();
+      addRipple(e.clientX - rect.left, e.clientY - rect.top, true);
+      addRipple(e.clientX - rect.left, e.clientY - rect.top, true);
     };
 
     page.addEventListener('mousemove', onMove);
-    page.addEventListener('mouseleave', onLeave);
+    page.addEventListener('click', onClick);
+    // initial drop
+    setTimeout(() => addRipple(w * 0.5, h * 0.5, true), 400);
+
     return () => {
+      window.removeEventListener('resize', resize);
       page.removeEventListener('mousemove', onMove);
-      page.removeEventListener('mouseleave', onLeave);
+      page.removeEventListener('click', onClick);
+      clearInterval(autoTimer);
       if (raf) cancelAnimationFrame(raf);
     };
   }, []);
 
   return (
     <div className="auth-page" ref={pageRef}>
-      <div ref={bgRef} className="auth-bg" style={{ backgroundImage: `url(${mercuryBg})` }} aria-hidden="true" />
-      <div ref={spotlightRef} className="auth-spotlight" aria-hidden="true" />
+      <div className="auth-bg" style={{ backgroundImage: `url(${mercuryBg})` }} aria-hidden="true" />
+      <canvas ref={waterRef} className="auth-water" aria-hidden="true" />
       <div className="auth-bg-overlay" aria-hidden="true" />
-      <div ref={orbRef} className="auth-orb" aria-hidden="true" />
       <div className="auth-center">
         <div className="auth-card">
         <div className="auth-logo">
