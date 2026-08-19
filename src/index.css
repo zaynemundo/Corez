@@ -3758,6 +3758,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 .auth-page {
   min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  width: 100vw;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3893,6 +3896,7 @@ h1, h2, h3, h4, h5, h6 {
 .auth-card {
   width: 100%;
   max-width: 420px;
+  margin: 0 auto;
   background: transparent;
   border: none;
   padding: 32px;
