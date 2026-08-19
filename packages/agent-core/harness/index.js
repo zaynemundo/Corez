@@ -5,3 +5,7 @@ export { TaskState, TASK_STATUSES, TERMINAL_TASK_STATUSES } from './TaskState.js
 export { EventBus } from './EventBus.js';
 export { CancellationManager } from './CancellationManager.js';
 export { abortableSleep } from './utils.js';
+export { SessionLog, SESSION_FORMAT_VERSION } from './SessionLog.js';
+export { AgentLoop, Inbox } from './AgentLoop.js';
+export { HarnessContext } from './HarnessContext.js';
+export { ProfileRegistry } from './ProfileRegistry.js';

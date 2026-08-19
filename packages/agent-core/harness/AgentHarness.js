@@ -1,4 +1,4 @@
-// The unified CoreZ agent harness.
+// The unified CoreZ agent harness - DeepSeek Harness inspired (B).
 //
 // One harness powers the website (Cloudflare Worker, conversation mode) and
 // provides the shared task layer: durable tasks, events, cancellation,
@@ -6,6 +6,14 @@
 // delegated to an injected repository runner (the Node AgentRuntime with its
 // evidence-backed gate); the browser runtime has no such runner and honestly
 // blocks repository tasks instead of pretending files were touched.
+//
+// B-upgrade: DSH-lite
+// - Everything is a plugin via HarnessContext (ctx) + Cordis-style effects
+// - SessionLog append-only log is source of truth for model-visible history (deriveMessages)
+// - AgentLoop drives turn/step over SessionLog with waterfall agent/pre-step, agent/request, llm/stream
+// - ToolRegistry pipeline: tools/pre-execute (waterfall) -> guard -> tools/execute -> tools/post-execute -> tools/result
+// - Profiles/bundles composition (web/headless/agy) via ProfileRegistry + --patch overlays
+// - Capability seams: llm (ProviderChain), tools, sessions, fs/shell/subagents via context
 
 import { EventBus } from './EventBus.js';
 import { TASK_STATUSES } from './TaskState.js';
@@ -16,6 +24,11 @@ import { abortableSleep } from './utils.js';
 import { RetryScheduler } from '../providers/retryScheduler.js';
 import { ProviderChain } from '../providers/providerChain.js';
 import { CompactionEngine } from '../context/CompactionEngine.js';
+import { SessionLog } from './SessionLog.js';
+import { AgentLoop } from './AgentLoop.js';
+import { HarnessContext } from './HarnessContext.js';
+import { ProfileRegistry } from './ProfileRegistry.js';
+import { ToolRegistry } from '../tools/index.js';
 
 export class AgentHarness {
   constructor(options = {}) {
@@ -40,6 +53,30 @@ export class AgentHarness {
       baseBackoffMs: options.providerBaseBackoffMs
     });
 
+    // DSH-lite tool seam: shared bus so waterfalls are globally observable
+    this.toolRegistry = options.toolRegistry || new ToolRegistry({ eventBus: this.eventBus });
+
+    // HarnessContext (ctx) - the plugin surface (Cordis-inspired, lightweight)
+    this.harnessContext = options.harnessContext || new HarnessContext({
+      eventBus: this.eventBus,
+      sessionManager: this.sessions,
+      toolRegistry: this.toolRegistry,
+      providerChain: this.providerChain
+    });
+
+    // Profile composition (web / headless / agy) - DSH layers
+    this.profileRegistry = options.profileRegistry || new ProfileRegistry({ context: this.harnessContext, cwd: options.cwd || process.cwd() });
+    const initialProfile = options.profile || 'web';
+    try { this.profileRegistry.compose(initialProfile); } catch {}
+
+    // Per-task SessionLogs (durable projection, in-memory for now)
+    this.sessionLogs = new Map();
+
+    // Feature flag: when true, conversation mode drives through AgentLoop (turn/step)
+    // Keep default false for test parity; callers can enable via options.enableAgentLoop
+    this.enableAgentLoop = options.enableAgentLoop === true || options.harnessMode === 'dsh';
+    this.activeProfile = this.profileRegistry.activeProfile?.name || initialProfile;
+
     // Repository-mode delegation target (Node CLI AgentRuntime). Without it,
     // repository tasks are honestly blocked in the browser runtime.
     this.repositoryRunner = options.repositoryRunner || null;
@@ -57,6 +94,9 @@ export class AgentHarness {
         });
       });
     }
+    // Also persist SessionLog durable events into the store's event stream
+    // (so listEvents can replay composite history for reconnect).
+    this._bindSessionLogPersistence();
     // Operator hang guard for in-process retry waits (0 disables waiting).
     this.maxRetryWaitMs = Number.isFinite(options.maxRetryWaitMs)
       ? options.maxRetryWaitMs
@@ -76,10 +116,65 @@ export class AgentHarness {
     });
   }
 
+  _bindSessionLogPersistence() {
+    // Whenever a SessionLog appends, mirror it to store best-effort via taskId mapping
+    // (lazy: each log is created with a back-reference to the harness)
+    // We monkey-patch append on creation site instead of polling.
+  }
+
+  _ensureSessionLog(task) {
+    const key = String(task.taskId);
+    if (this.sessionLogs.has(key)) return this.sessionLogs.get(key);
+    const log = new SessionLog({
+      sessionId: task.sessionId || key,
+      header: {
+        cwd: task.workspaceId || undefined,
+        agentPreset: this.activeProfile,
+        createdAt: Date.now()
+      }
+    });
+    // wrap append to also persist into store events (best-effort)
+    const originalAppend = log.append.bind(log);
+    log.append = (type, data, opts) => {
+      const ev = originalAppend(type, data, opts);
+      if (this.store) {
+        this.store.appendEvent(key, { type, data: ev.data, seq: ev.seq, time: ev.time, surfaceOp: ev.surfaceOp, sourceEventSeqs: ev.sourceEventSeqs, ignorable: ev.ignorable, taskId: key, sessionId: log.sessionId }).catch(() => {});
+      }
+      // also emit on eventBus for typed observers
+      try { this.eventBus.emit({ type, taskId: key, sessionId: log.sessionId, seq: ev.seq, data: ev.data }); } catch {}
+      return ev;
+    };
+    this.sessionLogs.set(key, log);
+    return log;
+  }
+
+  getSessionLog(taskId) {
+    return this.sessionLogs.get(String(taskId)) || null;
+  }
+
+  // Profile affordances (DSH: dsh --profile web --dump-config, --patch)
+  dumpConfig() {
+    return this.profileRegistry.dumpConfig();
+  }
+
+  composeProfile(profileName, opts = {}) {
+    const rows = this.profileRegistry.compose(profileName, opts);
+    this.activeProfile = this.profileRegistry.activeProfile?.name || profileName;
+    return rows;
+  }
+
+  applyPatch(patch) {
+    return this.profileRegistry.applyPatch(patch);
+  }
+
+  // HarnessContext plugin surface (everything is a plugin)
+  get ctx() { return this.harnessContext; }
+
   // ---- Public API ----
 
   async startTask({ userId, sessionId, workspaceId, prompt, model, mode = 'repository', autoApprove, contract } = {}) {
     const task = await this.taskManager.createTask({ userId, sessionId, workspaceId, prompt, model, mode, contract });
+    this._ensureSessionLog(task);
     this.#execute(task, { autoApprove }).catch((err) => this.#handleLoopError(task, err));
     return task;
   }
@@ -94,6 +189,7 @@ export class AgentHarness {
       mode: options.mode || 'repository',
       contract: options.contract
     });
+    this._ensureSessionLog(task);
     return this.#execute(task, options);
   }
 
@@ -108,10 +204,17 @@ export class AgentHarness {
     task.touch();
     await this.taskManager.updateTask(taskId, { status: task.status, error: null });
     this.eventBus.emit({ type: 'task.resumed', taskId, userId: task.userId });
+    // re-ensure log exists even after restart
+    this._ensureSessionLog(task);
     return this.#execute(task, options);
   }
 
   async cancelTask(taskId, userId = null) {
+    // also cancel any live loop bound to this task
+    const log = this.sessionLogs.get(String(taskId));
+    if (log && log._loop) {
+      try { log._loop.cancel({ kind: 'user' }); } catch {}
+    }
     return this.taskManager.cancelTask(taskId, userId);
   }
 
@@ -220,6 +323,9 @@ export class AgentHarness {
     if (mode === 'repository') {
       return this.#executeRepository(task, options);
     }
+    if (this.enableAgentLoop) {
+      return this.#executeAgentLoop(task, options);
+    }
     return this.#executeConversation(task, options);
   }
 
@@ -274,11 +380,76 @@ export class AgentHarness {
     }
   }
 
+  // Agentic turn/step loop (DSH-lite) - single task, multi-step, tool-aware
+  async #executeAgentLoop(task, options = {}) {
+    const { signal, renewLease } = options;
+    const log = this._ensureSessionLog(task);
+    const loop = new AgentLoop({
+      sessionLog: log,
+      eventBus: this.eventBus,
+      providerChain: this.providerChain,
+      toolRegistry: this.toolRegistry,
+      sessionId: task.taskId,
+      model: task.model,
+      provider: options.provider || null,
+      systemPromptProvider: {
+        assemble: async ({ signal: _sig }) => ({
+          system: `You are COREZ AI, an AI assistant. Answer directly; use tools when needed.`,
+          tools: this.toolRegistry.getToolSchemas()
+        })
+      }
+    });
+    // keep loop handle for cancellation
+    log._loop = loop;
+    if (signal) signal.addEventListener('abort', () => loop.cancel({ kind: 'user' }), { once: true });
+
+    // seed inbox with initial prompt as durable user message (model-visible => logged)
+    loop.send({ role: 'user', content: task.prompt }, 'next-turn', true);
+
+    // mirror loop lifecycle events to task status
+    const onComplete = new Promise((resolve) => {
+      let settled = false;
+      const onStatus = (ev) => {
+        if (ev.taskId !== task.taskId) return;
+      };
+      // waitIdle will resolve after turn flow completes
+    });
+
+    try {
+      await loop.whenIdle();
+      // Derive final assistant text from log (model-visible surface)
+      const msgs = log.deriveMessages();
+      const lastAssistant = [...msgs].reverse().find((m) => m.role === 'assistant');
+      const finalContent = lastAssistant ? (typeof lastAssistant.content === 'string' ? lastAssistant.content : JSON.stringify(lastAssistant.content)) : '';
+      task.messages = msgs;
+      task.currentStep = log.events.filter((e) => e.type === 'step/end').length;
+      if (signal?.aborted) return this.#finishCancelled(task);
+      if (!finalContent || !finalContent.trim()) {
+        task.markTerminal(TASK_STATUSES.FAILED, null, 'The model returned an empty conversation response.');
+        this.eventBus.emit({ type: 'task.failed', taskId: task.taskId, error: 'The model returned an empty conversation response.' });
+        await this.#persist(task);
+        return task;
+      }
+      return this.#finishCompleted(task, finalContent);
+    } catch (err) {
+      if (signal?.aborted) return this.#finishCancelled(task);
+      task.markTerminal(TASK_STATUSES.FAILED, null, err?.message || 'Agent loop failed.');
+      this.eventBus.emit({ type: 'task.failed', taskId: task.taskId, error: err?.message || 'Agent loop failed.' });
+      await this.#persist(task);
+      return task;
+    } finally {
+      delete log._loop;
+    }
+  }
+
   // Conversation mode: a model <-> retry exchange with no completion gate and
   // no repository tools. Stops only on completion, cancellation, a permanent
   // provider failure across every configured provider, or an empty response.
   async #executeConversation(task, options = {}) {
     const { signal, renewLease } = options;
+    const log = this._ensureSessionLog(task);
+    // Also mirror into log for deriveMessages parity (even when using legacy path)
+    try { log.append('turn/start', { turn: 1 }); } catch {}
     const messages = task.messages.length > 0
       ? task.messages
       : [
@@ -286,6 +457,8 @@ export class AgentHarness {
           { role: 'user', content: task.prompt }
         ];
     task.messages = messages;
+    // log user message as surface (so deriveMessages includes it)
+    try { log.append('user/message', { role: 'user', content: task.prompt }, { surfaceOp: 'append' }); } catch {}
     await this.#persist(task);
 
     while (!signal.aborted) {
@@ -318,6 +491,7 @@ export class AgentHarness {
               taskId: task.taskId,
               savedTokens: compactRes.savedTokens
             });
+            try { log.append('context/compacted', { savedTokens: compactRes.savedTokens }); } catch {}
           }
         } catch {
           // Compaction is best-effort; keep running with existing messages
@@ -325,6 +499,7 @@ export class AgentHarness {
       }
 
       this.eventBus.emit({ type: 'model.requested', taskId: task.taskId, step: task.currentStep + 1 });
+      try { log.append('step/start', { turn: 1, step: task.currentStep + 1 }); } catch {}
 
       const chainResult = await this.providerChain.generate({
         taskId: task.taskId,
@@ -382,6 +557,10 @@ export class AgentHarness {
         step: task.currentStep,
         provider: chainResult.provider
       });
+      try { log.append('assistant/chunk', { turn: 1, step: task.currentStep, chunk: { type: 'text', text: content } }); } catch {}
+      try { log.append('assistant/message', { turn: 1, step: task.currentStep, message: { role: 'assistant', content } }, { surfaceOp: 'append', sourceEventSeqs: [] }); } catch {}
+      try { log.append('step/end', { turn: 1, step: task.currentStep }); } catch {}
+      try { log.append('turn/end', { turn: 1, reason: { kind: 'completed' } }); } catch {}
 
       if (!content.trim()) {
         task.markTerminal(TASK_STATUSES.FAILED, null, 'The model returned an empty conversation response.');
@@ -430,6 +609,8 @@ export class AgentHarness {
 
   async #persistUnsafe(task) {
     if (!this.store) return;
+    const log = this.sessionLogs.get(String(task.taskId));
+    const sessionLogSnapshot = log ? log.toJSON() : null;
     const snapshot = {
       status: task.status,
       messages: task.messages,
@@ -451,7 +632,8 @@ export class AgentHarness {
       result: task.result,
       error: task.error,
       terminalAt: task.terminalAt,
-      updatedAt: task.updatedAt
+      updatedAt: task.updatedAt,
+      sessionLog: sessionLogSnapshot
     };
     await this.store.updateTask(task.taskId, snapshot);
   }

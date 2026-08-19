@@ -9,6 +9,19 @@ param(
     [string]$Mode = 'Analysis',
 
     [Parameter()]
+    [ValidateSet('web', 'headless', 'agy')]
+    [string]$Profile = 'agy',
+
+    [Parameter()]
+    [string]$Patch,
+
+    [Parameter()]
+    [switch]$DumpConfig,
+
+    [Parameter()]
+    [switch]$Isolate,
+
+    [Parameter()]
     [ValidateRange(1, 60)]
     [int]$TimeoutMinutes = 5,
 
@@ -18,8 +31,46 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# --dump-config early exit (DSH parity: dsh --profile web --dump-config)
+if ($DumpConfig) {
+    $dumpScript = @"
+import { ProfileRegistry } from './packages/agent-core/harness/ProfileRegistry.js';
+import { HarnessContext } from './packages/agent-core/harness/HarnessContext.js';
+const ctx = new HarnessContext({});
+const reg = new ProfileRegistry({ context: ctx });
+const rows = reg.compose('$Profile');
+console.log(JSON.stringify({ profile: '$Profile', rows }, null, 2));
+"@
+    $tmpFile = Join-Path ([System.IO.Path]::GetTempPath()) "agy-dump-$([guid]::NewGuid().ToString('N')).mjs"
+    Set-Content -Path $tmpFile -Value $dumpScript -Encoding UTF8
+    try {
+        node $tmpFile
+        exit $LASTEXITCODE
+    } finally {
+        Remove-Item -Path $tmpFile -Force -ErrorAction SilentlyContinue
+    }
+}
+
 if (-not (Get-Command agy -ErrorAction SilentlyContinue)) {
     throw 'AGY is not installed or is not available on PATH.'
+}
+
+# Profile validation mirrors DSH profile registry (web/headless/agy)
+$validProfiles = @('web', 'headless', 'agy')
+if ($Profile -notin $validProfiles) {
+    throw "Unknown profile `"$Profile`". Available: $($validProfiles -join ', ')"
+}
+
+# Patch file validation (cordis.patch.json overlay)
+if ($Patch) {
+    if (-not (Test-Path $Patch)) {
+        throw "Patch file not found: $Patch"
+    }
+    try {
+        $null = Get-Content $Patch -Raw | ConvertFrom-Json
+    } catch {
+        throw "Patch file is not valid JSON: $Patch. $($_.Exception.Message)"
+    }
 }
 
 if (-not $OutputPath) {
@@ -96,7 +147,20 @@ $diff
     }
 }
 
+# DSH-lite: session log (model-visible => logged) - sidecar JSONL for replay
+$sessionLogDir = Join-Path $PSScriptRoot '..\artifacts\sessions'
+New-Item -ItemType Directory -Path $sessionLogDir -Force | Out-Null
+$sessionId = "agy-$($Mode.ToLowerInvariant())-$(Get-Date -Format 'yyyyMMdd-HHmmss')-$([guid]::NewGuid().ToString('N').Substring(0,6))"
+$sessionLogPath = Join-Path $sessionLogDir "$sessionId.jsonl"
+# append turn/start + user/message durably before dispatch
+$turnStart = @{ type = 'turn/start'; seq = 1; time = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds(); data = @{ turn = 1 } } | ConvertTo-Json -Compress
+$sessionStart = @{ type = 'step/start'; seq = 2; time = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds(); data = @{ turn = 1; step = 1 } } | ConvertTo-Json -Compress
+$userMsg = @{ type = 'user/message'; seq = 3; time = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds(); data = @{ role = 'user'; content = $effectiveTask }; surfaceOp = 'append' } | ConvertTo-Json -Compress
+Set-Content -Path $sessionLogPath -Value "$turnStart`n$sessionStart`n$userMsg" -Encoding UTF8
+
 $agyLogPath = Join-Path ([System.IO.Path]::GetTempPath()) "agy-cli-$([guid]::NewGuid().ToString('N')).log"
+# DSH profile determines sandbox + tool composition; agy modes map to --mode plan/accept-edits
+# --isolate mirrors dsh per-session isolate realm (session-specific capability set)
 $agyArguments = @(
     '--log-file', $agyLogPath,
     '--mode', $agyMode,
@@ -105,17 +169,38 @@ $agyArguments = @(
     '--print-timeout', "$($TimeoutMinutes)m",
     '--print', $effectiveTask
 )
+if ($Isolate) {
+    $agyArguments += @('--isolate', $sessionId)
+}
+if ($Patch) {
+    $agyArguments += @('--patch', $Patch)
+}
 
-Write-Host "Delegating to MiMo V2.5 (via AGY + Codex) in $Mode mode. Output: $OutputPath"
+Write-Host "Delegating to MiMo V2.5 (via AGY + Codex) profile=$Profile mode=$Mode isolate=$Isolate Output: $OutputPath SessionLog: $sessionLogPath"
 $agyOutput = @(& agy @agyArguments 2>&1 | Tee-Object -FilePath $OutputPath)
 $agyExitCode = $LASTEXITCODE
 $agyOutputText = $agyOutput -join [Environment]::NewLine
 
-if ($agyExitCode -ne 0) {
-    throw "AGY failed with exit code $agyExitCode. Partial output was preserved at '$OutputPath'."
-}
-if ([string]::IsNullOrWhiteSpace($agyOutputText) -or $agyOutputText -match 'no output produced') {
-    throw "AGY did not produce a usable response. Output was preserved at '$OutputPath'."
+# append assistant result to session log (durable, reconstructable)
+try {
+    $assistSeq = 4
+    $chunk = @{ type = 'assistant/chunk'; seq = $assistSeq; time = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds(); data = @{ turn = 1; step = 1; chunk = @{ type = 'text'; text = $agyOutputText.Substring(0, [Math]::Min(8000, $agyOutputText.Length)) } } } | ConvertTo-Json -Compress
+    Add-Content -Path $sessionLogPath -Value $chunk -Encoding UTF8
+    $assistMsg = @{ type = 'assistant/message'; seq = ($assistSeq+1); time = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds(); data = @{ turn = 1; step = 1; message = @{ role = 'assistant'; content = $agyOutputText } }; surfaceOp = 'append'; sourceEventSeqs = @($assistSeq) } | ConvertTo-Json -Compress
+    Add-Content -Path $sessionLogPath -Value $assistMsg -Encoding UTF8
+    $stepEnd = @{ type = 'step/end'; seq = ($assistSeq+2); time = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds(); data = @{ turn = 1; step = 1 } } | ConvertTo-Json -Compress
+    Add-Content -Path $sessionLogPath -Value $stepEnd -Encoding UTF8
+    $turnEnd = @{ type = 'turn/end'; seq = ($assistSeq+3); time = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds(); data = @{ turn = 1; reason = @{ kind = if ($agyExitCode -eq 0) { 'completed' } else { 'error' } } } } | ConvertTo-Json -Compress
+    Add-Content -Path $sessionLogPath -Value $turnEnd -Encoding UTF8
+} catch {
+    # session log is best-effort; never obscure main result
 }
 
-Write-Host "AGY completed. Review its output at: $OutputPath"
+if ($agyExitCode -ne 0) {
+    throw "AGY failed with exit code $agyExitCode. Partial output was preserved at '$OutputPath'. SessionLog: $sessionLogPath"
+}
+if ([string]::IsNullOrWhiteSpace($agyOutputText) -or $agyOutputText -match 'no output produced') {
+    throw "AGY did not produce a usable response. Output was preserved at '$OutputPath'. SessionLog: $sessionLogPath"
+}
+
+Write-Host "AGY completed. Review its output at: $OutputPath SessionLog: $sessionLogPath"

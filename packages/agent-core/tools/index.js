@@ -11,6 +11,7 @@ import { SkillRegistry, createSkillTool } from '../skills/SkillRegistry.js';
 import { TodoTracker, createTodoTool } from '../todos/TodoTracker.js';
 import { SessionQueryEngine, createSessionQueryTool } from '../session-query/SessionQueryEngine.js';
 import { PersistentTerminalManager, createPersistentCommandTool } from '../terminal/PersistentTerminalManager.js';
+import { EventBus } from '../harness/EventBus.js';
 
 // No fixed command timeout: valid builds, tests, and long-running commands
 // must never be terminated prematurely. An operator may set an explicit
@@ -31,11 +32,18 @@ export class ToolRegistry {
     this.todoTracker = options.todoTracker || new TodoTracker();
     this.sessionQueryEngine = options.sessionQueryEngine || new SessionQueryEngine();
     this.terminalManager = options.terminalManager || new PersistentTerminalManager();
+    // DSH-inspired: every registry owns its typed event bus; shared bus is injected.
+    this.eventBus = options.eventBus || new EventBus();
+    // Monotonic guards after pre-execute waterfall (ctx.tools.guard)
+    this._toolGuards = [];
     this.registerCoreTools();
   }
 
   registerTool(tool) {
     if (!tool.name) throw new Error('Tool must have a name');
+    // DSH throws on duplicate within one layer; for test compatibility we
+    // allow overwriting (idempotent re-register from a recreated sub-registry).
+    // A dedicated guard could still enforce monotonic policy via tools themselves.
     this.tools.set(tool.name, tool);
   }
 
@@ -55,61 +63,244 @@ export class ToolRegistry {
     }));
   }
 
+  // DSH parity: monotonic guard registration (plain or agent-scoped in future)
+  guard(guardFn) {
+    if (typeof guardFn !== 'function') throw new Error('ToolGuard must be a function');
+    this._toolGuards.push(guardFn);
+    return () => {
+      const i = this._toolGuards.indexOf(guardFn);
+      if (i !== -1) this._toolGuards.splice(i, 1);
+    };
+  }
+
+  // Convenience shims for waterfall registration (mirrors ctx.waterfall usage)
+  onPreExecute(handler) {
+    return this.eventBus.waterfall('tools/pre-execute', handler);
+  }
+  onExecute(handler) {
+    return this.eventBus.waterfall('tools/execute', handler);
+  }
+  onPostExecute(handler) {
+    return this.eventBus.waterfall('tools/post-execute', handler);
+  }
+
+  // Execution pipeline: pre-execute -> guards -> execute wrapper -> body -> post-execute -> finalizeContent -> prune
   async executeTool(name, args, runtimeOptions = {}) {
     const tool = this.getTool(name);
     if (!tool) {
       return { error: `Unknown tool: "${name}"` };
     }
 
-    const { context, permissionManager, autoApprove } = runtimeOptions;
+    const { context, permissionManager, autoApprove, signal } = runtimeOptions;
     const scopeId = runtimeOptions.taskId || runtimeOptions.sessionId || 'default';
+    const taskId = runtimeOptions.taskId || null;
+    if (signal?.aborted) {
+      return { error: `Tool "${name}" aborted before dispatch.`, code: 'ABORTED_BEFORE_DISPATCH' };
+    }
 
-    // 1. Guard check: detect repetitive runaway loops
+    // 1. pre-execute waterfall (reorderable policy)
+    let preDecision;
+    try {
+      preDecision = await this.eventBus.dispatchWaterfall('tools/pre-execute', { tool: name, args, taskId, signal }, () => ({ kind: 'allow' }));
+    } catch (err) {
+      return { error: `pre-execute failed for "${name}": ${err.message}` };
+    }
+    if (preDecision && preDecision.kind === 'deny') {
+      return { error: preDecision.reason || `Tool "${name}" denied by policy.`, code: 'DENIED' };
+    }
+    if (preDecision && preDecision.kind === 'ask') {
+      // Without ctx.approval (not composed), degrade to deny
+      return { error: preDecision.reason || `Tool "${name}" requires approval.`, code: 'DENIED', asked: true };
+    }
+
+    // 2. Guard check: repeat loop + monotonic guards
     const guardCheck = this.repeatToolGuard?.evaluate(name, args, scopeId);
     if (guardCheck?.status === 'blocked') {
       return { error: guardCheck.error, blocked: true };
     }
+    for (const g of this._toolGuards) {
+      try {
+        const reason = g({ name, args, taskId });
+        if (typeof reason === 'string' && reason) {
+          return { error: `Tool "${name}" denied by guard: ${reason}`, code: 'DENIED' };
+        }
+      } catch (err) {
+        return { error: `Tool guard failed: ${err.message}` };
+      }
+    }
 
-    // 2. Check permissions
+    // 3. Check permissions
     if (permissionManager) {
       const category = tool.category || PERMISSION_CATEGORIES.READ;
       const detail = args?.command || args?.filePath || args?.path || name;
       const permCheck = permissionManager.checkPermission(category, detail, { autoApprove });
-      
       if (!permCheck.allowed) {
         return { error: `Permission denied for ${name}: ${permCheck.reason}` };
       }
     }
 
+    // 4. Build execution descriptor (lossless arg snapshot, opaque token)
+    const token = Symbol(`tool:${name}`);
+    const frozenArgs = JSON.parse(JSON.stringify(args ?? {}));
+    Object.freeze(frozenArgs);
+    const execution = Object.freeze({
+      token,
+      name,
+      arguments: frozenArgs,
+      signal,
+      taskId,
+      ...(runtimeOptions.agent ? { agent: runtimeOptions.agent } : {}),
+      ...(runtimeOptions.parent ? { parent: runtimeOptions.parent } : {})
+    });
+
+    // 5. execute wrapper waterfall (timeout/retry/metrics plugins)
+    let innerResult;
+    const invokeBody = async () => {
+      const timeoutMs = tool.timeoutMs;
+      if (Number.isFinite(timeoutMs) && timeoutMs > 0) {
+        // bounded execution
+        return await Promise.race([
+          tool.execute(args, { ...runtimeOptions, signal, execution }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error(`TOOL_TIMEOUT after ${timeoutMs}ms`)), timeoutMs))
+            .then(() => { throw new Error(`TOOL_TIMEOUT`); })
+        ]);
+      }
+      return tool.execute(args, { ...runtimeOptions, signal, execution });
+    };
+
     try {
-      const result = await tool.execute(args, runtimeOptions);
-      if (context && typeof context.recordToolExecution === 'function') {
-        context.recordToolExecution(name, args, result);
-        if (['write_file', 'edit_file'].includes(name) && args.filePath && typeof context.recordModifiedFile === 'function') {
-          context.recordModifiedFile(args.filePath);
-        } else if (['read_file', 'edit_file'].includes(name) && args.filePath && typeof context.recordInspectedFile === 'function') {
-          context.recordInspectedFile(args.filePath);
-        }
-      }
-
-      // 3. Model-free pruning of oversized tool output
-      let finalResult = result;
-      if (this.pruner) {
-        const pruneRes = this.pruner.prune(result, { toolName: name, args, scopeId });
-        finalResult = pruneRes.result;
-      }
-
-      // Attach advisory warning if guard detected repetition
-      if (guardCheck?.status === 'advisory' || guardCheck?.status === 'diagnostic') {
-        if (typeof finalResult === 'object' && finalResult !== null) {
-          finalResult._guardWarning = guardCheck.message;
-        }
-      }
-
-      return finalResult;
+      innerResult = await this.eventBus.dispatchWaterfall('tools/execute', { execution, args: frozenArgs, signal }, invokeBody);
     } catch (err) {
+      if (signal?.aborted) {
+        return { error: `Tool "${name}" aborted.`, code: 'ABORTED', detail: err.message };
+      }
+      // TOOL_TIMEOUT is more specific than generic failure
+      if (err.message === 'TOOL_TIMEOUT' || err.message?.includes('TIMEOUT')) {
+        return { error: `Tool "${name}" timed out.`, code: 'TOOL_TIMEOUT' };
+      }
       return { error: `Tool "${name}" execution error: ${err.message}` };
     }
+
+    // on pre-abort, skip remaining phases
+    if (signal?.aborted && innerResult && !innerResult._abortedHandled) {
+      // if body succeeded but cancellation won, surface abort only if no more specific failure
+      // (DSH: successful outcome replaced with ABORTED)
+      if (innerResult && !innerResult.error) {
+        return { error: `Tool "${name}" aborted.`, code: 'ABORTED' };
+      }
+    }
+
+    // record execution for context
+    let normalized = innerResult;
+    if (context && typeof context.recordToolExecution === 'function') {
+      try {
+        context.recordToolExecution(name, args, normalized);
+      } catch {}
+      if (['write_file', 'edit_file'].includes(name) && args.filePath && typeof context.recordModifiedFile === 'function') {
+        try { context.recordModifiedFile(args.filePath); } catch {}
+      } else if (['read_file', 'edit_file'].includes(name) && args.filePath && typeof context.recordInspectedFile === 'function') {
+        try { context.recordInspectedFile(args.filePath); } catch {}
+      }
+    }
+
+    // 6. post-execute waterfall (may replace content/value or block)
+    if (normalized && typeof normalized === 'object') {
+      try {
+        const postDecision = await this.eventBus.dispatchWaterfall('tools/post-execute', { execution, result: normalized, signal }, () => null);
+        if (postDecision && postDecision.kind === 'block') {
+          normalized = { isError: true, error: { message: postDecision.reason || 'Blocked by post-execute' }, content: postDecision.reason || 'Blocked', _blocked: true };
+        } else if (postDecision && postDecision.kind === 'replace') {
+          if (postDecision.content !== undefined) normalized = { ...normalized, content: postDecision.content };
+          if (postDecision.value !== undefined) {
+            // re-validate canonical value path: replace value, keep content rerender if needed
+            normalized = { ...normalized, value: postDecision.value };
+          }
+        } else if (postDecision && postDecision.content !== undefined) {
+          // allow raw content replacement shorthand
+          normalized = { ...normalized, content: postDecision.content };
+        }
+      } catch (err) {
+        return { error: `post-execute failed for "${name}": ${err.message}` };
+      }
+    }
+
+    // 7. definition-owned finalizeContent (sync, total)
+    if (tool.finalizeContent && typeof tool.finalizeContent === 'function') {
+      try {
+        const finalized = tool.finalizeContent(execution, normalized);
+        if (finalized !== undefined && finalized !== null) {
+          // finalize may replace only content per DSH contract
+          if (typeof finalized === 'string') normalized = { ...normalized, content: finalized };
+          else if (typeof finalized === 'object' && finalized.content !== undefined) normalized = { ...normalized, content: finalized.content };
+        }
+      } catch (err) {
+        return { error: `finalizeContent failed for "${name}": ${err.message}` };
+      }
+    }
+
+    // 8. observe-only tools/result notification
+    try {
+      await this.eventBus.dispatchParallel('tools/result', { execution, result: normalized });
+      // legacy broadcast as well
+      this.eventBus.emit({ type: 'tools/result', execution, result: normalized, taskId });
+    } catch {}
+
+    // 9. Model-free pruning of oversized tool output
+    let finalResult = normalized;
+    if (this.pruner) {
+      const pruneRes = this.pruner.prune(normalized, { toolName: name, args, scopeId });
+      finalResult = pruneRes.result;
+    }
+
+    // Attach advisory warning if guard detected repetition
+    if (guardCheck?.status === 'advisory' || guardCheck?.status === 'diagnostic') {
+      if (typeof finalResult === 'object' && finalResult !== null) {
+        finalResult._guardWarning = guardCheck.message;
+      }
+    }
+
+    return finalResult;
+  }
+
+  // DSH parity: executionMode only parallel when explicitly isConcurrencySafe
+  executionMode(exec) {
+    const tool = this.getTool(exec.name);
+    if (!tool || typeof tool.isConcurrencySafe !== 'function') return 'exclusive';
+    try {
+      return tool.isConcurrencySafe(exec.arguments) === true ? 'parallel' : 'exclusive';
+    } catch {
+      return 'exclusive';
+    }
+  }
+
+  // Batch helper for agent-loop: executes many tool_calls with FIFO additionalContexts
+  async executeToolCalls(toolCalls, runtimeOptions = {}) {
+    const { signal } = runtimeOptions;
+    const results = [];
+    const additionalContexts = [];
+    let concluded = false;
+    // DSH: tool_calls within one step may be executed in parallel if safe; we simplify to parallel when all safe else sequential
+    const exclusive = toolCalls.some((tc) => this.executionMode({ name: tc.name || tc.function?.name, arguments: tc.arguments || tc.args }) !== 'parallel');
+    const runOne = async (tc) => {
+      if (signal?.aborted) return { error: 'aborted', code: 'ABORTED' };
+      const name = tc.name || tc.function?.name || tc.name;
+      let args = tc.arguments || tc.args || tc.function?.arguments;
+      if (typeof args === 'string') {
+        try { args = JSON.parse(args); } catch { args = {}; }
+      }
+      const res = await this.executeTool(name, args, runtimeOptions);
+      // capture deferred contexts (tool used exec.deferContext)
+      if (res && Array.isArray(res.additionalContexts)) additionalContexts.push(...res.additionalContexts);
+      return res;
+    };
+    if (exclusive) {
+      for (const tc of toolCalls) results.push(await runOne(tc));
+    } else {
+      const settled = await Promise.all(toolCalls.map(runOne));
+      results.push(...settled);
+    }
+    // DSH truncation: if any result was produced, turn may conclude or continue
+    return { results, additionalContexts, concluded };
   }
 
   registerCoreTools() {
@@ -698,4 +889,3 @@ export class ToolRegistry {
     }
   }
 }
-

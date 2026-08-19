@@ -36,7 +36,9 @@ const KNOWN_DURABLE_TYPES = new Set([
 function isJsonValue(v) {
   if (v === null) return true;
   const t = typeof v;
-  if (t === 'string' || t === 'boolean' || t === 'number') return Number.isFinite(v);
+  if (t === 'string') return true;
+  if (t === 'boolean') return true;
+  if (t === 'number') return Number.isFinite(v);
   if (Array.isArray(v)) return v.every(isJsonValue);
   if (t === 'object') {
     for (const k of Object.keys(v)) if (!isJsonValue(v[k])) return false;
