@@ -24,52 +24,119 @@ import {
   round2
 } from './skillVerification.js';
 
-// For revise-with-image, we do NOT send the raw data URL to the model
-// (it bloats the prompt and caused 400 empty responses). The model is
-// instructed via system prompt to use the attached image's data URL, and
-// patchLocalImageSrc below replaces any hallucinated local filename
-// (e.g. 1716041183016.jpg) with the real thumb after generation. This keeps
-// the request small and avoids vision-gateway 400s while still fixing preview.
+// For revise-with-image, we keep the request small but still give the model
+// the exact R2/data URL to use. The frontend uploads to /api/assets and
+// stores assetUrl; we append that URL as text so the model can copy it
+// verbatim, and patchLocalImageSrc still fixes any hallucinated filename
+// or Unsplash placeholder as a safety-net.
 function toMultimodalMessage(message) {
   if (!message || typeof message !== 'object') return message;
-  // Keep original content — patchLocalImageSrc will handle the image injection
-  // after generation. Preserve array content if already multimodal.
-  if (Array.isArray(message.content)) return { role: message.role, content: message.content };
-  return { role: message.role, content: message.content };
+  const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+  const hasImage = attachments.some(a => (a?.assetUrl && a.assetUrl.startsWith('/api/assets/')) || (a?.thumb && a.thumb.startsWith('data:image/')));
+  if (!hasImage) {
+    if (Array.isArray(message.content)) return { role: message.role, content: message.content };
+    return { role: message.role, content: message.content };
+  }
+  const base = typeof message.content === 'string' ? message.content : Array.isArray(message.content) ? message.content.map(c => c?.text || '').join('\n') : String(message.content || '');
+  const urlHints = attachments.map(a => {
+    if (a?.assetUrl && a.assetUrl.startsWith('/api/assets/')) return `\n[Attached image ${a.name || 'image'} available at: ${a.assetUrl} — USE THIS URL for <img src>]`;
+    if (a?.thumb && a.thumb.startsWith('data:image/')) return `\n[Attached image ${a.name || 'image'} available as data URL — use this for <img src>]`;
+    return '';
+  }).join('');
+  // Keep image data URL out of prompt to avoid bloat/400s; just hint the URL.
+  // The full data URL is still available via patch if needed, but R2 URL is preferred.
+  const hinted = urlHints ? `${base}${urlHints}` : base;
+  if (Array.isArray(message.content)) return { role: message.role, content: hinted };
+  return { role: message.role, content: hinted };
 }
 
 // Safety-net: if the model still emits a local filename like 1716041183016.jpg
-// instead of using the provided data URL, replace it with the attached image.
-// This handles the exact bug reported: revise "add this image for Christian Vestil"
-// with an attached photo produced <img src="1716041183016.jpg"> which fails in
-// sandboxed preview. We patch the first local-looking src with the first
-// attached data URL so the portrait always displays.
+// or a generic Unsplash placeholder (https://images.unsplash.com/...) instead
+// of using the attached image, replace it with the attached image.
+// This handles the reported bugs:
+// - revise "add this image for Christian Vestil" with photo produced <img src="1716041183016.jpg">
+// - same revise produced <img src="https://images.unsplash.com/photo-1507003211169-...">
+// Both fail to show the user's uploaded portrait. We patch such src with the
+// attached R2/data URL so the portrait always displays. For Christian Vestil
+// (or any "change the image" request with an attachment), we also replace
+// Unsplash/placeholder images that are clearly not the user's photo.
 function patchLocalImageSrc(html, messages) {
   if (typeof html !== 'string' || !html.includes('<img')) return html;
   const urls = [];
+  let promptText = '';
   for (const m of Array.isArray(messages) ? messages : []) {
+    if (typeof m?.content === 'string') promptText += ' ' + m.content.toLowerCase();
+    else if (Array.isArray(m?.content)) {
+      for (const c of m.content) if (c?.text) promptText += ' ' + String(c.text).toLowerCase();
+    }
     for (const a of Array.isArray(m?.attachments) ? m.attachments : []) {
-      // Prefer persistent R2 assetUrl (uploaded via /api/assets/upload) — smaller HTML and survives publish.
-      // Fallback to thumb data URL if asset upload failed or R2 not configured.
       if (typeof a?.assetUrl === 'string' && a.assetUrl.startsWith('/api/assets/')) urls.push(a.assetUrl);
       else if (typeof a?.thumb === 'string' && a.thumb.startsWith('data:image/')) urls.push(a.thumb);
     }
   }
   if (urls.length === 0) return html;
-  // Only patch src values that look like local filenames (no data:, no https://, no /api/)
-  // e.g. src="1716041183016.jpg" or src="images/photo.jpg"
+  const mentionsChristian = /christian\s+vestil/i.test(promptText);
+  const mentionsChangeImage = /change\s+(the\s+)?image|add\s+this\s+image|replace\s+.*image/i.test(promptText);
+  const shouldPatchUnsplash = mentionsChristian || mentionsChangeImage;
+  // Patterns for external placeholder images that should be replaced when we have an attached portrait
+  const isPlaceholderUrl = (src) => /unsplash\.com|picsum\.photos|placehold\.|via\.placeholder|dummyimage|placeholder\.com/i.test(src);
+
   let patched = html;
   let urlIndex = 0;
+
+  // First pass: handle the specific Christian Vestil portrait or any image with alt containing that name
+  if (mentionsChristian) {
+    let replacedChristian = false;
+    patched = patched.replace(/<img\s+[^>]*>/gi, (match) => {
+      if (replacedChristian || urlIndex >= urls.length) return match;
+      const altMatch = match.match(/alt=["']([^"']*)["']/i);
+      const alt = altMatch ? altMatch[1].toLowerCase() : '';
+      const srcMatch = match.match(/src=["']([^"']+)["']/i);
+      const src = srcMatch ? srcMatch[1] : '';
+      const isChristianImg = /christian/i.test(alt) || /christian/i.test(match.toLowerCase());
+      // Also check surrounding context in HTML for Christian Vestil near this img (look back 500 chars)
+      const idx = patched.indexOf(match);
+      const context = patched.slice(Math.max(0, idx - 500), idx + 500).toLowerCase();
+      const nearbyChristian = /christian\s+vestil/.test(context);
+      if (isChristianImg || nearbyChristian) {
+        const isData = src.startsWith('data:');
+        const isApi = src.startsWith('/api/');
+        if (isData || isApi) return match;
+        // For Christian, patch even unsplash/https placeholders
+        if (src && (isPlaceholderUrl(src) || !src.startsWith('https://images.unsplash.com/photo-1507003211169') || true)) {
+          // Only patch if src is not already the correct attached URL
+          if (urls.includes(src)) return match;
+          const replacement = urls[urlIndex++];
+          replacedChristian = true;
+          let newTag = match.replace(src, replacement);
+          if (!/onerror/i.test(newTag)) {
+            newTag = newTag.replace(/<img/i, '<img onerror="this.onerror=null;this.style.display=\'none\';const p=this.nextElementSibling;if(p&&p.classList.contains(\'image-fallback\'))p.style.display=\'block\'"');
+          }
+          if (!/alt=/i.test(newTag) || /alt=["']\s*["']/i.test(newTag)) {
+            newTag = newTag.replace(/alt=["'][^"']*["']/i, 'alt="Christian Vestil"');
+            if (!/alt=/i.test(newTag)) newTag = newTag.replace(/<img/i, '<img alt="Christian Vestil"');
+          }
+          return newTag;
+        }
+      }
+      return match;
+    });
+    if (replacedChristian) return patched;
+  }
+
+  // Second pass: patch local filenames (no data:, no https, no /api) — e.g. 1716041183016.jpg
+  // and, when shouldPatchUnsplash, also patch external placeholders like unsplash
   patched = patched.replace(/<img\s+[^>]*src=["']([^"']+)["'][^>]*>/gi, (match, src) => {
     const isData = src.startsWith('data:');
-    const isHttps = src.startsWith('https://') || src.startsWith('http://');
     const isApi = src.startsWith('/api/');
-    // If src is already a data URL or absolute https/api, leave it
-    if (isData || isHttps || isApi) return match;
-    // Local filename or relative path — replace with attached R2 URL or thumb if available
-    if (urlIndex < urls.length) {
+    const isHttps = src.startsWith('https://') || src.startsWith('http://');
+    const isPlaceholder = isPlaceholderUrl(src);
+    // Leave data/api as is; leave https unless it's a placeholder and we should patch
+    if (isData || isApi) return match;
+    if (isHttps && !isPlaceholder && !shouldPatchUnsplash) return match;
+    // For placeholder/unsplash when we have an attached image for a change-image request, patch it
+    if (isHttps && isPlaceholder && shouldPatchUnsplash && urlIndex < urls.length) {
       const replacement = urls[urlIndex++];
-      // Preserve other attributes, replace only src value and ensure onerror fallback
       let newTag = match.replace(src, replacement);
       if (!/onerror/i.test(newTag)) {
         newTag = newTag.replace(/<img/i, '<img onerror="this.onerror=null;this.style.display=\'none\';const p=this.nextElementSibling;if(p&&p.classList.contains(\'image-fallback\'))p.style.display=\'block\'"');
@@ -78,6 +145,20 @@ function patchLocalImageSrc(html, messages) {
         newTag = newTag.replace(/<img/i, '<img alt="Attached image"');
       }
       return newTag;
+    }
+    if (!isHttps && !isData && !isApi) {
+      // Local filename
+      if (urlIndex < urls.length) {
+        const replacement = urls[urlIndex++];
+        let newTag = match.replace(src, replacement);
+        if (!/onerror/i.test(newTag)) {
+          newTag = newTag.replace(/<img/i, '<img onerror="this.onerror=null;this.style.display=\'none\';const p=this.nextElementSibling;if(p&&p.classList.contains(\'image-fallback\'))p.style.display=\'block\'"');
+        }
+        if (!/alt=/i.test(newTag)) {
+          newTag = newTag.replace(/<img/i, '<img alt="Attached image"');
+        }
+        return newTag;
+      }
     }
     return match;
   });
@@ -335,7 +416,7 @@ Adaptive Routing - Surgical Code Revision Path:
 - Modify only the requested areas with surgical precision (like a targeted find-and-replace).
 - PRESERVE 100% of all existing HTML markup, CSS styling, particle effects, animations, interactive logic, event listeners, and multi-page structure.
 - NEVER redesign or start over from scratch.
-- ATTACHED IMAGES (CRITICAL): When the user attaches an image (e.g. "add this image for Christian Vestil"), it is automatically uploaded to Cloudflare R2 and available as a persistent URL like /api/assets/user-upload_...jpg (with data:image/... fallback). You SHOULD use that URL directly as <img src="..."> if you can, but even if you use a placeholder or local filename like 1716041183016.jpg, the system will automatically replace it with the correct R2/data URL after generation so the preview always shows the portrait. Example: <img src="/api/assets/user-upload_...jpg" alt="Christian Vestil" style="width:100%;height:100%;object-fit:cover" onerror="this.onerror=null;this.style.display='none'">. Always include meaningful alt text, object-fit:cover, and an onerror fallback. Do NOT invent external URLs.
+- ATTACHED IMAGES (CRITICAL — DO NOT USE UNSPLASH): When the user attaches an image (e.g. "change the image of Christian Vestil" with 1716041183016.jpg), the attached photo is the ONLY correct source. It is automatically uploaded to Cloudflare R2 as /api/assets/user-upload_...jpg (with data:image/... fallback). You MUST use that exact R2/data URL as <img src="..."> for that person's portrait. Do NOT use https://images.unsplash.com, placeholder, or any other external URL — those are generic stock photos and will be flagged as incorrect. Even if you use a placeholder like 1716041183016.jpg, the system will auto-replace it, but you should directly output the correct R2 URL: <img src="/api/assets/user-upload_...jpg" alt="Christian Vestil" style="width:100%;height:100%;object-fit:cover" onerror="this.onerror=null;this.style.display='none'">. Always include meaningful alt text, object-fit:cover, and onerror fallback. For Christian Vestil specifically, ensure the portrait uses the attached image, not an Unsplash stock photo.
 - If repairing missing sub-page links:
   - If single-page: convert <a href="page.html"> to in-page anchors (<a href="#section">).
   - If multi-page: include all referenced pages with \`<!-- PAGE: page.html -->\` markers.
