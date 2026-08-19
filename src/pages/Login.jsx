@@ -159,27 +159,14 @@ export default function Login() {
         ctx.fillRect(0, 0, w, h);
       }
 
-      // draw the flow ripples themselves (water lines) on top of the distorted image
-      let alive = false;
+      // update ripples for box displacement only - no visible circles
       for (let i = ripples.length - 1; i >= 0; i--) {
         const p = ripples[i];
         p.r += p.speed;
         p.opacity = Math.max(0, 0.5 * (1 - p.r / p.maxR));
-        if (p.r >= p.maxR) { ripples.splice(i, 1); continue; }
-        alive = true;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(255,255,255,${p.opacity * 0.55})`;
-        ctx.lineWidth = 1.2;
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r * 0.68, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(160,200,255,${p.opacity * 0.16})`;
-        ctx.lineWidth = 0.9;
-        ctx.stroke();
+        if (p.r >= p.maxR) ripples.splice(i, 1);
       }
 
-      // keep flowing even without ripples for the gentle wave
       raf = requestAnimationFrame(draw);
     };
     // delay start by 900ms to avoid initial lag on page load
