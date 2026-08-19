@@ -1,7 +1,7 @@
 ---
 description: Implements core game loop, requestAnimationFrame timing, rendering pipeline, entity management, physics system, and audio systems.
 mode: subagent
-model: opencode-go/muse-spark-1.2
+model: opencode-go/muse-spark-1.2-contributor
 temperature: 0.1
 
 permission:

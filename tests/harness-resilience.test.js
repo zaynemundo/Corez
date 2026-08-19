@@ -238,7 +238,7 @@ describe('runCreationHarness resilience', () => {
     expect(final.build).toBe(GOOD_ARTIFACT);
   });
 
-  it('H1.6: the build phase streams with muse-spark-1.2 by default and honors OPENCODE_BUILD_MODEL', async () => {
+  it('H1.6: the build phase streams with muse-spark-1.2-contributor by default and honors OPENCODE_BUILD_MODEL', async () => {
     const buildCalls = [];
     runStreamingChain.mockImplementation(async function* (messages, options) {
       buildCalls.push({ serialized: JSON.stringify(messages || []), options });
@@ -248,20 +248,20 @@ describe('runCreationHarness resilience', () => {
 
     const isBuildCall = (c) => c.serialized.includes('Deliver ONLY the complete, finished artifact');
 
-    // Default build model: muse-spark-1.2 (planning/review keep the general model).
+    // Default build model: muse-spark-1.2-contributor (planning/review keep the general model).
     const storeDefault = createTaskStateStore({});
     await drain(runCreationHarness(harnessOptions(storeDefault)), []);
     const defaultBuild = buildCalls.find(isBuildCall);
-    expect(defaultBuild?.options.model).toBe('muse-spark-1.2');
+    expect(defaultBuild?.options.model).toBe('muse-spark-1.2-contributor');
 
     // Explicit per-deployment override wins.
     buildCalls.length = 0;
     const storeOverride = createTaskStateStore({});
     await drain(runCreationHarness(harnessOptions(storeOverride, {
-      env: { ...ENV, OPENCODE_BUILD_MODEL: 'muse-spark-1.2-override' }
+      env: { ...ENV, OPENCODE_BUILD_MODEL: 'muse-spark-1.2-contributor-override' }
     })), []);
     const overrideBuild = buildCalls.find(isBuildCall);
-    expect(overrideBuild?.options.model).toBe('muse-spark-1.2-override');
+    expect(overrideBuild?.options.model).toBe('muse-spark-1.2-contributor-override');
   });
 
   it('H2: the lease heartbeat is refreshed while a long build streams', async () => {

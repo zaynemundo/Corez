@@ -1,13 +1,13 @@
 /**
  * Dynamic Model Router
  * 
- * Routes all tasks to Muse Spark 1.2 (muse-spark-1.2) — the unified site-wide
+ * Routes all tasks to Muse Spark 1.2 (muse-spark-1.2-contributor) — the unified site-wide
  * model for visual tasks, backend logic, algorithms, scripting, general chat,
  * writing, data and Q&A.
  */
 
-export const MODEL_VISUAL = 'muse-spark-1.2';
-export const MODEL_DEFAULT = 'muse-spark-1.2';
+export const MODEL_VISUAL = 'muse-spark-1.2-contributor';
+export const MODEL_DEFAULT = 'muse-spark-1.2-contributor';
 
 const VISUAL_SKILL_IDS = new Set([
   'visual-creative',

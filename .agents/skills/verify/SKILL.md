@@ -46,8 +46,8 @@ npm run deploy   # deploys worker + dist assets to Cloudflare
 
 - Chat: open http://localhost:3000, send a message; watch Network for
   `POST /api/ai` returning `{content, model}` (model names the provider,
-  e.g. `opencode:muse-spark-1.2`, `deepseek:muse-spark-1.2`,
-  `openrouter:muse-spark-1.2`).
+  e.g. `opencode:muse-spark-1.2-contributor`, `deepseek:muse-spark-1.2-contributor`,
+  `openrouter:muse-spark-1.2-contributor`).
 - Images: prompts matching the image intent hit `POST /api/image` and
   return `{image, model}` — the worker tries an image model chain (Google
   Nano Banana 2 first, legacy FLUX last; `OPENROUTER_IMAGE_MODEL` overrides)

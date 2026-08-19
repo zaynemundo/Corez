@@ -146,7 +146,7 @@ export async function* runCreationHarness(options) {
       : DEFAULT_BUILD_CHECKPOINT_MS
   } = options;
 
-  // Build phase model: all tasks use Muse Spark 1.2 (muse-spark-1.2)
+  // Build phase model: all tasks use Muse Spark 1.2 (muse-spark-1.2-contributor)
   // as the unified site-wide model. OPENCODE_BUILD_MODEL overrides per
   // deployment and is checked first so it wins for any task type.
   const buildModel = options.model || env?.OPENCODE_BUILD_MODEL || selectModelForRequest({ prompt, primaryIntent, complexity }, env);

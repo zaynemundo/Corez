@@ -2,7 +2,7 @@
 
 ## Roles and authority
 
-- **Muse Spark 1.2** (`muse-spark-1.2` / opencode-go) is the lead engineering agent, handling orchestration, development, vision, visual inspection, UI layout, game design, SVG creation, and overall implementation strategy.
+- **Muse Spark 1.2** (`muse-spark-1.2-contributor` / opencode-go) is the lead engineering agent, handling orchestration, development, vision, visual inspection, UI layout, game design, SVG creation, and overall implementation strategy.
 - **FLUX 1 Schnell** (`@cf/black-forest-labs/flux-1-schnell`) is used for fast, free background image generation and visual artwork.
 
 ## Verification & Git completion policy
@@ -35,7 +35,7 @@ Roles match `SWARM_ROLES` in `packages/agent-core/swarm`: `orchestrator`, `explo
 
 > **Primary Model Rule**: **Muse Spark 1.2** operates as the lead primary executor for all code execution, component building, UI work, task graph routing, architectural guidance, code review, and empirical verification.
 
-- `primary-executor` — `muse-spark-1.2` / `opencode-go` — Coder / Tester: writes code, builds components, edits files, runs tests.
+- `primary-executor` — `muse-spark-1.2-contributor` / `opencode-go` — Coder / Tester: writes code, builds components, edits files, runs tests.
 - `art-director` — `flux-2-klein-4b` / `cloudflare-workers-ai` — Creative Lead: visual direction, color palettes, background textures, art assets.
 
 ### File Ownership & Context Rules

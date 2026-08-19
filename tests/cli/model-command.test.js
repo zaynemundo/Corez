@@ -30,8 +30,8 @@ describe('/model CLI Command', () => {
     const config = loadCorezConfig(process.cwd());
     expect(config.model).toBe('kimi-k3');
 
-    // Switch back to default muse-spark-1.2
-    await handleModelCommand(['muse-spark-1.2'], { cwd: process.cwd() }, {
+    // Switch back to default muse-spark-1.2-contributor
+    await handleModelCommand(['muse-spark-1.2-contributor'], { cwd: process.cwd() }, {
       banner: () => {},
       status: () => {},
       success: () => {},
@@ -56,7 +56,7 @@ describe('/model CLI Command', () => {
   });
 
   it('runs corez-code /model kimi-k3 via CLI router cleanly', async () => {
-    const code = await runCli(['/model', 'muse-spark-1.2']);
+    const code = await runCli(['/model', 'muse-spark-1.2-contributor']);
     expect(code).toBe(0);
   });
 });

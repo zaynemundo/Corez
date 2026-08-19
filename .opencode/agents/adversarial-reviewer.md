@@ -1,7 +1,7 @@
 ---
 description: Optional expensive adversarial critic for major architectural disputes and final high-risk release signoffs.
 mode: subagent
-model: opencode-go/muse-spark-1.2
+model: opencode-go/muse-spark-1.2-contributor
 temperature: 0.2
 
 permission:

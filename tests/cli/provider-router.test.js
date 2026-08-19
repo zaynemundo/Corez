@@ -8,7 +8,7 @@ describe('ModelProviderRouter', () => {
 
     expect(Array.isArray(models)).toBe(true);
     expect(models.length).toBeGreaterThan(0);
-    expect(models.some(m => m.id === 'muse-spark-1.2')).toBe(true);
+    expect(models.some(m => m.id === 'muse-spark-1.2-contributor')).toBe(true);
   });
 
   it('runs local agent fallback simulation when no API key is set', async () => {

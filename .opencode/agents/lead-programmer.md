@@ -1,7 +1,7 @@
 ---
 description: Converts game specs into modular software engineering architecture, task decomposition, and code review coordination.
 mode: subagent
-model: opencode-go/muse-spark-1.2
+model: opencode-go/muse-spark-1.2-contributor
 temperature: 0.1
 
 permission:
