@@ -195,8 +195,8 @@ export function createTodoTool(todoTracker) {
         // allowParallel check: if more than one in_progress and caller didn't allow, could deny
         // For now, store as is (DSH plugin would handle allowParallel)
         const data = todoTracker.setTodos(scopeId, normalized.map((n) => ({ id: n.id, title: n.title, status: n.status })));
-        // also return DSH-shaped response
-        return { success: true, todos: normalized.map((n) => ({ content: n.title, status: n.status === 'todo' ? 'pending' : n.status })), ...data };
+        // also return DSH-shaped response (DSH todos overwrite internal shape, keep stats)
+        return { success: true, ...data, todos: normalized.map((n) => ({ content: n.title, status: n.status === 'todo' ? 'pending' : n.status })) };
       }
 
       if (action === 'list' || (!action && !todos && !item && !update)) {

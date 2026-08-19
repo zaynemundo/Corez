@@ -85,6 +85,7 @@ describe('Hosted AI fallback behavior', () => {
     let aiCalls = 0;
     const fetchMock = vi.fn(async (url) => {
       if (url === '/api/inspiration') return Response.json({ sites: [] });
+      if (url === '/api/embed') return Response.json({ embeddings: [] });
       aiCalls += 1;
       return new Response(
         'data: {"type":"meta"}\n\ndata: {"type":"done","final":true}\n\n',
@@ -106,6 +107,7 @@ describe('Hosted AI fallback behavior', () => {
     // stream parser must surface the real content, never a fake empty stream.
     const fetchMock = vi.fn(async (url) => {
       if (url === '/api/inspiration') return Response.json({ sites: [] });
+      if (url === '/api/embed') return Response.json({ embeddings: [] });
       return new Response(
         JSON.stringify({ content: 'Greeting from the fast path.', model: 'corez-greeting' }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
@@ -124,6 +126,7 @@ describe('Hosted AI fallback behavior', () => {
   it('reports a security-challenge page verbatim instead of a fake empty stream', async () => {
     const fetchMock = vi.fn(async (url) => {
       if (url === '/api/inspiration') return Response.json({ sites: [] });
+      if (url === '/api/embed') return Response.json({ embeddings: [] });
       return new Response(
         '<!DOCTYPE html><html><head><title>Just a moment...</title></head><body>challenge</body></html>',
         { status: 200, headers: { 'Content-Type': 'text/html' } }
@@ -140,6 +143,7 @@ describe('Hosted AI fallback behavior', () => {
   it('reports an empty body honestly instead of a fake empty stream', async () => {
     const fetchMock = vi.fn(async (url) => {
       if (url === '/api/inspiration') return Response.json({ sites: [] });
+      if (url === '/api/embed') return Response.json({ embeddings: [] });
       return new Response('', { status: 200 });
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -152,12 +156,13 @@ describe('Hosted AI fallback behavior', () => {
       onDelta: () => {},
       retryDelaysMs: [0, 0, 0]
     })).rejects.toThrow(/empty response/i);
-    expect(fetchMock.mock.calls.filter(([url]) => url !== '/api/inspiration')).toHaveLength(4);
+    expect(fetchMock.mock.calls.filter(([url]) => url !== '/api/inspiration' && url !== '/api/embed')).toHaveLength(4);
   });
 
   it('diagnoses a 403 challenge page as a WAF interception instead of a generic HTTP failure', async () => {
     const fetchMock = vi.fn(async (url) => {
       if (url === '/api/inspiration') return Response.json({ sites: [] });
+      if (url === '/api/embed') return Response.json({ embeddings: [] });
       return new Response(
         '<!DOCTYPE html><html><head><title>Just a moment...</title></head><body>challenge</body></html>',
         { status: 403, headers: { 'Content-Type': 'text/html' } }
@@ -169,7 +174,7 @@ describe('Hosted AI fallback behavior', () => {
       stream: true,
       onDelta: () => {}
     })).rejects.toThrow(/WAF bypass rule for \/api\//i);
-    const aiCalls = fetchMock.mock.calls.filter(([url]) => url !== '/api/inspiration');
+    const aiCalls = fetchMock.mock.calls.filter(([url]) => url !== '/api/inspiration' && url !== '/api/embed');
     expect(aiCalls).toHaveLength(2);
     expect(aiCalls[1][0]).toBe('https://chat.zayne-mayo.workers.dev/api/ai');
   });
@@ -177,6 +182,7 @@ describe('Hosted AI fallback behavior', () => {
   it('retries a Cloudflare challenge through the direct Worker hostname', async () => {
     const fetchMock = vi.fn(async (url) => {
       if (url === '/api/inspiration') return Response.json({ sites: [] });
+      if (url === '/api/embed') return Response.json({ embeddings: [] });
       if (url === '/api/ai') {
         return new Response(
           '<!DOCTYPE html><html><head><title>Just a moment...</title></head><body>challenge</body></html>',
@@ -197,12 +203,13 @@ describe('Hosted AI fallback behavior', () => {
     });
 
     expect(response).toBe('Playable game HTML');
-    expect(fetchMock.mock.calls.filter(([url]) => url !== '/api/inspiration')).toHaveLength(2);
+    expect(fetchMock.mock.calls.filter(([url]) => url !== '/api/inspiration' && url !== '/api/embed')).toHaveLength(2);
   });
 
   it('does not bypass the primary endpoint for ordinary 403 errors', async () => {
     const fetchMock = vi.fn(async (url) => {
       if (url === '/api/inspiration') return Response.json({ sites: [] });
+      if (url === '/api/embed') return Response.json({ embeddings: [] });
       return Response.json({ error: 'Forbidden' }, { status: 403 });
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -211,12 +218,13 @@ describe('Hosted AI fallback behavior', () => {
       stream: true,
       onDelta: () => {}
     })).rejects.toThrow(/HTTP 403/i);
-    expect(fetchMock.mock.calls.filter(([url]) => url !== '/api/inspiration')).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([url]) => url !== '/api/inspiration' && url !== '/api/embed')).toHaveLength(1);
   });
 
   it('does not bypass an explicit Cloudflare block page', async () => {
     const fetchMock = vi.fn(async (url) => {
       if (url === '/api/inspiration') return Response.json({ sites: [] });
+      if (url === '/api/embed') return Response.json({ embeddings: [] });
       return new Response('<!DOCTYPE html><html><body>Access denied</body></html>', {
         status: 403,
         headers: { 'Content-Type': 'text/html', 'cf-mitigated': 'block' }
@@ -228,12 +236,13 @@ describe('Hosted AI fallback behavior', () => {
       stream: true,
       onDelta: () => {}
     })).rejects.toThrow(/HTTP 403/i);
-    expect(fetchMock.mock.calls.filter(([url]) => url !== '/api/inspiration')).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([url]) => url !== '/api/inspiration' && url !== '/api/embed')).toHaveLength(1);
   });
 
   it('forwards harness phase and clear events and returns only the final artifact', async () => {
     const fetchMock = vi.fn(async (url) => {
       if (url === '/api/inspiration') return Response.json({ sites: [] });
+      if (url === '/api/embed') return Response.json({ embeddings: [] });
       return new Response(
         [
           'data: {"type":"meta"}',
@@ -271,6 +280,7 @@ describe('Hosted AI fallback behavior', () => {
     let aiCalls = 0;
     const fetchMock = vi.fn(async (url) => {
       if (url === '/api/inspiration') return Response.json({ sites: [] });
+      if (url === '/api/embed') return Response.json({ embeddings: [] });
       aiCalls += 1;
       return new Response(
         'data: {"type":"error","status":429,"retryable":true,"message":"A build for this request is already in progress."}\n\n',
@@ -295,6 +305,7 @@ describe('Hosted AI fallback behavior', () => {
     let aiCalls = 0;
     const fetchMock = vi.fn(async (url) => {
       if (url === '/api/inspiration') return Response.json({ sites: [] });
+      if (url === '/api/embed') return Response.json({ embeddings: [] });
       aiCalls += 1;
       if (aiCalls === 1) {
         // First attempt: the stream dies mid-harness (phase events only,

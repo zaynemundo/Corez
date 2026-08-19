@@ -465,12 +465,22 @@ export function createFallbackSvgDataUrl(prompt) {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
-export async function generateImage(prompt, signal = null, referenceImage = null) {
+export async function generateImage(prompt, signal = null, referenceImage = null, options = {}) {
+  const hasReferenceImage = typeof referenceImage === 'string' && referenceImage.startsWith('data:image');
+
+  // Primary: Workers AI FLUX.2 klein-4b (free, no key) via /api/image/cf.
+  // OpenRouter reference images require multimodal support, so skip Workers AI
+  // when the user supplied one — fall through to the OpenRouter path.
+  if (!hasReferenceImage) {
+    const workersImage = await generateWorkersAIImage(prompt, signal, options);
+    if (workersImage) return workersImage;
+  }
+
   try {
     const payload = { prompt };
     // The user's own reference image (data URL) is forwarded so image models
     // can use it as visual input instead of generating from text alone.
-    if (typeof referenceImage === 'string' && referenceImage.startsWith('data:image')) {
+    if (hasReferenceImage) {
       payload.referenceImage = referenceImage;
     }
     const fetchOptions = {
