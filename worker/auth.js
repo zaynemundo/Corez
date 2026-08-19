@@ -6,6 +6,7 @@ export const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
 // Per-IP rate limiter for authentication routes (10 requests per minute)
 const authRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 10 });
+const forgotRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 5 });
 
 // ---------- helpers ----------
 export function b64urlEncode(buf) {
@@ -109,6 +110,9 @@ export async function ensureTables(env) {
     await env.DB.prepare(`CREATE TABLE IF NOT EXISTS chat_messages (id TEXT PRIMARY KEY, chat_id TEXT NOT NULL, user_id TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, attachments TEXT, created_at INTEGER NOT NULL)`).run();
     await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_chats_user_updated ON chats(user_id, updated_at DESC)`).run();
     await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_messages_chat_created ON chat_messages(chat_id, created_at ASC)`).run();
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS password_resets (id TEXT PRIMARY KEY, email TEXT NOT NULL, token TEXT UNIQUE NOT NULL, expires_at INTEGER NOT NULL, used INTEGER DEFAULT 0, created_at INTEGER NOT NULL)`).run();
+    await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_resets_token ON password_resets(token)`).run();
+    await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_resets_email ON password_resets(email)`).run();
     // seed default invite codes from env if table empty
     const count = await env.DB.prepare('SELECT COUNT(*) as c FROM invite_codes').first();
     if (count && Number(count.c) === 0 && env.INVITE_CODES) {
@@ -341,6 +345,88 @@ export async function handleAuth(request, env) {
     headers.append('Set-Cookie', setCookieHeader(token));
     headers.append('Set-Cookie', 'oauth_state=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0');
     return new Response(null, { status: 302, headers });
+  }
+
+  // POST /api/auth/forgot - request password reset email
+  if (path === '/api/auth/forgot' && request.method === 'POST') {
+    const retryAfter = forgotRateLimiter(request);
+    if (retryAfter !== null) {
+      return jsonResponse(429, { error: 'Too many reset attempts. Please wait.' }, { 'Retry-After': String(retryAfter) });
+    }
+    let body;
+    try { body = await request.json(); } catch { return jsonResponse(400, { error: 'Invalid JSON' }); }
+    const email = String(body.email || '').trim().toLowerCase();
+    if (!validEmail(email)) return jsonResponse(400, { error: 'Valid email required' });
+    if (!env?.DB) return jsonResponse(500, { error: 'Auth database not configured' });
+
+    const user = await findUserByEmail(env, email);
+    // Always return ok to not leak existence, but only create token if user exists and is local
+    if (user && user.password_hash) {
+      const token = b64urlEncode(crypto.getRandomValues(new Uint8Array(32)));
+      const id = randomId();
+      const expiresAt = Date.now() + 60 * 60 * 1000; // 1 hour
+      try {
+        await env.DB.prepare('INSERT INTO password_resets (id, email, token, expires_at, created_at) VALUES (?,?,?,?,?)').bind(id, email, token, expiresAt, Date.now()).run();
+        const resetUrl = `${url.origin}/?token=${encodeURIComponent(token)}`;
+        // Try to send via Resend if configured, otherwise log
+        const resendKey = env?.RESEND_API_KEY;
+        if (resendKey) {
+          try {
+            const from = env?.RESEND_FROM || 'CoreZ <onboarding@resend.dev>';
+            await fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                from,
+                to: email,
+                subject: 'Reset your CoreZ password',
+                html: `<p>You requested a password reset for <strong>${email}</strong>.</p><p><a href="${resetUrl}">Click here to reset your password</a> (expires in 1 hour).</p><p>If you did not request this, ignore this email.</p><p>Token: <code>${token}</code></p>`
+              })
+            });
+          } catch (e) {
+            console.warn('Resend failed:', safeErrorDetail(e));
+          }
+        } else {
+          console.warn(`Password reset token for ${email}: ${token} -> ${resetUrl}`);
+        }
+        // In dev without RESEND, return token for testing (only when no Resend key)
+        if (!resendKey) {
+          return jsonResponse(200, { ok: true, message: 'If that email exists, a reset link has been sent.', token, resetUrl });
+        }
+      } catch (e) {
+        console.warn('Failed to create reset token:', safeErrorDetail(e));
+      }
+    }
+    return jsonResponse(200, { ok: true, message: 'If that email exists, a reset link has been sent.' });
+  }
+
+  // POST /api/auth/reset - reset password with token
+  if (path === '/api/auth/reset' && request.method === 'POST') {
+    const retryAfter = forgotRateLimiter(request);
+    if (retryAfter !== null) {
+      return jsonResponse(429, { error: 'Too many reset attempts. Please wait.' }, { 'Retry-After': String(retryAfter) });
+    }
+    let body;
+    try { body = await request.json(); } catch { return jsonResponse(400, { error: 'Invalid JSON' }); }
+    const token = String(body.token || '').trim();
+    const password = String(body.password || '');
+    if (!token) return jsonResponse(400, { error: 'Reset token required' });
+    if (password.length < 8) return jsonResponse(400, { error: 'Password must be at least 8 characters' });
+    if (!env?.DB) return jsonResponse(500, { error: 'Auth database not configured' });
+
+    const row = await env.DB.prepare('SELECT * FROM password_resets WHERE token=?').bind(token).first();
+    if (!row) return jsonResponse(400, { error: 'Invalid or expired reset token' });
+    if (Number(row.used) === 1) return jsonResponse(400, { error: 'Reset token already used' });
+    if (Date.now() > Number(row.expires_at)) return jsonResponse(400, { error: 'Reset token expired' });
+
+    const user = await findUserByEmail(env, String(row.email));
+    if (!user) return jsonResponse(400, { error: 'User not found' });
+
+    const hash = await hashPassword(password);
+    await env.DB.prepare('UPDATE users SET password_hash=? WHERE id=?').bind(hash, user.id).run();
+    await env.DB.prepare('UPDATE password_resets SET used=1 WHERE id=?').bind(row.id).run();
+
+    return jsonResponse(200, { ok: true, message: 'Password has been reset. You can now login.' });
   }
 
   return null;

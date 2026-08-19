@@ -55,8 +55,32 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  const forgot = async (email) => {
+    const r = await fetch('/api/auth/forgot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ email })
+    });
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) throw new Error(d.error || 'Failed to send reset email');
+    return d;
+  };
+
+  const reset = async (token, password) => {
+    const r = await fetch('/api/auth/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ token, password })
+    });
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) throw new Error(d.error || 'Failed to reset password');
+    return d;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout, refresh: fetchMe }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, logout, forgot, reset, refresh: fetchMe }}>
       {children}
     </AuthContext.Provider>
   );
