@@ -805,6 +805,9 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 1rem;
   font-weight: 400;
   line-height: 1.7;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  overflow: hidden;
 }
 
 [data-theme="light"] .message-wrapper.user .message-content {
@@ -1814,10 +1817,13 @@ h1, h2, h3, h4, h5, h6 {
 /* Code Block Component */
 .code-block-container {
   margin: 0.75rem 0;
+  max-width: 100%;
+  width: 100%;
   border-radius: var(--radius-md);
   overflow: hidden;
   border: 1px solid var(--border-color);
   background-color: var(--code-bg);
+  min-width: 0;
 }
 
 .code-header {
@@ -1905,11 +1911,27 @@ h1, h2, h3, h4, h5, h6 {
 .code-content {
   padding: 0.85rem;
   overflow-x: auto;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  white-space: pre-wrap;
+  max-width: 100%;
+  min-width: 0;
   font-family: var(--font-mono);
   font-size: 0.875rem;
   font-weight: 400;
   line-height: 1.5;
   color: #eeeeee;
+  scrollbar-width: thin;
+}
+
+.code-content code {
+  display: block;
+  max-width: 100%;
+  min-width: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  overflow-x: auto;
 }
 
 /* Single-Line Fully Rounded Input Box */
