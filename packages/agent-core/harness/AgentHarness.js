@@ -409,10 +409,12 @@ export class AgentHarness {
   async #executeAgentLoop(task, options = {}) {
     const { signal, renewLease } = options;
     const log = this._ensureSessionLog(task);
+    const llmService = this.harnessContext?.llm || null;
     const loop = new AgentLoop({
       sessionLog: log,
       eventBus: this.eventBus,
       providerChain: this.providerChain,
+      llmService,
       toolRegistry: this.toolRegistry,
       sessionId: task.taskId,
       model: task.model,

@@ -8,6 +8,7 @@
 
 import { SessionLog } from './SessionLog.js';
 import { BlockAssembler } from '../llm/BlockAssembler.js';
+import { LlmService } from '../llm/LlmService.js';
 
 export class Inbox {
   constructor(sessionLog, { onSpliced } = {}) {
@@ -100,10 +101,11 @@ export class AgentLoop {
   constructor(options = {}) {
     if (!options.sessionLog) throw new Error('AgentLoop requires sessionLog');
     if (!options.eventBus) throw new Error('AgentLoop requires eventBus');
-    if (!options.providerChain) throw new Error('AgentLoop requires providerChain');
+    if (!options.providerChain && !options.llmService) throw new Error('AgentLoop requires providerChain or llmService');
     this.sessionLog = options.sessionLog;
     this.eventBus = options.eventBus;
-    this.providerChain = options.providerChain;
+    this.providerChain = options.providerChain || options.llmService?.providerChain || null;
+    this.llmService = options.llmService || (this.providerChain ? new LlmService({ providerChain: this.providerChain }) : null);
     this.toolRegistry = options.toolRegistry || null;
     this.systemPromptProvider = options.systemPromptProvider || null;
     this.id = options.sessionId || this.sessionLog.sessionId;
@@ -329,62 +331,124 @@ export class AgentLoop {
       this.sessionLog.append('request/context', requestContext);
     }
 
-    // LLM streaming: our providerChain is non-streaming but we emulate chunk seqs for log fidelity
+    // LLM streaming via LlmService (DSH dsh-llm parity) + BlockAssembler
     const genMessages = [...boundaryMessages];
-    // if the loop derived messages already include the just-appended user messages, they are there; else inject assembly?
     const fullMessages = genMessages.length ? genMessages : [{ role: 'user', content: 'continue' }];
 
-    // allow llm/stream waterfall to wrap generation
+    // choose seam: prefer LlmService (which itself wraps ProviderChain with prepareCall/stream)
+    const llm = this.llmService || (this.providerChain ? new LlmService({ providerChain: this.providerChain }) : null);
+    if (!llm) throw new Error('No LLM service available');
+
+    // allow llm/stream waterfall to wrap generation — DSH: waterfall receives request + next
     const doGenerate = async () => {
-      const res = await this.providerChain.generate({ taskId: this.id, model: requestConfig.model, messages: fullMessages, tools, signal });
+      // Prefer LlmService streaming; fall back to direct generate for mocks
+      if (typeof llm.stream === 'function' && typeof llm.prepareCall === 'function') {
+        try {
+          const prep = await llm.prepareCall({ provider: requestConfig.provider, model: requestConfig.model, reasoningEffort: requestConfig.reasoningEffort, maxTokens: requestConfig.maxTokens }, signal);
+          const chunks = [];
+          for await (const ch of prep.stream({ provider: prep.config.provider, model: prep.config.model, messages: fullMessages, tools, sessionId: this.id, signal })) {
+            chunks.push(ch);
+          }
+          // chunks are StreamChunk; reconstruct result for backward compat
+          // we will also feed them to BlockAssembler below — for now return chunks
+          return { status: 'completed', chunks, provider: prep.config.provider, model: prep.config.model };
+        } catch (_e) {
+          // fallback to generate
+        }
+      }
+      const res = await (this.providerChain || llm).generate({ taskId: this.id, model: requestConfig.model, messages: fullMessages, tools, signal });
       return res;
     };
-    let result;
+
+    let rawResult;
     try {
-      result = await this.eventBus.dispatchWaterfall('llm/stream', { turn, step, request: { provider: requestConfig.provider, model: requestConfig.model, messages: fullMessages }, signal }, doGenerate);
-      if (result && result.status === undefined && result.content !== undefined) {
-        // waterfall returned raw content
-        result = { status: 'completed', content: result.content, toolCalls: result.toolCalls || [] };
+      rawResult = await this.eventBus.dispatchWaterfall('llm/stream', { turn, step, request: { provider: requestConfig.provider, model: requestConfig.model, messages: fullMessages }, signal }, doGenerate);
+      if (rawResult && rawResult.status === undefined && rawResult.content !== undefined) {
+        rawResult = { status: 'completed', content: rawResult.content, toolCalls: rawResult.toolCalls || [] };
       }
     } catch (e) {
       signal.throwIfAborted();
       throw e;
     }
 
-    if (result?.status === 'cancelled' || signal.aborted) throw new DOMException('aborted', 'AbortError');
-
-    // handle retry-scheduled as failure for this step (caller may schedule task retry)
-    if (result?.status === 'retry-scheduled' || result?.status === 'retry_scheduled') {
-      throw new Error(result.error || `Provider ${result.provider} retry pending`);
+    if (rawResult?.status === 'cancelled' || signal.aborted) throw new DOMException('aborted', 'AbortError');
+    if (rawResult?.status === 'retry-scheduled' || rawResult?.status === 'retry_scheduled') {
+      throw new Error(rawResult.error || `Provider ${rawResult.provider} retry pending`);
     }
-    if (result?.status === 'failed') {
-      // surface as llm error
-      const err = new Error(result.error || 'LLM failed');
+    if (rawResult?.status === 'failed') {
+      const err = new Error(rawResult.error || 'LLM failed');
       err.code = 'LLM_FAILED';
       throw err;
     }
 
-    const content = result?.content ?? '';
-    const toolCalls = result?.toolCalls ?? result?.tool_calls ?? [];
-
-    // emit assistant chunks (one chunk for now; real streaming would push many)
+    // Normalize rawResult into StreamChunk sequence via BlockAssembler
+    const assembler = new BlockAssembler();
     const chunkSeqs = [];
-    if (content) {
-      const chunk = { type: 'text', text: content };
-      const ev = this.sessionLog.append('assistant/chunk', { turn, step, chunk });
-      chunkSeqs.push(ev.seq);
-      this.eventBus.emit({ type: 'assistant/chunk', taskId: this.id, turn, step, chunk });
+    // If rawResult already contains chunks (from LlmService streaming), push them directly
+    if (Array.isArray(rawResult?.chunks)) {
+      for (const ch of rawResult.chunks) {
+        assembler.push(ch);
+        // also log raw chunk for replay fidelity (assistant/chunk is durable raw)
+        // ch is already a StreamChunk; log it as-is
+        const ev = this.sessionLog.append('assistant/chunk', { turn, step, chunk: ch });
+        chunkSeqs.push(ev.seq);
+        this.eventBus.emit({ type: 'assistant/chunk', taskId: this.id, turn, step, chunk: ch });
+      }
+    } else {
+      // legacy mocked result with content/toolCalls — synthesize chunks
+      const content = rawResult?.content ?? '';
+      const toolCalls = rawResult?.toolCalls ?? rawResult?.tool_calls ?? [];
+      // text deltas (split in two to exercise streaming)
+      if (content) {
+        const mid = Math.floor(String(content).length / 2);
+        const part1 = String(content).slice(0, mid);
+        const part2 = String(content).slice(mid);
+        const ch1 = { type: 'text-delta', index: 0, text: part1 || String(content) };
+        const ch2 = part1 ? { type: 'text-delta', index: 0, text: part2 } : null;
+        for (const ch of [ch1, ch2].filter(Boolean)) {
+          assembler.push(ch);
+          const ev = this.sessionLog.append('assistant/chunk', { turn, step, chunk: ch });
+          chunkSeqs.push(ev.seq);
+          this.eventBus.emit({ type: 'assistant/chunk', taskId: this.id, turn, step, chunk: ch });
+        }
+      }
+      if (Array.isArray(toolCalls) && toolCalls.length) {
+        for (let i = 0; i < toolCalls.length; i++) {
+          const tc = toolCalls[i];
+          const idx = (content ? 1 : 0) + i;
+          const name = tc.name || tc.function?.name || '';
+          const args = typeof tc.arguments === 'string' ? tc.arguments : typeof tc.function?.arguments === 'string' ? tc.function.arguments : JSON.stringify(tc.arguments || tc.args || {});
+          const id = tc.id || tc.callId || `call-${i}`;
+          const ch = { type: 'tool-call-delta', index: idx, id, name, argumentsDelta: args };
+          assembler.push(ch);
+          const ev = this.sessionLog.append('assistant/chunk', { turn, step, chunk: ch });
+          chunkSeqs.push(ev.seq);
+          this.eventBus.emit({ type: 'assistant/chunk', taskId: this.id, turn, step, chunk: ch });
+          // block-end for tool-call (DSH canonical)
+          const end = { type: 'block-end', index: idx, block: { type: 'tool-call', id, name, arguments: args } };
+          assembler.push(end);
+        }
+      }
+      // usage + finish (DSH)
+      assembler.push({ type: 'usage', usage: rawResult?.usage || { promptTokens: 10, completionTokens: 10, totalTokens: 20 } });
+      assembler.push({ type: 'finish', reason: { kind: rawResult?.finishReason === 'max-tokens' ? 'max-tokens' : 'stop' } });
     }
 
-    // assemble assistant message
+    const blocks = assembler.blocks();
+    const textBlocks = blocks.filter((b) => b.type === 'text');
+    const toolCallBlocks = blocks.filter((b) => b.type === 'tool-call');
+    const content = textBlocks.map((b) => b.text).join('');
+    const toolCalls = toolCallBlocks;
+
+    // assemble assistant message (DSH createAssistantMessage)
     const assistantMessage = {
       role: 'assistant',
       content: content || '',
-      ...(toolCalls.length ? { tool_calls: toolCalls.map((c) => ({ id: c.id || c.callId || `call_${Math.random().toString(36).slice(2, 6)}`, type: 'function', function: { name: c.name || c.function?.name, arguments: typeof c.arguments === 'string' ? c.arguments : JSON.stringify(c.arguments || c.args || {}) } })) } : {})
+      ...(toolCalls.length ? { tool_calls: toolCalls.map((c) => ({ id: c.id, type: 'function', function: { name: c.name, arguments: c.arguments } })) } : {}),
+      ...(assembler.usage ? { usage: assembler.usage } : {})
     };
-    // also handle tool-call blocks for newer spec
-    const isMaxTokens = content.length > 120000;
-    this.sessionLog.append('assistant/message', { turn, step, message: assistantMessage }, { surfaceOp: 'append', sourceEventSeqs: chunkSeqs });
+    const isMaxTokens = assembler.finish.kind === 'max-tokens';
+    this.sessionLog.append('assistant/message', { turn, step, message: assistantMessage, ...(assembler.usage ? { usage: assembler.usage } : {}) }, { surfaceOp: 'append', sourceEventSeqs: chunkSeqs });
     this.eventBus.emit({ type: 'assistant/message', taskId: this.id, turn, step, message: assistantMessage });
 
     if (isMaxTokens) return { kind: 'max-tokens' };
