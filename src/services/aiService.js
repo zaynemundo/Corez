@@ -1884,37 +1884,7 @@ Its core purpose is to remove the technical gap between having an idea and launc
   }
 
   if (intent.type === 'explanation') {
-    // For office/design inspiration queries, give a direct local answer even when hosted is down
-    if (/office.*inspiration/i.test(cleanPrompt)) {
-      return `**Office inspirations** are curated ideas and references that help you design a workspace that looks good and works well.
-
-**Core idea:** A collection of visual and functional concepts — layout, colors, furniture, lighting, decor — that spark and guide your office design.
-
-**Why it matters:** The right inspirations save time, prevent costly mistakes, and ensure your office supports focus, collaboration, and brand identity.
-
-**Key parts:**
-- **Layout & flow** — open plan vs. private zones, e.g., a central collaboration table with quiet pods around the edges.
-- **Style & mood** — palette, materials, lighting, e.g., warm wood + white with soft pendant lighting for a calm, modern feel.
-- **Function & details** — storage, ergonomics, greenery, e.g., standing desks, plants, and acoustic panels for comfort and productivity.
-
-**Next step:** Pick one reference image you like and note *what* you like about it (color, layout, vibe) — then we can build on it. Want me to generate a few office concepts for you? Just say the style (e.g., "minimal, Japandi, industrial").`;
-    }
     const reason = describeHostedUnavailable(hostedError);
-    // Don't surface empty-stream technical details to the user - just give the framework
-    if (/empty streaming response/i.test(reason)) {
-      return `**Office inspirations** — and most design topics — are about gathering visual and functional ideas to shape a space that works for you.
-
-**Core idea:** Inspirations are reference points (images, layouts, palettes, furniture) that guide your design decisions.
-
-**Why it matters:** They help you avoid blank-page paralysis and create a cohesive, functional office.
-
-**Key parts:**
-- **Idea source** — where you find them: Pinterest, Awwwards, physical spaces, e.g., a light-filled coworking photo.
-- **Translation** — how you adapt an idea to your space, e.g., using a seen color palette on your own walls.
-- **Application** — making it real: furniture, lighting, layout e.g., "let's try that open shelf idea in your office."
-
-**Next step:** Tell me your office size, style preference, or a photo you like and I'll turn it into a concrete plan or generate a visual.`;
-    }
     return `I can't properly answer "${cleanPrompt}" right now because the hosted AI service is currently unavailable.${reason}\n\nRetry in a moment and I'll explain it directly in plain language. If you'd rather work through it yourself in the meantime, this framework keeps any topic approachable:\n\n1. **Core idea** — define the topic in one everyday sentence.\n2. **Why it matters** — connect it to what you're trying to accomplish.\n3. **Key parts** — two or three simple pieces, each with a concrete example.\n4. **Next step** — one small action to test your understanding.`;
   }
 
@@ -2302,6 +2272,32 @@ export async function generateAIResponse(prompt, history = [], signal = null, on
     if (hostedAiError?.name === 'AbortError') throw hostedAiError;
     if (/Authentication required/i.test(hostedAiError?.message || '')) {
       return 'Please log in to continue. Your session may have expired — refresh the page and sign in again, then retry your request.';
+    }
+    // Empty streaming is often transient (model overloaded, reasoning-only) - retry once with a more explicit prompt
+    if (/empty streaming response|empty or reasoning-only/i.test(hostedAiError?.message || '') && !cleanPrompt.startsWith('[RETRY]')) {
+      try {
+        const retryPrompt = `[RETRY] Explain clearly and directly: ${cleanPrompt}`;
+        const retryResponse = await generateHostedAIResponse(retryPrompt, intent, history, signal, {
+          stream: typeof onDelta === 'function',
+          onDelta,
+          onPhase,
+          onClear
+        });
+        if (retryResponse) {
+          const imageMatch = retryResponse.match(/\[IMAGE_PROMPT:\s*(.*?)\]/i);
+          if (imageMatch) {
+            const imagePrompt = imageMatch[1].trim();
+            try {
+              const imageUrl = await generateImage(imagePrompt, signal, extractReferenceImage(history));
+              if (imageUrl) return retryResponse.replace(imageMatch[0], `![](${imageUrl})`);
+            } catch {}
+          }
+          return retryResponse;
+        }
+      } catch (retryErr) {
+        if (retryErr?.name === 'AbortError') throw retryErr;
+        console.warn('Retry also failed, falling back to local.', retryErr);
+      }
     }
     console.warn('Hosted AI unavailable; using local Corez fallback.', hostedAiError);
     return generateLocalAIResponse(cleanPrompt, hostedAiError, signal);
