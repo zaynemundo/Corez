@@ -40,11 +40,21 @@ export default function Login() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    const img = new Image();
+    img.src = mercuryBg;
+    let imgLoaded = false;
+    img.onload = () => { imgLoaded = true; if (!raf) raf = requestAnimationFrame(draw); };
+
     let raf = 0;
     const ripples = [];
     let w = 0;
     let h = 0;
-    let dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    let time = 0;
+
+    // grid for water flow that actually distorts the Mercury image
+    const cols = 56;
+    const rows = 32;
 
     const resize = () => {
       const rect = page.getBoundingClientRect();
@@ -61,63 +71,109 @@ export default function Login() {
 
     const addRipple = (x, y, big = false) => {
       ripples.push({
-        x,
-        y,
+        x, y,
         r: 0,
-        maxR: big ? 140 + Math.random() * 40 : 68 + Math.random() * 42,
-        speed: big ? 1.7 : 1.35 + Math.random() * 0.6,
-        opacity: 0.42,
-        line: big ? 1.4 : 1.1,
-      });
-      // second inner ripple for water depth
-      ripples.push({
-        x: x + (Math.random() - 0.5) * 6,
-        y: y + (Math.random() - 0.5) * 6,
-        r: 0,
-        maxR: big ? 86 : 38,
-        speed: big ? 1.1 : 0.95,
-        opacity: 0.22,
-        line: 0.9,
+        maxR: big ? 220 : 88 + Math.random() * 36,
+        speed: big ? 2.1 : 1.6 + Math.random() * 0.7,
+        strength: big ? 18 : 10,
+        opacity: 0.5,
       });
       if (!raf) raf = requestAnimationFrame(draw);
     };
 
-    // auto gentle ripples like water surface
+    // gentle auto flow
     const autoTimer = setInterval(() => {
-      if (ripples.length > 12) return;
-      addRipple(Math.random() * w, Math.random() * h * 0.9 + h * 0.05, Math.random() > 0.7);
-    }, 1400);
+      if (ripples.length > 10) return;
+      addRipple(Math.random() * w, Math.random() * h, Math.random() > 0.75);
+    }, 900);
 
     const draw = () => {
+      time += 0.016;
       ctx.clearRect(0, 0, w, h);
+
+      if (imgLoaded && img.complete && img.naturalWidth) {
+        // draw Mercury image with water flow: grid displacement driven by ripples + gentle wave
+        const cellW = w / cols;
+        const cellH = h / rows;
+        // cover-fit the Mercury image into canvas
+        const iw = img.naturalWidth;
+        const ih = img.naturalHeight;
+        const scale = Math.max(w / iw, h / ih);
+        const sw = iw * scale;
+        const sh = ih * scale;
+        const sx0 = (w - sw) / 2;
+        const sy0 = (h - sh) / 2;
+
+        for (let gy = 0; gy < rows; gy++) {
+          for (let gx = 0; gx < cols; gx++) {
+            const x = gx * cellW;
+            const y = gy * cellH;
+            const cx = x + cellW / 2;
+            const cy = y + cellH / 2;
+
+            // base gentle water flow (sine wave)
+            let dx = Math.sin(cy * 0.008 + time * 0.7) * 2.2 + Math.cos(cx * 0.006 + time * 0.5) * 1.6;
+            let dy = Math.cos(cx * 0.007 + time * 0.6) * 1.4 + Math.sin(cy * 0.005 + time * 0.4) * 1.2;
+
+            // ripple displacement - flow interacts with image
+            for (const p of ripples) {
+              const dist = Math.hypot(cx - p.x, cy - p.y);
+              if (dist < p.r && dist > p.r - 26) {
+                const wave = Math.sin((dist - p.r) * 0.22) * p.strength * (1 - p.r / p.maxR);
+                const ang = Math.atan2(cy - p.y, cx - p.x);
+                dx += Math.cos(ang) * wave * 0.45;
+                dy += Math.sin(ang) * wave * 0.45;
+              } else if (dist < p.r) {
+                const inside = (1 - dist / p.r) * 0.6;
+                dx += Math.sin(dist * 0.08 + time * 2) * inside;
+                dy += Math.cos(dist * 0.08 + time * 2) * inside;
+              }
+            }
+
+            // sample from Mercury image with displacement
+            const sx = ((x + dx - sx0) / sw) * iw;
+            const sy = ((y + dy - sy0) / sh) * ih;
+            const sW = (cellW / sw) * iw;
+            const sH = (cellH / sh) * ih;
+
+            if (sx >= 0 && sy >= 0 && sx + sW <= iw && sy + sH <= ih) {
+              ctx.drawImage(img, sx, sy, sW, sH, x, y, cellW + 0.7, cellH + 0.7);
+            } else {
+              // edge clamp
+              ctx.drawImage(img, Math.max(0, sx), Math.max(0, sy), Math.min(sW, iw), Math.min(sH, ih), x, y, cellW + 0.7, cellH + 0.7);
+            }
+          }
+        }
+      } else {
+        // fallback while image loads
+        ctx.fillStyle = '#08080a';
+        ctx.fillRect(0, 0, w, h);
+      }
+
+      // draw the flow ripples themselves (water lines) on top of the distorted image
       let alive = false;
       for (let i = ripples.length - 1; i >= 0; i--) {
         const p = ripples[i];
         p.r += p.speed;
-        p.opacity = Math.max(0, 0.42 * (1 - p.r / p.maxR));
-        if (p.r >= p.maxR || p.opacity <= 0.01) {
-          ripples.splice(i, 1);
-          continue;
-        }
+        p.opacity = Math.max(0, 0.5 * (1 - p.r / p.maxR));
+        if (p.r >= p.maxR) { ripples.splice(i, 1); continue; }
         alive = true;
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(255,255,255,${p.opacity})`;
-        ctx.lineWidth = p.line;
+        ctx.strokeStyle = `rgba(255,255,255,${p.opacity * 0.55})`;
+        ctx.lineWidth = 1.2;
         ctx.stroke();
-        // soft inner glow
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r * 0.72, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(180,210,255,${p.opacity * 0.18})`;
-        ctx.lineWidth = p.line * 0.7;
+        ctx.arc(p.x, p.y, p.r * 0.68, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(160,200,255,${p.opacity * 0.16})`;
+        ctx.lineWidth = 0.9;
         ctx.stroke();
       }
-      if (alive || ripples.length) {
-        raf = requestAnimationFrame(draw);
-      } else {
-        raf = 0;
-      }
+
+      // keep flowing even without ripples for the gentle wave
+      raf = requestAnimationFrame(draw);
     };
+    raf = requestAnimationFrame(draw);
 
     let lastX = 0;
     let lastY = 0;
@@ -125,25 +181,19 @@ export default function Login() {
       const rect = page.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
-      const dist = Math.hypot(x - lastX, y - lastY);
-      if (dist < 14) return;
-      lastX = x;
-      lastY = y;
+      if (Math.hypot(x - lastX, y - lastY) < 12) return;
+      lastX = x; lastY = y;
       addRipple(x, y);
-      // extra splash on fast move
-      if (dist > 38) addRipple(x, y, true);
+      if (Math.hypot(x - lastX, y - lastY) > 32) addRipple(x, y, true);
     };
-
     const onClick = (e) => {
       const rect = page.getBoundingClientRect();
-      addRipple(e.clientX - rect.left, e.clientY - rect.top, true);
       addRipple(e.clientX - rect.left, e.clientY - rect.top, true);
     };
 
     page.addEventListener('mousemove', onMove);
     page.addEventListener('click', onClick);
-    // initial drop
-    setTimeout(() => addRipple(w * 0.5, h * 0.5, true), 400);
+    setTimeout(() => addRipple(w * 0.52, h * 0.48, true), 500);
 
     return () => {
       window.removeEventListener('resize', resize);
@@ -156,7 +206,6 @@ export default function Login() {
 
   return (
     <div className="auth-page" ref={pageRef}>
-      <div className="auth-bg" style={{ backgroundImage: `url(${mercuryBg})` }} aria-hidden="true" />
       <canvas ref={waterRef} className="auth-water" aria-hidden="true" />
       <div className="auth-bg-overlay" aria-hidden="true" />
       <div className="auth-center">
