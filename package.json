@@ -11,7 +11,7 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "rm -rf .wrangler && vite build",
     "test": "vitest run",
     "test:cli": "vitest run tests/cli",
     "dev:cli": "node packages/cli/bin/corez.mjs",

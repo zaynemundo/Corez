@@ -34,9 +34,11 @@
   // ranking also uses it first (rerank then embeddings) before keyed
   // providers; disable with WORKERS_AI_RERANK_DISABLED / WORKERS_AI_EMBED_DISABLED.
   // D1 removed 2026-08-19: was blocking deploy with invalid database_id "corez-auth" (10021). Auth falls back to dev mode.
+  // Force cache bust 2026-08-19T10:41Z
   "ai": {
     "binding": "AI"
   },
+  "d1_databases": [],
   "migrations": [
     {
       "tag": "v1-game-rooms",
