@@ -3772,13 +3772,11 @@ h1, h2, h3, h4, h5, h6 {
 .auth-bg {
   position: absolute;
   inset: 0;
-  background-size: 78%;
+  background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
   background-color: #000;
-  filter: blur(14px) saturate(1.08) brightness(0.92);
-  transform: scale(0.88);
-  opacity: 0.92;
+  filter: blur(8px) saturate(1.05) brightness(0.96);
 }
 .auth-bg-overlay {
   position: absolute;
