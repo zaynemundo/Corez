@@ -1,7 +1,7 @@
 ---
 description: Implements browser responsive HUD, start menus, pause screens, game-over overlays, control guides, and victory screens.
 mode: subagent
-model: opencode-go/mimo-v2.5
+model: opencode-go/muse-spark-1.2
 temperature: 0.2
 
 permission:

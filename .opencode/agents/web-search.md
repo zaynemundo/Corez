@@ -1,7 +1,7 @@
 ---
 description: Use this agent when you need to research information on the internet, particularly for debugging issues, finding solutions to technical problems, or gathering comprehensive information from multiple sources. This agent excels at finding relevant discussions. Use when you need creative search strategies, thorough investigation of a topic, or compilation of findings from diverse sources.
 mode: subagent
-model: opencode-go/mimo-v2.5
+model: opencode-go/muse-spark-1.2
 temperature: 0.4
 tools:
   read: true

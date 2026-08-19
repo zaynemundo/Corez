@@ -8,8 +8,8 @@ import { TaskDependencyGraph, AGENT_LIFECYCLE_STATES } from './taskGraph.js';
 import { AdaptiveConcurrencyQueue } from './adaptiveQueue.js';
 
 export const OPENROUTER_SWARM_ROUTING = {
-  // Mimo V2.5 is the cheapest capable model — the site-wide default.
-  model: 'xiaomi/mimo-v2.5',
+  // Muse Spark 1.2 is the unified site-wide model.
+  model: 'muse-spark-1.2',
   provider: {
     sort: 'throughput',
     allow_fallbacks: true,

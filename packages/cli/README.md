@@ -11,7 +11,7 @@ First-party AI coding CLI for CoreZ, built as a standalone modular platform supp
 - **Automated Fix Mode**: Run `corez fix` to automatically run tests/lint/build, diagnose errors, and repair failing code.
 - **Git Code Review**: Run `corez review` to audit uncommitted Git changes for bugs, regressions, and security risks.
 - **Multi-Agent Swarm Orchestration**: Run `corez swarm "task"` to run CoreZ's DAG-based multi-agent architecture across Explorer, Architect, Frontend, Backend, Tester, and Reviewer roles.
-- **Model Router & Catalog**: Supports OpenCode Go (`kimi-k3`, `deepseek-v4-pro`, `deepseek-v4-flash`), OpenRouter, and local fallback execution.
+- **Model Router & Catalog**: Supports OpenCode Go (`muse-spark-1.2`, `kimi-k3`), OpenRouter, and local fallback execution.
 - **Safety & Permissions**: Granular permission categories (`read`, `workspace-write`, `shell`, `network`, `dangerous`) with protection against destructive commands (`rm -rf /`, `git reset --hard`, `sudo`).
 
 ## Installation for Development
@@ -79,7 +79,7 @@ You can configure CoreZ locally in your project by creating `.corez/config.json`
 
 ```json
 {
-  "model": "deepseek-v4-pro",
+  "model": "muse-spark-1.2",
   "reasoning": "high",
   "mode": "agent",
   "permissions": {
@@ -94,7 +94,7 @@ You can configure CoreZ locally in your project by creating `.corez/config.json`
 
 ### Environment Variables
 
-- `OPENCODE_GO_API_KEY` or `OPENCODE_API_KEY`: Key for OpenCode Go models (`deepseek-v4-pro`, `kimi-k3`, `deepseek-v4-flash`).
+- `OPENCODE_GO_API_KEY` or `OPENCODE_API_KEY`: Key for OpenCode Go models (`muse-spark-1.2`, `kimi-k3`).
 - `OPENROUTER_API_KEY`: Key for OpenRouter models.
 - `COREZ_MODEL`: Override default AI model.
 - `COREZ_AUTO_APPROVE` / `YOLO`: Set to `true` to auto-approve tool permissions.

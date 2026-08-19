@@ -57,7 +57,7 @@ describe('E2E /api/ai pipeline', () => {
     const fetchMock = vi.fn(async (url, init) => {
       expect(url).toBe(OPENCODE_URL);
       const body = JSON.parse(init.body);
-      expect(body.model).toBe('mimo-v2.5');
+      expect(body.model).toBe('muse-spark-1.2');
       expect(body.messages[0].role).toBe('system');
       return mockOpenAI('This is a complete and correct answer about compilers. A compiler translates source code into machine code. An interpreter runs code line by line.');
     });

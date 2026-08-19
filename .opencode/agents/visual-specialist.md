@@ -1,7 +1,7 @@
 ---
 description: Performs visual inspection of captured game screenshots and compares against art-direction.json and game-spec.json.
 mode: subagent
-model: opencode-go/mimo-v2.5
+model: opencode-go/muse-spark-1.2
 temperature: 0.1
 
 permission:

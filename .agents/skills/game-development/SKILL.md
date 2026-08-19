@@ -477,10 +477,10 @@ Orchestration entry point for the CoreZ AI Game Studio. Analyzes game request, s
 **Agents needed:**
 | Role | Agent | Mode |
 |------|-------|------|
-| Creative Director | deepseek-v4-flash | read-only advisory |
-| Lead Programmer | deepseek-v4-flash | implement |
-| UI Programmer | deepseek-v4-flash | implement |
-| QA Tester | deepseek-v4-flash | test |
+| Creative Director | muse-spark-1.2 | read-only advisory |
+| Lead Programmer | muse-spark-1.2 | implement |
+| UI Programmer | muse-spark-1.2 | implement |
+| QA Tester | muse-spark-1.2 | test |
 
 #### MEDIUM (5-7 agents, 3-6 hours implementation)
 
@@ -499,13 +499,13 @@ Orchestration entry point for the CoreZ AI Game Studio. Analyzes game request, s
 **Agents needed:**
 | Role | Agent | Mode |
 |------|-------|------|
-| Creative Director | deepseek-v4-flash | read-only advisory |
-| Game Designer | deepseek-v4-flash | spec writer |
-| Lead Programmer | deepseek-v4-flash | implement |
-| UI Programmer | deepseek-v4-flash | implement |
+| Creative Director | muse-spark-1.2 | read-only advisory |
+| Game Designer | muse-spark-1.2 | spec writer |
+| Lead Programmer | muse-spark-1.2 | implement |
+| UI Programmer | muse-spark-1.2 | implement |
 | Art Director | flux-1-schnell | asset generation |
-| Technical Artist | deepseek-v4-flash | asset integration |
-| QA Tester | deepseek-v4-flash | test |
+| Technical Artist | muse-spark-1.2 | asset integration |
+| QA Tester | muse-spark-1.2 | test |
 
 #### LARGE (8+ agents, 8+ hours implementation)
 
@@ -526,16 +526,16 @@ Orchestration entry point for the CoreZ AI Game Studio. Analyzes game request, s
 **Agents needed:**
 | Role | Agent | Mode |
 |------|-------|------|
-| Producer | deepseek-v4-flash | orchestration lead |
-| Creative Director | deepseek-v4-flash | read-only |
-| Game Designer | deepseek-v4-flash | spec |
-| Lead Programmer | deepseek-v4-flash | architecture + core |
-| UI Programmer | deepseek-v4-flash | HUD/menus |
+| Producer | muse-spark-1.2 | orchestration lead |
+| Creative Director | muse-spark-1.2 | read-only |
+| Game Designer | muse-spark-1.2 | spec |
+| Lead Programmer | muse-spark-1.2 | architecture + core |
+| UI Programmer | muse-spark-1.2 | HUD/menus |
 | Art Director | flux-1-schnell | backgrounds/assets |
-| Technical Artist | deepseek-v4-flash | sprite pipeline |
-| Physics Advisor | deepseek-v4-flash | read-only advisory |
-| QA Tester | deepseek-v4-flash | test |
-| Code Reviewer | deepseek-v4-flash | read-only review |
+| Technical Artist | muse-spark-1.2 | sprite pipeline |
+| Physics Advisor | muse-spark-1.2 | read-only advisory |
+| QA Tester | muse-spark-1.2 | test |
+| Code Reviewer | muse-spark-1.2 | read-only review |
 
 ---
 
@@ -623,20 +623,20 @@ estimated_hours: "1-2"  # per complexity: SMALL 1-2, MEDIUM 3-6, LARGE 8+
 
 team:
   - role: "Lead Programmer"
-    agent: "deepseek-v4-flash"
+    agent: "muse-spark-1.2"
     mode: "implement"
     tasks:
       - "Set up project structure and build config"
       - "Implement core game loop and rendering"
       - "Implement player controls and physics"
   - role: "UI Programmer"
-    agent: "deepseek-v4-flash"
+    agent: "muse-spark-1.2"
     mode: "implement"
     tasks:
       - "Build HUD (score, health, pause button)"
       - "Implement start screen and game-over overlay"
   - role: "QA Tester"
-    agent: "deepseek-v4-flash"
+    agent: "muse-spark-1.2"
     mode: "implement"
     tasks:
       - "Write smoke tests for core loop"

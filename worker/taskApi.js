@@ -51,7 +51,7 @@ export function buildHarness(env) {
   return new AgentHarness({
     taskStore: store,
     adapters,
-    defaultModel: 'mimo-v2.5',
+    defaultModel: 'muse-spark-1.2',
     persistEvents: true,
     cancellationManager: sharedCancellations,
     maxRetryWaitMs: 0 // no in-process retry waits in the Worker; resume via API

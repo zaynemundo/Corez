@@ -18,7 +18,7 @@ function makeWorkspace(name) {
 function immediateProvider(content) {
   return {
     async generate() {
-      return { status: 'completed', content, toolCalls: [], provider: 'test', model: 'deepseek-v4-flash' };
+      return { status: 'completed', content, toolCalls: [], provider: 'test', model: 'muse-spark-1.2' };
     }
   };
 }
@@ -56,7 +56,7 @@ describe('multi-user isolation', () => {
         // Echo the last user message as the completed response so each task's
         // conversation content is observable.
         const userMessages = messages.filter((m) => m.role === 'user').map((m) => m.content);
-        return { status: 'completed', content: userMessages[userMessages.length - 1] || '', toolCalls: [], provider: 'test', model: 'deepseek-v4-flash' };
+        return { status: 'completed', content: userMessages[userMessages.length - 1] || '', toolCalls: [], provider: 'test', model: 'muse-spark-1.2' };
       }
     });
 

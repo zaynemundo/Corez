@@ -194,7 +194,7 @@ export class OpenCodeGoAdapter extends ProviderAdapter {
       id: PROVIDER_IDS.OPENCODE_GO,
       apiKey,
       endpoint: options.endpoint ?? process.env.OPENCODE_ENDPOINT ?? PROVIDER_ENDPOINTS[PROVIDER_IDS.OPENCODE_GO],
-      model: options.model ?? process.env.OPENCODE_MODEL ?? 'deepseek-v4-flash',
+      model: options.model ?? process.env.OPENCODE_MODEL ?? 'muse-spark-1.2',
       referer: 'https://corez.ai',
       title: 'COREZ AI'
     });
@@ -210,7 +210,7 @@ export class DeepSeekAdapter extends ProviderAdapter {
       id: PROVIDER_IDS.DEEPSEEK,
       apiKey,
       endpoint: options.endpoint ?? process.env.DEEPSEEK_ENDPOINT ?? PROVIDER_ENDPOINTS[PROVIDER_IDS.DEEPSEEK],
-      model: options.model ?? process.env.DEEPSEEK_MODEL ?? 'deepseek-v4-flash'
+      model: options.model ?? process.env.DEEPSEEK_MODEL ?? 'muse-spark-1.2'
     });
   }
 
@@ -228,7 +228,7 @@ export class OpenRouterAdapter extends ProviderAdapter {
       id: PROVIDER_IDS.OPENROUTER,
       apiKey,
       endpoint: options.endpoint ?? process.env.OPENROUTER_ENDPOINT ?? PROVIDER_ENDPOINTS[PROVIDER_IDS.OPENROUTER],
-      model: options.model ?? process.env.OPENROUTER_MODEL ?? 'deepseek-v4-flash',
+      model: options.model ?? process.env.OPENROUTER_MODEL ?? 'muse-spark-1.2',
       referer: 'https://corez.ai',
       title: 'COREZ AI'
     });

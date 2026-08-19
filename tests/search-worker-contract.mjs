@@ -304,7 +304,7 @@ async function run() {
 
   // DeepSeek V4 Flash setups (OPENCODE_GO_API_KEY only, no OpenRouter key):
   // rerank goes through the OpenCode Go gateway first with the same key that
-  // serves mimo-v2.5.
+  // serves muse-spark-1.2.
   const originalFetch4 = globalThis.fetch;
   try {
     globalThis.fetch = async (url, init) => {
@@ -337,7 +337,7 @@ async function run() {
   }
 
   // OpenCode Go gateway rerank down -> embeddings fallback on the same
-  // gateway (perplexity model), still with only the mimo-v2.5 key.
+  // gateway (perplexity model), still with only the muse-spark-1.2 key.
   const originalFetch5 = globalThis.fetch;
   try {
     globalThis.fetch = async (url, init) => {
@@ -374,7 +374,7 @@ async function run() {
     globalThis.fetch = originalFetch5;
   }
 
-  // When both providers are configured, OpenCode Go (mimo-v2.5
+  // When both providers are configured, OpenCode Go (muse-spark-1.2
   // gateway) is tried first and OpenRouter only falls back on failure.
   const originalFetch6 = globalThis.fetch;
   try {

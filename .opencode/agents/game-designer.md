@@ -1,7 +1,7 @@
 ---
 description: Formulates structured game design specs, core loops, mechanics, controls, progression, enemies, and win/loss rules.
 mode: subagent
-model: opencode-go/mimo-v2.5
+model: opencode-go/muse-spark-1.2
 temperature: 0.2
 
 permission:

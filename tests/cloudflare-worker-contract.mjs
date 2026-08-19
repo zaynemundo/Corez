@@ -196,12 +196,12 @@ async function run() {
     // New API contract: the worker returns provider + diagnostics alongside
     // content/model so clients can report truncation, repairs and latency.
     assert.equal(successBody.content, 'Worker response');
-    assert.equal(successBody.model, 'opencode:mimo-v2.5');
+    assert.equal(successBody.model, 'opencode:muse-spark-1.2');
     assert.equal(successBody.provider, 'opencode-go');
     assert.equal(successBody.diagnostics.truncationDetected, false);
     assert.equal(successBody.diagnostics.repaired, false);
     assert.equal(typeof successBody.diagnostics.ttftMs, 'number');
-    assert.equal(invocation.payload.model, 'mimo-v2.5');
+    assert.equal(invocation.payload.model, 'muse-spark-1.2');
     assert.deepEqual(Object.keys(invocation.payload), ['model', 'messages']);
     // The execution prompt (with the Awwwards design spec) reaches the model
     // as the user message instead of the bare prompt.
@@ -262,8 +262,8 @@ async function run() {
       assert.equal(deepseekResp.status, 200);
       const deepseekData = await deepseekResp.json();
       assert.equal(deepseekData.content, 'DeepSeek fallback response');
-      assert.equal(deepseekData.model, 'deepseek:mimo-v2.5');
-      assert.equal(deepseekPayload.model, 'mimo-v2.5');
+      assert.equal(deepseekData.model, 'deepseek:muse-spark-1.2');
+      assert.equal(deepseekPayload.model, 'muse-spark-1.2');
       assert.equal(deepseekPayload.stream, false);
       // No output-token caps anywhere: general requests are uncapped too.
       assert.equal(deepseekPayload.max_tokens, undefined);
@@ -293,8 +293,8 @@ async function run() {
       assert.equal(opencodeKeyResp.status, 200);
       const opencodeKeyData = await opencodeKeyResp.json();
       assert.equal(opencodeKeyData.content, 'OpenCode Go response');
-      assert.equal(opencodeKeyData.model, 'opencode:mimo-v2.5');
-      assert.equal(opencodePayload.model, 'mimo-v2.5');
+      assert.equal(opencodeKeyData.model, 'opencode:muse-spark-1.2');
+      assert.equal(opencodePayload.model, 'muse-spark-1.2');
       // No output-token caps anywhere: general requests are uncapped too.
       assert.equal(opencodePayload.max_tokens, undefined);
       assert.ok(Array.isArray(opencodePayload.messages));
@@ -380,7 +380,7 @@ async function run() {
         assert.equal(url, 'https://opencode.ai/zen/go/v1/chat/completions');
         const payload = JSON.parse(init.body);
         capturedPayloads.push(payload);
-        assert.equal(payload.model, 'mimo-v2.5');
+        assert.equal(payload.model, 'muse-spark-1.2');
         assert.equal(payload.reasoning, undefined);
         return new Response(JSON.stringify({
           choices: [{ message: { content: 'OpenCode Go preferred response' } }]
@@ -400,14 +400,14 @@ async function run() {
       assert.equal(opencodePreferredResp.status, 200);
       const opencodePreferredData = await opencodePreferredResp.json();
       assert.equal(opencodePreferredData.content, 'OpenCode Go preferred response');
-      assert.equal(opencodePreferredData.model, 'opencode:mimo-v2.5');
+      assert.equal(opencodePreferredData.model, 'opencode:muse-spark-1.2');
 
       // Client-supplied body.model is never trusted: the server-controlled
       // model list always wins.
       globalThis.fetch = async (_url, init) => {
         const payload = JSON.parse(init.body);
         capturedPayloads.push(payload);
-        assert.equal(payload.model, 'mimo-v2.5');
+        assert.equal(payload.model, 'muse-spark-1.2');
         return new Response(JSON.stringify({
           choices: [{ message: { content: 'Server model used' } }]
         }), {
@@ -457,7 +457,7 @@ async function run() {
       assert.equal(opencodeRetryResp.status, 200);
       const opencodeRetryData = await json(opencodeRetryResp);
       assert.equal(opencodeRetryData.content, 'Recovered on the OpenCode Go retry');
-      assert.equal(opencodeRetryData.model, 'opencode:mimo-v2.5');
+      assert.equal(opencodeRetryData.model, 'opencode:muse-spark-1.2');
       assert.equal(opencodeRetryCalls, 2);
 
       // Transient-only OpenCode failure with no further provider: the retry
@@ -570,8 +570,8 @@ async function run() {
         // The harness always streams FROM the provider; only the
         // client-facing delivery is non-streaming.
         assert.equal(body.stream, true);
-        // The build phase runs on mimo-v2.5 (the designated build executor).
-        assert.equal(body.model, 'mimo-v2.5');
+        // The build phase runs on muse-spark-1.2 (the designated build executor).
+        assert.equal(body.model, 'muse-spark-1.2');
         const sse = (event) => `data: ${JSON.stringify(event)}\n\n`;
         return new Response(
           sse({ choices: [{ delta: { content: harnessArtifact }, finish_reason: null }] })

@@ -1,7 +1,7 @@
 ---
 description: Implements player movement, physics interactions, attacks, abilities, collision detection, health, and player states.
 mode: subagent
-model: opencode-go/mimo-v2.5
+model: opencode-go/muse-spark-1.2
 temperature: 0.1
 
 permission:

@@ -146,9 +146,10 @@ export async function* runCreationHarness(options) {
       : DEFAULT_BUILD_CHECKPOINT_MS
   } = options;
 
-  // Build phase model: routes visual tasks (UI/UX, CSS, images, SVGs, canvas)
-  // to mimo-v2.5, and all other tasks (logic, backend, general chat, data) to deepseek-v4-flash.
-  const buildModel = options.model || selectModelForRequest({ prompt, primaryIntent, complexity }, env);
+  // Build phase model: all tasks use Muse Spark 1.2 (muse-spark-1.2)
+  // as the unified site-wide model. OPENCODE_BUILD_MODEL overrides per
+  // deployment and is checked first so it wins for any task type.
+  const buildModel = options.model || env?.OPENCODE_BUILD_MODEL || selectModelForRequest({ prompt, primaryIntent, complexity }, env);
 
   // Fast path: game requests ALWAYS take the lighter path — game creation is
   // deliberately basic: the user prompt serves as the spec (no planning

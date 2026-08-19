@@ -1,13 +1,13 @@
 /**
  * Dynamic Model Router
  * 
- * Routes visual tasks (images, vision inspection, UI/UX, CSS styling, SVGs, canvas art)
- * to Mimo V2.5 (mimo-v2.5), and all other tasks (backend logic, algorithms, scripting,
- * general chat, writing, data, Q&A) to DeepSeek V4 Flash (deepseek-v4-flash).
+ * Routes all tasks to Muse Spark 1.2 (muse-spark-1.2) — the unified site-wide
+ * model for visual tasks, backend logic, algorithms, scripting, general chat,
+ * writing, data and Q&A.
  */
 
-export const MODEL_VISUAL = 'mimo-v2.5';
-export const MODEL_DEFAULT = 'deepseek-v4-flash';
+export const MODEL_VISUAL = 'muse-spark-1.2';
+export const MODEL_DEFAULT = 'muse-spark-1.2';
 
 const VISUAL_SKILL_IDS = new Set([
   'visual-creative',
@@ -70,8 +70,7 @@ export function isVisualRequest({ prompt = '', intent = null, fineIntent = null,
 
 /**
  * Selects the optimal model for a given request:
- * - Mimo V2.5 for visual tasks (UI/UX, CSS, images, SVGs, canvas)
- * - DeepSeek V4 Flash for everything else (logic, backend, general chat, writing, data)
+ * - Muse Spark 1.2 for all tasks (unified model)
  * 
  * @param {Object} options Request options (prompt, intent, skills, messages)
  * @param {Object} [env] Worker environment variables

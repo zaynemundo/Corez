@@ -24,7 +24,7 @@ those topics as generic architecture work unless implementation is requested.
 
 ## 1. Model Routing & Primary/Secondary Failovers
 
-- **Routing Logic**: Direct fast structured classification tasks to lightweight local logic (e.g. the repo's `src/services/intentClassifier.js`) and complex reasoning/art direction to the primary model (DeepSeek V4 Flash, `deepseek-v4-flash`).
+- **Routing Logic**: Direct fast structured classification tasks to lightweight local logic (e.g. the repo's `src/services/intentClassifier.js`) and complex reasoning/art direction to the primary model (Muse Spark 1.2, `muse-spark-1.2`).
 - **Graceful Failover**: CoreZ runs OpenCode Go -> official DeepSeek ->
   OpenRouter in `worker/providerChain.js`. Transient failures use bounded
   per-request retries and persisted retry schedules; permanent authentication,
