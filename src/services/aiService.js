@@ -485,6 +485,7 @@ export async function generateImage(prompt, signal = null, referenceImage = null
     }
     const fetchOptions = {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json'
       },
@@ -527,6 +528,7 @@ export async function generateWorkersAIImage(prompt, signal = null, options = {}
     if (Number.isFinite(seed)) payload.seed = Math.max(0, Math.round(seed));
     const fetchOptions = {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     };
@@ -854,6 +856,7 @@ export async function generateHostedAIResponse(
 
   const fetchOptions = {
     method: 'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
     },
@@ -993,6 +996,9 @@ export async function generateHostedAIResponse(
         try {
           errorText = await response.text();
         } catch { /* keep empty */ }
+        if (response.status === 401) {
+          throw new Error('Authentication required. Please log in.');
+        }
         // A 403 with the Cloudflare challenge page ("Just a moment...") means
         // the WAF intercepted the request before it reached the worker — the
         // API needs a WAF bypass rule, not a retry.
@@ -1177,6 +1183,9 @@ export async function generateHostedAIResponse(
   }
 
   if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Authentication required. Please log in.');
+    }
     const serverMsg = typeof data?.error === 'string' ? data.error : (data?.error?.message || data?.message || `HTTP ${response.status}`);
     const detail = typeof data?.detail === 'string' && data.detail.trim() ? ` (${data.detail.trim()})` : '';
     throw new Error(`Hosted AI request failed: ${serverMsg}${detail}`);
@@ -2063,6 +2072,7 @@ export async function generateAISessionTitle(prompt) {
   try {
     const response = await fetch(AI_PROXY_ENDPOINT, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json'
       },
@@ -2260,6 +2270,9 @@ export async function generateAIResponse(prompt, history = [], signal = null, on
     }
   } catch (hostedAiError) {
     if (hostedAiError?.name === 'AbortError') throw hostedAiError;
+    if (/Authentication required/i.test(hostedAiError?.message || '')) {
+      return 'Please log in to continue. Your session may have expired — refresh the page and sign in again, then retry your request.';
+    }
     console.warn('Hosted AI unavailable; using local Corez fallback.', hostedAiError);
     return generateLocalAIResponse(cleanPrompt, hostedAiError, signal);
   }
