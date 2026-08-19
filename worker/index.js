@@ -24,28 +24,18 @@ import {
   round2
 } from './skillVerification.js';
 
-// Convert a chat message with image attachments (thumb data URLs) into
-// OpenAI-style multimodal content so vision-capable models (Muse Spark 1.2)
-// actually see the image. Text attachments are already inlined via
-// buildAttachmentPrompt, so only image thumbs need conversion.
+// For revise-with-image, we do NOT send the raw data URL to the model
+// (it bloats the prompt and caused 400 empty responses). The model is
+// instructed via system prompt to use the attached image's data URL, and
+// patchLocalImageSrc below replaces any hallucinated local filename
+// (e.g. 1716041183016.jpg) with the real thumb after generation. This keeps
+// the request small and avoids vision-gateway 400s while still fixing preview.
 function toMultimodalMessage(message) {
   if (!message || typeof message !== 'object') return message;
-  const attachments = Array.isArray(message.attachments) ? message.attachments : [];
-  const imageAttachments = attachments.filter(
-    (a) => typeof a?.thumb === 'string' && a.thumb.startsWith('data:image/') && a.thumb.length > 0 && a.thumb.length <= 8 * 1024 * 1024
-  );
-  if (imageAttachments.length === 0) {
-    // No vision data — keep simple string content. If content is already an
-    // array (pre-multimodal), preserve it.
-    if (Array.isArray(message.content)) return { role: message.role, content: message.content };
-    return { role: message.role, content: message.content };
-  }
-  const text = typeof message.content === 'string' ? message.content : Array.isArray(message.content) ? message.content.map(c => c?.text || '').join('\n') : String(message.content || '');
-  const parts = [{ type: 'text', text }];
-  for (const att of imageAttachments) {
-    parts.push({ type: 'image_url', image_url: { url: att.thumb } });
-  }
-  return { role: message.role, content: parts };
+  // Keep original content — patchLocalImageSrc will handle the image injection
+  // after generation. Preserve array content if already multimodal.
+  if (Array.isArray(message.content)) return { role: message.role, content: message.content };
+  return { role: message.role, content: message.content };
 }
 
 // Safety-net: if the model still emits a local filename like 1716041183016.jpg

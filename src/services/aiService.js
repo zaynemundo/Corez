@@ -1789,9 +1789,22 @@ export async function generateLocalAIResponse(prompt, hostedError = null, signal
 
   // Revision context: the user asked to revise an embedded code block. Never
   // discard their code or fabricate a different app — report the real status.
-  const revisionMatch = cleanPrompt.match(/\[Context: The user is requesting a revision for the following code block\]/i);
+  const revisionMatch = cleanPrompt.match(/\[(?:SURGICAL REVISION CONTEXT|Context: The user is requesting a revision)/i);
   const hasEmbeddedCode = cleanPrompt.includes('```');
-  const userRequestPart = cleanPrompt.split(/User Request:\s*/i).slice(-1)[0]?.trim() || '';
+  let userRequestPart = cleanPrompt.split(/User Request:\s*/i).slice(-1)[0]?.trim() || '';
+  // For surgical context, extract the actual user revision request without the surrounding boilerplate
+  if (!userRequestPart || isRevisionContextPrompt(cleanPrompt)) {
+    const surgicalMatch = cleanPrompt.match(/User Revision Request:\s*([\s\S]*?)(?:\n\[INSTRUCTION\]:|\n\[Attached files\]|$)/i);
+    if (surgicalMatch && surgicalMatch[1].trim()) {
+      userRequestPart = surgicalMatch[1].trim().split('\n')[0].trim();
+    } else {
+      // Fallback: try to extract "Revise code: ..." line
+      const reviseLine = cleanPrompt.match(/Revise code:[^\n]*/i);
+      if (reviseLine) userRequestPart = reviseLine[0].trim();
+    }
+  }
+  // Clean up any remaining attachment metadata from the displayed request
+  userRequestPart = userRequestPart.replace(/\n\[Attached files\][\s\S]*$/, '').trim();
 
   if (revisionMatch) {
     const reason = describeHostedUnavailable(hostedError);
@@ -1869,7 +1882,10 @@ Its core purpose is to remove the technical gap between having an idea and launc
   }
 
   const fallbackReason = describeHostedUnavailable(hostedError);
-  return `I can't act on "${cleanPrompt}" right now because the hosted AI service is currently unavailable.${fallbackReason}\n\nRetry in a moment and I'll turn it into a plan, a written answer, code, or a live preview depending on what you need.`;
+  // For surgical revisions, don't leak the internal context — show just the user request
+  const displayPrompt = isRevisionContextPrompt(cleanPrompt) && userRequestPart ? userRequestPart : cleanPrompt.slice(0, 120);
+  const safeDisplay = displayPrompt.replace(/\[SURGICAL REVISION CONTEXT[\s\S]*?\[INSTRUCTION\]:[\s\S]*/i, '').trim().slice(0, 120) || displayPrompt.slice(0, 80);
+  return `I can't act on "${safeDisplay}" right now because the hosted AI service is currently unavailable.${fallbackReason}\n\nRetry in a moment and I'll turn it into a plan, a written answer, code, or a live preview depending on what you need.`;
 }
 
 const IMAGE_PATTERNS = /\b(generate|create|draw|make|render|show|give me|give us|want|need|produce)\b.*\b(image|picture|photo|logo|illustration|artwork|wallpaper|drawing|graphic|icon)\b|\b(image|picture|photo|logo|illustration|artwork|wallpaper|drawing|graphic|icon)\b.*\b(generate|create|draw|make|render|flux)\b/i;
