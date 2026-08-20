@@ -23,6 +23,27 @@ const CSS_BODY_HINT =
 function looksLikeHtmlDocument(html) {
   return /<!doctype\s+html|<html[\s>]|<head[\s>]|<body[\s>]/i.test(html);
 }
+// Strip a leading Base64 blob that was accidentally pasted BEFORE <!DOCTYPE html>.
+// Users sometimes copy a portfolio where a data:image/jpeg;base64,... header or raw
+// base64 dump (7-10k chars) is prepended before the real document. That blob decodes
+// to binary "data" (file: data) and breaks rendering. If the string starts with
+// a large base64-looking prefix before the first HTML tag, drop it — generic for all users.
+function stripLeadingBase64Blob(html) {
+  if (typeof html !== 'string' || html.length < 1200) return html;
+  const htmlStart = html.search(/<!doctype\s+html|<html[\s>]/i);
+  if (htmlStart <= 0) return html;
+  if (htmlStart < 500) return html;
+  const prefix = html.slice(0, htmlStart);
+  if (prefix.length < 500) return html;
+  // Must not contain real HTML tags
+  if (/<[a-z][a-z0-9-]*[\s>]/i.test(prefix)) return html;
+  // If prefix is mostly base64 chars + whitespace and no '<', it's a stray dump
+  const base64Len = prefix.replace(/[^A-Za-z0-9+\/\=\s]/g, '').length;
+  const ratio = base64Len / prefix.length;
+  if (ratio > 0.85) return html.slice(htmlStart).trimStart();
+  if (prefix.length > 1000 && !prefix.includes('<') && ratio > 0.7) return html.slice(htmlStart).trimStart();
+  return html;
+}
 
 // Index (within `segment`) of the first line that starts a JS statement.
 // Returns -1 when no JS-looking line exists.
@@ -159,7 +180,7 @@ function wrapOrphanBlocks(html) {
  */
 export function repairMalformedHtml(html) {
   if (!html || typeof html !== 'string') return html;
-  let out = html;
+  let out = stripLeadingBase64Blob(html);
 
   // 1. Mangled opening tags: "<<script>", "< script>", "&lt;script&gt;".
   out = out

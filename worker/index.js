@@ -73,16 +73,13 @@ function fixCommonJSInHtml(html) {
     .replace(/Math\.random\(\)\s*([a-zA-Z_][a-zA-Z0-9_]*\.height)/g, 'Math.random()*$1');
 }
 
-// Safety-net: if the model still emits a local filename like 1716041183016.jpg
+// Safety-net: if the model still emits a local filename (e.g. 1716041183016.jpg, avatar.jpg)
 // or a generic Unsplash placeholder (https://images.unsplash.com/...) instead
-// of using the attached image, replace it with the attached image.
-// This handles the reported bugs:
-// - revise "add this image for Christian Vestil" with photo produced <img src="1716041183016.jpg">
-// - same revise produced <img src="https://images.unsplash.com/photo-1507003211169-...">
-// Both fail to show the user's uploaded portrait. We patch such src with the
-// attached R2/data URL so the portrait always displays. For Christian Vestil
-// (or any "change the image" request with an attachment), we also replace
-// Unsplash/placeholder images that are clearly not the user's photo.
+// of using the user's attached image, replace it with the attached image.
+// Generic for all users/portfolios: when the user attaches any image and asks
+// to use it (e.g. "add this image", "change the photo", "use my portrait"),
+// we patch local filenames, hallucinated R2 URLs, and placeholder Unsplash
+// images so the uploaded photo always displays.
 function patchLocalImageSrc(html, messages) {
   if (typeof html !== 'string' || !html.includes('<img')) return html;
   const urls = [];
@@ -98,52 +95,46 @@ function patchLocalImageSrc(html, messages) {
     }
   }
   if (urls.length === 0) return html;
-  const mentionsChristian = /christian\s+vestil/i.test(promptText);
-  const mentionsChangeImage = /change\s+(the\s+)?image|add\s+this\s+image|replace\s+.*image/i.test(promptText);
-  const shouldPatchUnsplash = mentionsChristian || mentionsChangeImage;
+  const mentionsChangeImage = /change\s+(the\s+)?image|add\s+this\s+image|replace\s+.*image|use\s+this\s+(image|photo|picture|portrait|avatar)/i.test(promptText);
+  const shouldPatchUnsplash = mentionsChangeImage;
   // Patterns for external placeholder images that should be replaced when we have an attached portrait
   const isPlaceholderUrl = (src) => /unsplash\.com|picsum\.photos|placehold\.|via\.placeholder|dummyimage|placeholder\.com/i.test(src);
 
   let patched = html;
   let urlIndex = 0;
 
-  // First pass: handle the specific Christian Vestil portrait or any image with alt containing that name
-  if (mentionsChristian) {
-    let replacedChristian = false;
+  // First pass (generic): when user explicitly asked to change/add an image, replace the most likely portrait/avatar/profile image
+  if (shouldPatchUnsplash) {
+    let replacedPrimary = false;
     patched = patched.replace(/<img\s+[^>]*>/gi, (match) => {
-      if (replacedChristian || urlIndex >= urls.length) return match;
+      if (replacedPrimary || urlIndex >= urls.length) return match;
       const altMatch = match.match(/alt=["']([^"']*)["']/i);
       const alt = altMatch ? altMatch[1].toLowerCase() : '';
       const srcMatch = match.match(/src=["']([^"']+)["']/i);
       const src = srcMatch ? srcMatch[1] : '';
-      const isChristianImg = /christian/i.test(alt) || /christian/i.test(match.toLowerCase());
-      // Also check surrounding context in HTML for Christian Vestil near this img (look back 500 chars)
+      const isPortraitAlt = /(portrait|avatar|profile|headshot|photo)/i.test(alt) || /(portrait|avatar|profile|headshot)/i.test(match.toLowerCase());
       const idx = patched.indexOf(match);
       const context = patched.slice(Math.max(0, idx - 500), idx + 500).toLowerCase();
-      const nearbyChristian = /christian\s+vestil/.test(context);
-      if (isChristianImg || nearbyChristian) {
+      const nearbyPortrait = /(portrait|avatar|profile|headshot)/i.test(context);
+      const isPlaceholder = isPlaceholderUrl(src);
+      const isLocalFile = src && !src.startsWith('data:') && !src.startsWith('/api/') && !src.startsWith('http');
+      if (isPortraitAlt || nearbyPortrait || isPlaceholder || isLocalFile) {
         const isCorrectUrl = urls.includes(src);
         if (isCorrectUrl) return match;
-        // For Christian, patch ANY src that is not already the correct URL —
-        // includes local filenames, Unsplash placeholders, AND hallucinated R2 URLs
-        // like /api/assets/user-upload_1716041183016.jpg which is missing timestamp/random
         if (src) {
           const replacement = urls[urlIndex++];
-          replacedChristian = true;
+          replacedPrimary = true;
           let newTag = match.replace(src, replacement);
-          // Remove erroneous display:none that hides the portrait (reported bug)
           newTag = newTag.replace(/\s*display\s*:\s*none\s*;?/gi, '');
-          // Clean up style attribute if it becomes empty or has trailing ;
           newTag = newTag.replace(/style=["']\s*["']/i, '');
           newTag = newTag.replace(/style=["']\s*;\s*["']/i, 'style=""');
           if (!/onerror/i.test(newTag)) {
             newTag = newTag.replace(/<img/i, '<img onerror="this.onerror=null;this.style.display=\'none\';const p=this.nextElementSibling;if(p&&p.classList.contains(\'image-fallback\'))p.style.display=\'block\'"');
           }
           if (!/alt=/i.test(newTag) || /alt=["']\s*["']/i.test(newTag)) {
-            newTag = newTag.replace(/alt=["'][^"']*["']/i, 'alt="Christian Vestil"');
-            if (!/alt=/i.test(newTag)) newTag = newTag.replace(/<img/i, '<img alt="Christian Vestil"');
+            newTag = newTag.replace(/alt=["'][^"']*["']/i, 'alt="User portrait"');
+            if (!/alt=/i.test(newTag)) newTag = newTag.replace(/<img/i, '<img alt="User portrait"');
           }
-          // Ensure object-fit:cover is present and display is not none
           if (!/object-fit/i.test(newTag)) {
             newTag = newTag.replace(/style=["']/i, 'style="object-fit:cover;');
             if (!/style=/i.test(newTag)) newTag = newTag.replace(/<img/i, '<img style="width:100%;height:100%;object-fit:cover"');
@@ -153,7 +144,7 @@ function patchLocalImageSrc(html, messages) {
       }
       return match;
     });
-    if (replacedChristian) return patched;
+    if (replacedPrimary) return patched;
   }
 
   // Second pass: patch local filenames, placeholder Unsplash, and hallucinated R2 URLs
@@ -465,7 +456,7 @@ function buildSystemPrompt(options = {}) {
 Adaptive Routing - Code Revision Path:
 - Apply the requested change directly to the provided code and output the complete updated file.
 - Keep all other code, styles, scripts and structure unchanged unless the request explicitly says to change them.
-- When the user attaches an image (e.g. for Christian Vestil), use that exact image — it is available as /api/assets/user-upload_...jpg (or data:image/...). Do NOT use Unsplash or invented URLs. Example: <img src="/api/assets/user-upload_...jpg" alt="Christian Vestil" style="width:100%;height:100%;object-fit:cover"> with alt and onerror fallback.
+- When the user attaches an image (e.g. for any person's portrait/avatar/profile), use that exact image — it is available as /api/assets/user-upload_...jpg (or data:image/...). Do NOT use Unsplash or invented URLs. Example: <img src="/api/assets/user-upload_...jpg" alt="User portrait" style="width:100%;height:100%;object-fit:cover"> with meaningful alt and onerror fallback.
 - If the existing code is HTML, output the full HTML document inside one \`\`\`html block.
 - If repairing missing sub-page links:
   - If single-page: convert <a href="page.html"> to in-page anchors (<a href="#section">).
@@ -601,7 +592,7 @@ Reasoning & Response Quality (Muse Spark 1.2 — hidden chain-of-thought):
 
 Guidelines for Output:
 - FOLLOW THE USER'S REQUEST EXACTLY: deliver precisely what the user asked for — implement everything they requested and add nothing they did not ask for. When the user's instruction conflicts with any default or template behaviour, the user's explicit instruction wins.
-- ATTACHED IMAGES: If the user attaches an image, it is automatically uploaded to Cloudflare R2 (persistent URL like /api/assets/user-upload_...jpg) with a data:image/... fallback. When the task requires that image (e.g. portrait for Christian Vestil), use the R2 URL if you know it, otherwise use the data URL verbatim in <img src="..."> — do NOT use local filenames like 1716041183016.jpg or invented URLs. The system also auto-patches any local filename to the correct R2/data URL after generation, so preview always shows the portrait. Always include meaningful alt text, object-fit:cover, and onerror fallback.
+- ATTACHED IMAGES: If the user attaches an image, it is automatically uploaded to Cloudflare R2 (persistent URL like /api/assets/user-upload_...jpg) with a data:image/... fallback. When the task requires that image (e.g. a person's portrait, avatar, or any user-uploaded photo), use the R2 URL if you know it, otherwise use the data URL verbatim in <img src="..."> — do NOT use local filenames like 1716041183016.jpg, avatar.jpg, or invented URLs. The system also auto-patches any local filename or placeholder image to the correct R2/data URL after generation, so the user's photo always displays. Always include meaningful alt text, object-fit:cover, and onerror fallback.
 - AMBIGUOUS REQUESTS: When a user's prompt is ambiguous, underspecified, or missing essential details (e.g. they say "make a game", "build a website", "create a plan", or give a vague prompt with multiple conflicting interpretations), do NOT ask clarifying questions and do NOT present choice menus or option lists. Instead, choose the most sensible default interpretation, state the key assumption you made in ONE short sentence, and deliver the complete result. The user can refine it in a follow-up message.
 - DEFAULT FORMAT (React/JSX): When writing code or building apps, components, tools, dashboards, or games without an explicitly requested format, default to clean, modern React/JSX components (using \`\`\`jsx ... \`\`\` code blocks). ALWAYS name your main top-level component "export default function App()".
 - REQUESTED FORMATS (HTML/CSS/JS): If the user explicitly requests HTML, CSS, vanilla JS, or plain web code, output complete single-file HTML/CSS/JS inside ONE SINGLE \`\`\`html ... \`\`\` code block.
