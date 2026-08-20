@@ -1,7 +1,7 @@
 From f9f9bd5f2336060d700da8f2ae999cc12a316b5d Mon Sep 17 00:00:00 2001
 From: zaynemundo <zayne.mayo@gmail.com>
 Date: Thu, 20 Aug 2026 06:08:29 +0000
-Subject: [PATCH] feat: implement image handling in summarization and
+Subject: [PATCH 1/2] feat: implement image handling in summarization and
  serialization processes
 
 ---
@@ -302,6 +302,141 @@ index ffb5a586bf..5c782cab82 100644
 +    expect(Object.isFrozen(out[0])).toBe(true)
 +  })
 +})
+-- 
+2.53.0
+
+
+From 30c32092fd4015d6e60cf7b349629f222d5fa4a5 Mon Sep 17 00:00:00 2001
+From: zaynemundo <zayne.mayo@gmail.com>
+Date: Thu, 20 Aug 2026 07:34:37 +0000
+Subject: [PATCH 2/2] fix(llm-pi-ai): handle image offload and
+ finish_reason-less streams
+
+- adapter: strip in-history images for text-only models, keep fresh image rejection, pass sanitized messages to toPiContext with maxRequestImageBytes
+- stream: treat content-bearing stream without finish_reason as stop/tool-calls (OpenCode Zen Go gateway ends with {choices:[],cost:0})
+- tests: add coverage for stream ended without finish_reason
+---
+ packages/llm/llm-pi-ai/src/adapter.ts        | 22 ++++++++++++++---
+ packages/llm/llm-pi-ai/src/stream.ts         | 14 +++++++++++
+ packages/llm/llm-pi-ai/tests/convert.spec.ts | 26 ++++++++++++++++++++
+ 3 files changed, 58 insertions(+), 4 deletions(-)
+
+diff --git a/packages/llm/llm-pi-ai/src/adapter.ts b/packages/llm/llm-pi-ai/src/adapter.ts
+index 5ecec593da..ebfc7365c4 100644
+--- a/packages/llm/llm-pi-ai/src/adapter.ts
++++ b/packages/llm/llm-pi-ai/src/adapter.ts
+@@ -37,12 +37,14 @@ import {
+   LlmAdapter,
+   LlmError,
+   ReasoningEffortId,
++  stripMessageImagesToText,
+ } from '@deepseek-ai/dsh-llm'
+ import type {
+   GenerateOptions,
+   LlmModelInfo,
+   LlmProviderInfo,
+   LlmResolvedModelInfo,
++  Message,
+   ReasoningEffortId as ReasoningEffortIdType,
+   ResolvedRetryPolicy,
+   StreamChunk,
+@@ -304,9 +306,21 @@ export class PiAiAdapter extends LlmAdapter {
+     using watchdog = idleWatchdog(upstream, streamIdleTimeoutMs, 'LLM_STREAM_IDLE_TIMEOUT')
+ 
+     try {
+-      const containsImage = options.messages.some(message => contentHasImage(message.content))
++      let messages: readonly Message[] = options.messages
++      let containsImage = messages.some(message => contentHasImage(message.content))
+       if (containsImage && !model.input.includes('image')) {
+-        throw new LlmError(`pi-ai model "${model.id}" does not support image input`, 'UNSUPPORTED_CONTENT')
++        // A FRESH attachment rides in the final message: refuse it clearly so
++        // the user knows this model cannot see it. Images in EARLIER messages
++        // are in-history history (attached while a vision model owned the
++        // session): stripping them to a text placeholder lets the text-only
++        // model still understand and answer the conversation instead of every
++        // turn dying on the same stale attachment.
++        const finalMessage = messages[messages.length - 1]
++        if (finalMessage !== undefined && contentHasImage(finalMessage.content)) {
++          throw new LlmError(`pi-ai model "${model.id}" does not support image input`, 'UNSUPPORTED_CONTENT')
++        }
++        messages = stripMessageImagesToText(messages)
++        containsImage = false
+       }
+       const attachments = containsImage ? this.config.resolveAttachments?.() : undefined
+       if (containsImage && attachments === undefined) {
+@@ -316,8 +330,8 @@ export class PiAiAdapter extends LlmAdapter {
+         this.config.onReplayDegrade?.({ provider: options.provider, model: options.model, reason })
+       }
+       const context = attachments === undefined
+-        ? toPiContext(options, undefined, onReplayDegrade)
+-        : await toPiContext(options, attachments, onReplayDegrade, profile.maxRequestImageBytes)
++        ? toPiContext({ ...options, messages: messages as Message[] }, undefined, onReplayDegrade)
++        : await toPiContext({ ...options, messages: messages as Message[] }, attachments, onReplayDegrade, profile.maxRequestImageBytes)
+       const events = snapshot.models.streamSimple(model, context, {
+         ...profileOptions(profile, reasoning, apiKey),
+         ...options.temperature === undefined ? {} : { temperature: options.temperature },
+diff --git a/packages/llm/llm-pi-ai/src/stream.ts b/packages/llm/llm-pi-ai/src/stream.ts
+index d45df45a39..6969288ad6 100644
+--- a/packages/llm/llm-pi-ai/src/stream.ts
++++ b/packages/llm/llm-pi-ai/src/stream.ts
+@@ -110,6 +110,20 @@ export function mapStopReason(message: AssistantMessage, contextWindow?: number)
+     }
+     case 'error': {
+       const text = message.errorMessage ?? 'pi-ai stream error'
++      // Some OpenAI-compatible gateways close a CONTENT-BEARING stream without
++      // ever sending the terminal chunk that carries `finish_reason` (the
++      // OpenCode Zen Go gateway's muse route ends with `{"choices":[],"cost":"0"}`
++      // and no finish_reason anywhere). pi-ai reports that as a stream error,
++      // and classifying it as TRANSPORT would retry forever — the same wire
++      // behavior repeats every attempt. When the output already carries text
++      // or tool calls, the response IS complete: only the terminal marker is
++      // missing, so map it to the successful finish it represents.
++      if (/stream ended (?:before|without)\b/i.test(text)) {
++        const hasToolCalls = message.content.some(block => block.type === 'toolCall')
++        const hasText = message.content.some(block => block.type === 'text' && block.text.length > 0)
++        if (hasToolCalls) return { kind: 'tool-calls' }
++        if (hasText) return { kind: 'stop' }
++      }
+       return { kind: 'error', failure: { message: text, code: classifyPiAiError(text) } }
+     }
+   }
+diff --git a/packages/llm/llm-pi-ai/tests/convert.spec.ts b/packages/llm/llm-pi-ai/tests/convert.spec.ts
+index 2a3b41b0c4..56b32537ac 100644
+--- a/packages/llm/llm-pi-ai/tests/convert.spec.ts
++++ b/packages/llm/llm-pi-ai/tests/convert.spec.ts
+@@ -809,6 +809,32 @@ describe('mapStopReason / mapUsage', () => {
+       .toMatchObject({ kind: 'error', failure: { code: 'TRANSPORT' } })
+   })
+ 
++  it('treats a content-bearing stream without finish_reason as a successful stop', () => {
++    // The OpenCode Zen Go gateway's muse route closes the stream with
++    // `{"choices":[],"cost":"0"}` and never sends a non-null finish_reason.
++    // The response is complete; only the terminal marker is missing.
++    expect(mapStopReason(assistant({
++      stopReason: 'error',
++      errorMessage: 'Stream ended without finish_reason',
++      content: [{ type: 'text', text: 'Here is the complete answer.' }],
++    }))).toEqual({ kind: 'stop' })
++  })
++
++  it('treats a tool-call-bearing stream without finish_reason as a completed tool call', () => {
++    expect(mapStopReason(assistant({
++      stopReason: 'error',
++      errorMessage: 'Stream ended without finish_reason',
++      content: [{ type: 'toolCall', id: 't1', name: 'get_weather', arguments: { city: 'Cebu' } }],
++    }))).toEqual({ kind: 'tool-calls' })
++  })
++
++  it('keeps the TRANSPORT error when a finish_reason-less stream carries no content', () => {
++    expect(mapStopReason(assistant({
++      stopReason: 'error',
++      errorMessage: 'Stream ended without finish_reason',
++    }))).toMatchObject({ kind: 'error', failure: { code: 'TRANSPORT' } })
++  })
++
+   it('uses pi-ai provider-specific overflow classification without losing rate-limit exclusions', () => {
+     expect(mapStopReason(assistant({
+       stopReason: 'error',
 -- 
 2.53.0
 
