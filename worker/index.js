@@ -2447,7 +2447,7 @@ async function handlePublish(request, env) {
   // are served directly since they contain no internal .html navigation.
   if (request.method === 'GET' && !RESERVED_SLUGS.has(pathname.slice(1)) && PUBLISH_SLUG_PATTERN.test(pathname.slice(1))) {
     if (!env?.ASSET_BUCKET) {
-      return typeof env.ASSETS?.fetch === 'function' ? env.ASSETS.fetch(request) : jsonResponse(530, { error: 'R2 storage (ASSET_BUCKET) is not configured.' });
+      return typeof env.ASSETS?.fetch === 'function' ? serveAssets(request, env) : jsonResponse(530, { error: 'R2 storage (ASSET_BUCKET) is not configured.' });
     }
     const slug = pathname.slice(1);
     const object = await env.ASSET_BUCKET.get(`publish/${slug}.json`);
@@ -2455,7 +2455,7 @@ async function handlePublish(request, env) {
       if (GENERATED_SLUG_PATTERN.test(slug)) {
         return jsonResponse(404, { error: 'Published creation not found.' });
       }
-      return typeof env.ASSETS?.fetch === 'function' ? env.ASSETS.fetch(request) : jsonResponse(404, { error: 'Published creation not found.' });
+      return typeof env.ASSETS?.fetch === 'function' ? serveAssets(request, env) : jsonResponse(404, { error: 'Published creation not found.' });
     }
     let record;
     try {
@@ -2479,6 +2479,47 @@ async function handlePublish(request, env) {
   }
 
   return jsonResponse(405, { error: 'Method not allowed.' });
+}
+
+// Application CSP for the SPA (attached to HTML documents served from the
+// assets binding). 'unsafe-inline' in script-src is REQUIRED: previews are
+// AI-generated documents executed in sandboxed srcdoc iframes, and srcdoc
+// documents inherit the parent's CSP (a child meta CSP does not override it
+// — verified empirically in Chromium), so inline scripts must be allowed at
+// the app level. Inline scripts only ever run inside originless, sandboxed
+// iframes; the app bundle itself is external and eval-free. No 'unsafe-eval'.
+// Published pages and previews carry their own stricter policy
+// (publishedPageHeaders / PREVIEW_CSP).
+const APP_CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "img-src 'self' data: blob: https:",
+  "media-src 'self' data: blob: https:",
+  "connect-src 'self' https: wss:",
+  "frame-src 'self' blob: data: 'srcdoc'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'self'"
+].join('; ');
+
+// Serve a static asset from the assets binding, attaching the application
+// CSP to HTML documents. Non-HTML responses pass through untouched.
+async function serveAssets(request, env) {
+  const response = await env.ASSETS.fetch(request);
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('text/html')) {
+    const headers = new Headers(response.headers);
+    headers.set('Content-Security-Policy', APP_CSP);
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers
+    });
+  }
+  return response;
 }
 
 async function runJsonSafe(operation) {
@@ -2549,6 +2590,6 @@ export default {
     if (pathname.startsWith('/api/')) {
       return jsonResponse(404, { error: 'API route not found.' });
     }
-    return typeof env.ASSETS?.fetch === 'function' ? env.ASSETS.fetch(request) : jsonResponse(503, { error: 'Static assets not configured.' });
+    return typeof env.ASSETS?.fetch === 'function' ? serveAssets(request, env) : jsonResponse(503, { error: 'Static assets not configured.' });
   }
 };

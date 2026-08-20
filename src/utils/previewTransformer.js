@@ -301,6 +301,23 @@ export function injectNavigationGuard(html) {
   return `${html}\n${script}`;
 }
 
+// Preview documents run inside sandboxed srcdoc iframes. srcdoc documents
+// inherit the parent app's CSP, so every preview carries its own explicit
+// policy: AI-generated inline scripts/styles and CDN libraries keep working
+// while the preview document stays originless. Mirrors the worker's
+// published-page policy (publishedPageHeaders in worker/index.js) so
+// in-app previews and published links behave identically.
+const PREVIEW_CSP = "default-src 'none'; script-src 'unsafe-inline' https:; style-src 'unsafe-inline' https:; img-src data: https: blob:; font-src data: https:; media-src data: https: blob:; connect-src https:";
+
+function withPreviewCsp(html) {
+  if (!html || typeof html !== 'string') return html;
+  const meta = `  <meta http-equiv="Content-Security-Policy" content="${PREVIEW_CSP}">`;
+  if (/<head[^>]*>/i.test(html)) {
+    return html.replace(/<head[^>]*>/i, (match) => `${match}\n${meta}`);
+  }
+  return `<!DOCTYPE html>\n<html lang="en">\n<head>\n${meta}\n</head>\n<body>\n${html}\n</body>\n</html>`;
+}
+
 export function formatCodeForPreview(rawCode) {
   if (!rawCode || typeof rawCode !== 'string') return '';
   // Deterministic repair of model-output corruption (missing or mangled
@@ -312,14 +329,14 @@ export function formatCodeForPreview(rawCode) {
 
   // 1. If it's already a full HTML document, return as-is
   if (/^<!DOCTYPE html/i.test(stripped) || /^<html/i.test(stripped)) {
-    return injectNavigationGuard(injectFullscreenGamePatch(trimmed));
+    return withPreviewCsp(injectNavigationGuard(injectFullscreenGamePatch(trimmed)));
   }
 
   // 2. If it's pure HTML/CSS/JS without React/JSX syntax, wrap into a clean preview HTML document
   const isReactJsx = /export\s+default|export\s+(?:const|let|var|function|class)|import\s+React|React\.|className\s*=|useState\s*\(|useEffect\s*\(|useRef\s*\(|useMemo\s*\(|useCallback\s*\(|useReducer\s*\(|useContext\s*\(|createContext\s*\(|onClick\s*=\s*\{|onChange\s*=\s*\{|return\s*\(\s*<|return\s*<|function\s+[A-Z]|const\s+[A-Z][A-Za-z0-9_]*\s*=\s*(?:\([^)]*\)|[A-Za-z0-9_]+)\s*=>/i.test(trimmed);
 
   if (!isReactJsx && (/<[a-z0-9-]+[\s>]/i.test(trimmed) || /<style[\s>]/i.test(trimmed) || /<script[\s>]/i.test(trimmed) || /document\.get|document\.query|window\.add/i.test(trimmed))) {
-    return `<!DOCTYPE html>
+    return withPreviewCsp(`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -349,7 +366,7 @@ export function formatCodeForPreview(rawCode) {
   <script>${FULLSCREEN_GAME_PATCH}</script>
   <script>${NAVIGATION_GUARD_SCRIPT}</script>
 </body>
-</html>`;
+</html>`);
   }
 
   // 3. Prepare JSX / React code for browser standalone Babel compilation
@@ -443,7 +460,7 @@ export function formatCodeForPreview(rawCode) {
     )
   );
 
-  return `<!DOCTYPE html>
+  return withPreviewCsp(`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -712,5 +729,5 @@ export function formatCodeForPreview(rawCode) {
   <script>${FULLSCREEN_GAME_PATCH}</script>
   <script>${NAVIGATION_GUARD_SCRIPT}</script>
 </body>
-</html>`;
+</html>`);
 }
