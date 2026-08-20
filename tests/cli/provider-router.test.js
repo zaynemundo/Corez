@@ -11,21 +11,6 @@ describe('ModelProviderRouter', () => {
     expect(models.some(m => m.id === 'muse-spark-1.2-contributor')).toBe(true);
   });
 
-  it('registers the Muse Spark 1.2 ModLens vision variant in the catalog', () => {
-    const router = new ModelProviderRouter();
-    const modlens = router.getAvailableModels().find(m => m.id === 'muse-spark-1.2-contributor-modlens');
-
-    expect(modlens).toBeDefined();
-    expect(modlens.name).toMatch(/Muse Spark 1.2/);
-    expect(modlens.provider).toBe('modlens');
-    expect(modlens.role).toMatch(/Vision/i);
-    // Off by default; true when enabled via options or MODLENS_ENABLED.
-    expect(modlens.configured).toBe(false);
-
-    const enabled = new ModelProviderRouter({ modlensEnabled: true });
-    expect(enabled.getAvailableModels().find(m => m.id === 'muse-spark-1.2-contributor-modlens').configured).toBe(true);
-  });
-
   it('runs local agent fallback simulation when no API key is set', async () => {
     const router = new ModelProviderRouter();
     const res = await router.generate({

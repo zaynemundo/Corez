@@ -1,7 +1,6 @@
 export const MODEL_CATALOG = Object.freeze([
   { id: 'muse-spark-1.2-contributor', name: 'Muse Spark 1.2', provider: 'opencode-go', role: 'Primary Executor (Orchestration, Coding, UI, Building & Verification)' },
   { id: 'muse-spark-1.2-contributor', name: 'Muse Spark 1.2', provider: 'opencode-go', role: 'Fast Secondary Executor (Rapid UI iterations & smoke testing)' },
-  { id: 'muse-spark-1.2-contributor-modlens', name: 'Muse Spark 1.2 (ModLens)', provider: 'modlens', role: 'Vision & Visual Inspection (ModLens image understanding bridge)' },
   { id: 'kimi-k3', name: 'Kimi K3 Code', provider: 'opencode-go', role: 'Physics & Engine Advisor (specialized math/physics guidance)' },
   { id: 'flux-1-schnell', name: 'FLUX 1 Schnell', provider: 'cloudflare-workers-ai', role: 'Visual Asset & Art Director' }
 ]);
@@ -9,20 +8,14 @@ export const MODEL_CATALOG = Object.freeze([
 export class ModelProviderRouter {
   constructor(options = {}) {
     this.opencodeApiKey = process.env.OPENCODE_GO_API_KEY || process.env.OPENCODE_API_KEY || options.opencodeApiKey;
-    // ModLens (vision bridge) is considered configured when enabled explicitly
-    // (MODLENS_ENABLED=true or options.modlensEnabled). Default off so the
-    // catalog never claims a vision backend that is not provisioned.
-    this.modlensEnabled = options.modlensEnabled !== undefined
-      ? Boolean(options.modlensEnabled)
-      : process.env.MODLENS_ENABLED === 'true';
     this.defaultModel = options.defaultModel || 'muse-spark-1.2-contributor';
   }
 
   getAvailableModels() {
     return MODEL_CATALOG.map(m => ({
       ...m,
-      configured: m.provider === 'modlens'
-        ? this.modlensEnabled
+      configured: m.provider === 'opencode-go'
+        ? Boolean(this.opencodeApiKey)
         : Boolean(this.opencodeApiKey)
     }));
   }
