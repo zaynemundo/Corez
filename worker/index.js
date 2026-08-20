@@ -4,6 +4,7 @@ import { fetchAwwwardsInspiration, handleInspiration } from './inspiration.js';
 import { safeErrorDetail, readBoundedJson, jsonResponse, createTaskStateStore, createRateLimiter, estimateCostUsd } from './utils.js';
 import { runProviderChain, runStreamingChain, callOpenRouterImage } from './providerChain.js';
 import { runCreationHarness } from './harness.js';
+import { repairMalformedHtml } from './htmlRepair.js';
 import { selectModelForRequest, selectReasoningConfig } from './modelRouter.js';
 import { processResponse, detectTruncation, stitchContinuationChunk, CONTINUATION_INSTRUCTION, ANTI_REPEAT_CONTINUATION_INSTRUCTION } from './responseProcessor.js';
 import {
@@ -1907,7 +1908,9 @@ async function handleR2Apps(request, env) {
 
     if (url.searchParams.get('format') === 'html') {
       // Same originless-sandbox rendering contract as published creations.
-      return new Response(appData.html || appData.code, {
+      // Repair legacy artifacts whose missing/mangled <script> opening tag
+      // would otherwise render the code as visible page text.
+      return new Response(repairMalformedHtml(appData.html || appData.code), {
         headers: publishedPageHeaders()
       });
     }
@@ -2351,7 +2354,9 @@ async function handlePublish(request, env) {
       if (!pageHtml) {
         return jsonResponse(404, { error: 'Published page not found.' });
       }
-      return new Response(pageHtml, {
+      // Repair legacy artifacts whose missing/mangled <script> opening tag
+      // would otherwise render the code as visible page text.
+      return new Response(repairMalformedHtml(pageHtml), {
         headers: { ...publishedPageHeaders(), 'Access-Control-Allow-Origin': '*' }
       });
     }
@@ -2382,7 +2387,9 @@ async function handlePublish(request, env) {
       if (!html) {
         return jsonResponse(404, { error: 'Published creation not found.' });
       }
-      return new Response(html, { headers: publishedPageHeaders() });
+      // Repair legacy artifacts whose missing/mangled <script> opening tag
+      // would otherwise render the code as visible page text.
+      return new Response(repairMalformedHtml(html), { headers: publishedPageHeaders() });
     }
   }
 
@@ -2418,7 +2425,9 @@ async function handlePublish(request, env) {
     if (!html) {
       return jsonResponse(404, { error: 'Published creation not found.' });
     }
-    return new Response(html, { headers: publishedPageHeaders() });
+    // Repair legacy artifacts whose missing/mangled <script> opening tag
+    // would otherwise render the code as visible page text.
+    return new Response(repairMalformedHtml(html), { headers: publishedPageHeaders() });
   }
 
   return jsonResponse(405, { error: 'Method not allowed.' });

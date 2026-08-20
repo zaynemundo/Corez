@@ -3,6 +3,8 @@
  * ready to be rendered safely inside an iframe.
  */
 
+import { repairMalformedHtml } from './htmlRepair.js';
+
 // Multi-page site support: the model may emit multiple full HTML documents
 // inside ONE code block, separated by page markers:
 //
@@ -301,7 +303,11 @@ export function injectNavigationGuard(html) {
 
 export function formatCodeForPreview(rawCode) {
   if (!rawCode || typeof rawCode !== 'string') return '';
-  const trimmed = rawCode.trim();
+  // Deterministic repair of model-output corruption (missing or mangled
+  // <script>/<style> opening tags) that would otherwise make the browser
+  // render the block as visible page text. Safe on well-formed documents
+  // (no-op) and on React/JSX code (guarded internally).
+  const trimmed = repairMalformedHtml(rawCode.trim());
   const stripped = trimmed.replace(/^(?:\s*<!--[\s\S]*?-->\s*)+/i, '').trim();
 
   // 1. If it's already a full HTML document, return as-is

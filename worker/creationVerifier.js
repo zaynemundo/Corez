@@ -5,6 +5,34 @@
 
 const MAX_PAGES = 12;
 
+// Sequential <script>/<style> tag balance scan. Returns issue codes:
+// - 'stray-closing-tag': a </script>/</style> with no preceding open (the
+//   model omitted the opening tag; the browser renders the block as text).
+// - 'malformed-block-open': an opening tag that swallowed lines (no ">" on
+//   the tag's own line) — same visible-text failure.
+// - 'truncated-block': opens without closes (output cut off mid-block).
+function scanBlockBalance(content) {
+  const pattern = /<\/?(script|style)\b[^>]*>/gi;
+  let depth = 0;
+  let match;
+  const issues = [];
+  while ((match = pattern.exec(content)) !== null) {
+    const token = match[0];
+    if (/^<\//i.test(token)) {
+      depth -= 1;
+      if (depth < 0) {
+        issues.push('stray-closing-tag');
+        depth = 0;
+      }
+    } else if (!/\/>/.test(token)) {
+      depth += 1;
+      if (/[\r\n]/.test(token)) issues.push('malformed-block-open');
+    }
+  }
+  if (depth > 0) issues.push('truncated-block');
+  return issues;
+}
+
 const GAME_LOOP_PATTERNS = /\b(requestAnimationFrame|setInterval)\b/i;
 const GAME_UPDATE_PATTERNS = /\b(gameLoop|update|render|loop)\b/i;
 const INPUT_PATTERNS = /\b(addEventListener\s*\(\s*['"](keydown|keyup|mousedown|mouseup|mousemove|click|touchstart)['"])/i;
@@ -33,17 +61,27 @@ export function verifyCreation(html, options = {}) {
     failures.push({ code: 'incomplete-html', detail: 'The artifact is missing a complete <html>...</html> document.' });
   }
 
-  // Truncation guard: an odd number of <script> tags means the document was
-  // cut off mid-block (the closing tag never arrived).
-  const tags = content.match(/<\/?(script|style)\b/gi) || [];
-  let scriptDepth = 0;
-  for (const tag of tags) {
-    if (/^<\//i.test(tag)) scriptDepth -= 1;
-    else if (!/\/>/.test(tag)) scriptDepth += 1;
-    if (scriptDepth < 0) scriptDepth = 0;
-  }
-  if (scriptDepth !== 0) {
-    failures.push({ code: 'truncated-block', detail: 'The artifact has an unclosed <script> or <style> block — output was likely cut off.' });
+  // Structural block balance: <script>/<style> opens and closes must match in
+  // order. A stray closing tag (a close with no preceding open) means the
+  // model omitted the opening tag — the browser then renders the whole block
+  // as visible page text. An unclosed block means the output was cut off. An
+  // opening tag whose span up to its first ">" contains a newline means the
+  // tag swallowed the first lines of its block (also renders as page text).
+  const balanceIssues = scanBlockBalance(content);
+  for (const issue of balanceIssues) {
+    if (issue === 'stray-closing-tag') {
+      failures.push({
+        code: 'stray-closing-tag',
+        detail: 'The artifact has a </script> or </style> closing tag with no matching opening tag — the browser renders the block as visible page text.'
+      });
+    } else if (issue === 'malformed-block-open') {
+      failures.push({
+        code: 'malformed-script-tag',
+        detail: 'A <script> or <style> opening tag is malformed and swallows the first lines of its block, so the browser renders the block as visible page text.'
+      });
+    } else {
+      failures.push({ code: 'truncated-block', detail: 'The artifact has an unclosed <script> or <style> block — output was likely cut off.' });
+    }
   }
 
   const scriptTags = content.match(/<script\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/gi) || [];

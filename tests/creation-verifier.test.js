@@ -54,6 +54,55 @@ describe('verifyCreation', () => {
     expect(result.failures.some((f) => f.code === 'truncated-block')).toBe(true);
   });
 
+  it('rejects a stray </script> with no opening tag (code rendered as page text)', () => {
+    const content = `<!DOCTYPE html><html><head></head><body><div>hi</div>
+// Reveal + skill bars
+const io=new IntersectionObserver(entries=>{
+entries.forEach(e=>{
+if(e.isIntersecting){
+e.target.classList.add('in');
+}
+});
+});
+</script>
+</body></html>`;
+    const result = verifyCreation(content, { intentType: 'website_creation' });
+    expect(result.passed).toBe(false);
+    expect(result.failures.some((f) => f.code === 'stray-closing-tag')).toBe(true);
+  });
+
+  it('rejects an embedded early </script> inside a script block', () => {
+    const content = `<!DOCTYPE html><html><head></head><body>
+<script>
+const s = 'foo';
+const t = '</script>';
+alert(t);
+</script>
+</body></html>`;
+    const result = verifyCreation(content, { intentType: 'app' });
+    expect(result.passed).toBe(false);
+    expect(result.failures.some((f) => f.code === 'stray-closing-tag')).toBe(true);
+  });
+
+  it('rejects a <script> opening tag that swallowed the first lines of its block', () => {
+    const content = `<!DOCTYPE html><html><head></head><body><div>ok</div>
+<script
+// first line of js
+const x=1;
+console.log(x);
+</script>
+</body></html>`;
+    const result = verifyCreation(content, { intentType: 'app' });
+    expect(result.passed).toBe(false);
+    expect(result.failures.some((f) => f.code === 'malformed-script-tag')).toBe(true);
+  });
+
+  it('passes balanced adjacent script blocks', () => {
+    const content = '<!DOCTYPE html><html><head><style>body{}</style></head><body><script>a()</script><script>b()</script></body></html>';
+    const result = verifyCreation(content, { intentType: 'app' });
+    expect(result.passed).toBe(true);
+  });
+
   it('rejects external http(s) scripts', () => {
     const result = verifyCreation(
       '<html><body><script src="https://evil.example/x.js"></script></body></html>',

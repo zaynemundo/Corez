@@ -10,6 +10,7 @@
 import { runProviderChain, runStreamingChain } from './providerChain.js';
 import { selectModelForRequest, selectReasoningConfig } from './modelRouter.js';
 import { verifyCreation, verifySpecCoverage, buildRepairPrompt } from './creationVerifier.js';
+import { repairMalformedHtml } from './htmlRepair.js';
 import { estimateCostUsd } from './utils.js';
 import { swarmEnabledFor, runSwarmSpecialists, buildSwarmContext } from './swarm.js';
 import {
@@ -30,6 +31,8 @@ export const HARD_FAILURE_CODES = new Set([
   'empty-output',
   'incomplete-html',
   'truncated-block',
+  'stray-closing-tag',
+  'malformed-script-tag',
   'unbalanced-braces',
   'missing-canvas',
   'missing-loop',
@@ -560,6 +563,20 @@ export async function* runCreationHarness(options) {
         await persist(store, taskId, state);
       }
 
+      // Deterministic structural repair: models occasionally emit HTML whose
+      // <script>/<style> opening tag is missing or mangled, so the browser
+      // renders the block as visible page text (htmlRepair.js). Repair
+      // BEFORE verification and persistence so the stored artifact is the
+      // fixed version, and re-stream it (clear + full delta) so the client's
+      // accumulated stream matches the artifact exactly.
+      const repairedBuild = repairMalformedHtml(collected);
+      if (repairedBuild !== collected) {
+        collected = repairedBuild;
+        yield { type: 'clear' };
+        yield { type: 'delta', text: collected };
+        buildStreamed = true;
+      }
+
       state.build = collected;
       state.model = model || state.model;
       state.provider = provider || state.provider;
@@ -703,6 +720,17 @@ export async function* runCreationHarness(options) {
         break;
       }
       state.build = collected;
+      // Deterministic repair of structural corruption (missing/mangled
+      // <script> opening tags) before the repaired build is persisted and
+      // re-verified, so the artifact never ships with code rendered as text.
+      // Re-stream when the repair changed the content so the client's
+      // accumulated stream matches the persisted artifact.
+      const repairedRoundBuild = repairMalformedHtml(state.build);
+      if (repairedRoundBuild !== state.build) {
+        state.build = repairedRoundBuild;
+        yield { type: 'clear' };
+        yield { type: 'delta', text: state.build };
+      }
       // Persist the repaired build once (resume needs the latest artifact);
       // the re-verification below is deterministic and persisted at the end.
       await persist(store, taskId, state);
