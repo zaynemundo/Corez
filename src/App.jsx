@@ -734,9 +734,12 @@ function MainApp() {
   };
 
   // Filter + sort for sidebar: show chats with at least one message OR currently active empty chat, most recent first
+  // FIX: chats from listChats start as {messages:[], _loaded:false} until their messages are fetched.
+  // The old filter hid every non-active chat on refresh because messages.length was 0.
   const sidebarSessions = useMemo(() => {
     const filtered = sessions.filter(s => {
       if (s.id === activeSessionId) return true;
+      if (s._loaded === false) return true;
       return Array.isArray(s.messages) && s.messages.length > 0;
     });
     return [...filtered].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
