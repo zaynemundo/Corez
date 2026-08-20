@@ -2410,21 +2410,19 @@ async function handlePublish(request, env) {
         return jsonResponse(409, { error: `The slug "${rawRequestedSlug}" is already taken. Please choose a different URL.` });
       }
       // Ownership: overwriting an existing slug requires being its owner.
-      // Records created before ownership checks shipped have no ownerUserId
-      // and fail closed — re-publish under a new slug instead.
+      // Legacy records (no ownerUserId) are auto-claimed on first re-publish
+      // so existing published links keep working after the fix.
       if (existingObject) {
         let existingRecord = null;
         try {
           existingRecord = JSON.parse(await existingObject.text());
         } catch {
-          // unreadable record -> treat as foreign, refuse to overwrite
+          // unreadable record -> treat as unowned, allow claim below
         }
-        if (!existingRecord?.ownerUserId) {
-          return jsonResponse(403, { error: 'This slug predates ownership checks. Please publish under a new slug.' });
-        }
-        if (existingRecord.ownerUserId !== uid) {
+        if (existingRecord?.ownerUserId && existingRecord.ownerUserId !== uid) {
           return jsonResponse(403, { error: 'This slug belongs to another user.' });
         }
+        // Legacy (no ownerUserId) falls through and will be claimed by this publish (ownerUserId = uid).
       }
       slug = rawRequestedSlug;
 
@@ -2473,10 +2471,12 @@ async function handlePublish(request, env) {
         try {
           prevRecord = JSON.parse(await prevObject.text());
         } catch {
-          // unreadable record -> refuse to delete it
+          // unreadable record -> treat as unowned, allow cleanup (no history leak)
         }
-        if (!prevRecord?.ownerUserId || prevRecord.ownerUserId !== uid) {
-          return jsonResponse(403, { error: 'The previous slug belongs to another user or predates ownership checks.' });
+        // Legacy previous slugs (no owner) and owned-by-me both allow cleanup;
+        // only slugs owned by someone else are blocked.
+        if (prevRecord?.ownerUserId && prevRecord.ownerUserId !== uid) {
+          return jsonResponse(403, { error: 'The previous slug belongs to another user.' });
         }
       }
       try {
