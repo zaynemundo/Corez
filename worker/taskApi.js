@@ -12,14 +12,24 @@ import { R2TaskStore } from '../packages/agent-core/persistence/R2TaskStore.js';
 import { ContextStore } from '../packages/agent-core/persistence/ContextStore.js';
 import { OpenCodeGoAdapter, DeepSeekAdapter, OpenRouterAdapter } from '../packages/agent-core/providers/adapters.js';
 import { TERMINAL_TASK_STATUSES } from '../packages/agent-core/harness/TaskState.js';
+import { verifySession } from './auth.js';
 import { jsonResponse, readBoundedJson, safeErrorDetail } from './utils.js';
 
 export const OWNER_HEADER = 'x-corez-user';
 const TASK_ID_PATTERN = /^[A-Za-z0-9._:-]{1,160}$/;
 const RECORD_ID_PATTERN = /^[A-Za-z0-9._-]{1,160}$/;
 
-function getUserId(request) {
-  return (request.headers.get(OWNER_HEADER) || '').trim().slice(0, 100) || 'anonymous';
+// Caller identity: the verified session is the ONLY trusted source. The
+// legacy X-Corez-User header is honored solely when AUTH_SECRET is unset
+// (local dev / contract tests) and is never trusted in production, where a
+// missing session means 401.
+async function getUserId(request, env) {
+  const sess = await verifySession(request, env);
+  if (sess?.uid) return sess.uid;
+  if (!env?.AUTH_SECRET) {
+    return (request.headers.get(OWNER_HEADER) || '').trim().slice(0, 100) || 'anonymous';
+  }
+  return null;
 }
 
 // One shared cancellation registry per Worker isolate: a cancel request in
@@ -95,7 +105,10 @@ function parseTaskId(raw) {
 export async function handleTaskApi(request, env) {
   const url = new URL(request.url);
   const pathname = url.pathname;
-  const userId = getUserId(request);
+  const userId = await getUserId(request, env);
+  if (!userId) {
+    return jsonResponse(401, { error: 'Authentication required.' });
+  }
 
   // POST /api/tasks — start a task, return the task id immediately.
   if (pathname === '/api/tasks' && request.method === 'POST') {

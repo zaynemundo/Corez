@@ -1,6 +1,7 @@
 import { handleSearch } from './search.js';
 import { handleRerank, handleEmbed } from './aiModels.js';
 import { fetchAwwwardsInspiration, handleInspiration } from './inspiration.js';
+import { verifySession } from './auth.js';
 import { safeErrorDetail, readBoundedJson, jsonResponse, createTaskStateStore, createRateLimiter, estimateCostUsd } from './utils.js';
 import { runProviderChain, runStreamingChain, callOpenRouterImage } from './providerChain.js';
 import { runCreationHarness } from './harness.js';
@@ -1501,11 +1502,12 @@ function retrySleepFor(env) {
   return () => new Promise((resolve) => setTimeout(resolve, overrideMs));
 }
 
-async function saveToR2IfAvailable(env, key, buffer, mimeType = 'image/png') {
+async function saveToR2IfAvailable(env, key, buffer, mimeType = 'image/png', ownerId = null) {
   if (env.ASSET_BUCKET && typeof env.ASSET_BUCKET.put === 'function') {
     try {
       await env.ASSET_BUCKET.put(key, buffer, {
-        httpMetadata: { contentType: mimeType }
+        httpMetadata: { contentType: mimeType },
+        ...(ownerId ? { customMetadata: { ownerId } } : {})
       });
       return `/api/assets/${key}`;
     } catch {
@@ -1631,7 +1633,7 @@ async function handleImage(request, env) {
     }
 
     if (buffer && buffer.byteLength > 0) {
-      const r2Url = await saveToR2IfAvailable(env, r2Key, buffer, mimeType);
+      const r2Url = await saveToR2IfAvailable(env, r2Key, buffer, mimeType, await sessionUid(request, env));
       return jsonResponse(200, { image: r2Url || imageUrl, model: imageModel });
     }
   } catch (err) {
@@ -1751,7 +1753,7 @@ async function handleWorkersAIImage(request, env) {
   let imageUrl = `data:${mimeType};base64,${base64}`;
   try {
     const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
-    const r2Url = await saveToR2IfAvailable(env, r2Key, bytes.buffer, mimeType);
+    const r2Url = await saveToR2IfAvailable(env, r2Key, bytes.buffer, mimeType, await sessionUid(request, env));
     if (r2Url) imageUrl = r2Url;
   } catch {
     // R2 is optional: the data URL is returned when storage fails.
@@ -1764,10 +1766,19 @@ async function handleR2Assets(request, env) {
     return jsonResponse(503, { error: 'Cloudflare R2 ASSET_BUCKET is not configured.' });
   }
 
+  const uid = await sessionUid(request, env);
+  if (!uid) {
+    return jsonResponse(401, { error: 'Authentication required.' });
+  }
+
   const url = new URL(request.url);
   const pathname = url.pathname;
 
   if (pathname === '/api/assets/upload' && request.method === 'POST') {
+    const retryAfter = assetsRateLimiter(request);
+    if (retryAfter !== null) {
+      return jsonResponse(429, { error: 'Too many asset requests. Try again shortly.' }, { 'Retry-After': String(retryAfter) });
+    }
     let body;
     try {
       body = await readBoundedJson(request);
@@ -1821,7 +1832,11 @@ async function handleR2Assets(request, env) {
     }
 
     await env.ASSET_BUCKET.put(key, bytes, {
-      httpMetadata: { contentType: mimeType }
+      httpMetadata: { contentType: mimeType },
+      // Ownership binding: only the uploading session's uid may read or
+      // delete this object. Keys stay flat (URLs are stable), ownership
+      // travels in R2 custom metadata instead.
+      customMetadata: { ownerId: uid }
     });
 
     return jsonResponse(200, {
@@ -1842,6 +1857,12 @@ async function handleR2Assets(request, env) {
       return jsonResponse(404, { error: 'Asset not found in R2 bucket.' });
     }
 
+    // Ownership check: objects written before this control shipped carry no
+    // ownerId metadata and fail closed (403) — re-upload to re-bind them.
+    if (object.customMetadata?.ownerId !== uid) {
+      return jsonResponse(403, { error: 'Asset access denied.' });
+    }
+
     const headers = new Headers();
     object.writeHttpMetadata(headers);
     headers.set('etag', object.httpEtag);
@@ -1859,9 +1880,19 @@ async function handleR2Assets(request, env) {
   }
 
   if (request.method === 'DELETE' && pathname.startsWith('/api/assets/')) {
+    const retryAfter = assetsRateLimiter(request);
+    if (retryAfter !== null) {
+      return jsonResponse(429, { error: 'Too many asset requests. Try again shortly.' }, { 'Retry-After': String(retryAfter) });
+    }
     const key = decodePathSegment(pathname.replace('/api/assets/', ''));
     if (!key || !SAFE_STORAGE_SEGMENT.test(key)) {
       return jsonResponse(400, { error: 'Invalid asset key.' });
+    }
+
+    // Ownership check before delete (R2 head is a metadata-only lookup).
+    const existing = await env.ASSET_BUCKET.head(key);
+    if (!existing || existing.customMetadata?.ownerId !== uid) {
+      return jsonResponse(403, { error: 'Asset access denied.' });
     }
 
     await env.ASSET_BUCKET.delete(key);
@@ -1876,11 +1907,20 @@ async function handleR2Apps(request, env) {
     return jsonResponse(530, { error: 'R2 storage (ASSET_BUCKET) is not configured.' });
   }
 
+  const uid = await sessionUid(request, env);
+  if (!uid) {
+    return jsonResponse(401, { error: 'Authentication required.' });
+  }
+
   const url = new URL(request.url);
   const pathname = url.pathname;
 
   // 1. POST /api/apps/store - Store or update an app under a session
   if (pathname === '/api/apps/store' && request.method === 'POST') {
+    const retryAfter = appsRateLimiter(request);
+    if (retryAfter !== null) {
+      return jsonResponse(429, { error: 'Too many app requests. Try again shortly.' }, { 'Retry-After': String(retryAfter) });
+    }
     let body;
     try {
       body = await readBoundedJson(request);
@@ -1917,7 +1957,7 @@ async function handleR2Apps(request, env) {
       metadata: body?.metadata || {}
     };
 
-    const key = `apps/${sessionId}/${appId}.json`;
+    const key = `apps/${uid}/${sessionId}/${appId}.json`;
     await env.ASSET_BUCKET.put(key, JSON.stringify(appRecord), {
       httpMetadata: { contentType: 'application/json' }
     });
@@ -1940,7 +1980,7 @@ async function handleR2Apps(request, env) {
       return jsonResponse(400, { error: 'Invalid path segment.' });
     }
 
-    const key = `apps/${sessionId}/${appId}.json`;
+    const key = `apps/${uid}/${sessionId}/${appId}.json`;
     const object = await env.ASSET_BUCKET.get(key);
     if (!object) {
       return jsonResponse(404, { error: 'App not found in R2 storage.' });
@@ -1972,7 +2012,7 @@ async function handleR2Apps(request, env) {
     if (sessionId === null || !SAFE_STORAGE_SEGMENT.test(sessionId)) {
       return jsonResponse(400, { error: 'Invalid session id in path.' });
     }
-    const prefix = `apps/${sessionId}/`;
+    const prefix = `apps/${uid}/${sessionId}/`;
     const list = await env.ASSET_BUCKET.list({ prefix });
 
     const apps = [];
@@ -2006,18 +2046,22 @@ async function handleR2Apps(request, env) {
       return jsonResponse(400, { error: 'Invalid path segment.' });
     }
 
-    const key = `apps/${sessionId}/${appId}.json`;
+    const key = `apps/${uid}/${sessionId}/${appId}.json`;
     await env.ASSET_BUCKET.delete(key);
     return jsonResponse(200, { success: true, sessionId, appId });
   }
 
   // 5. DELETE /api/apps/:sessionId - Delete ALL apps associated with a chat session
   if (request.method === 'DELETE' && pathname.match(/^\/api\/apps\/[^/]+$/)) {
+    const retryAfter = appsRateLimiter(request);
+    if (retryAfter !== null) {
+      return jsonResponse(429, { error: 'Too many app requests. Try again shortly.' }, { 'Retry-After': String(retryAfter) });
+    }
     const sessionId = decodePathSegment(pathname.replace('/api/apps/', ''));
     if (sessionId === null || !SAFE_STORAGE_SEGMENT.test(sessionId)) {
       return jsonResponse(400, { error: 'Invalid session id in path.' });
     }
-    const prefix = `apps/${sessionId}/`;
+    const prefix = `apps/${uid}/${sessionId}/`;
     const list = await env.ASSET_BUCKET.list({ prefix });
 
     let count = 0;
@@ -2056,11 +2100,20 @@ async function handleR2Memory(request, env) {
     return jsonResponse(530, { error: 'R2 storage (ASSET_BUCKET) is not configured.' });
   }
 
+  const uid = await sessionUid(request, env);
+  if (!uid) {
+    return jsonResponse(401, { error: 'Authentication required.' });
+  }
+
   const url = new URL(request.url);
   const pathname = url.pathname;
 
   // 1. POST /api/memory/store - Store or update a memory entry
   if (pathname === '/api/memory/store' && request.method === 'POST') {
+    const retryAfter = memoryRateLimiter(request);
+    if (retryAfter !== null) {
+      return jsonResponse(429, { error: 'Too many memory requests. Try again shortly.' }, { 'Retry-After': String(retryAfter) });
+    }
     let body;
     try {
       body = await readBoundedJson(request);
@@ -2068,7 +2121,9 @@ async function handleR2Memory(request, env) {
       return jsonResponse(400, { error: 'Invalid JSON payload.' });
     }
 
-    const userId = typeof body?.userId === 'string' ? body.userId.trim() : 'default_user';
+    // Identity comes from the verified session only; any client-supplied
+    // userId is ignored so one account can never touch another's namespace.
+    const userId = uid;
     const keyName = typeof body?.key === 'string' ? body.key.trim() : `mem_${Date.now()}`;
     const category = typeof body?.category === 'string' ? body.category.trim() : 'general';
     const text = typeof body?.text === 'string' ? body.text : (typeof body?.value === 'string' ? body.value : '');
@@ -2112,6 +2167,10 @@ async function handleR2Memory(request, env) {
 
   // 2. POST /api/memory/search - Search relevant memories
   if (pathname === '/api/memory/search' && request.method === 'POST') {
+    const retryAfter = memoryRateLimiter(request);
+    if (retryAfter !== null) {
+      return jsonResponse(429, { error: 'Too many memory requests. Try again shortly.' }, { 'Retry-After': String(retryAfter) });
+    }
     let body;
     try {
       body = await readBoundedJson(request);
@@ -2119,7 +2178,8 @@ async function handleR2Memory(request, env) {
       return jsonResponse(400, { error: 'Invalid JSON payload.' });
     }
 
-    const userId = typeof body?.userId === 'string' ? body.userId.trim() : 'default_user';
+    // Scoped to the verified session's namespace; body.userId is ignored.
+    const userId = uid;
     const query = typeof body?.query === 'string' ? body.query.trim().toLowerCase() : '';
     const categoryFilter = typeof body?.category === 'string' ? body.category.trim().toLowerCase() : '';
 
@@ -2167,11 +2227,9 @@ async function handleR2Memory(request, env) {
 
   // 3. GET /api/memory/:userId - List all memories for a user
   if (request.method === 'GET' && pathname.match(/^\/api\/memory\/[^/]+$/)) {
-    const encodedUserId = pathname.replace('/api/memory/', '');
-    const userId = decodePathSegment(encodedUserId);
-    if (userId === null || !SAFE_STORAGE_SEGMENT.test(userId)) {
-      return jsonResponse(400, { error: 'Invalid user id in path.' });
-    }
+    // The path userId is ignored for scoping: only the session's namespace
+    // is ever listed.
+    const userId = uid;
     const prefix = `memory/${userId}/`;
     const list = await env.ASSET_BUCKET.list({ prefix });
 
@@ -2196,13 +2254,18 @@ async function handleR2Memory(request, env) {
 
   // 4. DELETE /api/memory/:userId/:key - Delete a memory
   if (request.method === 'DELETE' && pathname.match(/^\/api\/memory\/[^/]+\/[^/]+$/)) {
+    const retryAfter = memoryRateLimiter(request);
+    if (retryAfter !== null) {
+      return jsonResponse(429, { error: 'Too many memory requests. Try again shortly.' }, { 'Retry-After': String(retryAfter) });
+    }
     const parts = pathname.replace('/api/memory/', '').split('/');
-    const userId = decodePathSegment(parts[0]);
     const keyName = decodePathSegment(parts[1]);
-    if (userId === null || keyName === null || !SAFE_STORAGE_SEGMENT.test(userId) || !SAFE_STORAGE_SEGMENT.test(keyName)) {
+    if (keyName === null || !SAFE_STORAGE_SEGMENT.test(keyName)) {
       return jsonResponse(400, { error: 'Invalid path segment.' });
     }
 
+    // Scoped to the session's namespace; the path userId is ignored.
+    const userId = uid;
     const key = `memory/${userId}/${keyName}.json`;
     await env.ASSET_BUCKET.delete(key);
     return jsonResponse(200, { success: true, userId, key: keyName });
@@ -2235,7 +2298,30 @@ const publishRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 30 });
 // them per client like every other costly endpoint.
 const imageRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 30 });
 
+// R2-backed user-data routes (assets, apps, memory) are unauthenticated-free
+// in the sense that any valid session reaches them: bound writes/deletes per
+// client so one session cannot fill the bucket or burn egress at line rate.
+const assetsRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 30 });
+const appsRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 30 });
+const memoryRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 30 });
+
+// Derive the caller identity from the verified session. entry.js's auth gate
+// already rejected unauthenticated callers when AUTH_SECRET is set, so here a
+// null return means "no session in a production deployment" -> 401. Without
+// AUTH_SECRET (local dev) the identity is 'dev' and is never trusted.
+async function sessionUid(request, env) {
+  const sess = await verifySession(request, env);
+  if (sess?.uid) return sess.uid;
+  if (!env?.AUTH_SECRET) return 'dev';
+  return null;
+}
+
 async function handlePublish(request, env) {
+  const uid = await sessionUid(request, env);
+  if (!uid) {
+    return jsonResponse(401, { error: 'Authentication required.' });
+  }
+
   const url = new URL(request.url);
   const pathname = url.pathname;
 
@@ -2323,6 +2409,23 @@ async function handlePublish(request, env) {
       if (existingObject && body?.previousSlug && body.previousSlug !== rawRequestedSlug) {
         return jsonResponse(409, { error: `The slug "${rawRequestedSlug}" is already taken. Please choose a different URL.` });
       }
+      // Ownership: overwriting an existing slug requires being its owner.
+      // Records created before ownership checks shipped have no ownerUserId
+      // and fail closed — re-publish under a new slug instead.
+      if (existingObject) {
+        let existingRecord = null;
+        try {
+          existingRecord = JSON.parse(await existingObject.text());
+        } catch {
+          // unreadable record -> treat as foreign, refuse to overwrite
+        }
+        if (!existingRecord?.ownerUserId) {
+          return jsonResponse(403, { error: 'This slug predates ownership checks. Please publish under a new slug.' });
+        }
+        if (existingRecord.ownerUserId !== uid) {
+          return jsonResponse(403, { error: 'This slug belongs to another user.' });
+        }
+      }
       slug = rawRequestedSlug;
 
       if (existingObject && (!body?.previousSlug || body.previousSlug === rawRequestedSlug)) {
@@ -2355,14 +2458,27 @@ async function handlePublish(request, env) {
       title,
       html,
       customized: isCustomized,
+      ownerUserId: uid,
       createdAt: new Date().toISOString()
     };
     if (Object.keys(pages).length > 0) {
       record.pages = pages;
     }
 
-    // Clean up previous slug if renamed
+    // Clean up previous slug if renamed — only when the caller owns it.
     if (body?.previousSlug && body.previousSlug !== slug && PUBLISH_SLUG_PATTERN.test(body.previousSlug)) {
+      const prevObject = await env.ASSET_BUCKET.get(`publish/${body.previousSlug}.json`);
+      if (prevObject) {
+        let prevRecord = null;
+        try {
+          prevRecord = JSON.parse(await prevObject.text());
+        } catch {
+          // unreadable record -> refuse to delete it
+        }
+        if (!prevRecord?.ownerUserId || prevRecord.ownerUserId !== uid) {
+          return jsonResponse(403, { error: 'The previous slug belongs to another user or predates ownership checks.' });
+        }
+      }
       try {
         await env.ASSET_BUCKET.delete(`publish/${body.previousSlug}.json`);
       } catch {

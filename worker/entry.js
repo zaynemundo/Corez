@@ -113,7 +113,7 @@ export default {
     }
 
     // Auth gate - protect AI and app APIs when AUTH_SECRET is set
-    const authPaths = ['/api/ai', '/api/image', '/api/apps', '/api/memory', '/api/publish', '/api/assets', '/api/chats'];
+    const authPaths = ['/api/ai', '/api/image', '/api/apps', '/api/memory', '/api/publish', '/api/assets', '/api/chats', '/api/tasks', '/api/task', '/api/context'];
     const needsAuth = authPaths.some(p => url.pathname === p || url.pathname.startsWith(p + '/')) || url.pathname.startsWith('/api/game/');
     if (needsAuth) {
       const sess = await verifySession(request, env);
