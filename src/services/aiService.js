@@ -911,7 +911,7 @@ export async function generateHostedAIResponse(
         });
       }
     }
-    throw new Error('Hosted AI request failed to reach the AI worker.');
+    throw new Error('Corez AI Services is currently packed. Please try again in a moment.');
   };
 
   const fetchHostedResponse = async (options) => {
@@ -999,13 +999,7 @@ export async function generateHostedAIResponse(
         if (response.status === 401) {
           throw new Error('Authentication required. Please log in.');
         }
-        // A 403 with the Cloudflare challenge page ("Just a moment...") means
-        // the WAF intercepted the request before it reached the worker — the
-        // API needs a WAF bypass rule, not a retry.
-        if (response.status === 403 && CLOUDFLARE_CHALLENGE_PATTERN.test(errorText.slice(0, 4000))) {
-          throw new Error('The hosted AI request was intercepted by a security challenge page before reaching the worker. The site needs a WAF bypass rule for /api/* — please retry in a moment.');
-        }
-        throw new Error(`Hosted AI stream failed: HTTP ${response.status} ${errorText.slice(0, 200)}`);
+        throw new Error('Corez AI Services is currently packed. Please try again in a moment.');
       }
       if (!response.body) throw new Error('Hosted AI stream had no body.');
       const reader = response.body.getReader();
@@ -1082,19 +1076,16 @@ export async function generateHostedAIResponse(
         continue;
       }
       if (retryableError) {
-        throw new Error(retryableError.message || 'Hosted AI stream error.');
+        throw new Error('Corez AI Services is currently packed. Please try again in a moment.');
       }
       if (streamed.trim()) return streamed;
 
-      // The stream completed with zero deltas and no error event: the response
-      // was NOT valid SSE. Diagnose the body so the user sees the real cause
-      // instead of a generic "no streamed content" (a Cloudflare challenge
-      // page, a proxy error page, or a JSON fast-path answer).
+      // Stream completed with no usable content
       if (!rawTrimmed) {
-        throw new Error('The hosted AI returned an empty response. Please try again.');
+        throw new Error('Corez AI Services is currently packed. Please try again in a moment.');
       }
       if (CLOUDFLARE_CHALLENGE_PATTERN.test(rawTrimmed.slice(0, 4000))) {
-        throw new Error('The hosted AI request was intercepted by a security challenge page instead of reaching the worker. Please retry in a moment.');
+        throw new Error('Corez AI Services is currently packed. Please try again in a moment.');
       }
       if (rawTrimmed.startsWith('{') || rawTrimmed.startsWith('[')) {
         try {
@@ -1103,14 +1094,13 @@ export async function generateHostedAIResponse(
             return parsed.content;
           }
           if (typeof parsed?.error === 'string') {
-            throw new Error(`Hosted AI request failed: ${parsed.error}`);
+            throw new Error('Corez AI Services is currently packed. Please try again in a moment.');
           }
         } catch (jsonErr) {
-          if (jsonErr instanceof Error && jsonErr.message.startsWith('Hosted AI request failed:')) throw jsonErr;
-          // Fall through to the generic error below.
+          if (jsonErr instanceof Error && jsonErr.message.includes('Corez AI Services is currently packed')) throw jsonErr;
         }
       }
-      throw new Error('Hosted AI returned no streamed content.');
+      throw new Error('Corez AI Services is currently packed. Please try again in a moment.');
     }
   }
 
@@ -1179,16 +1169,14 @@ export async function generateHostedAIResponse(
     }
   }
   if (data?.status === 'retry-scheduled') {
-    throw new Error('The hosted AI service is temporarily busy and its recovery is still scheduled. Please try again shortly.');
+    throw new Error('Corez AI Services is currently packed. Please try again in a moment.');
   }
 
   if (!response.ok) {
     if (response.status === 401) {
       throw new Error('Authentication required. Please log in.');
     }
-    const serverMsg = typeof data?.error === 'string' ? data.error : (data?.error?.message || data?.message || `HTTP ${response.status}`);
-    const detail = typeof data?.detail === 'string' && data.detail.trim() ? ` (${data.detail.trim()})` : '';
-    throw new Error(`Hosted AI request failed: ${serverMsg}${detail}`);
+    throw new Error('Corez AI Services is currently packed. Please try again in a moment.');
   }
 
   // Defense-in-depth: reasoning text must never reach the user. Strip closed
@@ -1202,7 +1190,7 @@ export async function generateHostedAIResponse(
   const rawContent = strippedContent || null;
 
   if (!rawContent) {
-    throw new Error('Hosted AI returned only reasoning and no answer.');
+    throw new Error('Corez AI Services is currently packed. Please try again in a moment.');
   }
 
   // Persist project memory returned by the worker so the next follow-up turn
@@ -1768,20 +1756,9 @@ export async function runImageCommand(imagePrompt, history = [], signal = null) 
   return `![](${imageUrl})`;
 }
 
-// Build the "why" for the honest fallback: name the transport error when the
-// fetch itself failed, and give actionable guidance — the request never
-// reached an AI provider, so a provider-key hint would be misleading.
 export function describeHostedUnavailable(hostedError) {
-  const message = hostedError?.message || '';
-  const isTransportFailure = /networkerror|failed to fetch|load failed|fetch failed|ERR_CONNECTION|net::|econnrefused|connection refused/i.test(message);
-  let reason = message ? ` The hosted AI service is unavailable: ${message}` : ' The hosted AI service is currently unavailable.';
-  if (isTransportFailure) {
-    // The browser never got an HTTP response: this is a backend connectivity
-    // problem, not a missing provider key. Give actionable guidance for both
-    // local development and the deployed Worker regardless of hostname.
-    reason += ' The request never reached the AI worker. Locally, /api/* is proxied to the Cloudflare Worker on port 8787 — start it with `npx wrangler dev` (with OPENCODE_GO_API_KEY in .dev.vars) so this request has a backend to answer. For the deployed site, make sure the Worker is deployed with `npx wrangler deploy`.';
-  }
-  return reason;
+  // User-facing: never leak provider names, ports, or env keys.
+  return ' Corez AI Services is currently packed. Please try again in a moment.';
 }
 
 // Generate concise, natural AI responses for any public user
@@ -1814,8 +1791,7 @@ export async function generateLocalAIResponse(prompt, hostedError = null, signal
   userRequestPart = userRequestPart.replace(/\n\[Attached files\][\s\S]*$/, '').trim();
 
   if (revisionMatch) {
-    const reason = describeHostedUnavailable(hostedError);
-    return `I can see the code you want to revise, but I couldn't apply your revision (${userRequestPart || 'no request captured'}).${reason} Your code has not been changed.`;
+    return `I can see the code you want to revise, but Corez AI Services is currently packed. Please try again in a moment — your code has not been changed.`;
   }
 
   // 1. GREETINGS & SMALL TALK (Universal & Natural)
@@ -1863,18 +1839,15 @@ Its core purpose is to remove the technical gap between having an idea and launc
     // Games are NEVER canned: the hosted CoreZ AI is the only creator. When
     // it is unavailable, say so instead of substituting a template game.
     if (isGameDevIntent(cleanPrompt) || intent.primaryIntent === 'game_creation') {
-      const reason = describeHostedUnavailable(hostedError);
-      return `I'd love to build that game for you, but ${reason.trim()} — so I can't create it right now. Your request was received; please try again in a moment.`;
+      return `I'd love to build that game for you, but Corez AI Services is currently packed. Please try again in a moment.`;
     }
-    const reason = describeHostedUnavailable(hostedError);
-    return `I'd love to build that for you, but it doesn't match any app template I can synthesize offline, and ${reason.trim()} — so I can't create this specific app right now. Please check the AI service configuration (e.g. OPENCODE_GO_API_KEY for local dev) and try again.`;
+    return `I'd love to build that for you, but Corez AI Services is currently packed. Please try again in a moment.`;
   }
 
   // 5. PUBLIC USER INTENT RESPONSES
   if (intent.type === 'code-help') {
     if (hasEmbeddedCode) {
-      const reason = describeHostedUnavailable(hostedError).replace(/^ The hosted AI service is unavailable/, '');
-      return `I can see the code you shared, but the hosted AI service is currently unavailable${reason}, so I couldn't analyse or revise it. Please check the AI service configuration and try again — your code has not been changed.`;
+      return `I can see the code you shared, but Corez AI Services is currently packed. Please try again in a moment — your code has not been changed.`;
     }
     return `I understand the goal: ${intent.summary}\n\nShare the snippet, error message, or file you are working on. I'll walk through what is happening, identify the likely cause, propose a fix, and explain how to verify it so you can move forward without guessing.`;
   }
@@ -1884,15 +1857,13 @@ Its core purpose is to remove the technical gap between having an idea and launc
   }
 
   if (intent.type === 'explanation') {
-    const reason = describeHostedUnavailable(hostedError);
-    return `I can't properly answer "${cleanPrompt}" right now because the hosted AI service is currently unavailable.${reason}\n\nRetry in a moment and I'll explain it directly in plain language. If you'd rather work through it yourself in the meantime, this framework keeps any topic approachable:\n\n1. **Core idea** — define the topic in one everyday sentence.\n2. **Why it matters** — connect it to what you're trying to accomplish.\n3. **Key parts** — two or three simple pieces, each with a concrete example.\n4. **Next step** — one small action to test your understanding.`;
+    return `I can't properly answer "${cleanPrompt}" right now because Corez AI Services is currently packed. Please try again in a moment.\n\nRetry in a moment and I'll explain it directly in plain language.`;
   }
 
-  const fallbackReason = describeHostedUnavailable(hostedError);
   // For surgical revisions, don't leak the internal context — show just the user request
   const displayPrompt = isRevisionContextPrompt(cleanPrompt) && userRequestPart ? userRequestPart : cleanPrompt.slice(0, 120);
   const safeDisplay = displayPrompt.replace(/\[SURGICAL REVISION CONTEXT[\s\S]*?\[INSTRUCTION\]:[\s\S]*/i, '').trim().slice(0, 120) || displayPrompt.slice(0, 80);
-  return `I can't act on "${safeDisplay}" right now because the hosted AI service is currently unavailable.${fallbackReason}\n\nRetry in a moment and I'll turn it into a plan, a written answer, code, or a live preview depending on what you need.`;
+  return `I can't act on "${safeDisplay}" right now because Corez AI Services is currently packed. Please try again in a moment.`;
 }
 
 const IMAGE_PATTERNS = /\b(generate|create|draw|make|render|show|give me|give us|want|need|produce)\b.*\b(image|picture|photo|logo|illustration|artwork|wallpaper|drawing|graphic|icon)\b|\b(image|picture|photo|logo|illustration|artwork|wallpaper|drawing|graphic|icon)\b.*\b(generate|create|draw|make|render|flux)\b/i;
