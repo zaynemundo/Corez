@@ -1,0 +1,307 @@
+From f9f9bd5f2336060d700da8f2ae999cc12a316b5d Mon Sep 17 00:00:00 2001
+From: zaynemundo <zayne.mayo@gmail.com>
+Date: Thu, 20 Aug 2026 06:08:29 +0000
+Subject: [PATCH] feat: implement image handling in summarization and
+ serialization processes
+
+---
+ .../compaction-basic/src/summarizer.ts        | 10 ++-
+ .../tests/compaction-basic.spec.ts            |  8 ++-
+ packages/llm/llm-deepseek/src/serialize.ts    |  9 ++-
+ .../llm/llm-deepseek/tests/serialize.spec.ts  | 45 ++++++++++++
+ packages/llm/llm/src/content.ts               | 42 +++++++++++
+ packages/llm/llm/tests/content.spec.ts        | 70 +++++++++++++++++++
+ 6 files changed, 179 insertions(+), 5 deletions(-)
+
+diff --git a/packages/compaction/compaction-basic/src/summarizer.ts b/packages/compaction/compaction-basic/src/summarizer.ts
+index e77d9ec0a0..ca81f7cb07 100644
+--- a/packages/compaction/compaction-basic/src/summarizer.ts
++++ b/packages/compaction/compaction-basic/src/summarizer.ts
+@@ -5,7 +5,7 @@
+  */
+ 
+ import type { Context } from '@deepseek-ai/cordis'
+-import { contentHasImage, createUserMessage, BlockAssembler, LlmError } from '@deepseek-ai/dsh-llm'
++import { contentHasImage, createUserMessage, BlockAssembler, LlmError, stripMessageImagesToText } from '@deepseek-ai/dsh-llm'
+ import type {
+   ContentBlock, FinishReason, GenerateOptions, Message, TokenUsage, ToolSchema,
+ } from '@deepseek-ai/dsh-llm'
+@@ -150,10 +150,16 @@ export async function summarizeWithLlm(
+       source: { kind: 'plugin', plugin: 'dsh-compaction-basic' },
+     }),
+   ]
++  // The replayed region can carry image attachments from turns a vision
++  // model handled. A text-only summarization target cannot see them — the
++  // gateway rejects image content outright — so replace in-history images
++  // with a text placeholder and keep the compaction moving. (The adapter
++  // layer applies the same rule, but a compaction summary is text-only by
++  // contract, so the sanitized input is enforced here too.)
+   const options: GenerateOptions = {
+     provider: target.provider,
+     model: target.model,
+-    messages,
++    messages: stripMessageImagesToText(messages) as Message[],
+     ...input.system === undefined ? {} : { system: input.system },
+     ...input.tools === undefined ? {} : { tools: [...input.tools] },
+     maxTokens: config.maxTokens,
+diff --git a/packages/compaction/compaction-basic/tests/compaction-basic.spec.ts b/packages/compaction/compaction-basic/tests/compaction-basic.spec.ts
+index 2cf07d3f70..7a4cb56cba 100644
+--- a/packages/compaction/compaction-basic/tests/compaction-basic.spec.ts
++++ b/packages/compaction/compaction-basic/tests/compaction-basic.spec.ts
+@@ -1247,7 +1247,13 @@ describe('default one-shot summarizer', () => {
+     expect(adapter.lastOptions?.system).toBe('REPLAYED SYSTEM')
+     expect(adapter.lastOptions?.tools).toEqual(tools)
+     const messages = adapter.lastOptions?.messages ?? []
+-    expect(messages[0]).toEqual(prefix)
++    // In-history image attachments are replaced with a text placeholder so a
++    // text-only summarization target is never sent image content.
++    expect(messages[0]).not.toEqual(prefix)
++    expect(messages[0].content).toEqual([
++      { type: 'text', text: 'earlier turn' },
++      { type: 'text', text: '[Image attached — omitted: this model does not support image input]' },
++    ])
+     const last = messages.at(-1)?.content[0]
+     const lastText = last?.type === 'text' ? last.text : ''
+     expect(lastText).toContain('Write concise English engineering prose.')
+diff --git a/packages/llm/llm-deepseek/src/serialize.ts b/packages/llm/llm-deepseek/src/serialize.ts
+index 498b3fb2f7..bdd3caf0e3 100644
+--- a/packages/llm/llm-deepseek/src/serialize.ts
++++ b/packages/llm/llm-deepseek/src/serialize.ts
+@@ -6,7 +6,7 @@
+  * @module dsh-llm-deepseek/serialize
+  */
+ 
+-import { contentHasImage, LlmError, offloadRequestImages } from '@deepseek-ai/dsh-llm'
++import { contentHasImage, LlmError, offloadRequestImages, stripMessageImagesToText } from '@deepseek-ai/dsh-llm'
+ import type { ContentBlock, GenerateOptions, Message } from '@deepseek-ai/dsh-llm'
+ import { AttachmentError } from '@deepseek-ai/dsh-attachment'
+ import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
+@@ -201,8 +201,13 @@ function serializeAssistant(message: Message): WireMessage {
+  * @returns the wire messages; order preserved, each tool result expanded into its own entry.
+  */
+ export function serializeMessages(messages: Message[]): WireMessage[] {
++  const finalMessage = messages[messages.length - 1]
++  if (finalMessage !== undefined && contentHasImage(finalMessage.content)) {
++    assertTextOnly(finalMessage.content)
++  }
++  const sanitized = stripMessageImagesToText(messages)
+   const wire: WireMessage[] = []
+-  for (const message of messages) {
++  for (const message of sanitized) {
+     assertTextOnly(message.content)
+     if (message.role === 'system') {
+       wire.push({ role: 'system', content: flattenText(message.content) })
+diff --git a/packages/llm/llm-deepseek/tests/serialize.spec.ts b/packages/llm/llm-deepseek/tests/serialize.spec.ts
+index 742efc863d..c34f255652 100644
+--- a/packages/llm/llm-deepseek/tests/serialize.spec.ts
++++ b/packages/llm/llm-deepseek/tests/serialize.spec.ts
+@@ -173,6 +173,51 @@ describe('serializeMessages', () => {
+     })])).toThrow(expect.objectContaining({ code: 'UNSUPPORTED_CONTENT' }))
+   })
+ 
++  it('replaces in-history image blocks with a text placeholder so the turn proceeds', () => {
++    const wire = serializeMessages([
++      createUserMessage({
++        content: [
++          { type: 'text', text: 'screenshot below' },
++          {
++            type: 'image',
++            attachment: {
++              attachmentId: AttachmentId(`sha256:${'b'.repeat(64)}`),
++              mediaType: 'image/png', bytes: 68, width: 1, height: 1,
++            },
++          },
++        ],
++        source: { kind: 'plugin', plugin: 'test' },
++      }),
++      createUserMessage({
++        content: [{ type: 'text', text: 'please continue' }],
++        source: { kind: 'plugin', plugin: 'test' },
++      }),
++    ])
++    expect(wire).toEqual([
++      { role: 'user', content: 'screenshot below[Image attached — omitted: this model does not support image input]' },
++      { role: 'user', content: 'please continue' },
++    ])
++  })
++
++  it('still rejects a fresh image attachment in the final message', () => {
++    expect(() => serializeMessages([
++      createUserMessage({
++        content: [{ type: 'text', text: 'earlier text' }],
++        source: { kind: 'plugin', plugin: 'test' },
++      }),
++      createUserMessage({
++        content: [{
++          type: 'image',
++          attachment: {
++            attachmentId: AttachmentId(`sha256:${'c'.repeat(64)}`),
++            mediaType: 'image/png', bytes: 68, width: 1, height: 1,
++          },
++        }],
++        source: { kind: 'plugin', plugin: 'test' },
++      }),
++    ])).toThrow(expect.objectContaining({ code: 'UNSUPPORTED_CONTENT' }))
++  })
++
+   it('emits an empty user message rather than dropping block-less messages', () => {
+     const wire = serializeMessages([createUserMessage({
+       content: [],
+diff --git a/packages/llm/llm/src/content.ts b/packages/llm/llm/src/content.ts
+index 55c0719fb9..911cbb39a4 100644
+--- a/packages/llm/llm/src/content.ts
++++ b/packages/llm/llm/src/content.ts
+@@ -1,12 +1,16 @@
+ /** Content-block structure helpers. @module @deepseek-ai/dsh-llm/content */
+ 
+ import type { ContentBlock } from './types.ts'
++import { freezeMessage } from './message.ts'
+ import type { Message } from './message.ts'
+ 
+ /** Model-facing stand-in for an image removed to fit a provider request bound. */
+ export const OFFLOADED_IMAGE_TEXT
+   = '[image omitted to keep the request within its image limit; older images are omitted first. If this image is still needed, read its file again when a path is available; otherwise ask the user to attach it again.]'
+ 
++/** Placeholder text replacing an image a text-only model cannot see. */
++export const IMAGE_OMITTED_PLACEHOLDER = '[Image attached — omitted: this model does not support image input]'
++
+ /**
+  * True when typed model content contains an image block, walking nested
+  * tool-result content. This is the one recursive image walk shared by every
+@@ -92,3 +96,41 @@ export function offloadRequestImages(
+     return content === message.content ? message : { ...message, content }
+   })
+ }
++
++/**
++ * Replace every image block (nested tool-result images included) with the
++ * text placeholder, keeping the message structure and all other blocks.
++ * Returns the original array (same reference) when nothing changed.
++ * @param content - typed model content blocks.
++ * @returns content with images replaced, or the same reference when none.
++ */
++export function stripImagesToText(content: readonly ContentBlock[]): ContentBlock[] {
++  const out = content.map((block): ContentBlock => {
++    if (block.type === 'image') {
++      return { type: 'text', text: IMAGE_OMITTED_PLACEHOLDER }
++    }
++    if (block.type === 'tool-result' && contentHasImage(block.content)) {
++      const inner = stripImagesToText(block.content)
++      return inner === block.content ? block : { ...block, content: inner }
++    }
++    return block
++  })
++  return out.every((block, index) => block === content[index]) ? (content as ContentBlock[]) : out
++}
++
++/**
++ * Serialize a message list for a text-only model: image blocks in every
++ * message become the text placeholder so an in-history attachment (from a
++ * turn handled by a vision model) does not kill the whole request. The
++ * returned messages are freshly frozen; messages without images are reused.
++ * @param messages - the conversation to sanitize.
++ * @returns the same list when no message contained an image, else the
++ *   sanitized, frozen list.
++ */
++export function stripMessageImagesToText(messages: readonly Message[]): readonly Message[] {
++  const out = messages.map((message) => {
++    const content = stripImagesToText(message.content)
++    return content === message.content ? message : freezeMessage({ ...message, content })
++  })
++  return out.every((message, index) => message === messages[index]) ? messages : out
++}
+diff --git a/packages/llm/llm/tests/content.spec.ts b/packages/llm/llm/tests/content.spec.ts
+index ffb5a586bf..5c782cab82 100644
+--- a/packages/llm/llm/tests/content.spec.ts
++++ b/packages/llm/llm/tests/content.spec.ts
+@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest'
+ import { AttachmentId } from '@deepseek-ai/dsh-attachment'
+ import { CallId, createUserMessage, OFFLOADED_IMAGE_TEXT, offloadRequestImages } from '../src/index.ts'
+ import type { ContentBlock } from '../src/index.ts'
++import {
++  contentHasImage,
++  IMAGE_OMITTED_PLACEHOLDER,
++  stripImagesToText,
++  stripMessageImagesToText,
++} from '../src/content.ts'
+ 
+ const source = { kind: 'plugin' as const, plugin: 'test' }
+ 
+@@ -18,6 +24,10 @@ function image(bytes: number): ContentBlock {
+   }
+ }
+ 
++function imageBlock(): { type: 'image' } {
++  return { type: 'image' }
++}
++
+ describe('offloadRequestImages', () => {
+   it('preserves the original request when its base64 payload fits exactly', () => {
+     const messages = [createUserMessage({ content: [image(3), image(3)], source })]
+@@ -87,3 +97,63 @@ describe('offloadRequestImages', () => {
+     ])
+   })
+ })
++
++describe('stripImagesToText', () => {
++  it('leaves image-free content untouched (same reference)', () => {
++    const content = [{ type: 'text', text: 'hi' }]
++    expect(stripImagesToText(content)).toBe(content)
++  })
++
++  it('replaces an image block with the placeholder text', () => {
++    const out = stripImagesToText([{ type: 'text', text: 'see ' }, imageBlock()])
++    expect(out).toEqual([
++      { type: 'text', text: 'see ' },
++      { type: 'text', text: IMAGE_OMITTED_PLACEHOLDER },
++    ])
++    expect(contentHasImage(out)).toBe(false)
++  })
++
++  it('replaces images nested inside tool results', () => {
++    const out = stripImagesToText([
++      { type: 'tool-result', toolCallId: 't1', content: [imageBlock(), { type: 'text', text: 'gen' }] },
++    ])
++    expect(out).toEqual([
++      {
++        type: 'tool-result',
++        toolCallId: 't1',
++        content: [{ type: 'text', text: IMAGE_OMITTED_PLACEHOLDER }, { type: 'text', text: 'gen' }],
++      },
++    ])
++    expect(contentHasImage(out)).toBe(false)
++  })
++})
++
++describe('stripMessageImagesToText', () => {
++  it('returns the same list when no message has an image', () => {
++    const messages = [createUserMessage({
++      content: [{ type: 'text', text: 'hi' }],
++      source: { kind: 'plugin', plugin: 'test' },
++    })]
++    expect(stripMessageImagesToText(messages)).toBe(messages)
++  })
++
++  it('replaces images in in-history messages and freezes the result', () => {
++    const messages = [
++      createUserMessage({
++        content: [{ type: 'text', text: 'screenshot' }, imageBlock()],
++        source: { kind: 'plugin', plugin: 'test' },
++      }),
++      createUserMessage({
++        content: [{ type: 'text', text: 'please continue' }],
++        source: { kind: 'plugin', plugin: 'test' },
++      }),
++    ]
++    const out = stripMessageImagesToText(messages)
++    expect(out).not.toBe(messages)
++    // The image-free message is reused; the image-bearing one is sanitized.
++    expect(out[1]).toBe(messages[1])
++    expect(contentHasImage(out[0].content)).toBe(false)
++    expect(out[0].content).toContainEqual({ type: 'text', text: IMAGE_OMITTED_PLACEHOLDER })
++    expect(Object.isFrozen(out[0])).toBe(true)
++  })
++})
+-- 
+2.53.0
+
