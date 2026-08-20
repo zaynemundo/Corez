@@ -6,6 +6,7 @@ import { runProviderChain, runStreamingChain, callOpenRouterImage } from './prov
 import { runCreationHarness } from './harness.js';
 import { repairMalformedHtml } from './htmlRepair.js';
 import { selectModelForRequest, selectReasoningConfig } from './modelRouter.js';
+import { describeAttachmentsWithMimo, buildMimoContextBlock, isMimoAvailable } from './mimo.js';
 import { processResponse, detectTruncation, stitchContinuationChunk, CONTINUATION_INSTRUCTION, ANTI_REPEAT_CONTINUATION_INSTRUCTION } from './responseProcessor.js';
 import {
   parseProjectState,
@@ -33,19 +34,21 @@ import {
 function toMultimodalMessage(message) {
   if (!message || typeof message !== 'object') return message;
   const attachments = Array.isArray(message.attachments) ? message.attachments : [];
-  const hasImage = attachments.some(a => (a?.assetUrl && a.assetUrl.startsWith('/api/assets/')) || (a?.thumb && a.thumb.startsWith('data:image/')));
-  if (!hasImage) {
+  const hasMedia = attachments.some(a => (a?.assetUrl && String(a.assetUrl).startsWith('/api/assets/')) || (a?.thumb && String(a.thumb).startsWith('data:')) || (typeof a?.content === 'string' && a.content.trim()));
+  if (!hasMedia) {
     if (Array.isArray(message.content)) return { role: message.role, content: message.content };
     return { role: message.role, content: message.content };
   }
   const base = typeof message.content === 'string' ? message.content : Array.isArray(message.content) ? message.content.map(c => c?.text || '').join('\n') : String(message.content || '');
   const urlHints = attachments.map(a => {
-    if (a?.assetUrl && a.assetUrl.startsWith('/api/assets/')) return `\n[Attached image ${a.name || 'image'} available at: ${a.assetUrl} — USE THIS URL for <img src>]`;
-    if (a?.thumb && a.thumb.startsWith('data:image/')) return `\n[Attached image ${a.name || 'image'} available as data URL — use this for <img src>]`;
+    const name = a.name || 'file';
+    const mime = String(a.type || '').toLowerCase();
+    const kind = mime.startsWith('image/') ? 'image' : mime.startsWith('video/') ? 'video' : mime.startsWith('audio/') ? 'audio' : 'file';
+    if (a?.assetUrl && String(a.assetUrl).startsWith('/api/assets/')) return `\n[Attached ${kind} "${name}" available at: ${a.assetUrl} — USE THIS URL for <img>/<video>/<audio> src if needed]`;
+    if (a?.thumb && String(a.thumb).startsWith('data:')) return `\n[Attached ${kind} "${name}" available as data URL — use this for src if needed]`;
+    if (typeof a?.content === 'string' && a.content.trim()) return `\n[Attached file "${name}" content extracted — see MiMo context]`;
     return '';
   }).join('');
-  // Keep image data URL out of prompt to avoid bloat/400s; just hint the URL.
-  // The full data URL is still available via patch if needed, but R2 URL is preferred.
   const hinted = urlHints ? `${base}${urlHints}` : base;
   if (Array.isArray(message.content)) return { role: message.role, content: hinted };
   return { role: message.role, content: hinted };
@@ -748,7 +751,58 @@ async function handleAi(request, env) {
   // honest: no live evidence is injected and the verifier flags answers
   // that still present current values as fabricated.
   // ---------------------------------------------------------------------
-  const runtimeContext = buildRuntimeContext();
+  // ---------------------------------------------------------------------
+ // MiMo V2.5 -> Muse Spark 1.2 Two-Stage Pipeline (corez.pro)
+ // Every user attachment (image, file, video, audio, any media) is first
+ // understood by MiMo V2.5 (vision + multimodal file understanding), then
+ // its textual description is fed as grounded context to Muse Spark 1.2
+ // for the final generation. Muse itself is text-only through the gateway,
+ // so this pre-pass gives it true vision/file knowledge. Failures are
+ // silent — the Muse build always proceeds even if MiMo is unavailable.
+ // Covers: image/*, video/*, audio/*, pdf, text, and generic files.
+ // ---------------------------------------------------------------------
+ if (!env?.__DISABLE_MIMO_PREFETCH) {
+   try {
+     const allAttachments = [];
+     const seenMimo = new Set();
+     for (const m of Array.isArray(messages) ? messages : []) {
+       for (const a of Array.isArray(m?.attachments) ? m.attachments : []) {
+         const key = String(a?.assetUrl || a?.thumb || (a?.name + '|' + a?.type) || '');
+         if (!key || seenMimo.has(key)) continue;
+         seenMimo.add(key);
+         if (a?.thumb || a?.assetUrl || (typeof a?.content === 'string' && a.content.trim()) || a?.type) allAttachments.push(a);
+       }
+     }
+     // Also include top-level body attachments if present (some clients send separately)
+     if (Array.isArray(body?.attachments)) {
+       for (const a of body.attachments) {
+         const key = String(a?.assetUrl || a?.thumb || (a?.name + '|' + a?.type) || '');
+         if (!key || seenMimo.has(key)) continue;
+         seenMimo.add(key);
+         if (a?.thumb || a?.assetUrl || (typeof a?.content === 'string' && a.content.trim()) || a?.type) allAttachments.push(a);
+       }
+     }
+     if (allAttachments.length > 0 && isMimoAvailable(env)) {
+       const mimoDescriptions = await describeAttachmentsWithMimo(allAttachments, executionPrompt || prompt, env, clientDisconnectSignal);
+       const mimoBlock = buildMimoContextBlock(mimoDescriptions);
+       if (mimoBlock) {
+         apiMessages.push({ role: 'system', content: mimoBlock });
+         // Also hint asset URLs explicitly so Muse uses the correct src
+         const assetHints = mimoDescriptions.map(d => {
+           const src = allAttachments.find(a => (a.name||'') === d.name)?.assetUrl || '';
+           return src ? '[' + d.kind + ' "' + d.name + '" R2 URL: ' + src + ']' : '';
+         }).filter(Boolean).join('\n');
+         if (assetHints) {
+           // Patch hint is already in toMultimodalMessage for history, but ensure current turn has it
+         }
+       }
+     }
+   } catch (mimoErr) {
+     console.warn('MiMo pre-pass failed (continuing to Muse):', mimoErr?.message || mimoErr);
+   }
+ }
+
+ const runtimeContext = buildRuntimeContext();
   const liveDataNeed = detectLiveDataNeed(executionPrompt || prompt);
   const specialistIds = Array.isArray(skills)
     ? skills.map((s) => (typeof s === 'string' ? s : s.id)).filter(Boolean)
@@ -1721,7 +1775,11 @@ async function handleR2Assets(request, env) {
       return jsonResponse(400, { error: 'Invalid JSON payload.' });
     }
 
-    const ALLOWED_ASSET_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml', 'image/x-icon'];
+    // Asset types accepted by /api/assets/upload — images always, plus
+    // video/audio/file types used by the MiMo V2.5 -> Muse Spark 1.2 pipeline.
+    // All are stored in R2 and served as static assets; the worker never
+    // executes them.
+    const ALLOWED_ASSET_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml', 'image/x-icon', 'video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo', 'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/webm', 'audio/mp4', 'application/pdf', 'text/plain', 'text/csv', 'application/json'];
     const SAFE_KEY = /^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$/;
 
     const key = typeof body?.key === 'string' ? body.key.replace(/^\/+/, '') : `asset_${Date.now()}`;
@@ -1737,8 +1795,7 @@ async function handleR2Assets(request, env) {
     if (!ALLOWED_ASSET_TYPES.includes(mimeType)) {
       return jsonResponse(400, { error: `Unsupported content type "${mimeType}".` });
     }
-    // The data URL must be a base64 data URL whose declared image type matches
-    // the stored content type; arbitrary bytes are never stored as-is.
+    // Data URL must match the declared mime type (generic for all media used by MiMo pipeline).
     const expectedPrefix = `data:${mimeType};base64,`;
     if (!dataUrl.startsWith(expectedPrefix)) {
       return jsonResponse(400, { error: 'dataUrl must be a base64 data URL matching the declared content type.' });

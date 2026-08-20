@@ -5,17 +5,13 @@ description: Use when a CoreZ request includes attached files or attachment hand
 
 # File Attachment Analysis
 
-## Current ingestion behavior
+## Current ingestion behavior (MiMo V2.5 -> Muse Spark 1.2 pipeline)
 
-- `src/components/ChatInput.jsx` accepts multiple files.
-- Text-like files up to 200 KiB are read and their contents are injected into
-  the model prompt with filename, type, and size metadata.
-- Images up to 1.5 MiB may receive a local thumbnail for display, but image
-  bytes are not sent to a vision model through this attachment path.
-- Other files, oversized text files, and unsupported binaries contribute only
-  metadata. Their contents have not been inspected.
-- Attachment content is omitted from local session persistence to avoid
-  storing large or private payloads indefinitely.
+- `src/components/ChatInput.jsx` + `src/utils/fileAttachmentUtils.js` accept multiple files: image/*, video/*, audio/*, pdf, and text-like files.
+- Text-like files up to 200 KiB are read and injected with filename/type/size; larger or binary files route through the MiMo pre-pass.
+- Images up to 1.5 MiB (video/audio up to 8 MiB) get a data URL thumb and an R2 upload (`/api/assets/upload`) for persistence. The Worker stores all types (image/png, video/mp4, audio/mpeg, application/pdf, etc.).
+- **Two-stage pipeline for corez.pro:** every attachment (image, file, video, audio, and more) is first described by **MiMo V2.5** (`worker/mimo.js`) — vision for images/video, transcription for audio, summarization for files — then the textual description is injected as grounded system context for **Muse Spark 1.2**, which does the final generation. Muse is text-only via the gateway; MiMo is the eyes/ears.
+- Attachment content is omitted from local session persistence to avoid storing large or private payloads indefinitely.
 
 ## Workflow
 

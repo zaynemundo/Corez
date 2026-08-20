@@ -1,4 +1,5 @@
 export const MAX_IMAGE_THUMB_BYTES = 1.5 * 1024 * 1024; // 1.5 MiB
+export const MAX_MEDIA_THUMB_BYTES = 8 * 1024 * 1024; // 8 MiB for video/audio (still uploaded via R2)
 export const MAX_TEXT_CONTENT_BYTES = 200 * 1024; // 200 KiB
 
 export const TEXT_EXTENSIONS = new Set([
@@ -7,6 +8,11 @@ export const TEXT_EXTENSIONS = new Set([
   'toml', 'env', 'gitignore', 'config', 'rst', 'tex', 'bat', 'ps1', 'c', 'cpp',
   'h', 'hpp', 'java', 'rs', 'go', 'php', 'rb', 'lua', 'dart', 'vue', 'svelte'
 ]);
+
+// mime buckets used by the MiMo -> Muse pipeline
+export const IMAGE_MIMES = /^image\//i;
+export const VIDEO_MIMES = /^video\//i;
+export const AUDIO_MIMES = /^audio\//i;
 
 export function extensionOf(name) {
   const dot = String(name || '').lastIndexOf('.');
@@ -17,6 +23,11 @@ export function isTextLike(file) {
   return Boolean(file?.type?.startsWith('text/'))
     || (file?.type === 'application/json')
     || TEXT_EXTENSIONS.has(extensionOf(file?.name));
+}
+
+export function isMediaFile(file) {
+  const type = String(file?.type || '').toLowerCase();
+  return IMAGE_MIMES.test(type) || VIDEO_MIMES.test(type) || AUDIO_MIMES.test(type);
 }
 
 export function formatBytes(bytes) {
@@ -35,6 +46,15 @@ export function readFileAsText(file) {
   });
 }
 
+export function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 export function hasFiles(dataTransfer) {
   if (!dataTransfer) return false;
   const types = Array.from(dataTransfer.types || []);
@@ -43,7 +63,13 @@ export function hasFiles(dataTransfer) {
 
 /**
  * Process a collection of files into attachment entries with unique IDs,
- * reading image thumbnails and text contents asynchronously.
+ * reading thumbnails/media data and text contents asynchronously.
+ *
+ * Two-stage pipeline for corez.pro: every attachment (image, video, audio,
+ * file) is first understood by MiMo V2.5 (vision/multimodal), then its
+ * textual description is fed to Muse Spark 1.2 for generation. This
+ * function prepares the attachments so the worker's MiMo pre-pass can
+ * describe them.
  *
  * @param {FileList | File[]} fileList
  * @param {Function} setAttachments
@@ -60,23 +86,26 @@ export function processFiles(fileList, setAttachments) {
 
   setAttachments((prev) => [
     ...(prev || []),
-    ...created.map(({ id, name, type, size }) => ({ id, name, type, size, uploading: type.startsWith('image/') && size <= MAX_IMAGE_THUMB_BYTES }))
+    ...created.map(({ id, name, type, size }) => ({
+      id, name, type, size,
+      uploading: (type.startsWith('image/') && size <= MAX_IMAGE_THUMB_BYTES) || (isMediaFile({ type }) && size <= MAX_MEDIA_THUMB_BYTES)
+    }))
   ]);
 
   created.forEach((entry) => {
-    if (entry.file?.type?.startsWith('image/') && entry.file.size <= MAX_IMAGE_THUMB_BYTES) {
+    const isImage = entry.file?.type?.startsWith('image/') && entry.file.size <= MAX_IMAGE_THUMB_BYTES;
+    const isMedia = isMediaFile(entry.file) && entry.file.size <= MAX_MEDIA_THUMB_BYTES;
+    if (isImage || isMedia) {
       const reader = new FileReader();
       reader.onload = () => {
         if (reader.result && typeof reader.result === 'string') {
           const thumb = reader.result;
           setAttachments((prev) => (prev || []).map((a) => (a.id === entry.id ? { ...a, thumb, uploading: true } : a)));
-          // Also upload to R2 for persistent URL (used in generated HTML and publishing)
-          // Fire-and-forget: store assetUrl when upload succeeds, keep thumb as fallback
-          const ext = extensionOf(entry.name) || 'jpg';
-          const safeName = entry.name.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 80) || `image.${ext}`;
+          // Also upload to R2 for persistent URL (used in generated HTML/publishing and for MiMo fallback)
+          const ext = extensionOf(entry.name) || (entry.file.type?.startsWith('video/') ? 'mp4' : entry.file.type?.startsWith('audio/') ? 'mp3' : 'jpg');
+          const safeName = entry.name.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 80) || `media.${ext}`;
           const key = `user-upload_${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeName}`;
-          const mimeType = entry.file.type || `image/${ext}`;
-          // Use data URL directly for upload; worker will validate and store
+          const mimeType = entry.file.type || `${isMedia && !isImage ? 'video' : 'image'}/${ext}`;
           fetch('/api/assets/upload', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

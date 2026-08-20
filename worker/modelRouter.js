@@ -1,9 +1,17 @@
 /**
- * Dynamic Model Router
- * 
- * Routes all tasks to Muse Spark 1.2 (muse-spark-1.2-contributor) — the unified site-wide
- * model for visual tasks, backend logic, algorithms, scripting, general chat,
- * writing, data and Q&A.
+ * Dynamic Model Router — Two-Stage Media Pipeline for corez.pro
+ *
+ * 1) MiMo V2.5 (mimo-v2.5) — vision + multimodal file understanding.
+ *    Every user attachment (image/*, video/*, audio/*, pdf, text, generic file)
+ *    is first described by MiMo V2.5 via worker/mimo.js. MiMo runs on the same
+ *    OpenCode Zen Go gateway as Muse (same endpoint + key, different model).
+ * 2) Muse Spark 1.2 (muse-spark-1.2-contributor) — the unified site-wide
+ *    builder for visual tasks, backend logic, algorithms, scripting, general
+ *    chat, writing, data and Q&A. It receives MiMo's textual description as
+ *    grounded system context and does the final generation.
+ *
+ * Text-only Muse benefits from MiMo's hidden vision reasoning: MiMo is the
+ * eyes/ears, Muse is the hands. See worker/mimo.js for the pre-pass.
  */
 
 export const MODEL_VISUAL = 'muse-spark-1.2-contributor';
