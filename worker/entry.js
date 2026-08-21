@@ -112,13 +112,21 @@ export default {
       if (chatsRes) return withDirectAiCors(chatsRes);
     }
 
-    // Auth gate - protect AI and app APIs when AUTH_SECRET is set. Public
-    // published-asset reads (/api/assets/<key>) stay OPEN to anonymous
-    // visitors so published creations render for everyone; the worker's
-    // ownership + publish-reference check still protects private assets.
-    const authPaths = ['/api/ai', '/api/image', '/api/apps', '/api/memory', '/api/publish', '/api/chats', '/api/tasks', '/api/task', '/api/context'];
+    // Auth gate - protect AI and app APIs when AUTH_SECRET is set. Published
+    // creations (/api/publish output at /<slug> and their referenced assets
+    // at /api/assets/<key>) must stay OPEN to anonymous visitors so share
+    // links render for everyone. The publish handler enforces auth for POST
+    // /api/publish, and handleR2Assets enforces ownership + publish-reference
+    // for asset GETs. All other /api/assets writes stay auth-gated.
+    const authPaths = ['/api/ai', '/api/image', '/api/apps', '/api/memory', '/api/publish', '/api/assets', '/api/chats', '/api/tasks', '/api/task', '/api/context'];
+    const baseAuthPath = authPaths.some(p => url.pathname === p || url.pathname.startsWith(p + '/')) || url.pathname.startsWith('/api/game/');
     const isPublicAssetGet = url.pathname.startsWith('/api/assets/') && request.method === 'GET';
-    const needsAuth = (authPaths.some(p => url.pathname === p || url.pathname.startsWith(p + '/')) || url.pathname.startsWith('/api/game/')) && !isPublicAssetGet;
+    const isPublicPublishGet = request.method === 'GET' && (
+      url.pathname === '/api/publish' ||
+      (!url.pathname.startsWith('/api/') && !url.pathname.startsWith('/dist/') && !url.pathname.startsWith('/assets/'))
+    );
+    const isPublicRoute = isPublicAssetGet || isPublicPublishGet;
+    const needsAuth = baseAuthPath && !isPublicRoute;
     if (needsAuth) {
       const sess = await verifySession(request, env);
       if (!sess && env.AUTH_SECRET) {

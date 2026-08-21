@@ -2389,17 +2389,17 @@ async function sessionUid(request, env) {
 }
 
 async function handlePublish(request, env) {
-  const uid = await sessionUid(request, env);
-  if (!uid) {
-    return jsonResponse(401, { error: 'Authentication required.' });
-  }
-
   const url = new URL(request.url);
   const pathname = url.pathname;
 
   // POST /api/publish - publish (or republish under an explicit slug) a
-  // creation so anyone with the link can open it.
+  // creation so anyone with the link can open it. Requires authentication;
+  // GET /<slug> routes below are public and do not require a session.
   if (pathname === '/api/publish' && request.method === 'POST') {
+    const uid = await sessionUid(request, env);
+    if (!uid) {
+      return jsonResponse(401, { error: 'Authentication required.' });
+    }
     const retryAfter = publishRateLimiter(request);
     if (retryAfter !== null) {
       return jsonResponse(429, { error: 'Too many publish requests. Try again shortly.' }, { 'Retry-After': String(retryAfter) });
