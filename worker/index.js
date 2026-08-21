@@ -997,7 +997,6 @@ async function handleAi(request, env) {
     const harnessIntentType = ['app', 'game_creation', 'website_creation', 'design_task'].includes(resolvedPrimary)
       ? resolvedPrimary
       : intentType;
-    const chatId = typeof body.chatId === 'string' && body.chatId.trim() ? body.chatId.trim().slice(0, 64) : null;
     const harnessOptions = {
       prompt,
       primaryIntent: resolvedPrimary,
@@ -1010,8 +1009,7 @@ async function handleAi(request, env) {
       complexity: body.complexity,
       model: selectedModel,
       reasoning: selectedReasoning.reasoning,
-      temperature: selectedReasoning.temperature,
-      chatId
+      temperature: selectedReasoning.temperature
     };
     if (body.stream === true) {
       // Streaming harness: SSE events (phase/delta/done) keep the client
