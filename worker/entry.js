@@ -112,9 +112,13 @@ export default {
       if (chatsRes) return withDirectAiCors(chatsRes);
     }
 
-    // Auth gate - protect AI and app APIs when AUTH_SECRET is set
-    const authPaths = ['/api/ai', '/api/image', '/api/apps', '/api/memory', '/api/publish', '/api/assets', '/api/chats', '/api/tasks', '/api/task', '/api/context'];
-    const needsAuth = authPaths.some(p => url.pathname === p || url.pathname.startsWith(p + '/')) || url.pathname.startsWith('/api/game/');
+    // Auth gate - protect AI and app APIs when AUTH_SECRET is set. Public
+    // published-asset reads (/api/assets/<key>) stay OPEN to anonymous
+    // visitors so published creations render for everyone; the worker's
+    // ownership + publish-reference check still protects private assets.
+    const authPaths = ['/api/ai', '/api/image', '/api/apps', '/api/memory', '/api/publish', '/api/chats', '/api/tasks', '/api/task', '/api/context'];
+    const isPublicAssetGet = url.pathname.startsWith('/api/assets/') && request.method === 'GET';
+    const needsAuth = (authPaths.some(p => url.pathname === p || url.pathname.startsWith(p + '/')) || url.pathname.startsWith('/api/game/')) && !isPublicAssetGet;
     if (needsAuth) {
       const sess = await verifySession(request, env);
       if (!sess && env.AUTH_SECRET) {

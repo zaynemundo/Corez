@@ -90,6 +90,48 @@ describe('Ownership security (assets/apps/memory/publish/tasks)', () => {
     expect(aliceDel.status).toBe(200);
   });
 
+  it('assets: anonymous visitors can read assets referenced by a published creation', async () => {
+    const up = await call(worker, '/api/assets/upload', {
+      method: 'POST', cookie: aliceCookie,
+      body: { key: 'alice-pub.png', mimeType: 'image/png', dataUrl: 'data:image/png;base64,iVBORw0KGgo=' }
+    });
+    expect(up.status).toBe(200);
+
+    // Not yet published: anonymous read still fails closed
+    const anonBefore = await call(worker, '/api/assets/alice-pub.png');
+    expect(anonBefore.status).toBe(403);
+
+    // Alice publishes a page that references the asset
+    const pub = await call(worker, '/api/publish', {
+      method: 'POST', cookie: aliceCookie,
+      body: { slug: 'public-page', html: '<img src="/api/assets/alice-pub.png"><h1>Public</h1>' }
+    });
+    expect(pub.status).toBe(200);
+
+    // Anonymous visitor can now read the published creation's asset
+    const anonAfter = await call(worker, '/api/assets/alice-pub.png');
+    expect(anonAfter.status).toBe(200);
+  });
+
+  it('assets: anonymous visitors cannot read unpublished assets even after another publish exists', async () => {
+    const up = await call(worker, '/api/assets/upload', {
+      method: 'POST', cookie: aliceCookie,
+      body: { key: 'alice-private.png', mimeType: 'image/png', dataUrl: 'data:image/png;base64,iVBORw0KGgo=' }
+    });
+    expect(up.status).toBe(200);
+
+    // Alice publishes something unrelated (no reference to the private asset)
+    const pub = await call(worker, '/api/publish', {
+      method: 'POST', cookie: aliceCookie,
+      body: { slug: 'other-page', html: '<h1>Public</h1>' }
+    });
+    expect(pub.status).toBe(200);
+
+    // Anonymous visitor still cannot read the unpublished asset
+    const anon = await call(worker, '/api/assets/alice-private.png');
+    expect(anon.status).toBe(403);
+  });
+
   it('assets: no session cookie in production mode -> 401', async () => {
     const res = await call(worker, '/api/assets/upload', {
       method: 'POST',

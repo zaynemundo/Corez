@@ -1761,18 +1761,83 @@ async function handleWorkersAIImage(request, env) {
   return jsonResponse(200, { image: imageUrl, model: WORKERS_AI_IMAGE_MODEL });
 }
 
+// Markers written at publish time for every /api/assets/<key> referenced by
+// the published document(s): anonymous asset GETs check the marker (one R2
+// get) instead of scanning every publish record. Legacy records published
+// before markers existed fall back to a bounded record scan.
+const ASSET_PUBLIC_MARKER_PREFIX = 'asset-pub/';
+
+function extractReferencedAssetKeys(htmlParts) {
+  const keys = new Set();
+  const ASSET_REF_PATTERN = /\/api\/assets\/([A-Za-z0-9][A-Za-z0-9._-]{0,254})/g;
+  for (const part of htmlParts) {
+    if (typeof part !== 'string') continue;
+    let match;
+    while ((match = ASSET_REF_PATTERN.exec(part)) !== null) {
+      keys.add(match[1]);
+    }
+  }
+  return [...keys];
+}
+
+// An asset is public when a published creation references it: published
+// pages are shared to anyone, so their images must load for anonymous
+// visitors too. Fast path: the publish-time marker (asset-pub/<key>).
+// Fallback for legacy records (published before markers): a bounded scan of
+// live publish records looking for the reference.
+async function isAssetPublished(env, key) {
+  if (!env?.ASSET_BUCKET) return false;
+  try {
+    const marker = await env.ASSET_BUCKET.get(`${ASSET_PUBLIC_MARKER_PREFIX}${key}`);
+    if (marker) return true;
+  } catch {
+    // marker read failure falls through to the legacy scan
+  }
+  if (typeof env.ASSET_BUCKET.list !== 'function') return false;
+  try {
+    const listing = await env.ASSET_BUCKET.list({ prefix: 'publish/', limit: 100 });
+    const objects = Array.isArray(listing?.objects) ? listing.objects : [];
+    for (const obj of objects) {
+      const recordObj = await env.ASSET_BUCKET.get(obj.key);
+      if (!recordObj) continue;
+      let record;
+      try {
+        record = JSON.parse(await recordObj.text());
+      } catch {
+        continue;
+      }
+      const htmlParts = [typeof record?.html === 'string' ? record.html : ''];
+      if (record?.pages && typeof record.pages === 'object') {
+        for (const pageHtml of Object.values(record.pages)) {
+          if (typeof pageHtml === 'string') htmlParts.push(pageHtml);
+        }
+      }
+      if (htmlParts.some((html) => html.includes(`/api/assets/${key}`))) return true;
+    }
+  } catch {
+    // Listing/read failures never block asset access: fall through to the
+    // ownership check.
+  }
+  return false;
+}
+
 async function handleR2Assets(request, env) {
   if (!env.ASSET_BUCKET || typeof env.ASSET_BUCKET.put !== 'function') {
     return jsonResponse(503, { error: 'Cloudflare R2 ASSET_BUCKET is not configured.' });
   }
 
-  const uid = await sessionUid(request, env);
-  if (!uid) {
-    return jsonResponse(401, { error: 'Authentication required.' });
-  }
-
   const url = new URL(request.url);
   const pathname = url.pathname;
+
+  // Public published-asset reads: anonymous GETs are allowed through so
+  // published creations render for visitors; the ownership + publish-
+  // reference check below still protects private assets. Uploads and
+  // deletes always require a verified session.
+  const isAnonymousGet = request.method === 'GET' && pathname.startsWith('/api/assets/');
+  const uid = await sessionUid(request, env);
+  if (!uid && !isAnonymousGet) {
+    return jsonResponse(401, { error: 'Authentication required.' });
+  }
 
   if (pathname === '/api/assets/upload' && request.method === 'POST') {
     const retryAfter = assetsRateLimiter(request);
@@ -1857,9 +1922,16 @@ async function handleR2Assets(request, env) {
       return jsonResponse(404, { error: 'Asset not found in R2 bucket.' });
     }
 
+    // Public-read model for published creations: anyone with the public
+    // share link must be able to load the creation's images, so assets that
+    // are referenced by a published page are served to everyone. The
+    // ownership check below still protects unpublished/private assets.
+    //
     // Ownership check: objects written before this control shipped carry no
     // ownerId metadata and fail closed (403) — re-upload to re-bind them.
-    if (object.customMetadata?.ownerId !== uid) {
+    // Assets referenced by a published page (owner's own uploads) are served
+    // to anonymous visitors so published creations stay fully public.
+    if (object.customMetadata?.ownerId !== uid && !(await isAssetPublished(env, key))) {
       return jsonResponse(403, { error: 'Asset access denied.' });
     }
 
@@ -2489,6 +2561,22 @@ async function handlePublish(request, env) {
     await env.ASSET_BUCKET.put(`publish/${slug}.json`, JSON.stringify(record), {
       httpMetadata: { contentType: 'application/json' }
     });
+
+    // Public-asset markers: every /api/assets/<key> referenced by the
+    // published document(s) becomes readable by anonymous visitors (fast
+    // marker lookup, no per-request record scan). Best-effort — a marker
+    // failure never fails the publish; the legacy bounded scan still covers
+    // such records.
+    try {
+      const referencedKeys = extractReferencedAssetKeys([html, ...Object.values(pages)]);
+      for (const assetKey of referencedKeys) {
+        await env.ASSET_BUCKET.put(`${ASSET_PUBLIC_MARKER_PREFIX}${assetKey}`, '1', {
+          httpMetadata: { contentType: 'text/plain' }
+        });
+      }
+    } catch {
+      // ignore: markers are an optimization, not a correctness dependency
+    }
 
     return jsonResponse(200, { success: true, slug, url: `/${slug}`, customized: isCustomized });
   }
