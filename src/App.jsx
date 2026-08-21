@@ -72,10 +72,42 @@ function MainApp() {
   const [canvasFullScreen, setCanvasFullScreen] = useState(false);
   const [activeCanvasCode, setActiveCanvasCode] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [isThinking, setIsThinking] = useState(false);
-  const [streamingContent, setStreamingContent] = useState(null);
+  // Per-chat concurrent state: same-tab true parallel (isThinking per chatId, parallel fetches)
+  const [thinkingByChat, setThinkingByChat] = useState({}); // Record<chatId, boolean>
+  const [streamingByChat, setStreamingByChat] = useState({}); // Record<chatId, string>
   const [isStreamCollapsed, setIsStreamCollapsed] = useState(false);
-  const [swarmVisible, setSwarmVisible] = useState(false);
+  const [swarmVisibleByChat, setSwarmVisibleByChat] = useState({}); // per-chat swarm phase
+  const swarmVisible = Boolean(activeSessionId && swarmVisibleByChat[activeSessionId]);
+  const setSwarmVisible = useCallback((next) => {
+    if (!activeSessionId) return;
+    if (typeof next === 'function') {
+      const cur = Boolean(swarmVisibleByChat[activeSessionId]);
+      const val = next(cur);
+      setSwarmVisibleByChat(prev => ({ ...prev, [activeSessionId]: Boolean(val) }));
+    } else {
+      setSwarmVisibleByChat(prev => ({ ...prev, [activeSessionId]: Boolean(next) }));
+    }
+  }, [activeSessionId, swarmVisibleByChat]);
+  // Derived for active chat for backward compat in UI
+  const isThinking = Boolean(activeSessionId && thinkingByChat[activeSessionId]);
+  const streamingContent = activeSessionId ? (streamingByChat[activeSessionId] ?? null) : null;
+  const setIsThinking = useCallback((next) => {
+    // Back-compat setter for single-chat callers (e.g., resume effect): route to activeSessionId
+    if (typeof next === 'function') {
+      // not used externally
+      return;
+    }
+    if (!activeSessionId) return;
+    setThinkingByChat(prev => ({ ...prev, [activeSessionId]: Boolean(next) }));
+  }, [activeSessionId]);
+  const setStreamingContent = useCallback((updater) => {
+    if (!activeSessionId) return;
+    setStreamingByChat(prev => {
+      const cur = prev[activeSessionId] ?? null;
+      const nextVal = typeof updater === 'function' ? updater(cur) : updater;
+      return { ...prev, [activeSessionId]: nextVal };
+    });
+  }, [activeSessionId]);
   const [theme, setTheme] = useState(() => {
     try {
       return localStorage.getItem('corez_theme') || 'dark';
@@ -92,7 +124,16 @@ function MainApp() {
 
   const messagesEndRef = useRef(null);
   const chatInputRef = useRef(null);
-  const abortControllerRef = useRef(null);
+  // Per-chat abort controllers for same-tab parallel (Stop A only aborts A)
+  const abortControllersRef = useRef(new Map());
+  const abortControllerRef = {
+    get current() { return activeSessionId ? (abortControllersRef.current.get(activeSessionId) || null) : null; },
+    set current(v) {
+      if (!activeSessionId) return;
+      if (v) abortControllersRef.current.set(activeSessionId, v);
+      else abortControllersRef.current.delete(activeSessionId);
+    }
+  };
   const focusTimeoutRef = useRef(null);
   const resumeStartedRef = useRef(false);
   const dragCounterRef = useRef(0);
@@ -403,6 +444,30 @@ function MainApp() {
   };
 
   const handleDeleteSession = async (id) => {
+    // Abort any in-flight stream for this chat only (per-chat abort independence)
+    const ctrl = abortControllersRef.current.get(id);
+    if (ctrl) {
+      ctrl.abort();
+      abortControllersRef.current.delete(id);
+    }
+    setThinkingByChat(prev => {
+      if (!prev[id]) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setStreamingByChat(prev => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setSwarmVisibleByChat(prev => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
     // Optimistic UI
     setSessions(prev => prev.filter(s => s.id !== id));
     if (activeSessionId === id) {
@@ -422,6 +487,12 @@ function MainApp() {
   };
 
   const handleClearAllHistory = async () => {
+    // Abort all in-flight streams (per-chat independence: clear all)
+    abortControllersRef.current.forEach(ctrl => { try { ctrl.abort(); } catch {} });
+    abortControllersRef.current.clear();
+    setThinkingByChat({});
+    setStreamingByChat({});
+    setSwarmVisibleByChat({});
     const ids = sessions.map(s => s.id);
     setSessions([]);
     navigate('/');
@@ -463,20 +534,51 @@ function MainApp() {
     }
   };
 
-  const handleStopMessage = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
+  const handleStopMessage = (chatId) => {
+    const target = (typeof chatId === 'string' && chatId) ? chatId : activeSessionId;
+    if (!target) return;
+    const ctrl = abortControllersRef.current.get(target);
+    if (ctrl) {
+      ctrl.abort();
+      abortControllersRef.current.delete(target);
     }
-    localStorage.removeItem('corez_pending_request');
-    setIsThinking(false);
+    // Clear per-chat thinking/streaming/swarm; keep other chats unaffected (parallel requirement)
+    setThinkingByChat(prev => {
+      if (!prev[target]) return prev;
+      const next = { ...prev };
+      delete next[target];
+      return next;
+    });
+    setStreamingByChat(prev => {
+      if (!(target in prev)) return prev;
+      const next = { ...prev };
+      delete next[target];
+      return next;
+    });
+    setSwarmVisibleByChat(prev => {
+      if (!(target in prev)) return prev;
+      const next = { ...prev };
+      delete next[target];
+      return next;
+    });
+    // pendingRequest is legacy single; clear it if it belongs to this chat
+    try {
+      const raw = localStorage.getItem('corez_pending_request');
+      if (raw) {
+        const p = JSON.parse(raw);
+        if (p?.sessionId === target) localStorage.removeItem('corez_pending_request');
+      }
+    } catch {}
   };
 
   const [chatInput, setChatInput] = useState('');
   const [revisionContextCode, setRevisionContextCode] = useState('');
 
   const handleSendMessage = async (promptText, attachmentsArg = []) => {
-    if (isThinking) return;
+    // Per-chat parallel guard: only block if THIS chat is already thinking, not global
+    // Need targetSessionId first, but we can early check active. For "/" creation we allow.
+    const earlyTarget = activeSessionId;
+    if (earlyTarget && thinkingByChat[earlyTarget]) return;
     setAttachments([]);
 
     // Determine target chat — create if on "/" 
@@ -531,6 +633,8 @@ function MainApp() {
           draftMessages = msgs;
         } catch {}
       }
+      // Per-chat guard: if THIS chat is already streaming, block duplicate send (parallel allows other chats)
+      if (thinkingByChat[targetSessionId]) return;
     }
 
     const attachmentPrompt = buildAttachmentPrompt(attachmentsArg);
@@ -591,8 +695,9 @@ function MainApp() {
       console.warn('Failed to persist user message', e);
     }
 
-    setIsThinking(true);
-    setSwarmVisible(false);
+    // Per-chat thinking: set true for THIS chat only, not global
+    setThinkingByChat(prev => ({ ...prev, [targetSessionId]: true }));
+    setSwarmVisibleByChat(prev => ({ ...prev, [targetSessionId]: false }));
 
     const pendingData = {
       sessionId: targetSessionId,
@@ -618,7 +723,7 @@ function MainApp() {
     } catch { /* Ignore storage errors */ }
 
     const controller = new AbortController();
-    abortControllerRef.current = controller;
+    abortControllersRef.current.set(targetSessionId, controller);
 
     const isRevision = Boolean(revisionContextCode) || isRevisionContextPrompt(apiPrompt) || /^\s*(?:@\w+\s+)?(?:revise|update|change|fix|modify|refactor)\b/i.test(promptText);
 
@@ -637,14 +742,16 @@ function MainApp() {
 
     try {
       setIsStreamCollapsed(false);
-      setStreamingContent('');
+      // Per-chat streaming: init buffer for this chat
+      setStreamingByChat(prev => ({ ...prev, [targetSessionId]: '' }));
       const response = await generateAIResponse(apiPrompt, updatedApiMessages, controller.signal, (delta) => {
-        setStreamingContent(prev => (prev || '') + delta);
+        // Route delta to the chat that owns this request, even if user switched active chat
+        setStreamingByChat(prev => ({ ...prev, [targetSessionId]: (prev[targetSessionId] || '') + delta }));
       }, (phaseEvent) => {
-        setSwarmVisible(phaseEvent.phase === 'swarm-planning');
+        setSwarmVisibleByChat(prev => ({ ...prev, [targetSessionId]: phaseEvent.phase === 'swarm-planning' }));
       }, () => {
-        setStreamingContent('');
-      });
+        setStreamingByChat(prev => ({ ...prev, [targetSessionId]: '' }));
+      }, targetSessionId);
       if (response) {
         const aiMsg = toAssistantMessage(response);
         const extractedCode = extractCodeFromMessage(aiMsg.content);
@@ -675,12 +782,35 @@ function MainApp() {
         console.error('AI generation error:', err);
       }
     } finally {
-      if (abortControllerRef.current === controller) {
-        localStorage.removeItem('corez_pending_request');
-        setIsThinking(false);
-        setSwarmVisible(false);
-        setStreamingContent(null);
-        abortControllerRef.current = null;
+      // Only clear if this controller is still the one for this chat (per-chat abort independence)
+      const currentCtrl = abortControllersRef.current.get(targetSessionId);
+      if (currentCtrl === controller) {
+        try {
+          const raw = localStorage.getItem('corez_pending_request');
+          if (raw) {
+            const p = JSON.parse(raw);
+            if (p?.sessionId === targetSessionId) localStorage.removeItem('corez_pending_request');
+          }
+        } catch {}
+        setThinkingByChat(prev => {
+          if (!prev[targetSessionId]) return prev;
+          const next = { ...prev };
+          delete next[targetSessionId];
+          return next;
+        });
+        setSwarmVisibleByChat(prev => {
+          if (!(targetSessionId in prev)) return prev;
+          const next = { ...prev };
+          delete next[targetSessionId];
+          return next;
+        });
+        setStreamingByChat(prev => {
+          if (!(targetSessionId in prev)) return prev;
+          const next = { ...prev };
+          delete next[targetSessionId];
+          return next;
+        });
+        abortControllersRef.current.delete(targetSessionId);
       }
     }
   };
@@ -766,6 +896,7 @@ function MainApp() {
         theme={theme}
         onToggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
         onCloseSidebar={() => setSidebarOpen(false)}
+        thinkingByChat={thinkingByChat}
       />
 
       {isMobileViewport && sidebarOpen && (

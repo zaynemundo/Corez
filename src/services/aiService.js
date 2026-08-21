@@ -810,6 +810,8 @@ export async function generateHostedAIResponse(
   signal = null,
   options = {}
 ) {
+  // chatId is used for per-chat parallel isolation (harnessTaskId scoped by chatId)
+  const chatId = typeof options.chatId === 'string' ? options.chatId : null;
   // 1. Fine-grained intent classification & contract generation
   const fineIntent = classifyIntentNew(prompt);
   const legacyIntentType = toLegacyIntentType(fineIntent?.primaryIntent || fineIntent?.type);
@@ -874,7 +876,8 @@ export async function generateHostedAIResponse(
       mode: executionMode,
       project: persistedProjectState || undefined,
       stream: options.stream === true,
-      harness: useCreationHarness
+      harness: useCreationHarness,
+      ...(chatId ? { chatId } : {})
     }),
   };
   if (signal) fetchOptions.signal = signal;
@@ -2133,7 +2136,7 @@ export function isExplicitImageRequest(prompt) {
   return false;
 }
 
-export async function generateAIResponse(prompt, history = [], signal = null, onDelta = null, onPhase = null, onClear = null) {
+export async function generateAIResponse(prompt, history = [], signal = null, onDelta = null, onPhase = null, onClear = null, chatId = null) {
   // Explicit commands first: @website, @game, @research, @image. The command
   // token is stripped before any model sees the prompt, so the AI is never
   // confused by it.
@@ -2219,7 +2222,8 @@ export async function generateAIResponse(prompt, history = [], signal = null, on
       stream: typeof onDelta === 'function',
       onDelta,
       onPhase,
-      onClear
+      onClear,
+      chatId
     });
     if (hostedAiResponse) {
       // Check if the AI decided to generate an image
@@ -2252,7 +2256,8 @@ export async function generateAIResponse(prompt, history = [], signal = null, on
           stream: typeof onDelta === 'function',
           onDelta,
           onPhase,
-          onClear
+          onClear,
+          chatId
         });
         if (retryResponse) {
           const imageMatch = retryResponse.match(/\[IMAGE_PROMPT:\s*(.*?)\]/i);

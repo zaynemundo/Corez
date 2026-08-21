@@ -74,8 +74,11 @@ const SPEC_SYSTEM_PROMPT =
 const REVIEW_INSTRUCTION =
   'Think step by step internally to verify functional correctness, then answer. You are the final reviewer of a finished artifact. Check it for FUNCTIONAL correctness only: does it run, are the core interactions wired up (buttons, controls, game loop, navigation), is any essential feature missing or visibly broken? Reply with ONLY a single line: either "APPROVED" or "NEEDS_FIX: <one sentence describing the functional defect>". Do not include internal reasoning or thinking.';
 
-export function harnessTaskId(prompt, primaryIntent) {
-  const seed = `${primaryIntent}|${String(prompt || '').trim()}`;
+export function harnessTaskId(prompt, primaryIntent, chatId) {
+  const base = `${primaryIntent}|${String(prompt || '').trim()}`;
+  // Independent per chatId: same prompt in two chats -> independent tasks (user requested parallel)
+  // Fallback to legacy hash when chatId absent (backwards compat for direct API/test callers)
+  const seed = chatId ? `${base}|${String(chatId).trim()}` : base;
   let hash = 0x811c9dc5;
   for (let i = 0; i < seed.length; i += 1) {
     hash ^= seed.charCodeAt(i);
@@ -175,7 +178,8 @@ export async function* runCreationHarness(options) {
   // canvas, loop, input) — never by word-matching the prompt.
   const skipCoverage = isGameRequest && fastPath;
 
-  const taskId = harnessTaskId(prompt, primaryIntent);
+  const chatId = typeof options.chatId === 'string' && options.chatId.trim() ? options.chatId.trim().slice(0, 64) : null;
+  const taskId = harnessTaskId(prompt, primaryIntent, chatId);
   const baseSystem = apiMessages.filter((m) => m.role === 'system');
   const userMessages = apiMessages.filter((m) => m.role !== 'system');
   const now = Date.now();

@@ -20,7 +20,8 @@ export default function Sidebar({
   activeView,
   theme,
   onToggleTheme,
-  onCloseSidebar
+  onCloseSidebar,
+  thinkingByChat = {}
 }) {
   const [openMenuId, setOpenMenuId] = useState(null);
 
@@ -93,6 +94,23 @@ export default function Sidebar({
             title={session.title}
           >
             <span className="history-item-title">{session.title}</span>
+            {thinkingByChat[session.id] && (
+              <span
+                title="AI is working in this chat"
+                aria-label="AI working"
+                style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  background: 'var(--accent, #6366f1)',
+                  display: 'inline-block',
+                  marginLeft: '6px',
+                  flexShrink: 0,
+                  boxShadow: '0 0 6px var(--accent, #6366f1)',
+                  animation: 'pulse 1.2s ease-in-out infinite'
+                }}
+              />
+            )}
             <div className="history-item-menu">
               <button
                 type="button"
