@@ -220,8 +220,21 @@ export async function publishAppInR2({ html, title = 'Untitled Application', slu
     const res = await fetch('/api/publish', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(payload)
     });
+    // Cloudflare Managed Challenge (HTML) can be returned for API calls from
+    // datacenter IPs or when the browser lacks a cf_clearance cookie. Detect
+    // non-JSON 403 with HTML before treating it as a JSON error.
+    const contentType = res.headers.get('content-type') || '';
+    const isHtmlChallenge = !contentType.includes('application/json') && res.status === 403;
+    if (isHtmlChallenge) {
+      const text = await res.text().catch(() => '');
+      const isChallenge = text.includes('Just a moment') || text.includes('cf_chl_opt') || text.includes('challenges.cloudflare.com');
+      if (isChallenge) {
+        return { success: false, error: 'Blocked by Cloudflare security check — please refresh the page and try again. If Under Attack Mode is enabled, disable it or wait for the challenge to complete.' };
+      }
+    }
     const data = await res.json().catch(() => null);
     if (res.ok && data?.slug) {
       const next = [
@@ -235,9 +248,23 @@ export async function publishAppInR2({ html, title = 'Untitled Application', slu
       }
       return { success: true, slug: data.slug, url: data.url, customized: Boolean(data.customized) };
     }
+    // Surface the precise server error: 401 auth, 403 ownership, 429 rate-limit, 530 R2, etc.
+    // Keep the server-provided error verbatim for test compatibility; add status hints only for auth/R2.
+    if (res.status === 401) {
+      const base = data?.error || `Publish failed with status ${res.status}.`;
+      return { success: false, error: `${base} — please log in again.` };
+    }
+    if (res.status === 530 || (data?.error && String(data.error).toLowerCase().includes('not configured'))) {
+      const base = data?.error || `Publish failed with status ${res.status}.`;
+      return { success: false, error: `${base} — hosted R2 storage is not configured.` };
+    }
     return { success: false, error: data?.error || `Publish failed with status ${res.status}.` };
   } catch (err) {
     console.warn('Publish request failed:', err);
-    return { success: false, error: 'Publish request failed. Please check network connection.' };
+    const msg = err?.message ? String(err.message) : '';
+    if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+      return { success: false, error: 'Publish request failed — network error. Check connection and refresh to solve the Cloudflare challenge if present.' };
+    }
+    return { success: false, error: msg ? `Publish request failed: ${msg}` : 'Publish request failed. Please check network connection.' };
   }
 }

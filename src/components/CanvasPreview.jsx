@@ -164,11 +164,22 @@ export default function CanvasPreview({
         setPublishResult({ slug: result.slug, url: result.url, customized: Boolean(result.customized) });
         setPublishError(null);
       } else {
-        setPublishError('Publishing failed. The hosted service may be unavailable — try again.');
+        // Surface the server-provided error (401 auth, 403 ownership, 429 rate-limit, 530 R2, etc.)
+        // instead of hiding it behind a generic "hosted service may be unavailable".
+        const serverError = result?.error ? String(result.error) : '';
+        const isServiceUnavailable = serverError.includes('530') || serverError.toLowerCase().includes('not configured');
+        if (isServiceUnavailable) {
+          setPublishError('Publishing failed: R2 storage is not configured on the hosted service — contact support.');
+        } else if (serverError) {
+          setPublishError(`Publishing failed: ${serverError}`);
+        } else {
+          setPublishError('Publishing failed. The hosted service may be unavailable — try again.');
+        }
       }
     } catch (err) {
       console.warn('Publish error:', err);
-      setPublishError('Publishing failed. Please try again.');
+      const msg = err?.message ? String(err.message) : 'Publishing failed. Please try again.';
+      setPublishError(msg.includes('Publish') ? msg : `Publishing failed: ${msg}`);
     } finally {
       setPublishing(false);
     }
