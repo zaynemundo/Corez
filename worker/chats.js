@@ -23,35 +23,54 @@ const VALID_TITLE_LEN = 120;
 // ---------------------------------------------------------------------
 // D1 schema helpers
 // ---------------------------------------------------------------------
+let tablesEnsured = false;
+let tablesPromise = null;
 export async function ensureChatsTables(env) {
   if (!env?.DB) return;
-  try {
-    await env.DB.prepare(
-      `CREATE TABLE IF NOT EXISTS chats (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        title TEXT NOT NULL DEFAULT 'New Conversation',
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      )`
-    ).run();
-    await env.DB.prepare(
-      `CREATE TABLE IF NOT EXISTS chat_messages (
-        id TEXT PRIMARY KEY,
-        chat_id TEXT NOT NULL,
-        user_id TEXT NOT NULL,
-        role TEXT NOT NULL,
-        content TEXT NOT NULL,
-        attachments TEXT,
-        created_at INTEGER NOT NULL,
-        FOREIGN KEY(chat_id) REFERENCES chats(id) ON DELETE CASCADE
-      )`
-    ).run();
-    await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_chats_user_updated ON chats(user_id, updated_at DESC)`).run();
-    await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_messages_chat_created ON chat_messages(chat_id, created_at ASC)`).run();
-  } catch (e) {
-    console.warn('ensureChatsTables failed:', safeErrorDetail(e));
+  if (tablesEnsured) return;
+  if (tablesPromise) {
+    await tablesPromise;
+    return;
   }
+  tablesPromise = (async () => {
+    try {
+      // Run table creates in parallel, not 4 sequential round-trips
+      await Promise.all([
+        env.DB.prepare(
+          `CREATE TABLE IF NOT EXISTS chats (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            title TEXT NOT NULL DEFAULT 'New Conversation',
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+          )`
+        ).run(),
+        env.DB.prepare(
+          `CREATE TABLE IF NOT EXISTS chat_messages (
+            id TEXT PRIMARY KEY,
+            chat_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            attachments TEXT,
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY(chat_id) REFERENCES chats(id) ON DELETE CASCADE
+          )`
+        ).run(),
+      ]);
+      await Promise.all([
+        env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_chats_user_updated ON chats(user_id, updated_at DESC)`).run(),
+        env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_messages_chat_created ON chat_messages(chat_id, created_at ASC)`).run(),
+      ]);
+      tablesEnsured = true;
+    } catch (e) {
+      console.warn('ensureChatsTables failed:', safeErrorDetail(e));
+      // Allow retry on next request
+      tablesPromise = null;
+      throw e;
+    }
+  })();
+  await tablesPromise;
 }
 
 function sanitizeTitle(title) {

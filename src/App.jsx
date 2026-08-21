@@ -97,6 +97,9 @@ function MainApp() {
   const resumeStartedRef = useRef(false);
   const dragCounterRef = useRef(0);
   const userDismissedCanvasRef = useRef(false);
+  const sessionsRef = useRef(sessions);
+  const fetchingChatIdsRef = useRef(new Set());
+  useEffect(() => { sessionsRef.current = sessions; }, [sessions]);
 
   const activeSessionId = chatIdFromUrl;
   const activeSession = useMemo(() => sessions.find(s => s.id === activeSessionId) || null, [sessions, activeSessionId]);
@@ -119,7 +122,8 @@ function MainApp() {
       setSessions(mapped);
       setSessionsLoaded(true);
 
-      // Migration: if server has 0 chats but localStorage has sessions, migrate them
+      // Migration: if server has 0 chats but localStorage has sessions, migrate in BACKGROUND
+      // Do NOT block the initial load - user should see "empty" immediately, migration happens async
       if (mapped.length === 0) {
         try {
           const saved = localStorage.getItem('corez_sessions');
@@ -127,37 +131,42 @@ function MainApp() {
             const parsed = JSON.parse(saved);
             if (Array.isArray(parsed) && parsed.length > 0) {
               const toMigrate = parsed.filter(s => s && Array.isArray(s.messages) && s.messages.length > 0).slice(0, 5);
-              for (const local of toMigrate) {
-                try {
-                  const title = local.title || 'Migrated Conversation';
-                  const created = await chatService.createChat({ title });
-                  // Bulk sync messages
-                  if (local.messages && local.messages.length > 0) {
-                    // sanitize messages for server
-                    const sanitized = local.messages.map((m, idx) => ({
-                      role: m.role || 'user',
-                      content: typeof m.content === 'string' ? m.content : '',
-                      attachments: m.attachments || null,
-                      createdAt: Date.now() + idx,
+              if (toMigrate.length > 0) {
+                // Run migration in background, parallelized (not sequential)
+                (async () => {
+                  try {
+                    await Promise.all(toMigrate.map(async (local) => {
+                      try {
+                        const title = local.title || 'Migrated Conversation';
+                        const created = await chatService.createChat({ title });
+                        if (local.messages && local.messages.length > 0) {
+                          const sanitized = local.messages.map((m, idx) => ({
+                            role: m.role || 'user',
+                            content: typeof m.content === 'string' ? m.content : '',
+                            attachments: m.attachments || null,
+                            createdAt: Date.now() + idx,
+                          }));
+                          await chatService.putChat(created.id, { messages: sanitized });
+                        }
+                      } catch (e) {
+                        console.warn('Migration failed for session', local.id, e);
+                      }
                     }));
-                    await chatService.putChat(created.id, { messages: sanitized });
+                    const after = await chatService.listChats();
+                    setSessions(after.map((c) => ({
+                      id: c.id,
+                      title: c.title,
+                      messages: [],
+                      createdAt: c.createdAt,
+                      updatedAt: c.updatedAt,
+                      _loaded: false,
+                    })));
+                    try { localStorage.removeItem('corez_sessions'); } catch {}
+                  } catch (e) {
+                    console.warn('Background migration failed', e);
                   }
-                } catch (e) {
-                  console.warn('Migration failed for session', local.id, e);
-                }
+                })();
               }
-              // Re-fetch after migration
-              const after = await chatService.listChats();
-              setSessions(after.map((c) => ({
-                id: c.id,
-                title: c.title,
-                messages: [],
-                createdAt: c.createdAt,
-                updatedAt: c.updatedAt,
-                _loaded: false,
-              })));
-              // Clear localStorage after successful migration to avoid re-migrating
-              try { localStorage.removeItem('corez_sessions'); } catch {}
             }
           }
         } catch (e) {
@@ -166,7 +175,6 @@ function MainApp() {
       }
     } catch (e) {
       console.warn('Failed to list chats, falling back to localStorage:', e);
-      // Fallback to localStorage for offline/dev without D1
       try {
         const saved = localStorage.getItem('corez_sessions');
         if (saved) {
@@ -186,13 +194,16 @@ function MainApp() {
   }, [fetchChatList]);
 
   // -------------------------------------------------------------
-  // Fetch messages for active chat when URL changes
+  // Fetch messages for active chat when URL changes — parallel, not blocked by chat list
   // -------------------------------------------------------------
   useEffect(() => {
     if (!activeSessionId) return;
     if (!user) return;
-    const existing = sessions.find(s => s.id === activeSessionId);
+    // Use ref to avoid re-triggering when sessions array changes (prevents waterfall)
+    const existing = sessionsRef.current.find(s => s.id === activeSessionId);
     if (existing && existing._loaded) return;
+    if (fetchingChatIdsRef.current.has(activeSessionId)) return;
+    fetchingChatIdsRef.current.add(activeSessionId);
 
     let cancelled = false;
     const load = async () => {
@@ -224,11 +235,12 @@ function MainApp() {
         }
       } finally {
         if (!cancelled) setChatLoading(false);
+        fetchingChatIdsRef.current.delete(activeSessionId);
       }
     };
     load();
-    return () => { cancelled = true; };
-  }, [activeSessionId, user, sessions, navigate]);
+    return () => { cancelled = true; fetchingChatIdsRef.current.delete(activeSessionId); };
+  }, [activeSessionId, user, navigate]);
 
   // -------------------------------------------------------------
   // UI helpers
