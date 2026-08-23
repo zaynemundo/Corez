@@ -52,9 +52,9 @@ const SLEEP_CHUNK_MS = 250;
 // provider loudly instead: the failure is classified transient (504), the
 // chain retries or falls back, and the client always receives an explicit
 // SSE error event with the real reason.
-  const DEFAULT_TTFT_TIMEOUT_MS = 120_000;     // first byte / first token
-  const DEFAULT_IDLE_TIMEOUT_MS = 60_000;      // silence mid-stream
-  const DEFAULT_NONSTREAM_TIMEOUT_MS = 90_000; // non-streaming call total
+const DEFAULT_TTFT_TIMEOUT_MS = 120_000;     // first byte / first token
+const DEFAULT_IDLE_TIMEOUT_MS = 60_000;      // silence mid-stream
+const DEFAULT_NONSTREAM_TIMEOUT_MS = 90_000; // non-streaming call total
 
 function envTimeoutMs(env, key, fallback) {
   const value = Number(env?.[key]);
@@ -693,14 +693,10 @@ export async function runProviderChain(messages, options = {}) {
     }
   }
 
-  // Log real failures server-side, but return generic to client
-  if (failures.length > 0) {
-    console.warn('AI provider failures:', failures.slice(0, 3).join(' | ').slice(0, 500));
-  }
   return {
     status: 'failed',
-    error: 'Corez AI Services is currently packed. Please try again in a moment.',
-    errorStatus: lastErrorStatus || 503,
+    error: failures.slice(0, 3).join(' | ').slice(0, 300) || 'all providers returned no usable response',
+    errorStatus: lastErrorStatus,
     taskId
   };
 }
@@ -741,8 +737,7 @@ export function runStreamingChain(messages, options = {}) {
 
   async function* events() {
     if (providers.length === 0) {
-      console.warn('No AI provider key configured - returning packed error');
-      yield { type: 'error', message: 'Corez AI Services is currently packed. Please try again in a moment.', status: 503 };
+      yield { type: 'error', message: 'No AI provider key configured on this deployment.', status: 502 };
       return;
     }
 
@@ -781,13 +776,15 @@ export function runStreamingChain(messages, options = {}) {
           let got = yield* tryStream(messages);
           if (!got.text.trim()) {
             emptyAttempts += 1;
+            // Reasoning models occasionally emit only thinking with no
+            // content. That is transient, not permanent: retry the SAME
+            // provider a bounded number of times (short backoff) before
+            // falling through to the next provider.
             if (emptyAttempts < MAX_EMPTY_ATTEMPTS && !signal?.aborted) {
               await sleep(750 * emptyAttempts);
               continue;
             }
-            // Internal: keep provider label for logs, but don't expose to client
-            console.warn(`Provider ${provider.label} empty stream`);
-            failureMessages.push(`Corez AI Services is currently packed.`);
+            failureMessages.push(`${provider.label}: empty or reasoning-only stream`);
             if (signal?.aborted) {
               yield { type: 'error', message: 'AI request cancelled.', status: 499 };
               return;
@@ -811,8 +808,7 @@ export function runStreamingChain(messages, options = {}) {
         } catch (err) {
           onlyEmptyFailures = false;
           const failure = err instanceof Error ? err : new Error(safeErrorDetail(err));
-          console.warn(`Provider ${provider.label} stream error:`, safeErrorDetail(failure));
-          failureMessages.push(`Corez AI Services is currently packed.`);
+          failureMessages.push(`${provider.label}: ${safeErrorDetail(failure)}`);
           if (signal?.aborted) {
             yield { type: 'error', message: 'AI request cancelled.', status: 499 };
             return;
@@ -821,9 +817,14 @@ export function runStreamingChain(messages, options = {}) {
         }
       }
     }
+    // Empty/reasoning-only streams are TRANSIENT by nature (the model just
+    // thought without answering): when every provider failed that way, the
+    // error is retryable (503) so the client's harness auto-resume re-issues
+    // the identical request instead of treating it as permanent. Hard
+    // provider errors (auth, validation) stay non-retryable 502.
     yield {
       type: 'error',
-      message: 'Corez AI Services is currently packed. Please try again in a moment.',
+      message: failureMessages.slice(0, 3).join(' | ').slice(0, 300) || 'all providers returned no usable stream',
       status: onlyEmptyFailures ? 503 : 502,
       ...(onlyEmptyFailures ? { retryable: true } : {})
     };
