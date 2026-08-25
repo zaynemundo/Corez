@@ -58,7 +58,8 @@ describe('E2E /api/ai pipeline', () => {
       expect(url).toBe(OPENCODE_URL);
       const body = JSON.parse(init.body);
       expect(body.model).toBe('muse-spark-1.2-contributor');
-      expect(body.messages[0].role).toBe('system');
+      const msgs = body.input || body.messages;
+      expect(msgs[0].role).toBe('system');
       return mockOpenAI('This is a complete and correct answer about compilers. A compiler translates source code into machine code. An interpreter runs code line by line.');
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -127,7 +128,8 @@ describe('E2E /api/ai pipeline', () => {
   it('injects the project context into the system prompt on follow-up turns', async () => {
     const fetchMock = vi.fn(async (url, init) => {
       const body = JSON.parse(init.body);
-      const systemPrompts = body.messages.filter((m) => m.role === 'system').map((m) => m.content);
+      const msgs = body.input || body.messages;
+      const systemPrompts = msgs.filter((m) => m.role === 'system').map((m) => m.content);
       const joined = systemPrompts.join('\n');
       expect(joined).toContain('EXISTING PROJECT STATE');
       expect(joined).toContain('Framework: react');

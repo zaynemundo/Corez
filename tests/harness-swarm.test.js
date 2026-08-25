@@ -33,7 +33,7 @@ function buildSwarmMockProvider() {
   const buildMessages = [];
   const fetchMock = vi.fn(async (_url, init) => {
     const body = JSON.parse(init.body);
-    const messages = JSON.stringify(body.messages || []);
+    const messages = JSON.stringify(body.input || body.messages || []);
     const isStreaming = body.stream === true;
 
     if (messages.includes('Produce a concise build specification')) {
@@ -54,7 +54,7 @@ function buildSwarmMockProvider() {
     }
     // The streamed build phase.
     calls.build += 1;
-    buildMessages.push(body.messages || []);
+    buildMessages.push(body.input || body.messages || []);
     return isStreaming ? sseDelta([WEBSITE_ARTIFACT]) : jsonCompletion(WEBSITE_ARTIFACT);
   });
   return { fetchMock, calls, buildMessages };
@@ -129,7 +129,7 @@ describe('creation harness swarm pre-pass', () => {
       inFlight += 1;
       maxInFlight = Math.max(maxInFlight, inFlight);
       const body = JSON.parse(init.body);
-      const messages = JSON.stringify(body.messages || []);
+      const messages = JSON.stringify(body.input || body.messages || []);
       let response;
       if (messages.includes('concise implementation brief')) {
         await new Promise((r) => setTimeout(r, 60));
@@ -158,13 +158,13 @@ describe('creation harness swarm pre-pass', () => {
     const { fetchMock, buildMessages } = buildSwarmMockProvider();
     fetchMock.mockImplementation(async (_url, init) => {
       const body = JSON.parse(init.body);
-      const messages = JSON.stringify(body.messages || []);
+      const messages = JSON.stringify(body.input || body.messages || []);
       if (messages.includes('Produce a concise build specification')) return jsonCompletion(SPEC);
       if (messages.includes('concise implementation brief')) return permanentFailure();
       if (messages.includes('visual direction brief')) return permanentFailure();
       if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('APPROVED');
       if (body.stream === true) {
-        buildMessages.push(body.messages || []);
+        buildMessages.push(body.input || body.messages || []);
         return sseDelta([WEBSITE_ARTIFACT]);
       }
       return jsonCompletion(WEBSITE_ARTIFACT);
@@ -184,13 +184,13 @@ describe('creation harness swarm pre-pass', () => {
     const { fetchMock, buildMessages } = buildSwarmMockProvider();
     fetchMock.mockImplementation(async (_url, init) => {
       const body = JSON.parse(init.body);
-      const messages = JSON.stringify(body.messages || []);
+      const messages = JSON.stringify(body.input || body.messages || []);
       if (messages.includes('Produce a concise build specification')) return jsonCompletion(SPEC);
       if (messages.includes('concise implementation brief')) return permanentFailure();
       if (messages.includes('visual direction brief')) return jsonCompletion('ART: survived');
       if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('APPROVED');
       if (body.stream === true) {
-        buildMessages.push(body.messages || []);
+        buildMessages.push(body.input || body.messages || []);
         return sseDelta([WEBSITE_ARTIFACT]);
       }
       return jsonCompletion(WEBSITE_ARTIFACT);
@@ -231,7 +231,7 @@ requestAnimationFrame(gameLoop);
     const { fetchMock, calls } = buildSwarmMockProvider();
     fetchMock.mockImplementation(async (_url, init) => {
       const body = JSON.parse(init.body);
-      const messages = JSON.stringify(body.messages || []);
+      const messages = JSON.stringify(body.input || body.messages || []);
       if (messages.includes('concise implementation brief')) return permanentFailure();
       if (messages.includes('visual direction brief')) return permanentFailure();
       if (messages.includes('Produce a concise build specification')) return jsonCompletion(SPEC);
@@ -266,13 +266,13 @@ requestAnimationFrame(gameLoop);
     // fail hard so a re-run would be visible.
     fetchMock.mockImplementation(async (_url, init) => {
       const body = JSON.parse(init.body);
-      const messages = JSON.stringify(body.messages || []);
+      const messages = JSON.stringify(body.input || body.messages || []);
       if (messages.includes('concise implementation brief')) return permanentFailure();
       if (messages.includes('visual direction brief')) return permanentFailure();
       if (messages.includes('Produce a concise build specification')) return jsonCompletion(SPEC);
       if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('APPROVED');
       if (body.stream === true) {
-        buildMessages.push(body.messages || []);
+        buildMessages.push(body.input || body.messages || []);
         return sseDelta([WEBSITE_ARTIFACT]);
       }
       return jsonCompletion(WEBSITE_ARTIFACT);

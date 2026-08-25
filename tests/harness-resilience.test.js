@@ -104,7 +104,7 @@ describe('runCreationHarness resilience', () => {
   it('H1: persists an owner-tagged lease before planning and 429s a concurrent run without clobbering it', async () => {
     streamMock();
     const fetchMock = vi.fn(async (_url, init) => {
-      const messages = JSON.stringify(JSON.parse(init.body).messages || []);
+      const messages = JSON.stringify((JSON.parse(init.body).input || JSON.parse(init.body).messages) || []);
       if (messages.includes('Produce a concise build specification')) return jsonCompletion('spec');
       if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('APPROVED');
       return jsonCompletion('');
@@ -162,7 +162,7 @@ describe('runCreationHarness resilience', () => {
   it('H1: a stale or foreign lease (expired heartbeat) is reacquired, not stuck', async () => {
     streamMock();
     const fetchMock = vi.fn(async (_url, init) => {
-      const messages = JSON.stringify(JSON.parse(init.body).messages || []);
+      const messages = JSON.stringify((JSON.parse(init.body).input || JSON.parse(init.body).messages) || []);
       if (messages.includes('Produce a concise build specification')) return jsonCompletion('spec');
       if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('APPROVED');
       return jsonCompletion('');
@@ -267,7 +267,7 @@ describe('runCreationHarness resilience', () => {
   it('H2: the lease heartbeat is refreshed while a long build streams', async () => {
     streamMock();
     const fetchMock = vi.fn(async (_url, init) => {
-      const messages = JSON.stringify(JSON.parse(init.body).messages || []);
+      const messages = JSON.stringify((JSON.parse(init.body).input || JSON.parse(init.body).messages) || []);
       if (messages.includes('Produce a concise build specification')) return jsonCompletion('spec');
       if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('APPROVED');
       return jsonCompletion('');
@@ -316,7 +316,7 @@ describe('runCreationHarness resilience', () => {
     // last good build and end with done — never with an error.
     streamMock({ repairError: new Error('provider hiccup'), repairPartial: '<html><body>partial' });
     const fetchMock = vi.fn(async (_url, init) => {
-      const messages = JSON.stringify(JSON.parse(init.body).messages || []);
+      const messages = JSON.stringify((JSON.parse(init.body).input || JSON.parse(init.body).messages) || []);
       if (messages.includes('Produce a concise build specification')) return jsonCompletion('spec');
       if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('NEEDS_FIX: the button does nothing');
       return jsonCompletion('');
@@ -347,7 +347,7 @@ describe('runCreationHarness resilience', () => {
       yield { type: 'done', finishReason: 'stop' };
     });
     const fetchMock = vi.fn(async (_url, init) => {
-      const messages = JSON.stringify(JSON.parse(init.body).messages || []);
+      const messages = JSON.stringify((JSON.parse(init.body).input || JSON.parse(init.body).messages) || []);
       if (messages.includes('Produce a concise build specification')) return jsonCompletion('spec');
       if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('NEEDS_FIX: the button does nothing');
       return jsonCompletion('');
@@ -365,7 +365,7 @@ describe('runCreationHarness resilience', () => {
     // Review provider is permanently down (401): runProviderChain returns
     // { status: 'failed', error } with no content.
     const fetchMock = vi.fn(async (_url, init) => {
-      const messages = JSON.stringify(JSON.parse(init.body).messages || []);
+      const messages = JSON.stringify((JSON.parse(init.body).input || JSON.parse(init.body).messages) || []);
       if (messages.includes('Produce a concise build specification')) return jsonCompletion('spec');
       if (messages.includes('final reviewer of a finished artifact')) return new Response('no', { status: 401 });
       return jsonCompletion('');
@@ -391,7 +391,7 @@ describe('runCreationHarness resilience', () => {
   it('M2: a spec provider outage surfaces the real provider failure', async () => {
     streamMock();
     const fetchMock = vi.fn(async (_url, init) => {
-      const messages = JSON.stringify(JSON.parse(init.body).messages || []);
+      const messages = JSON.stringify((JSON.parse(init.body).input || JSON.parse(init.body).messages) || []);
       if (messages.includes('Produce a concise build specification')) return new Response('no', { status: 401 });
       return jsonCompletion('');
     });
@@ -418,7 +418,7 @@ describe('runCreationHarness resilience', () => {
       yield { type: 'done', finishReason: 'stop' };
     });
     const fetchMock = vi.fn(async (_url, init) => {
-      const messages = JSON.stringify(JSON.parse(init.body).messages || []);
+      const messages = JSON.stringify((JSON.parse(init.body).input || JSON.parse(init.body).messages) || []);
       if (messages.includes('Produce a concise build specification')) return jsonCompletion('spec');
       if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('APPROVED');
       return jsonCompletion('');
@@ -482,7 +482,7 @@ describe('runCreationHarness resilience', () => {
     });
 
     const fetchMock = vi.fn(async (_url, init) => {
-      const messages = JSON.stringify(JSON.parse(init.body).messages || []);
+      const messages = JSON.stringify((JSON.parse(init.body).input || JSON.parse(init.body).messages) || []);
       if (messages.includes('Produce a concise build specification')) return jsonCompletion('spec');
       if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('APPROVED');
       return jsonCompletion('');
@@ -531,7 +531,7 @@ describe('runCreationHarness resilience', () => {
     });
 
     const fetchMock = vi.fn(async (_url, init) => {
-      const messages = JSON.stringify(JSON.parse(init.body).messages || []);
+      const messages = JSON.stringify((JSON.parse(init.body).input || JSON.parse(init.body).messages) || []);
       if (messages.includes('Produce a concise build specification')) return jsonCompletion('spec');
       if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('APPROVED');
       return jsonCompletion('');

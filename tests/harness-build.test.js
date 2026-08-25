@@ -38,7 +38,7 @@ function buildMockProvider({ spec = 'A single-canvas game with a loop.', review 
 
   const fetchMock = vi.fn(async (_url, init) => {
     const body = JSON.parse(init.body);
-    const messages = JSON.stringify(body.messages || []);
+    const messages = JSON.stringify(body.input || body.messages || []);
     const isStreaming = body.stream === true;
 
     if (messages.includes('Produce a concise build specification')) {
@@ -128,7 +128,7 @@ describe('runCreationHarness', () => {
     const goodProvider = buildMockProvider();
     goodProvider.fetchMock.mockImplementation(async (_url, init) => {
       const body = JSON.parse(init.body);
-      const messages = JSON.stringify(body.messages || []);
+      const messages = JSON.stringify(body.input || body.messages || []);
       if (messages.includes('Produce a concise build specification')) return jsonCompletion('spec');
       if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('APPROVED');
       return body.stream === true ? sseDelta([GOOD_ARTIFACT]) : jsonCompletion(GOOD_ARTIFACT);
@@ -147,7 +147,7 @@ describe('runCreationHarness', () => {
     const stubbornProvider = buildMockProvider();
     stubbornProvider.fetchMock.mockImplementation(async (_url, init) => {
       const body = JSON.parse(init.body);
-      const messages = JSON.stringify(body.messages || []);
+      const messages = JSON.stringify(body.input || body.messages || []);
       if (messages.includes('Produce a concise build specification')) return jsonCompletion('spec');
       if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('APPROVED');
       const broken = BROKEN_ARTIFACT;
@@ -206,7 +206,7 @@ describe('runCreationHarness', () => {
     let buildCalls = 0;
     provider.fetchMock.mockImplementation(async (_url, init) => {
       const body = JSON.parse(init.body);
-      const messages = JSON.stringify(body.messages || []);
+      const messages = JSON.stringify(body.input || body.messages || []);
       if (messages.includes('Produce a concise build specification')) return jsonCompletion('A game with a score, three levels, and an enemy.');
       if (messages.includes('Analyze the build specification below') || messages.includes('Produce a concise visual direction brief')) return jsonCompletion('Brief');
       if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('APPROVED');
@@ -239,7 +239,7 @@ describe('runCreationHarness', () => {
     // Build directly with the GOOD artifact (no repair needed).
     provider.fetchMock.mockImplementation(async (_url, init) => {
       const body = JSON.parse(init.body);
-      const messages = JSON.stringify(body.messages || []);
+      const messages = JSON.stringify(body.input || body.messages || []);
       if (messages.includes('Produce a concise build specification')) return jsonCompletion('spec');
       if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('APPROVED');
       return body.stream === true ? sseDelta([GOOD_ARTIFACT]) : jsonCompletion(GOOD_ARTIFACT);
@@ -457,7 +457,7 @@ describe('runCreationHarness', () => {
     const provider = buildMockProvider();
     provider.fetchMock.mockImplementation(async (_url, init) => {
       const body = JSON.parse(init.body);
-      const messages = JSON.stringify(body.messages || []);
+      const messages = JSON.stringify(body.input || body.messages || []);
       if (messages.includes('Produce a concise build specification')) return jsonCompletion('spec');
       if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('APPROVED');
       return body.stream === true ? sseDelta(['\n', '   ']) : jsonCompletion('   ');

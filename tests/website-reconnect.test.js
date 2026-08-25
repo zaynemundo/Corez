@@ -88,7 +88,7 @@ describe('website task API + SSE reconnection', () => {
   async function startTask(env, prompt = 'hello task') {
     globalThis.fetch = async (url, init) => {
       const payload = JSON.parse(init.body);
-      const content = payload.messages[payload.messages.length - 1].content === prompt
+      const content = (payload.input || payload.messages)[(payload.input || payload.messages).length - 1].content === prompt
         ? `answer to ${prompt}`
         : 'continuation answer';
       return new Response(JSON.stringify({ choices: [{ message: { content } }] }), {
@@ -166,7 +166,7 @@ describe('website task API + SSE reconnection', () => {
     const started = new Promise((resolve) => { release = resolve; });
     globalThis.fetch = async (url, init) => {
       const payload = JSON.parse(init.body);
-      if (payload.messages.some((m) => m.content === 'long running task')) {
+      if ((payload.input || payload.messages).some((m) => m.content === 'long running task')) {
         release();
         return new Promise((resolve) => {
           const timer = setTimeout(() => resolve(new Response(JSON.stringify({ choices: [{ message: { content: 'late' } }] }), { status: 200 })), 10_000);

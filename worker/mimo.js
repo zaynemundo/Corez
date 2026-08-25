@@ -109,11 +109,16 @@ function buildMimoMessages(attachment, promptHint) {
   ];
 }
 
+function isResponsesEndpoint(endpoint) {
+  return typeof endpoint === 'string' && endpoint.includes('/responses');
+}
+
 async function callMimo(messages, env, signal) {
   const key = mimoKey(env);
   if (!key) return null;
   const endpoint = mimoEndpoint(env);
   const model = mimoModel(env);
+  const isResponses = isResponsesEndpoint(endpoint);
 
   const controller = new AbortController();
   const onAbort = () => controller.abort();
@@ -126,6 +131,7 @@ async function callMimo(messages, env, signal) {
   // MiMo vision should be quick — 25s cap per attachment so the main build is not blocked
   timeout = setTimeout(() => { hit = true; controller.abort(); }, 25000);
   try {
+    const body = isResponses ? { model, input: messages } : { model, messages };
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
@@ -134,11 +140,20 @@ async function callMimo(messages, env, signal) {
         'HTTP-Referer': 'https://corez.pro',
         'X-Title': 'COREZ AI - MiMo Vision'
       },
-      body: JSON.stringify({ model, messages }),
+      body: JSON.stringify(body),
       signal: controller.signal
     });
     if (!res.ok) return null;
     const data = await res.json().catch(() => null);
+    if (isResponses) {
+      const output = Array.isArray(data?.output) ? data.output : [];
+      const messageItem = output.find((item) => item && item.type === 'message' && item.role === 'assistant');
+      if (messageItem && Array.isArray(messageItem.content)) {
+        const textPart = messageItem.content.find((c) => c && c.type === 'output_text' && typeof c.text === 'string');
+        if (textPart && typeof textPart.text === 'string' && textPart.text.trim()) return textPart.text.trim();
+      }
+      return null;
+    }
     const text = data?.choices?.[0]?.message?.content;
     if (typeof text === 'string' && text.trim()) return text.trim();
     if (Array.isArray(text)) {

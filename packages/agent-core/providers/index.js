@@ -33,7 +33,7 @@ export class ModelProviderRouter {
 
         const body = {
           model,
-          messages,
+          input: messages,
           tools: tools.length > 0 ? tools : undefined,
           temperature: Number.isFinite(temperature) ? temperature : 0.42,
           reasoning: reasoning && typeof reasoning === 'object' ? reasoning : { effort: String(reasoning || 'high'), exclude: true }
@@ -51,6 +51,15 @@ export class ModelProviderRouter {
 
         if (res.ok) {
           const data = await res.json();
+          if (Array.isArray(data.output)) {
+            const messageItem = data.output.find((item) => item && item.type === 'message' && item.role === 'assistant');
+            const textPart = messageItem && Array.isArray(messageItem.content) ? messageItem.content.find((c) => c && c.type === 'output_text' && typeof c.text === 'string') : null;
+            return {
+              content: textPart ? textPart.text : '',
+              toolCalls: [],
+              raw: data
+            };
+          }
           const choice = data.choices?.[0];
           return {
             content: choice?.message?.content || '',

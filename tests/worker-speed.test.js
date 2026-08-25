@@ -134,8 +134,9 @@ describe('AI response speed optimizations', () => {
 
     expect(response.status).toBe(200);
     expect(inspirationFetch).not.toHaveBeenCalled();
-    expect(providerPayload.messages[0].content).toContain('do NOT default to retro, pixel art, neon, or another fixed aesthetic');
-    expect(providerPayload.messages.some((message) => /Live design inspiration from Awwwards/.test(message.content))).toBe(false);
+    const payloadMsgs = providerPayload.input || providerPayload.messages;
+    expect(payloadMsgs[0].content).toContain('do NOT default to retro, pixel art, neon, or another fixed aesthetic');
+    expect(payloadMsgs.some((message) => /Live design inspiration from Awwwards/.test(message.content))).toBe(false);
   });
 
   it('keeps web-design inspiration for non-game app requests', async () => {

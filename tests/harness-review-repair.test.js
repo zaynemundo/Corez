@@ -88,7 +88,7 @@ describe('runCreationHarness review-repair refill', () => {
 
     // Spec + review go through the real runProviderChain (global fetch).
     const fetchMock = vi.fn(async (_url, init) => {
-      const messages = JSON.stringify(JSON.parse(init.body).messages || []);
+      const messages = JSON.stringify((JSON.parse(init.body).input || JSON.parse(init.body).messages) || []);
       if (messages.includes('Produce a concise build specification')) return jsonCompletion('spec');
       if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('NEEDS_FIX: the button does nothing');
       return jsonCompletion('');
@@ -126,7 +126,7 @@ describe('runCreationHarness review-repair refill', () => {
     });
 
     const fetchMock = vi.fn(async (_url, init) => {
-      const messages = JSON.stringify(JSON.parse(init.body).messages || []);
+      const messages = JSON.stringify((JSON.parse(init.body).input || JSON.parse(init.body).messages) || []);
       if (messages.includes('Produce a concise build specification')) return jsonCompletion('spec');
       if (messages.includes('final reviewer of a finished artifact')) {
         reviewCalls += 1;
@@ -157,7 +157,7 @@ describe('runCreationHarness review-repair refill', () => {
       yield { type: 'done', finishReason: 'stop' };
     });
     const fetchMock = vi.fn(async (_url, init) => {
-      const messages = JSON.stringify(JSON.parse(init.body).messages || []);
+      const messages = JSON.stringify((JSON.parse(init.body).input || JSON.parse(init.body).messages) || []);
       if (messages.includes('Produce a concise build specification')) return jsonCompletion('spec');
       if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('looks fine to me'); // not APPROVED / NEEDS_FIX
       return jsonCompletion('');

@@ -89,7 +89,35 @@ function extractContentText(content) {
   return '';
 }
 
+function isResponsesEndpoint(endpoint) {
+  return typeof endpoint === 'string' && endpoint.includes('/responses');
+}
+
+function toResponsesInput(messages) {
+  if (!Array.isArray(messages)) return messages;
+  return messages.map((m) => {
+    if (!m || typeof m !== 'object') return m;
+    const role = m.role || 'user';
+    if (Array.isArray(m.content)) return { role, content: m.content };
+    if (typeof m.content === 'string') return { role, content: m.content };
+    return { role, content: extractContentText(m.content) };
+  });
+}
+
+function parseResponsesMessage(data) {
+  if (!data || typeof data !== 'object') return { content: '', toolCalls: [] };
+  const output = Array.isArray(data.output) ? data.output : [];
+  const messageItem = output.find((item) => item && item.type === 'message' && item.role === 'assistant');
+  if (!messageItem || !Array.isArray(messageItem.content)) return { content: '', toolCalls: [] };
+  const textPart = messageItem.content.find((c) => c && c.type === 'output_text' && typeof c.text === 'string');
+  const content = textPart ? textPart.text : '';
+  return { content, toolCalls: [] };
+}
+
 function parseCompletionResponse(data) {
+  if (data && Array.isArray(data.output)) {
+    return parseResponsesMessage(data);
+  }
   const message = data?.choices?.[0]?.message;
   if (!message) return { content: '', toolCalls: [] };
   const content = extractContentText(message.content);
@@ -152,11 +180,16 @@ export class ProviderAdapter {
   }
 
   buildBody({ model, messages, tools, reasoning, temperature }) {
+    const isResponses = isResponsesEndpoint(this.endpoint);
     const body = {
       model: model || this.defaultModel,
-      messages,
       temperature: Number.isFinite(temperature) ? temperature : 0.42
     };
+    if (isResponses) {
+      body.input = toResponsesInput(messages);
+    } else {
+      body.messages = messages;
+    }
     if (reasoning && typeof reasoning === 'object') body.reasoning = reasoning;
     else if (reasoning) body.reasoning = { effort: String(reasoning), exclude: true };
     if (Array.isArray(tools) && tools.length > 0) body.tools = tools;

@@ -63,7 +63,7 @@ async function captureSystemPrompt(intent) {
   } finally {
     globalThis.fetch = originalFetch;
   }
-  return invocation.payload.messages[0].content;
+  return (invocation.payload.input || invocation.payload.messages)[0].content;
 }
 
 async function run() {
@@ -202,11 +202,11 @@ async function run() {
     assert.equal(successBody.diagnostics.repaired, false);
     assert.equal(typeof successBody.diagnostics.ttftMs, 'number');
     assert.equal(invocation.payload.model, 'muse-spark-1.2-contributor');
-    assert.ok(Array.isArray(invocation.payload.messages));
-    assert.ok(['model', 'messages', 'reasoning', 'temperature'].includes(Object.keys(invocation.payload)[0]) || Object.keys(invocation.payload).includes('model'));
-    // Payload must contain model + messages and may include reasoning/temperature for Muse Spark 1.2
+    assert.ok(Array.isArray(invocation.payload.input || invocation.payload.messages));
+    assert.ok(['model', 'messages', 'input', 'reasoning', 'temperature'].includes(Object.keys(invocation.payload)[0]) || Object.keys(invocation.payload).includes('model'));
+    // Payload must contain model + input/messages and may include reasoning/temperature for Muse Spark 1.2
     assert.ok(Object.keys(invocation.payload).includes('model'));
-    assert.ok(Object.keys(invocation.payload).includes('messages'));
+    assert.ok(Object.keys(invocation.payload).includes('input') || Object.keys(invocation.payload).includes('messages'));
     assert.equal(invocation.payload.max_tokens, undefined);
     assert.equal(invocation.payload.max_completion_tokens, undefined);
     if (invocation.payload.reasoning !== undefined) {
@@ -216,9 +216,9 @@ async function run() {
     }
     // The execution prompt (with the Awwwards design spec) reaches the model
     // as the user message instead of the bare prompt.
-    assert.equal(invocation.payload.messages[1].content, 'Build a timer\n\n--- Awwwards Visual Design Principles ---\nStyle Target: Luxury Dark Mode');
-    assert.match(invocation.payload.messages[0].content, /Build a timer app/);
-    assert.match(invocation.payload.messages[0].content, /Inferred intent: app/);
+    assert.equal((invocation.payload.input || invocation.payload.messages)[1].content, 'Build a timer\n\n--- Awwwards Visual Design Principles ---\nStyle Target: Luxury Dark Mode');
+    assert.match((invocation.payload.input || invocation.payload.messages)[0].content, /Build a timer app/);
+    assert.match((invocation.payload.input || invocation.payload.messages)[0].content, /Inferred intent: app/);
 
     let generalPayload;
     globalThis.fetch = async (url, init) => {
@@ -240,15 +240,15 @@ async function run() {
     // No output-token caps anywhere: every request is uncapped so reasoning
     // models can think as long as they need. Reasoning/temperature may be present for Muse Spark 1.2.
     assert.ok(Object.keys(generalPayload).includes('model'));
-    assert.ok(Object.keys(generalPayload).includes('messages'));
+    assert.ok(Object.keys(generalPayload).includes('input') || Object.keys(generalPayload).includes('messages'));
     assert.equal(generalPayload.max_tokens, undefined);
     assert.equal(generalPayload.max_completion_tokens, undefined);
     if (generalPayload.reasoning !== undefined) {
       assert.ok(['low', 'medium', 'high', 'xhigh'].includes(generalPayload.reasoning.effort));
     }
     assert.equal(generalPayload.max_tokens, undefined);
-    assert.match(generalPayload.messages[0].content, /Adaptive Routing - Fast Path/);
-    assert.match(generalPayload.messages[0].content, /Inferred intent: general/);
+    assert.match((generalPayload.input || generalPayload.messages)[0].content, /Adaptive Routing - Fast Path/);
+    assert.match((generalPayload.input || generalPayload.messages)[0].content, /Inferred intent: general/);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -316,8 +316,8 @@ async function run() {
       assert.equal(opencodePayload.model, 'muse-spark-1.2-contributor');
       // No output-token caps anywhere: general requests are uncapped too.
       assert.equal(opencodePayload.max_tokens, undefined);
-      assert.ok(Array.isArray(opencodePayload.messages));
-      assert.equal(opencodePayload.messages.at(-1).content, 'Explain black roses');
+      assert.ok(Array.isArray(opencodePayload.input || opencodePayload.messages));
+      assert.equal((opencodePayload.input || opencodePayload.messages).at(-1).content, 'Explain black roses');
       assert.ok(opencodePayload.reasoning && typeof opencodePayload.reasoning === 'object');
       assert.ok(['low', 'medium', 'high', 'xhigh'].includes(opencodePayload.reasoning.effort));
       assert.equal(opencodePayload.reasoning.exclude, true);
@@ -573,7 +573,7 @@ async function run() {
     globalThis.fetch = historyOriginalFetch;
   }
   assert.deepEqual(
-    historyPayload.messages.slice(1).map((message) => message.content),
+    (historyPayload.input || historyPayload.messages).slice(1).map((message) => message.content),
     ['Earlier question', 'Earlier answer', 'Current question']
   );
 
@@ -658,7 +658,7 @@ async function run() {
       );
       assert.equal(liveResponse.status, 200);
       assert.equal((await json(liveResponse)).content, 'Grounded answer');
-      const systemContent = livePayload.messages
+      const systemContent = (livePayload.input || livePayload.messages)
         .filter((message) => message.role === 'system')
         .map((message) => message.content)
         .join('\n');
