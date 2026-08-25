@@ -8,10 +8,10 @@ function makeHarness({ provider, store, repositoryRunner, maxRetryWaitMs = 0 } =
     taskStore: store || new MemoryTaskStore(),
     providerChain: provider || {
       async generate() {
-        return { status: 'completed', content: 'answer', toolCalls: [], provider: 'test', model: 'muse-spark-1.2-contributor' };
+        return { status: 'completed', content: 'answer', toolCalls: [], provider: 'test', model: 'mimo-v2.5' };
       }
     },
-    defaultModel: 'muse-spark-1.2-contributor',
+    defaultModel: 'mimo-v2.5',
     maxRetryWaitMs,
     repositoryRunner: repositoryRunner || null
   });
@@ -116,7 +116,7 @@ describe('AgentHarness', () => {
           if (calls === 1) {
             return { status: 'retry-scheduled', provider: 'opencode-go', retryAfterSeconds: 120, error: 'rate limited', content: '', toolCalls: [] };
           }
-          return { status: 'completed', content: 'recovered answer', toolCalls: [], provider: 'opencode-go', model: 'muse-spark-1.2-contributor' };
+          return { status: 'completed', content: 'recovered answer', toolCalls: [], provider: 'opencode-go', model: 'mimo-v2.5' };
         }
       }
     });

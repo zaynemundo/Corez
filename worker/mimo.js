@@ -1,12 +1,12 @@
 /**
- * MiMo V2.5 -> Muse Spark 1.2 Two-Stage Pipeline for corez.pro
+ * MiMo V2.5 -> Mimo V2.5 Two-Stage Pipeline for corez.pro
  *
  * Every user attachment (image, video, audio, file, etc.) is first
  * understood by MiMo V2.5 (vision + multimodal), then its textual
- * description is fed to Muse Spark 1.2 for generation.
+ * description is fed to Mimo V2.5 for generation.
  *
  * This file is used by worker/index.js (server) and is safe to call
- * from any context. It reuses the same gateway as Muse (OpenCode Zen Go)
+ * from any context. It reuses the same gateway as Mimo (OpenCode Zen Go)
  * but with model mimo-v2.5 — same auth, same endpoint, different model.
  */
 
@@ -193,5 +193,5 @@ export function buildMimoContextBlock(descriptions) {
     const label = d.kind === 'image' ? 'Image' : d.kind === 'video' ? 'Video' : d.kind === 'audio' ? 'Audio' : 'File';
     return (i + 1) + ". " + label + " \"" + d.name + "\" (" + (d.type || d.kind) + "):\n" + d.description;
   }).join("\n\n");
-  return "MiMo V2.5 Media Understanding (vision/file analysis — authoritative, use this as ground truth for the attached media, then fulfill the user's request with Muse Spark 1.2):\n" + lines + "\n\nUse the above MiMo descriptions as the true content of the user's attached files. Do NOT hallucinate or invent media content — ground your generation in these descriptions.";
+  return "MiMo V2.5 Media Understanding (vision/file analysis — authoritative, use this as ground truth for the attached media, then fulfill the user's request with Mimo V2.5):\n" + lines + "\n\nUse the above MiMo descriptions as the true content of the user's attached files. Do NOT hallucinate or invent media content — ground your generation in these descriptions.";
 }

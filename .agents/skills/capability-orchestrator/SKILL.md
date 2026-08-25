@@ -13,18 +13,18 @@ Use this skill to analyze incoming user requests, determine the minimal required
 
 | Request Type | Lead Engine | Required Skills | Output Artifact |
 | --- | --- | --- | --- |
-| Web Application / UI Layout | `opencode-go/muse-spark-1.2-contributor` (preferred, fallback `deepseek` → `openrouter`) | *see §1.1 Design Decision Tree* + `accessibility-expert` | React / HTML / CSS components |
+| Web Application / UI Layout | `opencode-go/mimo-v2.5` (preferred, fallback `deepseek` → `openrouter`) | *see §1.1 Design Decision Tree* + `accessibility-expert` | React / HTML / CSS components |
 | Image Generation / Artwork | FLUX 1 (`schnell` / `dev`) via Cloudflare Workers AI | `visual-creative` (+ `image-generation` for endpoint) | R2 stored image URLs & gallery cards |
-| Web Game / Canvas Arcade | `opencode-go/muse-spark-1.2-contributor` (preferred, fallback `deepseek` → `openrouter`) | `game-development`, `frontend-modern-design` | Canvas 2D / JS physics engine |
-| Back-End API / Worker Router | `opencode-go/muse-spark-1.2-contributor` (preferred, fallback `deepseek` → `openrouter`) | `backend-architecture`, `ai-infrastructure` | Cloudflare Worker / Node route handlers |
-| Bug Investigation / Refactoring | `opencode-go/muse-spark-1.2-contributor` (preferred) | `auto-debugging`, `code-review-testing`, `software-engineering` | Verified code fix & green test run |
-| PDF / Document Deliverables | `opencode-go/muse-spark-1.2-contributor` (preferred) | `pdf` | HTML/Paged.js or LaTeX PDF, processed PDFs |
-| Live Facts / Lookups (weather, time, rates) | `opencode-go/muse-spark-1.2-contributor` | `live-utilities`, `research-current-information` | Dated, source-cited answer |
-| Memory / Preferences | `opencode-go/muse-spark-1.2-contributor` | `r2-mem0-memory`, `personalisation-context` | R2-stored memory records |
-| Scheduling / Reminders | `opencode-go/muse-spark-1.2-contributor` | `scheduling-automation` | Schedule specification (no durable scheduler yet) |
-| Credentials / Env Setup | `opencode-go/muse-spark-1.2-contributor` | `ask-env-values` | Explicitly confirmed env values |
-| Runtime Verification | `opencode-go/muse-spark-1.2-contributor` | `verify` | Launched app with verified endpoints |
-| Data Analysis / Reports | `opencode-go/muse-spark-1.2-contributor` | `data-documents` | Validated spreadsheets, charts, docs |
+| Web Game / Canvas Arcade | `opencode-go/mimo-v2.5` (preferred, fallback `deepseek` → `openrouter`) | `game-development`, `frontend-modern-design` | Canvas 2D / JS physics engine |
+| Back-End API / Worker Router | `opencode-go/mimo-v2.5` (preferred, fallback `deepseek` → `openrouter`) | `backend-architecture`, `ai-infrastructure` | Cloudflare Worker / Node route handlers |
+| Bug Investigation / Refactoring | `opencode-go/mimo-v2.5` (preferred) | `auto-debugging`, `code-review-testing`, `software-engineering` | Verified code fix & green test run |
+| PDF / Document Deliverables | `opencode-go/mimo-v2.5` (preferred) | `pdf` | HTML/Paged.js or LaTeX PDF, processed PDFs |
+| Live Facts / Lookups (weather, time, rates) | `opencode-go/mimo-v2.5` | `live-utilities`, `research-current-information` | Dated, source-cited answer |
+| Memory / Preferences | `opencode-go/mimo-v2.5` | `r2-mem0-memory`, `personalisation-context` | R2-stored memory records |
+| Scheduling / Reminders | `opencode-go/mimo-v2.5` | `scheduling-automation` | Schedule specification (no durable scheduler yet) |
+| Credentials / Env Setup | `opencode-go/mimo-v2.5` | `ask-env-values` | Explicitly confirmed env values |
+| Runtime Verification | `opencode-go/mimo-v2.5` | `verify` | Launched app with verified endpoints |
+| Data Analysis / Reports | `opencode-go/mimo-v2.5` | `data-documents` | Validated spreadsheets, charts, docs |
 
 > **Provider chain (canonical):** `OPENCODE_GO_API_KEY` / `OPENCODE_API_KEY` (preferred OpenCode Go) → `DEEPSEEK_API_KEY` → `OPENROUTER_API_KEY`. See `verify` and `ai-infrastructure` for timeout/retry behavior. `OPENROUTER_API_KEY` also required for `POST /api/image`. Never ask public app users for these keys — see `ask-env-values`.
 
@@ -47,7 +47,7 @@ Use this skill to analyze incoming user requests, determine the minimal required
 ## 2. Orchestration Strategy
 
 1. **Minimal Surface**: Activate only the skills directly required for the request (use `§1.1` for design) to conserve context budget and latency. `game-development` is 4000+ lines — do not load it for non-game tasks.
-2. **Provider-aware routing**: Fast structured classification → local `src/services/intentClassifier.js`. Complex reasoning/art direction → `opencode-go/muse-spark-1.2-contributor` via the chain in `ai-infrastructure: §1`.
+2. **Provider-aware routing**: Fast structured classification → local `src/services/intentClassifier.js`. Complex reasoning/art direction → `opencode-go/mimo-v2.5` via the chain in `ai-infrastructure: §1`.
 3. **Subagent Delegation**: Delegate broad research tasks to the `research` subagent (or the `research-current-information` skill when live web research is required) to keep context clean.
 4. **Strict Policy Compliance**: Enforce `cursor-security-rules` (canonical security) and git completion policies (`git-superpowers`) upon finishing file modifications. Backend work must also satisfy `backend-architecture: Level 1`.
 5. **Verification**: End every implementation with `verify` checks (`npm test`, `npm run lint`, `npm run build`, `npm run test:cloudflare`) — see `software-engineering: §4` for canonical commands.

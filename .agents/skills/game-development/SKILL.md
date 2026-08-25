@@ -477,10 +477,10 @@ Orchestration entry point for the CoreZ AI Game Studio. Analyzes game request, s
 **Agents needed:**
 | Role | Agent | Mode |
 |------|-------|------|
-| Creative Director | muse-spark-1.2-contributor | read-only advisory |
-| Lead Programmer | muse-spark-1.2-contributor | implement |
-| UI Programmer | muse-spark-1.2-contributor | implement |
-| QA Tester | muse-spark-1.2-contributor | test |
+| Creative Director | mimo-v2.5 | read-only advisory |
+| Lead Programmer | mimo-v2.5 | implement |
+| UI Programmer | mimo-v2.5 | implement |
+| QA Tester | mimo-v2.5 | test |
 
 #### MEDIUM (5-7 agents, 3-6 hours implementation)
 
@@ -499,13 +499,13 @@ Orchestration entry point for the CoreZ AI Game Studio. Analyzes game request, s
 **Agents needed:**
 | Role | Agent | Mode |
 |------|-------|------|
-| Creative Director | muse-spark-1.2-contributor | read-only advisory |
-| Game Designer | muse-spark-1.2-contributor | spec writer |
-| Lead Programmer | muse-spark-1.2-contributor | implement |
-| UI Programmer | muse-spark-1.2-contributor | implement |
+| Creative Director | mimo-v2.5 | read-only advisory |
+| Game Designer | mimo-v2.5 | spec writer |
+| Lead Programmer | mimo-v2.5 | implement |
+| UI Programmer | mimo-v2.5 | implement |
 | Art Director | flux-1-schnell | asset generation |
-| Technical Artist | muse-spark-1.2-contributor | asset integration |
-| QA Tester | muse-spark-1.2-contributor | test |
+| Technical Artist | mimo-v2.5 | asset integration |
+| QA Tester | mimo-v2.5 | test |
 
 #### LARGE (8+ agents, 8+ hours implementation)
 
@@ -526,16 +526,16 @@ Orchestration entry point for the CoreZ AI Game Studio. Analyzes game request, s
 **Agents needed:**
 | Role | Agent | Mode |
 |------|-------|------|
-| Producer | muse-spark-1.2-contributor | orchestration lead |
-| Creative Director | muse-spark-1.2-contributor | read-only |
-| Game Designer | muse-spark-1.2-contributor | spec |
-| Lead Programmer | muse-spark-1.2-contributor | architecture + core |
-| UI Programmer | muse-spark-1.2-contributor | HUD/menus |
+| Producer | mimo-v2.5 | orchestration lead |
+| Creative Director | mimo-v2.5 | read-only |
+| Game Designer | mimo-v2.5 | spec |
+| Lead Programmer | mimo-v2.5 | architecture + core |
+| UI Programmer | mimo-v2.5 | HUD/menus |
 | Art Director | flux-1-schnell | backgrounds/assets |
-| Technical Artist | muse-spark-1.2-contributor | sprite pipeline |
-| Physics Advisor | muse-spark-1.2-contributor | read-only advisory |
-| QA Tester | muse-spark-1.2-contributor | test |
-| Code Reviewer | muse-spark-1.2-contributor | read-only review |
+| Technical Artist | mimo-v2.5 | sprite pipeline |
+| Physics Advisor | mimo-v2.5 | read-only advisory |
+| QA Tester | mimo-v2.5 | test |
+| Code Reviewer | mimo-v2.5 | read-only review |
 
 ---
 
@@ -623,20 +623,20 @@ estimated_hours: "1-2"  # per complexity: SMALL 1-2, MEDIUM 3-6, LARGE 8+
 
 team:
   - role: "Lead Programmer"
-    agent: "muse-spark-1.2-contributor"
+    agent: "mimo-v2.5"
     mode: "implement"
     tasks:
       - "Set up project structure and build config"
       - "Implement core game loop and rendering"
       - "Implement player controls and physics"
   - role: "UI Programmer"
-    agent: "muse-spark-1.2-contributor"
+    agent: "mimo-v2.5"
     mode: "implement"
     tasks:
       - "Build HUD (score, health, pause button)"
       - "Implement start screen and game-over overlay"
   - role: "QA Tester"
-    agent: "muse-spark-1.2-contributor"
+    agent: "mimo-v2.5"
     mode: "implement"
     tasks:
       - "Write smoke tests for core loop"

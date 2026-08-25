@@ -10,7 +10,7 @@ export async function handleSwarmCommand(prompt, options = {}, ui) {
   ui.status('◐', `Initializing Multi-Agent Swarm Orchestrator for: "${prompt}"...`);
 
   const orchestrator = new GenericSwarmOrchestrator({
-    providerRouter: new ModelProviderRouter({ defaultModel: 'muse-spark-1.2-contributor' })
+    providerRouter: new ModelProviderRouter({ defaultModel: 'mimo-v2.5' })
   });
 
   try {

@@ -112,7 +112,7 @@ export class AgentLoop {
     this.session = this.sessionLog; // alias for DSH parity
     this.options = {
       provider: options.provider || '',
-      model: options.model || 'muse-spark-1.2-contributor',
+      model: options.model || 'mimo-v2.5',
       maxTokens: options.maxTokens
     };
     this.inbox = new Inbox(this.sessionLog, {

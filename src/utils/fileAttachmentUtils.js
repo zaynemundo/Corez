@@ -67,7 +67,7 @@ export function hasFiles(dataTransfer) {
  *
  * Two-stage pipeline for corez.pro: every attachment (image, video, audio,
  * file) is first understood by MiMo V2.5 (vision/multimodal), then its
- * textual description is fed to Muse Spark 1.2 for generation. This
+ * textual description is fed to Mimo V2.5 for generation. This
  * function prepares the attachments so the worker's MiMo pre-pass can
  * describe them.
  *

@@ -177,7 +177,7 @@ export function printHelp(ui) {
   console.log(`\n${styles.bold}EXAMPLES${styles.reset}`);
   console.log(`  ${styles.dim}corez plan "add Stripe subscriptions"${styles.reset}`);
   console.log(`  ${styles.dim}corez run "fix all lint errors" --auto${styles.reset}`);
-  console.log(`  ${styles.dim}corez -m muse-spark-1.2-contributor check for bugs${styles.reset}`);
+  console.log(`  ${styles.dim}corez -m mimo-v2.5 check for bugs${styles.reset}`);
   console.log(`  ${styles.dim}corez build "create admin dashboard"${styles.reset}`);
   console.log(`  ${styles.dim}corez review${styles.reset}`);
   console.log(`  ${styles.dim}corez completion${styles.reset}`);
