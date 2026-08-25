@@ -1,6 +1,6 @@
 import { classifyProviderFailure, createTaskStateStore, safeErrorDetail } from './utils.js';
 
-export const OPENCODE_DEFAULT_ENDPOINT = 'https://opencode.ai/zen/go/v1/chat/completions';
+export const OPENCODE_DEFAULT_ENDPOINT = 'https://opencode.ai/zen/go/v1/responses';
 export const DEEPSEEK_DEFAULT_ENDPOINT = 'https://api.deepseek.com/chat/completions';
 export const OPENROUTER_DEFAULT_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 export const DEFAULT_MODEL = 'muse-spark-1.2-contributor';

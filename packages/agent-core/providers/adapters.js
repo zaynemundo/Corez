@@ -24,7 +24,7 @@ export const PROVIDER_ENV_KEYS = Object.freeze({
 });
 
 export const PROVIDER_ENDPOINTS = Object.freeze({
-  [PROVIDER_IDS.OPENCODE_GO]: 'https://opencode.ai/zen/go/v1/chat/completions',
+  [PROVIDER_IDS.OPENCODE_GO]: 'https://opencode.ai/zen/go/v1/responses',
   [PROVIDER_IDS.DEEPSEEK]: 'https://api.deepseek.com/chat/completions',
   [PROVIDER_IDS.OPENROUTER]: 'https://openrouter.ai/api/v1/chat/completions'
 });

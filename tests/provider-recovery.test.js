@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { buildProviderChain, runProviderChain, runStreamingChain, TASK_STATUS_STORE_PREFIX } from '../worker/providerChain.js';
 import { createTaskStateStore } from '../worker/utils.js';
 
-const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/chat/completions';
+const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/responses';
 const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 

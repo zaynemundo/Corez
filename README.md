@@ -17,7 +17,7 @@ Corez deploys the Vite application and its AI endpoints together as a Cloudflare
 
 When `OPENCODE_GO_API_KEY` (or `OPENCODE_API_KEY`) is configured, `/api/ai` routes through the **OpenCode Go API** first (it serves the latest Muse Spark 1.2 builds). OpenCode Go is preferred and stays preferred; the official DeepSeek API and OpenRouter are fallbacks tried in order only when the preferred provider cannot serve:
 
-1. **OpenCode Go** — `OPENCODE_GO_API_KEY` / `OPENCODE_API_KEY`, endpoint `OPENCODE_ENDPOINT` (default `https://opencode.ai/zen/go/v1/chat/completions`), model `OPENCODE_MODEL` (default `muse-spark-1.2-contributor`).
+1. **OpenCode Go** — `OPENCODE_GO_API_KEY` / `OPENCODE_API_KEY`, endpoint `OPENCODE_ENDPOINT` (default `https://opencode.ai/zen/go/v1/responses`), model `OPENCODE_MODEL` (default `muse-spark-1.2-contributor`).
 2. **Official DeepSeek API** — `DEEPSEEK_API_KEY`, endpoint `DEEPSEEK_ENDPOINT` (default `https://api.deepseek.com/chat/completions`), model `DEEPSEEK_MODEL` (default `muse-spark-1.2-contributor`).
 3. **OpenRouter** — `OPENROUTER_API_KEY`, endpoint `https://openrouter.ai/api/v1/chat/completions`, model `OPENROUTER_MODEL` (default `muse-spark-1.2-contributor`).
 

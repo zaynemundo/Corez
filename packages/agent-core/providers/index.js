@@ -29,7 +29,7 @@ export class ModelProviderRouter {
     // tasks, medium for general, low for trivial — all excluded from output.
     if (activeKey) {
       try {
-        const endpoint = 'https://opencode.ai/zen/go/v1/chat/completions';
+        const endpoint = 'https://opencode.ai/zen/go/v1/responses';
 
         const body = {
           model,

@@ -27,7 +27,7 @@ describe('ModelProviderRouter', () => {
     const originalFetch = globalThis.fetch;
     try {
       globalThis.fetch = async (url, init) => {
-        expect(url).toBe('https://opencode.ai/zen/go/v1/chat/completions');
+        expect(url).toBe('https://opencode.ai/zen/go/v1/responses');
         expect(init.headers.Authorization).toBe('Bearer test-key');
         return new Response(JSON.stringify({
           choices: [{ message: { content: 'gateway response' } }]

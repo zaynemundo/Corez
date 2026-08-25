@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import worker from '../worker/index.js';
 
-const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/chat/completions';
+const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/responses';
 const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 delete process.env.OPENROUTER_API_KEY;
@@ -398,7 +398,7 @@ async function run() {
 
       // OpenCode Go wins when BOTH opencode and DeepSeek keys are configured
       globalThis.fetch = async (url, init) => {
-        assert.equal(url, 'https://opencode.ai/zen/go/v1/chat/completions');
+        assert.equal(url, 'https://opencode.ai/zen/go/v1/responses');
         const payload = JSON.parse(init.body);
         capturedPayloads.push(payload);
         assert.equal(payload.model, 'muse-spark-1.2-contributor');
@@ -449,7 +449,7 @@ async function run() {
       // failure is retried once before any other provider is consulted.
       let opencodeRetryCalls = 0;
       globalThis.fetch = async (url, init) => {
-        if (url === 'https://opencode.ai/zen/go/v1/chat/completions') {
+        if (url === 'https://opencode.ai/zen/go/v1/responses') {
           opencodeRetryCalls += 1;
           capturedPayloads.push(JSON.parse(init.body));
           if (opencodeRetryCalls === 1) {
@@ -486,7 +486,7 @@ async function run() {
       // schedule is persisted and the request reports a resumable task
       // instead of a 502 (200 retry-scheduled with a taskId).
       globalThis.fetch = async (url) => {
-        assert.equal(url, 'https://opencode.ai/zen/go/v1/chat/completions');
+        assert.equal(url, 'https://opencode.ai/zen/go/v1/responses');
         return new Response('{}', { status: 503 });
       };
       const opencodeFailResp = await post(
@@ -502,7 +502,7 @@ async function run() {
       // OpenCode PERMANENT failure with no further provider still ends in an
       // honest 502 whose detail names the failed provider.
       globalThis.fetch = async (url) => {
-        assert.equal(url, 'https://opencode.ai/zen/go/v1/chat/completions');
+        assert.equal(url, 'https://opencode.ai/zen/go/v1/responses');
         return new Response('{}', { status: 401 });
       };
       const opencodePermanentFailResp = await post(

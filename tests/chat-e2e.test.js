@@ -10,7 +10,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import swarmWorker from '../worker/entry.js';
 
-const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/chat/completions';
+const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/responses';
 const env = { OPENCODE_GO_API_KEY: 'sk-test', __COREZ_RETRY_SLEEP_MS: '0' };
 
 function post(worker, body, customEnv = env) {
