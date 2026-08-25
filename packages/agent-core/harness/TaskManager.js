@@ -28,7 +28,7 @@ export class TaskManager {
       sessionId: sessionId || null,
       workspaceId: workspaceId || null,
       prompt: prompt.trim(),
-      model: model || 'mimo-v2.5',
+      model: model || 'muse-spark-1.2-contributor',
       mode
     });
     task.contract = contract && typeof contract === 'object' ? contract : null;

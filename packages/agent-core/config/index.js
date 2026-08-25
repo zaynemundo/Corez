@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 export const DEFAULT_CONFIG = Object.freeze({
-  model: 'mimo-v2.5',
+  model: 'muse-spark-1.2-contributor',
   reasoning: 'high',
   mode: 'agent',
   permissions: {

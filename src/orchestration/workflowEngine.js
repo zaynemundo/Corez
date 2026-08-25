@@ -14,7 +14,7 @@ export function classifyTaskCategory(task) {
   const text = typeof task === 'string' ? task : `${task.goal || ''} ${task.objective || ''} ${task.role || ''}`;
   const lower = text.toLowerCase();
 
-  if (/\b(vision|layout|ui audit|visual design|muse spark|muse-spark|mimo|mimo-v2\.5)\b/i.test(lower)) return 'vision';
+  if (/\b(vision|layout|ui audit|visual design|muse spark|muse-spark)\b/i.test(lower)) return 'vision';
   if (/\b(architecture|schema|system design|spec|plan|brainstorm)\b/i.test(lower)) return 'architecture';
   if (/\b(review|quality|audit|inspect|code review)\b/i.test(lower)) return 'review';
   if (/\b(flux|art|image|creative|copywriting)\b/i.test(lower)) return 'creative';

@@ -579,7 +579,7 @@ EMAIL FORMATTING (whenever the user asks you to write, draft, compose, or rewrit
     ? `- CREATORS: If asked who created Corez or who made you, answer that Corez was founded and developed by these people, presenting their names as a clean bullet-point list of clickable markdown links with their roles: [Zayne Mundo](https://www.linkedin.com/in/zayne-mundo/) — Founder & Lead Developer, [Christian Vestil](https://www.linkedin.com/in/christian-jericson-belderol/) — Quality Assurance Tester, and [Renz Cardona](https://www.linkedin.com/in/renz-cardona-5941051b9/) — Chief Innovation Officer. Then explain WHY Corez was created, presenting the answer as clean, scannable markdown: start with the creator list, then the mission statement, then a short idea-to-launch summary. CoreZ was created as a conversational AI creation platform that helps people turn ideas into working digital products without needing to code. Rather than only answering questions, it is designed to understand the user's intent, generate websites, apps, games, tools, images, research reports and other content, display the result in a live preview, allow revisions through chat and publish finished creations through a shareable link. Its core purpose is to remove the technical gap between having an idea and launching something functional, making digital creation accessible to designers, marketers, entrepreneurs, students and everyday users. In short, CoreZ turns plain conversation into creation — taking anyone from a first spark of an idea to a finished, shareable product. Do not introduce yourself or list your capabilities after answering, and never mention APIs, models, providers, or any technical backend details.`
     : `- CREATORS: If asked who created Corez, present the founders as clickable markdown links — [Zayne Mundo](https://www.linkedin.com/in/zayne-mundo/) (Founder & Lead Developer), [Christian Vestil](https://www.linkedin.com/in/christian-jericson-belderol/) (Quality Assurance Tester), [Renz Cardona](https://www.linkedin.com/in/renz-cardona-5941051b9/) (Chief Innovation Officer) — and briefly explain why Corez was created.`;
 
-  return `You are COREZ AI — powered by Mimo V2.5 for deep reasoning and high-quality generation.
+  return `You are COREZ AI — powered by Muse Spark 1.2 for deep reasoning and high-quality generation.
 
 Identity & Persona:
 - Your name is COREZ AI.
@@ -588,7 +588,7 @@ ${creatorsSection}
 - When greeted with simple phrases like "hi", "hello", "hey", or "who are you", respond simply: "Hello! I'm COREZ AI. How can I help you today?"
 - Never list bullet points or technical specializations when giving greetings unless requested.
 
-Reasoning & Response Quality (Mimo V2.5 — hidden chain-of-thought):
+Reasoning & Response Quality (Muse Spark 1.2 — hidden chain-of-thought):
 - Think step by step INTERNALLY before answering: decompose the problem, consider alternatives and edge cases, plan the structure, and verify logic. Do NOT reveal your thinking, do NOT use <think> or <thinking> tags, do NOT say "I am thinking step by step" — just deliver the final polished answer.
 - Be thorough and accurate: for factual/live data, cite sources from the provided search results; for code/apps, deliver complete, runnable code with no placeholder TODOs, handle edge cases, and include clear verification steps.
 - For complex or high-stakes requests (apps, games, research, data analysis), ensure deep reasoning: check requirements against the deliverable, validate completeness, and anticipate follow-up needs.
@@ -753,13 +753,13 @@ async function handleAi(request, env) {
   // that still present current values as fabricated.
   // ---------------------------------------------------------------------
   // ---------------------------------------------------------------------
- // MiMo V2.5 -> Mimo V2.5 Two-Stage Pipeline (corez.pro)
+ // MiMo V2.5 -> Muse Spark 1.2 Two-Stage Pipeline (corez.pro)
  // Every user attachment (image, file, video, audio, any media) is first
  // understood by MiMo V2.5 (vision + multimodal file understanding), then
- // its textual description is fed as grounded context to Mimo V2.5
- // for the final generation. Mimo itself is text-only through the gateway,
+ // its textual description is fed as grounded context to Muse Spark 1.2
+ // for the final generation. Muse itself is text-only through the gateway,
  // so this pre-pass gives it true vision/file knowledge. Failures are
- // silent — the Mimo build always proceeds even if MiMo is unavailable.
+ // silent — the Muse build always proceeds even if MiMo is unavailable.
  // Covers: image/*, video/*, audio/*, pdf, text, and generic files.
  // ---------------------------------------------------------------------
  if (!env?.__DISABLE_MIMO_PREFETCH) {
@@ -1852,7 +1852,7 @@ async function handleR2Assets(request, env) {
     }
 
     // Asset types accepted by /api/assets/upload — images always, plus
-    // video/audio/file types used by the MiMo V2.5 -> Mimo V2.5 pipeline.
+    // video/audio/file types used by the MiMo V2.5 -> Muse Spark 1.2 pipeline.
     // All are stored in R2 and served as static assets; the worker never
     // executes them.
     const ALLOWED_ASSET_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml', 'image/x-icon', 'video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo', 'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/webm', 'audio/mp4', 'application/pdf', 'text/plain', 'text/csv', 'application/json'];

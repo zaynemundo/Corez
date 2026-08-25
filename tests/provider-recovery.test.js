@@ -79,7 +79,7 @@ describe('provider fallback chain recovery', () => {
     });
 
     expect(result.content).toBe('finally recovered');
-    expect(result.model).toBe('opencode:mimo-v2.5');
+    expect(result.model).toBe('opencode:muse-spark-1.2-contributor');
     expect(attempts).toBe(6);
   });
 
@@ -174,7 +174,7 @@ describe('provider fallback chain recovery', () => {
 
     expect(result.content).toBe('deepseek answered');
     expect(result.provider).toBe('deepseek');
-    expect(result.model).toBe('deepseek:mimo-v2.5');
+    expect(result.model).toBe('deepseek:muse-spark-1.2-contributor');
     const deepseekCall = captured.find((c) => c.url === DEEPSEEK_URL);
     expect(deepseekCall.payload.messages).toEqual(messages);
     expect(captured.filter((c) => c.url === OPENCODE_URL)).toHaveLength(1);
@@ -371,7 +371,7 @@ describe('provider fallback chain recovery', () => {
       sleep: async () => {},
       jitter: () => 0
     });
-    expect(opencodeResult.model).toBe('opencode:mimo-v2.5');
+    expect(opencodeResult.model).toBe('opencode:muse-spark-1.2-contributor');
 
     vi.stubGlobal('fetch', vi.fn(async (url) => (
       url === OPENROUTER_URL ? okResponse('via openrouter') : errorResponse(401, 'unauthorized')
@@ -381,7 +381,7 @@ describe('provider fallback chain recovery', () => {
       sleep: async () => {},
       jitter: () => 0
     });
-    expect(openrouterResult.model).toBe('openrouter:mimo-v2.5');
+    expect(openrouterResult.model).toBe('openrouter:muse-spark-1.2-contributor');
   });
 });
 

@@ -1,7 +1,7 @@
 ---
 description: Implements enemy behavior trees, finite state machines, pathing, attack patterns, difficulty scaling, and boss AI logic.
 mode: subagent
-model: opencode-go/mimo-v2.5
+model: opencode-go/muse-spark-1.2-contributor
 temperature: 0.1
 
 permission:

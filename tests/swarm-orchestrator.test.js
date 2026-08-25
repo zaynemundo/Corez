@@ -3,7 +3,7 @@ import { AgentSwarmOrchestrator, OPENROUTER_SWARM_ROUTING } from '../src/service
 
 describe('Unlimited Dynamic Swarm: Agent Swarm Orchestrator', () => {
   it('includes exact OpenRouter model routing parameters', () => {
-    expect(OPENROUTER_SWARM_ROUTING.model).toBe('mimo-v2.5');
+    expect(OPENROUTER_SWARM_ROUTING.model).toBe('muse-spark-1.2-contributor');
     expect(OPENROUTER_SWARM_ROUTING.provider).toEqual({
       sort: 'throughput',
       allow_fallbacks: true,

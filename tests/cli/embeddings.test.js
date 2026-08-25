@@ -19,7 +19,7 @@ describe('Vector Embeddings (perplexity/pplx-embed-v1-0.6b)', () => {
     expect(res.embeddings[0].length).toBeGreaterThan(0);
   });
 
-  it('routes embeddings through the OpenCode Go gateway with the mimo-v2.5 key', async () => {
+  it('routes embeddings through the OpenCode Go gateway with the muse-spark-1.2-contributor key', async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => ({

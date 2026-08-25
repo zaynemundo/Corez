@@ -26,13 +26,13 @@ describe('RemoteRunner', () => {
     };
 
     const runner = new RemoteRunner({ baseUrl: 'https://runner.example.com/', token: 'secret' });
-    const result = await runner.runTask('add login', { model: 'mimo-v2.5', workspaceId: '/srv/ws' });
+    const result = await runner.runTask('add login', { model: 'muse-spark-1.2-contributor', workspaceId: '/srv/ws' });
 
     expect(captured.url).toBe('https://runner.example.com/tasks');
     expect(captured.init.headers.Authorization).toBe('Bearer secret');
     expect(JSON.parse(captured.init.body)).toEqual({
       prompt: 'add login',
-      model: 'mimo-v2.5',
+      model: 'muse-spark-1.2-contributor',
       workspaceId: '/srv/ws'
     });
     expect(result.success).toBe(true);

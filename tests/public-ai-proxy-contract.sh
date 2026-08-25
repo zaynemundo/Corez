@@ -41,7 +41,7 @@ check_absent 'settings does not expose provider or model names' 'GLM|DeepSeek|Ki
 check 'README documents the OpenCode Go secret' 'OPENCODE_GO_API_KEY' "$readme"
 check 'README documents the DeepSeek fallback secret' 'DEEPSEEK_API_KEY' "$readme"
 check 'README documents the OpenRouter fallback secret' 'OPENROUTER_API_KEY' "$readme"
-check 'README documents primary text routing' 'mimo-v2.5' "$readme"
+check 'README documents primary text routing' 'muse-spark-1[.]2' "$readme"
 check 'README documents the OpenRouter image model' 'google/gemini-3[.]1-flash-lite-image' "$readme"
 check_absent 'README no longer documents the retired FLUX model' 'black-forest-labs/flux-1-schnell' "$readme"
 check_absent 'README no longer documents MiMo V2.5' 'xiaomi/mimo-v2[.]5' "$readme"
