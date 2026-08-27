@@ -117,7 +117,7 @@ describe('Dynamic Swarm DAG & Specialist Expansion', () => {
           { taskId: 'task-fe', role: SWARM_ROLES.FRONTEND, objective: 'Build FE' },
           { taskId: 'task-be', role: SWARM_ROLES.BACKEND, objective: 'Build BE' }
         ]
-      });
+      }, { rewireDownstream: true });
 
       expect(newTasks).toHaveLength(2);
       expect(graph.tasks.get('task-impl').status).toBe(AGENT_LIFECYCLE_STATES.DECOMPOSED);

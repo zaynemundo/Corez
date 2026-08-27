@@ -241,10 +241,10 @@ export class TaskDependencyGraph {
   }
 
   /**
-   * Handles subtask decomposition for a task and re-wires any existing downstream tasks
+   * Handles subtask decomposition for a task and optionally re-wires any existing downstream tasks
    * that depended on parentTaskId so they now depend on the new child tasks.
    */
-  handleDecomposition(parentTaskId, decompositionPayload) {
+  handleDecomposition(parentTaskId, decompositionPayload, options = {}) {
     const parentTask = this.tasks.get(parentTaskId);
     if (!parentTask) return [];
 
@@ -269,9 +269,8 @@ export class TaskDependencyGraph {
       newTasks.push(subTask);
     }
 
-    // Downstream dependency rewiring:
-    // Any existing tasks in the graph that depended on parentTaskId now depend on the newly created tasks
-    if (newTasks.length > 0) {
+    const shouldRewire = options.rewireDownstream || decompositionPayload.rewireDownstream;
+    if (shouldRewire && newTasks.length > 0) {
       const newSubTaskIds = newTasks.map(t => t.taskId);
       for (const [taskId, task] of this.tasks.entries()) {
         if (taskId !== parentTaskId && task.dependencies.includes(parentTaskId)) {
