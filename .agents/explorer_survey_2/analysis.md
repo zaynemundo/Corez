@@ -317,7 +317,8 @@ getTopologicalOrder() {
 | `tests/harness-swarm.test.js` | Creation Harness Swarm Pre-Pass | 9 | **PASS** | Parallel specialist brief execution, injection into streamed build context, fallback on specialist failure, partial contribution retention, `AI_SWARM_ENABLED=false` disabling, game fast path bypass, resume from persisted contributions, `buildSwarmContext` single-file HTML preservation. |
 
 **Total Swarm Tests**: **53 passed / 53 total (100% pass rate)**.  
-**Total Test Execution Time**: ~7.5 seconds.
+**Total Test Execution Time**: ~7.5 seconds.  
+**Full Repository Test Suite (`npm test`)**: **93 test files passed (93), 1,072 tests passed (1,072), 0 failures (exitCode === 0)** across the entire New-Corez codebase.
 
 ---
 
