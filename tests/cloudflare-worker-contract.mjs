@@ -253,44 +253,23 @@ async function run() {
     globalThis.fetch = originalFetch;
   }
 
-  // A DeepSeek-only environment falls back to the official DeepSeek API: the
-  // request succeeds with the deepseek label and a plain OpenAI-style payload.
+  // DeepSeek-only is no longer supported for chat: with only DEEPSEEK_API_KEY
+  // and no OPENCODE_GO_API_KEY, /api/ai returns honest 502 (no chat provider).
   {
     const originalFetch = globalThis.fetch;
-    let deepseekPayload;
     try {
       let opencodePayload;
-      globalThis.fetch = async (url, init) => {
-        assert.equal(url, DEEPSEEK_URL);
-        deepseekPayload = JSON.parse(init.body);
-        capturedPayloads.push(deepseekPayload);
-        return new Response(JSON.stringify({
-          choices: [{ message: { content: 'DeepSeek fallback response' } }]
-        }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' }
-        });
+      globalThis.fetch = async () => {
+        throw new Error('no chat provider should be called when only DeepSeek key is present');
       };
 
       const deepseekResp = await post(
         JSON.stringify({ prompt: 'Explain black roses', intent: { type: 'general' } }),
         env({ DEEPSEEK_API_KEY: 'sk-deepseek-test' })
       );
-      assert.equal(deepseekResp.status, 200);
+      assert.equal(deepseekResp.status, 502);
       const deepseekData = await deepseekResp.json();
-      assert.equal(deepseekData.content, 'DeepSeek fallback response');
-      assert.equal(deepseekData.model, 'deepseek:muse-spark-1.2-contributor');
-      assert.equal(deepseekPayload.model, 'muse-spark-1.2-contributor');
-      assert.equal(deepseekPayload.stream, false);
-      // No output-token caps anywhere: general requests are uncapped too.
-      assert.equal(deepseekPayload.max_tokens, undefined);
-      assert.equal(deepseekPayload.max_completion_tokens, undefined);
-      assert.ok(Array.isArray(deepseekPayload.messages));
-      assert.equal(deepseekPayload.messages.at(-1).content, 'Explain black roses');
-      assert.ok(deepseekPayload.reasoning && typeof deepseekPayload.reasoning === 'object');
-      assert.ok(['low', 'medium', 'high', 'xhigh'].includes(deepseekPayload.reasoning.effort));
-      assert.equal(deepseekPayload.reasoning.exclude, true);
-      assert.equal(deepseekPayload.provider, undefined);
+      assert.equal(deepseekData.error, 'Unable to generate AI response.');
 
       // With OPENCODE_GO_API_KEY configured, the request succeeds and the
       // payload carries reasoning for Muse Spark 1.2 but no provider-specific fields.
@@ -998,16 +977,26 @@ async function run() {
   const memoryStore = new Map();
   const memoryBucket = {
     put: async (key, value, options) => {
-      memoryStore.set(key, { value, contentType: options?.httpMetadata?.contentType || 'application/octet-stream' });
+      memoryStore.set(key, { value, contentType: options?.httpMetadata?.contentType || 'application/octet-stream', customMetadata: options?.customMetadata || {} });
     },
     get: async (key) => memoryStore.has(key) ? {
       text: async () => memoryStore.get(key).value,
-      arrayBuffer: async () => memoryStore.get(key).value,
+      arrayBuffer: async () => {
+        const v = memoryStore.get(key).value;
+        return typeof v === 'string' ? new TextEncoder().encode(v).buffer : v;
+      },
       writeHttpMetadata: (headers) => { headers.set('Content-Type', memoryStore.get(key).contentType); },
-      httpEtag: 'mock-etag'
+      httpEtag: 'mock-etag',
+      customMetadata: memoryStore.get(key).customMetadata || {},
+      body: memoryStore.get(key).value
     } : null,
+    head: async (key) => memoryStore.has(key) ? { customMetadata: memoryStore.get(key).customMetadata || {}, httpEtag: 'mock-etag' } : null,
     delete: async (key) => { memoryStore.delete(key); },
-    list: async ({ prefix }) => ({ objects: [...memoryStore.keys()].filter(k => k.startsWith(prefix)).map(key => ({ key })) })
+    list: async ({ prefix, limit } = {}) => {
+      const keys = [...memoryStore.keys()].filter(k => k.startsWith(prefix || ''));
+      const sliced = typeof limit === 'number' ? keys.slice(0, limit) : keys;
+      return { objects: sliced.map(key => ({ key })) };
+    }
   };
   const memoryEnv = () => env({ ASSET_BUCKET: memoryBucket });
 
@@ -1064,8 +1053,13 @@ async function run() {
 
   // Storage key segments are validated on every endpoint: no slashes, no
   // leading dots, and no traversal via decoded path segments.
+  // POST /api/memory/store now derives userId from the session (uid), not
+  // body.userId — a malicious body userId is ignored and the request
+  // succeeds as the session user (dev in this test env).
   const badMemoryStoreUser = await memoryPost('/api/memory/store', { userId: '../escape', key: 'k', text: 'x' });
-  assert.equal(badMemoryStoreUser.status, 400);
+  assert.equal(badMemoryStoreUser.status, 200);
+  const badMemoryStoreUserBody = await json(badMemoryStoreUser);
+  assert.equal(badMemoryStoreUserBody.userId, 'dev');
 
   const badMemoryStoreKey = await memoryPost('/api/memory/store', { userId: 'u1', key: 'a/b', text: 'x' });
   assert.equal(badMemoryStoreKey.status, 400);
@@ -1074,7 +1068,8 @@ async function run() {
     new Request('https://corez.test/api/memory/%2E%2E%2Fescape', { method: 'GET' }),
     memoryEnv()
   );
-  assert.equal(badMemoryPath.status, 400);
+  // GET /api/memory/:userId now scopes to the session user (uid) and ignores the path param, so a traversal attempt is not rejected — it simply lists the session user's memories.
+  assert.equal(badMemoryPath.status, 200);
 
   const badAppStore = await worker.fetch(
     new Request('https://corez.test/api/apps/store', {
@@ -1330,7 +1325,7 @@ async function run() {
   assert.equal(publishWithJunk.status, 200);
   const junkData = await json(publishWithJunk);
   const junkRecord = JSON.parse(memoryStore.get(`publish/${junkData.slug}.json`).value);
-  assert.deepEqual(Object.keys(junkRecord).sort(), ['createdAt', 'customized', 'html', 'slug', 'title']);
+  assert.deepEqual(Object.keys(junkRecord).sort(), ['createdAt', 'customized', 'html', 'ownerUserId', 'slug', 'title']);
   assert.equal(junkRecord.html, '<h1>App Only</h1>');
   assert.equal(junkRecord.sessionId, undefined);
   assert.equal(junkRecord.messages, undefined);

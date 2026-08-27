@@ -1,7 +1,7 @@
 import { classifyProviderFailure, createTaskStateStore, safeErrorDetail } from './utils.js';
 
 export const OPENCODE_DEFAULT_ENDPOINT = 'https://opencode.ai/zen/go/v1/responses';
-export const DEEPSEEK_DEFAULT_ENDPOINT = 'https://api.deepseek.com/chat/completions';
+// DEEPSEEK_DEFAULT_ENDPOINT removed — chat no longer falls back to DeepSeek.
 export const OPENROUTER_DEFAULT_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 export const DEFAULT_MODEL = 'muse-spark-1.2-contributor';
 
@@ -554,11 +554,12 @@ async function callChatEndpoint({ endpoint, key, model, label, messages, signal,
 }
 
 /**
- * Build the ordered provider fallback chain: OpenCode Go is preferred and
- * stays preferred; the official DeepSeek API and OpenRouter are fallbacks
- * tried only when the preferred provider cannot serve. Any provider can be
- * disabled through OPENCODE_GO_DISABLED / DEEPSEEK_DISABLED /
- * OPENROUTER_DISABLED (any truthy value).
+ * Build the chat provider chain — SINGLE provider only.
+ * Cloudflare Chat ( /api/ai ) now uses OPENCODE_GO_API_KEY exclusively.
+ * No DeepSeek or OpenRouter fallback for chat. Image generation
+ * (callOpenRouterImage) still uses OPENROUTER_API_KEY separately when
+ * configured, but text chat never falls back. Disable with
+ * OPENCODE_GO_DISABLED (any truthy value).
  */
 export function buildProviderChain(env = {}) {
   const chain = [];
@@ -609,92 +610,9 @@ export function buildProviderChain(env = {}) {
     });
   }
 
-  const deepseekKey = env?.DEEPSEEK_API_KEY;
-  if (deepseekKey && !isDisabled(env?.DEEPSEEK_DISABLED)) {
-    const rawDeepSeekModel = env?.DEEPSEEK_MODEL || DEFAULT_MODEL;
-    // Guard against vision-only model being misconfigured for DeepSeek
-    const model = rawDeepSeekModel === 'mimo-v2.5' || rawDeepSeekModel === 'xiaomi/mimo-v2.5'
-      ? 'deepseek-v4-flash'
-      : rawDeepSeekModel;
-    const callOptions = (envOverrides = {}) => ({
-      endpoint: envOverrides.endpoint || env?.DEEPSEEK_ENDPOINT || DEEPSEEK_DEFAULT_ENDPOINT,
-      key: deepseekKey,
-      model,
-      label: 'deepseek',
-      ttftTimeoutMs,
-      idleTimeoutMs,
-      timeoutMs: nonstreamTimeoutMs
-    });
-    const buildCallBodyExtra = (options = {}) => {
-      const extra = { stream: false, ...(options.bodyExtra || {}) };
-      if (options.reasoning) extra.reasoning = options.reasoning;
-      if (Number.isFinite(options.temperature)) extra.temperature = options.temperature;
-      return extra;
-    };
-    const buildStreamBodyExtra = (options = {}) => {
-      const extra = { ...(options.bodyExtra || {}) };
-      if (options.reasoning) extra.reasoning = options.reasoning;
-      if (Number.isFinite(options.temperature)) extra.temperature = options.temperature;
-      return extra;
-    };
-    chain.push({
-      id: 'deepseek',
-      label: 'deepseek',
-      model,
-      call: (messages, options = {}) => callChatEndpoint({
-        ...callOptions(),
-        messages,
-        signal: options.signal,
-        bodyExtra: buildCallBodyExtra(options)
-      }),
-      stream: (messages, options = {}) => streamChatEndpoint({
-        ...callOptions(),
-        messages,
-        signal: options.signal,
-        onTtft: options.onTtft,
-        bodyExtra: buildStreamBodyExtra(options)
-      })
-    });
-  }
-
-  const openrouterKey = env?.OPENROUTER_API_KEY;
-  if (openrouterKey && !isDisabled(env?.OPENROUTER_DISABLED)) {
-    const model = env?.OPENROUTER_MODEL || DEFAULT_MODEL;
-    const callOptions = (envOverrides = {}) => ({
-      endpoint: envOverrides.endpoint || env?.OPENROUTER_ENDPOINT || OPENROUTER_DEFAULT_ENDPOINT,
-      key: openrouterKey,
-      model,
-      label: 'openrouter',
-      extraHeaders: { 'HTTP-Referer': 'https://corez.ai', 'X-Title': 'COREZ AI' },
-      ttftTimeoutMs,
-      idleTimeoutMs,
-      timeoutMs: nonstreamTimeoutMs
-    });
-    const buildBodyExtra = (options = {}) => {
-      const extra = { ...(options.bodyExtra || {}) };
-      if (options.reasoning) extra.reasoning = options.reasoning;
-      if (Number.isFinite(options.temperature)) extra.temperature = options.temperature;
-      return extra;
-    };
-    chain.push({
-      id: 'openrouter',
-      label: 'openrouter',
-      model,
-      call: (messages, options = {}) => callChatEndpoint({
-        ...callOptions(),
-        messages,
-        signal: options.signal,
-        bodyExtra: buildBodyExtra(options)
-      }),
-      stream: (messages, options = {}) => streamChatEndpoint({
-        ...callOptions(),
-        messages,
-        signal: options.signal,
-        onTtft: options.onTtft,
-        bodyExtra: buildBodyExtra(options)
-      })
-    });
-  }
+  // NOTE: Fallback text providers are intentionally NOT part of the chat chain.
+  // Chat is OpenCode Go only. Image generation via callOpenRouterImage()
+  // still uses its own key when present.
 
   return chain;
 }

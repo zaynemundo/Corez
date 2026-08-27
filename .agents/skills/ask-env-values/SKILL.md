@@ -25,17 +25,13 @@ deployment secrets, API keys, Replit Secrets, or runtime configuration values.
 
 ## CoreZ provider configuration
 
-CoreZ does not use Cloudflare Workers AI. Hosted text generation uses this
-server-side provider chain:
-
-- `OPENCODE_GO_API_KEY` (or `OPENCODE_API_KEY`) enables the preferred OpenCode
-  Go provider. `OPENCODE_ENDPOINT` and `OPENCODE_MODEL` are optional overrides.
-- `DEEPSEEK_API_KEY` enables the optional official DeepSeek fallback.
-  `DEEPSEEK_ENDPOINT` and `DEEPSEEK_MODEL` are optional overrides.
-- `OPENROUTER_API_KEY` enables the optional OpenRouter text fallback and is
-  required for `POST /api/image`. `OPENROUTER_IMAGE_MODEL` optionally overrides
-  the server-controlled image model.
-- `ASSET_BUCKET` and `GAME_ROOMS` are Cloudflare bindings, not secret strings.
+CoreZ does not use Cloudflare Workers AI for chat. Hosted text generation
+uses `OPENCODE_GO_API_KEY` only (`OPENCODE_API_KEY` is a legacy alias,
+`OPENCODE_ENDPOINT` and `OPENCODE_MODEL` are optional overrides) — no
+DeepSeek or OpenRouter fallback for chat. Image generation (`POST /api/image`)
+still requires `OPENROUTER_API_KEY` separately (`OPENROUTER_IMAGE_MODEL`
+optionally overrides the server-controlled image model). `ASSET_BUCKET` and
+`GAME_ROOMS` are Cloudflare bindings, not secret strings.
 
 Ask only for providers needed by the requested deployment. Never ask a public
 app user for these values, and never expose them in browser code or responses.

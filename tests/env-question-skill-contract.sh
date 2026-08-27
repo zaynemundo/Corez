@@ -34,7 +34,7 @@ check 'skill says to identify variable names first' 'variable names|required var
 check 'skill asks where to place values' 'where.*set|target environment|deployment'
 check 'skill explains CoreZ provider configuration' 'CoreZ provider configuration'
 check 'skill documents the preferred OpenCode key' 'OPENCODE_GO_API_KEY'
-check 'skill documents the DeepSeek fallback key' 'DEEPSEEK_API_KEY'
+check_absent 'skill no longer documents DeepSeek fallback for chat' 'DEEPSEEK_API_KEY'
 check 'skill documents the OpenRouter image key' 'OPENROUTER_API_KEY'
 check 'skill states Workers AI is unused' 'does not use Cloudflare Workers AI'
 check 'skill uses placeholders in docs/examples' 'placeholder|<value>|your_'

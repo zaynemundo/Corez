@@ -25,15 +25,10 @@ OPENCODE_GO_API_KEY=sk-... npx wrangler dev --host localhost
 npm run dev
 ```
 
-Requires a `.dev.vars` file (or env var) with the OpenCode Go provider key.
-Provider fallback chain (OpenCode Go is preferred and stays preferred):
-1. OpenCode Go (`OPENCODE_GO_API_KEY` / `OPENCODE_API_KEY`)
-2. Official DeepSeek API (`DEEPSEEK_API_KEY`)
-3. OpenRouter (`OPENROUTER_API_KEY`, also the FLUX 1 Schnell image provider)
-
-Fallbacks are tried only when the preferred provider cannot serve; each can
-be disabled with `OPENCODE_GO_DISABLED` / `DEEPSEEK_DISABLED` /
-`OPENROUTER_DISABLED`.
+Requires a `.dev.vars` file (or env var) with `OPENCODE_GO_API_KEY`.
+Chat uses OpenCode Go only — no DeepSeek or OpenRouter fallback for
+`/api/ai` (disable with `OPENCODE_GO_DISABLED`). `OPENROUTER_API_KEY` is
+only for image generation (`/api/image`).
 
 ### 2. Pre-built static + deployed worker
 
@@ -45,9 +40,7 @@ npm run deploy   # deploys worker + dist assets to Cloudflare
 ## Drive
 
 - Chat: open http://localhost:3000, send a message; watch Network for
-  `POST /api/ai` returning `{content, model}` (model names the provider,
-  e.g. `opencode:muse-spark-1.2-contributor`, `deepseek:muse-spark-1.2-contributor`,
-  `openrouter:muse-spark-1.2-contributor`).
+  `POST /api/ai` returning `{content, model}` (chat is `opencode:muse-spark-1.2-contributor` only).
 - Images: prompts matching the image intent hit `POST /api/image` and
   return `{image, model}` — the worker tries an image model chain (Google
   Nano Banana 2 first, legacy FLUX last; `OPENROUTER_IMAGE_MODEL` overrides)

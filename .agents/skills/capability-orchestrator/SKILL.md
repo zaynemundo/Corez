@@ -13,10 +13,10 @@ Use this skill to analyze incoming user requests, determine the minimal required
 
 | Request Type | Lead Engine | Required Skills | Output Artifact |
 | --- | --- | --- | --- |
-| Web Application / UI Layout | `opencode-go/muse-spark-1.2-contributor` (preferred, fallback `deepseek` → `openrouter`) | *see §1.1 Design Decision Tree* + `accessibility-expert` | React / HTML / CSS components |
+| Web Application / UI Layout | `opencode-go/muse-spark-1.2-contributor` (OpenCode Go only) | *see §1.1 Design Decision Tree* + `accessibility-expert` | React / HTML / CSS components |
 | Image Generation / Artwork | FLUX 1 (`schnell` / `dev`) via Cloudflare Workers AI | `visual-creative` (+ `image-generation` for endpoint) | R2 stored image URLs & gallery cards |
-| Web Game / Canvas Arcade | `opencode-go/muse-spark-1.2-contributor` (preferred, fallback `deepseek` → `openrouter`) | `game-development`, `frontend-modern-design` | Canvas 2D / JS physics engine |
-| Back-End API / Worker Router | `opencode-go/muse-spark-1.2-contributor` (preferred, fallback `deepseek` → `openrouter`) | `backend-architecture`, `ai-infrastructure` | Cloudflare Worker / Node route handlers |
+| Web Game / Canvas Arcade | `opencode-go/muse-spark-1.2-contributor` (OpenCode Go only) | `game-development`, `frontend-modern-design` | Canvas 2D / JS physics engine |
+| Back-End API / Worker Router | `opencode-go/muse-spark-1.2-contributor` (OpenCode Go only) | `backend-architecture`, `ai-infrastructure` | Cloudflare Worker / Node route handlers |
 | Bug Investigation / Refactoring | `opencode-go/muse-spark-1.2-contributor` (preferred) | `auto-debugging`, `code-review-testing`, `software-engineering` | Verified code fix & green test run |
 | PDF / Document Deliverables | `opencode-go/muse-spark-1.2-contributor` (preferred) | `pdf` | HTML/Paged.js or LaTeX PDF, processed PDFs |
 | Live Facts / Lookups (weather, time, rates) | `opencode-go/muse-spark-1.2-contributor` | `live-utilities`, `research-current-information` | Dated, source-cited answer |
@@ -26,7 +26,7 @@ Use this skill to analyze incoming user requests, determine the minimal required
 | Runtime Verification | `opencode-go/muse-spark-1.2-contributor` | `verify` | Launched app with verified endpoints |
 | Data Analysis / Reports | `opencode-go/muse-spark-1.2-contributor` | `data-documents` | Validated spreadsheets, charts, docs |
 
-> **Provider chain (canonical):** `OPENCODE_GO_API_KEY` / `OPENCODE_API_KEY` (preferred OpenCode Go) → `DEEPSEEK_API_KEY` → `OPENROUTER_API_KEY`. See `verify` and `ai-infrastructure` for timeout/retry behavior. `OPENROUTER_API_KEY` also required for `POST /api/image`. Never ask public app users for these keys — see `ask-env-values`.
+> **Provider (canonical):** `OPENCODE_GO_API_KEY` / `OPENCODE_API_KEY` (OpenCode Go only for chat). `OPENROUTER_API_KEY` required only for `POST /api/image`. See `verify` and `ai-infrastructure` for timeout/retry behavior. Never ask public app users for these keys — see `ask-env-values`.
 
 ### 1.1 Design Skill Decision Tree (replaces ambiguous routing)
 

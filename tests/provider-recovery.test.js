@@ -55,9 +55,9 @@ afterEach(() => {
 });
 
 describe('provider fallback chain recovery', () => {
-  it('orders providers OpenCode Go -> DeepSeek -> OpenRouter', () => {
+  it('chat chain is OpenCode Go only (no DeepSeek/OpenRouter fallback)', () => {
     const chain = buildProviderChain(providerEnv());
-    expect(chain.map((p) => p.id)).toEqual(['opencode-go', 'deepseek', 'openrouter']);
+    expect(chain.map((p) => p.id)).toEqual(['opencode-go']);
   });
 
   it('recovers after more than three transient failures (5x429 then 200)', async () => {
@@ -156,13 +156,12 @@ describe('provider fallback chain recovery', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('falls back to the next provider with the same messages after a permanent failure', async () => {
+  it('chat has no fallback: permanent failure on OpenCode Go fails honestly', async () => {
     const captured = [];
     vi.stubGlobal('fetch', vi.fn(async (url, init) => {
       const payload = JSON.parse(init.body);
       captured.push({ url, payload });
-      if (url === OPENCODE_URL) return errorResponse(401, 'unauthorized');
-      return okResponse('deepseek answered');
+      return errorResponse(401, 'unauthorized');
     }));
 
     const messages = [{ role: 'user', content: 'same task for every provider' }];
@@ -172,12 +171,10 @@ describe('provider fallback chain recovery', () => {
       jitter: () => 0
     });
 
-    expect(result.content).toBe('deepseek answered');
-    expect(result.provider).toBe('deepseek');
-    expect(result.model).toBe('deepseek:muse-spark-1.2-contributor');
-    const deepseekCall = captured.find((c) => c.url === DEEPSEEK_URL);
-    expect(deepseekCall.payload.messages).toEqual(messages);
-    expect(captured.filter((c) => c.url === OPENCODE_URL)).toHaveLength(1);
+    expect(result.status).toBe('failed');
+    expect(result.error).toMatch(/opencode/);
+    expect(captured).toHaveLength(1);
+    expect(captured[0].url).toBe(OPENCODE_URL);
   });
 
   it('cancels during backoff when the client signal fires', async () => {
@@ -306,19 +303,18 @@ describe('provider fallback chain recovery', () => {
     vi.stubGlobal('fetch', vi.fn(async (url, init) => {
       const payload = JSON.parse(init.body);
       payloads.push({ url, payload });
-      if (url === OPENCODE_URL) return errorResponse(401, 'unauthorized');
-      if (url === DEEPSEEK_URL) return errorResponse(400, 'invalid params');
-      return okResponse('final answer');
+      return errorResponse(401, 'unauthorized');
     }));
 
     const result = await runProviderChain([{ role: 'user', content: 'no caps' }], {
-      env: providerEnv(),
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode' },
       sleep: async () => {},
       jitter: () => 0
     });
 
-    expect(result.content).toBe('final answer');
-    expect(payloads.map((p) => p.url)).toEqual([OPENCODE_URL, DEEPSEEK_URL, OPENROUTER_URL]);
+    expect(result.status).toBe('failed');
+    expect(payloads).toHaveLength(1);
+    expect(payloads[0].url).toBe(OPENCODE_URL);
     for (const { payload } of payloads) {
       expect(payload.max_tokens).toBeUndefined();
       expect(payload.max_completion_tokens).toBeUndefined();
@@ -330,38 +326,38 @@ describe('provider fallback chain recovery', () => {
     vi.stubGlobal('fetch', vi.fn(async (url, init) => {
       const payload = JSON.parse(init.body);
       payloads.push({ url, payload });
-      if (url === OPENCODE_URL) return errorResponse(401, 'unauthorized');
-      return okResponse('quick answer');
+      return errorResponse(401, 'unauthorized');
     }));
 
     const result = await runProviderChain([{ role: 'user', content: 'hi' }], {
-      env: providerEnv(),
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode' },
       sleep: async () => {},
       jitter: () => 0
     });
 
-    expect(result.content).toBe('quick answer');
+    expect(result.status).toBe('failed');
+    expect(payloads).toHaveLength(1);
     for (const { payload } of payloads) {
       expect(payload.max_tokens).toBeUndefined();
       expect(payload.max_completion_tokens).toBeUndefined();
     }
   });
 
-  it('skips providers disabled by configuration', async () => {
+  it('chat has no fallback: disabling OpenCode Go leaves no provider', async () => {
     const urls = [];
     vi.stubGlobal('fetch', vi.fn(async (url) => {
       urls.push(url);
-      return okResponse('deepseek only');
+      return okResponse('should not be called');
     }));
 
     const result = await runProviderChain([{ role: 'user', content: 'chain' }], {
-      env: providerEnv({ OPENCODE_GO_DISABLED: '1', OPENROUTER_DISABLED: 'true' }),
+      env: providerEnv({ OPENCODE_GO_DISABLED: '1' }),
       sleep: async () => {},
       jitter: () => 0
     });
 
-    expect(result.provider).toBe('deepseek');
-    expect(urls).toEqual([DEEPSEEK_URL]);
+    expect(result.status).toBe('failed');
+    expect(urls).toEqual([]);
   });
 
   it('records which provider completed each request in the model label', async () => {
@@ -373,15 +369,13 @@ describe('provider fallback chain recovery', () => {
     });
     expect(opencodeResult.model).toBe('opencode:muse-spark-1.2-contributor');
 
-    vi.stubGlobal('fetch', vi.fn(async (url) => (
-      url === OPENROUTER_URL ? okResponse('via openrouter') : errorResponse(401, 'unauthorized')
-    )));
-    const openrouterResult = await runProviderChain([{ role: 'user', content: 'label' }], {
+    vi.stubGlobal('fetch', vi.fn(async () => errorResponse(401, 'unauthorized')));
+    const noFallbackResult = await runProviderChain([{ role: 'user', content: 'label' }], {
       env: { OPENROUTER_API_KEY: 'sk-openrouter' },
       sleep: async () => {},
       jitter: () => 0
     });
-    expect(openrouterResult.model).toBe('openrouter:muse-spark-1.2-contributor');
+    expect(noFallbackResult.status).toBe('failed');
   });
 });
 
@@ -478,42 +472,39 @@ describe('runStreamingChain empty-stream behavior', () => {
     expect(calls).toBe(2);
   });
 
-  it('falls through to the next provider when the preferred one streams nothing three times', async () => {
+  it('chat has no fallback: empty stream on OpenCode Go fails retryable 503', async () => {
     let calls = 0;
-    vi.stubGlobal('fetch', vi.fn(async (url) => {
+    vi.stubGlobal('fetch', vi.fn(async () => {
       calls += 1;
-      if (String(url).includes(OPENCODE_URL)) return sseChunks(['done']);
-      return sseChunks(['The ', 'game ', 'works', 'done']);
+      return sseChunks(['done']);
     }));
 
     const events = [];
     for await (const event of runStreamingChain([{ role: 'user', content: 'build a game' }], {
-      env: { OPENCODE_GO_API_KEY: 'sk-opencode', DEEPSEEK_API_KEY: 'sk-deepseek' },
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode' },
       signal: null,
       ...fast
     })) {
       events.push(event);
     }
 
-    const deltas = events.filter((e) => e.type === 'delta').map((e) => e.text).join('');
-    expect(deltas).toBe('The game works');
-    expect(events.some((e) => e.type === 'done')).toBe(true);
-    expect(events.filter((e) => e.type === 'error')).toHaveLength(0);
-    // 3 empty retries on opencode-go, then deepseek answered.
-    expect(calls).toBe(4);
+    const errors = events.filter((e) => e.type === 'error');
+    expect(errors).toHaveLength(1);
+    expect(errors[0].status).toBe(503);
+    expect(events.some((e) => e.type === 'done')).toBe(false);
+    expect(calls).toBe(3);
   });
 
   it('stays non-retryable 502 when a hard provider failure is mixed in', async () => {
     let calls = 0;
-    vi.stubGlobal('fetch', vi.fn(async (url) => {
+    vi.stubGlobal('fetch', vi.fn(async () => {
       calls += 1;
-      if (String(url).includes(OPENCODE_URL)) return errorResponse(500, 'upstream exploded');
-      return sseChunks(['done']);
+      return errorResponse(500, 'upstream exploded');
     }));
 
     const events = [];
     for await (const event of runStreamingChain([{ role: 'user', content: 'build a game' }], {
-      env: { OPENCODE_GO_API_KEY: 'sk-opencode', DEEPSEEK_API_KEY: 'sk-deepseek' },
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode' },
       signal: null,
       ...fast
     })) {
@@ -526,7 +517,6 @@ describe('runStreamingChain empty-stream behavior', () => {
     expect(errors[0].retryable).toBeUndefined();
     expect(errors[0].message).toMatch(/upstream exploded/);
     expect(events.some((e) => e.type === 'done')).toBe(false);
-    // 1 hard failure + 3 empty retries on deepseek.
-    expect(calls).toBe(4);
+    expect(calls).toBe(1);
   });
 });
