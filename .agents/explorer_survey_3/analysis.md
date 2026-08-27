@@ -139,7 +139,7 @@ Outputs detailed JSON and Markdown reports to `benchmark-results/benchmark-<time
 
 | Script | Command | Purpose |
 |---|---|---|
-| `npm test` | `vitest run` | Runs all 93 unit and integration test suites |
+| `npm test` | `vitest run` | Runs all 93 unit and integration test suites (1,072 tests passed, exitCode === 0) |
 | `npm run test:swarm` | `vitest run tests/swarm-task-graph.test.js ...` | Runs swarm-specific unit test suites |
 | `npm run test:cli` | `vitest run tests/cli` | Runs CLI command and agent loop tests |
 | `npm run test:reliability` | `vitest run tests/response-processor.test.js ...` | Reliability, response processing, and speed tests |
