@@ -576,12 +576,14 @@ export function classifyComplexity(prompt, intent) {
   }
 
   if (type === INTENT_TYPES.WEBSITE_CREATION) {
+    if (/\b(epic|enterprise-scale|massive|large-scale|full platform|complete platform|AAA|metaverse)\b/i.test(lower)) return COMPLEXITY_LEVELS.EPIC;
     if (/\b(SaaS|enterprise|production|full-stack|complex|complete|full)\b/i.test(lower)) return COMPLEXITY_LEVELS.HIGH;
     if (/\b(landing|simple|single page|portfolio)\b/i.test(lower)) return COMPLEXITY_LEVELS.LOW;
     return COMPLEXITY_LEVELS.MEDIUM;
   }
 
   if (type === INTENT_TYPES.GAME_CREATION) {
+    if (/\b(epic|massive|large-scale|full platform|AAA|metaverse|persistent world|open world)\b/i.test(lower)) return COMPLEXITY_LEVELS.EPIC;
     if (/\b(multiplayer|mmo|rpg|role playing|complex|large|production)\b/i.test(lower)) return COMPLEXITY_LEVELS.HIGH;
     if (/\b(snake|pong|tictactoe|quiz|memory|simple|basic)\b/i.test(lower)) return COMPLEXITY_LEVELS.LOW;
     return COMPLEXITY_LEVELS.MEDIUM;
