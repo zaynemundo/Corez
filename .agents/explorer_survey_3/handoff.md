@@ -41,6 +41,7 @@
      - `"test:game": "vitest run tests/game-manifest.test.js tests/game-asset-storage.test.js tests/game-pipeline-state.test.js tests/game-iframe-bridge.test.js"`
      - `"test:cloudflare": "node tests/cloudflare-worker-contract.mjs ..."`
    - Execution command `npx vitest run tests/swarm-*.test.js tests/harness-swarm.test.js tests/cli/generic-swarm.test.js` executed 67 tests across 8 test suites with 100% pass rate (`exitCode === 0`).
+   - Full repository test command `npm test` (`vitest run`) executed across 93 test files and 1,072 tests with 100% success (`exitCode === 0`).
 
 ---
 
