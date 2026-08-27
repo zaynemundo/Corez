@@ -12,6 +12,7 @@ import { TASK_STATUS_STORE_PREFIX } from './providerChain.js';
 import { handleTaskApi } from './taskApi.js';
 import { handleAuth, verifySession } from './auth.js';
 import { handleChats } from './chats.js';
+import { handleN8nWebhook } from './n8nBridge.js';
 export { GameRoom } from './gameRoom.js';
 
 // Per-client AI request rate bound: paid provider tokens are spent on every
@@ -105,6 +106,12 @@ export default {
       'X-Frame-Options': 'DENY',
       'Referrer-Policy': 'no-referrer'
     };
+
+    // n8n webhook bridge — webhook-only, no API key
+    if (url.pathname === '/api/n8n/webhook') {
+      const n8nRes = await handleN8nWebhook(request, env);
+      if (n8nRes) return withDirectAiCors(n8nRes);
+    }
 
     // Chat routes — handle before generic auth gate so they can use verifySession directly
     if (url.pathname === '/api/chats' || url.pathname.startsWith('/api/chats/')) {
