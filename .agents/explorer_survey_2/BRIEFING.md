@@ -1,4 +1,4 @@
-# BRIEFING — 2026-08-27T12:04:38Z
+# BRIEFING — 2026-08-27T12:08:15Z
 
 ## Mission
 Investigate Dynamic DAG mechanics (ResourceLockManager, dependency context propagation, verifier retry loops), Topological artifact merging, and Swarm test suite status for CoreZ Project Survey.
@@ -17,17 +17,31 @@ Investigate Dynamic DAG mechanics (ResourceLockManager, dependency context propa
 
 ## Current Parent
 - Conversation ID: 45712cd3-4f3c-446a-8969-c6aa5aeedcc0
-- Updated: not yet
+- Updated: 2026-08-27T12:04:38Z
 
 ## Investigation State
-- **Explored paths**: [TBD]
-- **Key findings**: [TBD]
-- **Unexplored areas**: Dynamic DAG mechanics, ResourceLockManager, upstream dependency context propagation, verifier-driven retry loops, topological artifact merging, swarm test files.
+- **Explored paths**:
+  - `src/services/gamePipeline/swarm/taskGraph.js` (ResourceLockManager, TaskDependencyGraph, SharedProjectState, lifecycle states)
+  - `packages/agent-core/swarm/index.js` (GenericSwarmOrchestrator, decideSwarmMode, buildDefaultTasks)
+  - `packages/agent-core/swarm/roles.js` (SWARM_ROLES, ROLE_DEFINITIONS, formatRoleUserPrompt)
+  - `packages/agent-core/swarm/hierarchicalSynthesis.js` (HierarchicalSynthesis, chunkByTokens)
+  - `src/services/gamePipeline/swarm/adaptiveQueue.js` (AdaptiveConcurrencyQueue)
+  - `src/services/gamePipeline/swarm/agentSwarmOrchestrator.js` (AgentSwarmOrchestrator, mergeOutputsInDagOrder)
+  - `worker/swarm.js` (Creation harness swarm pre-pass)
+  - `tests/swarm-*.test.js`, `tests/cli/generic-swarm.test.js`, `tests/harness-swarm.test.js` (8 test suites, 53 tests)
+- **Key findings**:
+  - `ResourceLockManager` implements all-or-nothing multi-resource locking with dry-run collision check and automatic rollback, preventing race conditions and deadlocks.
+  - Upstream context is gathered from `validatedOutputs` and injected in isolated Markdown blocks via `formatRoleUserPrompt`.
+  - `GenericSwarmOrchestrator` implements self-correction retry loops up to `maxAttempts` injecting verifier diagnostic feedback.
+  - Topological artifact merging deterministically orders string deliverables in DFS post-order (`mergeOutputsInDagOrder`) and generates discrete `artifactMap` collections.
+  - All 8 swarm test files (53 tests) pass with 100% success (`exitCode === 0`).
+- **Unexplored areas**: None remaining within assigned survey scope.
 
 ## Key Decisions Made
-- Initiated exploration on Dynamic DAG, resource locking, retry loops, topological merging, and swarm tests.
+- Completed full deep-dive analysis in `analysis.md` and 5-component handoff report in `handoff.md`.
 
 ## Artifact Index
 - /workspaces/New-Corez/.agents/explorer_survey_2/analysis.md — Detailed analysis report
-- /workspaces/New-Corez/.agents/explorer_survey_2/handoff.md — Handoff report
+- /workspaces/New-Corez/.agents/explorer_survey_2/handoff.md — 5-component handoff report
 - /workspaces/New-Corez/.agents/explorer_survey_2/progress.md — Liveness & progress tracking
+- /workspaces/New-Corez/.agents/explorer_survey_2/DISPATCH.md — Dispatch log
