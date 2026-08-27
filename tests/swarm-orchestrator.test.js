@@ -90,4 +90,81 @@ describe('Unlimited Dynamic Swarm: Agent Swarm Orchestrator', () => {
     // The failed task's output must not leak into the final artifact.
     expect(result.finalHtml).toBeNull();
   });
+
+  it('propagates upstream validated deliverables to downstream task prompts', async () => {
+    const receivedPrompts = [];
+    const mockAiClient = async (prompt) => {
+      receivedPrompts.push(prompt);
+      if (prompt.includes('Lead Swarm Architect')) {
+        return JSON.stringify([
+          { taskId: 'task-art', role: 'art-director', objective: 'Define colors', dependencies: [], ownedResources: ['spec/art.json'] },
+          { taskId: 'task-engine', role: 'engine-architect', objective: 'Build engine', dependencies: ['task-art'], ownedResources: ['engine/core.js'] }
+        ]);
+      }
+      if (prompt.includes('Role: art-director')) {
+        return JSON.stringify({ primaryColor: '#ff0055', theme: 'neon-cyberpunk' });
+      }
+      return '<canvas id="gameCanvas"></canvas>';
+    };
+
+    const orchestrator = new AgentSwarmOrchestrator({
+      aiClient: mockAiClient
+    });
+
+    const result = await orchestrator.executeSwarmJob('Build neon game');
+    expect(result.completed).toBe(true);
+
+    const enginePrompt = receivedPrompts.find(p => p.includes('Role: engine-architect'));
+    expect(enginePrompt).toBeDefined();
+    expect(enginePrompt).toContain('### Upstream Context & Deliverables:');
+    expect(enginePrompt).toContain('--- Context from [task-art] (art-director) ---');
+    expect(enginePrompt).toContain('#ff0055');
+    expect(enginePrompt).toContain('neon-cyberpunk');
+  });
+
+  it('executes self-correction retry loop and injects verifier evidence into retry prompt', async () => {
+    let engineAttempts = 0;
+    const receivedEnginePrompts = [];
+    const mockAiClient = async (prompt) => {
+      if (prompt.includes('Lead Swarm Architect')) {
+        return JSON.stringify([
+          { taskId: 'task-engine', role: 'engine-architect', objective: 'Build engine', dependencies: [], ownedResources: ['engine/core.js'] }
+        ]);
+      }
+      if (prompt.includes('Role: engine-architect')) {
+        engineAttempts++;
+        receivedEnginePrompts.push(prompt);
+        if (engineAttempts === 1) {
+          return '<canvas id="broken"></canvas>';
+        }
+        return '<canvas id="gameCanvas" width="800" height="600"></canvas>';
+      }
+      return 'OK';
+    };
+
+    const orchestrator = new AgentSwarmOrchestrator({
+      aiClient: mockAiClient,
+      verifier: async ({ task, output }) => {
+        if (task.role === 'engine-architect') {
+          const content = typeof output === 'object' ? output.output : output;
+          if (content.includes('broken')) {
+            return { ok: false, evidence: 'Canvas id must be gameCanvas with dimensions' };
+          }
+        }
+        return { ok: true, evidence: 'All tests passed' };
+      }
+    });
+
+    const result = await orchestrator.executeSwarmJob('Build canvas game');
+    expect(result.completed).toBe(true);
+    expect(engineAttempts).toBe(2);
+    expect(result.finalHtml).toContain('id="gameCanvas"');
+
+    // Check that retry prompt contained verification feedback
+    const retryPrompt = receivedEnginePrompts[1];
+    expect(retryPrompt).toBeDefined();
+    expect(retryPrompt).toContain('### Self-Correction Retry (Attempt 2/3):');
+    expect(retryPrompt).toContain('Verifier feedback: Canvas id must be gameCanvas with dimensions');
+    expect(retryPrompt).toContain('Please analyze the failure above and fix the issue in your revised output.');
+  });
 });

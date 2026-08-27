@@ -1,0 +1,302 @@
+{
+  "generatedAt": "2026-08-27T12:11:10.394Z",
+  "mode": "INTEGRATION",
+  "url": null,
+  "summary": {
+    "total": 15,
+    "passed": 10,
+    "failed": 5
+  },
+  "results": [
+    {
+      "label": "INTEGRATION",
+      "kind": "single",
+      "id": "general-001",
+      "category": "general",
+      "prompt": "What is the difference between a compiler and an interpreter?",
+      "passed": false,
+      "score": 2.6,
+      "aspects": {
+        "instructionAdherence": 0,
+        "functionalCorrectness": 0.6,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 0,
+        "uxQuality": 0.7,
+        "efficiency": 1
+      },
+      "hardFailures": [
+        "empty-provider-response",
+        "truncated-response (empty-response)",
+        "ignored-core-requirement (missing: compiler, interpreter)"
+      ],
+      "diagnostics": null,
+      "latencyMs": 142,
+      "provider": null,
+      "model": null,
+      "transportError": "HTTP 502",
+      "responseLength": 0
+    },
+    {
+      "label": "INTEGRATION",
+      "kind": "single",
+      "id": "general-002",
+      "category": "general",
+      "prompt": "Give me three tips for staying focused while working from home.",
+      "passed": false,
+      "score": 2.6,
+      "aspects": {
+        "instructionAdherence": 0,
+        "functionalCorrectness": 0.6,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 0,
+        "uxQuality": 0.7,
+        "efficiency": 1
+      },
+      "hardFailures": [
+        "empty-provider-response",
+        "truncated-response (empty-response)",
+        "ignored-core-requirement (missing: tip, focus)"
+      ],
+      "diagnostics": null,
+      "latencyMs": 7,
+      "provider": null,
+      "model": null,
+      "transportError": "HTTP 502",
+      "responseLength": 0
+    },
+    {
+      "label": "INTEGRATION",
+      "kind": "single",
+      "id": "general-003",
+      "category": "general",
+      "prompt": "Explain how the internet works in simple terms.",
+      "passed": false,
+      "score": 2.6,
+      "aspects": {
+        "instructionAdherence": 0,
+        "functionalCorrectness": 0.6,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 0,
+        "uxQuality": 0.7,
+        "efficiency": 1
+      },
+      "hardFailures": [
+        "empty-provider-response",
+        "truncated-response (empty-response)",
+        "ignored-core-requirement (missing: packet, server)"
+      ],
+      "diagnostics": null,
+      "latencyMs": 4,
+      "provider": null,
+      "model": null,
+      "transportError": "HTTP 502",
+      "responseLength": 0
+    },
+    {
+      "label": "INTEGRATION",
+      "kind": "single",
+      "id": "general-004",
+      "category": "general",
+      "prompt": "What should I check before deploying a website to production?",
+      "passed": false,
+      "score": 2.6,
+      "aspects": {
+        "instructionAdherence": 0,
+        "functionalCorrectness": 0.6,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 0,
+        "uxQuality": 0.7,
+        "efficiency": 1
+      },
+      "hardFailures": [
+        "empty-provider-response",
+        "truncated-response (empty-response)",
+        "ignored-core-requirement (missing: check, deploy)"
+      ],
+      "diagnostics": null,
+      "latencyMs": 1,
+      "provider": null,
+      "model": null,
+      "transportError": "HTTP 502",
+      "responseLength": 0
+    },
+    {
+      "label": "INTEGRATION",
+      "kind": "single",
+      "id": "general-005",
+      "category": "general",
+      "prompt": "Compare MySQL and PostgreSQL in a few short points.",
+      "passed": false,
+      "score": 2.6,
+      "aspects": {
+        "instructionAdherence": 0,
+        "functionalCorrectness": 0.6,
+        "conversationContinuity": 0.6,
+        "executionValidation": 1,
+        "completeness": 0,
+        "uxQuality": 0.7,
+        "efficiency": 1
+      },
+      "hardFailures": [
+        "empty-provider-response",
+        "truncated-response (empty-response)",
+        "ignored-core-requirement (missing: MySQL, PostgreSQL)"
+      ],
+      "diagnostics": null,
+      "latencyMs": 3,
+      "provider": null,
+      "model": null,
+      "transportError": "HTTP 502",
+      "responseLength": 0
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-001",
+      "category": "failure",
+      "description": "truncated explanation",
+      "passed": true,
+      "score": 4.6,
+      "hardFailures": [
+        "truncated-response (ends-with-conjunction)"
+      ],
+      "expectedReason": "truncated response",
+      "responseLength": 84
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-002",
+      "category": "failure",
+      "description": "truncated code fence",
+      "passed": true,
+      "score": 4.7,
+      "hardFailures": [
+        "truncated-response (open-code-fence)"
+      ],
+      "expectedReason": "open code fence",
+      "responseLength": 47
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-003",
+      "category": "failure",
+      "description": "syntactically invalid JS",
+      "passed": true,
+      "score": 3.9,
+      "hardFailures": [
+        "truncated-response (unmatched-())",
+        "syntax-failure (js: Unexpected identifier 'x')"
+      ],
+      "expectedReason": "syntax failure",
+      "responseLength": 69
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-004",
+      "category": "failure",
+      "description": "completely wrong answer",
+      "passed": true,
+      "score": 3.1,
+      "hardFailures": [
+        "ignored-core-requirement (missing: focus, work)"
+      ],
+      "expectedReason": "ignored core requirement (no focus/work tips)",
+      "responseLength": 107
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-005",
+      "category": "failure",
+      "description": "empty response",
+      "passed": true,
+      "score": 4.6,
+      "hardFailures": [
+        "empty-provider-response",
+        "truncated-response (empty-response)"
+      ],
+      "expectedReason": "empty provider response",
+      "responseLength": 0
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-006",
+      "category": "failure",
+      "description": "working answer but wrong framework",
+      "passed": true,
+      "score": 4.2,
+      "hardFailures": [
+        "unrelated-framework-replacement-during-follow-up",
+        "removed-existing-functionality"
+      ],
+      "expectedReason": "unrelated framework replacement during follow-up",
+      "responseLength": 117
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-007",
+      "category": "failure",
+      "description": "deletes existing functionality",
+      "passed": true,
+      "score": 4.7,
+      "hardFailures": [
+        "removed-existing-functionality"
+      ],
+      "expectedReason": "removal of required existing functionality",
+      "responseLength": 103
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-008",
+      "category": "failure",
+      "description": "fabricated claim about previous implementation",
+      "passed": true,
+      "score": 4.1,
+      "hardFailures": [
+        "unrelated-framework-replacement-during-follow-up",
+        "removed-existing-functionality",
+        "fabricated-claim-about-existing-implementation"
+      ],
+      "expectedReason": "fabricated claim about existing implementation",
+      "responseLength": 103
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-009",
+      "category": "failure",
+      "description": "malformed response for a code request",
+      "passed": true,
+      "score": 3.8,
+      "hardFailures": [
+        "missing-requested-deliverable (no code block)"
+      ],
+      "expectedReason": "missing requested deliverable (no code)",
+      "responseLength": 82
+    },
+    {
+      "label": "UNIT",
+      "kind": "failure",
+      "id": "failure-010",
+      "category": "failure",
+      "description": "beautiful UI with broken game logic",
+      "passed": true,
+      "score": 4.1,
+      "hardFailures": [
+        "broken-game-logic (missing signals: game-loop, scoring, controls)"
+      ],
+      "expectedReason": "no scoring / game-over logic despite beautiful UI",
+      "responseLength": 288
+    }
+  ]
+}
