@@ -33,8 +33,13 @@ export async function createChat({ title } = {}) {
   return await r.json();
 }
 
-export async function getChat(chatId) {
-  const r = await fetchJson(`${BASE}/${encodeURIComponent(chatId)}`, { method: 'GET' });
+export async function getChat(chatId, opts = {}) {
+  const params = new URLSearchParams();
+  if (opts.compact) params.set('compact', '1');
+  if (opts.keep) params.set('keep', String(opts.keep));
+  if (opts.limit) params.set('limit', String(opts.limit));
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  const r = await fetchJson(`${BASE}/${encodeURIComponent(chatId)}${qs}`, { method: 'GET' });
   if (!r.ok) {
     const e = await r.json().catch(() => ({}));
     const err = new Error(e.error || `getChat failed: ${r.status}`);
@@ -42,6 +47,14 @@ export async function getChat(chatId) {
     throw err;
   }
   return await r.json();
+}
+
+export async function getChatCompact(chatId, keep = 30) {
+  return getChat(chatId, { compact: true, keep });
+}
+
+export async function getChatFull(chatId) {
+  return getChat(chatId, { compact: false });
 }
 
 export async function patchChatTitle(chatId, title) {

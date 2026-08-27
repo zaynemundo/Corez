@@ -13,6 +13,8 @@ import { formatBytes, processFiles, hasFiles } from './utils/fileAttachmentUtils
 import { generateAIResponse, extractCodeFromMessage, generateSessionTitle, generateAISessionTitle, isRevisionContextPrompt } from './services/aiService';
 import { storeAppInR2, deleteSessionAppsInR2 } from './services/appStorageService';
 import * as chatService from './services/chatService';
+import CompactedBanner from './components/CompactedBanner';
+import { compactChatMessages, shouldCompact, expandCompactedChat } from './services/smartCompact';
 
 function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -89,6 +91,7 @@ function MainApp() {
   });
   const [attachments, setAttachments] = useState([]);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [expandedCompactIds, setExpandedCompactIds] = useState(() => new Set());
 
   const messagesEndRef = useRef(null);
   const chatInputRef = useRef(null);
@@ -195,6 +198,7 @@ function MainApp() {
 
   // -------------------------------------------------------------
   // Fetch messages for active chat when URL changes — parallel, not blocked by chat list
+  // Smart compacting: fetch compact view by default (keep recent 30), expand on demand
   // -------------------------------------------------------------
   useEffect(() => {
     if (!activeSessionId) return;
@@ -209,22 +213,41 @@ function MainApp() {
     const load = async () => {
       setChatLoading(true);
       try {
-        const data = await chatService.getChat(activeSessionId);
+        const isExpanded = expandedCompactIds.has(activeSessionId);
+        const data = isExpanded
+          ? await chatService.getChat(activeSessionId, { compact: false })
+          : await chatService.getChat(activeSessionId, { compact: true, keep: 30 });
         if (cancelled) return;
-        const msgs = Array.isArray(data.messages) ? data.messages.map((m) => ({
+        let msgs = Array.isArray(data.messages) ? data.messages.map((m) => ({
           role: m.role,
           content: m.content,
           attachments: m.attachments || undefined,
+          // Preserve server compact meta on the banner message if present
+          ...(m._compactMeta ? { _compactMeta: m._compactMeta } : {}),
         })) : [];
+        let compactMeta = data.compactMeta || null;
+        let fullMessages = null;
+        // Extract compact meta from banner message if server embedded it
+        const bannerFromServer = msgs.find((m) => m._compactMeta?.isCompactSummary);
+        if (bannerFromServer && !compactMeta) compactMeta = bannerFromServer._compactMeta;
+        // Client-side fallback: if server didn't compact but we should (e.g. local fallback or small keep threshold)
+        if (!compactMeta && !isExpanded && shouldCompact(msgs)) {
+          const result = compactChatMessages(msgs);
+          if (result.compacted) {
+            msgs = result.displayMessages;
+            compactMeta = result.meta;
+            fullMessages = result.originalMessages;
+          }
+        }
         setSessions(prev => {
           const idx = prev.findIndex(s => s.id === activeSessionId);
           if (idx >= 0) {
             const next = [...prev];
-            next[idx] = { ...prev[idx], title: data.title, messages: msgs, _loaded: true };
+            next[idx] = { ...prev[idx], title: data.title, messages: msgs, _loaded: true, _compactMeta: compactMeta, _fullMessages: fullMessages };
             return next;
           }
           // Chat exists on server but not in list yet (e.g. direct link / shared device)
-          return [{ id: data.id, title: data.title, messages: msgs, createdAt: data.createdAt, updatedAt: data.updatedAt, _loaded: true }, ...prev];
+          return [{ id: data.id, title: data.title, messages: msgs, createdAt: data.createdAt, updatedAt: data.updatedAt, _loaded: true, _compactMeta: compactMeta, _fullMessages: fullMessages }, ...prev];
         });
       } catch (e) {
         if (e?.status === 404 || e?.status === 403) {
@@ -240,7 +263,7 @@ function MainApp() {
     };
     load();
     return () => { cancelled = true; fetchingChatIdsRef.current.delete(activeSessionId); };
-  }, [activeSessionId, user, navigate]);
+  }, [activeSessionId, user, navigate, expandedCompactIds]);
 
   // -------------------------------------------------------------
   // UI helpers
@@ -405,6 +428,44 @@ function MainApp() {
     setRevisionContextCode('');
   };
 
+  const handleExpandCompact = async () => {
+    if (!activeSessionId) return;
+    const active = sessions.find((s) => s.id === activeSessionId);
+    // If we have full snapshot from client-side compact, restore without fetch
+    if (active?._fullMessages && Array.isArray(active._fullMessages) && active._fullMessages.length > 0) {
+      setSessions((prev) => prev.map((s) => s.id === activeSessionId ? { ...s, messages: active._fullMessages, _compactMeta: null, _fullMessages: null } : s));
+      setExpandedCompactIds((prev) => { const n = new Set(prev); n.add(activeSessionId); return n; });
+      return;
+    }
+    // Otherwise fetch full history from server
+    setChatLoading(true);
+    try {
+      const data = await chatService.getChat(activeSessionId, { compact: false });
+      const msgs = Array.isArray(data.messages) ? data.messages.map((m) => ({ role: m.role, content: m.content, attachments: m.attachments || undefined })) : [];
+      setSessions((prev) => prev.map((s) => s.id === activeSessionId ? { ...s, messages: msgs, _compactMeta: null, _fullMessages: null, _loaded: true } : s));
+      setExpandedCompactIds((prev) => { const n = new Set(prev); n.add(activeSessionId); return n; });
+    } catch (e) {
+      console.warn('Failed to expand compacted chat', e);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const handleCollapseCompact = () => {
+    if (!activeSessionId) return;
+    const active = sessions.find((s) => s.id === activeSessionId);
+    const full = active?.messages;
+    if (!full || !Array.isArray(full) || full.length === 0) return;
+    // Re-compact the currently loaded full history
+    if (shouldCompact(full)) {
+      const result = compactChatMessages(full);
+      if (result.compacted) {
+        setSessions((prev) => prev.map((s) => s.id === activeSessionId ? { ...s, messages: result.displayMessages, _compactMeta: result.meta, _fullMessages: result.originalMessages } : s));
+      }
+    }
+    setExpandedCompactIds((prev) => { const n = new Set(prev); n.delete(activeSessionId); return n; });
+  };
+
   const handleNewChat = () => {
     navigate('/');
     setActiveView('chat');
@@ -533,15 +594,34 @@ function MainApp() {
       const existing = sessions.find(s => s.id === targetSessionId);
       if (existing && !existing._loaded) {
         try {
-          const data = await chatService.getChat(targetSessionId);
-          const msgs = Array.isArray(data.messages) ? data.messages.map(m => ({
+          const isExpanded = expandedCompactIds.has(targetSessionId);
+          const data = isExpanded
+            ? await chatService.getChat(targetSessionId, { compact: false })
+            : await chatService.getChat(targetSessionId, { compact: true, keep: 30 });
+          let msgs = Array.isArray(data.messages) ? data.messages.map(m => ({
             role: m.role,
             content: m.content,
             attachments: m.attachments || undefined,
+            ...(m._compactMeta ? { _compactMeta: m._compactMeta } : {}),
           })) : [];
-          setSessions(prev => prev.map(s => s.id === targetSessionId ? { ...s, title: data.title, messages: msgs, _loaded: true } : s));
+          let compactMeta = data.compactMeta || null;
+          const bannerFromServer = msgs.find((m) => m._compactMeta?.isCompactSummary);
+          if (bannerFromServer && !compactMeta) compactMeta = bannerFromServer._compactMeta;
+          let fullMessages = null;
+          if (!compactMeta && !isExpanded && shouldCompact(msgs)) {
+            const result = compactChatMessages(msgs);
+            if (result.compacted) {
+              msgs = result.displayMessages;
+              compactMeta = result.meta;
+              fullMessages = result.originalMessages;
+            }
+          }
+          setSessions(prev => prev.map(s => s.id === targetSessionId ? { ...s, title: data.title, messages: msgs, _loaded: true, _compactMeta: compactMeta, _fullMessages: fullMessages } : s));
           draftMessages = msgs;
         } catch {}
+      } else if (existing && existing._compactMeta) {
+        // Keep compacted view for draft — the banner summarizes older history for the AI
+        draftMessages = existing.messages;
       }
     }
 
@@ -586,7 +666,23 @@ function MainApp() {
           if (s.messages.length === 0 && updatedTitle !== s.title) {
             chatService.patchChatTitle(targetSessionId, updatedTitle).catch(() => {});
           }
-          return { ...s, title: updatedTitle, messages: [...s.messages, displayMsg], _loaded: true, updatedAt: nowTs };
+          const nextMessages = [...s.messages, displayMsg];
+          const nextFull = Array.isArray(s._fullMessages) ? [...s._fullMessages, displayMsg] : s._fullMessages;
+          // Auto-compact if we just grew beyond threshold and we are not expanded
+          let nextCompactMeta = s._compactMeta || null;
+          let finalMessages = nextMessages;
+          let finalFull = nextFull;
+          if (!expandedCompactIds.has(targetSessionId) && shouldCompact(nextFull || nextMessages)) {
+            const sourceForCompact = nextFull || nextMessages;
+            const result = compactChatMessages(sourceForCompact);
+            if (result.compacted) {
+              finalMessages = result.displayMessages;
+              nextCompactMeta = result.meta;
+              finalFull = result.originalMessages;
+              // Keep the newly added message visible (it is already in recent)
+            }
+          }
+          return { ...s, title: updatedTitle, messages: finalMessages, _loaded: true, updatedAt: nowTs, _compactMeta: nextCompactMeta, _fullMessages: finalFull };
         }
         return s;
       });
@@ -671,7 +767,21 @@ function MainApp() {
         setSessions(prev => {
           const mapped = prev.map(s => {
             if (s.id === targetSessionId) {
-              return { ...s, messages: [...s.messages, aiMsg], updatedAt: nowTs2 };
+              const nextMsgs = [...s.messages, aiMsg];
+              const nextFull = Array.isArray(s._fullMessages) ? [...s._fullMessages, aiMsg] : s._fullMessages;
+              let finalMsgs = nextMsgs;
+              let finalFull = nextFull;
+              let finalMeta = s._compactMeta || null;
+              if (!expandedCompactIds.has(targetSessionId) && shouldCompact(nextFull || nextMsgs)) {
+                const src = nextFull || nextMsgs;
+                const res = compactChatMessages(src);
+                if (res.compacted) {
+                  finalMsgs = res.displayMessages;
+                  finalMeta = res.meta;
+                  finalFull = res.originalMessages;
+                }
+              }
+              return { ...s, messages: finalMsgs, _fullMessages: finalFull, _compactMeta: finalMeta, updatedAt: nowTs2 };
             }
             return s;
           });
@@ -824,14 +934,28 @@ function MainApp() {
                   </div>
                 ) : (
                   <div className="messages-inner">
-                    {activeSession?.messages.map((msg, idx) => (
-                      <ChatMessage
-                        key={idx}
-                        message={msg}
-                        onRunInCanvas={handleRunInCanvas}
-                        onReviseCode={handleReviseCode}
-                      />
-                    ))}
+                    {activeSession?.messages.map((msg, idx) => {
+                      if (msg?._compactMeta?.isCompactSummary) {
+                        const isExpanded = expandedCompactIds.has(activeSessionId);
+                        return (
+                          <CompactedBanner
+                            key={`compact-${idx}`}
+                            meta={msg._compactMeta}
+                            isExpanded={isExpanded}
+                            onExpand={handleExpandCompact}
+                            onCollapse={handleCollapseCompact}
+                          />
+                        );
+                      }
+                      return (
+                        <ChatMessage
+                          key={idx}
+                          message={msg}
+                          onRunInCanvas={handleRunInCanvas}
+                          onReviseCode={handleReviseCode}
+                        />
+                      );
+                    })}
                     {isThinking && (
                       <div className="message-wrapper ai">
                         <div className="message-body">

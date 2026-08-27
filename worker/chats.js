@@ -85,6 +85,102 @@ function sanitizeContent(content) {
   return String(content);
 }
 
+// Smart compact summary builder for server-side compaction
+// Mirrors src/services/contextStore.js buildContextSummary without persistence
+function buildWorkerCompactSummary(messages) {
+  const requirements = [];
+  const negativeConstraints = [];
+  const exactErrors = [];
+  const decisions = [];
+  const codeSignatures = [];
+  const lines = [];
+  for (const m of messages) {
+    const text = typeof m?.content === 'string' ? m.content : '';
+    lines.push(...text.split('\n'));
+  }
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    if (/(must not|do not|never|forbidden|don't|must not change|must preserve|must keep|must retain)/i.test(line)) {
+      negativeConstraints.push(line.slice(0, 200));
+      continue;
+    }
+    if (/^(requirement|must|need|require|constraint|goal|acceptance criterion)[: ]/i.test(line)) {
+      requirements.push(line.slice(0, 200));
+      continue;
+    }
+    if (/(error|exception|failed|failure|stack trace|uncaught|fatal|FAIL|syntaxerror|typeerror)/i.test(line)) {
+      exactErrors.push(line.slice(0, 200));
+      continue;
+    }
+    if (/^[-*]\s*(?:add|implement|fix|refactor|change|update|remove|migrate)\b/i.test(line)) {
+      requirements.push(line.slice(0, 200));
+    }
+  }
+  for (let i = 0; i < lines.length; i++) {
+    if (/^\s*```/.test(lines[i])) {
+      const sig = lines[i + 1]?.trim().slice(0, 80);
+      if (sig) codeSignatures.push(sig);
+    }
+  }
+  const topicWords = new Map();
+  const topicText = lines.join(' ').toLowerCase().slice(0, 50000);
+  const words = topicText.match(/[a-z]{5,}/g) || [];
+  for (const w of words) {
+    if (['would','should','could','about','there','their','these','those','which','while'].includes(w)) continue;
+    topicWords.set(w, (topicWords.get(w)||0)+1);
+  }
+  const topics = [...topicWords.entries()].sort((a,b)=>b[1]-a[1]).slice(0,6).map(([w])=>w);
+  const parts = ['[Compacted history: earlier messages summarized. Full records remain retrievable.]'];
+  if (topics.length) parts.push(`Topics: ${topics.join(', ')}.`);
+  if (requirements.length) parts.push(`Requirements: ${requirements.slice(0,3).join(' | ')}`);
+  if (negativeConstraints.length) parts.push(`Constraints: ${negativeConstraints.slice(0,2).join(' | ')}`);
+  if (exactErrors.length) parts.push(`Errors: ${exactErrors.slice(0,2).join(' | ')}`);
+  if (codeSignatures.length) parts.push(`Code: ${codeSignatures.slice(0,2).join(' | ')}`);
+  return { topics, parts: parts.join('\n'), requirements, negativeConstraints, exactErrors, codeSignatures };
+}
+
+function applySmartCompact(messages, url) {
+  const compact = url.searchParams.get('compact') === '1' || url.searchParams.get('compact') === 'true';
+  const keep = Math.min(100, Math.max(5, parseInt(url.searchParams.get('keep') || '30', 10) || 30));
+  const limitParam = parseInt(url.searchParams.get('limit') || '', 10);
+  const effectiveLimit = Number.isFinite(limitParam) ? Math.min(500, Math.max(1, limitParam)) : null;
+
+  // If explicit limit without compact, just slice
+  if (!compact && effectiveLimit != null && messages.length > effectiveLimit) {
+    const sliced = messages.slice(-effectiveLimit);
+    return { messages: sliced, meta: { limit: effectiveLimit, total: messages.length, compacted: false } };
+  }
+  if (!compact) return { messages, meta: null };
+  // Compact: keep recent `keep`, summarize older if total > keep
+  if (messages.length <= keep) return { messages, meta: null };
+  const older = messages.slice(0, messages.length - keep);
+  const recent = messages.slice(messages.length - keep);
+  if (older.length === 0) return { messages, meta: null };
+  // Only compact if older is meaningful ( >5 messages or >30KB )
+  const olderBytes = JSON.stringify(older).length;
+  if (older.length < 5 && olderBytes < 30_000) return { messages, meta: null };
+  const summary = buildWorkerCompactSummary(older);
+  const banner = {
+    id: `compact-${Date.now()}`,
+    role: 'system',
+    content: summary.parts,
+    attachments: null,
+    createdAt: older[older.length-1]?.createdAt || Date.now(),
+    _compactMeta: {
+      isCompactSummary: true,
+      compactedCount: older.length,
+      topics: summary.topics,
+      summaryLine: summary.topics.length ? `Topics: ${summary.topics.join(', ')}` : `${older.length} earlier messages summarized`,
+      persisted: false,
+    }
+  };
+  return {
+    messages: [banner, ...recent],
+    meta: { compacted: true, compactedCount: older.length, keep, total: messages.length, topics: summary.topics }
+  };
+}
+
 // ---------------------------------------------------------------------
 // Main handler
 // ---------------------------------------------------------------------
@@ -221,13 +317,13 @@ export async function handleChats(request, env) {
   }
 
   // -------------------------------------------------------------------
-  // GET /api/chats/:id — fetch single chat with messages
+  // GET /api/chats/:id — fetch single chat with messages (supports ?limit=&compact=&keep=)
   // -------------------------------------------------------------------
   if (!isMessagesSubroute && request.method === 'GET') {
     try {
       const msgRows = await env.DB.prepare('SELECT id, role, content, attachments, created_at as createdAt FROM chat_messages WHERE chat_id = ? AND user_id = ? ORDER BY created_at ASC LIMIT 500')
         .bind(chatId, userId).all();
-      const messages = (msgRows?.results || []).map((r) => {
+      let messages = (msgRows?.results || []).map((r) => {
         let attachments = null;
         if (r.attachments) {
           try { attachments = JSON.parse(r.attachments); } catch { attachments = null; }
@@ -240,13 +336,18 @@ export async function handleChats(request, env) {
           createdAt: r.createdAt,
         };
       });
+      const compacted = applySmartCompact(messages, url);
+      messages = compacted.messages;
+      const headers = {};
+      if (compacted.meta) headers['X-Corez-Compact'] = JSON.stringify(compacted.meta);
       return jsonResponse(200, {
         id: chatRow.id,
         title: chatRow.title,
         createdAt: chatRow.created_at,
         updatedAt: chatRow.updated_at,
         messages,
-      });
+        ...(compacted.meta ? { compactMeta: compacted.meta } : {}),
+      }, headers);
     } catch (e) {
       console.error('GET /api/chats/:id failed:', safeErrorDetail(e));
       return jsonResponse(500, { error: 'Failed to fetch chat.' });
@@ -358,13 +459,13 @@ export async function handleChats(request, env) {
   }
 
   // -------------------------------------------------------------------
-  // GET /api/chats/:id/messages — list messages (alternative)
+  // GET /api/chats/:id/messages — list messages (alternative, supports ?limit=&compact=&keep=)
   // -------------------------------------------------------------------
   if (isMessagesSubroute && request.method === 'GET') {
     try {
       const msgRows = await env.DB.prepare('SELECT id, role, content, attachments, created_at as createdAt FROM chat_messages WHERE chat_id = ? AND user_id = ? ORDER BY created_at ASC LIMIT 500')
         .bind(chatId, userId).all();
-      const messages = (msgRows?.results || []).map((r) => {
+      let messages = (msgRows?.results || []).map((r) => {
         let attachments = null;
         if (r.attachments) {
           try { attachments = JSON.parse(r.attachments); } catch { attachments = null; }
@@ -377,7 +478,11 @@ export async function handleChats(request, env) {
           createdAt: r.createdAt,
         };
       });
-      return jsonResponse(200, { chatId, messages });
+      const compacted = applySmartCompact(messages, url);
+      messages = compacted.messages;
+      const headers = {};
+      if (compacted.meta) headers['X-Corez-Compact'] = JSON.stringify(compacted.meta);
+      return jsonResponse(200, { chatId, messages, ...(compacted.meta ? { compactMeta: compacted.meta } : {}) }, headers);
     } catch (e) {
       console.error('GET /api/chats/:id/messages failed:', safeErrorDetail(e));
       return jsonResponse(500, { error: 'Failed to fetch messages.' });
