@@ -93,7 +93,8 @@ Command executed: `npx vitest run tests/swarm-*.test.js tests/cli/generic-swarm.
 - Test Files: 8 passed (8)
 - Total Tests: 53 passed (53)
 - Exit Code: 0
-- Detailed breakdown:
+- **Full Repository Test Suite (`npm test`)**: 93 passed (93 files), 1,072 passed (1,072 tests), 0 failures (exitCode === 0)
+- Detailed breakdown of swarm suites:
   - `tests/cli/generic-swarm.test.js` (13 passed)
   - `tests/harness-swarm.test.js` (9 passed)
   - `tests/swarm-dynamic-dag.test.js` (9 passed)
