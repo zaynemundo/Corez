@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import worker from '../worker/index.js';
 
 const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/responses';
-const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';
+const _DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 delete process.env.OPENROUTER_API_KEY;
 

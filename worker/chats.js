@@ -91,7 +91,7 @@ function buildWorkerCompactSummary(messages) {
   const requirements = [];
   const negativeConstraints = [];
   const exactErrors = [];
-  const decisions = [];
+  const _decisions = [];
   const codeSignatures = [];
   const lines = [];
   for (const m of messages) {

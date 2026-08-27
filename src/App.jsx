@@ -14,7 +14,7 @@ import { generateAIResponse, extractCodeFromMessage, generateSessionTitle, gener
 import { storeAppInR2, deleteSessionAppsInR2 } from './services/appStorageService';
 import * as chatService from './services/chatService';
 import CompactedBanner from './components/CompactedBanner';
-import { compactChatMessages, shouldCompact, expandCompactedChat } from './services/smartCompact';
+import { compactChatMessages, shouldCompact, expandCompactedChat as _expandCompactedChat } from './services/smartCompact';
 
 function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);

@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Archive, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 
 export default function CompactedBanner({ meta, onExpand, onCollapse, isExpanded }) {

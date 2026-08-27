@@ -3,8 +3,8 @@ import { buildProviderChain, runProviderChain, runStreamingChain, TASK_STATUS_ST
 import { createTaskStateStore } from '../worker/utils.js';
 
 const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/responses';
-const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const _DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';
+const _OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 function providerEnv(overrides = {}) {
   return {
