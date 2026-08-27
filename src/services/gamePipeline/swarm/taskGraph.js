@@ -32,6 +32,40 @@ export class ResourceLockManager {
     return { success: true, lockInfo };
   }
 
+  /**
+   * All-or-nothing atomic lock acquisition across multiple resources.
+   * If any resource is locked by another agent, rolls back all acquisitions from this call.
+   */
+  acquireLocks(resourceNames = [], agentId) {
+    if (!Array.isArray(resourceNames) || resourceNames.length === 0) {
+      return { success: true, acquired: [] };
+    }
+
+    // 1. Dry run check: ensure all requested resources are available
+    for (const resName of resourceNames) {
+      const existing = this.locks.get(resName);
+      if (existing && existing.locked && existing.ownerAgentId !== agentId) {
+        return {
+          success: false,
+          lockedResource: resName,
+          currentOwner: existing.ownerAgentId,
+          version: existing.version
+        };
+      }
+    }
+
+    // 2. Atomic acquisition
+    const acquired = [];
+    for (const resName of resourceNames) {
+      const res = this.acquireLock(resName, agentId);
+      if (res.success) {
+        acquired.push(res.lockInfo);
+      }
+    }
+
+    return { success: true, acquired };
+  }
+
   releaseLock(resourceName, agentId) {
     const existing = this.locks.get(resourceName);
     if (existing && existing.ownerAgentId === agentId) {
@@ -41,8 +75,37 @@ export class ResourceLockManager {
     return false;
   }
 
+  releaseLocks(resourceNames = [], agentId) {
+    if (!Array.isArray(resourceNames) || resourceNames.length === 0) return true;
+    let allReleased = true;
+    for (const resName of resourceNames) {
+      const released = this.releaseLock(resName, agentId);
+      if (!released) allReleased = false;
+    }
+    return allReleased;
+  }
+
+  releaseAllLocksForAgent(agentId) {
+    let count = 0;
+    for (const [resName, lock] of this.locks.entries()) {
+      if (lock.ownerAgentId === agentId && lock.locked) {
+        this.locks.set(resName, { ...lock, locked: false });
+        count++;
+      }
+    }
+    return count;
+  }
+
   getLock(resourceName) {
     return this.locks.get(resourceName) || null;
+  }
+
+  canAcquireAll(resourceNames = [], agentId) {
+    if (!Array.isArray(resourceNames) || resourceNames.length === 0) return true;
+    return resourceNames.every(resName => {
+      const lock = this.locks.get(resName);
+      return !lock || !lock.locked || lock.ownerAgentId === agentId;
+    });
   }
 }
 
@@ -129,13 +192,13 @@ export class TaskDependencyGraph {
       role: taskDef.role,
       taskId: taskDef.taskId,
       objective: taskDef.objective,
-      dependencies: Array.isArray(taskDef.dependencies) ? taskDef.dependencies : [],
-      inputRefs: Array.isArray(taskDef.inputRefs) ? taskDef.inputRefs : [],
+      dependencies: Array.isArray(taskDef.dependencies) ? [...taskDef.dependencies] : [],
+      inputRefs: Array.isArray(taskDef.inputRefs) ? [...taskDef.inputRefs] : [],
       outputSchema: taskDef.outputSchema || {},
-      ownedResources: Array.isArray(taskDef.ownedResources) ? taskDef.ownedResources : [],
+      ownedResources: Array.isArray(taskDef.ownedResources) ? [...taskDef.ownedResources] : [],
       isEssential: taskDef.isEssential !== false,
       status: AGENT_LIFECYCLE_STATES.CREATED,
-      attempt: 1,
+      attempt: taskDef.attempt || 1,
       maxAttempts: taskDef.maxAttempts || 3,
       createdTimestamp: Date.now()
     };
@@ -158,6 +221,7 @@ export class TaskDependencyGraph {
       if (
         task.status === AGENT_LIFECYCLE_STATES.CREATED ||
         task.status === AGENT_LIFECYCLE_STATES.QUEUED ||
+        task.status === AGENT_LIFECYCLE_STATES.RETRYING ||
         task.status === AGENT_LIFECYCLE_STATES.WAITING_FOR_DEPENDENCIES
       ) {
         const dependenciesMet = task.dependencies.every(depId => {
@@ -176,6 +240,10 @@ export class TaskDependencyGraph {
     return ready;
   }
 
+  /**
+   * Handles subtask decomposition for a task and re-wires any existing downstream tasks
+   * that depended on parentTaskId so they now depend on the new child tasks.
+   */
   handleDecomposition(parentTaskId, decompositionPayload) {
     const parentTask = this.tasks.get(parentTaskId);
     if (!parentTask) return [];
@@ -193,13 +261,89 @@ export class TaskDependencyGraph {
         taskId: sub.taskId,
         objective: sub.objective || `Subtask of ${parentTaskId}`,
         dependencies: subDependencies,
+        inputRefs: Array.isArray(sub.inputRefs) ? sub.inputRefs : (parentTask.inputRefs || []),
         ownedResources: sub.ownedResources || [],
-        isEssential: parentTask.isEssential
+        isEssential: parentTask.isEssential,
+        maxAttempts: sub.maxAttempts || parentTask.maxAttempts || 3
       });
       newTasks.push(subTask);
     }
 
+    // Downstream dependency rewiring:
+    // Any existing tasks in the graph that depended on parentTaskId now depend on the newly created tasks
+    if (newTasks.length > 0) {
+      const newSubTaskIds = newTasks.map(t => t.taskId);
+      for (const [taskId, task] of this.tasks.entries()) {
+        if (taskId !== parentTaskId && task.dependencies.includes(parentTaskId)) {
+          task.dependencies = task.dependencies
+            .filter(d => d !== parentTaskId)
+            .concat(newSubTaskIds);
+        }
+      }
+    }
+
     return newTasks;
+  }
+
+  /**
+   * Dynamically injects an array of specialist tasks into the graph,
+   * wiring their dependencies and optionally updating downstream tasks.
+   */
+  injectDynamicTasks(newTasksList = [], { afterTaskId, beforeTaskIds = [] } = {}) {
+    const addedTasks = [];
+    for (const t of newTasksList) {
+      const taskDeps = Array.isArray(t.dependencies) ? [...t.dependencies] : [];
+      if (afterTaskId && !taskDeps.includes(afterTaskId)) {
+        taskDeps.push(afterTaskId);
+      }
+      const added = this.addTask({
+        ...t,
+        dependencies: taskDeps
+      });
+      addedTasks.push(added);
+    }
+
+    if (beforeTaskIds.length > 0 && addedTasks.length > 0) {
+      const addedIds = addedTasks.map(t => t.taskId);
+      for (const beforeId of beforeTaskIds) {
+        const targetTask = this.tasks.get(beforeId);
+        if (targetTask) {
+          for (const newId of addedIds) {
+            if (!targetTask.dependencies.includes(newId)) {
+              targetTask.dependencies.push(newId);
+            }
+          }
+        }
+      }
+    }
+
+    return addedTasks;
+  }
+
+  /**
+   * Returns all tasks sorted in topological order (dependencies precede dependents).
+   */
+  getTopologicalOrder() {
+    const visited = new Set();
+    const result = [];
+
+    const visit = (taskId) => {
+      if (visited.has(taskId)) return;
+      visited.add(taskId);
+      const task = this.tasks.get(taskId);
+      if (task) {
+        for (const depId of task.dependencies) {
+          visit(depId);
+        }
+        result.push(task);
+      }
+    };
+
+    for (const taskId of this.tasks.keys()) {
+      visit(taskId);
+    }
+
+    return result;
   }
 
   isSwarmComplete() {

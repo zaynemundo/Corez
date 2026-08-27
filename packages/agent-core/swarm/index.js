@@ -9,26 +9,18 @@ export { AdaptiveConcurrencyQueue } from '../../../src/services/gamePipeline/swa
 
 export { HierarchicalSynthesis, chunkByTokens, DEFAULT_CHUNK_MAX_TOKENS } from './hierarchicalSynthesis.js';
 
+export {
+  SWARM_ROLES,
+  ROLE_DEFINITIONS,
+  getRoleDefinition,
+  getRoleSystemPrompt,
+  formatRoleUserPrompt
+} from './roles.js';
+
 import { TaskDependencyGraph, AGENT_LIFECYCLE_STATES } from '../../../src/services/gamePipeline/swarm/taskGraph.js';
 import { AdaptiveConcurrencyQueue } from '../../../src/services/gamePipeline/swarm/adaptiveQueue.js';
 import { estimateTokens } from '../persistence/ContextStore.js';
-
-export const SWARM_ROLES = Object.freeze({
-  ORCHESTRATOR: 'orchestrator',
-  EXPLORER: 'explorer',
-  ARCHITECT: 'architect',
-  ENGINEER: 'engineer',
-  FRONTEND: 'frontend',
-  BACKEND: 'backend',
-  DEBUGGER: 'debugger',
-  TESTER: 'tester',
-  REVIEWER: 'reviewer',
-  SECURITY: 'security',
-  INTEGRATION: 'integration',
-  ART_DIRECTOR: 'art-director',
-  ACCESSIBILITY: 'accessibility',
-  PERFORMANCE: 'performance'
-});
+import { SWARM_ROLES, getRoleSystemPrompt, formatRoleUserPrompt } from './roles.js';
 
 export const SWARM_MODE = Object.freeze({
   AUTO: 'auto',
@@ -171,25 +163,97 @@ export class GenericSwarmOrchestrator {
     const completedResults = [];
     const verification = [];
 
-    // 2. Process DAG tasks using Adaptive Concurrency Queue
+    // Process DAG tasks using Adaptive Concurrency Queue and atomic Resource Locking
     while (!graph.isSwarmComplete()) {
       const readyTasks = graph.getReadyTasks();
       if (readyTasks.length === 0) {
         const anyRunningOrQueued = Array.from(graph.tasks.values()).some(
-          t => t.status === AGENT_LIFECYCLE_STATES.RUNNING || t.status === AGENT_LIFECYCLE_STATES.QUEUED
+          t => t.status === AGENT_LIFECYCLE_STATES.RUNNING ||
+               t.status === AGENT_LIFECYCLE_STATES.QUEUED ||
+               t.status === AGENT_LIFECYCLE_STATES.RETRYING
         );
         if (!anyRunningOrQueued) break;
         await new Promise(r => setTimeout(r, 50));
         continue;
       }
 
-      const executions = readyTasks.map(task => {
+      // Filter tasks that can acquire all required ownedResources
+      const acquirableTasks = [];
+      for (const task of readyTasks) {
+        if (graph.resourceManager.canAcquireAll(task.ownedResources, task.agentId)) {
+          acquirableTasks.push(task);
+        }
+      }
+
+      if (acquirableTasks.length === 0) {
+        // Resource contention: wait for running tasks to release locks
+        await new Promise(r => setTimeout(r, 50));
+        continue;
+      }
+
+      const executions = acquirableTasks.map(task => {
+        // Atomically acquire resource locks
+        const lockRes = graph.resourceManager.acquireLocks(task.ownedResources, task.agentId);
+        if (!lockRes.success) {
+          // Defer task to next loop iteration
+          return Promise.resolve();
+        }
+
         task.status = AGENT_LIFECYCLE_STATES.RUNNING;
         onStatus({ step: 'agent_start', role: task.role, taskId: task.taskId, objective: task.objective });
 
         return this.queue.enqueue(async () => {
           try {
-            const result = await this.runSingleAgentTask(graph, task, userPrompt, options);
+            // Gather upstream context from completed dependencies and inputRefs
+            const upstreamIds = Array.from(new Set([...(task.dependencies || []), ...(task.inputRefs || [])]));
+            const upstreamContexts = [];
+            for (const depId of upstreamIds) {
+              const depTask = graph.tasks.get(depId);
+              const output = graph.projectState.state.validatedOutputs[depId];
+              if (depTask && output !== undefined) {
+                upstreamContexts.push({
+                  taskId: depId,
+                  role: depTask.role,
+                  output
+                });
+              }
+            }
+
+            const result = await this.runSingleAgentTask(graph, task, userPrompt, {
+              ...options,
+              upstreamContexts
+            });
+
+            // Extract potential decomposition payload from result.output or result
+            let decompositionPayload = null;
+            if (result && typeof result === 'object') {
+              if (result.output && typeof result.output === 'object') {
+                decompositionPayload = result.output;
+              } else if (result.status === 'requires_decomposition' || Array.isArray(result.suggestedTasks)) {
+                decompositionPayload = result;
+              } else if (typeof result.output === 'string') {
+                try {
+                  const parsed = JSON.parse(result.output);
+                  if (parsed && typeof parsed === 'object' && (parsed.status === 'requires_decomposition' || Array.isArray(parsed.suggestedTasks))) {
+                    decompositionPayload = parsed;
+                  }
+                } catch {}
+              }
+            }
+
+            // Handle dynamic runtime decomposition if suggested
+            if (decompositionPayload && (decompositionPayload.status === 'requires_decomposition' || Array.isArray(decompositionPayload.suggestedTasks))) {
+              const newSubtasks = graph.handleDecomposition(task.taskId, decompositionPayload);
+              graph.resourceManager.releaseAllLocksForAgent(task.agentId);
+              onStatus({
+                step: 'agent_decomposed',
+                role: task.role,
+                taskId: task.taskId,
+                newTasksCount: newSubtasks.length
+              });
+              return result;
+            }
+
             task.status = AGENT_LIFECYCLE_STATES.VALIDATING;
 
             if (this.verifier) {
@@ -206,27 +270,64 @@ export class GenericSwarmOrchestrator {
                 ok,
                 evidence: verdict?.evidence || ''
               });
+
               if (!ok) {
+                const evidence = verdict?.evidence || 'no evidence provided';
+                if ((task.attempt || 1) < (task.maxAttempts || 3)) {
+                  task.attempt = (task.attempt || 1) + 1;
+                  task.status = AGENT_LIFECYCLE_STATES.RETRYING;
+                  task.verificationEvidence = evidence;
+                  graph.resourceManager.releaseAllLocksForAgent(task.agentId);
+                  onStatus({
+                    step: 'agent_retrying',
+                    role: task.role,
+                    taskId: task.taskId,
+                    attempt: task.attempt,
+                    reason: `verification failed: ${evidence}`
+                  });
+                  return result;
+                }
+
                 task.status = AGENT_LIFECYCLE_STATES.FAILED;
-                task.failureReason = `verification failed: ${verdict?.evidence || 'no evidence provided'}`;
+                task.failureReason = `verification failed: ${evidence}`;
                 graph.projectState.recordIssue(task.agentId, task.taskId, task.failureReason, task.isEssential);
+                graph.resourceManager.releaseAllLocksForAgent(task.agentId);
                 onStatus({ step: 'agent_failed', role: task.role, taskId: task.taskId, reason: task.failureReason });
                 return result;
               }
             }
 
-            const commitRes = graph.projectState.commitTaskOutput(task.agentId, task.taskId, result);
+            const commitRes = graph.projectState.commitTaskOutput(task.agentId, task.taskId, result, task.ownedResources);
             if (!commitRes.success) {
               task.status = AGENT_LIFECYCLE_STATES.FAILED;
               task.failureReason = commitRes.reason;
+              graph.resourceManager.releaseAllLocksForAgent(task.agentId);
               onStatus({ step: 'agent_failed', role: task.role, taskId: task.taskId, reason: commitRes.reason });
               return result;
             }
+
             task.status = AGENT_LIFECYCLE_STATES.COMPLETED;
+            graph.resourceManager.releaseAllLocksForAgent(task.agentId);
             completedResults.push({ task, result });
             onStatus({ step: 'agent_complete', role: task.role, taskId: task.taskId });
             return result;
           } catch (err) {
+            graph.resourceManager.releaseAllLocksForAgent(task.agentId);
+
+            if ((task.attempt || 1) < (task.maxAttempts || 3) && !err.message?.includes('no providerRouter')) {
+              task.attempt = (task.attempt || 1) + 1;
+              task.status = AGENT_LIFECYCLE_STATES.RETRYING;
+              task.lastError = err.message;
+              onStatus({
+                step: 'agent_retrying',
+                role: task.role,
+                taskId: task.taskId,
+                attempt: task.attempt,
+                reason: err.message
+              });
+              return;
+            }
+
             task.status = AGENT_LIFECYCLE_STATES.FAILED;
             task.failureReason = err.message;
             onStatus({ step: 'agent_failed', role: task.role, taskId: task.taskId, reason: err.message });
@@ -242,7 +343,7 @@ export class GenericSwarmOrchestrator {
       t => t.status === AGENT_LIFECYCLE_STATES.FAILED
     );
     const stuckTasks = Array.from(graph.tasks.values()).filter(t => {
-      const terminal = [AGENT_LIFECYCLE_STATES.COMPLETED, AGENT_LIFECYCLE_STATES.FAILED];
+      const terminal = [AGENT_LIFECYCLE_STATES.COMPLETED, AGENT_LIFECYCLE_STATES.DECOMPOSED, AGENT_LIFECYCLE_STATES.FAILED];
       return !terminal.includes(t.status);
     });
 
@@ -254,6 +355,21 @@ export class GenericSwarmOrchestrator {
       });
     }
 
+    // Build discrete artifact map and topological synthesis
+    const topologicalTasks = graph.getTopologicalOrder();
+    const artifactMap = {};
+    const topologicalOutputs = [];
+
+    for (const t of topologicalTasks) {
+      const out = graph.projectState.state.validatedOutputs[t.taskId];
+      if (out !== undefined) {
+        topologicalOutputs.push({ taskId: t.taskId, role: t.role, output: out });
+        for (const res of t.ownedResources) {
+          artifactMap[res] = out;
+        }
+      }
+    }
+
     return {
       projectId,
       mode,
@@ -262,11 +378,13 @@ export class GenericSwarmOrchestrator {
       results: completedResults,
       verification,
       failedTasks: failedTasks.map(t => ({ taskId: t.taskId, role: t.role, reason: t.failureReason })),
-      incompleteTasks: stuckTasks.map(t => ({ taskId: t.taskId, role: t.role, status: t.status }))
+      incompleteTasks: stuckTasks.map(t => ({ taskId: t.taskId, role: t.role, status: t.status })),
+      artifactMap,
+      topologicalOutputs
     };
   }
 
-  async runSingleAgentTask(graph, task, userPrompt, options) {
+  async runSingleAgentTask(graph, task, userPrompt, options = {}) {
     if (options.mockExecution) {
       return { status: 'success', role: task.role, output: `Completed objective: ${task.objective}` };
     }
@@ -280,9 +398,23 @@ export class GenericSwarmOrchestrator {
       );
     }
 
+    const systemPrompt = getRoleSystemPrompt(task.role);
+    const userContent = formatRoleUserPrompt({
+      role: task.role,
+      objective: task.objective,
+      userPrompt,
+      upstreamContexts: options.upstreamContexts || [],
+      retryContext: task.attempt > 1 ? {
+        attempt: task.attempt,
+        maxAttempts: task.maxAttempts,
+        lastError: task.lastError,
+        verificationEvidence: task.verificationEvidence
+      } : null
+    });
+
     const messages = [
-      { role: 'system', content: `You are the CoreZ ${task.role} agent.` },
-      { role: 'user', content: `Task: ${task.objective}\nJob: ${userPrompt}` }
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userContent }
     ];
     const res = await this.providerRouter.generate({ messages, signal: options.signal });
     return { status: 'success', role: task.role, output: res.content };
