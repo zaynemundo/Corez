@@ -123,6 +123,34 @@ export function analyzePublicUserIntent(prompt) {
     };
   }
 
+  // CV rewrite disambiguation: pasted work history containing "Developed websites..."
+  // must not be treated as app/website creation when instruction is to condense.
+  const lowerForCV = cleanPrompt.toLowerCase();
+  const isCVRewriteForLegacy = (/\b(cv|resume|curriculum vitae)\b/i.test(lowerForCV) && /\b(less|short|concise|condense|rewrite|rephrase|reduce|bullet)\b/i.test(lowerForCV))
+    || /\bgive me less description\b/i.test(lowerForCV)
+    || (/\b(less description|shorten|condense|rewrite)\b/i.test(lowerForCV) && (lowerForCV.includes('created proposals') || lowerForCV.includes('developed websites')));
+  if (isCVRewriteForLegacy) {
+    const instructionPart = (() => {
+      const markers = ['created proposals', 'developed websites using', 'collaborated with the design'];
+      let earliest = cleanPrompt.length;
+      for (const m of markers) {
+        const idx = lowerForCV.indexOf(m);
+        if (idx !== -1 && idx < earliest) earliest = idx;
+      }
+      return earliest < cleanPrompt.length ? lowerForCV.slice(0, earliest) : lowerForCV.slice(0, 280);
+    })();
+    const hasWebInInstruction = /\b(build|make|create|generate|develop|design|launch|ship)\b.*\b(website|site|landing page|webpage|web app|homepage|portfolio site)\b/i.test(instructionPart);
+    if (!hasWebInInstruction) {
+      return {
+        type: 'writing',
+        summary: 'Help the user shape public-facing words or content.',
+        responseStrategy: 'Offer a concise draft or rewrite with a clear tone.',
+        confidence: 0.92,
+        source: 'prompt-intelligence-cv-guard'
+      };
+    }
+  }
+
   // Try the new Prompt Intelligence intent engine first
   let newIntent;
   try {

@@ -127,8 +127,8 @@ const INTENT_HANDLERS = [
   },
   {
     type: INTENT_TYPES.CONTENT_CREATION,
-    pattern: /\b(write|create|compose|draft|generate)\b.*\b(article|blog|post|email|newsletter|copy|content|text|document|report|proposal|summary|description)\b/i,
-    signals: ['write', 'create', 'compose', 'article', 'blog', 'email', 'newsletter', 'copy', 'content'],
+    pattern: /\b(write|create|compose|draft|generate|rewrite|condense|shorten|summarize|rephrase|reduce|polish|edit)\b.*\b(article|blog|post|email|newsletter|copy|content|text|document|report|proposal|summary|description|cv|resume|bullet|bio)\b|\b(give me less|less description|make.*shorter|make.*concise|short version|concise version|ultra.short|condensed version)\b/i,
+    signals: ['write', 'create', 'compose', 'article', 'blog', 'email', 'newsletter', 'copy', 'content', 'cv', 'resume', 'rewrite', 'summarize', 'condense', 'less description', 'shorten', 'bullet'],
     extract(_prompt, _lower) {
       return {
         goal: `create written content`,
@@ -255,6 +255,42 @@ function detectOutputFormat(lower, primaryType) {
   return 'text';
 }
 
+// ---------------------------------------------------------------------------
+// CV / Rewrite vs Web-dev disambiguation
+// ---------------------------------------------------------------------------
+
+function isCVRewriteRequest(lower) {
+  const hasCV = /\b(cv|resume|curriculum vitae|biodata)\b/i.test(lower);
+  const hasRewriteSignal = /\b(less description|less text|shorten|short version|condense|condensed|concise|make.*concise|make.*shorter|rewrite|rephrase|reduce|brief|summarize|summary|bullet|one line)\b/i.test(lower) || /\bgive me less/i.test(lower);
+  const hasPastedCVContent = lower.includes('created proposals') || lower.includes('developed websites') || (lower.includes('social media') && lower.includes('analytics'));
+  // Case 1: explicit CV + rewrite
+  if (hasCV && hasRewriteSignal) return true;
+  // Case 2: rewrite request with pasted CV-like work history block
+  if (hasRewriteSignal && hasPastedCVContent) return true;
+  // Case 3: bare "give me less description for this" with any work history
+  if (/\bgive me less description\b/i.test(lower)) return true;
+  return false;
+}
+
+function getInstructionPart(prompt) {
+  // Instruction is typically the first 300 chars before a long pasted block.
+  // Detect pasted block start by a newline followed by a long bullet or "Created proposals"
+  const lower = prompt.toLowerCase();
+  const pastedMarkers = ['created proposals', 'developed websites using', 'collaborated with the design'];
+  let earliest = prompt.length;
+  for (const m of pastedMarkers) {
+    const idx = lower.indexOf(m);
+    if (idx !== -1 && idx < earliest) earliest = idx;
+  }
+  // Instruction is everything before the pasted block, or first 280 chars if no marker
+  if (earliest < prompt.length) return prompt.slice(0, earliest).toLowerCase();
+  return prompt.slice(0, 280).toLowerCase();
+}
+
+function hasExplicitWebCreationInInstruction(instructionLower) {
+  return /\b(build|make|create|generate|develop|design|launch|ship)\b.*\b(website|site|landing page|webpage|web app|web application|homepage|portfolio site)\b|\b(website|site|landing page|portfolio)\b.*\b(build|make|create|generate|design|develop)\b/i.test(instructionLower);
+}
+
 /**
  * @param {string} prompt — raw user prompt
  * @returns {object} structured intent result
@@ -265,6 +301,32 @@ export function classifyIntent(prompt) {
   }
 
   const lower = prompt.toLowerCase().trim();
+
+  // Early disambiguation: CV rewrite / "less description" must NOT become website_creation
+  // Pasted work history like "Developed websites using WordPress..." contains "website" + "develop"
+  // which previously triggered website_creation via signals. We isolate the instruction prefix.
+  if (isCVRewriteRequest(lower)) {
+    const instructionLower = getInstructionPart(prompt);
+    const hasWebInInstruction = hasExplicitWebCreationInInstruction(instructionLower);
+    if (!hasWebInInstruction) {
+      // Force content_creation — the user wants a shorter CV, not a website build
+      const handler = INTENT_HANDLERS.find((h) => h.type === INTENT_TYPES.CONTENT_CREATION);
+      const confidence = Math.max(0.88, computeConfidence(handler, lower));
+      const extracted = handler.extract(prompt, lower);
+      return createIntentResult({
+        type: INTENT_TYPES.CONTENT_CREATION,
+        primaryIntent: INTENT_TYPES.CONTENT_CREATION,
+        secondaryIntent: null,
+        confidence,
+        goal: extracted.goal || 'condense CV work history into concise bullets',
+        domain: 'career / resume',
+        deliverable: 'content',
+        isExistingProject: false,
+        outputFormat: 'markdown',
+      });
+    }
+  }
+
   const candidateMatches = [];
 
   for (const handler of INTENT_HANDLERS) {
@@ -276,6 +338,65 @@ export function classifyIntent(prompt) {
   }
 
   candidateMatches.sort((a, b) => b.confidence - a.confidence);
+
+  // Secondary guards: pasted CV/resume content must not hijack intent
+  const instructionLowerFallback = getInstructionPart(prompt);
+  const pastHistoryMarkers = ['created proposals', 'collaborated with the design', 'monitored social media', 'developed websites using', 'managed advertising', 'maintained close contact with clients', 'scheduled social media posts'];
+  const resumeSignalCount = pastHistoryMarkers.filter((m) => lower.includes(m)).length;
+  const looksLikeResumeDump = resumeSignalCount >= 2;
+
+  if (!hasExplicitWebCreationInInstruction(instructionLowerFallback) && /\b(give me less|less description|condense|rewrite|rephrase|make.*concise|make.*shorter|short version|concise version)\b/i.test(lower)) {
+    const filtered = candidateMatches.filter((c) => c.handler.type !== INTENT_TYPES.WEBSITE_CREATION && c.handler.type !== INTENT_TYPES.GAME_CREATION);
+    if (filtered.length > 0 && filtered[0].confidence >= 0.15) {
+      candidateMatches.length = 0;
+      candidateMatches.push(...filtered);
+      candidateMatches.sort((a, b) => b.confidence - a.confidence);
+    } else if (filtered.length === 0 && candidateMatches.some((c) => c.handler.type === INTENT_TYPES.WEBSITE_CREATION)) {
+      // No alternative — fall back to content_creation for rewrite requests
+      candidateMatches.length = 0;
+      const handler = INTENT_HANDLERS.find((h) => h.type === INTENT_TYPES.CONTENT_CREATION);
+      candidateMatches.push({ handler, confidence: 0.88 });
+    }
+  }
+
+  // Tertiary guard: pure past-tense resume dump without any web-build instruction should not be website_creation
+  if (looksLikeResumeDump && !hasExplicitWebCreationInInstruction(instructionLowerFallback)) {
+    const filteredResume = candidateMatches.filter((c) => c.handler.type !== INTENT_TYPES.WEBSITE_CREATION);
+    if (filteredResume.length > 0) {
+      candidateMatches.length = 0;
+      candidateMatches.push(...filteredResume);
+      candidateMatches.sort((a, b) => b.confidence - a.confidence);
+    } else if (candidateMatches.some((c) => c.handler.type === INTENT_TYPES.WEBSITE_CREATION)) {
+      // Convert bare resume dump to content_creation/general
+      candidateMatches.length = 0;
+      const handler = INTENT_HANDLERS.find((h) => h.type === INTENT_TYPES.CONTENT_CREATION);
+      if (handler) candidateMatches.push({ handler, confidence: 0.75 });
+    }
+  }
+
+  // Quaternary guard: signal-only website_creation from past-tense work history without request verb
+  const hasRequestVerb = /\b(need|want|looking for|hire|seeking|require|build|make|create|generate|design|launch|ship|make me|create me|build me)\b/i.test(instructionLowerFallback);
+  const pastResumeVerbs = (lower.match(/\b(developed|created|collaborated|monitored|managed|maintained|scheduled|designed)\b/gi) || []).length;
+  if (!hasRequestVerb && pastResumeVerbs >= 1 && pastResumeVerbs >= (lower.match(/\b(website|site|landing page)\b/gi) || []).length) {
+    // Check if top candidate is website_creation via signals only
+    const webHandler = INTENT_HANDLERS.find((h) => h.type === INTENT_TYPES.WEBSITE_CREATION);
+    const webPatternMatched = webHandler.pattern.test(prompt);
+    if (!webPatternMatched && candidateMatches.some((c) => c.handler.type === INTENT_TYPES.WEBSITE_CREATION)) {
+      const filteredPast = candidateMatches.filter((c) => c.handler.type !== INTENT_TYPES.WEBSITE_CREATION);
+      if (filteredPast.length > 0) {
+        candidateMatches.length = 0;
+        candidateMatches.push(...filteredPast);
+        candidateMatches.sort((a, b) => b.confidence - a.confidence);
+      } else {
+        candidateMatches.length = 0;
+        const handler = INTENT_HANDLERS.find((h) => h.type === INTENT_TYPES.CONTENT_CREATION);
+        if (handler && /\b(rewrite|condense|summarize|less description|shorten)\b/i.test(lower)) {
+          candidateMatches.push({ handler, confidence: 0.75 });
+        }
+        // otherwise will fall through to GENERAL_QUESTION
+      }
+    }
+  }
 
   if (candidateMatches.length === 0 || candidateMatches[0].confidence < 0.15) {
     const isExisting = detectIsExistingProject(lower, INTENT_TYPES.GENERAL_QUESTION);
