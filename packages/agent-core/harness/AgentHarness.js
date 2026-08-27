@@ -417,7 +417,7 @@ export class AgentHarness {
 
   // Agentic turn/step loop (DSH-lite) - single task, multi-step, tool-aware
   async #executeAgentLoop(task, options = {}) {
-    const { signal, renewLease } = options;
+    const { signal, renewLease: _renewLease } = options;
     const log = this._ensureSessionLog(task);
     const llmService = this.harnessContext?.llm || null;
     const loop = new AgentLoop({
@@ -444,13 +444,15 @@ export class AgentHarness {
     loop.send({ role: 'user', content: task.prompt }, 'next-turn', true);
 
     // mirror loop lifecycle events to task status
-    const onComplete = new Promise((resolve) => {
-      let settled = false;
-      const onStatus = (ev) => {
+    const _onComplete = new Promise((_resolve) => {
+      let _settled = false;
+      const _onStatus = (ev) => {
         if (ev.taskId !== task.taskId) return;
       };
+      void _settled; void _onStatus;
       // waitIdle will resolve after turn flow completes
     });
+    void _onComplete;
 
     try {
       await loop.whenIdle();

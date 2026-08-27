@@ -1,4 +1,4 @@
-/* eslint-disable no-empty, no-unused-vars */
+/* eslint-disable no-unused-vars */
 // ShellService — DSH dsh-shell / dsh-shell capability seam parity
 // Service Definition: ctx.shell.exec(command, opts)
 // Provider: local shell via ctx.subprocess (which spawns via child_process)

@@ -57,7 +57,7 @@ function useChatIdFromUrl() {
 
 function MainApp() {
   const navigate = useNavigate();
-  const location = useLocation();
+  const _location = useLocation();
   const chatIdFromUrl = useChatIdFromUrl();
   const { user } = useAuth();
 
@@ -554,7 +554,7 @@ function MainApp() {
 
     // Determine target chat — create if on "/" 
     let targetSessionId = activeSessionId;
-    let isNewlyCreated = false;
+    let _isNewlyCreated = false;
     let draftMessages = activeSession?.messages || [];
 
     // If no active chat, create one server-side first so URL becomes /chat/:id
@@ -563,7 +563,7 @@ function MainApp() {
       try {
         const created = await chatService.createChat({ title: provisionalTitle });
         targetSessionId = created.id;
-        isNewlyCreated = true;
+        _isNewlyCreated = true;
         const newSession = {
           id: targetSessionId,
           title: created.title,
@@ -578,7 +578,7 @@ function MainApp() {
       } catch (e) {
         console.warn('Failed to create chat on server, falling back to local id', e);
         targetSessionId = `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        isNewlyCreated = true;
+        _isNewlyCreated = true;
         const fallbackSession = {
           id: targetSessionId,
           title: provisionalTitle,

@@ -1,4 +1,4 @@
-/* eslint-disable no-empty, no-unused-vars */
+/* eslint-disable no-unused-vars */
 // SubagentService — DSH dsh-subagent capability seam parity
 // Service Definition: ctx.subagents (start, capabilities)
 // Providers: fork-in-process (local), spawn-in-process, acp (out-of-process)

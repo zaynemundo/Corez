@@ -1,4 +1,3 @@
-/* eslint-disable no-empty, no-unused-vars */
 // Core capability bundle — DSH dsh-base parity
 // Mounts all capability seams onto a HarnessContext as plugins.
 // Each capability is a Service Definition / Provider / Consumer triple.

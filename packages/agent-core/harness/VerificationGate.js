@@ -1,4 +1,3 @@
-/* eslint-disable no-empty, no-unused-vars */
 // VerificationGate: agy must test before saying its done.
 //
 // Enforces the DSH verifier principle: an agent's text claim is never evidence.

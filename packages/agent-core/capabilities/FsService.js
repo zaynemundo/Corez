@@ -1,4 +1,3 @@
-/* eslint-disable no-empty, no-unused-vars */
 // FsService — DSH dsh-fs / dsh-fs capability seam parity
 // Service Definition + local Provider. Consumers (tools) call ctx.fs,
 // which emits capability events (fs/*) and respects workspace policy.

@@ -210,7 +210,7 @@ export class SessionManager {
       this.logs.set(key, log);
       this._wrapLogPersistence(key, log);
       return log;
-    } catch (e) {
+    } catch (_e) {
       return null;
     }
   }

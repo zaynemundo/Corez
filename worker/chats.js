@@ -227,7 +227,7 @@ export async function handleChats(request, env) {
   // POST /api/chats — create new chat
   // -------------------------------------------------------------------
   if (pathname === '/api/chats' && request.method === 'POST') {
-    let body = {};
+    let body;
     try {
       body = await readBoundedJson(request);
     } catch {
@@ -360,7 +360,7 @@ export async function handleChats(request, env) {
   // PUT /api/chats/:id — bulk sync (title + messages) for migration
   // -------------------------------------------------------------------
   if (!isMessagesSubroute && request.method === 'PATCH') {
-    let body = {};
+    let body;
     try { body = await readBoundedJson(request); } catch { return jsonResponse(400, { error: 'Invalid JSON.' }); }
     const newTitle = sanitizeTitle(body?.title);
     const now = Date.now();
@@ -376,7 +376,7 @@ export async function handleChats(request, env) {
 
   if (!isMessagesSubroute && request.method === 'PUT') {
     // Bulk sync: replace messages (for migration / full sync)
-    let body = {};
+    let body;
     try { body = await readBoundedJson(request); } catch { return jsonResponse(400, { error: 'Invalid JSON.' }); }
     const newTitle = body?.title != null ? sanitizeTitle(body.title) : null;
     const incomingMessages = Array.isArray(body?.messages) ? body.messages : null;
@@ -436,7 +436,7 @@ export async function handleChats(request, env) {
   // POST /api/chats/:id/messages — append single message
   // -------------------------------------------------------------------
   if (isMessagesSubroute && request.method === 'POST') {
-    let body = {};
+    let body;
     try { body = await readBoundedJson(request); } catch { return jsonResponse(400, { error: 'Invalid JSON.' }); }
     const role = body?.role === 'assistant' ? 'assistant' : body?.role === 'system' ? 'system' : 'user';
     const content = sanitizeContent(body?.content);

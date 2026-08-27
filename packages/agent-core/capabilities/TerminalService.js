@@ -1,4 +1,4 @@
-/* eslint-disable no-empty, no-unused-vars */
+/* eslint-disable no-unused-vars */
 // TerminalService — DSH dsh-terminal capability seam parity
 // Service Definition: ctx.terminals (persistent terminal sessions)
 // Provider: PersistentTerminalManager (already exists) wrapped as dsh-terminal provider

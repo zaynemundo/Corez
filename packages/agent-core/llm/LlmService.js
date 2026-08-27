@@ -1,4 +1,3 @@
-/* eslint-disable no-empty, no-unused-vars */
 // LlmService — DSH dsh-llm parity (Service Definition)
 // Wraps ProviderChain with prepareCall / stream / adapter metadata,
 // BlockAssembler integration, and reasoning/maxTokens/contextWindow handling.

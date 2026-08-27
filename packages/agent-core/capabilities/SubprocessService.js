@@ -1,4 +1,4 @@
-/* eslint-disable no-empty, no-unused-vars */
+/* eslint-disable no-unused-vars */
 // SubprocessService — DSH dsh-subprocess capability seam parity
 // Service Definition: ctx.subprocess.spawn(command, opts)
 // Provider: local process-tree provider (spawnSync / spawn)

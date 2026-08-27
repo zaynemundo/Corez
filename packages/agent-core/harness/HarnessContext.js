@@ -1,4 +1,3 @@
-/* eslint-disable no-empty, no-unused-vars */
 // HarnessContext: Cordis-inspired plugin context for CoreZ
 //
 // Provides the shared `ctx` surface that DSH calls `Context`:

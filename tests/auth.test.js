@@ -12,7 +12,7 @@ import {
   hashPassword,
   verifyPassword,
   validEmail,
-  verifySession,
+  verifySession as _verifySession,
   requireAuth,
   handleAuth,
   SESSION_COOKIE

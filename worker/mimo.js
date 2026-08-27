@@ -37,7 +37,7 @@ export function isMimoAvailable(env) {
   return Boolean(mimoKey(env));
 }
 
-export function collectMediaAttachments(messages, prompt) {
+export function collectMediaAttachments(messages, _prompt) {
   const collected = [];
   const seen = new Set();
   for (const m of Array.isArray(messages) ? messages : []) {
@@ -126,7 +126,7 @@ async function callMimo(messages, env, signal) {
     if (signal.aborted) controller.abort();
     else signal.addEventListener('abort', onAbort, { once: true });
   }
-  let timeout = null;
+  let timeout;
   let hit = false;
   // MiMo vision should be quick — 25s cap per attachment so the main build is not blocked
   timeout = setTimeout(() => { hit = true; controller.abort(); }, 25000);

@@ -1,4 +1,3 @@
-/* eslint-disable no-empty, no-unused-vars */
 // Typed event bus with replay support - DeepSeek Harness inspired.
 //
 // Supports Cordis-style dispatch modes on the same bus:

@@ -39,7 +39,7 @@ function stripLeadingBase64Blob(html) {
   // Must not contain real HTML tags
   if (/<[a-z][a-z0-9-]*[\s>]/i.test(prefix)) return html;
   // If prefix is mostly base64 chars + whitespace and no '<', it's a stray dump
-  const base64Len = prefix.replace(/[^A-Za-z0-9+\/\=\s]/g, '').length;
+  const base64Len = prefix.replace(/[^A-Za-z0-9+/=\s]/g, '').length;
   const ratio = base64Len / prefix.length;
   if (ratio > 0.85) return html.slice(htmlStart).trimStart();
   if (prefix.length > 1000 && !prefix.includes('<') && ratio > 0.7) return html.slice(htmlStart).trimStart();

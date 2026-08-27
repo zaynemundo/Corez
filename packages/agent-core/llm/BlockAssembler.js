@@ -1,4 +1,3 @@
-/* eslint-disable no-empty, no-unused-vars */
 // BlockAssembler — DSH dsh-llm/assembler parity
 // Single canonical assembly algorithm: feeds StreamChunk, yields ContentBlock[]
 
