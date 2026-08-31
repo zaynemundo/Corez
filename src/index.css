@@ -51,6 +51,8 @@
   --chat-bg-overlay: rgba(0, 0, 0, 0.48);
   --chat-bg-sidebar: rgba(0, 0, 0, 0.34);
   --chat-bg-pane: rgba(0, 0, 0, 0.14);
+  --chat-bg-blur: 10px;
+  --chat-bg-saturate: 1.05;
 
   --radius-xs: 6px;
   --radius-sm: 8px;
@@ -99,6 +101,8 @@
   --chat-bg-overlay: rgba(255, 255, 255, 0.68);
   --chat-bg-sidebar: rgba(255, 255, 255, 0.58);
   --chat-bg-pane: rgba(255, 255, 255, 0.22);
+  --chat-bg-blur: 10px;
+  --chat-bg-saturate: 1.05;
 }
 
 * {
@@ -177,16 +181,25 @@ h1, h2, h3, h4, h5, h6 {
   width: 100%;
   height: 100%;
   background-color: var(--bg-primary);
+  overflow: hidden;
+}
+
+.app-container::before {
+  content: "";
+  position: absolute;
+  inset: -12px;
+  z-index: 0;
   background-image: var(--chat-bg-image-fallback);
   background-image: var(--chat-bg-image);
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
-  background-attachment: fixed;
-  overflow: hidden;
+  filter: blur(var(--chat-bg-blur)) saturate(var(--chat-bg-saturate)) brightness(0.96);
+  transform: scale(1.06);
+  pointer-events: none;
 }
 
-.app-container::before {
+.app-container::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -201,25 +214,21 @@ h1, h2, h3, h4, h5, h6 {
   z-index: 1;
 }
 
-@supports (-webkit-touch-callout: none) {
-  .app-container {
-    background-attachment: scroll;
-  }
-}
-
 @media (max-width: 767px) {
-  .app-container {
+  .app-container::before {
     background-image: url('/corez-bg-1200.webp');
   }
 }
 
-/* Fully Rounded Sidebar Elements — translucent over unified parent grain */
+/* Fully Rounded Sidebar Elements — translucent blurred glass over unified parent grain */
 .sidebar {
   width: var(--sidebar-width);
   height: 100%;
   margin: var(--sidebar-margin);
   padding: 0;
   background-color: var(--sidebar-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: none;
   border-right: 1px solid var(--sidebar-border);
   border-radius: var(--sidebar-radius);
@@ -614,6 +623,8 @@ h1, h2, h3, h4, h5, h6 {
   flex-direction: column;
   height: 100%;
   background-color: var(--chat-bg-pane);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   min-width: 0;
 }
 
