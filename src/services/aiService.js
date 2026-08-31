@@ -151,6 +151,34 @@ export function analyzePublicUserIntent(prompt) {
     }
   }
 
+  // Business-copy writing guard: "At Office Inspirations, we provide full-service design, installation..."
+  // Must not be treated as website/app creation even though it contains "design"/"solutions".
+  // Classify as writing when the prompt is a business sentence copy request without an explicit website/app build instruction.
+  const lowerBusiness = lowerForCV;
+  const isBusinessCopyWriting = (
+    (
+      (/\bat\s+[^.!?]{2,60},\s*we\s+provide\b/i.test(cleanPrompt) || lowerBusiness.includes('we provide a complete') || lowerBusiness.includes('we provide full-service'))
+      && /\b(design|installation|furniture|ergonomic|consultancy|leasing)\b/i.test(cleanPrompt)
+      && !/\b(build|create|make|generate|design|develop|ship)\b.*\b(website|web site|landing page|webpage|web app|homepage|portfolio|site|app|html|preview)\b/i.test(lowerBusiness)
+      && !/^\s*@(game|website|app)\b/i.test(cleanPrompt)
+    )
+    || (
+      lowerBusiness.includes('expanded versions') && lowerBusiness.includes('keep your core message')
+    )
+    || (
+      lowerBusiness.includes('at office inspirations') && lowerBusiness.includes('we provide')
+    )
+  );
+  if (isBusinessCopyWriting) {
+    return {
+      type: 'writing',
+      summary: 'Help the user shape public-facing words or content.',
+      responseStrategy: 'Offer a concise draft or rewrite with a clear tone. Do NOT generate HTML code, previews, or website scaffolding unless the user explicitly asks for a website, landing page, or code.',
+      confidence: 0.94,
+      source: 'business-copy-guard'
+    };
+  }
+
   // Try the new Prompt Intelligence intent engine first
   let newIntent;
   try {

@@ -756,11 +756,14 @@ function MainApp() {
       if (response) {
         const aiMsg = toAssistantMessage(response);
         const extractedCode = extractCodeFromMessage(aiMsg.content);
-        if (extractedCode) {
+        // Only auto-open canvas when the USER explicitly intended creation.
+        // Writing/explanation prompts that happen to contain ```html from the model
+        // stay as chat code blocks with a manual "Run in Canvas" button.
+        // No auto-population of canvas state for non-creation intents.
+        const shouldAutoOpenCanvas = Boolean(extractedCode && (isCreationIntent || isRevision) && !userDismissedCanvasRef.current);
+        if (shouldAutoOpenCanvas) {
           setActiveCanvasCode(extractedCode);
-          if (!userDismissedCanvasRef.current) {
-            setCanvasOpen(true);
-          }
+          setCanvasOpen(true);
         }
         
         const nowTs2 = Date.now();
