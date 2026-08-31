@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { 
   Settings, 
-  Sun, 
-  Moon, 
   PanelLeft,
   MoreVertical,
   Trash2
@@ -22,6 +20,8 @@ export default function Sidebar({
   onToggleTheme,
   onCloseSidebar
 }) {
+  // theme/onToggleTheme kept for backwards compat but now live inside SettingsModal
+  void theme; void onToggleTheme;
   const [openMenuId, setOpenMenuId] = useState(null);
 
   useEffect(() => {
@@ -134,37 +134,33 @@ export default function Sidebar({
       </div>
 
       <div className="sidebar-footer">
-        <AuthFooter />
-        <button 
-          className="footer-action-btn" 
-          onClick={onToggleTheme}
-          title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-        >
-          {theme === 'dark' ? <Sun size={16} strokeWidth={1.5} /> : <Moon size={16} strokeWidth={1.5} />}
-          <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
-        </button>
-        <button 
-          className="footer-action-btn" 
-          onClick={onOpenSettings}
-          title="Corez Settings"
-        >
-          <Settings size={16} strokeWidth={1.5} />
-          <span>Settings</span>
-        </button>
+        <SidebarProfileRow onOpenSettings={onOpenSettings} />
       </div>
     </aside>
   );
 }
 
-function AuthFooter() {
+function SidebarProfileRow({ onOpenSettings }) {
   let auth;
-  try { auth = useAuth(); } catch { return null; }
-  if (!auth?.user) return null;
+  try { auth = useAuth(); } catch { auth = null; }
+  const email = auth?.user?.email || '';
+  const username = email ? email.split('@')[0] : 'Guest';
+  const displayName = username.charAt(0).toUpperCase() + username.slice(1);
+  const initial = displayName.charAt(0).toUpperCase() || 'G';
   return (
-    <div className="sidebar-auth-footer">
-      <span className="sidebar-user-email" title={auth.user.email}>{auth.user.email}</span>
-      <button className="footer-action-btn" onClick={auth.logout} title="Logout">
-        <span>Logout</span>
+    <div className="sidebar-profile-row">
+      <div className="sidebar-profile-left" title={email}>
+        <div className="sidebar-avatar" aria-hidden="true">{initial}</div>
+        <span className="sidebar-username">{displayName}</span>
+      </div>
+      <button
+        type="button"
+        className="sidebar-settings-icon"
+        onClick={onOpenSettings}
+        aria-label="Open settings"
+        title="Settings"
+      >
+        <Settings size={16} strokeWidth={1.5} />
       </button>
     </div>
   );

@@ -514,11 +514,86 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .sidebar-footer {
-  padding: 7.5px 8px;
+  padding: 8px;
   border-top: 1px solid var(--sidebar-border);
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
+}
+
+/* Nice profile + settings row: username left, single settings icon right */
+.sidebar-profile-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 42px;
+  padding: 6px 6px 6px 8px;
+  border-radius: 10px;
+  background: transparent;
+  transition: var(--transition-fast);
+}
+
+.sidebar-profile-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.sidebar-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.sidebar-username {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 148px;
+  letter-spacing: -0.01em;
+}
+
+.sidebar-settings-icon {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: var(--transition-fast);
+}
+
+.sidebar-settings-icon:hover {
+  color: var(--text-primary);
+  background: var(--sidebar-item-hover-bg);
+  border-color: var(--border-color);
+}
+
+.sidebar-settings-icon:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
 }
 
 .footer-action-btn {
@@ -2324,6 +2399,74 @@ h1, h2, h3, h4, h5, h6 {
 
 .modal-header { display: flex; align-items: center; justify-content: space-between; }
 .modal-title { font-size: 0.875rem; font-weight: 400; }
+
+.settings-modal-card { gap: 1.1rem; }
+.settings-section { display: flex; flex-direction: column; gap: 0.6rem; }
+.settings-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.settings-profile-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.85rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+.settings-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+.settings-profile-meta { display: flex; flex-direction: column; min-width: 0; }
+.settings-profile-email { font-size: 13px; font-weight: 500; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings-profile-sub { font-size: 11px; color: var(--text-muted); }
+.settings-row-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.7rem 0.85rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.settings-row-btn:hover { border-color: var(--border-hover); background: var(--bg-card); }
+.settings-row-left { display: flex; align-items: center; gap: 0.6rem; }
+.settings-row-hint { font-size: 12px; color: var(--text-muted); }
+.settings-actions { display: flex; flex-direction: column; gap: 0.5rem; padding-top: 0.25rem; border-top: 1px solid var(--border-color); }
+.settings-danger-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 0.85rem;
+  background: transparent;
+  border: 1px solid rgba(239,68,68,0.22);
+  border-radius: 10px;
+  color: #ef4444;
+  font-size: 14px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.settings-danger-btn:hover { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.32); }
 
 .form-group { display: flex; flex-direction: column; gap: 0.3rem; }
 .form-label { font-size: 0.875rem; font-weight: 400; color: var(--text-secondary); }

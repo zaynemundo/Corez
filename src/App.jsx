@@ -1020,6 +1020,8 @@ function MainApp() {
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         onClearAllHistory={handleClearAllHistory}
+        theme={theme}
+        onToggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
       />
     </div>
   );
