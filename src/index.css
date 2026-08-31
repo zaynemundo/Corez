@@ -39,20 +39,12 @@
   --sidebar-body-size: 14px;
   --sidebar-icon-size: 20px;
   --sidebar-item-min-height: 38px;
-  --sidebar-bg: rgba(0, 0, 0, 0.34);
+  --sidebar-bg: var(--bg-primary);
   --sidebar-bg-opaque: var(--bg-primary);
   --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-shadow: none;
-  --sidebar-item-hover-bg: rgba(255, 255, 255, 0.06);
-  --sidebar-item-active-bg: rgba(255, 255, 255, 0.12);
-
-  --chat-bg-image: url('/corez-bg-1920.webp');
-  --chat-bg-image-fallback: url('/corez-bg-1920.jpg');
-  --chat-bg-overlay: rgba(0, 0, 0, 0.48);
-  --chat-bg-sidebar: rgba(0, 0, 0, 0.34);
-  --chat-bg-pane: rgba(0, 0, 0, 0.14);
-  --chat-bg-blur: 10px;
-  --chat-bg-saturate: 1.05;
+  --sidebar-item-hover-bg: rgba(255, 255, 255, 0.05);
+  --sidebar-item-active-bg: rgba(255, 255, 255, 0.10);
 
   --radius-xs: 6px;
   --radius-sm: 8px;
@@ -89,20 +81,12 @@
   --selection-color: #000000;
   --inline-code-color: #7c5e10;
 
-  --sidebar-bg: rgba(255, 255, 255, 0.58);
+  --sidebar-bg: var(--bg-primary);
   --sidebar-bg-opaque: var(--bg-primary);
   --sidebar-border: rgba(0, 0, 0, 0.08);
   --sidebar-shadow: none;
-  --sidebar-item-hover-bg: rgba(0, 0, 0, 0.05);
-  --sidebar-item-active-bg: rgba(0, 0, 0, 0.08);
-
-  --chat-bg-image: url('/corez-bg-1920.webp');
-  --chat-bg-image-fallback: url('/corez-bg-1920.jpg');
-  --chat-bg-overlay: rgba(255, 255, 255, 0.68);
-  --chat-bg-sidebar: rgba(255, 255, 255, 0.58);
-  --chat-bg-pane: rgba(255, 255, 255, 0.22);
-  --chat-bg-blur: 10px;
-  --chat-bg-saturate: 1.05;
+  --sidebar-item-hover-bg: rgba(0, 0, 0, 0.035);
+  --sidebar-item-active-bg: rgba(0, 0, 0, 0.06);
 }
 
 * {
@@ -174,61 +158,21 @@ h1, h2, h3, h4, h5, h6 {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 99px; }
 
-/* Main Layout — unified Corez grain background (single no-repeat cover across sidebar+chat) */
+/* Main Layout */
 .app-container {
-  position: relative;
   display: flex;
   width: 100%;
   height: 100%;
   background-color: var(--bg-primary);
-  overflow: hidden;
 }
 
-.app-container::before {
-  content: "";
-  position: absolute;
-  inset: -12px;
-  z-index: 0;
-  background-image: var(--chat-bg-image-fallback);
-  background-image: var(--chat-bg-image);
-  background-size: cover;
-  background-position: center center;
-  background-repeat: no-repeat;
-  filter: blur(var(--chat-bg-blur)) saturate(var(--chat-bg-saturate)) brightness(0.96);
-  transform: scale(1.06);
-  pointer-events: none;
-}
-
-.app-container::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  background: var(--chat-bg-overlay);
-  pointer-events: none;
-}
-
-.app-container > .sidebar,
-.app-container > .main-content {
-  position: relative;
-  z-index: 1;
-}
-
-@media (max-width: 767px) {
-  .app-container::before {
-    background-image: url('/corez-bg-1200.webp');
-  }
-}
-
-/* Fully Rounded Sidebar Elements — translucent blurred glass over unified parent grain */
+/* Fully Rounded Sidebar Elements */
 .sidebar {
   width: var(--sidebar-width);
   height: 100%;
   margin: var(--sidebar-margin);
   padding: 0;
   background-color: var(--sidebar-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   border: none;
   border-right: 1px solid var(--sidebar-border);
   border-radius: var(--sidebar-radius);
@@ -608,13 +552,12 @@ h1, h2, h3, h4, h5, h6 {
   justify-content: center;
 }
 
-/* Main Content Area — transparent so parent grain shows through */
+/* Main Content Area */
 .main-content {
   flex: 1;
   display: flex;
   height: 100%;
   overflow: hidden;
-  background: transparent;
 }
 
 .chat-pane {
@@ -622,9 +565,7 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background-color: var(--chat-bg-pane);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background-color: var(--bg-primary);
   min-width: 0;
 }
 
@@ -719,12 +660,12 @@ h1, h2, h3, h4, h5, h6 {
   display: none;
 }
 
-/* Spacious Message Inner Container — lowered 12px to sit deeper over blurred grain */
+/* Spacious Message Inner Container */
 .messages-inner {
   width: 100%;
   max-width: 800px;
   margin-top: auto;
-  padding: 2.25rem 1.5rem 4.5rem;
+  padding: 1.5rem 1.5rem 4.5rem;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
@@ -2071,7 +2012,7 @@ h1, h2, h3, h4, h5, h6 {
   max-width: calc(min(100%, 800px) - 3rem);
   align-self: center;
   position: sticky;
-  bottom: 1rem;
+  bottom: 1.5rem;
   flex-shrink: 0;
   z-index: 10;
   display: flex;
@@ -2847,15 +2788,6 @@ h1, h2, h3, h4, h5, h6 {
   .sidebar {
     top: env(safe-area-inset-top, 0px);
     left: env(safe-area-inset-left, 0px);
-  }
-}
-
-@media (max-width: 767px) {
-  .sidebar {
-    background-color: rgba(0, 0, 0, 0.82);
-  }
-  [data-theme="light"] .sidebar {
-    background-color: rgba(255, 255, 255, 0.92);
   }
 }
 
