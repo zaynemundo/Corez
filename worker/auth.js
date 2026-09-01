@@ -104,7 +104,10 @@ export async function ensureTables(env) {
   if (!env?.DB) return;
   // Create tables if not exist - idempotent, cheap on every auth request
   try {
-    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, password_hash TEXT, provider TEXT DEFAULT 'local', google_id TEXT, created_at INTEGER NOT NULL)`).run();
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, password_hash TEXT, provider TEXT DEFAULT 'local', google_id TEXT, created_at INTEGER NOT NULL, plan TEXT DEFAULT 'free')`).run();
+    // Migrate old users tables without plan column
+    try { await env.DB.prepare(`ALTER TABLE users ADD COLUMN plan TEXT DEFAULT 'free'`).run(); } catch {}
+    try { await env.DB.prepare(`ALTER TABLE users ADD COLUMN subscription_status TEXT DEFAULT 'active'`).run(); } catch {}
     await env.DB.prepare(`CREATE TABLE IF NOT EXISTS invite_codes (code TEXT PRIMARY KEY, used_by TEXT, used_at INTEGER, max_uses INTEGER DEFAULT 1, uses INTEGER DEFAULT 0)`).run();
     await env.DB.prepare(`CREATE TABLE IF NOT EXISTS chats (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, title TEXT NOT NULL DEFAULT 'New Conversation', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`).run();
     await env.DB.prepare(`CREATE TABLE IF NOT EXISTS chat_messages (id TEXT PRIMARY KEY, chat_id TEXT NOT NULL, user_id TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, attachments TEXT, created_at INTEGER NOT NULL)`).run();
@@ -113,19 +116,8 @@ export async function ensureTables(env) {
     await env.DB.prepare(`CREATE TABLE IF NOT EXISTS password_resets (id TEXT PRIMARY KEY, email TEXT NOT NULL, token TEXT UNIQUE NOT NULL, expires_at INTEGER NOT NULL, used INTEGER DEFAULT 0, created_at INTEGER NOT NULL)`).run();
     await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_resets_token ON password_resets(token)`).run();
     await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_resets_email ON password_resets(email)`).run();
-    // seed default invite codes from env if table empty
-    const count = await env.DB.prepare('SELECT COUNT(*) as c FROM invite_codes').first();
-    if (count && Number(count.c) === 0 && env.INVITE_CODES) {
-      const codes = String(env.INVITE_CODES).split(',').map(s=>s.trim()).filter(Boolean);
-      for (const code of codes) {
-        try { await env.DB.prepare('INSERT OR IGNORE INTO invite_codes (code) VALUES (?)').bind(code).run(); } catch {}
-      }
-    }
-    // fallback default code if nothing configured
-    const c2 = await env.DB.prepare('SELECT COUNT(*) as c FROM invite_codes').first();
-    if (c2 && Number(c2.c) === 0) {
-      await env.DB.prepare('INSERT OR IGNORE INTO invite_codes (code) VALUES (?)').bind('COREZ-INVITE-2026').run();
-    }
+    // Invite codes are now optional (kept for backward compat, not required for signup)
+    // No seeding needed for new installs — free signup is open
   } catch {}
 }
 
@@ -186,7 +178,13 @@ export async function handleAuth(request, env) {
   if (path === '/api/auth/me' && request.method === 'GET') {
     const sess = await verifySession(request, env);
     if (!sess) return jsonResponse(401, { error: 'Not authenticated' });
-    return jsonResponse(200, { user: { id: sess.uid, email: sess.email } });
+    // Prefer DB plan (source of truth), fallback to JWT
+    let plan = sess.plan || 'free';
+    try {
+      const u = await findUserById(env, sess.uid);
+      if (u && typeof u.plan === 'string' && u.plan) plan = String(u.plan).toLowerCase();
+    } catch {}
+    return jsonResponse(200, { user: { id: sess.uid, email: sess.email, plan } });
   }
 
   // Rate limiting for auth mutations (login & signup)
@@ -208,35 +206,37 @@ export async function handleAuth(request, env) {
     });
   }
 
-  // POST /api/auth/signup
+  // POST /api/auth/signup — invite code no longer required, 3 plans: free / standard / premium
   if (path === '/api/auth/signup' && request.method === 'POST') {
     let body;
     try { body = await request.json(); } catch { return jsonResponse(400, { error: 'Invalid JSON' }); }
     const email = String(body.email || '').trim().toLowerCase();
     const password = String(body.password || '');
-    const inviteCode = String(body.inviteCode || body.invite_code || '').trim();
+    const rawPlan = String(body.plan || body.tier || body.product || 'free').trim().toLowerCase();
+    const allowedPlans = new Set(['free', 'standard', 'premium', 'basic']);
+    const plan = allowedPlans.has(rawPlan) ? (rawPlan === 'basic' ? 'standard' : rawPlan) : 'free';
 
     if (!validEmail(email)) return jsonResponse(400, { error: 'Valid email required' });
     if (password.length < 8) return jsonResponse(400, { error: 'Password must be at least 8 characters' });
-    if (!inviteCode) return jsonResponse(400, { error: 'Invite code required' });
+    if (!allowedPlans.has(plan)) return jsonResponse(400, { error: 'Invalid plan. Use free, standard (18.36 AED) or premium (27.54 AED)' });
     if (!env?.DB) return jsonResponse(500, { error: 'Auth database not configured' });
     if (!env?.AUTH_SECRET) return jsonResponse(500, { error: 'AUTH_SECRET not configured' });
-
-    // validate invite code
-    const codeRow = await env.DB.prepare('SELECT * FROM invite_codes WHERE code=?').bind(inviteCode).first();
-    if (!codeRow) return jsonResponse(403, { error: 'Invalid invite code' });
-    if (Number(codeRow.uses) >= Number(codeRow.max_uses)) return jsonResponse(403, { error: 'Invite code already used' });
 
     const existing = await findUserByEmail(env, email);
     if (existing) return jsonResponse(409, { error: 'Email already registered' });
 
     const hash = await hashPassword(password);
     const id = randomId();
-    await env.DB.prepare('INSERT INTO users (id, email, password_hash, provider, created_at) VALUES (?,?,?,?,?)').bind(id, email, hash, 'local', Date.now()).run();
-    await env.DB.prepare('UPDATE invite_codes SET uses = uses + 1, used_by=?, used_at=? WHERE code=?').bind(email, Date.now(), inviteCode).run();
+    // Try insert with plan, fallback to without plan for old schema
+    try {
+      await env.DB.prepare('INSERT INTO users (id, email, password_hash, provider, created_at, plan) VALUES (?,?,?,?,?,?)').bind(id, email, hash, 'local', Date.now(), plan).run();
+    } catch {
+      await env.DB.prepare('INSERT INTO users (id, email, password_hash, provider, created_at) VALUES (?,?,?,?,?)').bind(id, email, hash, 'local', Date.now()).run();
+      try { await env.DB.prepare('UPDATE users SET plan=? WHERE id=?').bind(plan, id).run(); } catch {}
+    }
 
-    const token = await createJWT({ uid: id, email, exp: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE }, env.AUTH_SECRET);
-    return new Response(JSON.stringify({ ok: true, user: { id, email } }), {
+    const token = await createJWT({ uid: id, email, plan, exp: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE }, env.AUTH_SECRET);
+    return new Response(JSON.stringify({ ok: true, user: { id, email, plan } }), {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
@@ -260,8 +260,9 @@ export async function handleAuth(request, env) {
     if (!user || !user.password_hash) return jsonResponse(401, { error: 'Invalid email or password' });
     if (!(await verifyPassword(password, user.password_hash))) return jsonResponse(401, { error: 'Invalid email or password' });
 
-    const token = await createJWT({ uid: user.id, email: user.email, exp: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE }, env.AUTH_SECRET);
-    return new Response(JSON.stringify({ ok: true, user: { id: user.id, email: user.email } }), {
+    const plan = (user.plan && String(user.plan).trim().toLowerCase()) || 'free';
+    const token = await createJWT({ uid: user.id, email: user.email, plan, exp: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE }, env.AUTH_SECRET);
+    return new Response(JSON.stringify({ ok: true, user: { id: user.id, email: user.email, plan } }), {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
@@ -335,10 +336,15 @@ export async function handleAuth(request, env) {
     let user = await findUserByEmail(env, email);
     if (!user) {
       const id = randomId();
-      await env.DB.prepare('INSERT INTO users (id, email, password_hash, provider, google_id, created_at) VALUES (?,?,?,?,?,?)').bind(id, email, null, 'google', googleId, Date.now()).run();
-      user = { id, email };
+      try {
+        await env.DB.prepare('INSERT INTO users (id, email, password_hash, provider, google_id, created_at, plan) VALUES (?,?,?,?,?,?,?)').bind(id, email, null, 'google', googleId, Date.now(), 'free').run();
+      } catch {
+        await env.DB.prepare('INSERT INTO users (id, email, password_hash, provider, google_id, created_at) VALUES (?,?,?,?,?,?)').bind(id, email, null, 'google', googleId, Date.now()).run();
+      }
+      user = { id, email, plan: 'free' };
     }
-    const token = await createJWT({ uid: user.id, email: user.email, exp: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE }, env.AUTH_SECRET);
+    const plan = (user.plan && String(user.plan).trim().toLowerCase()) || 'free';
+    const token = await createJWT({ uid: user.id, email: user.email, plan, exp: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE }, env.AUTH_SECRET);
 
     const headers = new Headers();
     headers.set('Location', '/');

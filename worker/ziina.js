@@ -3,8 +3,9 @@ import { jsonResponse, readBoundedJson, safeErrorDetail } from './utils.js';
 const ZIINA_BASE = 'https://api-v2.ziina.com/api';
 const MIN_FILS = 200; // 2 AED
 
-// Corez product pricing — 18.36 AED Standard, 27.54 AED Premium
+// Corez product pricing — Free (0), Standard 18.36 AED, Premium 27.54 AED
 export const ZIINA_PLANS = {
+  free: { amount: 0, label: 'Free', aed: '0.00' },
   standard: { amount: 1836, label: 'Standard', aed: '18.36' },
   premium: { amount: 2754, label: 'Premium', aed: '27.54' },
   basic: { amount: 1836, label: 'Standard', aed: '18.36' }, // alias
@@ -137,8 +138,13 @@ export async function handleZiina(request, env) {
       amount = Number(amount);
     }
 
+    // Free plan needs no payment
+    if (planMeta && planMeta.amount === 0) {
+      return jsonResponse(200, { free: true, plan: 'free', amount: 0, currency_code: 'AED', message: 'Free plan — no payment required', redirect_url: null });
+    }
+
     if (!Number.isFinite(amount)) {
-      return jsonResponse(400, { error: 'amount or plan is required. Use plan: "standard" (1836 fils = 18.36 AED) or "premium" (2754 fils = 27.54 AED), or amount in fils (100 AED = 10000 fils). Minimum 200 fils (2 AED).' });
+      return jsonResponse(400, { error: 'amount or plan is required. Use plan: "free" (0 AED), "standard" (1836 fils = 18.36 AED) or "premium" (2754 fils = 27.54 AED), or amount in fils (100 AED = 10000 fils). Minimum 200 fils (2 AED).' });
     }
     // If user passed AED value like 100 and we already multiplied? The above handles amount_aed, but if they pass amount=100 expecting AED, they'd get 100 fils which is below min. We detect likely AED vs fils: if amount < 200 and amount is integer and they passed amount without fils suffix, we could hint. But spec says fils, so enforce.
     if (!Number.isInteger(amount)) {

@@ -70,8 +70,22 @@ function createMockD1() {
             return { success: true };
           }
           if (q.startsWith('INSERT INTO users')) {
-            const [id, email, password_hash, provider, created_at] = bound;
-            users.set(email.toLowerCase(), { id, email: email.toLowerCase(), password_hash, provider, created_at });
+            // Support both 5-col (old) and 6-col (with plan)
+            const [id, email, password_hash, provider, created_at, plan] = bound;
+            const p = plan || 'free';
+            // bound length 5 means no plan col; 6 means plan included
+            if (bound.length === 6) {
+              users.set(email.toLowerCase(), { id, email: email.toLowerCase(), password_hash, provider, created_at, plan: p });
+            } else {
+              users.set(email.toLowerCase(), { id, email: email.toLowerCase(), password_hash, provider, created_at, plan: 'free' });
+            }
+            return { success: true };
+          }
+          if (q.startsWith('UPDATE users SET plan=')) {
+            const [plan, id] = bound;
+            for (const u of users.values()) {
+              if (u.id === id) { u.plan = plan; break; }
+            }
             return { success: true };
           }
           if (q.startsWith('UPDATE invite_codes SET uses = uses + 1')) {
@@ -230,14 +244,14 @@ describe('Worker Auth Engine', () => {
       expect(body.user.email).toBe('user@corez.pro');
     });
 
-    it('registers a user on POST /api/auth/signup with valid invite code', async () => {
+    it('registers a user on POST /api/auth/signup without invite code (free plan default)', async () => {
       const req = new Request('https://corez.pro/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: 'newuser@corez.pro',
           password: 'Password123!',
-          inviteCode: 'COREZ-INVITE-2026'
+          plan: 'free'
         })
       });
 
@@ -246,13 +260,42 @@ describe('Worker Auth Engine', () => {
       const body = await res.json();
       expect(body.ok).toBe(true);
       expect(body.user.email).toBe('newuser@corez.pro');
+      expect(body.user.plan).toBe('free');
 
       const setCookie = res.headers.get('Set-Cookie');
       expect(setCookie).toContain(SESSION_COOKIE);
     });
 
-    it('rejects signup with invalid or exhausted invite code', async () => {
-      const badReq = new Request('https://corez.pro/api/auth/signup', {
+    it('registers with standard and premium plans and ignores invite codes', async () => {
+      const standardReq = new Request('https://corez.pro/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: 'standard@corez.pro',
+          password: 'Password123!',
+          plan: 'standard'
+        })
+      });
+      const standardRes = await handleAuth(standardReq, mockEnv);
+      expect(standardRes.status).toBe(200);
+      expect((await standardRes.json()).user.plan).toBe('standard');
+
+      const premiumReq = new Request('https://corez.pro/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: 'premium@corez.pro',
+          password: 'Password123!',
+          plan: 'premium',
+          inviteCode: 'IGNORED-CODE'
+        })
+      });
+      const premiumRes = await handleAuth(premiumReq, mockEnv);
+      expect(premiumRes.status).toBe(200);
+      expect((await premiumRes.json()).user.plan).toBe('premium');
+
+      // Invalid plan falls back to free, but invalid invite code no longer blocks
+      const badInviteReq = new Request('https://corez.pro/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -261,33 +304,20 @@ describe('Worker Auth Engine', () => {
           inviteCode: 'NON-EXISTENT-CODE'
         })
       });
-      const badRes = await handleAuth(badReq, mockEnv);
-      expect(badRes.status).toBe(403);
-      expect((await badRes.json()).error).toBe('Invalid invite code');
-
-      const exhaustedReq = new Request('https://corez.pro/api/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: 'exhausted@corez.pro',
-          password: 'Password123!',
-          inviteCode: 'COREZ-EXHAUSTED'
-        })
-      });
-      const exhaustedRes = await handleAuth(exhaustedReq, mockEnv);
-      expect(exhaustedRes.status).toBe(403);
-      expect((await exhaustedRes.json()).error).toBe('Invite code already used');
+      const badRes = await handleAuth(badInviteReq, mockEnv);
+      expect(badRes.status).toBe(200);
+      expect((await badRes.json()).user.email).toBe('bad@corez.pro');
     });
 
     it('authenticates registered user on POST /api/auth/login', async () => {
-      // 1. Sign up user
+      // 1. Sign up user (no invite code needed, free plan)
       const signupReq = new Request('https://corez.pro/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: 'loginuser@corez.pro',
           password: 'LoginPass123!',
-          inviteCode: 'COREZ-INVITE-2026'
+          plan: 'free'
         })
       });
       await handleAuth(signupReq, mockEnv);

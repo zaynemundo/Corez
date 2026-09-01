@@ -37,12 +37,12 @@ export function AuthProvider({ children }) {
     return d.user;
   };
 
-  const signup = async (email, password, inviteCode) => {
+  const signup = async (email, password, plan = 'free') => {
     const r = await fetch('/api/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ email, password, inviteCode })
+      body: JSON.stringify({ email, password, plan })
     });
     const d = await r.json().catch(()=>({}));
     if (!r.ok) throw new Error(d.error || 'Signup failed');
