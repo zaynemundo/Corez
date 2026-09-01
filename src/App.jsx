@@ -9,6 +9,7 @@ import SettingsModal from './components/SettingsModal';
 import DropZoneOverlay from './components/DropZoneOverlay';
 import Login from './pages/Login';
 import { PaymentSuccess, PaymentCancel } from './pages/PaymentStatus';
+import Pricing from './pages/Pricing';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { formatBytes, processFiles, hasFiles } from './utils/fileAttachmentUtils';
 import { generateAIResponse, extractCodeFromMessage, generateSessionTitle, generateAISessionTitle, isRevisionContextPrompt } from './services/aiService';
@@ -1030,10 +1031,20 @@ function MainApp() {
 
 function AppInner() {
   const { user, loading } = useAuth();
+  const location = useLocation();
+  const isPublicPricing = location.pathname === '/pricing';
   if (loading) {
     return null;
   }
   if (!user) {
+    if (isPublicPricing) {
+      return (
+        <Routes>
+          <Route path="/pricing" element={<Pricing />} />
+          <Route path="*" element={<Login />} />
+        </Routes>
+      );
+    }
     return <Login />;
   }
   // Authenticated — render routed MainApp
@@ -1041,6 +1052,7 @@ function AppInner() {
     <Routes>
       <Route path="/" element={<MainApp />} />
       <Route path="/chat/:chatId" element={<MainApp />} />
+      <Route path="/pricing" element={<Pricing />} />
       <Route path="/payment/success" element={<PaymentSuccess />} />
       <Route path="/payment/cancel" element={<PaymentCancel />} />
       <Route path="*" element={<Navigate to="/" replace />} />
