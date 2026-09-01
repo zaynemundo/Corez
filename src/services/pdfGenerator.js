@@ -20,23 +20,23 @@
 
 function escapeHtml(value) {
   return String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function inlineReportText(text) {
   return escapeHtml(text)
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*]+)\*/g, "<em>$1</em>")
     .replace(/(\[\d+\](?:\[\d+\])*)/g, '<span class="ref">$1</span>');
 }
 
 // Strip bold/italic markers for plain-text output (PDF).
 function stripInlineMarkdown(text) {
-  return String(text).replace(/\*\*/g, '').replace(/\*/g, '');
+  return String(text).replace(/\*\*/g, "").replace(/\*/g, "");
 }
 
 const HORIZONTAL_RULE = /^[-*_]{3,}\s*$/;
@@ -48,7 +48,9 @@ const NUMBERED_ITEM = /^(\d+)[.)]\s+/;
 // "1. item" lines become numbered items, horizontal rules are skipped and
 // everything else is a paragraph.
 function parseReportBlocks(body) {
-  const rawLines = String(body || '').split('\n').map((line) => line.replace(/\r/g, ''));
+  const rawLines = String(body || "")
+    .split("\n")
+    .map((line) => line.replace(/\r/g, ""));
   let start = 0;
   while (start < rawLines.length && !rawLines[start].trim()) start += 1;
   const lines = rawLines.slice(start);
@@ -59,14 +61,17 @@ function parseReportBlocks(body) {
     const trimmed = line.trim();
     if (!trimmed || HORIZONTAL_RULE.test(trimmed)) continue;
     if (/^#{2,}\s+/.test(trimmed)) {
-      const text = trimmed.replace(/^#{2,}\s+/, '');
-      blocks.push({ kind: NUMBERED_ITEM.test(text) ? 'subheading' : 'heading', text });
+      const text = trimmed.replace(/^#{2,}\s+/, "");
+      blocks.push({
+        kind: NUMBERED_ITEM.test(text) ? "subheading" : "heading",
+        text,
+      });
     } else if (/^[-*]\s+/.test(trimmed)) {
-      blocks.push({ kind: 'bullet', text: trimmed.replace(/^[-*]\s+/, '') });
+      blocks.push({ kind: "bullet", text: trimmed.replace(/^[-*]\s+/, "") });
     } else if (NUMBERED_ITEM.test(trimmed)) {
-      blocks.push({ kind: 'numbered', text: trimmed });
+      blocks.push({ kind: "numbered", text: trimmed });
     } else {
-      blocks.push({ kind: 'paragraph', text: trimmed });
+      blocks.push({ kind: "paragraph", text: trimmed });
     }
   }
   return blocks;
@@ -76,7 +81,9 @@ function parseReportBlocks(body) {
 // structured source list exists, the body copy is redundant and is dropped.
 function cutSourcesBlock(blocks, hasStructuredSources) {
   if (!hasStructuredSources) return blocks;
-  const index = blocks.findIndex((b) => b.kind === 'heading' && /^sources\s*$/i.test(b.text));
+  const index = blocks.findIndex(
+    (b) => b.kind === "heading" && /^sources\s*$/i.test(b.text),
+  );
   return index >= 0 ? blocks.slice(0, index) : blocks;
 }
 
@@ -94,59 +101,78 @@ function renderReportHtml(blocks) {
     }
   };
   for (const block of blocks) {
-    if (block.kind === 'heading') {
+    if (block.kind === "heading") {
       flushList();
       html.push(`<h2>${inlineReportText(block.text)}</h2>`);
-    } else if (block.kind === 'subheading') {
+    } else if (block.kind === "subheading") {
       flushList();
       html.push(`<h3>${inlineReportText(block.text)}</h3>`);
-    } else if (block.kind === 'bullet') {
-      if (listTag !== 'ul') flushList();
-      listTag = 'ul';
-      listItems = (listItems === null ? '' : listItems) + `<li>${inlineReportText(block.text)}</li>`;
-    } else if (block.kind === 'numbered') {
-      if (listTag !== 'ol') flushList();
-      listTag = 'ol';
-      listItems = (listItems === null ? '' : listItems) + `<li>${inlineReportText(block.text.replace(NUMBERED_ITEM, ''))}</li>`;
+    } else if (block.kind === "bullet") {
+      if (listTag !== "ul") flushList();
+      listTag = "ul";
+      listItems =
+        (listItems === null ? "" : listItems) +
+        `<li>${inlineReportText(block.text)}</li>`;
+    } else if (block.kind === "numbered") {
+      if (listTag !== "ol") flushList();
+      listTag = "ol";
+      listItems =
+        (listItems === null ? "" : listItems) +
+        `<li>${inlineReportText(block.text.replace(NUMBERED_ITEM, ""))}</li>`;
     } else {
       flushList();
       html.push(`<p>${inlineReportText(block.text)}</p>`);
     }
   }
   flushList();
-  return html.join('\n');
+  return html.join("\n");
 }
 
-export function synthesizePdfDocumentHtml({ title = 'CoreZ Research Report', body = '', sources = [] }) {
-  const safeTitle = String(title).replace(/[<>&"']/g, '').slice(0, 200);
+export function synthesizePdfDocumentHtml({
+  title = "CoreZ Research Report",
+  body = "",
+  sources = [],
+}) {
+  const safeTitle = String(title)
+    .replace(/[<>&"']/g, "")
+    .slice(0, 200);
   const sourceItems = Array.isArray(sources)
     ? sources
         .filter((s) => s && (s.title || s.url))
-        .map((s) => `<li><a href="${escapeHtml(s.url || '')}">${escapeHtml(s.title || 'Source')}</a>${s.url ? `<span>${escapeHtml(s.url)}</span>` : ''}</li>`)
-        .join('')
-    : '';
+        .map(
+          (s) =>
+            `<li><a href="${escapeHtml(s.url || "")}">${escapeHtml(s.title || "Source")}</a>${s.url ? `<span>${escapeHtml(s.url)}</span>` : ""}</li>`,
+        )
+        .join("")
+    : "";
   const sourcesBlock = sourceItems
     ? `<h2>Sources</h2><ol class="sources">${sourceItems}</ol>`
-    : '';
+    : "";
 
   // Body blocks with the redundant AI "Sources" section removed when the
   // styled structured list is shown instead.
-  const bodyBlocks = cutSourcesBlock(parseReportBlocks(body), sourceItems.length > 0);
+  const bodyBlocks = cutSourcesBlock(
+    parseReportBlocks(body),
+    sourceItems.length > 0,
+  );
   const reportHtml = renderReportHtml(bodyBlocks);
 
   // PDF paragraphs: the same structured blocks, with the structured sources
   // appended so the downloaded PDF still lists every source.
   const pdfBlocks = bodyBlocks.map((block) => ({
     kind: block.kind,
-    text: stripInlineMarkdown(block.text).replace(/[<>]/g, '')
+    text: stripInlineMarkdown(block.text).replace(/[<>]/g, ""),
   }));
   if (sourceItems.length > 0) {
-    pdfBlocks.push({ kind: 'heading', text: 'Sources' });
+    pdfBlocks.push({ kind: "heading", text: "Sources" });
     const cleanSources = sources.filter((s) => s && (s.title || s.url));
     cleanSources.forEach((source, index) => {
       pdfBlocks.push({
-        kind: 'numbered',
-        text: `${index + 1}. ${source.title || 'Source'} — ${source.url || ''}`.replace(/[<>]/g, '')
+        kind: "numbered",
+        text: `${index + 1}. ${source.title || "Source"} — ${source.url || ""}`.replace(
+          /[<>]/g,
+          "",
+        ),
       });
     });
   }
@@ -305,6 +331,6 @@ export function synthesizePdfDocumentHtml({ title = 'CoreZ Research Report', bod
   }
 </script>
 </body>
-</html>`
+</html>`,
   };
 }

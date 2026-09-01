@@ -3,7 +3,7 @@
  * ready to be rendered safely inside an iframe.
  */
 
-import { repairMalformedHtml } from './htmlRepair.js';
+import { repairMalformedHtml } from "./htmlRepair.js";
 
 // Multi-page site support: the model may emit multiple full HTML documents
 // inside ONE code block, separated by page markers:
@@ -30,15 +30,21 @@ const MULTI_PAGE_HEADER_PATTERN = /^\s*<!--\s*CORESITE-PAGES:[\s\S]*?-->\s*$/gm;
  * never breaks.
  */
 export function parseMultiPageSite(rawCode) {
-  if (!rawCode || typeof rawCode !== 'string') {
-    return { isMultiPage: false, pages: [{ name: 'index.html', html: rawCode || '' }] };
+  if (!rawCode || typeof rawCode !== "string") {
+    return {
+      isMultiPage: false,
+      pages: [{ name: "index.html", html: rawCode || "" }],
+    };
   }
 
   const trimmed = rawCode.trim();
   const hasMarker = MULTI_PAGE_MARKER_PATTERN.test(trimmed);
   MULTI_PAGE_MARKER_PATTERN.lastIndex = 0;
   if (!hasMarker) {
-    return { isMultiPage: false, pages: [{ name: 'index.html', html: trimmed }] };
+    return {
+      isMultiPage: false,
+      pages: [{ name: "index.html", html: trimmed }],
+    };
   }
 
   const segments = trimmed.split(MULTI_PAGE_MARKER_PATTERN);
@@ -50,7 +56,7 @@ export function parseMultiPageSite(rawCode) {
     const name = segments[i].trim();
     if (!MULTI_PAGE_NAME_PATTERN.test(name)) continue;
 
-    let html = segments[i + 1].replace(MULTI_PAGE_HEADER_PATTERN, '').trim();
+    let html = segments[i + 1].replace(MULTI_PAGE_HEADER_PATTERN, "").trim();
     if (!html) continue;
     if (pages.length >= MAX_MULTI_PAGE_COUNT) break;
 
@@ -61,14 +67,17 @@ export function parseMultiPageSite(rawCode) {
   }
 
   if (pages.length === 0) {
-    return { isMultiPage: false, pages: [{ name: 'index.html', html: trimmed }] };
+    return {
+      isMultiPage: false,
+      pages: [{ name: "index.html", html: trimmed }],
+    };
   }
 
   // Index page (if present) must come first so the preview opens on the home
   // page even when the model lists pages out of order.
   pages.sort((a, b) => {
-    if (a.name === 'index.html') return -1;
-    if (b.name === 'index.html') return 1;
+    if (a.name === "index.html") return -1;
+    if (b.name === "index.html") return 1;
     return a.name.localeCompare(b.name);
   });
 
@@ -97,38 +106,64 @@ export function validateMultiPageSite(pages) {
   const issues = [];
 
   if (!Array.isArray(pages) || pages.length === 0) {
-    return { valid: false, issues: [{ severity: 'error', page: null, message: 'No pages were produced.' }] };
+    return {
+      valid: false,
+      issues: [
+        { severity: "error", page: null, message: "No pages were produced." },
+      ],
+    };
   }
 
   const names = new Set(pages.map((p) => p.name));
-  if (!names.has('index.html')) {
-    issues.push({ severity: 'error', page: null, message: 'Missing index.html home page.' });
+  if (!names.has("index.html")) {
+    issues.push({
+      severity: "error",
+      page: null,
+      message: "Missing index.html home page.",
+    });
   }
 
   for (const page of pages) {
-    const html = typeof page?.html === 'string' ? page.html : '';
+    const html = typeof page?.html === "string" ? page.html : "";
     if (!html.trim()) {
-      issues.push({ severity: 'error', page: page.name, message: `${page.name} is empty.` });
+      issues.push({
+        severity: "error",
+        page: page.name,
+        message: `${page.name} is empty.`,
+      });
       continue;
     }
     if (!/<\/html>/i.test(html)) {
-      issues.push({ severity: 'warn', page: page.name, message: `${page.name} is not a complete HTML document (missing closing </html>).` });
+      issues.push({
+        severity: "warn",
+        page: page.name,
+        message: `${page.name} is not a complete HTML document (missing closing </html>).`,
+      });
     }
 
     for (const match of html.matchAll(INTERNAL_LINK_PATTERN)) {
       const href = match[1].trim();
-      if (!href || href.charAt(0) === '#' || ABSOLUTE_URL_PATTERN.test(href) || PROTOCOL_RELATIVE_PATTERN.test(href)) {
+      if (
+        !href ||
+        href.charAt(0) === "#" ||
+        ABSOLUTE_URL_PATTERN.test(href) ||
+        PROTOCOL_RELATIVE_PATTERN.test(href)
+      ) {
         continue;
       }
-      const target = href.split(/[#?]/)[0].split('/').pop();
+      const target = href.split(/[#?]/)[0].split("/").pop();
       if (!PAGE_TARGET_PATTERN.test(target)) continue;
       if (!names.has(target)) {
-        issues.push({ severity: 'error', page: page.name, message: `${page.name} links to missing page ${target}.` });
+        issues.push({
+          severity: "error",
+          page: page.name,
+          message: `${page.name} links to missing page ${target}.`,
+        });
       }
     }
   }
 
-  return { valid: issues.every((issue) => issue.severity !== 'error'), issues };
+  return { valid: issues.every((issue) => issue.severity !== "error"), issues };
 }
 
 /**
@@ -192,10 +227,13 @@ export const MULTI_PAGE_ROUTER_SCRIPT = `
 })();`;
 
 export function injectMultiPageRouter(html, pageNames) {
-  if (!html || typeof html !== 'string' || !pageNames || pageNames.length === 0) return html;
+  if (!html || typeof html !== "string" || !pageNames || pageNames.length === 0)
+    return html;
   const script = `<script>${MULTI_PAGE_ROUTER_SCRIPT}</script>`;
-  if (/<\/head>/i.test(html)) return html.replace(/<\/head>/i, `${script}\n</head>`);
-  if (/<\/body>/i.test(html)) return html.replace(/<\/body>/i, `${script}\n</body>`);
+  if (/<\/head>/i.test(html))
+    return html.replace(/<\/head>/i, `${script}\n</head>`);
+  if (/<\/body>/i.test(html))
+    return html.replace(/<\/body>/i, `${script}\n</body>`);
   return `${html}\n${script}`;
 }
 
@@ -262,9 +300,11 @@ export const FULLSCREEN_GAME_PATCH = `
 })();`;
 
 export function injectFullscreenGamePatch(html) {
-  if (!html || typeof html !== 'string' || !html.includes('<canvas')) return html;
+  if (!html || typeof html !== "string" || !html.includes("<canvas"))
+    return html;
   const script = `<script>${FULLSCREEN_GAME_PATCH}</script>`;
-  if (/<\/body>/i.test(html)) return html.replace(/<\/body>/i, `${script}\n</body>`);
+  if (/<\/body>/i.test(html))
+    return html.replace(/<\/body>/i, `${script}\n</body>`);
   return `${html}\n${script}`;
 }
 
@@ -295,9 +335,10 @@ export const NAVIGATION_GUARD_SCRIPT = `
   })();`;
 
 export function injectNavigationGuard(html) {
-  if (!html || typeof html !== 'string') return html;
+  if (!html || typeof html !== "string") return html;
   const script = `<script>${NAVIGATION_GUARD_SCRIPT}</script>`;
-  if (/<\/body>/i.test(html)) return html.replace(/<\/body>/i, `${script}\n</body>`);
+  if (/<\/body>/i.test(html))
+    return html.replace(/<\/body>/i, `${script}\n</body>`);
   return `${html}\n${script}`;
 }
 
@@ -307,10 +348,11 @@ export function injectNavigationGuard(html) {
 // while the preview document stays originless. Mirrors the worker's
 // published-page policy (publishedPageHeaders in worker/index.js) so
 // in-app previews and published links behave identically.
-const PREVIEW_CSP = "default-src 'none'; script-src 'unsafe-inline' https:; style-src 'unsafe-inline' https:; img-src data: https: blob:; font-src data: https:; media-src data: https: blob:; connect-src https:";
+const PREVIEW_CSP =
+  "default-src 'none'; script-src 'unsafe-inline' https:; style-src 'unsafe-inline' https:; img-src data: https: blob:; font-src data: https:; media-src data: https: blob:; connect-src https:";
 
 function withPreviewCsp(html) {
-  if (!html || typeof html !== 'string') return html;
+  if (!html || typeof html !== "string") return html;
   const meta = `  <meta http-equiv="Content-Security-Policy" content="${PREVIEW_CSP}">`;
   if (/<head[^>]*>/i.test(html)) {
     return html.replace(/<head[^>]*>/i, (match) => `${match}\n${meta}`);
@@ -319,23 +361,34 @@ function withPreviewCsp(html) {
 }
 
 export function formatCodeForPreview(rawCode) {
-  if (!rawCode || typeof rawCode !== 'string') return '';
+  if (!rawCode || typeof rawCode !== "string") return "";
   // Deterministic repair of model-output corruption (missing or mangled
   // <script>/<style> opening tags) that would otherwise make the browser
   // render the block as visible page text. Safe on well-formed documents
   // (no-op) and on React/JSX code (guarded internally).
   const trimmed = repairMalformedHtml(rawCode.trim());
-  const stripped = trimmed.replace(/^(?:\s*<!--[\s\S]*?-->\s*)+/i, '').trim();
+  const stripped = trimmed.replace(/^(?:\s*<!--[\s\S]*?-->\s*)+/i, "").trim();
 
   // 1. If it's already a full HTML document, return as-is
   if (/^<!DOCTYPE html/i.test(stripped) || /^<html/i.test(stripped)) {
-    return withPreviewCsp(injectNavigationGuard(injectFullscreenGamePatch(trimmed)));
+    return withPreviewCsp(
+      injectNavigationGuard(injectFullscreenGamePatch(trimmed)),
+    );
   }
 
   // 2. If it's pure HTML/CSS/JS without React/JSX syntax, wrap into a clean preview HTML document
-  const isReactJsx = /export\s+default|export\s+(?:const|let|var|function|class)|import\s+React|React\.|className\s*=|useState\s*\(|useEffect\s*\(|useRef\s*\(|useMemo\s*\(|useCallback\s*\(|useReducer\s*\(|useContext\s*\(|createContext\s*\(|onClick\s*=\s*\{|onChange\s*=\s*\{|return\s*\(\s*<|return\s*<|function\s+[A-Z]|const\s+[A-Z][A-Za-z0-9_]*\s*=\s*(?:\([^)]*\)|[A-Za-z0-9_]+)\s*=>/i.test(trimmed);
+  const isReactJsx =
+    /export\s+default|export\s+(?:const|let|var|function|class)|import\s+React|React\.|className\s*=|useState\s*\(|useEffect\s*\(|useRef\s*\(|useMemo\s*\(|useCallback\s*\(|useReducer\s*\(|useContext\s*\(|createContext\s*\(|onClick\s*=\s*\{|onChange\s*=\s*\{|return\s*\(\s*<|return\s*<|function\s+[A-Z]|const\s+[A-Z][A-Za-z0-9_]*\s*=\s*(?:\([^)]*\)|[A-Za-z0-9_]+)\s*=>/i.test(
+      trimmed,
+    );
 
-  if (!isReactJsx && (/<[a-z0-9-]+[\s>]/i.test(trimmed) || /<style[\s>]/i.test(trimmed) || /<script[\s>]/i.test(trimmed) || /document\.get|document\.query|window\.add/i.test(trimmed))) {
+  if (
+    !isReactJsx &&
+    (/<[a-z0-9-]+[\s>]/i.test(trimmed) ||
+      /<style[\s>]/i.test(trimmed) ||
+      /<script[\s>]/i.test(trimmed) ||
+      /document\.get|document\.query|window\.add/i.test(trimmed))
+  ) {
     return withPreviewCsp(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -373,79 +426,143 @@ export function formatCodeForPreview(rawCode) {
   let processed = rawCode;
 
   // Clean file comment headers like `// App.tsx` or `// components/layout/Navbar.tsx`
-  processed = processed.replace(/^\/\/\s*[\w./-]+\.(?:tsx|jsx|ts|js)\s*$/gm, '');
+  processed = processed.replace(
+    /^\/\/\s*[\w./-]+\.(?:tsx|jsx|ts|js)\s*$/gm,
+    "",
+  );
 
   // 3. Convert or remove ESM import statements
-  processed = processed.replace(/import\s+[\s\S]*?(?:from\s+['"].*?['"]|['"].*?['"])\s*;?/g, (match) => {
-    if (match.includes('lucide-react')) {
-      const iconMatches = match.match(/\{([\s\S]*?)\}/);
-      if (iconMatches && iconMatches[1]) {
-        const icons = iconMatches[1].split(',').map(i => i.trim()).filter(Boolean);
-        return icons.map(icon => `const ${icon} = LucideStub;`).join('\n');
+  processed = processed.replace(
+    /import\s+[\s\S]*?(?:from\s+['"].*?['"]|['"].*?['"])\s*;?/g,
+    (match) => {
+      if (match.includes("lucide-react")) {
+        const iconMatches = match.match(/\{([\s\S]*?)\}/);
+        if (iconMatches && iconMatches[1]) {
+          const icons = iconMatches[1]
+            .split(",")
+            .map((i) => i.trim())
+            .filter(Boolean);
+          return icons.map((icon) => `const ${icon} = LucideStub;`).join("\n");
+        }
       }
-    }
-    if (match.includes('three')) {
-      if (/import\s+(\*\s+as\s+THREE|THREE)\s+from/i.test(match) || /import\s+THREE\b/i.test(match)) {
+      if (match.includes("three")) {
+        if (
+          /import\s+(\*\s+as\s+THREE|THREE)\s+from/i.test(match) ||
+          /import\s+THREE\b/i.test(match)
+        ) {
+          return `var THREE = window.THREE || window.__THREE_STUB__;`;
+        }
+        const componentMatches = match.match(/\{([\s\S]*?)\}/);
+        if (componentMatches && componentMatches[1]) {
+          const comps = componentMatches[1]
+            .split(",")
+            .map((c) => c.trim().split(/\s+as\s+/)[0])
+            .filter(Boolean);
+          return comps
+            .map(
+              (comp) =>
+                `var ${comp} = (window.THREE && window.THREE['${comp}']) || window.__3D_STUBS__?.['${comp}'] || CanvasStub;`,
+            )
+            .join("\n");
+        }
         return `var THREE = window.THREE || window.__THREE_STUB__;`;
       }
-      const componentMatches = match.match(/\{([\s\S]*?)\}/);
-      if (componentMatches && componentMatches[1]) {
-        const comps = componentMatches[1].split(',').map(c => c.trim().split(/\s+as\s+/)[0]).filter(Boolean);
-        return comps.map(comp => `var ${comp} = (window.THREE && window.THREE['${comp}']) || window.__3D_STUBS__?.['${comp}'] || CanvasStub;`).join('\n');
+      if (
+        match.includes("@react-three/fiber") ||
+        match.includes("@react-three/drei")
+      ) {
+        const componentMatches = match.match(/\{([\s\S]*?)\}/);
+        if (componentMatches && componentMatches[1]) {
+          const comps = componentMatches[1]
+            .split(",")
+            .map((c) => c.trim().split(/\s+as\s+/)[0])
+            .filter(Boolean);
+          return comps
+            .map(
+              (comp) =>
+                `var ${comp} = window.__3D_STUBS__?.['${comp}'] || CanvasStub;`,
+            )
+            .join("\n");
+        }
       }
-      return `var THREE = window.THREE || window.__THREE_STUB__;`;
-    }
-    if (match.includes('@react-three/fiber') || match.includes('@react-three/drei')) {
-      const componentMatches = match.match(/\{([\s\S]*?)\}/);
-      if (componentMatches && componentMatches[1]) {
-        const comps = componentMatches[1].split(',').map(c => c.trim().split(/\s+as\s+/)[0]).filter(Boolean);
-        return comps.map(comp => `var ${comp} = window.__3D_STUBS__?.['${comp}'] || CanvasStub;`).join('\n');
-      }
-    }
-    return '';
-  });
+      return "";
+    },
+  );
 
   // Clean TypeScript interfaces and type declarations
-  processed = processed.replace(/export\s+interface\s+[A-Za-z0-9_]+\s*\{[\s\S]*?\}/g, '');
-  processed = processed.replace(/interface\s+[A-Za-z0-9_]+\s*\{[\s\S]*?\}/g, '');
-  processed = processed.replace(/export\s+type\s+[A-Za-z0-9_]+\s*=[\s\S]*?;/g, '');
-  processed = processed.replace(/type\s+[A-Za-z0-9_]+\s*=[\s\S]*?;/g, '');
+  processed = processed.replace(
+    /export\s+interface\s+[A-Za-z0-9_]+\s*\{[\s\S]*?\}/g,
+    "",
+  );
+  processed = processed.replace(
+    /interface\s+[A-Za-z0-9_]+\s*\{[\s\S]*?\}/g,
+    "",
+  );
+  processed = processed.replace(
+    /export\s+type\s+[A-Za-z0-9_]+\s*=[\s\S]*?;/g,
+    "",
+  );
+  processed = processed.replace(/type\s+[A-Za-z0-9_]+\s*=[\s\S]*?;/g, "");
 
   // Strip generic type arguments on hooks (e.g. useRef<HTMLDivElement>(null) -> useRef(null))
-  processed = processed.replace(/(useRef|useState|useMemo|useCallback|useContext|useReducer|createRef|forwardRef)\s*<[\s\S]*?>/g, '$1');
+  processed = processed.replace(
+    /(useRef|useState|useMemo|useCallback|useContext|useReducer|createRef|forwardRef)\s*<[\s\S]*?>/g,
+    "$1",
+  );
 
   // Strip TypeScript type assertions (e.g. `as const`, `as any`, `as HTMLDivElement`, `as const satisfies ...`)
-  processed = processed.replace(/\s+as\s+(?:const|any|unknown|boolean|number|string|React\.[A-Za-z0-9_]+|[A-Za-z0-9_]+)/g, '');
+  processed = processed.replace(
+    /\s+as\s+(?:const|any|unknown|boolean|number|string|React\.[A-Za-z0-9_]+|[A-Za-z0-9_]+)/g,
+    "",
+  );
 
   // 4. Clean up export statements
   // Strip named exports like `export const X = ...` -> `const X = ...`
-  processed = processed.replace(/export\s+(const|let|var|function|class)\s+/g, '$1 ');
+  processed = processed.replace(
+    /export\s+(const|let|var|function|class)\s+/g,
+    "$1 ",
+  );
 
   // export default function FunctionName
-  processed = processed.replace(/export\s+default\s+function\s+([A-Za-z0-9_]+)/g, (_, name) => {
-    return `function ${name}`;
-  });
+  processed = processed.replace(
+    /export\s+default\s+function\s+([A-Za-z0-9_]+)/g,
+    (_, name) => {
+      return `function ${name}`;
+    },
+  );
 
   // export default class ClassName
-  processed = processed.replace(/export\s+default\s+class\s+([A-Za-z0-9_]+)/g, (_, name) => {
-    return `class ${name}`;
-  });
+  processed = processed.replace(
+    /export\s+default\s+class\s+([A-Za-z0-9_]+)/g,
+    (_, name) => {
+      return `class ${name}`;
+    },
+  );
 
   // export default const/let/var Name = ...
-  processed = processed.replace(/export\s+default\s+(?:const|let|var)\s+([A-Za-z0-9_]+)\s*=/g, (_, name) => {
-    return `const ${name} = `;
-  });
+  processed = processed.replace(
+    /export\s+default\s+(?:const|let|var)\s+([A-Za-z0-9_]+)\s*=/g,
+    (_, name) => {
+      return `const ${name} = `;
+    },
+  );
 
   // export default Identifier;
-  processed = processed.replace(/export\s+default\s+([A-Za-z0-9_]+)\s*;?/g, (_, name) => {
-    return `window.__COREZ_APP__ = ${name};`;
-  });
+  processed = processed.replace(
+    /export\s+default\s+([A-Za-z0-9_]+)\s*;?/g,
+    (_, name) => {
+      return `window.__COREZ_APP__ = ${name};`;
+    },
+  );
 
   // Anonymous default export: export default () => ... or export default function() ...
   if (/export\s+default\s+function\s*\(/.test(processed)) {
-    processed = processed.replace(/export\s+default\s+function\s*\(/, 'function App(');
+    processed = processed.replace(
+      /export\s+default\s+function\s*\(/,
+      "function App(",
+    );
   } else if (/export\s+default\s*/.test(processed)) {
-    processed = processed.replace(/export\s+default\s*/, 'const App = ');
+    processed = processed.replace(/export\s+default\s*/, "const App = ");
   }
 
   // 5. If code starts directly with a JSX tag (e.g. <div ...>), wrap it in function App
@@ -456,8 +573,12 @@ export function formatCodeForPreview(rawCode) {
   // Extract all capital letter function/const component names defined in code for fallback detection
   const componentMatches = Array.from(
     new Set(
-      [...processed.matchAll(/(?:function|class|const|let|var)\s+([A-Z][A-Za-z0-9_]*)/g)].map(m => m[1])
-    )
+      [
+        ...processed.matchAll(
+          /(?:function|class|const|let|var)\s+([A-Z][A-Za-z0-9_]*)/g,
+        ),
+      ].map((m) => m[1]),
+    ),
   );
 
   return withPreviewCsp(`<!DOCTYPE html>

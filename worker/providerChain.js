@@ -1,33 +1,40 @@
-import { classifyProviderFailure, createTaskStateStore, safeErrorDetail } from './utils.js';
+import {
+  classifyProviderFailure,
+  createTaskStateStore,
+  safeErrorDetail,
+} from "./utils.js";
 
-export const OPENCODE_DEFAULT_ENDPOINT = 'https://opencode.ai/zen/go/v1/responses';
+export const OPENCODE_DEFAULT_ENDPOINT =
+  "https://opencode.ai/zen/go/v1/responses";
 // DEEPSEEK_DEFAULT_ENDPOINT removed — chat no longer falls back to DeepSeek.
-export const OPENROUTER_DEFAULT_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
-export const DEFAULT_MODEL = 'muse-spark-1.2-contributor';
+export const OPENROUTER_DEFAULT_ENDPOINT =
+  "https://openrouter.ai/api/v1/chat/completions";
+export const DEFAULT_MODEL = "muse-spark-1.2-contributor";
 
 // OpenRouter retired black-forest-labs/flux-1-schnell, so image generation
 // uses Google's Nano Banana 2 lite (Gemini 3.1 Flash Lite Image) only.
 // OPENROUTER_IMAGE_MODEL overrides the chain with a single model.
-export const DEFAULT_IMAGE_MODEL_CHAIN = [
-  'google/gemini-3.1-flash-lite-image'
-];
+export const DEFAULT_IMAGE_MODEL_CHAIN = ["google/gemini-3.1-flash-lite-image"];
 
 // Transient failures are retried with adaptive exponential backoff (base
 // 750ms doubling, jittered, honouring the provider's Retry-After) until
 // recovery, cancellation, permanent classification, or the single request's
 // practical window. Beyond that window the retry schedule is persisted so a
 // later invocation resumes the same task instead of returning a 502.
-const RETRY_STORE_PREFIX = 'retry/';
+const RETRY_STORE_PREFIX = "retry/";
 // The retry schedule is also mirrored under `task-status/<taskId>` so the
 // public GET /api/task/<taskId> endpoint can report when a deferred task
 // becomes eligible again (the retry key itself embeds the provider id and
 // message hash, which the client never sees).
-export const TASK_STATUS_STORE_PREFIX = 'task-status/';
+export const TASK_STATUS_STORE_PREFIX = "task-status/";
 
 async function persistRetrySchedule(store, retryKey, taskId, schedule) {
   await store.save(retryKey, schedule);
   if (taskId) {
-    await store.save(`${TASK_STATUS_STORE_PREFIX}${taskId}`, { ...schedule, retryKey });
+    await store.save(`${TASK_STATUS_STORE_PREFIX}${taskId}`, {
+      ...schedule,
+      retryKey,
+    });
   }
 }
 
@@ -52,8 +59,8 @@ const SLEEP_CHUNK_MS = 250;
 // provider loudly instead: the failure is classified transient (504), the
 // chain retries or falls back, and the client always receives an explicit
 // SSE error event with the real reason.
-const DEFAULT_TTFT_TIMEOUT_MS = 120_000;     // first byte / first token
-const DEFAULT_IDLE_TIMEOUT_MS = 60_000;      // silence mid-stream
+const DEFAULT_TTFT_TIMEOUT_MS = 120_000; // first byte / first token
+const DEFAULT_IDLE_TIMEOUT_MS = 60_000; // silence mid-stream
 const DEFAULT_NONSTREAM_TIMEOUT_MS = 90_000; // non-streaming call total
 
 function envTimeoutMs(env, key, fallback) {
@@ -62,18 +69,22 @@ function envTimeoutMs(env, key, fallback) {
 }
 
 function extractContentText(content) {
-  if (typeof content === 'string') return content;
+  if (typeof content === "string") return content;
   // Multimodal responses can wrap text in content parts: [{ type, text }]
   if (Array.isArray(content)) {
     return content
-      .map(part => (part && typeof part === 'object' && typeof part.text === 'string') ? part.text : '')
-      .join('');
+      .map((part) =>
+        part && typeof part === "object" && typeof part.text === "string"
+          ? part.text
+          : "",
+      )
+      .join("");
   }
-  return '';
+  return "";
 }
 
 function isResponsesEndpoint(endpoint) {
-  return typeof endpoint === 'string' && endpoint.includes('/responses');
+  return typeof endpoint === "string" && endpoint.includes("/responses");
 }
 
 function toResponsesInput(messages) {
@@ -81,33 +92,43 @@ function toResponsesInput(messages) {
   // Responses API accepts the same message array but under the `input` key.
   // Preserve role/content structure; normalize content to string when needed.
   return messages.map((m) => {
-    if (!m || typeof m !== 'object') return m;
-    const role = m.role || 'user';
+    if (!m || typeof m !== "object") return m;
+    const role = m.role || "user";
     if (Array.isArray(m.content)) return { role, content: m.content };
-    if (typeof m.content === 'string') return { role, content: m.content };
+    if (typeof m.content === "string") return { role, content: m.content };
     return { role, content: extractContentText(m.content) };
   });
 }
 
 function extractResponsesContent(data) {
-  if (!data || typeof data !== 'object') return { content: '', reasoning: false, usage: null, stopReason: null };
+  if (!data || typeof data !== "object")
+    return { content: "", reasoning: false, usage: null, stopReason: null };
   const output = Array.isArray(data.output) ? data.output : [];
-  const messageItem = output.find((item) => item && item.type === 'message' && item.role === 'assistant');
-  let content = '';
+  const messageItem = output.find(
+    (item) => item && item.type === "message" && item.role === "assistant",
+  );
+  let content = "";
   if (messageItem && Array.isArray(messageItem.content)) {
-    const textPart = messageItem.content.find((c) => c && c.type === 'output_text' && typeof c.text === 'string');
+    const textPart = messageItem.content.find(
+      (c) => c && c.type === "output_text" && typeof c.text === "string",
+    );
     if (textPart) content = textPart.text;
   }
   content = stripThinkingBlocks(content);
-  const hasReasoningFlag = output.some((item) => item && item.type === 'reasoning');
+  const hasReasoningFlag = output.some(
+    (item) => item && item.type === "reasoning",
+  );
   let usage = null;
   const usageData = data.usage || (data.response && data.response.usage);
-  if (usageData && typeof usageData === 'object') {
-    const inputTokens = Number(usageData.input_tokens ?? usageData.prompt_tokens) || 0;
-    const outputTokens = Number(usageData.output_tokens ?? usageData.completion_tokens) || 0;
+  if (usageData && typeof usageData === "object") {
+    const inputTokens =
+      Number(usageData.input_tokens ?? usageData.prompt_tokens) || 0;
+    const outputTokens =
+      Number(usageData.output_tokens ?? usageData.completion_tokens) || 0;
     if (inputTokens || outputTokens) usage = { inputTokens, outputTokens };
   }
-  const stopReason = data.status || (data.response && data.response.status) || null;
+  const stopReason =
+    data.status || (data.response && data.response.status) || null;
   return { content, reasoning: hasReasoningFlag, usage, stopReason };
 }
 
@@ -117,11 +138,11 @@ function extractResponsesContent(data) {
 // is reasoning too: everything from the marker onward is dropped, since any
 // real answer would only ever follow a closed block.
 function stripThinkingBlocks(text) {
-  if (typeof text !== 'string') return '';
+  if (typeof text !== "string") return "";
   return text
-    .replace(/<thinking\b[^>]*>[\s\S]*?<\/thinking>/gi, '')
-    .replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, '')
-    .replace(/<(?:think|thinking)\b[^>]*>[\s\S]*$/gi, '')
+    .replace(/<thinking\b[^>]*>[\s\S]*?<\/thinking>/gi, "")
+    .replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, "")
+    .replace(/<(?:think|thinking)\b[^>]*>[\s\S]*$/gi, "")
     .trim();
 }
 
@@ -129,12 +150,12 @@ function stripThinkingBlocks(text) {
 // is internal model thought: it is a retry signal, never the answer (surfacing
 // it previously handed users raw <think> dumps instead of the requested code).
 function answerText(message) {
-  if (!message || typeof message !== 'object') return '';
+  if (!message || typeof message !== "object") return "";
   return stripThinkingBlocks(extractContentText(message.content));
 }
 
 function hasReasoning(message) {
-  if (!message || typeof message !== 'object') return false;
+  if (!message || typeof message !== "object") return false;
   const reasoning = extractContentText(message.reasoning_content);
   if (reasoning.trim()) return true;
   return /<(?:think|thinking)\b/i.test(extractContentText(message.content));
@@ -143,7 +164,7 @@ function hasReasoning(message) {
 function isDisabled(value) {
   if (value === undefined || value === null) return false;
   const str = String(value).trim().toLowerCase();
-  return str !== '' && str !== 'false' && str !== '0' && str !== 'no';
+  return str !== "" && str !== "false" && str !== "0" && str !== "no";
 }
 
 async function defaultSleep(ms) {
@@ -156,9 +177,9 @@ function defaultClock() {
 
 // Parse an SSE data line from a streaming OpenAI-compatible endpoint.
 function parseSseData(line) {
-  if (!line.startsWith('data:')) return null;
+  if (!line.startsWith("data:")) return null;
   const payload = line.slice(5).trim();
-  if (!payload || payload === '[DONE]') return { done: true };
+  if (!payload || payload === "[DONE]") return { done: true };
   try {
     return JSON.parse(payload);
   } catch {
@@ -172,7 +193,19 @@ function parseSseData(line) {
  * final chunk carrying usage/finish_reason when the provider sends them.
  * Provider fallback is NOT handled here: runProviderChain owns the chain.
  */
-async function* streamChatEndpoint({ endpoint, key, model, label, messages, signal, extraHeaders = {}, bodyExtra = {}, onTtft, ttftTimeoutMs = DEFAULT_TTFT_TIMEOUT_MS, idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS }) {
+async function* streamChatEndpoint({
+  endpoint,
+  key,
+  model,
+  label,
+  messages,
+  signal,
+  extraHeaders = {},
+  bodyExtra = {},
+  onTtft,
+  ttftTimeoutMs = DEFAULT_TTFT_TIMEOUT_MS,
+  idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS,
+}) {
   const requestStartedAt = Date.now();
 
   // Deadline machinery: the client signal plus two timers — a first-token
@@ -183,13 +216,19 @@ async function* streamChatEndpoint({ endpoint, key, model, label, messages, sign
   const forwardAbort = () => controller.abort();
   if (signal) {
     if (signal.aborted) controller.abort();
-    else signal.addEventListener('abort', forwardAbort, { once: true });
+    else signal.addEventListener("abort", forwardAbort, { once: true });
   }
   let deadlineHit = false;
   let firstChunk = true;
-  let ttftTimer = setTimeout(() => { deadlineHit = true; controller.abort(); }, ttftTimeoutMs);
+  let ttftTimer = setTimeout(() => {
+    deadlineHit = true;
+    controller.abort();
+  }, ttftTimeoutMs);
   let idleTimer = null;
-  const clearTimers = () => { clearTimeout(ttftTimer); clearTimeout(idleTimer); };
+  const clearTimers = () => {
+    clearTimeout(ttftTimer);
+    clearTimeout(idleTimer);
+  };
 
   const isResponses = isResponsesEndpoint(endpoint);
   const requestBody = isResponses
@@ -198,30 +237,34 @@ async function* streamChatEndpoint({ endpoint, key, model, label, messages, sign
 
   try {
     const response = await fetch(endpoint, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${key}`,
-        'Content-Type': 'application/json',
-        ...extraHeaders
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        ...extraHeaders,
       },
       body: JSON.stringify(requestBody),
-      signal: controller.signal
+      signal: controller.signal,
     });
 
     if (!response.ok) {
-      const detail = (await response.text().catch(() => '')).slice(0, 200);
-      const failure = new Error(`HTTP ${response.status}: ${safeErrorDetail(detail)}`);
+      const detail = (await response.text().catch(() => "")).slice(0, 200);
+      const failure = new Error(
+        `HTTP ${response.status}: ${safeErrorDetail(detail)}`,
+      );
       failure.status = response.status;
-      const retryAfter = Number(response.headers.get('Retry-After') || 0);
-      if (Number.isFinite(retryAfter) && retryAfter > 0) failure.retryAfter = retryAfter;
+      const retryAfter = Number(response.headers.get("Retry-After") || 0);
+      if (Number.isFinite(retryAfter) && retryAfter > 0)
+        failure.retryAfter = retryAfter;
       throw failure;
     }
 
-    if (!response.body) throw new Error(`${label} streaming response had no body`);
+    if (!response.body)
+      throw new Error(`${label} streaming response had no body`);
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
-    let buffer = '';
+    let buffer = "";
     let usage = null;
     let finishReason = null;
     let sawDone = false;
@@ -238,10 +281,13 @@ async function* streamChatEndpoint({ endpoint, key, model, label, messages, sign
           clearTimeout(ttftTimer);
         }
         clearTimeout(idleTimer);
-        idleTimer = setTimeout(() => { deadlineHit = true; controller.abort(); }, idleTimeoutMs);
+        idleTimer = setTimeout(() => {
+          deadlineHit = true;
+          controller.abort();
+        }, idleTimeoutMs);
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
         for (const line of lines) {
           const parsed = parseSseData(line.trim());
           if (!parsed) continue;
@@ -253,57 +299,81 @@ async function* streamChatEndpoint({ endpoint, key, model, label, messages, sign
             // OpenCode Go Responses API streaming: deltas are response.output_text.delta,
             // completion is response.completed with usage in response.usage.
             // For test compatibility, also accept legacy chat `choices` payloads when the endpoint is /responses.
-            if (parsed.type === 'response.output_text.delta' && typeof parsed.delta === 'string' && parsed.delta) {
+            if (
+              parsed.type === "response.output_text.delta" &&
+              typeof parsed.delta === "string" &&
+              parsed.delta
+            ) {
               const delta = parsed.delta;
               if (!ttftEmitted) {
                 ttftEmitted = true;
                 const ttftMs = Date.now() - requestStartedAt;
-                if (typeof onTtft === 'function') onTtft(ttftMs);
+                if (typeof onTtft === "function") onTtft(ttftMs);
                 yield { text: delta, ttftMs };
               } else {
                 yield { text: delta };
               }
-            } else if (parsed.type === 'response.completed' && parsed.response) {
+            } else if (
+              parsed.type === "response.completed" &&
+              parsed.response
+            ) {
               const u = parsed.response.usage;
-              if (u && typeof u === 'object') {
+              if (u && typeof u === "object") {
                 usage = {
                   inputTokens: Number(u.input_tokens ?? u.prompt_tokens) || 0,
-                  outputTokens: Number(u.output_tokens ?? u.completion_tokens) || 0
+                  outputTokens:
+                    Number(u.output_tokens ?? u.completion_tokens) || 0,
                 };
               }
-              finishReason = parsed.response.status || 'stop';
+              finishReason = parsed.response.status || "stop";
               sawDone = true;
             } else if (parsed.choices && parsed.choices[0]) {
               // Legacy chat SSE mocked for /responses endpoint (tests) — handle as chat delta.
               const choice = parsed.choices[0];
               if (choice?.finish_reason) finishReason = choice.finish_reason;
               if (choice?.delta) {
-                const reasoningDelta = extractContentText(choice.delta.reasoning_content || choice.delta.reasoning);
+                const reasoningDelta = extractContentText(
+                  choice.delta.reasoning_content || choice.delta.reasoning,
+                );
                 const delta = extractContentText(choice.delta.content);
                 if (delta) {
                   if (!ttftEmitted) {
                     ttftEmitted = true;
                     const ttftMs = Date.now() - requestStartedAt;
-                    if (typeof onTtft === 'function') onTtft(ttftMs);
+                    if (typeof onTtft === "function") onTtft(ttftMs);
                     yield { text: delta, ttftMs };
                   } else {
                     yield { text: delta };
                   }
                 } else if (reasoningDelta) {
-                  yield { text: '', reasoning: reasoningDelta };
+                  yield { text: "", reasoning: reasoningDelta };
                 }
               }
               if (parsed.usage) {
                 usage = {
-                  inputTokens: Number(parsed.usage.prompt_tokens ?? parsed.usage.input_tokens) || 0,
-                  outputTokens: Number(parsed.usage.completion_tokens ?? parsed.usage.output_tokens) || 0
+                  inputTokens:
+                    Number(
+                      parsed.usage.prompt_tokens ?? parsed.usage.input_tokens,
+                    ) || 0,
+                  outputTokens:
+                    Number(
+                      parsed.usage.completion_tokens ??
+                        parsed.usage.output_tokens,
+                    ) || 0,
                 };
               }
               if (choice?.finish_reason) sawDone = true;
-            } else if (parsed.usage && typeof parsed.usage === 'object') {
+            } else if (parsed.usage && typeof parsed.usage === "object") {
               usage = {
-                inputTokens: Number(parsed.usage.input_tokens ?? parsed.usage.prompt_tokens) || 0,
-                outputTokens: Number(parsed.usage.output_tokens ?? parsed.usage.completion_tokens) || 0
+                inputTokens:
+                  Number(
+                    parsed.usage.input_tokens ?? parsed.usage.prompt_tokens,
+                  ) || 0,
+                outputTokens:
+                  Number(
+                    parsed.usage.output_tokens ??
+                      parsed.usage.completion_tokens,
+                  ) || 0,
               };
             }
             continue;
@@ -314,16 +384,22 @@ async function* streamChatEndpoint({ endpoint, key, model, label, messages, sign
             // every streamed response reported 0/0 token usage.
             usage = {
               inputTokens: Number(parsed.usage.prompt_tokens) || 0,
-              outputTokens: Number(parsed.usage.completion_tokens) || 0
+              outputTokens: Number(parsed.usage.completion_tokens) || 0,
             };
           }
-           const choice = parsed.choices && parsed.choices[0];
+          const choice = parsed.choices && parsed.choices[0];
           if (choice?.finish_reason) finishReason = choice.finish_reason;
           if (choice?.delta) {
             // Reasoning deltas (reasoning_content / reasoning) are tracked for diagnostics
             // but never yielded as user-visible content. TTFT measures time to first *content*.
-            const reasoningDelta = extractContentText(choice.delta.reasoning_content || choice.delta.reasoning);
-            if (reasoningDelta && typeof onTtft === 'function' && !ttftEmitted) {
+            const reasoningDelta = extractContentText(
+              choice.delta.reasoning_content || choice.delta.reasoning,
+            );
+            if (
+              reasoningDelta &&
+              typeof onTtft === "function" &&
+              !ttftEmitted
+            ) {
               // Do not emit TTFT for reasoning-only deltas — wait for real content.
             }
             const delta = extractContentText(choice.delta.content);
@@ -331,7 +407,7 @@ async function* streamChatEndpoint({ endpoint, key, model, label, messages, sign
               if (!ttftEmitted) {
                 ttftEmitted = true;
                 const ttftMs = Date.now() - requestStartedAt;
-                if (typeof onTtft === 'function') onTtft(ttftMs);
+                if (typeof onTtft === "function") onTtft(ttftMs);
                 yield { text: delta, ttftMs };
               } else {
                 yield { text: delta };
@@ -339,16 +415,16 @@ async function* streamChatEndpoint({ endpoint, key, model, label, messages, sign
             } else if (reasoningDelta) {
               // Yield internal reasoning signal for diagnostics (not user-visible)
               // Keep TTFT pending until real content arrives.
-              yield { text: '', reasoning: reasoningDelta };
+              yield { text: "", reasoning: reasoningDelta };
             }
           }
         }
       }
       if (!sawDone && finishReason === null && !ttftEmitted) {
         // No chunks at all: treat as empty response.
-        throw new Error('empty streaming response');
+        throw new Error("empty streaming response");
       }
-      yield { text: '', usage, finishReason };
+      yield { text: "", usage, finishReason };
     } finally {
       try {
         reader.releaseLock();
@@ -359,7 +435,7 @@ async function* streamChatEndpoint({ endpoint, key, model, label, messages, sign
   } catch (err) {
     if (deadlineHit) {
       const failure = new Error(
-        `${label} provider timed out (${firstChunk ? `no response within ${Math.ceil(ttftTimeoutMs / 1000)}s` : `no data for ${Math.ceil(idleTimeoutMs / 1000)}s mid-stream`}). The provider may be overloaded — please try again in a moment.`
+        `${label} provider timed out (${firstChunk ? `no response within ${Math.ceil(ttftTimeoutMs / 1000)}s` : `no data for ${Math.ceil(idleTimeoutMs / 1000)}s mid-stream`}). The provider may be overloaded — please try again in a moment.`,
       );
       failure.status = 504;
       failure.retryable = true;
@@ -368,7 +444,7 @@ async function* streamChatEndpoint({ endpoint, key, model, label, messages, sign
     throw err;
   } finally {
     clearTimers();
-    if (signal) signal.removeEventListener('abort', forwardAbort);
+    if (signal) signal.removeEventListener("abort", forwardAbort);
   }
 }
 
@@ -386,10 +462,10 @@ export function iterableToReadableStream(iterable) {
       }
     },
     cancel() {
-      if (typeof iterator.return === 'function') {
+      if (typeof iterator.return === "function") {
         iterator.return().catch(() => {});
       }
-    }
+    },
   });
 }
 
@@ -400,7 +476,7 @@ function taskHash(messages) {
     hash ^= input.charCodeAt(i);
     hash = Math.imul(hash, 0x01000193);
   }
-  return (hash >>> 0).toString(16).padStart(8, '0');
+  return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
 // Sleeps in small chunks so a client disconnect interrupts the backoff
@@ -415,7 +491,17 @@ async function sleepInterruptible(ms, signal, sleep) {
   }
 }
 
-async function callChatEndpoint({ endpoint, key, model, label, messages, signal, extraHeaders = {}, bodyExtra = {}, timeoutMs = DEFAULT_NONSTREAM_TIMEOUT_MS }) {
+async function callChatEndpoint({
+  endpoint,
+  key,
+  model,
+  label,
+  messages,
+  signal,
+  extraHeaders = {},
+  bodyExtra = {},
+  timeoutMs = DEFAULT_NONSTREAM_TIMEOUT_MS,
+}) {
   // Deadline guard: same rationale as the streaming endpoint — a hung
   // non-stream call must fail (504, transient) so the chain retries or falls
   // back instead of hanging the whole request until the platform kills it.
@@ -423,10 +509,13 @@ async function callChatEndpoint({ endpoint, key, model, label, messages, signal,
   const forwardAbort = () => controller.abort();
   if (signal) {
     if (signal.aborted) controller.abort();
-    else signal.addEventListener('abort', forwardAbort, { once: true });
+    else signal.addEventListener("abort", forwardAbort, { once: true });
   }
   let deadlineHit = false;
-  const timer = setTimeout(() => { deadlineHit = true; controller.abort(); }, timeoutMs);
+  const timer = setTimeout(() => {
+    deadlineHit = true;
+    controller.abort();
+  }, timeoutMs);
   const isResponses = isResponsesEndpoint(endpoint);
   const requestBody = isResponses
     ? { model, input: toResponsesInput(messages), ...bodyExtra }
@@ -436,22 +525,25 @@ async function callChatEndpoint({ endpoint, key, model, label, messages, signal,
     // Every provider gets its own Authorization header from its own key:
     // credentials are never merged or forwarded between providers.
     const response = await fetch(endpoint, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${key}`,
-        'Content-Type': 'application/json',
-        ...extraHeaders
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        ...extraHeaders,
       },
       body: JSON.stringify(requestBody),
-      signal: controller.signal
+      signal: controller.signal,
     });
 
     if (!response.ok) {
-      const detail = (await response.text().catch(() => '')).slice(0, 200);
-      const failure = new Error(`HTTP ${response.status}: ${safeErrorDetail(detail)}`);
+      const detail = (await response.text().catch(() => "")).slice(0, 200);
+      const failure = new Error(
+        `HTTP ${response.status}: ${safeErrorDetail(detail)}`,
+      );
       failure.status = response.status;
-      const retryAfter = Number(response.headers.get('Retry-After') || 0);
-      if (Number.isFinite(retryAfter) && retryAfter > 0) failure.retryAfter = retryAfter;
+      const retryAfter = Number(response.headers.get("Retry-After") || 0);
+      if (Number.isFinite(retryAfter) && retryAfter > 0)
+        failure.retryAfter = retryAfter;
       return { failure, classified: classifyProviderFailure(failure) };
     }
 
@@ -459,14 +551,19 @@ async function callChatEndpoint({ endpoint, key, model, label, messages, signal,
     if (isResponses) {
       // Responses API: primary format is `output` array; for test compatibility also accept legacy `choices` mocks.
       if (Array.isArray(data.output)) {
-        const { content, reasoning: hasReasonFlag, usage, stopReason } = extractResponsesContent(data);
+        const {
+          content,
+          reasoning: hasReasonFlag,
+          usage,
+          stopReason,
+        } = extractResponsesContent(data);
         if (content) {
           return {
             content,
             reasoning: hasReasonFlag,
             model: `${label}:${model}`,
             usage,
-            stopReason
+            stopReason,
           };
         }
         // Fallback: some tests mock `choices` even for /responses endpoint — accept it.
@@ -480,20 +577,26 @@ async function callChatEndpoint({ endpoint, key, model, label, messages, signal,
             model: `${label}:${model}`,
             usage: data?.usage
               ? {
-                  inputTokens: Number(data.usage.prompt_tokens ?? data.usage.input_tokens) || 0,
-                  outputTokens: Number(data.usage.completion_tokens ?? data.usage.output_tokens) || 0
+                  inputTokens:
+                    Number(
+                      data.usage.prompt_tokens ?? data.usage.input_tokens,
+                    ) || 0,
+                  outputTokens:
+                    Number(
+                      data.usage.completion_tokens ?? data.usage.output_tokens,
+                    ) || 0,
                 }
               : usage,
-            stopReason: data?.choices?.[0]?.finish_reason || stopReason
+            stopReason: data?.choices?.[0]?.finish_reason || stopReason,
           };
         }
         // No content at all — return empty success for outer empty handling
         return {
-          content: '',
+          content: "",
           reasoning: hasReasonFlag,
           model: `${label}:${model}`,
           usage,
-          stopReason
+          stopReason,
         };
       }
       // No `output` array — treat as chat fallback (legacy mocks)
@@ -506,20 +609,30 @@ async function callChatEndpoint({ endpoint, key, model, label, messages, signal,
           model: `${label}:${model}`,
           usage: data?.usage
             ? {
-                inputTokens: Number(data.usage.prompt_tokens ?? data.usage.input_tokens) || 0,
-                outputTokens: Number(data.usage.completion_tokens ?? data.usage.output_tokens) || 0
+                inputTokens:
+                  Number(data.usage.prompt_tokens ?? data.usage.input_tokens) ||
+                  0,
+                outputTokens:
+                  Number(
+                    data.usage.completion_tokens ?? data.usage.output_tokens,
+                  ) || 0,
               }
             : null,
-          stopReason: data?.choices?.[0]?.finish_reason || null
+          stopReason: data?.choices?.[0]?.finish_reason || null,
         };
       }
-      const { content, reasoning: hasReasonFlag, usage, stopReason } = extractResponsesContent(data);
+      const {
+        content,
+        reasoning: hasReasonFlag,
+        usage,
+        stopReason,
+      } = extractResponsesContent(data);
       return {
         content,
         reasoning: hasReasonFlag,
         model: `${label}:${model}`,
         usage,
-        stopReason
+        stopReason,
       };
     }
     const message = data?.choices?.[0]?.message;
@@ -530,26 +643,33 @@ async function callChatEndpoint({ endpoint, key, model, label, messages, signal,
       usage: data?.usage
         ? {
             inputTokens: Number(data.usage.prompt_tokens) || 0,
-            outputTokens: Number(data.usage.completion_tokens) || 0
+            outputTokens: Number(data.usage.completion_tokens) || 0,
           }
         : null,
-      stopReason: data?.choices?.[0]?.finish_reason || null
+      stopReason: data?.choices?.[0]?.finish_reason || null,
     };
   } catch (err) {
     if (deadlineHit) {
-      const failure = new Error(`${label} provider timed out after ${Math.ceil(timeoutMs / 1000)}s. The provider may be overloaded — please try again in a moment.`);
+      const failure = new Error(
+        `${label} provider timed out after ${Math.ceil(timeoutMs / 1000)}s. The provider may be overloaded — please try again in a moment.`,
+      );
       failure.status = 504;
       failure.retryable = true;
       return { failure, classified: classifyProviderFailure(failure) };
     }
-    console.warn(`${label} model ${model} request failed:`, safeErrorDetail(err));
-    const failure = err instanceof Error ? err : new Error(safeErrorDetail(err));
-    if (failure.status === undefined && Number(err?.status)) failure.status = Number(err.status);
+    console.warn(
+      `${label} model ${model} request failed:`,
+      safeErrorDetail(err),
+    );
+    const failure =
+      err instanceof Error ? err : new Error(safeErrorDetail(err));
+    if (failure.status === undefined && Number(err?.status))
+      failure.status = Number(err.status);
     if (err?.retryAfter) failure.retryAfter = err.retryAfter;
     return { failure, classified: classifyProviderFailure(failure) };
   } finally {
     clearTimeout(timer);
-    if (signal) signal.removeEventListener('abort', forwardAbort);
+    if (signal) signal.removeEventListener("abort", forwardAbort);
   }
 }
 
@@ -563,50 +683,74 @@ async function callChatEndpoint({ endpoint, key, model, label, messages, signal,
  */
 export function buildProviderChain(env = {}) {
   const chain = [];
-  const ttftTimeoutMs = envTimeoutMs(env, 'AI_TTFT_TIMEOUT_MS', DEFAULT_TTFT_TIMEOUT_MS);
-  const idleTimeoutMs = envTimeoutMs(env, 'AI_IDLE_TIMEOUT_MS', DEFAULT_IDLE_TIMEOUT_MS);
-  const nonstreamTimeoutMs = envTimeoutMs(env, 'AI_NONSTREAM_TIMEOUT_MS', DEFAULT_NONSTREAM_TIMEOUT_MS);
+  const ttftTimeoutMs = envTimeoutMs(
+    env,
+    "AI_TTFT_TIMEOUT_MS",
+    DEFAULT_TTFT_TIMEOUT_MS,
+  );
+  const idleTimeoutMs = envTimeoutMs(
+    env,
+    "AI_IDLE_TIMEOUT_MS",
+    DEFAULT_IDLE_TIMEOUT_MS,
+  );
+  const nonstreamTimeoutMs = envTimeoutMs(
+    env,
+    "AI_NONSTREAM_TIMEOUT_MS",
+    DEFAULT_NONSTREAM_TIMEOUT_MS,
+  );
 
   const opencodeKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY;
   if (opencodeKey && !isDisabled(env?.OPENCODE_GO_DISABLED)) {
     const rawModel = env?.OPENCODE_MODEL || DEFAULT_MODEL;
     // Guard against misconfigured env that points the main text model at the vision-only MiMo model.
-    const model = rawModel === 'mimo-v2.5' || rawModel === 'xiaomi/mimo-v2.5' ? DEFAULT_MODEL : rawModel;
+    const model =
+      rawModel === "mimo-v2.5" || rawModel === "xiaomi/mimo-v2.5"
+        ? DEFAULT_MODEL
+        : rawModel;
     const callOptions = (envOverrides = {}) => ({
-      endpoint: envOverrides.endpoint || env?.OPENCODE_ENDPOINT || OPENCODE_DEFAULT_ENDPOINT,
+      endpoint:
+        envOverrides.endpoint ||
+        env?.OPENCODE_ENDPOINT ||
+        OPENCODE_DEFAULT_ENDPOINT,
       key: opencodeKey,
       model,
-      label: 'opencode',
-      extraHeaders: { 'HTTP-Referer': 'https://corez.ai', 'X-Title': 'COREZ AI' },
+      label: "opencode",
+      extraHeaders: {
+        "HTTP-Referer": "https://corez.ai",
+        "X-Title": "COREZ AI",
+      },
       ttftTimeoutMs,
       idleTimeoutMs,
-      timeoutMs: nonstreamTimeoutMs
+      timeoutMs: nonstreamTimeoutMs,
     });
     const buildBodyExtra = (options = {}) => {
       const extra = { ...(options.bodyExtra || {}) };
       if (options.reasoning) extra.reasoning = options.reasoning;
-      if (Number.isFinite(options.temperature)) extra.temperature = options.temperature;
+      if (Number.isFinite(options.temperature))
+        extra.temperature = options.temperature;
       return extra;
     };
     chain.push({
-      id: 'opencode-go',
-      label: 'opencode',
+      id: "opencode-go",
+      label: "opencode",
       model,
-      call: (messages, options = {}) => callChatEndpoint({
-        ...callOptions(),
-        messages,
-        signal: options.signal,
-        bodyExtra: buildBodyExtra(options),
-        ...(options.model ? { model: options.model } : {})
-      }),
-      stream: (messages, options = {}) => streamChatEndpoint({
-        ...callOptions(),
-        messages,
-        signal: options.signal,
-        onTtft: options.onTtft,
-        bodyExtra: buildBodyExtra(options),
-        ...(options.model ? { model: options.model } : {})
-      })
+      call: (messages, options = {}) =>
+        callChatEndpoint({
+          ...callOptions(),
+          messages,
+          signal: options.signal,
+          bodyExtra: buildBodyExtra(options),
+          ...(options.model ? { model: options.model } : {}),
+        }),
+      stream: (messages, options = {}) =>
+        streamChatEndpoint({
+          ...callOptions(),
+          messages,
+          signal: options.signal,
+          onTtft: options.onTtft,
+          bodyExtra: buildBodyExtra(options),
+          ...(options.model ? { model: options.model } : {}),
+        }),
     });
   }
 
@@ -641,12 +785,20 @@ export async function runProviderChain(messages, options = {}) {
   const clock = options.clock || defaultClock;
   const sleep = options.sleep || defaultSleep;
   const jitter = options.jitter || Math.random;
-  const store = options.store !== undefined ? options.store : createTaskStateStore(env);
-  const maxRequestRetryMs = Number.isFinite(options.maxRequestRetryMs) && options.maxRequestRetryMs >= 0
-    ? options.maxRequestRetryMs
-    : DEFAULT_REQUEST_RETRY_MS;
-  const hash = typeof options.taskHash === 'string' && options.taskHash ? options.taskHash : taskHash(messages);
-  const taskId = typeof options.taskId === 'string' && options.taskId ? options.taskId : `rt-${hash}`;
+  const store =
+    options.store !== undefined ? options.store : createTaskStateStore(env);
+  const maxRequestRetryMs =
+    Number.isFinite(options.maxRequestRetryMs) && options.maxRequestRetryMs >= 0
+      ? options.maxRequestRetryMs
+      : DEFAULT_REQUEST_RETRY_MS;
+  const hash =
+    typeof options.taskHash === "string" && options.taskHash
+      ? options.taskHash
+      : taskHash(messages);
+  const taskId =
+    typeof options.taskId === "string" && options.taskId
+      ? options.taskId
+      : `rt-${hash}`;
 
   const failures = [];
   let lastErrorStatus = 0;
@@ -670,35 +822,48 @@ export async function runProviderChain(messages, options = {}) {
       } catch {
         // Corrupt or missing record behaves as absent.
       }
-      if (schedule && schedule.status === 'retry-scheduled') {
+      if (schedule && schedule.status === "retry-scheduled") {
         resumed = true;
         attempt = Math.max(0, Number(schedule.attempt) || 0);
-        const waitMs = Math.max(0, (Number(schedule.nextEligibleAt) || 0) - clock());
+        const waitMs = Math.max(
+          0,
+          (Number(schedule.nextEligibleAt) || 0) - clock(),
+        );
         if (waitMs > 0) {
           if (waitMs > maxRequestRetryMs) {
             // Still outside this invocation's practical window: keep the
             // persisted schedule and tell the client when to come back.
             return {
               taskId,
-              status: 'retry-scheduled',
+              status: "retry-scheduled",
               retryAfterSeconds: Math.ceil(waitMs / 1000),
-              provider: provider.id
+              provider: provider.id,
             };
           }
           await sleepInterruptible(waitMs, signal, sleep);
-          if (signal?.aborted) return { taskId, status: 'cancelled' };
+          if (signal?.aborted) return { taskId, status: "cancelled" };
         }
       }
     }
 
-    let result = await provider.call(messages, { signal, attempt, model: options.model, reasoning: options.reasoning, temperature: options.temperature, bodyExtra: options.bodyExtra });
+    let result = await provider.call(messages, {
+      signal,
+      attempt,
+      model: options.model,
+      reasoning: options.reasoning,
+      temperature: options.temperature,
+      bodyExtra: options.bodyExtra,
+    });
 
     while (result?.failure) {
       const cls = result.classified || classifyProviderFailure(result.failure);
       recordFailure(provider.label, result.failure);
-      lastErrorStatus = Number(result.failure?.status) > 0 ? Number(result.failure.status) : lastErrorStatus;
+      lastErrorStatus =
+        Number(result.failure?.status) > 0
+          ? Number(result.failure.status)
+          : lastErrorStatus;
 
-      if (cls.kind === 'permanent') {
+      if (cls.kind === "permanent") {
         // Authentication, validation, unsupported-model etc.: never retried.
         if (store) {
           try {
@@ -710,12 +875,17 @@ export async function runProviderChain(messages, options = {}) {
         break;
       }
 
-      if (signal?.aborted) return { taskId, status: 'cancelled' };
+      if (signal?.aborted) return { taskId, status: "cancelled" };
 
       attempt += 1;
-      const backoffMs = cls.retryAfterMs > 0
-        ? cls.retryAfterMs
-        : Math.min(BACKOFF_BASE_MS * 2 ** (attempt - 1) + jitter() * BACKOFF_JITTER_MS, MAX_SINGLE_SLEEP_MS);
+      const backoffMs =
+        cls.retryAfterMs > 0
+          ? cls.retryAfterMs
+          : Math.min(
+              BACKOFF_BASE_MS * 2 ** (attempt - 1) +
+                jitter() * BACKOFF_JITTER_MS,
+              MAX_SINGLE_SLEEP_MS,
+            );
       const now = clock();
       const nextEligibleAt = now + backoffMs;
 
@@ -730,8 +900,8 @@ export async function runProviderChain(messages, options = {}) {
               taskId,
               attempt,
               nextEligibleAt,
-              status: 'retry-scheduled',
-              lastError: safeErrorDetail(result.failure)
+              status: "retry-scheduled",
+              lastError: safeErrorDetail(result.failure),
             });
           } catch {
             // Best effort.
@@ -739,15 +909,22 @@ export async function runProviderChain(messages, options = {}) {
         }
         return {
           taskId,
-          status: 'retry-scheduled',
+          status: "retry-scheduled",
           retryAfterSeconds: Math.max(1, Math.ceil(backoffMs / 1000)),
-          provider: provider.id
+          provider: provider.id,
         };
       }
 
       await sleepInterruptible(backoffMs, signal, sleep);
-      if (signal?.aborted) return { taskId, status: 'cancelled' };
-      result = await provider.call(messages, { signal, attempt, model: options.model, reasoning: options.reasoning, temperature: options.temperature, bodyExtra: options.bodyExtra });
+      if (signal?.aborted) return { taskId, status: "cancelled" };
+      result = await provider.call(messages, {
+        signal,
+        attempt,
+        model: options.model,
+        reasoning: options.reasoning,
+        temperature: options.temperature,
+        bodyExtra: options.bodyExtra,
+      });
     }
 
     if (result?.content) {
@@ -765,7 +942,7 @@ export async function runProviderChain(messages, options = {}) {
         taskId,
         resumed,
         usage: result.usage || null,
-        stopReason: result.stopReason || null
+        stopReason: result.stopReason || null,
       };
     }
 
@@ -773,16 +950,18 @@ export async function runProviderChain(messages, options = {}) {
     // failure and let the next provider in the chain try. If no provider
     // produces a usable answer the request fails honestly.
     if (!result || !result.failure) {
-      recordFailure(provider.label, 'empty or reasoning-only response');
-      if (signal?.aborted) return { taskId, status: 'cancelled' };
+      recordFailure(provider.label, "empty or reasoning-only response");
+      if (signal?.aborted) return { taskId, status: "cancelled" };
     }
   }
 
   return {
-    status: 'failed',
-    error: failures.slice(0, 3).join(' | ').slice(0, 300) || 'all providers returned no usable response',
+    status: "failed",
+    error:
+      failures.slice(0, 3).join(" | ").slice(0, 300) ||
+      "all providers returned no usable response",
     errorStatus: lastErrorStatus,
-    taskId
+    taskId,
   };
 }
 
@@ -812,7 +991,9 @@ export function runStreamingChain(messages, options = {}) {
   // reported in meta/done events instead of the provider's default model.
   const model = options.model || null;
   const reasoning = options.reasoning || null;
-  const temperature = Number.isFinite(options.temperature) ? options.temperature : null;
+  const temperature = Number.isFinite(options.temperature)
+    ? options.temperature
+    : null;
   const bodyExtra = options.bodyExtra || null;
 
   const startedAt = clock();
@@ -822,12 +1003,20 @@ export function runStreamingChain(messages, options = {}) {
 
   async function* events() {
     if (providers.length === 0) {
-      yield { type: 'error', message: 'No AI provider key configured on this deployment.', status: 502 };
+      yield {
+        type: "error",
+        message: "No AI provider key configured on this deployment.",
+        status: 502,
+      };
       return;
     }
 
     for (const provider of providers) {
-      yield { type: 'meta', provider: provider.id, model: model || provider.model };
+      yield {
+        type: "meta",
+        provider: provider.id,
+        model: model || provider.model,
+      };
       const ttftHolder = { ms: 0 };
       let emptyAttempts = 0;
       const MAX_EMPTY_ATTEMPTS = 3;
@@ -839,19 +1028,21 @@ export function runStreamingChain(messages, options = {}) {
           async function* tryStream(msgs) {
             const iter = provider.stream(msgs, {
               signal,
-              onTtft: (ms) => { ttftHolder.ms = ttftHolder.ms || ms; },
+              onTtft: (ms) => {
+                ttftHolder.ms = ttftHolder.ms || ms;
+              },
               model,
               reasoning,
               temperature,
-              bodyExtra
+              bodyExtra,
             });
-            let text = '';
+            let text = "";
             let usage = null;
             let finishReason = null;
             for await (const chunk of iter) {
               if (chunk.text) {
                 text += chunk.text;
-                yield { type: 'delta', text: chunk.text };
+                yield { type: "delta", text: chunk.text };
               }
               if (chunk.usage) usage = chunk.usage;
               if (chunk.finishReason) finishReason = chunk.finishReason;
@@ -869,33 +1060,46 @@ export function runStreamingChain(messages, options = {}) {
               await sleep(750 * emptyAttempts);
               continue;
             }
-            failureMessages.push(`${provider.label}: empty or reasoning-only stream`);
+            failureMessages.push(
+              `${provider.label}: empty or reasoning-only stream`,
+            );
             if (signal?.aborted) {
-              yield { type: 'error', message: 'AI request cancelled.', status: 499 };
+              yield {
+                type: "error",
+                message: "AI request cancelled.",
+                status: 499,
+              };
               return;
             }
             break;
           }
           yield {
-            type: 'usage',
+            type: "usage",
             inputTokens: got.usage?.inputTokens ?? 0,
-            outputTokens: got.usage?.outputTokens ?? 0
+            outputTokens: got.usage?.outputTokens ?? 0,
           };
           yield {
-            type: 'done',
-            finishReason: got.finishReason || 'stop',
+            type: "done",
+            finishReason: got.finishReason || "stop",
             ttftMs: ttftHolder.ms || 0,
             totalMs: clock() - startedAt,
             provider: provider.id,
-            model: model || provider.model
+            model: model || provider.model,
           };
           return;
         } catch (err) {
           onlyEmptyFailures = false;
-          const failure = err instanceof Error ? err : new Error(safeErrorDetail(err));
-          failureMessages.push(`${provider.label}: ${safeErrorDetail(failure)}`);
+          const failure =
+            err instanceof Error ? err : new Error(safeErrorDetail(err));
+          failureMessages.push(
+            `${provider.label}: ${safeErrorDetail(failure)}`,
+          );
           if (signal?.aborted) {
-            yield { type: 'error', message: 'AI request cancelled.', status: 499 };
+            yield {
+              type: "error",
+              message: "AI request cancelled.",
+              status: 499,
+            };
             return;
           }
           break;
@@ -908,10 +1112,12 @@ export function runStreamingChain(messages, options = {}) {
     // the identical request instead of treating it as permanent. Hard
     // provider errors (auth, validation) stay non-retryable 502.
     yield {
-      type: 'error',
-      message: failureMessages.slice(0, 3).join(' | ').slice(0, 300) || 'all providers returned no usable stream',
+      type: "error",
+      message:
+        failureMessages.slice(0, 3).join(" | ").slice(0, 300) ||
+        "all providers returned no usable stream",
       status: onlyEmptyFailures ? 503 : 502,
-      ...(onlyEmptyFailures ? { retryable: true } : {})
+      ...(onlyEmptyFailures ? { retryable: true } : {}),
     };
   }
 
@@ -931,38 +1137,51 @@ export function runStreamingChain(messages, options = {}) {
  * multimodal content ([{ type: 'text' }, { type: 'image_url' }]) so image
  * models use it as visual reference instead of inventing from text alone.
  */
-export async function callOpenRouterImage(apiKey, prompt, parentSignal, imageModels = DEFAULT_IMAGE_MODEL_CHAIN, referenceImage = null) {
-  const models = Array.isArray(imageModels) && imageModels.length > 0 ? imageModels : DEFAULT_IMAGE_MODEL_CHAIN;
-  const userContent = (typeof referenceImage === 'string' && referenceImage)
-    ? [
-        { type: 'text', text: prompt },
-        { type: 'image_url', image_url: { url: referenceImage } }
-      ]
-    : prompt;
+export async function callOpenRouterImage(
+  apiKey,
+  prompt,
+  parentSignal,
+  imageModels = DEFAULT_IMAGE_MODEL_CHAIN,
+  referenceImage = null,
+) {
+  const models =
+    Array.isArray(imageModels) && imageModels.length > 0
+      ? imageModels
+      : DEFAULT_IMAGE_MODEL_CHAIN;
+  const userContent =
+    typeof referenceImage === "string" && referenceImage
+      ? [
+          { type: "text", text: prompt },
+          { type: "image_url", image_url: { url: referenceImage } },
+        ]
+      : prompt;
   for (const model of models) {
     // Deadline guard: a hung image generation must not hang the request.
     const controller = new AbortController();
     const forwardAbort = () => controller.abort();
     if (parentSignal) {
       if (parentSignal.aborted) controller.abort();
-      else parentSignal.addEventListener('abort', forwardAbort, { once: true });
+      else parentSignal.addEventListener("abort", forwardAbort, { once: true });
     }
     let deadlineHit = false;
-    const timer = setTimeout(() => { deadlineHit = true; controller.abort(); }, 60_000);
+    const timer = setTimeout(() => {
+      deadlineHit = true;
+      controller.abort();
+    }, 60_000);
     try {
       const response = await fetch(OPENROUTER_DEFAULT_ENDPOINT, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': 'https://corez.ai',
-          'X-Title': 'COREZ AI',
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${apiKey}`,
+          "HTTP-Referer": "https://corez.ai",
+          "X-Title": "COREZ AI",
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           model,
-          messages: [{ role: 'user', content: userContent }]
+          messages: [{ role: "user", content: userContent }],
         }),
-        signal: controller.signal
+        signal: controller.signal,
       });
 
       if (response.ok) {
@@ -973,23 +1192,28 @@ export async function callOpenRouterImage(apiKey, prompt, parentSignal, imageMod
           // OpenAI-style images[0].image_url.url — accept both.
           const first = message.images[0];
           const imageUrl = first?.url || first?.image_url?.url;
-          if (typeof imageUrl === 'string' && imageUrl) {
+          if (typeof imageUrl === "string" && imageUrl) {
             return { url: imageUrl, model };
           }
         }
-        const content = typeof message?.content === 'string' ? message.content : '';
-        const urlMatch = content.match(/https?:\/\/[^\s)"']+\.(?:png|jpg|jpeg|webp)/i)
-          || content.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
+        const content =
+          typeof message?.content === "string" ? message.content : "";
+        const urlMatch =
+          content.match(/https?:\/\/[^\s)"']+\.(?:png|jpg|jpeg|webp)/i) ||
+          content.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
         if (urlMatch) return { url: urlMatch[1] || urlMatch[0], model };
-        if (content.startsWith('data:image')) return { url: content, model };
+        if (content.startsWith("data:image")) return { url: content, model };
       }
     } catch (err) {
       if (!deadlineHit) {
-        console.warn(`OpenRouter image generation attempt failed (${model}):`, safeErrorDetail(err));
+        console.warn(
+          `OpenRouter image generation attempt failed (${model}):`,
+          safeErrorDetail(err),
+        );
       }
     } finally {
       clearTimeout(timer);
-      if (parentSignal) parentSignal.removeEventListener('abort', forwardAbort);
+      if (parentSignal) parentSignal.removeEventListener("abort", forwardAbort);
     }
   }
   return null;

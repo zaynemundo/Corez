@@ -1,6 +1,17 @@
-import { UploadCloud, FileCode2, Image, FileText, Sparkles } from 'lucide-react';
+import {
+  UploadCloud,
+  FileCode2,
+  Image,
+  FileText,
+  Sparkles,
+} from "lucide-react";
 
-export default function DropZoneOverlay({ isDragging, onDrop, onDragLeave, onDragOver }) {
+export default function DropZoneOverlay({
+  isDragging,
+  onDrop,
+  onDragLeave,
+  onDragOver,
+}) {
   if (!isDragging) return null;
 
   return (
@@ -15,7 +26,11 @@ export default function DropZoneOverlay({ isDragging, onDrop, onDragLeave, onDra
     >
       <div className="file-drop-card">
         <div className="file-drop-icon-wrapper">
-          <UploadCloud size={38} strokeWidth={1.75} className="file-drop-icon" />
+          <UploadCloud
+            size={38}
+            strokeWidth={1.75}
+            className="file-drop-icon"
+          />
         </div>
         <h2 className="file-drop-title">Drop any file here</h2>
         <p className="file-drop-subtitle">

@@ -10,7 +10,9 @@ export function expandDependencies(skillIds, registry) {
 
   function visit(id) {
     if (visiting.has(id)) {
-      throw new Error(`Circular dependency detected in skill resolution: ${id}`);
+      throw new Error(
+        `Circular dependency detected in skill resolution: ${id}`,
+      );
     }
     if (!visited.has(id)) {
       visiting.add(id);
@@ -18,7 +20,9 @@ export function expandDependencies(skillIds, registry) {
       if (skill && Array.isArray(skill.dependencies)) {
         for (const depId of skill.dependencies) {
           if (!registry.getSkill(depId)) {
-            console.warn(`Skill "${id}" depends on "${depId}" which is not registered.`);
+            console.warn(
+              `Skill "${id}" depends on "${depId}" which is not registered.`,
+            );
             continue;
           }
           visit(depId);
@@ -36,5 +40,5 @@ export function expandDependencies(skillIds, registry) {
     }
   }
 
-  return orderedSkillIds.map(id => registry.getSkill(id)).filter(Boolean);
+  return orderedSkillIds.map((id) => registry.getSkill(id)).filter(Boolean);
 }

@@ -5,7 +5,7 @@
  * execution prompt.  Does not change the user's underlying goal.
  */
 
-import { INTENT_TYPES, COMPLEXITY_LEVELS } from './schemas.js';
+import { INTENT_TYPES, COMPLEXITY_LEVELS } from "./schemas.js";
 
 export const MIN_PROMPT_SCORE = 8.5;
 // Safety ceiling only: refinement normally stops on the progress rule
@@ -21,18 +21,25 @@ export const MAX_REFINEMENT_LOOPS = 100;
  * @returns {string} enriched execution prompt
  */
 export function architectPrompt({ intent, requirements, context, rawPrompt }) {
-  if (!rawPrompt || typeof rawPrompt !== 'string') return '';
+  if (!rawPrompt || typeof rawPrompt !== "string") return "";
 
   const type = intent?.type || INTENT_TYPES.UNKNOWN;
   const complexity = intent?.complexity || COMPLEXITY_LEVELS.MEDIUM;
 
   // Trivial/simple-edit prompts are passed through with minimal enrichment
-  if (complexity === COMPLEXITY_LEVELS.TRIVIAL || type === INTENT_TYPES.SIMPLE_EDIT) {
+  if (
+    complexity === COMPLEXITY_LEVELS.TRIVIAL ||
+    type === INTENT_TYPES.SIMPLE_EDIT
+  ) {
     return buildSimplePrompt(rawPrompt, intent, requirements, context);
   }
 
   // For code questions, keep it light
-  if (type === INTENT_TYPES.CODE_QUESTION || type === INTENT_TYPES.RESEARCH || type === INTENT_TYPES.GENERAL_QUESTION) {
+  if (
+    type === INTENT_TYPES.CODE_QUESTION ||
+    type === INTENT_TYPES.RESEARCH ||
+    type === INTENT_TYPES.GENERAL_QUESTION
+  ) {
     return buildQuestionPrompt(rawPrompt, intent, requirements, context);
   }
 
@@ -57,7 +64,10 @@ export function architectPrompt({ intent, requirements, context, rawPrompt }) {
   }
 
   // For design tasks
-  if (type === INTENT_TYPES.DESIGN_TASK || type === INTENT_TYPES.IMAGE_GENERATION) {
+  if (
+    type === INTENT_TYPES.DESIGN_TASK ||
+    type === INTENT_TYPES.IMAGE_GENERATION
+  ) {
     return buildDesignPrompt(rawPrompt, intent, requirements, context);
   }
 
@@ -74,8 +84,21 @@ export function architectPrompt({ intent, requirements, context, rawPrompt }) {
  * Refinement pass — called when Critic determines the prompt needs improvement.
  * Adds structure and clarity without changing the underlying goal.
  */
-export function refinePrompt(failedPrompt, criticResult, { intent: _intent, requirements: _requirements, context: _context, rawPrompt: _rawPrompt }) {
-  if (!criticResult || !criticResult.recommendedImprovements || !criticResult.recommendedImprovements.length) {
+export function refinePrompt(
+  failedPrompt,
+  criticResult,
+  {
+    intent: _intent,
+    requirements: _requirements,
+    context: _context,
+    rawPrompt: _rawPrompt,
+  },
+) {
+  if (
+    !criticResult ||
+    !criticResult.recommendedImprovements ||
+    !criticResult.recommendedImprovements.length
+  ) {
     return failedPrompt;
   }
 
@@ -84,19 +107,35 @@ export function refinePrompt(failedPrompt, criticResult, { intent: _intent, requ
   for (const improvement of criticResult.recommendedImprovements) {
     const lower = improvement.toLowerCase();
 
-    if (lower.includes('test') || lower.includes('validation') || lower.includes('verify')) {
+    if (
+      lower.includes("test") ||
+      lower.includes("validation") ||
+      lower.includes("verify")
+    ) {
       if (!/test|validate|verify/i.test(refined)) {
-        refined += '\n\nAfter implementation, run existing tests and verify the changes work correctly.';
+        refined +=
+          "\n\nAfter implementation, run existing tests and verify the changes work correctly.";
       }
     }
 
-    if (lower.includes('structure') || lower.includes('organize') || lower.includes('organise')) {
+    if (
+      lower.includes("structure") ||
+      lower.includes("organize") ||
+      lower.includes("organise")
+    ) {
       if (!/```|\/\*\*|\/\/\s*---/gi.test(refined)) {
-        refined = refined.replace(/(\n)(\w)/, '$1\n## Implementation Steps\n\n$2');
+        refined = refined.replace(
+          /(\n)(\w)/,
+          "$1\n## Implementation Steps\n\n$2",
+        );
       }
     }
 
-    if (lower.includes('context') || lower.includes('reuse') || lower.includes('existing')) {
+    if (
+      lower.includes("context") ||
+      lower.includes("reuse") ||
+      lower.includes("existing")
+    ) {
       const ctx = _context;
       if (ctx && ctx.framework) {
         if (!refined.toLowerCase().includes(ctx.framework.toLowerCase())) {
@@ -118,15 +157,21 @@ function buildSimplePrompt(rawPrompt, intent, requirements, context) {
   const explicit = requirements?.explicit || [];
 
   if (context?.framework) {
-    parts.push(`\n\nApply this change within the existing ${context.framework} project.`);
+    parts.push(
+      `\n\nApply this change within the existing ${context.framework} project.`,
+    );
   }
 
   if (explicit.length > 0) {
-    parts.push(`\n\nEnsure the change is minimal and does not introduce unrelated modifications.`);
+    parts.push(
+      `\n\nEnsure the change is minimal and does not introduce unrelated modifications.`,
+    );
   }
 
-  parts.push('\nDo not introduce new features, extensive refactors, or breaking changes.');
-  return parts.join('');
+  parts.push(
+    "\nDo not introduce new features, extensive refactors, or breaking changes.",
+  );
+  return parts.join("");
 }
 
 function buildQuestionPrompt(rawPrompt, intent, requirements, context) {
@@ -141,14 +186,18 @@ function buildWebsitePrompt(rawPrompt, intent, requirements, context) {
   const explicit = requirements?.explicit || [];
   const _inferred = requirements?.inferred || [];
   const forbidden = requirements?.forbidden || [];
-  const domain = intent?.domain || 'general';
+  const domain = intent?.domain || "general";
 
   let result = `${rawPrompt}\n\n`;
   result += `Create a polished, responsive website for ${domain}.\n\n`;
   result += `The website should communicate quality, clarity, and visual polish.\n\n`;
 
   // One-shot mode: the user asked for a single page only.
-  if (/\b(oneshot|one-shot|one shot|single[- ]page|one[- ]page)\b/i.test(rawPrompt)) {
+  if (
+    /\b(oneshot|one-shot|one shot|single[- ]page|one[- ]page)\b/i.test(
+      rawPrompt,
+    )
+  ) {
     result += `ONE-SHOT MODE: the user asked for a single page only. Output ONE single complete HTML document and nothing else — no sub-pages, no markers.\n\n`;
   } else {
     // Multi-page by default: output each page as its own complete HTML
@@ -166,11 +215,23 @@ function buildWebsitePrompt(rawPrompt, intent, requirements, context) {
   result += `- responsive navigation\n`;
   result += `- hero section\n`;
 
-  if (explicit.some((e) => e.includes('product') || e.includes('collection') || e.includes('catalog'))) {
+  if (
+    explicit.some(
+      (e) =>
+        e.includes("product") ||
+        e.includes("collection") ||
+        e.includes("catalog"),
+    )
+  ) {
     result += `- product collection or catalog\n`;
   }
 
-  if (explicit.some((e) => e.includes('form') || e.includes('contact') || e.includes('consult'))) {
+  if (
+    explicit.some(
+      (e) =>
+        e.includes("form") || e.includes("contact") || e.includes("consult"),
+    )
+  ) {
     result += `- contact or consultation section\n`;
   }
 
@@ -245,9 +306,13 @@ function buildFeaturePrompt(rawPrompt, _intent, requirements, context) {
   }
 
   if (context?.dependencies && context?.dependencies.length > 0) {
-    const keyDeps = context.dependencies.filter((d) => /\b(auth|router|state|api|supabase|firebase|prisma|orm|database|http|axios|fetch)\b/i.test(d));
+    const keyDeps = context.dependencies.filter((d) =>
+      /\b(auth|router|state|api|supabase|firebase|prisma|orm|database|http|axios|fetch)\b/i.test(
+        d,
+      ),
+    );
     if (keyDeps.length > 0) {
-      result += `The project uses: ${keyDeps.join(', ')}.\nReuse these instead of introducing new dependencies.\n\n`;
+      result += `The project uses: ${keyDeps.join(", ")}.\nReuse these instead of introducing new dependencies.\n\n`;
     }
   }
 
@@ -303,7 +368,7 @@ function buildContentPrompt(rawPrompt, _intent, _requirements, _context) {
 }
 
 function buildGenericPrompt(rawPrompt, intent, requirements, context) {
-  const type = intent?.type || 'general';
+  const type = intent?.type || "general";
   const explicit = requirements?.explicit || [];
   const _inferred2 = requirements?.inferred || [];
   const forbidden = requirements?.forbidden || [];

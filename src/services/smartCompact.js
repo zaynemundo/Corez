@@ -8,7 +8,11 @@
  * the full history is never lost — the summary carries retrieval keys.
  */
 
-import { buildContextSummary, persistAndSummarize, retrieveContextMessages } from './contextStore.js';
+import {
+  buildContextSummary,
+  persistAndSummarize,
+  retrieveContextMessages,
+} from "./contextStore.js";
 
 export const SMART_COMPACT_DEFAULTS = {
   keepRecent: 30,
@@ -45,16 +49,31 @@ export function shouldCompact(messages, opts = {}) {
 export function compactChatMessages(messages, opts = {}) {
   const { keepRecent } = { ...SMART_COMPACT_DEFAULTS, ...opts };
   if (!Array.isArray(messages) || messages.length <= keepRecent) {
-    return { compacted: false, displayMessages: messages, meta: null, originalMessages: messages };
+    return {
+      compacted: false,
+      displayMessages: messages,
+      meta: null,
+      originalMessages: messages,
+    };
   }
   if (!shouldCompact(messages, opts)) {
-    return { compacted: false, displayMessages: messages, meta: null, originalMessages: messages };
+    return {
+      compacted: false,
+      displayMessages: messages,
+      meta: null,
+      originalMessages: messages,
+    };
   }
 
   const older = messages.slice(0, messages.length - keepRecent);
   const recent = messages.slice(messages.length - keepRecent);
   if (older.length === 0) {
-    return { compacted: false, displayMessages: messages, meta: null, originalMessages: messages };
+    return {
+      compacted: false,
+      displayMessages: messages,
+      meta: null,
+      originalMessages: messages,
+    };
   }
 
   const built = buildContextSummary(older);
@@ -65,16 +84,25 @@ export function compactChatMessages(messages, opts = {}) {
 
   // Human-readable one-liner for the banner (topics + key signals)
   const summaryParts = [];
-  if (topics.length) summaryParts.push(`Topics: ${topics.slice(0, 6).join(', ')}`);
-  if (built.summary.requirements.length) summaryParts.push(`${built.summary.requirements.length} requirements`);
-  if (built.summary.negativeConstraints.length) summaryParts.push(`${built.summary.negativeConstraints.length} constraints`);
-  if (built.summary.exactErrors.length) summaryParts.push(`${built.summary.exactErrors.length} errors`);
-  if (built.summary.codeSignatures.length) summaryParts.push(`${built.summary.codeSignatures.length} code blocks`);
+  if (topics.length)
+    summaryParts.push(`Topics: ${topics.slice(0, 6).join(", ")}`);
+  if (built.summary.requirements.length)
+    summaryParts.push(`${built.summary.requirements.length} requirements`);
+  if (built.summary.negativeConstraints.length)
+    summaryParts.push(
+      `${built.summary.negativeConstraints.length} constraints`,
+    );
+  if (built.summary.exactErrors.length)
+    summaryParts.push(`${built.summary.exactErrors.length} errors`);
+  if (built.summary.codeSignatures.length)
+    summaryParts.push(`${built.summary.codeSignatures.length} code blocks`);
 
-  const summaryLine = summaryParts.length ? summaryParts.join(' • ') : 'Earlier conversation summarized';
+  const summaryLine = summaryParts.length
+    ? summaryParts.join(" • ")
+    : "Earlier conversation summarized";
 
   const banner = {
-    role: 'system',
+    role: "system",
     content: summaryMessage.content,
     // Render hint for the UI
     _compactMeta: {
@@ -106,17 +134,24 @@ export function compactChatMessages(messages, opts = {}) {
  */
 export function expandCompactedChat(compactResult) {
   if (!compactResult || !compactResult.compacted) {
-    return compactResult?.displayMessages || compactResult?.originalMessages || [];
+    return (
+      compactResult?.displayMessages || compactResult?.originalMessages || []
+    );
   }
   const { meta, originalMessages } = compactResult;
   if (meta?.recordId) {
     const retrieved = retrieveContextMessages(meta.recordId);
     if (Array.isArray(retrieved) && retrieved.length > 0) {
-      const recent = compactResult.displayMessages.filter((m) => !m._compactMeta);
+      const recent = compactResult.displayMessages.filter(
+        (m) => !m._compactMeta,
+      );
       return [...retrieved, ...recent];
     }
   }
-  return originalMessages || compactResult.displayMessages.filter((m) => !m._compactMeta);
+  return (
+    originalMessages ||
+    compactResult.displayMessages.filter((m) => !m._compactMeta)
+  );
 }
 
 /**

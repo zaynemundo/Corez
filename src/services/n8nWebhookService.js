@@ -9,7 +9,7 @@
  *   await triggerN8nWebhook({ webhookUrl: 'https://your-n8n/webhook/abc', event: 'lead.captured', payload: formData });
  */
 
-const BRIDGE = '/api/n8n/webhook';
+const BRIDGE = "/api/n8n/webhook";
 
 export async function triggerN8nWebhook({ webhookUrl, event, payload } = {}) {
   const body = {};
@@ -18,14 +18,16 @@ export async function triggerN8nWebhook({ webhookUrl, event, payload } = {}) {
   if (payload !== undefined) body.payload = payload;
 
   const r = await fetch(BRIDGE, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) {
-    const err = new Error(data.error || `n8n webhook bridge failed: ${r.status}`);
+    const err = new Error(
+      data.error || `n8n webhook bridge failed: ${r.status}`,
+    );
     err.status = r.status;
     err.detail = data.detail || data;
     throw err;
@@ -35,9 +37,17 @@ export async function triggerN8nWebhook({ webhookUrl, event, payload } = {}) {
 
 // Convenience wrappers for common CoreZ events
 export function onPublishTrigger({ chatId, title, appUrl, webhookUrl } = {}) {
-  return triggerN8nWebhook({ webhookUrl, event: 'corez.publish', payload: { chatId, title, appUrl, at: Date.now() } });
+  return triggerN8nWebhook({
+    webhookUrl,
+    event: "corez.publish",
+    payload: { chatId, title, appUrl, at: Date.now() },
+  });
 }
 
 export function onLeadCaptured(formData, webhookUrl) {
-  return triggerN8nWebhook({ webhookUrl, event: 'corez.lead.captured', payload: formData });
+  return triggerN8nWebhook({
+    webhookUrl,
+    event: "corez.lead.captured",
+    payload: formData,
+  });
 }

@@ -10,7 +10,7 @@ export class MemoryStorageAdapter {
 
   async put(key, blob, metadata = {}) {
     let dataUrl;
-    if (typeof FileReader !== 'undefined') {
+    if (typeof FileReader !== "undefined") {
       dataUrl = await new Promise((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result);
@@ -18,10 +18,15 @@ export class MemoryStorageAdapter {
       });
     } else {
       const buffer = Buffer.from(await blob.arrayBuffer());
-      dataUrl = `data:${blob.type || 'image/png'};base64,${buffer.toString('base64')}`;
+      dataUrl = `data:${blob.type || "image/png"};base64,${buffer.toString("base64")}`;
     }
 
-    this.store.set(key, { dataUrl, metadata, size: blob.size, type: blob.type });
+    this.store.set(key, {
+      dataUrl,
+      metadata,
+      size: blob.size,
+      type: blob.type,
+    });
     return dataUrl;
   }
 
@@ -35,13 +40,13 @@ export class MemoryStorageAdapter {
 }
 
 export class LocalStorageAdapter {
-  constructor(prefix = 'corez_asset_') {
+  constructor(prefix = "corez_asset_") {
     this.prefix = prefix;
   }
 
   async put(key, blob, metadata = {}) {
     let dataUrl;
-    if (typeof FileReader !== 'undefined') {
+    if (typeof FileReader !== "undefined") {
       dataUrl = await new Promise((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result);
@@ -49,23 +54,31 @@ export class LocalStorageAdapter {
       });
     } else {
       const buffer = Buffer.from(await blob.arrayBuffer());
-      dataUrl = `data:${blob.type || 'image/png'};base64,${buffer.toString('base64')}`;
+      dataUrl = `data:${blob.type || "image/png"};base64,${buffer.toString("base64")}`;
     }
 
     const storageKey = `${this.prefix}${key}`;
-    const payload = JSON.stringify({ dataUrl, metadata, type: blob.type, timestamp: Date.now() });
+    const payload = JSON.stringify({
+      dataUrl,
+      metadata,
+      type: blob.type,
+      timestamp: Date.now(),
+    });
     try {
-      if (typeof localStorage !== 'undefined') {
+      if (typeof localStorage !== "undefined") {
         localStorage.setItem(storageKey, payload);
       }
     } catch (e) {
-      console.warn('LocalStorage quota exceeded in AssetStorage, storing in fallback.', e);
+      console.warn(
+        "LocalStorage quota exceeded in AssetStorage, storing in fallback.",
+        e,
+      );
     }
     return dataUrl;
   }
 
   async get(key) {
-    if (typeof localStorage === 'undefined') return null;
+    if (typeof localStorage === "undefined") return null;
     const payload = localStorage.getItem(`${this.prefix}${key}`);
     if (!payload) return null;
     try {
@@ -76,21 +89,22 @@ export class LocalStorageAdapter {
   }
 
   async delete(key) {
-    if (typeof localStorage === 'undefined') return;
+    if (typeof localStorage === "undefined") return;
     localStorage.removeItem(`${this.prefix}${key}`);
   }
 }
 
 export class CloudflareR2StorageAdapter {
-  constructor(endpoint = '/api/assets') {
+  constructor(endpoint = "/api/assets") {
     this.endpoint = endpoint;
     this.fallbackAdapter = new MemoryStorageAdapter();
   }
 
   buildUrl(subPath) {
-    const fullPath = `${this.endpoint}${subPath.startsWith('/') ? subPath : '/' + subPath}`;
-    if (fullPath.startsWith('http://') || fullPath.startsWith('https://')) return fullPath;
-    if (typeof window !== 'undefined' && window.location?.origin) {
+    const fullPath = `${this.endpoint}${subPath.startsWith("/") ? subPath : "/" + subPath}`;
+    if (fullPath.startsWith("http://") || fullPath.startsWith("https://"))
+      return fullPath;
+    if (typeof window !== "undefined" && window.location?.origin) {
       return `${window.location.origin}${fullPath}`;
     }
     return fullPath;
@@ -98,7 +112,7 @@ export class CloudflareR2StorageAdapter {
 
   async put(key, blob, metadata = {}) {
     let dataUrl;
-    if (typeof FileReader !== 'undefined') {
+    if (typeof FileReader !== "undefined") {
       dataUrl = await new Promise((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result);
@@ -106,15 +120,15 @@ export class CloudflareR2StorageAdapter {
       });
     } else {
       const buffer = Buffer.from(await blob.arrayBuffer());
-      dataUrl = `data:${blob.type || 'image/png'};base64,${buffer.toString('base64')}`;
+      dataUrl = `data:${blob.type || "image/png"};base64,${buffer.toString("base64")}`;
     }
 
     try {
-      if (typeof fetch === 'function') {
-        const response = await fetch(this.buildUrl('/upload'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key, dataUrl, mimeType: blob.type, metadata })
+      if (typeof fetch === "function") {
+        const response = await fetch(this.buildUrl("/upload"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key, dataUrl, mimeType: blob.type, metadata }),
         });
 
         if (response.ok) {
@@ -123,7 +137,10 @@ export class CloudflareR2StorageAdapter {
         }
       }
     } catch (err) {
-      console.warn('Cloudflare R2 API upload failed, using memory adapter fallback.', err.message);
+      console.warn(
+        "Cloudflare R2 API upload failed, using memory adapter fallback.",
+        err.message,
+      );
     }
 
     return this.fallbackAdapter.put(key, blob, metadata);
@@ -131,7 +148,7 @@ export class CloudflareR2StorageAdapter {
 
   async get(key) {
     try {
-      if (typeof fetch === 'function') {
+      if (typeof fetch === "function") {
         const response = await fetch(this.buildUrl(`/${key}`));
         if (response.ok) {
           const blob = await response.blob();
@@ -146,8 +163,8 @@ export class CloudflareR2StorageAdapter {
 
   async delete(key) {
     try {
-      if (typeof fetch === 'function') {
-        await fetch(this.buildUrl(`/${key}`), { method: 'DELETE' });
+      if (typeof fetch === "function") {
+        await fetch(this.buildUrl(`/${key}`), { method: "DELETE" });
       }
     } catch {
       // Ignored - fallback to memory adapter
@@ -161,17 +178,22 @@ export class AssetStorageService {
     this.adapter = adapter;
   }
 
-  async fetchAndPersistAsset(jobId, assetId, sourceUrl, expectedType = 'image/png') {
+  async fetchAndPersistAsset(
+    jobId,
+    assetId,
+    sourceUrl,
+    expectedType = "image/png",
+  ) {
     if (!sourceUrl) {
       throw new Error(`Invalid sourceUrl for asset ${assetId}`);
     }
 
     let blob;
     // 1. If sourceUrl is already a data URI
-    if (sourceUrl.startsWith('data:')) {
+    if (sourceUrl.startsWith("data:")) {
       let u8arr;
       try {
-        const parts = sourceUrl.split(',');
+        const parts = sourceUrl.split(",");
         const mime = parts[0].match(/:(.*?);/)?.[1] || expectedType;
         const bstr = atob(parts[1]);
         let n = bstr.length;
@@ -181,19 +203,29 @@ export class AssetStorageService {
         }
         blob = new Blob([u8arr], { type: mime });
       } catch (err) {
-        throw new Error(`Invalid data URI payload for asset ${assetId}: ${err.message}`, { cause: err });
+        throw new Error(
+          `Invalid data URI payload for asset ${assetId}: ${err.message}`,
+          { cause: err },
+        );
       }
     } else {
       // 2. Download from the remote generated-image URL.
       const response = await fetch(sourceUrl);
       if (!response.ok) {
-        throw new Error(`Failed to download asset from ${sourceUrl}: HTTP ${response.status}`);
+        throw new Error(
+          `Failed to download asset from ${sourceUrl}: HTTP ${response.status}`,
+        );
       }
       blob = await response.blob();
     }
 
     // 3. Validate MIME type
-    const validMimes = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
+    const validMimes = [
+      "image/png",
+      "image/jpeg",
+      "image/webp",
+      "image/svg+xml",
+    ];
     if (!validMimes.includes(blob.type) && !validMimes.includes(expectedType)) {
       throw new Error(`Invalid image MIME type: ${blob.type}`);
     }
@@ -204,16 +236,18 @@ export class AssetStorageService {
       jobId,
       assetId,
       originalUrl: sourceUrl,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     });
 
     return {
       assetId,
       permanentUrl,
       sizeBytes: blob.size,
-      mimeType: blob.type
+      mimeType: blob.type,
     };
   }
 }
 
-export const defaultAssetStorage = new AssetStorageService(new MemoryStorageAdapter());
+export const defaultAssetStorage = new AssetStorageService(
+  new MemoryStorageAdapter(),
+);

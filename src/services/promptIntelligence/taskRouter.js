@@ -10,7 +10,7 @@ import {
   COMPLEXITY_LEVELS,
   EXECUTION_MODES,
   createRoutingResult,
-} from './schemas.js';
+} from "./schemas.js";
 
 /**
  * Default routing table — maps intent type to execution mode.
@@ -31,31 +31,31 @@ const ROUTING_TABLE = {
   },
   [INTENT_TYPES.RESEARCH]: {
     mode: EXECUTION_MODES.RESEARCH_AGENT,
-    agents: ['research_agent'],
+    agents: ["research_agent"],
   },
   [INTENT_TYPES.IMAGE_GENERATION]: {
     mode: EXECUTION_MODES.DIRECT_AGENT,
-    agents: ['flux_generator'],
+    agents: ["flux_generator"],
   },
   [INTENT_TYPES.CONTENT_CREATION]: {
     mode: EXECUTION_MODES.DIRECT_AGENT,
-    agents: ['content_writer'],
+    agents: ["content_writer"],
   },
   [INTENT_TYPES.DESIGN_TASK]: {
     mode: EXECUTION_MODES.DIRECT_AGENT,
-    agents: ['designer'],
+    agents: ["designer"],
   },
   [INTENT_TYPES.BUG_FIX]: {
     mode: EXECUTION_MODES.DEBUG_AGENT,
-    agents: ['debugger'],
+    agents: ["debugger"],
   },
   [INTENT_TYPES.CODE_REFACTOR]: {
     mode: EXECUTION_MODES.CODING_WORKFLOW,
-    agents: ['refactor_specialist', 'reviewer'],
+    agents: ["refactor_specialist", "reviewer"],
   },
   [INTENT_TYPES.FEATURE_IMPLEMENTATION]: {
     mode: EXECUTION_MODES.CODING_WORKFLOW,
-    agents: ['architect', 'implementer', 'reviewer'],
+    agents: ["architect", "implementer", "reviewer"],
   },
   [INTENT_TYPES.WEBSITE_CREATION]: {
     mode: EXECUTION_MODES.WEBSITE_BUILD,
@@ -75,17 +75,58 @@ const ROUTING_TABLE = {
  * Complexity-based agent compositions for website and game builds.
  */
 const WEBSITE_AGENTS_BY_COMPLEXITY = {
-  [COMPLEXITY_LEVELS.LOW]: ['frontend_developer'],
-  [COMPLEXITY_LEVELS.MEDIUM]: ['designer', 'frontend_developer', 'reviewer'],
-  [COMPLEXITY_LEVELS.HIGH]: ['architect', 'designer', 'frontend_developer', 'reviewer', 'qa_tester'],
-  [COMPLEXITY_LEVELS.EPIC]: ['architect', 'designer', 'frontend_developer', 'backend_developer', 'reviewer', 'qa_tester', 'security_reviewer'],
+  [COMPLEXITY_LEVELS.LOW]: ["frontend_developer"],
+  [COMPLEXITY_LEVELS.MEDIUM]: ["designer", "frontend_developer", "reviewer"],
+  [COMPLEXITY_LEVELS.HIGH]: [
+    "architect",
+    "designer",
+    "frontend_developer",
+    "reviewer",
+    "qa_tester",
+  ],
+  [COMPLEXITY_LEVELS.EPIC]: [
+    "architect",
+    "designer",
+    "frontend_developer",
+    "backend_developer",
+    "reviewer",
+    "qa_tester",
+    "security_reviewer",
+  ],
 };
 
 const GAME_AGENTS_BY_COMPLEXITY = {
-  [COMPLEXITY_LEVELS.LOW]: ['gameplay_programmer'],
-  [COMPLEXITY_LEVELS.MEDIUM]: ['game_designer', 'gameplay_programmer', 'ui_programmer', 'qa_tester'],
-  [COMPLEXITY_LEVELS.HIGH]: ['game_designer', 'tech_director', 'gameplay_programmer', 'engine_programmer', 'ui_programmer', 'qa_lead', 'code_reviewer'],
-  [COMPLEXITY_LEVELS.EPIC]: ['producer', 'game_designer', 'tech_director', 'lead_programmer', 'gameplay_programmer', 'engine_programmer', 'ai_programmer', 'ui_programmer', 'level_designer', 'technical_artist', 'qa_lead', 'qa_tester', 'code_reviewer'],
+  [COMPLEXITY_LEVELS.LOW]: ["gameplay_programmer"],
+  [COMPLEXITY_LEVELS.MEDIUM]: [
+    "game_designer",
+    "gameplay_programmer",
+    "ui_programmer",
+    "qa_tester",
+  ],
+  [COMPLEXITY_LEVELS.HIGH]: [
+    "game_designer",
+    "tech_director",
+    "gameplay_programmer",
+    "engine_programmer",
+    "ui_programmer",
+    "qa_lead",
+    "code_reviewer",
+  ],
+  [COMPLEXITY_LEVELS.EPIC]: [
+    "producer",
+    "game_designer",
+    "tech_director",
+    "lead_programmer",
+    "gameplay_programmer",
+    "engine_programmer",
+    "ai_programmer",
+    "ui_programmer",
+    "level_designer",
+    "technical_artist",
+    "qa_lead",
+    "qa_tester",
+    "code_reviewer",
+  ],
 };
 
 /**
@@ -106,15 +147,29 @@ export function route(intent, requirements, context = {}) {
 
   // Select agents based on complexity
   if (type === INTENT_TYPES.WEBSITE_CREATION) {
-    result.recommendedAgents = WEBSITE_AGENTS_BY_COMPLEXITY[complexity] || WEBSITE_AGENTS_BY_COMPLEXITY[COMPLEXITY_LEVELS.MEDIUM];
+    result.recommendedAgents =
+      WEBSITE_AGENTS_BY_COMPLEXITY[complexity] ||
+      WEBSITE_AGENTS_BY_COMPLEXITY[COMPLEXITY_LEVELS.MEDIUM];
     result.reason = `Website creation routed to ${result.mode} with ${result.recommendedAgents.length} agents at ${complexity} complexity`;
   } else if (type === INTENT_TYPES.GAME_CREATION) {
-    result.recommendedAgents = GAME_AGENTS_BY_COMPLEXITY[complexity] || GAME_AGENTS_BY_COMPLEXITY[COMPLEXITY_LEVELS.MEDIUM];
+    result.recommendedAgents =
+      GAME_AGENTS_BY_COMPLEXITY[complexity] ||
+      GAME_AGENTS_BY_COMPLEXITY[COMPLEXITY_LEVELS.MEDIUM];
     result.reason = `Game creation routed to ${result.mode} with ${result.recommendedAgents.length} agents at ${complexity} complexity`;
   } else if (type === INTENT_TYPES.FEATURE_IMPLEMENTATION) {
     // Scale based on complexity
-    if (complexity === COMPLEXITY_LEVELS.HIGH || complexity === COMPLEXITY_LEVELS.EPIC) {
-      result.recommendedAgents = ['architect', 'frontend', 'backend', 'implementer', 'reviewer', 'tester'];
+    if (
+      complexity === COMPLEXITY_LEVELS.HIGH ||
+      complexity === COMPLEXITY_LEVELS.EPIC
+    ) {
+      result.recommendedAgents = [
+        "architect",
+        "frontend",
+        "backend",
+        "implementer",
+        "reviewer",
+        "tester",
+      ];
     } else {
       result.recommendedAgents = entry.agents;
     }
@@ -125,14 +180,20 @@ export function route(intent, requirements, context = {}) {
   // Context-aware routing: if auth is needed and project has Supabase, route appropriately
   if (context && context.dependencies) {
     const deps = context.dependencies.map((d) => d.toLowerCase());
-    if (deps.some((d) => d.includes('supabase'))) {
-      if (!result.recommendedAgents.includes('supabase_integration')) {
-        result.recommendedAgents = [...result.recommendedAgents, 'supabase_integration'];
+    if (deps.some((d) => d.includes("supabase"))) {
+      if (!result.recommendedAgents.includes("supabase_integration")) {
+        result.recommendedAgents = [
+          ...result.recommendedAgents,
+          "supabase_integration",
+        ];
       }
     }
-    if (deps.some((d) => d.includes('firebase'))) {
-      if (!result.recommendedAgents.includes('firebase_integration')) {
-        result.recommendedAgents = [...result.recommendedAgents, 'firebase_integration'];
+    if (deps.some((d) => d.includes("firebase"))) {
+      if (!result.recommendedAgents.includes("firebase_integration")) {
+        result.recommendedAgents = [
+          ...result.recommendedAgents,
+          "firebase_integration",
+        ];
       }
     }
   }
@@ -150,8 +211,17 @@ export function shouldUseFullPipeline(intent) {
   const complexity = intent.complexity;
 
   // Trivial/low-complexity tasks skip the full pipeline
-  if (complexity === COMPLEXITY_LEVELS.TRIVIAL || complexity === COMPLEXITY_LEVELS.LOW) {
-    if (type === INTENT_TYPES.SIMPLE_EDIT || type === INTENT_TYPES.CODE_QUESTION || type === INTENT_TYPES.GENERAL_QUESTION || type === INTENT_TYPES.RESEARCH || type === INTENT_TYPES.IMAGE_GENERATION) {
+  if (
+    complexity === COMPLEXITY_LEVELS.TRIVIAL ||
+    complexity === COMPLEXITY_LEVELS.LOW
+  ) {
+    if (
+      type === INTENT_TYPES.SIMPLE_EDIT ||
+      type === INTENT_TYPES.CODE_QUESTION ||
+      type === INTENT_TYPES.GENERAL_QUESTION ||
+      type === INTENT_TYPES.RESEARCH ||
+      type === INTENT_TYPES.IMAGE_GENERATION
+    ) {
       return false;
     }
   }
@@ -169,23 +239,23 @@ export function toLegacyIntentType(intentType) {
     case INTENT_TYPES.WEBSITE_CREATION:
     case INTENT_TYPES.GAME_CREATION:
     case INTENT_TYPES.IMAGE_GENERATION:
-      return 'app';
+      return "app";
     case INTENT_TYPES.FEATURE_IMPLEMENTATION:
     case INTENT_TYPES.CODE_REFACTOR:
     case INTENT_TYPES.SIMPLE_EDIT:
-      return 'code-help';
+      return "code-help";
     case INTENT_TYPES.BUG_FIX:
-      return 'code-help';
+      return "code-help";
     case INTENT_TYPES.CODE_QUESTION:
-      return 'code-help';
+      return "code-help";
     case INTENT_TYPES.RESEARCH:
     case INTENT_TYPES.MARKET:
-      return 'explanation';
+      return "explanation";
     case INTENT_TYPES.CONTENT_CREATION:
-      return 'writing';
+      return "writing";
     case INTENT_TYPES.GENERAL_QUESTION:
-      return 'general';
+      return "general";
     default:
-      return 'general';
+      return "general";
   }
 }

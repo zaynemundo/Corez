@@ -3,18 +3,18 @@
  * DAG task graph for orchestrating parallel subagent execution and state lock safety.
  */
 
-import { 
-  TaskDependencyGraph, 
-  ResourceLockManager, 
-  SharedProjectState, 
-  AGENT_LIFECYCLE_STATES 
-} from '../services/gamePipeline/swarm/taskGraph.js';
+import {
+  TaskDependencyGraph,
+  ResourceLockManager,
+  SharedProjectState,
+  AGENT_LIFECYCLE_STATES,
+} from "../services/gamePipeline/swarm/taskGraph.js";
 
-export { 
-  TaskDependencyGraph, 
-  ResourceLockManager, 
-  SharedProjectState, 
-  AGENT_LIFECYCLE_STATES 
+export {
+  TaskDependencyGraph,
+  ResourceLockManager,
+  SharedProjectState,
+  AGENT_LIFECYCLE_STATES,
 };
 
 export function createPlanTaskGraph(projectId, tasks = []) {
@@ -22,10 +22,10 @@ export function createPlanTaskGraph(projectId, tasks = []) {
   for (const t of tasks) {
     graph.addTask({
       taskId: t.taskId || t.id,
-      role: t.role || 'IMPLEMENTER',
+      role: t.role || "IMPLEMENTER",
       objective: t.goal || t.objective || t.title,
       dependencies: t.dependencies || [],
-      ownedResources: t.ownedResources || t.relevantFiles || []
+      ownedResources: t.ownedResources || t.relevantFiles || [],
     });
   }
   return graph;

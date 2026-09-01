@@ -6,24 +6,28 @@
 // Inline generation always answers with SSE (or an honest error event), so
 // the client never misreads a valid response.
 
-import baseWorker from './index.js';
-import { readBoundedJson, createTaskStateStore, createRateLimiter } from './utils.js';
-import { TASK_STATUS_STORE_PREFIX } from './providerChain.js';
-import { handleTaskApi } from './taskApi.js';
-import { handleAuth, verifySession } from './auth.js';
-import { handleChats } from './chats.js';
-import { handleN8nWebhook } from './n8nBridge.js';
-import { handleZiina } from './ziina.js';
-import { handleSubscriptions } from './subscriptions.js';
-export { GameRoom } from './gameRoom.js';
+import baseWorker from "./index.js";
+import {
+  readBoundedJson,
+  createTaskStateStore,
+  createRateLimiter,
+} from "./utils.js";
+import { TASK_STATUS_STORE_PREFIX } from "./providerChain.js";
+import { handleTaskApi } from "./taskApi.js";
+import { handleAuth, verifySession } from "./auth.js";
+import { handleChats } from "./chats.js";
+import { handleN8nWebhook } from "./n8nBridge.js";
+import { handleZiina } from "./ziina.js";
+import { handleSubscriptions } from "./subscriptions.js";
+export { GameRoom } from "./gameRoom.js";
 
 // Per-client AI request rate bound: paid provider tokens are spent on every
 // /api/ai POST, so a single client must not be able to run up the bill.
 const aiRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 20 });
 const DIRECT_AI_ORIGINS = new Set([
-  'https://corez.pro',
-  'https://chat.corez.pro',
-  'https://web.corez.pro'
+  "https://corez.pro",
+  "https://chat.corez.pro",
+  "https://web.corez.pro",
 ]);
 
 export function isApprovedDirectAiOrigin(origin) {
@@ -45,91 +49,119 @@ export default {
     // wrangler dev rewrites request.url to the first route host (corez.pro)
     // even when the browser connected to localhost:8787, so gating on
     // url.hostname alone would loop every dev request through a self 301.
-    const clientHost = String(request.headers.get('Host') || url.host || '').toLowerCase();
-    const isLocalClient = clientHost.includes('localhost') || clientHost.includes('127.0.0.1') || clientHost.includes('::1') || url.hostname === 'localhost' || url.hostname === '127.0.0.1';
-    const normalizedClientHost = clientHost.replace(/:\d+$/, '');
-    const isDirectAiHost = normalizedClientHost === 'chat.zayne-mayo.workers.dev'
-      || url.hostname === 'chat.zayne-mayo.workers.dev';
-    const requestOrigin = request.headers.get('Origin') || '';
-    if (isDirectAiHost && url.pathname !== '/api/ai') {
-      return new Response(JSON.stringify({ error: 'Route not found.' }), {
+    const clientHost = String(
+      request.headers.get("Host") || url.host || "",
+    ).toLowerCase();
+    const isLocalClient =
+      clientHost.includes("localhost") ||
+      clientHost.includes("127.0.0.1") ||
+      clientHost.includes("::1") ||
+      url.hostname === "localhost" ||
+      url.hostname === "127.0.0.1";
+    const normalizedClientHost = clientHost.replace(/:\d+$/, "");
+    const isDirectAiHost =
+      normalizedClientHost === "chat.zayne-mayo.workers.dev" ||
+      url.hostname === "chat.zayne-mayo.workers.dev";
+    const requestOrigin = request.headers.get("Origin") || "";
+    if (isDirectAiHost && url.pathname !== "/api/ai") {
+      return new Response(JSON.stringify({ error: "Route not found." }), {
         status: 404,
-        headers: { 'Content-Type': 'application/json', 'X-Content-Type-Options': 'nosniff' }
+        headers: {
+          "Content-Type": "application/json",
+          "X-Content-Type-Options": "nosniff",
+        },
       });
     }
-    const directAiOrigin = isDirectAiHost && url.pathname === '/api/ai'
-      ? (isApprovedDirectAiOrigin(requestOrigin) ? requestOrigin : null)
-      : null;
-    if (isDirectAiHost && url.pathname === '/api/ai' && !directAiOrigin) {
-      return new Response(JSON.stringify({ error: 'Direct AI access requires an approved CoreZ origin.' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json', 'X-Content-Type-Options': 'nosniff' }
-      });
+    const directAiOrigin =
+      isDirectAiHost && url.pathname === "/api/ai"
+        ? isApprovedDirectAiOrigin(requestOrigin)
+          ? requestOrigin
+          : null
+        : null;
+    if (isDirectAiHost && url.pathname === "/api/ai" && !directAiOrigin) {
+      return new Response(
+        JSON.stringify({
+          error: "Direct AI access requires an approved CoreZ origin.",
+        }),
+        {
+          status: 403,
+          headers: {
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+          },
+        },
+      );
     }
-    if (request.method === 'OPTIONS') {
+    if (request.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
         headers: {
-          'Access-Control-Allow-Origin': directAiOrigin || '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-          'Access-Control-Max-Age': '86400'
-        }
+          "Access-Control-Allow-Origin": directAiOrigin || "*",
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type, Authorization",
+          "Access-Control-Max-Age": "86400",
+        },
       });
     }
     const withDirectAiCors = (response) => {
       if (!directAiOrigin) return response;
       const headers = new Headers(response.headers);
-      headers.set('Access-Control-Allow-Origin', directAiOrigin);
-      headers.set('Vary', 'Origin');
+      headers.set("Access-Control-Allow-Origin", directAiOrigin);
+      headers.set("Vary", "Origin");
       return new Response(response.body, {
         status: response.status,
         statusText: response.statusText,
-        headers
+        headers,
       });
     };
-    if (url.protocol === 'http:' && !isLocalClient) {
-      url.protocol = 'https:';
+    if (url.protocol === "http:" && !isLocalClient) {
+      url.protocol = "https:";
       return Response.redirect(url.toString(), 301);
     }
 
     // Auth routes - always handle before rate limiting
-    if (url.pathname.startsWith('/api/auth/')) {
+    if (url.pathname.startsWith("/api/auth/")) {
       const authRes = await handleAuth(request, env);
       if (authRes) return authRes;
     }
     const store = createTaskStateStore(env);
     const jsonHeaders = {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': directAiOrigin || '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      'X-Content-Type-Options': 'nosniff',
-      'X-Frame-Options': 'DENY',
-      'Referrer-Policy': 'no-referrer'
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": directAiOrigin || "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "X-Content-Type-Options": "nosniff",
+      "X-Frame-Options": "DENY",
+      "Referrer-Policy": "no-referrer",
     };
 
     // n8n webhook bridge — webhook-only, no API key
-    if (url.pathname === '/api/n8n/webhook') {
+    if (url.pathname === "/api/n8n/webhook") {
       const n8nRes = await handleN8nWebhook(request, env);
       if (n8nRes) return withDirectAiCors(n8nRes);
     }
 
     // Ziina payment gateway — create & fetch payment intents
     // POST /api/ziina/payment_intent  (+ aliases)  |  GET /api/ziina/payment_intent/{id}
-    if (url.pathname.startsWith('/api/ziina/') || url.pathname.startsWith('/api/payments/ziina/')) {
+    if (
+      url.pathname.startsWith("/api/ziina/") ||
+      url.pathname.startsWith("/api/payments/ziina/")
+    ) {
       const ziinaRes = await handleZiina(request, env);
       if (ziinaRes) return withDirectAiCors(ziinaRes);
     }
 
     // Subscriptions — monthly recurring (Free / Standard 18.36 AED / Premium 27.54 AED)
-    if (url.pathname.startsWith('/api/subscriptions')) {
+    if (url.pathname.startsWith("/api/subscriptions")) {
       const subRes = await handleSubscriptions(request, env);
       if (subRes) return withDirectAiCors(subRes);
     }
 
     // Chat routes — handle before generic auth gate so they can use verifySession directly
-    if (url.pathname === '/api/chats' || url.pathname.startsWith('/api/chats/')) {
+    if (
+      url.pathname === "/api/chats" ||
+      url.pathname.startsWith("/api/chats/")
+    ) {
       const chatsRes = await handleChats(request, env);
       if (chatsRes) return withDirectAiCors(chatsRes);
     }
@@ -140,37 +172,63 @@ export default {
     // links render for everyone. The publish handler enforces auth for POST
     // /api/publish, and handleR2Assets enforces ownership + publish-reference
     // for asset GETs. All other /api/assets writes stay auth-gated.
-    const authPaths = ['/api/ai', '/api/image', '/api/apps', '/api/memory', '/api/publish', '/api/assets', '/api/chats', '/api/tasks', '/api/task', '/api/context'];
-    const baseAuthPath = authPaths.some(p => url.pathname === p || url.pathname.startsWith(p + '/')) || url.pathname.startsWith('/api/game/');
-    const isPublicAssetGet = url.pathname.startsWith('/api/assets/') && request.method === 'GET';
-    const isPublicPublishGet = request.method === 'GET' && (
-      url.pathname === '/api/publish' ||
-      (!url.pathname.startsWith('/api/') && !url.pathname.startsWith('/dist/') && !url.pathname.startsWith('/assets/'))
-    );
+    const authPaths = [
+      "/api/ai",
+      "/api/image",
+      "/api/apps",
+      "/api/memory",
+      "/api/publish",
+      "/api/assets",
+      "/api/chats",
+      "/api/tasks",
+      "/api/task",
+      "/api/context",
+    ];
+    const baseAuthPath =
+      authPaths.some(
+        (p) => url.pathname === p || url.pathname.startsWith(p + "/"),
+      ) || url.pathname.startsWith("/api/game/");
+    const isPublicAssetGet =
+      url.pathname.startsWith("/api/assets/") && request.method === "GET";
+    const isPublicPublishGet =
+      request.method === "GET" &&
+      (url.pathname === "/api/publish" ||
+        (!url.pathname.startsWith("/api/") &&
+          !url.pathname.startsWith("/dist/") &&
+          !url.pathname.startsWith("/assets/")));
     const isPublicRoute = isPublicAssetGet || isPublicPublishGet;
     const needsAuth = baseAuthPath && !isPublicRoute;
     if (needsAuth) {
       const sess = await verifySession(request, env);
       if (!sess && env.AUTH_SECRET) {
-        return new Response(JSON.stringify({ error: 'Authentication required. Please log in.' }), { status: 401, headers: jsonHeaders });
+        return new Response(
+          JSON.stringify({ error: "Authentication required. Please log in." }),
+          { status: 401, headers: jsonHeaders },
+        );
       }
     }
     // SPA gate - redirect unauthenticated browser navigations to login (client also gates, this is defense)
     // Every /api/ai call spends paid provider tokens: bound the per-client
     // rate (20/min per IP) so one client cannot burn the deployment budget.
-    if (url.pathname === '/api/ai' && request.method === 'POST') {
+    if (url.pathname === "/api/ai" && request.method === "POST") {
       const retryAfter = aiRateLimiter(request);
       if (retryAfter !== null) {
-        return new Response(JSON.stringify({ error: 'Too many AI requests. Try again shortly.' }), {
-          status: 429,
-          headers: { ...jsonHeaders, 'Retry-After': String(retryAfter) }
-        });
+        return new Response(
+          JSON.stringify({ error: "Too many AI requests. Try again shortly." }),
+          {
+            status: 429,
+            headers: { ...jsonHeaders, "Retry-After": String(retryAfter) },
+          },
+        );
       }
     }
 
     // Unified harness task API (task lifecycle + SSE events) and context
     // records through the real entrypoint — same harness layer as the CLI.
-    if (url.pathname.startsWith('/api/tasks') || url.pathname.startsWith('/api/context/records')) {
+    if (
+      url.pathname.startsWith("/api/tasks") ||
+      url.pathname.startsWith("/api/context/records")
+    ) {
       const taskResponse = await handleTaskApi(request, env);
       if (taskResponse) return taskResponse;
     }
@@ -182,41 +240,59 @@ export default {
     // task-status/<taskId> when the schedule is persisted and removed when the
     // task completes or fails permanently — a missing record means the task is
     // no longer deferred (resend to fetch the result, or it never existed).
-    if (url.pathname.startsWith('/api/task/')) {
-      if (request.method !== 'GET') {
-        return new Response(JSON.stringify({ error: 'Method not allowed.' }), { status: 405, headers: jsonHeaders });
+    if (url.pathname.startsWith("/api/task/")) {
+      if (request.method !== "GET") {
+        return new Response(JSON.stringify({ error: "Method not allowed." }), {
+          status: 405,
+          headers: jsonHeaders,
+        });
       }
       let taskId;
       try {
-        taskId = decodeURIComponent(url.pathname.slice('/api/task/'.length));
+        taskId = decodeURIComponent(url.pathname.slice("/api/task/".length));
       } catch {
-        return new Response(JSON.stringify({ error: 'Invalid task id.' }), { status: 400, headers: jsonHeaders });
+        return new Response(JSON.stringify({ error: "Invalid task id." }), {
+          status: 400,
+          headers: jsonHeaders,
+        });
       }
       if (!taskId || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/.test(taskId)) {
-        return new Response(JSON.stringify({ error: 'Invalid task id.' }), { status: 400, headers: jsonHeaders });
+        return new Response(JSON.stringify({ error: "Invalid task id." }), {
+          status: 400,
+          headers: jsonHeaders,
+        });
       }
       const record = await store.load(`${TASK_STATUS_STORE_PREFIX}${taskId}`);
-      if (!record || record.status !== 'retry-scheduled') {
-        return new Response(JSON.stringify({ taskId, status: 'not-scheduled' }), { status: 200, headers: jsonHeaders });
+      if (!record || record.status !== "retry-scheduled") {
+        return new Response(
+          JSON.stringify({ taskId, status: "not-scheduled" }),
+          { status: 200, headers: jsonHeaders },
+        );
       }
-      const retryAfterSeconds = Math.max(0, Math.ceil((Number(record.nextEligibleAt) - Date.now()) / 1000));
-      return new Response(JSON.stringify({
-        taskId,
-        status: 'retry-scheduled',
-        provider: record.provider || null,
-        providerLabel: record.providerLabel || null,
-        attempt: Number(record.attempt) || 0,
-        nextEligibleAt: Number(record.nextEligibleAt) || 0,
-        retryAfterSeconds,
-        lastError: record.lastError || null
-      }), { status: 200, headers: jsonHeaders });
+      const retryAfterSeconds = Math.max(
+        0,
+        Math.ceil((Number(record.nextEligibleAt) - Date.now()) / 1000),
+      );
+      return new Response(
+        JSON.stringify({
+          taskId,
+          status: "retry-scheduled",
+          provider: record.provider || null,
+          providerLabel: record.providerLabel || null,
+          attempt: Number(record.attempt) || 0,
+          nextEligibleAt: Number(record.nextEligibleAt) || 0,
+          retryAfterSeconds,
+          lastError: record.lastError || null,
+        }),
+        { status: 200, headers: jsonHeaders },
+      );
     }
 
     // The /api/ai handler serves the direct route (baseWorker); the provider
     // fallback chain decides which configured provider actually answers.
     // Without ANY provider key it fails honestly. Every request runs inline:
     // creation requests take the harness, everything else the direct path.
-    if (url.pathname === '/api/ai' && request.method === 'POST') {
+    if (url.pathname === "/api/ai" && request.method === "POST") {
       const baseRequest = request.clone();
       let body;
       try {
@@ -235,5 +311,5 @@ export default {
     }
 
     return withDirectAiCors(await baseWorker.fetch(request, env, ctx));
-  }
+  },
 };

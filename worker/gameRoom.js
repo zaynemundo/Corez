@@ -16,7 +16,16 @@ const BULLET_SPEED = 0.65;
 const BULLET_RADIUS = 0.012;
 const MAX_BULLETS = 50;
 const MAX_MESSAGE_BYTES = 4096;
-const COLORS = ['#22d3ee', '#f472b6', '#4ade80', '#facc15', '#a78bfa', '#fb923c', '#f87171', '#34d399'];
+const COLORS = [
+  "#22d3ee",
+  "#f472b6",
+  "#4ade80",
+  "#facc15",
+  "#a78bfa",
+  "#fb923c",
+  "#f87171",
+  "#34d399",
+];
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -54,7 +63,7 @@ export class GameRoom {
       if (player.ws === ws) {
         this.players.delete(playerId);
         removed += 1;
-        this.broadcast({ type: 'player_left', playerId, name: player.name });
+        this.broadcast({ type: "player_left", playerId, name: player.name });
       }
     }
     if (removed > 0) this.stopTickIfIdle();
@@ -63,30 +72,33 @@ export class GameRoom {
   // Socket-level errors surface through this handler instead of becoming
   // unhandled errors on the Durable Object; the player is treated as gone.
   webSocketError(ws, error) {
-    console.warn('GameRoom WebSocket error:', String(error?.message || error).slice(0, 200));
+    console.warn(
+      "GameRoom WebSocket error:",
+      String(error?.message || error).slice(0, 200),
+    );
     this.webSocketClose(ws);
   }
 
   // ---- Message handling ----------------------------------------------------
 
   handleMessage(ws, raw) {
-    if (typeof raw !== 'string' || raw.length > MAX_MESSAGE_BYTES) return;
+    if (typeof raw !== "string" || raw.length > MAX_MESSAGE_BYTES) return;
     let data;
     try {
       data = JSON.parse(raw);
     } catch {
       return;
     }
-    if (!data || typeof data !== 'object') return;
+    if (!data || typeof data !== "object") return;
 
     switch (data.type) {
-      case 'join':
+      case "join":
         this.handleJoin(ws, data);
         break;
-      case 'input':
+      case "input":
         this.handleInput(ws, data);
         break;
-      case 'shoot':
+      case "shoot":
         this.handleShoot(ws, data);
         break;
       default:
@@ -98,11 +110,11 @@ export class GameRoom {
     // One connection may own at most one player: duplicate joins on the same
     // socket would leak player records that are never cleaned up on close.
     if (this.findPlayerByWs(ws)) {
-      this.send(ws, { type: 'error', message: 'Already joined.' });
+      this.send(ws, { type: "error", message: "Already joined." });
       return;
     }
     if (this.players.size >= ARENA_MAX_PLAYERS) {
-      this.send(ws, { type: 'error', message: 'Room is full.' });
+      this.send(ws, { type: "error", message: "Room is full." });
       return;
     }
     const playerId = this.generateId();
@@ -110,32 +122,35 @@ export class GameRoom {
     const player = {
       id: playerId,
       ws,
-      name: String(data.name || 'Player').slice(0, 20),
+      name: String(data.name || "Player").slice(0, 20),
       x: spawn.x,
       y: spawn.y,
       color: COLORS[this.players.size % COLORS.length],
       score: 0,
-      keys: { up: false, down: false, left: false, right: false }
+      keys: { up: false, down: false, left: false, right: false },
     };
     this.players.set(playerId, player);
     this.send(ws, {
-      type: 'welcome',
+      type: "welcome",
       playerId,
       roomId: String(this.state.id),
-      players: this.publicPlayers()
+      players: this.publicPlayers(),
     });
-    this.broadcast({ type: 'player_joined', player: this.publicPlayer(player) });
+    this.broadcast({
+      type: "player_joined",
+      player: this.publicPlayer(player),
+    });
     this.startTick();
   }
 
   handleInput(ws, data) {
     const player = this.findPlayerByWs(ws);
-    if (!player || !data.keys || typeof data.keys !== 'object') return;
+    if (!player || !data.keys || typeof data.keys !== "object") return;
     player.keys = {
       up: data.keys.up === true,
       down: data.keys.down === true,
       left: data.keys.left === true,
-      right: data.keys.right === true
+      right: data.keys.right === true,
     };
   }
 
@@ -152,7 +167,7 @@ export class GameRoom {
       y: player.y,
       dx: dx / length,
       dy: dy / length,
-      ownerId: player.id
+      ownerId: player.id,
     });
   }
 
@@ -167,8 +182,16 @@ export class GameRoom {
       const dy = (player.keys.down ? 1 : 0) - (player.keys.up ? 1 : 0);
       if (dx !== 0 || dy !== 0) {
         const length = Math.hypot(dx, dy);
-        player.x = clamp(player.x + (dx / length) * PLAYER_SPEED * step, PLAYER_RADIUS, 1 - PLAYER_RADIUS);
-        player.y = clamp(player.y + (dy / length) * PLAYER_SPEED * step, PLAYER_RADIUS, 1 - PLAYER_RADIUS);
+        player.x = clamp(
+          player.x + (dx / length) * PLAYER_SPEED * step,
+          PLAYER_RADIUS,
+          1 - PLAYER_RADIUS,
+        );
+        player.y = clamp(
+          player.y + (dy / length) * PLAYER_SPEED * step,
+          PLAYER_RADIUS,
+          1 - PLAYER_RADIUS,
+        );
       }
     }
 
@@ -180,15 +203,18 @@ export class GameRoom {
       if (!dead) {
         for (const player of this.players.values()) {
           if (player.id === bullet.ownerId) continue;
-          if (Math.hypot(player.x - bullet.x, player.y - bullet.y) < PLAYER_RADIUS + BULLET_RADIUS) {
+          if (
+            Math.hypot(player.x - bullet.x, player.y - bullet.y) <
+            PLAYER_RADIUS + BULLET_RADIUS
+          ) {
             const killer = this.players.get(bullet.ownerId);
             if (killer) killer.score += 1;
             this.broadcast({
-              type: 'kill',
+              type: "kill",
               killerId: bullet.ownerId,
               victimId: player.id,
-              killerName: killer ? killer.name : '',
-              victimName: player.name
+              killerName: killer ? killer.name : "",
+              victimName: player.name,
             });
             const spawn = this.randomSpawn();
             player.x = spawn.x;
@@ -202,10 +228,10 @@ export class GameRoom {
     }
 
     this.broadcast({
-      type: 'state',
+      type: "state",
       tick: this.tickCount,
       players: this.publicPlayers(),
-      bullets: this.publicBullets()
+      bullets: this.publicBullets(),
     });
   }
 
@@ -237,33 +263,37 @@ export class GameRoom {
       x: Math.round(player.x * 1000) / 1000,
       y: Math.round(player.y * 1000) / 1000,
       color: player.color,
-      score: player.score
+      score: player.score,
     };
   }
 
   publicPlayers() {
-    return [...this.players.values()].map(player => this.publicPlayer(player));
+    return [...this.players.values()].map((player) =>
+      this.publicPlayer(player),
+    );
   }
 
   publicBullets() {
-    return this.bullets.map(bullet => ({
+    return this.bullets.map((bullet) => ({
       x: Math.round(bullet.x * 1000) / 1000,
       y: Math.round(bullet.y * 1000) / 1000,
-      ownerId: bullet.ownerId
+      ownerId: bullet.ownerId,
     }));
   }
 
   randomSpawn() {
     return {
       x: 0.12 + Math.random() * 0.76,
-      y: 0.12 + Math.random() * 0.76
+      y: 0.12 + Math.random() * 0.76,
     };
   }
 
   generateId() {
     const bytes = new Uint8Array(4);
     crypto.getRandomValues(bytes);
-    return [...bytes].map(byte => byte.toString(16).padStart(2, '0')).join('');
+    return [...bytes]
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("");
   }
 
   send(ws, payload) {

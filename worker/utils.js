@@ -10,42 +10,52 @@ export const MAX_BODY_BYTES = 24 * 1024 * 1024;
 export function estimateCostUsd(inputTokens, outputTokens, env) {
   const inputRate = Number(env?.AI_COST_PER_M_INPUT_USD) || 0.14;
   const outputRate = Number(env?.AI_COST_PER_M_OUTPUT_USD) || 0.28;
-  const input = Number.isFinite(inputTokens) && inputTokens > 0 ? inputTokens : 0;
-  const output = Number.isFinite(outputTokens) && outputTokens > 0 ? outputTokens : 0;
-  return Math.round(((input / 1e6) * inputRate + (output / 1e6) * outputRate) * 1e6) / 1e6;
+  const input =
+    Number.isFinite(inputTokens) && inputTokens > 0 ? inputTokens : 0;
+  const output =
+    Number.isFinite(outputTokens) && outputTokens > 0 ? outputTokens : 0;
+  return (
+    Math.round(
+      ((input / 1e6) * inputRate + (output / 1e6) * outputRate) * 1e6,
+    ) / 1e6
+  );
 }
 
 export const SECURITY_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Max-Age': '86400',
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
-  'Referrer-Policy': 'no-referrer'
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Max-Age": "86400",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "no-referrer",
 };
 
 export function jsonResponse(status, body, extraHeaders = {}) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       ...SECURITY_HEADERS,
-      ...extraHeaders
-    }
+      ...extraHeaders,
+    },
   });
 }
 
 export function safeErrorDetail(error) {
-  const raw = error instanceof Error
-    ? error.message
-    : typeof error?.message === 'string'
+  const raw =
+    error instanceof Error
       ? error.message
-      : String(error);
+      : typeof error?.message === "string"
+        ? error.message
+        : String(error);
 
   return raw
-    .replace(/(authorization\s*:\s*bearer\s+)[^\s,;]+/gi, '$1[REDACTED]')
-    .replace(/\b(api[_-]?key|token|secret|password)\b(\s*[:=]\s*)([^\s&,;]+)/gi, '$1$2[REDACTED]')
+    .replace(/(authorization\s*:\s*bearer\s+)[^\s,;]+/gi, "$1[REDACTED]")
+    .replace(
+      /\b(api[_-]?key|token|secret|password)\b(\s*[:=]\s*)([^\s&,;]+)/gi,
+      "$1$2[REDACTED]",
+    )
     .slice(0, 500);
 }
 
@@ -54,14 +64,19 @@ export function safeErrorDetail(error) {
  * Returns the Retry-After seconds when the client is over the limit,
  * otherwise null (and records the request).
  */
-export function createRateLimiter({ windowMs = 60_000, limit = 20, maxClients = 1_000 } = {}) {
+export function createRateLimiter({
+  windowMs = 60_000,
+  limit = 20,
+  maxClients = 1_000,
+} = {}) {
   const clients = new Map();
 
   function clientIdentity(request) {
-    const candidate = request.headers.get('CF-Connecting-IP')
-      || request.headers.get('X-Forwarded-For')?.split(',')[0]
-      || 'anonymous';
-    return candidate.trim().slice(0, 128) || 'anonymous';
+    const candidate =
+      request.headers.get("CF-Connecting-IP") ||
+      request.headers.get("X-Forwarded-For")?.split(",")[0] ||
+      "anonymous";
+    return candidate.trim().slice(0, 128) || "anonymous";
   }
 
   return function rateRetryAfter(request, now = Date.now()) {
@@ -83,7 +98,10 @@ export function createRateLimiter({ windowMs = 60_000, limit = 20, maxClients = 
       record.count = 0;
     }
     if (record.count >= limit) {
-      return Math.max(1, Math.ceil((record.windowStart + windowMs - now) / 1000));
+      return Math.max(
+        1,
+        Math.ceil((record.windowStart + windowMs - now) / 1000),
+      );
     }
     record.count += 1;
     return null;
@@ -98,34 +116,50 @@ export function createRateLimiter({ windowMs = 60_000, limit = 20, maxClients = 
  */
 export function classifyProviderFailure(error) {
   const status = Number(error?.status);
-  const message = String(error?.message || '');
+  const message = String(error?.message || "");
   const retryAfter = Number(error?.retryAfter) || 0;
 
   const PERMANENT_STATUS = new Set([400, 401, 403, 404, 405, 413, 422, 501]);
   if (PERMANENT_STATUS.has(status)) {
-    return { kind: 'permanent', status, retryAfterMs: 0 };
+    return { kind: "permanent", status, retryAfterMs: 0 };
   }
 
-  if (status === 429 || status === 408 || (Number.isFinite(status) && status >= 500)) {
+  if (
+    status === 429 ||
+    status === 408 ||
+    (Number.isFinite(status) && status >= 500)
+  ) {
     return {
-      kind: 'transient',
+      kind: "transient",
       status,
-      retryAfterMs: retryAfter > 0 ? retryAfter * 1000 : 0
+      retryAfterMs: retryAfter > 0 ? retryAfter * 1000 : 0,
     };
   }
 
-  if (/unauthorized|invalid api|authentication|forbidden|not found|unsupported model|validation error|invalid request/i.test(message)) {
-    return { kind: 'permanent', status, retryAfterMs: 0 };
+  if (
+    /unauthorized|invalid api|authentication|forbidden|not found|unsupported model|validation error|invalid request/i.test(
+      message,
+    )
+  ) {
+    return { kind: "permanent", status, retryAfterMs: 0 };
   }
 
-  if (/429|408|rate limit|too many|temporarily|unavailable|gateway|timeout|network|econn|fetch failed|ecosystem/i.test(message)) {
-    return { kind: 'transient', status, retryAfterMs: retryAfter > 0 ? retryAfter * 1000 : 0 };
+  if (
+    /429|408|rate limit|too many|temporarily|unavailable|gateway|timeout|network|econn|fetch failed|ecosystem/i.test(
+      message,
+    )
+  ) {
+    return {
+      kind: "transient",
+      status,
+      retryAfterMs: retryAfter > 0 ? retryAfter * 1000 : 0,
+    };
   }
 
   // Unclassified network/transport failures are transient by default: the
   // recovery loop retries with backoff and stops only on permanent
   // classification, user cancellation, or the unavailability horizon.
-  return { kind: 'transient', status, retryAfterMs: 0 };
+  return { kind: "transient", status, retryAfterMs: 0 };
 }
 
 /**
@@ -139,14 +173,17 @@ export function createTaskStateStore(env = {}) {
   const bucket = env?.ASSET_BUCKET;
   const memory = new Map();
 
-  const keyOf = (taskId) => `corez-tasks/${String(taskId).replace(/[^A-Za-z0-9._-]/g, '_')}.json`;
+  const keyOf = (taskId) =>
+    `corez-tasks/${String(taskId).replace(/[^A-Za-z0-9._-]/g, "_")}.json`;
 
   return {
     async save(taskId, state) {
       const serialized = JSON.stringify(state);
       memory.set(String(taskId), serialized);
       if (bucket) {
-        await bucket.put(keyOf(taskId), serialized, { httpMetadata: { contentType: 'application/json' } });
+        await bucket.put(keyOf(taskId), serialized, {
+          httpMetadata: { contentType: "application/json" },
+        });
       }
     },
     async load(taskId) {
@@ -172,12 +209,15 @@ export function createTaskStateStore(env = {}) {
           // Best effort.
         }
       }
-    }
+    },
   };
 }
 
 export async function readBoundedJson(request, maxBytes = MAX_BODY_BYTES) {
-  const contentLength = parseInt(request.headers.get('Content-Length') || '0', 10);
+  const contentLength = parseInt(
+    request.headers.get("Content-Length") || "0",
+    10,
+  );
   if (contentLength > maxBytes) {
     throw new Error(`Request body exceeds ${maxBytes} byte limit.`);
   }
@@ -186,7 +226,7 @@ export async function readBoundedJson(request, maxBytes = MAX_BODY_BYTES) {
   // the limit, so this guard works even when the platform's own 100 MB cap
   // would otherwise allow a large body to reach memory.
   const decoder = new TextDecoder();
-  let text = '';
+  let text = "";
   let bytesRead = 0;
   if (request.body) {
     const reader = request.body.getReader();

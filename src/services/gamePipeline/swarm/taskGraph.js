@@ -5,15 +5,15 @@
  */
 
 export const AGENT_LIFECYCLE_STATES = {
-  CREATED: 'created',
-  QUEUED: 'queued',
-  WAITING_FOR_DEPENDENCIES: 'waiting_for_dependencies',
-  RUNNING: 'running',
-  VALIDATING: 'validating',
-  COMPLETED: 'completed',
-  FAILED: 'failed',
-  DECOMPOSED: 'decomposed',
-  RETRYING: 'retrying'
+  CREATED: "created",
+  QUEUED: "queued",
+  WAITING_FOR_DEPENDENCIES: "waiting_for_dependencies",
+  RUNNING: "running",
+  VALIDATING: "validating",
+  COMPLETED: "completed",
+  FAILED: "failed",
+  DECOMPOSED: "decomposed",
+  RETRYING: "retrying",
 };
 
 export class ResourceLockManager {
@@ -24,10 +24,19 @@ export class ResourceLockManager {
   acquireLock(resourceName, agentId) {
     const existing = this.locks.get(resourceName);
     if (existing && existing.locked && existing.ownerAgentId !== agentId) {
-      return { success: false, currentOwner: existing.ownerAgentId, version: existing.version };
+      return {
+        success: false,
+        currentOwner: existing.ownerAgentId,
+        version: existing.version,
+      };
     }
     const version = (existing ? existing.version : 0) + 1;
-    const lockInfo = { resourceName, ownerAgentId: agentId, version, locked: true };
+    const lockInfo = {
+      resourceName,
+      ownerAgentId: agentId,
+      version,
+      locked: true,
+    };
     this.locks.set(resourceName, lockInfo);
     return { success: true, lockInfo };
   }
@@ -49,7 +58,7 @@ export class ResourceLockManager {
           success: false,
           lockedResource: resName,
           currentOwner: existing.ownerAgentId,
-          version: existing.version
+          version: existing.version,
         };
       }
     }
@@ -76,7 +85,8 @@ export class ResourceLockManager {
   }
 
   releaseLocks(resourceNames = [], agentId) {
-    if (!Array.isArray(resourceNames) || resourceNames.length === 0) return true;
+    if (!Array.isArray(resourceNames) || resourceNames.length === 0)
+      return true;
     let allReleased = true;
     for (const resName of resourceNames) {
       const released = this.releaseLock(resName, agentId);
@@ -101,8 +111,9 @@ export class ResourceLockManager {
   }
 
   canAcquireAll(resourceNames = [], agentId) {
-    if (!Array.isArray(resourceNames) || resourceNames.length === 0) return true;
-    return resourceNames.every(resName => {
+    if (!Array.isArray(resourceNames) || resourceNames.length === 0)
+      return true;
+    return resourceNames.every((resName) => {
       const lock = this.locks.get(resName);
       return !lock || !lock.locked || lock.ownerAgentId === agentId;
     });
@@ -112,7 +123,9 @@ export class ResourceLockManager {
 export class SharedProjectState {
   constructor(projectId) {
     this.state = {
-      projectId: projectId || `swarm_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      projectId:
+        projectId ||
+        `swarm_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       specVersion: 1,
       agents: {},
       tasks: {},
@@ -121,7 +134,7 @@ export class SharedProjectState {
       assets: {},
       validatedOutputs: {},
       issues: [],
-      events: []
+      events: [],
     };
   }
 
@@ -134,18 +147,21 @@ export class SharedProjectState {
     const agent = this.state.agents[agentId];
 
     if (!task || !agent) {
-      return { success: false, reason: 'Task or Agent does not exist.' };
+      return { success: false, reason: "Task or Agent does not exist." };
     }
 
     if (task.status === AGENT_LIFECYCLE_STATES.COMPLETED) {
-      return { success: false, reason: 'Task is already completed.' };
+      return { success: false, reason: "Task is already completed." };
     }
 
     // Verify resource ownership if resources locked
     for (const resName of resourceLocks) {
       const lock = this.state.resources[resName];
       if (lock && lock.locked && lock.ownerAgentId !== agentId) {
-        return { success: false, reason: `Resource "${resName}" is locked by another agent "${lock.ownerAgentId}".` };
+        return {
+          success: false,
+          reason: `Resource "${resName}" is locked by another agent "${lock.ownerAgentId}".`,
+        };
       }
     }
 
@@ -156,11 +172,11 @@ export class SharedProjectState {
     this.state.agents[agentId].status = AGENT_LIFECYCLE_STATES.COMPLETED;
 
     this.state.events.push({
-      type: 'TASK_COMPLETED',
+      type: "TASK_COMPLETED",
       agentId,
       taskId,
       version: this.state.specVersion,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     return { success: true, version: this.state.specVersion };
@@ -173,7 +189,7 @@ export class SharedProjectState {
       taskId,
       description: issueDescription,
       isBlocking,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 }
@@ -186,21 +202,27 @@ export class TaskDependencyGraph {
   }
 
   addTask(taskDef) {
-    const agentId = taskDef.agentId || `agent_${taskDef.role}_${Math.random().toString(36).slice(2, 7)}`;
+    const agentId =
+      taskDef.agentId ||
+      `agent_${taskDef.role}_${Math.random().toString(36).slice(2, 7)}`;
     const fullTask = {
       agentId,
       role: taskDef.role,
       taskId: taskDef.taskId,
       objective: taskDef.objective,
-      dependencies: Array.isArray(taskDef.dependencies) ? [...taskDef.dependencies] : [],
+      dependencies: Array.isArray(taskDef.dependencies)
+        ? [...taskDef.dependencies]
+        : [],
       inputRefs: Array.isArray(taskDef.inputRefs) ? [...taskDef.inputRefs] : [],
       outputSchema: taskDef.outputSchema || {},
-      ownedResources: Array.isArray(taskDef.ownedResources) ? [...taskDef.ownedResources] : [],
+      ownedResources: Array.isArray(taskDef.ownedResources)
+        ? [...taskDef.ownedResources]
+        : [],
       isEssential: taskDef.isEssential !== false,
       status: AGENT_LIFECYCLE_STATES.CREATED,
       attempt: taskDef.attempt || 1,
       maxAttempts: taskDef.maxAttempts || 3,
-      createdTimestamp: Date.now()
+      createdTimestamp: Date.now(),
     };
 
     this.tasks.set(fullTask.taskId, fullTask);
@@ -209,7 +231,7 @@ export class TaskDependencyGraph {
       agentId,
       role: fullTask.role,
       taskId: fullTask.taskId,
-      status: AGENT_LIFECYCLE_STATES.CREATED
+      status: AGENT_LIFECYCLE_STATES.CREATED,
     };
 
     return fullTask;
@@ -224,9 +246,13 @@ export class TaskDependencyGraph {
         task.status === AGENT_LIFECYCLE_STATES.RETRYING ||
         task.status === AGENT_LIFECYCLE_STATES.WAITING_FOR_DEPENDENCIES
       ) {
-        const dependenciesMet = task.dependencies.every(depId => {
+        const dependenciesMet = task.dependencies.every((depId) => {
           const depTask = this.tasks.get(depId);
-          return depTask && (depTask.status === AGENT_LIFECYCLE_STATES.COMPLETED || depTask.status === AGENT_LIFECYCLE_STATES.DECOMPOSED);
+          return (
+            depTask &&
+            (depTask.status === AGENT_LIFECYCLE_STATES.COMPLETED ||
+              depTask.status === AGENT_LIFECYCLE_STATES.DECOMPOSED)
+          );
         });
 
         if (dependenciesMet) {
@@ -251,31 +277,40 @@ export class TaskDependencyGraph {
     parentTask.status = AGENT_LIFECYCLE_STATES.DECOMPOSED;
     const newTasks = [];
 
-    const suggested = Array.isArray(decompositionPayload.suggestedTasks) ? decompositionPayload.suggestedTasks : [];
+    const suggested = Array.isArray(decompositionPayload.suggestedTasks)
+      ? decompositionPayload.suggestedTasks
+      : [];
     for (const sub of suggested) {
-      const subDependencies = Array.isArray(sub.dependencies) && sub.dependencies.length > 0
-        ? [...sub.dependencies]
-        : [...(parentTask.dependencies || [])];
+      const subDependencies =
+        Array.isArray(sub.dependencies) && sub.dependencies.length > 0
+          ? [...sub.dependencies]
+          : [...(parentTask.dependencies || [])];
       const subTask = this.addTask({
         role: sub.role || parentTask.role,
         taskId: sub.taskId,
         objective: sub.objective || `Subtask of ${parentTaskId}`,
         dependencies: subDependencies,
-        inputRefs: Array.isArray(sub.inputRefs) ? sub.inputRefs : (parentTask.inputRefs || []),
+        inputRefs: Array.isArray(sub.inputRefs)
+          ? sub.inputRefs
+          : parentTask.inputRefs || [],
         ownedResources: sub.ownedResources || [],
         isEssential: parentTask.isEssential,
-        maxAttempts: sub.maxAttempts || parentTask.maxAttempts || 3
+        maxAttempts: sub.maxAttempts || parentTask.maxAttempts || 3,
       });
       newTasks.push(subTask);
     }
 
-    const shouldRewire = options.rewireDownstream || decompositionPayload.rewireDownstream;
+    const shouldRewire =
+      options.rewireDownstream || decompositionPayload.rewireDownstream;
     if (shouldRewire && newTasks.length > 0) {
-      const newSubTaskIds = newTasks.map(t => t.taskId);
+      const newSubTaskIds = newTasks.map((t) => t.taskId);
       for (const [taskId, task] of this.tasks.entries()) {
-        if (taskId !== parentTaskId && task.dependencies.includes(parentTaskId)) {
+        if (
+          taskId !== parentTaskId &&
+          task.dependencies.includes(parentTaskId)
+        ) {
           task.dependencies = task.dependencies
-            .filter(d => d !== parentTaskId)
+            .filter((d) => d !== parentTaskId)
             .concat(newSubTaskIds);
         }
       }
@@ -288,7 +323,10 @@ export class TaskDependencyGraph {
    * Dynamically injects an array of specialist tasks into the graph,
    * wiring their dependencies and optionally updating downstream tasks.
    */
-  injectDynamicTasks(newTasksList = [], { afterTaskId, beforeTaskIds = [] } = {}) {
+  injectDynamicTasks(
+    newTasksList = [],
+    { afterTaskId, beforeTaskIds = [] } = {},
+  ) {
     const addedTasks = [];
     for (const t of newTasksList) {
       const taskDeps = Array.isArray(t.dependencies) ? [...t.dependencies] : [];
@@ -297,13 +335,13 @@ export class TaskDependencyGraph {
       }
       const added = this.addTask({
         ...t,
-        dependencies: taskDeps
+        dependencies: taskDeps,
       });
       addedTasks.push(added);
     }
 
     if (beforeTaskIds.length > 0 && addedTasks.length > 0) {
-      const addedIds = addedTasks.map(t => t.taskId);
+      const addedIds = addedTasks.map((t) => t.taskId);
       for (const beforeId of beforeTaskIds) {
         const targetTask = this.tasks.get(beforeId);
         if (targetTask) {
@@ -348,9 +386,11 @@ export class TaskDependencyGraph {
   isSwarmComplete() {
     let allEssentialComplete = true;
     for (const task of this.tasks.values()) {
-      if (task.isEssential
-        && task.status !== AGENT_LIFECYCLE_STATES.COMPLETED
-        && task.status !== AGENT_LIFECYCLE_STATES.DECOMPOSED) {
+      if (
+        task.isEssential &&
+        task.status !== AGENT_LIFECYCLE_STATES.COMPLETED &&
+        task.status !== AGENT_LIFECYCLE_STATES.DECOMPOSED
+      ) {
         allEssentialComplete = false;
         break;
       }

@@ -1,4 +1,10 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
 
 const AuthContext = createContext(null);
 
@@ -8,7 +14,7 @@ export function AuthProvider({ children }) {
 
   const fetchMe = useCallback(async () => {
     try {
-      const r = await fetch('/api/auth/me', { credentials: 'include' });
+      const r = await fetch("/api/auth/me", { credentials: "include" });
       if (r.ok) {
         const d = await r.json();
         setUser(d.user);
@@ -22,65 +28,78 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  useEffect(() => { fetchMe(); }, [fetchMe]);
+  useEffect(() => {
+    fetchMe();
+  }, [fetchMe]);
 
   const login = async (email, password) => {
-    const r = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ email, password })
+    const r = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ email, password }),
     });
-    const d = await r.json().catch(()=>({}));
-    if (!r.ok) throw new Error(d.error || 'Login failed');
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || "Login failed");
     setUser(d.user);
     return d.user;
   };
 
-  const signup = async (email, password, plan = 'free') => {
-    const r = await fetch('/api/auth/signup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ email, password, plan })
+  const signup = async (email, password, plan = "free") => {
+    const r = await fetch("/api/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ email, password, plan }),
     });
-    const d = await r.json().catch(()=>({}));
-    if (!r.ok) throw new Error(d.error || 'Signup failed');
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || "Signup failed");
     setUser(d.user);
     return d.user;
   };
 
   const logout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     setUser(null);
   };
 
   const forgot = async (email) => {
-    const r = await fetch('/api/auth/forgot', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ email })
+    const r = await fetch("/api/auth/forgot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ email }),
     });
-    const d = await r.json().catch(()=>({}));
-    if (!r.ok) throw new Error(d.error || 'Failed to send reset email');
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || "Failed to send reset email");
     return d;
   };
 
   const reset = async (token, password) => {
-    const r = await fetch('/api/auth/reset', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ token, password })
+    const r = await fetch("/api/auth/reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ token, password }),
     });
-    const d = await r.json().catch(()=>({}));
-    if (!r.ok) throw new Error(d.error || 'Failed to reset password');
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || "Failed to reset password");
     return d;
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout, forgot, reset, refresh: fetchMe }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        signup,
+        logout,
+        forgot,
+        reset,
+        refresh: fetchMe,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -88,6 +107,6 @@ export function AuthProvider({ children }) {
 
 export function useAuth() {
   const v = useContext(AuthContext);
-  if (!v) throw new Error('useAuth must be inside AuthProvider');
+  if (!v) throw new Error("useAuth must be inside AuthProvider");
   return v;
 }

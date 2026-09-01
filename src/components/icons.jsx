@@ -10,13 +10,13 @@ function iconProps(size, strokeWidth) {
   return {
     width: size,
     height: size,
-    viewBox: '0 0 24 24',
-    fill: 'none',
-    stroke: 'currentColor',
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
     strokeWidth,
-    strokeLinecap: 'round',
-    strokeLinejoin: 'round',
-    'aria-hidden': true
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    "aria-hidden": true,
   };
 }
 

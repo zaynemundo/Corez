@@ -4,14 +4,14 @@
  * When server is unavailable (tests/local dev without D1), callers fallback to localStorage.
  */
 
-const BASE = '/api/chats';
+const BASE = "/api/chats";
 
 function fetchJson(url, opts = {}) {
-  return fetch(url, { credentials: 'include', ...opts });
+  return fetch(url, { credentials: "include", ...opts });
 }
 
 export async function listChats() {
-  const r = await fetchJson(BASE, { method: 'GET' });
+  const r = await fetchJson(BASE, { method: "GET" });
   if (!r.ok) {
     const e = await r.json().catch(() => ({}));
     throw new Error(e.error || `listChats failed: ${r.status}`);
@@ -22,8 +22,8 @@ export async function listChats() {
 
 export async function createChat({ title } = {}) {
   const r = await fetchJson(BASE, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(title ? { title } : {}),
   });
   if (!r.ok) {
@@ -35,11 +35,13 @@ export async function createChat({ title } = {}) {
 
 export async function getChat(chatId, opts = {}) {
   const params = new URLSearchParams();
-  if (opts.compact) params.set('compact', '1');
-  if (opts.keep) params.set('keep', String(opts.keep));
-  if (opts.limit) params.set('limit', String(opts.limit));
-  const qs = params.toString() ? `?${params.toString()}` : '';
-  const r = await fetchJson(`${BASE}/${encodeURIComponent(chatId)}${qs}`, { method: 'GET' });
+  if (opts.compact) params.set("compact", "1");
+  if (opts.keep) params.set("keep", String(opts.keep));
+  if (opts.limit) params.set("limit", String(opts.limit));
+  const qs = params.toString() ? `?${params.toString()}` : "";
+  const r = await fetchJson(`${BASE}/${encodeURIComponent(chatId)}${qs}`, {
+    method: "GET",
+  });
   if (!r.ok) {
     const e = await r.json().catch(() => ({}));
     const err = new Error(e.error || `getChat failed: ${r.status}`);
@@ -59,8 +61,8 @@ export async function getChatFull(chatId) {
 
 export async function patchChatTitle(chatId, title) {
   const r = await fetchJson(`${BASE}/${encodeURIComponent(chatId)}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ title }),
   });
   if (!r.ok) {
@@ -75,8 +77,8 @@ export async function putChat(chatId, { title, messages } = {}) {
   if (title != null) payload.title = title;
   if (messages != null) payload.messages = messages;
   const r = await fetchJson(`${BASE}/${encodeURIComponent(chatId)}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   if (!r.ok) {
@@ -88,8 +90,8 @@ export async function putChat(chatId, { title, messages } = {}) {
 
 export async function appendMessage(chatId, { role, content, attachments }) {
   const r = await fetchJson(`${BASE}/${encodeURIComponent(chatId)}/messages`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ role, content, attachments }),
   });
   if (!r.ok) {
@@ -100,7 +102,9 @@ export async function appendMessage(chatId, { role, content, attachments }) {
 }
 
 export async function deleteChat(chatId) {
-  const r = await fetchJson(`${BASE}/${encodeURIComponent(chatId)}`, { method: 'DELETE' });
+  const r = await fetchJson(`${BASE}/${encodeURIComponent(chatId)}`, {
+    method: "DELETE",
+  });
   if (!r.ok) {
     const e = await r.json().catch(() => ({}));
     throw new Error(e.error || `deleteChat failed: ${r.status}`);
@@ -109,7 +113,7 @@ export async function deleteChat(chatId) {
 }
 
 export async function deleteAllChats() {
-  const r = await fetchJson(BASE, { method: 'DELETE' });
+  const r = await fetchJson(BASE, { method: "DELETE" });
   if (!r.ok) {
     const e = await r.json().catch(() => ({}));
     throw new Error(e.error || `deleteAllChats failed: ${r.status}`);

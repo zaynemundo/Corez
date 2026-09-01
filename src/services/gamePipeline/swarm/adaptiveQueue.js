@@ -14,9 +14,8 @@ export class AdaptiveConcurrencyQueue {
     //   0 / undefined  -> adaptive (grows with sustained low latency)
     //   > 0            -> explicit operator ceiling (e.g. from
     //                     DEFAULT_CONFIG.swarm.maxConcurrency)
-    this.operatorCeiling = options.maxAllowedConcurrency
-      ?? options.maxConcurrency
-      ?? 0;
+    this.operatorCeiling =
+      options.maxAllowedConcurrency ?? options.maxConcurrency ?? 0;
     this.currentConcurrency = options.initialConcurrency || 4;
     this.activeCount = 0;
     this.queue = [];
@@ -44,7 +43,7 @@ export class AdaptiveConcurrencyQueue {
         taskMetadata,
         resolve,
         reject,
-        enqueuedAt: Date.now()
+        enqueuedAt: Date.now(),
       });
       this.processQueue();
     });
@@ -53,7 +52,10 @@ export class AdaptiveConcurrencyQueue {
   processQueue() {
     if (this.isBackoffActive || this.queue.length === 0) return;
 
-    while (this.activeCount < this.currentConcurrency && this.queue.length > 0) {
+    while (
+      this.activeCount < this.currentConcurrency &&
+      this.queue.length > 0
+    ) {
       const item = this.queue.shift();
       if (!item) break;
 
@@ -69,12 +71,15 @@ export class AdaptiveConcurrencyQueue {
       const duration = Date.now() - startTime;
 
       this.recordSuccess(duration);
-      item.resolve({ status: 'fulfilled', value: result });
+      item.resolve({ status: "fulfilled", value: result });
     } catch (error) {
-      const isRateLimit = error?.status === 429 || error?.message?.includes('429') || error?.message?.includes('rate limit');
+      const isRateLimit =
+        error?.status === 429 ||
+        error?.message?.includes("429") ||
+        error?.message?.includes("rate limit");
       this.recordFailure(isRateLimit, error);
-      
-      item.resolve({ status: 'rejected', reason: error });
+
+      item.resolve({ status: "rejected", reason: error });
     } finally {
       this.activeCount--;
       this.processQueue();
@@ -88,10 +93,18 @@ export class AdaptiveConcurrencyQueue {
     this.consecutiveSuccesses++;
 
     // Adaptive Scale Up: Increase concurrency if low latency (<1500ms) and consecutive successes
-    if (this.consecutiveSuccesses >= 3 && this.currentConcurrency < this.ceiling()) {
-      const avgLatency = this.recentLatencies.reduce((a, b) => a + b, 0) / this.recentLatencies.length;
+    if (
+      this.consecutiveSuccesses >= 3 &&
+      this.currentConcurrency < this.ceiling()
+    ) {
+      const avgLatency =
+        this.recentLatencies.reduce((a, b) => a + b, 0) /
+        this.recentLatencies.length;
       if (avgLatency < 2000) {
-        this.currentConcurrency = Math.min(this.ceiling(), this.currentConcurrency + 1);
+        this.currentConcurrency = Math.min(
+          this.ceiling(),
+          this.currentConcurrency + 1,
+        );
         this.consecutiveSuccesses = 0;
       }
     }
@@ -105,11 +118,17 @@ export class AdaptiveConcurrencyQueue {
       // and remember the rate-limit evidence so the adaptive ceiling never
       // outruns what the provider can sustain.
       this.rateLimitHits += 1;
-      this.currentConcurrency = Math.max(this.minConcurrency, Math.floor(this.currentConcurrency / 2));
+      this.currentConcurrency = Math.max(
+        this.minConcurrency,
+        Math.floor(this.currentConcurrency / 2),
+      );
       this.triggerBackoff();
     } else {
       // General error: Hold or slightly reduce concurrency
-      this.currentConcurrency = Math.max(this.minConcurrency, this.currentConcurrency - 1);
+      this.currentConcurrency = Math.max(
+        this.minConcurrency,
+        this.currentConcurrency - 1,
+      );
     }
   }
 
@@ -119,7 +138,7 @@ export class AdaptiveConcurrencyQueue {
 
     // Exponential backoff with jitter (500ms * multiplier + random jitter)
     const jitter = Math.random() * 300;
-    const backoffDelay = (500 * this.backoffMultiplier) + jitter;
+    const backoffDelay = 500 * this.backoffMultiplier + jitter;
 
     setTimeout(() => {
       this.isBackoffActive = false;
@@ -128,16 +147,20 @@ export class AdaptiveConcurrencyQueue {
   }
 
   getMetrics() {
-    const avgLatency = this.recentLatencies.length > 0
-      ? Math.round(this.recentLatencies.reduce((a, b) => a + b, 0) / this.recentLatencies.length)
-      : 0;
+    const avgLatency =
+      this.recentLatencies.length > 0
+        ? Math.round(
+            this.recentLatencies.reduce((a, b) => a + b, 0) /
+              this.recentLatencies.length,
+          )
+        : 0;
 
     return {
       currentConcurrency: this.currentConcurrency,
       activeCount: this.activeCount,
       queuedTasks: this.queue.length,
       averageLatencyMs: avgLatency,
-      isBackoffActive: this.isBackoffActive
+      isBackoffActive: this.isBackoffActive,
     };
   }
 }

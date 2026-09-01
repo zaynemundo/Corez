@@ -1,83 +1,109 @@
-import { useRef, useEffect, useState } from 'react';
-import { Send, Square, ChevronRight, Globe, Gamepad2, Search, Image as ImageIcon, X } from 'lucide-react';
-import { PlusIcon } from './icons';
-import { processFiles, formatBytes, hasFiles, MAX_IMAGE_THUMB_BYTES } from '../utils/fileAttachmentUtils';
+import { useRef, useEffect, useState } from "react";
+import {
+  Send,
+  Square,
+  ChevronRight,
+  Globe,
+  Gamepad2,
+  Search,
+  Image as ImageIcon,
+  X,
+} from "lucide-react";
+import { PlusIcon } from "./icons";
+import {
+  processFiles,
+  formatBytes,
+  hasFiles,
+  MAX_IMAGE_THUMB_BYTES,
+} from "../utils/fileAttachmentUtils";
 
 // Commands offered as suggestions when the user types "@".
 // Keep in sync with parseSlashCommand in services/aiService.js.
 const COMMANDS = [
   {
-    command: 'website',
-    label: '@website',
-    name: 'Website',
-    description: 'Create a website or web page',
+    command: "website",
+    label: "@website",
+    name: "Website",
+    description: "Create a website or web page",
     icon: Globe,
-    placeholder: 'Describe the website you want to build...'
+    placeholder: "Describe the website you want to build...",
   },
   {
-    command: 'game',
-    label: '@game',
-    name: 'Game',
-    description: 'Create a playable game',
+    command: "game",
+    label: "@game",
+    name: "Game",
+    description: "Create a playable game",
     icon: Gamepad2,
-    placeholder: 'Describe the game you want to build...'
+    placeholder: "Describe the game you want to build...",
   },
   {
-    command: 'research',
-    label: '@research',
-    name: 'Research',
-    description: 'Deep research: multi-item web search + PDF report',
+    command: "research",
+    label: "@research",
+    name: "Research",
+    description: "Deep research: multi-item web search + PDF report",
     icon: Search,
-    placeholder: 'Enter a research topic or question...'
+    placeholder: "Enter a research topic or question...",
   },
   {
-    command: 'image',
-    label: '@image',
-    name: 'Image',
-    description: 'Generate an AI image or artwork',
+    command: "image",
+    label: "@image",
+    name: "Image",
+    description: "Generate an AI image or artwork",
     icon: ImageIcon,
-    placeholder: 'Describe the image you want to generate...'
-  }
+    placeholder: "Describe the image you want to generate...",
+  },
 ];
 
-export default function ChatInput({ 
-  input, 
-  setInput, 
-  onSendMessage, 
-  onStopMessage, 
-  isStreaming, 
+export default function ChatInput({
+  input,
+  setInput,
+  onSendMessage,
+  onStopMessage,
+  isStreaming,
   textareaRef,
   attachments: externalAttachments,
   setAttachments: externalSetAttachments,
-  onAddFiles
+  onAddFiles,
 }) {
   const internalRef = useRef(null);
   const refToUse = textareaRef || internalRef;
-  const [showSuggestions, setShowSuggestions] = useState(() => String(input || '').startsWith('@'));
+  const [showSuggestions, setShowSuggestions] = useState(() =>
+    String(input || "").startsWith("@"),
+  );
   const [activeIndex, setActiveIndex] = useState(0);
   const suggestionsRef = useRef(null);
   const fileInputRef = useRef(null);
 
   const [internalAttachments, setInternalAttachments] = useState([]);
-  const attachments = externalAttachments !== undefined ? externalAttachments : internalAttachments;
+  const attachments =
+    externalAttachments !== undefined
+      ? externalAttachments
+      : internalAttachments;
   const setAttachments = externalSetAttachments || setInternalAttachments;
 
   const [isDragOverInput, setIsDragOverInput] = useState(false);
   const dragInputCounterRef = useRef(0);
-  const hasPendingImage = attachments.some(a => (a.type?.startsWith('image/') && !a.thumb && a.size <= MAX_IMAGE_THUMB_BYTES) || a.uploading);
+  const hasPendingImage = attachments.some(
+    (a) =>
+      (a.type?.startsWith("image/") &&
+        !a.thumb &&
+        a.size <= MAX_IMAGE_THUMB_BYTES) ||
+      a.uploading,
+  );
 
   useEffect(() => {
     if (refToUse.current) {
-      refToUse.current.style.height = 'auto';
+      refToUse.current.style.height = "auto";
       refToUse.current.style.height = `${Math.min(refToUse.current.scrollHeight, 140)}px`;
     }
   }, [input]);
 
   // Show suggestions when the input starts with "@" (optionally followed by
   // partial command text) and is not streaming.
-  const match = !isStreaming && input.startsWith('@') ? input.match(/^@([a-z]*)$/i) : null;
+  const match =
+    !isStreaming && input.startsWith("@") ? input.match(/^@([a-z]*)$/i) : null;
   const show = showSuggestions && match !== null;
-  const typed = match ? match[1].toLowerCase() : '';
+  const typed = match ? match[1].toLowerCase() : "";
   const filtered = typed
     ? COMMANDS.filter((c) => c.command.startsWith(typed))
     : COMMANDS;
@@ -91,13 +117,17 @@ export default function ChatInput({
   useEffect(() => {
     if (!show) return;
     const onClick = (e) => {
-      if (suggestionsRef.current && !suggestionsRef.current.contains(e.target)
-        && refToUse.current && !refToUse.current.contains(e.target)) {
+      if (
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(e.target) &&
+        refToUse.current &&
+        !refToUse.current.contains(e.target)
+      ) {
         setShowSuggestions(false);
       }
     };
-    document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
   }, [show, refToUse]);
 
   const applySuggestion = (command) => {
@@ -116,14 +146,14 @@ export default function ChatInput({
     const files = event.target.files;
     if (!files || files.length === 0) return;
     processFiles(files, setAttachments);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (fileInputRef.current) fileInputRef.current.value = "";
     if (refToUse.current) {
       refToUse.current.focus();
     }
   };
 
   const removeAttachment = (id) => {
-    setAttachments(prev => (prev || []).filter(a => a.id !== id));
+    setAttachments((prev) => (prev || []).filter((a) => a.id !== id));
   };
 
   const handleInputDragEnter = (e) => {
@@ -146,7 +176,7 @@ export default function ChatInput({
     if (!hasFiles(e.dataTransfer)) return;
     e.preventDefault();
     if (e.dataTransfer) {
-      e.dataTransfer.dropEffect = 'copy';
+      e.dataTransfer.dropEffect = "copy";
     }
   };
 
@@ -174,34 +204,39 @@ export default function ChatInput({
     }
     const textToSend = input.trim();
     if (!textToSend && attachments.length === 0) return;
-    const hasPendingImage = attachments.some(a => a.type?.startsWith('image/') && !a.thumb && a.size <= MAX_IMAGE_THUMB_BYTES);
+    const hasPendingImage = attachments.some(
+      (a) =>
+        a.type?.startsWith("image/") &&
+        !a.thumb &&
+        a.size <= MAX_IMAGE_THUMB_BYTES,
+    );
     if (hasPendingImage) {
       // Image thumb still generating — wait briefly then retry; the chip shows loading
       setTimeout(() => handleSubmit(e), 150);
       return;
     }
     onSendMessage(textToSend, attachments);
-    setInput('');
+    setInput("");
     setAttachments([]);
     setShowSuggestions(false);
     if (refToUse.current) {
-      refToUse.current.style.height = 'auto';
+      refToUse.current.style.height = "auto";
     }
   };
 
   const handleKeyDown = (e) => {
     if (show && filtered.length > 0) {
-      if (e.key === 'ArrowDown') {
+      if (e.key === "ArrowDown") {
         e.preventDefault();
         setActiveIndex((i) => (i + 1) % filtered.length);
         return;
       }
-      if (e.key === 'ArrowUp') {
+      if (e.key === "ArrowUp") {
         e.preventDefault();
         setActiveIndex((i) => (i - 1 + filtered.length) % filtered.length);
         return;
       }
-      if (e.key === 'Tab' || e.key === 'Enter') {
+      if (e.key === "Tab" || e.key === "Enter") {
         const selected = filtered[activeIndex];
         if (selected) {
           e.preventDefault();
@@ -209,13 +244,13 @@ export default function ChatInput({
           return;
         }
       }
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         e.preventDefault();
         setShowSuggestions(false);
         return;
       }
     }
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
     }
@@ -225,14 +260,19 @@ export default function ChatInput({
     <div className="input-container">
       <form
         onSubmit={handleSubmit}
-        className={`input-box ${isDragOverInput ? 'drag-over' : ''}`}
+        className={`input-box ${isDragOverInput ? "drag-over" : ""}`}
         onDragEnter={handleInputDragEnter}
         onDragOver={handleInputDragOver}
         onDragLeave={handleInputDragLeave}
         onDrop={handleInputDrop}
       >
         {show && filtered.length > 0 && (
-          <div className="slash-suggestions" ref={suggestionsRef} role="listbox" aria-label="Commands">
+          <div
+            className="slash-suggestions"
+            ref={suggestionsRef}
+            role="listbox"
+            aria-label="Commands"
+          >
             {filtered.map((entry, index) => {
               const Icon = entry.icon;
               return (
@@ -242,15 +282,21 @@ export default function ChatInput({
                   role="option"
                   aria-selected={index === activeIndex}
                   aria-label={`${entry.label}: ${entry.description}`}
-                  className={`slash-suggestion-item ${index === activeIndex ? 'active' : ''}`}
+                  className={`slash-suggestion-item ${index === activeIndex ? "active" : ""}`}
                   onMouseEnter={() => setActiveIndex(index)}
                   onClick={() => applySuggestion(entry.command)}
                 >
                   <span className="slash-suggestion-icon">
                     <Icon size={15} strokeWidth={1.5} />
                   </span>
-                  <span className="slash-suggestion-desc">{entry.description}</span>
-                  <ChevronRight size={14} strokeWidth={1.5} className="slash-suggestion-chevron" />
+                  <span className="slash-suggestion-desc">
+                    {entry.description}
+                  </span>
+                  <ChevronRight
+                    size={14}
+                    strokeWidth={1.5}
+                    className="slash-suggestion-chevron"
+                  />
                 </button>
               );
             })}
@@ -259,18 +305,51 @@ export default function ChatInput({
         {attachments.length > 0 && (
           <div className="attachment-chips-bar" aria-label="Attached files">
             {attachments.map((attachment) => {
-              const isPendingThumb = attachment.type?.startsWith('image/') && !attachment.thumb && attachment.size <= MAX_IMAGE_THUMB_BYTES;
+              const isPendingThumb =
+                attachment.type?.startsWith("image/") &&
+                !attachment.thumb &&
+                attachment.size <= MAX_IMAGE_THUMB_BYTES;
               const isUploading = Boolean(attachment.uploading);
               const isPending = isPendingThumb || isUploading;
               return (
                 <span key={attachment.id} className="attachment-chip">
                   {attachment.thumb ? (
-                    <img src={attachment.thumb} alt="" className="attachment-chip-thumb" style={isUploading ? { opacity: 0.6 } : undefined} />
+                    <img
+                      src={attachment.thumb}
+                      alt=""
+                      className="attachment-chip-thumb"
+                      style={isUploading ? { opacity: 0.6 } : undefined}
+                    />
                   ) : isPendingThumb ? (
-                    <span className="attachment-chip-thumb" style={{ display: 'inline-block', width: 24, height: 24, background: '#333', borderRadius: 4, textAlign: 'center', lineHeight: '24px', fontSize: 10, color: '#888' }}>…</span>
+                    <span
+                      className="attachment-chip-thumb"
+                      style={{
+                        display: "inline-block",
+                        width: 24,
+                        height: 24,
+                        background: "#333",
+                        borderRadius: 4,
+                        textAlign: "center",
+                        lineHeight: "24px",
+                        fontSize: 10,
+                        color: "#888",
+                      }}
+                    >
+                      …
+                    </span>
                   ) : null}
-                  <span className="chip-filename" title={`${attachment.name} (${formatBytes(attachment.size)})`}>
-                    {attachment.name} {isPending ? (isUploading ? '(uploading...)' : '(loading...)') : attachment.assetUrl ? '✓' : ''}
+                  <span
+                    className="chip-filename"
+                    title={`${attachment.name} (${formatBytes(attachment.size)})`}
+                  >
+                    {attachment.name}{" "}
+                    {isPending
+                      ? isUploading
+                        ? "(uploading...)"
+                        : "(loading...)"
+                      : attachment.assetUrl
+                        ? "✓"
+                        : ""}
                   </span>
                   <button
                     type="button"
@@ -335,8 +414,12 @@ export default function ChatInput({
             <button
               type="submit"
               className="send-btn"
-              disabled={(!input.trim() && attachments.length === 0) || hasPendingImage}
-              title={hasPendingImage ? "Image still loading..." : "Send Message"}
+              disabled={
+                (!input.trim() && attachments.length === 0) || hasPendingImage
+              }
+              title={
+                hasPendingImage ? "Image still loading..." : "Send Message"
+              }
             >
               <Send size={15} strokeWidth={1.5} />
             </button>

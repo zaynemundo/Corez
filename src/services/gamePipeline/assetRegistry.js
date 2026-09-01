@@ -8,10 +8,10 @@ export function buildAssetRegistry(assetsMap) {
   for (const [id, info] of Object.entries(assetsMap)) {
     registry[id] = {
       src: info.permanentUrl || info.originalUrl,
-      type: 'image',
+      type: "image",
       width: info.width || 64,
       height: info.height || 64,
-      transparent: info.transparent || false
+      transparent: info.transparent || false,
     };
   }
   return registry;

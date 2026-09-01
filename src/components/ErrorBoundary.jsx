@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { Component } from "react";
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
@@ -11,7 +11,7 @@ export default class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error('ErrorBoundary caught:', error, errorInfo);
+    console.error("ErrorBoundary caught:", error, errorInfo);
   }
 
   render() {
@@ -21,7 +21,7 @@ export default class ErrorBoundary extends Component {
           <div className="error-boundary-content">
             <h2>Something went wrong</h2>
             <p className="error-boundary-detail">
-              {this.state.error?.message || 'An unexpected error occurred.'}
+              {this.state.error?.message || "An unexpected error occurred."}
             </p>
             <button
               type="button"

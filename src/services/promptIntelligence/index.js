@@ -30,14 +30,28 @@
  *   8. FINAL EXECUTION PROMPT → CoreZ execution
  */
 
-import { createTask, INTENT_TYPES } from './schemas.js';
-import { classifyIntent, extractRequirements, detectMissingInformation, classifyComplexity } from './intentEngine.js';
-import { createIntentContract } from './intentContract.js';
-import { ContextEngine } from './contextEngine.js';
-import { architectPrompt, refinePrompt, MIN_PROMPT_SCORE, MAX_REFINEMENT_LOOPS } from './promptArchitect.js';
-import { critiquePrompt } from './promptCritic.js';
-import { guardIntent, deEscalate } from './intentGuard.js';
-import { route, shouldUseFullPipeline, toLegacyIntentType } from './taskRouter.js';
+import { createTask, INTENT_TYPES } from "./schemas.js";
+import {
+  classifyIntent,
+  extractRequirements,
+  detectMissingInformation,
+  classifyComplexity,
+} from "./intentEngine.js";
+import { createIntentContract } from "./intentContract.js";
+import { ContextEngine } from "./contextEngine.js";
+import {
+  architectPrompt,
+  refinePrompt,
+  MIN_PROMPT_SCORE,
+  MAX_REFINEMENT_LOOPS,
+} from "./promptArchitect.js";
+import { critiquePrompt } from "./promptCritic.js";
+import { guardIntent, deEscalate } from "./intentGuard.js";
+import {
+  route,
+  shouldUseFullPipeline,
+  toLegacyIntentType,
+} from "./taskRouter.js";
 
 export {
   classifyIntent,
@@ -49,7 +63,7 @@ export {
   MAX_REFINEMENT_LOOPS,
 };
 
-export { INTENT_TYPES, EXECUTION_MODES, createTask } from './schemas.js';
+export { INTENT_TYPES, EXECUTION_MODES, createTask } from "./schemas.js";
 
 /**
  * Process a raw user prompt through the full intelligence pipeline.
@@ -62,16 +76,22 @@ export { INTENT_TYPES, EXECUTION_MODES, createTask } from './schemas.js';
  * @param {boolean} [options.dryRun]        — run pipeline without reaching out to models (optional)
  * @returns {Promise<object>} pipeline result
  */
-export async function process({ prompt, projectContext, verbose, dryRun, signal } = {}) {
-  if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
-    return createEmptyResult('No prompt provided');
+export async function process({
+  prompt,
+  projectContext,
+  verbose,
+  dryRun,
+  signal,
+} = {}) {
+  if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
+    return createEmptyResult("No prompt provided");
   }
 
   const rawPrompt = prompt.trim();
   const result = createTask({ rawPrompt });
 
   // ----- 1. Intake (task object already created) ------
-  if (verbose) log('INTAKE', 'Task object created', result.id);
+  if (verbose) log("INTAKE", "Task object created", result.id);
 
   // ----- 2. Intent Engine -----
   const intent = classifyIntent(rawPrompt);
@@ -87,17 +107,33 @@ export async function process({ prompt, projectContext, verbose, dryRun, signal 
   result.requirements = requirements;
 
   if (verbose) {
-    log('INTENT', `${intent.type} (${Math.round(intent.confidence * 100)}%)`, `complexity: ${complexity}`);
-    log('REQUIREMENTS', `explicit: ${requirements.explicit.length}, inferred: ${requirements.inferred.length}, forbidden: ${requirements.forbidden.length}`);
+    log(
+      "INTENT",
+      `${intent.type} (${Math.round(intent.confidence * 100)}%)`,
+      `complexity: ${complexity}`,
+    );
+    log(
+      "REQUIREMENTS",
+      `explicit: ${requirements.explicit.length}, inferred: ${requirements.inferred.length}, forbidden: ${requirements.forbidden.length}`,
+    );
   }
 
   // ----- 3. Intent Contract -----
   const contract = createIntentContract(intent, requirements);
-  if (verbose) log('CONTRACT', `must achieve: ${contract.mustAchieve.length}, must not: ${contract.mustNotInvent.length}`);
+  if (verbose)
+    log(
+      "CONTRACT",
+      `must achieve: ${contract.mustAchieve.length}, must not: ${contract.mustNotInvent.length}`,
+    );
 
   // Fast path: skip heavy pipeline for trivial/low-complexity tasks
   if (!shouldUseFullPipeline(intent)) {
-    const enrichedPrompt = architectPrompt({ intent, requirements, context: {}, rawPrompt });
+    const enrichedPrompt = architectPrompt({
+      intent,
+      requirements,
+      context: {},
+      rawPrompt,
+    });
     const routingResult = route(intent, requirements, {});
 
     result.prompt.enriched = enrichedPrompt;
@@ -105,7 +141,7 @@ export async function process({ prompt, projectContext, verbose, dryRun, signal 
     result.prompt.score = 10;
     result.routing = routingResult;
 
-    if (verbose) log('FAST PATH', `Direct execution → ${routingResult.mode}`);
+    if (verbose) log("FAST PATH", `Direct execution → ${routingResult.mode}`);
 
     return buildOutput(result, contract);
   }
@@ -114,21 +150,30 @@ export async function process({ prompt, projectContext, verbose, dryRun, signal 
   let context = {};
   try {
     if (signal?.aborted) {
-      return createEmptyResult('Task aborted before context gathering');
+      return createEmptyResult("Task aborted before context gathering");
     }
     if (projectContext) {
       context = projectContext;
-      if (verbose) log('CONTEXT', 'Using supplied project context');
+      if (verbose) log("CONTEXT", "Using supplied project context");
     } else if (!dryRun) {
       const engine = new ContextEngine();
       context = await engine.gather(rawPrompt, intent, { signal });
-      if (verbose) log('CONTEXT', `framework: ${context.framework || 'none'}, deps: ${context.dependencies?.length || 0}`);
+      if (verbose)
+        log(
+          "CONTEXT",
+          `framework: ${context.framework || "none"}, deps: ${context.dependencies?.length || 0}`,
+        );
     }
   } catch (err) {
     if (signal?.aborted) {
-      return createEmptyResult('Task aborted during context gathering');
+      return createEmptyResult("Task aborted during context gathering");
     }
-    if (verbose) log('CONTEXT', 'Context gathering failed, continuing without', err.message);
+    if (verbose)
+      log(
+        "CONTEXT",
+        "Context gathering failed, continuing without",
+        err.message,
+      );
   }
   result.context = context;
 
@@ -137,23 +182,39 @@ export async function process({ prompt, projectContext, verbose, dryRun, signal 
   result.prompt.enriched = enriched;
 
   if (verbose) {
-    log('ARCHITECT', `Generated enriched prompt (${enriched.split(/\s+/).length} words)`);
+    log(
+      "ARCHITECT",
+      `Generated enriched prompt (${enriched.split(/\s+/).length} words)`,
+    );
   }
 
   // ----- 6. Critic + Refinement Loop (progress-aware) -----
   let criticResult = critiquePrompt(rawPrompt, enriched, intent, requirements);
   result.prompt.score = criticResult.score;
 
-  if (verbose) log('CRITIC', `${criticResult.score}/10`, `issues: ${criticResult.issues.length}`);
+  if (verbose)
+    log(
+      "CRITIC",
+      `${criticResult.score}/10`,
+      `issues: ${criticResult.issues.length}`,
+    );
 
   // Continue refining only while each pass measurably improves the prompt
   // (>= 0.05 score gain). Once a refinement stops improving the prompt, the
   // state is genuinely stable and further identical attempts cannot help.
   let refinementCount = 0;
-  while (criticResult.score < MIN_PROMPT_SCORE && refinementCount < MAX_REFINEMENT_LOOPS) {
+  while (
+    criticResult.score < MIN_PROMPT_SCORE &&
+    refinementCount < MAX_REFINEMENT_LOOPS
+  ) {
     refinementCount += 1;
     const previousScore = criticResult.score;
-    enriched = refinePrompt(enriched, criticResult, { intent, requirements, context, rawPrompt });
+    enriched = refinePrompt(enriched, criticResult, {
+      intent,
+      requirements,
+      context,
+      rawPrompt,
+    });
     criticResult = critiquePrompt(rawPrompt, enriched, intent, requirements);
 
     if (verbose) log(`REFINE #${refinementCount}`, `${criticResult.score}/10`);
@@ -169,17 +230,22 @@ export async function process({ prompt, projectContext, verbose, dryRun, signal 
 
   if (guardResult.intentDrift) {
     if (verbose) {
-      log('GUARD', 'INTENT DRIFT DETECTED', guardResult.reason);
-      log('GUARD', 'Violations:', guardResult.violations.map((v) => v.message).join(' | '));
+      log("GUARD", "INTENT DRIFT DETECTED", guardResult.reason);
+      log(
+        "GUARD",
+        "Violations:",
+        guardResult.violations.map((v) => v.message).join(" | "),
+      );
     }
 
     enriched = deEscalate(enriched, guardResult, intent);
     criticResult = critiquePrompt(rawPrompt, enriched, intent, requirements);
     result.prompt.score = criticResult.score;
 
-    if (verbose) log('GUARD', `De-escalated, new score: ${criticResult.score}/10`);
+    if (verbose)
+      log("GUARD", `De-escalated, new score: ${criticResult.score}/10`);
   } else if (verbose) {
-    log('GUARD', 'Intent preserved OK');
+    log("GUARD", "Intent preserved OK");
   }
 
   result.prompt.final = enriched;
@@ -190,7 +256,11 @@ export async function process({ prompt, projectContext, verbose, dryRun, signal 
   result.routing = routingResult;
 
   if (verbose) {
-    log('ROUTE', `${routingResult.mode}`, `agents: ${routingResult.recommendedAgents.join(', ') || 'none'}`);
+    log(
+      "ROUTE",
+      `${routingResult.mode}`,
+      `agents: ${routingResult.recommendedAgents.join(", ") || "none"}`,
+    );
   }
 
   return buildOutput(result, contract);
@@ -255,21 +325,26 @@ function buildOutput(task, contract) {
 
 function createEmptyResult(reason) {
   return {
-    rawPrompt: '',
-    intent: { type: INTENT_TYPES.UNKNOWN, confidence: 0, complexity: 'low' },
+    rawPrompt: "",
+    intent: { type: INTENT_TYPES.UNKNOWN, confidence: 0, complexity: "low" },
     requirements: { explicit: [], inferred: [], forbidden: [] },
     contract: { mustAchieve: [], mayInfer: [], mustNotInvent: [] },
     context: {},
-    executionPrompt: '',
+    executionPrompt: "",
     quality: { score: 0, refinementCount: 0, intentPreserved: true },
-    routing: { mode: 'direct', recommendedAgents: [], complexity: 'low', reason },
+    routing: {
+      mode: "direct",
+      recommendedAgents: [],
+      complexity: "low",
+      reason,
+    },
     legacyIntentType: toLegacyIntentType(INTENT_TYPES.UNKNOWN),
     error: reason,
   };
 }
 
 function log(stage, message, detail) {
-  const prefix = '[COREZ PIPELINE]';
-  const detailStr = detail ? ` → ${detail}` : '';
+  const prefix = "[COREZ PIPELINE]";
+  const detailStr = detail ? ` → ${detail}` : "";
   console.warn(`${prefix} ${stage}: ${message}${detailStr}`);
 }

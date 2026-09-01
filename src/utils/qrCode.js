@@ -17,7 +17,7 @@ function createQRMatrix(text) {
       for (let c = 0; c < 7; c++) {
         const isBorder = r === 0 || r === 6 || c === 0 || c === 6;
         const isCenter = r >= 2 && r <= 4 && c >= 2 && c <= 4;
-        matrix[r0 + r][c0 + c] = (isBorder || isCenter) ? 1 : 0;
+        matrix[r0 + r][c0 + c] = isBorder || isCenter ? 1 : 0;
         reserved[r0 + r][c0 + c] = true;
       }
     }
@@ -42,11 +42,11 @@ function createQRMatrix(text) {
   // Timing patterns
   for (let i = 8; i < size - 8; i++) {
     if (!reserved[6][i]) {
-      matrix[6][i] = (i % 2 === 0) ? 1 : 0;
+      matrix[6][i] = i % 2 === 0 ? 1 : 0;
       reserved[6][i] = true;
     }
     if (!reserved[i][6]) {
-      matrix[i][6] = (i % 2 === 0) ? 1 : 0;
+      matrix[i][6] = i % 2 === 0 ? 1 : 0;
       reserved[i][6] = true;
     }
   }
@@ -58,7 +58,7 @@ function createQRMatrix(text) {
     for (let c = -2; c <= 2; c++) {
       const isOuter = Math.abs(r) === 2 || Math.abs(c) === 2;
       const isCenter = r === 0 && c === 0;
-      matrix[alignR + r][alignC + c] = (isOuter || isCenter) ? 1 : 0;
+      matrix[alignR + r][alignC + c] = isOuter || isCenter ? 1 : 0;
       reserved[alignR + r][alignC + c] = true;
     }
   }
@@ -83,10 +83,11 @@ function createQRMatrix(text) {
     for (let c = 0; c < size; c++) {
       if (!reserved[r][c]) {
         const charCode = bytes[(r * size + c) % bytes.length] || 0;
-        const pseudoRandomBit = ((seed ^ (r * 31 + c * 17 + charCode + (bitIdx++))) & 1) === 1;
+        const pseudoRandomBit =
+          ((seed ^ (r * 31 + c * 17 + charCode + bitIdx++)) & 1) === 1;
         // Mask rule: (row + col) % 2 == 0
         const mask = (r + c) % 2 === 0;
-        matrix[r][c] = (pseudoRandomBit !== mask) ? 1 : 0;
+        matrix[r][c] = pseudoRandomBit !== mask ? 1 : 0;
       }
     }
   }
@@ -98,10 +99,10 @@ function createQRMatrix(text) {
  * Generates an SVG data URL for a given URL or text payload.
  */
 export function generateQrCodeSvg(text, options = {}) {
-  if (!text || typeof text !== 'string') return '';
+  if (!text || typeof text !== "string") return "";
   const size = options.size || 160;
-  const fgColor = options.fgColor || '#ffffff';
-  const bgColor = options.bgColor || 'transparent';
+  const fgColor = options.fgColor || "#ffffff";
+  const bgColor = options.bgColor || "transparent";
   const margin = options.margin !== undefined ? options.margin : 2;
 
   const matrix = createQRMatrix(text);
@@ -109,7 +110,7 @@ export function generateQrCodeSvg(text, options = {}) {
   const totalCells = matrixSize + margin * 2;
   const cellSize = size / totalCells;
 
-  let rects = '';
+  let rects = "";
   for (let r = 0; r < matrixSize; r++) {
     for (let c = 0; c < matrixSize; c++) {
       if (matrix[r][c] === 1) {
@@ -120,8 +121,11 @@ export function generateQrCodeSvg(text, options = {}) {
     }
   }
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">` +
-    (bgColor !== 'transparent' ? `<rect width="${size}" height="${size}" fill="${bgColor}" rx="8" />` : '') +
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">` +
+    (bgColor !== "transparent"
+      ? `<rect width="${size}" height="${size}" fill="${bgColor}" rx="8" />`
+      : "") +
     rects +
     `</svg>`;
 
@@ -131,10 +135,13 @@ export function generateQrCodeSvg(text, options = {}) {
 /**
  * Generates standard embed iframe HTML for published creation.
  */
-export function generateEmbedSnippet(publishedUrl, { width = '100%', height = '600', title = 'CoreZ Creation' } = {}) {
-  const fullUrl = publishedUrl.startsWith('http')
+export function generateEmbedSnippet(
+  publishedUrl,
+  { width = "100%", height = "600", title = "CoreZ Creation" } = {},
+) {
+  const fullUrl = publishedUrl.startsWith("http")
     ? publishedUrl
-    : `https://corez.pro${publishedUrl.startsWith('/') ? '' : '/'}${publishedUrl}`;
+    : `https://corez.pro${publishedUrl.startsWith("/") ? "" : "/"}${publishedUrl}`;
 
-  return `<iframe src="${fullUrl}" title="${title.replace(/"/g, '&quot;')}" width="${width}" height="${height}" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen" style="border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; max-width: 100%;"></iframe>`;
+  return `<iframe src="${fullUrl}" title="${title.replace(/"/g, "&quot;")}" width="${width}" height="${height}" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen" style="border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; max-width: 100%;"></iframe>`;
 }

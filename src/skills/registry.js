@@ -3,7 +3,7 @@
  * Central registry managing Superpowers workflow skills and CoreZ specialist capabilities.
  */
 
-import { SUPERPOWERS_SKILLS, COREZ_SPECIALIST_SKILLS } from './definitions.js';
+import { SUPERPOWERS_SKILLS, COREZ_SPECIALIST_SKILLS } from "./definitions.js";
 
 export class SkillRegistry {
   constructor() {
@@ -18,20 +18,24 @@ export class SkillRegistry {
   }
 
   registerSkill(skill) {
-    if (!skill || typeof skill !== 'object' || !skill.id) {
-      throw new Error('Invalid skill object: id is required.');
+    if (!skill || typeof skill !== "object" || !skill.id) {
+      throw new Error("Invalid skill object: id is required.");
     }
     const normalized = {
       id: skill.id,
       name: skill.name || skill.id,
-      description: skill.description || '',
+      description: skill.description || "",
       triggers: Array.isArray(skill.triggers) ? skill.triggers : [],
-      phase: skill.phase || 'IMPLEMENTING',
+      phase: skill.phase || "IMPLEMENTING",
       priority: skill.priority || 50,
       dependencies: Array.isArray(skill.dependencies) ? skill.dependencies : [],
-      compatibleIntents: Array.isArray(skill.compatibleIntents) ? skill.compatibleIntents : ['app', 'code-help', 'writing', 'explanation', 'general'],
-      requiresTools: Array.isArray(skill.requiresTools) ? skill.requiresTools : [],
-      instructions: skill.instructions || ''
+      compatibleIntents: Array.isArray(skill.compatibleIntents)
+        ? skill.compatibleIntents
+        : ["app", "code-help", "writing", "explanation", "general"],
+      requiresTools: Array.isArray(skill.requiresTools)
+        ? skill.requiresTools
+        : [],
+      instructions: skill.instructions || "",
     };
     this.skills.set(normalized.id, normalized);
     return normalized;
@@ -46,15 +50,15 @@ export class SkillRegistry {
   }
 
   getSkillsForIntent(intent) {
-    return this.getAllSkills().filter(skill => 
-      skill.compatibleIntents.includes(intent)
+    return this.getAllSkills().filter((skill) =>
+      skill.compatibleIntents.includes(intent),
     );
   }
 
   getFormattedSkillList() {
     return this.getAllSkills()
-      .map(skill => `- ${skill.id}: ${skill.description}`)
-      .join('\n');
+      .map((skill) => `- ${skill.id}: ${skill.description}`)
+      .join("\n");
   }
 }
 

@@ -4,7 +4,7 @@
  */
 
 export function generateEngineSkeleton(gameSpec = {}) {
-  const title = gameSpec.title || 'COREZ Arcade Game';
+  const title = gameSpec.title || "COREZ Arcade Game";
 
   return `<!DOCTYPE html>
 <html lang="en">

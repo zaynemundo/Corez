@@ -9,5 +9,5 @@ export {
   generatePageFooter,
   generateSubPageTemplate,
   scaffoldMultiPageSite,
-  analyzeSiteGraph
-} from '../../packages/agent-core/scaffolding/multiPageScaffold.js';
+  analyzeSiteGraph,
+} from "../../packages/agent-core/scaffolding/multiPageScaffold.js";

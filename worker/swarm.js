@@ -13,48 +13,58 @@
 // with AI_SWARM_ENABLED=false. Nothing here caps what the AI may produce —
 // the build stream itself is unchanged and uncapped.
 
-import { runProviderChain } from './providerChain.js';
-import { detectDesignArchetype, buildDesignSystemPrompt, generateTokensCss } from './designSystems.js';
+import { runProviderChain } from "./providerChain.js";
+import {
+  detectDesignArchetype,
+  buildDesignSystemPrompt,
+  generateTokensCss,
+} from "./designSystems.js";
 
 const SPEC_SYSTEM_PROMPT =
-  'You are COREZ AI, an AI creation platform that builds websites, apps, and games. Answer directly with the requested output only.';
+  "You are COREZ AI, an AI creation platform that builds websites, apps, and games. Answer directly with the requested output only.";
 
 // Each specialist gets a focused brief and a hard word budget so the calls
 // stay short and fast — the parallelism, not the prompt size, is the point.
 export const SWARM_SPECIALIST_BRIEFS = Object.freeze([
   {
-    role: 'architect',
+    role: "architect",
     instruction:
-      'Analyze the build specification below and produce a concise implementation brief: overall page structure, key sections, state and data flow, and the components that must exist. If multi-page navigation is requested, outline page routes (e.g. index.html, about.html). At most 200 words. Do not write code.'
+      "Analyze the build specification below and produce a concise implementation brief: overall page structure, key sections, state and data flow, and the components that must exist. If multi-page navigation is requested, outline page routes (e.g. index.html, about.html). At most 200 words. Do not write code.",
   },
   {
-    role: 'art-director',
+    role: "art-director",
     instruction:
-      'Produce a concise visual direction brief grounded in modern design principles and quality standards: active color palette with hex/HSL tokens, typography hierarchy (Google Fonts), spacing scale, and 2-3 signature micro-interactions. Avoid purple-on-dark cliches and flat textureless cards. At most 175 words. Do not write code.'
-  }
+      "Produce a concise visual direction brief grounded in modern design principles and quality standards: active color palette with hex/HSL tokens, typography hierarchy (Google Fonts), spacing scale, and 2-3 signature micro-interactions. Avoid purple-on-dark cliches and flat textureless cards. At most 175 words. Do not write code.",
+  },
 ]);
 
 export const EXTENDED_SPECIALIST_BRIEFS = Object.freeze({
   accessibility: {
-    role: 'accessibility',
+    role: "accessibility",
     instruction:
-      'Produce a concise accessibility & usability brief: semantic HTML5 landmarks (<header>, <nav>, <main>, <footer>), keyboard focus rings, WCAG 2.2 AA contrast rules, and ARIA labels. At most 150 words. Do not write code.'
+      "Produce a concise accessibility & usability brief: semantic HTML5 landmarks (<header>, <nav>, <main>, <footer>), keyboard focus rings, WCAG 2.2 AA contrast rules, and ARIA labels. At most 150 words. Do not write code.",
   },
   performance: {
-    role: 'performance',
+    role: "performance",
     instruction:
-      'Produce a concise performance brief: critical rendering path, asset containment, efficient CSS selectors, and script execution order. At most 150 words. Do not write code.'
-  }
+      "Produce a concise performance brief: critical rendering path, asset containment, efficient CSS selectors, and script execution order. At most 150 words. Do not write code.",
+  },
 });
 
-export function resolveSpecialistBriefs(promptText = '') {
-  const text = String(promptText || '').toLowerCase();
+export function resolveSpecialistBriefs(promptText = "") {
+  const text = String(promptText || "").toLowerCase();
   const briefs = [...SWARM_SPECIALIST_BRIEFS];
 
-  if (/\b(accessibility|wcag|a11y|screen reader|aria|contrast|accessible)\b/i.test(text)) {
+  if (
+    /\b(accessibility|wcag|a11y|screen reader|aria|contrast|accessible)\b/i.test(
+      text,
+    )
+  ) {
     briefs.push(EXTENDED_SPECIALIST_BRIEFS.accessibility);
   }
-  if (/\b(performance|optimize|speed|fast|lighthouse|latency|fps)\b/i.test(text)) {
+  if (
+    /\b(performance|optimize|speed|fast|lighthouse|latency|fps)\b/i.test(text)
+  ) {
     briefs.push(EXTENDED_SPECIALIST_BRIEFS.performance);
   }
 
@@ -67,12 +77,12 @@ export function envFlagEnabled(env, key, defaultValue = true) {
   const value = env?.[key];
   if (value === undefined || value === null) return defaultValue;
   const str = String(value).trim().toLowerCase();
-  if (str === '') return defaultValue;
-  return str !== 'false' && str !== '0' && str !== 'no';
+  if (str === "") return defaultValue;
+  return str !== "false" && str !== "0" && str !== "no";
 }
 
 export function swarmEnabledFor(env) {
-  return envFlagEnabled(env, 'AI_SWARM_ENABLED', true);
+  return envFlagEnabled(env, "AI_SWARM_ENABLED", true);
 }
 
 /**
@@ -83,16 +93,23 @@ export function swarmEnabledFor(env) {
  * Failed specialists are dropped from contributions; if every specialist
  * fails, `reason` explains why and `contributions` is empty.
  */
-export async function runSwarmSpecialists({ prompt, spec, env = {}, signal = null, sleep }) {
+export async function runSwarmSpecialists({
+  prompt,
+  spec,
+  env = {},
+  signal = null,
+  sleep,
+}) {
   const startedAt = Date.now();
-  const timeoutMs = Number(env?.AI_SWARM_TIMEOUT_MS) > 0
-    ? Number(env?.AI_SWARM_TIMEOUT_MS)
-    : DEFAULT_SWARM_TIMEOUT_MS;
+  const timeoutMs =
+    Number(env?.AI_SWARM_TIMEOUT_MS) > 0
+      ? Number(env?.AI_SWARM_TIMEOUT_MS)
+      : DEFAULT_SWARM_TIMEOUT_MS;
   // The same tight non-stream deadline guard the planning call uses: a hung
   // specialist surfaces quickly instead of burning the full 90s timeout.
   const chainEnv = { ...env, AI_NONSTREAM_TIMEOUT_MS: String(timeoutMs) };
-  const brief = String(spec || '').trim();
-  const originalRequest = String(prompt || '').trim();
+  const brief = String(spec || "").trim();
+  const originalRequest = String(prompt || "").trim();
 
   const archetype = detectDesignArchetype(`${originalRequest} ${brief}`);
   const tokensSample = generateTokensCss(archetype);
@@ -100,31 +117,35 @@ export async function runSwarmSpecialists({ prompt, spec, env = {}, signal = nul
 
   const results = await Promise.allSettled(
     activeBriefs.map((specialist) => {
-      const isArtDirector = specialist.role === 'art-director';
+      const isArtDirector = specialist.role === "art-director";
       const specialistInstruction = isArtDirector
         ? `${specialist.instruction}\n\nRecommended Archetype Tokens (${archetype.name}):\n${tokensSample}`
         : specialist.instruction;
 
       const messages = [
-        { role: 'system', content: SPEC_SYSTEM_PROMPT },
-        { role: 'system', content: specialistInstruction },
+        { role: "system", content: SPEC_SYSTEM_PROMPT },
+        { role: "system", content: specialistInstruction },
         {
-          role: 'user',
-          content: `Original request:\n${originalRequest}\n\nBuild specification:\n${brief}`
-        }
+          role: "user",
+          content: `Original request:\n${originalRequest}\n\nBuild specification:\n${brief}`,
+        },
       ];
       return runProviderChain(messages, {
         env: chainEnv,
         signal,
         store: null,
         sleep,
-        maxRequestRetryMs: timeoutMs
+        maxRequestRetryMs: timeoutMs,
       });
-    })
+    }),
   );
 
   if (signal?.aborted) {
-    return { contributions: [], elapsedMs: Date.now() - startedAt, cancelled: true };
+    return {
+      contributions: [],
+      elapsedMs: Date.now() - startedAt,
+      cancelled: true,
+    };
   }
 
   const contributions = [];
@@ -132,15 +153,17 @@ export async function runSwarmSpecialists({ prompt, spec, env = {}, signal = nul
   for (let index = 0; index < results.length; index += 1) {
     const outcome = results[index];
     const role = activeBriefs[index].role;
-    if (outcome.status === 'fulfilled' && outcome.value?.content) {
+    if (outcome.status === "fulfilled" && outcome.value?.content) {
       contributions.push({
         role,
         content: outcome.value.content,
-        model: outcome.value.model || null
+        model: outcome.value.model || null,
       });
     } else {
-      const result = outcome.status === 'fulfilled' ? outcome.value : null;
-      failures.push(`${role}: ${result?.error || (outcome.status === 'rejected' ? String(outcome.reason) : 'no usable response')}`);
+      const result = outcome.status === "fulfilled" ? outcome.value : null;
+      failures.push(
+        `${role}: ${result?.error || (outcome.status === "rejected" ? String(outcome.reason) : "no usable response")}`,
+      );
     }
   }
 
@@ -149,9 +172,11 @@ export async function runSwarmSpecialists({ prompt, spec, env = {}, signal = nul
     archetype: archetype.id,
     elapsedMs: Date.now() - startedAt,
     cancelled: false,
-    reason: contributions.length === 0
-      ? (failures.slice(0, 2).join(' | ').slice(0, 300) || 'no specialist contributions')
-      : null
+    reason:
+      contributions.length === 0
+        ? failures.slice(0, 2).join(" | ").slice(0, 300) ||
+          "no specialist contributions"
+        : null,
   };
 }
 
@@ -161,18 +186,23 @@ export async function runSwarmSpecialists({ prompt, spec, env = {}, signal = nul
  * stable role order.
  */
 export function buildSwarmContext(spec, contributions, options = {}) {
-  const parts = [`Build specification:\n${String(spec || '').trim()}`];
+  const parts = [`Build specification:\n${String(spec || "").trim()}`];
   if (Array.isArray(contributions) && contributions.length > 0) {
     for (const contribution of contributions) {
       if (contribution?.role && contribution?.content) {
         parts.push(`## ${contribution.role}\n${contribution.content}`);
       }
     }
-    const designPrompt = buildDesignSystemPrompt(options.prompt || spec, options);
+    const designPrompt = buildDesignSystemPrompt(
+      options.prompt || spec,
+      options,
+    );
     if (designPrompt) {
       parts.push(designPrompt);
     }
   }
-  parts.push('Deliver ONLY the complete, finished artifact as a single self-contained HTML document.');
-  return parts.join('\n\n');
+  parts.push(
+    "Deliver ONLY the complete, finished artifact as a single self-contained HTML document.",
+  );
+  return parts.join("\n\n");
 }

@@ -5,7 +5,7 @@
  * Does NOT send the entire repository — only what is relevant.
  */
 
-import { createContextSummary } from './schemas.js';
+import { createContextSummary } from "./schemas.js";
 
 /**
  * @typedef {Object} ProjectSource
@@ -20,7 +20,7 @@ import { createContextSummary } from './schemas.js';
 export class ContextEngine {
   constructor(options = {}) {
     this.fileReader = options.fileReader || defaultFileReader;
-    this.projectRoot = options.projectRoot || '.';
+    this.projectRoot = options.projectRoot || ".";
     this.cache = new Map();
   }
 
@@ -28,11 +28,11 @@ export class ContextEngine {
     const summary = createContextSummary();
     const signal = options.signal || null;
     const ensureAbortable = () => {
-      if (signal?.aborted) throw new Error('AbortError');
+      if (signal?.aborted) throw new Error("AbortError");
     };
 
     try {
-      const pkg = await this.readJSON('package.json');
+      const pkg = await this.readJSON("package.json");
       if (pkg) {
         summary.projectType = detectProjectType(pkg);
         summary.dependencies = extractKeyDeps(pkg);
@@ -41,7 +41,7 @@ export class ContextEngine {
         summary.instructions = [];
       }
     } catch (err) {
-      if (err?.message === 'AbortError') throw err;
+      if (err?.message === "AbortError") throw err;
       // graceful degradation
     }
 
@@ -60,7 +60,7 @@ export class ContextEngine {
         ensureAbortable();
         summary.relevantFiles = await this.findRelevantFiles(prompt, intent);
       } catch (err) {
-        if (err?.message === 'AbortError') throw err;
+        if (err?.message === "AbortError") throw err;
         summary.relevantFiles = [];
       }
 
@@ -90,11 +90,11 @@ export class ContextEngine {
   }
 
   async readInstructions() {
-    const cacheKey = 'instructions';
+    const cacheKey = "instructions";
     if (this.cache.has(cacheKey)) return this.cache.get(cacheKey);
 
     const instructions = [];
-    const files = ['AGENTS.md', 'COREZ.md', 'README.md', '.corez/config.json'];
+    const files = ["AGENTS.md", "COREZ.md", "README.md", ".corez/config.json"];
     for (const file of files) {
       try {
         const content = await this.fileReader.read(file);
@@ -115,15 +115,21 @@ export class ContextEngine {
     const lower = prompt.toLowerCase();
     const files = [];
 
-    if (intent.type === 'feature_implementation' || intent.type === 'simple_edit' || intent.type === 'bug_fix') {
-      if (/\b(component|react|jsx|tsx|button|modal|form|input)\b/i.test(lower)) {
-        files.push('src/components/');
+    if (
+      intent.type === "feature_implementation" ||
+      intent.type === "simple_edit" ||
+      intent.type === "bug_fix"
+    ) {
+      if (
+        /\b(component|react|jsx|tsx|button|modal|form|input)\b/i.test(lower)
+      ) {
+        files.push("src/components/");
       }
       if (/\b(api|route|endpoint|fetch|request|service)\b/i.test(lower)) {
-        files.push('src/services/');
+        files.push("src/services/");
       }
       if (/\b(style|css|tailwind|theme|design)\b/i.test(lower)) {
-        files.push('src/index.css');
+        files.push("src/index.css");
       }
     }
 
@@ -136,37 +142,38 @@ export class ContextEngine {
 // ---------------------------------------------------------------------------
 
 function detectProjectType(pkg) {
-  if (!pkg) return 'node';
+  if (!pkg) return "node";
   const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
-  if (deps.react || deps['@vitejs/plugin-react']) return 'react-vite';
-  if (deps.next) return 'nextjs';
-  if (deps.vue) return 'vue';
-  if (deps.svelte) return 'svelte';
-  if (deps.express) return 'express';
-  if (deps.fastify) return 'fastify';
-  return 'node';
+  if (deps.react || deps["@vitejs/plugin-react"]) return "react-vite";
+  if (deps.next) return "nextjs";
+  if (deps.vue) return "vue";
+  if (deps.svelte) return "svelte";
+  if (deps.express) return "express";
+  if (deps.fastify) return "fastify";
+  return "node";
 }
 
 function detectFramework(pkg) {
   if (!pkg) return null;
   const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
-  if (deps.react || deps['@vitejs/plugin-react']) return 'React';
-  if (deps.next) return 'Next.js';
-  if (deps.vue) return 'Vue';
-  if (deps.svelte) return 'Svelte';
-  if (deps.angular || deps['@angular/core']) return 'Angular';
+  if (deps.react || deps["@vitejs/plugin-react"]) return "React";
+  if (deps.next) return "Next.js";
+  if (deps.vue) return "Vue";
+  if (deps.svelte) return "Svelte";
+  if (deps.angular || deps["@angular/core"]) return "Angular";
   return null;
 }
 
 function detectStyling(pkg) {
   if (!pkg) return null;
   const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
-  if (deps.tailwindcss) return 'Tailwind CSS';
-  if (deps['styled-components']) return 'Styled Components';
-  if (deps['@emotion/react']) return 'Emotion';
-  if (deps.sass || deps['node-sass']) return 'Sass';
-  if (deps['@mui/material'] || deps['@chakra-ui/react']) return 'Component Library';
-  return 'CSS';
+  if (deps.tailwindcss) return "Tailwind CSS";
+  if (deps["styled-components"]) return "Styled Components";
+  if (deps["@emotion/react"]) return "Emotion";
+  if (deps.sass || deps["node-sass"]) return "Sass";
+  if (deps["@mui/material"] || deps["@chakra-ui/react"])
+    return "Component Library";
+  return "CSS";
 }
 
 function extractKeyDeps(pkg) {
@@ -179,9 +186,11 @@ function detectExistingFeatures(prompt, intent) {
   const features = [];
   const lower = prompt.toLowerCase();
 
-  if (intent.type === 'feature_implementation' || intent.type === 'bug_fix') {
-    if (/\b(auth|login|logout|session|supabase|firebase|jwt|oauth)\b/i.test(lower)) {
-      features.push('authentication system exists');
+  if (intent.type === "feature_implementation" || intent.type === "bug_fix") {
+    if (
+      /\b(auth|login|logout|session|supabase|firebase|jwt|oauth)\b/i.test(lower)
+    ) {
+      features.push("authentication system exists");
     }
   }
 
@@ -195,7 +204,7 @@ function detectExistingFeatures(prompt, intent) {
 const defaultFileReader = {
   async read(filename) {
     // In browser context, try fetching from root
-    if (typeof fetch === 'function') {
+    if (typeof fetch === "function") {
       try {
         const res = await fetch(`/${filename}`);
         if (res.ok) return await res.text();

@@ -6,16 +6,20 @@
 // R2, events stream over SSE with Last-Event-ID replay, and task ownership is
 // enforced per user.
 
-import { AgentHarness } from '../packages/agent-core/harness/AgentHarness.js';
-import { CancellationManager } from '../packages/agent-core/harness/CancellationManager.js';
-import { R2TaskStore } from '../packages/agent-core/persistence/R2TaskStore.js';
-import { ContextStore } from '../packages/agent-core/persistence/ContextStore.js';
-import { OpenCodeGoAdapter, DeepSeekAdapter, OpenRouterAdapter } from '../packages/agent-core/providers/adapters.js';
-import { TERMINAL_TASK_STATUSES } from '../packages/agent-core/harness/TaskState.js';
-import { verifySession } from './auth.js';
-import { jsonResponse, readBoundedJson, safeErrorDetail } from './utils.js';
+import { AgentHarness } from "../packages/agent-core/harness/AgentHarness.js";
+import { CancellationManager } from "../packages/agent-core/harness/CancellationManager.js";
+import { R2TaskStore } from "../packages/agent-core/persistence/R2TaskStore.js";
+import { ContextStore } from "../packages/agent-core/persistence/ContextStore.js";
+import {
+  OpenCodeGoAdapter,
+  DeepSeekAdapter,
+  OpenRouterAdapter,
+} from "../packages/agent-core/providers/adapters.js";
+import { TERMINAL_TASK_STATUSES } from "../packages/agent-core/harness/TaskState.js";
+import { verifySession } from "./auth.js";
+import { jsonResponse, readBoundedJson, safeErrorDetail } from "./utils.js";
 
-export const OWNER_HEADER = 'x-corez-user';
+export const OWNER_HEADER = "x-corez-user";
 const TASK_ID_PATTERN = /^[A-Za-z0-9._:-]{1,160}$/;
 const RECORD_ID_PATTERN = /^[A-Za-z0-9._-]{1,160}$/;
 
@@ -27,7 +31,10 @@ async function getUserId(request, env) {
   const sess = await verifySession(request, env);
   if (sess?.uid) return sess.uid;
   if (!env?.AUTH_SECRET) {
-    return (request.headers.get(OWNER_HEADER) || '').trim().slice(0, 100) || 'anonymous';
+    return (
+      (request.headers.get(OWNER_HEADER) || "").trim().slice(0, 100) ||
+      "anonymous"
+    );
   }
   return null;
 }
@@ -45,33 +52,33 @@ export function buildHarness(env) {
     new OpenCodeGoAdapter({
       opencodeApiKey: env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY,
       endpoint: env?.OPENCODE_ENDPOINT,
-      model: env?.OPENCODE_MODEL
+      model: env?.OPENCODE_MODEL,
     }),
     new DeepSeekAdapter({
       deepseekApiKey: env?.DEEPSEEK_API_KEY,
       endpoint: env?.DEEPSEEK_ENDPOINT,
-      model: env?.DEEPSEEK_MODEL
+      model: env?.DEEPSEEK_MODEL,
     }),
     new OpenRouterAdapter({
       openrouterApiKey: env?.OPENROUTER_API_KEY,
       endpoint: env?.OPENROUTER_ENDPOINT,
-      model: env?.OPENROUTER_MODEL
-    })
+      model: env?.OPENROUTER_MODEL,
+    }),
   ];
   return new AgentHarness({
     taskStore: store,
     adapters,
-    defaultModel: 'muse-spark-1.2-contributor',
+    defaultModel: "muse-spark-1.2-contributor",
     persistEvents: true,
     cancellationManager: sharedCancellations,
-    maxRetryWaitMs: 0 // no in-process retry waits in the Worker; resume via API
+    maxRetryWaitMs: 0, // no in-process retry waits in the Worker; resume via API
     // Repository tasks are never executed on this deployment: the public
     // Worker has no repository workspace and never delegates to one.
   });
 }
 
 function publicTask(task) {
-  if (!task || typeof task !== 'object') return task;
+  if (!task || typeof task !== "object") return task;
   return {
     taskId: task.taskId,
     userId: task.userId,
@@ -93,7 +100,7 @@ function publicTask(task) {
     error: task.error,
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
-    terminalAt: task.terminalAt
+    terminalAt: task.terminalAt,
   };
 }
 
@@ -107,20 +114,20 @@ export async function handleTaskApi(request, env) {
   const pathname = url.pathname;
   const userId = await getUserId(request, env);
   if (!userId) {
-    return jsonResponse(401, { error: 'Authentication required.' });
+    return jsonResponse(401, { error: "Authentication required." });
   }
 
   // POST /api/tasks — start a task, return the task id immediately.
-  if (pathname === '/api/tasks' && request.method === 'POST') {
+  if (pathname === "/api/tasks" && request.method === "POST") {
     let body;
     try {
       body = await readBoundedJson(request);
     } catch {
-      return jsonResponse(400, { error: 'Invalid JSON payload.' });
+      return jsonResponse(400, { error: "Invalid JSON payload." });
     }
-    const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : '';
+    const prompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";
     if (!prompt) {
-      return jsonResponse(400, { error: 'prompt is required.' });
+      return jsonResponse(400, { error: "prompt is required." });
     }
 
     // Repository tasks are never executed on this deployment: corez.pro is a
@@ -128,19 +135,24 @@ export async function handleTaskApi(request, env) {
     // remote workspace. Repository work belongs to the local CLI agent.
     if (body?.workspaceId) {
       return jsonResponse(400, {
-        error: 'Repository mode is not available on this public deployment: no repository workspace is attached and remote workspace execution is disabled. Run the local CLI agent against a repository for repository work.'
+        error:
+          "Repository mode is not available on this public deployment: no repository workspace is attached and remote workspace execution is disabled. Run the local CLI agent against a repository for repository work.",
       });
     }
 
     const harness = buildHarness(env);
     const task = await harness.startTask({
       userId,
-      sessionId: typeof body?.sessionId === 'string' ? body.sessionId.slice(0, 160) : null,
+      sessionId:
+        typeof body?.sessionId === "string"
+          ? body.sessionId.slice(0, 160)
+          : null,
       workspaceId: null,
       prompt,
-      model: typeof body?.model === 'string' ? body.model.slice(0, 120) : undefined,
-      mode: 'conversation',
-      autoApprove: false
+      model:
+        typeof body?.model === "string" ? body.model.slice(0, 120) : undefined,
+      mode: "conversation",
+      autoApprove: false,
     });
     return jsonResponse(202, publicTask(task));
   }
@@ -149,91 +161,107 @@ export async function handleTaskApi(request, env) {
   const taskMatch = pathname.match(/^\/api\/tasks\/([^/]+)(?:\/([^/]+))?$/);
   if (taskMatch) {
     const taskId = parseTaskId(taskMatch[1]);
-    if (!taskId) return jsonResponse(400, { error: 'Invalid task id.' });
+    if (!taskId) return jsonResponse(400, { error: "Invalid task id." });
     const sub = taskMatch[2] || null;
 
-    if (request.method === 'GET' && sub === null) {
+    if (request.method === "GET" && sub === null) {
       const task = env.ASSET_BUCKET ? await readTask(env, taskId) : null;
-      if (!task) return jsonResponse(404, { error: 'Task not found.' });
-      if (task.userId !== userId) return jsonResponse(403, { error: 'Access denied.' });
+      if (!task) return jsonResponse(404, { error: "Task not found." });
+      if (task.userId !== userId)
+        return jsonResponse(403, { error: "Access denied." });
       return jsonResponse(200, publicTask(task));
     }
 
-    if (request.method === 'POST' && sub === 'resume') {
+    if (request.method === "POST" && sub === "resume") {
       const harness = buildHarness(env);
       let task;
       try {
         task = await harness.resumeTask(taskId, userId);
       } catch (err) {
-        if (err?.message?.includes('Access denied')) return jsonResponse(403, { error: 'Access denied.' });
-        if (err?.message?.includes('Task not found')) return jsonResponse(404, { error: 'Task not found.' });
+        if (err?.message?.includes("Access denied"))
+          return jsonResponse(403, { error: "Access denied." });
+        if (err?.message?.includes("Task not found"))
+          return jsonResponse(404, { error: "Task not found." });
         return jsonResponse(500, { error: safeErrorDetail(err) });
       }
       return jsonResponse(200, publicTask(task));
     }
 
-    if (request.method === 'POST' && sub === 'cancel') {
+    if (request.method === "POST" && sub === "cancel") {
       const harness = buildHarness(env);
       let task;
       try {
         task = await harness.cancelTask(taskId, userId);
       } catch (err) {
-        if (err?.message?.includes('Access denied')) return jsonResponse(403, { error: 'Access denied.' });
-        if (err?.message?.includes('Task not found')) return jsonResponse(404, { error: 'Task not found.' });
+        if (err?.message?.includes("Access denied"))
+          return jsonResponse(403, { error: "Access denied." });
+        if (err?.message?.includes("Task not found"))
+          return jsonResponse(404, { error: "Task not found." });
         return jsonResponse(500, { error: safeErrorDetail(err) });
       }
       return jsonResponse(200, publicTask(task));
     }
 
-    if (request.method === 'GET' && sub === 'events') {
+    if (request.method === "GET" && sub === "events") {
       return streamTaskEvents(request, env, taskId, userId);
     }
 
-    if (request.method === 'GET' && sub === 'artifacts') {
+    if (request.method === "GET" && sub === "artifacts") {
       const task = await readTask(env, taskId);
-      if (!task) return jsonResponse(404, { error: 'Task not found.' });
-      if (task.userId !== userId) return jsonResponse(403, { error: 'Access denied.' });
+      if (!task) return jsonResponse(404, { error: "Task not found." });
+      if (task.userId !== userId)
+        return jsonResponse(403, { error: "Access denied." });
       return jsonResponse(200, {
         taskId,
         plan: task.plan || null,
         evidence: (task.evidence || []).slice(-200),
         modifiedFiles: task.modifiedFiles || [],
         inspectedFiles: (task.inspectedFiles || []).slice(-200),
-        providerHistory: task.providerHistory || []
+        providerHistory: task.providerHistory || [],
       });
     }
 
-    return jsonResponse(405, { error: 'Method not allowed.' });
+    return jsonResponse(405, { error: "Method not allowed." });
   }
 
   // POST /api/context/records — durable context record save.
-  if (pathname === '/api/context/records' && request.method === 'POST') {
+  if (pathname === "/api/context/records" && request.method === "POST") {
     let body;
     try {
       body = await readBoundedJson(request);
     } catch {
-      return jsonResponse(400, { error: 'Invalid JSON payload.' });
+      return jsonResponse(400, { error: "Invalid JSON payload." });
     }
     const messages = Array.isArray(body?.messages) ? body.messages : [];
     if (messages.length === 0) {
-      return jsonResponse(400, { error: 'messages are required.' });
+      return jsonResponse(400, { error: "messages are required." });
     }
     if (!env?.ASSET_BUCKET) {
-      return jsonResponse(503, { error: 'Context storage (ASSET_BUCKET) is not configured.' });
+      return jsonResponse(503, {
+        error: "Context storage (ASSET_BUCKET) is not configured.",
+      });
     }
     const store = new ContextStore({ bucket: env.ASSET_BUCKET });
     const result = await store.save({
       userId,
-      sessionId: typeof body?.sessionId === 'string' ? body.sessionId.slice(0, 160) : null,
+      sessionId:
+        typeof body?.sessionId === "string"
+          ? body.sessionId.slice(0, 160)
+          : null,
       messages,
-      recordId: typeof body?.recordId === 'string' && RECORD_ID_PATTERN.test(body.recordId) ? body.recordId : null,
-      summary: typeof body?.summary === 'string' ? body.summary.slice(0, 5000) : null
+      recordId:
+        typeof body?.recordId === "string" &&
+        RECORD_ID_PATTERN.test(body.recordId)
+          ? body.recordId
+          : null,
+      summary:
+        typeof body?.summary === "string" ? body.summary.slice(0, 5000) : null,
     });
     if (!result.persisted) {
       return jsonResponse(502, {
-        error: 'Context record could not be persisted.',
+        error: "Context record could not be persisted.",
         persisted: false,
-        reason: result.reason
+        reason: result.reason,
       });
     }
     return jsonResponse(200, result);
@@ -241,21 +269,25 @@ export async function handleTaskApi(request, env) {
 
   // GET /api/context/records/:recordId
   const recordMatch = pathname.match(/^\/api\/context\/records\/([^/]+)$/);
-  if (recordMatch && request.method === 'GET') {
+  if (recordMatch && request.method === "GET") {
     const recordId = decodeURIComponent(recordMatch[1]);
     if (!RECORD_ID_PATTERN.test(recordId)) {
-      return jsonResponse(400, { error: 'Invalid record id.' });
+      return jsonResponse(400, { error: "Invalid record id." });
     }
     if (!env?.ASSET_BUCKET) {
-      return jsonResponse(503, { error: 'Context storage (ASSET_BUCKET) is not configured.' });
+      return jsonResponse(503, {
+        error: "Context storage (ASSET_BUCKET) is not configured.",
+      });
     }
     const store = new ContextStore({ bucket: env.ASSET_BUCKET });
     try {
       const record = await store.get(recordId, { userId });
-      if (!record) return jsonResponse(404, { error: 'Context record not found.' });
+      if (!record)
+        return jsonResponse(404, { error: "Context record not found." });
       return jsonResponse(200, record);
     } catch (err) {
-      if (err?.status === 403) return jsonResponse(403, { error: 'Access denied.' });
+      if (err?.status === 403)
+        return jsonResponse(403, { error: "Access denied." });
       return jsonResponse(500, { error: safeErrorDetail(err) });
     }
   }
@@ -271,11 +303,11 @@ async function readTask(env, taskId) {
 
 function sseHeaders() {
   return {
-    'Content-Type': 'text/event-stream; charset=utf-8',
-    'Cache-Control': 'no-cache, no-transform',
-    Connection: 'keep-alive',
-    'Access-Control-Allow-Origin': '*',
-    'X-Accel-Buffering': 'no'
+    "Content-Type": "text/event-stream; charset=utf-8",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+    "Access-Control-Allow-Origin": "*",
+    "X-Accel-Buffering": "no",
   };
 }
 
@@ -295,9 +327,9 @@ async function streamTaskEvents(request, env, taskId, userId) {
   if (initialTask === null) {
     // The task record may be temporarily unreadable; poll for it briefly.
   } else if (initialTask === undefined || !initialTask) {
-    return jsonResponse(404, { error: 'Task not found.' });
+    return jsonResponse(404, { error: "Task not found." });
   } else if (initialTask.userId !== userId) {
-    return jsonResponse(403, { error: 'Access denied.' });
+    return jsonResponse(403, { error: "Access denied." });
   }
 
   const encoder = new TextEncoder();
@@ -305,13 +337,21 @@ async function streamTaskEvents(request, env, taskId, userId) {
   const writer = writable.getWriter();
   const closed = request.signal?.aborted ? true : false;
   let clientClosed = closed;
-  request.signal?.addEventListener('abort', () => { clientClosed = true; }, { once: true });
+  request.signal?.addEventListener(
+    "abort",
+    () => {
+      clientClosed = true;
+    },
+    { once: true },
+  );
 
   const sendEvent = async (event) => {
     try {
-      await writer.write(encoder.encode(
-        `id: ${event.id}\nevent: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`
-      ));
+      await writer.write(
+        encoder.encode(
+          `id: ${event.id}\nevent: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`,
+        ),
+      );
     } catch {
       clientClosed = true;
     }
@@ -321,7 +361,7 @@ async function streamTaskEvents(request, env, taskId, userId) {
   // keeps growing while the harness task runs; a disconnected client only
   // misses events it can replay via Last-Event-ID on reconnect.
   (async () => {
-    let sinceId = parseLastEventId(request.headers.get('last-event-id'));
+    let sinceId = parseLastEventId(request.headers.get("last-event-id"));
     let backoffMs = 400;
     let lastActivity = Date.now();
     const deadline = Date.now() + 90_000;
@@ -354,7 +394,12 @@ async function streamTaskEvents(request, env, taskId, userId) {
         current = null;
       }
       if (current && TERMINAL_TASK_STATUSES.has(current.status)) {
-        await sendEvent({ id: sinceId + 1, type: 'task.stream_end', taskId, status: current.status });
+        await sendEvent({
+          id: sinceId + 1,
+          type: "task.stream_end",
+          taskId,
+          status: current.status,
+        });
         break;
       }
 

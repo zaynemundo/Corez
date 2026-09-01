@@ -15,13 +15,15 @@
  * must-preserve constraints, unresolved decisions.
  */
 
-import { getContextClient } from './contextStoreClient.js';
+import { getContextClient } from "./contextStoreClient.js";
 
-const STORE_KEY = 'corez_context_records';
+const STORE_KEY = "corez_context_records";
 
 function localStore() {
-  if (typeof window !== 'undefined' && window.localStorage) return window.localStorage;
-  if (typeof globalThis !== 'undefined' && globalThis.localStorage) return globalThis.localStorage;
+  if (typeof window !== "undefined" && window.localStorage)
+    return window.localStorage;
+  if (typeof globalThis !== "undefined" && globalThis.localStorage)
+    return globalThis.localStorage;
   return null;
 }
 
@@ -62,7 +64,7 @@ export function storeContextRecords(records) {
  * is returned as-is.
  */
 export function retrieveContextRecord(recordId) {
-  if (typeof recordId !== 'string' || !recordId) return null;
+  if (typeof recordId !== "string" || !recordId) return null;
   const sessionRecord = getContextClient().store.get(recordId);
   if (sessionRecord) return sessionRecord;
   const legacy = loadContextRecords()[recordId];
@@ -103,7 +105,10 @@ export function deleteContextRecords(keys) {
 }
 
 function makeRecordId() {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
     return `ctx-${crypto.randomUUID()}`;
   }
   return `ctx-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
@@ -124,31 +129,51 @@ export function buildContextSummary(messages) {
 
   const lines = [];
   for (const message of Array.isArray(messages) ? messages : []) {
-    const text = typeof message?.content === 'string' ? message.content : '';
-    lines.push(...text.split('\n'));
+    const text = typeof message?.content === "string" ? message.content : "";
+    lines.push(...text.split("\n"));
   }
 
   for (const rawLine of lines) {
     const line = rawLine.trim();
     if (!line) continue;
 
-    if (/(must not|do not|never|forbidden|don'?t|must not change|must preserve|must keep|must retain)/i.test(line)) {
+    if (
+      /(must not|do not|never|forbidden|don'?t|must not change|must preserve|must keep|must retain)/i.test(
+        line,
+      )
+    ) {
       negativeConstraints.push(line.slice(0, 400));
       continue;
     }
-    if (/^(requirement|must|need|require|constraint|goal|acceptance criterion|user (wants|needs|requires)|the user (wants|needs|requires))[: ]/i.test(line)) {
+    if (
+      /^(requirement|must|need|require|constraint|goal|acceptance criterion|user (wants|needs|requires)|the user (wants|needs|requires))[: ]/i.test(
+        line,
+      )
+    ) {
       requirements.push(line.slice(0, 400));
       continue;
     }
-    if (/(error|exception|failed|failure|stack trace|uncaught|fatal|FAIL|syntaxerror|typeerror|referenceerror)/i.test(line)) {
+    if (
+      /(error|exception|failed|failure|stack trace|uncaught|fatal|FAIL|syntaxerror|typeerror|referenceerror)/i.test(
+        line,
+      )
+    ) {
       exactErrors.push(line.slice(0, 400));
       continue;
     }
-    if (/^(decision|decided|we agreed|final choice|use |chosen|approved|rejected):/i.test(line)) {
+    if (
+      /^(decision|decided|we agreed|final choice|use |chosen|approved|rejected):/i.test(
+        line,
+      )
+    ) {
       decisions.push(line.slice(0, 400));
       continue;
     }
-    if (/^[-*]\s*(?:add|implement|fix|refactor|change|update|remove|migrate)\b/i.test(line)) {
+    if (
+      /^[-*]\s*(?:add|implement|fix|refactor|change|update|remove|migrate)\b/i.test(
+        line,
+      )
+    ) {
       requirements.push(line.slice(0, 400));
     }
   }
@@ -166,10 +191,28 @@ export function buildContextSummary(messages) {
   // Topic extraction samples a bounded window: matching a multi-MB joined
   // string against `[a-z]{5,}` overflows the V8 regex engine's stack. A
   // bounded sample is more than enough to label the dominant topics.
-  const topicText = lines.join(' ').toLowerCase();
+  const topicText = lines.join(" ").toLowerCase();
   const words = topicText.slice(0, 2 * 1024 * 1024).match(/[a-z]{5,}/g) || [];
   for (const word of words) {
-    if (['would', 'should', 'could', 'about', 'there', 'their', 'these', 'those', 'which', 'while', 'because', 'through', 'between', 'however'].includes(word)) continue;
+    if (
+      [
+        "would",
+        "should",
+        "could",
+        "about",
+        "there",
+        "their",
+        "these",
+        "those",
+        "which",
+        "while",
+        "because",
+        "through",
+        "between",
+        "however",
+      ].includes(word)
+    )
+      continue;
     topicWords.set(word, (topicWords.get(word) || 0) + 1);
   }
   const topTopics = [...topicWords.entries()]
@@ -184,11 +227,17 @@ export function buildContextSummary(messages) {
       negativeConstraints,
       exactErrors,
       decisions,
-      codeSignatures
+      codeSignatures,
     },
-    retrievalKeys: [...requirements, ...negativeConstraints, ...exactErrors].slice(0, 24)
-      .map((item) => item.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 48))
-      .filter((key) => key.length >= 6)
+    retrievalKeys: [...requirements, ...negativeConstraints, ...exactErrors]
+      .slice(0, 24)
+      .map((item) =>
+        item
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .slice(0, 48),
+      )
+      .filter((key) => key.length >= 6),
   };
 }
 
@@ -224,12 +273,12 @@ export function persistAndSummarize(messages) {
     id: recordId,
     createdAt: Date.now(),
     messages: messagesList,
-    summaryKeys: built.retrievalKeys
+    summaryKeys: built.retrievalKeys,
   };
 
   const client = getContextClient();
   const saved = client.saveRecordSync(record);
-  if (client.backend === 'server') {
+  if (client.backend === "server") {
     // Fire-and-forget durable push: the session copy already guarantees
     // exact retrieval within this session; the server copy completes the
     // cross-refresh guarantee in the background.
@@ -238,40 +287,52 @@ export function persistAndSummarize(messages) {
   const persisted = Boolean(saved.ok);
 
   const parts = persisted
-    ? ['[Context compaction: earlier messages persisted as exact retrievable records. Summary with retrieval links below; full records can be re-fetched verbatim by key.]']
-    : ['[Context compaction: earlier messages kept in-session but NOT durably persisted (persisted: false). The summary below is the only reliable source of the extracted content.]'];
+    ? [
+        "[Context compaction: earlier messages persisted as exact retrievable records. Summary with retrieval links below; full records can be re-fetched verbatim by key.]",
+      ]
+    : [
+        "[Context compaction: earlier messages kept in-session but NOT durably persisted (persisted: false). The summary below is the only reliable source of the extracted content.]",
+      ];
 
   if (built.summary.topics.length > 0) {
-    parts.push(`Topics: ${built.summary.topics.join(', ')}.`);
+    parts.push(`Topics: ${built.summary.topics.join(", ")}.`);
   }
   if (built.summary.requirements.length > 0) {
-    parts.push(`Requirements: ${built.summary.requirements.join(' | ')}`);
+    parts.push(`Requirements: ${built.summary.requirements.join(" | ")}`);
   }
   if (built.summary.negativeConstraints.length > 0) {
-    parts.push(`Must-preserve / negative constraints: ${built.summary.negativeConstraints.join(' | ')}`);
+    parts.push(
+      `Must-preserve / negative constraints: ${built.summary.negativeConstraints.join(" | ")}`,
+    );
   }
   if (built.summary.exactErrors.length > 0) {
-    parts.push(`Exact errors: ${built.summary.exactErrors.join(' | ')}`);
+    parts.push(`Exact errors: ${built.summary.exactErrors.join(" | ")}`);
   }
   if (built.summary.decisions.length > 0) {
-    parts.push(`Decisions: ${built.summary.decisions.join(' | ')}`);
+    parts.push(`Decisions: ${built.summary.decisions.join(" | ")}`);
   }
   if (built.summary.codeSignatures.length > 0) {
-    parts.push(`Code blocks referenced: ${built.summary.codeSignatures.join(' | ')}`);
+    parts.push(
+      `Code blocks referenced: ${built.summary.codeSignatures.join(" | ")}`,
+    );
   }
   if (persisted) {
-    parts.push(`Full records: retrieve by key "${recordId}" (or via retrieveContextRecords).`);
+    parts.push(
+      `Full records: retrieve by key "${recordId}" (or via retrieveContextRecords).`,
+    );
   } else {
-    parts.push('Full records are not retrievable: durable storage was unavailable (persisted: false).');
+    parts.push(
+      "Full records are not retrievable: durable storage was unavailable (persisted: false).",
+    );
   }
 
   return {
     recordId,
     persisted,
     summaryMessage: {
-      role: 'system',
-      content: parts.join('\n')
+      role: "system",
+      content: parts.join("\n"),
     },
-    retrievalKeys: built.retrievalKeys
+    retrievalKeys: built.retrievalKeys,
   };
 }

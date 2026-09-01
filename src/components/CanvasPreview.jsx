@@ -1,12 +1,12 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { 
-  Code2, 
-  RotateCw, 
-  Maximize2, 
-  Minimize2, 
-  Download, 
-  Copy, 
-  Check, 
+import { useState, useEffect, useMemo, useRef } from "react";
+import {
+  Code2,
+  RotateCw,
+  Maximize2,
+  Minimize2,
+  Download,
+  Copy,
+  Check,
   X,
   Monitor,
   Laptop,
@@ -20,42 +20,50 @@ import {
   QrCode,
   Code,
   Link2,
-  Wand2
-} from 'lucide-react';
-import { formatCodeForPreview, parseMultiPageSite, injectMultiPageRouter, validateMultiPageSite } from '../utils/previewTransformer';
-import { publishAppInR2 } from '../services/appStorageService';
-import { createZipBlob } from '../utils/zipPackager';
-import { generateQrCodeSvg, generateEmbedSnippet } from '../utils/qrCode';
+  Wand2,
+} from "lucide-react";
+import {
+  formatCodeForPreview,
+  parseMultiPageSite,
+  injectMultiPageRouter,
+  validateMultiPageSite,
+} from "../utils/previewTransformer";
+import { publishAppInR2 } from "../services/appStorageService";
+import { createZipBlob } from "../utils/zipPackager";
+import { generateQrCodeSvg, generateEmbedSnippet } from "../utils/qrCode";
 
-export default function CanvasPreview({ 
-  code, 
-  title = 'Untitled Application',
-  onClose, 
+export default function CanvasPreview({
+  code,
+  title = "Untitled Application",
+  onClose,
   onRevise,
-  isFullScreen, 
+  isFullScreen,
   onToggleFullScreen,
   sessionId = null,
-  isStreaming = false
+  isStreaming = false,
 }) {
-  const [activeTab, setActiveTab] = useState('preview');
-  const [deviceMode, setDeviceMode] = useState('desktop'); // 'desktop' | 'laptop' | 'tablet' | 'mobile'
-  const [editableCode, setEditableCode] = useState(code || '');
+  const [activeTab, setActiveTab] = useState("preview");
+  const [deviceMode, setDeviceMode] = useState("desktop"); // 'desktop' | 'laptop' | 'tablet' | 'mobile'
+  const [editableCode, setEditableCode] = useState(code || "");
   const [copied, setCopied] = useState(false);
   const [key, setKey] = useState(0);
   const [publishing, setPublishing] = useState(false);
   const [publishResult, setPublishResult] = useState(null); // { slug, url }
   const [publishError, setPublishError] = useState(null);
-  const [customSlug, setCustomSlug] = useState('');
+  const [customSlug, setCustomSlug] = useState("");
   const [isUpdatingSlug, setIsUpdatingSlug] = useState(false);
   const [slugError, setSlugError] = useState(null);
   const [slugSuccess, setSlugSuccess] = useState(null);
-  const [activePage, setActivePage] = useState('index.html');
-  const [publishTab, setPublishTab] = useState('link'); // 'link' | 'qr' | 'embed'
+  const [activePage, setActivePage] = useState("index.html");
+  const [publishTab, setPublishTab] = useState("link"); // 'link' | 'qr' | 'embed'
   const [embedCopied, setEmbedCopied] = useState(false);
 
   const iframeRef = useRef(null);
 
-  const multiPage = useMemo(() => parseMultiPageSite(editableCode), [editableCode]);
+  const multiPage = useMemo(
+    () => parseMultiPageSite(editableCode),
+    [editableCode],
+  );
 
   // Completeness gate: before the creation is shown or published, check that
   // a multi-page output has an index.html, no empty pages, and no broken
@@ -68,25 +76,31 @@ export default function CanvasPreview({
   const multiPageValidation = useMemo(() => {
     if (multiPage.isMultiPage) return validateMultiPageSite(multiPage.pages);
     if (!editableCode) return null;
-    return validateMultiPageSite([{ name: 'index.html', html: editableCode }]);
+    return validateMultiPageSite([{ name: "index.html", html: editableCode }]);
   }, [multiPage, editableCode]);
 
   const currentPage = useMemo(() => {
-    return multiPage.pages.find((p) => p.name === activePage) || multiPage.pages[0] || { name: 'index.html', html: '' };
+    return (
+      multiPage.pages.find((p) => p.name === activePage) ||
+      multiPage.pages[0] || { name: "index.html", html: "" }
+    );
   }, [multiPage, activePage]);
 
   const formattedSrcDoc = useMemo(() => {
-    if (!currentPage.html) return '';
+    if (!currentPage.html) return "";
     const doc = formatCodeForPreview(currentPage.html);
     return multiPage.isMultiPage
-      ? injectMultiPageRouter(doc, multiPage.pages.map((p) => p.name))
+      ? injectMultiPageRouter(
+          doc,
+          multiPage.pages.map((p) => p.name),
+        )
       : doc;
   }, [currentPage, multiPage]);
 
   useEffect(() => {
-    setEditableCode(code || '');
-    setActivePage('index.html');
-    setKey(prev => prev + 1);
+    setEditableCode(code || "");
+    setActivePage("index.html");
+    setKey((prev) => prev + 1);
   }, [code]);
 
   // Multi-page navigation: the sandboxed iframe cannot navigate or reach the
@@ -98,28 +112,29 @@ export default function CanvasPreview({
     const handleNavMessage = (event) => {
       if (event.source !== iframeRef.current?.contentWindow) return;
       const data = event.data;
-      if (!data || typeof data !== 'object' || data.type !== 'corez-nav') return;
-      if (typeof data.page !== 'string' || !data.page) return;
+      if (!data || typeof data !== "object" || data.type !== "corez-nav")
+        return;
+      if (typeof data.page !== "string" || !data.page) return;
       const target = multiPage.pages.find((p) => p.name === data.page);
       if (!target) return;
       setActivePage(target.name);
     };
-    window.addEventListener('message', handleNavMessage);
-    return () => window.removeEventListener('message', handleNavMessage);
+    window.addEventListener("message", handleNavMessage);
+    return () => window.removeEventListener("message", handleNavMessage);
   }, [multiPage]);
 
   // Exit fullscreen on Escape key press
   useEffect(() => {
     if (!isFullScreen) return;
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        if (typeof onToggleFullScreen === 'function') {
+      if (e.key === "Escape") {
+        if (typeof onToggleFullScreen === "function") {
           onToggleFullScreen();
         }
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isFullScreen, onToggleFullScreen]);
 
   const handlePublish = async () => {
@@ -130,11 +145,11 @@ export default function CanvasPreview({
     // fix the output instead of sharing a broken link.
     if (multiPageValidation && !multiPageValidation.valid) {
       const errors = multiPageValidation.issues
-        .filter((issue) => issue.severity === 'error')
+        .filter((issue) => issue.severity === "error")
         .map((issue) => issue.message)
         .slice(0, 3);
       setPublishError(
-        `This site is incomplete: ${errors.join('; ')}. Ask Corez to fix it before publishing.`
+        `This site is incomplete: ${errors.join("; ")}. Ask Corez to fix it before publishing.`,
       );
       return;
     }
@@ -144,42 +159,62 @@ export default function CanvasPreview({
       const pagesPayload = {};
       if (multiPage.isMultiPage) {
         for (const page of multiPage.pages) {
-          pagesPayload[page.name] = injectMultiPageRouter(formatCodeForPreview(page.html), multiPage.pages.map((p) => p.name));
+          pagesPayload[page.name] = injectMultiPageRouter(
+            formatCodeForPreview(page.html),
+            multiPage.pages.map((p) => p.name),
+          );
         }
       }
       // The published home page is always the site's index page — never
       // whatever page the user happened to be viewing when they hit
       // Publish (the preview's active page is not the site's home).
-      const homeHtml = multiPage.isMultiPage && pagesPayload['index.html']
-        ? pagesPayload['index.html']
-        : formattedSrcDoc;
+      const homeHtml =
+        multiPage.isMultiPage && pagesPayload["index.html"]
+          ? pagesPayload["index.html"]
+          : formattedSrcDoc;
       const result = await publishAppInR2({
         html: homeHtml,
         title,
         slug: publishResult?.slug || null,
         sessionId,
-        ...(Object.keys(pagesPayload).length > 0 ? { pages: pagesPayload } : {})
+        ...(Object.keys(pagesPayload).length > 0
+          ? { pages: pagesPayload }
+          : {}),
       });
       if (result && result.url) {
-        setPublishResult({ slug: result.slug, url: result.url, customized: Boolean(result.customized) });
+        setPublishResult({
+          slug: result.slug,
+          url: result.url,
+          customized: Boolean(result.customized),
+        });
         setPublishError(null);
       } else {
         // Surface the server-provided error (401 auth, 403 ownership, 429 rate-limit, 530 R2, etc.)
         // instead of hiding it behind a generic "hosted service may be unavailable".
-        const serverError = result?.error ? String(result.error) : '';
-        const isServiceUnavailable = serverError.includes('530') || serverError.toLowerCase().includes('not configured');
+        const serverError = result?.error ? String(result.error) : "";
+        const isServiceUnavailable =
+          serverError.includes("530") ||
+          serverError.toLowerCase().includes("not configured");
         if (isServiceUnavailable) {
-          setPublishError('Publishing failed: R2 storage is not configured on the hosted service — contact support.');
+          setPublishError(
+            "Publishing failed: R2 storage is not configured on the hosted service — contact support.",
+          );
         } else if (serverError) {
           setPublishError(`Publishing failed: ${serverError}`);
         } else {
-          setPublishError('Publishing failed. The hosted service may be unavailable — try again.');
+          setPublishError(
+            "Publishing failed. The hosted service may be unavailable — try again.",
+          );
         }
       }
     } catch (err) {
-      console.warn('Publish error:', err);
-      const msg = err?.message ? String(err.message) : 'Publishing failed. Please try again.';
-      setPublishError(msg.includes('Publish') ? msg : `Publishing failed: ${msg}`);
+      console.warn("Publish error:", err);
+      const msg = err?.message
+        ? String(err.message)
+        : "Publishing failed. Please try again.";
+      setPublishError(
+        msg.includes("Publish") ? msg : `Publishing failed: ${msg}`,
+      );
     } finally {
       setPublishing(false);
     }
@@ -193,11 +228,16 @@ export default function CanvasPreview({
 
   const handleUpdateSlug = async (e) => {
     if (e) e.preventDefault();
-    const cleaned = (customSlug || '').trim().toLowerCase();
+    const cleaned = (customSlug || "").trim().toLowerCase();
     if (!cleaned || cleaned === publishResult?.slug || isUpdatingSlug) return;
 
-    if (!/^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/.test(cleaned) || cleaned.includes('--')) {
-      setSlugError('Slug must be 3-50 characters with lowercase letters, numbers, and single hyphens.');
+    if (
+      !/^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/.test(cleaned) ||
+      cleaned.includes("--")
+    ) {
+      setSlugError(
+        "Slug must be 3-50 characters with lowercase letters, numbers, and single hyphens.",
+      );
       setSlugSuccess(null);
       return;
     }
@@ -210,30 +250,42 @@ export default function CanvasPreview({
       const pagesPayload = {};
       if (multiPage.isMultiPage) {
         for (const page of multiPage.pages) {
-          pagesPayload[page.name] = injectMultiPageRouter(formatCodeForPreview(page.html), multiPage.pages.map((p) => p.name));
+          pagesPayload[page.name] = injectMultiPageRouter(
+            formatCodeForPreview(page.html),
+            multiPage.pages.map((p) => p.name),
+          );
         }
       }
       // The published home page is always the site's index page.
-      const homeHtml = multiPage.isMultiPage && pagesPayload['index.html']
-        ? pagesPayload['index.html']
-        : formattedSrcDoc;
+      const homeHtml =
+        multiPage.isMultiPage && pagesPayload["index.html"]
+          ? pagesPayload["index.html"]
+          : formattedSrcDoc;
       const result = await publishAppInR2({
         html: homeHtml,
         title,
         slug: cleaned,
         previousSlug: publishResult?.slug || null,
         sessionId,
-        ...(Object.keys(pagesPayload).length > 0 ? { pages: pagesPayload } : {})
+        ...(Object.keys(pagesPayload).length > 0
+          ? { pages: pagesPayload }
+          : {}),
       });
 
       if (result && result.url && result.success !== false) {
-        setPublishResult({ slug: result.slug, url: result.url, customized: true });
-        setSlugSuccess('URL updated successfully!');
+        setPublishResult({
+          slug: result.slug,
+          url: result.url,
+          customized: true,
+        });
+        setSlugSuccess("URL updated successfully!");
       } else {
-        setSlugError(result?.error || 'Slug already in use or unavailable. Try another.');
+        setSlugError(
+          result?.error || "Slug already in use or unavailable. Try another.",
+        );
       }
     } catch {
-      setSlugError('Failed to update slug. Please try again.');
+      setSlugError("Failed to update slug. Please try again.");
     } finally {
       setIsUpdatingSlug(false);
     }
@@ -266,13 +318,17 @@ export default function CanvasPreview({
       // Multi-page site export: package all individual HTML files into a ZIP archive
       const filesToZip = multiPage.pages.map((p) => ({
         name: p.name,
-        content: formatCodeForPreview(p.html)
+        content: formatCodeForPreview(p.html),
       }));
       const blob = createZipBlob(filesToZip);
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      const fileSlug = (title || 'corez-site').toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/(^-|-$)/g, '') || 'corez-site';
+      const fileSlug =
+        (title || "corez-site")
+          .toLowerCase()
+          .replace(/[^a-z0-9_-]+/g, "-")
+          .replace(/(^-|-$)/g, "") || "corez-site";
       a.download = `${fileSlug}.zip`;
       document.body.appendChild(a);
       a.click();
@@ -280,11 +336,17 @@ export default function CanvasPreview({
       URL.revokeObjectURL(url);
     } else {
       // Single-file HTML deliverable export
-      const blob = new Blob([formatCodeForPreview(editableCode)], { type: 'text/html' });
+      const blob = new Blob([formatCodeForPreview(editableCode)], {
+        type: "text/html",
+      });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      const fileSlug = (title || 'corez-app').toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/(^-|-$)/g, '') || 'corez-app';
+      const fileSlug =
+        (title || "corez-app")
+          .toLowerCase()
+          .replace(/[^a-z0-9_-]+/g, "-")
+          .replace(/(^-|-$)/g, "") || "corez-app";
       a.download = `${fileSlug}.html`;
       document.body.appendChild(a);
       a.click();
@@ -315,52 +377,91 @@ export default function CanvasPreview({
   };
 
   const handleRefresh = () => {
-    setKey(prev => prev + 1);
+    setKey((prev) => prev + 1);
   };
 
   const deviceSpecs = {
-    desktop: { label: 'Desktop', width: '100%', res: 'Fluid / 1920px', ratio: null },
-    laptop: { label: 'Laptop', width: '1100px', res: '1366 × 768', ratio: '16 / 9' },
-    tablet: { label: 'Tablet', width: '768px', res: '768 × 1024', ratio: '3 / 4' },
-    mobile: { label: 'Mobile', width: '375px', res: '375 × 812', ratio: '375 / 812' }
+    desktop: {
+      label: "Desktop",
+      width: "100%",
+      res: "Fluid / 1920px",
+      ratio: null,
+    },
+    laptop: {
+      label: "Laptop",
+      width: "1100px",
+      res: "1366 × 768",
+      ratio: "16 / 9",
+    },
+    tablet: {
+      label: "Tablet",
+      width: "768px",
+      res: "768 × 1024",
+      ratio: "3 / 4",
+    },
+    mobile: {
+      label: "Mobile",
+      width: "375px",
+      res: "375 × 812",
+      ratio: "375 / 812",
+    },
   };
 
   return (
-    <div className={`canvas-pane ${isFullScreen ? 'full-width' : ''}`}>
+    <div className={`canvas-pane ${isFullScreen ? "full-width" : ""}`}>
       <div className="canvas-header">
         <div className="canvas-title">
           <span>Preview</span>
 
           {/* View Mode: Preview vs Source */}
-          <div style={{ display: 'flex', background: 'var(--bg-tertiary)', padding: '2px', borderRadius: 'var(--radius-pill)', marginLeft: '0.5rem', border: '1px solid var(--border-color)' }}>
+          <div
+            style={{
+              display: "flex",
+              background: "var(--bg-tertiary)",
+              padding: "2px",
+              borderRadius: "var(--radius-pill)",
+              marginLeft: "0.5rem",
+              border: "1px solid var(--border-color)",
+            }}
+          >
             <button
-              onClick={() => setActiveTab('preview')}
+              onClick={() => setActiveTab("preview")}
               style={{
-                padding: '3px 10px',
-                borderRadius: 'var(--radius-pill)',
-                border: 'none',
-                background: activeTab === 'preview' ? 'var(--text-primary)' : 'transparent',
-                color: activeTab === 'preview' ? 'var(--bg-primary)' : 'var(--text-secondary)',
-                fontSize: '0.725rem',
+                padding: "3px 10px",
+                borderRadius: "var(--radius-pill)",
+                border: "none",
+                background:
+                  activeTab === "preview"
+                    ? "var(--text-primary)"
+                    : "transparent",
+                color:
+                  activeTab === "preview"
+                    ? "var(--bg-primary)"
+                    : "var(--text-secondary)",
+                fontSize: "0.725rem",
                 fontWeight: 300,
-                cursor: 'pointer',
-                transition: 'var(--transition-fast)'
+                cursor: "pointer",
+                transition: "var(--transition-fast)",
               }}
             >
               Preview
             </button>
             <button
-              onClick={() => setActiveTab('code')}
+              onClick={() => setActiveTab("code")}
               style={{
-                padding: '3px 10px',
-                borderRadius: 'var(--radius-pill)',
-                border: 'none',
-                background: activeTab === 'code' ? 'var(--text-primary)' : 'transparent',
-                color: activeTab === 'code' ? 'var(--bg-primary)' : 'var(--text-secondary)',
-                fontSize: '0.725rem',
+                padding: "3px 10px",
+                borderRadius: "var(--radius-pill)",
+                border: "none",
+                background:
+                  activeTab === "code" ? "var(--text-primary)" : "transparent",
+                color:
+                  activeTab === "code"
+                    ? "var(--bg-primary)"
+                    : "var(--text-secondary)",
+                fontSize: "0.725rem",
                 fontWeight: 300,
-                cursor: 'pointer',
-                transition: 'var(--transition-fast)'
+                cursor: "pointer",
+                transition: "var(--transition-fast)",
               }}
             >
               Source
@@ -369,36 +470,36 @@ export default function CanvasPreview({
         </div>
 
         {/* Device Viewport Selector (Desktop vs Laptop vs Tablet vs Mobile Icon-only) */}
-        {activeTab === 'preview' && (
+        {activeTab === "preview" && (
           <div className="device-mode-bar">
             <button
-              onClick={() => setDeviceMode('desktop')}
+              onClick={() => setDeviceMode("desktop")}
               title="Desktop Screen View"
-              className={`device-btn ${deviceMode === 'desktop' ? 'active' : ''}`}
+              className={`device-btn ${deviceMode === "desktop" ? "active" : ""}`}
             >
               <Monitor size={15} strokeWidth={1.5} />
             </button>
 
             <button
-              onClick={() => setDeviceMode('laptop')}
+              onClick={() => setDeviceMode("laptop")}
               title="Laptop View (1366 × 768)"
-              className={`device-btn ${deviceMode === 'laptop' ? 'active' : ''}`}
+              className={`device-btn ${deviceMode === "laptop" ? "active" : ""}`}
             >
               <Laptop size={15} strokeWidth={1.5} />
             </button>
 
             <button
-              onClick={() => setDeviceMode('tablet')}
+              onClick={() => setDeviceMode("tablet")}
               title="Tablet View (768 × 1024)"
-              className={`device-btn ${deviceMode === 'tablet' ? 'active' : ''}`}
+              className={`device-btn ${deviceMode === "tablet" ? "active" : ""}`}
             >
               <Tablet size={15} strokeWidth={1.5} />
             </button>
 
             <button
-              onClick={() => setDeviceMode('mobile')}
+              onClick={() => setDeviceMode("mobile")}
               title="Mobile View (375 × 812)"
-              className={`device-btn ${deviceMode === 'mobile' ? 'active' : ''}`}
+              className={`device-btn ${deviceMode === "mobile" ? "active" : ""}`}
             >
               <Smartphone size={15} strokeWidth={1.5} />
             </button>
@@ -411,7 +512,7 @@ export default function CanvasPreview({
 
         <div className="canvas-controls">
           {/* Revise: request changes to this creation directly in chat */}
-          {editableCode && !isStreaming && typeof onRevise === 'function' && (
+          {editableCode && !isStreaming && typeof onRevise === "function" && (
             <button
               type="button"
               className="code-btn revise-canvas-btn"
@@ -419,17 +520,17 @@ export default function CanvasPreview({
               title="Revise this creation with AI"
               aria-label="Revise with AI"
               style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.35rem',
-                padding: '0.35rem 0.65rem',
-                fontSize: '0.75rem',
-                borderRadius: 'var(--radius-pill)',
-                background: 'var(--bg-tertiary)',
-                border: '1px solid var(--border-color)',
-                color: 'var(--text-primary)',
-                cursor: 'pointer',
-                transition: 'var(--transition-fast)'
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.35rem",
+                padding: "0.35rem 0.65rem",
+                fontSize: "0.75rem",
+                borderRadius: "var(--radius-pill)",
+                background: "var(--bg-tertiary)",
+                border: "1px solid var(--border-color)",
+                color: "var(--text-primary)",
+                cursor: "pointer",
+                transition: "var(--transition-fast)",
               }}
             >
               <Wand2 size={13} strokeWidth={1.5} />
@@ -445,27 +546,63 @@ export default function CanvasPreview({
               onClick={handlePublish}
               disabled={publishing}
               title="Publish this creation and share the link"
-              aria-label={publishing ? 'Publishing...' : 'Publish'}
+              aria-label={publishing ? "Publishing..." : "Publish"}
             >
-              {publishing ? <Loader2 size={13} className="spin-icon" /> : <Share2 size={13} />}
-              <span>{publishing ? 'Publishing...' : 'Publish'}</span>
+              {publishing ? (
+                <Loader2 size={13} className="spin-icon" />
+              ) : (
+                <Share2 size={13} />
+              )}
+              <span>{publishing ? "Publishing..." : "Publish"}</span>
             </button>
           )}
 
-          <button className="icon-btn" onClick={handleRefresh} title="Reload Preview">
+          <button
+            className="icon-btn"
+            onClick={handleRefresh}
+            title="Reload Preview"
+          >
             <RotateCw size={14} strokeWidth={1.5} />
           </button>
-          <button className="icon-btn" onClick={handleCopy} title="Copy Source Code">
-            {copied ? <Check size={14} strokeWidth={1.5} style={{ color: '#ffffff' }} /> : <Copy size={14} strokeWidth={1.5} />}
+          <button
+            className="icon-btn"
+            onClick={handleCopy}
+            title="Copy Source Code"
+          >
+            {copied ? (
+              <Check size={14} strokeWidth={1.5} style={{ color: "#ffffff" }} />
+            ) : (
+              <Copy size={14} strokeWidth={1.5} />
+            )}
           </button>
-          <button className="icon-btn" onClick={handleDownload} title={multiPage.isMultiPage ? 'Download Website (.zip)' : 'Download .html file'}>
+          <button
+            className="icon-btn"
+            onClick={handleDownload}
+            title={
+              multiPage.isMultiPage
+                ? "Download Website (.zip)"
+                : "Download .html file"
+            }
+          >
             <Download size={14} strokeWidth={1.5} />
           </button>
-          <button className="icon-btn" onClick={handlePrint} title="Export to PDF / Print">
+          <button
+            className="icon-btn"
+            onClick={handlePrint}
+            title="Export to PDF / Print"
+          >
             <Printer size={14} strokeWidth={1.5} />
           </button>
-          <button className="icon-btn" onClick={onToggleFullScreen} title="Toggle Fullscreen">
-            {isFullScreen ? <Minimize2 size={14} strokeWidth={1.5} /> : <Maximize2 size={14} strokeWidth={1.5} />}
+          <button
+            className="icon-btn"
+            onClick={onToggleFullScreen}
+            title="Toggle Fullscreen"
+          >
+            {isFullScreen ? (
+              <Minimize2 size={14} strokeWidth={1.5} />
+            ) : (
+              <Maximize2 size={14} strokeWidth={1.5} />
+            )}
           </button>
           <button className="icon-btn" onClick={onClose} title="Close Preview">
             <X size={14} strokeWidth={1.5} />
@@ -473,46 +610,60 @@ export default function CanvasPreview({
         </div>
       </div>
 
-      <div className={`canvas-body ${deviceMode !== 'desktop' && activeTab === 'preview' ? 'device-wrapper' : ''}`}>
+      <div
+        className={`canvas-body ${deviceMode !== "desktop" && activeTab === "preview" ? "device-wrapper" : ""}`}
+      >
         {multiPageValidation && !multiPageValidation.valid && (
           <div
             role="alert"
             className="multipage-validation-banner"
             style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '8px',
-              margin: '0 0 10px',
-              padding: '8px 12px',
-              background: 'rgba(239, 68, 68, 0.12)',
-              border: '1px solid rgba(239, 68, 68, 0.35)',
-              borderRadius: 'var(--radius-md)',
-              color: 'var(--text-primary)',
-              fontSize: '0.78rem',
-              lineHeight: 1.4
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "8px",
+              margin: "0 0 10px",
+              padding: "8px 12px",
+              background: "rgba(239, 68, 68, 0.12)",
+              border: "1px solid rgba(239, 68, 68, 0.35)",
+              borderRadius: "var(--radius-md)",
+              color: "var(--text-primary)",
+              fontSize: "0.78rem",
+              lineHeight: 1.4,
             }}
           >
-            <span style={{ color: '#f87171', fontWeight: 600, whiteSpace: 'nowrap' }}>Incomplete site</span>
+            <span
+              style={{
+                color: "#f87171",
+                fontWeight: 600,
+                whiteSpace: "nowrap",
+              }}
+            >
+              Incomplete site
+            </span>
             <span>
               {multiPageValidation.issues
-                .filter((issue) => issue.severity === 'error')
+                .filter((issue) => issue.severity === "error")
                 .map((issue) => issue.message)
-                .join(' · ')}
-              {' '}
+                .join(" · ")}{" "}
               Publishing is blocked until fixed.
             </span>
           </div>
         )}
         {editableCode ? (
-          activeTab === 'preview' ? (
+          activeTab === "preview" ? (
             <div className={`preview-container device-mode-${deviceMode}`}>
-              {deviceMode !== 'desktop' && (
+              {deviceMode !== "desktop" && (
                 <div className="device-frame-header">
                   <div className="device-camera-dot" />
-                  <span className="device-spec-tag">{deviceSpecs[deviceMode].label} • {deviceSpecs[deviceMode].res}</span>
+                  <span className="device-spec-tag">
+                    {deviceSpecs[deviceMode].label} •{" "}
+                    {deviceSpecs[deviceMode].res}
+                  </span>
                 </div>
               )}
-              <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+              <div
+                style={{ position: "relative", width: "100%", height: "100%" }}
+              >
                 <iframe
                   key={`${key}-${activePage}`}
                   ref={iframeRef}
@@ -521,18 +672,19 @@ export default function CanvasPreview({
                   className="preview-iframe"
                   sandbox="allow-scripts allow-forms allow-pointer-lock allow-downloads allow-popups"
                   style={
-                    deviceMode !== 'desktop'
+                    deviceMode !== "desktop"
                       ? {
                           // Fixed device width, real device aspect ratio, and
                           // height derived from it — the frame never stretches
                           // to the pane height or clips. margin:auto centers
                           // while remaining scrollable when the pane is small.
                           width: deviceSpecs[deviceMode].width,
-                          maxWidth: '100%',
+                          maxWidth: "100%",
                           aspectRatio: deviceSpecs[deviceMode].ratio,
-                          height: 'auto',
-                          margin: 'auto',
-                          borderRadius: deviceMode === 'mobile' ? '20px' : '12px'
+                          height: "auto",
+                          margin: "auto",
+                          borderRadius:
+                            deviceMode === "mobile" ? "20px" : "12px",
                         }
                       : {}
                   }
@@ -550,11 +702,31 @@ export default function CanvasPreview({
         ) : isStreaming ? (
           <div className="canvas-empty-state canvas-building-state">
             <div className="canvas-building-spinner">
-              <Loader2 size={28} className="spin-icon" style={{ color: 'var(--accent, #6366f1)' }} />
+              <Loader2
+                size={28}
+                className="spin-icon"
+                style={{ color: "var(--accent, #6366f1)" }}
+              />
             </div>
-            <h3 style={{ fontSize: '1rem', margin: '0.5rem 0 0.25rem', fontWeight: 500 }}>Live Designing & Building...</h3>
-            <p style={{ maxWidth: '300px', fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
-              Streaming visual components, layout shaders & logic into preview canvas.
+            <h3
+              style={{
+                fontSize: "1rem",
+                margin: "0.5rem 0 0.25rem",
+                fontWeight: 500,
+              }}
+            >
+              Live Designing & Building...
+            </h3>
+            <p
+              style={{
+                maxWidth: "300px",
+                fontSize: "0.8rem",
+                color: "var(--text-secondary)",
+                margin: 0,
+              }}
+            >
+              Streaming visual components, layout shaders & logic into preview
+              canvas.
             </p>
           </div>
         ) : (
@@ -562,9 +734,10 @@ export default function CanvasPreview({
             <div className="canvas-empty-icon">
               <Code2 size={22} strokeWidth={1.5} />
             </div>
-            <h3 style={{ fontSize: '0.95rem' }}>No Active App Running</h3>
-            <p style={{ maxWidth: '280px', fontSize: '0.8rem' }}>
-              Ask Corez to build an application or click <b>"Run Preview"</b> on any code block.
+            <h3 style={{ fontSize: "0.95rem" }}>No Active App Running</h3>
+            <p style={{ maxWidth: "280px", fontSize: "0.8rem" }}>
+              Ask Corez to build an application or click <b>"Run Preview"</b> on
+              any code block.
             </p>
           </div>
         )}
@@ -579,10 +752,20 @@ export default function CanvasPreview({
           aria-label="Share your published creation"
           onClick={() => setPublishResult(null)}
         >
-          <div className="modal-card publish-modal-card" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="modal-card publish-modal-card"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header">
               <span className="modal-title">
-                <Share2 size={15} style={{ marginRight: '6px', verticalAlign: 'middle', color: 'var(--accent, #818cf8)' }} />
+                <Share2
+                  size={15}
+                  style={{
+                    marginRight: "6px",
+                    verticalAlign: "middle",
+                    color: "var(--accent, #818cf8)",
+                  }}
+                />
                 Your creation is live
               </span>
               <button
@@ -596,37 +779,57 @@ export default function CanvasPreview({
               </button>
             </div>
 
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
-              Anyone with this link can open <b style={{ color: 'var(--text-primary)' }}>{title.slice(0, 60)}</b>:
+            <p
+              style={{
+                fontSize: "0.8rem",
+                color: "var(--text-secondary)",
+                margin: 0,
+              }}
+            >
+              Anyone with this link can open{" "}
+              <b style={{ color: "var(--text-primary)" }}>
+                {title.slice(0, 60)}
+              </b>
+              :
             </p>
 
             {/* Share Modal Tabs: Link | QR Code | Embed */}
             <div
               className="publish-modal-tabs"
               style={{
-                display: 'flex',
-                gap: '6px',
-                margin: '8px 0 12px',
-                borderBottom: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.08))',
-                paddingBottom: '8px'
+                display: "flex",
+                gap: "6px",
+                margin: "8px 0 12px",
+                borderBottom:
+                  "1px solid var(--border-subtle, rgba(255, 255, 255, 0.08))",
+                paddingBottom: "8px",
               }}
             >
               <button
                 type="button"
-                className={`publish-tab-btn ${publishTab === 'link' ? 'active' : ''}`}
-                onClick={() => setPublishTab('link')}
+                className={`publish-tab-btn ${publishTab === "link" ? "active" : ""}`}
+                onClick={() => setPublishTab("link")}
                 style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  padding: '4px 10px',
-                  borderRadius: 'var(--radius-sm, 6px)',
-                  border: publishTab === 'link' ? '1px solid var(--accent, #3b82f6)' : '1px solid transparent',
-                  background: publishTab === 'link' ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
-                  color: publishTab === 'link' ? 'var(--text-primary, #ffffff)' : 'var(--text-secondary, #9ca3af)',
-                  fontSize: '0.75rem',
-                  fontWeight: publishTab === 'link' ? 600 : 400,
-                  cursor: 'pointer'
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "5px",
+                  padding: "4px 10px",
+                  borderRadius: "var(--radius-sm, 6px)",
+                  border:
+                    publishTab === "link"
+                      ? "1px solid var(--accent, #3b82f6)"
+                      : "1px solid transparent",
+                  background:
+                    publishTab === "link"
+                      ? "rgba(59, 130, 246, 0.12)"
+                      : "transparent",
+                  color:
+                    publishTab === "link"
+                      ? "var(--text-primary, #ffffff)"
+                      : "var(--text-secondary, #9ca3af)",
+                  fontSize: "0.75rem",
+                  fontWeight: publishTab === "link" ? 600 : 400,
+                  cursor: "pointer",
                 }}
               >
                 <Link2 size={13} />
@@ -634,20 +837,29 @@ export default function CanvasPreview({
               </button>
               <button
                 type="button"
-                className={`publish-tab-btn ${publishTab === 'qr' ? 'active' : ''}`}
-                onClick={() => setPublishTab('qr')}
+                className={`publish-tab-btn ${publishTab === "qr" ? "active" : ""}`}
+                onClick={() => setPublishTab("qr")}
                 style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  padding: '4px 10px',
-                  borderRadius: 'var(--radius-sm, 6px)',
-                  border: publishTab === 'qr' ? '1px solid var(--accent, #3b82f6)' : '1px solid transparent',
-                  background: publishTab === 'qr' ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
-                  color: publishTab === 'qr' ? 'var(--text-primary, #ffffff)' : 'var(--text-secondary, #9ca3af)',
-                  fontSize: '0.75rem',
-                  fontWeight: publishTab === 'qr' ? 600 : 400,
-                  cursor: 'pointer'
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "5px",
+                  padding: "4px 10px",
+                  borderRadius: "var(--radius-sm, 6px)",
+                  border:
+                    publishTab === "qr"
+                      ? "1px solid var(--accent, #3b82f6)"
+                      : "1px solid transparent",
+                  background:
+                    publishTab === "qr"
+                      ? "rgba(59, 130, 246, 0.12)"
+                      : "transparent",
+                  color:
+                    publishTab === "qr"
+                      ? "var(--text-primary, #ffffff)"
+                      : "var(--text-secondary, #9ca3af)",
+                  fontSize: "0.75rem",
+                  fontWeight: publishTab === "qr" ? 600 : 400,
+                  cursor: "pointer",
                 }}
               >
                 <QrCode size={13} />
@@ -655,20 +867,29 @@ export default function CanvasPreview({
               </button>
               <button
                 type="button"
-                className={`publish-tab-btn ${publishTab === 'embed' ? 'active' : ''}`}
-                onClick={() => setPublishTab('embed')}
+                className={`publish-tab-btn ${publishTab === "embed" ? "active" : ""}`}
+                onClick={() => setPublishTab("embed")}
                 style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  padding: '4px 10px',
-                  borderRadius: 'var(--radius-sm, 6px)',
-                  border: publishTab === 'embed' ? '1px solid var(--accent, #3b82f6)' : '1px solid transparent',
-                  background: publishTab === 'embed' ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
-                  color: publishTab === 'embed' ? 'var(--text-primary, #ffffff)' : 'var(--text-secondary, #9ca3af)',
-                  fontSize: '0.75rem',
-                  fontWeight: publishTab === 'embed' ? 600 : 400,
-                  cursor: 'pointer'
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "5px",
+                  padding: "4px 10px",
+                  borderRadius: "var(--radius-sm, 6px)",
+                  border:
+                    publishTab === "embed"
+                      ? "1px solid var(--accent, #3b82f6)"
+                      : "1px solid transparent",
+                  background:
+                    publishTab === "embed"
+                      ? "rgba(59, 130, 246, 0.12)"
+                      : "transparent",
+                  color:
+                    publishTab === "embed"
+                      ? "var(--text-primary, #ffffff)"
+                      : "var(--text-secondary, #9ca3af)",
+                  fontSize: "0.75rem",
+                  fontWeight: publishTab === "embed" ? 600 : 400,
+                  cursor: "pointer",
                 }}
               >
                 <Code size={13} />
@@ -676,18 +897,18 @@ export default function CanvasPreview({
               </button>
             </div>
 
-            {publishTab === 'link' && (
+            {publishTab === "link" && (
               <>
                 <div
                   className="publish-link-box"
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    background: 'var(--bg-tertiary)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: '8px 10px'
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    background: "var(--bg-tertiary)",
+                    border: "1px solid var(--border-color)",
+                    borderRadius: "var(--radius-md)",
+                    padding: "8px 10px",
                   }}
                 >
                   <input
@@ -698,17 +919,22 @@ export default function CanvasPreview({
                     style={{
                       flex: 1,
                       minWidth: 0,
-                      background: 'transparent',
-                      border: 'none',
-                      outline: 'none',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.8rem',
-                      fontFamily: 'monospace'
+                      background: "transparent",
+                      border: "none",
+                      outline: "none",
+                      color: "var(--text-primary)",
+                      fontSize: "0.8rem",
+                      fontFamily: "monospace",
                     }}
                   />
-                  <button type="button" className="code-btn" onClick={handleCopyLink} title="Copy link">
+                  <button
+                    type="button"
+                    className="code-btn"
+                    onClick={handleCopyLink}
+                    title="Copy link"
+                  >
                     {copied ? <Check size={14} /> : <Copy size={14} />}
-                    <span>{copied ? 'Copied' : 'Copy'}</span>
+                    <span>{copied ? "Copied" : "Copy"}</span>
                   </button>
                   <a
                     className="code-btn"
@@ -716,7 +942,12 @@ export default function CanvasPreview({
                     target="_blank"
                     rel="noopener noreferrer"
                     title="Open in new tab"
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      textDecoration: "none",
+                    }}
                   >
                     <ExternalLink size={14} />
                     <span>Open</span>
@@ -724,141 +955,289 @@ export default function CanvasPreview({
                 </div>
 
                 {/* Slug Customization / 1-Time Change */}
-                {publishResult.customized || (publishResult.slug && !/^[a-z0-9]{4,8}-[0-9]{1,6}$/.test(publishResult.slug)) ? (
+                {publishResult.customized ||
+                (publishResult.slug &&
+                  !/^[a-z0-9]{4,8}-[0-9]{1,6}$/.test(publishResult.slug)) ? (
                   <div
                     className="publish-slug-locked"
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '7px 10px',
-                      background: 'var(--bg-tertiary)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: 'var(--radius-md)'
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      padding: "7px 10px",
+                      background: "var(--bg-tertiary)",
+                      border: "1px solid var(--border-color)",
+                      borderRadius: "var(--radius-md)",
                     }}
                   >
-                    <Lock size={13} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+                    <Lock
+                      size={13}
+                      style={{ color: "var(--text-secondary)", flexShrink: 0 }}
+                    />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: '0.74rem', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>
+                      <p
+                        style={{
+                          fontSize: "0.74rem",
+                          fontWeight: 500,
+                          color: "var(--text-primary)",
+                          margin: 0,
+                        }}
+                      >
                         Custom slug locked (1-time change used)
                       </p>
-                      <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: '1px 0 0' }}>
+                      <p
+                        style={{
+                          fontSize: "0.7rem",
+                          color: "var(--text-secondary)",
+                          margin: "1px 0 0",
+                        }}
+                      >
                         Republishing automatically updates this link.
                       </p>
                     </div>
                   </div>
                 ) : (
-                  <form onSubmit={handleUpdateSlug} className="publish-slug-form" style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <label htmlFor="custom-slug-input" style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                  <form
+                    onSubmit={handleUpdateSlug}
+                    className="publish-slug-form"
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "5px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <label
+                        htmlFor="custom-slug-input"
+                        style={{
+                          fontSize: "0.75rem",
+                          fontWeight: 500,
+                          color: "var(--text-secondary)",
+                        }}
+                      >
                         Customize URL slug:
                       </label>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>1-time change</span>
+                      <span
+                        style={{
+                          fontSize: "0.7rem",
+                          color: "var(--text-secondary)",
+                        }}
+                      >
+                        1-time change
+                      </span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0, background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 8px' }}>
-                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', userSelect: 'none' }}>corez.pro/</span>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          flex: 1,
+                          minWidth: 0,
+                          background: "var(--bg-tertiary)",
+                          border: "1px solid var(--border-color)",
+                          borderRadius: "var(--radius-md)",
+                          padding: "0 8px",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: "0.78rem",
+                            color: "var(--text-secondary)",
+                            fontFamily: "var(--font-mono)",
+                            userSelect: "none",
+                          }}
+                        >
+                          corez.pro/
+                        </span>
                         <input
                           id="custom-slug-input"
                           type="text"
                           value={customSlug}
                           onChange={(e) => {
-                            setCustomSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''));
+                            setCustomSlug(
+                              e.target.value
+                                .toLowerCase()
+                                .replace(/[^a-z0-9-]/g, ""),
+                            );
                             setSlugError(null);
                             setSlugSuccess(null);
                           }}
                           placeholder="my-custom-slug"
                           aria-label="Custom slug"
-                          style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-primary)', fontSize: '0.8rem', fontFamily: 'var(--font-mono)', padding: '7px 4px' }}
+                          style={{
+                            flex: 1,
+                            minWidth: 0,
+                            background: "transparent",
+                            border: "none",
+                            outline: "none",
+                            color: "var(--text-primary)",
+                            fontSize: "0.8rem",
+                            fontFamily: "var(--font-mono)",
+                            padding: "7px 4px",
+                          }}
                         />
                       </div>
                       <button
                         type="submit"
                         className="code-btn"
                         onClick={handleUpdateSlug}
-                        disabled={isUpdatingSlug || !customSlug || customSlug === publishResult.slug}
-                        style={{ whiteSpace: 'nowrap', padding: '6px 12px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        disabled={
+                          isUpdatingSlug ||
+                          !customSlug ||
+                          customSlug === publishResult.slug
+                        }
+                        style={{
+                          whiteSpace: "nowrap",
+                          padding: "6px 12px",
+                          fontSize: "0.75rem",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                        }}
                       >
-                        {isUpdatingSlug ? <Loader2 size={13} className="spin-icon" /> : 'Save Slug'}
+                        {isUpdatingSlug ? (
+                          <Loader2 size={13} className="spin-icon" />
+                        ) : (
+                          "Save Slug"
+                        )}
                       </button>
                     </div>
                     {slugError && (
-                      <p role="alert" style={{ fontSize: '0.74rem', color: '#f87171', margin: '2px 0 0' }}>{slugError}</p>
+                      <p
+                        role="alert"
+                        style={{
+                          fontSize: "0.74rem",
+                          color: "#f87171",
+                          margin: "2px 0 0",
+                        }}
+                      >
+                        {slugError}
+                      </p>
                     )}
                     {slugSuccess && (
-                      <p role="status" style={{ fontSize: '0.74rem', color: '#4ade80', margin: '2px 0 0' }}>{slugSuccess}</p>
+                      <p
+                        role="status"
+                        style={{
+                          fontSize: "0.74rem",
+                          color: "#4ade80",
+                          margin: "2px 0 0",
+                        }}
+                      >
+                        {slugSuccess}
+                      </p>
                     )}
                   </form>
                 )}
               </>
             )}
 
-            {publishTab === 'qr' && (
+            {publishTab === "qr" && (
               <div
                 className="publish-qr-view"
                 style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '16px 12px',
-                  background: 'var(--bg-tertiary, #181922)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: 'var(--radius-md, 10px)',
-                  gap: '10px'
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "16px 12px",
+                  background: "var(--bg-tertiary, #181922)",
+                  border: "1px solid var(--border-color)",
+                  borderRadius: "var(--radius-md, 10px)",
+                  gap: "10px",
                 }}
               >
                 <div
                   className="qr-code-svg-container"
                   style={{
-                    background: '#ffffff',
-                    padding: '8px',
-                    borderRadius: '8px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
+                    background: "#ffffff",
+                    padding: "8px",
+                    borderRadius: "8px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
-                  dangerouslySetInnerHTML={{ __html: generateQrCodeSvg(publishLink, { size: 140, fgColor: '#090a0f', bgColor: '#ffffff' }) }}
+                  dangerouslySetInnerHTML={{
+                    __html: generateQrCodeSvg(publishLink, {
+                      size: 140,
+                      fgColor: "#090a0f",
+                      bgColor: "#ffffff",
+                    }),
+                  }}
                 />
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #9ca3af)', margin: 0, textAlign: 'center' }}>
+                <p
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "var(--text-secondary, #9ca3af)",
+                    margin: 0,
+                    textAlign: "center",
+                  }}
+                >
                   Scan with your phone's camera to preview live on mobile.
                 </p>
               </div>
             )}
 
-            {publishTab === 'embed' && (
-              <div className="publish-embed-view" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {publishTab === "embed" && (
+              <div
+                className="publish-embed-view"
+                style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+              >
                 <textarea
                   readOnly
                   value={generateEmbedSnippet(publishLink, { title })}
                   onFocus={(e) => e.target.select()}
                   aria-label="Embed iframe HTML"
                   style={{
-                    width: '100%',
-                    height: '80px',
-                    background: 'var(--bg-tertiary)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: '8px 10px',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.75rem',
-                    fontFamily: 'monospace',
-                    resize: 'none'
+                    width: "100%",
+                    height: "80px",
+                    background: "var(--bg-tertiary)",
+                    border: "1px solid var(--border-color)",
+                    borderRadius: "var(--radius-md)",
+                    padding: "8px 10px",
+                    color: "var(--text-primary)",
+                    fontSize: "0.75rem",
+                    fontFamily: "monospace",
+                    resize: "none",
                   }}
                 />
                 <button
                   type="button"
                   className="code-btn"
                   onClick={handleCopyEmbed}
-                  style={{ alignSelf: 'flex-end', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                  style={{
+                    alignSelf: "flex-end",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "5px",
+                  }}
                 >
                   {embedCopied ? <Check size={13} /> : <Copy size={13} />}
-                  <span>{embedCopied ? 'Copied Embed Code' : 'Copy Embed Code'}</span>
+                  <span>
+                    {embedCopied ? "Copied Embed Code" : "Copy Embed Code"}
+                  </span>
                 </button>
               </div>
             )}
 
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0 }}>
+            <p
+              style={{
+                fontSize: "0.75rem",
+                color: "var(--text-secondary)",
+                margin: 0,
+              }}
+            >
               Only this app is shared — your chat stays private.
             </p>
           </div>
@@ -869,17 +1248,17 @@ export default function CanvasPreview({
         <div
           role="alert"
           style={{
-            position: 'absolute',
-            bottom: '12px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: 'var(--bg-tertiary)',
-            border: '1px solid var(--border-color)',
-            color: 'var(--text-primary)',
-            borderRadius: 'var(--radius-md)',
-            padding: '8px 14px',
-            fontSize: '0.8rem',
-            zIndex: 20
+            position: "absolute",
+            bottom: "12px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "var(--bg-tertiary)",
+            border: "1px solid var(--border-color)",
+            color: "var(--text-primary)",
+            borderRadius: "var(--radius-md)",
+            padding: "8px 14px",
+            fontSize: "0.8rem",
+            zIndex: 20,
           }}
         >
           {publishError}
@@ -889,7 +1268,7 @@ export default function CanvasPreview({
             onClick={() => setPublishError(null)}
             title="Dismiss"
             aria-label="Dismiss"
-            style={{ marginLeft: '8px', verticalAlign: 'middle' }}
+            style={{ marginLeft: "8px", verticalAlign: "middle" }}
           >
             <X size={13} />
           </button>

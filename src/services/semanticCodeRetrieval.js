@@ -1,6 +1,6 @@
 /**
  * Semantic Code Retrieval Service
- * 
+ *
  * Generates vector embeddings for user prompts via the Workers AI embedding
  * endpoint (POST /api/embed, powered by BGE-M3 / BGE-Large) and performs cosine
  * similarity matching against a curated knowledge base of verified code patterns,
@@ -9,10 +9,21 @@
 
 export const CODE_PATTERN_KNOWLEDGE_BASE = [
   {
-    id: 'multipage-site-structure',
-    title: 'Multi-Page Website Architecture with Unified Theme',
-    tags: ['multipage', 'multi-page', 'pages', 'portfolio', 'navigation', 'about', 'contact', 'projects', 'website'],
-    description: 'Complete multi-page site architecture using <!-- PAGE: filename.html --> markers, relative navigation anchors, single unified background, and zero missing page link errors.',
+    id: "multipage-site-structure",
+    title: "Multi-Page Website Architecture with Unified Theme",
+    tags: [
+      "multipage",
+      "multi-page",
+      "pages",
+      "portfolio",
+      "navigation",
+      "about",
+      "contact",
+      "projects",
+      "website",
+    ],
+    description:
+      "Complete multi-page site architecture using <!-- PAGE: filename.html --> markers, relative navigation anchors, single unified background, and zero missing page link errors.",
     snippet: `<!-- PAGE: index.html -->
 <!DOCTYPE html>
 <html lang="en">
@@ -44,13 +55,24 @@ export const CODE_PATTERN_KNOWLEDGE_BASE = [
   <nav><a href="index.html">Home</a><a href="about.html" class="active">About</a><a href="projects.html">Projects</a><a href="contact.html">Contact</a></nav>
   <main><h1>About</h1></main>
 </body>
-</html>`
+</html>`,
   },
   {
-    id: 'canvas-particle-system',
-    title: 'Interactive 2D Canvas Particle System & Glow',
-    tags: ['particles', 'canvas', 'background', 'animation', 'cursor', 'glow', 'interactive', 'visual', 'effect'],
-    description: 'Lightweight, high-performance HTML5 canvas particle background with distance connecting lines, mouse attraction/glow, and responsive resize handler.',
+    id: "canvas-particle-system",
+    title: "Interactive 2D Canvas Particle System & Glow",
+    tags: [
+      "particles",
+      "canvas",
+      "background",
+      "animation",
+      "cursor",
+      "glow",
+      "interactive",
+      "visual",
+      "effect",
+    ],
+    description:
+      "Lightweight, high-performance HTML5 canvas particle background with distance connecting lines, mouse attraction/glow, and responsive resize handler.",
     snippet: `<canvas id="particlesCanvas" style="position:fixed;inset:0;pointer-events:none;z-index:0"></canvas>
 <script>
 (function() {
@@ -73,13 +95,26 @@ export const CODE_PATTERN_KNOWLEDGE_BASE = [
   }
   loop();
 })();
-</script>`
+</script>`,
   },
   {
-    id: 'glassmorphism-card-grid',
-    title: 'Dynamic Mouse-Tracking Glassmorphic Cards',
-    tags: ['card', 'cards', 'grid', 'glass', 'glassmorphism', 'hover', 'mouse', 'ui', 'modern', 'dark mode', 'services'],
-    description: 'Modern glassmorphic card grid with radial gradient hover tracking, smooth scale animations, and accessibility-compliant contrast.',
+    id: "glassmorphism-card-grid",
+    title: "Dynamic Mouse-Tracking Glassmorphic Cards",
+    tags: [
+      "card",
+      "cards",
+      "grid",
+      "glass",
+      "glassmorphism",
+      "hover",
+      "mouse",
+      "ui",
+      "modern",
+      "dark mode",
+      "services",
+    ],
+    description:
+      "Modern glassmorphic card grid with radial gradient hover tracking, smooth scale animations, and accessibility-compliant contrast.",
     snippet: `<style>
   .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; }
   .glass-card {
@@ -93,13 +128,22 @@ export const CODE_PATTERN_KNOWLEDGE_BASE = [
     transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), border-color 0.3s;
   }
   .glass-card:hover { transform: translateY(-6px); border-color: rgba(168, 85, 247, 0.4); }
-</style>`
+</style>`,
   },
   {
-    id: 'interactive-counter-stats',
-    title: 'Animated Metric Counter Statistics with Ease-Out',
-    tags: ['counter', 'stats', 'numbers', 'metrics', 'animation', 'dashboard', 'analytics'],
-    description: 'Smooth intersection-observer triggered numeric counter animation with cubic easing and zero dependencies.',
+    id: "interactive-counter-stats",
+    title: "Animated Metric Counter Statistics with Ease-Out",
+    tags: [
+      "counter",
+      "stats",
+      "numbers",
+      "metrics",
+      "animation",
+      "dashboard",
+      "analytics",
+    ],
+    description:
+      "Smooth intersection-observer triggered numeric counter animation with cubic easing and zero dependencies.",
     snippet: `<div class="stat"><h3 class="counter" data-target="250">0</h3><p>Projects</p></div>
 <script>
 const counters = document.querySelectorAll('.counter');
@@ -120,13 +164,25 @@ const observer = new IntersectionObserver((entries) => {
   });
 }, { threshold: 0.5 });
 counters.forEach(c => observer.observe(c));
-</script>`
+</script>`,
   },
   {
-    id: 'canvas-game-loop-engine',
-    title: 'Responsive 2D Canvas Game Loop with Touch Controls',
-    tags: ['game', 'canvas', 'arcade', 'touch', 'controls', 'loop', 'keyboard', 'retro', 'player', 'collision'],
-    description: 'Full-viewport 2D canvas game loop featuring keyboard & on-screen mobile touch controls, state machine, and fixed-ratio coordinate scaling.',
+    id: "canvas-game-loop-engine",
+    title: "Responsive 2D Canvas Game Loop with Touch Controls",
+    tags: [
+      "game",
+      "canvas",
+      "arcade",
+      "touch",
+      "controls",
+      "loop",
+      "keyboard",
+      "retro",
+      "player",
+      "collision",
+    ],
+    description:
+      "Full-viewport 2D canvas game loop featuring keyboard & on-screen mobile touch controls, state machine, and fixed-ratio coordinate scaling.",
     snippet: `<canvas id="gameCanvas" style="display:block;width:100%;height:100%"></canvas>
 <script>
 (function() {
@@ -151,22 +207,36 @@ counters.forEach(c => observer.observe(c));
   }
   requestAnimationFrame(gameLoop);
 })();
-</script>`
+</script>`,
   },
   {
-    id: 'surgical-diff-revision',
-    title: 'Surgical Section Replacement Pattern',
-    tags: ['revise', 'revision', 'fix', 'update', 'modify', 'surgical', 'change'],
-    description: 'Preserves 100% of surrounding HTML/CSS structure while isolating and applying specific modifications to target tags, variables, or functions.',
-    snippet: `<!-- Locate target selector/component and modify only the requested rules/elements while preserving the rest -->`
-  }
+    id: "surgical-diff-revision",
+    title: "Surgical Section Replacement Pattern",
+    tags: [
+      "revise",
+      "revision",
+      "fix",
+      "update",
+      "modify",
+      "surgical",
+      "change",
+    ],
+    description:
+      "Preserves 100% of surrounding HTML/CSS structure while isolating and applying specific modifications to target tags, variables, or functions.",
+    snippet: `<!-- Locate target selector/component and modify only the requested rules/elements while preserving the rest -->`,
+  },
 ];
 
 /**
  * Computes cosine similarity between two numeric vectors.
  */
 export function cosineSimilarity(vecA, vecB) {
-  if (!Array.isArray(vecA) || !Array.isArray(vecB) || vecA.length === 0 || vecA.length !== vecB.length) {
+  if (
+    !Array.isArray(vecA) ||
+    !Array.isArray(vecB) ||
+    vecA.length === 0 ||
+    vecA.length !== vecB.length
+  ) {
     return 0;
   }
   let dotProduct = 0;
@@ -186,17 +256,19 @@ export function cosineSimilarity(vecA, vecB) {
  * Used when the remote Workers AI / OpenCode embedding endpoint is offline or unavailable.
  */
 export function createLocalEmbeddingVector(text, dimensions = 64) {
-  const clean = String(text || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
+  const clean = String(text || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ");
   const tokens = clean.split(/\s+/).filter(Boolean);
   const vector = new Array(dimensions).fill(0);
-  
+
   if (tokens.length === 0) return vector;
 
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i];
     let hash = 0;
     for (let j = 0; j < token.length; j++) {
-      hash = ((hash << 5) - hash) + token.charCodeAt(j);
+      hash = (hash << 5) - hash + token.charCodeAt(j);
       hash |= 0;
     }
     const idx = Math.abs(hash) % dimensions;
@@ -220,10 +292,10 @@ export function createLocalEmbeddingVector(text, dimensions = 64) {
 export async function fetchEmbeddings(texts) {
   const items = Array.isArray(texts) ? texts : [texts];
   try {
-    const res = await fetch('/api/embed', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: items })
+    const res = await fetch("/api/embed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: items }),
     });
     if (res.ok) {
       const json = await res.json();
@@ -236,7 +308,7 @@ export async function fetchEmbeddings(texts) {
   }
 
   // Local fallback vectors
-  return items.map(t => createLocalEmbeddingVector(t));
+  return items.map((t) => createLocalEmbeddingVector(t));
 }
 
 /**
@@ -245,31 +317,38 @@ export async function fetchEmbeddings(texts) {
 const patternVectorsCache = new Map();
 
 function getPatternText(pattern) {
-  return `${pattern.title} ${pattern.tags.join(' ')} ${pattern.description}`;
+  return `${pattern.title} ${pattern.tags.join(" ")} ${pattern.description}`;
 }
 
 /**
  * Semantically retrieves the most relevant code patterns for a given user prompt.
- * 
+ *
  * @param {string} prompt User request prompt
  * @param {Object} options
  * @param {number} options.topK Maximum number of patterns to return (default: 2)
  * @param {number} options.minSimilarity Minimum cosine similarity score threshold (default: 0.15)
  * @returns {Promise<Array<{ pattern: Object, score: number }>>}
  */
-export async function retrieveSemanticCodePatterns(prompt, { topK = 2, minSimilarity = 0.15 } = {}) {
-  if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
+export async function retrieveSemanticCodePatterns(
+  prompt,
+  { topK = 2, minSimilarity = 0.15 } = {},
+) {
+  if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
     return [];
   }
 
   const promptText = prompt.trim();
-  
+
   // 1. Ensure pattern vectors are computed
-  const patternTexts = CODE_PATTERN_KNOWLEDGE_BASE.map(p => getPatternText(p));
+  const patternTexts = CODE_PATTERN_KNOWLEDGE_BASE.map((p) =>
+    getPatternText(p),
+  );
   let patternVectors = [];
-  
+
   if (patternVectorsCache.size === CODE_PATTERN_KNOWLEDGE_BASE.length) {
-    patternVectors = CODE_PATTERN_KNOWLEDGE_BASE.map(p => patternVectorsCache.get(p.id));
+    patternVectors = CODE_PATTERN_KNOWLEDGE_BASE.map((p) =>
+      patternVectorsCache.get(p.id),
+    );
   } else {
     patternVectors = await fetchEmbeddings(patternTexts);
     CODE_PATTERN_KNOWLEDGE_BASE.forEach((p, idx) => {
@@ -289,7 +368,7 @@ export async function retrieveSemanticCodePatterns(prompt, { topK = 2, minSimila
 
   // 4. Sort and filter
   return scored
-    .filter(item => item.score >= minSimilarity)
+    .filter((item) => item.score >= minSimilarity)
     .sort((a, b) => b.score - a.score)
     .slice(0, topK);
 }
@@ -299,7 +378,7 @@ export async function retrieveSemanticCodePatterns(prompt, { topK = 2, minSimila
  */
 export function formatRetrievedPatternsForPrompt(retrievedPatterns) {
   if (!Array.isArray(retrievedPatterns) || retrievedPatterns.length === 0) {
-    return '';
+    return "";
   }
 
   let formatted = `\n[SEMANTIC EMBEDDING RETRIEVAL - RELEVANT CODE ARCHITECTURE PATTERNS]:\n`;

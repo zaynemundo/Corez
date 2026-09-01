@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { 
+import { useEffect, useRef, useState } from "react";
+import {
   Layers,
   Copy,
   Check,
@@ -12,23 +12,35 @@ import {
   Maximize2,
   Minimize2,
   Download,
-  X
-} from 'lucide-react';
-import { extractCodeFromMessage } from '../services/aiService';
+  X,
+} from "lucide-react";
+import { extractCodeFromMessage } from "../services/aiService";
 
 function safeImageUrl(url) {
-  if (!url || typeof url !== 'string') return '';
-  if (url.startsWith('https://') || url.startsWith('http://')) return url;
+  if (!url || typeof url !== "string") return "";
+  if (url.startsWith("https://") || url.startsWith("http://")) return url;
   // Same-origin relative paths (e.g. the worker's R2 asset URLs like /api/assets/image_*.png)
-  if (url.startsWith('/') && !url.startsWith('//')) return url;
-  if (url.startsWith('data:image/png') || url.startsWith('data:image/jpeg') || url.startsWith('data:image/webp') || url.startsWith('data:image/svg+xml')) return url;
-  return '';
+  if (url.startsWith("/") && !url.startsWith("//")) return url;
+  if (
+    url.startsWith("data:image/png") ||
+    url.startsWith("data:image/jpeg") ||
+    url.startsWith("data:image/webp") ||
+    url.startsWith("data:image/svg+xml")
+  )
+    return url;
+  return "";
 }
 
 function safeHref(url) {
-  if (!url || typeof url !== 'string') return '';
-  if (url.startsWith('https://') || url.startsWith('http://') || url.startsWith('mailto:') || url.startsWith('#')) return url;
-  return '';
+  if (!url || typeof url !== "string") return "";
+  if (
+    url.startsWith("https://") ||
+    url.startsWith("http://") ||
+    url.startsWith("mailto:") ||
+    url.startsWith("#")
+  )
+    return url;
+  return "";
 }
 
 // A code block only gets "Open Canvas Preview" / "Revise" actions when it is a
@@ -37,52 +49,67 @@ function safeHref(url) {
 // or embed markup echoed inside an informational answer — stay as plain
 // copyable code.
 function isExecutableCodeBlock(lang, code) {
-  const normalizedLang = (lang || '').toLowerCase();
-  const text = code || '';
+  const normalizedLang = (lang || "").toLowerCase();
+  const text = code || "";
 
   // Multi-page site marker detection (<!-- PAGE: index.html --> or <!-- CORESITE-PAGES: ... -->)
-  if (/<!--\s*(?:PAGE|CORESITE-PAGES):\s*[^\s>]+\s*-->/i.test(text)) return true;
+  if (/<!--\s*(?:PAGE|CORESITE-PAGES):\s*[^\s>]+\s*-->/i.test(text))
+    return true;
 
   // Strip leading HTML comments or whitespace before checking for document root
-  const stripped = text.replace(/^(?:\s*<!--[\s\S]*?-->\s*)+/i, '').trim();
+  const stripped = text.replace(/^(?:\s*<!--[\s\S]*?-->\s*)+/i, "").trim();
 
   // Full HTML documents, with or without an explicit language tag. A block
   // must be a DOCUMENT to be a deliverable: an <html> root or a doctype.
   // Fragments that merely contain <style>/<script>/<body> tags (embeds,
   // page excerpts from search results, markup examples) are NOT runnable
   // pages and must not get preview actions.
-  if (/^<!DOCTYPE html/i.test(stripped) || /^<html[\s>]/i.test(stripped)) return true;
+  if (/^<!DOCTYPE html/i.test(stripped) || /^<html[\s>]/i.test(stripped))
+    return true;
 
   // Standalone canvas games with a 2D context or animation frame loop
-  if (/<canvas[\s>]/i.test(stripped) && (/\.getContext\s*\(/i.test(text) || /requestAnimationFrame/i.test(text))) {
+  if (
+    /<canvas[\s>]/i.test(stripped) &&
+    (/\.getContext\s*\(/i.test(text) || /requestAnimationFrame/i.test(text))
+  ) {
     return true;
   }
 
   // React/JSX blocks are app deliverables by output contract.
-  if (['jsx', 'tsx', 'react'].includes(normalizedLang)) {
+  if (["jsx", "tsx", "react"].includes(normalizedLang)) {
     return true;
   }
 
   // Plain JS is executable only when it mounts React or renders to the DOM
   // as a standalone app — helper snippets from explanations are excluded.
-  if (['js', 'javascript'].includes(normalizedLang)) {
-    return /ReactDOM\.render\s*\(|createRoot\s*\(|hydrateRoot\s*\(/.test(text)
-      || (/export\s+default/.test(text) && /<\w[\s>]/.test(text));
+  if (["js", "javascript"].includes(normalizedLang)) {
+    return (
+      /ReactDOM\.render\s*\(|createRoot\s*\(|hydrateRoot\s*\(/.test(text) ||
+      (/export\s+default/.test(text) && /<\w[\s>]/.test(text))
+    );
   }
 
   return false;
 }
 
 function extractUnfencedDeliverable(text) {
-  if (!text || typeof text !== 'string') return null;
+  if (!text || typeof text !== "string") return null;
 
   // Check for multi-page site marker or document root
-  let matchIdx = text.search(/<!--\s*(?:PAGE|CORESITE-PAGES):\s*[^\s>]+\s*-->/i);
+  let matchIdx = text.search(
+    /<!--\s*(?:PAGE|CORESITE-PAGES):\s*[^\s>]+\s*-->/i,
+  );
   if (matchIdx === -1) {
     matchIdx = text.search(/(?:<!DOCTYPE\s+html|<html[\s>])/i);
     if (matchIdx !== -1) {
       const remaining = text.slice(matchIdx);
-      if (!remaining.includes('</html>') && !remaining.includes('</body>') && !remaining.includes('</head>') && !remaining.includes('<style') && !remaining.includes('<script')) {
+      if (
+        !remaining.includes("</html>") &&
+        !remaining.includes("</body>") &&
+        !remaining.includes("</head>") &&
+        !remaining.includes("<style") &&
+        !remaining.includes("<script")
+      ) {
         matchIdx = -1;
       }
     }
@@ -92,10 +119,12 @@ function extractUnfencedDeliverable(text) {
 
   let preamble = text.slice(0, matchIdx).trim();
   // Strip trailing "Fullscreen" or "Preview" single-word labels if present at end of preamble
-  preamble = preamble.replace(/(?:\r?\n|^)\s*(?:Fullscreen|Preview)\s*$/i, '').trim();
+  preamble = preamble
+    .replace(/(?:\r?\n|^)\s*(?:Fullscreen|Preview)\s*$/i, "")
+    .trim();
 
   const code = text.slice(matchIdx).trim();
-  const isExecutable = isExecutableCodeBlock('html', code);
+  const isExecutable = isExecutableCodeBlock("html", code);
 
   if (!isExecutable) return null;
 
@@ -116,23 +145,23 @@ function CodeSnippetBlock({ code, lang, onRunInCanvas, onReviseCode }) {
   return (
     <div className="code-block-container">
       <div className="code-header">
-        <span className="code-lang">{lang || 'code'}</span>
-        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+        <span className="code-lang">{lang || "code"}</span>
+        <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
           {onRunInCanvas && (
-            <button 
+            <button
               className="code-btn"
-              style={{ 
-                padding: '0.35rem 0.75rem', 
-                background: 'var(--text-primary)', 
-                color: 'var(--bg-primary)',
+              style={{
+                padding: "0.35rem 0.75rem",
+                background: "var(--text-primary)",
+                color: "var(--bg-primary)",
                 fontWeight: 600,
-                fontSize: '0.75rem',
-                borderRadius: '5px',
-                border: 'none',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.35rem'
+                fontSize: "0.75rem",
+                borderRadius: "5px",
+                border: "none",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.35rem",
               }}
               onClick={() => onRunInCanvas(code)}
               title="Run app live in preview canvas"
@@ -142,16 +171,16 @@ function CodeSnippetBlock({ code, lang, onRunInCanvas, onReviseCode }) {
             </button>
           )}
           {onReviseCode && (
-            <button 
+            <button
               className="code-btn"
               style={{
-                padding: '0.35rem 0.65rem',
-                fontSize: '0.75rem',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.35rem'
+                padding: "0.35rem 0.65rem",
+                fontSize: "0.75rem",
+                borderRadius: "5px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.35rem",
               }}
               onClick={() => onReviseCode(code)}
               title="Ask AI to revise this code"
@@ -161,8 +190,12 @@ function CodeSnippetBlock({ code, lang, onRunInCanvas, onReviseCode }) {
             </button>
           )}
           <button className="code-btn" onClick={handleCopy} title="Copy code">
-            {copied ? <Check size={12} strokeWidth={1.5} /> : <Copy size={12} strokeWidth={1.5} />}
-            <span>{copied ? 'Copied' : 'Copy'}</span>
+            {copied ? (
+              <Check size={12} strokeWidth={1.5} />
+            ) : (
+              <Copy size={12} strokeWidth={1.5} />
+            )}
+            <span>{copied ? "Copied" : "Copy"}</span>
           </button>
         </div>
       </div>
@@ -175,32 +208,35 @@ function CodeSnippetBlock({ code, lang, onRunInCanvas, onReviseCode }) {
 
 function ExecutableCodeBlock({ code, onRunInCanvas, onReviseCode }) {
   return (
-    <div className="executable-code-action-bar" style={{
-      margin: '0.75rem 0',
-      width: '100%',
-      display: 'flex',
-      gap: '0.6rem',
-      alignItems: 'stretch'
-    }}>
+    <div
+      className="executable-code-action-bar"
+      style={{
+        margin: "0.75rem 0",
+        width: "100%",
+        display: "flex",
+        gap: "0.6rem",
+        alignItems: "stretch",
+      }}
+    >
       {onRunInCanvas && (
-        <button 
+        <button
           className="code-btn primary-preview-btn"
-          style={{ 
+          style={{
             flex: 1,
-            padding: '0.75rem 1rem', 
-            background: 'var(--text-primary)', 
-            color: 'var(--bg-primary)',
+            padding: "0.75rem 1rem",
+            background: "var(--text-primary)",
+            color: "var(--bg-primary)",
             fontWeight: 600,
-            fontSize: '0.875rem',
-            borderRadius: 'var(--radius-md, 12px)',
-            border: 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.5rem',
-            boxShadow: 'none',
-            transition: 'var(--transition-fast)'
+            fontSize: "0.875rem",
+            borderRadius: "var(--radius-md, 12px)",
+            border: "none",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.5rem",
+            boxShadow: "none",
+            transition: "var(--transition-fast)",
           }}
           onClick={() => onRunInCanvas(code)}
           title="Run app live in preview canvas"
@@ -210,23 +246,23 @@ function ExecutableCodeBlock({ code, onRunInCanvas, onReviseCode }) {
         </button>
       )}
       {onReviseCode && (
-        <button 
+        <button
           className="code-btn secondary-revise-btn"
-          style={{ 
+          style={{
             flex: 1,
-            padding: '0.75rem 1rem', 
-            background: 'var(--bg-tertiary)',
-            color: 'var(--text-primary)',
+            padding: "0.75rem 1rem",
+            background: "var(--bg-tertiary)",
+            color: "var(--text-primary)",
             fontWeight: 500,
-            fontSize: '0.875rem',
-            borderRadius: 'var(--radius-md, 12px)',
-            border: '1px solid var(--border-color)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.5rem',
-            transition: 'var(--transition-fast)'
+            fontSize: "0.875rem",
+            borderRadius: "var(--radius-md, 12px)",
+            border: "1px solid var(--border-color)",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.5rem",
+            transition: "var(--transition-fast)",
           }}
           onClick={() => onReviseCode(code)}
           title="Ask AI to revise this code"
@@ -240,20 +276,22 @@ function ExecutableCodeBlock({ code, onRunInCanvas, onReviseCode }) {
 }
 
 export async function fetchImageAsPngBlob(url) {
-  if (!url || typeof url !== 'string') throw new Error('Invalid image URL');
+  if (!url || typeof url !== "string") throw new Error("Invalid image URL");
 
-  if (url.startsWith('data:image/png')) {
+  if (url.startsWith("data:image/png")) {
     try {
       const res = await fetch(url);
       return await res.blob();
-    } catch { /* Fallback to canvas */ }
+    } catch {
+      /* Fallback to canvas */
+    }
   }
 
   try {
     const res = await fetch(url);
     if (res.ok) {
       const blob = await res.blob();
-      if (blob.type === 'image/png') {
+      if (blob.type === "image/png") {
         return blob;
       }
     }
@@ -262,53 +300,68 @@ export async function fetchImageAsPngBlob(url) {
   }
 
   return new Promise((resolve, reject) => {
-    if (typeof Image === 'undefined') {
-      return reject(new Error('Image constructor unavailable'));
+    if (typeof Image === "undefined") {
+      return reject(new Error("Image constructor unavailable"));
     }
     const img = new Image();
-    img.crossOrigin = 'anonymous';
+    img.crossOrigin = "anonymous";
     img.onload = () => {
       try {
-        const canvas = document.createElement('canvas');
+        const canvas = document.createElement("canvas");
         canvas.width = img.naturalWidth || img.width || 300;
         canvas.height = img.naturalHeight || img.height || 300;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) throw new Error('Canvas context unavailable');
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("Canvas context unavailable");
         ctx.drawImage(img, 0, 0);
         canvas.toBlob((blob) => {
           if (blob) resolve(blob);
-          else reject(new Error('Canvas toBlob failed'));
-        }, 'image/png');
+          else reject(new Error("Canvas toBlob failed"));
+        }, "image/png");
       } catch (err) {
         reject(err);
       }
     };
-    img.onerror = () => reject(new Error('Image failed to load for clipboard copy'));
+    img.onerror = () =>
+      reject(new Error("Image failed to load for clipboard copy"));
     img.src = url;
   });
 }
 
 export async function copyImageToClipboard(url) {
   if (!url) return false;
-  const fullUrl = url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')
-    ? url
-    : (typeof window !== 'undefined' ? new URL(url, window.location.origin).href : url);
+  const fullUrl =
+    url.startsWith("http://") ||
+    url.startsWith("https://") ||
+    url.startsWith("data:")
+      ? url
+      : typeof window !== "undefined"
+        ? new URL(url, window.location.origin).href
+        : url;
 
-  if (typeof navigator !== 'undefined' && navigator.clipboard && typeof window !== 'undefined' && window.ClipboardItem && navigator.clipboard.write) {
+  if (
+    typeof navigator !== "undefined" &&
+    navigator.clipboard &&
+    typeof window !== "undefined" &&
+    window.ClipboardItem &&
+    navigator.clipboard.write
+  ) {
     try {
       const blob = await fetchImageAsPngBlob(fullUrl);
       if (blob) {
         await navigator.clipboard.write([
-          new ClipboardItem({ 'image/png': blob })
+          new ClipboardItem({ "image/png": blob }),
         ]);
         return true;
       }
     } catch (err) {
-      console.warn('Direct image clipboard write failed, falling back to text URL:', err);
+      console.warn(
+        "Direct image clipboard write failed, falling back to text URL:",
+        err,
+      );
     }
   }
 
-  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(fullUrl);
     return true;
   }
@@ -325,21 +378,27 @@ function MessageActions({ content }) {
   useEffect(() => {
     if (!rateOpen) return;
     const handleOutsideClick = (e) => {
-      if (rateWrapperRef.current && !rateWrapperRef.current.contains(e.target)) {
+      if (
+        rateWrapperRef.current &&
+        !rateWrapperRef.current.contains(e.target)
+      ) {
         setRateOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleOutsideClick);
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, [rateOpen]);
 
   const handleCopy = async () => {
     if (!content) return;
     const imgMatch = content.match(/^!\[(.*?)\]\((.*?)\)\s*$/);
     if (imgMatch) {
-      const fullUrl = imgMatch[2].startsWith('data:') || imgMatch[2].startsWith('http')
-        ? imgMatch[2]
-        : (typeof window !== 'undefined' ? new URL(imgMatch[2], window.location.origin).href : imgMatch[2]);
+      const fullUrl =
+        imgMatch[2].startsWith("data:") || imgMatch[2].startsWith("http")
+          ? imgMatch[2]
+          : typeof window !== "undefined"
+            ? new URL(imgMatch[2], window.location.origin).href
+            : imgMatch[2];
       await copyImageToClipboard(fullUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -354,26 +413,30 @@ function MessageActions({ content }) {
   };
 
   const handleRateToggle = () => {
-    setRateOpen(prev => !prev);
+    setRateOpen((prev) => !prev);
   };
 
   const handleRateChoice = (choice) => {
-    setRating(prev => prev === choice ? null : choice);
+    setRating((prev) => (prev === choice ? null : choice));
     setRateOpen(false);
   };
 
   const handleShare = async () => {
     const imgMatch = content.match(/^!\[(.*?)\]\((.*?)\)\s*$/);
     const shareData = {
-      title: 'COREZ AI Response',
-      text: imgMatch ? new URL(imgMatch[2], window.location.origin).href : content
+      title: "COREZ AI Response",
+      text: imgMatch
+        ? new URL(imgMatch[2], window.location.origin).href
+        : content,
     };
     if (navigator.share) {
       try {
         await navigator.share(shareData);
         setShared(true);
         setTimeout(() => setShared(false), 2000);
-      } catch { /* Dismissed by the user */ }
+      } catch {
+        /* Dismissed by the user */
+      }
       return;
     }
     if (navigator.clipboard) {
@@ -387,45 +450,65 @@ function MessageActions({ content }) {
     <div className="message-actions" aria-label="Message actions">
       <button
         type="button"
-        className={`message-action-btn copy-action ${copied ? 'active' : ''}`}
+        className={`message-action-btn copy-action ${copied ? "active" : ""}`}
         onClick={handleCopy}
-        title={copied ? 'Response copied' : 'Copy response'}
-        aria-label={copied ? 'Response copied' : 'Copy response'}
+        title={copied ? "Response copied" : "Copy response"}
+        aria-label={copied ? "Response copied" : "Copy response"}
       >
-        {copied ? <Check size={14} strokeWidth={1.5} /> : <Copy size={14} strokeWidth={1.5} />}
+        {copied ? (
+          <Check size={14} strokeWidth={1.5} />
+        ) : (
+          <Copy size={14} strokeWidth={1.5} />
+        )}
       </button>
       <div className="rate-wrapper" ref={rateWrapperRef}>
         <button
           type="button"
-          className={`message-action-btn ${rating ? 'active' : ''}`}
+          className={`message-action-btn ${rating ? "active" : ""}`}
           onClick={handleRateToggle}
-          title={rating ? (rating === 'good' ? 'Good response (click to change)' : 'Bad response (click to change)') : 'Rate response'}
-          aria-label={rating ? 'Change rating' : 'Rate response'}
+          title={
+            rating
+              ? rating === "good"
+                ? "Good response (click to change)"
+                : "Bad response (click to change)"
+              : "Rate response"
+          }
+          aria-label={rating ? "Change rating" : "Rate response"}
           aria-pressed={!!rating}
           aria-expanded={rateOpen}
           aria-haspopup="true"
         >
-          {rating === 'good' ? <ThumbsUp size={14} strokeWidth={1.5} /> : rating === 'bad' ? <ThumbsDown size={14} strokeWidth={1.5} /> : <ThumbsUp size={14} strokeWidth={1.5} />}
+          {rating === "good" ? (
+            <ThumbsUp size={14} strokeWidth={1.5} />
+          ) : rating === "bad" ? (
+            <ThumbsDown size={14} strokeWidth={1.5} />
+          ) : (
+            <ThumbsUp size={14} strokeWidth={1.5} />
+          )}
         </button>
         {rateOpen && (
-          <div className="rate-options" role="group" aria-label="Rate this response">
+          <div
+            className="rate-options"
+            role="group"
+            aria-label="Rate this response"
+          >
             <button
               type="button"
-              className={`rate-option-btn ${rating === 'good' ? 'active good' : ''}`}
-              onClick={() => handleRateChoice('good')}
+              className={`rate-option-btn ${rating === "good" ? "active good" : ""}`}
+              onClick={() => handleRateChoice("good")}
               title="Good response"
               aria-label="Good response"
-              aria-pressed={rating === 'good'}
+              aria-pressed={rating === "good"}
             >
               <ThumbsUp size={13} strokeWidth={1.5} />
             </button>
             <button
               type="button"
-              className={`rate-option-btn ${rating === 'bad' ? 'active bad' : ''}`}
-              onClick={() => handleRateChoice('bad')}
+              className={`rate-option-btn ${rating === "bad" ? "active bad" : ""}`}
+              onClick={() => handleRateChoice("bad")}
               title="Bad response"
               aria-label="Bad response"
-              aria-pressed={rating === 'bad'}
+              aria-pressed={rating === "bad"}
             >
               <ThumbsDown size={13} strokeWidth={1.5} />
             </button>
@@ -434,10 +517,10 @@ function MessageActions({ content }) {
       </div>
       <button
         type="button"
-        className={`message-action-btn ${shared ? 'active' : ''}`}
+        className={`message-action-btn ${shared ? "active" : ""}`}
         onClick={handleShare}
-        title={shared ? 'Copied' : 'Share response'}
-        aria-label={shared ? 'Copied' : 'Share response'}
+        title={shared ? "Copied" : "Share response"}
+        aria-label={shared ? "Copied" : "Share response"}
       >
         <Share2 size={14} strokeWidth={1.5} />
       </button>
@@ -446,22 +529,22 @@ function MessageActions({ content }) {
 }
 
 export function parseEmailContent(content) {
-  const emailLines = String(content || '').split('\n');
-  let subject = '';
-  let recipients = '';
+  const emailLines = String(content || "").split("\n");
+  let subject = "";
+  let recipients = "";
   let bodyStart = 0;
 
   for (let j = 0; j < emailLines.length; j++) {
     const ln = emailLines[j].trim();
     const subjectMatch = ln.match(/^(?:\*\*)?Subject:\s*(.*?)(?:\*\*)?$/i);
     if (subjectMatch) {
-      subject = subjectMatch[1].replace(/\*\*/g, '').trim();
+      subject = subjectMatch[1].replace(/\*\*/g, "").trim();
       bodyStart = j + 1;
       continue;
     }
     const toMatch = ln.match(/^(?:\*\*)?To:\s*(.*?)(?:\*\*)?$/i);
     if (toMatch) {
-      recipients = toMatch[1].replace(/\*\*/g, '').trim();
+      recipients = toMatch[1].replace(/\*\*/g, "").trim();
       bodyStart = j + 1;
       continue;
     }
@@ -480,11 +563,14 @@ export function parseEmailContent(content) {
       bodyStart = j + 1;
       continue;
     }
-    if (ln === '') {
+    if (ln === "") {
       // Check if subsequent lines have another header
       const nextLines = emailLines.slice(j + 1);
-      const nextHeader = nextLines.find(l => l.trim() !== '');
-      if (nextHeader && /^(?:\*\*)?(?:Subject|To|From|Cc|Bcc|Date):\s*/i.test(nextHeader.trim())) {
+      const nextHeader = nextLines.find((l) => l.trim() !== "");
+      if (
+        nextHeader &&
+        /^(?:\*\*)?(?:Subject|To|From|Cc|Bcc|Date):\s*/i.test(nextHeader.trim())
+      ) {
         bodyStart = j + 1;
         continue;
       }
@@ -495,16 +581,21 @@ export function parseEmailContent(content) {
     break;
   }
 
-  return { subject, recipients, body: emailLines.slice(bodyStart).join('\n').trim() };
+  return {
+    subject,
+    recipients,
+    body: emailLines.slice(bodyStart).join("\n").trim(),
+  };
 }
 
 const EMAIL_HEADER_START_RE = /^(?:\*\*)?(?:Subject|To|From):\s*(.+)$/i;
-const EMAIL_SIGNOFF_RE = /^(?:Best regards|Warm regards|Kind regards|With regards|Regards|Sincerely|Thanks|Thank you|Best|Cheers|Respectfully|Yours truly|With appreciation)[,\s]*$/i;
+const EMAIL_SIGNOFF_RE =
+  /^(?:Best regards|Warm regards|Kind regards|With regards|Regards|Sincerely|Thanks|Thank you|Best|Cheers|Respectfully|Yours truly|With appreciation)[,\s]*$/i;
 
 export function splitTextAndEmail(text) {
-  if (!text || typeof text !== 'string') return [{ type: 'text', content: '' }];
-  
-  const lines = text.split('\n');
+  if (!text || typeof text !== "string") return [{ type: "text", content: "" }];
+
+  const lines = text.split("\n");
   let headerStartIdx = -1;
 
   for (let i = 0; i < lines.length; i++) {
@@ -516,8 +607,10 @@ export function splitTextAndEmail(text) {
         const nextTrimmed = lines[k].trim();
         if (
           /^(?:\*\*)?(?:Subject|To|From|Cc|Bcc|Date):\s*/i.test(nextTrimmed) ||
-          /^(?:Hi|Dear|Hello|Hey|Good morning|Good afternoon|To whom|Team)[,\s]/i.test(nextTrimmed) ||
-          (nextTrimmed.length > 0 && !nextTrimmed.startsWith('#'))
+          /^(?:Hi|Dear|Hello|Hey|Good morning|Good afternoon|To whom|Team)[,\s]/i.test(
+            nextTrimmed,
+          ) ||
+          (nextTrimmed.length > 0 && !nextTrimmed.startsWith("#"))
         ) {
           hasFollowup = true;
           break;
@@ -531,7 +624,7 @@ export function splitTextAndEmail(text) {
   }
 
   if (headerStartIdx === -1) {
-    return [{ type: 'text', content: text }];
+    return [{ type: "text", content: text }];
   }
 
   let emailEndIdx = lines.length;
@@ -539,37 +632,44 @@ export function splitTextAndEmail(text) {
     const trimmed = lines[i].trim();
     if (EMAIL_SIGNOFF_RE.test(trimmed)) {
       let sigEnd = i + 1;
-      while (sigEnd < lines.length && sigEnd <= i + 3 && lines[sigEnd].trim() !== '') {
+      while (
+        sigEnd < lines.length &&
+        sigEnd <= i + 3 &&
+        lines[sigEnd].trim() !== ""
+      ) {
         sigEnd++;
       }
       emailEndIdx = sigEnd;
       break;
     }
-    if (i > headerStartIdx + 3 && (trimmed.startsWith('##') || trimmed === '---' || trimmed === '***')) {
+    if (
+      i > headerStartIdx + 3 &&
+      (trimmed.startsWith("##") || trimmed === "---" || trimmed === "***")
+    ) {
       emailEndIdx = i;
       break;
     }
   }
 
-  const beforeText = lines.slice(0, headerStartIdx).join('\n').trim();
-  const emailText = lines.slice(headerStartIdx, emailEndIdx).join('\n').trim();
-  const afterText = lines.slice(emailEndIdx).join('\n').trim();
+  const beforeText = lines.slice(0, headerStartIdx).join("\n").trim();
+  const emailText = lines.slice(headerStartIdx, emailEndIdx).join("\n").trim();
+  const afterText = lines.slice(emailEndIdx).join("\n").trim();
 
   const parsed = parseEmailContent(emailText);
   if (!parsed.subject && !parsed.recipients) {
-    return [{ type: 'text', content: text }];
+    return [{ type: "text", content: text }];
   }
   if (!parsed.body || parsed.body.length < 10) {
-    return [{ type: 'text', content: text }];
+    return [{ type: "text", content: text }];
   }
 
   const result = [];
   if (beforeText) {
-    result.push({ type: 'text', content: beforeText });
+    result.push({ type: "text", content: beforeText });
   }
-  result.push({ type: 'email', content: emailText });
+  result.push({ type: "email", content: emailText });
   if (afterText) {
-    result.push({ type: 'text', content: afterText });
+    result.push({ type: "text", content: afterText });
   }
   return result;
 }
@@ -586,9 +686,12 @@ function EmailCard({ content, renderBody }) {
   const fullText = [
     `Subject: ${subject}`,
     ...(recipients ? [`To: ${recipients}`] : []),
-    '',
-    body
-  ].join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    "",
+    body,
+  ]
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 
   const handleCopy = async () => {
     if (navigator.clipboard) {
@@ -599,7 +702,7 @@ function EmailCard({ content, renderBody }) {
   };
 
   const handleSend = () => {
-    const to = /@/.test(recipients) ? recipients : '';
+    const to = /@/.test(recipients) ? recipients : "";
     const mailto = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.location.href = mailto;
     setSent(true);
@@ -627,14 +730,16 @@ function EmailCard({ content, renderBody }) {
         <div className="email-toolbar-left">
           <button
             type="button"
-            className={`email-action-btn ${editing ? 'active' : ''}`}
+            className={`email-action-btn ${editing ? "active" : ""}`}
             onClick={editing ? cancelEdit : startEdit}
-            aria-label={editing ? 'Cancel editing' : 'Edit email'}
-            title={editing ? 'Cancel' : 'Edit'}
+            aria-label={editing ? "Cancel editing" : "Edit email"}
+            title={editing ? "Cancel" : "Edit"}
           >
             {editing ? <X size={13} /> : <Pencil size={13} />}
           </button>
-          <span className="email-action-label">{editing ? 'Cancel' : 'Edit'}</span>
+          <span className="email-action-label">
+            {editing ? "Cancel" : "Edit"}
+          </span>
         </div>
         <div className="email-toolbar-right">
           {editing ? (
@@ -652,16 +757,16 @@ function EmailCard({ content, renderBody }) {
             <>
               <button
                 type="button"
-                className={`email-icon-btn ${copied ? 'active' : ''}`}
+                className={`email-icon-btn ${copied ? "active" : ""}`}
                 onClick={handleCopy}
-                aria-label={copied ? 'Email copied' : 'Copy email'}
-                title={copied ? 'Copied' : 'Copy email'}
+                aria-label={copied ? "Email copied" : "Copy email"}
+                title={copied ? "Copied" : "Copy email"}
               >
                 {copied ? <Check size={15} /> : <Copy size={15} />}
               </button>
               <button
                 type="button"
-                className={`email-send-btn ${sent ? 'sent' : ''}`}
+                className={`email-send-btn ${sent ? "sent" : ""}`}
                 onClick={handleSend}
               >
                 {sent ? <Check size={14} /> : <Send size={14} />}
@@ -696,7 +801,7 @@ function EmailCard({ content, renderBody }) {
               className="email-edit-textarea"
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              rows={Math.min(10, Math.max(4, body.split('\n').length))}
+              rows={Math.min(10, Math.max(4, body.split("\n").length))}
             />
           </label>
         </div>
@@ -716,7 +821,7 @@ function EmailCard({ content, renderBody }) {
 }
 
 export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
-  const isUser = message.role === 'user';
+  const isUser = message.role === "user";
   const [fullscreenImage, setFullscreenImage] = useState(null);
   const [imageCopied, setImageCopied] = useState(false);
   const modalRef = useRef(null);
@@ -725,21 +830,21 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
     if (!fullscreenImage) return;
     setImageCopied(false);
     const onKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        if (typeof document !== 'undefined' && document.fullscreenElement) {
+      if (e.key === "Escape") {
+        if (typeof document !== "undefined" && document.fullscreenElement) {
           document.exitFullscreen?.().catch?.(() => {});
         }
         setFullscreenImage(null);
       }
     };
-    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener("keydown", onKeyDown);
     return () => {
-      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener("keydown", onKeyDown);
     };
   }, [fullscreenImage]);
 
   const handleExitFullscreen = () => {
-    if (typeof document !== 'undefined' && document.fullscreenElement) {
+    if (typeof document !== "undefined" && document.fullscreenElement) {
       document.exitFullscreen?.().catch?.(() => {});
     }
     setFullscreenImage(null);
@@ -763,12 +868,15 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
     }
     if (!fullscreenImage?.url) return;
     const filename = fullscreenImage.alt
-      ? `${fullscreenImage.alt.replace(/[^a-z0-9_-]/gi, '_').toLowerCase().slice(0, 40)}.png`
-      : 'corez_generated_image.png';
+      ? `${fullscreenImage.alt
+          .replace(/[^a-z0-9_-]/gi, "_")
+          .toLowerCase()
+          .slice(0, 40)}.png`
+      : "corez_generated_image.png";
 
     try {
-      if (fullscreenImage.url.startsWith('data:')) {
-        const a = document.createElement('a');
+      if (fullscreenImage.url.startsWith("data:")) {
+        const a = document.createElement("a");
         a.href = fullscreenImage.url;
         a.download = filename;
         document.body.appendChild(a);
@@ -777,10 +885,10 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
         return;
       }
       const res = await fetch(fullscreenImage.url);
-      if (!res.ok) throw new Error('Fetch failed');
+      if (!res.ok) throw new Error("Fetch failed");
       const blob = await res.blob();
       const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = blobUrl;
       a.download = filename;
       document.body.appendChild(a);
@@ -788,11 +896,11 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
       document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
     } catch {
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = fullscreenImage.url;
       a.download = filename;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -804,9 +912,16 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
     return (
       <div className="message-attachments" aria-label="Attached files">
         {attachments.map((attachment) => (
-          <span key={attachment.id || attachment.name} className="message-attachment-chip">
+          <span
+            key={attachment.id || attachment.name}
+            className="message-attachment-chip"
+          >
             {attachment.thumb && (
-              <img src={attachment.thumb} alt="" className="attachment-chip-thumb" />
+              <img
+                src={attachment.thumb}
+                alt=""
+                className="attachment-chip-thumb"
+              />
             )}
             <span className="chip-filename" title={attachment.name}>
               {attachment.name}
@@ -832,17 +947,19 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
       if (imgMatch) {
         const rawUrl = imgMatch[2];
         const safeUrl = safeImageUrl(rawUrl);
-        const altText = imgMatch[1] || '';
+        const altText = imgMatch[1] || "";
         return (
           <span
             key={i}
             className="markdown-inline-img-wrapper"
             role="button"
             tabIndex={0}
-            aria-label={`View fullscreen: ${altText || 'image'}`}
-            onClick={() => safeUrl && setFullscreenImage({ url: safeUrl, alt: altText })}
+            aria-label={`View fullscreen: ${altText || "image"}`}
+            onClick={() =>
+              safeUrl && setFullscreenImage({ url: safeUrl, alt: altText })
+            }
             onKeyDown={(e) => {
-              if ((e.key === 'Enter' || e.key === ' ') && safeUrl) {
+              if ((e.key === "Enter" || e.key === " ") && safeUrl) {
                 e.preventDefault();
                 setFullscreenImage({ url: safeUrl, alt: altText });
               }
@@ -859,10 +976,27 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
         const href = safeHref(linkMatch[2]);
         const isLinkedIn = /linkedin\.com/i.test(linkMatch[2]);
         return (
-          <a key={i} href={href} target="_blank" rel="noopener noreferrer" className={`markdown-link${isLinkedIn ? ' linkedin-link' : ''}`}>
+          <a
+            key={i}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`markdown-link${isLinkedIn ? " linkedin-link" : ""}`}
+          >
             {isLinkedIn && (
-              <svg className="linkedin-icon" viewBox="-2 -2 24 24" width="14" height="14" role="img" aria-label="LinkedIn" xmlns="http://www.w3.org/2000/svg">
-                <path fill="currentColor" d="M19.959 11.719v7.379h-4.278v-6.885c0-1.73-.619-2.91-2.167-2.91-1.182 0-1.886.796-2.195 1.565-.113.275-.142.658-.142 1.043v7.187h-4.28s.058-11.66 0-12.869h4.28v1.824l-.028.042h.028v-.042c.568-.875 1.583-2.126 3.856-2.126 2.815 0 4.926 1.84 4.926 5.792zM2.421.026C.958.026 0 .986 0 2.249c0 1.235.93 2.224 2.365 2.224h.028c1.493 0 2.42-.989 2.42-2.224C4.787.986 3.887.026 2.422.026zM.254 19.098h4.278V6.229H.254v12.869z" />
+              <svg
+                className="linkedin-icon"
+                viewBox="-2 -2 24 24"
+                width="14"
+                height="14"
+                role="img"
+                aria-label="LinkedIn"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  fill="currentColor"
+                  d="M19.959 11.719v7.379h-4.278v-6.885c0-1.73-.619-2.91-2.167-2.91-1.182 0-1.886.796-2.195 1.565-.113.275-.142.658-.142 1.043v7.187h-4.28s.058-11.66 0-12.869h4.28v1.824l-.028.042h.028v-.042c.568-.875 1.583-2.126 3.856-2.126 2.815 0 4.926 1.84 4.926 5.792zM2.421.026C.958.026 0 .986 0 2.249c0 1.235.93 2.224 2.365 2.224h.028c1.493 0 2.42-.989 2.42-2.224C4.787.986 3.887.026 2.422.026zM.254 19.098h4.278V6.229H.254v12.869z"
+                />
               </svg>
             )}
             {linkMatch[1]}
@@ -870,37 +1004,50 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
         );
       }
 
-      if (token.startsWith('`') && token.endsWith('`') && token.length > 2) {
-        return <code key={i} className="inline-code">{token.slice(1, -1)}</code>;
+      if (token.startsWith("`") && token.endsWith("`") && token.length > 2) {
+        return (
+          <code key={i} className="inline-code">
+            {token.slice(1, -1)}
+          </code>
+        );
       }
-      if (token.startsWith('**') && token.endsWith('**') && token.length > 4) {
-        return <strong key={i}>{renderInlineFormattedText(token.slice(2, -2))}</strong>;
+      if (token.startsWith("**") && token.endsWith("**") && token.length > 4) {
+        return (
+          <strong key={i}>
+            {renderInlineFormattedText(token.slice(2, -2))}
+          </strong>
+        );
       }
-      if (token.startsWith('*') && token.endsWith('*') && token.length > 2) {
+      if (token.startsWith("*") && token.endsWith("*") && token.length > 2) {
         return <em key={i}>{renderInlineFormattedText(token.slice(1, -1))}</em>;
       }
       return token;
     });
   };
 
-  const isTableDelimiter = (line) => /^\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?$/.test(line.trim());
+  const isTableDelimiter = (line) =>
+    /^\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?$/.test(line.trim());
 
   const parseTableBlock = (tableLines) => {
     if (tableLines.length < 2) return null;
     const parseRow = (line) => {
-      const trimmed = line.trim().replace(/^\||\|$/g, '');
-      return trimmed.split('|').map(cell => cell.trim());
+      const trimmed = line.trim().replace(/^\||\|$/g, "");
+      return trimmed.split("|").map((cell) => cell.trim());
     };
 
     const headers = parseRow(tableLines[0]);
-    const bodyLines = isTableDelimiter(tableLines[1]) ? tableLines.slice(2) : tableLines.slice(1);
-    const bodyRows = bodyLines.filter(line => !isTableDelimiter(line)).map(parseRow);
+    const bodyLines = isTableDelimiter(tableLines[1])
+      ? tableLines.slice(2)
+      : tableLines.slice(1);
+    const bodyRows = bodyLines
+      .filter((line) => !isTableDelimiter(line))
+      .map(parseRow);
 
     return { headers, bodyRows };
   };
 
   const renderTextAndTables = (textBlock) => {
-    const lines = textBlock.split('\n');
+    const lines = textBlock.split("\n");
     const elements = [];
     let i = 0;
 
@@ -909,15 +1056,19 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
       const trimmed = line.trim();
 
       // Table detection: line starting with |
-      if (trimmed.startsWith('|')) {
+      if (trimmed.startsWith("|")) {
         const tableLines = [];
         let j = i;
         while (j < lines.length) {
           const lTrim = lines[j].trim();
-          if (lTrim.startsWith('|')) {
+          if (lTrim.startsWith("|")) {
             tableLines.push(lTrim);
             j++;
-          } else if (lTrim === '' && j + 1 < lines.length && lines[j + 1].trim().startsWith('|')) {
+          } else if (
+            lTrim === "" &&
+            j + 1 < lines.length &&
+            lines[j + 1].trim().startsWith("|")
+          ) {
             j++; // skip blank line between table rows
           } else {
             break;
@@ -946,7 +1097,7 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </div>,
             );
             i = j;
             continue;
@@ -955,7 +1106,7 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
       }
 
       if (!trimmed) {
-        elements.push(<div key={`blank-${i}`} style={{ height: '0.35rem' }} />);
+        elements.push(<div key={`blank-${i}`} style={{ height: "0.35rem" }} />);
         i++;
         continue;
       }
@@ -972,17 +1123,19 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
       if (standaloneImgMatch) {
         const rawUrl = standaloneImgMatch[2];
         const safeUrl = safeImageUrl(rawUrl);
-        const altText = standaloneImgMatch[1] || '';
+        const altText = standaloneImgMatch[1] || "";
         elements.push(
           <div key={`img-${i}`} className="markdown-image-wrapper">
             <div
               className="markdown-image-card"
               role="button"
               tabIndex={0}
-              aria-label={`View fullscreen: ${altText || 'image'}`}
-              onClick={() => safeUrl && setFullscreenImage({ url: safeUrl, alt: altText })}
+              aria-label={`View fullscreen: ${altText || "image"}`}
+              onClick={() =>
+                safeUrl && setFullscreenImage({ url: safeUrl, alt: altText })
+              }
               onKeyDown={(e) => {
-                if ((e.key === 'Enter' || e.key === ' ') && safeUrl) {
+                if ((e.key === "Enter" || e.key === " ") && safeUrl) {
                   e.preventDefault();
                   setFullscreenImage({ url: safeUrl, alt: altText });
                 }
@@ -995,7 +1148,8 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
                   className="image-action-badge"
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (safeUrl) setFullscreenImage({ url: safeUrl, alt: altText });
+                    if (safeUrl)
+                      setFullscreenImage({ url: safeUrl, alt: altText });
                   }}
                   aria-label="View fullscreen"
                   title="View fullscreen"
@@ -1005,21 +1159,30 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
                 </button>
               </div>
             </div>
-            {altText && <span className="markdown-image-caption">{altText}</span>}
-          </div>
+            {altText && (
+              <span className="markdown-image-caption">{altText}</span>
+            )}
+          </div>,
         );
         i++;
         continue;
       }
 
-      if (trimmed.startsWith('# ') || trimmed.startsWith('## ') || trimmed.startsWith('### ')) {
+      if (
+        trimmed.startsWith("# ") ||
+        trimmed.startsWith("## ") ||
+        trimmed.startsWith("### ")
+      ) {
         const level = Math.min(3, trimmed.match(/^(#+)/)[1].length);
-        const headingText = trimmed.replace(/^#+\s*/, '');
-        const HeadingTag = level === 1 ? 'h2' : level === 2 ? 'h3' : 'h4';
+        const headingText = trimmed.replace(/^#+\s*/, "");
+        const HeadingTag = level === 1 ? "h2" : level === 2 ? "h3" : "h4";
         elements.push(
-          <HeadingTag key={`h-${i}`} className={`markdown-heading level-${level}`}>
+          <HeadingTag
+            key={`h-${i}`}
+            className={`markdown-heading level-${level}`}
+          >
             {renderInlineFormattedText(headingText)}
-          </HeadingTag>
+          </HeadingTag>,
         );
         i++;
         continue;
@@ -1027,26 +1190,46 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
 
       // Blockquote, upgraded to a callout when it opens with a bold keyword
       // ("**Note:** ...", "**Tip:** ...") or a status emoji.
-      if (trimmed.startsWith('> ')) {
+      if (trimmed.startsWith("> ")) {
         const quoteText = trimmed.slice(2);
-        const CALL_OUT_TYPES = ['note', 'info', 'tip', 'warning', 'caution', 'important', 'danger', 'success'];
+        const CALL_OUT_TYPES = [
+          "note",
+          "info",
+          "tip",
+          "warning",
+          "caution",
+          "important",
+          "danger",
+          "success",
+        ];
         // "**Note:** ..." (colon inside the bold) or "**Tip** — ..." (separator outside).
-        const calloutMatch = quoteText.match(/^\*\*([A-Za-z]+):?\*\*\s*[:—-]?\s*/i);
+        const calloutMatch = quoteText.match(
+          /^\*\*([A-Za-z]+):?\*\*\s*[:—-]?\s*/i,
+        );
         const keyword = calloutMatch ? calloutMatch[1].toLowerCase() : null;
-        const calloutType = keyword && CALL_OUT_TYPES.includes(keyword) ? keyword : null;
-        const emojiMatch = !calloutType && quoteText.match(/^(💡|ℹ️|⚠️|❌|✅|🔥|🚀|📌)\s*/);
+        const calloutType =
+          keyword && CALL_OUT_TYPES.includes(keyword) ? keyword : null;
+        const emojiMatch =
+          !calloutType && quoteText.match(/^(💡|ℹ️|⚠️|❌|✅|🔥|🚀|📌)\s*/);
         const isCallout = !!calloutType || !!emojiMatch;
         const body = calloutType
           ? quoteText.slice(calloutMatch[0].length)
           : emojiMatch
             ? quoteText.slice(emojiMatch[0].length)
             : quoteText;
-        const typeClass = calloutType ? `callout-${calloutType === 'caution' ? 'warning' : calloutType}` : '';
+        const typeClass = calloutType
+          ? `callout-${calloutType === "caution" ? "warning" : calloutType}`
+          : "";
         elements.push(
-          <blockquote key={`q-${i}`} className={`markdown-blockquote ${isCallout ? `markdown-callout ${typeClass}`.trim() : ''}`.trim()}>
-            {calloutType && <strong className="callout-label">{calloutMatch[1]}</strong>}
+          <blockquote
+            key={`q-${i}`}
+            className={`markdown-blockquote ${isCallout ? `markdown-callout ${typeClass}`.trim() : ""}`.trim()}
+          >
+            {calloutType && (
+              <strong className="callout-label">{calloutMatch[1]}</strong>
+            )}
             {renderInlineFormattedText(body)}
-          </blockquote>
+          </blockquote>,
         );
         i++;
         continue;
@@ -1061,23 +1244,37 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
         while (i < lines.length) {
           const innerLine = lines[i].trim();
           const innerMatch = innerLine.match(/^([-*]|\d+\.)\s+(.*)$/);
-          if (!innerMatch || (ordered && !/^\d+\.\s/.test(innerLine)) || (!ordered && !/^[-*]\s/.test(innerLine))) break;
+          if (
+            !innerMatch ||
+            (ordered && !/^\d+\.\s/.test(innerLine)) ||
+            (!ordered && !/^[-*]\s/.test(innerLine))
+          )
+            break;
           items.push(innerMatch[2]);
           i++;
         }
-        const ListTag = ordered ? 'ol' : 'ul';
+        const ListTag = ordered ? "ol" : "ul";
         elements.push(
-          <ListTag key={`list-${i}`} className={`markdown-list ${ordered ? 'ordered' : ''}`}>
+          <ListTag
+            key={`list-${i}`}
+            className={`markdown-list ${ordered ? "ordered" : ""}`}
+          >
             {items.map((itemText, itemIdx) => {
               const taskMatch = itemText.match(/^\[([ xX])\]\s+(.*)$/);
               if (taskMatch) {
-                const checked = taskMatch[1].toLowerCase() === 'x';
+                const checked = taskMatch[1].toLowerCase() === "x";
                 return (
-                  <li key={itemIdx} className="markdown-list-item markdown-task-list-item">
-                    <span className={`markdown-checkbox ${checked ? 'checked' : ''}`} aria-hidden="true">
+                  <li
+                    key={itemIdx}
+                    className="markdown-list-item markdown-task-list-item"
+                  >
+                    <span
+                      className={`markdown-checkbox ${checked ? "checked" : ""}`}
+                      aria-hidden="true"
+                    >
                       {checked && <Check size={11} strokeWidth={3} />}
                     </span>
-                    <span className={checked ? 'markdown-task-done' : ''}>
+                    <span className={checked ? "markdown-task-done" : ""}>
                       {renderInlineFormattedText(taskMatch[2])}
                     </span>
                   </li>
@@ -1089,16 +1286,12 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
                 </li>
               );
             })}
-          </ListTag>
+          </ListTag>,
         );
         continue;
       }
 
-      elements.push(
-        <p key={`p-${i}`}>
-          {renderInlineFormattedText(line)}
-        </p>
-      );
+      elements.push(<p key={`p-${i}`}>{renderInlineFormattedText(line)}</p>);
       i++;
     }
 
@@ -1117,21 +1310,21 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
     while ((match = codeBlockRegex.exec(content)) !== null) {
       if (match.index > lastIndex) {
         parts.push({
-          type: 'text',
-          content: content.slice(lastIndex, match.index)
+          type: "text",
+          content: content.slice(lastIndex, match.index),
         });
       }
 
-      const lang = match[1] || 'code';
+      const lang = match[1] || "code";
       const code = match[2].trim();
       const isExecutable = isExecutableCodeBlock(lang, code);
 
       parts.push({
-        type: 'code',
+        type: "code",
         lang: lang,
         code: code,
         isExecutable: isExecutable,
-        index: blockCount++
+        index: blockCount++,
       });
 
       lastIndex = match.index + match[0].length;
@@ -1139,8 +1332,8 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
 
     if (lastIndex < content.length) {
       parts.push({
-        type: 'text',
-        content: content.slice(lastIndex)
+        type: "text",
+        content: content.slice(lastIndex),
       });
     }
 
@@ -1148,13 +1341,14 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
     // trail the last code block should be merged INTO that block rather than
     // rendered as raw plain text.  The harness occasionally emits them outside
     // the fenced code block due to continuation stitching.
-    const ORPHANED_TAG_RE = /^\s*(?:<\/(?:script|style|body|html|div|section|main|head|head)>\s*)+$/i;
+    const ORPHANED_TAG_RE =
+      /^\s*(?:<\/(?:script|style|body|html|div|section|main|head|head)>\s*)+$/i;
     for (let i = parts.length - 1; i > 0; i--) {
-      if (parts[i].type === 'text' && ORPHANED_TAG_RE.test(parts[i].content)) {
+      if (parts[i].type === "text" && ORPHANED_TAG_RE.test(parts[i].content)) {
         // Find the preceding code block.
         for (let j = i - 1; j >= 0; j--) {
-          if (parts[j].type === 'code') {
-            parts[j].code += '\n' + parts[i].content.trim();
+          if (parts[j].type === "code") {
+            parts[j].code += "\n" + parts[i].content.trim();
             parts.splice(i, 1);
             break;
           }
@@ -1174,33 +1368,40 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
     const mergeableParts = [];
     let pendingMarkers = null;
     for (const p of parts) {
-      if (p.type === 'text') {
+      if (p.type === "text") {
         // A text part that already contains the documents themselves (an
         // unfenced deliverable) keeps its markers — the later
         // extractUnfencedDeliverable pass preserves them. Only marker text
         // BETWEEN fenced blocks (no document content) is spliced here.
         const containsDocuments = /<!DOCTYPE\s+html|<html[\s>]/.test(p.content);
-        const markerLines = containsDocuments ? [] : (p.content.match(MARKER_LINE_RE) || []).map((m) => m.trim());
+        const markerLines = containsDocuments
+          ? []
+          : (p.content.match(MARKER_LINE_RE) || []).map((m) => m.trim());
         if (markerLines.length > 0) {
-          const prose = p.content.replace(MARKER_LINE_RE, '').trim();
-          if (prose) mergeableParts.push({ type: 'text', content: prose });
-          pendingMarkers = pendingMarkers ? `${pendingMarkers}\n${markerLines.join('\n')}` : markerLines.join('\n');
+          const prose = p.content.replace(MARKER_LINE_RE, "").trim();
+          if (prose) mergeableParts.push({ type: "text", content: prose });
+          pendingMarkers = pendingMarkers
+            ? `${pendingMarkers}\n${markerLines.join("\n")}`
+            : markerLines.join("\n");
           continue;
         }
         mergeableParts.push(p);
         continue;
       }
-      if (p.type === 'code' && pendingMarkers) {
-        if (mergeableParts.length > 0 && mergeableParts[mergeableParts.length - 1].type === 'code') {
+      if (p.type === "code" && pendingMarkers) {
+        if (
+          mergeableParts.length > 0 &&
+          mergeableParts[mergeableParts.length - 1].type === "code"
+        ) {
           const prev = mergeableParts[mergeableParts.length - 1];
           prev.code = `${prev.code}\n\n${pendingMarkers}\n\n${p.code}`;
-          prev.lang = 'html';
+          prev.lang = "html";
           prev.isExecutable = true;
           pendingMarkers = null;
           continue;
         }
         p.code = `${pendingMarkers}\n\n${p.code}`;
-        p.lang = 'html';
+        p.lang = "html";
         p.isExecutable = true;
         pendingMarkers = null;
       }
@@ -1210,18 +1411,18 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
 
     const processedParts = [];
     for (const p of parts) {
-      if (p.type === 'text') {
+      if (p.type === "text") {
         const unfenced = extractUnfencedDeliverable(p.content);
         if (unfenced) {
           if (unfenced.preamble) {
-            processedParts.push({ type: 'text', content: unfenced.preamble });
+            processedParts.push({ type: "text", content: unfenced.preamble });
           }
           processedParts.push({
-            type: 'code',
-            lang: 'html',
+            type: "code",
+            lang: "html",
             code: unfenced.code,
             isExecutable: true,
-            index: blockCount++
+            index: blockCount++,
           });
         } else {
           processedParts.push(p);
@@ -1233,7 +1434,7 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
 
     const expandedParts = [];
     for (const p of processedParts) {
-      if (p.type === 'text') {
+      if (p.type === "text") {
         const subParts = splitTextAndEmail(p.content);
         expandedParts.push(...subParts);
       } else {
@@ -1241,11 +1442,13 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
       }
     }
 
-    const fullDeliverableCode = !isUser ? extractCodeFromMessage(content) : null;
+    const fullDeliverableCode = !isUser
+      ? extractCodeFromMessage(content)
+      : null;
     let hasRenderedExecutableBar = false;
 
     return expandedParts.map((part, idx) => {
-      if (part.type === 'code') {
+      if (part.type === "code") {
         if (part.isExecutable && !isUser) {
           if (!hasRenderedExecutableBar) {
             hasRenderedExecutableBar = true;
@@ -1259,25 +1462,32 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
               />
             );
           }
-          return <CodeSnippetBlock key={idx} code={part.code} lang={part.lang} />;
+          return (
+            <CodeSnippetBlock key={idx} code={part.code} lang={part.lang} />
+          );
         }
-        
+
         if (isUser) {
           return (
-            <div key={idx} style={{ 
-              margin: '0.4rem 0', 
-              padding: '0.4rem 0.65rem',
-              backgroundColor: 'rgba(0,0,0,0.15)', 
-              border: '1px solid var(--border-color)', 
-              borderRadius: 'var(--radius-sm)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              color: 'var(--text-secondary)',
-              fontSize: '0.75rem'
-            }}>
+            <div
+              key={idx}
+              style={{
+                margin: "0.4rem 0",
+                padding: "0.4rem 0.65rem",
+                backgroundColor: "rgba(0,0,0,0.15)",
+                border: "1px solid var(--border-color)",
+                borderRadius: "var(--radius-sm)",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                color: "var(--text-secondary)",
+                fontSize: "0.75rem",
+              }}
+            >
               <Layers size={14} strokeWidth={1.5} />
-              <span>Attached code block ({part.code.split('\n').length} lines)</span>
+              <span>
+                Attached code block ({part.code.split("\n").length} lines)
+              </span>
             </div>
           );
         }
@@ -1285,9 +1495,13 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
         return <CodeSnippetBlock key={idx} code={part.code} lang={part.lang} />;
       }
 
-      if (part.type === 'email') {
+      if (part.type === "email") {
         return (
-          <EmailCard key={idx} content={part.content} renderBody={renderTextAndTables} />
+          <EmailCard
+            key={idx}
+            content={part.content}
+            renderBody={renderTextAndTables}
+          />
         );
       }
 
@@ -1300,15 +1514,13 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
   };
 
   return (
-    <div className={`message-wrapper ${isUser ? 'user' : 'ai'}`}>
+    <div className={`message-wrapper ${isUser ? "user" : "ai"}`}>
       <div className="message-body">
         <div className="message-content">
           {isUser && renderAttachments(message.attachments)}
           {renderFormattedText(message.content)}
         </div>
-        {!isUser && (
-          <MessageActions content={message.content || ''} />
-        )}
+        {!isUser && <MessageActions content={message.content || ""} />}
       </div>
 
       {fullscreenImage && (
@@ -1317,23 +1529,38 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
           className="image-fullscreen-modal"
           role="dialog"
           aria-modal="true"
-          aria-label={fullscreenImage.alt || 'Fullscreen Image Preview'}
+          aria-label={fullscreenImage.alt || "Fullscreen Image Preview"}
           onClick={() => setFullscreenImage(null)}
         >
           <div className="image-fullscreen-backdrop" />
-          <div className="image-fullscreen-container" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="image-fullscreen-container"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="image-fullscreen-toolbar">
-              <span className="image-fullscreen-title">{fullscreenImage.alt || 'Generated Image'}</span>
+              <span className="image-fullscreen-title">
+                {fullscreenImage.alt || "Generated Image"}
+              </span>
               <div className="image-fullscreen-actions">
                 <button
                   type="button"
                   className="image-fullscreen-btn"
                   onClick={handleCopyImage}
-                  title={imageCopied ? "Image copied to clipboard" : "Copy image to clipboard"}
-                  aria-label={imageCopied ? "Image copied to clipboard" : "Copy image"}
+                  title={
+                    imageCopied
+                      ? "Image copied to clipboard"
+                      : "Copy image to clipboard"
+                  }
+                  aria-label={
+                    imageCopied ? "Image copied to clipboard" : "Copy image"
+                  }
                 >
-                  {imageCopied ? <Check size={15} strokeWidth={1.75} /> : <Copy size={15} strokeWidth={1.75} />}
-                  <span>{imageCopied ? 'Copied Image' : 'Copy Image'}</span>
+                  {imageCopied ? (
+                    <Check size={15} strokeWidth={1.75} />
+                  ) : (
+                    <Copy size={15} strokeWidth={1.75} />
+                  )}
+                  <span>{imageCopied ? "Copied Image" : "Copy Image"}</span>
                 </button>
                 <button
                   type="button"
@@ -1357,10 +1584,13 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
                 </button>
               </div>
             </div>
-            <div className="image-fullscreen-content" onClick={() => setFullscreenImage(null)}>
+            <div
+              className="image-fullscreen-content"
+              onClick={() => setFullscreenImage(null)}
+            >
               <img
                 src={fullscreenImage.url}
-                alt={fullscreenImage.alt || 'Generated Image'}
+                alt={fullscreenImage.alt || "Generated Image"}
                 className="image-fullscreen-img"
                 onClick={(e) => e.stopPropagation()}
               />

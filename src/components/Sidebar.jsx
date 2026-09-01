@@ -1,11 +1,6 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { 
-  Settings, 
-  PanelLeft,
-  MoreVertical,
-  Trash2
-} from 'lucide-react';
+import { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
+import { Settings, PanelLeft, MoreVertical, Trash2 } from "lucide-react";
 
 export default function Sidebar({
   isOpen,
@@ -18,33 +13,38 @@ export default function Sidebar({
   activeView,
   theme,
   onToggleTheme,
-  onCloseSidebar
+  onCloseSidebar,
 }) {
   // theme/onToggleTheme kept for backwards compat but now live inside SettingsModal
-  void theme; void onToggleTheme;
+  void theme;
+  void onToggleTheme;
   const [openMenuId, setOpenMenuId] = useState(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (!event.target.closest('.history-item-menu')) {
+      if (!event.target.closest(".history-item-menu")) {
         setOpenMenuId(null);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
   return (
-    <aside className={`sidebar ${isOpen ? '' : 'collapsed'}`} aria-hidden={!isOpen} inert={!isOpen || undefined}>
+    <aside
+      className={`sidebar ${isOpen ? "" : "collapsed"}`}
+      aria-hidden={!isOpen}
+      inert={!isOpen || undefined}
+    >
       <div className="sidebar-header">
-        <button 
-          className="brand-icon-toggle" 
+        <button
+          className="brand-icon-toggle"
           onClick={onCloseSidebar}
           title="Collapse Sidebar"
         >
           <span className="brand-wordmark">COREZ</span>
         </button>
-        <button 
-          className="sidebar-close-btn" 
+        <button
+          className="sidebar-close-btn"
           onClick={onCloseSidebar}
           title="Collapse Sidebar"
           aria-label="Collapse Sidebar"
@@ -54,8 +54,8 @@ export default function Sidebar({
       </div>
 
       <div className="sidebar-action-box">
-        <button 
-          className="new-chat-btn" 
+        <button
+          className="new-chat-btn"
           onClick={onNewChat}
           title="New Chat Session"
         >
@@ -74,7 +74,7 @@ export default function Sidebar({
         {sessions.map((session) => (
           <div
             key={session.id}
-            className={`history-item ${activeView === 'chat' && session.id === activeSessionId ? 'active' : ''}`}
+            className={`history-item ${activeView === "chat" && session.id === activeSessionId ? "active" : ""}`}
             onClick={() => onSelectSession(session.id)}
             onKeyDown={(e) => {
               // Keyboard activation belongs to the container itself; key
@@ -82,7 +82,7 @@ export default function Sidebar({
               // here and must not select the conversation or block the
               // button's own activation.
               if (e.target !== e.currentTarget) return;
-              if (e.key === 'Enter' || e.key === ' ') {
+              if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
                 onSelectSession(session.id);
               }
@@ -142,15 +142,21 @@ export default function Sidebar({
 
 function SidebarProfileRow({ onOpenSettings }) {
   let auth;
-  try { auth = useAuth(); } catch { auth = null; }
-  const email = auth?.user?.email || '';
-  const username = email ? email.split('@')[0] : 'Guest';
+  try {
+    auth = useAuth();
+  } catch {
+    auth = null;
+  }
+  const email = auth?.user?.email || "";
+  const username = email ? email.split("@")[0] : "Guest";
   const displayName = username.charAt(0).toUpperCase() + username.slice(1);
-  const initial = displayName.charAt(0).toUpperCase() || 'G';
+  const initial = displayName.charAt(0).toUpperCase() || "G";
   return (
     <div className="sidebar-profile-row">
       <div className="sidebar-profile-left" title={email}>
-        <div className="sidebar-avatar" aria-hidden="true">{initial}</div>
+        <div className="sidebar-avatar" aria-hidden="true">
+          {initial}
+        </div>
         <span className="sidebar-username">{displayName}</span>
       </div>
       <button

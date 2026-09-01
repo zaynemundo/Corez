@@ -6,11 +6,11 @@
 export class CapabilityRegistry {
   constructor(capabilities = {}) {
     this.capabilities = new Map([
-      ['filesystem', capabilities.filesystem !== false],
-      ['terminal', capabilities.terminal !== false],
-      ['git', Boolean(capabilities.git)],
-      ['browser', Boolean(capabilities.browser)],
-      ['apis', capabilities.apis !== false]
+      ["filesystem", capabilities.filesystem !== false],
+      ["terminal", capabilities.terminal !== false],
+      ["git", Boolean(capabilities.git)],
+      ["browser", Boolean(capabilities.browser)],
+      ["apis", capabilities.apis !== false],
     ]);
   }
 
@@ -34,5 +34,5 @@ export const defaultCapabilityRegistry = new CapabilityRegistry({
   terminal: true,
   git: false,
   browser: false,
-  apis: true
+  apis: true,
 });

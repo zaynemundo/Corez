@@ -20,7 +20,7 @@
  * never claimed as durable.
  */
 
-const META_KEY = 'corez_context_metadata';
+const META_KEY = "corez_context_metadata";
 
 // Shared in-session store: every client that does not opt into its own Map
 // writes here, so exact records are immediately retrievable within the
@@ -28,15 +28,20 @@ const META_KEY = 'corez_context_metadata';
 export const memoryContextStore = new Map();
 
 function makeRecordId() {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
     return `ctx-${crypto.randomUUID()}`;
   }
   return `ctx-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
 }
 
 function detectStorage() {
-  if (typeof window !== 'undefined' && window.localStorage) return window.localStorage;
-  if (typeof globalThis !== 'undefined' && globalThis.localStorage) return globalThis.localStorage;
+  if (typeof window !== "undefined" && window.localStorage)
+    return window.localStorage;
+  if (typeof globalThis !== "undefined" && globalThis.localStorage)
+    return globalThis.localStorage;
   return null;
 }
 
@@ -89,39 +94,49 @@ function removeMetadataKey(storage, recordId) {
  *             this to route requests to the worker handlers.
  */
 export function createContextClient(options = {}) {
-  const backend = options.backend === 'memory' || options.backend === 'none'
-    ? options.backend
-    : 'server';
-  const endpoint = typeof options.endpoint === 'string' ? options.endpoint : '/api/context/records';
-  const storage = options.storage !== undefined ? options.storage : detectStorage();
+  const backend =
+    options.backend === "memory" || options.backend === "none"
+      ? options.backend
+      : "server";
+  const endpoint =
+    typeof options.endpoint === "string"
+      ? options.endpoint
+      : "/api/context/records";
+  const storage =
+    options.storage !== undefined ? options.storage : detectStorage();
   const store = options.store || memoryContextStore;
-  const fetchImpl = typeof options.fetchImpl === 'function'
-    ? options.fetchImpl
-    : (input, init) => globalThis.fetch(input, init);
+  const fetchImpl =
+    typeof options.fetchImpl === "function"
+      ? options.fetchImpl
+      : (input, init) => globalThis.fetch(input, init);
 
   // Records are always normalised to the stored shape { id, createdAt,
   // messages }; summaryKeys is an indexing hint carried only in the metadata.
   // The messages array is copied so a caller mutating it later can never
   // silently alter the stored record.
   function normalizeRecord(record) {
-    const recordId = typeof record?.id === 'string' && record.id ? record.id : makeRecordId();
+    const recordId =
+      typeof record?.id === "string" && record.id ? record.id : makeRecordId();
     return {
       recordId,
       createdAt: Number(record?.createdAt) || Date.now(),
       messages: Array.isArray(record?.messages) ? [...record.messages] : [],
-      summaryKeys: Array.isArray(record?.summaryKeys) ? [...record.summaryKeys] : []
+      summaryKeys: Array.isArray(record?.summaryKeys)
+        ? [...record.summaryKeys]
+        : [],
     };
   }
 
   function saveRecordSync(record) {
-    if (!record || typeof record !== 'object') {
-      return { ok: false, recordId: null, backend, reason: 'invalid record' };
+    if (!record || typeof record !== "object") {
+      return { ok: false, recordId: null, backend, reason: "invalid record" };
     }
-    const { recordId, createdAt, messages, summaryKeys } = normalizeRecord(record);
+    const { recordId, createdAt, messages, summaryKeys } =
+      normalizeRecord(record);
     store.set(recordId, { id: recordId, createdAt, messages });
 
-    if (backend === 'none') {
-      return { ok: false, recordId, backend, reason: 'no durable backend' };
+    if (backend === "none") {
+      return { ok: false, recordId, backend, reason: "no durable backend" };
     }
     const metadataOk = persistMetadataSync(recordId, createdAt, summaryKeys);
     return { ok: metadataOk, recordId, backend };
@@ -132,14 +147,14 @@ export function createContextClient(options = {}) {
     meta[recordId] = {
       recordId,
       createdAt,
-      summaryKeys
+      summaryKeys,
     };
     return writeMetadata(storage, meta);
   }
 
   async function saveRecord(record) {
     const syncResult = saveRecordSync(record);
-    if (backend !== 'server') return syncResult;
+    if (backend !== "server") return syncResult;
 
     // The server copy is the durable half of the claim. Even when the local
     // index failed (quota), the server push is still attempted so the record
@@ -147,20 +162,20 @@ export function createContextClient(options = {}) {
     // the server accepted the record AND the local index was written.
     try {
       const response = await fetchImpl(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: syncResult.recordId,
           createdAt: record?.createdAt ? Number(record.createdAt) : Date.now(),
-          messages: Array.isArray(record?.messages) ? record.messages : []
-        })
+          messages: Array.isArray(record?.messages) ? record.messages : [],
+        }),
       });
       if (!response.ok) {
         return {
           ok: false,
           recordId: syncResult.recordId,
           backend,
-          reason: `server rejected the record (HTTP ${response.status})`
+          reason: `server rejected the record (HTTP ${response.status})`,
         };
       }
       return { ...syncResult, ok: syncResult.ok };
@@ -169,23 +184,29 @@ export function createContextClient(options = {}) {
         ok: false,
         recordId: syncResult.recordId,
         backend,
-        reason: String(err?.message || err)
+        reason: String(err?.message || err),
       };
     }
   }
 
   async function getRecord(recordId) {
-    if (typeof recordId !== 'string' || !recordId) return null;
+    if (typeof recordId !== "string" || !recordId) return null;
     if (store.has(recordId)) return store.get(recordId);
-    if (backend !== 'server') return null;
+    if (backend !== "server") return null;
     // Only fetch records this browser has ever indexed — unknown ids are
     // never probed blindly.
     if (!readMetadata(storage)[recordId]) return null;
     try {
-      const response = await fetchImpl(`${endpoint}/${encodeURIComponent(recordId)}`);
+      const response = await fetchImpl(
+        `${endpoint}/${encodeURIComponent(recordId)}`,
+      );
       if (!response.ok) return null;
       const record = await response.json();
-      if (record && typeof record === 'object' && typeof record.id === 'string') {
+      if (
+        record &&
+        typeof record === "object" &&
+        typeof record.id === "string"
+      ) {
         store.set(record.id, record);
         return record;
       }
@@ -205,14 +226,16 @@ export function createContextClient(options = {}) {
   }
 
   async function deleteRecord(recordId) {
-    if (typeof recordId !== 'string' || !recordId) {
-      return { ok: false, recordId, backend, reason: 'invalid record id' };
+    if (typeof recordId !== "string" || !recordId) {
+      return { ok: false, recordId, backend, reason: "invalid record id" };
     }
     store.delete(recordId);
     removeMetadataKey(storage, recordId);
-    if (backend === 'server') {
+    if (backend === "server") {
       try {
-        await fetchImpl(`${endpoint}/${encodeURIComponent(recordId)}`, { method: 'DELETE' });
+        await fetchImpl(`${endpoint}/${encodeURIComponent(recordId)}`, {
+          method: "DELETE",
+        });
       } catch {
         // Best effort: the local index is gone either way.
       }
@@ -229,8 +252,8 @@ export function createContextClient(options = {}) {
     getRecords,
     deleteRecord,
     available() {
-      return backend !== 'none' && storage !== null;
-    }
+      return backend !== "none" && storage !== null;
+    },
   };
 }
 
