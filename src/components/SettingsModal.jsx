@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { X, Settings, Trash2, Sun, Moon, LogOut, User, Crown, Zap, Sparkles, Check } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { X, Settings, Trash2, Sun, Moon, LogOut, User, Crown, Zap, Sparkles, ArrowRight, ExternalLink } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function SettingsModal({ isOpen, onClose, onClearAllHistory, theme, onToggleTheme }) {
@@ -11,7 +12,6 @@ export default function SettingsModal({ isOpen, onClose, onClearAllHistory, them
   const isDark = theme === 'dark';
   const [sub, setSub] = useState(null);
   const [subLoading, setSubLoading] = useState(false);
-  const [payBusy, setPayBusy] = useState('');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -32,57 +32,7 @@ export default function SettingsModal({ isOpen, onClose, onClearAllHistory, them
   const currentPlan = sub?.plan || userPlan || 'free';
   const isExpired = sub?.status === 'expired' || sub?.isExpired;
   const periodEnd = sub?.period_end ? new Date(sub.period_end).toLocaleDateString() : null;
-
-  const handleCheckout = async (plan) => {
-    if (plan === 'free') {
-      // Downgrade / cancel
-      if (!confirm('Downgrade to Free? You will lose paid features at period end.')) return;
-      setPayBusy(plan);
-      try {
-        const r = await fetch('/api/subscriptions/cancel', { method: 'POST', credentials: 'include' });
-        const d = await r.json().catch(() => ({}));
-        if (r.ok) {
-          alert('Downgraded to Free');
-          // refresh auth and subscription
-          try { await auth?.refresh?.(); } catch {}
-          const mr = await fetch('/api/subscriptions/me', { credentials: 'include' });
-          const md = await mr.json().catch(() => ({}));
-          if (mr.ok) setSub(md);
-        } else {
-          alert(d.error || 'Failed to cancel');
-        }
-      } finally { setPayBusy(''); }
-      return;
-    }
-    setPayBusy(plan);
-    try {
-      const origin = window.location.origin;
-      const r = await fetch('/api/subscriptions/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          plan,
-          success_url: origin + '/payment/success?plan=' + plan,
-          cancel_url: origin + '/payment/cancel?plan=' + plan,
-          test: false
-        })
-      });
-      const d = await r.json().catch(() => ({}));
-      if (r.ok && d.redirect_url) {
-        window.location.href = d.redirect_url;
-      } else if (d.free) {
-        alert('Free plan activated');
-        try { await auth?.refresh?.(); } catch {}
-      } else {
-        alert(d.error || 'Checkout failed');
-      }
-    } catch (e) {
-      alert(e.message || 'Checkout failed');
-    } finally {
-      setPayBusy('');
-    }
-  };
+  const navigate = useNavigate();
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -145,48 +95,22 @@ export default function SettingsModal({ isOpen, onClose, onClearAllHistory, them
             </span>
           </div>
 
-          <div className="pricing-grid">
-            {[
-              { id: 'free', name: 'Free', price: '0', currency: 'AED', sub: 'forever', icon: Sparkles, features: ['20 generations / mo', '1 project', 'Community support'], cta: 'Downgrade' },
-              { id: 'standard', name: 'Standard', price: '18.36', currency: 'AED', sub: '/ month', icon: Zap, features: ['200 generations / mo', '10 projects', 'Publish & share', 'Priority queue'], popular: true, cta: 'Upgrade' },
-              { id: 'premium', name: 'Premium', price: '27.54', currency: 'AED', sub: '/ month', icon: Crown, features: ['Unlimited generations', 'Unlimited projects', 'Priority support', 'Early access'], cta: 'Go Premium' },
-            ].map(p => {
-              const isCurrent = currentPlan === p.id && !isExpired;
-              const busy = payBusy === p.id;
-              const Icon = p.icon;
-              const tierClass = `pricing-card--${p.id}`;
-              return (
-                <div key={p.id} className={`pricing-card ${tierClass} ${isCurrent ? 'pricing-card--current' : ''} ${p.popular ? 'pricing-card--popular' : ''} ${busy ? 'pricing-card--busy' : ''}`}>
-                  {p.popular && <span className="pricing-popular-badge">Most Popular</span>}
-                  {isCurrent && <span className="pricing-current-check"><Check size={11} strokeWidth={2.5} /></span>}
-                  <div className="pricing-card-icon">
-                    <Icon size={16} strokeWidth={1.75} />
-                  </div>
-                  <div className="pricing-card-name">{p.name}</div>
-                  <div className="pricing-card-price">
-                    <span className="pricing-price-amount">{p.price}</span>
-                    <span className="pricing-price-currency">{p.currency}</span>
-                    <span className="pricing-price-interval">{p.sub}</span>
-                  </div>
-                  <ul className="pricing-card-features">
-                    {p.features.map(f => (
-                      <li key={f}><Check size={11} strokeWidth={2} className="pricing-feature-check" />{f}</li>
-                    ))}
-                  </ul>
-                  <button
-                    type="button"
-                    disabled={busy || isCurrent}
-                    onClick={() => handleCheckout(p.id)}
-                    className={`pricing-cta ${isCurrent ? 'pricing-cta--current' : p.id === 'premium' ? 'pricing-cta--premium' : p.id === 'standard' ? 'pricing-cta--standard' : 'pricing-cta--free'}`}
-                  >
-                    {busy ? 'Processing…' : isCurrent ? 'Current plan' : p.cta}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
+          <button
+            type="button"
+            className="pricing-manage-btn"
+            onClick={() => { onClose(); navigate('/pricing'); }}
+            aria-label="Manage plan — go to pricing page"
+          >
+            <span className="pricing-manage-left">
+              <span className="pricing-manage-title">Manage plan</span>
+              <span className="pricing-manage-sub">View pricing • Upgrade or downgrade • Monthly via Ziina</span>
+            </span>
+            <span className="pricing-manage-cta">
+              View pricing <ArrowRight size={14} strokeWidth={1.75} />
+            </span>
+          </button>
           <div className="pricing-footnote">
-            Billed monthly via <strong>Ziina</strong> • Cancel anytime • <span>Secure checkout • AED</span>
+            Connected to <strong>/pricing</strong> • Standard 18.36 AED / Premium 27.54 AED • Billed monthly • <ExternalLink size={10} /> Secure Ziina checkout
           </div>
         </div>
 
