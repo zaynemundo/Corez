@@ -13,6 +13,7 @@ import { handleTaskApi } from './taskApi.js';
 import { handleAuth, verifySession } from './auth.js';
 import { handleChats } from './chats.js';
 import { handleN8nWebhook } from './n8nBridge.js';
+import { handleZiina } from './ziina.js';
 export { GameRoom } from './gameRoom.js';
 
 // Per-client AI request rate bound: paid provider tokens are spent on every
@@ -111,6 +112,13 @@ export default {
     if (url.pathname === '/api/n8n/webhook') {
       const n8nRes = await handleN8nWebhook(request, env);
       if (n8nRes) return withDirectAiCors(n8nRes);
+    }
+
+    // Ziina payment gateway — create & fetch payment intents
+    // POST /api/ziina/payment_intent  (+ aliases)  |  GET /api/ziina/payment_intent/{id}
+    if (url.pathname.startsWith('/api/ziina/') || url.pathname.startsWith('/api/payments/ziina/')) {
+      const ziinaRes = await handleZiina(request, env);
+      if (ziinaRes) return withDirectAiCors(ziinaRes);
     }
 
     // Chat routes — handle before generic auth gate so they can use verifySession directly
