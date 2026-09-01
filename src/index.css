@@ -3126,6 +3126,19 @@ h6 {
     );
   pointer-events: none;
 }
+[data-theme="light"] .pricing-bg {
+  background:
+    radial-gradient(
+      800px circle at 50% -10%,
+      rgba(0, 0, 0, 0.04),
+      transparent 60%
+    ),
+    radial-gradient(
+      600px circle at 90% 20%,
+      rgba(141, 110, 0, 0.06),
+      transparent 50%
+    );
+}
 .pricing-header {
   position: relative;
   max-width: 1120px;
@@ -3268,9 +3281,8 @@ h6 {
   flex-direction: column;
   padding: 22px 18px 18px;
   border-radius: 20px;
-  background: rgba(18, 20, 29, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  backdrop-filter: blur(12px);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   transition: all 0.2s ease;
   overflow: hidden;
 }
@@ -3282,8 +3294,8 @@ h6 {
   padding: 1px;
   background: linear-gradient(
     135deg,
-    rgba(255, 255, 255, 0.07),
-    rgba(255, 255, 255, 0.01)
+    rgba(255, 255, 255, 0.06),
+    rgba(255, 255, 255, 0.015)
   );
   -webkit-mask:
     linear-gradient(#fff 0 0) content-box,
@@ -3292,31 +3304,40 @@ h6 {
   mask-composite: exclude;
   pointer-events: none;
 }
+[data-theme="light"] .pricing-card-page::before {
+  background: linear-gradient(
+    135deg,
+    rgba(0, 0, 0, 0.04),
+    rgba(0, 0, 0, 0.01)
+  );
+}
 .pricing-card-page:hover {
   transform: translateY(-3px);
-  border-color: rgba(255, 255, 255, 0.12);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  border-color: var(--border-hover);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+}
+[data-theme="light"] .pricing-card-page:hover {
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08);
 }
 .pricing-card-page--highlight {
-  background: linear-gradient(
-    165deg,
-    rgba(22, 24, 34, 0.85) 0%,
-    rgba(18, 20, 29, 0.7) 100%
-  );
-  border-color: rgba(255, 255, 255, 0.09);
+  background: var(--bg-secondary);
+  border-color: var(--border-hover);
 }
 .pricing-card-page--premium {
-  background: linear-gradient(
-    165deg,
-    rgba(24, 22, 16, 0.9) 0%,
-    rgba(18, 20, 29, 0.78) 100%
-  );
+  background: var(--bg-secondary);
   border-color: transparent;
   box-shadow:
-    0 20px 60px rgba(0, 0, 0, 0.55),
-    0 0 0 1px rgba(241, 250, 140, 0.16),
-    0 0 36px rgba(241, 250, 140, 0.08);
+    0 20px 60px rgba(0, 0, 0, 0.12),
+    0 0 0 1px rgba(241, 250, 140, 0.18),
+    0 0 32px rgba(241, 250, 140, 0.06);
   transform: scale(1.02);
+}
+[data-theme="light"] .pricing-card-page--premium {
+  background: #ffffff;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.08),
+    0 0 0 1px rgba(212, 175, 55, 0.22),
+    0 0 28px rgba(212, 175, 55, 0.08);
 }
 .pricing-card-page--premium::before {
   background: linear-gradient(

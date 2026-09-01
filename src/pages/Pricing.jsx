@@ -75,6 +75,8 @@ export default function Pricing() {
   const [billing, setBilling] = useState("monthly"); // monthly | yearly (yearly shows save)
   const [payBusy, setPayBusy] = useState("");
   const [currentPlan, setCurrentPlan] = useState(user?.plan || "free");
+  const [sub, setSub] = useState(null);
+  const tierRank = { free: 0, standard: 1, premium: 2 };
 
   useEffect(() => {
     let cancelled = false;
@@ -84,8 +86,10 @@ export default function Pricing() {
           credentials: "include",
         });
         const d = await r.json().catch(() => ({}));
-        if (!cancelled && r.ok && d?.plan) setCurrentPlan(d.plan);
-        else if (!cancelled && user?.plan) setCurrentPlan(user.plan);
+        if (!cancelled && r.ok) {
+          if (d?.plan) setCurrentPlan(d.plan);
+          setSub(d);
+        } else if (!cancelled && user?.plan) setCurrentPlan(user.plan);
       } catch {}
     };
     load();
@@ -103,30 +107,45 @@ export default function Pricing() {
       navigate("/?next=/pricing");
       return;
     }
-    if (planId === "free") {
-      if (
-        !confirm(
-          "Downgrade to Free? You will lose paid features at period end.",
-        )
-      )
-        return;
+    if (planId === currentPlan) return;
+
+    const currentRank = tierRank[currentPlan] ?? 0;
+    const targetRank = tierRank[planId] ?? 0;
+    const isDowngrade = targetRank < currentRank;
+
+    // Downgrade or cancel — schedule after period_end
+    if (isDowngrade || planId === "free") {
+      const targetLabel = planId === "free" ? "Free" : planId;
+      const confirmMsg =
+        planId === "free"
+          ? "Downgrade to Free? You will keep current plan until period end, then switch to Free."
+          : `Downgrade to ${targetLabel}? You will keep ${currentPlan} until period end, then switch to ${targetLabel}.`;
+      if (!confirm(confirmMsg)) return;
       setPayBusy(planId);
       try {
         const r = await fetch("/api/subscriptions/cancel", {
           method: "POST",
+          headers: { "Content-Type": "application/json" },
           credentials: "include",
+          body: JSON.stringify({ plan: planId }),
         });
         const d = await r.json().catch(() => ({}));
         if (r.ok) {
-          alert("Downgraded to Free");
-          setCurrentPlan("free");
-        } else alert(d.error || "Failed");
+          alert(d.message || `Scheduled to downgrade to ${targetLabel} after current period`);
+          // Refresh current plan — backend keeps current until period_end, but show scheduled
+          try {
+            const mr = await fetch("/api/subscriptions/me", { credentials: "include" });
+            const md = await mr.json().catch(() => ({}));
+            if (mr.ok && md?.plan) setCurrentPlan(md.plan);
+          } catch {}
+        } else alert(d.error || "Failed to schedule downgrade");
       } finally {
         setPayBusy("");
       }
       return;
     }
-    if (planId === currentPlan) return;
+
+    // Upgrade — immediate checkout via Ziina
     setPayBusy(planId);
     try {
       const origin = window.location.origin;
@@ -247,6 +266,68 @@ export default function Pricing() {
         </div>
       </header>
 
+      {sub?.isScheduledDowngrade && sub?.downgrade_plan && (
+        <div style={{ maxWidth: "1120px", margin: "0 auto", padding: "0 24px 12px", width: "100%" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "12px",
+              padding: "12px 14px",
+              borderRadius: "12px",
+              background: "rgba(251,191,36,0.08)",
+              border: "1px solid rgba(251,191,36,0.18)",
+              fontSize: "13px",
+            }}
+          >
+            <span style={{ color: "var(--text-secondary)", lineHeight: 1.4 }}>
+              Scheduled to downgrade to <strong style={{ color: "var(--text-primary)", textTransform: "capitalize" }}>{sub.downgrade_plan}</strong> on{" "}
+              {sub.period_end ? new Date(sub.period_end).toLocaleDateString() : "period end"} — you keep <strong style={{ textTransform: "capitalize" }}>{currentPlan}</strong> until then.
+            </span>
+            <button
+              type="button"
+              onClick={async () => {
+                if (!confirm("Keep current plan? Cancel scheduled downgrade.")) return;
+                try {
+                  const r = await fetch("/api/subscriptions/cancel", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({ undo: true }),
+                  });
+                  const d = await r.json().catch(() => ({}));
+                  if (r.ok) {
+                    alert("Scheduled downgrade canceled — keeping " + currentPlan);
+                    const mr = await fetch("/api/subscriptions/me", { credentials: "include" });
+                    const md = await mr.json().catch(() => ({}));
+                    if (mr.ok) {
+                      setSub(md);
+                      if (md?.plan) setCurrentPlan(md.plan);
+                    }
+                  } else alert(d.error || "Failed");
+                } catch (e) {
+                  alert(e.message || "Failed");
+                }
+              }}
+              style={{
+                padding: "6px 12px",
+                borderRadius: "999px",
+                border: "1px solid var(--border-color)",
+                background: "var(--bg-primary)",
+                color: "var(--text-primary)",
+                fontWeight: 600,
+                fontSize: "12px",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Keep {currentPlan}
+            </button>
+          </div>
+        </div>
+      )}
+
       <main className="pricing-main">
         <div className="pricing-grid-page">
           {PLANS.map((p) => {
@@ -290,18 +371,20 @@ export default function Pricing() {
                 )}
                 <button
                   type="button"
-                  disabled={busy || isCurrent}
+                  disabled={busy || isCurrent || sub?.downgrade_plan === p.id}
                   onClick={() => handleCheckout(p.id)}
-                  className={`pricing-cta-page ${p.premium ? "premium" : p.id === "standard" ? "standard" : "free"} ${isCurrent ? "current" : ""}`}
+                  className={`pricing-cta-page ${p.premium ? "premium" : p.id === "standard" ? "standard" : "free"} ${isCurrent || sub?.downgrade_plan === p.id ? "current" : ""}`}
                 >
                   {busy
                     ? "Processing…"
                     : isCurrent
                       ? "Current plan"
-                      : p.id === "free"
-                        ? "Downgrade"
-                        : p.cta}
-                  {!isCurrent && p.id !== "free" && (
+                      : sub?.downgrade_plan === p.id
+                        ? "Scheduled"
+                        : tierRank[p.id] < tierRank[currentPlan]
+                          ? "Downgrade"
+                          : p.cta}
+                  {!isCurrent && sub?.downgrade_plan !== p.id && tierRank[p.id] >= tierRank[currentPlan] && p.id !== "free" && (
                     <ArrowRight size={14} strokeWidth={1.75} />
                   )}
                 </button>

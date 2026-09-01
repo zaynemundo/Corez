@@ -51,6 +51,16 @@ export async function ensureSubscriptionTables(env) {
         `ALTER TABLE users ADD COLUMN subscription_ziina_id TEXT`,
       ).run();
     } catch {}
+    try {
+      await env.DB.prepare(
+        `ALTER TABLE users ADD COLUMN downgrade_plan TEXT`,
+      ).run();
+    } catch {}
+    try {
+      await env.DB.prepare(
+        `ALTER TABLE users ADD COLUMN downgrade_scheduled_at INTEGER`,
+      ).run();
+    } catch {}
   } catch (e) {
     console.warn("ensureSubscriptionTables failed", safeErrorDetail(e));
   }
@@ -70,28 +80,96 @@ export async function getActiveSubscription(env, userId) {
   try {
     // Get user plan first
     const user = await env.DB.prepare(
-      "SELECT plan, subscription_plan, subscription_status, subscription_period_end FROM users WHERE id=?",
+      "SELECT plan, subscription_plan, subscription_status, subscription_period_end, downgrade_plan, downgrade_scheduled_at FROM users WHERE id=?",
     )
       .bind(userId)
       .first();
-    const plan = user?.plan || user?.subscription_plan || "free";
-    const periodEnd = user?.subscription_period_end;
-    const status = user?.subscription_status || "active";
+    let plan = user?.plan || user?.subscription_plan || "free";
+    let periodEnd = user?.subscription_period_end;
+    let status = user?.subscription_status || "active";
+    const downgradePlan = user?.downgrade_plan ? String(user.downgrade_plan).toLowerCase() : null;
 
-    // If free, always active
+    // If free, always active (but check if downgrade scheduled to free is pending and period ended)
     if (plan === "free" || plan === FREE_PLAN) {
+      // If free with downgrade scheduled, clear it
+      if (downgradePlan) {
+        try {
+          await env.DB.prepare(
+            `UPDATE users SET downgrade_plan=NULL, downgrade_scheduled_at=NULL WHERE id=?`,
+          )
+            .bind(userId)
+            .run();
+        } catch {}
+      }
       return { plan: "free", status: "active", period_end: null, isFree: true };
     }
 
-    // For paid, check expiry
+    // For paid, check expiry and scheduled downgrade
     const now = Date.now();
+    // If period ended and there's a scheduled downgrade, perform it now (lazy)
     if (periodEnd && Number(periodEnd) < now) {
+      if (downgradePlan && ZIINA_PLANS[downgradePlan]) {
+        // Perform downgrade
+        const newPlan = downgradePlan;
+        try {
+          await env.DB.prepare(
+            `UPDATE users SET plan=?, subscription_plan=?, subscription_status='active', downgrade_plan=NULL, downgrade_scheduled_at=NULL, subscription_period_end=NULL, subscription_ziina_id=NULL WHERE id=?`,
+          )
+            .bind(newPlan, newPlan, userId)
+            .run();
+          // Insert a record for downgrade
+          try {
+            await env.DB.prepare(
+              `INSERT INTO subscriptions (id, user_id, plan, amount, currency_code, status, period_start, period_end, ziina_payment_id, created_at, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+            )
+              .bind(
+                crypto.randomUUID(),
+                userId,
+                newPlan,
+                ZIINA_PLANS[newPlan].amount,
+                "AED",
+                "active",
+                now,
+                null,
+                null,
+                now,
+                now,
+              )
+              .run();
+          } catch {}
+        } catch {}
+        if (newPlan === "free") {
+          return { plan: "free", status: "active", period_end: null, isFree: true, downgraded: true };
+        }
+        return {
+          plan: newPlan,
+          status: "active",
+          period_end: null,
+          isFree: false,
+          downgraded: true,
+        };
+      }
+      // No downgrade, just expired
       return {
         plan,
         status: "expired",
         period_end: Number(periodEnd),
         isExpired: true,
         isFree: false,
+        downgrade_plan: downgradePlan || null,
+      };
+    }
+    // If canceled/downgrade scheduled but still within period, show as active with scheduled flag
+    if (downgradePlan) {
+      return {
+        plan,
+        status: status === "canceled" ? "canceled" : "active",
+        period_end: periodEnd ? Number(periodEnd) : null,
+        isFree: false,
+        isScheduledDowngrade: true,
+        downgrade_plan: downgradePlan,
+        downgrade_scheduled_at: user?.downgrade_scheduled_at ? Number(user.downgrade_scheduled_at) : null,
       };
     }
     if (status === "expired" || status === "canceled") {
@@ -148,10 +226,11 @@ export async function activateSubscription(
   amount,
 ) {
   const now = Date.now();
-  const periodEnd = now + MONTH_DAYS * DAY_MS;
+  const isFree = plan === "free" || plan === FREE_PLAN;
+  const periodEnd = isFree ? null : now + MONTH_DAYS * DAY_MS;
   const id = crypto.randomUUID();
   const meta = ZIINA_PLANS[plan] || ZIINA_PLANS["standard"];
-  const finalAmount = amount || meta.amount;
+  const finalAmount = isFree ? 0 : amount || meta.amount;
 
   try {
     // Insert subscription record
@@ -177,9 +256,9 @@ export async function activateSubscription(
     console.warn("activateSubscription insert failed", safeErrorDetail(e));
   }
   try {
-    // Update users table
+    // Update users table — clear any scheduled downgrade on activation
     await env.DB.prepare(
-      `UPDATE users SET plan=?, subscription_plan=?, subscription_status=?, subscription_period_end=?, subscription_ziina_id=? WHERE id=?`,
+      `UPDATE users SET plan=?, subscription_plan=?, subscription_status=?, subscription_period_end=?, subscription_ziina_id=?, downgrade_plan=NULL, downgrade_scheduled_at=NULL WHERE id=?`,
     )
       .bind(plan, plan, "active", periodEnd, ziinaPaymentId || null, userId)
       .run();
@@ -188,6 +267,14 @@ export async function activateSubscription(
     try {
       await env.DB.prepare(`UPDATE users SET plan=? WHERE id=?`)
         .bind(plan, userId)
+        .run();
+    } catch {}
+    // Try to clear downgrade if columns exist
+    try {
+      await env.DB.prepare(
+        `UPDATE users SET downgrade_plan=NULL, downgrade_scheduled_at=NULL WHERE id=?`,
+      )
+        .bind(userId)
         .run();
     } catch {}
   }
@@ -546,33 +633,118 @@ export async function handleSubscriptions(request, env) {
     }
   }
 
-  // POST /api/subscriptions/cancel  -> cancel / downgrade to free
+  // POST /api/subscriptions/cancel  -> schedule cancel/downgrade after period_end
+  // Body: { plan?: 'free'|'standard'|'premium', undo?: boolean }
+  // If user has active paid plan with future period_end, keep it active until period_end then downgrade.
+  // If already expired or no period, downgrade immediately.
   if (pathname === "/api/subscriptions/cancel" && request.method === "POST") {
+    let body;
     try {
-      await env.DB.prepare(
-        `UPDATE users SET plan='free', subscription_plan='free', subscription_status='canceled', subscription_period_end=? WHERE id=?`,
-      )
-        .bind(Date.now(), userId)
-        .run();
+      body = await readBoundedJson(request);
     } catch {
+      body = {};
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) body = {};
+    // Handle undo of scheduled downgrade
+    if (body.undo === true || body.keep === true || body.undo_downgrade === true) {
       try {
-        await env.DB.prepare(`UPDATE users SET plan='free' WHERE id=?`)
+        await env.DB.prepare(
+          `UPDATE users SET downgrade_plan=NULL, downgrade_scheduled_at=NULL, subscription_status='active' WHERE id=?`,
+        )
           .bind(userId)
           .run();
       } catch {}
+      const current = await getActiveSubscription(env, userId);
+      return jsonResponse(200, {
+        ok: true,
+        plan: current?.plan || "free",
+        message: "Scheduled downgrade canceled — keeping current plan",
+        subscription: current,
+      });
     }
-    // Also mark active subscriptions as canceled
+
+    const rawTarget = String(body.plan || body.target_plan || body.downgrade_plan || "free")
+      .trim()
+      .toLowerCase();
+    const targetPlan = ZIINA_PLANS[rawTarget] ? rawTarget : "free";
+
+    // Get current subscription
+    const current = await getActiveSubscription(env, userId);
+    const currentPlan = current?.plan || "free";
+    const periodEnd = current?.period_end ? Number(current.period_end) : null;
+    const now = Date.now();
+
+    // If already on target, nothing to do
+    if (currentPlan === targetPlan && !current?.isScheduledDowngrade) {
+      return jsonResponse(200, {
+        ok: true,
+        plan: currentPlan,
+        message: `Already on ${targetPlan} plan`,
+        subscription: current,
+      });
+    }
+
+    // If target is same as scheduled downgrade, acknowledge
+    if (current?.downgrade_plan === targetPlan) {
+      return jsonResponse(200, {
+        ok: true,
+        plan: currentPlan,
+        scheduled: targetPlan,
+        period_end: periodEnd,
+        message: `Already scheduled to downgrade to ${targetPlan} on ${periodEnd ? new Date(periodEnd).toLocaleDateString() : "period end"}`,
+        subscription: current,
+      });
+    }
+
+    // If no active period or already expired, downgrade immediately
+    if (!periodEnd || periodEnd <= now || current?.isExpired) {
+      await activateSubscription(env, userId, targetPlan, null, ZIINA_PLANS[targetPlan].amount);
+      const updated = await getActiveSubscription(env, userId);
+      return jsonResponse(200, {
+        ok: true,
+        plan: targetPlan,
+        message:
+          targetPlan === "free"
+            ? "Downgraded to Free immediately"
+            : `Downgraded to ${targetPlan} immediately`,
+        subscription: updated,
+      });
+    }
+
+    // Has future period_end — schedule downgrade after period_end
     try {
       await env.DB.prepare(
-        `UPDATE subscriptions SET status='canceled', updated_at=? WHERE user_id=? AND status='active'`,
+        `UPDATE users SET downgrade_plan=?, downgrade_scheduled_at=?, subscription_status='canceled' WHERE id=?`,
       )
-        .bind(Date.now(), userId)
+        .bind(targetPlan, now, userId)
         .run();
-    } catch {}
+    } catch (e) {
+      // Fallback if downgrade columns missing — try to set via alter then retry
+      try {
+        await env.DB.prepare(`ALTER TABLE users ADD COLUMN downgrade_plan TEXT`).run();
+      } catch {}
+      try {
+        await env.DB.prepare(`ALTER TABLE users ADD COLUMN downgrade_scheduled_at INTEGER`).run();
+      } catch {}
+      try {
+        await env.DB.prepare(
+          `UPDATE users SET downgrade_plan=?, downgrade_scheduled_at=?, subscription_status='canceled' WHERE id=?`,
+        )
+          .bind(targetPlan, now, userId)
+          .run();
+      } catch {}
+    }
+    const scheduled = await getActiveSubscription(env, userId);
     return jsonResponse(200, {
       ok: true,
-      plan: "free",
-      message: "Subscription canceled — downgraded to Free",
+      plan: currentPlan,
+      scheduled: targetPlan,
+      period_end: periodEnd,
+      message:
+        targetPlan === "free"
+          ? `Scheduled to downgrade to Free on ${new Date(periodEnd).toLocaleDateString()} — you keep ${currentPlan} until then`
+          : `Scheduled to downgrade to ${targetPlan} on ${new Date(periodEnd).toLocaleDateString()} — you keep ${currentPlan} until then`,
+      subscription: scheduled,
     });
   }
 

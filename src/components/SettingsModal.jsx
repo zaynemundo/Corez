@@ -123,7 +123,7 @@ export default function SettingsModal({
         <div className="settings-section pricing-section">
           <div className="settings-section-label">Plan &amp; Billing</div>
           <div
-            className={`pricing-status ${isExpired ? "expired" : currentPlan}`}
+            className={`pricing-status ${isExpired ? "expired" : sub?.isScheduledDowngrade ? "scheduled" : currentPlan}`}
           >
             <div className="pricing-status-left">
               <span className={`pricing-status-icon ${currentPlan}`}>
@@ -137,33 +137,99 @@ export default function SettingsModal({
               </span>
               <div>
                 <div className="pricing-status-plan">
-                  {currentPlan} {isExpired ? "(expired)" : ""}
+                  {currentPlan} {isExpired ? "(expired)" : sub?.isScheduledDowngrade ? "(scheduled)" : ""}
                 </div>
                 <div className="pricing-status-desc">
                   {subLoading
                     ? "Loading…"
-                    : currentPlan === "free"
-                      ? "Free forever — upgrade anytime"
-                      : periodEnd
-                        ? isExpired
-                          ? `Expired on ${periodEnd} — renew to continue`
-                          : `Renews on ${periodEnd} • Monthly via Ziina`
-                        : "Monthly via Ziina • Cancel anytime"}
+                    : sub?.isScheduledDowngrade && sub?.downgrade_plan
+                      ? `Scheduled to downgrade to ${sub.downgrade_plan} on ${periodEnd} — you keep ${currentPlan} until then`
+                      : currentPlan === "free"
+                        ? "Free forever — upgrade anytime"
+                        : periodEnd
+                          ? isExpired
+                            ? `Expired on ${periodEnd} — renew to continue`
+                            : `Renews on ${periodEnd} • Monthly via Ziina`
+                          : "Monthly via Ziina • Cancel anytime"}
                 </div>
               </div>
             </div>
             <span
-              className={`pricing-status-badge ${isExpired ? "expired" : "active"}`}
+              className={`pricing-status-badge ${isExpired ? "expired" : sub?.isScheduledDowngrade ? "scheduled" : "active"}`}
+              style={
+                sub?.isScheduledDowngrade
+                  ? { background: "rgba(251,191,36,0.12)", color: "#fde68a", borderColor: "rgba(251,191,36,0.28)" }
+                  : undefined
+              }
             >
               {isExpired
                 ? "Expired"
-                : sub?.status === "active"
-                  ? "Active"
-                  : currentPlan === "free"
+                : sub?.isScheduledDowngrade
+                  ? "Scheduled"
+                  : sub?.status === "active"
                     ? "Active"
-                    : sub?.status || "Active"}
+                    : currentPlan === "free"
+                      ? "Active"
+                      : sub?.status || "Active"}
             </span>
           </div>
+
+          {sub?.isScheduledDowngrade && sub?.downgrade_plan && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "10px",
+                padding: "10px 12px",
+                borderRadius: "10px",
+                background: "rgba(251,191,36,0.08)",
+                border: "1px solid rgba(251,191,36,0.18)",
+                fontSize: "12px",
+              }}
+            >
+              <span style={{ color: "var(--text-secondary)", lineHeight: 1.4 }}>
+                Will downgrade to <strong style={{ color: "var(--text-primary)", textTransform: "capitalize" }}>{sub.downgrade_plan}</strong> on {periodEnd}
+              </span>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!confirm("Keep current plan? Cancel scheduled downgrade.")) return;
+                  try {
+                    const r = await fetch("/api/subscriptions/cancel", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      credentials: "include",
+                      body: JSON.stringify({ undo: true }),
+                    });
+                    const d = await r.json().catch(() => ({}));
+                    if (r.ok) {
+                      alert("Scheduled downgrade canceled — keeping " + currentPlan);
+                      const mr = await fetch("/api/subscriptions/me", { credentials: "include" });
+                      const md = await mr.json().catch(() => ({}));
+                      if (mr.ok) setSub(md);
+                      try { await auth?.refresh?.(); } catch {}
+                    } else alert(d.error || "Failed");
+                  } catch (e) {
+                    alert(e.message || "Failed");
+                  }
+                }}
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: "999px",
+                  border: "1px solid var(--border-color)",
+                  background: "var(--bg-primary)",
+                  color: "var(--text-primary)",
+                  fontWeight: 600,
+                  fontSize: "11px",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Keep {currentPlan}
+              </button>
+            </div>
+          )}
 
           <button
             type="button"
@@ -188,6 +254,10 @@ export default function SettingsModal({
             Connected to <strong>/pricing</strong> • Standard 18.36 AED /
             Premium 27.54 AED • Billed monthly • <ExternalLink size={10} />{" "}
             Secure Ziina checkout
+            <br />
+            <span style={{ fontSize: "10px", color: "var(--text-muted)" }}>
+              Cancel or downgrade takes effect after current period ends — you keep current plan until {periodEnd || "period end"}.
+            </span>
           </div>
         </div>
 
