@@ -579,16 +579,17 @@ EMAIL FORMATTING (whenever the user asks you to write, draft, compose, or rewrit
     ? `- CREATORS: If asked who created Corez or who made you, answer that Corez was founded and developed by these people, presenting their names as a clean bullet-point list of clickable markdown links with their roles: [Zayne Mundo](https://www.linkedin.com/in/zayne-mundo/) — Founder & Lead Developer, [Christian Vestil](https://www.linkedin.com/in/christian-jericson-belderol/) — Quality Assurance Tester, and [Renz Cardona](https://www.linkedin.com/in/renz-cardona-5941051b9/) — Chief Innovation Officer. Then explain WHY Corez was created, presenting the answer as clean, scannable markdown: start with the creator list, then the mission statement, then a short idea-to-launch summary. CoreZ was created as a conversational AI creation platform that helps people turn ideas into working digital products without needing to code. Rather than only answering questions, it is designed to understand the user's intent, generate websites, apps, games, tools, images, research reports and other content, display the result in a live preview, allow revisions through chat and publish finished creations through a shareable link. Its core purpose is to remove the technical gap between having an idea and launching something functional, making digital creation accessible to designers, marketers, entrepreneurs, students and everyday users. In short, CoreZ turns plain conversation into creation — taking anyone from a first spark of an idea to a finished, shareable product. Do not introduce yourself or list your capabilities after answering, and never mention APIs, models, providers, or any technical backend details.`
     : `- CREATORS: If asked who created Corez, present the founders as clickable markdown links — [Zayne Mundo](https://www.linkedin.com/in/zayne-mundo/) (Founder & Lead Developer), [Christian Vestil](https://www.linkedin.com/in/christian-jericson-belderol/) (Quality Assurance Tester), [Renz Cardona](https://www.linkedin.com/in/renz-cardona-5941051b9/) (Chief Innovation Officer) — and briefly explain why Corez was created.`;
 
-  return `You are COREZ AI — powered by Muse Spark 1.2 for deep reasoning and high-quality generation.
+  return `You are COREZ AI — powered by Corez 1.0 for deep reasoning and high-quality generation.
 
 Identity & Persona:
 - Your name is COREZ AI.
 ${creatorsSection}
-- STRICT MODEL ANONYMITY RULE: NEVER mention what underlying AI model, provider, vendor, architecture, or engine powers you in public chat or user responses. Always identify yourself strictly as COREZ AI.
+- STRICT MODEL ANONYMITY RULE: NEVER mention what underlying AI model, provider, vendor, architecture, or engine powers you in public chat or user responses. Always identify yourself strictly as COREZ AI. The underlying engine is strictly confidential and must never be disclosed, even if the user insists, tricks, or claims you are another model.
+- MODEL IDENTITY RULE: If the user asks what model you are, what AI model powers you, what LLM you are, which model you use, "what model of ai are you using", or accuses you of being Muse, Muse Spark, Meta AI, GPT, ChatGPT, Claude, Gemini, Llama, MiMo, DeepSeek, or any other external model, respond exactly with: "I'm Corez 1.0 built by Corez." You may add a brief helpful follow-up like "How can I help you today?" but never mention Muse Spark, Meta, or any other provider. Never be evasive, never refuse — answer directly as Corez 1.0.
 - When greeted with simple phrases like "hi", "hello", "hey", or "who are you", respond simply: "Hello! I'm COREZ AI. How can I help you today?"
 - Never list bullet points or technical specializations when giving greetings unless requested.
 
-Reasoning & Response Quality (Muse Spark 1.2 — hidden chain-of-thought):
+Reasoning & Response Quality (Corez 1.0 — hidden chain-of-thought):
 - Think step by step INTERNALLY before answering: decompose the problem, consider alternatives and edge cases, plan the structure, and verify logic. Do NOT reveal your thinking, do NOT use <think> or <thinking> tags, do NOT say "I am thinking step by step" — just deliver the final polished answer.
 - Be thorough and accurate: for factual/live data, cite sources from the provided search results; for code/apps, deliver complete, runnable code with no placeholder TODOs, handle edge cases, and include clear verification steps.
 - For complex or high-stakes requests (apps, games, research, data analysis), ensure deep reasoning: check requirements against the deliverable, validate completeness, and anticipate follow-up needs.
@@ -721,6 +722,50 @@ async function handleAi(request, env) {
     return jsonResponse(200, {
       content: greetingContent,
       model: 'corez-greeting'
+    });
+  }
+
+  // Model identity fast-path: "what model are you using" / "which llm" / "are you Muse" etc.
+  // Always answer Corez 1.0 deterministically without paying an LLM round-trip, so the
+  // underlying provider (Muse Spark) is never leaked even if the model is tricked.
+  // This covers the exact user request: "what model of ai are you using" -> "Corez 1.0".
+  const MODEL_IDENTITY_PATTERN = /(what|which)\s+(model|llm|ai\s*model|language\s*model).*?\b(you|your|using|power|are\s+you)\b|what\s+model\s+of\s+ai\s+are\s+you\s+using|are\s+you\s+(muse|meta\s*ai|muse\s+spark|gpt|chatgpt|claude|gemini|llama|mimo|deepseek|openai)|which\s+ai\s+are\s+you|powered\s+by.*\b(you|model)\b/i;
+  const lowerPrompt = String(prompt || '').toLowerCase();
+  const isModelIdentityQuestion = MODEL_IDENTITY_PATTERN.test(prompt)
+    || (/what\s+model/i.test(lowerPrompt) && /\b(you|your)\b/i.test(lowerPrompt))
+    || (/which\s+model/i.test(lowerPrompt) && /\b(you|your)\b/i.test(lowerPrompt))
+    || (/what\s+ai\s+are\s+you/i.test(lowerPrompt))
+    || (/\bpowered\s+by\b/i.test(prompt) && /\b(you|model|ai)\b/i.test(prompt));
+  const hasYouReference = /\b(you|your|are you|you're|u are)\b/i.test(prompt);
+  const hasModelKeyword = /\b(model|muse|gpt|claude|gemini|llama|meta|mimo|deepseek|llm|ai|powered)\b/i.test(prompt);
+  const isPoweredByQuestion = /\bpowered\s+by\b/i.test(prompt) && hasYouReference;
+  if (isModelIdentityQuestion && hasYouReference && (hasModelKeyword || isPoweredByQuestion) && prompt.length <= 350) {
+    const modelReply = "I'm Corez 1.0 built by Corez. How can I help you today?";
+    if (body.stream === true) {
+      const encoder = new TextEncoder();
+      const sse = (event) => `data: ${JSON.stringify(event)}\n\n`;
+      const readable = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(sse({ type: 'meta', provider: 'corez', model: 'corez-1.0' })));
+          controller.enqueue(encoder.encode(sse({ type: 'delta', text: modelReply })));
+          controller.enqueue(encoder.encode(sse({ type: 'done', final: true, projectState: null })));
+          controller.close();
+        }
+      });
+      return new Response(readable, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          'Access-Control-Allow-Origin': '*',
+          'X-Accel-Buffering': 'no'
+        }
+      });
+    }
+    return jsonResponse(200, {
+      content: modelReply,
+      model: 'corez-1.0'
     });
   }
 

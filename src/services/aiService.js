@@ -1,9 +1,9 @@
 // Corez AI Service Engine - Universal Public Conversational Engine
 
 export const MODEL = {
-  id: 'corez',
-  name: 'Corez AI',
-  description: 'Minimalist AI assistant for concise conversation, reasoning, and live app creation.'
+  id: 'corez-1.0',
+  name: 'Corez 1.0',
+  description: 'Corez 1.0 — conversational AI creation platform for websites, apps, games, and tools.'
 };
 
 // AI traffic order. The raw workers.dev host (chat.zayne-mayo.workers.dev)
