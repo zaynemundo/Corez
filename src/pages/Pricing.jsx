@@ -632,40 +632,6 @@ export default function Pricing() {
           </div>
         </div>
 
-        <div className="pricing-faq">
-          <h2>FAQs</h2>
-          <div className="pricing-faq-grid">
-            <div>
-              <h3>Can I cancel anytime?</h3>
-              <p>
-                Yes. Downgrade to Free in Settings → Plan & Billing or on this
-                page. You keep paid features until the period ends.
-              </p>
-            </div>
-            <div>
-              <h3>How does monthly billing work?</h3>
-              <p>
-                Billed monthly via Ziina (UAE). Standard 1836 fils, Premium 2754
-                fils. We create a 30-day subscription on successful payment —
-                renew manually when it expires.
-              </p>
-            </div>
-            <div>
-              <h3>What payment methods?</h3>
-              <p>
-                Ziina hosted checkout: cards, Apple Pay & Google Pay where
-                supported. Test mode uses any card.
-              </p>
-            </div>
-            <div>
-              <h3>Need help?</h3>
-              <p>
-                Contact us via the app. Free forever — upgrade when you need
-                more.
-              </p>
-            </div>
-          </div>
-        </div>
       </main>
 
       <footer className="pricing-footer">
