@@ -15,7 +15,6 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [plan, setPlan] = useState('free');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [forgotSent, setForgotSent] = useState('');
@@ -32,37 +31,7 @@ export default function Login() {
       if (mode === 'login') {
         await login(email, password);
       } else if (mode === 'signup') {
-        await signup(email, password, plan);
-        // For paid plans, create monthly subscription via Ziina and redirect to checkout
-        if (plan === 'standard' || plan === 'premium') {
-          try {
-            const origin = typeof window !== 'undefined' ? window.location.origin : 'https://corez.pro';
-            const payRes = await fetch('/api/subscriptions/checkout', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({
-                plan,
-                success_url: origin + '/payment/success?plan=' + plan,
-                cancel_url: origin + '/payment/cancel?plan=' + plan,
-                test: false
-              })
-            });
-            const payData = await payRes.json().catch(() => ({}));
-            if (payRes.ok && payData.redirect_url) {
-              window.location.href = payData.redirect_url;
-              return;
-            } else if (payData.free) {
-              // Free handled — no redirect
-            } else if (!payRes.ok) {
-              console.warn('Subscription checkout failed', payData);
-              // Still let signup succeed — user can pay later from settings
-              setError(payData.error || 'Payment setup failed — you can upgrade later from settings.');
-            }
-          } catch (payErr) {
-            console.warn('Payment redirect failed', payErr);
-          }
-        }
+        await signup(email, password, 'free');
       } else if (mode === 'forgot') {
         const res = await forgot(email);
         setForgotSent(res.message || 'If that email exists, a reset link has been sent.');
@@ -168,46 +137,6 @@ export default function Login() {
               <button type="button" className="auth-link" style={{ fontSize: '12px' }} onClick={() => { setMode('forgot'); setError(''); setForgotSent(''); }}>
                 Forgot password?
               </button>
-            </div>
-          )}
-
-          {mode === 'signup' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <span style={{ fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', fontSize: '11px', color: 'var(--text-secondary)' }}>Choose Plan</span>
-              <div role="radiogroup" aria-label="Choose plan" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                {[
-                  { id: 'free', name: 'Free', price: '0 AED', sub: 'forever', desc: 'Get started', features: 'Limited generations' },
-                  { id: 'standard', name: 'Standard', price: '18.36 AED', sub: '/ month', desc: 'Most popular', features: 'More builds & publish' },
-                  { id: 'premium', name: 'Premium', price: '27.54 AED', sub: '/ month', desc: 'Full power', features: 'Unlimited & priority' },
-                ].map(p => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={plan === p.id}
-                    onClick={() => setPlan(p.id)}
-                    style={{
-                      padding: '12px 8px',
-                      borderRadius: '10px',
-                      border: plan === p.id ? '1.5px solid var(--text-primary)' : '1px solid var(--border-color)',
-                      background: plan === p.id ? 'var(--bg-tertiary)' : 'transparent',
-                      color: 'var(--text-primary)',
-                      cursor: 'pointer',
-                      textAlign: 'center',
-                      transition: 'all 0.15s ease',
-                      position: 'relative'
-                    }}
-                  >
-                    {plan === p.id && <span style={{ position: 'absolute', top: '6px', right: '6px', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--text-primary)' }} />}
-                    <div style={{ fontWeight: 700, fontSize: '13px' }}>{p.name}</div>
-                    <div style={{ fontSize: '12px', fontWeight: 600, marginTop: '4px', color: plan === p.id ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{p.price}<span style={{ fontSize: '10px', fontWeight: 400, color: 'var(--text-muted)' }}> {p.sub}</span></div>
-                    <div style={{ fontSize: '10px', marginTop: '2px', color: 'var(--text-muted)' }}>{p.features}</div>
-                  </button>
-                ))}
-              </div>
-              <small className="auth-hint" style={{ textAlign: 'center' }}>
-                {plan === 'free' ? 'Free forever — upgrade anytime.' : plan === 'standard' ? 'Standard — 18.36 AED / month via Ziina. Renewed monthly, cancel anytime.' : 'Premium — 27.54 AED / month via Ziina. Renewed monthly, cancel anytime.'}
-              </small>
             </div>
           )}
 
