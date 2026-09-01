@@ -136,7 +136,10 @@ export default function Pricing() {
           try {
             const mr = await fetch("/api/subscriptions/me", { credentials: "include" });
             const md = await mr.json().catch(() => ({}));
-            if (mr.ok && md?.plan) setCurrentPlan(md.plan);
+            if (mr.ok) {
+              setSub(md);
+              if (md?.plan) setCurrentPlan(md.plan);
+            }
           } catch {}
         } else alert(d.error || "Failed to schedule downgrade");
       } finally {
@@ -163,11 +166,86 @@ export default function Pricing() {
       const d = await r.json().catch(() => ({}));
       if (r.ok && d.redirect_url) {
         window.location.href = d.redirect_url;
+      } else if (r.ok && d.verified) {
+        // The earlier checkout was actually paid — the server activated it.
+        try {
+          const mr = await fetch("/api/subscriptions/me", { credentials: "include" });
+          const md = await mr.json().catch(() => ({}));
+          if (mr.ok) {
+            setSub(md);
+            if (md?.plan) setCurrentPlan(md.plan);
+          }
+        } catch {}
+        alert(d.message || `Payment found completed — ${planId} activated`);
       } else {
         alert(d.error || "Checkout failed");
       }
     } catch (e) {
       alert(e.message || "Checkout failed");
+    } finally {
+      setPayBusy("");
+    }
+  };
+
+  const resumePendingCheckout = async () => {
+    setPayBusy(sub?.pending_plan || "pending");
+    try {
+      const r = await fetch("/api/subscriptions/pending", { credentials: "include" });
+      const d = await r.json().catch(() => ({}));
+      const pendingInfo = d?.pending;
+      if (!pendingInfo) {
+        const mr = await fetch("/api/subscriptions/me", { credentials: "include" });
+        const md = await mr.json().catch(() => ({}));
+        setSub(md);
+        if (md?.plan) setCurrentPlan(md.plan);
+        return;
+      }
+      if (String(pendingInfo.status || "").toLowerCase() === "completed") {
+        const vr = await fetch("/api/subscriptions/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ payment_id: pendingInfo.payment_id, plan: pendingInfo.plan }),
+        });
+        const vd = await vr.json().catch(() => ({}));
+        if (vr.ok && vd?.verified) {
+          const mr = await fetch("/api/subscriptions/me", { credentials: "include" });
+          const md = await mr.json().catch(() => ({}));
+          setSub(md);
+          if (md?.plan) setCurrentPlan(md.plan);
+          alert(vd.message || "Payment verified — plan activated");
+          return;
+        }
+      }
+      if (pendingInfo.redirect_url) window.location.href = pendingInfo.redirect_url;
+      else alert("This checkout is no longer available — please try again.");
+    } catch (e) {
+      alert(e.message || "Could not resume payment");
+    } finally {
+      setPayBusy("");
+    }
+  };
+
+  const abandonPendingCheckout = async () => {
+    if (!confirm("Cancel this pending payment? Your current plan stays unchanged.")) return;
+    setPayBusy(sub?.pending_plan || "pending");
+    try {
+      const r = await fetch("/api/subscriptions/abandon", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ plan: sub?.pending_plan || undefined }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) {
+        const mr = await fetch("/api/subscriptions/me", { credentials: "include" });
+        const md = await mr.json().catch(() => ({}));
+        setSub(md);
+        if (md?.plan) setCurrentPlan(md.plan);
+        if (d?.activated) alert("Payment had completed on Ziina — plan activated.");
+      } else alert(d.error || "Failed to cancel pending payment");
+    } catch (e) {
+      alert(e.message || "Failed");
     } finally {
       setPayBusy("");
     }
@@ -265,6 +343,67 @@ export default function Pricing() {
           )}
         </div>
       </header>
+
+      {user && sub?.pending_plan && sub.pending_plan !== currentPlan && (
+        <div style={{ maxWidth: "1120px", margin: "0 auto", padding: "0 24px 12px", width: "100%" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: "12px",
+              padding: "12px 14px",
+              borderRadius: "12px",
+              background: "rgba(251,191,36,0.08)",
+              border: "1px solid rgba(251,191,36,0.18)",
+              fontSize: "13px",
+            }}
+          >
+            <span style={{ color: "var(--text-secondary)", lineHeight: 1.4 }}>
+              An unfinished <strong style={{ color: "var(--text-primary)", textTransform: "capitalize" }}>{sub.pending_plan}</strong> checkout is waiting — you still have <strong style={{ textTransform: "capitalize" }}>{currentPlan}</strong> until you complete or cancel it.
+            </span>
+            <span style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={resumePendingCheckout}
+                disabled={payBusy === sub.pending_plan}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: "999px",
+                  border: "1px solid var(--text-primary)",
+                  background: "var(--text-primary)",
+                  color: "var(--bg-primary)",
+                  fontWeight: 600,
+                  fontSize: "12px",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {payBusy === sub.pending_plan ? "Loading…" : "Continue payment"}
+              </button>
+              <button
+                type="button"
+                onClick={abandonPendingCheckout}
+                disabled={payBusy === sub.pending_plan}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: "999px",
+                  border: "1px solid var(--border-color)",
+                  background: "var(--bg-primary)",
+                  color: "var(--text-primary)",
+                  fontWeight: 600,
+                  fontSize: "12px",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Cancel
+              </button>
+            </span>
+          </div>
+        </div>
+      )}
 
       {sub?.isScheduledDowngrade && sub?.downgrade_plan && (
         <div style={{ maxWidth: "1120px", margin: "0 auto", padding: "0 24px 12px", width: "100%" }}>

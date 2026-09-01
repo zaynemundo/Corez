@@ -78,6 +78,17 @@ export function getPlanOrFree(plan) {
 export async function getActiveSubscription(env, userId) {
   if (!env?.DB || !userId) return null;
   try {
+    // Latest pending (abandoned or in-flight upgrade) — reported but never current
+    const pending = await env.DB.prepare(
+      "SELECT plan, ziina_payment_id FROM subscriptions WHERE user_id=? AND status='pending' ORDER BY created_at DESC LIMIT 1",
+    )
+      .bind(userId)
+      .first()
+      .catch(() => null);
+    const pendingFields = {
+      pending_plan: pending?.plan ? String(pending.plan).toLowerCase() : null,
+      pending_payment_id: pending?.ziina_payment_id || null,
+    };
     // Get user plan first
     const user = await env.DB.prepare(
       "SELECT plan, subscription_plan, subscription_status, subscription_period_end, downgrade_plan, downgrade_scheduled_at FROM users WHERE id=?",
@@ -87,7 +98,7 @@ export async function getActiveSubscription(env, userId) {
     let plan = user?.plan || user?.subscription_plan || "free";
     let periodEnd = user?.subscription_period_end;
     let status = user?.subscription_status || "active";
-    const downgradePlan = user?.downgrade_plan ? String(user.downgrade_plan).toLowerCase() : null;
+    let downgradePlan = user?.downgrade_plan ? String(user.downgrade_plan).toLowerCase() : null;
 
     // If free, always active (but check if downgrade scheduled to free is pending and period ended)
     if (plan === "free" || plan === FREE_PLAN) {
@@ -101,8 +112,24 @@ export async function getActiveSubscription(env, userId) {
             .run();
         } catch {}
       }
-      return { plan: "free", status: "active", period_end: null, isFree: true };
+      return { plan: "free", status: "active", period_end: null, isFree: true, ...pendingFields };
     }
+
+    // Scheduled downgrade that matches the current plan is meaningless — clear it
+    if (downgradePlan && downgradePlan === plan) {
+      try {
+        await env.DB.prepare(
+          `UPDATE users SET downgrade_plan=NULL, downgrade_scheduled_at=NULL, subscription_status='active' WHERE id=?`,
+        )
+          .bind(userId)
+          .run();
+      } catch {}
+      downgradePlan = null;
+      status = "active";
+    }
+    // 'canceled' without a scheduled downgrade is a stale legacy flag — the user
+    // is still on their paid plan until period end (or expired past it).
+    if (status === "canceled" && !downgradePlan) status = "active";
 
     // For paid, check expiry and scheduled downgrade
     const now = Date.now();
@@ -140,7 +167,7 @@ export async function getActiveSubscription(env, userId) {
           } catch {}
         } catch {}
         if (newPlan === "free") {
-          return { plan: "free", status: "active", period_end: null, isFree: true, downgraded: true };
+          return { plan: "free", status: "active", period_end: null, isFree: true, downgraded: true, ...pendingFields };
         }
         return {
           plan: newPlan,
@@ -148,6 +175,7 @@ export async function getActiveSubscription(env, userId) {
           period_end: null,
           isFree: false,
           downgraded: true,
+          ...pendingFields,
         };
       }
       // No downgrade, just expired
@@ -158,6 +186,7 @@ export async function getActiveSubscription(env, userId) {
         isExpired: true,
         isFree: false,
         downgrade_plan: downgradePlan || null,
+        ...pendingFields,
       };
     }
     // If canceled/downgrade scheduled but still within period, show as active with scheduled flag
@@ -170,6 +199,7 @@ export async function getActiveSubscription(env, userId) {
         isScheduledDowngrade: true,
         downgrade_plan: downgradePlan,
         downgrade_scheduled_at: user?.downgrade_scheduled_at ? Number(user.downgrade_scheduled_at) : null,
+        ...pendingFields,
       };
     }
     if (status === "expired" || status === "canceled") {
@@ -178,11 +208,12 @@ export async function getActiveSubscription(env, userId) {
         status,
         period_end: periodEnd ? Number(periodEnd) : null,
         isFree: false,
+        ...pendingFields,
       };
     }
-    // Try to get latest subscription record
+    // Try to get latest ACTIVE subscription record (ignore pending — pending is not current)
     const sub = await env.DB.prepare(
-      "SELECT * FROM subscriptions WHERE user_id=? ORDER BY created_at DESC LIMIT 1",
+      "SELECT * FROM subscriptions WHERE user_id=? AND status='active' ORDER BY created_at DESC LIMIT 1",
     )
       .bind(userId)
       .first()
@@ -192,9 +223,22 @@ export async function getActiveSubscription(env, userId) {
         sub.period_end &&
         Number(sub.period_end) < now &&
         sub.status === "active";
+      // If sub is expired but we have a scheduled downgrade, already handled above
+      // Otherwise return active sub
+      if (isExpired) {
+        // Reconcile: the plan actually lapsed — treat as expired, keep fallback users-table fields
+        return {
+          plan: sub.plan,
+          status: "expired",
+          period_end: Number(sub.period_end),
+          isExpired: true,
+          isFree: false,
+          ...pendingFields,
+        };
+      }
       return {
         plan: sub.plan,
-        status: isExpired ? "expired" : sub.status,
+        status: sub.status,
         period_start: sub.period_start ? Number(sub.period_start) : null,
         period_end: sub.period_end
           ? Number(sub.period_end)
@@ -202,16 +246,19 @@ export async function getActiveSubscription(env, userId) {
             ? Number(periodEnd)
             : null,
         ziina_payment_id: sub.ziina_payment_id,
-        isExpired: !!isExpired,
+        isExpired: false,
         isFree: false,
         subscription: sub,
+        ...pendingFields,
       };
     }
+    // No active sub row, fallback to users table plan (handles free and scheduled)
     return {
       plan,
       status,
       period_end: periodEnd ? Number(periodEnd) : null,
       isFree: false,
+      ...pendingFields,
     };
   } catch {
     return null;
@@ -233,6 +280,22 @@ export async function activateSubscription(
   const finalAmount = isFree ? 0 : amount || meta.amount;
 
   try {
+    // Mark any previous ACTIVE rows as completed (one true current plan) and drop
+    // abandoned/finished pending rows so they can never activate later.
+    try {
+      await env.DB.prepare(
+        `UPDATE subscriptions SET status='completed', updated_at=? WHERE user_id=? AND status='active'`,
+      )
+        .bind(now, userId)
+        .run();
+    } catch {}
+    try {
+      await env.DB.prepare(
+        `DELETE FROM subscriptions WHERE user_id=? AND status='pending'`,
+      )
+        .bind(userId)
+        .run();
+    } catch {}
     // Insert subscription record
     await env.DB.prepare(
       `INSERT INTO subscriptions (id, user_id, plan, amount, currency_code, status, period_start, period_end, ziina_payment_id, created_at, updated_at)
@@ -288,6 +351,48 @@ export async function activateSubscription(
   };
 }
 
+// Reconcile pending (in-flight / abandoned) checkouts against Ziina.
+// Any pending that was actually completed activates immediately — money is
+// never silently discarded. Everything else is dropped so a stale pending
+// can never overwrite the user's real current plan later.
+export async function reconcilePendingSubscriptions(env, userId) {
+  let pendingRows = [];
+  try {
+    const rows = await env.DB.prepare(
+      "SELECT id, plan, ziina_payment_id FROM subscriptions WHERE user_id=? AND status='pending'",
+    )
+      .bind(userId).all();
+    pendingRows = Array.isArray(rows?.results) ? rows.results : [];
+  } catch {
+    return { reconciled: false };
+  }
+  if (pendingRows.length === 0) return { reconciled: true, activated: null };
+  const apiKey = env?.ZIINA_API_KEY || env?.ZIINA_API_TOKEN;
+  let activated = null;
+  for (const row of pendingRows) {
+    if (!row.ziina_payment_id || !apiKey) {
+      try { await env.DB.prepare(`DELETE FROM subscriptions WHERE id=?`).bind(row.id).run(); } catch {}
+      continue;
+    }
+    try {
+      const ziinaRes = await fetch(
+        `${ZIINA_BASE}/payment_intent/${encodeURIComponent(row.ziina_payment_id)}`,
+        { headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" } },
+      );
+      const data = ziinaRes.ok ? await ziinaRes.json().catch(() => ({})) : {};
+      if (String(data?.status || "").toLowerCase() === "completed") {
+        activated = await activateSubscription(env, userId, row.plan, row.ziina_payment_id, Number(data?.amount) || ZIINA_PLANS[row.plan]?.amount);
+        // activateSubscription deleted all pending rows already
+        break;
+      }
+      await env.DB.prepare(`DELETE FROM subscriptions WHERE id=?`).bind(row.id).run();
+    } catch {
+      try { await env.DB.prepare(`DELETE FROM subscriptions WHERE id=?`).bind(row.id).run(); } catch {}
+    }
+  }
+  return { reconciled: true, activated };
+}
+
 export async function handleSubscriptions(request, env) {
   const url = new URL(request.url);
   const pathname = url.pathname;
@@ -317,6 +422,10 @@ export async function handleSubscriptions(request, env) {
 
   // GET /api/subscriptions/me  -> current subscription
   if (pathname === "/api/subscriptions/me" && request.method === "GET") {
+    // Reconcile in-flight checkouts first: a completed-but-unverified Ziina
+    // payment activates here, abandoned ones are dropped — so a pending
+    // upgrade can never mask or later clobber the user's real plan.
+    await reconcilePendingSubscriptions(env, userId);
     const sub = await getActiveSubscription(env, userId);
     if (!sub)
       return jsonResponse(200, {
@@ -325,6 +434,75 @@ export async function handleSubscriptions(request, env) {
         isFree: true,
       });
     return jsonResponse(200, sub);
+  }
+
+  // GET /api/subscriptions/pending -> in-flight checkout (resume payment)
+  if (pathname === "/api/subscriptions/pending" && request.method === "GET") {
+    const apiKey = env?.ZIINA_API_KEY || env?.ZIINA_API_TOKEN;
+    try {
+      const row = await env.DB.prepare(
+        "SELECT plan, ziina_payment_id FROM subscriptions WHERE user_id=? AND status='pending' ORDER BY created_at DESC LIMIT 1",
+      )
+        .bind(userId)
+        .first();
+      if (!row || !row.ziina_payment_id)
+        return jsonResponse(200, { pending: null });
+      let ziina = {};
+      if (apiKey) {
+        const r = await fetch(
+          `${ZIINA_BASE}/payment_intent/${encodeURIComponent(row.ziina_payment_id)}`,
+          { headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" } },
+        );
+        ziina = r.ok ? await r.json().catch(() => ({})) : {};
+      }
+      return jsonResponse(200, {
+        pending: {
+          plan: row.plan,
+          payment_id: row.ziina_payment_id,
+          status: ziina?.status || null,
+          redirect_url: ziina?.redirect_url || null,
+        },
+      });
+    } catch (e) {
+      return jsonResponse(502, { error: "Failed to load pending checkout", detail: safeErrorDetail(e) });
+    }
+  }
+
+  // POST /api/subscriptions/abandon -> drop an unfinished checkout (cancel upgrade)
+  // Body: { plan? } — omit to abandon every pending checkout for this user.
+  if (pathname === "/api/subscriptions/abandon" && request.method === "POST") {
+    let body;
+    try { body = await readBoundedJson(request); } catch { body = {}; }
+    if (!body || typeof body !== "object" || Array.isArray(body)) body = {};
+    const plan = String(body.plan || "").trim().toLowerCase();
+    // Reconcile first: if the "abandoned" payment actually completed on Ziina,
+    // it must activate — abandoning must never lose a captured payment.
+    const reconciled = await reconcilePendingSubscriptions(env, userId);
+    if (!reconciled?.activated) {
+      try {
+        if (plan && ZIINA_PLANS[plan]) {
+          await env.DB.prepare(
+            `DELETE FROM subscriptions WHERE user_id=? AND status='pending' AND lower(plan)=?`,
+          )
+            .bind(userId, plan)
+            .run();
+        } else {
+          await env.DB.prepare(
+            `DELETE FROM subscriptions WHERE user_id=? AND status='pending'`,
+          )
+            .bind(userId)
+            .run();
+        }
+      } catch {}
+    }
+    const sub = await getActiveSubscription(env, userId);
+    return jsonResponse(200, {
+      ok: true,
+      plan: sub?.plan || "free",
+      activated: Boolean(reconciled?.activated),
+      message: reconciled?.activated ? "Payment completed — plan activated" : "Pending checkout removed",
+      subscription: sub,
+    });
   }
 
   // GET /api/subscriptions/plans  -> list plans
@@ -406,6 +584,59 @@ export async function handleSubscriptions(request, env) {
 
     const apiKey = env?.ZIINA_API_KEY || env?.ZIINA_API_TOKEN;
     if (!apiKey) return jsonResponse(500, { error: "Ziina not configured" });
+
+    // Reuse an existing in-flight checkout for this same plan instead of
+    // creating a duplicate Ziina intent — repeated Upgrade clicks resume.
+    try {
+      const existing = await env.DB.prepare(
+        "SELECT ziina_payment_id FROM subscriptions WHERE user_id=? AND status='pending' AND lower(plan)=? ORDER BY created_at DESC LIMIT 1",
+      )
+        .bind(userId, plan)
+        .first();
+      if (existing?.ziina_payment_id) {
+        const r = await fetch(
+          `${ZIINA_BASE}/payment_intent/${encodeURIComponent(existing.ziina_payment_id)}`,
+          { headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" } },
+        );
+        const data = r.ok ? await r.json().catch(() => ({})) : {};
+        if (r.ok && data?.id && !["completed", "failed", "canceled"].includes(String(data.status || "").toLowerCase())) {
+          return jsonResponse(200, {
+            plan,
+            amount: meta.amount,
+            aed: meta.aed,
+            interval: "month",
+            resumed: true,
+            ziina_id: data.id,
+            redirect_url: data.redirect_url,
+            embedded_url: data.embedded_url,
+            success_url: data.success_url,
+            cancel_url: data.cancel_url,
+            status: data.status,
+            raw: data,
+          });
+        }
+        // Completed but unverified → activate now; failed/canceled → drop and create fresh.
+        if (r.ok && String(data?.status || "").toLowerCase() === "completed") {
+          const activated = await activateSubscription(env, userId, plan, data.id, Number(data?.amount) || meta.amount);
+          return jsonResponse(200, {
+            plan,
+            verified: true,
+            status: "completed",
+            period_end: activated.period_end,
+            aed: meta.aed,
+            interval: "month",
+            message: `Subscription activated — ${meta.label} valid for 30 days`,
+          });
+        }
+        try {
+          await env.DB.prepare(
+            `DELETE FROM subscriptions WHERE user_id=? AND status='pending' AND lower(plan)=?`,
+          )
+            .bind(userId, plan)
+            .run();
+        } catch {}
+      }
+    } catch {}
 
     const origin = url.origin;
     const successUrl =
@@ -645,6 +876,10 @@ export async function handleSubscriptions(request, env) {
       body = {};
     }
     if (!body || typeof body !== "object" || Array.isArray(body)) body = {};
+    // Any cancel action means abandoned pending checkouts must not survive as
+    // phantom "pending" plans: reconcile them against Ziina first (a completed
+    // payment activates — money is never silently discarded), drop the rest.
+    await reconcilePendingSubscriptions(env, userId);
     // Handle undo of scheduled downgrade
     if (body.undo === true || body.keep === true || body.undo_downgrade === true) {
       try {

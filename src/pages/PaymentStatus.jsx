@@ -216,6 +216,25 @@ export function PaymentCancel() {
   const [search] = useSearchParams();
   const navigate = useNavigate();
   const plan = search.get("plan") || "";
+  const [abandoned, setAbandoned] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    const doAbandon = async () => {
+      try {
+        const r = await fetch("/api/subscriptions/abandon", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(plan ? { plan } : {}),
+        });
+        if (!cancelled && r.ok) setAbandoned(true);
+      } catch {}
+    };
+    doAbandon();
+    return () => {
+      cancelled = true;
+    };
+  }, [plan]);
   return (
     <div
       style={{
