@@ -12,46 +12,10 @@ export function PaymentSuccess() {
     let cancelled = false;
     const verify = async () => {
       try {
-        // First, get latest subscription to find pending ziina id if not in URL
         const paymentId = search.get('payment_id') || search.get('id') || search.get('paymentId');
         let body = {};
         if (paymentId) body.payment_id = paymentId;
         if (plan) body.plan = plan;
-
-        // If no paymentId in URL, the checkout endpoint stored pending with ziina id;
-        // we can try to verify via latest pending — the verify endpoint will handle missing id by checking latest pending? For now we try me first.
-        if (!paymentId) {
-          // Try to get pending from subscriptions/me
-          try {
-            const meRes = await fetch('/api/subscriptions/me', { credentials: 'include' });
-            const meData = await meRes.json().catch(() => ({}));
-            if (meData?.subscription?.ziina_payment_id) {
-              body.payment_id = meData.subscription.ziina_payment_id;
-            } else if (meData?.ziina_payment_id) {
-              body.payment_id = meData.ziina_payment_id;
-            }
-          } catch {}
-        }
-
-        if (!body.payment_id) {
-          // No id to verify — maybe free plan or already activated
-          // Try to just fetch subscription status
-          const meRes = await fetch('/api/subscriptions/me', { credentials: 'include' });
-          const meData = await meRes.json().catch(() => ({}));
-          if (meRes.ok && (meData.status === 'active' || meData.plan === plan)) {
-            if (!cancelled) {
-              setStatus('success');
-              setDetail(`Your ${plan} subscription is active. Valid for 30 days.`);
-            }
-            return;
-          }
-          // Still no id — show pending
-          if (!cancelled) {
-            setStatus('success');
-            setDetail('Payment recorded. If you completed payment on Ziina, your subscription will be active within a moment — refresh in a few seconds.');
-          }
-          return;
-        }
 
         const res = await fetch('/api/subscriptions/verify', {
           method: 'POST',
