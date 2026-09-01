@@ -3,6 +3,21 @@ import { jsonResponse, readBoundedJson, safeErrorDetail } from './utils.js';
 const ZIINA_BASE = 'https://api-v2.ziina.com/api';
 const MIN_FILS = 200; // 2 AED
 
+// Corez product pricing — 18.36 AED Standard, 27.54 AED Premium
+export const ZIINA_PLANS = {
+  standard: { amount: 1836, label: 'Standard', aed: '18.36' },
+  premium: { amount: 2754, label: 'Premium', aed: '27.54' },
+  basic: { amount: 1836, label: 'Standard', aed: '18.36' }, // alias
+};
+
+export function resolvePlanAmount(plan, fallbackAmount) {
+  if (typeof plan === 'string') {
+    const key = plan.trim().toLowerCase();
+    if (ZIINA_PLANS[key]) return ZIINA_PLANS[key].amount;
+  }
+  return fallbackAmount;
+}
+
 function isValidHttpsUrl(value) {
   if (typeof value !== 'string' || !value.trim()) return false;
   try {
@@ -94,19 +109,36 @@ export async function handleZiina(request, env) {
     }
     if (!body || typeof body !== 'object' || Array.isArray(body)) body = {};
 
-    // Normalize amount: support amount (fils), amount_fils, amountInFils, amount_aed, amountAed
-    let amount = body.amount;
-    if (amount === undefined && body.amount_fils !== undefined) amount = body.amount_fils;
-    if (amount === undefined && body.amountInFils !== undefined) amount = body.amountInFils;
-    if (amount === undefined && body.amount_aed !== undefined) amount = Number(body.amount_aed) * 100;
-    if (amount === undefined && body.amountAed !== undefined) amount = Number(body.amountAed) * 100;
-    if (amount === undefined && body.amountAED !== undefined) amount = Number(body.amountAED) * 100;
+    // Plan shortcut: { plan: 'standard' | 'premium' } → fixed pricing (18.36 / 27.54 AED)
+    // Also accepts tier / product as alias
+    const planKey = body.plan || body.tier || body.product || body.package;
+    let planMeta = null;
+    if (typeof planKey === 'string' && planKey.trim()) {
+      const k = planKey.trim().toLowerCase();
+      if (ZIINA_PLANS[k]) {
+        planMeta = ZIINA_PLANS[k];
+      } else if (k) {
+        return jsonResponse(400, { error: `Unknown plan '${planKey}'. Use 'standard' (18.36 AED) or 'premium' (27.54 AED).` });
+      }
+    }
 
-    // Also support amount as string
-    amount = Number(amount);
+    // Normalize amount: support amount (fils), amount_fils, amountInFils, amount_aed, amountAed
+    // If plan is set, its fixed amount wins (ignore any amount sent)
+    let amount;
+    if (planMeta) {
+      amount = planMeta.amount;
+    } else {
+      amount = body.amount;
+      if (amount === undefined && body.amount_fils !== undefined) amount = body.amount_fils;
+      if (amount === undefined && body.amountInFils !== undefined) amount = body.amountInFils;
+      if (amount === undefined && body.amount_aed !== undefined) amount = Number(body.amount_aed) * 100;
+      if (amount === undefined && body.amountAed !== undefined) amount = Number(body.amountAed) * 100;
+      if (amount === undefined && body.amountAED !== undefined) amount = Number(body.amountAED) * 100;
+      amount = Number(amount);
+    }
 
     if (!Number.isFinite(amount)) {
-      return jsonResponse(400, { error: 'amount is required (in fils, 100 AED = 10000 fils). Minimum 200 fils (2 AED). You can also pass amount_aed.' });
+      return jsonResponse(400, { error: 'amount or plan is required. Use plan: "standard" (1836 fils = 18.36 AED) or "premium" (2754 fils = 27.54 AED), or amount in fils (100 AED = 10000 fils). Minimum 200 fils (2 AED).' });
     }
     // If user passed AED value like 100 and we already multiplied? The above handles amount_aed, but if they pass amount=100 expecting AED, they'd get 100 fils which is below min. We detect likely AED vs fils: if amount < 200 and amount is integer and they passed amount without fils suffix, we could hint. But spec says fils, so enforce.
     if (!Number.isInteger(amount)) {
@@ -138,7 +170,11 @@ export async function handleZiina(request, env) {
       amount,
       currency_code,
     };
-    if (typeof body.message === 'string' && body.message.trim()) ziinaPayload.message = body.message.trim().slice(0, 500);
+    if (typeof body.message === 'string' && body.message.trim()) {
+      ziinaPayload.message = body.message.trim().slice(0, 500);
+    } else if (planMeta) {
+      ziinaPayload.message = `Corez ${planMeta.label} — ${planMeta.aed} AED`;
+    }
     if (success_url) ziinaPayload.success_url = String(success_url).trim();
     if (cancel_url) ziinaPayload.cancel_url = String(cancel_url).trim();
     if (failure_url) ziinaPayload.failure_url = String(failure_url).trim();
