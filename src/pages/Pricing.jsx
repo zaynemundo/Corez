@@ -96,11 +96,11 @@ export default function Pricing() {
 
   const handleCheckout = async (planId) => {
     if (!user) {
-      navigate("/"); // will show login
-      // store intended plan
       try {
         localStorage.setItem("corez_pending_plan", planId);
+        localStorage.setItem("corez_next", "/pricing");
       } catch {}
+      navigate("/?next=/pricing");
       return;
     }
     if (planId === "free") {
@@ -154,6 +154,22 @@ export default function Pricing() {
     }
   };
 
+  // If user just logged in with a pending plan from pricing, auto-resume checkout
+  useEffect(() => {
+    if (!user) return;
+    let pending = null;
+    try {
+      pending = localStorage.getItem("corez_pending_plan");
+    } catch {}
+    if (pending && (pending === "standard" || pending === "premium")) {
+      try {
+        localStorage.removeItem("corez_pending_plan");
+        localStorage.removeItem("corez_next");
+      } catch {}
+      setTimeout(() => handleCheckout(pending), 400);
+    }
+  }, [user]);
+
   return (
     <div className="pricing-page">
       <div className="pricing-bg" aria-hidden="true" />
@@ -163,10 +179,29 @@ export default function Pricing() {
             COREZ
           </button>
           <div className="pricing-nav-actions">
-            <span className="pricing-nav-hint">Already have an account?</span>
-            <button onClick={() => navigate("/")} className="pricing-nav-login">
-              Sign in
-            </button>
+            {user ? (
+              <>
+                <span className="pricing-nav-hint" style={{ textTransform: "capitalize" }}>
+                  {currentPlan} • {user.email}
+                </span>
+                <button
+                  onClick={() => navigate("/")}
+                  className="pricing-nav-login"
+                >
+                  Back to Corez
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="pricing-nav-hint">Already have an account?</span>
+                <button
+                  onClick={() => navigate("/")}
+                  className="pricing-nav-login"
+                >
+                  Sign in
+                </button>
+              </>
+            )}
           </div>
         </div>
         <div className="pricing-hero">

@@ -2645,40 +2645,21 @@ h6 {
   gap: 0.75rem;
   padding: 0.85rem 0.95rem;
   border-radius: 12px;
-  background: linear-gradient(
-    135deg,
-    rgba(18, 20, 29, 0.85) 0%,
-    rgba(26, 28, 38, 0.75) 100%
-  );
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(12px);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
   position: relative;
-  overflow: hidden;
 }
 .pricing-status::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(
-    600px circle at 0% 0%,
-    rgba(255, 255, 255, 0.04),
-    transparent 40%
-  );
-  pointer-events: none;
+  display: none;
 }
 .pricing-status.premium {
-  border-color: rgba(241, 250, 140, 0.22);
-  box-shadow:
-    0 0 0 1px rgba(241, 250, 140, 0.08),
-    0 8px 32px rgba(0, 0, 0, 0.35);
+  border-color: var(--border-color);
+  box-shadow: none;
+  background: var(--bg-tertiary);
 }
 .pricing-status.expired {
   border-color: rgba(248, 113, 113, 0.22);
-  background: linear-gradient(
-    135deg,
-    rgba(28, 18, 20, 0.85) 0%,
-    rgba(38, 24, 26, 0.75) 100%
-  );
+  background: var(--bg-tertiary);
 }
 .pricing-status-left {
   display: flex;
@@ -2694,20 +2675,20 @@ h6 {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
   color: var(--text-secondary);
 }
 .pricing-status-icon.premium {
-  background: linear-gradient(135deg, #f1fa8c 0%, #d4af37 100%);
-  color: #0a0a0f;
-  border-color: rgba(241, 250, 140, 0.9);
-  box-shadow: 0 2px 12px rgba(241, 250, 140, 0.35);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+  box-shadow: none;
 }
 .pricing-status-icon.standard {
-  background: rgba(255, 255, 255, 0.09);
+  background: var(--bg-card);
   color: var(--text-primary);
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: var(--border-color);
 }
 .pricing-status-plan {
   font-family: "Outfit", sans-serif;
@@ -3049,27 +3030,18 @@ h6 {
   width: 100%;
   padding: 14px 14px;
   border-radius: 12px;
-  background: linear-gradient(
-    135deg,
-    rgba(18, 20, 29, 0.85) 0%,
-    rgba(26, 28, 38, 0.75) 100%
-  );
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
   color: var(--text-primary);
   cursor: pointer;
   transition: all 0.15s ease;
   text-align: left;
-  backdrop-filter: blur(12px);
 }
 .pricing-manage-btn:hover {
-  border-color: rgba(255, 255, 255, 0.14);
-  background: linear-gradient(
-    135deg,
-    rgba(22, 24, 34, 0.9) 0%,
-    rgba(30, 32, 42, 0.85) 100%
-  );
+  border-color: var(--border-hover);
+  background: var(--bg-card);
   transform: translateY(-1px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  box-shadow: none;
 }
 .pricing-manage-left {
   display: flex;
@@ -3123,13 +3095,20 @@ h6 {
   }
 }
 
-/* Pricing Page — ChatGPT-inspired */
+/* Pricing Page — ChatGPT-inspired — full viewport capture */
 .pricing-page {
+  width: 100%;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg-primary);
   color: var(--text-primary);
-  position: relative;
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
   overflow-x: hidden;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
 }
 .pricing-bg {
   position: fixed;

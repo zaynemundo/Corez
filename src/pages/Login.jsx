@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import mercuryBg from "../../assets/Mercury_5.jpeg";
 
@@ -34,6 +35,7 @@ export default function Login() {
     }
   });
   const [newPassword, setNewPassword] = useState("");
+  const navigate = useNavigate();
 
   const submit = async (e) => {
     e.preventDefault();
@@ -42,8 +44,27 @@ export default function Login() {
     try {
       if (mode === "login") {
         await login(email, password);
+        // If user came from pricing with pending plan, go back to pricing
+        try {
+          const pending = localStorage.getItem("corez_pending_plan");
+          const next = new URLSearchParams(window.location.search).get("next") || localStorage.getItem("corez_next");
+          if (pending && (pending === "standard" || pending === "premium")) {
+            navigate("/pricing");
+          } else if (next === "/pricing") {
+            localStorage.removeItem("corez_next");
+            navigate("/pricing");
+          }
+        } catch {}
       } else if (mode === "signup") {
         await signup(email, password, "free");
+        try {
+          const pending = localStorage.getItem("corez_pending_plan");
+          if (pending) {
+            localStorage.removeItem("corez_pending_plan");
+            localStorage.removeItem("corez_next");
+            navigate("/pricing");
+          }
+        } catch {}
       } else if (mode === "forgot") {
         const res = await forgot(email);
         setForgotSent(
