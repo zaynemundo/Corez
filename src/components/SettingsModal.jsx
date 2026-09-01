@@ -126,66 +126,67 @@ export default function SettingsModal({ isOpen, onClose, onClearAllHistory, them
           </button>
         </div>
 
-        <div className="settings-section">
+        <div className="settings-section pricing-section">
           <div className="settings-section-label">Plan &amp; Billing</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)' }}>
+          <div className={`pricing-status ${isExpired ? 'expired' : currentPlan}`}>
+            <div className="pricing-status-left">
+              <span className={`pricing-status-icon ${currentPlan}`}>
+                {currentPlan === 'premium' ? <Crown size={14} strokeWidth={1.75} /> : currentPlan === 'standard' ? <Zap size={14} strokeWidth={1.75} /> : <Sparkles size={14} strokeWidth={1.75} />}
+              </span>
               <div>
-                <div style={{ fontWeight: 700, fontSize: '13px', textTransform: 'capitalize', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  {currentPlan === 'premium' ? <Crown size={14} /> : currentPlan === 'standard' ? <Zap size={14} /> : <Sparkles size={14} />}
-                  {currentPlan} {isExpired ? '(expired)' : ''}
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                  {subLoading ? 'Loading…' : currentPlan === 'free' ? 'Free forever' : periodEnd ? (isExpired ? `Expired on ${periodEnd} — renew to continue` : `Renews on ${periodEnd} • Monthly via Ziina`) : 'Monthly via Ziina • Cancel anytime'}
+                <div className="pricing-status-plan">{currentPlan} {isExpired ? '(expired)' : ''}</div>
+                <div className="pricing-status-desc">
+                  {subLoading ? 'Loading…' : currentPlan === 'free' ? 'Free forever — upgrade anytime' : periodEnd ? (isExpired ? `Expired on ${periodEnd} — renew to continue` : `Renews on ${periodEnd} • Monthly via Ziina`) : 'Monthly via Ziina • Cancel anytime'}
                 </div>
               </div>
-              <span style={{ fontSize: '11px', fontWeight: 600, padding: '4px 8px', borderRadius: '999px', background: isExpired ? 'rgba(248,113,113,0.15)' : 'rgba(74,222,128,0.15)', color: isExpired ? '#fca5a5' : '#86efac', border: '1px solid', borderColor: isExpired ? 'rgba(248,113,113,0.3)' : 'rgba(74,222,128,0.3)' }}>
-                {isExpired ? 'Expired' : sub?.status === 'active' ? 'Active' : currentPlan === 'free' ? 'Active' : sub?.status || 'Active'}
-              </span>
             </div>
+            <span className={`pricing-status-badge ${isExpired ? 'expired' : 'active'}`}>
+              {isExpired ? 'Expired' : sub?.status === 'active' ? 'Active' : currentPlan === 'free' ? 'Active' : sub?.status || 'Active'}
+            </span>
+          </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-              {[
-                { id: 'free', name: 'Free', price: '0 AED', sub: 'forever', features: 'Limited' },
-                { id: 'standard', name: 'Standard', price: '18.36 AED', sub: '/mo', features: 'More builds', popular: true },
-                { id: 'premium', name: 'Premium', price: '27.54 AED', sub: '/mo', features: 'Unlimited' },
-              ].map(p => {
-                const isCurrent = currentPlan === p.id && !isExpired;
-                const busy = payBusy === p.id;
-                return (
-                  <div key={p.id} style={{ padding: '10px 8px', borderRadius: '10px', border: isCurrent ? '1.5px solid var(--text-primary)' : '1px solid var(--border-color)', background: isCurrent ? 'var(--bg-tertiary)' : 'transparent', textAlign: 'center', position: 'relative', opacity: busy ? 0.7 : 1 }}>
-                    {p.popular && !isCurrent && <span style={{ position: 'absolute', top: '-7px', left: '50%', transform: 'translateX(-50%)', fontSize: '9px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', background: 'var(--text-primary)', color: 'var(--bg-primary)', padding: '2px 6px', borderRadius: '999px' }}>Popular</span>}
-                    {isCurrent && <span style={{ position: 'absolute', top: '6px', right: '6px', width: '16px', height: '16px', borderRadius: '50%', background: 'var(--text-primary)', color: 'var(--bg-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Check size={10} strokeWidth={2.5} /></span>}
-                    <div style={{ fontWeight: 700, fontSize: '12px' }}>{p.name}</div>
-                    <div style={{ fontSize: '11px', fontWeight: 700, marginTop: '4px' }}>{p.price}<span style={{ fontSize: '9px', fontWeight: 400, color: 'var(--text-muted)' }}> {p.sub}</span></div>
-                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>{p.features}</div>
-                    <button
-                      type="button"
-                      disabled={busy || isCurrent}
-                      onClick={() => handleCheckout(p.id)}
-                      style={{
-                        marginTop: '8px',
-                        width: '100%',
-                        padding: '6px',
-                        borderRadius: '7px',
-                        border: isCurrent ? '1px solid var(--border-color)' : '1px solid var(--text-primary)',
-                        background: isCurrent ? 'transparent' : 'var(--text-primary)',
-                        color: isCurrent ? 'var(--text-muted)' : 'var(--bg-primary)',
-                        fontWeight: 600,
-                        fontSize: '11px',
-                        cursor: isCurrent || busy ? 'default' : 'pointer',
-                        opacity: isCurrent ? 0.6 : 1
-                      }}
-                    >
-                      {busy ? '...' : isCurrent ? 'Current' : p.id === 'free' ? 'Downgrade' : 'Upgrade'}
-                    </button>
+          <div className="pricing-grid">
+            {[
+              { id: 'free', name: 'Free', price: '0', currency: 'AED', sub: 'forever', icon: Sparkles, features: ['20 generations / mo', '1 project', 'Community support'], cta: 'Downgrade' },
+              { id: 'standard', name: 'Standard', price: '18.36', currency: 'AED', sub: '/ month', icon: Zap, features: ['200 generations / mo', '10 projects', 'Publish & share', 'Priority queue'], popular: true, cta: 'Upgrade' },
+              { id: 'premium', name: 'Premium', price: '27.54', currency: 'AED', sub: '/ month', icon: Crown, features: ['Unlimited generations', 'Unlimited projects', 'Priority support', 'Early access'], cta: 'Go Premium' },
+            ].map(p => {
+              const isCurrent = currentPlan === p.id && !isExpired;
+              const busy = payBusy === p.id;
+              const Icon = p.icon;
+              const tierClass = `pricing-card--${p.id}`;
+              return (
+                <div key={p.id} className={`pricing-card ${tierClass} ${isCurrent ? 'pricing-card--current' : ''} ${p.popular ? 'pricing-card--popular' : ''} ${busy ? 'pricing-card--busy' : ''}`}>
+                  {p.popular && <span className="pricing-popular-badge">Most Popular</span>}
+                  {isCurrent && <span className="pricing-current-check"><Check size={11} strokeWidth={2.5} /></span>}
+                  <div className="pricing-card-icon">
+                    <Icon size={16} strokeWidth={1.75} />
                   </div>
-                );
-              })}
-            </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.4 }}>
-              Billed monthly via Ziina • Cancel anytime • <span style={{ color: 'var(--text-secondary)' }}>Standard 18.36 AED / mo • Premium 27.54 AED / mo</span>
-            </div>
+                  <div className="pricing-card-name">{p.name}</div>
+                  <div className="pricing-card-price">
+                    <span className="pricing-price-amount">{p.price}</span>
+                    <span className="pricing-price-currency">{p.currency}</span>
+                    <span className="pricing-price-interval">{p.sub}</span>
+                  </div>
+                  <ul className="pricing-card-features">
+                    {p.features.map(f => (
+                      <li key={f}><Check size={11} strokeWidth={2} className="pricing-feature-check" />{f}</li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    disabled={busy || isCurrent}
+                    onClick={() => handleCheckout(p.id)}
+                    className={`pricing-cta ${isCurrent ? 'pricing-cta--current' : p.id === 'premium' ? 'pricing-cta--premium' : p.id === 'standard' ? 'pricing-cta--standard' : 'pricing-cta--free'}`}
+                  >
+                    {busy ? 'Processing…' : isCurrent ? 'Current plan' : p.cta}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <div className="pricing-footnote">
+            Billed monthly via <strong>Ziina</strong> • Cancel anytime • <span>Secure checkout • AED</span>
           </div>
         </div>
 
