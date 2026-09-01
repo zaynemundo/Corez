@@ -33,11 +33,11 @@ export default function Login() {
         await login(email, password);
       } else if (mode === 'signup') {
         await signup(email, password, plan);
-        // For paid plans, immediately create Ziina payment intent and redirect
+        // For paid plans, create monthly subscription via Ziina and redirect to checkout
         if (plan === 'standard' || plan === 'premium') {
           try {
             const origin = typeof window !== 'undefined' ? window.location.origin : 'https://corez.pro';
-            const payRes = await fetch('/api/ziina/payment_intent', {
+            const payRes = await fetch('/api/subscriptions/checkout', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               credentials: 'include',
@@ -52,9 +52,12 @@ export default function Login() {
             if (payRes.ok && payData.redirect_url) {
               window.location.href = payData.redirect_url;
               return;
+            } else if (payData.free) {
+              // Free handled — no redirect
             } else if (!payRes.ok) {
-              console.warn('Payment intent failed', payData);
+              console.warn('Subscription checkout failed', payData);
               // Still let signup succeed — user can pay later from settings
+              setError(payData.error || 'Payment setup failed — you can upgrade later from settings.');
             }
           } catch (payErr) {
             console.warn('Payment redirect failed', payErr);
@@ -173,9 +176,9 @@ export default function Login() {
               <span style={{ fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', fontSize: '11px', color: 'var(--text-secondary)' }}>Choose Plan</span>
               <div role="radiogroup" aria-label="Choose plan" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
                 {[
-                  { id: 'free', name: 'Free', price: '0 AED', desc: 'Get started', features: 'Limited generations' },
-                  { id: 'standard', name: 'Standard', price: '18.36 AED', desc: 'Most popular', features: 'More builds & publish' },
-                  { id: 'premium', name: 'Premium', price: '27.54 AED', desc: 'Full power', features: 'Unlimited & priority' },
+                  { id: 'free', name: 'Free', price: '0 AED', sub: 'forever', desc: 'Get started', features: 'Limited generations' },
+                  { id: 'standard', name: 'Standard', price: '18.36 AED', sub: '/ month', desc: 'Most popular', features: 'More builds & publish' },
+                  { id: 'premium', name: 'Premium', price: '27.54 AED', sub: '/ month', desc: 'Full power', features: 'Unlimited & priority' },
                 ].map(p => (
                   <button
                     key={p.id}
@@ -197,13 +200,13 @@ export default function Login() {
                   >
                     {plan === p.id && <span style={{ position: 'absolute', top: '6px', right: '6px', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--text-primary)' }} />}
                     <div style={{ fontWeight: 700, fontSize: '13px' }}>{p.name}</div>
-                    <div style={{ fontSize: '12px', fontWeight: 600, marginTop: '4px', color: plan === p.id ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{p.price}</div>
+                    <div style={{ fontSize: '12px', fontWeight: 600, marginTop: '4px', color: plan === p.id ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{p.price}<span style={{ fontSize: '10px', fontWeight: 400, color: 'var(--text-muted)' }}> {p.sub}</span></div>
                     <div style={{ fontSize: '10px', marginTop: '2px', color: 'var(--text-muted)' }}>{p.features}</div>
                   </button>
                 ))}
               </div>
               <small className="auth-hint" style={{ textAlign: 'center' }}>
-                {plan === 'free' ? 'Free forever — upgrade anytime.' : plan === 'standard' ? 'Standard billed via Ziina — test card works when test mode is on.' : 'Premium unlocks everything.'}
+                {plan === 'free' ? 'Free forever — upgrade anytime.' : plan === 'standard' ? 'Standard — 18.36 AED / month via Ziina. Renewed monthly, cancel anytime.' : 'Premium — 27.54 AED / month via Ziina. Renewed monthly, cancel anytime.'}
               </small>
             </div>
           )}

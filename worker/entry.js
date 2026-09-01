@@ -14,6 +14,7 @@ import { handleAuth, verifySession } from './auth.js';
 import { handleChats } from './chats.js';
 import { handleN8nWebhook } from './n8nBridge.js';
 import { handleZiina } from './ziina.js';
+import { handleSubscriptions } from './subscriptions.js';
 export { GameRoom } from './gameRoom.js';
 
 // Per-client AI request rate bound: paid provider tokens are spent on every
@@ -119,6 +120,12 @@ export default {
     if (url.pathname.startsWith('/api/ziina/') || url.pathname.startsWith('/api/payments/ziina/')) {
       const ziinaRes = await handleZiina(request, env);
       if (ziinaRes) return withDirectAiCors(ziinaRes);
+    }
+
+    // Subscriptions — monthly recurring (Free / Standard 18.36 AED / Premium 27.54 AED)
+    if (url.pathname.startsWith('/api/subscriptions')) {
+      const subRes = await handleSubscriptions(request, env);
+      if (subRes) return withDirectAiCors(subRes);
     }
 
     // Chat routes — handle before generic auth gate so they can use verifySession directly
