@@ -3095,18 +3095,15 @@ h6 {
   }
 }
 
-/* Pricing Page — ChatGPT-inspired — full viewport capture */
+/* Pricing Page — ChatGPT-inspired */
 .pricing-page {
   width: 100%;
   min-height: 100vh;
   min-height: 100dvh;
   background: var(--bg-primary);
   color: var(--text-primary);
-  position: fixed;
-  inset: 0;
-  overflow-y: auto;
+  position: relative;
   overflow-x: hidden;
-  z-index: 30;
   display: flex;
   flex-direction: column;
 }
