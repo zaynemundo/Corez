@@ -163,7 +163,7 @@ export default function Pricing() {
           plan: planId,
           interval,
           success_url: origin + "/payment/success?plan=" + planId + "&interval=" + interval,
-          cancel_url: origin + "/payment/cancel?plan=" + planId + "&interval=" + interval,
+          cancel_url: origin + "/pricing",
           test: false,
         }),
       });

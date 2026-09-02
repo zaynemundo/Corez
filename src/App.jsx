@@ -15,7 +15,7 @@ import CanvasPreview from "./components/CanvasPreview";
 import SettingsModal from "./components/SettingsModal";
 import DropZoneOverlay from "./components/DropZoneOverlay";
 import Login from "./pages/Login";
-import { PaymentSuccess, PaymentCancel } from "./pages/PaymentStatus";
+import { PaymentSuccess } from "./pages/PaymentStatus";
 import Pricing from "./pages/Pricing";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import {
@@ -1398,7 +1398,6 @@ function AppInner() {
       <Route path="/chat/:chatId" element={<MainApp theme={theme} setTheme={setTheme} />} />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/payment/success" element={<PaymentSuccess />} />
-      <Route path="/payment/cancel" element={<PaymentCancel />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

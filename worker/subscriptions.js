@@ -662,7 +662,7 @@ export async function handleSubscriptions(request, env) {
     const cancelUrl =
       body.cancel_url ||
       body.cancelUrl ||
-      `${origin}/payment/cancel?plan=${plan}`;
+      `${origin}/pricing`;
     const testFlag = body.test ?? false; // default live for subscriptions
 
     // Validate URLs
