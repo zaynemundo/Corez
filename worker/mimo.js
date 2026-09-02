@@ -11,7 +11,7 @@
  */
 
 export const MIMO_DEFAULT_MODEL = "mimo-v2.5";
-export const MIMO_DEFAULT_ENDPOINT = "https://opencode.ai/zen/go/v1/responses";
+export const MIMO_DEFAULT_ENDPOINT = "https://opencode.ai/zen/go/v1/chat/completions";
 
 const MIMO_MEDIA_PROMPTS = {
   image:
