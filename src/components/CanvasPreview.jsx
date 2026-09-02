@@ -411,60 +411,33 @@ export default function CanvasPreview({
     <div className={`canvas-pane ${isFullScreen ? "full-width" : ""}`}>
       <div className="canvas-header">
         <div className="canvas-title">
-          <span>Preview</span>
-
-          {/* View Mode: Preview vs Source */}
+          {/* View Mode toggle: Preview <-> Source */}
           <div
             style={{
               display: "flex",
               background: "var(--bg-tertiary)",
               padding: "2px",
               borderRadius: "var(--radius-pill)",
-              marginLeft: "0.5rem",
               border: "1px solid var(--border-color)",
             }}
           >
             <button
-              onClick={() => setActiveTab("preview")}
+              onClick={() =>
+                setActiveTab(activeTab === "preview" ? "code" : "preview")
+              }
               style={{
                 padding: "3px 10px",
                 borderRadius: "var(--radius-pill)",
                 border: "none",
-                background:
-                  activeTab === "preview"
-                    ? "var(--text-primary)"
-                    : "transparent",
-                color:
-                  activeTab === "preview"
-                    ? "var(--bg-primary)"
-                    : "var(--text-secondary)",
+                background: "var(--text-primary)",
+                color: "var(--bg-primary)",
                 fontSize: "0.725rem",
                 fontWeight: 300,
                 cursor: "pointer",
                 transition: "var(--transition-fast)",
               }}
             >
-              Preview
-            </button>
-            <button
-              onClick={() => setActiveTab("code")}
-              style={{
-                padding: "3px 10px",
-                borderRadius: "var(--radius-pill)",
-                border: "none",
-                background:
-                  activeTab === "code" ? "var(--text-primary)" : "transparent",
-                color:
-                  activeTab === "code"
-                    ? "var(--bg-primary)"
-                    : "var(--text-secondary)",
-                fontSize: "0.725rem",
-                fontWeight: 300,
-                cursor: "pointer",
-                transition: "var(--transition-fast)",
-              }}
-            >
-              Source
+              {activeTab === "preview" ? "Source" : "Preview"}
             </button>
           </div>
         </div>

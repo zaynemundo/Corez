@@ -50,6 +50,6 @@
     "vite": "^6.1.0",
     "vitest": "^3.2.4",
     "vscode-langservers-extracted": "^4.10.0",
-    "wrangler": "^4.112.0"
+    "wrangler": "^4.128.0"
   }
 }
