@@ -2388,10 +2388,19 @@ async function handleImage(request, env) {
 // Same response contract as /api/image: { image: <r2 url | data url>, model }.
 //
 // Input contract: prompt (required) + optional width/height (256-1920) and
-// seed. The model consumes multipart/form-data (the JSON body shape is
+// seed + optional model. The model consumes multipart/form-data (the JSON body shape is
 // rejected by the runner), so the binding call builds a FormData part.
 const WORKERS_AI_IMAGE_MODEL = "@cf/black-forest-labs/flux-2-klein-4b";
 const WORKERS_AI_FALLBACK_MODEL = "@cf/black-forest-labs/flux-1-schnell";
+const WORKERS_AI_SDXL_LIGHTNING_MODEL =
+  "@cf/bytedance/stable-diffusion-xl-lightning";
+const ALLOWED_WORKERS_AI_IMAGE_MODELS = new Set([
+  WORKERS_AI_IMAGE_MODEL,
+  WORKERS_AI_FALLBACK_MODEL,
+  WORKERS_AI_SDXL_LIGHTNING_MODEL,
+  "@cf/stabilityai/stable-diffusion-xl-base-1.0",
+  "@cf/lykon/dreamshaper-8-lcm",
+]);
 
 function boundedInt(value, min, max) {
   const n = Number(value);
@@ -2460,11 +2469,37 @@ async function handleWorkersAIImage(request, env) {
     return controller.signal;
   })();
 
-  // Enhance very short prompts like "flower" for better FLUX results
+  // Enhance very short prompts like "flower" for better SDXL/FLUX results
   const enhancedPrompt =
     prompt.trim().length < 15 && !prompt.includes(",")
       ? `${prompt.trim()}, high detail, photorealistic, vibrant colors, studio lighting, 4k`
       : prompt;
+
+  // Allow client to request a specific Workers AI model (e.g. sdxl-lightning)
+  let requestedModel =
+    typeof body.model === "string" ? body.model.trim() : "";
+  // Normalize shorthands: sdxl-lightning, sdxl, dreamshaper, etc.
+  const modelAliases = {
+    "sdxl-lightning": WORKERS_AI_SDXL_LIGHTNING_MODEL,
+    sdxl: WORKERS_AI_SDXL_LIGHTNING_MODEL,
+    lightning: WORKERS_AI_SDXL_LIGHTNING_MODEL,
+    "stable-diffusion-xl-lightning": WORKERS_AI_SDXL_LIGHTNING_MODEL,
+    "stable-diffusion-xl-lighting": WORKERS_AI_SDXL_LIGHTNING_MODEL,
+    "flux-klein": WORKERS_AI_IMAGE_MODEL,
+    "flux-schnell": WORKERS_AI_FALLBACK_MODEL,
+    flux: WORKERS_AI_IMAGE_MODEL,
+    schnell: WORKERS_AI_FALLBACK_MODEL,
+    dreamshaper: "@cf/lykon/dreamshaper-8-lcm",
+    "sdxl-base": "@cf/stabilityai/stable-diffusion-xl-base-1.0",
+  };
+  if (modelAliases[requestedModel.toLowerCase()]) {
+    requestedModel = modelAliases[requestedModel.toLowerCase()];
+  }
+  const selectedModel =
+    requestedModel && ALLOWED_WORKERS_AI_IMAGE_MODELS.has(requestedModel)
+      ? requestedModel
+      : WORKERS_AI_IMAGE_MODEL;
+  let usedModel = selectedModel;
 
   let result;
   try {
@@ -2473,6 +2508,7 @@ async function handleWorkersAIImage(request, env) {
     // derived Content-Type with the boundary (the documented klein-4b
     // pattern): passing a raw FormData with a custom Content-Type strips the
     // boundary (runner 3030), and string/byte bodies are rejected (8001).
+    // SDXL-Lightning uses the same multipart shape (prompt + optional width/height/seed).
     const form = new FormData();
     form.append("prompt", enhancedPrompt);
     const width = boundedInt(body.width, 256, 1920);
@@ -2490,18 +2526,22 @@ async function handleWorkersAIImage(request, env) {
     };
     try {
       result = await ai.run(
-        WORKERS_AI_IMAGE_MODEL,
+        selectedModel,
         inputs,
         clientSignal ? { signal: clientSignal } : undefined,
       );
     } catch (primaryErr) {
-      // Fallback to flux-1-schnell if klein-4b is unavailable (model not found, quota, etc.)
+      // Fallback to flux-1-schnell if selected model is unavailable (model not found, quota, etc.)
       const msg = String(primaryErr?.message || "");
       const isModelNotFound =
         /model not found|unknown model|not available|400|404/i.test(msg);
-      if (isModelNotFound && WORKERS_AI_FALLBACK_MODEL) {
+      const fallbackModel =
+        selectedModel !== WORKERS_AI_FALLBACK_MODEL
+          ? WORKERS_AI_FALLBACK_MODEL
+          : WORKERS_AI_SDXL_LIGHTNING_MODEL;
+      if (isModelNotFound && fallbackModel) {
         console.warn(
-          `Primary Workers AI model ${WORKERS_AI_IMAGE_MODEL} failed (${safeErrorDetail(primaryErr)}), trying fallback ${WORKERS_AI_FALLBACK_MODEL}`,
+          `Primary Workers AI model ${selectedModel} failed (${safeErrorDetail(primaryErr)}), trying fallback ${fallbackModel}`,
         );
         const fallbackForm = new FormData();
         fallbackForm.append("prompt", enhancedPrompt);
@@ -2516,10 +2556,11 @@ async function handleWorkersAIImage(request, env) {
           },
         };
         result = await ai.run(
-          WORKERS_AI_FALLBACK_MODEL,
+          fallbackModel,
           fallbackInputs,
           clientSignal ? { signal: clientSignal } : undefined,
         );
+        usedModel = fallbackModel;
       } else {
         throw primaryErr;
       }
@@ -2567,7 +2608,7 @@ async function handleWorkersAIImage(request, env) {
   } catch {
     // R2 is optional: the data URL is returned when storage fails.
   }
-  return jsonResponse(200, { image: imageUrl, model: WORKERS_AI_IMAGE_MODEL });
+  return jsonResponse(200, { image: imageUrl, model: usedModel });
 }
 
 // Markers written at publish time for every /api/assets/<key> referenced by
