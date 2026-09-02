@@ -15,11 +15,11 @@ Corez deploys the Vite application and its AI endpoints together as a Cloudflare
 
 ### Text and multimodal requests
 
-When `OPENCODE_GO_API_KEY` (or `OPENCODE_API_KEY`) is configured, `/api/ai` routes exclusively through the **OpenCode Go API** (it serves the latest Muse Spark 1.2 builds). Chat has no DeepSeek or OpenRouter fallback — `/api/ai` uses `OPENCODE_GO_API_KEY` only:
+When `OPENCODE_GO_API_KEY` (or `OPENCODE_API_KEY`) is configured, `/api/ai` routes exclusively through the **OpenCode Go API** (it serves the latest Muse Spark 1.3 builds). Chat has no DeepSeek or OpenRouter fallback — `/api/ai` uses `OPENCODE_GO_API_KEY` only:
 
-1. **OpenCode Go** — `OPENCODE_GO_API_KEY` / `OPENCODE_API_KEY`, endpoint `OPENCODE_ENDPOINT` (default `https://opencode.ai/zen/go/v1/responses`), model `OPENCODE_MODEL` (default `muse-spark-1.2-contributor`).
+1. **OpenCode Go** — `OPENCODE_GO_API_KEY` / `OPENCODE_API_KEY`, endpoint `OPENCODE_ENDPOINT` (default `https://opencode.ai/zen/go/v1/responses`), model `OPENCODE_MODEL` (default `muse-spark-1.3-contributor`).
 
-All chat, coding, app & swarm requests use `muse-spark-1.2-contributor` unless overridden. The model list is server-controlled: client-supplied `body.model` is never trusted. The chat provider can be disabled with `OPENCODE_GO_DISABLED` (any truthy value). The provider key never leaves the worker, and the content returned to users is provider-neutral. Image generation (`/api/image`) still uses `OPENROUTER_API_KEY` separately when configured.
+All chat, coding, app & swarm requests use `muse-spark-1.3-contributor` unless overridden. The model list is server-controlled: client-supplied `body.model` is never trusted. The chat provider can be disabled with `OPENCODE_GO_DISABLED` (any truthy value). The provider key never leaves the worker, and the content returned to users is provider-neutral. Image generation (`/api/image`) still uses `OPENROUTER_API_KEY` separately when configured.
 
 Transient failures (408, 429, 5xx, network) are retried with adaptive exponential backoff (750 ms base, doubling, jittered, honouring the provider's `Retry-After`, single sleeps capped at 30 s) until the provider recovers, the client disconnects, or the failure is classified permanent (401/403/400/unsupported model — never retried). Reasoning-only replies get one continuation nudge. When the provider cannot recover within one request's practical window, the retry schedule is persisted (`retry/<provider>/<task>` records) and the request answers `200 { taskId, status: "retry-scheduled", retryAfterSeconds }`; resending the same messages resumes the exact task, so no work is restarted. Clients can poll `GET /api/task/<taskId>` for the exact eligibility time (`retryAfterSeconds` / `nextEligibleAt`) while the schedule is persisted — a missing record means the task is no longer deferred. Permanent failure of the provider ends in an honest `502`. Cloudflare Workers AI is not used for chat.
 

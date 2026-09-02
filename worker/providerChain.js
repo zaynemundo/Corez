@@ -9,7 +9,7 @@ export const OPENCODE_DEFAULT_ENDPOINT =
 // DEEPSEEK_DEFAULT_ENDPOINT removed — chat no longer falls back to DeepSeek.
 export const OPENROUTER_DEFAULT_ENDPOINT =
   "https://openrouter.ai/api/v1/chat/completions";
-export const DEFAULT_MODEL = "muse-spark-1.2-contributor";
+export const DEFAULT_MODEL = "muse-spark-1.3-contributor";
 
 // OpenRouter retired black-forest-labs/flux-1-schnell, so image generation
 // uses Google's Nano Banana 2 lite (Gemini 3.1 Flash Lite Image) only.
@@ -774,8 +774,8 @@ export function buildProviderChain(env = {}) {
  * Options: { env, signal, sleep, clock, jitter, store, maxRequestRetryMs,
  * taskHash, taskId, model, reasoning, temperature, bodyExtra } — sleep/clock/jitter are injectable for
  * deterministic tests. `model` overrides the provider's configured model for
- * this call (e.g. the harness build phase pins muse-spark-1.2-contributor). `reasoning`
- * and `temperature` are forwarded as body fields for reasoning models (Muse Spark 1.2).
+ * this call (e.g. the harness build phase pins muse-spark-1.3-contributor). `reasoning`
+ * and `temperature` are forwarded as body fields for reasoning models (Muse Spark 1.3).
  * Every request is uncapped: the provider decides how long it generates, and no output
  * ceiling is ever sent.
  */

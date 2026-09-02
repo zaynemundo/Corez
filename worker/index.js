@@ -1135,10 +1135,10 @@ async function handleAi(request, env) {
   // that still present current values as fabricated.
   // ---------------------------------------------------------------------
   // ---------------------------------------------------------------------
-  // MiMo V2.5 -> Muse Spark 1.2 Two-Stage Pipeline (corez.pro)
+  // MiMo V2.5 -> Muse Spark 1.3 Two-Stage Pipeline (corez.pro)
   // Every user attachment (image, file, video, audio, any media) is first
   // understood by MiMo V2.5 (vision + multimodal file understanding), then
-  // its textual description is fed as grounded context to Muse Spark 1.2
+  // its textual description is fed as grounded context to Muse Spark 1.3
   // for the final generation. Muse itself is text-only through the gateway,
   // so this pre-pass gives it true vision/file knowledge. Failures are
   // silent — the Muse build always proceeds even if MiMo is unavailable.
@@ -2739,7 +2739,7 @@ async function handleR2Assets(request, env) {
     }
 
     // Asset types accepted by /api/assets/upload — images always, plus
-    // video/audio/file types used by the MiMo V2.5 -> Muse Spark 1.2 pipeline.
+    // video/audio/file types used by the MiMo V2.5 -> Muse Spark 1.3 pipeline.
     // All are stored in R2 and served as static assets; the worker never
     // executes them.
     const ALLOWED_ASSET_TYPES = [

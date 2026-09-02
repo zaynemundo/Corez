@@ -2,7 +2,7 @@
 
 ## Roles and authority
 
-- **Muse Spark 1.2** (`muse-spark-1.2-contributor` / opencode-go) is the lead engineering agent, handling orchestration, development, vision, visual inspection, UI layout, game design, SVG creation, and overall implementation strategy.
+- **Muse Spark 1.3** (`muse-spark-1.3-contributor` / opencode-go) is the lead engineering agent, handling orchestration, development, vision, visual inspection, UI layout, game design, SVG creation, and overall implementation strategy.
 - **FLUX 1 Schnell** (`@cf/black-forest-labs/flux-1-schnell`) is used for fast, free background image generation and visual artwork.
 
 ## Verification & Git completion policy
@@ -15,11 +15,11 @@
 
 ## Standard sequence
 
-1. Muse Spark 1.2 defines a bounded task and identifies files that subagents may inspect or, if explicitly authorised, edit.
-2. Muse Spark 1.2 delegates with analysis-only mode unless implementation is necessary and authorised.
+1. Muse Spark 1.3 defines a bounded task and identifies files that subagents may inspect or, if explicitly authorised, edit.
+2. Muse Spark 1.3 delegates with analysis-only mode unless implementation is necessary and authorised.
 3. Subagents return findings or changes.
-4. Muse Spark 1.2 critically reviews the response and diff.
-5. Muse Spark 1.2 makes the final engineering decision and performs independent verification.
+4. Muse Spark 1.3 critically reviews the response and diff.
+5. Muse Spark 1.3 makes the final engineering decision and performs independent verification.
 
 ## Swarm Multi-Agent Execution for Coding
 
@@ -31,11 +31,11 @@ Coding, development, and implementation tasks (websites, web apps, browser games
 
 Roles match `SWARM_ROLES` in `packages/agent-core/swarm`: `orchestrator`, `explorer`, `architect`, `engineer`, `frontend`, `backend`, `debugger`, `tester`, `reviewer`, `security`, `integration`, and `art-director`. Visual assets are produced by `asset-worker` agents through the FLUX image provider (`flux-2-klein-4b` / `cloudflare-workers-ai`).
 
-### Execution Model (Muse Spark 1.2 Single Model Executor)
+### Execution Model (Muse Spark 1.3 Single Model Executor)
 
-> **Primary Model Rule**: **Muse Spark 1.2** operates as the lead primary executor for all code execution, component building, UI work, task graph routing, architectural guidance, code review, and empirical verification.
+> **Primary Model Rule**: **Muse Spark 1.3** operates as the lead primary executor for all code execution, component building, UI work, task graph routing, architectural guidance, code review, and empirical verification.
 
-- `primary-executor` — `muse-spark-1.2-contributor` / `opencode-go` — Coder / Tester: writes code, builds components, edits files, runs tests.
+- `primary-executor` — `muse-spark-1.3-contributor` / `opencode-go` — Coder / Tester: writes code, builds components, edits files, runs tests.
 - `art-director` — `flux-2-klein-4b` / `cloudflare-workers-ai` — Creative Lead: visual direction, color palettes, background textures, art assets.
 
 ### File Ownership & Context Rules

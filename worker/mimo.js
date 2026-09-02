@@ -1,9 +1,9 @@
 /**
- * MiMo V2.5 -> Muse Spark 1.2 Two-Stage Pipeline for corez.pro
+ * MiMo V2.5 -> Muse Spark 1.3 Two-Stage Pipeline for corez.pro
  *
  * Every user attachment (image, video, audio, file, etc.) is first
  * understood by MiMo V2.5 (vision + multimodal), then its textual
- * description is fed to Muse Spark 1.2 for generation.
+ * description is fed to Muse Spark 1.3 for generation.
  *
  * This file is used by worker/index.js (server) and is safe to call
  * from any context. It reuses the same gateway as Muse (OpenCode Zen Go)
@@ -353,7 +353,7 @@ export function buildMimoContextBlock(descriptions) {
     })
     .join("\n\n");
   return (
-    "MiMo V2.5 Media Understanding (vision/file analysis — authoritative, use this as ground truth for the attached media, then fulfill the user's request with Muse Spark 1.2):\n" +
+    "MiMo V2.5 Media Understanding (vision/file analysis — authoritative, use this as ground truth for the attached media, then fulfill the user's request with Muse Spark 1.3):\n" +
     lines +
     "\n\nUse the above MiMo descriptions as the true content of the user's attached files. Do NOT hallucinate or invent media content — ground your generation in these descriptions. When you need to display the attached image in generated HTML, use the EXACT R2 URL provided above for <img src> (e.g. <img src=\"https://corez.pro/api/assets/user-upload_...jpg\"> — must start with https://corez.pro/api/assets/). Never use local filenames like \"Screenshot 2026-09-02 145516.png\" or relative /api/assets/ — they will 404 or break on published sites."
   );

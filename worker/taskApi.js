@@ -68,7 +68,7 @@ export function buildHarness(env) {
   return new AgentHarness({
     taskStore: store,
     adapters,
-    defaultModel: "muse-spark-1.2-contributor",
+    defaultModel: "muse-spark-1.3-contributor",
     persistEvents: true,
     cancellationManager: sharedCancellations,
     maxRetryWaitMs: 0, // no in-process retry waits in the Worker; resume via API

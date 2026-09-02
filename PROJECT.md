@@ -23,7 +23,7 @@ CoreZ provides a multi-agent swarm orchestration framework spanning both CLI/age
      ┌─────────────────────────────────────────────────────────────────┐
      │ 1. ResourceLockManager: All-or-Nothing Atomic Lock Acquisition  │
      │ 2. Upstream Context Injection: Discrete markdown deliverables   │
-     │ 3. Agent Execution: Primary Lead (Muse Spark 1.2) & FLUX Art    │
+      │ 3. Agent Execution: Primary Lead (Muse Spark 1.3) & FLUX Art    │
      │ 4. Verifier Gate & Self-Correction Retry (up to maxAttempts)    │
      │ 5. Atomic Output Commit & Lock Release                          │
      │ 6. Topological DFS Traversal: Discrete & Merged Artifacts       │

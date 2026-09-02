@@ -40,7 +40,7 @@ npm run deploy   # deploys worker + dist assets to Cloudflare
 ## Drive
 
 - Chat: open http://localhost:3000, send a message; watch Network for
-  `POST /api/ai` returning `{content, model}` (chat is `opencode:muse-spark-1.2-contributor` only).
+  `POST /api/ai` returning `{content, model}` (chat is `opencode:muse-spark-1.3-contributor` only).
 - Images: prompts matching the image intent hit `POST /api/image` and
   return `{image, model}` — the worker tries an image model chain (Google
   Nano Banana 2 first, legacy FLUX last; `OPENROUTER_IMAGE_MODEL` overrides)

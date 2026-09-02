@@ -33,7 +33,7 @@ export class TaskState {
     this.workspaceId = workspaceId || null;
     this.status = TASK_STATUSES.PENDING;
     this.prompt = prompt || '';
-    this.model = model || 'muse-spark-1.2-contributor';
+    this.model = model || 'muse-spark-1.3-contributor';
     this.mode = mode;
     this.messages = [];
     this.plan = null;

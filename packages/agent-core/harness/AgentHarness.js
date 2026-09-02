@@ -98,7 +98,7 @@ export class AgentHarness {
     // Repository-mode delegation target (Node CLI AgentRuntime). Without it,
     // repository tasks are honestly blocked in the browser runtime.
     this.repositoryRunner = options.repositoryRunner || null;
-    this.defaultModel = options.defaultModel || 'muse-spark-1.2-contributor';
+    this.defaultModel = options.defaultModel || 'muse-spark-1.3-contributor';
     this.autoApprove = options.autoApprove === true;
     // Durable event persistence: every emitted event is appended to the task
     // store so SSE consumers can reconnect and replay what they missed.

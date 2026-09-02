@@ -23,7 +23,7 @@ function recordingChain() {
       const content = chunkCount > 0
         ? `Chunk summary for ${chunkCount} contributions`
         : 'Final merged answer';
-      return { status: 'completed', content, toolCalls: [], provider: 'mock', model: 'muse-spark-1.2-contributor' };
+      return { status: 'completed', content, toolCalls: [], provider: 'mock', model: 'muse-spark-1.3-contributor' };
     }
   };
 }
@@ -45,7 +45,7 @@ describe('1,001-workstream hierarchical synthesis', () => {
     const result = await synthesis.synthesize({
       outputs: makeOutputs(),
       prompt: 'Build everything',
-      model: 'muse-spark-1.2-contributor'
+      model: 'muse-spark-1.3-contributor'
     });
 
     expect(result.content).toBe('Final merged answer');
@@ -70,7 +70,7 @@ describe('1,001-workstream hierarchical synthesis', () => {
 
     const firstChain = recordingChain();
     const first = new HierarchicalSynthesis({ providerChain: firstChain, store, taskId: 'swarm-wave' });
-    await first.synthesize({ outputs: makeOutputs(1001), prompt: 'wave build', model: 'muse-spark-1.2-contributor' });
+    await first.synthesize({ outputs: makeOutputs(1001), prompt: 'wave build', model: 'muse-spark-1.3-contributor' });
 
     const taskAfterWave = await store.getTask('swarm-wave');
     expect(taskAfterWave.synthesisState.wave).toBe(1);
@@ -82,7 +82,7 @@ describe('1,001-workstream hierarchical synthesis', () => {
     const outputIds = await resumed.storeOutputs(makeOutputs(1001));
     expect(outputIds.storedAgentIds.length).toBe(WORKSTREAM_COUNT); // deduped, none lost
 
-    const continuation = await resumed.resume({ prompt: 'wave build', model: 'muse-spark-1.2-contributor' });
+    const continuation = await resumed.resume({ prompt: 'wave build', model: 'muse-spark-1.3-contributor' });
     expect(continuation).not.toBeNull();
     // The resumed wave ran, and the persisted outputs survived the restart.
     expect(secondChain.calls.length).toBeGreaterThan(0);

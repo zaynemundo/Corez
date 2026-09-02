@@ -8,8 +8,8 @@ import { TaskDependencyGraph, AGENT_LIFECYCLE_STATES } from "./taskGraph.js";
 import { AdaptiveConcurrencyQueue } from "./adaptiveQueue.js";
 
 export const OPENROUTER_SWARM_ROUTING = {
-  // Muse Spark 1.2 is the unified site-wide model.
-  model: "muse-spark-1.2-contributor",
+  // Muse Spark 1.3 is the unified site-wide model.
+  model: "muse-spark-1.3-contributor",
   provider: {
     sort: "throughput",
     allow_fallbacks: true,

@@ -1,6 +1,6 @@
 export const MODEL_CATALOG = Object.freeze([
-  { id: 'muse-spark-1.2-contributor', name: 'Muse Spark 1.2', provider: 'opencode-go', role: 'Primary Executor (Orchestration, Coding, UI, Building & Verification)' },
-  { id: 'muse-spark-1.2-contributor', name: 'Muse Spark 1.2', provider: 'opencode-go', role: 'Fast Secondary Executor (Rapid UI iterations & smoke testing)' },
+  { id: 'muse-spark-1.3-contributor', name: 'Muse Spark 1.3', provider: 'opencode-go', role: 'Primary Executor (Orchestration, Coding, UI, Building & Verification)' },
+  { id: 'muse-spark-1.3-contributor', name: 'Muse Spark 1.3', provider: 'opencode-go', role: 'Fast Secondary Executor (Rapid UI iterations & smoke testing)' },
   { id: 'kimi-k3', name: 'Kimi K3 Code', provider: 'opencode-go', role: 'Physics & Engine Advisor (specialized math/physics guidance)' },
   { id: 'flux-1-schnell', name: 'FLUX 1 Schnell', provider: 'cloudflare-workers-ai', role: 'Visual Asset & Art Director' }
 ]);
@@ -8,7 +8,7 @@ export const MODEL_CATALOG = Object.freeze([
 export class ModelProviderRouter {
   constructor(options = {}) {
     this.opencodeApiKey = process.env.OPENCODE_GO_API_KEY || process.env.OPENCODE_API_KEY || options.opencodeApiKey;
-    this.defaultModel = options.defaultModel || 'muse-spark-1.2-contributor';
+    this.defaultModel = options.defaultModel || 'muse-spark-1.3-contributor';
   }
 
   getAvailableModels() {
@@ -25,7 +25,7 @@ export class ModelProviderRouter {
 
     // If the API key is present, execute HTTP request against OpenCode Go
     // (the only configured provider; direct OpenRouter integration removed).
-    // Muse Spark 1.2 benefits from hidden reasoning: high effort for complex
+    // Muse Spark 1.3 benefits from hidden reasoning: high effort for complex
     // tasks, medium for general, low for trivial — all excluded from output.
     if (activeKey) {
       try {

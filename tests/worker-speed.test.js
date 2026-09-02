@@ -178,7 +178,7 @@ describe('AI response speed optimizations', () => {
     });
 
     expect(generalPayload).not.toBeNull();
-    expect(generalPayload.model).toBe('muse-spark-1.2-contributor');
+    expect(generalPayload.model).toBe('muse-spark-1.3-contributor');
     expect(generalPayload.reasoning).toEqual({ effort: 'low', exclude: true });
     expect(generalPayload.temperature).toBeDefined();
     expect(generalPayload.max_completion_tokens).toBeUndefined();
@@ -201,7 +201,7 @@ describe('AI response speed optimizations', () => {
     });
 
     expect(complexPayload).not.toBeNull();
-    expect(complexPayload.model).toBe('muse-spark-1.2-contributor');
+    expect(complexPayload.model).toBe('muse-spark-1.3-contributor');
     expect(complexPayload.reasoning).toEqual({ effort: 'high', exclude: true });
     expect(complexPayload.temperature).toBeDefined();
     expect(complexPayload.max_tokens).toBeUndefined();

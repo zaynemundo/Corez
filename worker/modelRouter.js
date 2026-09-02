@@ -5,7 +5,7 @@
  *    Every user attachment (image/*, video/*, audio/*, pdf, text, generic file)
  *    is first described by MiMo V2.5 via worker/mimo.js. MiMo runs on the same
  *    OpenCode Zen Go gateway as Muse (same endpoint + key, different model).
- * 2) Muse Spark 1.2 (muse-spark-1.2-contributor) — the unified site-wide
+ * 2) Muse Spark 1.3 (muse-spark-1.3-contributor) — the unified site-wide
  *    builder for visual tasks, backend logic, algorithms, scripting, general
  *    chat, writing, data and Q&A. It receives MiMo's textual description as
  *    grounded system context and does the final generation.
@@ -14,8 +14,8 @@
  * eyes/ears, Muse is the hands. See worker/mimo.js for the pre-pass.
  */
 
-export const MODEL_VISUAL = "muse-spark-1.2-contributor";
-export const MODEL_DEFAULT = "muse-spark-1.2-contributor";
+export const MODEL_VISUAL = "muse-spark-1.3-contributor";
+export const MODEL_DEFAULT = "muse-spark-1.3-contributor";
 
 const VISUAL_SKILL_IDS = new Set([
   "visual-creative",
@@ -106,7 +106,7 @@ export function isVisualRequest({
 
 /**
  * Selects the optimal model for a given request:
- * - Muse Spark 1.2 for all tasks (unified model)
+ * - Muse Spark 1.3 for all tasks (unified model)
  *
  * @param {Object} options Request options (prompt, intent, skills, messages)
  * @param {Object} [env] Worker environment variables
@@ -133,7 +133,7 @@ export function selectModelForRequest(options = {}, env = {}) {
 }
 
 /**
- * Complexity-aware reasoning & temperature selection for Muse Spark 1.2.
+ * Complexity-aware reasoning & temperature selection for Muse Spark 1.3.
  *
  * Reasoning models benefit from explicit effort hints: trivial prompts should
  * not waste reasoning tokens, while high/epic tasks (games, apps, research)

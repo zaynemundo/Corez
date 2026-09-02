@@ -477,10 +477,10 @@ Orchestration entry point for the CoreZ AI Game Studio. Analyzes game request, s
 **Agents needed:**
 | Role | Agent | Mode |
 |------|-------|------|
-| Creative Director | muse-spark-1.2-contributor | read-only advisory |
-| Lead Programmer | muse-spark-1.2-contributor | implement |
-| UI Programmer | muse-spark-1.2-contributor | implement |
-| QA Tester | muse-spark-1.2-contributor | test |
+| Creative Director | muse-spark-1.3-contributor | read-only advisory |
+| Lead Programmer | muse-spark-1.3-contributor | implement |
+| UI Programmer | muse-spark-1.3-contributor | implement |
+| QA Tester | muse-spark-1.3-contributor | test |
 
 #### MEDIUM (5-7 agents, 3-6 hours implementation)
 
@@ -499,13 +499,13 @@ Orchestration entry point for the CoreZ AI Game Studio. Analyzes game request, s
 **Agents needed:**
 | Role | Agent | Mode |
 |------|-------|------|
-| Creative Director | muse-spark-1.2-contributor | read-only advisory |
-| Game Designer | muse-spark-1.2-contributor | spec writer |
-| Lead Programmer | muse-spark-1.2-contributor | implement |
-| UI Programmer | muse-spark-1.2-contributor | implement |
+| Creative Director | muse-spark-1.3-contributor | read-only advisory |
+| Game Designer | muse-spark-1.3-contributor | spec writer |
+| Lead Programmer | muse-spark-1.3-contributor | implement |
+| UI Programmer | muse-spark-1.3-contributor | implement |
 | Art Director | flux-1-schnell | asset generation |
-| Technical Artist | muse-spark-1.2-contributor | asset integration |
-| QA Tester | muse-spark-1.2-contributor | test |
+| Technical Artist | muse-spark-1.3-contributor | asset integration |
+| QA Tester | muse-spark-1.3-contributor | test |
 
 #### LARGE (8+ agents, 8+ hours implementation)
 
@@ -526,16 +526,16 @@ Orchestration entry point for the CoreZ AI Game Studio. Analyzes game request, s
 **Agents needed:**
 | Role | Agent | Mode |
 |------|-------|------|
-| Producer | muse-spark-1.2-contributor | orchestration lead |
-| Creative Director | muse-spark-1.2-contributor | read-only |
-| Game Designer | muse-spark-1.2-contributor | spec |
-| Lead Programmer | muse-spark-1.2-contributor | architecture + core |
-| UI Programmer | muse-spark-1.2-contributor | HUD/menus |
+| Producer | muse-spark-1.3-contributor | orchestration lead |
+| Creative Director | muse-spark-1.3-contributor | read-only |
+| Game Designer | muse-spark-1.3-contributor | spec |
+| Lead Programmer | muse-spark-1.3-contributor | architecture + core |
+| UI Programmer | muse-spark-1.3-contributor | HUD/menus |
 | Art Director | flux-1-schnell | backgrounds/assets |
-| Technical Artist | muse-spark-1.2-contributor | sprite pipeline |
-| Physics Advisor | muse-spark-1.2-contributor | read-only advisory |
-| QA Tester | muse-spark-1.2-contributor | test |
-| Code Reviewer | muse-spark-1.2-contributor | read-only review |
+| Technical Artist | muse-spark-1.3-contributor | sprite pipeline |
+| Physics Advisor | muse-spark-1.3-contributor | read-only advisory |
+| QA Tester | muse-spark-1.3-contributor | test |
+| Code Reviewer | muse-spark-1.3-contributor | read-only review |
 
 ---
 
@@ -623,20 +623,20 @@ estimated_hours: "1-2"  # per complexity: SMALL 1-2, MEDIUM 3-6, LARGE 8+
 
 team:
   - role: "Lead Programmer"
-    agent: "muse-spark-1.2-contributor"
+    agent: "muse-spark-1.3-contributor"
     mode: "implement"
     tasks:
       - "Set up project structure and build config"
       - "Implement core game loop and rendering"
       - "Implement player controls and physics"
   - role: "UI Programmer"
-    agent: "muse-spark-1.2-contributor"
+    agent: "muse-spark-1.3-contributor"
     mode: "implement"
     tasks:
       - "Build HUD (score, health, pause button)"
       - "Implement start screen and game-over overlay"
   - role: "QA Tester"
-    agent: "muse-spark-1.2-contributor"
+    agent: "muse-spark-1.3-contributor"
     mode: "implement"
     tasks:
       - "Write smoke tests for core loop"

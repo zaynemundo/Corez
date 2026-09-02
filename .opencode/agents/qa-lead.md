@@ -1,7 +1,7 @@
 ---
 description: Oversees acceptance criteria, test plans, regression strategy, bug severity classification, and quality gate decisions.
 mode: subagent
-model: opencode-go/muse-spark-1.2-contributor
+model: opencode-go/muse-spark-1.3-contributor
 temperature: 0.1
 
 permission:
