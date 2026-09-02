@@ -389,6 +389,17 @@ export function createFallbackSvgDataUrl(prompt) {
     lower.includes("crystal")
   )
     spriteType = "gem";
+  else if (
+    lower.includes("flower") ||
+    lower.includes("floral") ||
+    lower.includes("blossom") ||
+    lower.includes("rose") ||
+    lower.includes("tulip") ||
+    lower.includes("daisy") ||
+    lower.includes("nature") ||
+    lower.includes("plant")
+  )
+    spriteType = "potion";
 
   const colorMap = {
     ".": null,

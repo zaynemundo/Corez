@@ -2382,15 +2382,16 @@ async function handleImage(request, env) {
   return jsonResponse(200, { image: imageUrl, model: imageModel });
 }
 
-// Workers AI text-to-image endpoint: runs @cf/black-forest-labs/flux-2-klein-4b
-// on the account's OWN Workers AI (env.AI binding) — no third-party key, and
-// billed inside the daily free neuron allocation. Same response contract as
-// /api/image: { image: <r2 url | data url>, model }.
+// Workers AI text-to-image endpoint: runs FLUX on the account's OWN Workers AI
+// (env.AI binding) — no third-party key, billed inside the daily free neuron allocation.
+// Primary is flux-2-klein-4b (4B, fast, high quality), fallback is flux-1-schnell (stable).
+// Same response contract as /api/image: { image: <r2 url | data url>, model }.
 //
 // Input contract: prompt (required) + optional width/height (256-1920) and
 // seed. The model consumes multipart/form-data (the JSON body shape is
 // rejected by the runner), so the binding call builds a FormData part.
 const WORKERS_AI_IMAGE_MODEL = "@cf/black-forest-labs/flux-2-klein-4b";
+const WORKERS_AI_FALLBACK_MODEL = "@cf/black-forest-labs/flux-1-schnell";
 
 function boundedInt(value, min, max) {
   const n = Number(value);
@@ -2459,6 +2460,12 @@ async function handleWorkersAIImage(request, env) {
     return controller.signal;
   })();
 
+  // Enhance very short prompts like "flower" for better FLUX results
+  const enhancedPrompt =
+    prompt.trim().length < 15 && !prompt.includes(",")
+      ? `${prompt.trim()}, high detail, photorealistic, vibrant colors, studio lighting, 4k`
+      : prompt;
+
   let result;
   try {
     // The model consumes multipart/form-data. Serialize the FormData through
@@ -2467,7 +2474,7 @@ async function handleWorkersAIImage(request, env) {
     // pattern): passing a raw FormData with a custom Content-Type strips the
     // boundary (runner 3030), and string/byte bodies are rejected (8001).
     const form = new FormData();
-    form.append("prompt", prompt);
+    form.append("prompt", enhancedPrompt);
     const width = boundedInt(body.width, 256, 1920);
     const height = boundedInt(body.height, 256, 1920);
     const seed = boundedInt(body.seed, 0, 2147483647);
@@ -2481,11 +2488,42 @@ async function handleWorkersAIImage(request, env) {
         contentType: formResponse.headers.get("content-type"),
       },
     };
-    result = await ai.run(
-      WORKERS_AI_IMAGE_MODEL,
-      inputs,
-      clientSignal ? { signal: clientSignal } : undefined,
-    );
+    try {
+      result = await ai.run(
+        WORKERS_AI_IMAGE_MODEL,
+        inputs,
+        clientSignal ? { signal: clientSignal } : undefined,
+      );
+    } catch (primaryErr) {
+      // Fallback to flux-1-schnell if klein-4b is unavailable (model not found, quota, etc.)
+      const msg = String(primaryErr?.message || "");
+      const isModelNotFound =
+        /model not found|unknown model|not available|400|404/i.test(msg);
+      if (isModelNotFound && WORKERS_AI_FALLBACK_MODEL) {
+        console.warn(
+          `Primary Workers AI model ${WORKERS_AI_IMAGE_MODEL} failed (${safeErrorDetail(primaryErr)}), trying fallback ${WORKERS_AI_FALLBACK_MODEL}`,
+        );
+        const fallbackForm = new FormData();
+        fallbackForm.append("prompt", enhancedPrompt);
+        if (width !== null) fallbackForm.append("width", String(width));
+        if (height !== null) fallbackForm.append("height", String(height));
+        if (seed !== null) fallbackForm.append("seed", String(seed));
+        const fallbackResp = new Response(fallbackForm);
+        const fallbackInputs = {
+          multipart: {
+            body: fallbackResp.body,
+            contentType: fallbackResp.headers.get("content-type"),
+          },
+        };
+        result = await ai.run(
+          WORKERS_AI_FALLBACK_MODEL,
+          fallbackInputs,
+          clientSignal ? { signal: clientSignal } : undefined,
+        );
+      } else {
+        throw primaryErr;
+      }
+    }
   } catch (err) {
     if (clientSignal?.aborted || err?.name === "AbortError") {
       return jsonResponse(499, { error: "Image request cancelled." });
