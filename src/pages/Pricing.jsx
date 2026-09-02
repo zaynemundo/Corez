@@ -349,7 +349,7 @@ export default function Pricing() {
       </header>
 
       {user && sub?.pending_plan && sub.pending_plan !== currentPlan && (
-        <div style={{ maxWidth: "1120px", margin: "0 auto", padding: "0 24px 12px", width: "100%" }}>
+        <div className="pricing-banner-wrap" style={{ maxWidth: "1120px", margin: "0 auto", padding: "0 24px 12px", width: "100%" }}>
           <div
             style={{
               display: "flex",
@@ -410,7 +410,7 @@ export default function Pricing() {
       )}
 
       {sub?.isScheduledDowngrade && sub?.downgrade_plan && (
-        <div style={{ maxWidth: "1120px", margin: "0 auto", padding: "0 24px 12px", width: "100%" }}>
+        <div className="pricing-banner-wrap" style={{ maxWidth: "1120px", margin: "0 auto", padding: "0 24px 12px", width: "100%" }}>
           <div
             style={{
               display: "flex",
