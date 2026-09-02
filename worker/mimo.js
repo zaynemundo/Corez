@@ -327,8 +327,13 @@ export function buildMimoContextBlock(descriptions) {
             : d.kind === "audio"
               ? "Audio"
               : "File";
-      const srcHint = d.assetUrl
-        ? `\nR2 URL (use EXACTLY this for <img src> — never hallucinate local filenames like "${d.name}" or Screenshot...png): ${d.assetUrl}`
+      const absUrl = d.assetUrl
+        ? String(d.assetUrl).startsWith("http")
+          ? String(d.assetUrl)
+          : `https://corez.pro${String(d.assetUrl).startsWith("/") ? "" : "/"}${String(d.assetUrl)}`
+        : null;
+      const srcHint = absUrl
+        ? `\nR2 URL (use EXACTLY this for <img src> — must start with https://corez.pro/api/assets/ — never hallucinate local filenames like "${d.name}" or Screenshot...png): ${absUrl}`
         : d.thumb && String(d.thumb).startsWith("data:")
           ? `\nData URL available (use this for <img src> if no R2 URL): data:image/... (truncated, use assetUrl if present)`
           : "";
@@ -350,6 +355,6 @@ export function buildMimoContextBlock(descriptions) {
   return (
     "MiMo V2.5 Media Understanding (vision/file analysis — authoritative, use this as ground truth for the attached media, then fulfill the user's request with Muse Spark 1.2):\n" +
     lines +
-    "\n\nUse the above MiMo descriptions as the true content of the user's attached files. Do NOT hallucinate or invent media content — ground your generation in these descriptions. When you need to display the attached image in generated HTML, use the EXACT R2 URL provided above for <img src> (e.g. <img src=\"/api/assets/user-upload_...jpg\">). Never use local filenames like \"Screenshot 2026-09-02 145516.png\" — they will 404."
+    "\n\nUse the above MiMo descriptions as the true content of the user's attached files. Do NOT hallucinate or invent media content — ground your generation in these descriptions. When you need to display the attached image in generated HTML, use the EXACT R2 URL provided above for <img src> (e.g. <img src=\"https://corez.pro/api/assets/user-upload_...jpg\"> — must start with https://corez.pro/api/assets/). Never use local filenames like \"Screenshot 2026-09-02 145516.png\" or relative /api/assets/ — they will 404 or break on published sites."
   );
 }

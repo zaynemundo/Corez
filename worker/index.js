@@ -60,7 +60,7 @@ function toMultimodalMessage(message) {
     : [];
   const hasMedia = attachments.some(
     (a) =>
-      (a?.assetUrl && String(a.assetUrl).startsWith("/api/assets/")) ||
+      (a?.assetUrl && String(a.assetUrl).includes("/api/assets/")) ||
       (a?.thumb && String(a.thumb).startsWith("data:")) ||
       (typeof a?.content === "string" && a.content.trim()),
   );
@@ -86,8 +86,12 @@ function toMultimodalMessage(message) {
           : mime.startsWith("audio/")
             ? "audio"
             : "file";
-      if (a?.assetUrl && String(a.assetUrl).startsWith("/api/assets/"))
-        return `\n[Attached ${kind} "${name}" available at: ${a.assetUrl} — USE THIS URL for <img>/<video>/<audio> src if needed]`;
+      if (a?.assetUrl && String(a.assetUrl).includes("/api/assets/")) {
+        const absUrl = String(a.assetUrl).startsWith("http")
+          ? String(a.assetUrl)
+          : `https://corez.pro${String(a.assetUrl).startsWith("/") ? "" : "/"}${String(a.assetUrl)}`;
+        return `\n[Attached ${kind} "${name}" available at: ${absUrl} — USE THIS URL (must start with https://corez.pro/api/assets/) for <img>/<video>/<audio> src if needed]`;
+      }
       if (a?.thumb && String(a.thumb).startsWith("data:"))
         return `\n[Attached ${kind} "${name}" available as data URL — use this for src if needed]`;
       if (typeof a?.content === "string" && a.content.trim())
@@ -164,10 +168,13 @@ function patchLocalImageSrc(html, messages) {
     for (const a of Array.isArray(m?.attachments) ? m.attachments : []) {
       if (
         typeof a?.assetUrl === "string" &&
-        a.assetUrl.startsWith("/api/assets/")
-      )
-        urls.push(a.assetUrl);
-      else if (
+        String(a.assetUrl).includes("/api/assets/")
+      ) {
+        const abs = String(a.assetUrl).startsWith("http")
+          ? String(a.assetUrl)
+          : `https://corez.pro${String(a.assetUrl).startsWith("/") ? "" : "/"}${String(a.assetUrl)}`;
+        urls.push(abs);
+      } else if (
         typeof a?.thumb === "string" &&
         a.thumb.startsWith("data:image/")
       )
@@ -673,7 +680,7 @@ function buildSystemPrompt(options = {}) {
 Adaptive Routing - Code Revision Path:
 - Apply the requested change directly to the provided code and output the complete updated file.
 - Keep all other code, styles, scripts and structure unchanged unless the request explicitly says to change them.
-- When the user attaches an image (e.g. for any person's portrait/avatar/profile), use that exact image — it is available as /api/assets/user-upload_...jpg (or data:image/...). Do NOT use Unsplash or invented URLs. Example: <img src="/api/assets/user-upload_...jpg" alt="User portrait" style="width:100%;height:100%;object-fit:cover"> with meaningful alt and onerror fallback.
+- When the user attaches an image (e.g. for any person's portrait/avatar/profile), use that exact image — it is available as https://corez.pro/api/assets/user-upload_...jpg (or data:image/...). Do NOT use Unsplash or invented URLs. Example: <img src="https://corez.pro/api/assets/user-upload_...jpg" alt="User portrait" style="width:100%;height:100%;object-fit:cover"> with meaningful alt and onerror fallback. Always use absolute https://corez.pro/api/assets/ URLs for storage images, never relative /api/assets/ or local filenames.
 - If the existing code is HTML, output the full HTML document inside one \`\`\`html block.
 - If repairing missing sub-page links:
   - If single-page: convert <a href="page.html"> to in-page anchors (<a href="#section">).
@@ -855,7 +862,7 @@ Reasoning & Response Quality (Corez 1.0 — hidden chain-of-thought):
 
 Guidelines for Output:
 - FOLLOW THE USER'S REQUEST EXACTLY: deliver precisely what the user asked for — implement everything they requested and add nothing they did not ask for. When the user's instruction conflicts with any default or template behaviour, the user's explicit instruction wins.
- - ATTACHED IMAGES & VISION: You DO have vision. Every user attachment (image, video, audio, file) is first described by MiMo V2.5 (vision/multimodal) and the description is injected as "MiMo V2.5 Media Understanding" — treat it as ground truth, never ignore it. If the user asks to describe, analyze, OCR, or recreate an attached image, answer FROM that MiMo block and never reply "I cannot view images", "I don't have the ability to view", or any denial. If the MiMo block is present, quote/summarize it verbatim and ground your recreation in it. If no MiMo block is present but the "Attached media" system block lists an image, acknowledge the attachment exists (filename/type/size) and explain vision pre-pass was temporarily unavailable — ask the user for a one-line description of what's visible so you can still recreate/extract, do NOT hallucinate a generic "Layout & Structure / Typography / Color & Style" template. When the task requires that image (e.g. a person's portrait, avatar, or any user-uploaded photo), use the R2 URL if you know it, otherwise use the data URL verbatim in <img src="..."> — do NOT use local filenames like 1716041183016.jpg, avatar.jpg, or invented URLs. The system also auto-patches any local filename or placeholder image to the correct R2/data URL after generation, so the user's photo always displays. Always include meaningful alt text, object-fit:cover, and onerror fallback.
+ - ATTACHED IMAGES & VISION: You DO have vision. Every user attachment (image, video, audio, file) is first described by MiMo V2.5 (vision/multimodal) and the description is injected as "MiMo V2.5 Media Understanding" — treat it as ground truth, never ignore it. If the user asks to describe, analyze, OCR, or recreate an attached image, answer FROM that MiMo block and never reply "I cannot view images", "I don't have the ability to view", or any denial. If the MiMo block is present, quote/summarize it verbatim and ground your recreation in it. If no MiMo block is present but the "Attached media" system block lists an image, acknowledge the attachment exists (filename/type/size) and explain vision pre-pass was temporarily unavailable — ask the user for a one-line description of what's visible so you can still recreate/extract, do NOT hallucinate a generic "Layout & Structure / Typography / Color & Style" template. When the task requires that image (e.g. a person's portrait, avatar, or any user-uploaded photo), use the absolute R2 URL https://corez.pro/api/assets/user-upload_...jpg if you know it (must start with https://corez.pro/api/assets/, never relative /api/assets/ or local filenames like 1716041183016.jpg), otherwise use the data URL verbatim in <img src="..."> — do NOT use invented URLs. The system also auto-patches any local filename or placeholder image to the correct https://corez.pro/api/assets/ URL after generation, so the user's photo always displays. Always include meaningful alt text, object-fit:cover, and onerror fallback.
 - AMBIGUOUS REQUESTS: When a user's prompt is ambiguous, underspecified, or missing essential details (e.g. they say "make a game", "build a website", "create a plan", or give a vague prompt with multiple conflicting interpretations), do NOT ask clarifying questions and do NOT present choice menus or option lists. Instead, choose the most sensible default interpretation, state the key assumption you made in ONE short sentence, and deliver the complete result. The user can refine it in a follow-up message.
 - DEFAULT FORMAT (React/JSX): When writing code or building apps, components, tools, dashboards, or games without an explicitly requested format, default to clean, modern React/JSX components (using \`\`\`jsx ... \`\`\` code blocks). ALWAYS name your main top-level component "export default function App()".
 - REQUESTED FORMATS (HTML/CSS/JS): If the user explicitly requests HTML, CSS, vanilla JS, or plain web code, output complete single-file HTML/CSS/JS inside ONE SINGLE \`\`\`html ... \`\`\` code block.
@@ -1187,13 +1194,17 @@ async function handleAi(request, env) {
                   ? "audio"
                   : "file";
             const hasR2 =
-              a?.assetUrl && String(a.assetUrl).startsWith("/api/assets/");
+              a?.assetUrl && String(a.assetUrl).includes("/api/assets/");
             const hasThumb =
               a?.thumb && String(a.thumb).startsWith("data:");
             const hasContent =
               typeof a?.content === "string" && a.content.trim();
             if (hasR2) {
-              return `[Attached ${kind} "${a.name}" R2 URL: ${a.assetUrl} — USE THIS EXACT URL for <img>/<video>/<audio> src, never hallucinate local filenames like "${a.name}"]`;
+              // Always use absolute corez.pro URL for storage assets
+              const absoluteUrl = String(a.assetUrl).startsWith("http")
+                ? String(a.assetUrl)
+                : `https://corez.pro${String(a.assetUrl).startsWith("/") ? "" : "/"}${String(a.assetUrl)}`;
+              return `[Attached ${kind} "${a.name}" R2 URL: ${absoluteUrl} — USE THIS EXACT URL (must start with https://corez.pro/api/assets/) for <img>/<video>/<audio> src, never hallucinate local filenames like "${a.name}"]`;
             }
             if (hasThumb) {
               const sizeHint = a.size
@@ -2371,7 +2382,15 @@ async function handleImage(request, env) {
         mimeType,
         await sessionUid(request, env),
       );
-      return jsonResponse(200, { image: r2Url || imageUrl, model: imageModel });
+      const absoluteR2 = r2Url
+        ? String(r2Url).startsWith("http")
+          ? String(r2Url)
+          : `https://corez.pro${String(r2Url).startsWith("/") ? "" : "/"}${String(r2Url)}`
+        : null;
+      return jsonResponse(200, {
+        image: absoluteR2 || imageUrl,
+        model: imageModel,
+      });
     }
   } catch (err) {
     console.warn(
@@ -2604,7 +2623,11 @@ async function handleWorkersAIImage(request, env) {
       mimeType,
       await sessionUid(request, env),
     );
-    if (r2Url) imageUrl = r2Url;
+    if (r2Url) {
+      imageUrl = String(r2Url).startsWith("http")
+        ? String(r2Url)
+        : `https://corez.pro${String(r2Url).startsWith("/") ? "" : "/"}${String(r2Url)}`;
+    }
   } catch {
     // R2 is optional: the data URL is returned when storage fails.
   }
