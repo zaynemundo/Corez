@@ -3,12 +3,19 @@ import { jsonResponse, readBoundedJson, safeErrorDetail } from "./utils.js";
 const ZIINA_BASE = "https://api-v2.ziina.com/api";
 const MIN_FILS = 200; // 2 AED
 
-// Corez product pricing — Free (0), Standard 18.36 AED, Premium 27.54 AED
+// Corez product pricing — Free (0), Standard 18.36 AED/mo or 176.28 AED/year (20% off), Premium 27.54 AED/mo or 264.36 AED/year
 export const ZIINA_PLANS = {
-  free: { amount: 0, label: "Free", aed: "0.00" },
-  standard: { amount: 1836, label: "Standard", aed: "18.36" },
-  premium: { amount: 2754, label: "Premium", aed: "27.54" },
-  basic: { amount: 1836, label: "Standard", aed: "18.36" }, // alias
+  free: { amount: 0, label: "Free", aed: "0.00", interval: "forever" },
+  standard: { amount: 1836, label: "Standard", aed: "18.36", interval: "month" },
+  premium: { amount: 2754, label: "Premium", aed: "27.54", interval: "month" },
+  standard_yearly: { amount: 17628, label: "Standard", aed: "176.28", interval: "year" },
+  premium_yearly: { amount: 26436, label: "Premium", aed: "264.36", interval: "year" },
+  basic: { amount: 1836, label: "Standard", aed: "18.36", interval: "month" }, // alias
+};
+
+export const ZIINA_PLANS_YEARLY = {
+  standard: { amount: 17628, label: "Standard", aed: "176.28", interval: "year" },
+  premium: { amount: 26436, label: "Premium", aed: "264.36", interval: "year" },
 };
 
 export function resolvePlanAmount(plan, fallbackAmount) {
@@ -158,13 +165,24 @@ export async function handleZiina(request, env) {
     if (!body || typeof body !== "object" || Array.isArray(body)) body = {};
 
     // Plan shortcut: { plan: 'standard' | 'premium' } → fixed pricing (18.36 / 27.54 AED)
-    // Also accepts tier / product as alias
+    // Also accepts tier / product as alias, plus interval yearly for 20% off
     const planKey = body.plan || body.tier || body.product || body.package;
+    const intervalRaw = String(body.interval || body.billing || body.billing_interval || "").trim().toLowerCase();
+    const isYearly = intervalRaw === "yearly" || intervalRaw === "year" || intervalRaw === "annual" || intervalRaw === "annually";
     let planMeta = null;
     if (typeof planKey === "string" && planKey.trim()) {
       const k = planKey.trim().toLowerCase();
-      if (ZIINA_PLANS[k]) {
-        planMeta = ZIINA_PLANS[k];
+      // Handle yearly: standard + yearly => standard_yearly
+      const yearlyKey = isYearly ? `${k}_yearly` : null;
+      if (isYearly && yearlyKey && ZIINA_PLANS[yearlyKey]) {
+        planMeta = ZIINA_PLANS[yearlyKey];
+      } else if (ZIINA_PLANS[k]) {
+        // If yearly requested but plan is standard/premium without yearly suffix, map to yearly
+        if (isYearly && ZIINA_PLANS_YEARLY[k]) {
+          planMeta = ZIINA_PLANS_YEARLY[k];
+        } else {
+          planMeta = ZIINA_PLANS[k];
+        }
       } else if (k) {
         return jsonResponse(400, {
           error: `Unknown plan '${planKey}'. Use 'standard' (18.36 AED) or 'premium' (27.54 AED).`,

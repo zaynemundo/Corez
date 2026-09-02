@@ -4,6 +4,7 @@ import { ZIINA_PLANS } from "./ziina.js";
 const ZIINA_BASE = "https://api-v2.ziina.com/api";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MONTH_DAYS = 30;
+const YEAR_DAYS = 365;
 const FREE_PLAN = "free";
 
 export async function ensureSubscriptionTables(env) {
@@ -271,13 +272,21 @@ export async function activateSubscription(
   plan,
   ziinaPaymentId,
   amount,
+  interval = "month",
 ) {
   const now = Date.now();
   const isFree = plan === "free" || plan === FREE_PLAN;
-  const periodEnd = isFree ? null : now + MONTH_DAYS * DAY_MS;
+  const isYearly = String(interval).toLowerCase() === "year" || String(interval).toLowerCase() === "yearly" || String(interval).toLowerCase() === "annual";
+  const periodDays = isYearly ? YEAR_DAYS : MONTH_DAYS;
+  const periodEnd = isFree ? null : now + periodDays * DAY_MS;
   const id = crypto.randomUUID();
   const meta = ZIINA_PLANS[plan] || ZIINA_PLANS["standard"];
-  const finalAmount = isFree ? 0 : amount || meta.amount;
+  // For yearly, use yearly amount if not explicitly passed
+  let finalAmount = isFree ? 0 : amount || meta.amount;
+  if (isYearly && !amount) {
+    const yearlyMeta = ZIINA_PLANS[`${plan}_yearly`] || ZIINA_PLANS_YEARLY?.[plan];
+    if (yearlyMeta) finalAmount = yearlyMeta.amount;
+  }
 
   try {
     // Mark any previous ACTIVE rows as completed (one true current plan) and drop
@@ -571,7 +580,7 @@ export async function handleSubscriptions(request, env) {
 
     if (plan === "free") {
       // Free needs no payment — just activate
-      await activateSubscription(env, userId, "free", null, 0);
+      await activateSubscription(env, userId, "free", null, 0, "month");
       return jsonResponse(200, {
         free: true,
         plan: "free",
@@ -579,19 +588,26 @@ export async function handleSubscriptions(request, env) {
       });
     }
 
-    const meta = ZIINA_PLANS[plan];
+    const rawInterval = String(body.interval || body.billing || body.billing_interval || body.period || "").trim().toLowerCase();
+    const isYearly = rawInterval === "yearly" || rawInterval === "year" || rawInterval === "annual" || rawInterval === "annually";
+    const interval = isYearly ? "year" : "month";
+    const yearlyKey = `${plan}_yearly`;
+    const meta = isYearly && ZIINA_PLANS[yearlyKey] ? ZIINA_PLANS[yearlyKey] : ZIINA_PLANS[plan];
     if (!meta) return jsonResponse(400, { error: "Unknown plan" });
+    const periodLabel = isYearly ? "365 days" : "30 days";
+    const intervalLabel = isYearly ? "year" : "month";
 
     const apiKey = env?.ZIINA_API_KEY || env?.ZIINA_API_TOKEN;
     if (!apiKey) return jsonResponse(500, { error: "Ziina not configured" });
 
-    // Reuse an existing in-flight checkout for this same plan instead of
+    // Reuse an existing in-flight checkout for this same plan+interval instead of
     // creating a duplicate Ziina intent — repeated Upgrade clicks resume.
+    const pendingAmount = meta.amount;
     try {
       const existing = await env.DB.prepare(
-        "SELECT ziina_payment_id FROM subscriptions WHERE user_id=? AND status='pending' AND lower(plan)=? ORDER BY created_at DESC LIMIT 1",
+        "SELECT ziina_payment_id, amount FROM subscriptions WHERE user_id=? AND status='pending' AND lower(plan)=? AND amount=? ORDER BY created_at DESC LIMIT 1",
       )
-        .bind(userId, plan)
+        .bind(userId, plan, pendingAmount)
         .first();
       if (existing?.ziina_payment_id) {
         const r = await fetch(
@@ -604,7 +620,7 @@ export async function handleSubscriptions(request, env) {
             plan,
             amount: meta.amount,
             aed: meta.aed,
-            interval: "month",
+            interval: intervalLabel,
             resumed: true,
             ziina_id: data.id,
             redirect_url: data.redirect_url,
@@ -617,22 +633,22 @@ export async function handleSubscriptions(request, env) {
         }
         // Completed but unverified → activate now; failed/canceled → drop and create fresh.
         if (r.ok && String(data?.status || "").toLowerCase() === "completed") {
-          const activated = await activateSubscription(env, userId, plan, data.id, Number(data?.amount) || meta.amount);
+          const activated = await activateSubscription(env, userId, plan, data.id, Number(data?.amount) || meta.amount, interval);
           return jsonResponse(200, {
             plan,
             verified: true,
             status: "completed",
             period_end: activated.period_end,
             aed: meta.aed,
-            interval: "month",
-            message: `Subscription activated — ${meta.label} valid for 30 days`,
+            interval: intervalLabel,
+            message: `Subscription activated — ${meta.label} valid for ${periodLabel}`,
           });
         }
         try {
           await env.DB.prepare(
-            `DELETE FROM subscriptions WHERE user_id=? AND status='pending' AND lower(plan)=?`,
+            `DELETE FROM subscriptions WHERE user_id=? AND status='pending' AND lower(plan)=? AND amount=?`,
           )
-            .bind(userId, plan)
+            .bind(userId, plan, pendingAmount)
             .run();
         } catch {}
       }
@@ -667,7 +683,7 @@ export async function handleSubscriptions(request, env) {
     const ziinaPayload = {
       amount: meta.amount,
       currency_code: "AED",
-      message: body.message || `Corez ${meta.label} — ${meta.aed} AED / month`,
+      message: body.message || `Corez ${meta.label} — ${meta.aed} AED / ${interval}`,
       success_url: successUrl,
       cancel_url: cancelUrl,
       test: Boolean(testFlag),
@@ -725,7 +741,7 @@ export async function handleSubscriptions(request, env) {
         plan,
         amount: meta.amount,
         aed: meta.aed,
-        interval: "month",
+        interval,
         ziina_id: data.id,
         redirect_url: data.redirect_url,
         embedded_url: data.embedded_url,
@@ -813,22 +829,44 @@ export async function handleSubscriptions(request, env) {
           raw: data,
         });
       }
-      // Payment completed — activate monthly subscription
+      // Payment completed — activate subscription (monthly or yearly)
       const amount = Number(data.amount);
-      // Infer plan from amount if not provided
+      // Infer plan and interval from amount if not provided
       let plan = planHint;
-      if (!plan || !ZIINA_PLANS[plan] || ZIINA_PLANS[plan].amount !== amount) {
-        // Infer by amount
-        for (const [k, v] of Object.entries(ZIINA_PLANS)) {
-          if (v.amount === amount) {
-            plan = k;
-            break;
+      let interval = String(body.interval || body.billing || "").toLowerCase();
+      if (!interval || (interval !== "year" && interval !== "yearly" && interval !== "annual")) {
+        // Infer interval from amount
+        if (amount === 17628 || amount === 26436) interval = "year";
+        else interval = "month";
+      } else {
+        interval = interval === "year" || interval === "yearly" || interval === "annual" ? "year" : "month";
+      }
+      // Normalize plan for yearly amounts
+      if (amount === 17628) plan = "standard";
+      else if (amount === 26436) plan = "premium";
+      else if (!plan || !ZIINA_PLANS[plan] || ZIINA_PLANS[plan].amount !== amount) {
+        // Handle yearly suffix or fallback
+        const yearlyKey = plan ? `${plan}_yearly` : null;
+        if (yearlyKey && ZIINA_PLANS[yearlyKey] && ZIINA_PLANS[yearlyKey].amount === amount) {
+          // keep plan as base (standard/premium) and interval yearly
+          // plan already correct
+        } else {
+          // Infer by amount
+          for (const [k, v] of Object.entries(ZIINA_PLANS)) {
+            if (v.amount === amount) {
+              // If yearly, map back to base plan
+              if (k.endsWith("_yearly")) plan = k.replace("_yearly", "");
+              else plan = k;
+              break;
+            }
           }
         }
       }
+      // Handle yearly suffix
+      if (plan && plan.endsWith("_yearly")) plan = plan.replace("_yearly", "");
       if (!plan || plan === "free") {
         // If free, just set free
-        await activateSubscription(env, userId, "free", paymentId, 0);
+        await activateSubscription(env, userId, "free", paymentId, 0, "month");
         return jsonResponse(200, {
           verified: true,
           plan: "free",
@@ -836,14 +874,19 @@ export async function handleSubscriptions(request, env) {
           raw: data,
         });
       }
-      if (!ZIINA_PLANS[plan]) plan = amount === 2754 ? "premium" : "standard";
+      if (!ZIINA_PLANS[plan]) plan = amount === 2754 || amount === 26436 ? "premium" : "standard";
+      // Determine yearly from amount if not already set
+      if (amount === 17628 || amount === 26436) interval = "year";
+      const isYearly = interval === "year";
       const activated = await activateSubscription(
         env,
         userId,
         plan,
         paymentId,
         amount,
+        interval,
       );
+      const periodLabel = isYearly ? "365 days" : "30 days";
       return jsonResponse(200, {
         verified: true,
         plan,
@@ -851,9 +894,9 @@ export async function handleSubscriptions(request, env) {
         period_start: activated.period_start,
         period_end: activated.period_end,
         amount: activated.amount,
-        aed: ZIINA_PLANS[plan].aed,
-        interval: "month",
-        message: `Subscription activated — ${ZIINA_PLANS[plan].label} valid for 30 days`,
+        aed: ZIINA_PLANS[plan]?.aed ? (isYearly ? ZIINA_PLANS[`${plan}_yearly`]?.aed || ZIINA_PLANS[plan].aed : ZIINA_PLANS[plan].aed) : String((amount/100).toFixed(2)),
+        interval,
+        message: `Subscription activated — ${ZIINA_PLANS[plan].label} valid for ${periodLabel}`,
         raw: data,
       });
     } catch (err) {

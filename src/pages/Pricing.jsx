@@ -107,14 +107,16 @@ export default function Pricing() {
       navigate("/?next=/pricing");
       return;
     }
-    if (planId === currentPlan) return;
+    // Handle same plan but different billing interval (monthly -> yearly is an upgrade)
+    const isSamePlanYearlyUpgrade = planId === currentPlan && billing === "yearly" && sub?.interval !== "year";
+    if (planId === currentPlan && !isSamePlanYearlyUpgrade) return;
 
     const currentRank = tierRank[currentPlan] ?? 0;
     const targetRank = tierRank[planId] ?? 0;
-    const isDowngrade = targetRank < currentRank;
+    const isDowngrade = targetRank < currentRank && !isSamePlanYearlyUpgrade;
 
-    // Downgrade or cancel — schedule after period_end
-    if (isDowngrade || planId === "free") {
+    // Downgrade or cancel — schedule after period_end (but not for yearly upgrade)
+    if ((isDowngrade || planId === "free") && !isSamePlanYearlyUpgrade) {
       const targetLabel = planId === "free" ? "Free" : planId;
       const confirmMsg =
         planId === "free"
@@ -148,18 +150,20 @@ export default function Pricing() {
       return;
     }
 
-    // Upgrade — immediate checkout via Ziina
+    // Upgrade — immediate checkout via Ziina (handle yearly billing)
     setPayBusy(planId);
     try {
       const origin = window.location.origin;
+      const interval = billing === "yearly" && planId !== "free" ? "yearly" : "monthly";
       const r = await fetch("/api/subscriptions/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
           plan: planId,
-          success_url: origin + "/payment/success?plan=" + planId,
-          cancel_url: origin + "/payment/cancel?plan=" + planId,
+          interval,
+          success_url: origin + "/payment/success?plan=" + planId + "&interval=" + interval,
+          cancel_url: origin + "/payment/cancel?plan=" + planId + "&interval=" + interval,
           test: false,
         }),
       });
@@ -470,13 +474,14 @@ export default function Pricing() {
       <main className="pricing-main">
         <div className="pricing-grid-page">
           {PLANS.map((p) => {
-            const isCurrent = currentPlan === p.id;
+            const isYearlySelected = billing === "yearly" && p.id !== "free";
+            // Same plan but yearly billing is an upgrade (monthly -> yearly)
+            const isCurrent = currentPlan === p.id && !isYearlySelected;
             const Icon = p.icon;
             const busy = payBusy === p.id;
             const yearlyPrice =
               p.id === "free" ? "0" : p.id === "standard" ? "14.69" : "22.03"; // 20% off
-            const displayPrice =
-              billing === "yearly" && p.id !== "free" ? yearlyPrice : p.price;
+            const displayPrice = isYearlySelected ? yearlyPrice : p.price;
             return (
               <div
                 key={p.id}
