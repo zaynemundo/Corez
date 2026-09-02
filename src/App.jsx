@@ -86,7 +86,7 @@ function useChatIdFromUrl() {
   }, [location.pathname]);
 }
 
-function MainApp() {
+function MainApp({ theme, setTheme }) {
   const navigate = useNavigate();
   const _location = useLocation();
   const chatIdFromUrl = useChatIdFromUrl();
@@ -113,13 +113,6 @@ function MainApp() {
   const [streamingContent, setStreamingContent] = useState(null);
   const [isStreamCollapsed, setIsStreamCollapsed] = useState(false);
   const [swarmVisible, setSwarmVisible] = useState(false);
-  const [theme, setTheme] = useState(() => {
-    try {
-      return localStorage.getItem("corez_theme") || "dark";
-    } catch {
-      return "dark";
-    }
-  });
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
     if (
       typeof window === "undefined" ||
@@ -445,15 +438,6 @@ function MainApp() {
     window.addEventListener("keydown", closeSidebarWithEscape);
     return () => window.removeEventListener("keydown", closeSidebarWithEscape);
   }, [isMobileViewport, sidebarOpen]);
-
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    try {
-      localStorage.setItem("corez_theme", theme);
-    } catch {
-      /* Ignore storage errors */
-    }
-  }, [theme]);
 
   // Auto-resume background AI generation across accidental page refreshes
   useEffect(() => {
@@ -1362,6 +1346,34 @@ function AppInner() {
   const { user, loading } = useAuth();
   const location = useLocation();
   const isPublicPricing = location.pathname === "/pricing";
+  const [theme, setTheme] = useState(() => {
+    try {
+      return localStorage.getItem("corez_theme") || "dark";
+    } catch {
+      return "dark";
+    }
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    try {
+      localStorage.setItem("corez_theme", theme);
+    } catch {
+      /* Ignore storage errors */
+    }
+  }, [theme]);
+
+  // Keep theme in sync across tabs
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key === "corez_theme" && (e.newValue === "light" || e.newValue === "dark")) {
+        setTheme(e.newValue);
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
   if (loading) {
     return null;
   }
@@ -1379,8 +1391,8 @@ function AppInner() {
   // Authenticated — render routed MainApp
   return (
     <Routes>
-      <Route path="/" element={<MainApp />} />
-      <Route path="/chat/:chatId" element={<MainApp />} />
+      <Route path="/" element={<MainApp theme={theme} setTheme={setTheme} />} />
+      <Route path="/chat/:chatId" element={<MainApp theme={theme} setTheme={setTheme} />} />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/payment/success" element={<PaymentSuccess />} />
       <Route path="/payment/cancel" element={<PaymentCancel />} />
