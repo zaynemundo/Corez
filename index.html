@@ -36,11 +36,10 @@
       (function () {
         try {
           var t = localStorage.getItem("corez_theme");
-          if (t === "light" || t === "dark") {
-            document.documentElement.setAttribute("data-theme", t);
-          } else {
-            document.documentElement.setAttribute("data-theme", "dark");
-          }
+          var theme = t === "light" || t === "dark" ? t : "dark";
+          document.documentElement.setAttribute("data-theme", theme);
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute("content", theme === "light" ? "#ffffff" : "#0a0a0a");
         } catch (e) {
           document.documentElement.setAttribute("data-theme", "dark");
         }

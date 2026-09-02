@@ -3226,6 +3226,10 @@ h6 {
   padding: 6px 10px;
   border-radius: 999px;
 }
+[data-theme="light"] .pricing-kicker {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.08);
+}
 .pricing-title {
   margin: 16px 0 10px;
   font-family: "Outfit", sans-serif;
@@ -3600,6 +3604,9 @@ h6 {
   border-radius: 14px;
   background: rgba(18, 20, 29, 0.4);
 }
+[data-theme="light"] .pricing-table-wrap {
+  background: rgba(0, 0, 0, 0.02);
+}
 .pricing-table {
   width: 100%;
   border-collapse: collapse;
@@ -3618,6 +3625,9 @@ h6 {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   background: rgba(255, 255, 255, 0.02);
+}
+[data-theme="light"] .pricing-table th {
+  background: rgba(0, 0, 0, 0.02);
 }
 .pricing-table td {
   color: var(--text-secondary);
@@ -3655,6 +3665,9 @@ h6 {
   border: 1px solid var(--border-color);
   border-radius: 12px;
   background: rgba(18, 20, 29, 0.3);
+}
+[data-theme="light"] .pricing-faq-grid div {
+  background: rgba(0, 0, 0, 0.02);
 }
 .pricing-faq-grid h3 {
   font-size: 13px;
@@ -4003,10 +4016,34 @@ h6 {
 
   .message-body {
     max-width: 92%;
+    min-width: 0;
+    overflow: hidden;
+    overflow-wrap: anywhere;
   }
 
   .message-content {
     padding: 0.85rem 1rem;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .message-wrapper.user .message-content {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .markdown-body,
+  .markdown-body p,
+  .markdown-link {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    min-width: 0;
   }
 
   .input-box {
