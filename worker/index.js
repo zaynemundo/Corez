@@ -855,7 +855,7 @@ Reasoning & Response Quality (Corez 1.0 — hidden chain-of-thought):
 
 Guidelines for Output:
 - FOLLOW THE USER'S REQUEST EXACTLY: deliver precisely what the user asked for — implement everything they requested and add nothing they did not ask for. When the user's instruction conflicts with any default or template behaviour, the user's explicit instruction wins.
-- ATTACHED IMAGES: If the user attaches an image, it is automatically uploaded to Cloudflare R2 (persistent URL like /api/assets/user-upload_...jpg) with a data:image/... fallback. When the task requires that image (e.g. a person's portrait, avatar, or any user-uploaded photo), use the R2 URL if you know it, otherwise use the data URL verbatim in <img src="..."> — do NOT use local filenames like 1716041183016.jpg, avatar.jpg, or invented URLs. The system also auto-patches any local filename or placeholder image to the correct R2/data URL after generation, so the user's photo always displays. Always include meaningful alt text, object-fit:cover, and onerror fallback.
+ - ATTACHED IMAGES & VISION: You DO have vision. Every user attachment (image, video, audio, file) is first described by MiMo V2.5 (vision/multimodal) and the description is injected as "MiMo V2.5 Media Understanding" — treat it as ground truth, never ignore it. If the user asks to describe, analyze, OCR, or recreate an attached image, answer FROM that MiMo block and never reply "I cannot view images", "I don't have the ability to view", or any denial. If the MiMo block is present, quote/summarize it verbatim and ground your recreation in it. If no MiMo block is present but the "Attached media" system block lists an image, acknowledge the attachment exists (filename/type/size) and explain vision pre-pass was temporarily unavailable — ask the user for a one-line description of what's visible so you can still recreate/extract, do NOT hallucinate a generic "Layout & Structure / Typography / Color & Style" template. When the task requires that image (e.g. a person's portrait, avatar, or any user-uploaded photo), use the R2 URL if you know it, otherwise use the data URL verbatim in <img src="..."> — do NOT use local filenames like 1716041183016.jpg, avatar.jpg, or invented URLs. The system also auto-patches any local filename or placeholder image to the correct R2/data URL after generation, so the user's photo always displays. Always include meaningful alt text, object-fit:cover, and onerror fallback.
 - AMBIGUOUS REQUESTS: When a user's prompt is ambiguous, underspecified, or missing essential details (e.g. they say "make a game", "build a website", "create a plan", or give a vague prompt with multiple conflicting interpretations), do NOT ask clarifying questions and do NOT present choice menus or option lists. Instead, choose the most sensible default interpretation, state the key assumption you made in ONE short sentence, and deliver the complete result. The user can refine it in a follow-up message.
 - DEFAULT FORMAT (React/JSX): When writing code or building apps, components, tools, dashboards, or games without an explicitly requested format, default to clean, modern React/JSX components (using \`\`\`jsx ... \`\`\` code blocks). ALWAYS name your main top-level component "export default function App()".
 - REQUESTED FORMATS (HTML/CSS/JS): If the user explicitly requests HTML, CSS, vanilla JS, or plain web code, output complete single-file HTML/CSS/JS inside ONE SINGLE \`\`\`html ... \`\`\` code block.
@@ -1175,12 +1175,8 @@ async function handleAi(request, env) {
         }
       }
       if (allAttachments.length > 0) {
-        // Always hint R2 URLs explicitly so Muse uses correct src even if MiMo fails or is unavailable
+        // Always hint attached media explicitly so Muse never denies vision
         const directAssetHints = allAttachments
-          .filter(
-            (a) =>
-              a?.assetUrl && String(a.assetUrl).startsWith("/api/assets/"),
-          )
           .map((a) => {
             const mime = String(a.type || "").toLowerCase();
             const kind = mime.startsWith("image/")
@@ -1190,15 +1186,35 @@ async function handleAi(request, env) {
                 : mime.startsWith("audio/")
                   ? "audio"
                   : "file";
-            return `[Attached ${kind} "${a.name}" R2 URL: ${a.assetUrl} — USE THIS EXACT URL for <img>/<video>/<audio> src, never hallucinate local filenames like "${a.name}"]`;
+            const hasR2 =
+              a?.assetUrl && String(a.assetUrl).startsWith("/api/assets/");
+            const hasThumb =
+              a?.thumb && String(a.thumb).startsWith("data:");
+            const hasContent =
+              typeof a?.content === "string" && a.content.trim();
+            if (hasR2) {
+              return `[Attached ${kind} "${a.name}" R2 URL: ${a.assetUrl} — USE THIS EXACT URL for <img>/<video>/<audio> src, never hallucinate local filenames like "${a.name}"]`;
+            }
+            if (hasThumb) {
+              const sizeHint = a.size
+                ? ` (${(a.size / 1024).toFixed(1)}KB)`
+                : "";
+              return `[Attached ${kind} "${a.name}"${sizeHint} available as data URL thumb — vision via MiMo V2.5 will describe it; for <img src> use the data URL if no R2 URL]`;
+            }
+            if (hasContent) {
+              return `[Attached file "${a.name}" content length ${a.content.length} — see MiMo context]`;
+            }
+            return `[Attached ${kind} "${a.name}" (${mime || "unknown"}) — metadata only]`;
           })
+          .filter(Boolean)
           .join("\n");
         if (directAssetHints) {
           apiMessages.push({
             role: "system",
             content:
-              "Attached media R2 URLs (authoritative, use EXACTLY these for <img src>):\n" +
-              directAssetHints,
+              "Attached media (authoritative — you DO have vision via MiMo V2.5, never claim you cannot view images when this block is present):\n" +
+              directAssetHints +
+              "\nIf the user asks to describe, analyze, or recreate an attached image, use the MiMo V2.5 Media Understanding block as ground truth and never respond with 'I cannot view images'.",
           });
         }
       }

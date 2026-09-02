@@ -839,15 +839,17 @@ function MainApp({ theme, setTheme }) {
     }
 
     const displayAttachments = attachmentsArg.map(
-      ({ id, name, type, size, thumb }) => ({ id, name, type, size, thumb }),
+      ({ id, name, type, size, thumb, assetUrl, assetKey, content }) => ({ id, name, type, size, thumb, assetUrl, assetKey, content }),
     );
     const apiAttachments = attachmentsArg.map(
-      ({ name, type, size, thumb, content }) => ({
+      ({ name, type, size, thumb, content, assetUrl, assetKey }) => ({
         name,
         type,
         size,
         thumb,
         content,
+        assetUrl,
+        assetKey,
       }),
     );
 
