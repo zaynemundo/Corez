@@ -204,14 +204,15 @@ export default function ChatInput({
     }
     const textToSend = input.trim();
     if (!textToSend && attachments.length === 0) return;
-    const hasPendingImage = attachments.some(
+    const hasPending = attachments.some(
       (a) =>
-        a.type?.startsWith("image/") &&
-        !a.thumb &&
-        a.size <= MAX_IMAGE_THUMB_BYTES,
+        Boolean(a.uploading) ||
+        (a.type?.startsWith("image/") &&
+          !a.thumb &&
+          a.size <= MAX_IMAGE_THUMB_BYTES),
     );
-    if (hasPendingImage) {
-      // Image thumb still generating — wait briefly then retry; the chip shows loading
+    if (hasPending) {
+      // Image thumb still generating or R2 upload in flight — wait briefly then retry; the chip shows loading/uploading
       setTimeout(() => handleSubmit(e), 150);
       return;
     }

@@ -1,6 +1,7 @@
 export const MAX_IMAGE_THUMB_BYTES = 1.5 * 1024 * 1024; // 1.5 MiB
 export const MAX_MEDIA_THUMB_BYTES = 8 * 1024 * 1024; // 8 MiB for video/audio (still uploaded via R2)
 export const MAX_TEXT_CONTENT_BYTES = 200 * 1024; // 200 KiB
+export const MAX_ASSET_BYTES = 10 * 1024 * 1024; // 10 MiB decoded — worker R2 limit
 
 export const TEXT_EXTENSIONS = new Set([
   "txt",
@@ -145,7 +146,7 @@ export function processFiles(fileList, setAttachments) {
       type,
       size,
       uploading:
-        (type.startsWith("image/") && size <= MAX_IMAGE_THUMB_BYTES) ||
+        (type.startsWith("image/") && size <= MAX_ASSET_BYTES) ||
         (isMediaFile({ type }) && size <= MAX_MEDIA_THUMB_BYTES),
     })),
   ]);
@@ -154,6 +155,10 @@ export function processFiles(fileList, setAttachments) {
     const isImage =
       entry.file?.type?.startsWith("image/") &&
       entry.file.size <= MAX_IMAGE_THUMB_BYTES;
+    const isLargeImage =
+      entry.file?.type?.startsWith("image/") &&
+      entry.file.size > MAX_IMAGE_THUMB_BYTES &&
+      entry.file.size <= MAX_ASSET_BYTES;
     const isMedia =
       isMediaFile(entry.file) && entry.file.size <= MAX_MEDIA_THUMB_BYTES;
     if (isImage || isMedia) {
@@ -227,6 +232,89 @@ export function processFiles(fileList, setAttachments) {
         }
       };
       reader.readAsDataURL(entry.file);
+    } else if (isLargeImage) {
+      // Large image (1.5-10MB): no lightweight thumb, but still upload via R2 so MiMo/Muse can use it.
+      // Use dataUrl for R2 upload and also set thumb for vision (Muse gateway accepts up to 8MB dataUrl).
+      setAttachments((prev) =>
+        (prev || []).map((a) =>
+          a.id === entry.id ? { ...a, uploading: true } : a,
+        ),
+      );
+      const reader2 = new FileReader();
+      reader2.onload = () => {
+        if (reader2.result && typeof reader2.result === "string") {
+          const dataUrl = reader2.result;
+          const ext = extensionOf(entry.name) || "jpg";
+          const safeName =
+            entry.name.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 80) ||
+            `media.${ext}`;
+          const key = `user-upload_${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeName}`;
+          const mimeType = entry.file.type || `image/${ext}`;
+          // Set thumb as dataUrl for MiMo vision as well — worker prefers thumb
+          setAttachments((prev) =>
+            (prev || []).map((a) =>
+              a.id === entry.id ? { ...a, thumb: dataUrl } : a,
+            ),
+          );
+          fetch("/api/assets/upload", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ key, dataUrl, mimeType }),
+          })
+            .then(async (res) => {
+              if (!res.ok) {
+                setAttachments((prev) =>
+                  (prev || []).map((a) =>
+                    a.id === entry.id ? { ...a, uploading: false } : a,
+                  ),
+                );
+                return;
+              }
+              const data = await res.json().catch(() => null);
+              if (data?.url) {
+                setAttachments((prev) =>
+                  (prev || []).map((a) =>
+                    a.id === entry.id
+                      ? {
+                          ...a,
+                          assetUrl: data.url,
+                          assetKey: data.key,
+                          uploading: false,
+                        }
+                      : a,
+                  ),
+                );
+              } else {
+                setAttachments((prev) =>
+                  (prev || []).map((a) =>
+                    a.id === entry.id ? { ...a, uploading: false } : a,
+                  ),
+                );
+              }
+            })
+            .catch(() => {
+              setAttachments((prev) =>
+                (prev || []).map((a) =>
+                  a.id === entry.id ? { ...a, uploading: false } : a,
+                ),
+              );
+            });
+        } else {
+          setAttachments((prev) =>
+            (prev || []).map((a) =>
+              a.id === entry.id ? { ...a, uploading: false } : a,
+            ),
+          );
+        }
+      };
+      reader2.onerror = () => {
+        setAttachments((prev) =>
+          (prev || []).map((a) =>
+            a.id === entry.id ? { ...a, uploading: false } : a,
+          ),
+        );
+      };
+      reader2.readAsDataURL(entry.file);
     }
     if (isTextLike(entry.file) && entry.file.size <= MAX_TEXT_CONTENT_BYTES) {
       readFileAsText(entry.file)

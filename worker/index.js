@@ -1174,6 +1174,34 @@ async function handleAi(request, env) {
             allAttachments.push(a);
         }
       }
+      if (allAttachments.length > 0) {
+        // Always hint R2 URLs explicitly so Muse uses correct src even if MiMo fails or is unavailable
+        const directAssetHints = allAttachments
+          .filter(
+            (a) =>
+              a?.assetUrl && String(a.assetUrl).startsWith("/api/assets/"),
+          )
+          .map((a) => {
+            const mime = String(a.type || "").toLowerCase();
+            const kind = mime.startsWith("image/")
+              ? "image"
+              : mime.startsWith("video/")
+                ? "video"
+                : mime.startsWith("audio/")
+                  ? "audio"
+                  : "file";
+            return `[Attached ${kind} "${a.name}" R2 URL: ${a.assetUrl} — USE THIS EXACT URL for <img>/<video>/<audio> src, never hallucinate local filenames like "${a.name}"]`;
+          })
+          .join("\n");
+        if (directAssetHints) {
+          apiMessages.push({
+            role: "system",
+            content:
+              "Attached media R2 URLs (authoritative, use EXACTLY these for <img src>):\n" +
+              directAssetHints,
+          });
+        }
+      }
       if (allAttachments.length > 0 && isMimoAvailable(env)) {
         const mimoDescriptions = await describeAttachmentsWithMimo(
           allAttachments,
@@ -1184,21 +1212,6 @@ async function handleAi(request, env) {
         const mimoBlock = buildMimoContextBlock(mimoDescriptions);
         if (mimoBlock) {
           apiMessages.push({ role: "system", content: mimoBlock });
-          // Also hint asset URLs explicitly so Muse uses the correct src
-          const assetHints = mimoDescriptions
-            .map((d) => {
-              const src =
-                allAttachments.find((a) => (a.name || "") === d.name)
-                  ?.assetUrl || "";
-              return src
-                ? "[" + d.kind + ' "' + d.name + '" R2 URL: ' + src + "]"
-                : "";
-            })
-            .filter(Boolean)
-            .join("\n");
-          if (assetHints) {
-            // Patch hint is already in toMultimodalMessage for history, but ensure current turn has it
-          }
         }
       }
     } catch (mimoErr) {
@@ -1729,6 +1742,27 @@ async function handleAi(request, env) {
                 collected = repair.content;
               }
 
+              // Deterministic fix before honest gate: close truncated tags (htmlRepair)
+              if (repair.diagnostics.truncationDetected) {
+                const repairedStream = repairMalformedHtml(collected);
+                if (repairedStream !== collected) {
+                  const delta = repairedStream.slice(collected.length);
+                  if (delta) {
+                    controller.enqueue(
+                      encoder.encode(sse({ type: "delta", text: delta })),
+                    );
+                  }
+                  collected = repairedStream;
+                  const re = detectTruncation(collected, {
+                    stopReason: currentStopReason,
+                  });
+                  if (!re.truncated) {
+                    repair.diagnostics.truncationDetected = false;
+                    repair.diagnostics.truncationSignals = [];
+                  }
+                }
+              }
+
               // Honest-failure gate: if the answer is STILL cut off after the
               // provider stream, streaming continuations, and every repair
               // round, surface an explicit error instead of a clean "done"
@@ -1991,6 +2025,24 @@ async function handleAi(request, env) {
       maxRepairs: 2,
     });
     const repairMs = Date.now() - repairStartedAt;
+
+    // Deterministic truncation repair: close unclosed script/style/html tags
+    // so a clean truncation (e.g. token limit exactly at </script>) doesn't
+    // surface as a 502. This mirrors worker/htmlRepair.js logic but covers
+    // direct AI responses as well (harness already does this).
+    if (processed.diagnostics.truncationDetected) {
+      const repairedHtml = repairMalformedHtml(processed.content);
+      if (repairedHtml !== processed.content) {
+        processed.content = repairedHtml;
+        const re = detectTruncation(repairedHtml, {
+          stopReason: result.stopReason || null,
+        });
+        if (!re.truncated) {
+          processed.diagnostics.truncationDetected = false;
+          processed.diagnostics.truncationSignals = [];
+        }
+      }
+    }
 
     // Honest-failure gate: a reply that is STILL cut off after the provider
     // call and every repair round is never returned as a successful 200 —

@@ -219,5 +219,33 @@ export function repairMalformedHtml(html) {
     }
   }
 
+  // 5. Truncation repair: deterministically close truncated documents.
+  //    When the provider hits a token limit, the HTML often ends mid-script/style
+  //    or without </body></html>. Instead of returning a 502, close the tags
+  //    so the preview renders and the verification layer can repair further.
+  if (looksLikeHtmlDocument(out)) {
+    const scriptOpens = (out.match(/<script\b[^>]*>/gi) || []).length;
+    const scriptCloses = (out.match(/<\/script>/gi) || []).length;
+    if (scriptOpens > scriptCloses) {
+      out += "\n</script>".repeat(scriptOpens - scriptCloses);
+    }
+    const styleOpens = (out.match(/<style\b[^>]*>/gi) || []).length;
+    const styleCloses = (out.match(/<\/style>/gi) || []).length;
+    if (styleOpens > styleCloses) {
+      out += "\n</style>".repeat(styleOpens - styleCloses);
+    }
+    if (!/<\/body>/i.test(out) && /<body[^>]*>/i.test(out)) {
+      out += "\n</body>";
+    }
+    if (!/<\/html>/i.test(out)) {
+      out += "\n</html>";
+    }
+    // Ensure code fences are closed for chat rendering
+    const fenceCount = (out.match(/```/g) || []).length;
+    if (fenceCount % 2 === 1) {
+      out += "\n```";
+    }
+  }
+
   return out;
 }

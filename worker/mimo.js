@@ -76,24 +76,53 @@ function mediaKind(attachment) {
   return "generic";
 }
 
-function buildMimoMessages(attachment, promptHint) {
+async function fetchR2AssetAsDataUrl(assetUrl, env) {
+  try {
+    if (!env?.ASSET_BUCKET || typeof env.ASSET_BUCKET.get !== "function")
+      return null;
+    const key = String(assetUrl).replace(/^\/api\/assets\//, "");
+    if (!key || key.includes("..") || key.includes("/")) {
+      // Keys with slashes are valid (e.g. publish/...), but for user-upload we expect simple
+      // Still try fetch if it looks like a simple key
+      if (key.includes("/")) return null;
+    }
+    const obj = await env.ASSET_BUCKET.get(key);
+    if (!obj) return null;
+    const mime =
+      obj.httpMetadata?.contentType || "image/jpeg";
+    const buf = await obj.arrayBuffer();
+    if (!buf || buf.byteLength === 0) return null;
+    // Guard: don't blow up MiMo with huge payloads (>8MB)
+    if (buf.byteLength > 8 * 1024 * 1024) return null;
+    let binary = "";
+    const bytes = new Uint8Array(buf);
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+    }
+    const b64 = btoa(binary);
+    return `data:${mime};base64,${b64}`;
+  } catch {
+    return null;
+  }
+}
+
+function buildMimoMessages(attachment, promptHint, resolvedImageUrl) {
   const kind = mediaKind(attachment);
   const systemText = MIMO_MEDIA_PROMPTS[kind] || MIMO_MEDIA_PROMPTS.generic;
   const userText = promptHint
     ? `User request: "${String(promptHint).slice(0, 300)}" — ${systemText}`
     : systemText;
 
-  // Prefer data URL thumb (already base64, no fetch needed). Fallback to assetUrl if needed —
-  // the gateway accepts https URLs for vision; R2 URLs are public https when served.
+  // Prefer data URL thumb (already base64, no fetch needed). Fallback to resolved R2 dataUrl or https URL.
   const imageUrl =
-    attachment?.thumb && String(attachment.thumb).startsWith("data:")
+    resolvedImageUrl ||
+    (attachment?.thumb && String(attachment.thumb).startsWith("data:")
       ? String(attachment.thumb)
       : attachment?.assetUrl &&
-          String(attachment.assetUrl).startsWith("/api/assets/")
-        ? null // R2 relative — not directly fetchable by remote model; need thumb
-        : attachment?.assetUrl && String(attachment.assetUrl).startsWith("http")
-          ? String(attachment.assetUrl)
-          : null;
+          String(attachment.assetUrl).startsWith("http")
+        ? String(attachment.assetUrl)
+        : null);
 
   // For text-like files with extracted content, just ask mimo to summarize that content
   if (
@@ -255,14 +284,26 @@ export async function describeAttachmentsWithMimo(
   const results = await Promise.all(
     sorted.map(async (att) => {
       const kind = mediaKind(att);
-      const mimoMessages = buildMimoMessages(att, promptHint);
+      // Resolve R2 relative URLs to dataUrl for MiMo if thumb missing (large images)
+      let resolvedUrl = null;
+      if (
+        (!att?.thumb || !String(att.thumb).startsWith("data:")) &&
+        att?.assetUrl &&
+        String(att.assetUrl).startsWith("/api/assets/")
+      ) {
+        resolvedUrl = await fetchR2AssetAsDataUrl(att.assetUrl, env);
+      }
+      const mimoMessages = buildMimoMessages(att, promptHint, resolvedUrl);
       const desc = await callMimo(mimoMessages, env, signal);
       if (!desc) return null;
+      // Preserve assetUrl so downstream can inject exact R2 URL into Muse prompt
       return {
         name: att.name || "attachment",
         type: att.type || "",
         kind,
         description: desc,
+        assetUrl: att.assetUrl || null,
+        thumb: att.thumb || null,
       };
     }),
   );
@@ -286,6 +327,11 @@ export function buildMimoContextBlock(descriptions) {
             : d.kind === "audio"
               ? "Audio"
               : "File";
+      const srcHint = d.assetUrl
+        ? `\nR2 URL (use EXACTLY this for <img src> — never hallucinate local filenames like "${d.name}" or Screenshot...png): ${d.assetUrl}`
+        : d.thumb && String(d.thumb).startsWith("data:")
+          ? `\nData URL available (use this for <img src> if no R2 URL): data:image/... (truncated, use assetUrl if present)`
+          : "";
       return (
         i +
         1 +
@@ -296,13 +342,14 @@ export function buildMimoContextBlock(descriptions) {
         '" (' +
         (d.type || d.kind) +
         "):\n" +
-        d.description
+        d.description +
+        srcHint
       );
     })
     .join("\n\n");
   return (
     "MiMo V2.5 Media Understanding (vision/file analysis — authoritative, use this as ground truth for the attached media, then fulfill the user's request with Muse Spark 1.2):\n" +
     lines +
-    "\n\nUse the above MiMo descriptions as the true content of the user's attached files. Do NOT hallucinate or invent media content — ground your generation in these descriptions."
+    "\n\nUse the above MiMo descriptions as the true content of the user's attached files. Do NOT hallucinate or invent media content — ground your generation in these descriptions. When you need to display the attached image in generated HTML, use the EXACT R2 URL provided above for <img src> (e.g. <img src=\"/api/assets/user-upload_...jpg\">). Never use local filenames like \"Screenshot 2026-09-02 145516.png\" — they will 404."
   );
 }
