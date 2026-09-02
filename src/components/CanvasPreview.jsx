@@ -20,7 +20,6 @@ import {
   QrCode,
   Code,
   Link2,
-  Wand2,
 } from "lucide-react";
 import {
   formatCodeForPreview,
@@ -36,7 +35,6 @@ export default function CanvasPreview({
   code,
   title = "Untitled Application",
   onClose,
-  onRevise,
   isFullScreen,
   onToggleFullScreen,
   sessionId = null,
@@ -411,35 +409,22 @@ export default function CanvasPreview({
     <div className={`canvas-pane ${isFullScreen ? "full-width" : ""}`}>
       <div className="canvas-header">
         <div className="canvas-title">
-          {/* View Mode toggle: Preview <-> Source */}
-          <div
-            style={{
-              display: "flex",
-              background: "var(--bg-tertiary)",
-              padding: "2px",
-              borderRadius: "var(--radius-pill)",
-              border: "1px solid var(--border-color)",
-            }}
+          {/* View Mode toggle: Preview <-> Source (sized like Publish) */}
+          <button
+            type="button"
+            className="code-btn publish-btn"
+            onClick={() =>
+              setActiveTab(activeTab === "preview" ? "code" : "preview")
+            }
+            title={
+              activeTab === "preview" ? "View source code" : "Back to preview"
+            }
+            aria-label={
+              activeTab === "preview" ? "View source code" : "Back to preview"
+            }
           >
-            <button
-              onClick={() =>
-                setActiveTab(activeTab === "preview" ? "code" : "preview")
-              }
-              style={{
-                padding: "3px 10px",
-                borderRadius: "var(--radius-pill)",
-                border: "none",
-                background: "var(--text-primary)",
-                color: "var(--bg-primary)",
-                fontSize: "0.725rem",
-                fontWeight: 300,
-                cursor: "pointer",
-                transition: "var(--transition-fast)",
-              }}
-            >
-              {activeTab === "preview" ? "Source" : "Preview"}
-            </button>
-          </div>
+            {activeTab === "preview" ? "Source" : "Preview"}
+          </button>
         </div>
 
         {/* Device Viewport Selector (Desktop vs Laptop vs Tablet vs Mobile Icon-only) */}
@@ -484,33 +469,6 @@ export default function CanvasPreview({
             corez-nav message, so no external tab bar is needed. */}
 
         <div className="canvas-controls">
-          {/* Revise: request changes to this creation directly in chat */}
-          {editableCode && !isStreaming && typeof onRevise === "function" && (
-            <button
-              type="button"
-              className="code-btn revise-canvas-btn"
-              onClick={() => onRevise(editableCode)}
-              title="Revise this creation with AI"
-              aria-label="Revise with AI"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.35rem",
-                padding: "0.35rem 0.65rem",
-                fontSize: "0.75rem",
-                borderRadius: "var(--radius-pill)",
-                background: "var(--bg-tertiary)",
-                border: "1px solid var(--border-color)",
-                color: "var(--text-primary)",
-                cursor: "pointer",
-                transition: "var(--transition-fast)",
-              }}
-            >
-              <Wand2 size={13} strokeWidth={1.5} />
-              <span>Revise</span>
-            </button>
-          )}
-
           {/* Publish: share the creation with anyone via a short link */}
           {editableCode && !isStreaming && (
             <button

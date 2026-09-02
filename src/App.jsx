@@ -1321,7 +1321,6 @@ function MainApp({ theme, setTheme }) {
               code={activeCanvasCode}
               title={activeSession?.title || "Untitled Application"}
               onClose={handleCloseCanvas}
-              onRevise={handleReviseCode}
               isFullScreen={canvasFullScreen}
               onToggleFullScreen={() => setCanvasFullScreen((prev) => !prev)}
               sessionId={activeSession?.id || null}
