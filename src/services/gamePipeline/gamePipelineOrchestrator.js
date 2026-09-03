@@ -53,6 +53,18 @@ export class GamePipelineOrchestrator {
       );
       const planningPrompt = `You are a Lead Game Architect. Analyze this request and output ONLY a valid JSON object matching the required Game Pipeline schema:
 
+Platformer support (2D + 3D):
+- genre MUST be one of: arcade|platformer|platformer-2d|platformer-3d|puzzle|shooter|word. Use platformer-2d for side-view Canvas 2D, platformer-3d for Three.js 2.5D/3D.
+- mechanics MUST include coyote-time + jump-buffering for any platformer (6-frame coyote, 4-frame buffer, variable jump height).
+- controls MUST cover keyboard AND touch (left-joystick/dpad + tap-right + pause button).
+- difficultyCurve SHOULD ramp: safe onboarding (first success guaranteed in 30s) then escalation.
+
+Art direction (smooth minimalist HD by default — NEVER pixel/8-bit unless explicitly requested):
+- style examples: "minimalist HD smooth vector", "neon modern smooth", "cozy clean gradients".
+- palette: soft light/dark minimalist tokens (e.g. #f8fafc, #0f172a, #0ea5e9, #f59e0b).
+- camera: side-view for 2D platformer, side-view-2.5d or third-person for 3D platformer.
+- renderingRules for smooth HD MUST include: imageSmoothingEnabled=true, rounded vector shapes, soft shadows, gradients. MUST NOT include shape-rendering=crispEdges or imageSmoothingEnabled=false unless user explicitly asks pixel/8-bit.
+
 {
   "gameSpec": {
     "title": "Short title",

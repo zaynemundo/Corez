@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Drift 3D — Minimalist HD Platformer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;user-select:none}
+html,body{width:100%;height:100%;overflow:hidden;background:#eef2f7;color:#0f172a;font-family:Inter,system-ui,sans-serif;touch-action:none}
+#game-container{position:fixed;inset:0}
+canvas{width:100%;height:100%;display:block}
+.hud{position:absolute;top:14px;left:16px;right:16px;display:flex;justify-content:space-between;z-index:20;pointer-events:none}
+.pill{background:rgba(255,255,255,.88);backdrop-filter:blur(8px);border:1px solid rgba(15,23,42,.08);border-radius:999px;padding:8px 16px;font-size:14px;font-weight:600;box-shadow:0 4px 16px rgba(15,23,42,.1)}
+.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:30;background:rgba(241,245,249,.6);backdrop-filter:blur(10px)}
+.card{background:#fff;border-radius:24px;padding:36px 40px;max-width:440px;text-align:center;box-shadow:0 24px 64px rgba(15,23,42,.18)}
+.card h1{font-size:30px;letter-spacing:-.02em;margin-bottom:8px}
+.card p{font-size:14px;color:#64748b;line-height:1.55;margin-bottom:20px}
+.btn{background:#0f172a;color:#fff;border:0;border-radius:999px;padding:12px 28px;font-size:15px;font-weight:700;cursor:pointer}
+.touch-controls{position:absolute;bottom:calc(14px + env(safe-area-inset-bottom,0px));left:0;right:0;display:none;justify-content:space-between;padding:0 18px;z-index:25;pointer-events:none}
+.touch-btn{width:62px;height:62px;background:rgba(255,255,255,.7);border:1px solid rgba(15,23,42,.15);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;pointer-events:auto}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+</head>
+<body>
+<div id="game-container">
+<canvas id="gameCanvas"></canvas>
+<div class="hud"><div class="pill" id="scorePill">● 0</div><div class="pill" id="lifePill">♥♥♥</div><div class="pill">Drift 3D · Minimalist HD</div></div>
+<div class="overlay" id="overlay"><div class="card"><h1 id="ovTitle">Drift 3D</h1><p id="ovText">Side-view 3D platformer.<br>A/D or Arrows move · Space jump · P pause · R restart.<br>Collect 5 orbs, reach the mint gate.</p><button class="btn" id="ovBtn">Play</button></div></div>
+<div class="touch-controls" id="touchControls"><div style="display:flex;gap:8px"><div class="touch-btn" id="btnLeft">◄</div><div class="touch-btn" id="btnRight">►</div></div><div style="display:flex;gap:8px"><div class="touch-btn" id="btnJump">▲</div><div class="touch-btn" id="btnPause">II</div></div></div>
+</div>
+<script>
+// Minimalist HD 3D platformer (2.5D side-view) — smooth low-poly, soft shadows, no pixel art.
+// Skills: game-designer (loops), level-designer (pacing), technical-artist (3D budgets), audio (procedural).
+function sendHostMessage(type,payload){if(window.parent&&window.parent!==window){window.parent.postMessage({type,payload,timestamp:Date.now()},'*');}}
+sendHostMessage('GAME_LOADING',{progress:0});
+const Input={keys:{},touch:{left:false,right:false,up:false},init(){window.addEventListener('keydown',e=>{this.keys[e.code]=true;if(['Space','ArrowUp'].includes(e.code))e.preventDefault();if(e.code==='KeyP'||e.code==='Escape')togglePause();if(e.code==='KeyR')restart();});window.addEventListener('keyup',e=>{this.keys[e.code]=false;});const isTouch=('ontouchstart'in window||navigator.maxTouchPoints>0);if(isTouch)document.getElementById('touchControls').style.display='flex';const bind=(id,k)=>{const el=document.getElementById(id);const on=e=>{e.preventDefault();this.touch[k]=true;};const off=e=>{e.preventDefault();this.touch[k]=false;};el.addEventListener('touchstart',on,{passive:false});el.addEventListener('touchend',off,{passive:false});el.addEventListener('touchcancel',off,{passive:false});};bind('btnLeft','left');bind('btnRight','right');bind('btnJump','up');document.getElementById('btnPause').addEventListener('touchstart',e=>{e.preventDefault();togglePause();});},left(){return!!(this.keys['ArrowLeft']||this.keys['KeyA']||this.touch.left);},right(){return!!(this.keys['ArrowRight']||this.keys['KeyD']||this.touch.right);},jumpHeld(){return!!(this.keys['Space']||this.keys['ArrowUp']||this.keys['KeyW']||this.touch.up);}};
+const Sound={ctx:null,init(){if(this.ctx)return;const AC=window.AudioContext||window.webkitAudioContext;if(AC)this.ctx=new AC();},tone(f0,f1,dur,type,vol){if(!this.ctx)return;try{const t=this.ctx.currentTime;const o=this.ctx.createOscillator();const g=this.ctx.createGain();o.type=type;o.frequency.setValueAtTime(f0,t);o.frequency.exponentialRampToValueAtTime(Math.max(f1,1),t+dur);g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.01,t+dur);o.connect(g);g.connect(this.ctx.destination);o.start(t);o.stop(t+dur);}catch(e){}},jump(){this.tone(280,660,.16,'sine',.25);},coin(){this.tone(880,1320,.18,'sine',.22);},hit(){this.tone(160,40,.2,'sawtooth',.3);},win(){this.tone(523,1046,.4,'triangle',.25);}};
+window.addEventListener('pointerdown',()=>Sound.init(),{once:true});window.addEventListener('keydown',()=>Sound.init(),{once:true});
+const GameState={current:'START',score:0,lives:3,coins:0,set(s){this.current=s;if(s==='GAMEOVER')sendHostMessage('GAME_COMPLETE',{score:this.score,result:'lose'});if(s==='VICTORY')sendHostMessage('GAME_COMPLETE',{score:this.score,result:'win'});showOverlay();},restart(){this.score=0;this.lives=3;this.coins=0;resetLevel();this.set('PLAYING');sendHostMessage('GAME_RESTART',{});}};
+// --- Three.js scene (smooth minimalist) ---
+const canvas=document.getElementById('gameCanvas');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+const scene=new THREE.Scene();scene.background=new THREE.Color('#eef2f7');scene.fog=new THREE.Fog('#eef2f7',18,42);
+const camera=new THREE.PerspectiveCamera(50,window.innerWidth/window.innerHeight,.1,100);camera.position.set(0,3.4,11);
+scene.add(new THREE.HemisphereLight('#ffffff','#cbd5e1',.9));
+const sun=new THREE.DirectionalLight('#ffffff',1.6);sun.position.set(6,12,8);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-14;sun.shadow.camera.right=14;sun.shadow.camera.top=12;sun.shadow.camera.bottom=-6;scene.add(sun);
+const groundMat=new THREE.MeshStandardMaterial({color:'#e2e8f0',roughness:.95});
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(120,30),groundMat);ground.rotation.x=-Math.PI/2;ground.position.set(10,-2.2,-1);ground.receiveShadow=true;scene.add(ground);
+function smoothBox(w,h,d,color){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color,roughness:.55,metalness:.08}));m.castShadow=true;m.receiveShadow=true;return m;}
+const playerMesh=smoothBox(.7,1,.7,'#0f172a');playerMesh.position.set(0,0,0);scene.add(playerMesh);
+const eyeMat=new THREE.MeshBasicMaterial({color:'#38bdf8'});
+const eye=new THREE.Mesh(new THREE.SphereGeometry(.09,16,16),eyeMat);eye.position.set(.18,.2,.36);playerMesh.add(eye);
+const platDefs=[{x:0,y:-1.4,w:30},{x:-3.5,y:.2,w:3.4},{x:.5,y:1.2,w:3},{x:4.5,y:.2,w:3.2},{x:8,y:1.4,w:3.4},{x:11,y:.2,w:3},{x:5.5,y:2.8,w:2.8},{x:-1,y:2.6,w:2.4}];
+const platMeshes=platDefs.map(p=>{const m=smoothBox(p.w,.45,2.2,'#ffffff');m.position.set(p.x,p.y,-.2);scene.add(m);return m;});
+let coinMeshes=[],enemyMesh,exitMesh,exitGlow;
+function buildCoins(list){for(const c of coinMeshes)scene.remove(c);coinMeshes=list.map(c=>{const m=new THREE.Mesh(new THREE.TorusGeometry(.32,.13,14,28),new THREE.MeshStandardMaterial({color:'#f59e0b',roughness:.3,metalness:.45,emissive:'#92400e',emissiveIntensity:.25}));m.position.set(c.x,c.y,0);m.castShadow=true;scene.add(m);return m;});}
+enemyMesh=smoothBox(.8,.8,.8,'#fca5a5');scene.add(enemyMesh);
+exitMesh=smoothBox(1.2,1.8,.6,'#10b981');exitMesh.position.set(13,.2,-.2);scene.add(exitMesh);
+exitGlow=new THREE.PointLight('#10b981',1.2,8);exitGlow.position.set(13,1.2,1.5);scene.add(exitGlow);
+let player={x:-6,y:2,vx:0,vy:0,w:.7,h:1,grounded:false,coyote:0,buffer:0};
+let coins=[],enemy={x:4,min:2.5,max:7,vx:1.6};
+function resetLevel(){player={x:-6,y:2,vx:0,vy:0,w:.7,h:1,grounded:false,coyote:0,buffer:0};coins=[{x:-3.5,y:1.1,taken:false},{x:.5,y:2.1,taken:false},{x:4.5,y:1.1,taken:false},{x:8,y:2.3,taken:false},{x:5.5,y:3.7,taken:false},{x:-1,y:3.5,taken:false},{x:11,y:1.1,taken:false}];buildCoins(coins);enemy={x:4,min:2.5,max:7,vx:1.6};updateHUD();}
+resetLevel();
+function aabb(px,py,pw,ph,qx,qy,qw,qh){return px<qx+qw&&px+pw>qx&&py<qy+qh&&py+ph>qy;}
+let jumpLast=false,shakeT=0;
+function update(dt){if(GameState.current!=='PLAYING')return;
+const SPEED=6.2,GRAV=-22,JUMP=8.4;
+let ax=0;if(Input.left())ax-=1;if(Input.right())ax+=1;player.vx=ax*SPEED;
+const jHeld=Input.jumpHeld();const jPressed=jHeld&&!jumpLast;jumpLast=jHeld;
+if(player.grounded)player.coyote=6;else if(player.coyote>0)player.coyote--;
+if(jPressed)player.buffer=4;else if(player.buffer>0)player.buffer--;
+if(player.buffer>0&&player.coyote>0){player.vy=JUMP;player.coyote=0;player.buffer=0;player.grounded=false;Sound.jump();}
+if(!jHeld&&player.vy>2.5)player.vy=2.5;
+player.vy+=GRAV*dt;player.x+=player.vx*dt;player.y+=player.vy*dt;player.grounded=false;
+for(const p of platDefs){if(aabb(player.x-player.w/2,player.y-player.h/2,player.w,player.h,p.x-p.w/2,p.y-.22,p.w,.45)){if(player.vy<=0&&player.y-player.h/2>=p.y-.4){player.y=p.y+.225+player.h/2;player.vy=0;player.grounded=true;}}}
+if(player.y<-6){GameState.lives--;Sound.hit();shakeT=.35;if(GameState.lives<=0){GameState.set('GAMEOVER');return;}player.x=-6;player.y=2;player.vx=0;player.vy=0;}
+enemy.x+=enemy.vx*dt;if(enemy.x<enemy.min||enemy.x>enemy.max)enemy.vx*=-1;
+for(const c of coins){if(!c.taken&&Math.abs(player.x-c.x)<.7&&Math.abs(player.y-c.y)<.9){c.taken=true;GameState.coins++;GameState.score+=100;Sound.coin();}}
+const hitEnemy=aabb(player.x-.35,player.y-.5,.7,1,enemy.x-.4,-1,.8,.8);
+if(hitEnemy){if(player.vy<-2){GameState.score+=150;Sound.coin();enemy.x=enemy.min;}else{GameState.lives--;Sound.hit();shakeT=.4;if(GameState.lives<=0){GameState.set('GAMEOVER');return;}player.x=-6;player.y=2;player.vy=0;}}
+if(aabb(player.x-.35,player.y-.5,.7,1,12.4,-.7,1.2,1.8)&&GameState.coins>=5){GameState.score+=500;Sound.win();GameState.set('VICTORY');}
+updateHUD();}
+function updateHUD(){document.getElementById('scorePill').textContent='● '+GameState.score+' · orbs '+GameState.coins+'/5';document.getElementById('lifePill').textContent='♥'.repeat(Math.max(GameState.lives,0))||'—';}
+function render(dt,t){playerMesh.position.x=player.x;playerMesh.position.y=player.y;playerMesh.rotation.y+=((Input.right()?0:Input.left()?Math.PI:playerMesh.rotation.y)-playerMesh.rotation.y)*.1;
+enemyMesh.position.set(enemy.x,-.6,0);enemyMesh.rotation.y=t*1.5;
+coinMeshes.forEach((m,i)=>{const c=coins[i];m.visible=!c.taken;if(!c.taken){m.rotation.y=t*2.2+i;m.position.y=c.y+Math.sin(t*2+i)*.12;}});
+exitMesh.material.emissive=new THREE.Color(GameState.coins>=5?'#065f46':'#000000');
+const tx=player.x,ty=player.y+1.2;camera.position.x+=(tx-camera.position.x)*Math.min(1,dt*4);camera.position.y+=(ty-camera.position.y)*Math.min(1,dt*3);
+if(shakeT>0){shakeT-=dt;camera.position.x+=(Math.random()-.5)*.25;camera.position.y+=(Math.random()-.5)*.25;}
+camera.lookAt(camera.position.x,player.y+.4,0);
+renderer.render(scene,camera);}
+function showOverlay(){const ov=document.getElementById('overlay');if(GameState.current==='PLAYING'){ov.style.display='none';return;}ov.style.display='flex';const title=document.getElementById('ovTitle'),text=document.getElementById('ovText'),btn=document.getElementById('ovBtn');if(GameState.current==='START'){title.textContent='Drift 3D';btn.textContent='Play';}else if(GameState.current==='VICTORY'){title.textContent='Clear ✦ '+GameState.score;text.innerHTML='Gate opened with 5 orbs.<br>Press R to run again.';btn.textContent='Play again';}else if(GameState.current==='GAMEOVER'){title.textContent='Out of hearts';text.innerHTML='Score '+GameState.score+'.<br>Press R to retry.';btn.textContent='Retry';}else if(GameState.current==='PAUSED'){title.textContent='Paused';text.innerHTML='Press P / Esc to resume.';btn.textContent='Resume';}}
+function restart(){GameState.score=0;GameState.lives=3;GameState.coins=0;resetLevel();GameState.set('PLAYING');sendHostMessage('GAME_RESTART',{});}
+function togglePause(){if(GameState.current==='PLAYING'){GameState.current='PAUSED';showOverlay();}else if(GameState.current==='PAUSED'){GameState.set('PLAYING');}}
+document.getElementById('ovBtn').addEventListener('click',()=>{Sound.init();if(GameState.current==='PAUSED')GameState.set('PLAYING');else restart();});
+function resize(){renderer.setSize(window.innerWidth,window.innerHeight,false);camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();}
+window.addEventListener('resize',resize);resize();
+Input.init();showOverlay();sendHostMessage('GAME_READY',{});
+let last=performance.now(),acc=0;const STEP=1/60;
+function gameLoop(now){const ft=Math.min((now-last)/1000,.1);last=now;acc+=ft;while(acc>=STEP){if(GameState.current==='PLAYING')update(STEP);acc-=STEP;}render(ft,now/1000);requestAnimationFrame(gameLoop);}
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>

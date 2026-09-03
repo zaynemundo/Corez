@@ -49,6 +49,20 @@ export const EXTENDED_SPECIALIST_BRIEFS = Object.freeze({
     instruction:
       "Produce a concise performance brief: critical rendering path, asset containment, efficient CSS selectors, and script execution order. At most 150 words. Do not write code.",
   },
+  "game-designer": {
+    role: "game-designer",
+    // Taken from agency-agents/game-development/game-designer.md:
+    // loops, mechanic spec, tuning levers, onboarding in 30s.
+    instruction:
+      "Produce a concise game-design brief for a 2D/3D platformer: 3 player verbs, micro (3s) / meso (30s) / macro (5min) loops, win/lose conditions, coyote-time + jump-buffering, score/coin economy with sources/sinks, and onboarding (core verb in 30s, first success guaranteed). Smooth minimalist HD, never pixel/8-bit. At most 175 words. Do not write code.",
+  },
+  "level-designer": {
+    role: "level-designer",
+    // Taken from agency-agents/game-development/level-designer.md:
+    // legible critical path, pacing arc, grey-box first, encounters.
+    instruction:
+      "Produce a concise level-design brief for a platformer level: legible critical path, pacing arc (tension/release), 3-5 jumps + 1 patrol enemy + coins, safe onboarding then escalation, exit visible, fallback positions, touch + keyboard readable. Smooth minimalist HD shapes, no pixel art. At most 150 words. Do not write code.",
+  },
 });
 
 export function resolveSpecialistBriefs(promptText = "") {
@@ -66,6 +80,14 @@ export function resolveSpecialistBriefs(promptText = "") {
     /\b(performance|optimize|speed|fast|lighthouse|latency|fps)\b/i.test(text)
   ) {
     briefs.push(EXTENDED_SPECIALIST_BRIEFS.performance);
+  }
+  if (
+    /\b(game|platformer|2d|3d|godot|unity|unreal|roblox|jump|runner|shooter|puzzle|rpg)\b/i.test(
+      text,
+    )
+  ) {
+    briefs.push(EXTENDED_SPECIALIST_BRIEFS["game-designer"]);
+    briefs.push(EXTENDED_SPECIALIST_BRIEFS["level-designer"]);
   }
 
   return briefs;
