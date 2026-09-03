@@ -41,6 +41,7 @@ export const SPECIALIST_SKILL_IDS = [
   "event-planning",
   "study-aids",
   "meeting-notes",
+  "user-learning",
 ];
 
 const SPECIALIST_TRIGGER_PATTERNS = [
@@ -138,6 +139,11 @@ const SPECIALIST_TRIGGER_PATTERNS = [
     id: "meeting-notes",
     pattern:
       /\b(meeting (notes|summary|minutes|recap)|action items|summarize\w* (the )?(meeting|call|conversation))\b/i,
+  },
+  {
+    id: "user-learning",
+    pattern:
+      /\b(remember(\s+this|\s+that|\s+my|\s+me|\s+for)?\b|\bforget(\s+my|\s+this|\s+that|\s+everything)?\b|\bwhat do you know about me\b|\blearn about me\b|\bmy prefer\w+\b|\bmy name is\b|\bi prefer\b|\bmy tech stack\b|\bdelete (everything|what) you know about me\b)/i,
   },
 ];
 

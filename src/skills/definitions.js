@@ -687,4 +687,24 @@ export const COREZ_SPECIALIST_SKILLS = [
     instructions:
       'Extract decisions, discussion points, and owners with deadlines into clear structured notes. Only list actions, owners, and deadlines that actually appear in the source material — never infer them. A scheduled meeting with no explicitly named owner belongs in the summary or schedule, not the action-item table; never assign it to "Team". Put anything extra under a clearly labelled "Suggested Follow-ups" section, separate from confirmed actions. End with an action-item list (owner, task, due date) and ask for clarification when details are ambiguous.',
   },
+  {
+    id: "user-learning",
+    name: "User Learning & Memory",
+    description:
+      'Durable user memory: remember, recall, and forget preferences and facts. User scenario: "Remember I prefer dark mode" or "What do you know about me?"',
+    triggers: [
+      "remember",
+      "learn about me",
+      "my preference",
+      "what do you know about me",
+      "forget",
+    ],
+    phase: "IMPLEMENTING",
+    priority: 18,
+    dependencies: [],
+    compatibleIntents: ["general", "writing", "explanation"],
+    requiresTools: [],
+    instructions:
+      "Learn durable user facts only with explicit consent via the userLearningService (R2 /api/memory endpoints) using an unguessable userId — never default_user. Separate durable preferences from temporary task details, refuse secrets and sensitive PII, confirm success only after a 2xx store/delete response, apply saved facts quietly when relevant, and support recall ('what do you know about me') and forget without inventing facts.",
+  },
 ];
