@@ -1,4 +1,5 @@
 import { handleSearch } from "./search.js";
+import { handleMemory } from "./memory.js";
 import { handleRerank, handleEmbed } from "./aiModels.js";
 import { fetchAwwwardsInspiration, handleInspiration } from "./inspiration.js";
 import { verifySession } from "./auth.js";
@@ -3123,263 +3124,12 @@ async function handleR2Apps(request, env) {
   return jsonResponse(405, { error: "Method not allowed." });
 }
 
-function publicMemoryRecord(record) {
-  if (!record || typeof record !== "object") return record;
-  const publicRecord = { ...record };
-  // Embeddings are server-side only: never expose raw vectors to clients.
-  delete publicRecord.embedding;
-  delete publicRecord.embeddingModel;
-  return publicRecord;
-}
-
 function decodePathSegment(segment) {
   try {
     return decodeURIComponent(segment);
   } catch {
     return null;
   }
-}
-
-async function handleR2Memory(request, env) {
-  if (!env?.ASSET_BUCKET) {
-    return jsonResponse(530, {
-      error: "R2 storage (ASSET_BUCKET) is not configured.",
-    });
-  }
-
-  const uid = await sessionUid(request, env);
-  if (!uid) {
-    return jsonResponse(401, { error: "Authentication required." });
-  }
-
-  const url = new URL(request.url);
-  const pathname = url.pathname;
-
-  // 1. POST /api/memory/store - Store or update a memory entry
-  if (pathname === "/api/memory/store" && request.method === "POST") {
-    const retryAfter = memoryRateLimiter(request);
-    if (retryAfter !== null) {
-      return jsonResponse(
-        429,
-        { error: "Too many memory requests. Try again shortly." },
-        { "Retry-After": String(retryAfter) },
-      );
-    }
-    let body;
-    try {
-      body = await readBoundedJson(request);
-    } catch {
-      return jsonResponse(400, { error: "Invalid JSON payload." });
-    }
-
-    // Identity comes from the verified session only; any client-supplied
-    // userId is ignored so one account can never touch another's namespace.
-    const userId = uid;
-    const keyName =
-      typeof body?.key === "string" ? body.key.trim() : `mem_${Date.now()}`;
-    const category =
-      typeof body?.category === "string" ? body.category.trim() : "general";
-    const text =
-      typeof body?.text === "string"
-        ? body.text
-        : typeof body?.value === "string"
-          ? body.value
-          : "";
-
-    if (!text) {
-      return jsonResponse(400, {
-        error: "text or value content is required for memory storage.",
-      });
-    }
-    if (!SAFE_STORAGE_SEGMENT.test(userId)) {
-      return jsonResponse(400, {
-        error:
-          "Invalid userId: use letters, digits, dots, dashes or underscores.",
-      });
-    }
-    if (!SAFE_STORAGE_SEGMENT.test(keyName)) {
-      return jsonResponse(400, {
-        error:
-          "Invalid memory key: use letters, digits, dots, dashes or underscores.",
-      });
-    }
-
-    const now = new Date().toISOString();
-    const memoryRecord = {
-      userId,
-      key: keyName,
-      category,
-      text,
-      metadata: body?.metadata || {},
-      tags: Array.isArray(body?.tags) ? body.tags : [],
-      updatedAt: now,
-      createdAt: body?.createdAt || now,
-    };
-
-    const key = `memory/${userId}/${keyName}.json`;
-    await env.ASSET_BUCKET.put(key, JSON.stringify(memoryRecord), {
-      httpMetadata: { contentType: "application/json" },
-    });
-
-    return jsonResponse(200, {
-      success: true,
-      userId,
-      key: keyName,
-      r2Key: key,
-      embeddingStored: false,
-      record: publicMemoryRecord(memoryRecord),
-    });
-  }
-
-  // 2. POST /api/memory/search - Search relevant memories
-  if (pathname === "/api/memory/search" && request.method === "POST") {
-    const retryAfter = memoryRateLimiter(request);
-    if (retryAfter !== null) {
-      return jsonResponse(
-        429,
-        { error: "Too many memory requests. Try again shortly." },
-        { "Retry-After": String(retryAfter) },
-      );
-    }
-    let body;
-    try {
-      body = await readBoundedJson(request);
-    } catch {
-      return jsonResponse(400, { error: "Invalid JSON payload." });
-    }
-
-    // Scoped to the verified session's namespace; body.userId is ignored.
-    const userId = uid;
-    const query =
-      typeof body?.query === "string" ? body.query.trim().toLowerCase() : "";
-    const categoryFilter =
-      typeof body?.category === "string"
-        ? body.category.trim().toLowerCase()
-        : "";
-
-    if (!SAFE_STORAGE_SEGMENT.test(userId)) {
-      return jsonResponse(400, {
-        error:
-          "Invalid userId: use letters, digits, dots, dashes or underscores.",
-      });
-    }
-
-    const prefix = `memory/${userId}/`;
-    const list = await env.ASSET_BUCKET.list({ prefix });
-
-    const matches = [];
-    if (list && Array.isArray(list.objects)) {
-      const jsonObjects = list.objects.filter((obj) =>
-        obj.key.endsWith(".json"),
-      );
-      const items = await Promise.all(
-        jsonObjects.map((obj) => env.ASSET_BUCKET.get(obj.key)),
-      );
-      for (const item of items) {
-        if (item) {
-          try {
-            const data = JSON.parse(await item.text());
-            const catLower = String(data.category || "").toLowerCase();
-
-            if (!categoryFilter || catLower === categoryFilter) {
-              matches.push(data);
-            }
-          } catch {
-            /* ignore invalid cache entries */
-          }
-        }
-      }
-    }
-
-    if (!query) {
-      const publicMatches = matches.map(publicMemoryRecord);
-      return jsonResponse(200, {
-        userId,
-        query,
-        matches: publicMatches,
-        source: "keyword",
-      });
-    }
-
-    const keywordMatches = matches
-      .filter((m) => {
-        const textLower = String(m.text || "").toLowerCase();
-        const keyLower = String(m.key || "").toLowerCase();
-        const catLower = String(m.category || "").toLowerCase();
-        return (
-          textLower.includes(query) ||
-          keyLower.includes(query) ||
-          catLower.includes(query)
-        );
-      })
-      .map(publicMemoryRecord);
-
-    return jsonResponse(200, {
-      userId,
-      query,
-      matches: keywordMatches,
-      source: "keyword",
-    });
-  }
-
-  // 3. GET /api/memory/:userId - List all memories for a user
-  if (request.method === "GET" && pathname.match(/^\/api\/memory\/[^/]+$/)) {
-    // The path userId is ignored for scoping: only the session's namespace
-    // is ever listed.
-    const userId = uid;
-    const prefix = `memory/${userId}/`;
-    const list = await env.ASSET_BUCKET.list({ prefix });
-
-    const memories = [];
-    if (list && Array.isArray(list.objects)) {
-      const jsonObjects = list.objects.filter((obj) =>
-        obj.key.endsWith(".json"),
-      );
-      const items = await Promise.all(
-        jsonObjects.map((obj) => env.ASSET_BUCKET.get(obj.key)),
-      );
-      for (const item of items) {
-        if (item) {
-          try {
-            const data = JSON.parse(await item.text());
-            memories.push(publicMemoryRecord(data));
-          } catch {
-            /* ignore invalid cache entries */
-          }
-        }
-      }
-    }
-
-    return jsonResponse(200, { userId, memories });
-  }
-
-  // 4. DELETE /api/memory/:userId/:key - Delete a memory
-  if (
-    request.method === "DELETE" &&
-    pathname.match(/^\/api\/memory\/[^/]+\/[^/]+$/)
-  ) {
-    const retryAfter = memoryRateLimiter(request);
-    if (retryAfter !== null) {
-      return jsonResponse(
-        429,
-        { error: "Too many memory requests. Try again shortly." },
-        { "Retry-After": String(retryAfter) },
-      );
-    }
-    const parts = pathname.replace("/api/memory/", "").split("/");
-    const keyName = decodePathSegment(parts[1]);
-    if (keyName === null || !SAFE_STORAGE_SEGMENT.test(keyName)) {
-      return jsonResponse(400, { error: "Invalid path segment." });
-    }
-
-    // Scoped to the session's namespace; the path userId is ignored.
-    const userId = uid;
-    const key = `memory/${userId}/${keyName}.json`;
-    await env.ASSET_BUCKET.delete(key);
-    return jsonResponse(200, { success: true, userId, key: keyName });
-  }
-
-  return jsonResponse(405, { error: "Method not allowed." });
 }
 
 function publishedPageHeaders() {
@@ -3412,7 +3162,6 @@ const imageRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 30 });
 // client so one session cannot fill the bucket or burn egress at line rate.
 const assetsRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 30 });
 const appsRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 30 });
-const memoryRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 30 });
 
 // Derive the caller identity from the verified session. entry.js's auth gate
 // already rejected unauthenticated callers when AUTH_SECRET is set, so here a
@@ -3921,7 +3670,7 @@ export default {
       return runJsonSafe(() => handleR2Apps(request, env));
     }
     if (pathname.startsWith("/api/memory")) {
-      return runJsonSafe(() => handleR2Memory(request, env));
+      return runJsonSafe(() => handleMemory(request, env));
     }
     if (
       pathname === "/api/publish" ||

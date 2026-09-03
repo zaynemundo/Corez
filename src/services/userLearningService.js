@@ -1,6 +1,7 @@
 /**
  * User Learning Service — durable user memory wrapper.
- * Uses R2-backed /api/memory endpoints (see r2-mem0-memory skill).
+ * Backed by per-user SQLite storage (D1 `user_memories`, via `/api/memory`
+ * endpoints) with an R2 fallback (see r2-mem0-memory skill).
  * userId is the only access credential: require an unguessable per-user id,
  * never default_user, never store secrets or sensitive PII.
  */

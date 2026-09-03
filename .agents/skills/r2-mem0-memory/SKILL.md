@@ -7,7 +7,11 @@ description: Use for explicit persistent-memory operations through CoreZ R2 endp
 
 Use this skill whenever storing, recalling, updating, searching, or forgetting long-term persistent user facts, preferences, project memory, entity graph state, or context across user sessions.
 
-The memory engine uses Cloudflare R2 object storage (`ASSET_BUCKET`) via `/api/memory` endpoints to guarantee 0-database dependency long-term persistence.
+The memory engine stores per-user facts in SQLite (`user_memories` table in D1)
+via `/api/memory` endpoints, with the legacy R2 object layout (`memory/<userId>/<key>.json`
+in `ASSET_BUCKET`) as fallback when D1 is unavailable and as the one-time import
+source on first SQLite-backed read. Either way there is 0 extra-database dependency
+for callers: the same `/api/memory` API works in both cases.
 
 ## Security boundary
 
@@ -72,7 +76,8 @@ const { matches } = await res.json();
 
 - `POST /api/memory/store`
   - Payload: `{ userId?: string, key?: string, category?: string, text: string, tags?: string[], metadata?: object }`
-  - Response: `{ success: true, userId, key, r2Key, embeddingStored: false, record }`
+  - Response: `{ success: true, userId, key, r2Key, storage: 'd1' | 'r2', embeddingStored: false, record }`
+  - (`r2Key` is the R2 object key on the R2 path and `null` on the SQLite path.)
 
 - `POST /api/memory/search`
   - Payload: `{ userId?: string, query?: string, category?: string }`
