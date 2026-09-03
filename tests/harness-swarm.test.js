@@ -220,9 +220,12 @@ describe('creation harness swarm pre-pass', () => {
     const GAME_ARTIFACT = `<!DOCTYPE html>
 <html lang="en"><head><title>G</title></head>
 <body><canvas id="c"></canvas>
+<button id="startBtn">Play</button>
 <script>
+let state='menu',score=0,lives=3;
+document.getElementById('startBtn').addEventListener('click',function(){state='playing';});
 function gameLoop(){ update(); render(); }
-function update(){}
+function update(){ if(state!=='playing')return; score++; if(score>100){state='victory';} if(lives<=0){state='gameover';} }
 function render(){}
 document.addEventListener('keydown', function(){});
 canvas.addEventListener('mousemove', function(){});

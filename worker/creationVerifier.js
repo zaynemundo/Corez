@@ -37,6 +37,35 @@ const GAME_LOOP_PATTERNS = /\b(requestAnimationFrame|setInterval)\b/i;
 const GAME_UPDATE_PATTERNS = /\b(gameLoop|update|render|loop)\b/i;
 const INPUT_PATTERNS =
   /\b(addEventListener\s*\(\s*['"](keydown|keyup|mousedown|mouseup|mousemove|click|touchstart)['"])/i;
+// A game is not functional without a visible way to begin play: a Play/Start/
+// Deploy/Begin/Retry button (matched by label or by id/class), or a canvas
+// that starts on click. Presence of input listeners alone is not enough —
+// pointer-lock FPS builds have listeners yet leave the player stranded on a
+// menu with no working start control.
+function hasStartControl(content) {
+  const btnRe = /<(button|a)\b([^>]*)>([\s\S]{0,80}?)<\/\1>/gi;
+  let m;
+  while ((m = btnRe.exec(content)) !== null) {
+    const attrs = m[2] || "";
+    const text = (m[3] || "").replace(/<[^>]*>/g, " ");
+    if (/\b(play|start|deploy|begin|retry)\b/i.test(text)) return true;
+    if (
+      /\b(id|class)\s*=\s*["'][^"']*\b(start|play|deploy|begin|retry)\b[^"']*["']/i.test(
+        attrs,
+      )
+    )
+      return true;
+  }
+  if (
+    /<canvas\b[^>]*(id|class)=["'][^"']*\b(start|play)\b[^"']*["']/i.test(content)
+  )
+    return true;
+  return false;
+}
+// A complete game must be winnable or losable (ideally both). Endless builds
+// with no terminal state can never be finished, verified, or reviewed.
+const TERMINAL_STATE_PATTERNS =
+  /\b(victory|you win|win screen|level clear|stage clear|mission complete|mission failed|game complete|game-complete|gameover|game over|you lose|you lost|you died|out of (lives|hearts)|no lives left)\b/i;
 export const DEFAULT_APPROVED_CDNS = [
   "cdnjs.cloudflare.com",
   "cdn.jsdelivr.net",
@@ -155,6 +184,20 @@ export function verifyCreation(html, options = {}) {
       failures.push({
         code: "missing-input",
         detail: "The game registers no keyboard/mouse/touch input listeners.",
+      });
+    }
+    if (!hasStartControl(content)) {
+      failures.push({
+        code: "missing-start",
+        detail:
+          "The game has no visible start/play control (Play/Start/Deploy/Begin/Retry button) — the player lands with no working way to begin play.",
+      });
+    }
+    if (!TERMINAL_STATE_PATTERNS.test(content)) {
+      failures.push({
+        code: "missing-terminal-state",
+        detail:
+          "The game defines no win/victory or lose/game-over end state — a game that can never be won or lost is not a complete, verifiable deliverable.",
       });
     }
   }

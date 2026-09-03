@@ -6,9 +6,12 @@ const GOOD_GAME = `<!DOCTYPE html>
 <head><title>FPS</title></head>
 <body>
 <canvas id="c"></canvas>
+<button id="startBtn">Play</button>
 <script>
+let state='menu',score=0,lives=3;
+document.getElementById('startBtn').addEventListener('click',function(){state='playing';});
 function gameLoop(){ update(); render(); }
-function update(){}
+function update(){ if(state!=='playing')return; score++; if(score>100){state='victory';} if(lives<=0){state='gameover';} }
 function render(){}
 document.addEventListener('keydown', function(){});
 canvas.addEventListener('mousemove', function(){});
@@ -117,12 +120,34 @@ console.log(x);
     expect(codes).toContain('missing-canvas');
     expect(codes).toContain('missing-loop');
     expect(codes).toContain('missing-input');
+    expect(codes).toContain('missing-start');
+    expect(codes).toContain('missing-terminal-state');
   });
 
   it('flags badly unbalanced braces', () => {
-    const content = GOOD_GAME.replace(/function update\(\)\{\}/, 'function update() {' + '{'.repeat(15));
+    const content = GOOD_GAME.replace(/function render\(\)\{\}/, 'function render() {' + '{'.repeat(15));
     const result = verifyCreation(content, { intentType: 'game_creation' });
     expect(result.failures.some((f) => f.code === 'unbalanced-braces')).toBe(true);
+  });
+
+  it('rejects a game with a loop but no start control', () => {
+    const content = GOOD_GAME.replace(/<button id="startBtn">Play<\/button>\n/, '');
+    const result = verifyCreation(content, { intentType: 'game_creation' });
+    expect(result.passed).toBe(false);
+    expect(result.failures.some((f) => f.code === 'missing-start')).toBe(true);
+  });
+
+  it('rejects a game with no win or lose end state', () => {
+    const content = GOOD_GAME.replace(/victory/g, 'playing').replace(/gameover/g, 'playing');
+    const result = verifyCreation(content, { intentType: 'game_creation' });
+    expect(result.passed).toBe(false);
+    expect(result.failures.some((f) => f.code === 'missing-terminal-state')).toBe(true);
+  });
+
+  it('accepts a game-over-only end state (endless survival)', () => {
+    const content = GOOD_GAME.replace(/victory/g, 'playing');
+    const result = verifyCreation(content, { intentType: 'game_creation' });
+    expect(result.failures.some((f) => f.code === 'missing-terminal-state')).toBe(false);
   });
 });
 

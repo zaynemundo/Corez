@@ -45,6 +45,8 @@ export const HARD_FAILURE_CODES = new Set([
   "missing-canvas",
   "missing-loop",
   "missing-input",
+  "missing-start",
+  "missing-terminal-state",
 ]);
 const LEASE_MS = 5 * 60 * 1000;
 // The build lease is refreshed on a timer while the harness runs, so a long
@@ -450,6 +452,12 @@ export async function* runCreationHarness(options) {
             })
           : `Build specification:\n${state.spec}\n\nDeliver ONLY the complete, finished artifact as a single self-contained HTML document.`,
     };
+    // Games are verified for function before delivery (and repaired until
+    // they pass), so the first attempt is told the bar up front. Zero extra
+    // provider cost: this rides inside the existing build context.
+    if (isGameRequest) {
+      buildContext.content += `\n\nFunctional requirements for games: a visible clickable start control (Play/Start/Deploy); keyboard AND touch input where every movement direction maps to the on-screen/camera facing with no dead or unused movement code; a win path AND a lose path with restart; a render loop that draws every frame; valid JavaScript with no runtime errors on load, on start, or on input.`;
+    }
     let buildMessages = [...baseSystem, buildContext, ...userMessages];
     // Tracks whether this run streamed build content (build/continuation
     // deltas); a resumed run that skips the build phase re-emits the

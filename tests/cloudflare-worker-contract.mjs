@@ -560,7 +560,7 @@ async function run() {
   // worker runs the ENTIRE build loop and answers with the finished artifact
   // as a single JSON body (corez.pro -> provider -> wait -> full response).
   {
-    const harnessArtifact = '<!DOCTYPE html>\n<html lang="en"><head><title>G</title></head>\n<body><canvas id="c"></canvas>\n<script>\nfunction gameLoop(){ update(); render(); }\nfunction update(){}\nfunction render(){}\ndocument.addEventListener(\'keydown\', function(){});\ncanvas.addEventListener(\'mousemove\', function(){});\nrequestAnimationFrame(gameLoop);\n</script></body></html>';
+    const harnessArtifact = '<!DOCTYPE html>\n<html lang="en"><head><title>G</title></head>\n<body><canvas id="c"></canvas>\n<button id="startBtn">Play</button>\n<script>\nlet state=\'menu\',score=0,lives=3;\ndocument.getElementById(\'startBtn\').addEventListener(\'click\',function(){state=\'playing\';});\nfunction gameLoop(){ update(); render(); }\nfunction update(){ if(state!==\'playing\')return; score++; if(score>100){state=\'victory\';} if(lives<=0){state=\'gameover\';} }\nfunction render(){}\ndocument.addEventListener(\'keydown\', function(){});\ncanvas.addEventListener(\'mousemove\', function(){});\nrequestAnimationFrame(gameLoop);\n</script></body></html>';
     const harnessOriginalFetch = globalThis.fetch;
     try {
       let harnessProviderCalls = 0;

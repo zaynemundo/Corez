@@ -243,7 +243,8 @@ Instructions:
 1. Combine the HTML layout, canvas rendering loop, input handling, and Web Audio sounds.
 2. Configure canvas interpolation and rendering behavior to match the manifest's selected visual style.
 3. Preload all assets using \`loadAllAssets()\`, showing loading progress, and start the game loop inside the resolved \`.then()\`.
-4. Output ONLY the complete runnable HTML document wrapped inside a single \`\`\`html ... \`\`\` code block.`;
+4. Functional bar (verified by headless execution before delivery): the game must boot with zero script errors, expose a clickable start control (Play/Start/Deploy), map every movement input to the on-screen/camera facing with no dead or unused movement code, include both a win path and a lose path with restart, and draw to the canvas every frame while playing.
+5. Output ONLY the complete runnable HTML document wrapped inside a single \`\`\`html ... \`\`\` code block.`;
 
       let synthesizedHtmlResponse = await this.aiClient(synthesisPrompt, {
         signal,
@@ -259,6 +260,7 @@ Instructions:
       let testResult = await testGameHtml(
         extractedHtml,
         manifest.assetManifest,
+        { functional: true },
       );
 
       while (!testResult.passed && tracker.incrementRepairAttempt()) {
@@ -276,7 +278,9 @@ Instructions:
           synthesizedHtmlResponse,
         );
         if (repairedHtml) extractedHtml = repairedHtml;
-        testResult = await testGameHtml(extractedHtml, manifest.assetManifest);
+        testResult = await testGameHtml(extractedHtml, manifest.assetManifest, {
+          functional: true,
+        });
       }
 
       if (!testResult.passed) {

@@ -15,9 +15,12 @@ import { runStreamingChain } from '../worker/providerChain.js';
 const GOOD_ARTIFACT = `<!DOCTYPE html>
 <html lang="en"><head><title>G</title></head>
 <body><canvas id="c"></canvas>
+<button id="startBtn">Play</button>
 <script>
+let state='menu',score=0,lives=3;
+document.getElementById('startBtn').addEventListener('click',function(){state='playing';});
 function gameLoop(){ update(); render(); }
-function update(){}
+function update(){ if(state!=='playing')return; score++; if(score>100){state='victory';} if(lives<=0){state='gameover';} }
 function render(){}
 document.addEventListener('keydown', function(){});
 canvas.addEventListener('mousemove', function(){});
@@ -468,7 +471,7 @@ describe('runCreationHarness resilience', () => {
 
   it('H6: auto-continues a truncated build stream until the HTML and script blocks are fully closed', async () => {
     const part1 = `<!DOCTYPE html><html><body><canvas id="c"></canvas><script>let x = 0;\nfunction gameLoop() { update(); render(); }\nconst srd = (my *`;
-    const part2 = `Math.sin(angle));\nfunction update(){}\nfunction render(){}\ndocument.addEventListener('keydown', function(){});\ncanvas.addEventListener('mousemove', function(){});\nrequestAnimationFrame(gameLoop);\n</script></body></html>`;
+    const part2 = `Math.sin(angle));\nlet state='menu',score=0;\ndocument.getElementById('startBtn').addEventListener('click',function(){state='playing';});\nfunction update(){ if(state==='playing'){score++;} if(score>50){state='victory';} }\nfunction render(){}\ndocument.addEventListener('keydown', function(){});\ncanvas.addEventListener('mousemove', function(){});\nrequestAnimationFrame(gameLoop);\n</script><button id="startBtn">Play</button></body></html>`;
 
     runStreamingChain.mockImplementation(async function* (messages) {
       const serialized = JSON.stringify(messages || []);
@@ -507,7 +510,7 @@ describe('runCreationHarness resilience', () => {
     // Short truncated build (< 200 chars) so a full identical repeat
     // produces no growth and triggers the anti-repeat path.
     const part1 = '<html><body><canvas id="c"></canvas><script>const srd = (my *';
-    const part2 = `Math.sin(angle));\nfunction update(){}\nfunction render(){}\ndocument.addEventListener('keydown', function(){});\ncanvas.addEventListener('mousemove', function(){});\nrequestAnimationFrame(gameLoop);\n</script></body></html>`;
+    const part2 = `Math.sin(angle));\nlet state='menu',score=0;\ndocument.getElementById('startBtn').addEventListener('click',function(){state='playing';});\nfunction update(){ if(state==='playing'){score++;} if(score>50){state='victory';} }\nfunction render(){}\ndocument.addEventListener('keydown', function(){});\ncanvas.addEventListener('mousemove', function(){});\nrequestAnimationFrame(gameLoop);\n</script><button id="startBtn">Play</button></body></html>`;
 
     let continuationCalls = 0;
     runStreamingChain.mockImplementation(async function* (messages) {
