@@ -41,6 +41,10 @@ import {
   shouldCompact,
   expandCompactedChat as _expandCompactedChat,
 } from "./services/smartCompact";
+import {
+  isStreamVisibleForSession,
+  isStreamActiveElsewhere,
+} from "./utils/streamSession";
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -111,6 +115,9 @@ function MainApp({ theme, setTheme }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [streamingContent, setStreamingContent] = useState(null);
+  // Which chat the live stream belongs to. The user may switch chats
+  // mid-stream; the stream must only render in its originating chat.
+  const [streamingSessionId, setStreamingSessionId] = useState(null);
   const [isStreamCollapsed, setIsStreamCollapsed] = useState(false);
   const [swarmVisible, setSwarmVisible] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
@@ -139,6 +146,12 @@ function MainApp({ theme, setTheme }) {
   }, [sessions]);
 
   const activeSessionId = chatIdFromUrl;
+  // Ref mirror: async stream completions must compare against the chat the
+  // user is viewing *at completion time*, not at send time.
+  const activeSessionIdRef = useRef(activeSessionId);
+  useEffect(() => {
+    activeSessionIdRef.current = activeSessionId;
+  }, [activeSessionId]);
   const activeSession = useMemo(
     () => sessions.find((s) => s.id === activeSessionId) || null,
     [sessions, activeSessionId],
@@ -460,6 +473,7 @@ function MainApp({ theme, setTheme }) {
           }
           setIsThinking(true);
           setSwarmVisible(false);
+          setStreamingSessionId(targetSessionId);
           const controller = new AbortController();
           abortControllerRef.current = controller;
 
@@ -478,7 +492,10 @@ function MainApp({ theme, setTheme }) {
               if (!response) return;
               const aiMsg = toAssistantMessage(response);
               const extractedCode = extractCodeFromMessage(aiMsg.content);
-              if (extractedCode) {
+              if (
+                extractedCode &&
+                activeSessionIdRef.current === targetSessionId
+              ) {
                 setActiveCanvasCode(extractedCode);
                 setCanvasOpen(true);
               }
@@ -510,6 +527,7 @@ function MainApp({ theme, setTheme }) {
               setIsThinking(false);
               setSwarmVisible(false);
               setStreamingContent(null);
+              setStreamingSessionId(null);
               if (abortControllerRef.current === controller)
                 abortControllerRef.current = null;
             });
@@ -717,6 +735,7 @@ function MainApp({ theme, setTheme }) {
     }
     localStorage.removeItem("corez_pending_request");
     setIsThinking(false);
+    setStreamingSessionId(null);
   };
 
   const [chatInput, setChatInput] = useState("");
@@ -952,6 +971,7 @@ function MainApp({ theme, setTheme }) {
 
     setIsThinking(true);
     setSwarmVisible(false);
+    setStreamingSessionId(targetSessionId);
 
     const pendingData = {
       sessionId: targetSessionId,
@@ -1036,7 +1056,10 @@ function MainApp({ theme, setTheme }) {
         const shouldAutoOpenCanvas = Boolean(
           extractedCode &&
           (isCreationIntent || isRevision) &&
-          !userDismissedCanvasRef.current,
+          !userDismissedCanvasRef.current &&
+          // Never pop the canvas over a chat the user switched to mid-stream;
+          // the code stays in its own chat with a manual "Run in Canvas".
+          activeSessionIdRef.current === targetSessionId,
         );
         if (shouldAutoOpenCanvas) {
           setActiveCanvasCode(extractedCode);
@@ -1098,6 +1121,7 @@ function MainApp({ theme, setTheme }) {
         setIsThinking(false);
         setSwarmVisible(false);
         setStreamingContent(null);
+        setStreamingSessionId(null);
         abortControllerRef.current = null;
       }
     }
@@ -1218,6 +1242,30 @@ function MainApp({ theme, setTheme }) {
             )}
 
             <div className="messages-scroll">
+              {isStreamActiveElsewhere({
+                isThinking,
+                streamingSessionId,
+                activeSessionId,
+              }) && (
+                <div
+                  className="stream-elsewhere-banner"
+                  role="status"
+                  aria-label="Response streaming in another chat"
+                >
+                  <span>
+                    Responding in “
+                    {sessions.find((s) => s.id === streamingSessionId)
+                      ?.title || "another chat"}
+                    ”…
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/chat/${streamingSessionId}`)}
+                  >
+                    View
+                  </button>
+                </div>
+              )}
               {!sessionsLoaded ? (
                 <div className="welcome-container">
                   <h1 className="welcome-title">COREZ</h1>
@@ -1260,7 +1308,11 @@ function MainApp({ theme, setTheme }) {
                       />
                     );
                   })}
-                  {isThinking && (
+                  {isStreamVisibleForSession({
+                    isThinking,
+                    streamingSessionId,
+                    activeSessionId,
+                  }) && (
                     <div className="message-wrapper ai">
                       <div className="message-body">
                         <button

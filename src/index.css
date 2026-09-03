@@ -5650,3 +5650,39 @@ h6 {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Stream attribution banner: shown when a response is streaming in a
+   different chat than the one being viewed. */
+.stream-elsewhere-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px auto 0;
+  max-width: 880px;
+  padding: 8px 8px 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.stream-elsewhere-banner span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stream-elsewhere-banner button {
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid var(--border-hover);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+.stream-elsewhere-banner button:hover {
+  background: var(--bg-tertiary);
+}
