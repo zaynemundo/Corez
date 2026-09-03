@@ -15,6 +15,10 @@ it builds on `personalisation-context` (policy) + `r2-mem0-memory` (storage).
   "my name is Ada", "I use React + Vite", "my project is a 2D platformer".
 - User asks recall: "what do you know about me?", "what are my preferences?".
 - User asks forget: "forget my theme", "delete everything you know about me".
+- User volunteers identity facts: "I am a marketer in the UAE",
+  "I work with Fantoni", "my company represents brands across the UAE",
+  "we provide full-service workplace design" — offer to save, never
+  silently store (see workflow step 2b).
 - A durable preference repeats (tone, units, locale, stack, workflow) and is
   worth offering to save — offer first, never save silently.
 - Apply a saved fact quietly when it is relevant to the current task.
@@ -32,9 +36,17 @@ it builds on `personalisation-context` (policy) + `r2-mem0-memory` (storage).
 ## Workflow
 
 1. Separate durable facts from temporary task details. Only durable facts
-   are candidates for memory.
+   are candidates for memory. Use `detectUserFactCandidates()` in
+   `src/services/userLearningService.js` to extract volunteered identity
+   facts (name, role, employer/client, location, stack, preferences).
 2. If the request is ambiguous ("remember this"), ask what exactly to keep
    and for how long before storing.
+2b. Proactive offer: when the user volunteers a new durable fact about
+   themselves without saying "remember", finish the main answer first,
+   then offer to save it in ONE short sentence AFTER the answer and
+   OUTSIDE any deliverable copy (never inside posts, emails, or code) —
+   e.g. "Want me to remember that you work with Fantoni in the UAE?"
+   Store only after the user confirms.
 3. Store, search, list, or delete only through `src/services/userLearningService.js`
    (R2-backed `/api/memory/*` endpoints). A memory counts as saved only
    after a 2xx response with the expected `success`, `userId`, and `key`.

@@ -6,6 +6,7 @@
 
 import { defaultSkillRegistry } from "./registry.js";
 import { expandDependencies } from "./dependencies.js";
+import { detectUserFactCandidates } from "../services/userLearningService.js";
 
 const BUG_REPORT_PATTERNS =
   /\b(crash|crashes|bug|error|exception|fail|failed|fails|stack trace|not working|broken|issue|fix|debug)\b/i;
@@ -143,9 +144,16 @@ const SPECIALIST_TRIGGER_PATTERNS = [
   {
     id: "user-learning",
     pattern:
-      /\b(remember(\s+this|\s+that|\s+my|\s+me|\s+for)?\b|\bforget(\s+my|\s+this|\s+that|\s+everything)?\b|\bwhat do you know about me\b|\blearn about me\b|\bmy prefer\w+\b|\bmy name is\b|\bi prefer\b|\bmy tech stack\b|\bdelete (everything|what) you know about me\b)/i,
+      /\b(remember(\s+this|\s+that|\s+my|\s+me|\s+for)?\b|\bforget(\s+my|\s+this|\s+that|\s+everything)?\b|\bwhat do you know about me\b|\blearn about me\b|\bmy prefer\w+\b|\bmy name is\b|\bi prefer\b|\bmy tech stack\b|\bdelete (everything|what) you know about me\b|\bi\s+am\s+a\b|\bi\s+work\s+(with|at|for|in)\b|\bi\s+live\s+in\b|\bmy\s+(company|team|role|job|business|organisation|organization)\b|\b(based|located)\s+in\b|\bwe\s+(represent|provide|specialise|specialize)\b)/i,
   },
 ];
+
+// Explicit remember/recall/forget verbs: always fire user-learning.
+// Anything else is an implicit (volunteered-fact) match and needs extractor
+// confirmation — this keeps questions ("Am I a good fit?") and pasted code
+// from triggering remember offers.
+const USER_LEARNING_EXPLICIT_PATTERN =
+  /\b(remember(\s+this|\s+that|\s+my|\s+me|\s+for)?\b|\bforget(\s+my|\s+this|\s+that|\s+everything)?\b|\bwhat do you know about me\b|\blearn about me\b|\bmy prefer\w+\b|\bmy name is\b|\bi prefer\b|\bmy tech stack\b|\bdelete (everything|what) you know about me\b)/i;
 
 // Runs specialist detection BEFORE the heavy-workflow early return so everyday
 // conversational requests still receive their matching capability. Returns the
@@ -157,6 +165,23 @@ function matchSpecialistSkills(cleanPrompt) {
     if (pattern.test(cleanPrompt)) {
       matches.push(id);
     }
+  }
+  // Implicit user-learning matches (volunteered facts) require extractor
+  // confirmation: the extractor skips interrogative sentences and fenced
+  // code, so questions and pasted snippets never produce remember offers.
+  // Second net for volunteered identity facts: phrasing variants the regex
+  // misses still deserve a remember offer — never a silent store.
+  try {
+    const hasCandidates = detectUserFactCandidates(cleanPrompt).length > 0;
+    if (matches.includes("user-learning")) {
+      if (!USER_LEARNING_EXPLICIT_PATTERN.test(cleanPrompt) && !hasCandidates) {
+        matches.splice(matches.indexOf("user-learning"), 1);
+      }
+    } else if (hasCandidates) {
+      matches.push("user-learning");
+    }
+  } catch {
+    // Detection must never block skill resolution.
   }
   // Social-carousel copy ("post for this carousel", "carousel post + caption")
   // is marketing copy, not a pitch deck: drop presentation-design unless the

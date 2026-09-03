@@ -691,13 +691,16 @@ export const COREZ_SPECIALIST_SKILLS = [
     id: "user-learning",
     name: "User Learning & Memory",
     description:
-      'Durable user memory: remember, recall, and forget preferences and facts. User scenario: "Remember I prefer dark mode" or "What do you know about me?"',
+      'Durable user memory: remember, recall, and forget preferences and facts. User scenario: "Remember I prefer dark mode" or "What do you know about me?" Also fires on volunteered identity facts ("I am a marketer", "I work with Fantoni", "we represent brands across the UAE") to offer a save.',
     triggers: [
       "remember",
       "learn about me",
       "my preference",
       "what do you know about me",
       "forget",
+      "I am a",
+      "I work with",
+      "my company",
     ],
     phase: "IMPLEMENTING",
     priority: 18,
@@ -705,6 +708,6 @@ export const COREZ_SPECIALIST_SKILLS = [
     compatibleIntents: ["general", "writing", "explanation"],
     requiresTools: [],
     instructions:
-      "Learn durable user facts only with explicit consent via the userLearningService (R2 /api/memory endpoints) using an unguessable userId — never default_user. Separate durable preferences from temporary task details, refuse secrets and sensitive PII, confirm success only after a 2xx store/delete response, apply saved facts quietly when relevant, and support recall ('what do you know about me') and forget without inventing facts.",
+      "Notice volunteered identity facts too (name, role, employer/client, location, stack, durable preferences) — not only explicit 'remember' requests. When the user states a new durable fact about themselves, finish the main answer first, then offer to save it in ONE short sentence AFTER the answer and OUTSIDE any deliverable copy (never inside posts, emails, or code), e.g. 'Want me to remember that you work with Fantoni in the UAE?' Learn durable user facts only with explicit consent via the userLearningService (R2 /api/memory endpoints) using an unguessable userId — never default_user. Separate durable preferences from temporary task details, refuse secrets and sensitive PII, confirm success only after a 2xx store/delete response, apply saved facts quietly when relevant, and support recall ('what do you know about me') and forget without inventing facts. Never save silently and never claim a save that did not succeed.",
   },
 ];
