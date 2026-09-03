@@ -537,6 +537,44 @@ function hasExplicitWebCreationInInstruction(instructionLower) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Social carousel copy vs UI-carousel disambiguation
+// ---------------------------------------------------------------------------
+// A "carousel post" / "post for this carousel" / "LinkedIn/Instagram carousel"
+// is SOCIAL-MEDIA copy (slide breakdown + caption + hashtags) — NOT a UI
+// component to code. The pasted body copy often contains hijack words like
+// "research" ("continuous research into workplace behaviour") which must not
+// flip the request to research/explanation, and "carousel" must not flip it
+// to website/app creation. Only an explicit UI request ("carousel component",
+// "carousel UI", "carousel code/slider/website") is a build.
+function isSocialCarouselCopyInstruction(instructionLower) {
+  if (!instructionLower) return false;
+  const hasSocialInstruction =
+    /\b(create|write|draft|compose|make|generate|need|want)\b.{0,60}\b(post|caption|carousel post|linkedin post|instagram post|social post)\b/i.test(
+      instructionLower,
+    ) ||
+    /\bpost\s+for\s+(this|that|my|our|a|the)\s+carousel\b/i.test(
+      instructionLower,
+    ) ||
+    /\bcarousel\s+(post|caption|copy|slides?\b.*caption|caption\b.*slides?)\b/i.test(
+      instructionLower,
+    ) ||
+    (/\bcarousel\b/i.test(instructionLower) &&
+      /\b(post|caption|hashtags?|slide\s+\d|slide\s+breakdown)\b/i.test(
+        instructionLower,
+      ));
+  if (!hasSocialInstruction) return false;
+  // Explicit UI/code build overrides social-copy: user really wants a component.
+  const hasExplicitUICarousel =
+    /\bcarousel\b.{0,30}\b(component|widget|\bui\b|ux|slider|code|react|jsx|html|website|web\s?app|landing\s?page)\b/i.test(
+      instructionLower,
+    ) ||
+    /\b(build|code|develop|program)\b.{0,30}\b(carousel|slider)\b.{0,30}\b(component|widget|\bui\b|code|website|app)\b/i.test(
+      instructionLower,
+    );
+  return !hasExplicitUICarousel;
+}
+
 /**
  * @param {string} prompt — raw user prompt
  * @returns {object} structured intent result
@@ -550,6 +588,30 @@ export function classifyIntent(prompt) {
   }
 
   const lower = prompt.toLowerCase().trim();
+
+  // Early disambiguation: social-media carousel copy ("create a post for this
+  // carousel", "carousel post + caption") must stay content_creation even when
+  // the pasted body contains hijack words like "research" or "design".
+  // Instruction prefix only — the body copy is evidence, not intent.
+  const socialInstructionLower = getInstructionPart(prompt);
+  if (isSocialCarouselCopyInstruction(socialInstructionLower)) {
+    const handler = INTENT_HANDLERS.find(
+      (h) => h.type === INTENT_TYPES.CONTENT_CREATION,
+    );
+    const confidence = Math.max(0.9, computeConfidence(handler, lower));
+    const extracted = handler.extract(prompt, lower);
+    return createIntentResult({
+      type: INTENT_TYPES.CONTENT_CREATION,
+      primaryIntent: INTENT_TYPES.CONTENT_CREATION,
+      secondaryIntent: null,
+      confidence,
+      goal: extracted.goal || "create social carousel post copy",
+      domain: "social / marketing",
+      deliverable: "content",
+      isExistingProject: false,
+      outputFormat: "markdown",
+    });
+  }
 
   // Early disambiguation: CV rewrite / "less description" must NOT become website_creation
   // Pasted work history like "Developed websites using WordPress..." contains "website" + "develop"

@@ -84,8 +84,48 @@ const INTENT_PATTERNS = {
     /\b(explain|what is|what are|what's|whats|how does|why does|why is|why are|why do|teach me|break down|understand|compare|difference between|tell me about)\b/i,
 };
 
+// Social-media carousel copy ("create a post for this carousel",
+// "LinkedIn/Instagram carousel post + caption") is WRITING, not a UI build.
+// Instruction prefix only (first ~300 chars) so pasted body copy containing
+// "research"/"design" cannot hijack intent. Explicit UI terms
+// ("carousel component/UI/code/website") opt back into a build.
+export function isSocialCarouselCopyRequest(prompt) {
+  if (!prompt || typeof prompt !== "string") return false;
+  const instruction = String(prompt).slice(0, 400).toLowerCase();
+  const hasSocial =
+    /\b(create|write|draft|compose|make|generate|need|want)\b.{0,60}\b(post|caption|carousel post|linkedin post|instagram post|social post)\b/i.test(
+      instruction,
+    ) ||
+    /\bpost\s+for\s+(this|that|my|our|a|the)\s+carousel\b/i.test(instruction) ||
+    (/\bcarousel\b/i.test(instruction) &&
+      /\b(post|caption|hashtags?|slide\s+\d|slide\s+breakdown)\b/i.test(
+        instruction,
+      ));
+  if (!hasSocial) return false;
+  const hasExplicitUI =
+    /\bcarousel\b.{0,30}\b(component|widget|\bui\b|ux|slider|code|react|jsx|html|website|web\s?app|landing\s?page)\b/i.test(
+      instruction,
+    ) ||
+    /\b(build|code|develop|program)\b.{0,30}\b(carousel|slider)\b.{0,30}\b(component|widget|\bui\b|code|website|app)\b/i.test(
+      instruction,
+    );
+  return !hasExplicitUI;
+}
+
 function analyzeIntentWithRules(cleanPrompt) {
   const lower = cleanPrompt.toLowerCase();
+
+  // Social-carousel copy guard: "create a post for this carousel" is WRITING
+  // (slide copy + caption), never an app/component build. Must run BEFORE the
+  // app pattern so a future app regex containing "carousel" cannot hijack it.
+  if (isSocialCarouselCopyRequest(cleanPrompt)) {
+    return {
+      type: "writing",
+      summary: "Help the user shape public-facing words or content.",
+      responseStrategy:
+        "Offer slide-by-slide carousel copy plus caption and hashtags in plain markdown. Do NOT generate code or previews.",
+    };
+  }
 
   if (INTENT_PATTERNS.app.test(cleanPrompt)) {
     return {
@@ -213,6 +253,21 @@ export function analyzePublicUserIntent(prompt) {
         "Offer a concise draft or rewrite with a clear tone. Do NOT generate HTML code, previews, or website scaffolding unless the user explicitly asks for a website, landing page, or code.",
       confidence: 0.94,
       source: "business-copy-guard",
+    };
+  }
+
+  // Social-carousel copy guard: "i need to create a post for this carousel ..."
+  // is slide copy + caption + hashtags in plain markdown — never a UI component,
+  // React preview, or website build. Pasted body copy containing "research"
+  // must not flip it to explanation/research.
+  if (isSocialCarouselCopyRequest(cleanPrompt)) {
+    return {
+      type: "writing",
+      summary: "Help the user shape public-facing words or content.",
+      responseStrategy:
+        "Offer slide-by-slide carousel copy plus caption and hashtags in plain markdown. Do NOT generate code, HTML, React, or previews unless the user explicitly asks for a carousel component, UI, or website.",
+      confidence: 0.94,
+      source: "social-carousel-guard",
     };
   }
 
@@ -740,6 +795,12 @@ export async function generateWorkersAIImage(
 export async function improveCodingPrompt(prompt, intent = null) {
   const cleanPrompt = typeof prompt === "string" ? prompt.trim() : "";
   if (!cleanPrompt) return cleanPrompt;
+
+  // Social-carousel copy must never receive a coding spec (React/HTML) even if
+  // an upstream classifier mislabels it as an app build.
+  if (isSocialCarouselCopyRequest(cleanPrompt)) {
+    return cleanPrompt;
+  }
 
   const currentIntent = intent || analyzePublicUserIntent(cleanPrompt);
   const intentType = currentIntent?.type || "general";

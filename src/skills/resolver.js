@@ -63,7 +63,7 @@ const SPECIALIST_TRIGGER_PATTERNS = [
   {
     id: "marketing-copywriting",
     pattern:
-      /\b(marketing|ad copy|advertisement|advertising campaign|campaign|tagline|slogan|landing page copy|seo|blog post|social media|newsletter|email campaign|content plan|content calendar|brand voice|brand identity|brand strategy|brand guidelines|rebrand)\b/i,
+      /\b(marketing|ad copy|advertisement|advertising campaign|campaign|tagline|slogan|landing page copy|seo|blog post|social media|social post|linkedin post|instagram post|carousel post|carousel copy|carousel caption|caption|hashtags|newsletter|email campaign|content plan|content calendar|brand voice|brand identity|brand strategy|brand guidelines|rebrand)\b|post.{0,25}carousel|carousel.{0,25}(post|caption|copy|slides?)\b/i,
   },
   {
     id: "translation-localization",
@@ -156,6 +156,24 @@ function matchSpecialistSkills(cleanPrompt) {
   for (const { id, pattern } of SPECIALIST_TRIGGER_PATTERNS) {
     if (pattern.test(cleanPrompt)) {
       matches.push(id);
+    }
+  }
+  // Social-carousel copy ("post for this carousel", "carousel post + caption")
+  // is marketing copy, not a pitch deck: drop presentation-design unless the
+  // user explicitly asked for deck artifacts (pitch deck, powerpoint, keynote,
+  // speaker notes, slide deck).
+  const isSocialCarousel =
+    /\b(post\s+for\s+(this|that|my|our|a|the)\s+carousel|carousel\s+(post|copy|caption)|linkedin post|instagram post|social post)\b/i.test(
+      cleanPrompt,
+    ) && !/\b(carousel\s+(component|widget|\bui\b|code|website))\b/i.test(cleanPrompt);
+  if (isSocialCarousel && matches.includes("presentation-design")) {
+    const hasDeckTerms =
+      /\b(pitch deck|powerpoint|google slides|keynote|speaker notes|slide deck|slideshow|\d+-slide)\b/i.test(
+        cleanPrompt,
+      );
+    if (!hasDeckTerms) {
+      const idx = matches.indexOf("presentation-design");
+      matches.splice(idx, 1);
     }
   }
   return matches.length > 0 ? matches : null;
