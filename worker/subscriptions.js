@@ -1,5 +1,5 @@
 import { jsonResponse, readBoundedJson, safeErrorDetail } from "./utils.js";
-import { ZIINA_PLANS } from "./ziina.js";
+import { ZIINA_PLANS, ZIINA_PLANS_YEARLY } from "./ziina.js";
 
 const ZIINA_BASE = "https://api-v2.ziina.com/api";
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -365,7 +365,7 @@ export async function activateSubscription(
 // never silently discarded. Everything else is dropped so a stale pending
 // can never overwrite the user's real current plan later.
 export async function reconcilePendingSubscriptions(env, userId) {
-  let pendingRows = [];
+  let pendingRows;
   try {
     const rows = await env.DB.prepare(
       "SELECT id, plan, ziina_payment_id FROM subscriptions WHERE user_id=? AND status='pending'",
@@ -996,7 +996,7 @@ export async function handleSubscriptions(request, env) {
       )
         .bind(targetPlan, now, userId)
         .run();
-    } catch (e) {
+    } catch {
       // Fallback if downgrade columns missing — try to set via alter then retry
       try {
         await env.DB.prepare(`ALTER TABLE users ADD COLUMN downgrade_plan TEXT`).run();

@@ -109,6 +109,84 @@ export function hasFiles(dataTransfer) {
   return types.includes("Files") || types.includes("application/x-moz-file");
 }
 
+function mimeToExtension(mime) {
+  const type = String(mime || "").toLowerCase();
+  if (type === "image/png") return "png";
+  if (type === "image/jpeg") return "jpg";
+  if (type === "image/gif") return "gif";
+  if (type === "image/webp") return "webp";
+  if (type === "image/svg+xml") return "svg";
+  if (type === "image/bmp") return "bmp";
+  if (type === "image/avif") return "avif";
+  if (type.startsWith("image/")) return type.slice(6).split(";")[0] || "png";
+  return "";
+}
+
+/**
+ * Extract File objects from a paste ClipboardEvent's clipboardData.
+ *
+ * Handles the three ways browsers expose pasted images:
+ * 1. clipboardData.files (file copied from OS explorer / Finder)
+ * 2. clipboardData.items with kind === "file" (screenshots, Snipping Tool,
+ *    right-click "Copy image" in Chrome/Firefox — these often have an empty
+ *    file name, so a fallback name is generated)
+ *
+ * Returns an empty array when the paste is text-only so the caller can let
+ * the default text-paste behavior proceed.
+ *
+ * @param {DataTransfer | null} clipboardData
+ * @returns {File[]}
+ */
+export function extractFilesFromClipboard(clipboardData) {
+  if (!clipboardData) return [];
+  const out = [];
+  const seen = new Set();
+
+  const pushFile = (file) => {
+    if (!file) return;
+    // Dedupe: files + items can reference the same underlying blob
+    const key = `${file.name}|${file.type}|${file.size}|${file.lastModified}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    let named = file;
+    if (!named.name) {
+      const ext = mimeToExtension(named.type) || "png";
+      try {
+        named = new File([named], `pasted-image-${Date.now()}.${ext}`, {
+          type: named.type || `image/${ext}`,
+          lastModified: Date.now(),
+        });
+      } catch {
+        // File constructor unavailable — keep original; processFiles falls back to media.* names
+      }
+    }
+    out.push(named);
+  };
+
+  try {
+    if (clipboardData.files && clipboardData.files.length > 0) {
+      Array.from(clipboardData.files).forEach(pushFile);
+    }
+  } catch {
+    // ignore — fall through to items
+  }
+
+  try {
+    const items = clipboardData.items ? Array.from(clipboardData.items) : [];
+    for (const item of items) {
+      if (!item) continue;
+      if (item.kind === "file") {
+        const file = typeof item.getAsFile === "function" ? item.getAsFile() : null;
+        pushFile(file);
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  return out;
+}
+
 /**
  * Process a collection of files into attachment entries with unique IDs,
  * reading thumbnails/media data and text contents asynchronously.

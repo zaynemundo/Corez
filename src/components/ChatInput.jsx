@@ -14,6 +14,7 @@ import {
   processFiles,
   formatBytes,
   hasFiles,
+  extractFilesFromClipboard,
   MAX_IMAGE_THUMB_BYTES,
 } from "../utils/fileAttachmentUtils";
 
@@ -193,6 +194,33 @@ export default function ChatInput({
       if (refToUse.current) {
         refToUse.current.focus();
       }
+    }
+  };
+
+  const handleInputPaste = (e) => {
+    let clipboardData;
+    try {
+      clipboardData = e.clipboardData || e.nativeEvent?.clipboardData || null;
+    } catch {
+      clipboardData = null;
+    }
+    if (!clipboardData) return;
+    let pastedFiles;
+    try {
+      pastedFiles = extractFilesFromClipboard(clipboardData);
+    } catch {
+      return;
+    }
+    if (pastedFiles.length === 0) return;
+    // Files present (e.g. screenshot, copied image): attach them instead of
+    // inserting binary/text into the textarea. Text-only pastes fall through
+    // to the default behavior.
+    e.preventDefault();
+    e.stopPropagation();
+    processFiles(pastedFiles, setAttachments);
+    if (onAddFiles) onAddFiles(pastedFiles);
+    if (refToUse.current) {
+      refToUse.current.focus();
     }
   };
 
@@ -397,6 +425,7 @@ export default function ChatInput({
             setShowSuggestions(true);
           }}
           onKeyDown={handleKeyDown}
+          onPaste={handleInputPaste}
           placeholder={isStreaming ? "Corez is generating..." : "Ask Corez..."}
           aria-label={isStreaming ? "Corez is generating" : "Message Corez"}
           rows={1}

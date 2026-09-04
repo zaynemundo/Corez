@@ -22,6 +22,7 @@ import {
   formatBytes,
   processFiles,
   hasFiles,
+  extractFilesFromClipboard,
 } from "./utils/fileAttachmentUtils";
 import {
   generateAIResponse,
@@ -415,11 +416,32 @@ function MainApp({ theme, setTheme }) {
     window.addEventListener("dragleave", handleWindowDragLeave);
     window.addEventListener("dragover", handleWindowDragOver);
     window.addEventListener("drop", handleWindowDrop);
+    // Global paste fallback: attach clipboard images pasted anywhere, including
+    // as a safety net if the chat input's own onPaste did not handle the event
+    // (already-handled pastes are skipped via defaultPrevented, and the input
+    // handler's stopPropagation normally prevents double-processing).
+    const handleWindowPaste = (e) => {
+      if (e.defaultPrevented) return;
+      let pastedFiles;
+      try {
+        pastedFiles = extractFilesFromClipboard(e.clipboardData);
+      } catch {
+        return;
+      }
+      if (pastedFiles.length === 0) return;
+      e.preventDefault();
+      processFiles(pastedFiles, setAttachments);
+      if (chatInputRef.current) {
+        chatInputRef.current.focus();
+      }
+    };
+    window.addEventListener("paste", handleWindowPaste);
     return () => {
       window.removeEventListener("dragenter", handleWindowDragEnter);
       window.removeEventListener("dragleave", handleWindowDragLeave);
       window.removeEventListener("dragover", handleWindowDragOver);
       window.removeEventListener("drop", handleWindowDrop);
+      window.removeEventListener("paste", handleWindowPaste);
     };
   }, []);
 

@@ -2,8 +2,6 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   ResourceLockManager,
   TaskDependencyGraph,
-  SharedProjectState,
-  AGENT_LIFECYCLE_STATES
 } from '../src/services/gamePipeline/swarm/taskGraph.js';
 import { AdaptiveConcurrencyQueue } from '../src/services/gamePipeline/swarm/adaptiveQueue.js';
 import {

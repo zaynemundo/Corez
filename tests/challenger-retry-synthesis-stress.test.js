@@ -3,23 +3,16 @@ import {
   AgentSwarmOrchestrator,
   topologicalOrder,
   mergeOutputsInDagOrder,
-  OPENROUTER_SWARM_ROUTING
 } from '../src/services/gamePipeline/swarm/agentSwarmOrchestrator.js';
 import {
   TaskDependencyGraph,
-  AGENT_LIFECYCLE_STATES
 } from '../src/services/gamePipeline/swarm/taskGraph.js';
 import {
   HierarchicalSynthesis,
   chunkByTokens,
-  DEFAULT_CHUNK_MAX_TOKENS
 } from '../packages/agent-core/swarm/hierarchicalSynthesis.js';
 import { MemoryTaskStore } from '../packages/agent-core/persistence/TaskStore.js';
-import {
-  GenericSwarmOrchestrator,
-  SWARM_ROLES,
-  SWARM_MODE
-} from '../packages/agent-core/swarm/index.js';
+import '../packages/agent-core/swarm/index.js';
 
 describe('Challenger 2: Verifier-Driven Retry Loops & Self-Correction Diagnostics', () => {
   it('1.1: Self-correction retry loop injects verifier evidence and recovers on subsequent attempt', async () => {
@@ -43,7 +36,7 @@ describe('Challenger 2: Verifier-Driven Retry Loops & Self-Correction Diagnostic
       return 'OK';
     };
 
-    const verifier = vi.fn(async ({ task, output }) => {
+    const verifier = vi.fn(async ({ output }) => {
       const text = typeof output === 'object' ? output?.output : output;
       if (typeof text === 'string' && text.includes('wrongCanvas')) {
         return { ok: false, evidence: 'Canvas element must have id="gameCanvas" and script initialized' };
