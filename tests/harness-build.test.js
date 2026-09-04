@@ -212,6 +212,10 @@ describe('runCreationHarness', () => {
       const messages = JSON.stringify(body.input || body.messages || []);
       if (messages.includes('Produce a concise build specification')) return jsonCompletion('A game with a score, three levels, and an enemy.');
       if (messages.includes('Analyze the build specification below') || messages.includes('Produce a concise visual direction brief')) return jsonCompletion('Brief');
+      // Swarm pre-pass game briefs (prompt mentions "shooter", so the swarm
+      // resolves game-designer + level-designer specialists alongside
+      // architect/art-director). They contribute short design input, not builds.
+      if (messages.includes('Produce a concise game-design brief') || messages.includes('Produce a concise level-design brief')) return jsonCompletion('Brief');
       if (messages.includes('final reviewer of a finished artifact')) return jsonCompletion('APPROVED');
       if (messages.includes('did not pass functional verification')) {
         repairCalls += 1;

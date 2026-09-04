@@ -30,9 +30,12 @@ canvas.addEventListener('mousemove', function(){});
 requestAnimationFrame(gameLoop);
 </script></body></html>`;
 
-// Structurally broken for ANY intent: an unclosed <script> block trips the
-// truncation guard even without game-specific (canvas/loop/input) checks.
-const BROKEN_ARTIFACT = '<html><body><script>const x = 1;</body></html>';
+// Structurally broken for ANY intent: a bare fragment with no <html> document
+// trips the incomplete-html guard. It is deliberately NOT an html-looking
+// document so the deterministic truncation auto-close in repairMalformedHtml
+// (which only touches html-looking output) leaves it byte-identical —
+// verification must still see it broken and trigger a real repair round.
+const BROKEN_ARTIFACT = '<div><p>nothing here</p></div>';
 
 function jsonCompletion(content) {
   return Response.json({ choices: [{ message: { content } }] }, { status: 200 });

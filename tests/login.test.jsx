@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import Login from '../src/pages/Login.jsx';
 import { AuthProvider } from '../src/context/AuthContext.jsx';
 
@@ -9,13 +10,19 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('Login / Signup Component', () => {
-  it('renders login tab by default with email and password fields', () => {
-    render(
+function renderLogin() {
+  return render(
+    <MemoryRouter>
       <AuthProvider>
         <Login />
       </AuthProvider>
-    );
+    </MemoryRouter>
+  );
+}
+
+describe('Login / Signup Component', () => {
+  it('renders login tab by default with email and password fields', () => {
+    renderLogin();
 
     expect(screen.getByText('COREZ')).toBeTruthy();
     expect(screen.getByText('Sign in to your account')).toBeTruthy();
@@ -26,26 +33,19 @@ describe('Login / Signup Component', () => {
   });
 
   it('switches to signup tab when Sign Up tab is clicked', () => {
-    render(
-      <AuthProvider>
-        <Login />
-      </AuthProvider>
-    );
+    renderLogin();
 
     const signupTab = screen.getByRole('tab', { name: /^Sign Up$/i });
     fireEvent.click(signupTab);
 
     expect(screen.getByText('Create your account')).toBeTruthy();
-    expect(screen.getByText('Invite Code')).toBeTruthy();
+    expect(screen.getByPlaceholderText('you@corez.pro')).toBeTruthy();
+    expect(screen.getByPlaceholderText('••••••••')).toBeTruthy();
     expect(screen.getByRole('button', { name: /^Create Account$/i })).toBeTruthy();
   });
 
   it('toggles password visibility when eye icon is clicked', () => {
-    render(
-      <AuthProvider>
-        <Login />
-      </AuthProvider>
-    );
+    renderLogin();
 
     const passwordInput = screen.getByPlaceholderText('••••••••');
     expect(passwordInput.getAttribute('type')).toBe('password');
@@ -70,11 +70,7 @@ describe('Login / Signup Component', () => {
       return new Response(null, { status: 404 });
     });
 
-    render(
-      <AuthProvider>
-        <Login />
-      </AuthProvider>
-    );
+    renderLogin();
 
     fireEvent.change(screen.getByPlaceholderText('you@corez.pro'), { target: { value: 'alice@corez.pro' } });
     fireEvent.change(screen.getByPlaceholderText('••••••••'), { target: { value: 'WrongPassword123' } });

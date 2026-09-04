@@ -130,7 +130,7 @@ describe('/api/image/cf (Workers AI FLUX.2 klein-4b)', () => {
     const response = await post(swarmWorker, { prompt: 'a castle' }, bucketEnv);
     expect(response.status).toBe(200);
     const data = await response.json();
-    expect(data.image).toMatch(/^\/api\/assets\/image_cf_.+\.png$/);
+    expect(data.image).toMatch(/^(https:\/\/corez\.pro)?\/api\/assets\/image_cf_.+\.png$/);
     expect(store.size).toBe(1);
   });
 
