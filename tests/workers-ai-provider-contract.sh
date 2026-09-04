@@ -29,21 +29,21 @@ check_absent() {
   fi
 }
 
-check 'Worker routes text through OpenCode Go with the Muse Spark 1.2 build' 'muse-spark-1[.]2' "$providerChain"
+check 'Worker routes text through OpenCode Go with the Muse Spark 1.3 build' 'muse-spark-1[.]3' "$providerChain"
 check_absent 'Worker never hardcodes OpenRouter-prefixed model ids' 'xiaomi/mimo-v2[.]5' "$worker"
 check_absent 'Worker imposes no AI generation timeouts' 'AbortSignal[.]timeout' "$worker"
 check_absent 'Worker imposes no AI output token caps' 'max_tokens' "$worker"
 check 'Worker reports provider failure details' 'recordFailure' "$providerChain"
 check_absent 'Text generation does not use Workers AI GLM models' '@cf/zai-org/glm' "$worker"
-check 'Worker sends a system message' "role: 'system'" "$worker"
-check 'Worker sends a user message' "role: 'user'" "$worker"
+check 'Worker sends a system message' "role: [\"']system[\"']" "$worker"
+check 'Worker sends a user message' "role: [\"']user[\"']" "$worker"
 check 'Worker routes image generation through OpenRouter' 'openrouter[.]ai' "$providerChain"
 check 'Worker image path accepts OPENROUTER_API_KEY' 'OPENROUTER_API_KEY' "$worker"
 check_absent 'Chat no longer routes to DeepSeek API' 'api[.]deepseek[.]com' "$providerChain"
 check_absent 'Chat chain no longer accepts DEEPSEEK_API_KEY' 'DEEPSEEK_API_KEY' "$providerChain"
 check 'Worker uses the OpenCode Go endpoint' 'opencode[.]ai' "$providerChain"
 check 'Worker keeps OpenCode Go as the preferred provider' 'OPENCODE_GO_API_KEY' "$providerChain"
-check 'Worker recognises canonical code-help intent' "'code-help'" "$worker"
+check 'Worker recognises canonical code-help intent' "[\"']code-help[\"']" "$worker"
 check 'Public AI entrypoint routes /api/ai POST requests through the inline Worker' 'baseWorker[.]fetch\(baseRequest, env, ctx\)' "$entry"
 check_absent 'Public AI entrypoint no longer invokes retired swarm execution' 'runSwarm|executeSwarm|handleSwarm' "$entry"
 check_absent 'Worker no longer branches on retired swarm intent' "intentType === 'swarm'" "$worker"
@@ -54,14 +54,14 @@ check_absent 'Worker does not use the paid-only GLM-5.2 model' '@cf/zai-org/glm-
 check 'Worker uses the Workers AI rerank model' '@cf/baai/bge-reranker-base' worker/aiModels.js
 check 'Worker uses the Workers AI embedding model' '@cf/baai/bge-m3' worker/aiModels.js
 check 'Worker invokes the Workers AI binding for ranking models' 'env[.]AI[.]run' worker/aiModels.js
-check 'Worker routes /api/rerank' "pathname === '/api/rerank'" "$worker"
-check 'Worker routes /api/embed' "pathname === '/api/embed'" "$worker"
+check 'Worker routes /api/rerank' "pathname === [\"']/api/rerank[\"']" "$worker"
+check 'Worker routes /api/embed' "pathname === [\"']/api/embed[\"']" "$worker"
 check 'Search prefers the free Workers AI rerank first' 'rerankWithWorkersAI' worker/search.js
 check 'Search falls back to Workers AI embeddings' 'rankWithEmbeddingsWorkersAI' worker/search.js
 check 'Workers AI ranking can be disabled' 'WORKERS_AI_RERANK_DISABLED' worker/search.js
 check 'frontend calls the public AI route' "fetch\(AI_PROXY_ENDPOINT" "$service"
 check 'frontend configures the public AI route' "AI_PROXY_ENDPOINT = isPublicHost" "$service"
-check 'frontend keeps the same-origin /api/ai fallback' "'/api/ai'" "$service"
+check 'frontend keeps the same-origin /api/ai fallback' "[\"']/api/ai[\"']" "$service"
 check 'frontend has a direct Worker fallback for zone WAF challenges' 'chat[.]zayne-mayo[.]workers[.]dev/api/ai' "$service"
 check 'frontend retains local fallback' 'generateLocalAIResponse' "$service"
 check_absent 'frontend has no model override storage' 'corez_openrouter_model|VITE_OPENROUTER_MODEL' "$service"

@@ -196,15 +196,15 @@ async function run() {
     // New API contract: the worker returns provider + diagnostics alongside
     // content/model so clients can report truncation, repairs and latency.
     assert.equal(successBody.content, 'Worker response');
-    assert.equal(successBody.model, 'opencode:muse-spark-1.2-contributor');
+    assert.equal(successBody.model, 'opencode:muse-spark-1.3-contributor');
     assert.equal(successBody.provider, 'opencode-go');
     assert.equal(successBody.diagnostics.truncationDetected, false);
     assert.equal(successBody.diagnostics.repaired, false);
     assert.equal(typeof successBody.diagnostics.ttftMs, 'number');
-    assert.equal(invocation.payload.model, 'muse-spark-1.2-contributor');
+    assert.equal(invocation.payload.model, 'muse-spark-1.3-contributor');
     assert.ok(Array.isArray(invocation.payload.input || invocation.payload.messages));
     assert.ok(['model', 'messages', 'input', 'reasoning', 'temperature'].includes(Object.keys(invocation.payload)[0]) || Object.keys(invocation.payload).includes('model'));
-    // Payload must contain model + input/messages and may include reasoning/temperature for Muse Spark 1.2
+    // Payload must contain model + input/messages and may include reasoning/temperature for Muse Spark 1.3
     assert.ok(Object.keys(invocation.payload).includes('model'));
     assert.ok(Object.keys(invocation.payload).includes('input') || Object.keys(invocation.payload).includes('messages'));
     assert.equal(invocation.payload.max_tokens, undefined);
@@ -238,7 +238,7 @@ async function run() {
     );
     assert.equal(generalResponse.status, 200);
     // No output-token caps anywhere: every request is uncapped so reasoning
-    // models can think as long as they need. Reasoning/temperature may be present for Muse Spark 1.2.
+    // models can think as long as they need. Reasoning/temperature may be present for Muse Spark 1.3.
     assert.ok(Object.keys(generalPayload).includes('model'));
     assert.ok(Object.keys(generalPayload).includes('input') || Object.keys(generalPayload).includes('messages'));
     assert.equal(generalPayload.max_tokens, undefined);
@@ -272,7 +272,7 @@ async function run() {
       assert.equal(deepseekData.error, 'Unable to generate AI response.');
 
       // With OPENCODE_GO_API_KEY configured, the request succeeds and the
-      // payload carries reasoning for Muse Spark 1.2 but no provider-specific fields.
+      // payload carries reasoning for Muse Spark 1.3 but no provider-specific fields.
       globalThis.fetch = async (url, init) => {
         assert.equal(url, OPENCODE_URL);
         opencodePayload = JSON.parse(init.body);
@@ -291,8 +291,8 @@ async function run() {
       assert.equal(opencodeKeyResp.status, 200);
       const opencodeKeyData = await opencodeKeyResp.json();
       assert.equal(opencodeKeyData.content, 'OpenCode Go response');
-      assert.equal(opencodeKeyData.model, 'opencode:muse-spark-1.2-contributor');
-      assert.equal(opencodePayload.model, 'muse-spark-1.2-contributor');
+      assert.equal(opencodeKeyData.model, 'opencode:muse-spark-1.3-contributor');
+      assert.equal(opencodePayload.model, 'muse-spark-1.3-contributor');
       // No output-token caps anywhere: general requests are uncapped too.
       assert.equal(opencodePayload.max_tokens, undefined);
       assert.ok(Array.isArray(opencodePayload.input || opencodePayload.messages));
@@ -380,7 +380,7 @@ async function run() {
         assert.equal(url, 'https://opencode.ai/zen/go/v1/responses');
         const payload = JSON.parse(init.body);
         capturedPayloads.push(payload);
-        assert.equal(payload.model, 'muse-spark-1.2-contributor');
+        assert.equal(payload.model, 'muse-spark-1.3-contributor');
         assert.ok(payload.reasoning && typeof payload.reasoning === 'object');
         assert.ok(['low', 'medium', 'high', 'xhigh'].includes(payload.reasoning.effort));
         return new Response(JSON.stringify({
@@ -401,14 +401,14 @@ async function run() {
       assert.equal(opencodePreferredResp.status, 200);
       const opencodePreferredData = await opencodePreferredResp.json();
       assert.equal(opencodePreferredData.content, 'OpenCode Go preferred response');
-      assert.equal(opencodePreferredData.model, 'opencode:muse-spark-1.2-contributor');
+      assert.equal(opencodePreferredData.model, 'opencode:muse-spark-1.3-contributor');
 
       // Client-supplied body.model is never trusted: the server-controlled
       // model list always wins.
       globalThis.fetch = async (_url, init) => {
         const payload = JSON.parse(init.body);
         capturedPayloads.push(payload);
-        assert.equal(payload.model, 'muse-spark-1.2-contributor');
+        assert.equal(payload.model, 'muse-spark-1.3-contributor');
         return new Response(JSON.stringify({
           choices: [{ message: { content: 'Server model used' } }]
         }), {
@@ -458,7 +458,7 @@ async function run() {
       assert.equal(opencodeRetryResp.status, 200);
       const opencodeRetryData = await json(opencodeRetryResp);
       assert.equal(opencodeRetryData.content, 'Recovered on the OpenCode Go retry');
-      assert.equal(opencodeRetryData.model, 'opencode:muse-spark-1.2-contributor');
+      assert.equal(opencodeRetryData.model, 'opencode:muse-spark-1.3-contributor');
       assert.equal(opencodeRetryCalls, 2);
 
       // Transient-only OpenCode failure with no further provider: the retry
@@ -571,8 +571,8 @@ async function run() {
         // The harness always streams FROM the provider; only the
         // client-facing delivery is non-streaming.
         assert.equal(body.stream, true);
-        // The build phase runs on muse-spark-1.2-contributor (the designated build executor).
-        assert.equal(body.model, 'muse-spark-1.2-contributor');
+        // The build phase runs on muse-spark-1.3-contributor (the designated build executor).
+        assert.equal(body.model, 'muse-spark-1.3-contributor');
         const sse = (event) => `data: ${JSON.stringify(event)}\n\n`;
         return new Response(
           sse({ choices: [{ delta: { content: harnessArtifact }, finish_reason: null }] })
