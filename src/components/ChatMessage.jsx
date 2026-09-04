@@ -1105,8 +1105,9 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
         }
       }
 
+      // Blank lines render nothing: paragraph blocks carry their own
+      // spacing, so no spacer element is emitted.
       if (!trimmed) {
-        elements.push(<div key={`blank-${i}`} style={{ height: "0.35rem" }} />);
         i++;
         continue;
       }
