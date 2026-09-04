@@ -48,6 +48,10 @@ const BACKOFF_BASE_MS = 750;
 const BACKOFF_JITTER_MS = 500;
 const MAX_SINGLE_SLEEP_MS = 30_000;
 const DEFAULT_REQUEST_RETRY_MS = 30_000;
+// Streaming retries: a 429/5xx that clears within seconds must ride through
+// inside the open stream instead of failing the chat instantly. Attempts are
+// bounded so a hard outage still fails honestly.
+const MAX_STREAM_TRANSIENT_ATTEMPTS = 8;
 const SLEEP_CHUNK_MS = 250;
 
 // Timeout guards for upstream provider calls. A provider that hangs before
@@ -979,13 +983,20 @@ export async function runProviderChain(messages, options = {}) {
  * provider actually attempted. TTFT is measured per provider from request
  * start to its first delta. Empty or reasoning-only streams are failures of
  * that provider: there is no built-in recovery, the next provider is tried
- * and the request fails honestly if none produces content.
+ * and the request fails honestly if none produces content. Transient transport
+ * failures (429 rate limits, 5xx, network blips) are retried on the SAME
+ * provider with backoff (honouring Retry-After) inside the open stream, within
+ * maxRequestRetryMs, before falling through — a rate-limit blip that clears in
+ * seconds never surfaces to the user. A rate limit that outlasts the budget
+ * fails as retryable 429 with a short message (never a raw provider dump) so
+ * the client can back off and re-issue.
  */
 export function runStreamingChain(messages, options = {}) {
   const env = options.env || {};
   const signal = options.signal || null;
   const clock = options.clock || defaultClock;
   const sleep = options.sleep || defaultSleep;
+  const jitter = options.jitter || Math.random;
   // Optional per-call model override (e.g. the harness build phase pins its
   // own model): applied to whichever provider serves the request, and
   // reported in meta/done events instead of the provider's default model.
@@ -1000,6 +1011,14 @@ export function runStreamingChain(messages, options = {}) {
   const providers = buildProviderChain(env);
   const failureMessages = [];
   let onlyEmptyFailures = true;
+  // Last transient (retryable-class) failure seen, for the rate-limit branch
+  // of the terminal error below.
+  let lastTransient = null;
+  const maxRequestRetryMs =
+    Number.isFinite(options.maxRequestRetryMs) &&
+    options.maxRequestRetryMs >= 0
+      ? options.maxRequestRetryMs
+      : DEFAULT_REQUEST_RETRY_MS;
 
   async function* events() {
     if (providers.length === 0) {
@@ -1020,6 +1039,10 @@ export function runStreamingChain(messages, options = {}) {
       const ttftHolder = { ms: 0 };
       let emptyAttempts = 0;
       const MAX_EMPTY_ATTEMPTS = 3;
+      // Chars already streamed to the client for this provider: a failure
+      // after partial content cannot resume without duplicating it.
+      let streamedChars = 0;
+      let transientAttempts = 0;
       while (true) {
         try {
           // Streams a candidate message set, yielding deltas and returning the
@@ -1041,6 +1064,7 @@ export function runStreamingChain(messages, options = {}) {
             let finishReason = null;
             for await (const chunk of iter) {
               if (chunk.text) {
+                streamedChars += chunk.text.length;
                 text += chunk.text;
                 yield { type: "delta", text: chunk.text };
               }
@@ -1091,6 +1115,7 @@ export function runStreamingChain(messages, options = {}) {
           onlyEmptyFailures = false;
           const failure =
             err instanceof Error ? err : new Error(safeErrorDetail(err));
+          const cls = classifyProviderFailure(failure);
           failureMessages.push(
             `${provider.label}: ${safeErrorDetail(failure)}`,
           );
@@ -1102,9 +1127,69 @@ export function runStreamingChain(messages, options = {}) {
             };
             return;
           }
-          break;
+          // Permanent failures (auth, validation, bad model) are never
+          // retried; partial streams cannot resume without duplicating
+          // content already sent to the client.
+          if (cls.kind !== "transient" || streamedChars > 0) {
+            break;
+          }
+          // Transient blip (429 rate limit, 5xx, network): back off on the
+          // SAME provider inside the open stream, honouring Retry-After.
+          transientAttempts += 1;
+          lastTransient = {
+            status: Number(failure?.status) || 0,
+            retryAfter: Number(failure?.retryAfter) || 0,
+            message: String(failure?.message || ""),
+          };
+          const backoffMs =
+            cls.retryAfterMs > 0
+              ? Math.min(cls.retryAfterMs, MAX_SINGLE_SLEEP_MS)
+              : Math.min(
+                  BACKOFF_BASE_MS * 2 ** (transientAttempts - 1) +
+                    jitter() * BACKOFF_JITTER_MS,
+                  MAX_SINGLE_SLEEP_MS,
+                );
+          if (
+            transientAttempts >= MAX_STREAM_TRANSIENT_ATTEMPTS ||
+            clock() - startedAt + backoffMs > maxRequestRetryMs
+          ) {
+            break;
+          }
+          await sleepInterruptible(backoffMs, signal, sleep);
+          if (signal?.aborted) {
+            yield {
+              type: "error",
+              message: "AI request cancelled.",
+              status: 499,
+            };
+            return;
+          }
+          continue;
         }
       }
+    }
+    const rateLimited =
+      lastTransient &&
+      (lastTransient.status === 429 ||
+        /429|rate.?limit|too many requests/i.test(lastTransient.message));
+    if (rateLimited) {
+      // A rate limit that outlasted the in-stream budget: fail as retryable
+      // 429 with a short message (never a raw provider JSON dump) so the
+      // client backs off and re-issues instead of showing a dead end.
+      const retryAfterSeconds =
+        Number.isFinite(lastTransient.retryAfter) &&
+        lastTransient.retryAfter > 0
+          ? Math.max(1, Math.ceil(lastTransient.retryAfter))
+          : undefined;
+      yield {
+        type: "error",
+        message:
+          "The AI service is rate-limited right now and automatic retries are backing off. Please wait a moment and try again.",
+        status: 429,
+        retryable: true,
+        ...(retryAfterSeconds ? { retryAfterSeconds } : {}),
+      };
+      return;
     }
     // Empty/reasoning-only streams are TRANSIENT by nature (the model just
     // thought without answering): when every provider failed that way, the

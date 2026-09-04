@@ -468,6 +468,67 @@ describe('Hosted AI fallback behavior', () => {
     vi.unstubAllGlobals();
   }, 15000);
 
+  it('retries a retryable rate-limit error on plain chat, then delivers the answer', async () => {
+    // Plain chat (no creation harness) re-issues retryable streams with a
+    // short backoff ladder instead of failing on the first 429.
+    let aiCalls = 0;
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/inspiration') return Response.json({ sites: [] });
+      if (url === '/api/embed') return Response.json({ embeddings: [] });
+      aiCalls += 1;
+      if (aiCalls < 3) {
+        return new Response(
+          'data: {"type":"error","status":429,"retryable":true,"retryAfterSeconds":1,"message":"The AI service is rate-limited right now."}\n\n',
+          { status: 200 }
+        );
+      }
+      return new Response(
+        'data: {"type":"delta","text":"Red is a color."}\n\ndata: {"type":"done","final":true}\n\n',
+        { status: 200 }
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await generateHostedAIResponse('What is red?', undefined, [], null, {
+      stream: true,
+      onDelta: () => {},
+      retryDelaysMs: [0, 0]
+    });
+
+    expect(response).toBe('Red is a color.');
+    expect(aiCalls).toBe(3);
+  });
+
+  it('gives up honestly after bounded chat retries and never leaks the raw 429 JSON', async () => {
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/inspiration') return Response.json({ sites: [] });
+      if (url === '/api/embed') return Response.json({ embeddings: [] });
+      return new Response(
+        'data: {"type":"error","status":429,"retryable":true,"message":"The AI service is rate-limited right now."}\n\n',
+        { status: 200 }
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(generateHostedAIResponse('What is red?', undefined, [], null, {
+      stream: true,
+      onDelta: () => {},
+      retryDelaysMs: [0, 0]
+    })).rejects.toThrow(/rate-limited right now/);
+    // Bounded: initial attempt + 2 retries, then an honest throw.
+    expect(fetchMock.mock.calls.filter(([url]) => url !== '/api/inspiration' && url !== '/api/embed')).toHaveLength(3);
+  });
+
+  it('shortens the fallback reason for rate limits instead of dumping provider JSON', () => {
+    const reason = describeHostedUnavailable(
+      new Error('opencode: HTTP 429: {"model":"muse-spark-1.3-contributor","error":{"code":"rate_limit_exceeded"}}')
+    );
+    expect(reason).toMatch(/rate-limited right now/);
+    expect(reason).not.toContain('rate_limit_exceeded');
+    expect(reason).not.toContain('HTTP 429');
+    expect(reason).not.toContain('muse-spark');
+  });
+
   it('reports an honest busy error when the provider is still recovering after retries', async () => {
     // Every /api/ai call AND every /api/task/<id> status poll reports the
     // same persistent retry-scheduled state; after three bounded wait cycles

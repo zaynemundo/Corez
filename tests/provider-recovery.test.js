@@ -495,11 +495,44 @@ describe('runStreamingChain empty-stream behavior', () => {
     expect(calls).toBe(3);
   });
 
-  it('stays non-retryable 502 when a hard provider failure is mixed in', async () => {
+  it('retries transient 500s in-stream, then fails honest non-retryable 502', async () => {
+    // Transient provider errors ride through inside the open stream: an
+    // upstream blip is retried with backoff (bounded by attempts), and only
+    // a persistent outage surfaces — still as non-retryable 502.
+    // Frozen clock so the attempts cap (not the time budget) binds: exactly
+    // 1 initial attempt + 7 retries.
     let calls = 0;
     vi.stubGlobal('fetch', vi.fn(async () => {
       calls += 1;
       return errorResponse(500, 'upstream exploded');
+    }));
+
+    const events = [];
+    for await (const event of runStreamingChain([{ role: 'user', content: 'build a game' }], {
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode' },
+      signal: null,
+      sleep: async () => {},
+      clock: () => 0,
+      jitter: () => 0,
+    })) {
+      events.push(event);
+    }
+
+    const errors = events.filter((e) => e.type === 'error');
+    expect(errors).toHaveLength(1);
+    expect(errors[0].status).toBe(502);
+    expect(errors[0].retryable).toBeUndefined();
+    expect(errors[0].message).toMatch(/upstream exploded/);
+    expect(events.some((e) => e.type === 'done')).toBe(false);
+    // Bounded: initial attempt + retries up to the transient-attempts cap.
+    expect(calls).toBe(8);
+  });
+
+  it('never retries permanent 401 failures in-stream', async () => {
+    let calls = 0;
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      calls += 1;
+      return errorResponse(401, 'unauthorized');
     }));
 
     const events = [];
@@ -515,8 +548,129 @@ describe('runStreamingChain empty-stream behavior', () => {
     expect(errors).toHaveLength(1);
     expect(errors[0].status).toBe(502);
     expect(errors[0].retryable).toBeUndefined();
-    expect(errors[0].message).toMatch(/upstream exploded/);
+    expect(calls).toBe(1);
+  });
+
+  it('recovers in-stream after transient 429 rate limits', async () => {
+    const { clock, sleep } = fakeClock();
+    let calls = 0;
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      calls += 1;
+      return calls <= 2
+        ? errorResponse(429, 'rate limited')
+        : sseChunks(['recovered', 'done']);
+    }));
+
+    const events = [];
+    for await (const event of runStreamingChain([{ role: 'user', content: 'hello' }], {
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode' },
+      signal: null,
+      sleep,
+      clock,
+      jitter: () => 0,
+    })) {
+      events.push(event);
+    }
+
+    const deltas = events.filter((e) => e.type === 'delta').map((e) => e.text).join('');
+    expect(deltas).toBe('recovered');
+    expect(events.some((e) => e.type === 'done')).toBe(true);
+    expect(events.filter((e) => e.type === 'error')).toHaveLength(0);
+    expect(calls).toBe(3);
+  });
+
+  it('honours Retry-After on streaming 429 responses', async () => {
+    const { clock, sleep, state } = fakeClock();
+    let calls = 0;
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      calls += 1;
+      return calls === 1
+        ? errorResponse(429, 'slow down', { 'Retry-After': '2' })
+        : sseChunks(['ok now', 'done']);
+    }));
+
+    const events = [];
+    for await (const event of runStreamingChain([{ role: 'user', content: 'hello' }], {
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode' },
+      signal: null,
+      sleep,
+      clock,
+      jitter: () => 0,
+    })) {
+      events.push(event);
+    }
+
+    expect(events.some((e) => e.type === 'done')).toBe(true);
+    expect(calls).toBe(2);
+    expect(state.now).toBeGreaterThanOrEqual(2000);
+  });
+
+  it('fails retryable 429 with a short message when the limit outlasts the budget', async () => {
+    // Frozen clock so the attempts cap binds deterministically.
+    let calls = 0;
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      calls += 1;
+      return errorResponse(429, '{"error":{"code":"rate_limit_exceeded"}}');
+    }));
+
+    const events = [];
+    for await (const event of runStreamingChain([{ role: 'user', content: 'hello' }], {
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode' },
+      signal: null,
+      sleep: async () => {},
+      clock: () => 0,
+      jitter: () => 0,
+    })) {
+      events.push(event);
+    }
+
+    const errors = events.filter((e) => e.type === 'error');
+    expect(errors).toHaveLength(1);
+    expect(errors[0].status).toBe(429);
+    expect(errors[0].retryable).toBe(true);
+    expect(errors[0].message).toMatch(/rate-limited/);
+    // Never a raw provider JSON dump in the user-facing message.
+    expect(errors[0].message).not.toContain('rate_limit_exceeded');
+    expect(errors[0].message).not.toMatch(/HTTP 429/);
     expect(events.some((e) => e.type === 'done')).toBe(false);
+    expect(calls).toBe(8);
+  });
+
+  it('does not retry a failure that arrives after partial content streamed', async () => {
+    let calls = 0;
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      calls += 1;
+      const enc = new TextEncoder();
+      let errored = false;
+      return new Response(new ReadableStream({
+        start(c) {
+          c.enqueue(enc.encode('data: {"choices":[{"delta":{"content":"partial "},"finish_reason":null}]}\n\n'));
+        },
+        pull(c) {
+          // Fail on the second read, after the delta was delivered.
+          if (!errored) {
+            errored = true;
+            c.error(new Error('connection reset'));
+          } else {
+            c.close();
+          }
+        }
+      }), { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+    }));
+
+    const events = [];
+    for await (const event of runStreamingChain([{ role: 'user', content: 'hello' }], {
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode' },
+      signal: null,
+      ...fast
+    })) {
+      events.push(event);
+    }
+
+    // Already-sent content is preserved exactly once; the failure breaks
+    // instead of retrying (a retry would duplicate the partial text).
+    expect(events.filter((e) => e.type === 'delta').map((e) => e.text).join('')).toBe('partial ');
+    expect(events.filter((e) => e.type === 'error')).toHaveLength(1);
     expect(calls).toBe(1);
   });
 });

@@ -1147,6 +1147,8 @@ async function handleAi(request, env) {
   // silent — the Muse build always proceeds even if MiMo is unavailable.
   // Covers: image/*, video/*, audio/*, pdf, text, and generic files.
   // ---------------------------------------------------------------------
+  // MiMo pre-pass outcome for diagnostics (proves whether vision ran).
+  let mimoStatus = "skipped-no-attachments";
   if (!env?.__DISABLE_MIMO_PREFETCH) {
     try {
       const allAttachments = [];
@@ -1232,24 +1234,35 @@ async function handleAi(request, env) {
           });
         }
       }
-      if (allAttachments.length > 0 && isMimoAvailable(env)) {
-        const mimoDescriptions = await describeAttachmentsWithMimo(
-          allAttachments,
-          executionPrompt || prompt,
-          env,
-          clientDisconnectSignal,
-        );
-        const mimoBlock = buildMimoContextBlock(mimoDescriptions);
-        if (mimoBlock) {
-          apiMessages.push({ role: "system", content: mimoBlock });
+      if (allAttachments.length > 0) {
+        if (!isMimoAvailable(env)) {
+          mimoStatus = "unavailable-no-key";
+        } else {
+          const mimoDescriptions = await describeAttachmentsWithMimo(
+            allAttachments,
+            executionPrompt || prompt,
+            env,
+            clientDisconnectSignal,
+          );
+          mimoStatus =
+            mimoDescriptions.length > 0
+              ? `ok:${mimoDescriptions.length}/${allAttachments.length}`
+              : `failed:0/${allAttachments.length}`;
+          const mimoBlock = buildMimoContextBlock(mimoDescriptions);
+          if (mimoBlock) {
+            apiMessages.push({ role: "system", content: mimoBlock });
+          }
         }
       }
     } catch (mimoErr) {
+      mimoStatus = `error:${mimoErr?.message || mimoErr}`.slice(0, 120);
       console.warn(
         "MiMo pre-pass failed (continuing to Muse):",
         mimoErr?.message || mimoErr,
       );
     }
+  } else {
+    mimoStatus = "disabled-flag";
   }
 
   const runtimeContext = buildRuntimeContext();
@@ -1611,6 +1624,9 @@ async function handleAi(request, env) {
     const chainOptions = {
       env,
       signal: clientDisconnectSignal,
+      // Collapsible backoff for tests (__COREZ_RETRY_SLEEP_MS); real sleep
+      // in production so transient retries actually ride out the blip.
+      sleep: retrySleepFor(env),
       model: selectedModel,
       reasoning: selectedReasoning.reasoning,
       temperature: selectedReasoning.temperature,
@@ -2144,6 +2160,7 @@ async function handleAi(request, env) {
       totalMs: Date.now() - requestStartedAt,
       provider: result.provider || null,
       model: result.model || null,
+      mimoStatus,
       inputTokens: result.usage?.inputTokens ?? null,
       outputTokens: result.usage?.outputTokens ?? null,
       fallbackUsed: Boolean(result.resumed),

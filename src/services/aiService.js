@@ -1275,14 +1275,19 @@ export async function generateHostedAIResponse(
     // state (planning/build/verify/review) and an identical request resumes
     // or replays it. A stream that dies mid-flight (connection drop, platform
     // kill, provider outage, busy lease) is therefore retried with backoff
-    // instead of being reported as a dead end. Plain chat streams are issued
-    // exactly once and keep the fail-fast diagnosis below.
-    const MAX_STREAM_ATTEMPTS = useCreationHarness ? 4 : 1;
+    // instead of being reported as a dead end. Plain chat has no persisted
+    // task, but a retryable worker error (transient rate limit, empty stream)
+    // is still worth a bounded number of re-issues — a blip that clears in
+    // seconds must never surface as a permanent failure.
+    const MAX_STREAM_ATTEMPTS = useCreationHarness ? 4 : 3;
     // Test hook: tests pass tiny delays so retry behavior is exercised
-    // without waiting minutes.
+    // without waiting minutes. Chat (no persisted task) uses a short ladder
+    // so a blip costs seconds, not minutes; harness builds keep the long one.
     const STREAM_RETRY_DELAYS_MS = Array.isArray(options.retryDelaysMs)
       ? options.retryDelaysMs
-      : [15_000, 60_000, 240_000];
+      : useCreationHarness
+        ? [15_000, 60_000, 240_000]
+        : [2_000, 8_000];
     const waitWithAbort = async (ms) => {
       await new Promise((resolve) => {
         const timer = setTimeout(resolve, ms);
@@ -1368,11 +1373,11 @@ export async function generateHostedAIResponse(
           sawDone = true;
           if (event.projectState) projectState = event.projectState;
         } else if (event.type === "error") {
-          // Surface the worker's reason verbatim, except: a retryable
-          // harness error (busy lease, overloaded providers) means the
-          // persisted task can still be resumed — back off and retry.
+          // A retryable worker error (busy lease, rate limit, empty stream)
+          // means the request is still viable — back off and re-issue it
+          // (bounded by MAX_STREAM_ATTEMPTS) instead of failing instantly.
+          // Anything else surfaces the worker's reason verbatim.
           if (
-            useCreationHarness &&
             event.retryable === true &&
             attempt < MAX_STREAM_ATTEMPTS - 1
           ) {
@@ -1416,7 +1421,16 @@ export async function generateHostedAIResponse(
         attempt < MAX_STREAM_ATTEMPTS - 1 &&
         !signal?.aborted
       ) {
-        await waitWithAbort(STREAM_RETRY_DELAYS_MS[attempt] ?? 240_000);
+        // Prefer the worker's Retry-After window when it named one (rate
+        // limits); otherwise use the configured backoff ladder.
+        const retryAfterMs =
+          Number(retryableError?.retryAfterSeconds) > 0
+            ? Math.min(
+                Number(retryableError.retryAfterSeconds) * 1000,
+                120_000,
+              )
+            : (STREAM_RETRY_DELAYS_MS[attempt] ?? 240_000);
+        await waitWithAbort(retryAfterMs);
         continue;
       }
       if (retryableError) {
@@ -2319,6 +2333,13 @@ export async function runImageCommand(
 // reached an AI provider, so a provider-key hint would be misleading.
 export function describeHostedUnavailable(hostedError) {
   const message = hostedError?.message || "";
+  const isRateLimit =
+    /429|rate.?limit|rate_limit|too many requests/i.test(message);
+  if (isRateLimit) {
+    // Rate limits are transient and retried automatically on both ends: never
+    // dump the raw provider JSON into the reply — keep it to one short line.
+    return " The hosted AI service is rate-limited right now and automatic retries are backing off. Please wait a moment and try again.";
+  }
   const isTransportFailure =
     /networkerror|failed to fetch|load failed|fetch failed|ERR_CONNECTION|net::|econnrefused|connection refused/i.test(
       message,
