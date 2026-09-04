@@ -15,14 +15,14 @@ export const MIMO_DEFAULT_ENDPOINT = "https://opencode.ai/zen/go/v1/chat/complet
 
 const MIMO_MEDIA_PROMPTS = {
   image:
-    "Describe this image in detail for a builder AI. Cover: subjects, layout, colors, style, text visible, composition, mood, and any UI elements. Be concise but thorough (120-200 words).",
+    "Describe this image in detail for a builder AI. Cover: subjects, layout, colors, style, text visible, composition, mood, and any UI elements. Be concise but thorough (120-200 words). Respond in English.",
   video:
-    "Describe this video in detail for a builder AI. Cover: what is shown, motion/action, subjects, setting, colors, style, any text or UI. Be concise but thorough (120-200 words). If you see multiple frames, summarize the overall content.",
+    "Describe this video in detail for a builder AI. Cover: what is shown, motion/action, subjects, setting, colors, style, any text or UI. Be concise but thorough (120-200 words). If you see multiple frames, summarize the overall content. Respond in English.",
   audio:
     "Transcribe and describe this audio in detail for a builder AI. Provide a verbatim transcript if speech is present, plus notes on tone, speaker, music/sounds, and overall meaning (100-180 words).",
-  file: "Summarize this file for a builder AI. Extract key content, structure, and intent. If it is a document, transcribe the important text; if it is a design/spec, note layout and sections. Be concise (120-200 words).",
+  file: "Summarize this file for a builder AI. Extract key content, structure, and intent. If it is a document, transcribe the important text; if it is a design/spec, note layout and sections. Be concise (120-200 words). Respond in English.",
   generic:
-    "Describe this attachment in detail for a builder AI so it can use it accurately in generation. Cover content, structure, style, and intent (120-200 words).",
+    "Describe this attachment in detail for a builder AI so it can use it accurately in generation. Cover content, structure, style, and intent (120-200 words). Respond in English.",
 };
 
 function mimoEndpoint(env) {
@@ -76,16 +76,29 @@ function mediaKind(attachment) {
   return "generic";
 }
 
+/**
+ * Extract the R2 object key from an asset URL, accepting both the relative
+ * form (/api/assets/<key>) and the absolute form
+ * (https://corez.pro/api/assets/<key>) that attachments carry since storage
+ * URLs were absolutized. Returns null for anything else.
+ */
+function r2KeyFromAssetUrl(assetUrl) {
+  const path = String(assetUrl || "").replace(/^https?:\/\/[^/]+/i, "");
+  const prefix = "/api/assets/";
+  if (!path.startsWith(prefix)) return null;
+  const key = path.slice(prefix.length).split("?")[0];
+  // User-upload keys are simple filenames; nested publish/... keys are left
+  // to the direct-https path instead of a bucket refetch.
+  if (!key || key.includes("..") || key.includes("/")) return null;
+  return key;
+}
+
 async function fetchR2AssetAsDataUrl(assetUrl, env) {
   try {
     if (!env?.ASSET_BUCKET || typeof env.ASSET_BUCKET.get !== "function")
       return null;
-    const key = String(assetUrl).replace(/^\/api\/assets\//, "");
-    if (!key || key.includes("..") || key.includes("/")) {
-      // Keys with slashes are valid (e.g. publish/...), but for user-upload we expect simple
-      // Still try fetch if it looks like a simple key
-      if (key.includes("/")) return null;
-    }
+    const key = r2KeyFromAssetUrl(assetUrl);
+    if (!key) return null;
     const obj = await env.ASSET_BUCKET.get(key);
     if (!obj) return null;
     const mime =
@@ -186,7 +199,10 @@ function isResponsesEndpoint(endpoint) {
 
 async function callMimo(messages, env, signal) {
   const key = mimoKey(env);
-  if (!key) return null;
+  if (!key) {
+    console.warn("MiMo: skipped vision pre-pass (no API key available)");
+    return null;
+  }
   const endpoint = mimoEndpoint(env);
   const model = mimoModel(env);
   const isResponses = isResponsesEndpoint(endpoint);
@@ -217,7 +233,10 @@ async function callMimo(messages, env, signal) {
       body: JSON.stringify(body),
       signal: controller.signal,
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn(`MiMo: vision request failed (HTTP ${res.status})`);
+      return null;
+    }
     const data = await res.json().catch(() => null);
     if (isResponses) {
       const output = Array.isArray(data?.output) ? data.output : [];
@@ -235,6 +254,7 @@ async function callMimo(messages, env, signal) {
         )
           return textPart.text.trim();
       }
+      console.warn("MiMo: vision request returned no usable text");
       return null;
     }
     const text = data?.choices?.[0]?.message?.content;
@@ -246,10 +266,18 @@ async function callMimo(messages, env, signal) {
         .trim();
       if (joined) return joined;
     }
+    console.warn("MiMo: vision request returned no usable text");
     return null;
   } catch (err) {
-    if (hit) return null;
-    if (err?.name === "AbortError") return null;
+    if (hit) {
+      console.warn("MiMo: vision request timed out (25s cap)");
+      return null;
+    }
+    if (err?.name === "AbortError") {
+      console.warn("MiMo: vision request aborted (client disconnect)");
+      return null;
+    }
+    console.warn(`MiMo: vision request errored (${err?.message || err})`);
     return null;
   } finally {
     clearTimeout(timeout);
@@ -284,12 +312,13 @@ export async function describeAttachmentsWithMimo(
   const results = await Promise.all(
     sorted.map(async (att) => {
       const kind = mediaKind(att);
-      // Resolve R2 relative URLs to dataUrl for MiMo if thumb missing (large images)
+      // Resolve R2 URLs (relative or absolute https://corez.pro form) to a
+      // dataUrl for MiMo when no data-URL thumb is present (large images)
       let resolvedUrl = null;
       if (
         (!att?.thumb || !String(att.thumb).startsWith("data:")) &&
         att?.assetUrl &&
-        String(att.assetUrl).startsWith("/api/assets/")
+        r2KeyFromAssetUrl(att.assetUrl)
       ) {
         resolvedUrl = await fetchR2AssetAsDataUrl(att.assetUrl, env);
       }
