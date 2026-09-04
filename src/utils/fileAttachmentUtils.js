@@ -144,8 +144,11 @@ export function extractFilesFromClipboard(clipboardData) {
 
   const pushFile = (file) => {
     if (!file) return;
-    // Dedupe: files + items can reference the same underlying blob
-    const key = `${file.name}|${file.type}|${file.size}|${file.lastModified}`;
+    // Dedupe: browsers expose the same pasted blob through BOTH files and
+    // items, and the two views can carry different lastModified timestamps —
+    // so identity is name + type + size only (lastModified must NOT be part
+    // of the key, or one paste becomes two attachments / two uploads).
+    const key = `${file.name}|${file.type}|${file.size}`;
     if (seen.has(key)) return;
     seen.add(key);
     let named = file;
