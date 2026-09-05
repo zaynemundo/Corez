@@ -499,10 +499,13 @@ export function scoreContinuity({ project, response, userPrompt }) {
 
 // Self-referential continuation meta-commentary that models sometimes emit
 // when asked to continue an already-complete answer ("My previous reply was
-// already complete — it was a single greeting sentence..."). Any such text
-// is noise: strip from the first meta phrase to the end of the chunk.
+// already complete — it was a single greeting sentence...", or the newer
+// "continuation check" boilerplate: "No partial file or open document exists
+// in this session...", "## Continuation Status", "nothing further to append",
+// "paste the partial content..."). Any such text is noise: strip from the
+// first meta phrase to the end of the chunk.
 const META_COMMENTARY_PATTERN =
-  /(?:My (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|The (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|Your (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|(?:The|This) (?:response|reply|answer) is already (?:complete|finished)|There (?:is|was) (?:no|nothing) (?:dangling|open|more) (?:file|code|tag|expression|block|content)|No continuation (?:is )?needed|Nothing (?:to|left to|more to) continu)[^]*$/i;
+  /(?:My (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|The (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|Your (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|(?:The|This) (?:response|reply|answer) is already (?:complete|finished)|There (?:is|was) (?:no|nothing) (?:dangling|open|more) (?:file|code|tag|expression|block|content)|No continuation (?:is )?needed|Nothing (?:to|left to|more to) continu|No (?:partial|incomplete) (?:file|document|output|content)|#{1,3}\s*Continuation (?:Status|Check)|nothing (?:further|more|else) (?:to append|to add|can be appended)|no (?:stopping|stop) points? (?:to resume|for resuming) from|paste the (?:partial content|last lines)|continue directly from that exact|no open [`<])[^]*$/i;
 
 export function stripMetaCommentary(text) {
   const value = String(text || "");

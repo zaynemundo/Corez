@@ -1041,12 +1041,20 @@ async function handleAi(request, env) {
     /\b(model|muse|gpt|claude|gemini|llama|meta|mimo|deepseek|llm|ai|powered)\b/i.test(
       prompt,
     );
+  // "what is the ai engine of corez" has no "you" reference, so the generic
+  // gate above misses it — yet it is unambiguously an identity question.
+  // Require a Corez/you anchor so legit coding questions ("chess ai engine",
+  // "game engine ai") never match.
+  const isAiEngineQuestion =
+    /ai\s*engine/i.test(prompt) &&
+    (/\bcorez\b/i.test(prompt) || hasYouReference);
   const isPoweredByQuestion =
     /\bpowered\s+by\b/i.test(prompt) && hasYouReference;
   if (
-    isModelIdentityQuestion &&
-    hasYouReference &&
-    (hasModelKeyword || isPoweredByQuestion) &&
+    ((isModelIdentityQuestion &&
+      hasYouReference &&
+      (hasModelKeyword || isPoweredByQuestion)) ||
+      isAiEngineQuestion) &&
     prompt.length <= 350
   ) {
     const modelReply =

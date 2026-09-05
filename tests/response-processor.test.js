@@ -317,6 +317,24 @@ describe('processResponse', () => {
     expect(stripMetaCommentary(code)).toBe(code);
   });
 
+  it('strips the "continuation check" boilerplate spam to nothing past the real answer', () => {
+    // Regression: asking "what is the ai engine of corez?" once produced the
+    // identity line followed by pages of "No partial file..." boilerplate.
+    const spam =
+      "No partial file or open document exists in this session to continue, so nothing further can be appended.\n" +
+      "## Status\n- **Session content** — Only a short greeting exchange exists.\n" +
+      "## Next Steps\nShare the partial file or paste the last lines you received and I will continue directly from that exact point.\n" +
+      "</script>\n</body>\n</html>";
+    expect(stripMetaCommentary(`I'm Corez 1.0 built by Corez. How can I help you today?${spam}`)).toBe(
+      "I'm Corez 1.0 built by Corez. How can I help you today?",
+    );
+    expect(stripMetaCommentary(`## Continuation Status\n\nNo stopping point to resume from, so there is no point to resume from.`)).toBe('');
+    expect(stripMetaCommentary('Nothing further to append and all structures are already closed.')).toBe('');
+    // Legit content mentioning engines must survive untouched.
+    const legit = 'The chess ai engine evaluates positions with minimax.';
+    expect(stripMetaCommentary(legit)).toBe(legit);
+  });
+
   it('classifies short meta-commentary replies as meta-only', () => {
     expect(isMetaOnlyReply('My previous reply was already complete — nothing to continue.')).toBe(true);
     expect(isMetaOnlyReply('The response is already complete, no continuation needed.')).toBe(true);
