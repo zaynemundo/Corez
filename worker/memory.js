@@ -195,6 +195,48 @@ export async function d1DeleteMemory(env, { userId, key }) {
     .run();
 }
 
+// Inferred interest memory (profiler): repeated behavioral signals
+// accumulate confidence instead of overwriting. First sighting starts at
+// 0.35, each reinforcement adds 0.15 up to a 0.95 cap; per plan there is no
+// time decay — inferences persist until explicitly forgotten. Rows live in
+// the same table with category "inference" and a metadata envelope:
+// { confidence, evidence_count, first_seen, last_seen, status, topic }.
+export async function d1UpsertInference(env, { userId, key, text, topic }) {
+  const now = new Date().toISOString();
+  let existing = null;
+  try {
+    const rows = await d1SearchMemories(env, { userId });
+    existing = (rows || []).find((r) => r.key === key) || null;
+  } catch {
+    // Missing table or DB hiccup: treat as first sighting.
+  }
+  const prevMeta =
+    existing?.metadata && typeof existing.metadata === "object"
+      ? existing.metadata
+      : {};
+  const prevCount =
+    Number.isFinite(prevMeta.evidence_count) && prevMeta.evidence_count > 0
+      ? Math.floor(prevMeta.evidence_count)
+      : 0;
+  const evidence_count = prevCount + 1;
+  const confidence = Math.min(0.95, 0.35 + 0.15 * evidence_count);
+  return d1StoreMemory(env, {
+    userId,
+    key,
+    category: "inference",
+    text,
+    tags: ["inferred"],
+    metadata: {
+      confidence: Math.round(confidence * 100) / 100,
+      evidence_count,
+      first_seen: prevMeta.first_seen || existing?.createdAt || now,
+      last_seen: now,
+      status: "inferred",
+      topic: topic || key,
+    },
+  });
+}
+
 // Minimal account lookup for chat-time identity answers ("who am I").
 // Never throws: a missing users table or DB simply means "no account info".
 export async function getUserAccount(env, userId) {
