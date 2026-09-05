@@ -1385,6 +1385,11 @@ async function handleAi(request, env) {
       const uid = await sessionUid(request, env);
       if (uid) {
         memoryUid = uid;
+        // The tables only get created on /api/memory/* calls, which chat
+        // clients rarely make — so a fresh production DB has no tables at
+        // all and every silent list/store would fail. Ensure once per chat
+        // request (cheap IF NOT EXISTS) so memory works from day one.
+        await ensureMemoryTables(env).catch(() => {});
         const [account, facts] = await Promise.all([
           getUserAccount(env, uid),
           d1ListMemories(env, uid).catch(() => []),
