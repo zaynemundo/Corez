@@ -11,7 +11,10 @@ describe('PersistentTerminalManager & exec_persistent_command Tool', () => {
     if (manager) manager.disposeAll();
   });
 
-  it('preserves environment variables and directory state across multiple commands', async () => {
+  // Spawning real shells (powershell.exe cold start ~1-2s each) exceeds
+  // vitest's 5s default under parallel-suite load — these tests assert
+  // correctness (env isolation), not speed, so they get generous headroom.
+  it('preserves environment variables and directory state across multiple commands', { timeout: 30_000 }, async () => {
     manager = new PersistentTerminalManager();
 
     // 1. Export variable
@@ -32,7 +35,7 @@ describe('PersistentTerminalManager & exec_persistent_command Tool', () => {
     expect(r3.stdout).toContain('42');
   });
 
-  it('executes exec_persistent_command via ToolRegistry cleanly', async () => {
+  it('executes exec_persistent_command via ToolRegistry cleanly', { timeout: 30_000 }, async () => {
     const termTool = createPersistentCommandTool(manager);
     const registry = new ToolRegistry();
     registry.registerTool(termTool);
@@ -47,7 +50,7 @@ describe('PersistentTerminalManager & exec_persistent_command Tool', () => {
     expect(execRes.terminalId).toBe('registry_term');
   });
 
-  it('handles isolated terminal instances independently', async () => {
+  it('handles isolated terminal instances independently', { timeout: 30_000 }, async () => {
     const setAlpha = isWin ? '$env:ALPHA_ID="111"' : 'export ALPHA_ID=111';
     const setBeta = isWin ? '$env:BETA_ID="222"' : 'export BETA_ID=222';
     await manager.runCommand('term_alpha', setAlpha);
