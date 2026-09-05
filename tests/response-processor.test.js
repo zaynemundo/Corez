@@ -335,6 +335,40 @@ describe('processResponse', () => {
     expect(stripMetaCommentary(legit)).toBe(legit);
   });
 
+  it('strips the second-wave continuation boilerplate variants', () => {
+    // Newer phrasings observed in the wild after the first filter landed.
+    expect(
+      stripMetaCommentary(
+        "Hello! I'm COREZ AI.\n## Overview\nThere is no prior partial file or document in this session to continue from.",
+      ),
+    ).toBe("Hello! I'm COREZ AI.");
+    expect(
+      stripMetaCommentary(
+        "## Summary\nAssuming you meant a complete starter document, here it is.",
+      ),
+    ).toBe('');
+    expect(
+      stripMetaCommentary(
+        "Done.\n## Overview\nI can't continue from a stopping point because there is nothing to resume.",
+      ),
+    ).toBe('Done.');
+    expect(
+      stripMetaCommentary(
+        'All set.\n## Required to Proceed\nPaste your partial document in your next message and I will continue exactly from that line.',
+      ),
+    ).toBe('All set.');
+    expect(
+      stripMetaCommentary(
+        'No active partial file exists in this session, so nothing can be appended.\nNone found in the conversation history.\nProvide the partial content to proceed.',
+      ),
+    ).toBe('');
+    expect(
+      stripMetaCommentary(
+        'Finished.\nNo unclosed `<script>` tags remain to close.\nTo proceed, please paste the last lines you received.',
+      ),
+    ).toBe('Finished.');
+  });
+
   it('classifies short meta-commentary replies as meta-only', () => {
     expect(isMetaOnlyReply('My previous reply was already complete — nothing to continue.')).toBe(true);
     expect(isMetaOnlyReply('The response is already complete, no continuation needed.')).toBe(true);

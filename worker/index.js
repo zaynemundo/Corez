@@ -1,5 +1,12 @@
 import { handleSearch } from "./search.js";
-import { handleMemory } from "./memory.js";
+import {
+  handleMemory,
+  ensureMemoryTables,
+  d1StoreMemory,
+  d1ListMemories,
+  d1DeleteMemory,
+  getUserAccount,
+} from "./memory.js";
 import { handleRerank, handleEmbed } from "./aiModels.js";
 import { fetchAwwwardsInspiration, handleInspiration } from "./inspiration.js";
 import { verifySession } from "./auth.js";
@@ -885,6 +892,83 @@ ${imageRequestInstructions}
 Inferred intent: ${intentType} - ${intent?.summary || intent?.goal || "Understand the public user goal and give a useful next step."}`;
 }
 
+// Deterministic short replies honor the streaming contract exactly like the
+// greeting/identity fast-paths: a real SSE stream with one delta for
+// streamed requests, JSON otherwise — never a JSON body an SSE parser would
+// misread as an empty stream.
+function deterministicChatReply(body, text, model) {
+  if (body?.stream === true) {
+    const encoder = new TextEncoder();
+    const sse = (event) => `data: ${JSON.stringify(event)}\n\n`;
+    const readable = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(
+            sse({ type: "meta", provider: "corez", model }),
+          ),
+        );
+        controller.enqueue(encoder.encode(sse({ type: "delta", text })));
+        controller.enqueue(
+          encoder.encode(
+            sse({ type: "done", final: true, projectState: null }),
+          ),
+        );
+        controller.close();
+      },
+    });
+    return new Response(readable, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+        "Access-Control-Allow-Origin": "*",
+        "X-Accel-Buffering": "no",
+      },
+    });
+  }
+  return jsonResponse(200, {
+    content: text,
+    model,
+  });
+}
+
+// ---------------------------------------------------------------------
+// User memory command patterns (remember / recall / forget / who-am-I).
+// The memory store existed but was never wired into chat, so "remember
+// that..." silently stored nothing and "who am I" knew nothing. These run
+// deterministically against D1 in the verified-session uid namespace.
+// ---------------------------------------------------------------------
+const MEMORY_RECALL_PATTERN =
+  /\b(what do you know about me|who am i|what do you remember about me|do you remember me|list (?:what|everything) you (?:know|remember) about me|show (?:what|everything) you (?:know|remember) about me|what have you remembered about me)\b/i;
+const MEMORY_REMEMBER_PATTERN =
+  /^\s*(?:please\s+)?remember\s+(?:that\s+|this\s+|my\s+|me\s+|for\s+me\s+)?([\s\S]+?)\s*$/i;
+const MEMORY_FORGET_PATTERN =
+  /^\s*(?:please\s+)?forget\s+(.+?)\s*$/i;
+const MEMORY_SECRET_PATTERN =
+  /\b(password|passwd|api[_-]?key|secret|token|ssn|credit\s*card|bank\s*account)\b/i;
+const MEMORY_NAME_PATTERN = /\bmy\s+name\s+is\s+([^.,;!?]{2,60})/i;
+
+function buildMemoryRecallAnswer(account, facts) {
+  const who = account?.email
+    ? `You're logged in as ${account.email}`
+    : `You're logged in`;
+  const plan = account?.plan ? ` on the ${account.plan} plan` : "";
+  const lines = [`${who}${plan}.`];
+  if (Array.isArray(facts) && facts.length > 0) {
+    lines.push(
+      "Here's what I remember about you:",
+      ...facts.map((f) => `- ${f.text}`),
+    );
+  } else {
+    lines.push(
+      "I don't have anything memorized about you yet — tell me things like " +
+        `"remember that my name is..." and I'll keep them here.`,
+    );
+  }
+  return lines.join("\n");
+}
+
 async function handleAi(request, env) {
   if (request.method !== "POST") {
     return jsonResponse(405, { error: "Method not allowed." });
@@ -1097,6 +1181,153 @@ async function handleAi(request, env) {
     });
   }
 
+  // ---------------------------------------------------------------------
+  // User memory fast-path: remember / recall / forget + who-am-I, answered
+  // deterministically from D1 with no LLM round-trip (which also keeps
+  // these out of the continuation/repair loop). Memory is best-effort:
+  // anything unexpected falls through to the normal pipeline — memory
+  // must never break chat.
+  // ---------------------------------------------------------------------
+  let memoryUid = null;
+  let memoryAccount = null;
+  let memoryFacts = [];
+  try {
+    if (env?.DB) {
+      const uid = await sessionUid(request, env);
+      if (uid) {
+        memoryUid = uid;
+        const [account, facts] = await Promise.all([
+          getUserAccount(env, uid),
+          d1ListMemories(env, uid).catch(() => []),
+        ]);
+        memoryAccount = account;
+        memoryFacts = Array.isArray(facts) ? facts.slice(0, 20) : [];
+      }
+    }
+  } catch {
+    memoryUid = null;
+    memoryFacts = [];
+  }
+
+  if (memoryUid) {
+    // RECALL: "who am I" / "what do you know about me"
+    if (prompt.length <= 350 && MEMORY_RECALL_PATTERN.test(prompt)) {
+      return deterministicChatReply(
+        body,
+        buildMemoryRecallAnswer(memoryAccount, memoryFacts),
+        "corez-memory",
+      );
+    }
+    // REMEMBER: "remember that ..." (short explicit commands only, so
+    // task text like "remember to close the file" in long prompts is
+    // never mistaken for a memory store).
+    const rememberMatch =
+      prompt.length <= 300 ? prompt.match(MEMORY_REMEMBER_PATTERN) : null;
+    if (rememberMatch) {
+      const fact = String(rememberMatch[1] || "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/[.?!]+$/, "");
+      if (fact && fact.length <= 300) {
+        if (MEMORY_SECRET_PATTERN.test(fact)) {
+          return deterministicChatReply(
+            body,
+            "I can't store that — it looks like a secret or credential, and I never memorize those. Tell me something else about yourself instead.",
+            "corez-memory",
+          );
+        }
+        try {
+          await ensureMemoryTables(env);
+          const nameMatch = fact.match(MEMORY_NAME_PATTERN);
+          const record = await d1StoreMemory(env, {
+            userId: memoryUid,
+            key: nameMatch ? "identity.name" : `fact_${Date.now()}`,
+            category: nameMatch ? "identity" : "fact",
+            text: nameMatch
+              ? `User's name is ${nameMatch[1].trim()}`
+              : fact,
+          });
+          return deterministicChatReply(
+            body,
+            `Got it — I'll remember that: ${record.text}`,
+            "corez-memory",
+          );
+        } catch (err) {
+          console.warn(
+            "COREZ memory store failed (falling through to chat):",
+            safeErrorDetail(err),
+          );
+        }
+      }
+    }
+    // FORGET: "forget ..." / "forget everything"
+    const forgetMatch =
+      prompt.length <= 350 ? prompt.match(MEMORY_FORGET_PATTERN) : null;
+    if (forgetMatch) {
+      const target = String(forgetMatch[1] || "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/[.?!]+$/, "");
+      if (target) {
+        try {
+          if (
+            /^(everything|all|all of it|everything you know( about me)?|what you know about me|my memories)$/i.test(
+              target,
+            )
+          ) {
+            const count = memoryFacts.length;
+            for (const f of memoryFacts) {
+              await d1DeleteMemory(env, {
+                userId: memoryUid,
+                key: f.key,
+              }).catch(() => {});
+            }
+            return deterministicChatReply(
+              body,
+              count > 0
+                ? `Done — I forgot everything I knew about you (${count} ${count === 1 ? "memory" : "memories"} removed).`
+                : "There's nothing stored about you, so nothing to forget.",
+              "corez-memory",
+            );
+          }
+          const words = target
+            .toLowerCase()
+            .split(/[^a-z0-9]+/)
+            .filter((w) => w.length > 2);
+          const hits = memoryFacts.filter((f) => {
+            const haystack =
+              `${f.key} ${f.text} ${f.category}`.toLowerCase();
+            return words.some((w) => haystack.includes(w));
+          });
+          if (hits.length === 0) {
+            return deterministicChatReply(
+              body,
+              `I don't have anything stored about "${target}".`,
+              "corez-memory",
+            );
+          }
+          for (const h of hits) {
+            await d1DeleteMemory(env, {
+              userId: memoryUid,
+              key: h.key,
+            }).catch(() => {});
+          }
+          return deterministicChatReply(
+            body,
+            `Forgot ${hits.length === 1 ? "this" : `these ${hits.length}`}:\n` +
+              hits.map((h) => `- ${h.text}`).join("\n"),
+            "corez-memory",
+          );
+        } catch (err) {
+          console.warn(
+            "COREZ memory delete failed (falling through to chat):",
+            safeErrorDetail(err),
+          );
+        }
+      }
+    }
+  }
+
   const intent =
     body.intent &&
     typeof body.intent === "object" &&
@@ -1136,6 +1367,26 @@ async function handleAi(request, env) {
     executionPlan,
   });
   const apiMessages = [{ role: "system", content: systemPrompt }];
+
+  // Known-user grounding: the verified account plus remembered facts travel
+  // with every request so the model answers the owner about themselves
+  // ("my name", "my plan", preferences) instead of claiming amnesia. This
+  // block is private context — the system prompt already forbids pasting it
+  // into generated artifacts unless explicitly asked.
+  if (memoryUid && (memoryAccount?.email || memoryFacts.length > 0)) {
+    const factLines = memoryFacts
+      .slice(0, 12)
+      .map((f) => `- ${f.text} [${f.category}]`);
+    apiMessages.push({
+      role: "system",
+      content:
+        `User account & remembered facts (private — describes the logged-in account owner; you may answer the owner ABOUT themselves when asked, but NEVER paste this into generated code, artifacts, emails, posts, or published pages unless explicitly asked):\n` +
+        `- Logged in as: ${memoryAccount?.email || "unknown"} (plan: ${memoryAccount?.plan || "free"})\n` +
+        (factLines.length > 0
+          ? `- Remembered facts:\n${factLines.join("\n")}`
+          : `- Remembered facts: none yet`),
+    });
+  }
 
   // ---------------------------------------------------------------------
   // Skill Verification Layer — runtime context + live-data grounding.

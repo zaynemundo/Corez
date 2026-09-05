@@ -117,7 +117,7 @@ function escapeLikePattern(value) {
   return String(value).replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
 }
 
-async function d1StoreMemory(env, { userId, key, category, text, tags, metadata, createdAt }) {
+export async function d1StoreMemory(env, { userId, key, category, text, tags, metadata, createdAt }) {
   const now = new Date().toISOString();
   const existing = await env.DB.prepare(
     `SELECT created_at FROM user_memories WHERE user_id = ? AND key = ?`,
@@ -158,7 +158,7 @@ async function d1StoreMemory(env, { userId, key, category, text, tags, metadata,
   };
 }
 
-async function d1ListMemories(env, userId) {
+export async function d1ListMemories(env, userId) {
   const result = await env.DB.prepare(
     `SELECT user_id, key, category, text, tags, metadata, created_at, updated_at
      FROM user_memories WHERE user_id = ? ORDER BY updated_at DESC`,
@@ -168,7 +168,7 @@ async function d1ListMemories(env, userId) {
   return (result?.results || []).map(rowToRecord).filter(Boolean);
 }
 
-async function d1SearchMemories(env, { userId, query, category }) {
+export async function d1SearchMemories(env, { userId, query, category }) {
   const categoryFilter = typeof category === "string" ? category.trim() : "";
   const q = typeof query === "string" ? query.trim().toLowerCase() : "";
   let sql =
@@ -189,10 +189,34 @@ async function d1SearchMemories(env, { userId, query, category }) {
   return (result?.results || []).map(rowToRecord).filter(Boolean);
 }
 
-async function d1DeleteMemory(env, { userId, key }) {
+export async function d1DeleteMemory(env, { userId, key }) {
   await env.DB.prepare(`DELETE FROM user_memories WHERE user_id = ? AND key = ?`)
     .bind(userId, key)
     .run();
+}
+
+// Minimal account lookup for chat-time identity answers ("who am I").
+// Never throws: a missing users table or DB simply means "no account info".
+export async function getUserAccount(env, userId) {
+  try {
+    if (!env?.DB || typeof userId !== "string" || !userId) return null;
+    const row = await env.DB.prepare(
+      `SELECT id, email, plan FROM users WHERE id = ?`,
+    )
+      .bind(userId)
+      .first();
+    if (!row) return null;
+    return {
+      id: row.id,
+      email: typeof row.email === "string" ? row.email : null,
+      plan:
+        typeof row.plan === "string" && row.plan.trim()
+          ? row.plan.trim().toLowerCase()
+          : "free",
+    };
+  } catch {
+    return null;
+  }
 }
 
 // One-time legacy import: R2 JSON records for this user move into SQLite on

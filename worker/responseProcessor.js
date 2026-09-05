@@ -501,11 +501,13 @@ export function scoreContinuity({ project, response, userPrompt }) {
 // when asked to continue an already-complete answer ("My previous reply was
 // already complete — it was a single greeting sentence...", or the newer
 // "continuation check" boilerplate: "No partial file or open document exists
-// in this session...", "## Continuation Status", "nothing further to append",
-// "paste the partial content..."). Any such text is noise: strip from the
-// first meta phrase to the end of the chunk.
+// in this session...", "There is no prior partial file...", "Assuming you
+// meant...", "## Continuation Status", "nothing further to append",
+// "paste the partial content...", "I can't continue from a stopping
+// point..."). Any such text is noise: strip from the first meta phrase to
+// the end of the chunk.
 const META_COMMENTARY_PATTERN =
-  /(?:My (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|The (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|Your (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|(?:The|This) (?:response|reply|answer) is already (?:complete|finished)|There (?:is|was) (?:no|nothing) (?:dangling|open|more) (?:file|code|tag|expression|block|content)|No continuation (?:is )?needed|Nothing (?:to|left to|more to) continu|No (?:partial|incomplete) (?:file|document|output|content)|#{1,3}\s*Continuation (?:Status|Check)|nothing (?:further|more|else) (?:to append|to add|can be appended)|no (?:stopping|stop) points? (?:to resume|for resuming) from|paste the (?:partial content|last lines)|continue directly from that exact|no open [`<])[^]*$/i;
+  /(?:(?:^|\n)##[^\n]{0,80}\n+)?(?:My (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|The (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|Your (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|(?:The|This) (?:response|reply|answer) is already (?:complete|finished)|There (?:is|was) (?:no|nothing) (?:dangling|open|more) (?:file|code|tag|expression|block|content)|No continuation (?:is )?needed|Nothing (?:to|left to|more to) continu|No (?:partial|incomplete) (?:file|document|output|content)|There is no (?:prior )?partial (?:file|document|content|output)|Assuming (?:you meant|the active file|no prior partial|the previous|the last|a complete)|I can'?t continue from a stopping point|Paste (?:your|the) partial|Provide the partial content|No active (?:partial|document|file|content|conversation)|None found (?:in the conversation|to resume|to continue|yet)|What to Provide to Resume|Required to Proceed|To proceed, please paste|#{1,3}\s*Continuation (?:Status|Check)|nothing (?:further|more|else) (?:to append|to add|can be appended)|no (?:stopping|stop) points? (?:to resume|for resuming) from|paste the (?:partial content|last lines)|continue directly from that exact|No (?:open|unclosed) [`<])[^]*$/i;
 
 export function stripMetaCommentary(text) {
   const value = String(text || "");
