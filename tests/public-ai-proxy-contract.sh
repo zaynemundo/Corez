@@ -36,8 +36,6 @@ check 'frontend retains local response fallback' 'generateLocalAIResponse' "$ser
 check_absent 'hardcoded gold quote is retired' '3,240[.]50|3240[.]50' "$service"
 check_absent 'hardcoded bitcoin quote is retired' '66,259[.]00|66259[.]00' "$service"
 check_absent 'local fallback does not claim a live snapshot' 'live market snapshot' "$service"
-check 'settings explains automatic routing' 'automatically routes' "$settings"
-check 'settings explains server-managed model selection' 'managed server-side' "$settings"
 check_absent 'settings does not expose provider or model names' 'GLM|DeepSeek|Kimi|MiMo|OpenRouter|FLUX|Cloudflare Workers AI|@cf/' "$settings"
 check 'README documents the OpenCode Go secret' 'OPENCODE_GO_API_KEY' "$readme"
 check_absent 'README no longer documents DeepSeek fallback for chat' 'DEEPSEEK_API_KEY' "$readme"

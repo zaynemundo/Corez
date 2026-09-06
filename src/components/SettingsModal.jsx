@@ -12,7 +12,6 @@ import {
   Zap,
   Sparkles,
   ArrowRight,
-  ExternalLink,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -250,30 +249,6 @@ export default function SettingsModal({
               View pricing <ArrowRight size={14} strokeWidth={1.75} />
             </span>
           </button>
-          <div className="pricing-footnote">
-            Connected to <strong>/pricing</strong> • Standard 18.36 AED /
-            Premium 27.54 AED • Billed monthly • <ExternalLink size={10} />{" "}
-            Secure Ziina checkout
-            <br />
-            <span style={{ fontSize: "10px", color: "var(--text-muted)" }}>
-              Cancel or downgrade takes effect after current period ends — you keep current plan until {periodEnd || "period end"}.
-            </span>
-          </div>
-        </div>
-
-        <div className="settings-section">
-          <div className="settings-section-label">Support</div>
-          <div
-            style={{
-              fontSize: "0.825rem",
-              color: "var(--text-secondary)",
-              lineHeight: 1.5,
-            }}
-          >
-            Corez automatically routes text, code and visual requests through
-            configured hosted AI services with resilient fallbacks. Model
-            selection is managed server-side.
-          </div>
         </div>
 
         <div className="settings-actions">
