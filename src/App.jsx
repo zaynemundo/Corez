@@ -1291,12 +1291,10 @@ function MainApp({ theme, setTheme }) {
               {!sessionsLoaded ? (
                 <div className="welcome-container">
                   <h1 className="welcome-title">COREZ</h1>
-                  <p className="welcome-subtitle">Loading your chats…</p>
                 </div>
               ) : chatLoading ? (
                 <div className="welcome-container">
                   <h1 className="welcome-title">COREZ</h1>
-                  <p className="welcome-subtitle">Loading conversation…</p>
                 </div>
               ) : !activeSession || activeSession.messages.length === 0 ? (
                 <div className="welcome-container">
