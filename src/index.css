@@ -3386,6 +3386,24 @@ h6 {
     0 0 0 1px rgba(212, 175, 55, 0.22),
     0 0 28px rgba(212, 175, 55, 0.08);
 }
+/* Light mode: pale gold (#f1fa8c) is unreadable on white cards — use a
+   deep gold instead (matches --inline-code-color in light mode). */
+[data-theme="light"] .pricing-card--premium .pricing-card-icon,
+[data-theme="light"] .pricing-card-page--premium .pricing-card-page-icon {
+  background: linear-gradient(
+    135deg,
+    rgba(212, 175, 55, 0.16) 0%,
+    rgba(212, 175, 55, 0.1) 100%
+  );
+  border-color: rgba(212, 175, 55, 0.35);
+  color: #7c5e10;
+}
+[data-theme="light"] .pricing-card--premium .pricing-card-name,
+[data-theme="light"] .pricing-card-page--premium .pricing-card-page-name,
+[data-theme="light"] .pricing-card--premium .pricing-feature-check,
+[data-theme="light"] .pricing-card-page--premium .pricing-check {
+  color: #7c5e10;
+}
 .pricing-card-page--premium::before {
   background: linear-gradient(
     135deg,
