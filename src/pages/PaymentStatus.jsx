@@ -7,6 +7,7 @@ export function PaymentSuccess() {
   const [status, setStatus] = useState("verifying"); // verifying | success | expired | error
   const [detail, setDetail] = useState("");
   const plan = search.get("plan") || "standard";
+  const urlInterval = (search.get("interval") || "").toLowerCase();
 
   useEffect(() => {
     let cancelled = false;
@@ -19,6 +20,7 @@ export function PaymentSuccess() {
         let body = {};
         if (paymentId) body.payment_id = paymentId;
         if (plan) body.plan = plan;
+        if (urlInterval) body.interval = urlInterval;
 
         const res = await fetch("/api/subscriptions/verify", {
           method: "POST",
@@ -30,12 +32,31 @@ export function PaymentSuccess() {
         if (!cancelled) {
           if (res.ok && data.verified) {
             setStatus("success");
-            const aed = data.aed || (plan === "premium" ? "27.54" : "18.36");
+            const interval = String(
+              data.interval || urlInterval || "month",
+            ).toLowerCase();
+            const isYearly =
+              interval === "year" ||
+              interval === "yearly" ||
+              interval === "annual";
+            const aed =
+              data.aed ||
+              (plan === "premium"
+                ? isYearly
+                  ? "264.36"
+                  : "27.54"
+                : isYearly
+                  ? "176.28"
+                  : "18.36");
             const end = data.period_end
               ? new Date(data.period_end).toLocaleDateString()
-              : "30 days from now";
+              : isYearly
+                ? "365 days from now"
+                : "30 days from now";
             setDetail(
-              `Verified — ${data.plan || plan} active. ${aed} AED / month. Renews on ${end}.`,
+              isYearly
+                ? `Verified — ${data.plan || plan} active. ${aed} AED / year. Valid until ${end}.`
+                : `Verified — ${data.plan || plan} active. ${aed} AED / month. Renews on ${end}.`,
             );
           } else if (data.verified === false) {
             setStatus("verifying");

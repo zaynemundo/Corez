@@ -28,6 +28,7 @@ import {
   validateMultiPageSite,
 } from "../utils/previewTransformer";
 import { publishAppInR2 } from "../services/appStorageService";
+import { useAuth } from "../context/AuthContext";
 import { createZipBlob } from "../utils/zipPackager";
 import { generateQrCodeSvg, generateEmbedSnippet } from "../utils/qrCode";
 
@@ -55,6 +56,80 @@ export default function CanvasPreview({
   const [activePage, setActivePage] = useState("index.html");
   const [publishTab, setPublishTab] = useState("link"); // 'link' | 'qr' | 'embed'
   const [embedCopied, setEmbedCopied] = useState(false);
+
+  // Publish gating: sharing to corez.pro (including custom URL slugs) is a
+  // Standard/Premium feature. publishPlan stays null while unknown — unknown
+  // is allowed through and the server enforces the real gate, so logged-out
+  // guests still get the server's auth error and tests without a session
+  // keep working.
+  let auth = null;
+  try {
+    auth = useAuth();
+  } catch {
+    auth = null;
+  }
+  const [publishPlan, setPublishPlan] = useState(null);
+  const [planExpired, setPlanExpired] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadPlan = async () => {
+      try {
+        const r = await fetch("/api/subscriptions/me", {
+          credentials: "include",
+        });
+        const d = await r.json().catch(() => ({}));
+        if (cancelled) return;
+        if (r.ok && d) {
+          setPublishPlan(
+            String(d.plan || auth?.user?.plan || "free").toLowerCase(),
+          );
+          setPlanExpired(d.status === "expired" || d.isExpired === true);
+          return;
+        }
+      } catch {}
+      if (!cancelled && auth?.user?.plan) {
+        setPublishPlan(String(auth.user.plan).toLowerCase());
+      }
+    };
+    loadPlan();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const isPaidPublishPlan = (plan, expired) =>
+    (plan === "standard" || plan === "premium") && !expired;
+  const publishBlocked =
+    publishPlan !== null && !isPaidPublishPlan(publishPlan, planExpired);
+  const publishUpgradeMessage =
+    "Publishing to corez.pro is available on Standard and Premium plans. Upgrade to share your creation with a public link.";
+
+  const resolvePublishPlan = async () => {
+    if (publishPlan !== null)
+      return { plan: publishPlan, expired: planExpired };
+    try {
+      const r = await fetch("/api/subscriptions/me", {
+        credentials: "include",
+      });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok && d) {
+        const plan = String(
+          d.plan || auth?.user?.plan || "free",
+        ).toLowerCase();
+        const expired = d.status === "expired" || d.isExpired === true;
+        setPublishPlan(plan);
+        setPlanExpired(expired);
+        return { plan, expired };
+      }
+    } catch {}
+    if (auth?.user?.plan) {
+      const plan = String(auth.user.plan).toLowerCase();
+      setPublishPlan(plan);
+      return { plan, expired: false };
+    }
+    return { plan: null, expired: false };
+  };
 
   const iframeRef = useRef(null);
 
@@ -151,6 +226,16 @@ export default function CanvasPreview({
       );
       return;
     }
+    // Plan gate: publishing to corez.pro is Standard/Premium only.
+    const { plan: effectivePlan, expired: effectiveExpired } =
+      await resolvePublishPlan();
+    if (
+      effectivePlan !== null &&
+      !isPaidPublishPlan(effectivePlan, effectiveExpired)
+    ) {
+      setPublishError(publishUpgradeMessage);
+      return;
+    }
     setPublishing(true);
     setPublishError(null);
     try {
@@ -226,6 +311,15 @@ export default function CanvasPreview({
 
   const handleUpdateSlug = async (e) => {
     if (e) e.preventDefault();
+    const { plan: slugPlan, expired: slugExpired } =
+      await resolvePublishPlan();
+    if (slugPlan !== null && !isPaidPublishPlan(slugPlan, slugExpired)) {
+      setSlugError(
+        "Custom URL slugs are available on Standard and Premium plans.",
+      );
+      setSlugSuccess(null);
+      return;
+    }
     const cleaned = (customSlug || "").trim().toLowerCase();
     if (!cleaned || cleaned === publishResult?.slug || isUpdatingSlug) return;
 
@@ -469,23 +563,58 @@ export default function CanvasPreview({
             corez-nav message, so no external tab bar is needed. */}
 
         <div className="canvas-controls">
-          {/* Publish: share the creation with anyone via a short link */}
+          {/* Publish: share the creation with anyone via a short link.
+              Paid feature — free plans see a disabled locked button. */}
           {editableCode && !isStreaming && (
-            <button
-              type="button"
-              className="code-btn publish-btn"
-              onClick={handlePublish}
-              disabled={publishing}
-              title="Publish this creation and share the link"
-              aria-label={publishing ? "Publishing..." : "Publish"}
-            >
-              {publishing ? (
-                <Loader2 size={13} className="spin-icon" />
-              ) : (
-                <Share2 size={13} />
+            <>
+              <button
+                type="button"
+                className="code-btn publish-btn"
+                onClick={handlePublish}
+                disabled={publishing || publishBlocked}
+                title={
+                  publishBlocked
+                    ? "Publishing to corez.pro requires Standard or Premium"
+                    : "Publish this creation and share the link"
+                }
+                aria-label={
+                  publishing
+                    ? "Publishing..."
+                    : publishBlocked
+                      ? "Publish (requires Standard or Premium plan)"
+                      : "Publish"
+                }
+              >
+                {publishing ? (
+                  <Loader2 size={13} className="spin-icon" />
+                ) : publishBlocked ? (
+                  <Lock size={13} />
+                ) : (
+                  <Share2 size={13} />
+                )}
+                <span>{publishing ? "Publishing..." : "Publish"}</span>
+              </button>
+              {publishBlocked && (
+                <span
+                  style={{
+                    fontSize: "0.7rem",
+                    color: "var(--text-secondary)",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <a
+                    href="/pricing"
+                    style={{
+                      color: "var(--text-primary)",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Upgrade
+                  </a>{" "}
+                  to publish
+                </span>
               )}
-              <span>{publishing ? "Publishing..." : "Publish"}</span>
-            </button>
+            </>
           )}
 
           <button
@@ -885,10 +1014,33 @@ export default function CanvasPreview({
                   </a>
                 </div>
 
-                {/* Slug Customization / 1-Time Change */}
-                {publishResult.customized ||
-                (publishResult.slug &&
-                  !/^[a-z0-9]{4,8}-[0-9]{1,6}$/.test(publishResult.slug)) ? (
+                {/* Slug Customization / 1-Time Change (Standard & Premium only) */}
+                {publishBlocked ? (
+                  <p
+                    style={{
+                      fontSize: "0.74rem",
+                      color: "var(--text-secondary)",
+                      margin: "2px 0 0",
+                    }}
+                  >
+                    Custom URL slugs are available on Standard and Premium
+                    plans.{" "}
+                    <a
+                      href="/pricing"
+                      style={{
+                        color: "var(--text-primary)",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Upgrade
+                    </a>{" "}
+                    to choose a custom link.
+                  </p>
+                ) : publishResult.customized ||
+                  (publishResult.slug &&
+                    !/^[a-z0-9]{4,8}-[0-9]{1,6}$/.test(
+                      publishResult.slug,
+                    )) ? (
                   <div
                     className="publish-slug-locked"
                     style={{

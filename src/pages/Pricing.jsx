@@ -25,7 +25,6 @@ const PLANS = [
       "20 generations / month",
       "1 project",
       "Community support",
-      "Publish to corez.pro/*",
     ],
     cta: "Start for free",
     popular: false,
@@ -42,6 +41,7 @@ const PLANS = [
       "200 generations / month",
       "10 projects",
       "Publish & share",
+      "Custom URL slug",
       "Priority queue",
       "Standard support",
     ],
@@ -60,6 +60,8 @@ const PLANS = [
     features: [
       "Unlimited generations",
       "Unlimited projects",
+      "Publish & share",
+      "Custom URL slug",
       "Priority support",
       "Early access to new models",
       "Custom domains (soon)",
@@ -333,12 +335,6 @@ export default function Pricing() {
               Yearly <span className="pricing-save">Save 20%</span>
             </button>
           </div>
-          {billing === "yearly" && (
-            <div className="pricing-yearly-note">
-              Yearly billing coming soon — stay on monthly and save 20% when it
-              launches.
-            </div>
-          )}
         </div>
       </header>
 

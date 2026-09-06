@@ -3296,11 +3296,6 @@ h6 {
   border-radius: 999px;
   border: 1px solid rgba(74, 222, 128, 0.25);
 }
-.pricing-yearly-note {
-  margin-top: 10px;
-  font-size: 11px;
-  color: var(--text-muted);
-}
 .pricing-main {
   max-width: 1120px;
   margin: 0 auto;

@@ -11,6 +11,7 @@ import {
 import { handleRerank, handleEmbed } from "./aiModels.js";
 import { fetchAwwwardsInspiration, handleInspiration } from "./inspiration.js";
 import { verifySession } from "./auth.js";
+import { getActiveSubscription } from "./subscriptions.js";
 import {
   safeErrorDetail,
   readBoundedJson,
@@ -3705,6 +3706,30 @@ async function handlePublish(request, env) {
     const uid = await sessionUid(request, env);
     if (!uid) {
       return jsonResponse(401, { error: "Authentication required." });
+    }
+    // Paid feature: publishing to corez.pro (including custom URL slugs)
+    // requires an active Standard or Premium plan. Fail open when the
+    // subscription store is unavailable (local dev without D1): only an
+    // explicit free/expired plan is rejected.
+    if (env?.DB) {
+      let sub = null;
+      try {
+        sub = await getActiveSubscription(env, uid);
+      } catch {
+        // Subscription lookup failed — fail open, only an explicit
+        // free/expired plan below is rejected.
+      }
+      if (sub) {
+        const plan = String(sub.plan || "free").toLowerCase();
+        const expired =
+          sub.status === "expired" || sub.isExpired === true;
+        if (!((plan === "standard" || plan === "premium") && !expired)) {
+          return jsonResponse(403, {
+            error:
+              "Publishing to corez.pro requires a Standard or Premium plan. Upgrade to share your creation with a public link.",
+          });
+        }
+      }
     }
     const retryAfter = publishRateLimiter(request);
     if (retryAfter !== null) {
