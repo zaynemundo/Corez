@@ -7,6 +7,7 @@ import {
   ArrowRight,
   Shield,
   Clock,
+  X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -273,33 +274,34 @@ export default function Pricing() {
   return (
     <div className="pricing-page">
       <div className="pricing-bg" aria-hidden="true" />
-      <header className="pricing-header">
-        <div className="pricing-nav">
-          <button onClick={() => navigate("/")} className="pricing-logo">
-            COREZ
-          </button>
-          <div className="pricing-nav-actions">
-            {user ? (
-              <>
-                <button
-                  onClick={() => navigate("/")}
-                  className="pricing-nav-login"
-                >
-                  Back to Corez
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={() => navigate("/")}
-                  className="pricing-nav-login"
-                >
-                  Sign in
-                </button>
-              </>
-            )}
-          </div>
+      <div className="pricing-nav">
+        <button onClick={() => navigate("/")} className="pricing-logo">
+          COREZ
+        </button>
+        <div className="pricing-nav-actions">
+          {user ? (
+            <>
+              <button
+                onClick={() => navigate("/")}
+                className="pricing-nav-close"
+                aria-label="Back to Corez"
+              >
+                <X size={16} strokeWidth={2} />
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => navigate("/")}
+                className="pricing-nav-login"
+              >
+                Sign in
+              </button>
+            </>
+          )}
         </div>
+      </div>
+      <header className="pricing-header">
         <div className="pricing-hero">
           <h1 className="pricing-title">Plans that grow with you</h1>
           <p className="pricing-subtitle">
