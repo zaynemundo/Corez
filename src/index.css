@@ -3225,22 +3225,6 @@ h6 {
   text-align: center;
   padding: 12px 0 28px;
 }
-.pricing-kicker {
-  display: inline-block;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  padding: 6px 10px;
-  border-radius: 999px;
-}
-[data-theme="light"] .pricing-kicker {
-  background: rgba(0, 0, 0, 0.04);
-  border-color: rgba(0, 0, 0, 0.08);
-}
 .pricing-title {
   margin: 16px 0 10px;
   font-family: "Outfit", sans-serif;
@@ -3617,63 +3601,6 @@ h6 {
   font-size: 11px;
   color: var(--text-muted);
 }
-.pricing-compare {
-  margin-top: 48px;
-}
-.pricing-compare-title {
-  font-family: "Outfit", sans-serif;
-  font-weight: 700;
-  font-size: 18px;
-  text-align: center;
-  margin-bottom: 16px;
-}
-.pricing-table-wrap {
-  overflow-x: auto;
-  border: 1px solid var(--border-color);
-  border-radius: 14px;
-  background: rgba(18, 20, 29, 0.4);
-}
-[data-theme="light"] .pricing-table-wrap {
-  background: rgba(0, 0, 0, 0.02);
-}
-.pricing-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-.pricing-table th,
-.pricing-table td {
-  padding: 12px 16px;
-  text-align: left;
-  border-bottom: 1px solid var(--border-color);
-}
-.pricing-table th {
-  font-weight: 600;
-  color: var(--text-muted);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  background: rgba(255, 255, 255, 0.02);
-}
-[data-theme="light"] .pricing-table th {
-  background: rgba(0, 0, 0, 0.02);
-}
-.pricing-table td {
-  color: var(--text-secondary);
-}
-.pricing-table td:nth-child(n + 2) {
-  text-align: center;
-}
-.pricing-table th:nth-child(n + 2) {
-  text-align: center;
-}
-.pricing-tick {
-  color: var(--market-positive);
-}
-.pricing-cross {
-  color: var(--text-muted);
-  opacity: 0.4;
-}
 .pricing-faq {
   margin-top: 48px;
 }
@@ -3709,29 +3636,6 @@ h6 {
   line-height: 1.5;
   margin: 0;
 }
-.pricing-footer {
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: 32px 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--text-muted);
-  border-top: 1px solid var(--border-color);
-  margin-top: 24px;
-}
-.pricing-footer-link {
-  background: none;
-  border: none;
-  color: var(--text-primary);
-  font-weight: 600;
-  cursor: pointer;
-}
-.pricing-footer-link:hover {
-  text-decoration: underline;
-}
-
 @media (max-width: 860px) {
   .pricing-grid-page {
     grid-template-columns: 1fr;
@@ -4239,15 +4143,6 @@ h6 {
   .pricing-hero {
     padding: 8px 0 16px;
   }
-  .pricing-kicker {
-    font-size: 10px;
-    padding: 5px 9px;
-    line-height: 1.4;
-    max-width: 100%;
-    white-space: normal;
-    text-align: center;
-    word-break: break-word;
-  }
   .pricing-title {
     font-size: clamp(26px, 7vw, 32px);
     margin: 14px 0 8px;
@@ -4284,35 +4179,6 @@ h6 {
   }
   .pricing-banner-wrap {
     padding: 0 16px 12px !important;
-  }
-  .pricing-compare {
-    margin-top: 28px;
-  }
-  .pricing-compare-title {
-    font-size: 16px;
-    margin-bottom: 12px;
-  }
-  .pricing-table-wrap {
-    border-radius: 12px;
-    -webkit-overflow-scrolling: touch;
-  }
-  .pricing-table th,
-  .pricing-table td {
-    padding: 10px 8px;
-    font-size: 12px;
-    white-space: nowrap;
-  }
-  .pricing-table th:first-child,
-  .pricing-table td:first-child {
-    white-space: normal;
-    min-width: 110px;
-    text-align: left;
-  }
-  .pricing-footer {
-    flex-direction: column;
-    gap: 10px;
-    text-align: center;
-    padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px));
   }
 }
 

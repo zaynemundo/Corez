@@ -7,7 +7,6 @@ import {
   ArrowRight,
   Shield,
   Clock,
-  X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -302,9 +301,6 @@ export default function Pricing() {
           </div>
         </div>
         <div className="pricing-hero">
-          <div className="pricing-kicker">
-            Pricing • Billed monthly via Ziina • Secure checkout
-          </div>
           <h1 className="pricing-title">Plans that grow with you</h1>
           <p className="pricing-subtitle">
             Start free, upgrade when you need more. All plans include live
@@ -549,101 +545,7 @@ export default function Pricing() {
           })}
         </div>
 
-        <div className="pricing-compare">
-          <h2 className="pricing-compare-title">Compare plans</h2>
-          <div className="pricing-table-wrap">
-            <table className="pricing-table">
-              <thead>
-                <tr>
-                  <th>Feature</th>
-                  <th>Free</th>
-                  <th>Standard</th>
-                  <th>Premium</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>Generations / month</td>
-                  <td>20</td>
-                  <td>200</td>
-                  <td>Unlimited</td>
-                </tr>
-                <tr>
-                  <td>Projects</td>
-                  <td>1</td>
-                  <td>10</td>
-                  <td>Unlimited</td>
-                </tr>
-                <tr>
-                  <td>Publish to corez.pro</td>
-                  <td>
-                    <Check size={14} className="pricing-tick" />
-                  </td>
-                  <td>
-                    <Check size={14} className="pricing-tick" />
-                  </td>
-                  <td>
-                    <Check size={14} className="pricing-tick" />
-                  </td>
-                </tr>
-                <tr>
-                  <td>Priority queue</td>
-                  <td>
-                    <X size={14} className="pricing-cross" />
-                  </td>
-                  <td>
-                    <Check size={14} className="pricing-tick" />
-                  </td>
-                  <td>
-                    <Check size={14} className="pricing-tick" />
-                  </td>
-                </tr>
-                <tr>
-                  <td>Priority support</td>
-                  <td>
-                    <X size={14} className="pricing-cross" />
-                  </td>
-                  <td>
-                    <X size={14} className="pricing-cross" />
-                  </td>
-                  <td>
-                    <Check size={14} className="pricing-tick" />
-                  </td>
-                </tr>
-                <tr>
-                  <td>Early access</td>
-                  <td>
-                    <X size={14} className="pricing-cross" />
-                  </td>
-                  <td>
-                    <X size={14} className="pricing-cross" />
-                  </td>
-                  <td>
-                    <Check size={14} className="pricing-tick" />
-                  </td>
-                </tr>
-                <tr>
-                  <td>Price</td>
-                  <td>0 AED</td>
-                  <td>18.36 AED / mo</td>
-                  <td>27.54 AED / mo</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
       </main>
-
-      <footer className="pricing-footer">
-        <span>
-          © {new Date().getFullYear()} Corez • Secure checkout via Ziina • AED •
-          Monthly
-        </span>
-        <button onClick={() => navigate("/")} className="pricing-footer-link">
-          Back to Corez →
-        </button>
-      </footer>
     </div>
   );
 }
