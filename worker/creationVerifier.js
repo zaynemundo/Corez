@@ -66,6 +66,32 @@ function hasStartControl(content) {
 // with no terminal state can never be finished, verified, or reviewed.
 const TERMINAL_STATE_PATTERNS =
   /\b(victory|you win|win screen|level clear|stage clear|mission complete|mission failed|game complete|game-complete|gameover|game over|you lose|you lost|you died|out of (lives|hearts)|no lives left)\b/i;
+
+// --- Game quality gates (web game-dev best practices) ----------------------
+// These are repair-triggering quality failures, deliberately NOT hard
+// failures: a game missing them is improvable, not undeliverable, so the
+// harness repairs forward and still delivers after the repair budget.
+// Audio: Web Audio is essential to game feel and needs zero assets.
+const AUDIO_PATTERNS = /AudioContext|webkitAudioContext/i;
+// Fixed timestep: variable-dt integration slows down on weak devices; a
+// fixed-step accumulator (STEP = 1/60, while (acc >= STEP)) keeps physics
+// framerate-independent.
+const FIXED_TIMESTEP_PATTERNS =
+  /\b(accumulator|fixed[_-]?step|fixed[_-]?update|FIXED_STEP|fixedTimestep)\b|STEP\s*=\s*1\s*\/\s*(30|50|60)\b|while\s*\(\s*acc/i;
+// Held-key polling: movement must read a key map each frame (layout-
+// independent e.code), not react to discrete key events.
+const KEY_POLL_PATTERNS =
+  /(\bkeys\s*[[.])|(heldKeys)|(keyState)|(pressedKeys)|(Input\s*\.\s*isDown)/;
+// Object pooling: games that spawn bullets/particles only stay smooth when
+// short-lived objects are reused instead of allocated per frame. Stem
+// matching (bullets, bulletPool, spawnBullet, particles) — full-word
+// matching would miss the identifiers real game code uses.
+const POOL_PATTERNS = /pool/i;
+const SPAWNER_PATTERNS = /\b(bullet|projectile|missile|particle|spawn)\w*/i;
+// Portal-ready: fullscreen games must handle resize, and every deliverable
+// needs a viewport meta for mobile/portals.
+const RESIZE_PATTERNS = /\bresize\b|visualViewport|orientationchange|setTransform/i;
+const VIEWPORT_PATTERNS = /<meta\b[^>]*\bname\s*=\s*["']viewport["']/i;
 export const DEFAULT_APPROVED_CDNS = [
   "cdnjs.cloudflare.com",
   "cdn.jsdelivr.net",
@@ -198,6 +224,48 @@ export function verifyCreation(html, options = {}) {
         code: "missing-terminal-state",
         detail:
           "The game defines no win/victory or lose/game-over end state — a game that can never be won or lost is not a complete, verifiable deliverable.",
+      });
+    }
+    if (!AUDIO_PATTERNS.test(content)) {
+      failures.push({
+        code: "missing-audio",
+        detail:
+          "The game has no Web Audio (AudioContext) sound — add procedural sound effects (jump, collect, hit, win, lose) plus a simple music loop, created and resumed only inside a user gesture (Start button click/keypress), with a mute toggle.",
+      });
+    }
+    if (!FIXED_TIMESTEP_PATTERNS.test(content)) {
+      failures.push({
+        code: "missing-fixed-timestep",
+        detail:
+          "The game has no fixed-timestep simulation — accumulate real dt (clamped) and run update() in fixed STEP = 1/60 increments inside requestAnimationFrame so physics never slows down on weak devices.",
+      });
+    }
+    if (!KEY_POLL_PATTERNS.test(content)) {
+      failures.push({
+        code: "missing-key-polling",
+        detail:
+          "The game polls no held-key map each frame — track keys by e.code in a map on keydown/keyup and read it in update() (layout-independent movement), instead of reacting to discrete key events.",
+      });
+    }
+    if (SPAWNER_PATTERNS.test(content) && !POOL_PATTERNS.test(content)) {
+      failures.push({
+        code: "missing-object-pool",
+        detail:
+          "The game spawns bullets/particles but reuses no object pool — pool short-lived objects and never allocate with `new` inside the per-frame loop.",
+      });
+    }
+    if (!RESIZE_PATTERNS.test(content)) {
+      failures.push({
+        code: "missing-resize",
+        detail:
+          "The game handles no resize (no resize/visualViewport/orientationchange listener or canvas rescaling) — fullscreen and portal play break on window and orientation changes.",
+      });
+    }
+    if (!VIEWPORT_PATTERNS.test(content)) {
+      failures.push({
+        code: "missing-viewport",
+        detail:
+          "The game has no <meta name=\"viewport\"> tag — mobile and portal embeds render it at desktop scale.",
       });
     }
   }

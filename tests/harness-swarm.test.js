@@ -218,18 +218,26 @@ describe('creation harness swarm pre-pass', () => {
 
   it('skips the swarm for the game fast path', async () => {
     const GAME_ARTIFACT = `<!DOCTYPE html>
-<html lang="en"><head><title>G</title></head>
+<html lang="en"><head><title>G</title><meta name="viewport" content="width=device-width, initial-scale=1"></head>
 <body><canvas id="c"></canvas>
 <button id="startBtn">Play</button>
 <script>
 let state='menu',score=0,lives=3;
-document.getElementById('startBtn').addEventListener('click',function(){state='playing';});
-function gameLoop(){ update(); render(); }
-function update(){ if(state!=='playing')return; score++; if(score>100){state='victory';} if(lives<=0){state='gameover';} }
-function render(){}
-document.addEventListener('keydown', function(){});
+const keys={};
+let AC=window.AudioContext||window.webkitAudioContext,ac=null;
+function ensureAudio(){if(!ac&&AC){ac=new AC();}if(ac&&ac.state==='suspended'){ac.resume();}}
+document.addEventListener('keydown',function(e){keys[e.code]=true;ensureAudio();});
+document.addEventListener('keyup',function(e){keys[e.code]=false;});
 canvas.addEventListener('mousemove', function(){});
-requestAnimationFrame(gameLoop);
+document.getElementById('startBtn').addEventListener('click',function(){ensureAudio();state='playing';});
+const bulletPool=[];
+function spawnBullet(x,y){let b=bulletPool.pop()||{};b.x=x;b.y=y;b.vx=5;return b;}
+const STEP=1/60;let acc=0,last=0;
+function frame(t){const dt=Math.min((t-last)/1000,0.1);last=t;acc+=dt;while(acc>=STEP){update(STEP);acc-=STEP;}render();requestAnimationFrame(frame);}
+function update(dt){ if(state!=='playing')return; if(keys['ArrowRight']){score++;} if(score>100){state='victory';} if(lives<=0){state='gameover';} }
+function render(){}
+window.addEventListener('resize',function(){});
+requestAnimationFrame(frame);
 </script></body></html>`;
     const { fetchMock, calls } = buildSwarmMockProvider();
     fetchMock.mockImplementation(async (_url, init) => {

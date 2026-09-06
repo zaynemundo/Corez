@@ -13,18 +13,26 @@ vi.mock('../worker/providerChain.js', async (importOriginal) => {
 import { runStreamingChain } from '../worker/providerChain.js';
 
 const GOOD_ARTIFACT = `<!DOCTYPE html>
-<html lang="en"><head><title>G</title></head>
+<html lang="en"><head><title>G</title><meta name="viewport" content="width=device-width, initial-scale=1"></head>
 <body><canvas id="c"></canvas>
 <button id="startBtn">Play</button>
 <script>
 let state='menu',score=0,lives=3;
-document.getElementById('startBtn').addEventListener('click',function(){state='playing';});
-function gameLoop(){ update(); render(); }
-function update(){ if(state!=='playing')return; score++; if(score>100){state='victory';} if(lives<=0){state='gameover';} }
-function render(){}
-document.addEventListener('keydown', function(){});
+const keys={};
+let AC=window.AudioContext||window.webkitAudioContext,ac=null;
+function ensureAudio(){if(!ac&&AC){ac=new AC();}if(ac&&ac.state==='suspended'){ac.resume();}}
+document.addEventListener('keydown',function(e){keys[e.code]=true;ensureAudio();});
+document.addEventListener('keyup',function(e){keys[e.code]=false;});
 canvas.addEventListener('mousemove', function(){});
-requestAnimationFrame(gameLoop);
+document.getElementById('startBtn').addEventListener('click',function(){ensureAudio();state='playing';});
+const bulletPool=[];
+function spawnBullet(x,y){let b=bulletPool.pop()||{};b.x=x;b.y=y;b.vx=5;return b;}
+const STEP=1/60;let acc=0,last=0;
+function frame(t){const dt=Math.min((t-last)/1000,0.1);last=t;acc+=dt;while(acc>=STEP){update(STEP);acc-=STEP;}render();requestAnimationFrame(frame);}
+function update(dt){ if(state!=='playing')return; if(keys['ArrowRight']){score++;} if(score>100){state='victory';} if(lives<=0){state='gameover';} }
+function render(){}
+window.addEventListener('resize',function(){});
+requestAnimationFrame(frame);
 </script></body></html>`;
 
 const BROKEN_ARTIFACT = '<html><body><p>nothing here</p></body></html>';
@@ -471,7 +479,7 @@ describe('runCreationHarness resilience', () => {
 
   it('H6: auto-continues a truncated build stream until the HTML and script blocks are fully closed', async () => {
     const part1 = `<!DOCTYPE html><html><body><canvas id="c"></canvas><script>let x = 0;\nfunction gameLoop() { update(); render(); }\nconst srd = (my *`;
-    const part2 = `Math.sin(angle));\nlet state='menu',score=0;\ndocument.getElementById('startBtn').addEventListener('click',function(){state='playing';});\nfunction update(){ if(state==='playing'){score++;} if(score>50){state='victory';} }\nfunction render(){}\ndocument.addEventListener('keydown', function(){});\ncanvas.addEventListener('mousemove', function(){});\nrequestAnimationFrame(gameLoop);\n</script><button id="startBtn">Play</button></body></html>`;
+    const part2 = `Math.sin(angle));\nlet state='menu',score=0;\ndocument.getElementById('startBtn').addEventListener('click',function(){state='playing';});\nfunction update(){ if(state==='playing'){score++;} if(score>50){state='victory';} }\nfunction render(){}\ndocument.addEventListener('keydown', function(){});\ncanvas.addEventListener('mousemove', function(){});\nrequestAnimationFrame(gameLoop);\nconst keys={};keys['ArrowRight']=false;let AC=window.AudioContext,ac=null;const STEP=1/60;let acc=0;function stepFn(t){acc+=t;while(acc>=STEP){update(STEP);acc-=STEP;}}window.addEventListener('resize',function(){});\n</script><button id="startBtn">Play</button><meta name="viewport" content="width=device-width"></body></html>`;
 
     runStreamingChain.mockImplementation(async function* (messages) {
       const serialized = JSON.stringify(messages || []);
@@ -510,7 +518,7 @@ describe('runCreationHarness resilience', () => {
     // Short truncated build (< 200 chars) so a full identical repeat
     // produces no growth and triggers the anti-repeat path.
     const part1 = '<html><body><canvas id="c"></canvas><script>const srd = (my *';
-    const part2 = `Math.sin(angle));\nlet state='menu',score=0;\ndocument.getElementById('startBtn').addEventListener('click',function(){state='playing';});\nfunction update(){ if(state==='playing'){score++;} if(score>50){state='victory';} }\nfunction render(){}\ndocument.addEventListener('keydown', function(){});\ncanvas.addEventListener('mousemove', function(){});\nrequestAnimationFrame(gameLoop);\n</script><button id="startBtn">Play</button></body></html>`;
+    const part2 = `Math.sin(angle));\nlet state='menu',score=0;\ndocument.getElementById('startBtn').addEventListener('click',function(){state='playing';});\nfunction update(){ if(state==='playing'){score++;} if(score>50){state='victory';} }\nfunction render(){}\ndocument.addEventListener('keydown', function(){});\ncanvas.addEventListener('mousemove', function(){});\nrequestAnimationFrame(gameLoop);\nconst keys={};keys['ArrowRight']=false;let AC=window.AudioContext,ac=null;const STEP=1/60;let acc=0;function stepFn(t){acc+=t;while(acc>=STEP){update(STEP);acc-=STEP;}}window.addEventListener('resize',function(){});\n</script><button id="startBtn">Play</button><meta name="viewport" content="width=device-width"></body></html>`;
 
     let continuationCalls = 0;
     runStreamingChain.mockImplementation(async function* (messages) {

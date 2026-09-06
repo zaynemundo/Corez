@@ -136,6 +136,40 @@ export async function testGameHtml(
     for (const err of functional.errors) errors.push(err);
   }
 
+  // 9. Game quality warnings (advisory only — never fail the build): web
+  // game-dev best practices the generator is instructed to follow. Only
+  // evaluated for canvas content so plain pages never collect game advice.
+  if (canvas) {
+    if (!/AudioContext|webkitAudioContext/i.test(scriptTags)) {
+      warnings.push(
+        "No Web Audio usage detected — procedural sound effects add essential game feel with zero assets.",
+      );
+    } else if (!/\.resume\s*\(/.test(scriptTags)) {
+      warnings.push(
+        "AudioContext is never resumed — browsers require a user gesture (Start click/keypress) before audio can play.",
+      );
+    }
+    if (
+      !/\b(accumulator|fixed[_-]?step|fixed[_-]?update|FIXED_STEP|fixedTimestep)\b|STEP\s*=\s*1\s*\/\s*(30|50|60)\b|while\s*\(\s*acc/i.test(
+        scriptTags,
+      )
+    ) {
+      warnings.push(
+        "No fixed-timestep loop detected — variable-dt physics slows down on weak devices.",
+      );
+    }
+    if (!/\bresize\b|visualViewport|orientationchange/i.test(scriptTags)) {
+      warnings.push(
+        "No resize handling detected — fullscreen and portal embeds break on window/orientation changes.",
+      );
+    }
+    if (!/visibilitychange/.test(scriptTags)) {
+      warnings.push(
+        "Game does not pause when the tab hides — add a visibilitychange handler that pauses.",
+      );
+    }
+  }
+
   const passed = errors.length === 0;
 
   return {
@@ -277,7 +311,11 @@ function findStartControl(document) {
 /**
  * Headless functional check: boot the game, click start, feed it input, and
  * require a live render loop with zero script errors. Returns
- * { passed, errors }. Never throws — setup failures become error entries.
+ * { passed, errors, drawCalls }. drawCalls is the raw canvas command count
+ * observed in the check window — the same signal a frame-capture tool
+ * (e.g. Spector.js) reports, exposed here for future perf budgets without
+ * asserting an arbitrary threshold. Never throws — setup failures become
+ * error entries.
  */
 export async function runFunctionalGameCheck(htmlContent) {
   const errors = [];
@@ -319,7 +357,7 @@ export async function runFunctionalGameCheck(htmlContent) {
       errors.push(
         "functional: no clickable start control found — the game cannot be started headlessly.",
       );
-      return { passed: false, errors };
+      return { passed: false, errors, drawCalls: drawCalls.length };
     }
     try {
       startControl.click();
@@ -368,9 +406,9 @@ export async function runFunctionalGameCheck(htmlContent) {
       );
     }
 
-    return { passed: errors.length === 0, errors };
+    return { passed: errors.length === 0, errors, drawCalls: drawCalls.length };
   } catch (err) {
-    return { passed: false, errors: [`functional: harness setup failed: ${err.message}`] };
+    return { passed: false, errors: [`functional: harness setup failed: ${err.message}`], drawCalls: 0 };
   } finally {
     try {
       if (dom) dom.window.close();

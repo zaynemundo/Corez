@@ -3,19 +3,27 @@ import { verifyCreation, verifySpecCoverage, buildRepairPrompt } from '../worker
 
 const GOOD_GAME = `<!DOCTYPE html>
 <html lang="en">
-<head><title>FPS</title></head>
+<head><title>FPS</title><meta name="viewport" content="width=device-width, initial-scale=1"></head>
 <body>
 <canvas id="c"></canvas>
 <button id="startBtn">Play</button>
 <script>
 let state='menu',score=0,lives=3;
-document.getElementById('startBtn').addEventListener('click',function(){state='playing';});
-function gameLoop(){ update(); render(); }
-function update(){ if(state!=='playing')return; score++; if(score>100){state='victory';} if(lives<=0){state='gameover';} }
-function render(){}
-document.addEventListener('keydown', function(){});
+const keys={};
+let AC=window.AudioContext||window.webkitAudioContext,ac=null;
+function ensureAudio(){if(!ac&&AC){ac=new AC();}if(ac&&ac.state==='suspended'){ac.resume();}}
+document.addEventListener('keydown',function(e){keys[e.code]=true;ensureAudio();});
+document.addEventListener('keyup',function(e){keys[e.code]=false;});
 canvas.addEventListener('mousemove', function(){});
-requestAnimationFrame(gameLoop);
+document.getElementById('startBtn').addEventListener('click',function(){ensureAudio();state='playing';});
+const bulletPool=[];
+function spawnBullet(x,y){let b=bulletPool.pop()||{};b.x=x;b.y=y;b.vx=5;return b;}
+const STEP=1/60;let acc=0,last=0;
+function frame(t){const dt=Math.min((t-last)/1000,0.1);last=t;acc+=dt;while(acc>=STEP){update(STEP);acc-=STEP;}render();requestAnimationFrame(frame);}
+function update(dt){ if(state!=='playing')return; if(keys['ArrowRight']){score++;} if(score>100){state='victory';} if(lives<=0){state='gameover';} }
+function render(){}
+window.addEventListener('resize',function(){});
+requestAnimationFrame(frame);
 </script>
 </body>
 </html>`;
@@ -148,6 +156,85 @@ console.log(x);
     const content = GOOD_GAME.replace(/victory/g, 'playing');
     const result = verifyCreation(content, { intentType: 'game_creation' });
     expect(result.failures.some((f) => f.code === 'missing-terminal-state')).toBe(false);
+  });
+
+  it('rejects a game with no Web Audio', () => {
+    const content = GOOD_GAME.replace(
+      'let AC=window.AudioContext||window.webkitAudioContext,ac=null;',
+      'let ac=null;',
+    );
+    const result = verifyCreation(content, { intentType: 'game_creation' });
+    expect(result.passed).toBe(false);
+    expect(result.failures.some((f) => f.code === 'missing-audio')).toBe(true);
+  });
+
+  it('rejects a game with no fixed timestep', () => {
+    const content = GOOD_GAME
+      .replace('const STEP=1/60;let acc=0,last=0;', '')
+      .replace(
+        'function frame(t){const dt=Math.min((t-last)/1000,0.1);last=t;acc+=dt;while(acc>=STEP){update(STEP);acc-=STEP;}render();requestAnimationFrame(frame);}',
+        'function frame(t){update(0.016);render();requestAnimationFrame(frame);}',
+      );
+    const result = verifyCreation(content, { intentType: 'game_creation' });
+    expect(result.passed).toBe(false);
+    expect(result.failures.some((f) => f.code === 'missing-fixed-timestep')).toBe(true);
+  });
+
+  it('rejects a game that polls no held-key map', () => {
+    const content = GOOD_GAME.replace(/keys\[/g, 'k[');
+    const result = verifyCreation(content, { intentType: 'game_creation' });
+    expect(result.passed).toBe(false);
+    expect(result.failures.some((f) => f.code === 'missing-key-polling')).toBe(true);
+  });
+
+  it('rejects a spawning game with no object pool', () => {
+    const content = GOOD_GAME.replace(/bulletPool/g, 'activeShots');
+    const result = verifyCreation(content, { intentType: 'game_creation' });
+    expect(result.passed).toBe(false);
+    expect(result.failures.some((f) => f.code === 'missing-object-pool')).toBe(true);
+  });
+
+  it('does not require a pool when nothing spawns', () => {
+    const content = GOOD_GAME.replace(/bulletPool/g, 'activeShots').replace(
+      'function spawnBullet(x,y){let b=activeShots.pop()||{};b.x=x;b.y=y;b.vx=5;return b;}',
+      '',
+    );
+    const result = verifyCreation(content, { intentType: 'game_creation' });
+    expect(result.failures.some((f) => f.code === 'missing-object-pool')).toBe(false);
+  });
+
+  it('rejects a game with no resize handling', () => {
+    const content = GOOD_GAME.replace(
+      "window.addEventListener('resize',function(){});",
+      '',
+    );
+    const result = verifyCreation(content, { intentType: 'game_creation' });
+    expect(result.passed).toBe(false);
+    expect(result.failures.some((f) => f.code === 'missing-resize')).toBe(true);
+  });
+
+  it('rejects a game with no viewport meta', () => {
+    const content = GOOD_GAME.replace(
+      '<meta name="viewport" content="width=device-width, initial-scale=1">',
+      '',
+    );
+    const result = verifyCreation(content, { intentType: 'game_creation' });
+    expect(result.passed).toBe(false);
+    expect(result.failures.some((f) => f.code === 'missing-viewport')).toBe(true);
+  });
+
+  it('keeps quality gates soft (repairable, never build-blocking)', async () => {
+    const { HARD_FAILURE_CODES } = await import('../worker/harness.js');
+    for (const code of [
+      'missing-audio',
+      'missing-fixed-timestep',
+      'missing-key-polling',
+      'missing-object-pool',
+      'missing-resize',
+      'missing-viewport',
+    ]) {
+      expect(HARD_FAILURE_CODES.has(code)).toBe(false);
+    }
   });
 });
 

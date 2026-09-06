@@ -906,6 +906,13 @@ export async function improveCodingPrompt(prompt, intent = null) {
 - FULLSCREEN GAME REQUIREMENT: The game MUST fill the entire preview viewport — html/body with width:100%, height:100%, margin:0, overflow:hidden; a full-viewport canvas (width:100%, height:100%, display:block) with NO max-width, NO bordered box, NO rounded container around the game. Keep a fixed internal game resolution (e.g. 960x540) and scale it to the viewport with ctx.setTransform + a resize listener so the game always fills the screen.
 - MOBILE: size the canvas from visualViewport (not just innerHeight) and listen for orientationchange; include on-screen touch controls (left/right/jump/action buttons) shown only on touch or coarse-pointer devices, bound with touchstart/touchend/touchcancel.
 - COMPLETENESS CHECK before you finish: implement EVERY feature and rule you promise in the brief — score, lives, levels, enemies, collisions, win/lose states, menus — with no stubs, no TODOs, and no placeholder functions; the game must be fully playable end-to-end.
+- GAME LOOP: fixed-timestep simulation — accumulate real dt (clamped to max 0.1s) and run update() in fixed STEP=1/60 increments inside requestAnimationFrame; never tie movement or physics directly to raw frame dt.
+- CONTROLS: poll a held-key map every frame using e.code (layout-independent: KeyW/ArrowLeft/Space); preventDefault() scrolling keys (arrows/space); for mouse-look games use Pointer Lock; poll navigator.getGamepads() with a deadzone where controllers fit.
+- AUDIO: procedural Web Audio SFX (jump, collect, hit, win, lose) plus a simple looping music pattern — zero external audio files; create AND resume() the AudioContext ONLY inside a user gesture (Start button click/keypress); add a mute toggle on M.
+- ARCHITECTURE: explicit game-state machine (START/PLAYING/PAUSED/GAMEOVER/VICTORY, pausing on visibilitychange) and entity AI states (idle/patrol/chase/attack/flee); pool bullets/particles/enemies — reuse objects, never allocate with \`new\` inside the per-frame loop.
+- GAME FEEL: screen shake on hits, hit-flash, particle bursts, floating score popups, and difficulty that ramps with score/time.
+- ENEMY AI: give enemies a behavior ladder — patrol waypoints, chase on sight with steering (seek/flee/wander), grid pathfinding in mazes — scaled by a difficulty factor.
+- PORTAL-READY: viewport meta and resize handling (already required above), zero external requests except approved CDNs, fully playable while muted.
 - Output ONLY the brief followed by the code block — NO feature summary, NO step-by-step guide, NO closing paragraph after the code.`;
     }
 

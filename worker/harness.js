@@ -33,7 +33,9 @@ const MAX_REPAIR_ROUNDS = 5;
 // Structural-incompleteness failure codes: an artifact carrying any of these
 // is NOT a deliverable — it was cut off mid-block, its root document is
 // missing, or its skeleton (canvas/loop/input) is broken. Policy failures
-// (external-script, too-many-pages) do not truncate the artifact and are
+// (external-script, too-many-pages) and game quality gates (missing-audio,
+// missing-fixed-timestep, missing-key-polling, missing-object-pool,
+// missing-resize, missing-viewport) do not truncate the artifact and are
 // reported through diagnostics instead of failing the build.
 export const HARD_FAILURE_CODES = new Set([
   "empty-output",
@@ -870,8 +872,10 @@ export async function* runCreationHarness(options) {
     // every continuation and repair round is NEVER delivered as a successful
     // build — the client gets an explicit error instead of a clean "done"
     // over truncated content. Policy failures (external-script,
-    // too-many-pages) do not truncate the artifact, keep the review path,
-    // and surface through diagnostics.
+    // too-many-pages) and game quality gates (missing-audio,
+    // missing-fixed-timestep, missing-key-polling, missing-object-pool,
+    // missing-resize, missing-viewport) do not truncate the artifact, keep
+    // the review path, and surface through diagnostics.
     if (state.verification && !state.verification.passed) {
       const hardFailures = state.verification.failures.filter((f) =>
         HARD_FAILURE_CODES.has(f.code),

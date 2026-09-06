@@ -608,6 +608,10 @@ describe('Prompt Architect', () => {
     expect(result).toContain('collision detection');
     expect(result).toContain('without defaulting to retro or pixel art');
     expect(result).not.toContain('8-bit retro pixel art style for visuals');
+    expect(result).toContain('fixed timestep');
+    expect(result).toContain('Web Audio');
+    expect(result).toContain('mute toggle');
+    expect(result).toContain('e.code');
   });
 
   it('generates bug fix prompts with root cause focus', () => {

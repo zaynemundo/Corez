@@ -274,15 +274,18 @@ function buildGamePrompt(rawPrompt, _intent, requirements, _context) {
   result += `Build a complete, playable browser game.\n\n`;
 
   result += `The game should include:\n`;
-  result += `- core game loop with requestAnimationFrame\n`;
-  result += `- player controls and interaction\n`;
+  result += `- core game loop with requestAnimationFrame on a fixed timestep (accumulate clamped dt, update in STEP=1/60 increments — never raw frame dt)\n`;
+  result += `- player controls and interaction (held-key map polled per frame via e.code; touch controls; pointer lock / gamepad where fitting)\n`;
   result += `- collision detection\n`;
   result += `- scoring or progress tracking\n`;
-  result += `- game over / restart flow\n\n`;
+  result += `- game over / restart flow plus pause and explicit game states (START/PLAYING/PAUSED/GAMEOVER/VICTORY)\n`;
+  result += `- procedural Web Audio SFX and music (no external files), unlocked on the Start gesture, with a mute toggle\n`;
+  result += `- entity AI states (idle/patrol/chase/attack) with difficulty ramping\n`;
+  result += `- pooled bullets/particles (no per-frame allocation) and game feel (screen shake, hit-flash, particles)\n\n`;
 
   result += `Requirements:\n`;
   result += `- 60 FPS stable performance\n`;
-  result += `- responsive canvas rendering\n`;
+  result += `- responsive canvas rendering with viewport meta and resize handling\n`;
   result += `- self-contained HTML/CSS/JS output ready for the preview canvas\n`;
   result += `- preserve any visual style explicitly requested by the user; otherwise derive an original art direction from the genre and setting without defaulting to retro or pixel art\n\n`;
 

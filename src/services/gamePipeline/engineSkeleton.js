@@ -160,27 +160,112 @@ export function generateEngineSkeleton(gameSpec = {}) {
       right() { return this.isDown('ArrowRight', 'right'); }
     };
 
-    // 4. Audio Synth Manager
+    // 4. Audio Synth Manager (procedural SFX + music, zero assets)
     const Sound = {
       ctx: null,
+      muted: false,
+      musicTimer: null,
       init() {
         const AudioContext = window.AudioContext || window.webkitAudioContext;
-        if (AudioContext) this.ctx = new AudioContext();
+        if (AudioContext && !this.ctx) {
+          try { this.ctx = new AudioContext(); } catch(e) {}
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume().catch(() => {});
+        }
       },
-      playTone(freq = 440, type = 'square', duration = 0.1) {
-        if (!this.ctx) return;
+      toggleMute() {
+        this.muted = !this.muted;
+        if (this.muted) this.stopMusic();
+        return this.muted;
+      },
+      playTone(freq = 440, type = 'square', duration = 0.1, volume = 0.15, when = 0) {
+        if (!this.ctx || this.muted) return;
         try {
+          const t = this.ctx.currentTime + when;
           const osc = this.ctx.createOscillator();
           const gain = this.ctx.createGain();
           osc.type = type;
-          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-          gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+          osc.frequency.setValueAtTime(freq, t);
+          gain.gain.setValueAtTime(volume, t);
+          gain.gain.exponentialRampToValueAtTime(0.01, t + duration);
           osc.connect(gain);
           gain.connect(this.ctx.destination);
-          osc.start();
-          osc.stop(this.ctx.currentTime + duration);
+          osc.start(t);
+          osc.stop(t + duration);
         } catch(e) {}
+      },
+      // Named game SFX presets: Sound.sfx('jump'), ('collect'), ('hit'), ('win'), ('lose')
+      sfx(name) {
+        const P = {
+          jump: [[440, 'square', 0.12], [660, 'square', 0.1, 0.12, 0.06]],
+          collect: [[880, 'sine', 0.08], [1320, 'sine', 0.1, 0.12, 0.05]],
+          hit: [[160, 'sawtooth', 0.2]],
+          shoot: [[720, 'square', 0.07, 0.1]],
+          win: [[523, 'square', 0.12], [659, 'square', 0.12, 0.12, 0.12], [784, 'square', 0.2, 0.12, 0.24]],
+          lose: [[330, 'sawtooth', 0.2], [220, 'sawtooth', 0.3, 0.12, 0.15]]
+        }[name] || [[440, 'square', 0.1]];
+        P.forEach(p => this.playTone(p[0], p[1], p[2], p[3] || 0.15, p[4] || 0));
+      },
+      // Tiny looping bassline; call Sound.startMusic() after game start.
+      startMusic() {
+        if (!this.ctx || this.muted || this.musicTimer) return;
+        const bass = [110, 110, 130.8, 98];
+        let i = 0;
+        this.musicTimer = setInterval(() => {
+          if (this.muted || !this.ctx || GameState.current !== 'PLAYING') return;
+          this.playTone(bass[i % bass.length], 'triangle', 0.22, 0.07);
+          i++;
+        }, 300);
+      },
+      stopMusic() {
+        if (this.musicTimer) { clearInterval(this.musicTimer); this.musicTimer = null; }
+      }
+    };
+
+    // 4b. Fixed-timestep loop: physics stays identical at any framerate.
+    // Usage: Time.reset(performance.now()); requestAnimationFrame(Time.frame);
+    // with update(dt) and render() defined by the game.
+    const Time = {
+      STEP: 1 / 60,
+      acc: 0,
+      last: 0,
+      reset(t) { this.acc = 0; this.last = t || 0; },
+      frame(t) {
+        const dt = Math.min(((t - this.last) / 1000) || 0, 0.1);
+        this.last = t;
+        this.acc += dt;
+        let guard = 0;
+        while (this.acc >= this.STEP && guard < 5) { update(this.STEP); this.acc -= this.STEP; guard++; }
+        render();
+        requestAnimationFrame(Time.frame);
+      }
+    };
+
+    // 4c. Object pool factory: reuse short-lived objects (bullets, particles)
+    // instead of allocating per frame. Usage:
+    // const bullets = makePool(() => ({x:0,y:0,vx:0,active:false}));
+    // const b = bullets.obtain(); ... bullets.release(b);
+    function makePool(create, size) {
+      const free = [];
+      for (let i = 0; i < (size || 32); i++) free.push(create());
+      return {
+        obtain() { return free.pop() || create(); },
+        release(obj) { free.push(obj); },
+        get spare() { return free.length; }
+      };
+    }
+
+    // 4d. Screen shake: Shake.add(0.5) on hits; call Shake.apply(ctx) after
+    // View.beginFrame(ctx) and before drawing the world (never the HUD).
+    const Shake = {
+      trauma: 0,
+      add(amount) { this.trauma = Math.min(1, this.trauma + (amount || 0.4)); },
+      apply(ctx) {
+        if (this.trauma <= 0) return;
+        const s = this.trauma * this.trauma * 14;
+        ctx.translate((Math.random() * 2 - 1) * s, (Math.random() * 2 - 1) * s);
+        this.trauma = Math.max(0, this.trauma - 0.03);
       }
     };
 
@@ -194,9 +279,9 @@ export function generateEngineSkeleton(gameSpec = {}) {
       );
     }
 
-    // 6. Game State Manager
+    // 6. Game State Manager (explicit states incl. PAUSED)
     const GameState = {
-      current: 'START', // 'START' | 'PLAYING' | 'GAMEOVER' | 'VICTORY'
+      current: 'START', // 'START' | 'PLAYING' | 'PAUSED' | 'GAMEOVER' | 'VICTORY'
       score: 0,
       lives: 3,
       set(newState) {
@@ -214,8 +299,24 @@ export function generateEngineSkeleton(gameSpec = {}) {
 
     // Initialize core managers
     Input.init();
-    window.addEventListener('click', () => Sound.init(), { once: true });
-    window.addEventListener('keydown', () => Sound.init(), { once: true });
+    // Audio unlock: browsers require a user gesture before audio plays, and a
+    // suspended context must be resumed — keep listening (idempotent).
+    window.addEventListener('click', () => Sound.init());
+    window.addEventListener('keydown', () => Sound.init());
+    window.addEventListener('touchstart', () => Sound.init(), { passive: true });
+    // M mutes; auto-pause when the tab hides so rAF-throttled games never
+    // fast-forward or keep playing unseen.
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyM') Sound.toggleMute();
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && GameState.current === 'PLAYING') {
+        GameState.set('PAUSED');
+      }
+    });
+    window.addEventListener('blur', () => {
+      if (GameState.current === 'PLAYING') GameState.set('PAUSED');
+    });
   </script>
 </body>
 </html>`;

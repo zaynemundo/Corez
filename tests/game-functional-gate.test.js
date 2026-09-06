@@ -87,4 +87,24 @@ requestAnimationFrame(gameLoop);
     const result = await testGameHtml(minimal, { assets: [] }, { executeScripts: true });
     expect(result.passed).toBe(true);
   });
+
+  it('warns (without failing) when a game misses quality best practices', async () => {
+    const minimal = `<!DOCTYPE html><html><head><title>T</title></head><body>
+<canvas id="gameCanvas" width="960" height="540"></canvas>
+<script>
+function gameLoop() { requestAnimationFrame(gameLoop); }
+requestAnimationFrame(gameLoop);
+</script></body></html>`;
+    const result = await testGameHtml(minimal, { assets: [] });
+    expect(result.passed).toBe(true);
+    expect(result.warnings.some((w) => w.includes('Web Audio'))).toBe(true);
+    expect(result.warnings.some((w) => w.includes('fixed-timestep'))).toBe(true);
+    expect(result.warnings.some((w) => w.includes('resize'))).toBe(true);
+    expect(result.warnings.some((w) => w.includes('visibilitychange'))).toBe(true);
+  });
+
+  it('reports the observed draw-call count from the functional check', async () => {
+    const result = await runFunctionalGameCheck(CRASH_ON_START);
+    expect(typeof result.drawCalls).toBe('number');
+  });
 });
