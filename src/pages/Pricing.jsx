@@ -282,9 +282,6 @@ export default function Pricing() {
           <div className="pricing-nav-actions">
             {user ? (
               <>
-                <span className="pricing-nav-hint" style={{ textTransform: "capitalize" }}>
-                  {currentPlan} • {user.email}
-                </span>
                 <button
                   onClick={() => navigate("/")}
                   className="pricing-nav-login"
@@ -294,7 +291,6 @@ export default function Pricing() {
               </>
             ) : (
               <>
-                <span className="pricing-nav-hint">Already have an account?</span>
                 <button
                   onClick={() => navigate("/")}
                   className="pricing-nav-login"

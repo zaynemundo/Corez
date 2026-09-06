@@ -3208,15 +3208,6 @@ h6 {
   gap: 12px;
   font-size: 13px;
 }
-.pricing-nav-hint {
-  color: var(--text-muted);
-  display: none;
-}
-@media (min-width: 640px) {
-  .pricing-nav-hint {
-    display: inline;
-  }
-}
 .pricing-nav-login {
   padding: 8px 14px;
   border-radius: 999px;
