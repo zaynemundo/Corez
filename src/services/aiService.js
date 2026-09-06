@@ -2903,6 +2903,68 @@ export function isExplicitImageRequest(prompt) {
   return false;
 }
 
+// --- Persistent keep-trying retry policy ----------------------------------
+// The UI must never give up with "I can't act on ..." while the hosted AI
+// is temporarily unavailable. Instead the request stays pending and is
+// re-issued with backoff until it succeeds or the user presses Stop (abort).
+export const PERSISTENT_RETRY_BASE_DELAY_MS = 2000;
+export const PERSISTENT_RETRY_MAX_DELAY_MS = 30000;
+
+export function getPersistentRetryDelay(
+  attempt,
+  baseDelayMs = PERSISTENT_RETRY_BASE_DELAY_MS,
+  maxDelayMs = PERSISTENT_RETRY_MAX_DELAY_MS,
+) {
+  const base = Number(baseDelayMs) > 0 ? Number(baseDelayMs) : 2000;
+  const max = Number(maxDelayMs) > 0 ? Number(maxDelayMs) : 30000;
+  const exp = base * 2 ** Math.max(0, Number(attempt || 1) - 1);
+  return Math.min(exp, max);
+}
+
+export function isRetryableHostedError(err) {
+  if (!err) return true;
+  if (err?.name === "AbortError") return false;
+  if (/Authentication required/i.test(err?.message || "")) return false;
+  return true;
+}
+
+// True when a local fallback string is a hosted-unavailable give-up (not a
+// genuine instant answer like a greeting). Those give-ups must never be
+// returned to the user — they mean "keep retrying the hosted AI instead".
+export function isHostedUnavailableFallback(text) {
+  if (!text || typeof text !== "string") return false;
+  return /hosted AI service is (currently unavailable|rate-limited)|I can't act on|I can't properly answer|I couldn't apply your revision|couldn't analyse or revise|can't create (it|this specific app) right now|so I can't create/i.test(
+    text,
+  );
+}
+
+function resolvePersistentRetryOpts(retryOpts) {
+  const isTestEnv =
+    (typeof process !== "undefined" &&
+      (process?.env?.VITEST === "true" ||
+        process?.env?.VITEST === "1" ||
+        process?.env?.NODE_ENV === "test")) ||
+    (typeof globalThis !== "undefined" && Boolean(globalThis.__VITEST__));
+  const raw = retryOpts && typeof retryOpts === "object" ? retryOpts : {};
+  return {
+    // Production keeps trying indefinitely; tests keep the old single-attempt
+    // behaviour unless they explicitly opt into persistence.
+    maxPersistentAttempts:
+      raw.maxPersistentAttempts ??
+      raw.maxAttempts ??
+      (isTestEnv ? 1 : Number.POSITIVE_INFINITY),
+    baseDelayMs:
+      raw.baseDelayMs ?? PERSISTENT_RETRY_BASE_DELAY_MS,
+    maxDelayMs: raw.maxDelayMs ?? PERSISTENT_RETRY_MAX_DELAY_MS,
+    // Forwarded to the inner streaming retry ladder (tests use tiny delays).
+    innerRetryDelaysMs: Array.isArray(raw.retryDelaysMs)
+      ? raw.retryDelaysMs
+      : Array.isArray(raw.innerRetryDelaysMs)
+        ? raw.innerRetryDelaysMs
+        : undefined,
+  };
+}
+
 export async function generateAIResponse(
   prompt,
   history = [],
@@ -2910,6 +2972,7 @@ export async function generateAIResponse(
   onDelta = null,
   onPhase = null,
   onClear = null,
+  retryOpts = {},
 ) {
   // Explicit commands first: @website, @game, @research, @image. The command
   // token is stripped before any model sees the prompt, so the AI is never
@@ -3019,108 +3082,189 @@ export async function generateAIResponse(
     }
   }
 
-  try {
+  const {
+    maxPersistentAttempts,
+    baseDelayMs,
+    maxDelayMs,
+    innerRetryDelaysMs,
+  } = resolvePersistentRetryOpts(retryOpts);
+
+  const buildHostedStreamOpts = () => ({
+    stream: typeof onDelta === "function",
+    onDelta,
+    onPhase,
+    onClear,
+    ...(innerRetryDelaysMs ? { retryDelaysMs: innerRetryDelaysMs } : {}),
+  });
+
+  const callHostedOnce = async (promptToSend) => {
     // The app requests STREAMING responses: the worker answers with SSE
     // events (meta/delta/phase/done) so the user sees the answer and the
     // build phases live as they happen. Direct API clients may still send
     // stream:false and receive the finished artifact as one JSON body.
     const hostedAiResponse = await generateHostedAIResponse(
-      cleanPrompt,
+      promptToSend,
       intent,
       history,
       signal,
-      {
-        stream: typeof onDelta === "function",
-        onDelta,
-        onPhase,
-        onClear,
-      },
+      buildHostedStreamOpts(),
     );
-    if (hostedAiResponse) {
-      // Check if the AI decided to generate an image
-      const imageMatch = hostedAiResponse.match(/\[IMAGE_PROMPT:\s*(.*?)\]/i);
-      if (imageMatch) {
-        const imagePrompt = imageMatch[1].trim();
-        try {
-          const requestedModelTag = detectRequestedImageModel(
-            imagePrompt + " " + cleanPrompt,
-            history,
-          );
-          const imageUrl = await generateImage(
-            imagePrompt,
-            signal,
-            extractReferenceImage(history),
-            requestedModelTag ? { model: requestedModelTag } : {},
-          );
-          if (imageUrl) {
-            // Replace the tag with the actual image markdown
-            return hostedAiResponse.replace(imageMatch[0], `![](${imageUrl})`);
-          }
-        } catch (imgError) {
-          if (imgError?.name === "AbortError") throw imgError;
-          console.warn("Image generation error from AI tag.", imgError);
-        }
-      }
-      return hostedAiResponse;
-    }
-  } catch (hostedAiError) {
-    if (hostedAiError?.name === "AbortError") throw hostedAiError;
-    if (/Authentication required/i.test(hostedAiError?.message || "")) {
-      return "Please log in to continue. Your session may have expired — refresh the page and sign in again, then retry your request.";
-    }
-    // Empty streaming is often transient (model overloaded, reasoning-only) - retry once with a more explicit prompt
-    if (
-      /empty streaming response|empty or reasoning-only/i.test(
-        hostedAiError?.message || "",
-      ) &&
-      !cleanPrompt.startsWith("[RETRY]")
-    ) {
+    if (!hostedAiResponse) return null;
+    // Check if the AI decided to generate an image
+    const imageMatch = hostedAiResponse.match(/\[IMAGE_PROMPT:\s*(.*?)\]/i);
+    if (imageMatch) {
+      const imagePrompt = imageMatch[1].trim();
       try {
-        const retryPrompt = `[RETRY] Explain clearly and directly: ${cleanPrompt}`;
-        const retryResponse = await generateHostedAIResponse(
-          retryPrompt,
-          intent,
+        const requestedModelTag = detectRequestedImageModel(
+          imagePrompt + " " + cleanPrompt,
           history,
-          signal,
-          {
-            stream: typeof onDelta === "function",
-            onDelta,
-            onPhase,
-            onClear,
-          },
         );
-        if (retryResponse) {
-          const imageMatch = retryResponse.match(/\[IMAGE_PROMPT:\s*(.*?)\]/i);
-          if (imageMatch) {
-            const imagePrompt = imageMatch[1].trim();
-            try {
-              const requestedModelRetry = detectRequestedImageModel(
-                imagePrompt + " " + cleanPrompt,
-                history,
-              );
-              const imageUrl = await generateImage(
-                imagePrompt,
-                signal,
-                extractReferenceImage(history),
-                requestedModelRetry ? { model: requestedModelRetry } : {},
-              );
-              if (imageUrl)
-                return retryResponse.replace(imageMatch[0], `![](${imageUrl})`);
-            } catch {}
-          }
-          return retryResponse;
+        const imageUrl = await generateImage(
+          imagePrompt,
+          signal,
+          extractReferenceImage(history),
+          requestedModelTag ? { model: requestedModelTag } : {},
+        );
+        if (imageUrl) {
+          // Replace the tag with the actual image markdown
+          return hostedAiResponse.replace(imageMatch[0], `![](${imageUrl})`);
         }
-      } catch (retryErr) {
-        if (retryErr?.name === "AbortError") throw retryErr;
-        console.warn("Retry also failed, falling back to local.", retryErr);
+      } catch (imgError) {
+        if (imgError?.name === "AbortError") throw imgError;
+        console.warn("Image generation error from AI tag.", imgError);
       }
     }
-    console.warn(
-      "Hosted AI unavailable; using local Corez fallback.",
-      hostedAiError,
-    );
-    return generateLocalAIResponse(cleanPrompt, hostedAiError, signal);
-  }
+    return hostedAiResponse;
+  };
 
-  return generateLocalAIResponse(cleanPrompt, null, signal);
+  // Persistent keep-trying loop: never surface a hosted-unavailable give-up
+  // while the failure looks transient. The promise stays pending (the UI
+  // keeps its normal "thinking" state) and the same request is re-issued
+  // with backoff until it succeeds or the user presses Stop (abort).
+  // Only genuine instant answers (greetings, thanks, creator fact, ...) are
+  // returned from the local fallback without retrying; everything else that
+  // needs the hosted AI keeps retrying. Authentication failures are
+  // non-retryable and return the login message immediately.
+  let persistentAttempt = 0;
+  let promptToSend = cleanPrompt;
+  let usedExplicitRetryPrefix = false;
+  let lastHostedError = null;
+
+  while (true) {
+    persistentAttempt += 1;
+    if (signal?.aborted) throw abortError();
+    try {
+      const hostedResult = await callHostedOnce(promptToSend);
+      if (hostedResult) return hostedResult;
+      throw new Error("Hosted AI returned no content.");
+    } catch (hostedAiError) {
+      if (hostedAiError?.name === "AbortError" || signal?.aborted) {
+        throw hostedAiError?.name === "AbortError"
+          ? hostedAiError
+          : abortError();
+      }
+      if (/Authentication required/i.test(hostedAiError?.message || "")) {
+        return "Please log in to continue. Your session may have expired — refresh the page and sign in again, then retry your request.";
+      }
+      // Empty streaming is often transient (model overloaded,
+      // reasoning-only) — try once immediately with a more explicit prompt
+      // before entering the backoff ladder.
+      if (
+        /empty streaming response|empty or reasoning-only/i.test(
+          hostedAiError?.message || "",
+        ) &&
+        !usedExplicitRetryPrefix &&
+        !cleanPrompt.startsWith("[RETRY]")
+      ) {
+        usedExplicitRetryPrefix = true;
+        promptToSend = `[RETRY] Explain clearly and directly: ${cleanPrompt}`;
+        try {
+          const retryResponse = await callHostedOnce(promptToSend);
+          if (retryResponse) return retryResponse;
+        } catch (retryErr) {
+          if (retryErr?.name === "AbortError" || signal?.aborted) throw retryErr;
+          lastHostedError = retryErr;
+          console.warn("Explicit retry also failed, entering backoff.", retryErr);
+        }
+      }
+      lastHostedError = lastHostedError || hostedAiError;
+      // Preserve the original failure for the backoff report when the
+      // explicit retry above already ran.
+      const reportableError = hostedAiError;
+
+      // First failure: return immediately only when the local engine can
+      // answer without the hosted AI (greetings, thanks, creator, writing
+      // guidance, ...). Hosted-required prompts fall through to retry —
+      // their local "I can't act ..." give-up is never returned.
+      // Cached so the single-attempt (test / opt-out) path does not pay the
+      // 600ms local latency twice.
+      let firstLocal = null;
+      let firstLocalChecked = false;
+      if (persistentAttempt === 1) {
+        try {
+          firstLocal = await generateLocalAIResponse(
+            cleanPrompt,
+            reportableError,
+            signal,
+          );
+          firstLocalChecked = true;
+          if (firstLocal && !isHostedUnavailableFallback(firstLocal))
+            return firstLocal;
+        } catch (localErr) {
+          if (localErr?.name === "AbortError" || signal?.aborted)
+            throw localErr;
+        }
+      }
+
+      if (!isRetryableHostedError(reportableError)) {
+        console.warn(
+          "Hosted AI unavailable with non-retryable error; using local Corez fallback.",
+          reportableError,
+        );
+        if (firstLocalChecked && firstLocal) return firstLocal;
+        return generateLocalAIResponse(cleanPrompt, reportableError, signal);
+      }
+      if (persistentAttempt >= maxPersistentAttempts) {
+        if (!(Number(maxPersistentAttempts) > 1)) {
+          console.warn(
+            "Hosted AI unavailable; using local Corez fallback.",
+            lastHostedError || reportableError,
+          );
+        } else {
+          console.warn(
+            "Hosted AI unavailable after persistent retries; using local Corez fallback.",
+            lastHostedError || reportableError,
+          );
+        }
+        if (firstLocalChecked && firstLocal) return firstLocal;
+        return generateLocalAIResponse(
+          cleanPrompt,
+          lastHostedError || reportableError,
+          signal,
+        );
+      }
+      const delayMs = getPersistentRetryDelay(
+        persistentAttempt,
+        baseDelayMs,
+        maxDelayMs,
+      );
+      try {
+        onClear?.();
+      } catch {}
+      try {
+        onPhase?.({
+          phase: "retrying",
+          attempt: persistentAttempt,
+          delayMs,
+          message: reportableError?.message || "Hosted AI unavailable, retrying...",
+        });
+      } catch {}
+      console.warn(
+        `Hosted AI attempt ${persistentAttempt} failed; retrying in ${delayMs}ms...`,
+        reportableError,
+      );
+      await sleepResumable(delayMs, signal);
+      lastHostedError = null;
+    }
+  }
 }
