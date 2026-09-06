@@ -256,7 +256,7 @@ export default function Login() {
                 style={{
                   background: "rgba(74,222,128,0.12)",
                   borderColor: "rgba(74,222,128,0.3)",
-                  color: "#86efac",
+                  color: "var(--market-positive)",
                 }}
               >
                 {forgotSent}

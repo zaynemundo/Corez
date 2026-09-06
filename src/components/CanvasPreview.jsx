@@ -1062,7 +1062,7 @@ export default function CanvasPreview({
                         role="status"
                         style={{
                           fontSize: "0.74rem",
-                          color: "#4ade80",
+                          color: "var(--market-positive)",
                           margin: "2px 0 0",
                         }}
                       >
