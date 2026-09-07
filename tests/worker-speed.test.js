@@ -186,7 +186,7 @@ describe('AI response speed optimizations', () => {
     // reasoning models can think as long as they need.
     expect(generalPayload.max_tokens).toBeUndefined();
 
-    // Complex app request: high reasoning effort for thoroughness, still uncapped.
+    // Complex app request: xhigh (maximum) reasoning effort for thoroughness, still uncapped.
     let complexPayload = null;
     vi.stubGlobal('fetch', vi.fn(async (url, init) => {
       expect(url).toBe(OPENCODE_URL);
@@ -202,7 +202,7 @@ describe('AI response speed optimizations', () => {
 
     expect(complexPayload).not.toBeNull();
     expect(complexPayload.model).toBe('muse-spark-1.3-contributor');
-    expect(complexPayload.reasoning).toEqual({ effort: 'high', exclude: true });
+    expect(complexPayload.reasoning).toEqual({ effort: 'xhigh', exclude: true });
     expect(complexPayload.temperature).toBeDefined();
     expect(complexPayload.max_tokens).toBeUndefined();
     expect(complexPayload.max_completion_tokens).toBeUndefined();

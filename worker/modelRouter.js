@@ -144,7 +144,10 @@ const REASONING_BY_COMPLEXITY = Object.freeze({
   trivial: "low",
   low: "low",
   medium: "medium",
-  high: "high",
+  // High and epic work (SaaS builds, multiplayer/RPG games, research) gets
+  // the maximum xhigh reasoning effort — Muse Spark 1.3's top tier. Override
+  // down with AI_REASONING_EFFORT if latency/token cost matters more.
+  high: "xhigh",
   epic: "xhigh",
 });
 
