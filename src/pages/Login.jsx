@@ -154,6 +154,8 @@ export default function Login() {
               <label>
                 <span>Email</span>
                 <input
+                  id="corez-email"
+                  name="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -170,6 +172,8 @@ export default function Login() {
                 <span>Password</span>
                 <div className="auth-password-wrapper">
                   <input
+                    id="corez-password"
+                    name="password"
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -222,6 +226,8 @@ export default function Login() {
                   <span>New Password</span>
                   <div className="auth-password-wrapper">
                     <input
+                      id="corez-new-password"
+                      name="new-password"
                       type={showPassword ? "text" : "password"}
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}

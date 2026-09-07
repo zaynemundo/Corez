@@ -411,6 +411,7 @@ export default function ChatInput({
           ref={fileInputRef}
           type="file"
           multiple
+          name="attachments"
           className="visually-hidden-file-input"
           onChange={handleFileSelect}
           tabIndex={-1}
@@ -418,6 +419,8 @@ export default function ChatInput({
         />
         <textarea
           ref={refToUse}
+          id="corez-chat-input"
+          name="message"
           className="chat-textarea"
           value={input}
           onChange={(e) => {

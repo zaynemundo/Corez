@@ -753,6 +753,8 @@ export default function CanvasPreview({
             </div>
           ) : (
             <textarea
+              id="canvas-source-editor"
+              name="source-code"
               className="canvas-source-editor"
               aria-label="Source code editor"
               value={editableCode}
@@ -973,6 +975,8 @@ export default function CanvasPreview({
                 >
                   <input
                     readOnly
+                    id="publish-share-link"
+                    name="share-link"
                     value={publishLink}
                     onFocus={(e) => e.target.select()}
                     aria-label="Published share link"
@@ -1279,6 +1283,8 @@ export default function CanvasPreview({
               >
                 <textarea
                   readOnly
+                  id="publish-embed-html"
+                  name="embed-html"
                   value={generateEmbedSnippet(publishLink, { title })}
                   onFocus={(e) => e.target.select()}
                   aria-label="Embed iframe HTML"
