@@ -244,7 +244,10 @@ Instructions:
 2. Configure canvas interpolation and rendering behavior to match the manifest's selected visual style.
 3. Preload all assets using \`loadAllAssets()\`, showing loading progress, and start the game loop inside the resolved \`.then()\`.
 4. Functional bar (verified by headless execution before delivery): the game must boot with zero script errors, expose a clickable start control (Play/Start/Deploy), map every movement input to the on-screen/camera facing with no dead or unused movement code, include both a win path and a lose path with restart, and draw to the canvas every frame while playing.
-5. Output ONLY the complete runnable HTML document wrapped inside a single \`\`\`html ... \`\`\` code block.`;
+5. Begin your response with a MANDATORY 1-2 sentence chat brief (game title in bold, goal, controls) BEFORE the code block, then output the complete runnable HTML document wrapped inside a single \`\`\`html ... \`\`\` code block. NEVER output a bare code block with no brief.`;
+      // The chat brief lives outside the extracted HTML: extractHtmlFromResponse
+      // keeps only the code block for testing/storage, while callers wrap it
+      // back as brief + fenced block via buildGameChatMessage().
 
       let synthesizedHtmlResponse = await this.aiClient(synthesisPrompt, {
         signal,
@@ -310,5 +313,25 @@ Instructions:
       return response.trim();
     }
     return null;
+  }
+
+  extractChatBrief(response) {
+    if (!response) return "";
+    const fenceIdx = response.search(/```/);
+    const preamble =
+      fenceIdx > 0 ? response.slice(0, fenceIdx).trim() : "";
+    if (preamble.length >= 20) return preamble;
+    return "";
+  }
+
+  buildGameChatMessage(html, brief = "") {
+    const code = String(html || "").trim();
+    const titleMatch =
+      code.match(/<title>([^<]{3,80})<\/title>/i) ||
+      code.match(/<h1[^>]*>([^<]{3,60})</i);
+    const title = titleMatch ? titleMatch[1].trim() : "Your new game";
+    const fallback = `Here's **${title}** — open the preview and play.`;
+    const head = String(brief || "").trim() || fallback;
+    return `${head}\n\n\`\`\`html\n${code}\n\`\`\``;
   }
 }

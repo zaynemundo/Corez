@@ -345,6 +345,75 @@ export function checkGameRequirements(code) {
   );
 }
 
+// Every game deliverable must reach chat with a 1-2 sentence brief BEFORE
+// the code block (title + goal + controls). Models sometimes return a bare
+// code block despite the system prompt, leaving chat with no description.
+// This deterministic fallback injects a short brief derived from the game's
+// own <title>/controls so chat always has one. Non-game answers pass through
+// byte-identical.
+export function ensureGameChatBrief(content, userPrompt = "") {
+  const text = String(content || "");
+  if (!text.trim()) return text;
+
+  const blocks = extractCodeBlocks(text);
+  let code = blocks.map((b) => b.code).join("\n");
+  let fenceIdx = text.search(/```/);
+
+  if (!code) {
+    // Unfenced HTML deliverable (raw <!DOCTYPE html> pasted without fences).
+    const htmlIdx = text.search(/(?:<!DOCTYPE\s+html|<html[\s>])/i);
+    if (htmlIdx === -1) return text;
+    code = text.slice(htmlIdx);
+    fenceIdx = htmlIdx;
+  }
+
+  const signals = checkGameRequirements(code);
+  const hasControls = signals.includes("controls");
+  const hasLoop = signals.includes("game-loop") || signals.includes("canvas");
+  if (!hasControls || !hasLoop) return text;
+
+  // Most false positives are static canvas demos: require scoring,
+  // collision, or an explicit game ask before injecting.
+  const gameLike =
+    signals.includes("scoring") ||
+    signals.includes("collision") ||
+    /\b(game|playable|player|enemy|level|score|win\b|lose\b)/i.test(
+      `${userPrompt} ${code.slice(0, 2000)}`,
+    );
+  if (!gameLike) return text;
+
+  const rawPreamble = fenceIdx > 0 ? text.slice(0, fenceIdx).trim() : "";
+  const preamble = rawPreamble
+    .replace(/(?:\r?\n|^)\s*(?:Fullscreen|Preview)\s*$/i, "")
+    .trim();
+  // An existing 20+ char prose preamble counts as the brief — keep it.
+  if (preamble.length >= 20 && /[a-zA-Z]{3,}/.test(preamble)) return text;
+
+  const titleMatch =
+    code.match(/<title>([^<]{3,80})<\/title>/i) ||
+    code.match(/<h1[^>]*>([^<]{3,60})</i);
+  let title = (titleMatch && titleMatch[1].trim()) || "Your new game";
+  title = title.replace(/\s+/g, " ").slice(0, 60);
+
+  let goal = "play to win";
+  if (/collect|coin|orb/i.test(code)) goal = "collect to score and win";
+  else if (/score/i.test(code)) goal = "score points to win";
+  else if (/surviv|dodge|avoid|enemy/i.test(code))
+    goal = "dodge enemies and survive";
+
+  const controls = [];
+  if (/KeyW|WASD/i.test(code)) controls.push("Move with WASD/Arrow keys");
+  else if (/ArrowLeft|keydown/i.test(code))
+    controls.push("Move with the Arrow keys");
+  if (/Space/i.test(code)) controls.push("Space to jump/launch");
+  if (/touchstart|touchend|pointerdown/i.test(code))
+    controls.push("plus on-screen touch controls");
+  if (controls.length === 0) controls.push("Use the keyboard to play");
+
+  const brief = `Here's **${title}** — ${goal}. ${controls.join(", ")}.`;
+  return `${brief}\n\n${text.trimStart()}`;
+}
+
 export function analyzeProjectState(messages) {
   const history = Array.isArray(messages) ? messages : [];
   const assistantReplies = history
@@ -871,6 +940,12 @@ export async function processResponse(messages, content, options = {}) {
   // Belt-and-braces: never deliver trailing self-referential continuation
   // meta-commentary in the final answer.
   answer = stripMetaCommentary(answer);
+
+  // Guarantee: every game deliverable carries its 1-2 sentence chat brief.
+  // If the model returned a bare code block, derive one deterministically.
+  const beforeBrief = answer;
+  answer = ensureGameChatBrief(answer, userPrompt);
+  diagnostics.gameBriefInjected = answer !== beforeBrief;
 
   const finalTruncation = detectTruncation(answer, {
     stopReason: finalStopReason,

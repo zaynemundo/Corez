@@ -110,7 +110,28 @@ export function evaluateResponse(responseContent, contract = {}, intent = {}) {
       text.includes("<!DOCTYPE");
     if (!hasHtmlBlock) {
       violations.push("Expected HTML code block but none was provided");
+    } else if (
+      (intent?.type === "game_creation" ||
+        intent?.primaryIntent === "game_creation") &&
+      !hasGameChatBrief(text)
+    ) {
+      violations.push("Missing short game brief before code block");
+      missingRequirements.push(
+        "Game chat brief (1-2 sentences: title, goal, controls)",
+      );
     }
+  } else if (
+    (intent?.type === "game_creation" ||
+      intent?.primaryIntent === "game_creation") &&
+    (text.includes("```html") ||
+      text.includes("<html") ||
+      text.includes("<!DOCTYPE")) &&
+    !hasGameChatBrief(text)
+  ) {
+    violations.push("Missing short game brief before code block");
+    missingRequirements.push(
+      "Game chat brief (1-2 sentences: title, goal, controls)",
+    );
   }
 
   const isCompliant =
@@ -128,6 +149,73 @@ export function evaluateResponse(responseContent, contract = {}, intent = {}) {
     violations,
     missingRequirements,
   };
+}
+
+/**
+ * Deterministic client-side fallback: every game deliverable must reach chat
+ * with a 1-2 sentence brief BEFORE the code block. Mirrors the worker's
+ * ensureGameChatBrief so code-only model output still gets a description.
+ * Non-game answers pass through unchanged.
+ */
+export function ensureGameChatBrief(content) {
+  const text = String(content || "");
+  if (!text.trim()) return text;
+  const fenceIdx = text.search(/```/);
+  const htmlIdx = text.search(/(?:<!DOCTYPE\s+html|<html[\s>])/i);
+  if (fenceIdx === -1 && htmlIdx === -1) return text;
+  const codeStart = fenceIdx !== -1 ? fenceIdx : htmlIdx;
+  const code = text.slice(codeStart);
+  const hasLoop = /requestAnimationFrame|getContext\s*\(/i.test(code);
+  const hasControls = /keydown|keyup|touchstart|touchend|pointerdown/i.test(code);
+  if (!hasLoop || !hasControls) return text;
+  const gameLike =
+    /\b(score|collision|collide|overlap)\b/i.test(code) ||
+    /\b(game|player|enemy|level|win\b|lose\b)/i.test(code.slice(0, 2000));
+  if (!gameLike) return text;
+
+  const rawPreamble = codeStart > 0 ? text.slice(0, codeStart).trim() : "";
+  const preamble = rawPreamble
+    .replace(/(?:\r?\n|^)\s*(?:Fullscreen|Preview)\s*$/i, "")
+    .trim();
+  if (preamble.length >= 20 && /[a-zA-Z]{3,}/.test(preamble)) return text;
+
+  const titleMatch =
+    code.match(/<title>([^<]{3,80})<\/title>/i) ||
+    code.match(/<h1[^>]*>([^<]{3,60})</i);
+  let title = (titleMatch && titleMatch[1].trim()) || "Your new game";
+  title = title.replace(/\s+/g, " ").slice(0, 60);
+
+  let goal = "play to win";
+  if (/collect|coin|orb/i.test(code)) goal = "collect to score and win";
+  else if (/score/i.test(code)) goal = "score points to win";
+  else if (/surviv|dodge|avoid|enemy/i.test(code))
+    goal = "dodge enemies and survive";
+
+  const controls = [];
+  if (/KeyW|WASD/i.test(code)) controls.push("Move with WASD/Arrow keys");
+  else if (/ArrowLeft|keydown/i.test(code))
+    controls.push("Move with the Arrow keys");
+  if (/Space/i.test(code)) controls.push("Space to jump/launch");
+  if (/touchstart|touchend|pointerdown/i.test(code))
+    controls.push("plus on-screen touch controls");
+  if (controls.length === 0) controls.push("Use the keyboard to play");
+
+  return `Here's **${title}** — ${goal}. ${controls.join(", ")}.\n\n${text.trimStart()}`;
+}
+
+/**
+ * True when a game_creation response carries a usable chat brief before code.
+ */
+export function hasGameChatBrief(content) {
+  const text = String(content || "");
+  const fenceIdx = text.search(/```/);
+  const htmlIdx = text.search(/(?:<!DOCTYPE\s+html|<html[\s>])/i);
+  if (fenceIdx === -1 && htmlIdx === -1) return false;
+  const start = fenceIdx !== -1 ? fenceIdx : htmlIdx;
+  const preamble = (start > 0 ? text.slice(0, start).trim() : "")
+    .replace(/(?:\r?\n|^)\s*(?:Fullscreen|Preview)\s*$/i, "")
+    .trim();
+  return preamble.length >= 20 && /[a-zA-Z]{3,}/.test(preamble);
 }
 
 /**
@@ -161,6 +249,12 @@ export function repairResponse(
 
     // Apply deterministic local repairs for detected violations
     for (const violation of evaluation.violations) {
+      if (
+        violation.includes("Missing short game brief") &&
+        !hasGameChatBrief(content)
+      ) {
+        content = ensureGameChatBrief(content);
+      }
       if (violation.includes("code output block") && !content.includes("```")) {
         content +=
           '\n\n```jsx\n// Self-contained component fallback\nexport default function App() {\n  return <div className="p-4">App Content</div>;\n}\n```';

@@ -738,7 +738,7 @@ Adaptive Routing - Coding Path:
 ${designStyle}
 - Build a complete, runnable experience ready for the preview canvas.
 - NEVER mention "Awwwards", "Awwwards-inspired", or internal design framework names in your conversational response or preamble text to the user.
-- SHORT BRIEF FOR GAMES: When the request is a game, begin your response with a SMALL brief of at most 1-2 short sentences (the game title and its controls — e.g. "Here's Neon Pong — move with the Arrow keys, Space to launch."). NEVER write a long feature list, implementation summary, or "I built..." paragraph before or after the code.
+- SHORT BRIEF FOR GAMES (MANDATORY): When the request is a game, your response MUST begin with a 1-2 sentence chat brief BEFORE the code block — game title in bold, what the player does to win/lose, and the controls (e.g. "Here's **Neon Pong** — bounce the ball past your rival to score. Move with the Arrow keys, Space to launch."). NEVER output a bare code block with no brief. NEVER write a long feature list, implementation summary, or "I built..." paragraph before or after the code.
 - FULLSCREEN GAME REQUIREMENT: Games MUST fill the entire preview viewport — html/body with width:100%, height:100%, margin:0, overflow:hidden; a full-viewport canvas (width:100%, height:100%, display:block) with NO max-width, NO bordered box, NO rounded container around the game. Never wrap the canvas in a bordered/max-width "block". Keep a fixed internal game resolution (e.g. 960x540) and scale it to the viewport with ctx.setTransform + a resize listener so the game always fills the screen. On mobile, size the canvas from visualViewport, listen for orientationchange, and include on-screen touch controls shown only on touch devices.`;
   } else if (intentType === "writing") {
     adaptiveInstructions = `
@@ -882,7 +882,7 @@ Guidelines for Output:
 - PROPER LAYERING: Ensure proper visual layering (Background z-index:0 -> Content z-index:10 -> HUD/Toolbars z-index:20-30 -> Modals z-index:40-50+).
 - CRITICAL SINGLE-FILE MANDATE: Output all code as ONE SINGLE self-contained file in ONE SINGLE code block.
 - NEVER use "---" or "***" horizontal-rule lines anywhere in your response (they render as stray text in the chat UI); separate sections with "##" headings or blank lines instead.
-- Always start your response with a brief summary explaining your implementation choices before the code block.
+- Always start your response with a brief summary explaining your implementation choices before the code block — EXCEPT for games, where the MANDATORY 1-2 sentence SHORT BRIEF rule above replaces this (title + goal + controls only, no implementation summary).
 ${adaptiveInstructions}${formattingSection}${emailFormatting}
 
 Fine-Grained Intent: ${primaryIntent}${secondaryIntent}
