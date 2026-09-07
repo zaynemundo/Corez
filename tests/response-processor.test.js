@@ -16,7 +16,8 @@ import {
   mergeResponse,
   processResponse,
   stripMetaCommentary,
-  isMetaOnlyReply
+  isMetaOnlyReply,
+  isRestartedReply
 } from '../worker/responseProcessor.js';
 
 describe('detectTruncation', () => {
@@ -94,6 +95,16 @@ describe('detectTruncation', () => {
     const result = detectTruncation('   ');
     expect(result.truncated).toBe(true);
     expect(result.signals).toContain('empty-response');
+  });
+
+  it('does not flag a complete markdown table ending in a pipe', () => {
+    // A trailing '|' is a finished table row, not truncation — flagging it
+    // fired continuation rounds that re-streamed duplicate answers.
+    const table =
+      'Renters pay for CUDA.\n\n| GPU | Rate |\n| RTX 3090 | $0.35/hr |\n| EVO-X2 | n/a |';
+    const result = detectTruncation(table);
+    expect(result.truncated).toBe(false);
+    expect(result.signals).not.toContain('ends-with-structure-mark');
   });
 });
 
@@ -367,6 +378,71 @@ describe('processResponse', () => {
         'Finished.\nNo unclosed `<script>` tags remain to close.\nTo proceed, please paste the last lines you received.',
       ),
     ).toBe('Finished.');
+  });
+
+  it('strips the third-wave continuation boilerplate variants', () => {
+    // Phrasings observed when a complete table-heavy answer was continued.
+    expect(
+      stripMetaCommentary(
+        'Done.\nThere is no unfinished file or code block in this conversation to continue from, so I cannot pick up from an exact stopping point.',
+      ),
+    ).toBe('Done.');
+    expect(
+      stripMetaCommentary('No open file remains to continue — all tags and blocks are closed.'),
+    ).toBe('');
+    expect(
+      stripMetaCommentary('No prior file found in this conversation to continue from, so I will start fresh.'),
+    ).toBe('');
+    expect(
+      stripMetaCommentary(
+        "Answer.\nNo open document, code block, or body tag is left unfinished to continue — I am starting from your stopping-point instruction as the baseline.",
+      ),
+    ).toBe('Answer.');
+  });
+
+  it('detects a regenerated-from-scratch continuation as a restart', () => {
+    const original =
+      'You cannot rent that box on Vast.ai as a GPU host — Vast.ai only accepts NVIDIA GPUs. Here is why that matters for your setup.';
+    const restart =
+      'You cannot rent that box on Vast.ai as a GPU host — Vast.ai only accepts NVIDIA GPUs. Here is a table of alternatives.';
+    expect(isRestartedReply(original, restart)).toBe(true);
+    expect(
+      isRestartedReply(original, 'Short.'),
+    ).toBe(false);
+    expect(
+      isRestartedReply('Short.', 'Short but a much longer chunk that continues the thought with new material.'),
+    ).toBe(false);
+  });
+
+  it('discards a restarted continuation instead of duplicating the reply', () => {
+    const original =
+      'You cannot rent that box on Vast.ai as a GPU host — Vast.ai only accepts NVIDIA GPUs. Here is why that matters for your setup.';
+    const restart =
+      'You cannot rent that box on Vast.ai as a GPU host — Vast.ai only accepts NVIDIA GPUs. Here is a table of alternatives.';
+    const result = stitchContinuationChunk(original, restart);
+    expect(result.restarted).toBe(true);
+    expect(result.deltaText).toBe('');
+    expect(result.stitched).toBe(original);
+  });
+
+  it('keeps the original and stops when a truncation repair restarts', async () => {
+    // The truncation flag fired on a complete answer; the repair round
+    // regenerated it from the top instead of continuing. The loop must keep
+    // the original and stop — not stitch a duplicate, not burn more rounds.
+    const original =
+      'Host GPU comparison for renting. | GPU | Rate |\n| RTX 3090 | $0.35/hr | because';
+    const generate = vi.fn(async () => ({
+      content:
+        'Host GPU comparison for renting. | GPU | Rate |\n| RTX 3090 | $0.35/hr | plus a full regenerated table and more duplicated rows.',
+    }));
+    const result = await processResponse([{ role: 'user', content: 'x' }], original, {
+      userPrompt: 'x',
+      generate,
+      maxRepairs: 3,
+    });
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(result.diagnostics.repaired).toBe(false);
+    expect(result.content).toBe(original.trim());
   });
 
   it('classifies short meta-commentary replies as meta-only', () => {

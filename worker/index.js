@@ -2248,19 +2248,19 @@ async function handleAi(request, env) {
                 }
 
                 if (!contChunk.trim()) break;
-                const { stitched, deltaText } = stitchContinuationChunk(
-                  collected,
-                  contChunk,
-                );
+                const { stitched, deltaText, restarted } =
+                  stitchContinuationChunk(collected, contChunk);
                 if (deltaText) {
                   controller.enqueue(
                     encoder.encode(sse({ type: "delta", text: deltaText })),
                   );
                 }
-                if (stitched.length <= collected.length) {
+                if (restarted || stitched.length <= collected.length) {
                   // The model restarted from the beginning instead of
-                  // continuing: give it ONE retry with the anti-repetition
-                  // instruction before giving up on this pass.
+                  // continuing (restarted) or emitted nothing new: give it
+                  // ONE retry with the anti-repetition instruction before
+                  // giving up on this pass. Nothing duplicated was streamed:
+                  // restarted chunks carry an empty deltaText.
                   if (!antiRepeatTried) {
                     antiRepeatTried = true;
                     continue;

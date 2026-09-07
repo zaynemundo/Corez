@@ -647,7 +647,7 @@ export async function* runCreationHarness(options) {
         }
 
         if (!continuationChunk.trim()) break;
-        const { stitched, deltaText } = stitchContinuationChunk(
+        const { stitched, deltaText, restarted } = stitchContinuationChunk(
           collected,
           continuationChunk,
         );
@@ -655,10 +655,11 @@ export async function* runCreationHarness(options) {
           buildStreamed = true;
           yield { type: "delta", text: deltaText };
         }
-        if (stitched.length <= collected.length) {
-          // The model restarted from the beginning instead of continuing:
-          // give it ONE retry with the anti-repetition instruction before
-          // giving up on this pass.
+        if (restarted || stitched.length <= collected.length) {
+          // The model restarted from the beginning instead of continuing
+          // (restarted chunks carry an empty delta, so nothing duplicated was
+          // streamed): give it ONE retry with the anti-repetition instruction
+          // before giving up on this pass.
           if (!antiRepeatTried) {
             antiRepeatTried = true;
             continue;

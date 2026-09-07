@@ -111,7 +111,11 @@ export function detectTruncation(content, options = {}) {
       signals.push(`unclosed-html-${tagName}`);
   }
 
-  if (/[#|]+\s*$/.test(text)) signals.push("ends-with-structure-mark");
+  // A trailing '#' may be an unclosed ATX heading. A trailing '|' is NOT
+  // truncation evidence — it is a complete Markdown table row, and flagging
+  // it fired spurious continuation rounds (re-streamed duplicate answers) on
+  // every table-heavy reply.
+  if (/[#]+\s*$/.test(text)) signals.push("ends-with-structure-mark");
   if (/\n\s*\d+[.)]\s*$/.test(text)) signals.push("unfinished-list-item");
 
   const prose = stripFences(text).replace(/\s+$/, "");
@@ -122,10 +126,12 @@ export function detectTruncation(content, options = {}) {
     else if (TRAILING_OPENERS.test(prose)) signals.push("mid-sentence-cutoff");
   }
 
-  // Dangling JS arithmetic, assignment or logical operators at the end of the text
+  // Dangling JS arithmetic, assignment or logical operators at the end of the text.
+  // A single trailing '|' is a complete Markdown table row, not a dangling
+  // bitwise-or — only a double '||' counts as an unfinished logical-or.
   const trimmed = text.trim();
   if (
-    /[+\-*%=&|^~?:;,([{/]\s*$/.test(trimmed) &&
+    (/[+\-*%=&^~?:;,([{/]\s*$/.test(trimmed) || /\|\|\s*$/.test(trimmed)) &&
     !/-->\s*$/.test(trimmed) &&
     !/\/>\s*$/.test(trimmed)
   ) {
@@ -507,7 +513,7 @@ export function scoreContinuity({ project, response, userPrompt }) {
 // point..."). Any such text is noise: strip from the first meta phrase to
 // the end of the chunk.
 const META_COMMENTARY_PATTERN =
-  /(?:(?:^|\n)##[^\n]{0,80}\n+)?(?:My (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|The (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|Your (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|(?:The|This) (?:response|reply|answer) is already (?:complete|finished)|There (?:is|was) (?:no|nothing) (?:dangling|open|more) (?:file|code|tag|expression|block|content)|No continuation (?:is )?needed|Nothing (?:to|left to|more to) continu|No (?:partial|incomplete) (?:file|document|output|content)|There is no (?:prior )?partial (?:file|document|content|output)|Assuming (?:you meant|the active file|no prior partial|the previous|the last|a complete)|I can'?t continue from a stopping point|Paste (?:your|the) partial|Provide the partial content|No active (?:partial|document|file|content|conversation)|None found (?:in the conversation|to resume|to continue|yet)|What to Provide to Resume|Required to Proceed|To proceed, please paste|#{1,3}\s*Continuation (?:Status|Check)|nothing (?:further|more|else) (?:to append|to add|can be appended)|no (?:stopping|stop) points? (?:to resume|for resuming) from|paste the (?:partial content|last lines)|continue directly from that exact|No (?:open|unclosed) [`<])[^]*$/i;
+  /(?:(?:^|\n)##[^\n]{0,80}\n+)?(?:My (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|The (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|Your (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|(?:The|This) (?:response|reply|answer) is already (?:complete|finished)|There (?:is|was) (?:no|nothing) (?:dangling|open|more|unfinished|partial) (?:file|code|tag|expression|block|content)|No continuation (?:is )?needed|Nothing (?:to|left to|more to) continu|No (?:partial|incomplete) (?:file|document|output|content)|There is no (?:prior |unfinished )?(?:partial )?(?:file|document|content|output|code block)|No open (?:document|file|content|conversation)[\s\S]{0,120}?(?:unfinished|remains|needed|to continue|to resume)[^]*$|No prior (?:file|document|content|conversation) found|is left unfinished[^]*$|(?:starting|start) from (?:your|the) stopping-point instruction|stopping-point instruction as the baseline|Assuming (?:you meant|the active file|no prior partial|the previous|the last|a complete)|I can'?t continue from a stopping point|Paste (?:your|the) partial|Provide the partial content|No active (?:partial|document|file|content|conversation)|None found (?:in the conversation|to resume|to continue|yet)|What to Provide to Resume|Required to Proceed|To proceed, please paste|#{1,3}\s*Continuation (?:Status|Check)|nothing (?:further|more|else) (?:to append|to add|can be appended)|no (?:stopping|stop) points? (?:to resume|for resuming) from|paste the (?:partial content|last lines)|continue directly from that exact|No (?:open|unclosed) [`<])[^]*$/i;
 
 export function stripMetaCommentary(text) {
   const value = String(text || "");
@@ -526,12 +532,30 @@ export function isMetaOnlyReply(text) {
   return META_COMMENTARY_PATTERN.test(value);
 }
 
+// True when a continuation chunk regenerates the answer from the beginning
+// instead of appending the missing ending: its head matches the original's
+// head with no genuinely new tail. Stitching that would duplicate the whole
+// reply in the stream, so callers must discard the chunk (anti-repeat once,
+// then stop). A full repeat WITH a new tail is not a pure restart — the
+// stitcher consumes the repeated head and appends only the tail.
+export function isRestartedReply(original, continuation) {
+  const norm = (s) =>
+    String(s || "").replace(/\s+/g, " ").trim();
+  const o = norm(original);
+  const c = norm(continuation);
+  if (o.length < 40 || c.length < 40) return false;
+  if (!c.startsWith(o.slice(0, 60))) return false;
+  // Repeat plus genuinely new material is progress, not a restart.
+  if (c.startsWith(o)) return !c.slice(o.length).trim();
+  return true;
+}
+
 export function stitchContinuationChunk(original, continuation) {
   const orig = String(original || "");
   let cont = String(continuation || "");
 
   if (!cont.trim()) {
-    return { stitched: orig, deltaText: "", overlapLength: 0 };
+    return { stitched: orig, deltaText: "", overlapLength: 0, restarted: false };
   }
 
   // 1. Strip redundant model introductory chatter if any
@@ -543,6 +567,39 @@ export function stitchContinuationChunk(original, continuation) {
   // 1b. Strip trailing self-referential meta-commentary ("My previous reply
   // was already complete...") so it never pollutes the stitched answer.
   cont = stripMetaCommentary(cont);
+
+  // 1c. Regeneration handling: the model re-emitted from the top instead of
+  // continuing. A pure regeneration is discarded (stitched output would be
+  // the whole reply twice); a full repeat WITH a new tail has only the tail
+  // stitched so the new material is kept without duplicating the rest.
+  const normText = (s) => String(s || "").replace(/\s+/g, " ").trim();
+  const origNorm = normText(orig);
+  const contNorm = normText(cont);
+  if (
+    origNorm.length >= 40 &&
+    contNorm.length >= 40 &&
+    contNorm.startsWith(origNorm.slice(0, 60))
+  ) {
+    if (contNorm.startsWith(origNorm)) {
+      const tail = contNorm.slice(origNorm.length);
+      if (!tail.trim()) {
+        return {
+          stitched: orig,
+          deltaText: "",
+          overlapLength: 0,
+          restarted: true,
+        };
+      }
+      cont = tail;
+    } else if (isRestartedReply(orig, cont)) {
+      return {
+        stitched: orig,
+        deltaText: "",
+        overlapLength: 0,
+        restarted: true,
+      };
+    }
+  }
 
   // 2. If original is inside an open markdown code block, and continuation opens a redundant markdown fence
   const origHasOpenFence = countFences(orig) % 2 === 1;
@@ -571,7 +628,7 @@ export function stitchContinuationChunk(original, continuation) {
         overlapLength = len;
         cont = cont.slice(overlapLength);
         const stitched = origTrimmed + cont;
-        return { stitched, deltaText: cont, overlapLength };
+        return { stitched, deltaText: cont, overlapLength, restarted: false };
       }
     }
     // If no overlap and joining prose outside code, ensure word boundary spacing
@@ -588,7 +645,7 @@ export function stitchContinuationChunk(original, continuation) {
   }
 
   const stitched = orig + cont;
-  return { stitched, deltaText: cont, overlapLength };
+  return { stitched, deltaText: cont, overlapLength, restarted: false };
 }
 
 function buildContinuationMessages(messages, originalContent, reason) {
@@ -781,6 +838,18 @@ export async function processResponse(messages, content, options = {}) {
         // the original answer was complete and the truncation flag was a
         // false positive. Keep the original and stop repairing instead of
         // stitching the noise into the reply.
+        answer = String(answer || "").trim();
+        finalStopReason = "stop";
+        break;
+      }
+      if (
+        reason.startsWith("truncation") &&
+        isRestartedReply(answer, repairResult.content)
+      ) {
+        // The model regenerated the answer from the top instead of appending
+        // the missing ending (and the meta-only guard above did not catch
+        // it). Stitching would duplicate the reply; further rounds just burn
+        // calls, so keep the original and stop.
         answer = String(answer || "").trim();
         finalStopReason = "stop";
         break;

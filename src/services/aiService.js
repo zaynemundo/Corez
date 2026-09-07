@@ -3213,6 +3213,12 @@ export async function generateAIResponse(
         usedExplicitRetryPrefix = true;
         promptToSend = `[RETRY] Explain clearly and directly: ${cleanPrompt}`;
         try {
+          // The failed attempt may already have streamed partial deltas into
+          // the bubble — clear them so the retry does not play on top and the
+          // user sees one answer, not a partial plus a full repeat.
+          try {
+            onClear?.();
+          } catch {}
           const retryResponse = await callHostedOnce(promptToSend);
           if (retryResponse) return retryResponse;
         } catch (retryErr) {
