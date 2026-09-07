@@ -93,10 +93,21 @@ export default {
       );
     }
     if (request.method === "OPTIONS") {
+      // Credentialed cross-origin AI calls (corez.pro -> workers.dev with
+      // credentials:include) require a specific echoed origin PLUS
+      // Allow-Credentials on the preflight — a wildcard origin with
+      // credentials is rejected by browsers and the fetch never fires.
+      const preflightOrigin =
+        requestOrigin && isApprovedDirectAiOrigin(requestOrigin)
+          ? requestOrigin
+          : "*";
       return new Response(null, {
         status: 204,
         headers: {
-          "Access-Control-Allow-Origin": directAiOrigin || "*",
+          "Access-Control-Allow-Origin": preflightOrigin,
+          ...(preflightOrigin !== "*"
+            ? { "Access-Control-Allow-Credentials": "true" }
+            : {}),
           "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
           "Access-Control-Allow-Headers": "Content-Type, Authorization",
           "Access-Control-Max-Age": "86400",
@@ -107,6 +118,7 @@ export default {
       if (!directAiOrigin) return response;
       const headers = new Headers(response.headers);
       headers.set("Access-Control-Allow-Origin", directAiOrigin);
+      headers.set("Access-Control-Allow-Credentials", "true");
       headers.set("Vary", "Origin");
       return new Response(response.body, {
         status: response.status,
@@ -128,6 +140,11 @@ export default {
     const jsonHeaders = {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": directAiOrigin || "*",
+      // The direct-AI origin is a specific echoed origin (never "*"), so
+      // credentialed error responses (401/429) stay readable cross-origin.
+      ...(directAiOrigin
+        ? { "Access-Control-Allow-Credentials": "true" }
+        : {}),
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
       "X-Content-Type-Options": "nosniff",

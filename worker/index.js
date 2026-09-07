@@ -4158,13 +4158,19 @@ async function handlePublish(request, env) {
 // (publishedPageHeaders / PREVIEW_CSP).
 const APP_CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  // static.cloudflareinsights.com: Cloudflare's own analytics beacon
+  // (auto-injected RUM). Without it the beacon is blocked and every page
+  // logs a CSP violation.
+  "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' data: blob: https:",
   "media-src 'self' data: blob: https:",
   "connect-src 'self' https: wss:",
-  "frame-src 'self' blob: data: 'srcdoc'",
+  // No 'srcdoc' keyword exists in CSP — srcdoc iframes are covered by
+  // 'self' via their inherited origin. The bogus keyword only logged a
+  // violation on every page load.
+  "frame-src 'self' blob: data:",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

@@ -208,6 +208,9 @@ describe('E2E /api/ai pipeline', () => {
     }), env);
     expect(allowedCorezDomain.status).toBe(200);
     expect(allowedCorezDomain.headers.get('Access-Control-Allow-Origin')).toBe('https://corez.pro');
+    // Credentialed cross-origin AI calls need Allow-Credentials, otherwise
+    // the browser blocks the response and the chat never fires.
+    expect(allowedCorezDomain.headers.get('Access-Control-Allow-Credentials')).toBe('true');
 
     const allowedChatDomain = await swarmWorker.fetch(new Request('https://chat.zayne-mayo.workers.dev/api/ai', {
       method: 'POST',
@@ -231,6 +234,15 @@ describe('E2E /api/ai pipeline', () => {
     }), env);
     expect(optionsPreflight.status).toBe(204);
     expect(optionsPreflight.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:3000');
+    expect(optionsPreflight.headers.get('Access-Control-Allow-Credentials')).toBe('true');
+
+    // Unapproved origins are rejected outright on the direct host — even
+    // preflight gets a 403, so no CORS headers are ever issued to them.
+    const blockedPreflight = await swarmWorker.fetch(new Request('https://chat.zayne-mayo.workers.dev/api/ai', {
+      method: 'OPTIONS',
+      headers: { 'Origin': 'https://attacker.example' }
+    }), env);
+    expect(blockedPreflight.status).toBe(403);
   });
 
   it('restricts the direct hostname when Cloudflare rewrites request.url to a configured route', async () => {
