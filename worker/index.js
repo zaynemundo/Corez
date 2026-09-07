@@ -24,6 +24,7 @@ import {
   runProviderChain,
   runStreamingChain,
   callOpenRouterImage,
+  resolveOpencodeSessionId,
 } from "./providerChain.js";
 import { runCreationHarness } from "./harness.js";
 import { repairMalformedHtml } from "./htmlRepair.js";
@@ -1181,6 +1182,24 @@ async function handleAi(request, env) {
     return jsonResponse(400, { error: "Prompt is required." });
   }
 
+  // OpenCode gateway session affinity (required x-opencode-session header):
+  // one id per incoming request — explicit client hint first, then the
+  // authenticated user (stable across turns), else a fresh random id. Shared
+  // by every provider call in this request (title, chain, repairs, harness)
+  // so the gateway routes the whole turn to one backend.
+  let opencodeSessionHint =
+    typeof body.opencodeSession === "string" && body.opencodeSession.trim()
+      ? body.opencodeSession
+      : null;
+  if (!opencodeSessionHint) {
+    try {
+      opencodeSessionHint = await sessionUid(request, env);
+    } catch {
+      opencodeSessionHint = null;
+    }
+  }
+  const sessionId = resolveOpencodeSessionId(opencodeSessionHint);
+
   // Title-only fast path: the client asks the model to name a new chat
   // session from its first message. A tiny dedicated system prompt and a
   // strict output cap keep this near-free; failures resolve to title: null
@@ -1201,6 +1220,7 @@ async function handleAi(request, env) {
         signal: request.signal || null,
         store: null,
         sleep: retrySleepFor(env),
+        sessionId,
       });
       let title =
         typeof titleResult?.content === "string"
@@ -2045,6 +2065,7 @@ async function handleAi(request, env) {
       signal: clientDisconnectSignal,
       store: createTaskStateStore(env),
       sleep: retrySleepFor(env),
+      sessionId,
       complexity: body.complexity,
       model: selectedModel,
       reasoning: selectedReasoning.reasoning,
@@ -2131,6 +2152,7 @@ async function handleAi(request, env) {
       // Collapsible backoff for tests (__COREZ_RETRY_SLEEP_MS); real sleep
       // in production so transient retries actually ride out the blip.
       sleep: retrySleepFor(env),
+      sessionId,
       model: selectedModel,
       reasoning: selectedReasoning.reasoning,
       temperature: selectedReasoning.temperature,
@@ -2261,6 +2283,7 @@ async function handleAi(request, env) {
                     signal: clientDisconnectSignal,
                     store: createTaskStateStore(env),
                     sleep: retrySleepFor(env),
+                    sessionId,
                     model: selectedModel,
                     reasoning: selectedReasoning.reasoning,
                     temperature: selectedReasoning.temperature,
@@ -2530,6 +2553,7 @@ async function handleAi(request, env) {
     signal: clientDisconnectSignal,
     store: createTaskStateStore(env),
     sleep: retrySleepFor(env),
+    sessionId,
     model: selectedModel,
     reasoning: selectedReasoning.reasoning,
     temperature: selectedReasoning.temperature,
@@ -2565,6 +2589,7 @@ async function handleAi(request, env) {
           signal: clientDisconnectSignal,
           store: createTaskStateStore(env),
           sleep: retrySleepFor(env),
+          sessionId,
           model: selectedModel,
           reasoning: selectedReasoning.reasoning,
           temperature: selectedReasoning.temperature,

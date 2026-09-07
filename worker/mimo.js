@@ -13,6 +13,11 @@
 export const MIMO_DEFAULT_MODEL = "mimo-v2.5";
 export const MIMO_DEFAULT_ENDPOINT = "https://opencode.ai/zen/go/v1/chat/completions";
 
+import {
+  OPENCODE_SESSION_HEADER,
+  newOpencodeSessionId,
+} from "./providerChain.js";
+
 const MIMO_MEDIA_PROMPTS = {
   image:
     "Describe this image in detail for a builder AI. Cover: subjects, layout, colors, style, text visible, composition, mood, and any UI elements. Be concise but thorough (120-200 words). Respond in English.",
@@ -229,6 +234,8 @@ async function callMimo(messages, env, signal) {
         "Content-Type": "application/json",
         "HTTP-Referer": "https://corez.pro",
         "X-Title": "COREZ AI - MiMo Vision",
+        // Required by the OpenCode gateway (HTTP 400 MissingSessionID).
+        [OPENCODE_SESSION_HEADER]: newOpencodeSessionId(),
       },
       body: JSON.stringify(body),
       signal: controller.signal,

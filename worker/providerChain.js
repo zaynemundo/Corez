@@ -6,6 +6,36 @@ import {
 
 export const OPENCODE_DEFAULT_ENDPOINT =
   "https://opencode.ai/zen/go/v1/responses";
+// OpenCode Go/Zen routes requests to the upstream serving the selected model
+// via the x-opencode-session header. Since Sep 2026 the gateway rejects
+// chat requests without it (HTTP 400 MissingSessionID), so EVERY opencode
+// request must carry one. The value is an opaque session-affinity id: stable
+// within a run (all retries share it) so the gateway keeps one backend — and
+// its token cache — for the whole turn.
+export const OPENCODE_SESSION_HEADER = "x-opencode-session";
+const OPENCODE_SESSION_ALPHABET =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+export function newOpencodeSessionId() {
+  const bytes = new Uint8Array(26);
+  crypto.getRandomValues(bytes);
+  let id = "ses_";
+  for (const b of bytes) id += OPENCODE_SESSION_ALPHABET[b % 62];
+  return id;
+}
+
+export function resolveOpencodeSessionId(hint) {
+  if (typeof hint === "string") {
+    const v = hint.trim();
+    // Opaque caller ids (e.g. a user uid) are namespaced so they can never
+    // collide with real opencode session ids; already-prefixed values pass
+    // through untouched.
+    if (/^[A-Za-z0-9_-]{8,128}$/.test(v)) {
+      return v.startsWith("ses_") ? v : `ses_${v}`;
+    }
+  }
+  return newOpencodeSessionId();
+}
 // DEEPSEEK_DEFAULT_ENDPOINT removed — chat no longer falls back to DeepSeek.
 export const OPENROUTER_DEFAULT_ENDPOINT =
   "https://openrouter.ai/api/v1/chat/completions";
@@ -685,8 +715,11 @@ async function callChatEndpoint({
  * configured, but text chat never falls back. Disable with
  * OPENCODE_GO_DISABLED (any truthy value).
  */
-export function buildProviderChain(env = {}) {
+export function buildProviderChain(env = {}, extra = {}) {
   const chain = [];
+  // Session affinity for the OpenCode gateway (required header, resolved once
+  // per chain so every attempt in the run shares it).
+  const sessionId = resolveOpencodeSessionId(extra?.sessionId);
   const ttftTimeoutMs = envTimeoutMs(
     env,
     "AI_TTFT_TIMEOUT_MS",
@@ -722,6 +755,10 @@ export function buildProviderChain(env = {}) {
       extraHeaders: {
         "HTTP-Referer": "https://corez.ai",
         "X-Title": "COREZ AI",
+        // Required by the OpenCode gateway (HTTP 400 MissingSessionID
+        // without it). Resolved once per chain so every attempt in the run
+        // shares one affinity id.
+        [OPENCODE_SESSION_HEADER]: sessionId,
       },
       ttftTimeoutMs,
       idleTimeoutMs,
@@ -776,7 +813,7 @@ export function buildProviderChain(env = {}) {
  * of failing with a 502.
  *
  * Options: { env, signal, sleep, clock, jitter, store, maxRequestRetryMs,
- * taskHash, taskId, model, reasoning, temperature, bodyExtra } — sleep/clock/jitter are injectable for
+ * taskHash, taskId, model, reasoning, temperature, bodyExtra, sessionId } — sleep/clock/jitter are injectable for
  * deterministic tests. `model` overrides the provider's configured model for
  * this call (e.g. the harness build phase pins muse-spark-1.3-contributor). `reasoning`
  * and `temperature` are forwarded as body fields for reasoning models (Muse Spark 1.3).
@@ -812,7 +849,7 @@ export async function runProviderChain(messages, options = {}) {
   };
 
   const startedAt = clock();
-  const providers = buildProviderChain(env);
+  const providers = buildProviderChain(env, { sessionId: options.sessionId });
 
   for (const provider of providers) {
     let attempt = 0;
@@ -1008,7 +1045,7 @@ export function runStreamingChain(messages, options = {}) {
   const bodyExtra = options.bodyExtra || null;
 
   const startedAt = clock();
-  const providers = buildProviderChain(env);
+  const providers = buildProviderChain(env, { sessionId: options.sessionId });
   const failureMessages = [];
   let onlyEmptyFailures = true;
   // Last transient (retryable-class) failure seen, for the rate-limit branch

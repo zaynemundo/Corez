@@ -673,4 +673,50 @@ describe('runStreamingChain empty-stream behavior', () => {
     expect(events.filter((e) => e.type === 'error')).toHaveLength(1);
     expect(calls).toBe(1);
   });
+
+  it('sends x-opencode-session on every opencode request, stable across retries', async () => {
+    const { clock, sleep } = fakeClock();
+    const sessions = [];
+    let attempts = 0;
+    vi.stubGlobal('fetch', vi.fn(async (url, init) => {
+      sessions.push(init?.headers?.['x-opencode-session']);
+      attempts += 1;
+      return attempts <= 2 ? errorResponse(429, 'rate limited') : okResponse('recovered');
+    }));
+
+    const result = await runProviderChain([{ role: 'user', content: 'retry me' }], {
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode' },
+      sleep,
+      clock,
+      jitter: () => 0,
+      maxRequestRetryMs: 300_000
+    });
+
+    expect(result.content).toBe('recovered');
+    expect(attempts).toBe(3);
+    // The gateway rejects requests without the header (HTTP 400
+    // MissingSessionID); every attempt — including retries — carries one id.
+    expect(sessions).toHaveLength(3);
+    for (const s of sessions) expect(typeof s).toBe('string');
+    expect(new Set(sessions).size).toBe(1);
+  });
+
+  it('honours an explicit sessionId for the whole run', async () => {
+    const sessions = [];
+    vi.stubGlobal('fetch', vi.fn(async (url, init) => {
+      sessions.push(init?.headers?.['x-opencode-session']);
+      return okResponse('hello');
+    }));
+
+    const result = await runProviderChain([{ role: 'user', content: 'hi' }], {
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode' },
+      sessionId: 'user-abc-123',
+      sleep: async () => {},
+      clock: () => 0,
+      jitter: () => 0
+    });
+
+    expect(result.content).toBe('hello');
+    expect(sessions).toEqual(['ses_user-abc-123']);
+  });
 });

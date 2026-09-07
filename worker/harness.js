@@ -156,6 +156,9 @@ export async function* runCreationHarness(options) {
     store,
     sleep,
     complexity,
+    // OpenCode gateway session affinity: forwarded to every provider call in
+    // the build so the whole creation shares one affinity id.
+    sessionId,
     heartbeatIntervalMs = HEARTBEAT_INTERVAL_MS,
     checkpointIntervalMs = Number(env?.AI_HARNESS_CHECKPOINT_MS) > 0
       ? Number(env?.AI_HARNESS_CHECKPOINT_MS)
@@ -359,6 +362,7 @@ export async function* runCreationHarness(options) {
           signal,
           store: null,
           sleep,
+          sessionId,
           maxRequestRetryMs: specTimeoutMs,
           reasoning: { effort: "high", exclude: true },
           temperature: 0.25,
@@ -519,6 +523,7 @@ export async function* runCreationHarness(options) {
         for await (const event of runStreamingChain(buildMessages, {
           env,
           signal,
+          sessionId,
           model: buildModel,
           reasoning: buildReasoning,
           temperature: buildTemperature,
@@ -623,6 +628,7 @@ export async function* runCreationHarness(options) {
           for await (const event of runStreamingChain(continuationMessages, {
             env,
             signal,
+            sessionId,
             model: buildModel,
             reasoning: buildReasoning,
             temperature: buildTemperature,
@@ -756,6 +762,7 @@ export async function* runCreationHarness(options) {
         signal,
         store: null,
         sleep,
+        sessionId,
         reasoning: { effort: "low", exclude: true },
         temperature: 0.22,
       });
@@ -812,6 +819,7 @@ export async function* runCreationHarness(options) {
         for await (const event of runStreamingChain(repairMessages, {
           env,
           signal,
+          sessionId,
           model: buildModel,
           reasoning: buildReasoning,
           temperature: buildTemperature,
