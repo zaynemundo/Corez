@@ -1270,6 +1270,26 @@ export async function generateHostedAIResponse(
       }
     }
 
+    // A 401 from the primary may be a cross-origin cookie artifact, not a
+    // missing login: session cookies are domain-bound, so a request from
+    // corez.pro to the direct workers.dev host carries no corez.pro cookie.
+    // Retry once through the other endpoint (same-origin carries the cookie)
+    // before reporting an auth failure. A genuine logged-out state 401s on
+    // both endpoints and still surfaces the login message.
+    if (response.status === 401) {
+      try {
+        const fallback = await fetchWithTransportRetry(
+          options,
+          AI_FALLBACK_ENDPOINT,
+        );
+        if (fallback && (fallback.ok || fallback.status !== 401))
+          return fallback;
+      } catch (fallbackErr) {
+        if (fallbackErr?.name === "AbortError" || signal?.aborted)
+          throw fallbackErr;
+      }
+    }
+
     return response;
   };
 
@@ -2912,10 +2932,16 @@ export function isExplicitImageRequest(prompt) {
 
 // --- Persistent keep-trying retry policy ----------------------------------
 // The UI must never give up with "I can't act on ..." while the hosted AI
-// is temporarily unavailable. Instead the request stays pending and is
-// re-issued with backoff until it succeeds or the user presses Stop (abort).
+// is temporarily unavailable. Instead the request is re-issued with backoff
+// a bounded number of times, then the honest local fallback (with the real
+// error) is returned — a sustained outage must surface as an error, never
+// as a stream that loads forever. The user can press Stop (abort) at any
+// point to cancel the wait.
 export const PERSISTENT_RETRY_BASE_DELAY_MS = 2000;
 export const PERSISTENT_RETRY_MAX_DELAY_MS = 30000;
+// Production default: 1 initial attempt + explicit retry + up to this many
+// persistent attempts before surfacing the honest fallback.
+export const PERSISTENT_RETRY_DEFAULT_MAX_ATTEMPTS = 3;
 
 export function getPersistentRetryDelay(
   attempt,
@@ -2954,12 +2980,13 @@ function resolvePersistentRetryOpts(retryOpts) {
     (typeof globalThis !== "undefined" && Boolean(globalThis.__VITEST__));
   const raw = retryOpts && typeof retryOpts === "object" ? retryOpts : {};
   return {
-    // Production keeps trying indefinitely; tests keep the old single-attempt
-    // behaviour unless they explicitly opt into persistence.
+    // Production retries a bounded number of times, then surfaces the honest
+    // local fallback; tests keep the old single-attempt behaviour unless they
+    // explicitly opt into persistence.
     maxPersistentAttempts:
       raw.maxPersistentAttempts ??
       raw.maxAttempts ??
-      (isTestEnv ? 1 : Number.POSITIVE_INFINITY),
+      (isTestEnv ? 1 : PERSISTENT_RETRY_DEFAULT_MAX_ATTEMPTS),
     baseDelayMs:
       raw.baseDelayMs ?? PERSISTENT_RETRY_BASE_DELAY_MS,
     maxDelayMs: raw.maxDelayMs ?? PERSISTENT_RETRY_MAX_DELAY_MS,
@@ -3145,12 +3172,12 @@ export async function generateAIResponse(
   };
 
   // Persistent keep-trying loop: never surface a hosted-unavailable give-up
-  // while the failure looks transient. The promise stays pending (the UI
-  // keeps its normal "thinking" state) and the same request is re-issued
-  // with backoff until it succeeds or the user presses Stop (abort).
+  // while the failure looks transient. The same request is re-issued with
+  // backoff up to maxPersistentAttempts, then the honest local fallback is
+  // returned — the UI shows a real error instead of loading forever.
   // Only genuine instant answers (greetings, thanks, creator fact, ...) are
   // returned from the local fallback without retrying; everything else that
-  // needs the hosted AI keeps retrying. Authentication failures are
+  // needs the hosted AI retries first. Authentication failures are
   // non-retryable and return the login message immediately.
   let persistentAttempt = 0;
   let promptToSend = cleanPrompt;
