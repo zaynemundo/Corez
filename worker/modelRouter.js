@@ -4,18 +4,18 @@
  * 1) MiMo V2.5 (mimo-v2.5) — vision + multimodal file understanding.
  *    Every user attachment (image/*, video/*, audio/*, pdf, text, generic file)
  *    is first described by MiMo V2.5 via worker/mimo.js. MiMo runs on the same
- *    OpenCode Zen Go gateway as Muse (same endpoint + key, different model).
- * 2) Muse Spark 1.3 (muse-spark-1.3-contributor) — the unified site-wide
+ *    OpenCode Zen Go gateway as DeepSeek (same endpoint + key, different model).
+ * 2) DeepSeek V4.1 Flash (deepseek-flash) — the unified site-wide
  *    builder for visual tasks, backend logic, algorithms, scripting, general
  *    chat, writing, data and Q&A. It receives MiMo's textual description as
  *    grounded system context and does the final generation.
  *
- * Text-only Muse benefits from MiMo's hidden vision reasoning: MiMo is the
- * eyes/ears, Muse is the hands. See worker/mimo.js for the pre-pass.
+ * Text-only DeepSeek benefits from MiMo's hidden vision reasoning: MiMo is the
+ * eyes/ears, DeepSeek is the hands. See worker/mimo.js for the pre-pass.
  */
 
-export const MODEL_VISUAL = "muse-spark-1.3-contributor";
-export const MODEL_DEFAULT = "muse-spark-1.3-contributor";
+export const MODEL_VISUAL = "deepseek-flash";
+export const MODEL_DEFAULT = "deepseek-flash";
 
 const VISUAL_SKILL_IDS = new Set([
   "visual-creative",
@@ -106,7 +106,7 @@ export function isVisualRequest({
 
 /**
  * Selects the optimal model for a given request:
- * - Muse Spark 1.3 for all tasks (unified model)
+ * - DeepSeek V4.1 Flash for all tasks (unified model)
  *
  * @param {Object} options Request options (prompt, intent, skills, messages)
  * @param {Object} [env] Worker environment variables
@@ -133,7 +133,7 @@ export function selectModelForRequest(options = {}, env = {}) {
 }
 
 /**
- * Complexity-aware reasoning & temperature selection for Muse Spark 1.3.
+ * Complexity-aware reasoning & temperature selection for DeepSeek V4.1 Flash.
  *
  * Reasoning models benefit from explicit effort hints: trivial prompts should
  * not waste reasoning tokens, while high/epic tasks (games, apps, research)
@@ -145,7 +145,7 @@ const REASONING_BY_COMPLEXITY = Object.freeze({
   low: "low",
   medium: "medium",
   // High and epic work (SaaS builds, multiplayer/RPG games, research) gets
-  // the maximum xhigh reasoning effort — Muse Spark 1.3's top tier. Override
+  // the maximum xhigh reasoning effort — DeepSeek V4.1 Flash's top tier. Override
   // down with AI_REASONING_EFFORT if latency/token cost matters more.
   high: "xhigh",
   epic: "xhigh",

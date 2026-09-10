@@ -18,7 +18,7 @@ export function classifyTaskCategory(task) {
   const lower = text.toLowerCase();
 
   if (
-    /\b(vision|layout|ui audit|visual design|muse spark|muse-spark)\b/i.test(
+    /\b(vision|layout|ui audit|visual design|deepseek-flash|deepseek v4)\b/i.test(
       lower,
     )
   )

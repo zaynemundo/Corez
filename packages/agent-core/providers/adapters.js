@@ -24,10 +24,27 @@ export const PROVIDER_ENV_KEYS = Object.freeze({
 });
 
 export const PROVIDER_ENDPOINTS = Object.freeze({
-  [PROVIDER_IDS.OPENCODE_GO]: 'https://opencode.ai/zen/go/v1/responses',
+  [PROVIDER_IDS.OPENCODE_GO]: 'https://opencode.ai/zen/go/v1/chat/completions',
   [PROVIDER_IDS.DEEPSEEK]: 'https://api.deepseek.com/chat/completions',
   [PROVIDER_IDS.OPENROUTER]: 'https://openrouter.ai/api/v1/chat/completions'
 });
+
+// OpenCode Go/Zen rejects chat requests without a session-affinity header
+// (HTTP 400 MissingSessionID), so every opencode request carries an opaque id.
+const OPENCODE_SESSION_HEADER = 'x-opencode-session';
+
+function newOpencodeSessionId() {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const bytes = new Uint8Array(26);
+  if (typeof globalThis.crypto?.getRandomValues === 'function') {
+    globalThis.crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  let id = 'ses_';
+  for (const b of bytes) id += alphabet[b % 62];
+  return id;
+}
 
 // 401/400/403/404 and the rest of the 4xx range are permanent (a retry can
 // never fix a bad key or a bad request). 408/409/429 and everything in the
@@ -229,10 +246,17 @@ export class OpenCodeGoAdapter extends ProviderAdapter {
       id: PROVIDER_IDS.OPENCODE_GO,
       apiKey,
       endpoint: options.endpoint ?? process.env.OPENCODE_ENDPOINT ?? PROVIDER_ENDPOINTS[PROVIDER_IDS.OPENCODE_GO],
-      model: options.model ?? process.env.OPENCODE_MODEL ?? 'muse-spark-1.3-contributor',
+      model: options.model ?? process.env.OPENCODE_MODEL ?? 'deepseek-flash',
       referer: 'https://corez.ai',
       title: 'COREZ AI'
     });
+  }
+
+  buildHeaders() {
+    return {
+      ...super.buildHeaders(),
+      [OPENCODE_SESSION_HEADER]: newOpencodeSessionId()
+    };
   }
 }
 
@@ -245,7 +269,7 @@ export class DeepSeekAdapter extends ProviderAdapter {
       id: PROVIDER_IDS.DEEPSEEK,
       apiKey,
       endpoint: options.endpoint ?? process.env.DEEPSEEK_ENDPOINT ?? PROVIDER_ENDPOINTS[PROVIDER_IDS.DEEPSEEK],
-      model: options.model ?? process.env.DEEPSEEK_MODEL ?? 'muse-spark-1.3-contributor'
+      model: options.model ?? process.env.DEEPSEEK_MODEL ?? 'deepseek-flash'
     });
   }
 
@@ -267,7 +291,7 @@ export class OpenRouterAdapter extends ProviderAdapter {
       id: PROVIDER_IDS.OPENROUTER,
       apiKey,
       endpoint: options.endpoint ?? process.env.OPENROUTER_ENDPOINT ?? PROVIDER_ENDPOINTS[PROVIDER_IDS.OPENROUTER],
-      model: options.model ?? process.env.OPENROUTER_MODEL ?? 'muse-spark-1.3-contributor',
+      model: options.model ?? process.env.OPENROUTER_MODEL ?? 'deepseek-flash',
       referer: 'https://corez.ai',
       title: 'COREZ AI'
     });

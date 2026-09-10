@@ -75,7 +75,7 @@ describe('ProviderChain', () => {
 
     fetchSpy.mockImplementation(async (url, init) => {
       const body = JSON.parse(init.body);
-      calls.push({ url, body, auth: init.headers.Authorization });
+      calls.push({ url, body, auth: init.headers.Authorization, session: init.headers['x-opencode-session'] });
       if (String(url).includes('opencode.test')) return completionResponse('from opencode');
       return completionResponse('unexpected');
     });
@@ -86,7 +86,7 @@ describe('ProviderChain', () => {
     ];
     const tools = [{ name: 'read_file', description: 'Read a file' }];
 
-    const result = await chain.generate({ model: 'muse-spark-1.3-contributor', messages, tools });
+    const result = await chain.generate({ model: 'deepseek-flash', messages, tools });
 
     expect(result.status).toBe('completed');
     expect(result.content).toBe('from opencode');
@@ -97,6 +97,8 @@ describe('ProviderChain', () => {
     expect(calls[0].body.tools).toEqual(tools);
     // Each provider only ever sees its own key.
     expect(calls[0].auth).toBe('Bearer oc-key');
+    // The OpenCode Go gateway requires a session-affinity header.
+    expect(calls[0].session).toMatch(/^ses_[A-Za-z0-9]+$/);
   });
 
   it('falls back immediately when the preferred provider fails transiently and persists a retry schedule', async () => {
@@ -343,7 +345,7 @@ describe('ProviderChain', () => {
     });
 
     const result = await chain.generate({
-      model: 'muse-spark-1.3-contributor',
+      model: 'deepseek-flash',
       messages: [...toolMessages, { role: 'user', content: 'continue' }]
     });
 

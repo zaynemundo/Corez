@@ -1,7 +1,7 @@
 ---
 description: Designs map layouts, tilemaps, platform placements, encounter pacing, checkpoints, and level progression data.
 mode: subagent
-model: opencode-go/muse-spark-1.3-contributor
+model: opencode-go/deepseek-flash
 temperature: 0.2
 
 permission:

@@ -1,7 +1,7 @@
 ---
 description: Bridges art and code by producing coherent game assets, particle effects, and background graphics.
 mode: subagent
-model: opencode-go/muse-spark-1.3-contributor
+model: opencode-go/deepseek-flash
 temperature: 0.2
 
 permission:

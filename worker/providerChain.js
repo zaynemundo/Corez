@@ -5,7 +5,7 @@ import {
 } from "./utils.js";
 
 export const OPENCODE_DEFAULT_ENDPOINT =
-  "https://opencode.ai/zen/go/v1/responses";
+  "https://opencode.ai/zen/go/v1/chat/completions";
 // OpenCode Go/Zen routes requests to the upstream serving the selected model
 // via the x-opencode-session header. Since Sep 2026 the gateway rejects
 // chat requests without it (HTTP 400 MissingSessionID), so EVERY opencode
@@ -39,7 +39,7 @@ export function resolveOpencodeSessionId(hint) {
 // DEEPSEEK_DEFAULT_ENDPOINT removed — chat no longer falls back to DeepSeek.
 export const OPENROUTER_DEFAULT_ENDPOINT =
   "https://openrouter.ai/api/v1/chat/completions";
-export const DEFAULT_MODEL = "muse-spark-1.3-contributor";
+export const DEFAULT_MODEL = "deepseek-flash";
 
 // OpenRouter retired black-forest-labs/flux-1-schnell, so image generation
 // uses Google's Nano Banana 2 lite (Gemini 3.1 Flash Lite Image) only.
@@ -815,8 +815,8 @@ export function buildProviderChain(env = {}, extra = {}) {
  * Options: { env, signal, sleep, clock, jitter, store, maxRequestRetryMs,
  * taskHash, taskId, model, reasoning, temperature, bodyExtra, sessionId } — sleep/clock/jitter are injectable for
  * deterministic tests. `model` overrides the provider's configured model for
- * this call (e.g. the harness build phase pins muse-spark-1.3-contributor). `reasoning`
- * and `temperature` are forwarded as body fields for reasoning models (Muse Spark 1.3).
+ * this call (e.g. the harness build phase pins deepseek-flash). `reasoning`
+ * and `temperature` are forwarded as body fields for reasoning models (DeepSeek V4.1 Flash).
  * Every request is uncapped: the provider decides how long it generates, and no output
  * ceiling is ever sent.
  */

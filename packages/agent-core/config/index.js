@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 export const DEFAULT_CONFIG = Object.freeze({
-  model: 'muse-spark-1.3-contributor',
+  model: 'deepseek-flash',
   reasoning: 'high',
   mode: 'agent',
   permissions: {

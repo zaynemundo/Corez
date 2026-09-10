@@ -1,7 +1,7 @@
 ---
 description: Technical Director overseeing game architecture, frame-rate performance, code structure, and module boundaries.
 mode: subagent
-model: opencode-go/muse-spark-1.3-contributor
+model: opencode-go/deepseek-flash
 temperature: 0.1
 
 permission:

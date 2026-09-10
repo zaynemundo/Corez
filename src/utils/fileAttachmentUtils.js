@@ -49,7 +49,7 @@ export const TEXT_EXTENSIONS = new Set([
   "svelte",
 ]);
 
-// mime buckets used by the MiMo -> Muse pipeline
+// mime buckets used by the MiMo -> DeepSeek pipeline
 export const IMAGE_MIMES = /^image\//i;
 export const VIDEO_MIMES = /^video\//i;
 export const AUDIO_MIMES = /^audio\//i;
@@ -196,7 +196,7 @@ export function extractFilesFromClipboard(clipboardData) {
  *
  * Two-stage pipeline for corez.pro: every attachment (image, video, audio,
  * file) is first understood by MiMo V2.5 (vision/multimodal), then its
- * textual description is fed to Muse Spark 1.3 for generation. This
+ * textual description is fed to DeepSeek V4.1 Flash for generation. This
  * function prepares the attachments so the worker's MiMo pre-pass can
  * describe them.
  *
@@ -314,8 +314,8 @@ export function processFiles(fileList, setAttachments) {
       };
       reader.readAsDataURL(entry.file);
     } else if (isLargeImage) {
-      // Large image (1.5-10MB): no lightweight thumb, but still upload via R2 so MiMo/Muse can use it.
-      // Use dataUrl for R2 upload and also set thumb for vision (Muse gateway accepts up to 8MB dataUrl).
+      // Large image (1.5-10MB): no lightweight thumb, but still upload via R2 so MiMo/DeepSeek can use it.
+      // Use dataUrl for R2 upload and also set thumb for vision (DeepSeek gateway accepts up to 8MB dataUrl).
       setAttachments((prev) =>
         (prev || []).map((a) =>
           a.id === entry.id ? { ...a, uploading: true } : a,

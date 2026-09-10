@@ -165,7 +165,7 @@ export async function* runCreationHarness(options) {
       : DEFAULT_BUILD_CHECKPOINT_MS,
   } = options;
 
-  // Build phase model: all tasks use Muse Spark 1.3 (muse-spark-1.3-contributor)
+  // Build phase model: all tasks use DeepSeek V4.1 Flash (deepseek-flash)
   // as the unified site-wide model. OPENCODE_BUILD_MODEL overrides per
   // deployment and is checked first so it wins for any task type.
   const buildModel =
@@ -173,7 +173,7 @@ export async function* runCreationHarness(options) {
     env?.OPENCODE_BUILD_MODEL ||
     selectModelForRequest({ prompt, primaryIntent, complexity }, env);
   // Reasoning config: harness computes complexity-aware reasoning & temperature
-  // so Muse Spark 1.3 can think thoroughly for builds but cheaply for trivial.
+  // so DeepSeek V4.1 Flash can think thoroughly for builds but cheaply for trivial.
   const buildReasoning =
     options.reasoning ||
     selectReasoningConfig({ prompt, primaryIntent, complexity }, env).reasoning;

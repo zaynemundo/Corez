@@ -1,12 +1,12 @@
 /**
- * MiMo V2.5 -> Muse Spark 1.3 Two-Stage Pipeline for corez.pro
+ * MiMo V2.5 -> DeepSeek V4.1 Flash Two-Stage Pipeline for corez.pro
  *
  * Every user attachment (image, video, audio, file, etc.) is first
  * understood by MiMo V2.5 (vision + multimodal), then its textual
- * description is fed to Muse Spark 1.3 for generation.
+ * description is fed to DeepSeek V4.1 Flash for generation.
  *
  * This file is used by worker/index.js (server) and is safe to call
- * from any context. It reuses the same gateway as Muse (OpenCode Zen Go)
+ * from any context. It reuses the same gateway as DeepSeek (OpenCode Zen Go)
  * but with model mimo-v2.5 — same auth, same endpoint, different model.
  */
 
@@ -295,7 +295,7 @@ async function callMimo(messages, env, signal) {
 /**
  * Describe all collected attachments with MiMo V2.5.
  * Returns an array of { name, type, kind, description } — one per attachment that succeeded.
- * Failures are silent (null entries dropped) so the Muse build always proceeds.
+ * Failures are silent (null entries dropped) so the DeepSeek build always proceeds.
  */
 export async function describeAttachmentsWithMimo(
   attachments,
@@ -332,7 +332,7 @@ export async function describeAttachmentsWithMimo(
       const mimoMessages = buildMimoMessages(att, promptHint, resolvedUrl);
       const desc = await callMimo(mimoMessages, env, signal);
       if (!desc) return null;
-      // Preserve assetUrl so downstream can inject exact R2 URL into Muse prompt
+      // Preserve assetUrl so downstream can inject exact R2 URL into DeepSeek prompt
       return {
         name: att.name || "attachment",
         type: att.type || "",
@@ -347,8 +347,8 @@ export async function describeAttachmentsWithMimo(
 }
 
 /**
- * Build the system prompt block that carries MiMo descriptions to Muse.
- * Injected as a system message before the Muse generation so Muse has
+ * Build the system prompt block that carries MiMo descriptions to DeepSeek.
+ * Injected as a system message before the DeepSeek generation so DeepSeek has
  * grounded vision/file understanding.
  */
 export function buildMimoContextBlock(descriptions) {
@@ -389,7 +389,7 @@ export function buildMimoContextBlock(descriptions) {
     })
     .join("\n\n");
   return (
-    "MiMo V2.5 Media Understanding (vision/file analysis — authoritative, use this as ground truth for the attached media, then fulfill the user's request with Muse Spark 1.3):\n" +
+    "MiMo V2.5 Media Understanding (vision/file analysis — authoritative, use this as ground truth for the attached media, then fulfill the user's request with DeepSeek V4.1 Flash):\n" +
     lines +
     "\n\nUse the above MiMo descriptions as the true content of the user's attached files. Do NOT hallucinate or invent media content — ground your generation in these descriptions. When you need to display the attached image in generated HTML, use the EXACT R2 URL provided above for <img src> (e.g. <img src=\"https://corez.pro/api/assets/user-upload_...jpg\"> — must start with https://corez.pro/api/assets/). Never use local filenames like \"Screenshot 2026-09-02 145516.png\" or relative /api/assets/ — they will 404 or break on published sites."
   );

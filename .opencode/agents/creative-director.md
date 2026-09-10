@@ -1,7 +1,7 @@
 ---
 description: Oversees game vision, gameplay identity, genre interpretation, player fantasy, and creative consistency.
 mode: subagent
-model: opencode-go/muse-spark-1.3-contributor
+model: opencode-go/deepseek-flash
 temperature: 0.3
 
 permission:

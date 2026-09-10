@@ -10,7 +10,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import swarmWorker from '../worker/entry.js';
 
-const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/responses';
+const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/chat/completions';
 const env = { OPENCODE_GO_API_KEY: 'sk-test', __COREZ_RETRY_SLEEP_MS: '0' };
 
 function post(worker, body, customEnv = env) {
@@ -57,7 +57,7 @@ describe('E2E /api/ai pipeline', () => {
     const fetchMock = vi.fn(async (url, init) => {
       expect(url).toBe(OPENCODE_URL);
       const body = JSON.parse(init.body);
-      expect(body.model).toBe('muse-spark-1.3-contributor');
+      expect(body.model).toBe('deepseek-flash');
       const msgs = body.input || body.messages;
       expect(msgs[0].role).toBe('system');
       return mockOpenAI('This is a complete and correct answer about compilers. A compiler translates source code into machine code. An interpreter runs code line by line.');

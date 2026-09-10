@@ -29,7 +29,7 @@ check_absent() {
   fi
 }
 
-check 'Worker routes text through OpenCode Go with the Muse Spark 1.3 build' 'muse-spark-1[.]3' "$providerChain"
+check 'Worker routes text through OpenCode Go with the DeepSeek V4.1 Flash build' 'deepseek-flash' "$providerChain"
 check_absent 'Worker never hardcodes OpenRouter-prefixed model ids' 'xiaomi/mimo-v2[.]5' "$worker"
 check_absent 'Worker imposes no AI generation timeouts' 'AbortSignal[.]timeout' "$worker"
 check_absent 'Worker imposes no AI output token caps' 'max_tokens' "$worker"

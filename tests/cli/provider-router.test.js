@@ -8,7 +8,7 @@ describe('ModelProviderRouter', () => {
 
     expect(Array.isArray(models)).toBe(true);
     expect(models.length).toBeGreaterThan(0);
-    expect(models.some(m => m.id === 'muse-spark-1.3-contributor')).toBe(true);
+    expect(models.some(m => m.id === 'deepseek-flash')).toBe(true);
   });
 
   it('runs local agent fallback simulation when no API key is set', async () => {
@@ -27,8 +27,9 @@ describe('ModelProviderRouter', () => {
     const originalFetch = globalThis.fetch;
     try {
       globalThis.fetch = async (url, init) => {
-        expect(url).toBe('https://opencode.ai/zen/go/v1/responses');
+        expect(url).toBe('https://opencode.ai/zen/go/v1/chat/completions');
         expect(init.headers.Authorization).toBe('Bearer test-key');
+        expect(init.headers['x-opencode-session']).toMatch(/^ses_[A-Za-z0-9]+$/);
         return new Response(JSON.stringify({
           choices: [{ message: { content: 'gateway response' } }]
         }), {

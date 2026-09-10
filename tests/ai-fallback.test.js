@@ -521,12 +521,12 @@ describe('Hosted AI fallback behavior', () => {
 
   it('shortens the fallback reason for rate limits instead of dumping provider JSON', () => {
     const reason = describeHostedUnavailable(
-      new Error('opencode: HTTP 429: {"model":"muse-spark-1.3-contributor","error":{"code":"rate_limit_exceeded"}}')
+      new Error('opencode: HTTP 429: {"model":"deepseek-flash","error":{"code":"rate_limit_exceeded"}}')
     );
     expect(reason).toMatch(/rate-limited right now/);
     expect(reason).not.toContain('rate_limit_exceeded');
     expect(reason).not.toContain('HTTP 429');
-    expect(reason).not.toContain('muse-spark');
+    expect(reason).not.toContain('deepseek-flash');
   });
 
   it('reports an honest busy error when the provider is still recovering after retries', async () => {

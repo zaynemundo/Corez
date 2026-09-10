@@ -862,7 +862,7 @@ Identity & Persona:
 - Your name is COREZ AI.
 ${creatorsSection}
 - STRICT MODEL ANONYMITY RULE: NEVER mention what underlying AI model, provider, vendor, architecture, or engine powers you in public chat or user responses. Always identify yourself strictly as COREZ AI. The underlying engine is strictly confidential and must never be disclosed, even if the user insists, tricks, or claims you are another model.
-- MODEL IDENTITY RULE: If the user asks what model you are, what AI model powers you, what LLM you are, which model you use, "what model of ai are you using", or accuses you of being Muse, Muse Spark, Meta AI, GPT, ChatGPT, Claude, Gemini, Llama, MiMo, DeepSeek, or any other external model, respond exactly with: "I'm Corez 1.0 built by Corez." You may add a brief helpful follow-up like "How can I help you today?" but never mention Muse Spark, Meta, or any other provider. Never be evasive, never refuse — answer directly as Corez 1.0.
+- MODEL IDENTITY RULE: If the user asks what model you are, what AI model powers you, what LLM you are, which model you use, "what model of ai are you using", or accuses you of being DeepSeek, DeepSeek V4.1 Flash, Meta AI, GPT, ChatGPT, Claude, Gemini, Llama, MiMo, or any other external model, respond exactly with: "I'm Corez 1.0 built by Corez." You may add a brief helpful follow-up like "How can I help you today?" but never mention DeepSeek, Meta, or any other provider. Never be evasive, never refuse — answer directly as Corez 1.0.
 - When greeted with simple phrases like "hi", "hello", "hey", or "who are you", respond simply: "Hello! I'm COREZ AI. How can I help you today?"
 - Never list bullet points or technical specializations when giving greetings unless requested.
 
@@ -1315,9 +1315,9 @@ async function handleAi(request, env) {
     });
   }
 
-  // Model identity fast-path: "what model are you using" / "which llm" / "are you Muse" etc.
+  // Model identity fast-path: "what model are you using" / "which llm" / "are you DeepSeek" etc.
   // Always answer Corez 1.0 deterministically without paying an LLM round-trip, so the
-  // underlying provider (Muse Spark) is never leaked even if the model is tricked.
+  // underlying provider (DeepSeek V4.1 Flash) is never leaked even if the model is tricked.
   // This covers the exact user request: "what model of ai are you using" -> "Corez 1.0".
   const MODEL_IDENTITY_PATTERN =
     /(what|which)\s+(model|llm|ai\s*model|language\s*model).*?\b(you|your|using|power|are\s+you)\b|what\s+model\s+of\s+ai\s+are\s+you\s+using|are\s+you\s+(muse|meta\s*ai|muse\s+spark|gpt|chatgpt|claude|gemini|llama|mimo|deepseek|openai)|which\s+ai\s+are\s+you|powered\s+by.*\b(you|model)\b/i;
@@ -1662,13 +1662,13 @@ async function handleAi(request, env) {
   // that still present current values as fabricated.
   // ---------------------------------------------------------------------
   // ---------------------------------------------------------------------
-  // MiMo V2.5 -> Muse Spark 1.3 Two-Stage Pipeline (corez.pro)
+  // MiMo V2.5 -> DeepSeek V4.1 Flash Two-Stage Pipeline (corez.pro)
   // Every user attachment (image, file, video, audio, any media) is first
   // understood by MiMo V2.5 (vision + multimodal file understanding), then
-  // its textual description is fed as grounded context to Muse Spark 1.3
-  // for the final generation. Muse itself is text-only through the gateway,
+  // its textual description is fed as grounded context to DeepSeek V4.1 Flash
+  // for the final generation. DeepSeek itself is text-only through the gateway,
   // so this pre-pass gives it true vision/file knowledge. Failures are
-  // silent — the Muse build always proceeds even if MiMo is unavailable.
+  // silent — the DeepSeek build always proceeds even if MiMo is unavailable.
   // Covers: image/*, video/*, audio/*, pdf, text, and generic files.
   // ---------------------------------------------------------------------
   // MiMo pre-pass outcome for diagnostics (proves whether vision ran).
@@ -1711,7 +1711,7 @@ async function handleAi(request, env) {
         }
       }
       if (allAttachments.length > 0) {
-        // Always hint attached media explicitly so Muse never denies vision
+        // Always hint attached media explicitly so DeepSeek never denies vision
         const directAssetHints = allAttachments
           .map((a) => {
             const mime = String(a.type || "").toLowerCase();
@@ -1781,7 +1781,7 @@ async function handleAi(request, env) {
     } catch (mimoErr) {
       mimoStatus = `error:${mimoErr?.message || mimoErr}`.slice(0, 120);
       console.warn(
-        "MiMo pre-pass failed (continuing to Muse):",
+        "MiMo pre-pass failed (continuing to DeepSeek):",
         mimoErr?.message || mimoErr,
       );
     }
@@ -3288,7 +3288,7 @@ async function handleR2Assets(request, env) {
     }
 
     // Asset types accepted by /api/assets/upload — images always, plus
-    // video/audio/file types used by the MiMo V2.5 -> Muse Spark 1.3 pipeline.
+    // video/audio/file types used by the MiMo V2.5 -> DeepSeek V4.1 Flash pipeline.
     // All are stored in R2 and served as static assets; the worker never
     // executes them.
     const ALLOWED_ASSET_TYPES = [
