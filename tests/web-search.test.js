@@ -91,6 +91,26 @@ describe('fetchWebSearch client', () => {
     await expect(fetchWebSearch('  ')).rejects.toMatchObject({ status: 400 });
   });
 
+  it('normalizes control characters before sending', async () => {
+    const fetchMock = vi.fn(async () => Response.json({
+      kind: 'search',
+      query: 'line one line two end',
+      results: [{ title: 'T', url: 'https://example.com', snippet: 'S', source: 'Wikipedia' }],
+      meta: { source: 'Wikipedia' }
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fetchWebSearch('line one\nline two\tend');
+    expect(fetchMock).toHaveBeenCalledWith('/api/search', expect.objectContaining({
+      body: JSON.stringify({ query: 'line one line two end', detail: false })
+    }));
+    vi.unstubAllGlobals();
+  });
+
+  it('rejects queries that normalize to nothing', async () => {
+    await expect(fetchWebSearch('\u0000\u0000')).rejects.toMatchObject({ status: 400 });
+  });
+
   it('propagates abort as AbortError', async () => {
     const controller = new AbortController();
     vi.stubGlobal('fetch', async (_url, _options) => {
@@ -223,6 +243,18 @@ describe('Worker /api/search endpoint', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: '   ' })
+      }),
+      {}
+    );
+    expect(response.status).toBe(400);
+  });
+
+  it('rejects queries containing control characters with 400', async () => {
+    const response = await handleSearch(
+      new Request('https://corez.test/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'line one\nline two' })
       }),
       {}
     );

@@ -286,29 +286,53 @@ export function createLocalEmbeddingVector(text, dimensions = 64) {
   return vector;
 }
 
+// Worker contract (worker/aiModels.js MAX_EMBED_ITEM_CHARS): every item must
+// be a non-empty string of at most 8000 chars. Normalize before sending so an
+// empty or very long prompt can never guarantee a 400 on /api/embed.
+const MAX_EMBED_TEXT_CHARS = 8000;
+
 /**
  * Fetch embeddings from the backend Workers AI endpoint (/api/embed).
  */
 export async function fetchEmbeddings(texts) {
-  const items = Array.isArray(texts) ? texts : [texts];
+  const items = (Array.isArray(texts) ? texts : [texts]).map((item) =>
+    typeof item === "string" ? item.trim().slice(0, MAX_EMBED_TEXT_CHARS) : "",
+  );
+  if (items.length === 0) return [];
+
+  // Empty items cannot be sent (the worker trims and rejects them), so start
+  // from local vectors and overwrite the sendable positions with worker data.
+  // The returned array always keeps a 1:1 mapping with the input items.
+  const vectors = items.map((item) => createLocalEmbeddingVector(item));
+  const sendIndexes = [];
+  const payload = [];
+  items.forEach((item, index) => {
+    if (item) {
+      sendIndexes.push(index);
+      payload.push(item);
+    }
+  });
+  if (payload.length === 0) return vectors;
+
   try {
     const res = await fetch("/api/embed", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: items }),
+      body: JSON.stringify({ text: payload }),
     });
     if (res.ok) {
       const json = await res.json();
-      if (Array.isArray(json?.data) && json.data.length === items.length) {
-        return json.data;
+      if (Array.isArray(json?.data) && json.data.length === payload.length) {
+        sendIndexes.forEach((itemIndex, i) => {
+          vectors[itemIndex] = json.data[i];
+        });
       }
     }
   } catch {
-    // Network or server error -> fallback
+    // Network or server error -> keep local fallback vectors
   }
 
-  // Local fallback vectors
-  return items.map((t) => createLocalEmbeddingVector(t));
+  return vectors;
 }
 
 /**

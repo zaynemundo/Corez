@@ -58,15 +58,30 @@ function normalizeResults(payload) {
  * With `{ detail: true }` the worker also attaches full article extracts to
  * the top Wikipedia results, so reports can be grounded in real content.
  */
+// The worker rejects control characters (newlines, tabs) in queries, so
+// collapse them and whitespace runs into single spaces before sending — a
+// multi-line pasted question must still be searchable.
+function normalizeSearchQuery(query) {
+  let out = "";
+  for (let i = 0; i < query.length; i += 1) {
+    const code = query.charCodeAt(i);
+    out += code < 32 || code === 127 ? " " : query[i];
+  }
+  return out.replace(/\s+/g, " ").trim().slice(0, 200);
+}
+
 export async function fetchWebSearch(query, signal = null, options = {}) {
   if (!query || typeof query !== "string" || !query.trim()) {
     throw new SearchApiError("A search query is required.", 400);
   }
-  const trimmed = query.trim().slice(0, 200);
+  const normalized = normalizeSearchQuery(query);
+  if (!normalized) {
+    throw new SearchApiError("A search query is required.", 400);
+  }
   const fetchOptions = {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query: trimmed, detail: options.detail === true }),
+    body: JSON.stringify({ query: normalized, detail: options.detail === true }),
   };
   if (signal) fetchOptions.signal = signal;
 
