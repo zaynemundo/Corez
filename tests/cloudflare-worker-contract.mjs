@@ -973,6 +973,33 @@ async function run() {
   assert.equal(imageNoKeyResponse.status, 503);
   assert.match((await json(imageNoKeyResponse)).error, /no image provider is configured/);
 
+  // The SPA CSP is inherited by srcdoc preview iframes, so it must allow
+  // inline preview scripts and https CDN libraries (unpkg/Babel/Tailwind/
+  // Three, esm.sh). A policy without https: in script-src renders every
+  // JSX/CDN-based preview as a blank white frame on the deployed site.
+  {
+    const htmlEnv = env({
+      ASSETS: {
+        async fetch() {
+          return new Response(
+            '<!DOCTYPE html><html><head><title>COREZ</title></head><body>COREZ</body></html>',
+            { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+          );
+        }
+      }
+    });
+    const appPageResponse = await worker.fetch(
+      new Request('https://corez.test/'),
+      htmlEnv
+    );
+    assert.equal(appPageResponse.status, 200);
+    const appCsp = appPageResponse.headers.get('content-security-policy') || '';
+    assert.match(appCsp, /script-src 'self' 'unsafe-inline' https:/);
+    assert.match(appCsp, /style-src 'self' 'unsafe-inline' https:/);
+    assert.match(appCsp, /font-src 'self' data: https:/);
+    assert.match(appCsp, /frame-ancestors 'self'/);
+  }
+
   // Test /api/memory store + keyword search (no Workers AI embeddings)
   const memoryStore = new Map();
   const memoryBucket = {

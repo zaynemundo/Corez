@@ -4158,16 +4158,20 @@ async function handlePublish(request, env) {
 // — verified empirically in Chromium), so inline scripts must be allowed at
 // the app level. Inline scripts only ever run inside originless, sandboxed
 // iframes; the app bundle itself is external and eval-free. No 'unsafe-eval'.
-// Published pages and previews carry their own stricter policy
-// (publishedPageHeaders / PREVIEW_CSP).
+// https: is REQUIRED for the same inheritance reason: generated artifacts and
+// the JSX preview wrapper legitimately load libraries from CDNs (unpkg,
+// cdnjs, tailwind, esm.sh). Without it, every external script in a preview is
+// blocked and the canvas renders blank. This matches the published-page and
+// PREVIEW_CSP policies so in-app previews and published links behave
+// identically.
 const APP_CSP = [
   "default-src 'self'",
   // static.cloudflareinsights.com: Cloudflare's own analytics beacon
   // (auto-injected RUM). Without it the beacon is blocked and every page
   // logs a CSP violation.
-  "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' data: https://fonts.gstatic.com",
+  "script-src 'self' 'unsafe-inline' https: https://static.cloudflareinsights.com",
+  "style-src 'self' 'unsafe-inline' https:",
+  "font-src 'self' data: https:",
   "img-src 'self' data: blob: https:",
   "media-src 'self' data: blob: https:",
   "connect-src 'self' https: wss:",
