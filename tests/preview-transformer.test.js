@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatCodeForPreview, parseMultiPageSite, injectMultiPageRouter, validateMultiPageSite, MULTI_PAGE_NAME_PATTERN, NAVIGATION_GUARD_SCRIPT } from '../src/utils/previewTransformer.js';
+import { formatCodeForPreview, parseMultiPageSite, injectMultiPageRouter, validateMultiPageSite, MULTI_PAGE_NAME_PATTERN, NAVIGATION_GUARD_SCRIPT, PREVIEW_ERROR_REPORTER_SCRIPT } from '../src/utils/previewTransformer.js';
 
 describe('previewTransformer', () => {
   it('passes through pure HTML documents with only the safety patches added', () => {
@@ -423,5 +423,105 @@ describe('validateMultiPageSite', () => {
     const result = validateMultiPageSite([]);
     expect(result.valid).toBe(false);
     expect(result.issues[0].message).toContain('No pages');
+  });
+});
+
+describe('preview error reporter', () => {
+  function makeReporterHarness() {
+    const posted = [];
+    const windowListeners = {};
+    const documentListeners = {};
+    const fakeWindow = {
+      parent: { postMessage: (data) => posted.push(data) },
+      addEventListener: (type, fn) => {
+        windowListeners[type] = fn;
+      }
+    };
+    const fakeDocument = {
+      addEventListener: (type, fn) => {
+        documentListeners[type] = fn;
+      }
+    };
+    new Function('window', 'document', PREVIEW_ERROR_REPORTER_SCRIPT).call(
+      fakeWindow,
+      fakeWindow,
+      fakeDocument
+    );
+    return { posted, windowListeners, documentListeners, fakeWindow };
+  }
+
+  it('is injected into both HTML and JSX preview documents', () => {
+    const htmlDoc = formatCodeForPreview(
+      '<!DOCTYPE html><html><head></head><body><h1>Hi</h1></body></html>'
+    );
+    expect(htmlDoc).toContain('corez-preview-error');
+    expect(htmlDoc).toContain('securitypolicyviolation');
+
+    const jsxDoc = formatCodeForPreview(
+      'export default function App() { return <h1>Hi</h1>; }'
+    );
+    expect(jsxDoc).toContain('corez-preview-error');
+  });
+
+  it('forwards runtime, resource, rejection and CSP failures once each', () => {
+    const { posted, windowListeners, documentListeners } = makeReporterHarness();
+
+    windowListeners.error({ message: 'columns is not defined', filename: 'app.js', lineno: 12 });
+    windowListeners.error({ message: 'columns is not defined', filename: 'app.js', lineno: 12 });
+    windowListeners.error({ target: { src: 'https://unpkg.com/missing.js' } });
+    windowListeners.unhandledrejection({ reason: { message: 'fetch failed' } });
+    documentListeners.securitypolicyviolation({
+      violatedDirective: 'script-src',
+      blockedURI: 'https://cdn.example/a.js'
+    });
+
+    expect(posted).toHaveLength(4);
+    expect(posted[0]).toMatchObject({
+      type: 'corez-preview-error',
+      kind: 'error',
+      message: 'columns is not defined',
+      source: 'app.js',
+      line: 12
+    });
+    expect(posted[1]).toMatchObject({ kind: 'resource' });
+    expect(posted[1].message).toContain('missing.js');
+    expect(posted[2]).toMatchObject({ kind: 'unhandledrejection', message: 'fetch failed' });
+    expect(posted[3]).toMatchObject({ kind: 'csp' });
+    expect(posted[3].message).toContain('script-src');
+  });
+
+  it('caps long messages and leaves an existing window.onerror handler untouched', () => {
+    const { posted, windowListeners, fakeWindow } = makeReporterHarness();
+    const sentinel = () => 'artifact-handler';
+    fakeWindow.onerror = sentinel;
+
+    windowListeners.error({ message: 'x'.repeat(900), filename: 'a.js', lineno: 1 });
+
+    expect(posted).toHaveLength(1);
+    expect(posted[0].message).toHaveLength(500);
+    expect(fakeWindow.onerror).toBe(sentinel);
+  });
+
+  it('does not post when the preview is not framed', () => {
+    const listeners = {};
+    let postCalls = 0;
+    const fakeWindow = {
+      addEventListener: (type, fn) => {
+        listeners[type] = fn;
+      },
+      postMessage: () => {
+        postCalls += 1;
+      }
+    };
+    fakeWindow.parent = fakeWindow;
+    const fakeDocument = { addEventListener: () => {} };
+    new Function('window', 'document', PREVIEW_ERROR_REPORTER_SCRIPT).call(
+      fakeWindow,
+      fakeWindow,
+      fakeDocument
+    );
+
+    listeners.error({ message: 'boom' });
+    expect(postCalls).toBe(0);
   });
 });

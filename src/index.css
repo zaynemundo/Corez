@@ -3799,6 +3799,60 @@ h6 {
   justify-content: center;
 }
 
+.preview-error-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  margin-bottom: 0.75rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid rgba(248, 113, 113, 0.5);
+  background: rgba(248, 113, 113, 0.12);
+  color: #fecaca;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  text-align: left;
+}
+
+.preview-error-banner .preview-error-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.preview-error-banner strong {
+  color: #f87171;
+  font-weight: 600;
+}
+
+.preview-error-banner .preview-error-source {
+  opacity: 0.75;
+  word-break: break-all;
+}
+
+.preview-error-actions {
+  display: flex;
+  gap: 0.35rem;
+  flex: 0 0 auto;
+}
+
+.preview-error-btn {
+  cursor: pointer;
+  border: 1px solid rgba(248, 113, 113, 0.5);
+  background: transparent;
+  color: inherit;
+  border-radius: 6px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.72rem;
+}
+
+.preview-error-btn:hover {
+  background: rgba(248, 113, 113, 0.2);
+}
+
 .device-camera-dot {
   width: 6px;
   height: 6px;

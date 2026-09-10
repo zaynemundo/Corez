@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Code2,
   RotateCw,
@@ -56,6 +56,10 @@ export default function CanvasPreview({
   const [activePage, setActivePage] = useState("index.html");
   const [publishTab, setPublishTab] = useState("link"); // 'link' | 'qr' | 'embed'
   const [embedCopied, setEmbedCopied] = useState(false);
+  // Runtime failure reported by the preview iframe (blank/white previews get
+  // an explicit reason instead of silence).
+  const [runtimeError, setRuntimeError] = useState(null);
+  const [errorCopied, setErrorCopied] = useState(false);
 
   // Publish gating: sharing to corez.pro (including custom URL slugs) is a
   // Standard/Premium feature. publishPlan stays null while unknown — unknown
@@ -174,6 +178,8 @@ export default function CanvasPreview({
     setEditableCode(code || "");
     setActivePage("index.html");
     setKey((prev) => prev + 1);
+    setRuntimeError(null);
+    setErrorCopied(false);
   }, [code]);
 
   // Multi-page navigation: the sandboxed iframe cannot navigate or reach the
@@ -185,8 +191,20 @@ export default function CanvasPreview({
     const handleNavMessage = (event) => {
       if (event.source !== iframeRef.current?.contentWindow) return;
       const data = event.data;
-      if (!data || typeof data !== "object" || data.type !== "corez-nav")
+      if (!data || typeof data !== "object") return;
+      // Runtime/resource failures reported by the preview error reporter
+      // (previewTransformer) so a blank frame explains itself.
+      if (data.type === "corez-preview-error") {
+        setRuntimeError({
+          kind: typeof data.kind === "string" ? data.kind : "error",
+          message: String(data.message || "Preview error").slice(0, 500),
+          source: data.source ? String(data.source).slice(0, 200) : "",
+          line: Number(data.line) || 0,
+        });
+        setErrorCopied(false);
         return;
+      }
+      if (data.type !== "corez-nav") return;
       if (typeof data.page !== "string" || !data.page) return;
       const target = multiPage.pages.find((p) => p.name === data.page);
       if (!target) return;
@@ -195,6 +213,25 @@ export default function CanvasPreview({
     window.addEventListener("message", handleNavMessage);
     return () => window.removeEventListener("message", handleNavMessage);
   }, [multiPage]);
+
+  const copyRuntimeError = useCallback(() => {
+    if (!runtimeError) return;
+    const location = runtimeError.source
+      ? `\n${runtimeError.source}${runtimeError.line ? `:${runtimeError.line}` : ""}`
+      : "";
+    const label = runtimeError.kind === "error" ? "runtime" : runtimeError.kind;
+    const text = `Preview ${label} error: ${runtimeError.message}${location}`;
+    const clipboard = navigator.clipboard;
+    if (clipboard && typeof clipboard.writeText === "function") {
+      clipboard
+        .writeText(text)
+        .then(() => {
+          setErrorCopied(true);
+          window.setTimeout(() => setErrorCopied(false), 1800);
+        })
+        .catch(() => {});
+    }
+  }, [runtimeError]);
 
   // Exit fullscreen on Escape key press
   useEffect(() => {
@@ -712,6 +749,45 @@ export default function CanvasPreview({
         {editableCode ? (
           activeTab === "preview" ? (
             <div className={`preview-container device-mode-${deviceMode}`}>
+              {runtimeError && (
+                <div className="preview-error-banner" role="alert">
+                  <div className="preview-error-text">
+                    <strong>
+                      {runtimeError.kind === "csp"
+                        ? "Blocked by security policy"
+                        : runtimeError.kind === "resource"
+                          ? "Preview asset failed to load"
+                          : runtimeError.kind === "unhandledrejection"
+                            ? "Unhandled preview promise rejection"
+                            : "Preview runtime error"}
+                    </strong>
+                    <span>{runtimeError.message}</span>
+                    {runtimeError.source ? (
+                      <span className="preview-error-source">
+                        {runtimeError.source}
+                        {runtimeError.line ? `:${runtimeError.line}` : ""}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="preview-error-actions">
+                    <button
+                      type="button"
+                      className="preview-error-btn"
+                      onClick={copyRuntimeError}
+                    >
+                      {errorCopied ? "Copied ✓" : "Copy"}
+                    </button>
+                    <button
+                      type="button"
+                      className="preview-error-btn"
+                      onClick={() => setRuntimeError(null)}
+                      aria-label="Dismiss preview error"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              )}
               {deviceMode !== "desktop" && (
                 <div className="device-frame-header">
                   <div className="device-camera-dot" />

@@ -342,6 +342,62 @@ export function injectNavigationGuard(html) {
   return `${html}\n${script}`;
 }
 
+// Previews run in a sandboxed srcdoc iframe the parent cannot inspect (no
+// same-origin access), so a runtime error or a blocked CDN script leaves the
+// user staring at a blank white frame with no explanation. This reporter runs
+// first in every preview document and forwards failures to the parent canvas
+// panel: uncaught errors, unhandled rejections, failed resource loads
+// (including CSP-blocked CDN scripts), and securitypolicyviolation events.
+// Messages are deduplicated, capped, and carry no user data beyond the error
+// text and URL the browser already exposes.
+export const PREVIEW_ERROR_REPORTER_SCRIPT = `
+  (function () {
+    if (window.__corezErrorReporter) return;
+    window.__corezErrorReporter = true;
+    var seen = {};
+    function report(kind, message, source, line) {
+      try {
+        var text = String(message || 'Unknown preview error').slice(0, 500);
+        var src = source ? String(source).slice(0, 200) : '';
+        var key = kind + '|' + text + '|' + src + '|' + (line || 0);
+        if (seen[key]) return;
+        seen[key] = true;
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({
+            type: 'corez-preview-error',
+            kind: kind,
+            message: text,
+            source: src,
+            line: Number(line) || 0
+          }, '*');
+        }
+      } catch (e) {}
+    }
+    window.addEventListener('error', function (event) {
+      if (event && event.message) {
+        report('error', event.message, event.filename, event.lineno);
+        return;
+      }
+      var target = event && event.target;
+      var url = target && (target.src || target.href);
+      if (url) report('resource', 'Failed to load ' + url, url, 0);
+    }, true);
+    window.addEventListener('unhandledrejection', function (event) {
+      var reason = event && event.reason;
+      report(
+        'unhandledrejection',
+        reason && reason.message ? reason.message : reason,
+        '',
+        0
+      );
+    });
+    document.addEventListener('securitypolicyviolation', function (event) {
+      var directive = event && event.violatedDirective ? event.violatedDirective : 'csp';
+      var blocked = event && event.blockedURI ? event.blockedURI : '';
+      report('csp', 'Blocked by ' + directive + (blocked ? ': ' + blocked : ''), blocked, 0);
+    });
+  })();`;
+
 // Preview documents run inside sandboxed srcdoc iframes. srcdoc documents
 // inherit the parent app's CSP, so every preview carries its own explicit
 // policy: AI-generated inline scripts/styles and CDN libraries keep working
@@ -353,11 +409,11 @@ const PREVIEW_CSP =
 
 function withPreviewCsp(html) {
   if (!html || typeof html !== "string") return html;
-  const meta = `  <meta http-equiv="Content-Security-Policy" content="${PREVIEW_CSP}">`;
+  const head = `  <meta http-equiv="Content-Security-Policy" content="${PREVIEW_CSP}">\n  <script>${PREVIEW_ERROR_REPORTER_SCRIPT}</script>`;
   if (/<head[^>]*>/i.test(html)) {
-    return html.replace(/<head[^>]*>/i, (match) => `${match}\n${meta}`);
+    return html.replace(/<head[^>]*>/i, (match) => `${match}\n${head}`);
   }
-  return `<!DOCTYPE html>\n<html lang="en">\n<head>\n${meta}\n</head>\n<body>\n${html}\n</body>\n</html>`;
+  return `<!DOCTYPE html>\n<html lang="en">\n<head>\n${head}\n</head>\n<body>\n${html}\n</body>\n</html>`;
 }
 
 export function formatCodeForPreview(rawCode) {
