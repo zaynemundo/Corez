@@ -87,7 +87,7 @@ Use this skill whenever designing, building, reviewing, or refactoring APIs, ser
 
 ## Repository integration (CoreZ worker)
 
-- Entry point is `worker/swarm-index.js`; route dispatch lives in `worker/index.js`. Wrap storage handlers with `runJsonSafe`, return uniform payloads via `jsonResponse`, parse bodies with `readBoundedJson`, and reuse `safeErrorDetail` for sanitized error messages — all from `worker/utils.js`.
+- Entry point is `worker/entry.js` (the `main` in `wrangler.jsonc`); the base worker and route dispatch live in `worker/index.js`. Wrap storage handlers with `runJsonSafe`, return uniform payloads via `jsonResponse`, parse bodies with `readBoundedJson`, and reuse `safeErrorDetail` for sanitized error messages — all from `worker/utils.js`.
 - Validate every path segment / storage key against `SAFE_STORAGE_SEGMENT` (letters, digits, dots, dashes, underscores; no slashes or leading dots) before touching R2 — this blocks `../` traversal on `/api/apps`, `/api/memory`, and `/api/assets`.
 - Rate limit public endpoints with `createRateLimiter` (see `/api/publish`, `/api/ai`, `/api/image`) and return HTTP 429 with `Retry-After`.
 - Env bindings: `ASSET_BUCKET` (R2, required for storage/memory/publish endpoints), `GAME_ROOMS` (Durable Object for multiplayer), `ASSETS` (static SPA).

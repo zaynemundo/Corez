@@ -3,12 +3,50 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const SKILLS_ROOT = join(process.cwd(), '.agents', 'skills');
+const REPO_ROOT = process.cwd();
 const REQUIRED_CAPABILITY_SKILLS = [
   'corez-cli',
   'creation-preview-publishing',
   'durable-task-context',
   'file-attachment-analysis',
   'image-generation'
+];
+
+// Skills must reference repository artifacts that actually exist. Each entry
+// is [skill name, repo-relative path]; the path is asserted both in the skill
+// text and on disk so stale references fail the contract instead of shipping.
+const REQUIRED_REFERENCES = [
+  ['verify', 'worker/entry.js'],
+  ['backend-architecture', 'worker/entry.js'],
+  ['backend-architecture', 'worker/utils.js'],
+  ['ai-infrastructure', 'worker/providerChain.js'],
+  ['image-generation', 'tests/ai-image-routing.test.js'],
+  ['file-attachment-analysis', 'tests/chat-attachments.test.jsx'],
+  ['durable-task-context', 'tests/task-persistence.test.js'],
+  ['creation-preview-publishing', 'tests/app-r2-storage.test.js'],
+  ['accessibility-expert', 'tests/ui-responsive-contract.sh'],
+  ['code-review-testing', 'tests/workers-ai-rerank-embed-contract.mjs'],
+  ['git-superpowers', 'tests/git-superpowers-contract.sh'],
+  ['git-superpowers', '.agents/hooks.json'],
+  ['git-superpowers', '.agents/scripts/auto_commit.py'],
+  ['corez-cli', 'packages/cli'],
+  ['corez', 'packages/agent-core/verification/corez/ship.js'],
+  ['research', '.agents/skills/research/validate_json.py'],
+];
+
+// Provider, routing, and entrypoint claims that drifted from the code before.
+// If one of these reappears the skill is documenting a runtime that no longer
+// exists, so the contract fails and forces a re-check against the source.
+const FORBIDDEN_STALE_CLAIMS = [
+  ['ai-infrastructure', 'official DeepSeek'],
+  ['ai-infrastructure', 'does not currently use Cloudflare Workers AI'],
+  ['capability-orchestrator', 'FLUX 1 (`schnell` / `dev`)'],
+  ['code-review-testing', 'market-worker-contract'],
+  ['verify', 'Nano Banana 2 first'],
+  ['verify', 'swarm: true'],
+  ['verify', 'complexity: high/epic'],
+  ['research', 'webfetch` tool only (no search API)'],
+  ['accessibility-expert', 'via `npm run test:cloudflare` or directly'],
 ];
 
 function parseSkill(directory) {
@@ -61,5 +99,68 @@ describe('agent skill catalog contract', () => {
     expect(byName.get('r2-mem0-memory')).toContain('Never use `default_user`');
     expect(byName.get('creation-preview-publishing')).toContain('session identifier is the access credential');
     expect(byName.get('durable-task-context')).toMatch(/not strong\s+authentication/);
+  });
+
+  it('points every required reference at an existing repository artifact', () => {
+    const byName = new Map(skills.map((skill) => [skill.name, skill.source]));
+    for (const [skill, relativePath] of REQUIRED_REFERENCES) {
+      expect(byName.get(skill), `${skill} must exist for reference checks`).toBeTruthy();
+      expect(
+        byName.get(skill),
+        `${skill} must reference ${relativePath}`
+      ).toContain(relativePath);
+      expect(
+        existsSync(join(REPO_ROOT, relativePath)),
+        `${relativePath} referenced by ${skill} must exist`
+      ).toBe(true);
+    }
+  });
+
+  it('rejects known-stale provider, routing, and entrypoint claims', () => {
+    const byName = new Map(skills.map((skill) => [skill.name, skill.source]));
+    for (const [skill, staleClaim] of FORBIDDEN_STALE_CLAIMS) {
+      expect(byName.get(skill), `${skill} must exist for stale-claim checks`).toBeTruthy();
+      expect(
+        byName.get(skill).includes(staleClaim),
+        `${skill} must not document the stale claim: ${staleClaim}`
+      ).toBe(false);
+    }
+  });
+
+  it('keeps the worker entrypoint grounded in wrangler.jsonc', () => {
+    const wrangler = readFileSync(join(REPO_ROOT, 'wrangler.jsonc'), 'utf8');
+    const main = wrangler.match(/"main"\s*:\s*"([^"]+)"/)?.[1];
+    expect(main, 'wrangler.jsonc must declare a main entry').toBeTruthy();
+    const entrypoint = main.replace(/^\.\//, '');
+    expect(existsSync(join(REPO_ROOT, entrypoint)), `worker entry ${entrypoint} must exist`).toBe(true);
+    for (const skillName of ['verify', 'backend-architecture']) {
+      const source = skills.find((skill) => skill.name === skillName).source;
+      expect(source, `${skillName} must reference the real entrypoint`).toContain(entrypoint);
+      expect(source, `${skillName} must not reference swarm-index`).not.toContain('swarm-index');
+    }
+  });
+
+  it('routes the game skill through on-demand part files, not a monolith', () => {
+    const game = skills.find((skill) => skill.name === 'game-development');
+    expect(game, 'game-development skill must exist').toBeTruthy();
+    expect(game.source.length, 'router SKILL.md should stay small').toBeLessThan(20_000);
+
+    const referenced = [
+      ...game.source.matchAll(/`((?:parts|reference)\/[A-Za-z0-9_-]+\.md)`/g)
+    ].map((match) => match[1]);
+    expect(referenced.length, 'router must link the part files').toBeGreaterThanOrEqual(18);
+    for (const relativePath of referenced) {
+      expect(
+        existsSync(join(SKILLS_ROOT, 'game-development', relativePath)),
+        `${relativePath} linked from the game router must exist`
+      ).toBe(true);
+    }
+
+    const partOne = readFileSync(
+      join(SKILLS_ROOT, 'game-development', 'parts', '01-game-start.md'),
+      'utf8'
+    );
+    expect(partOne).toContain('flux-2-klein-4b');
+    expect(partOne).not.toContain('flux-1-schnell | asset generation');
   });
 });

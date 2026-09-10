@@ -197,6 +197,9 @@ Run `python3 {topic_slug}/generate_report.py`. Fix any script errors, re-run unt
 ## Guardrails
 
 - Confirm with the user before each batch and before finishing the outline; never fabricate citations, URLs, prices, or release details.
-- The `web-search` subagent researches with the `webfetch` tool only (no search API) — instruct it to construct search-engine and site-search URLs and analyze the fetched pages.
+- The `web-search` subagent should use its live web search tool when the
+  runtime provides one, then `webfetch` the most relevant pages; where no
+  search API exists, instruct it to construct search-engine and site-search
+  URLs and analyze the fetched pages.
 - Mark every uncertain value with `[uncertain]` and list it in the `uncertain` array; the report skips those fields.
 - Keep all research output values in English.

@@ -52,7 +52,7 @@ Use this skill whenever analyzing, auditing, reviewing code changes, debugging, 
 - Ensure test suites are fast, deterministic, and isolated (no state leaks between tests).
 
 ### Contract Tests & Bash Verification Scripts
-- Maintain repository contract scripts (e.g. `tests/ui-responsive-contract.sh`, `tests/cloudflare-worker-contract.mjs`, `tests/search-worker-contract.mjs`, `tests/market-worker-contract.mjs`).
+- Maintain repository contract scripts (e.g. `tests/ui-responsive-contract.sh`, `tests/cloudflare-worker-contract.mjs`, `tests/search-worker-contract.mjs`, `tests/workers-ai-rerank-embed-contract.mjs`).
 - Verify CSS design tokens, DOM classes, ARIA attributes, responsive layout breakpoints, and API status codes against explicit contract specs.
 
 ---

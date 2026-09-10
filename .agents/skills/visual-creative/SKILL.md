@@ -16,9 +16,11 @@ Use this skill whenever analyzing visual artwork, designing UI graphics, craftin
   lighting, and create self-contained SVG assets. CoreZ chat attachments alone
   provide only a local thumbnail and metadata; defer to
   `file-attachment-analysis` for that boundary.
-- **Image generation**: use CoreZ `POST /api/image` through the dedicated
-  `image-generation` skill. The server selects the model and returns its actual
-  model identifier. Do not hard-code a provider name in user-facing claims.
+- **Image generation**: use CoreZ `POST /api/image` (OpenRouter, key required)
+  or the keyless Workers AI `POST /api/image/cf` (FLUX.2 klein-4b, fallback
+  flux-1-schnell) through the dedicated `image-generation` skill. The server
+  selects the model and returns its actual model identifier. Do not hard-code a
+  provider name in user-facing claims.
 - **Capability boundary**: CoreZ does not implement background removal or
   arbitrary raster image editing. Offer an SVG/CSS alternative or an external
   workflow instead of claiming that operation succeeded.

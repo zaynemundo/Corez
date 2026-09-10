@@ -14,7 +14,7 @@ Use this skill to analyze incoming user requests, determine the minimal required
 | Request Type | Lead Engine | Required Skills | Output Artifact |
 | --- | --- | --- | --- |
 | Web Application / UI Layout | `opencode-go/deepseek-flash` (OpenCode Go only) | *see §1.1 Design Decision Tree* + `accessibility-expert` | React / HTML / CSS components |
-| Image Generation / Artwork | FLUX 1 (`schnell` / `dev`) via Cloudflare Workers AI | `visual-creative` (+ `image-generation` for endpoint) | R2 stored image URLs & gallery cards |
+| Image Generation / Artwork | OpenRouter `google/gemini-3.1-flash-lite-image` via `POST /api/image`; keyless Workers AI FLUX (`flux-2-klein-4b`, fallback `flux-1-schnell`) via `/api/image/cf` | `visual-creative` (+ `image-generation` for endpoint) | R2 stored image URLs & gallery cards |
 | Web Game / Canvas Arcade | `opencode-go/deepseek-flash` (OpenCode Go only) | `game-development`, `frontend-modern-design` | Canvas 2D / JS physics engine |
 | Back-End API / Worker Router | `opencode-go/deepseek-flash` (OpenCode Go only) | `backend-architecture`, `ai-infrastructure` | Cloudflare Worker / Node route handlers |
 | Bug Investigation / Refactoring | `opencode-go/deepseek-flash` (preferred) | `auto-debugging`, `code-review-testing`, `software-engineering` | Verified code fix & green test run |
@@ -46,7 +46,7 @@ Use this skill to analyze incoming user requests, determine the minimal required
 
 ## 2. Orchestration Strategy
 
-1. **Minimal Surface**: Activate only the skills directly required for the request (use `§1.1` for design) to conserve context budget and latency. `game-development` is 4000+ lines — do not load it for non-game tasks.
+1. **Minimal Surface**: Activate only the skills directly required for the request (use `§1.1` for design) to conserve context budget and latency. `game-development` is a router — load only the `parts/` and `reference/` files the current stage needs, never the whole pipeline.
 2. **Provider-aware routing**: Fast structured classification → local `src/services/intentClassifier.js`. Complex reasoning/art direction → `opencode-go/deepseek-flash` via the chain in `ai-infrastructure: §1`.
 3. **Subagent Delegation**: Delegate broad research tasks to the `research` subagent (or the `research-current-information` skill when live web research is required) to keep context clean.
 4. **Strict Policy Compliance**: Enforce `cursor-security-rules` (canonical security) and git completion policies (`git-superpowers`) upon finishing file modifications. Backend work must also satisfy `backend-architecture: Level 1`.

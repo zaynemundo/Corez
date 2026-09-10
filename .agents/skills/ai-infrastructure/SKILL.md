@@ -7,8 +7,12 @@ description: Use for AI deployment architecture, provider routing, local inferen
 
 Use this skill when designing, building, or optimizing AI model integrations,
 LLM API proxies, model routing, RAG retrieval, and prompt token efficiency.
-CoreZ does not currently use Cloudflare Workers AI or a vector database; treat
-those topics as generic architecture work unless implementation is requested.
+CoreZ does not use a vector database; treat RAG/vector-retrieval topics as
+generic architecture work unless implementation is requested. Cloudflare
+Workers AI **is** used through the `AI` binding: `/api/image/cf`
+(FLUX.2 klein-4b, flux-1-schnell fallback), `/api/rerank`
+(`@cf/baai/bge-reranker-base`), `/api/embed` (`@cf/baai/bge-m3`), and the free
+`/api/search` ranking path — these need no third-party key.
 
 ```
   ┌─────────────────────────────────────────────────────────────┐
@@ -25,14 +29,18 @@ those topics as generic architecture work unless implementation is requested.
 ## 1. Model Routing & Primary/Secondary Failovers
 
 - **Routing Logic**: Direct fast structured classification tasks to lightweight local logic (e.g. the repo's `src/services/intentClassifier.js`) and complex reasoning/art direction to the primary model (DeepSeek V4.1 Flash, `deepseek-flash`).
-- **Graceful Failover**: CoreZ runs OpenCode Go -> official DeepSeek ->
-  OpenRouter in `worker/providerChain.js`. Transient failures use bounded
-  per-request retries and persisted retry schedules; permanent authentication,
-  authorization, and invalid-request failures do not retry. Client disconnect
-  is the generation abort signal; do not add an arbitrary provider timeout.
+- **Graceful Failover**: chat uses OpenCode Go only
+  (`OPENCODE_GO_API_KEY`, `worker/providerChain.js`) — there is no DeepSeek or
+  OpenRouter text fallback. Transient failures use bounded per-request retries
+  and persisted retry schedules; permanent authentication, authorization, and
+  invalid-request failures do not retry. Client disconnect is the generation
+  abort signal; do not add an arbitrary provider timeout.
 - **Image routing**: `POST /api/image` uses the server-controlled OpenRouter
-  image model chain. `OPENROUTER_IMAGE_MODEL` may override it with one model,
-  and the response reports the model actually used.
+  image model chain (`OPENROUTER_API_KEY`; `OPENROUTER_IMAGE_MODEL` may
+  override it with one model, and the response reports the model actually
+  used). `POST /api/image/cf` is the keyless Workers AI path
+  (`flux-2-klein-4b` primary, `flux-1-schnell` fallback) and requires the `AI`
+  binding.
 
 ---
 

@@ -6,7 +6,7 @@ description: How to launch and drive COREZ end-to-end for runtime verification
 # Verifying COREZ end-to-end
 
 > Config note: worker config lives in `wrangler.jsonc` (not `wrangler.toml`) and the worker
-> entry is `./worker/swarm-index.js`. `wrangler dev` uses port 8787 by default.
+> entry is `./worker/entry.js`. `wrangler dev` uses port 8787 by default.
 
 ## Launch
 
@@ -40,12 +40,14 @@ npm run deploy   # deploys worker + dist assets to Cloudflare
 ## Drive
 
 - Chat: open http://localhost:3000, send a message; watch Network for
-  `POST /api/ai` returning `{content, model}` (chat is `opencode:muse-spark-1.3-contributor` only).
+  `POST /api/ai` returning `{content, model}` (chat is `opencode:deepseek-flash` only).
 - Images: prompts matching the image intent hit `POST /api/image` and
-  return `{image, model}` — the worker tries an image model chain (Google
-  Nano Banana 2 first, legacy FLUX last; `OPENROUTER_IMAGE_MODEL` overrides)
+  return `{image, model}` — the OpenRouter path uses
+  `google/gemini-3.1-flash-lite-image` (`OPENROUTER_IMAGE_MODEL` overrides)
   and reports the model that served the image (R2 URL when `ASSET_BUCKET`
-  is configured; honest 503 without `OPENROUTER_API_KEY`).
+  is configured; honest 503 without `OPENROUTER_API_KEY`). `POST /api/image/cf`
+  is the keyless Workers AI path (`flux-2-klein-4b` primary, `flux-1-schnell`
+  fallback) and needs the `AI` binding.
 - Memory/apps: `/api/memory/*` and `/api/apps/*` require the `ASSET_BUCKET`
   binding (503/530 without it); `wrangler dev` only provides real R2 with
   `--remote` and a deployed bucket.
@@ -54,7 +56,7 @@ npm run deploy   # deploys worker + dist assets to Cloudflare
 
 ```bash
 npm run lint
-npm test                              # 850+ unit tests
+npm test                              # 1,000+ unit tests
 npm run test:cloudflare               # all worker + contract suites
 npm run build
 ```
@@ -66,8 +68,10 @@ npm run build
 - Request bodies over 24 MB are rejected (`Request body rejected: ...
   byte limit`); the frontend trims history, so this only appears from raw
   API calls.
-- The swarm path only activates for `complexity: high/epic` app/code-help
-  requests or explicit `swarm: true`; it fans out to the same provider key.
+- The public `/api/ai` path no longer routes to a multi-agent swarm
+  (`worker/entry.js`). The creation harness runs a parallel specialist
+  pre-pass for non-fast-path website/app builds when `AI_SWARM_ENABLED` is
+  not false (`worker/harness.js`, `worker/swarm.js`).
 - `/api/ai` transient provider failures (429/5xx/network) are retried with
   adaptive backoff; when one request's practical window is exceeded the
   worker returns `200 {taskId, status: "retry-scheduled",

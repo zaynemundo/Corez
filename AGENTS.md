@@ -3,7 +3,7 @@
 ## Roles and authority
 
 - **DeepSeek V4.1 Flash** (`deepseek-flash` / opencode-go) is the lead engineering agent, handling orchestration, development, vision, visual inspection, UI layout, game design, SVG creation, and overall implementation strategy.
-- **FLUX 1 Schnell** (`@cf/black-forest-labs/flux-1-schnell`) is used for fast, free background image generation and visual artwork.
+- **FLUX (Workers AI)** is used for fast, free background image generation and visual artwork: `@cf/black-forest-labs/flux-2-klein-4b` primary with `@cf/black-forest-labs/flux-1-schnell` fallback via keyless `POST /api/image/cf`; OpenRouter (`google/gemini-3.1-flash-lite-image`) serves `POST /api/image` when `OPENROUTER_API_KEY` is configured.
 
 ## Verification & Git completion policy
 

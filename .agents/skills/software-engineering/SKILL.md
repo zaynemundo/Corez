@@ -43,7 +43,7 @@ Use this skill whenever designing, engineering, refactoring, debugging, or revie
 - **Mandatory Verification**: Run all applicable unit tests, contract scripts, linter commands, and production builds before declaring a task finished.
 - **Repository commands** (this repo):
   ```bash
-  npm test                # full vitest suite (850+ tests)
+  npm test                # full vitest suite (1,000+ tests)
   npm run lint            # eslint static analysis
   npm run build           # production build (vite)
   npm run test:cloudflare # worker + contract suites (node/bash scripts)

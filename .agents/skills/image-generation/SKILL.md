@@ -1,6 +1,6 @@
 ---
 name: image-generation
-description: Use when CoreZ must execute or debug AI image generation through POST /api/image; covers prompt routing, provider configuration, returned-model reporting, URL safety, persistence, cancellation, and honest failures.
+description: Use when CoreZ must execute or debug AI image generation through POST /api/image or the keyless POST /api/image/cf; covers prompt routing, provider configuration, returned-model reporting, URL safety, persistence, cancellation, and honest failures.
 ---
 
 # Image Generation
@@ -10,12 +10,17 @@ when code must call, test, or debug the actual CoreZ image endpoint.
 
 ## Endpoint contract
 
-- Send `POST /api/image` with JSON `{ "prompt": "..." }`. Optional
-  `"referenceImage"` (base64 `data:image/...` URL of the user's own image or a
-  public https URL) is forwarded to the model as multimodal image input, so
-  stylisation and "make it like this" requests use the reference instead of
-  inventing from text alone. The worker rejects malformed or internal-host
-  references with 400.
+- `POST /api/image` is the OpenRouter path and requires `OPENROUTER_API_KEY`.
+  Optional `"referenceImage"` (base64 `data:image/...` URL of the user's own
+  image or a public https URL) is forwarded to the model as multimodal image
+  input, so stylisation and "make it like this" requests use the reference
+  instead of inventing from text alone. The worker rejects malformed or
+  internal-host references with 400.
+- `POST /api/image/cf` is the keyless Workers AI path and requires the `AI`
+  binding (no provider key). Body: `{ prompt, width?, height?, seed?, model? }`
+  (dimensions 256-1920). Default model `@cf/black-forest-labs/flux-2-klein-4b`
+  with `@cf/black-forest-labs/flux-1-schnell` fallback; success also returns
+  `{ image, model }`, and 503 without the binding.
 - `OPENROUTER_API_KEY` is required. `OPENROUTER_IMAGE_MODEL` may override the
   server-controlled default with one model.
 - Success returns `{ image, model }`. Report the returned `model`; do not assume

@@ -30,7 +30,8 @@ uses `OPENCODE_GO_API_KEY` only (`OPENCODE_API_KEY` is a legacy alias,
 `OPENCODE_ENDPOINT` and `OPENCODE_MODEL` are optional overrides) — no
 DeepSeek or OpenRouter fallback for chat. Image generation (`POST /api/image`)
 still requires `OPENROUTER_API_KEY` separately (`OPENROUTER_IMAGE_MODEL`
-optionally overrides the server-controlled image model). `ASSET_BUCKET` and
+optionally overrides the server-controlled image model). The keyless
+`POST /api/image/cf` path instead needs the `AI` Workers AI binding. `ASSET_BUCKET` and
 `GAME_ROOMS` are Cloudflare bindings, not secret strings.
 
 Ask only for providers needed by the requested deployment. Never ask a public
