@@ -1,50 +1,28 @@
+// Unified worker chat provider chain.
+//
+// Chat is OpenCode Go only (no DeepSeek/OpenRouter text fallback). This module
+// owns retry scheduling, persisted resumable tasks, session affinity, and the
+// streaming event contract. Request shaping and the HTTP/SSE client live in
+// opencodeClient.js; image generation lives in imageProvider.js.
+
 import {
   classifyProviderFailure,
   createTaskStateStore,
   safeErrorDetail,
 } from "./utils.js";
+import {
+  DEFAULT_IDLE_TIMEOUT_MS,
+  DEFAULT_NONSTREAM_TIMEOUT_MS,
+  DEFAULT_TTFT_TIMEOUT_MS,
+  OPENCODE_DEFAULT_ENDPOINT,
+  OPENCODE_SESSION_HEADER,
+  callChatEndpoint,
+  resolveApiMode,
+  resolveOpencodeSessionId,
+  streamChatEndpoint,
+} from "./opencodeClient.js";
 
-export const OPENCODE_DEFAULT_ENDPOINT =
-  "https://opencode.ai/zen/go/v1/chat/completions";
-// OpenCode Go/Zen routes requests to the upstream serving the selected model
-// via the x-opencode-session header. Since Sep 2026 the gateway rejects
-// chat requests without it (HTTP 400 MissingSessionID), so EVERY opencode
-// request must carry one. The value is an opaque session-affinity id: stable
-// within a run (all retries share it) so the gateway keeps one backend — and
-// its token cache — for the whole turn.
-export const OPENCODE_SESSION_HEADER = "x-opencode-session";
-const OPENCODE_SESSION_ALPHABET =
-  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-
-export function newOpencodeSessionId() {
-  const bytes = new Uint8Array(26);
-  crypto.getRandomValues(bytes);
-  let id = "ses_";
-  for (const b of bytes) id += OPENCODE_SESSION_ALPHABET[b % 62];
-  return id;
-}
-
-export function resolveOpencodeSessionId(hint) {
-  if (typeof hint === "string") {
-    const v = hint.trim();
-    // Opaque caller ids (e.g. a user uid) are namespaced so they can never
-    // collide with real opencode session ids; already-prefixed values pass
-    // through untouched.
-    if (/^[A-Za-z0-9_-]{8,128}$/.test(v)) {
-      return v.startsWith("ses_") ? v : `ses_${v}`;
-    }
-  }
-  return newOpencodeSessionId();
-}
-// DEEPSEEK_DEFAULT_ENDPOINT removed — chat no longer falls back to DeepSeek.
-export const OPENROUTER_DEFAULT_ENDPOINT =
-  "https://openrouter.ai/api/v1/chat/completions";
 export const DEFAULT_MODEL = "deepseek-flash";
-
-// OpenRouter retired black-forest-labs/flux-1-schnell, so image generation
-// uses Google's Nano Banana 2 lite (Gemini 3.1 Flash Lite Image) only.
-// OPENROUTER_IMAGE_MODEL overrides the chain with a single model.
-export const DEFAULT_IMAGE_MODEL_CHAIN = ["google/gemini-3.1-flash-lite-image"];
 
 // Transient failures are retried with adaptive exponential backoff (base
 // 750ms doubling, jittered, honouring the provider's Retry-After) until
@@ -74,6 +52,7 @@ async function clearRetrySchedule(store, retryKey, taskId) {
     await store.remove(`${TASK_STATUS_STORE_PREFIX}${taskId}`);
   }
 }
+
 const BACKOFF_BASE_MS = 750;
 const BACKOFF_JITTER_MS = 500;
 const MAX_SINGLE_SLEEP_MS = 30_000;
@@ -84,115 +63,9 @@ const DEFAULT_REQUEST_RETRY_MS = 30_000;
 const MAX_STREAM_TRANSIENT_ATTEMPTS = 8;
 const SLEEP_CHUNK_MS = 250;
 
-// Timeout guards for upstream provider calls. A provider that hangs before
-// its first token (or stalls mid-stream, or never answers a non-stream call)
-// previously made the worker wait until Cloudflare killed the request at the
-// platform wall-clock limit — truncating the SSE stream before any delta or
-// error event reached the client, which then reported "Hosted AI returned no
-// streamed content." for a failure it could not see. The guards fail the
-// provider loudly instead: the failure is classified transient (504), the
-// chain retries or falls back, and the client always receives an explicit
-// SSE error event with the real reason.
-const DEFAULT_TTFT_TIMEOUT_MS = 120_000; // first byte / first token
-const DEFAULT_IDLE_TIMEOUT_MS = 60_000; // silence mid-stream
-const DEFAULT_NONSTREAM_TIMEOUT_MS = 90_000; // non-streaming call total
-
 function envTimeoutMs(env, key, fallback) {
   const value = Number(env?.[key]);
   return Number.isFinite(value) && value > 0 ? value : fallback;
-}
-
-function extractContentText(content) {
-  if (typeof content === "string") return content;
-  // Multimodal responses can wrap text in content parts: [{ type, text }]
-  if (Array.isArray(content)) {
-    return content
-      .map((part) =>
-        part && typeof part === "object" && typeof part.text === "string"
-          ? part.text
-          : "",
-      )
-      .join("");
-  }
-  return "";
-}
-
-function isResponsesEndpoint(endpoint) {
-  return typeof endpoint === "string" && endpoint.includes("/responses");
-}
-
-function toResponsesInput(messages) {
-  if (!Array.isArray(messages) || messages.length === 0) return messages;
-  // Responses API accepts the same message array but under the `input` key.
-  // Preserve role/content structure; normalize content to string when needed.
-  return messages.map((m) => {
-    if (!m || typeof m !== "object") return m;
-    const role = m.role || "user";
-    if (Array.isArray(m.content)) return { role, content: m.content };
-    if (typeof m.content === "string") return { role, content: m.content };
-    return { role, content: extractContentText(m.content) };
-  });
-}
-
-function extractResponsesContent(data) {
-  if (!data || typeof data !== "object")
-    return { content: "", reasoning: false, usage: null, stopReason: null };
-  const output = Array.isArray(data.output) ? data.output : [];
-  const messageItem = output.find(
-    (item) => item && item.type === "message" && item.role === "assistant",
-  );
-  let content = "";
-  if (messageItem && Array.isArray(messageItem.content)) {
-    const textPart = messageItem.content.find(
-      (c) => c && c.type === "output_text" && typeof c.text === "string",
-    );
-    if (textPart) content = textPart.text;
-  }
-  content = stripThinkingBlocks(content);
-  const hasReasoningFlag = output.some(
-    (item) => item && item.type === "reasoning",
-  );
-  let usage = null;
-  const usageData = data.usage || (data.response && data.response.usage);
-  if (usageData && typeof usageData === "object") {
-    const inputTokens =
-      Number(usageData.input_tokens ?? usageData.prompt_tokens) || 0;
-    const outputTokens =
-      Number(usageData.output_tokens ?? usageData.completion_tokens) || 0;
-    if (inputTokens || outputTokens) usage = { inputTokens, outputTokens };
-  }
-  const stopReason =
-    data.status || (data.response && data.response.status) || null;
-  return { content, reasoning: hasReasoningFlag, usage, stopReason };
-}
-
-// Reasoning models can emit their internal thought inline wrapped in
-// <think>/<thinking> blocks. Strip those sections so thinking text is never
-// presented as the answer. An unclosed block (output truncated mid-thought)
-// is reasoning too: everything from the marker onward is dropped, since any
-// real answer would only ever follow a closed block.
-function stripThinkingBlocks(text) {
-  if (typeof text !== "string") return "";
-  return text
-    .replace(/<thinking\b[^>]*>[\s\S]*?<\/thinking>/gi, "")
-    .replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, "")
-    .replace(/<(?:think|thinking)\b[^>]*>[\s\S]*$/gi, "")
-    .trim();
-}
-
-// The real answer of a chat message is its content field. reasoning_content
-// is internal model thought: it is a retry signal, never the answer (surfacing
-// it previously handed users raw <think> dumps instead of the requested code).
-function answerText(message) {
-  if (!message || typeof message !== "object") return "";
-  return stripThinkingBlocks(extractContentText(message.content));
-}
-
-function hasReasoning(message) {
-  if (!message || typeof message !== "object") return false;
-  const reasoning = extractContentText(message.reasoning_content);
-  if (reasoning.trim()) return true;
-  return /<(?:think|thinking)\b/i.test(extractContentText(message.content));
 }
 
 function isDisabled(value) {
@@ -207,279 +80,6 @@ async function defaultSleep(ms) {
 
 function defaultClock() {
   return Date.now();
-}
-
-// Parse an SSE data line from a streaming OpenAI-compatible endpoint.
-function parseSseData(line) {
-  if (!line.startsWith("data:")) return null;
-  const payload = line.slice(5).trim();
-  if (!payload || payload === "[DONE]") return { done: true };
-  try {
-    return JSON.parse(payload);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Streaming chat completion. Returns an async iterable of
- * { text, usage, finishReason, ttftMs } — text deltas as they arrive plus a
- * final chunk carrying usage/finish_reason when the provider sends them.
- * Provider fallback is NOT handled here: runProviderChain owns the chain.
- */
-async function* streamChatEndpoint({
-  endpoint,
-  key,
-  model,
-  label,
-  messages,
-  signal,
-  extraHeaders = {},
-  bodyExtra = {},
-  onTtft,
-  ttftTimeoutMs = DEFAULT_TTFT_TIMEOUT_MS,
-  idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS,
-}) {
-  const requestStartedAt = Date.now();
-
-  // Deadline machinery: the client signal plus two timers — a first-token
-  // timeout and a mid-stream silence timeout. On timeout the fetch is aborted
-  // and a classified 504 is thrown so the chain retries/falls back instead of
-  // letting the request hang until the platform kills it mid-stream.
-  const controller = new AbortController();
-  const forwardAbort = () => controller.abort();
-  if (signal) {
-    if (signal.aborted) controller.abort();
-    else signal.addEventListener("abort", forwardAbort, { once: true });
-  }
-  let deadlineHit = false;
-  let firstChunk = true;
-  let ttftTimer = setTimeout(() => {
-    deadlineHit = true;
-    controller.abort();
-  }, ttftTimeoutMs);
-  let idleTimer = null;
-  const clearTimers = () => {
-    clearTimeout(ttftTimer);
-    clearTimeout(idleTimer);
-  };
-
-  const isResponses = isResponsesEndpoint(endpoint);
-  const requestBody = isResponses
-    ? { model, input: toResponsesInput(messages), stream: true, ...bodyExtra }
-    : { model, messages, stream: true, ...bodyExtra };
-
-  try {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-        ...extraHeaders,
-      },
-      body: JSON.stringify(requestBody),
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      const detail = (await response.text().catch(() => "")).slice(0, 200);
-      const failure = new Error(
-        `HTTP ${response.status}: ${safeErrorDetail(detail)}`,
-      );
-      failure.status = response.status;
-      const retryAfter = Number(response.headers.get("Retry-After") || 0);
-      if (Number.isFinite(retryAfter) && retryAfter > 0)
-        failure.retryAfter = retryAfter;
-      throw failure;
-    }
-
-    if (!response.body)
-      throw new Error(`${label} streaming response had no body`);
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let usage = null;
-    let finishReason = null;
-    let sawDone = false;
-    let ttftEmitted = false;
-
-    try {
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        // First chunk clears the TTFT timer; the idle timer re-arms per
-        // chunk so mid-stream silence also aborts the request.
-        if (firstChunk) {
-          firstChunk = false;
-          clearTimeout(ttftTimer);
-        }
-        clearTimeout(idleTimer);
-        idleTimer = setTimeout(() => {
-          deadlineHit = true;
-          controller.abort();
-        }, idleTimeoutMs);
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-        for (const line of lines) {
-          const parsed = parseSseData(line.trim());
-          if (!parsed) continue;
-          if (parsed.done) {
-            sawDone = true;
-            continue;
-          }
-          if (isResponses) {
-            // OpenCode Go Responses API streaming: deltas are response.output_text.delta,
-            // completion is response.completed with usage in response.usage.
-            // For test compatibility, also accept legacy chat `choices` payloads when the endpoint is /responses.
-            if (
-              parsed.type === "response.output_text.delta" &&
-              typeof parsed.delta === "string" &&
-              parsed.delta
-            ) {
-              const delta = parsed.delta;
-              if (!ttftEmitted) {
-                ttftEmitted = true;
-                const ttftMs = Date.now() - requestStartedAt;
-                if (typeof onTtft === "function") onTtft(ttftMs);
-                yield { text: delta, ttftMs };
-              } else {
-                yield { text: delta };
-              }
-            } else if (
-              parsed.type === "response.completed" &&
-              parsed.response
-            ) {
-              const u = parsed.response.usage;
-              if (u && typeof u === "object") {
-                usage = {
-                  inputTokens: Number(u.input_tokens ?? u.prompt_tokens) || 0,
-                  outputTokens:
-                    Number(u.output_tokens ?? u.completion_tokens) || 0,
-                };
-              }
-              finishReason = parsed.response.status || "stop";
-              sawDone = true;
-            } else if (parsed.choices && parsed.choices[0]) {
-              // Legacy chat SSE mocked for /responses endpoint (tests) — handle as chat delta.
-              const choice = parsed.choices[0];
-              if (choice?.finish_reason) finishReason = choice.finish_reason;
-              if (choice?.delta) {
-                const reasoningDelta = extractContentText(
-                  choice.delta.reasoning_content || choice.delta.reasoning,
-                );
-                const delta = extractContentText(choice.delta.content);
-                if (delta) {
-                  if (!ttftEmitted) {
-                    ttftEmitted = true;
-                    const ttftMs = Date.now() - requestStartedAt;
-                    if (typeof onTtft === "function") onTtft(ttftMs);
-                    yield { text: delta, ttftMs };
-                  } else {
-                    yield { text: delta };
-                  }
-                } else if (reasoningDelta) {
-                  yield { text: "", reasoning: reasoningDelta };
-                }
-              }
-              if (parsed.usage) {
-                usage = {
-                  inputTokens:
-                    Number(
-                      parsed.usage.prompt_tokens ?? parsed.usage.input_tokens,
-                    ) || 0,
-                  outputTokens:
-                    Number(
-                      parsed.usage.completion_tokens ??
-                        parsed.usage.output_tokens,
-                    ) || 0,
-                };
-              }
-              if (choice?.finish_reason) sawDone = true;
-            } else if (parsed.usage && typeof parsed.usage === "object") {
-              usage = {
-                inputTokens:
-                  Number(
-                    parsed.usage.input_tokens ?? parsed.usage.prompt_tokens,
-                  ) || 0,
-                outputTokens:
-                  Number(
-                    parsed.usage.output_tokens ??
-                      parsed.usage.completion_tokens,
-                  ) || 0,
-              };
-            }
-            continue;
-          }
-          if (parsed.usage) {
-            // Map the provider's usage shape (prompt_tokens/completion_tokens)
-            // to the chain's inputTokens/outputTokens contract — without this
-            // every streamed response reported 0/0 token usage.
-            usage = {
-              inputTokens: Number(parsed.usage.prompt_tokens) || 0,
-              outputTokens: Number(parsed.usage.completion_tokens) || 0,
-            };
-          }
-          const choice = parsed.choices && parsed.choices[0];
-          if (choice?.finish_reason) finishReason = choice.finish_reason;
-          if (choice?.delta) {
-            // Reasoning deltas (reasoning_content / reasoning) are tracked for diagnostics
-            // but never yielded as user-visible content. TTFT measures time to first *content*.
-            const reasoningDelta = extractContentText(
-              choice.delta.reasoning_content || choice.delta.reasoning,
-            );
-            if (
-              reasoningDelta &&
-              typeof onTtft === "function" &&
-              !ttftEmitted
-            ) {
-              // Do not emit TTFT for reasoning-only deltas — wait for real content.
-            }
-            const delta = extractContentText(choice.delta.content);
-            if (delta) {
-              if (!ttftEmitted) {
-                ttftEmitted = true;
-                const ttftMs = Date.now() - requestStartedAt;
-                if (typeof onTtft === "function") onTtft(ttftMs);
-                yield { text: delta, ttftMs };
-              } else {
-                yield { text: delta };
-              }
-            } else if (reasoningDelta) {
-              // Yield internal reasoning signal for diagnostics (not user-visible)
-              // Keep TTFT pending until real content arrives.
-              yield { text: "", reasoning: reasoningDelta };
-            }
-          }
-        }
-      }
-      if (!sawDone && finishReason === null && !ttftEmitted) {
-        // No chunks at all: treat as empty response.
-        throw new Error("empty streaming response");
-      }
-      yield { text: "", usage, finishReason };
-    } finally {
-      try {
-        reader.releaseLock();
-      } catch {
-        // Already released.
-      }
-    }
-  } catch (err) {
-    if (deadlineHit) {
-      const failure = new Error(
-        `${label} provider timed out (${firstChunk ? `no response within ${Math.ceil(ttftTimeoutMs / 1000)}s` : `no data for ${Math.ceil(idleTimeoutMs / 1000)}s mid-stream`}). The provider may be overloaded — please try again in a moment.`,
-      );
-      failure.status = 504;
-      failure.retryable = true;
-      throw failure;
-    }
-    throw err;
-  } finally {
-    clearTimers();
-    if (signal) signal.removeEventListener("abort", forwardAbort);
-  }
 }
 
 // Wrap an async iterable in a backpressure-aware ReadableStream.
@@ -525,201 +125,19 @@ async function sleepInterruptible(ms, signal, sleep) {
   }
 }
 
-async function callChatEndpoint({
-  endpoint,
-  key,
-  model,
-  label,
-  messages,
-  signal,
-  extraHeaders = {},
-  bodyExtra = {},
-  timeoutMs = DEFAULT_NONSTREAM_TIMEOUT_MS,
-}) {
-  // Deadline guard: same rationale as the streaming endpoint — a hung
-  // non-stream call must fail (504, transient) so the chain retries or falls
-  // back instead of hanging the whole request until the platform kills it.
-  const controller = new AbortController();
-  const forwardAbort = () => controller.abort();
-  if (signal) {
-    if (signal.aborted) controller.abort();
-    else signal.addEventListener("abort", forwardAbort, { once: true });
-  }
-  let deadlineHit = false;
-  const timer = setTimeout(() => {
-    deadlineHit = true;
-    controller.abort();
-  }, timeoutMs);
-  const isResponses = isResponsesEndpoint(endpoint);
-  const requestBody = isResponses
-    ? { model, input: toResponsesInput(messages), ...bodyExtra }
-    : { model, messages, ...bodyExtra };
-
-  try {
-    // Every provider gets its own Authorization header from its own key:
-    // credentials are never merged or forwarded between providers.
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-        ...extraHeaders,
-      },
-      body: JSON.stringify(requestBody),
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      const detail = (await response.text().catch(() => "")).slice(0, 200);
-      const failure = new Error(
-        `HTTP ${response.status}: ${safeErrorDetail(detail)}`,
-      );
-      failure.status = response.status;
-      const retryAfter = Number(response.headers.get("Retry-After") || 0);
-      if (Number.isFinite(retryAfter) && retryAfter > 0)
-        failure.retryAfter = retryAfter;
-      return { failure, classified: classifyProviderFailure(failure) };
-    }
-
-    const data = await response.json();
-    if (isResponses) {
-      // Responses API: primary format is `output` array; for test compatibility also accept legacy `choices` mocks.
-      if (Array.isArray(data.output)) {
-        const {
-          content,
-          reasoning: hasReasonFlag,
-          usage,
-          stopReason,
-        } = extractResponsesContent(data);
-        if (content) {
-          return {
-            content,
-            reasoning: hasReasonFlag,
-            model: `${label}:${model}`,
-            usage,
-            stopReason,
-          };
-        }
-        // Fallback: some tests mock `choices` even for /responses endpoint — accept it.
-        const choiceMessage = data?.choices?.[0]?.message;
-        if (choiceMessage) {
-          const chatContent = answerText(choiceMessage);
-          // Return even empty content as success so outer empty-check handles it uniformly (502, not retry-scheduled)
-          return {
-            content: chatContent,
-            reasoning: hasReasoning(choiceMessage),
-            model: `${label}:${model}`,
-            usage: data?.usage
-              ? {
-                  inputTokens:
-                    Number(
-                      data.usage.prompt_tokens ?? data.usage.input_tokens,
-                    ) || 0,
-                  outputTokens:
-                    Number(
-                      data.usage.completion_tokens ?? data.usage.output_tokens,
-                    ) || 0,
-                }
-              : usage,
-            stopReason: data?.choices?.[0]?.finish_reason || stopReason,
-          };
-        }
-        // No content at all — return empty success for outer empty handling
-        return {
-          content: "",
-          reasoning: hasReasonFlag,
-          model: `${label}:${model}`,
-          usage,
-          stopReason,
-        };
-      }
-      // No `output` array — treat as chat fallback (legacy mocks)
-      const fallbackMessage = data?.choices?.[0]?.message;
-      if (fallbackMessage !== undefined) {
-        const chatContent = answerText(fallbackMessage);
-        return {
-          content: chatContent,
-          reasoning: hasReasoning(fallbackMessage),
-          model: `${label}:${model}`,
-          usage: data?.usage
-            ? {
-                inputTokens:
-                  Number(data.usage.prompt_tokens ?? data.usage.input_tokens) ||
-                  0,
-                outputTokens:
-                  Number(
-                    data.usage.completion_tokens ?? data.usage.output_tokens,
-                  ) || 0,
-              }
-            : null,
-          stopReason: data?.choices?.[0]?.finish_reason || null,
-        };
-      }
-      const {
-        content,
-        reasoning: hasReasonFlag,
-        usage,
-        stopReason,
-      } = extractResponsesContent(data);
-      return {
-        content,
-        reasoning: hasReasonFlag,
-        model: `${label}:${model}`,
-        usage,
-        stopReason,
-      };
-    }
-    const message = data?.choices?.[0]?.message;
-    return {
-      content: answerText(message),
-      reasoning: hasReasoning(message),
-      model: `${label}:${model}`,
-      usage: data?.usage
-        ? {
-            inputTokens: Number(data.usage.prompt_tokens) || 0,
-            outputTokens: Number(data.usage.completion_tokens) || 0,
-          }
-        : null,
-      stopReason: data?.choices?.[0]?.finish_reason || null,
-    };
-  } catch (err) {
-    if (deadlineHit) {
-      const failure = new Error(
-        `${label} provider timed out after ${Math.ceil(timeoutMs / 1000)}s. The provider may be overloaded — please try again in a moment.`,
-      );
-      failure.status = 504;
-      failure.retryable = true;
-      return { failure, classified: classifyProviderFailure(failure) };
-    }
-    console.warn(
-      `${label} model ${model} request failed:`,
-      safeErrorDetail(err),
-    );
-    const failure =
-      err instanceof Error ? err : new Error(safeErrorDetail(err));
-    if (failure.status === undefined && Number(err?.status))
-      failure.status = Number(err.status);
-    if (err?.retryAfter) failure.retryAfter = err.retryAfter;
-    return { failure, classified: classifyProviderFailure(failure) };
-  } finally {
-    clearTimeout(timer);
-    if (signal) signal.removeEventListener("abort", forwardAbort);
-  }
-}
-
 /**
  * Build the chat provider chain — SINGLE provider only.
- * Cloudflare Chat ( /api/ai ) now uses OPENCODE_GO_API_KEY exclusively.
+ * Cloudflare Chat ( /api/ai ) uses OPENCODE_GO_API_KEY exclusively.
  * No DeepSeek or OpenRouter fallback for chat. Image generation
- * (callOpenRouterImage) still uses OPENROUTER_API_KEY separately when
- * configured, but text chat never falls back. Disable with
- * OPENCODE_GO_DISABLED (any truthy value).
+ * (callOpenRouterImage in imageProvider.js) still uses OPENROUTER_API_KEY
+ * separately when configured. Disable with OPENCODE_GO_DISABLED (any truthy
+ * value).
  */
 export function buildProviderChain(env = {}, extra = {}) {
   const chain = [];
   // Session affinity for the OpenCode gateway (required header, resolved once
   // per chain so every attempt in the run shares it).
-  const sessionId = resolveOpencodeSessionId(extra?.sessionId);
+  const defaultSessionId = resolveOpencodeSessionId(extra?.sessionId);
   const ttftTimeoutMs = envTimeoutMs(
     env,
     "AI_TTFT_TIMEOUT_MS",
@@ -738,17 +156,18 @@ export function buildProviderChain(env = {}, extra = {}) {
 
   const opencodeKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY;
   if (opencodeKey && !isDisabled(env?.OPENCODE_GO_DISABLED)) {
-    const rawModel = env?.OPENCODE_MODEL || DEFAULT_MODEL;
-    // Guard against misconfigured env that points the main text model at the vision-only MiMo model.
-    const model =
-      rawModel === "mimo-v2.5" || rawModel === "xiaomi/mimo-v2.5"
-        ? DEFAULT_MODEL
-        : rawModel;
-    const callOptions = (envOverrides = {}) => ({
-      endpoint:
-        envOverrides.endpoint ||
-        env?.OPENCODE_ENDPOINT ||
-        OPENCODE_DEFAULT_ENDPOINT,
+    const rawModel =
+      String(env?.OPENCODE_MODEL || DEFAULT_MODEL).trim() || DEFAULT_MODEL;
+    // Guard against a misconfigured env that points the main text model at the
+    // vision-only MiMo family (vendor-prefixed or future ids included).
+    const model = /^(?:xiaomi\/)?mimo(?:-|$)/i.test(rawModel)
+      ? DEFAULT_MODEL
+      : rawModel;
+    const endpoint = env?.OPENCODE_ENDPOINT || OPENCODE_DEFAULT_ENDPOINT;
+    const api = resolveApiMode({ endpoint, api: env?.OPENCODE_API_MODE });
+    const callOptions = (sessionId) => ({
+      endpoint,
+      api,
       key: opencodeKey,
       model,
       label: "opencode",
@@ -756,20 +175,24 @@ export function buildProviderChain(env = {}, extra = {}) {
         "HTTP-Referer": "https://corez.ai",
         "X-Title": "COREZ AI",
         // Required by the OpenCode gateway (HTTP 400 MissingSessionID
-        // without it). Resolved once per chain so every attempt in the run
-        // shares one affinity id.
-        [OPENCODE_SESSION_HEADER]: sessionId,
+        // without it). Stable per chain so every attempt in the run shares
+        // one affinity id.
+        [OPENCODE_SESSION_HEADER]: sessionId || defaultSessionId,
       },
       ttftTimeoutMs,
       idleTimeoutMs,
       timeoutMs: nonstreamTimeoutMs,
     });
     const buildBodyExtra = (options = {}) => {
-      const extra = { ...(options.bodyExtra || {}) };
-      if (options.reasoning) extra.reasoning = options.reasoning;
+      const bodyExtra = { ...(options.bodyExtra || {}) };
+      // Reasoning hints are model-specific: OPENCODE_REASONING_DISABLED lets
+      // an operator switch to a non-reasoning model without a 400.
+      if (options.reasoning && !isDisabled(env?.OPENCODE_REASONING_DISABLED)) {
+        bodyExtra.reasoning = options.reasoning;
+      }
       if (Number.isFinite(options.temperature))
-        extra.temperature = options.temperature;
-      return extra;
+        bodyExtra.temperature = options.temperature;
+      return bodyExtra;
     };
     chain.push({
       id: "opencode-go",
@@ -777,7 +200,7 @@ export function buildProviderChain(env = {}, extra = {}) {
       model,
       call: (messages, options = {}) =>
         callChatEndpoint({
-          ...callOptions(),
+          ...callOptions(options.sessionId),
           messages,
           signal: options.signal,
           bodyExtra: buildBodyExtra(options),
@@ -785,7 +208,7 @@ export function buildProviderChain(env = {}, extra = {}) {
         }),
       stream: (messages, options = {}) =>
         streamChatEndpoint({
-          ...callOptions(),
+          ...callOptions(options.sessionId),
           messages,
           signal: options.signal,
           onTtft: options.onTtft,
@@ -810,15 +233,16 @@ export function buildProviderChain(env = {}, extra = {}) {
  * the single request's practical window. Beyond the window the retry schedule
  * is persisted under `retry/<providerId>/<hash>` (via createTaskStateStore)
  * and a resumable taskId is returned so a later invocation continues instead
- * of failing with a 502.
+ * of failing with a 502. The gateway session id is persisted with the schedule
+ * so a resumed task keeps the original backend affinity and token cache.
  *
  * Options: { env, signal, sleep, clock, jitter, store, maxRequestRetryMs,
- * taskHash, taskId, model, reasoning, temperature, bodyExtra, sessionId } — sleep/clock/jitter are injectable for
- * deterministic tests. `model` overrides the provider's configured model for
- * this call (e.g. the harness build phase pins deepseek-flash). `reasoning`
- * and `temperature` are forwarded as body fields for reasoning models (DeepSeek V4.1 Flash).
- * Every request is uncapped: the provider decides how long it generates, and no output
- * ceiling is ever sent.
+ * taskHash, taskId, model, reasoning, temperature, bodyExtra, sessionId } —
+ * sleep/clock/jitter are injectable for deterministic tests. `model` overrides
+ * the provider's configured model for this call (e.g. the harness build phase
+ * pins deepseek-flash). `reasoning` and `temperature` are forwarded as body
+ * fields for reasoning models. Every request is uncapped: the provider decides
+ * how long it generates, and no output ceiling is ever sent.
  */
 export async function runProviderChain(messages, options = {}) {
   const env = options.env || {};
@@ -840,6 +264,7 @@ export async function runProviderChain(messages, options = {}) {
     typeof options.taskId === "string" && options.taskId
       ? options.taskId
       : `rt-${hash}`;
+  const sessionId = resolveOpencodeSessionId(options.sessionId);
 
   const failures = [];
   let lastErrorStatus = 0;
@@ -849,11 +274,14 @@ export async function runProviderChain(messages, options = {}) {
   };
 
   const startedAt = clock();
-  const providers = buildProviderChain(env, { sessionId: options.sessionId });
+  const providers = buildProviderChain(env, { sessionId });
 
   for (const provider of providers) {
     let attempt = 0;
     let resumed = false;
+    // A resumed task reuses the persisted session id so the gateway keeps the
+    // backend (and its prompt/token cache) from the original run.
+    let providerSessionId = sessionId;
     const retryKey = `${RETRY_STORE_PREFIX}${provider.id}/${hash}`;
 
     if (store) {
@@ -866,6 +294,9 @@ export async function runProviderChain(messages, options = {}) {
       if (schedule && schedule.status === "retry-scheduled") {
         resumed = true;
         attempt = Math.max(0, Number(schedule.attempt) || 0);
+        if (typeof schedule.sessionId === "string" && schedule.sessionId) {
+          providerSessionId = schedule.sessionId;
+        }
         const waitMs = Math.max(
           0,
           (Number(schedule.nextEligibleAt) || 0) - clock(),
@@ -887,17 +318,20 @@ export async function runProviderChain(messages, options = {}) {
       }
     }
 
-    let result = await provider.call(messages, {
-      signal,
-      attempt,
-      model: options.model,
-      reasoning: options.reasoning,
-      temperature: options.temperature,
-      bodyExtra: options.bodyExtra,
-    });
+    const callProvider = () =>
+      provider.call(messages, {
+        signal,
+        model: options.model,
+        reasoning: options.reasoning,
+        temperature: options.temperature,
+        bodyExtra: options.bodyExtra,
+        sessionId: providerSessionId,
+      });
+
+    let result = await callProvider();
 
     while (result?.failure) {
-      const cls = result.classified || classifyProviderFailure(result.failure);
+      const cls = classifyProviderFailure(result.failure);
       recordFailure(provider.label, result.failure);
       lastErrorStatus =
         Number(result.failure?.status) > 0
@@ -941,6 +375,7 @@ export async function runProviderChain(messages, options = {}) {
               taskId,
               attempt,
               nextEligibleAt,
+              sessionId: providerSessionId,
               status: "retry-scheduled",
               lastError: safeErrorDetail(result.failure),
             });
@@ -958,14 +393,7 @@ export async function runProviderChain(messages, options = {}) {
 
       await sleepInterruptible(backoffMs, signal, sleep);
       if (signal?.aborted) return { taskId, status: "cancelled" };
-      result = await provider.call(messages, {
-        signal,
-        attempt,
-        model: options.model,
-        reasoning: options.reasoning,
-        temperature: options.temperature,
-        bodyExtra: options.bodyExtra,
-      });
+      result = await callProvider();
     }
 
     if (result?.content) {
@@ -1244,99 +672,4 @@ export function runStreamingChain(messages, options = {}) {
   }
 
   return iterableToReadableStream(events());
-}
-
-/**
- * Image generation through OpenRouter. Tries each model in the chain (env
- * override, then the default chain) and returns the first usable image as
- * { url, model } — the response reports the model that actually produced
- * the image. The preferred path parses choices[0].message.images[0].url;
- * content URLs and data:image payloads are also accepted. Returns null when
- * no model produced a usable image.
- *
- * referenceImage (optional) is a validated data: URL or public https URL of
- * the user's own image. When present the message becomes OpenAI-style
- * multimodal content ([{ type: 'text' }, { type: 'image_url' }]) so image
- * models use it as visual reference instead of inventing from text alone.
- */
-export async function callOpenRouterImage(
-  apiKey,
-  prompt,
-  parentSignal,
-  imageModels = DEFAULT_IMAGE_MODEL_CHAIN,
-  referenceImage = null,
-) {
-  const models =
-    Array.isArray(imageModels) && imageModels.length > 0
-      ? imageModels
-      : DEFAULT_IMAGE_MODEL_CHAIN;
-  const userContent =
-    typeof referenceImage === "string" && referenceImage
-      ? [
-          { type: "text", text: prompt },
-          { type: "image_url", image_url: { url: referenceImage } },
-        ]
-      : prompt;
-  for (const model of models) {
-    // Deadline guard: a hung image generation must not hang the request.
-    const controller = new AbortController();
-    const forwardAbort = () => controller.abort();
-    if (parentSignal) {
-      if (parentSignal.aborted) controller.abort();
-      else parentSignal.addEventListener("abort", forwardAbort, { once: true });
-    }
-    let deadlineHit = false;
-    const timer = setTimeout(() => {
-      deadlineHit = true;
-      controller.abort();
-    }, 60_000);
-    try {
-      const response = await fetch(OPENROUTER_DEFAULT_ENDPOINT, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "HTTP-Referer": "https://corez.ai",
-          "X-Title": "COREZ AI",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: "user", content: userContent }],
-        }),
-        signal: controller.signal,
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const message = data?.choices?.[0]?.message;
-        if (Array.isArray(message?.images) && message.images.length > 0) {
-          // Providers differ: some expose images[0].url, others use the
-          // OpenAI-style images[0].image_url.url — accept both.
-          const first = message.images[0];
-          const imageUrl = first?.url || first?.image_url?.url;
-          if (typeof imageUrl === "string" && imageUrl) {
-            return { url: imageUrl, model };
-          }
-        }
-        const content =
-          typeof message?.content === "string" ? message.content : "";
-        const urlMatch =
-          content.match(/https?:\/\/[^\s)"']+\.(?:png|jpg|jpeg|webp)/i) ||
-          content.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
-        if (urlMatch) return { url: urlMatch[1] || urlMatch[0], model };
-        if (content.startsWith("data:image")) return { url: content, model };
-      }
-    } catch (err) {
-      if (!deadlineHit) {
-        console.warn(
-          `OpenRouter image generation attempt failed (${model}):`,
-          safeErrorDetail(err),
-        );
-      }
-    } finally {
-      clearTimeout(timer);
-      if (parentSignal) parentSignal.removeEventListener("abort", forwardAbort);
-    }
-  }
-  return null;
 }

@@ -108,59 +108,9 @@ export function createRateLimiter({
   };
 }
 
-/**
- * Classify a provider failure. Transient failures (408, 429, 5xx, network
- * interruptions, gateway hiccups) are recoverable with backoff. Permanent
- * failures (authentication, validation, unsupported models) must never be
- * retried. Returns { kind: 'transient'|'permanent', status, retryAfterMs }.
- */
-export function classifyProviderFailure(error) {
-  const status = Number(error?.status);
-  const message = String(error?.message || "");
-  const retryAfter = Number(error?.retryAfter) || 0;
-
-  const PERMANENT_STATUS = new Set([400, 401, 403, 404, 405, 413, 422, 501]);
-  if (PERMANENT_STATUS.has(status)) {
-    return { kind: "permanent", status, retryAfterMs: 0 };
-  }
-
-  if (
-    status === 429 ||
-    status === 408 ||
-    (Number.isFinite(status) && status >= 500)
-  ) {
-    return {
-      kind: "transient",
-      status,
-      retryAfterMs: retryAfter > 0 ? retryAfter * 1000 : 0,
-    };
-  }
-
-  if (
-    /unauthorized|invalid api|authentication|forbidden|not found|unsupported model|validation error|invalid request/i.test(
-      message,
-    )
-  ) {
-    return { kind: "permanent", status, retryAfterMs: 0 };
-  }
-
-  if (
-    /429|408|rate limit|too many|temporarily|unavailable|gateway|timeout|network|econn|fetch failed|ecosystem/i.test(
-      message,
-    )
-  ) {
-    return {
-      kind: "transient",
-      status,
-      retryAfterMs: retryAfter > 0 ? retryAfter * 1000 : 0,
-    };
-  }
-
-  // Unclassified network/transport failures are transient by default: the
-  // recovery loop retries with backoff and stops only on permanent
-  // classification, user cancellation, or the unavailability horizon.
-  return { kind: "transient", status, retryAfterMs: 0 };
-}
+// Provider failure classification lives in the package layer so the worker
+// chat chain and the package ProviderChain can never drift.
+export { classifyProviderFailure } from "../packages/agent-core/providers/failure.js";
 
 /**
  * Durable task-state store. R2-backed when ASSET_BUCKET is configured so a

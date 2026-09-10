@@ -16,7 +16,8 @@ export const MIMO_DEFAULT_ENDPOINT = "https://opencode.ai/zen/go/v1/chat/complet
 import {
   OPENCODE_SESSION_HEADER,
   newOpencodeSessionId,
-} from "./providerChain.js";
+  resolveApiMode,
+} from "./opencodeClient.js";
 
 const MIMO_MEDIA_PROMPTS = {
   image:
@@ -198,10 +199,6 @@ function buildMimoMessages(attachment, promptHint, resolvedImageUrl) {
   ];
 }
 
-function isResponsesEndpoint(endpoint) {
-  return typeof endpoint === "string" && endpoint.includes("/responses");
-}
-
 async function callMimo(messages, env, signal) {
   const key = mimoKey(env);
   if (!key) {
@@ -210,7 +207,8 @@ async function callMimo(messages, env, signal) {
   }
   const endpoint = mimoEndpoint(env);
   const model = mimoModel(env);
-  const isResponses = isResponsesEndpoint(endpoint);
+  const isResponses =
+    resolveApiMode({ endpoint, api: env?.MIMO_API_MODE }) === "responses";
 
   const controller = new AbortController();
   const onAbort = () => controller.abort();

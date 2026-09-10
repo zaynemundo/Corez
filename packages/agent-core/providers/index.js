@@ -1,26 +1,14 @@
+import {
+  OPENCODE_SESSION_HEADER,
+  newOpencodeSessionId,
+} from './session.js';
+
 export const MODEL_CATALOG = Object.freeze([
   { id: 'deepseek-flash', name: 'DeepSeek V4.1 Flash', provider: 'opencode-go', role: 'Primary Executor (Orchestration, Coding, UI, Building & Verification)' },
   { id: 'deepseek-flash', name: 'DeepSeek V4.1 Flash', provider: 'opencode-go', role: 'Fast Secondary Executor (Rapid UI iterations & smoke testing)' },
   { id: 'kimi-k3', name: 'Kimi K3 Code', provider: 'opencode-go', role: 'Physics & Engine Advisor (specialized math/physics guidance)' },
   { id: 'flux-1-schnell', name: 'FLUX 1 Schnell', provider: 'cloudflare-workers-ai', role: 'Visual Asset & Art Director' }
 ]);
-
-const OPENCODE_SESSION_HEADER = 'x-opencode-session';
-
-// OpenCode Go/Zen rejects chat requests without a session-affinity header
-// (HTTP 400 MissingSessionID), so every request carries an opaque id.
-function newOpencodeSessionId() {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  const bytes = new Uint8Array(26);
-  if (typeof globalThis.crypto?.getRandomValues === 'function') {
-    globalThis.crypto.getRandomValues(bytes);
-  } else {
-    for (let i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256);
-  }
-  let id = 'ses_';
-  for (const b of bytes) id += alphabet[b % 62];
-  return id;
-}
 
 export class ModelProviderRouter {
   constructor(options = {}) {

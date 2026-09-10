@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { buildProviderChain, runProviderChain, runStreamingChain, TASK_STATUS_STORE_PREFIX } from '../worker/providerChain.js';
+import { resolveApiMode, resolveOpencodeSessionId } from '../worker/opencodeClient.js';
 import { createTaskStateStore } from '../worker/utils.js';
 
 const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/chat/completions';
@@ -718,5 +719,135 @@ describe('runStreamingChain empty-stream behavior', () => {
 
     expect(result.content).toBe('hello');
     expect(sessions).toEqual(['ses_user-abc-123']);
+  });
+});
+
+describe('OpenCode gateway client behavior', () => {
+  it('prefers the explicit API mode and falls back to the endpoint shape', () => {
+    expect(
+      resolveApiMode({ endpoint: 'https://opencode.ai/zen/go/v1/chat/completions' })
+    ).toBe('chat');
+    expect(resolveApiMode({ endpoint: 'https://opencode.ai/zen/go/v1/responses' })).toBe('responses');
+    expect(resolveApiMode({ endpoint: 'https://x/v1/responses', api: 'chat' })).toBe('chat');
+    expect(resolveApiMode({ endpoint: 'https://x/v1/chat/completions', api: 'responses' })).toBe('responses');
+  });
+
+  it('sends the responses body shape when OPENCODE_API_MODE=responses', async () => {
+    let payload;
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+      payload = JSON.parse(init.body);
+      return Response.json({
+        output: [
+          {
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'output_text', text: 'legacy ok' }]
+          }
+        ]
+      });
+    }));
+
+    const result = await runProviderChain([{ role: 'user', content: 'hi' }], {
+      env: {
+        OPENCODE_GO_API_KEY: 'sk-opencode',
+        OPENCODE_ENDPOINT: 'https://opencode.test/custom',
+        OPENCODE_API_MODE: 'responses'
+      },
+      sleep: async () => {},
+      clock: () => 0,
+      jitter: () => 0
+    });
+
+    expect(result.content).toBe('legacy ok');
+    expect(payload.input).toEqual([{ role: 'user', content: 'hi' }]);
+    expect(payload.messages).toBeUndefined();
+  });
+
+  it('reuses the persisted session id when a retry-scheduled task resumes', async () => {
+    const bucket = mockBucket();
+    const bucketEnv = { ...providerEnv(), ASSET_BUCKET: bucket.env };
+    const { clock, sleep, state } = fakeClock();
+    const sessions = [];
+    let failing = true;
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+      sessions.push(init?.headers?.['x-opencode-session']);
+      return failing ? errorResponse(503, 'gateway hiccup') : okResponse('resumed with affinity');
+    }));
+
+    const store1 = createTaskStateStore(bucketEnv);
+    const first = await runProviderChain([{ role: 'user', content: 'affinity' }], {
+      env: bucketEnv,
+      store: store1,
+      sleep,
+      clock,
+      jitter: () => 0,
+      maxRequestRetryMs: 0
+    });
+    expect(first.status).toBe('retry-scheduled');
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]).toMatch(/^ses_/);
+
+    // A later invocation resumes the task and must keep the same affinity id
+    // so the gateway can reuse the original backend's token cache.
+    failing = false;
+    state.now = 60_000;
+    const store2 = createTaskStateStore(bucketEnv);
+    const second = await runProviderChain([{ role: 'user', content: 'affinity' }], {
+      env: bucketEnv,
+      store: store2,
+      sleep,
+      clock,
+      jitter: () => 0,
+      maxRequestRetryMs: 300_000
+    });
+    expect(second.content).toBe('resumed with affinity');
+    expect(second.resumed).toBe(true);
+    expect(sessions).toHaveLength(2);
+    expect(sessions[1]).toBe(sessions[0]);
+  });
+
+  it('omits the reasoning field when OPENCODE_REASONING_DISABLED is set', async () => {
+    let payload;
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+      payload = JSON.parse(init.body);
+      return okResponse('no reasoning');
+    }));
+
+    const result = await runProviderChain([{ role: 'user', content: 'hello' }], {
+      env: {
+        OPENCODE_GO_API_KEY: 'sk-opencode',
+        OPENCODE_REASONING_DISABLED: 'true'
+      },
+      reasoning: { effort: 'high', exclude: true },
+      sleep: async () => {},
+      clock: () => 0,
+      jitter: () => 0
+    });
+
+    expect(result.content).toBe('no reasoning');
+    expect(payload.reasoning).toBeUndefined();
+  });
+
+  it('replaces the vision-only MiMo model and clamps oversized session ids', async () => {
+    let payload;
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+      payload = JSON.parse(init.body);
+      return okResponse('text answer');
+    }));
+
+    await runProviderChain([{ role: 'user', content: 'hi' }], {
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode', OPENCODE_MODEL: ' xiaomi/mimo-v2.5 ' },
+      sleep: async () => {},
+      clock: () => 0,
+      jitter: () => 0
+    });
+    expect(payload.model).toBe('deepseek-flash');
+
+    const oversized = 'a'.repeat(128);
+    expect(resolveOpencodeSessionId(oversized)).toMatch(/^ses_[A-Za-z0-9]{26}$/);
+    expect(resolveOpencodeSessionId('user-abc-123')).toBe('ses_user-abc-123');
+    const prefixed = `ses_${'b'.repeat(120)}`;
+    expect(resolveOpencodeSessionId(prefixed)).toBe(prefixed);
+    expect(resolveOpencodeSessionId(`ses_${'b'.repeat(125)}`)).toMatch(/^ses_[A-Za-z0-9]{26}$/);
   });
 });

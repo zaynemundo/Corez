@@ -23,9 +23,9 @@ import {
 import {
   runProviderChain,
   runStreamingChain,
-  callOpenRouterImage,
-  resolveOpencodeSessionId,
 } from "./providerChain.js";
+import { callOpenRouterImage } from "./imageProvider.js";
+import { resolveOpencodeSessionId } from "./opencodeClient.js";
 import { runCreationHarness } from "./harness.js";
 import { repairMalformedHtml } from "./htmlRepair.js";
 import { selectModelForRequest, selectReasoningConfig } from "./modelRouter.js";
@@ -2862,7 +2862,11 @@ async function handleImage(request, env) {
     imageModels,
     referenceImage,
   );
-  if (!imageResult) {
+  if (!imageResult?.url) {
+    console.warn(
+      "Image generation failed:",
+      JSON.stringify(imageResult?.attempts || []).slice(0, 300),
+    );
     return jsonResponse(503, {
       error:
         "Image generation is unavailable: the image provider did not return an image.",

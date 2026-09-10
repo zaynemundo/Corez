@@ -5,6 +5,12 @@
 // another provider's API key, and no adapter ever sends max_tokens /
 // max_completion_tokens (generations run as long as the model needs).
 
+import {
+  OPENCODE_SESSION_HEADER,
+  newOpencodeSessionId,
+} from './session.js';
+import { classifyFailureStatus } from './failure.js';
+
 export const PROVIDER_IDS = Object.freeze({
   OPENCODE_GO: 'opencode-go',
   DEEPSEEK: 'deepseek',
@@ -29,32 +35,11 @@ export const PROVIDER_ENDPOINTS = Object.freeze({
   [PROVIDER_IDS.OPENROUTER]: 'https://openrouter.ai/api/v1/chat/completions'
 });
 
-// OpenCode Go/Zen rejects chat requests without a session-affinity header
-// (HTTP 400 MissingSessionID), so every opencode request carries an opaque id.
-const OPENCODE_SESSION_HEADER = 'x-opencode-session';
-
-function newOpencodeSessionId() {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  const bytes = new Uint8Array(26);
-  if (typeof globalThis.crypto?.getRandomValues === 'function') {
-    globalThis.crypto.getRandomValues(bytes);
-  } else {
-    for (let i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256);
-  }
-  let id = 'ses_';
-  for (const b of bytes) id += alphabet[b % 62];
-  return id;
-}
-
-// 401/400/403/404 and the rest of the 4xx range are permanent (a retry can
-// never fix a bad key or a bad request). 408/409/429 and everything in the
-// 5xx range are transient. Network-level failures (no status) are transient.
+// 401/400/403/404 and the rest of the permanent status range can never be
+// fixed by a retry; 408/409/429 and everything in the 5xx range are
+// transient. Network-level failures (no status) are transient.
 export function classifyProviderFailure(status) {
-  if (!Number.isFinite(status) || status <= 0) return 'transient';
-  if (status >= 400 && status < 500 && ![408, 409, 429].includes(status)) {
-    return 'permanent';
-  }
-  return 'transient';
+  return classifyFailureStatus(status);
 }
 
 export function parseRetryAfter(value) {
