@@ -13,10 +13,17 @@ import {
   newOpencodeSessionId,
   resolveOpencodeSessionId,
 } from "../packages/agent-core/providers/session.js";
+import { resolveApiMode } from "../packages/agent-core/providers/endpoint.js";
+import {
+  createThinkingStreamFilter,
+  extractContentText,
+  stripThinkingBlocks,
+} from "../packages/agent-core/providers/text.js";
 
 export {
   OPENCODE_SESSION_HEADER,
   newOpencodeSessionId,
+  resolveApiMode,
   resolveOpencodeSessionId,
 };
 
@@ -35,36 +42,6 @@ export const OPENCODE_DEFAULT_ENDPOINT =
 export const DEFAULT_TTFT_TIMEOUT_MS = 120_000; // first byte / first token
 export const DEFAULT_IDLE_TIMEOUT_MS = 60_000; // silence mid-stream
 export const DEFAULT_NONSTREAM_TIMEOUT_MS = 90_000; // non-streaming call total
-
-// Endpoint shape is explicit (`api: 'chat' | 'responses'`), set from
-// OPENCODE_API_MODE by buildProviderChain. The URL is sniffed only as a
-// documented fallback for legacy OPENCODE_ENDPOINT values that point at the
-// retired /responses API; new configuration should set the mode explicitly.
-export function resolveApiMode({ endpoint, api } = {}) {
-  if (api === "chat" || api === "responses") return api;
-  if (
-    typeof endpoint === "string" &&
-    /\/responses(?:$|[?#/])/i.test(endpoint.trim())
-  ) {
-    return "responses";
-  }
-  return "chat";
-}
-
-function extractContentText(content) {
-  if (typeof content === "string") return content;
-  // Multimodal responses can wrap text in content parts: [{ type, text }]
-  if (Array.isArray(content)) {
-    return content
-      .map((part) =>
-        part && typeof part === "object" && typeof part.text === "string"
-          ? part.text
-          : "",
-      )
-      .join("");
-  }
-  return "";
-}
 
 function toResponsesInput(messages) {
   if (!Array.isArray(messages) || messages.length === 0) return messages;
@@ -88,20 +65,6 @@ function mapUsage(usage) {
     inputTokens: Number(usage.input_tokens ?? usage.prompt_tokens) || 0,
     outputTokens: Number(usage.output_tokens ?? usage.completion_tokens) || 0,
   };
-}
-
-// Reasoning models can emit their internal thought inline wrapped in
-// <think>/<thinking> blocks. Strip those sections so thinking text is never
-// presented as the answer. An unclosed block (output truncated mid-thought)
-// is reasoning too: everything from the marker onward is dropped, since any
-// real answer would only ever follow a closed block.
-function stripThinkingBlocks(text) {
-  if (typeof text !== "string") return "";
-  return text
-    .replace(/<thinking\b[^>]*>[\s\S]*?<\/thinking>/gi, "")
-    .replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, "")
-    .replace(/<(?:think|thinking)\b[^>]*>[\s\S]*$/gi, "")
-    .trim();
 }
 
 // The real answer of a chat message is its content field. reasoning_content
@@ -263,6 +226,9 @@ export async function* streamChatEndpoint({
     let finishReason = null;
     let sawDone = false;
     let ttftEmitted = false;
+    // Stateful stripper for inline <think>/<thinking> blocks: tags may be
+    // split across chunks, so filtering must span the whole stream.
+    const thinkingFilter = createThinkingStreamFilter();
 
     try {
       while (true) {
@@ -297,13 +263,15 @@ export async function* streamChatEndpoint({
               typeof parsed.delta === "string" &&
               parsed.delta
             ) {
+              const delta = thinkingFilter.push(parsed.delta);
+              if (!delta) continue;
               if (!ttftEmitted) {
                 ttftEmitted = true;
                 const ttftMs = Date.now() - requestStartedAt;
                 if (typeof onTtft === "function") onTtft(ttftMs);
-                yield { text: parsed.delta, ttftMs };
+                yield { text: delta, ttftMs };
               } else {
-                yield { text: parsed.delta };
+                yield { text: delta };
               }
             } else if (
               parsed.type === "response.completed" &&
@@ -324,9 +292,13 @@ export async function* streamChatEndpoint({
           if (choice?.delta) {
             // Reasoning deltas (reasoning_content / reasoning) are tracked for
             // diagnostics but never yielded as user-visible content. TTFT
-            // measures time to first *content*.
+            // measures time to first *filtered* content: inline <think> blocks
+            // are stripped here, which also covers models that emit reasoning
+            // into the content field instead of reasoning_content.
             const reasoningDelta = reasoningDeltaOf(choice.delta);
-            const delta = extractContentText(choice.delta.content);
+            const delta = thinkingFilter.push(
+              extractContentText(choice.delta.content),
+            );
             if (delta) {
               if (!ttftEmitted) {
                 ttftEmitted = true;
@@ -345,8 +317,21 @@ export async function* streamChatEndpoint({
           if (choice?.finish_reason) sawDone = true;
         }
       }
+      // Release a held-back partial tag; an unclosed thinking block swallows
+      // its remainder (truncated mid-thought), leaving no content.
+      const tail = thinkingFilter.flush();
+      if (tail) {
+        if (!ttftEmitted) {
+          ttftEmitted = true;
+          const ttftMs = Date.now() - requestStartedAt;
+          if (typeof onTtft === "function") onTtft(ttftMs);
+          yield { text: tail, ttftMs };
+        } else {
+          yield { text: tail };
+        }
+      }
       if (!sawDone && finishReason === null && !ttftEmitted) {
-        // No chunks at all: treat as empty response.
+        // No chunks at all (or reasoning-only output): empty response.
         throw new Error("empty streaming response");
       }
       // A stream that ends on content without [DONE]/finish_reason is

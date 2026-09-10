@@ -10,6 +10,8 @@ import {
   newOpencodeSessionId,
 } from './session.js';
 import { classifyFailureStatus } from './failure.js';
+import { resolveApiMode } from './endpoint.js';
+import { extractContentText, stripThinkingBlocks } from './text.js';
 
 export const PROVIDER_IDS = Object.freeze({
   OPENCODE_GO: 'opencode-go',
@@ -81,20 +83,6 @@ export function safeDetail(value, limit = 300) {
   return String(value).slice(0, limit);
 }
 
-function extractContentText(content) {
-  if (typeof content === 'string') return content;
-  if (Array.isArray(content)) {
-    return content
-      .map((part) => (part && typeof part === 'object' && typeof part.text === 'string' ? part.text : ''))
-      .join('');
-  }
-  return '';
-}
-
-function isResponsesEndpoint(endpoint) {
-  return typeof endpoint === 'string' && endpoint.includes('/responses');
-}
-
 function toResponsesInput(messages) {
   if (!Array.isArray(messages)) return messages;
   return messages.map((m) => {
@@ -112,7 +100,7 @@ function parseResponsesMessage(data) {
   const messageItem = output.find((item) => item && item.type === 'message' && item.role === 'assistant');
   if (!messageItem || !Array.isArray(messageItem.content)) return { content: '', toolCalls: [] };
   const textPart = messageItem.content.find((c) => c && c.type === 'output_text' && typeof c.text === 'string');
-  const content = textPart ? textPart.text : '';
+  const content = textPart ? stripThinkingBlocks(textPart.text) : '';
   return { content, toolCalls: [] };
 }
 
@@ -122,7 +110,7 @@ function parseCompletionResponse(data) {
   }
   const message = data?.choices?.[0]?.message;
   if (!message) return { content: '', toolCalls: [] };
-  const content = extractContentText(message.content);
+  const content = stripThinkingBlocks(extractContentText(message.content));
   const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
   return { content, toolCalls };
 }
@@ -178,16 +166,18 @@ export class ProviderAdapter {
     this.apiKey = options.apiKey || null;
     this.endpoint = options.endpoint || '';
     this.defaultModel = options.model || options.defaultModel || '';
+    // Explicit endpoint shape; the URL is only sniffed as a documented
+    // fallback for legacy endpoint values.
+    this.api = resolveApiMode({ endpoint: this.endpoint, api: options.api });
     this.configured = Boolean(this.apiKey);
   }
 
   buildBody({ model, messages, tools, reasoning, temperature }) {
-    const isResponses = isResponsesEndpoint(this.endpoint);
     const body = {
       model: model || this.defaultModel,
       temperature: Number.isFinite(temperature) ? temperature : 0.42
     };
-    if (isResponses) {
+    if (this.api === 'responses') {
       body.input = toResponsesInput(messages);
     } else {
       body.messages = messages;
@@ -198,7 +188,7 @@ export class ProviderAdapter {
     return body;
   }
 
-  buildHeaders() {
+  buildHeaders(_sessionId) {
     const headers = {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${this.apiKey}`
@@ -208,13 +198,13 @@ export class ProviderAdapter {
     return headers;
   }
 
-  async generate({ model, messages, tools, signal, reasoning, temperature }) {
+  async generate({ model, messages, tools, signal, reasoning, temperature, sessionId }) {
     if (!this.configured) {
       return { ok: false, status: null, detail: `${this.id} is not configured` };
     }
     return requestProvider({
       endpoint: this.endpoint,
-      headers: this.buildHeaders(),
+      headers: this.buildHeaders(sessionId),
       body: this.buildBody({ model, messages, tools, reasoning, temperature }),
       signal
     });
@@ -232,15 +222,20 @@ export class OpenCodeGoAdapter extends ProviderAdapter {
       apiKey,
       endpoint: options.endpoint ?? process.env.OPENCODE_ENDPOINT ?? PROVIDER_ENDPOINTS[PROVIDER_IDS.OPENCODE_GO],
       model: options.model ?? process.env.OPENCODE_MODEL ?? 'deepseek-flash',
+      api: options.api ?? process.env.OPENCODE_API_MODE,
       referer: 'https://corez.ai',
       title: 'COREZ AI'
     });
+    // One affinity id per adapter instance so every step of a harness/tool
+    // loop lands on the same gateway backend (and its token cache). A caller
+    // may override it per generate() call via the sessionId option.
+    this.sessionId = options.sessionId || newOpencodeSessionId();
   }
 
-  buildHeaders() {
+  buildHeaders(sessionId) {
     return {
       ...super.buildHeaders(),
-      [OPENCODE_SESSION_HEADER]: newOpencodeSessionId()
+      [OPENCODE_SESSION_HEADER]: sessionId || this.sessionId
     };
   }
 }
@@ -254,16 +249,9 @@ export class DeepSeekAdapter extends ProviderAdapter {
       id: PROVIDER_IDS.DEEPSEEK,
       apiKey,
       endpoint: options.endpoint ?? process.env.DEEPSEEK_ENDPOINT ?? PROVIDER_ENDPOINTS[PROVIDER_IDS.DEEPSEEK],
-      model: options.model ?? process.env.DEEPSEEK_MODEL ?? 'deepseek-flash'
+      model: options.model ?? process.env.DEEPSEEK_MODEL ?? 'deepseek-flash',
+      api: options.api
     });
-  }
-
-  buildBody(options) {
-    return { ...super.buildBody(options), stream: false };
-  }
-
-  async generate(options = {}) {
-    return super.generate(options);
   }
 }
 
@@ -277,6 +265,7 @@ export class OpenRouterAdapter extends ProviderAdapter {
       apiKey,
       endpoint: options.endpoint ?? process.env.OPENROUTER_ENDPOINT ?? PROVIDER_ENDPOINTS[PROVIDER_IDS.OPENROUTER],
       model: options.model ?? process.env.OPENROUTER_MODEL ?? 'deepseek-flash',
+      api: options.api,
       referer: 'https://corez.ai',
       title: 'COREZ AI'
     });

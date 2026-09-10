@@ -13,7 +13,7 @@ export const PERMANENT_STATUSES = Object.freeze(
 );
 
 const PERMANENT_MESSAGE_PATTERN =
-  /unauthorized|invalid api|authentication|forbidden|not found|unsupported model|validation error|invalid request/i;
+  /unauthorized|invalid api|authentication|forbidden|not found|unsupported model|validation error|invalid request|context[_ ]?(?:length|window)|maximum context|too many tokens|token limit|content policy|moderation|safety/i;
 const TRANSIENT_MESSAGE_PATTERN =
   /429|408|rate limit|too many|temporarily|unavailable|gateway|timeout|network|econn|fetch failed|ecosystem/i;
 

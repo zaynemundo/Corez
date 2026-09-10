@@ -43,6 +43,7 @@ import {
   recordQualitySignal,
 } from "./reflectionEngine.js";
 import { buildAwwwardsDesignPrompt } from "../../packages/agent-core/context/designTokens.js";
+import { stripThinkingBlocks } from "../../packages/agent-core/providers/text.js";
 import { resolveSkills } from "../skills/resolver.js";
 import { classifyExecutionMode } from "./executionModes.js";
 import { persistAndSummarize } from "./contextStore.js";
@@ -1596,16 +1597,12 @@ export async function generateHostedAIResponse(
     throw new Error(`Hosted AI request failed: ${serverMsg}${detail}`);
   }
 
-  // Defense-in-depth: reasoning text must never reach the user. Strip closed
-  // <think>/<thinking> blocks and anything after an unclosed marker (a
-  // truncated thinking-only reply), mirroring the worker's sanitizer.
-  const strippedContent = (
+  // Defense-in-depth: reasoning text must never reach the user. The worker
+  // already strips it (including inline blocks split across stream chunks),
+  // but a cached/legacy response or a direct path must never leak it either.
+  const strippedContent = stripThinkingBlocks(
     typeof data?.content === "string" ? data.content : ""
-  )
-    .replace(/<thinking\b[^>]*>[\s\S]*?<\/thinking>/gi, "")
-    .replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, "")
-    .replace(/<(?:think|thinking)\b[^>]*>[\s\S]*$/gi, "")
-    .trim();
+  );
   const rawContent = strippedContent || null;
 
   if (!rawContent) {

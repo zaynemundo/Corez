@@ -10,14 +10,15 @@
  * but with model mimo-v2.5 — same auth, same endpoint, different model.
  */
 
-export const MIMO_DEFAULT_MODEL = "mimo-v2.5";
-export const MIMO_DEFAULT_ENDPOINT = "https://opencode.ai/zen/go/v1/chat/completions";
-
 import {
+  OPENCODE_DEFAULT_ENDPOINT,
   OPENCODE_SESSION_HEADER,
   newOpencodeSessionId,
   resolveApiMode,
 } from "./opencodeClient.js";
+
+export const MIMO_DEFAULT_MODEL = "mimo-v2.5";
+export const MIMO_DEFAULT_ENDPOINT = OPENCODE_DEFAULT_ENDPOINT;
 
 const MIMO_MEDIA_PROMPTS = {
   image:

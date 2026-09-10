@@ -101,6 +101,43 @@ describe('ProviderChain', () => {
     expect(calls[0].session).toMatch(/^ses_[A-Za-z0-9]+$/);
   });
 
+  it('keeps one OpenCode session per adapter and honors per-call overrides', async () => {
+    const sessions = [];
+    fetchSpy.mockImplementation(async (_url, init) => {
+      sessions.push(init.headers['x-opencode-session']);
+      return completionResponse('ok');
+    });
+    const adapter = new OpenCodeGoAdapter({
+      opencodeApiKey: 'oc-key',
+      endpoint: 'https://opencode.test/v1'
+    });
+
+    await adapter.generate({ messages: [{ role: 'user', content: 'one' }] });
+    await adapter.generate({ messages: [{ role: 'user', content: 'two' }] });
+    expect(sessions).toHaveLength(2);
+    expect(sessions[1]).toBe(sessions[0]);
+
+    await adapter.generate({
+      messages: [{ role: 'user', content: 'three' }],
+      sessionId: 'ses_custom12345'
+    });
+    expect(sessions[2]).toBe('ses_custom12345');
+  });
+
+  it('strips inline thinking blocks from adapter content', async () => {
+    fetchSpy.mockImplementation(async () =>
+      completionResponse('Visible <thinking>secret</thinking>answer')
+    );
+    const adapter = new OpenCodeGoAdapter({
+      opencodeApiKey: 'oc-key',
+      endpoint: 'https://opencode.test/v1'
+    });
+    const res = await adapter.generate({
+      messages: [{ role: 'user', content: 'hi' }]
+    });
+    expect(res.content).toBe('Visible answer');
+  });
+
   it('falls back immediately when the preferred provider fails transiently and persists a retry schedule', async () => {
     const { scheduler, state } = memoryScheduler();
     const chain = new ProviderChain({

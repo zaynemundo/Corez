@@ -850,4 +850,71 @@ describe('OpenCode gateway client behavior', () => {
     expect(resolveOpencodeSessionId(prefixed)).toBe(prefixed);
     expect(resolveOpencodeSessionId(`ses_${'b'.repeat(125)}`)).toMatch(/^ses_[A-Za-z0-9]{26}$/);
   });
+
+  it('filters inline thinking blocks out of streamed content, even split across chunks', async () => {
+    const sse = (event) => `data: ${JSON.stringify(event)}\n\n`;
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      sse({ choices: [{ delta: { content: 'Hello <thi' }, finish_reason: null }] })
+      + sse({ choices: [{ delta: { content: 'nk>secret</thi' }, finish_reason: null }] })
+      + sse({ choices: [{ delta: { content: 'nk>world' }, finish_reason: null }] })
+      + sse({
+        choices: [{ delta: {}, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 3, completion_tokens: 2 }
+      })
+      + 'data: [DONE]\n\n',
+      { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+    )));
+
+    const events = [];
+    for await (const event of runStreamingChain([{ role: 'user', content: 'hello' }], {
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode' },
+      sleep: async () => {},
+      clock: () => 0,
+      jitter: () => 0
+    })) {
+      events.push(event);
+    }
+
+    const text = events.filter((e) => e.type === 'delta').map((e) => e.text).join('');
+    expect(text).toBe('Hello world');
+    expect(text).not.toContain('secret');
+    expect(events.find((e) => e.type === 'done')).toBeTruthy();
+    expect(events.find((e) => e.type === 'error')).toBeUndefined();
+  });
+
+  it('returns cancelled without calling the provider when the signal is already aborted', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const controller = new AbortController();
+    controller.abort();
+
+    const result = await runProviderChain([{ role: 'user', content: 'stop' }], {
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode' },
+      signal: controller.signal
+    });
+
+    expect(result.status).toBe('cancelled');
+    expect(result.taskId).toMatch(/^rt-[0-9a-f]{8}$/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('emits a cancellation event without calling the provider when already aborted (streaming)', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const controller = new AbortController();
+    controller.abort();
+
+    const events = [];
+    for await (const event of runStreamingChain([{ role: 'user', content: 'stop' }], {
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode' },
+      signal: controller.signal
+    })) {
+      events.push(event);
+    }
+
+    expect(events).toEqual([
+      { type: 'error', message: 'AI request cancelled.', status: 499 }
+    ]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

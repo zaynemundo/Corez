@@ -2863,10 +2863,11 @@ async function handleImage(request, env) {
     referenceImage,
   );
   if (!imageResult?.url) {
-    console.warn(
-      "Image generation failed:",
-      JSON.stringify(imageResult?.attempts || []).slice(0, 300),
-    );
+    const attemptSummary = (imageResult?.attempts || [])
+      .map((attempt) => `${attempt.model}:${attempt.reason || "failed"}`)
+      .join(" | ")
+      .slice(0, 300);
+    console.warn("Image generation failed:", attemptSummary || "no image returned");
     return jsonResponse(503, {
       error:
         "Image generation is unavailable: the image provider did not return an image.",

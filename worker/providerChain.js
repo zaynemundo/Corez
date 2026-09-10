@@ -266,6 +266,9 @@ export async function runProviderChain(messages, options = {}) {
       : `rt-${hash}`;
   const sessionId = resolveOpencodeSessionId(options.sessionId);
 
+  // An already-aborted signal must not spend a provider call.
+  if (signal?.aborted) return { taskId, status: "cancelled" };
+
   const failures = [];
   let lastErrorStatus = 0;
   const recordFailure = (label, reason) => {
@@ -486,6 +489,15 @@ export function runStreamingChain(messages, options = {}) {
       : DEFAULT_REQUEST_RETRY_MS;
 
   async function* events() {
+    // An already-aborted signal must not spend a provider call.
+    if (signal?.aborted) {
+      yield {
+        type: "error",
+        message: "AI request cancelled.",
+        status: 499,
+      };
+      return;
+    }
     if (providers.length === 0) {
       yield {
         type: "error",

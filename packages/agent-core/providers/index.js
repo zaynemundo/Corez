@@ -2,87 +2,112 @@ import {
   OPENCODE_SESSION_HEADER,
   newOpencodeSessionId,
 } from './session.js';
+import { resolveApiMode } from './endpoint.js';
+import { extractContentText, stripThinkingBlocks } from './text.js';
+import { PROVIDER_ENDPOINTS, PROVIDER_IDS } from './adapters.js';
 
 export const MODEL_CATALOG = Object.freeze([
   { id: 'deepseek-flash', name: 'DeepSeek V4.1 Flash', provider: 'opencode-go', role: 'Primary Executor (Orchestration, Coding, UI, Building & Verification)' },
-  { id: 'deepseek-flash', name: 'DeepSeek V4.1 Flash', provider: 'opencode-go', role: 'Fast Secondary Executor (Rapid UI iterations & smoke testing)' },
   { id: 'kimi-k3', name: 'Kimi K3 Code', provider: 'opencode-go', role: 'Physics & Engine Advisor (specialized math/physics guidance)' },
   { id: 'flux-1-schnell', name: 'FLUX 1 Schnell', provider: 'cloudflare-workers-ai', role: 'Visual Asset & Art Director' }
 ]);
+
+// Pull the assistant text out of either gateway response shape (chat
+// completions `choices[].message.content` or responses `output[]`).
+function extractAssistantText(data) {
+  if (!data || typeof data !== 'object') return '';
+  if (Array.isArray(data.output)) {
+    const messageItem = data.output.find(
+      (item) => item && item.type === 'message' && item.role === 'assistant',
+    );
+    const textPart =
+      messageItem && Array.isArray(messageItem.content)
+        ? messageItem.content.find(
+            (c) => c && c.type === 'output_text' && typeof c.text === 'string',
+          )
+        : null;
+    return textPart ? textPart.text : '';
+  }
+  return extractContentText(data.choices?.[0]?.message?.content);
+}
 
 export class ModelProviderRouter {
   constructor(options = {}) {
     this.opencodeApiKey = process.env.OPENCODE_GO_API_KEY || process.env.OPENCODE_API_KEY || options.opencodeApiKey;
     this.defaultModel = options.defaultModel || 'deepseek-flash';
+    this.endpoint =
+      options.endpoint ||
+      process.env.OPENCODE_ENDPOINT ||
+      PROVIDER_ENDPOINTS[PROVIDER_IDS.OPENCODE_GO];
+    this.api = options.api || process.env.OPENCODE_API_MODE;
   }
 
   getAvailableModels() {
-    return MODEL_CATALOG.map(m => ({
-      ...m,
-      configured: m.provider === 'opencode-go'
-        ? Boolean(this.opencodeApiKey)
-        : Boolean(this.opencodeApiKey)
+    return MODEL_CATALOG.map((model) => ({
+      ...model,
+      configured: Boolean(this.opencodeApiKey)
     }));
   }
 
   async generate({ model = this.defaultModel, messages = [], tools = [], reasoning = { effort: 'high', exclude: true }, temperature = 0.42, signal }) {
     const activeKey = this.opencodeApiKey;
 
-    // If the API key is present, execute HTTP request against OpenCode Go
-    // (the only configured provider; direct OpenRouter integration removed).
-    // DeepSeek V4.1 Flash benefits from hidden reasoning: high effort for complex
-    // tasks, medium for general, low for trivial — all excluded from output.
-    if (activeKey) {
-      try {
-        const endpoint = 'https://opencode.ai/zen/go/v1/chat/completions';
-
-        const body = {
-          model,
-          messages,
-          tools: tools.length > 0 ? tools : undefined,
-          temperature: Number.isFinite(temperature) ? temperature : 0.42,
-          reasoning: reasoning && typeof reasoning === 'object' ? reasoning : { effort: String(reasoning || 'high'), exclude: true }
-        };
-
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${activeKey}`,
-            [OPENCODE_SESSION_HEADER]: newOpencodeSessionId()
-          },
-          body: JSON.stringify(body),
-          signal
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data.output)) {
-            const messageItem = data.output.find((item) => item && item.type === 'message' && item.role === 'assistant');
-            const textPart = messageItem && Array.isArray(messageItem.content) ? messageItem.content.find((c) => c && c.type === 'output_text' && typeof c.text === 'string') : null;
-            return {
-              content: textPart ? textPart.text : '',
-              toolCalls: [],
-              raw: data
-            };
-          }
-          const choice = data.choices?.[0];
-          return {
-            content: choice?.message?.content || '',
-            toolCalls: choice?.message?.tool_calls || [],
-            raw: data
-          };
-        }
-        const detail = (await res.text().catch(() => '')).slice(0, 300);
-        console.warn(`[ModelProviderRouter] HTTP ${res.status} from ${endpoint}: ${detail || res.statusText}. Activating local agent simulation fallback.`);
-      } catch (err) {
-        if (err.name === 'AbortError') throw err;
-        console.warn(`[ModelProviderRouter] Request failed: ${err.message}. Activating local agent simulation fallback.`);
-      }
+    // No key: the deterministic local agent is an explicit offline mode. Mark
+    // the result so callers can tell simulated output from a real answer.
+    if (!activeKey) {
+      return { ...this.simulateLocalAgentResponse(messages, tools), offline: true };
     }
 
-    // Local deterministic agent fallback (Offline / No Key Mode)
-    return this.simulateLocalAgentResponse(messages, tools);
+    const api = resolveApiMode({ endpoint: this.endpoint, api: this.api });
+    const body = {
+      model,
+      temperature: Number.isFinite(temperature) ? temperature : 0.42,
+      reasoning:
+        reasoning && typeof reasoning === 'object'
+          ? reasoning
+          : { effort: String(reasoning || 'high'), exclude: true }
+    };
+    if (api === 'responses') body.input = messages;
+    else body.messages = messages;
+    if (Array.isArray(tools) && tools.length > 0) body.tools = tools;
+
+    let res;
+    try {
+      res = await fetch(this.endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${activeKey}`,
+          [OPENCODE_SESSION_HEADER]: newOpencodeSessionId()
+        },
+        body: JSON.stringify(body),
+        signal
+      });
+    } catch (err) {
+      if (err?.name === 'AbortError') throw err;
+      // A configured provider that cannot be reached must fail loudly: never
+      // fabricate a simulated answer that looks real to CLI/swarm callers.
+      throw new Error(
+        `OpenCode Go request failed: ${err?.message || 'network error'}`,
+        { cause: err }
+      );
+    }
+
+    if (!res.ok) {
+      const detail = (await res.text().catch(() => '')).slice(0, 300);
+      const error = new Error(
+        `OpenCode Go request failed: HTTP ${res.status}${detail ? ` ${detail}` : ` ${res.statusText}`}`
+      );
+      error.status = res.status;
+      throw error;
+    }
+
+    const data = await res.json();
+    return {
+      content: stripThinkingBlocks(extractAssistantText(data)),
+      toolCalls: data?.choices?.[0]?.message?.tool_calls || [],
+      raw: data
+    };
   }
 
   simulateLocalAgentResponse(messages, tools) {
@@ -190,4 +215,3 @@ export function cosineSimilarity(vecA, vecB) {
   const magnitude = Math.sqrt(normA) * Math.sqrt(normB);
   return magnitude ? dotProduct / magnitude : 0;
 }
-
