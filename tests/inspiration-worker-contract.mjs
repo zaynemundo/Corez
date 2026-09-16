@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import worker from '../worker/index.js';
-import { detectInspirationCategory, fetchAwwwardsInspiration } from '../worker/inspiration.js';
+import { detectInspirationCategory, fetchAwwwardsInspiration, fetchAwwwardsInspirationCached, INSPIRATION_CACHE_PREFIX, INSPIRATION_FRESH_MS } from '../worker/inspiration.js';
 
 function post(body, env = {}) {
   return worker.fetch(
@@ -18,6 +18,21 @@ function awwwardsHtml(slugs) {
     .map((slug) => `<a href="/sites/${slug}" class="site">${slug}</a>`)
     .join('\n');
   return `<!DOCTYPE html><html><body><div class="list">${anchors}</div></body></html>`;
+}
+
+function memoryKv() {
+  const store = new Map();
+  return {
+    store,
+    writes: 0,
+    async get(key) {
+      return store.has(key) ? store.get(key) : null;
+    },
+    async put(key, value) {
+      this.writes += 1;
+      store.set(key, value);
+    }
+  };
 }
 
 async function run() {
@@ -84,6 +99,81 @@ async function run() {
   );
   assert.equal(failResponse.status, 200);
   assert.deepEqual((await failResponse.json()).sites, []);
+
+  // ---------------------------------------------------------------------
+  // KV cache: a fresh entry is served without touching awwwards.com at all,
+  // so a repeat app build starts immediately instead of waiting on a scrape.
+  // ---------------------------------------------------------------------
+  const kv = memoryKv();
+  let scrapes = 0;
+  const scrapeOnce = async () => {
+    scrapes += 1;
+    return new Response(awwwardsHtml(['acid-crunch', 'forms']), { status: 200 });
+  };
+
+  const cold = await fetchAwwwardsInspirationCached({ INSPIRATION_CACHE: kv }, 'build a portfolio site', scrapeOnce);
+  assert.equal(cold.cache, 'refreshed');
+  assert.equal(cold.sites.length, 2);
+  // The scrape uses one fetch per page plus one per inspected site detail, so
+  // the cold run is a bounded burst — not a single request.
+  const coldFetches = scrapes;
+  assert.ok(coldFetches >= 3, 'cold run must actually scrape');
+  assert.equal(kv.writes, 1);
+  assert.ok(kv.store.has(`${INSPIRATION_CACHE_PREFIX}portfolio`));
+
+  const warm = await fetchAwwwardsInspirationCached(
+    { INSPIRATION_CACHE: kv },
+    'a different portfolio prompt',
+    async () => { throw new Error('the network must not be touched on a fresh hit'); }
+  );
+  assert.equal(warm.cache, 'fresh');
+  assert.equal(warm.sites.length, 2);
+  assert.equal(scrapes, coldFetches);
+
+  // A refresh failure must fall back to the cached copy, not an empty list.
+  const staleRaw = JSON.stringify({ sites: [{ title: 'Cached Site', url: 'https://www.awwwards.com/sites/cached-site' }], cachedAt: Date.now() - INSPIRATION_FRESH_MS - 1000, source: 'Awwwards' });
+  const staleKv = memoryKv();
+  staleKv.store.set(`${INSPIRATION_CACHE_PREFIX}portfolio`, staleRaw);
+  const stale = await fetchAwwwardsInspirationCached(
+    { INSPIRATION_CACHE: staleKv },
+    'portfolio',
+    async () => { throw new Error('awwwards is down'); }
+  );
+  assert.equal(stale.cache, 'stale');
+  assert.equal(stale.sites[0].title, 'Cached Site');
+  assert.equal(staleKv.writes, 0);
+
+  // A failed scrape with nothing cached must never write a fabricated entry.
+  const emptyKv = memoryKv();
+  const miss = await fetchAwwwardsInspirationCached(
+    { INSPIRATION_CACHE: emptyKv },
+    'portfolio',
+    async () => { throw new Error('awwwards is down'); }
+  );
+  assert.equal(miss.cache, 'miss');
+  assert.deepEqual(miss.sites, []);
+  assert.equal(emptyKv.writes, 0);
+
+  // Endpoint reports the cache status so a hit is observable in production.
+  const cachedEndpoint = await post(
+    { query: 'design a portfolio website' },
+    {
+      INSPIRATION_CACHE: kv,
+      __INSPIRATION_FETCH: async () => { throw new Error('network must not be used'); }
+    }
+  );
+  const cachedData = await cachedEndpoint.json();
+  assert.equal(cachedData.meta.cache, 'fresh');
+  assert.equal(cachedData.sites.length, 2);
+
+  // Without the binding the endpoint still works (uncached).
+  const uncachedEndpoint = await post(
+    { query: 'design a portfolio website' },
+    { __INSPIRATION_FETCH: async () => new Response(awwwardsHtml(['forms']), { status: 200 }) }
+  );
+  const uncachedData = await uncachedEndpoint.json();
+  assert.equal(uncachedData.sites.length, 1);
+  assert.equal(uncachedData.meta.cache, 'refreshed');
 
   console.log('Awwwards inspiration contract passed.');
 }

@@ -410,6 +410,96 @@ export async function fetchAwwwardsInspiration(query, fetchImpl = fetch) {
   return { sites, category: category.key, source: "Awwwards" };
 }
 
+// ---------------------------------------------------------------------------
+// Read-through KV cache
+//
+// Every app/site build scraped awwwards.com: one category page plus up to three
+// detail pages, each allowed 8s. The category listing changes on the order of
+// days, so the parsed result is cached per category:
+//   - a fresh entry (younger than INSPIRATION_FRESH_MS) is served without any
+//     network call at all;
+//   - after that window the scrape runs again and the entry is replaced;
+//   - when the scrape fails or yields nothing, a stale entry is still better
+//     than no references, so it is served instead of an empty list.
+// The timestamp lives inside the value so the freshness window can change
+// without flushing the namespace, and the binding is optional: without it the
+// endpoint behaves exactly as before (uncached).
+// ---------------------------------------------------------------------------
+export const INSPIRATION_CACHE_PREFIX = "inspiration:v1:";
+export const INSPIRATION_FRESH_MS = 6 * 60 * 60 * 1000;
+const INSPIRATION_CACHE_TTL_SECONDS = 14 * 24 * 60 * 60;
+
+async function readInspirationCache(env, categoryKey) {
+  const store = env?.INSPIRATION_CACHE;
+  if (!store?.get) return null;
+  try {
+    const raw = await store.get(`${INSPIRATION_CACHE_PREFIX}${categoryKey}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.sites)) return null;
+    const cachedAt = Number(parsed.cachedAt) || 0;
+    return {
+      sites: parsed.sites,
+      source: typeof parsed.source === "string" ? parsed.source : "Awwwards",
+      cachedAt,
+      fresh: Date.now() - cachedAt < INSPIRATION_FRESH_MS,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function writeInspirationCache(env, categoryKey, sites) {
+  const store = env?.INSPIRATION_CACHE;
+  if (!store?.put) return;
+  try {
+    await store.put(
+      `${INSPIRATION_CACHE_PREFIX}${categoryKey}`,
+      JSON.stringify({ sites, cachedAt: Date.now(), source: "Awwwards" }),
+      { expirationTtl: INSPIRATION_CACHE_TTL_SECONDS },
+    );
+  } catch {
+    // A cache write failure must never fail the request.
+  }
+}
+
+/**
+ * Cached variant of fetchAwwwardsInspiration for request paths.
+ * Same shape, plus `cache`: 'fresh' | 'refreshed' | 'stale' | 'miss'.
+ */
+export async function fetchAwwwardsInspirationCached(
+  env,
+  query,
+  fetchImpl = fetch,
+) {
+  const category = detectInspirationCategory(query);
+  const cached = await readInspirationCache(env, category.key);
+  if (cached?.fresh) {
+    return {
+      sites: cached.sites,
+      category: category.key,
+      source: cached.source,
+      cache: "fresh",
+    };
+  }
+
+  const result = await fetchAwwwardsInspiration(query, fetchImpl);
+  if (Array.isArray(result.sites) && result.sites.length > 0) {
+    await writeInspirationCache(env, result.category, result.sites);
+    return { ...result, cache: "refreshed" };
+  }
+
+  if (cached && cached.sites.length > 0) {
+    return {
+      sites: cached.sites,
+      category: category.key,
+      source: cached.source,
+      cache: "stale",
+    };
+  }
+  return { ...result, cache: "miss" };
+}
+
 export async function handleInspiration(request, env) {
   if (request.method !== "POST") {
     return jsonResponse(405, { error: "Method not allowed." });
@@ -428,12 +518,16 @@ export async function handleInspiration(request, env) {
   }
 
   const fetchImpl = env?.__INSPIRATION_FETCH || fetch;
-  const result = await fetchAwwwardsInspiration(query, fetchImpl);
+  const result = await fetchAwwwardsInspirationCached(env, query, fetchImpl);
   return jsonResponse(200, {
     kind: "inspiration",
     query,
     category: result.category,
     sites: result.sites,
-    meta: { source: result.source, servedAt: new Date().toISOString() },
+    meta: {
+      source: result.source,
+      cache: result.cache,
+      servedAt: new Date().toISOString(),
+    },
   });
 }

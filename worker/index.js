@@ -9,7 +9,7 @@ import {
   getUserAccount,
 } from "./memory.js";
 import { handleRerank, handleEmbed } from "./aiModels.js";
-import { fetchAwwwardsInspiration, handleInspiration } from "./inspiration.js";
+import { fetchAwwwardsInspirationCached, handleInspiration } from "./inspiration.js";
 import { verifySession } from "./auth.js";
 import { getActiveSubscription } from "./subscriptions.js";
 import {
@@ -1903,9 +1903,10 @@ async function handleAi(request, env) {
   const gameIntent = isGameCreationRequest(prompt, intent, fineIntent);
   if (appIntent && !gameIntent) {
     try {
-      const inspiration = await fetchAwwwardsInspiration(
+      const inspiration = await fetchAwwwardsInspirationCached(
+        env,
         prompt,
-        env?.__INSPIRATION_FETCH,
+        env?.__INSPIRATION_FETCH || fetch,
       );
       if (Array.isArray(inspiration?.sites) && inspiration.sites.length > 0) {
         const refs = inspiration.sites

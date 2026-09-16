@@ -56,6 +56,17 @@
       "bucket_name": "corez-assets"
     }
   ],
+  // Read-through cache for the Awwwards design references (/api/inspiration and
+  // the app-build prompt enrichment). The scrape costs one category page plus
+  // up to three detail pages on every build; the category listing changes on
+  // the order of days, so the parsed result is cached per category for 6 hours
+  // (14-day hard expiry) and a failed refresh falls back to the stale copy.
+  "kv_namespaces": [
+    {
+      "binding": "INSPIRATION_CACHE",
+      "id": "da51c6ee70c5465eb032b162af02572c"
+    }
+  ],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
