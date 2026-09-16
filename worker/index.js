@@ -4186,21 +4186,41 @@ const APP_CSP = [
   "frame-ancestors 'self'",
 ].join("; ");
 
+// Vite emits content-hashed build output under /assets/
+// (index-<hash>.js, index-<hash>.css, vendor-<hash>.js, <name>-<hash>.jpg):
+// the filename changes whenever the bytes change, so the browser may keep it
+// for a year without ever revalidating. The assets binding default
+// (`public, max-age=0, must-revalidate`) made the browser send a conditional
+// request for every bundle on every page load — a wasted round trip per asset
+// on each visit (the operator's own client RTT measured 163ms). A `_headers`
+// file cannot do this: custom rules from that file are not applied to
+// Worker-generated responses, and run_worker_first ["/*"] routes every asset
+// through this Worker. Anything that is not a hashed build artifact (the SPA
+// shell, robots.txt, sitemap.xml, the brand PNGs at the root) keeps the
+// revalidating default so a new deploy is still picked up immediately.
+const HASHED_BUILD_ASSET_PATTERN =
+  /^\/assets\/.+-[A-Za-z0-9_-]{8,}\.[A-Za-z0-9]+$/;
+const HASHED_ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable";
+
 // Serve a static asset from the assets binding, attaching the application
-// CSP to HTML documents. Non-HTML responses pass through untouched.
+// CSP to HTML documents. Non-HTML responses pass through untouched except for
+// hashed build artifacts, which get immutable browser caching.
 async function serveAssets(request, env) {
   const response = await env.ASSETS.fetch(request);
   const contentType = response.headers.get("content-type") || "";
-  if (contentType.includes("text/html")) {
-    const headers = new Headers(response.headers);
-    headers.set("Content-Security-Policy", APP_CSP);
-    return new Response(response.body, {
-      status: response.status,
-      statusText: response.statusText,
-      headers,
-    });
-  }
-  return response;
+  const pathname = new URL(request.url).pathname;
+  const isHtmlDocument = contentType.includes("text/html");
+  const isHashedBuildAsset = HASHED_BUILD_ASSET_PATTERN.test(pathname);
+  if (!isHtmlDocument && !isHashedBuildAsset) return response;
+  const headers = new Headers(response.headers);
+  if (isHtmlDocument) headers.set("Content-Security-Policy", APP_CSP);
+  if (isHashedBuildAsset)
+    headers.set("Cache-Control", HASHED_ASSET_CACHE_CONTROL);
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
 async function runJsonSafe(operation) {

@@ -1000,6 +1000,62 @@ async function run() {
     assert.match(appCsp, /frame-ancestors 'self'/);
   }
 
+  // Hashed Vite build output under /assets/ is content-addressed: it must be
+  // cached for a year without revalidating. The assets binding default
+  // (`public, max-age=0, must-revalidate`) forced a conditional request per
+  // bundle on every page load, which costs a full round trip per asset on each
+  // repeat visit. Non-hashed files keep the revalidating default.
+  {
+    const assetEnv = env({
+      ASSETS: {
+        async fetch(request) {
+          const pathname = new URL(request.url).pathname;
+          const contentType = pathname.endsWith('.css')
+            ? 'text/css'
+            : 'application/javascript';
+          return new Response(`asset:${pathname}`, {
+            status: 200,
+            headers: { 'Content-Type': contentType }
+          });
+        }
+      }
+    });
+
+    const hashedJs = await worker.fetch(
+      new Request('https://corez.test/assets/index-Cn5MrfAX.js'),
+      assetEnv
+    );
+    assert.equal(hashedJs.status, 200);
+    assert.equal(
+      hashedJs.headers.get('cache-control'),
+      'public, max-age=31536000, immutable'
+    );
+
+    const hashedCss = await worker.fetch(
+      new Request('https://corez.test/assets/index-Dwtw54yE.css'),
+      assetEnv
+    );
+    assert.equal(
+      hashedCss.headers.get('cache-control'),
+      'public, max-age=31536000, immutable'
+    );
+
+    // A stable (non-hashed) file in the same directory must NOT be pinned: a
+    // new deploy has to be able to replace it.
+    const stableAsset = await worker.fetch(
+      new Request('https://corez.test/assets/logo.png'),
+      assetEnv
+    );
+    assert.equal(stableAsset.headers.get('cache-control'), null);
+
+    // Same for root files such as robots.txt and the brand images.
+    const robots = await worker.fetch(
+      new Request('https://corez.test/robots.txt'),
+      assetEnv
+    );
+    assert.equal(robots.headers.get('cache-control'), null);
+  }
+
   // Test /api/memory store + keyword search (no Workers AI embeddings)
   const memoryStore = new Map();
   const memoryBucket = {

@@ -832,8 +832,27 @@ export async function improveCodingPrompt(prompt, intent = null) {
   const designSpec = useWebDesignReferences
     ? buildAwwwardsDesignPrompt(cleanPrompt)
     : "";
-  const liveInspiration = useWebDesignReferences
-    ? await (async () => {
+
+  // Both enrichment lookups are OPTIONAL context, and each one is a network
+  // round trip of its own (the worker's Awwwards scrape alone is allowed up to
+  // 8s). They used to run one after the other on the critical path, so the
+  // model request waited for the sum of both before it was even issued. Start
+  // them together, give each a bounded budget, and let the model request go as
+  // soon as they settle: a slow third party can then cost at most its budget
+  // instead of the whole build start.
+  const OPTIONAL_CONTEXT_BUDGET_MS = 2500;
+  const withOptionalBudget = (task, ms = OPTIONAL_CONTEXT_BUDGET_MS) => {
+    let timer;
+    const budget = new Promise((resolve) => {
+      timer = setTimeout(() => resolve(""), ms);
+    });
+    return Promise.race([task.catch(() => ""), budget]).finally(() =>
+      clearTimeout(timer),
+    );
+  };
+
+  const liveInspirationTask = useWebDesignReferences
+    ? (async () => {
         try {
           const { sites } = await fetchAwwwardsInspiration(cleanPrompt, null);
           if (sites.length === 0) return "";
@@ -854,10 +873,10 @@ export async function improveCodingPrompt(prompt, intent = null) {
           return "";
         }
       })()
-    : "";
+    : null;
 
   // Retrieve relevant code patterns via semantic embedding search
-  const semanticPatternsPrompt = await (async () => {
+  const semanticPatternsTask = (async () => {
     try {
       const patterns = await retrieveSemanticCodePatterns(cleanPrompt, {
         topK: 1,
@@ -868,6 +887,13 @@ export async function improveCodingPrompt(prompt, intent = null) {
       return "";
     }
   })();
+
+  const [liveInspiration, semanticPatternsPrompt] = await Promise.all([
+    liveInspirationTask
+      ? withOptionalBudget(liveInspirationTask)
+      : Promise.resolve(""),
+    withOptionalBudget(semanticPatternsTask),
+  ]);
 
   // Simple revision handling: just return the prompt with code as-is, no surgical spec
   if (isRevisionContextPrompt(cleanPrompt)) {

@@ -282,6 +282,54 @@ describe('Hosted AI fallback behavior', () => {
     })).rejects.toThrow(/Failed to fetch|never reached the AI worker/);
   }, 15000);
 
+  it('starts the inspiration and semantic-retrieval lookups together instead of one after the other', async () => {
+    // Both enrichments are optional network round trips. Running them in
+    // series made the model request wait for the sum of both (the worker's
+    // Awwwards scrape alone is allowed up to 8s), so the client must issue
+    // them concurrently and let the AI request start once they settle.
+    let releaseInspiration = null;
+    let inspirationFinished = false;
+    let embedStartedWhileInspirationPending = false;
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/inspiration') {
+        return await new Promise((resolve) => {
+          releaseInspiration = () => {
+            inspirationFinished = true;
+            resolve(Response.json({
+              sites: [{ title: 'Reference site', url: 'https://example.com' }]
+            }));
+          };
+        });
+      }
+      if (url === '/api/embed') {
+        embedStartedWhileInspirationPending = !inspirationFinished;
+        return Response.json({ data: [] });
+      }
+      if (url === '/api/ai') {
+        return new Response(
+          'data: {"type":"delta","text":"Built the bakery site."}\n\ndata: {"type":"done","final":true}\n\n',
+          { status: 200 }
+        );
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const pending = generateAIResponse('Build me a landing page for a bakery', [], null, () => {});
+
+    await vi.waitFor(
+      () => {
+        expect(typeof releaseInspiration).toBe('function');
+        expect(fetchMock.mock.calls.some(([url]) => url === '/api/embed')).toBe(true);
+      },
+      { timeout: 5000 }
+    );
+    releaseInspiration();
+
+    await expect(pending).resolves.toContain('Built the bakery site.');
+    expect(embedStartedWhileInspirationPending).toBe(true);
+  }, 15000);
+
   it('forwards harness phase and clear events and returns only the final artifact', async () => {
     const fetchMock = vi.fn(async (url) => {
       if (url === '/api/inspiration') return Response.json({ sites: [] });
