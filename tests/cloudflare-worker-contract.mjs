@@ -1054,6 +1054,17 @@ async function run() {
       assetEnv
     );
     assert.equal(robots.headers.get('cache-control'), null);
+
+    // Self-hosted variable fonts follow the same hashed-asset naming (their
+    // hash may contain '-' or '_'), so they must be pinned too.
+    const font = await worker.fetch(
+      new Request('https://corez.test/assets/outfit-latin-var-Bc-8i84L.woff2'),
+      assetEnv
+    );
+    assert.equal(
+      font.headers.get('cache-control'),
+      'public, max-age=31536000, immutable'
+    );
   }
 
   // Test /api/memory store + keyword search (no Workers AI embeddings)

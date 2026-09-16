@@ -1,0 +1,60 @@
+/*
+ * Self-hosted variable fonts for the CoreZ app shell.
+ *
+ * Previously index.html pulled a render-blocking stylesheet from
+ * fonts.googleapis.com that declared three families at fifteen weights. Two of
+ * those families were dead weight: the app's sans stack is a system stack
+ * (`--font-sans` never lists Inter), so Inter was downloaded and never used.
+ * Outfit (headings/display) and JetBrains Mono (code) are the only families
+ * the UI actually renders.
+ *
+ * Both families are now vendored as variable woff2 (one file per subset covers
+ * every weight the UI uses) and referenced through Vite, so they are emitted
+ * as content-hashed /assets/* files and inherit the immutable cache policy in
+ * worker/index.js. This removes two third-party origins from the critical path
+ * (DNS + TLS + a blocking request each) and replaces up to fifteen font
+ * requests with two same-origin files.
+ *
+ * Source: Google Fonts (SIL Open Font License 1.1 — self-hosting permitted).
+ * See src/assets/fonts/README.md for provenance.
+ */
+
+/* Outfit — latin-ext */
+@font-face {
+  font-family: "Outfit";
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url("./assets/fonts/outfit-latin-ext-var.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* Outfit — latin */
+@font-face {
+  font-family: "Outfit";
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url("./assets/fonts/outfit-latin-var.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* JetBrains Mono — latin-ext */
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("./assets/fonts/jetbrains-mono-latin-ext-var.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* JetBrains Mono — latin */
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("./assets/fonts/jetbrains-mono-latin-var.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
