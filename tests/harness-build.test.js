@@ -210,7 +210,11 @@ describe('runCreationHarness', () => {
     // always take the simple path and are never word-gated against the prompt.
     const COVERED_ARTIFACT = GOOD_ARTIFACT.replace(
       '<script>',
-      '<script>\nconst score = 0; const levels = 3; const enemy = {};'
+      // NOTE: the inserted snippet must be valid JavaScript in the artifact's
+      // scope — a duplicate "score" declaration is a real SyntaxError and now
+      // (correctly) fails verification, which would turn this single repair
+      // round into the full repair budget.
+      '<script>\nconst levels = 3; const enemy = {};'
     );
     const provider = buildMockProvider();
     let repairCalls = 0;

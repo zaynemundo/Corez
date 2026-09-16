@@ -3,6 +3,8 @@
 // every check is static so a full HTML document can be validated without
 // executing untrusted code.
 
+import { findInlineScriptSyntaxErrors } from "./jsSyntax.js";
+
 const MAX_PAGES = 12;
 
 // Sequential <script>/<style> tag balance scan. Returns issue codes:
@@ -92,8 +94,7 @@ const SPAWNER_PATTERNS = /\b(bullet|projectile|missile|particle|spawn)\w*/i;
 // needs a viewport meta for mobile/portals.
 const RESIZE_PATTERNS = /\bresize\b|visualViewport|orientationchange|setTransform/i;
 const VIEWPORT_PATTERNS = /<meta\b[^>]*\bname\s*=\s*["']viewport["']/i;
-export const DEFAULT_APPROVED_CDNS = [
-  "cdnjs.cloudflare.com",
+export const DEFAULT_APPROVED_CDNS = [  "cdnjs.cloudflare.com",
   "cdn.jsdelivr.net",
   "unpkg.com",
   "cdn.tailwindcss.com",
@@ -184,6 +185,21 @@ export function verifyCreation(html, options = {}) {
     failures.push({
       code: "unbalanced-braces",
       detail: `Braces are badly unbalanced (${braceOpen} open vs ${braceClose} close).`,
+    });
+  }
+
+  // Real JavaScript syntax, parsed per inline <script> block. The brace count
+  // above cannot see a single missing "}" (its tolerance is ±10 across the
+  // whole document), so a game could ship with "SyntaxError: missing } in
+  // compound statement" and render a dead preview. Every syntax error is a
+  // verification failure, which routes the artifact into the repair loop
+  // BEFORE delivery, and the reported line matches the browser's console.
+  for (const syntaxError of findInlineScriptSyntaxErrors(content)) {
+    failures.push({
+      code: "js-syntax-error",
+      detail: `The artifact contains invalid JavaScript${
+        syntaxError.line ? ` at line ${syntaxError.line}` : ""
+      }: ${syntaxError.message}. The generated page cannot run until this is fixed.`,
     });
   }
 
