@@ -330,8 +330,75 @@ describe('Hosted AI fallback behavior', () => {
     expect(embedStartedWhileInspirationPending).toBe(true);
   }, 15000);
 
-  it('forwards harness phase and clear events and returns only the final artifact', async () => {
+  it('waits for a build the worker still owns instead of discarding it with the local fallback', async () => {
+    // The harness keeps the request's task under a lease while it builds and
+    // answers a duplicate request with "A build for this request is already in
+    // progress." (retryable). The plain 2s/4s ladder gave up after ~6s and
+    // returned a local template, throwing the user's creation away; the client
+    // must wait for the worker and then collect the finished artifact.
+    let aiCalls = 0;
     const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/inspiration') return Response.json({ sites: [] });
+      if (url === '/api/embed') return Response.json({ data: [] });
+      aiCalls += 1;
+      if (aiCalls <= 4) {
+        return new Response(
+          'data: {"type":"error","status":429,"retryable":true,"message":"A build for this request is already in progress."}\n\n',
+          { status: 200 }
+        );
+      }
+      return new Response(
+        'data: {"type":"delta","text":"<html>finished build</html>"}\n\ndata: {"type":"done","final":true}\n\n',
+        { status: 200 }
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const phases = [];
+    const response = await generateAIResponse(
+      'Build a game',
+      [],
+      null,
+      () => {},
+      (event) => phases.push(event.phase),
+      () => {},
+      { retryDelaysMs: [0, 0, 0], buildInProgressDelaysMs: [0] }
+    );
+
+    expect(response).toBe('<html>finished build</html>');
+    expect(phases).toContain('waiting-for-build');
+    expect(response).not.toMatch(/hosted AI service is currently unavailable|Core idea/);
+    expect(aiCalls).toBe(5);
+  }, 20000);
+
+  it('reports an owned build honestly when the bounded wait is exhausted, never as a local template', async () => {
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/inspiration') return Response.json({ sites: [] });
+      if (url === '/api/embed') return Response.json({ data: [] });
+      return new Response(
+        'data: {"type":"error","status":429,"retryable":true,"message":"A build for this request is already in progress."}\n\n',
+        { status: 200 }
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await generateAIResponse(
+      'Build a game',
+      [],
+      null,
+      () => {},
+      () => {},
+      () => {},
+      { retryDelaysMs: [0, 0, 0], buildInProgressDelaysMs: [0] }
+    );
+
+    expect(response).toMatch(/still running on the server/i);
+    expect(response).toMatch(/send the same request again/i);
+    expect(response).not.toMatch(/hosted AI service is currently unavailable/);
+    expect(response).not.toContain('```html');
+  }, 20000);
+
+  it('forwards harness phase and clear events and returns only the final artifact', async () => {    const fetchMock = vi.fn(async (url) => {
       if (url === '/api/inspiration') return Response.json({ sites: [] });
       if (url === '/api/embed') return Response.json({ embeddings: [] });
       return new Response(
@@ -431,7 +498,7 @@ describe('Hosted AI fallback behavior', () => {
 
     expect(aiCalls).toBe(2);
     expect(response).toBe('<!DOCTYPE html><html><body><canvas></canvas></body></html>');
-    expect(phases).toEqual(['planning', 'building', 'building', 'verifying', 'done']);
+    expect(phases).toEqual(['planning', 'building', 'resuming', 'building', 'verifying', 'done']);
   }, 10000);
 
   it('delivers the full streamed answer to the chat flow without hitting the local fallback', async () => {

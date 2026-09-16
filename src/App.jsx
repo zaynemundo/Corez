@@ -36,6 +36,7 @@ import {
   deleteSessionAppsInR2,
 } from "./services/appStorageService";
 import * as chatService from "./services/chatService";
+import { buildPhaseLabel } from "./utils/buildPhaseLabel";
 import {
   persistUserTurn,
   persistAssistantTurnAfter,
@@ -125,6 +126,10 @@ function MainApp({ theme, setTheme }) {
   const [streamingSessionId, setStreamingSessionId] = useState(null);
   const [isStreamCollapsed, setIsStreamCollapsed] = useState(false);
   const [swarmVisible, setSwarmVisible] = useState(false);
+  // Live harness phase (planning/building/verifying/repairing/reviewing/…).
+  // A build can stream for minutes and is silent while the model reasons or
+  // while the artifact is verified and repaired, so the wait must be labelled.
+  const [buildPhase, setBuildPhase] = useState(null);
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
     if (
       typeof window === "undefined" ||
@@ -499,6 +504,7 @@ function MainApp({ theme, setTheme }) {
           }
           setIsThinking(true);
           setSwarmVisible(false);
+          setBuildPhase(null);
           setStreamingSessionId(targetSessionId);
           const controller = new AbortController();
           abortControllerRef.current = controller;
@@ -512,6 +518,7 @@ function MainApp({ theme, setTheme }) {
             },
             (phaseEvent) => {
               setSwarmVisible(phaseEvent.phase === "swarm-planning");
+              setBuildPhase(phaseEvent.phase || null);
             },
           )
             .then((response) => {
@@ -552,6 +559,7 @@ function MainApp({ theme, setTheme }) {
               localStorage.removeItem("corez_pending_request");
               setIsThinking(false);
               setSwarmVisible(false);
+              setBuildPhase(null);
               setStreamingContent(null);
               setStreamingSessionId(null);
               if (abortControllerRef.current === controller)
@@ -993,6 +1001,7 @@ function MainApp({ theme, setTheme }) {
 
     setIsThinking(true);
     setSwarmVisible(false);
+    setBuildPhase(null);
     setStreamingSessionId(targetSessionId);
 
     const pendingData = {
@@ -1063,6 +1072,7 @@ function MainApp({ theme, setTheme }) {
         },
         (phaseEvent) => {
           setSwarmVisible(phaseEvent.phase === "swarm-planning");
+          setBuildPhase(phaseEvent.phase || null);
         },
         () => {
           setStreamingContent("");
@@ -1144,6 +1154,7 @@ function MainApp({ theme, setTheme }) {
         localStorage.removeItem("corez_pending_request");
         setIsThinking(false);
         setSwarmVisible(false);
+        setBuildPhase(null);
         setStreamingContent(null);
         setStreamingSessionId(null);
         abortControllerRef.current = null;
@@ -1370,11 +1381,21 @@ function MainApp({ theme, setTheme }) {
                               : "Collapse response"
                           }
                         >
-                          {swarmVisible && (
-                            <span className="thinking-phase-label">
-                              Swarm planning…
-                            </span>
-                          )}
+                          {buildPhaseLabel(buildPhase)
+                            ? (
+                              <span
+                                className="thinking-phase-label"
+                                role="status"
+                                aria-live="polite"
+                              >
+                                {buildPhaseLabel(buildPhase)}
+                              </span>
+                            )
+                            : swarmVisible && (
+                              <span className="thinking-phase-label">
+                                Swarm planning…
+                              </span>
+                            )}
                           <span className="thinking-dot" />
                           <span className="thinking-dot" />
                           <span className="thinking-dot" />

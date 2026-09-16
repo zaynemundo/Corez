@@ -1486,6 +1486,16 @@ export async function generateHostedAIResponse(
                 120_000,
               )
             : (STREAM_RETRY_DELAYS_MS[attempt] ?? 240_000);
+        // A retry means the user's stream went quiet and the resumed request
+        // re-emits the artifact from the persisted task. Say so: without this
+        // the wait is an unexplained pause inside a build that already looks
+        // slow.
+        options.onPhase?.({
+          phase: "resuming",
+          attempt: attempt + 1,
+          total: MAX_STREAM_ATTEMPTS,
+          retryAfterMs,
+        });
         await waitWithAbort(retryAfterMs);
         continue;
       }
@@ -2968,6 +2978,32 @@ export const PERSISTENT_RETRY_MAX_DELAY_MS = 30000;
 // persistent attempts before surfacing the honest fallback.
 export const PERSISTENT_RETRY_DEFAULT_MAX_ATTEMPTS = 3;
 
+// A build the worker still owns is NOT an outage. The harness keeps the
+// request's persisted task under a lease while it builds, verifies, repairs and
+// reviews the artifact, and answers a duplicate request with "A build for this
+// request is already in progress." — meaning the same request is alive
+// server-side and a later retry replays the finished artifact. Giving up here
+// (the plain 2s/4s ladder) threw the user's creation away, so this class of
+// answer gets its own bounded ladder: long enough for a multi-minute build,
+// short enough to still fail honestly.
+export const BUILD_IN_PROGRESS_MAX_ATTEMPTS = 8;
+export const BUILD_IN_PROGRESS_BASE_DELAY_MS = 15_000;
+export const BUILD_IN_PROGRESS_MAX_DELAY_MS = 120_000;
+export const BUILD_IN_PROGRESS_MESSAGE =
+  "your build is still running on the server — send the same request again in a moment and it will pick up the finished result";
+
+/** True when the worker answered "your build is already in progress". */
+export function isBuildInProgressError(err) {
+  return /build for this request is already in progress/i.test(
+    err?.message || "",
+  );
+}
+
+export function getBuildInProgressDelay(attempt) {
+  const exp = BUILD_IN_PROGRESS_BASE_DELAY_MS * 2 ** Math.max(0, Number(attempt || 1) - 1);
+  return Math.min(exp, BUILD_IN_PROGRESS_MAX_DELAY_MS);
+}
+
 export function getPersistentRetryDelay(
   attempt,
   baseDelayMs = PERSISTENT_RETRY_BASE_DELAY_MS,
@@ -3021,6 +3057,11 @@ function resolvePersistentRetryOpts(retryOpts) {
       : Array.isArray(raw.innerRetryDelaysMs)
         ? raw.innerRetryDelaysMs
         : undefined,
+    // Ladder used while the worker still owns the request ("build already in
+    // progress"). Tests pass tiny delays instead of waiting minutes.
+    buildInProgressDelaysMs: Array.isArray(raw.buildInProgressDelaysMs)
+      ? raw.buildInProgressDelaysMs
+      : undefined,
   };
 }
 
@@ -3146,6 +3187,7 @@ export async function generateAIResponse(
     baseDelayMs,
     maxDelayMs,
     innerRetryDelaysMs,
+    buildInProgressDelaysMs,
   } = resolvePersistentRetryOpts(retryOpts);
 
   const buildHostedStreamOpts = () => ({
@@ -3205,6 +3247,7 @@ export async function generateAIResponse(
   // needs the hosted AI retries first. Authentication failures are
   // non-retryable and return the login message immediately.
   let persistentAttempt = 0;
+  let buildInProgressAttempt = 0;
   let promptToSend = cleanPrompt;
   let usedExplicitRetryPrefix = false;
   let lastHostedError = null;
@@ -3281,6 +3324,42 @@ export async function generateAIResponse(
         }
       }
 
+      // The worker owns a live build for this exact request: wait for it
+      // instead of failing. A later retry replays the finished artifact, so the
+      // user gets their creation rather than a local template.
+      if (isBuildInProgressError(reportableError)) {
+        buildInProgressAttempt += 1;
+        if (buildInProgressAttempt > BUILD_IN_PROGRESS_MAX_ATTEMPTS) {
+          console.warn(
+            "Build still owned by the worker after the bounded wait; asking the user to re-send.",
+            reportableError,
+          );
+          return `Your build is taking longer than this tab can wait for — ${BUILD_IN_PROGRESS_MESSAGE}.`;
+        }
+        const delayMs = Array.isArray(buildInProgressDelaysMs)
+          ? (buildInProgressDelaysMs[buildInProgressAttempt - 1] ??
+            buildInProgressDelaysMs[buildInProgressDelaysMs.length - 1] ??
+            0)
+          : getBuildInProgressDelay(buildInProgressAttempt);
+        try {
+          onClear?.();
+        } catch {}
+        try {
+          onPhase?.({
+            phase: "waiting-for-build",
+            attempt: buildInProgressAttempt,
+            total: BUILD_IN_PROGRESS_MAX_ATTEMPTS,
+            delayMs,
+          });
+        } catch {}
+        console.warn(
+          `Your build is still running on the server; waiting ${delayMs}ms before fetching it...`,
+          reportableError,
+        );
+        await sleepResumable(delayMs, signal);
+        lastHostedError = null;
+        continue;
+      }
       if (!isRetryableHostedError(reportableError)) {
         console.warn(
           "Hosted AI unavailable with non-retryable error; using local Corez fallback.",
