@@ -1918,6 +1918,19 @@ export const isCommand = isSlashCommand;
 export function isWebSearchRequest(prompt) {
   const text = String(prompt || "").toLowerCase();
   if (!text.trim()) return false;
+  // A code revision — or any prompt that carries a code block — is never a web
+  // search. Game and app source is full of words that satisfy the freshness
+  // vocabulary below ("score", "event", "update", "release", "launch",
+  // "current", "live"), so a revision like "add recoil and ammo" searched the
+  // web for the whole artifact and came back with Unity/Roblox tutorials that
+  // have nothing to do with editing this game.
+  if (
+    text.includes("```") ||
+    /\[context:|\[existing code to revise/i.test(text) ||
+    isRevisionContextPrompt(text)
+  ) {
+    return false;
+  }
   const searchPhrase =
     /\b(search|look up|lookup|google|browse|find out|fetch|retrieve|check)\b[\s\S]{0,60}\b(web|internet|online|current|latest|recent|news|updates?|today|now|live|real[- ]?time)\b/i;
   const factualRecency =
@@ -1971,7 +1984,13 @@ export function formatSearchResults(search) {
     const source = result.source ? ` (${result.source})` : "";
     return `${index + 1}. **${title}**${source}${url}${snippet}`;
   });
-  return `I searched the web for **"${search.query}"** and found these sources:\n\n${lines.join("\n\n")}\n\n_Results are search summaries; open the sources for full details._`;
+  // Never print a placeholder as if it were the query: a missing query renders
+  // "your request" instead of the literal word "undefined".
+  const queryLabel =
+    typeof search?.query === "string" && search.query.trim()
+      ? search.query.trim()
+      : "your request";
+  return `I searched the web for **"${queryLabel}"** and found these sources:\n\n${lines.join("\n\n")}\n\n_Results are search summaries; open the sources for full details._`;
 }
 
 // Answer a web-search request: prefer the hosted AI with the real search

@@ -327,6 +327,46 @@ describe('runCreationHarness', () => {
     expect(diagnostics?.harness?.approved).toBe(false);
   });
 
+  it('re-verifies a finished build under stricter rules and repairs it instead of replaying it', async () => {
+    // A stored artifact that "passed" under older verifier rules (no version
+    // stamp) but contains a real JavaScript syntax error: the retry must repair
+    // it rather than replay a broken build forever.
+    const brokenScript = GOOD_ARTIFACT.replace(
+      'function update(dt){',
+      'function update(dt){ if (score > 1) {'
+    );
+    const taskId = harnessTaskId('build a first person shooter game', 'game_creation');
+    const store = createTaskStateStore({});
+    await store.save(taskId, {
+      taskId,
+      status: 'done',
+      phase: 'done',
+      spec: 'A single-canvas game with a loop.',
+      build: brokenScript,
+      // Legacy record: verified before syntax checking existed → no version.
+      verification: { passed: true, failures: [] },
+      review: { approved: true },
+      repairCount: 0,
+      createdAt: Date.now() - 1000,
+      updatedAt: Date.now() - 1000
+    });
+
+    const { fetchMock, counts } = buildMockProvider();
+    vi.stubGlobal('fetch', fetchMock);
+    const { events } = await runHarness({ store });
+    const phases = events.filter((e) => e.type === 'phase').map((e) => e.phase);
+
+    expect(phases).toContain('repairing');
+    expect(collectDeltas(events)).toBe(GOOD_ARTIFACT);
+    expect(counts.repairCalls).toBe(1);
+    expect(counts.buildCalls).toBe(0);
+
+    // The re-verified record is stamped with the current rule set.
+    const saved = await store.load(taskId);
+    expect(saved.verification.version).toBe(2);
+    expect(saved.verification.passed).toBe(true);
+  });
+
   it('resumes from persisted state on an identical request', async () => {
     const { fetchMock, counts } = buildMockProvider();
     vi.stubGlobal('fetch', fetchMock);

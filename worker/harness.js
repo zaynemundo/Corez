@@ -13,6 +13,7 @@ import {
   verifyCreation,
   verifySpecCoverage,
   buildRepairPrompt,
+  VERIFIER_VERSION,
 } from "./creationVerifier.js";
 import { repairMalformedHtml } from "./htmlRepair.js";
 import { estimateCostUsd } from "./utils.js";
@@ -126,6 +127,7 @@ function parseReview(text) {
 // coverage target).
 function verifyBuildState(spec, build, intentType, options = {}) {
   const verification = verifyCreation(build, { intentType });
+  verification.version = VERIFIER_VERSION;
   const coverage =
     !options.skipCoverage && spec
       ? verifySpecCoverage(spec, build)
@@ -244,29 +246,17 @@ export async function* runCreationHarness(options) {
 
   const originalPrompt = prompt;
 
-  // Terminal state: replay the finished artifact so a retry never rebuilds.
-  if (state.status === "done" && state.build?.trim()) {
-    yield {
-      type: "phase",
-      phase: "done",
-      attempt: state.repairCount,
-      total: MAX_REPAIR_ROUNDS,
-    };
-    yield { type: "delta", text: state.build };
-    yield { type: "done", final: true, projectState: null };
-    return;
-  }
-
-  // Re-verify an existing build when resuming: a build persisted by an
-  // incremental checkpoint (mid-stream) or by an interrupted run has either
-  // no verification record yet or one from older verifier rules — verify it
-  // now so an incomplete artifact is caught by the repair loop instead of
-  // skipping verification. Whitespace-only builds are never "verified": they
-  // fall through to the empty-build guard below and fail loudly.
+  // Verifier rules get stricter over time (e.g. real JavaScript syntax
+  // checking). A stored verification record from an older rule set proves
+  // nothing about the artifact, so it is recomputed before the task is treated
+  // as finished or resumed. Once recomputed, later retries reuse the record.
+  const storedVerificationIsCurrent =
+    Boolean(state.verification) &&
+    state.verification.version === VERIFIER_VERSION;
   if (
     state.build &&
     state.build.trim() &&
-    (!state.verification || !state.verification.passed)
+    (!storedVerificationIsCurrent || !state.verification.passed)
   ) {
     state.verification = verifyBuildState(
       state.spec,
@@ -274,6 +264,26 @@ export async function* runCreationHarness(options) {
       state.intentType,
       { skipCoverage },
     );
+  }
+
+  // Terminal state: replay the finished artifact so a retry never rebuilds.
+  // Only an artifact that still passes verification replays verbatim; one that
+  // fails under the current rules reopens with a single repair round, so a
+  // retry fixes it instead of replaying a broken build forever.
+  if (state.status === "done" && state.build?.trim()) {
+    if (state.verification?.passed) {
+      yield {
+        type: "phase",
+        phase: "done",
+        attempt: state.repairCount,
+        total: MAX_REPAIR_ROUNDS,
+      };
+      yield { type: "delta", text: state.build };
+      yield { type: "done", final: true, projectState: null };
+      return;
+    }
+    state.status = "active";
+    state.repairCount = Math.max(0, MAX_REPAIR_ROUNDS - 1);
   }
 
   // Lease: only one invocation may build a given request at a time. The

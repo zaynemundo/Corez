@@ -7,6 +7,14 @@ import { findInlineScriptSyntaxErrors } from "./jsSyntax.js";
 
 const MAX_PAGES = 12;
 
+// Bump whenever verification rules change in a way that could fail an artifact
+// an older rule set accepted (for example: adding real JavaScript syntax
+// checking). Every verification record carries this number, so the harness can
+// recompute a record produced by older rules before it replays or resumes a
+// finished build instead of trusting a stale "verified" stamp.
+// 2 = inline <script> syntax checking (acorn).
+export const VERIFIER_VERSION = 2;
+
 // Sequential <script>/<style> tag balance scan. Returns issue codes:
 // - 'stray-closing-tag': a </script>/</style> with no preceding open (the
 //   model omitted the opening tag; the browser renders the block as text).

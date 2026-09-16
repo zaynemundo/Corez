@@ -107,7 +107,13 @@ export async function fetchWebSearch(query, signal = null, options = {}) {
   if (response.status === 200) {
     const results = normalizeResults(data);
     if (results.length > 0) {
-      return { results, source: data?.meta?.source || "search" };
+      // Return the query that was actually searched so callers can render what
+      // was searched. Without it the summary printed `"undefined"` as the query.
+      const echoed =
+        typeof data?.query === "string" && data.query.trim()
+          ? data.query.trim()
+          : normalized;
+      return { query: echoed, results, source: data?.meta?.source || "search" };
     }
     throw new SearchApiError(
       "Web search returned no usable results.",

@@ -24,8 +24,30 @@ describe('Web search detection', () => {
     expect(isWebSearchRequest("What's the newest Imagine Dragons song?")).toBe(true);
   });
 
-  it('does not search for knowledge questions without a recency signal', () => {
-    expect(isWebSearchRequest('Explain black roses')).toBe(false);
+  it('never searches the web for a code revision, even when the code is full of freshness words', () => {
+    // Real game source reads as "current/live/update/release/launch/score" —
+    // enough to satisfy the freshness vocabulary and search the whole artifact.
+    // That is how "add recoil and ammo" came back with Unity/Roblox tutorials.
+    const gameCode = `<!DOCTYPE html><html><body><canvas></canvas><script>
+      let score = 0, currentWave = 1, live = true;
+      document.addEventListener('keyup', e => { if (e.code === 'Mouse0') releaseTrigger(); });
+      function update(dt) { score += 1; }
+      function launch() { console.log('launch projectile, event fired, results shown'); }
+      requestAnimationFrame(function loop(){ update(1/60); requestAnimationFrame(loop); });
+    </script></body></html>`;
+    const revisionPrompt = `[Context: The user is requesting a revision for the following code block]\n\`\`\`\n${gameCode}\n\`\`\`\n\nUser Request: add recoil and ammo`;
+
+    expect(isWebSearchRequest(revisionPrompt)).toBe(false);
+    expect(isWebSearchRequest('Revise code: add recoil and ammo')).toBe(false);
+    // Any prompt carrying a fenced code block is an artifact task, not research.
+    expect(isWebSearchRequest('Here is my code, find the latest bug:\n```js\nconst current = 1;\n```')).toBe(false);
+
+    // Control: a genuine freshness question still searches.
+    expect(isWebSearchRequest('What is the latest news about game engines?')).toBe(true);
+    expect(isWebSearchRequest('Search the web for current FPS recoil techniques')).toBe(true);
+  });
+
+  it('does not search for knowledge questions without a recency signal', () => {    expect(isWebSearchRequest('Explain black roses')).toBe(false);
     expect(isWebSearchRequest('What is photosynthesis?')).toBe(false);
     expect(isWebSearchRequest('Build me a chess game')).toBe(false);
     expect(isWebSearchRequest('Help me fix this JavaScript error')).toBe(false);
@@ -73,11 +95,31 @@ describe('fetchWebSearch client', () => {
     expect(result.results[0]).toEqual({
       title: 'T', url: 'https://example.com', snippet: 'S', source: 'Wikipedia'
     });
+    // The searched query comes back with the results: the local summary used to
+    // render the literal word "undefined" as the query.
+    expect(result.query).toBe('web search');
     expect(fetchMock).toHaveBeenCalledWith('/api/search', expect.objectContaining({
       method: 'POST',
       body: JSON.stringify({ query: 'web search', detail: false })
     }));
     vi.unstubAllGlobals();
+  });
+
+  it('renders the searched query in the summary and never a placeholder', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+      kind: 'search',
+      results: [{ title: 'T', url: 'https://example.com', snippet: 'S', source: 'Exa' }]
+    })));
+    const result = await fetchWebSearch('latest recoil techniques');
+    const formatted = formatSearchResults(result);
+    expect(formatted).toContain('**"latest recoil techniques"**');
+    expect(formatted).not.toContain('undefined');
+    vi.unstubAllGlobals();
+
+    // Even a caller that passes no query at all must not print "undefined".
+    const missingQuery = formatSearchResults({ results: [{ title: 'T', url: 'https://example.com' }] });
+    expect(missingQuery).not.toContain('undefined');
+    expect(missingQuery).toContain('your request');
   });
 
   it('throws an honest error when the worker returns no results', async () => {
