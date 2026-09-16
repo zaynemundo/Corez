@@ -1,9 +1,20 @@
 ---
 name: personalisation-context
-description: Use for explicitly requested, privacy-preserving personalization of tone, units, locale, appearance, or durable preferences; never infer sensitive traits or rely on shared anonymous memory identifiers.
+description: Use when the user asks to remember, recall, update, or forget a preference, or to adapt tone, language, locale, units, timezone, spelling, appearance, accent colour, or recurring output format. Not for raw R2 memory endpoint operations - use `r2-mem0-memory` instead.
 ---
 
 # Personalisation & Context
+
+## When to use
+- The user explicitly asks to remember, forget, or update a durable preference.
+- The user asks for a default tone, language, locale, units, timezone, regional spelling, or recurring output format.
+- A supported interface preference such as appearance, accent colour, or assistant personality needs changing.
+- Prior project context should be reused so the user does not repeat known information.
+
+## When not to use
+- Raw R2-backed memory endpoint operations - use `r2-mem0-memory` instead.
+- Durable facts such as the user's name, tech stack, or goals - use `user-learning` instead.
+- Location-dependent answers such as weather or travel - use `live-utilities` instead.
 
 ## Supported work
 - Remember or forget durable preferences when the user explicitly requests it.
@@ -26,3 +37,12 @@ description: Use for explicitly requested, privacy-preserving personalization of
 - Do not claim to remember, forget, or change a setting unless the operation succeeded.
 - Avoid creepy or unnecessary references to historical context.
 - Never use personalisation to override factual accuracy, safety controls, or the user's current instruction.
+
+## Verification
+- Confirm the memory operation reported success before telling the user a preference was remembered or forgotten.
+- Confirm the chosen interface value is supported and the setting actually changed before claiming it.
+
+## Related skills
+- `r2-mem0-memory` - the approved R2-backed memory storage and deletion operations.
+- `user-learning` - durable facts about the user, such as name, tech stack, and goals.
+- `live-utilities` - location-dependent answers such as weather, time, or currency.

@@ -1,11 +1,25 @@
 ---
 name: frontend-design
-description: Use for new interfaces or substantial bespoke redesigns requiring distinctive art direction, typography, and layout; use frontend-modern-design for an explicitly requested modern design system, and not for routine CSS fixes.
+description: Use when designing a new landing page, portfolio, pricing page or full site redesign that needs a distinctive look, bespoke art direction, and palette and typography choices. Not for an explicitly requested modern design system with tokens or light/dark themes - use `frontend-modern-design` instead.
 ---
 
 # Frontend Design
 
 > **Scope & Relationship (canonical):** Use **this skill** for *new bespoke interfaces* requiring distinctive art direction and one deliberate aesthetic risk. For an explicitly requested *design system* with tokens, light/dark, responsive HUD, use `frontend-modern-design`. For gesture/spring/drag/swipe sheets, add `apple-design` as a *supplement* to whichever primary is active. See `capability-orchestrator: §1.1` decision tree. The repo's z-index and token contracts are **canonical in `frontend-modern-design: §1 & §5`** — this skill references them instead of duplicating.
+
+## When to use
+
+- The brief asks for a new page, landing page, portfolio, marketing site, or a full visual redesign that must not look templated.
+- You need art direction: palette, display/body type pairing, layout concept, and one signature element.
+- The client rejected previous proposals as generic and wants a distinctive point of view.
+- Copy tone and interface wording are part of the design work.
+
+## When not to use
+
+- The request explicitly asks for a modern design system, tokens, light/dark themes, or a responsive HUD - use `frontend-modern-design`.
+- The work is gesture, spring, drag, or bottom-sheet motion physics - add `apple-design` as a supplement to the active primary design skill.
+- The task is a WCAG audit, contrast check, or focus-order fix - use `accessibility-expert`.
+- The task is game mechanics, levels, or gameplay systems - use `game-development`.
 
 Approach this as the design lead at a small studio known for giving every client a visual identity that could not be mistaken for anyone else's. This client has already rejected proposals that felt templated, and is paying for a distinctive point of view: make deliberate, opinionated choices about palette, typography, and layout that are specific to this brief, and take one real aesthetic risk you can justify.
 
@@ -54,3 +68,15 @@ Use active voice as default. A control should say exactly what happens when it's
 Treat failure and emptiness as moments for direction, not mood. Explain what went wrong and how to fix it, in the interface's voice rather than a person's. Errors don't apologize, and they are never vague about what happened. An empty screen is an invitation to act.
 
 Keep the register conversational and tuned: plain verbs, sentence case, no filler, with tone matched to the brand and the audience. Let each element do exactly one job. A label labels, an example demonstrates, and nothing quietly does double duty.
+
+## Verification
+
+- Run `npm run lint` and `npm run build` after implementing the design so the shipped stylesheet and markup build cleanly.
+- Keep the self-critique pass above: responsive down to mobile, visible keyboard focus, reduced motion respected, and stacking per `frontend-modern-design: §5`.
+
+## Related skills
+
+- `frontend-modern-design` - canonical design tokens and z-index layering this skill references instead of duplicating.
+- `apple-design` - gesture, spring, and momentum work layered on top as a supplement.
+- `accessibility-expert` - WCAG 2.2 AA contrast, focus, and screen reader checks on the finished design.
+- `visual-creative` - SVG assets, image prompt direction, and visual inspection support.

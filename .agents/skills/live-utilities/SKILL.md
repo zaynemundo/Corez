@@ -1,9 +1,21 @@
 ---
 name: live-utilities
-description: Use for narrow deterministic calculations or current weather, time, date, holiday, currency, unit, or sports lookups; use research for multi-source reports.
+description: Use when the user asks for the current time in a city, a timezone or date conversion, weather or a forecast, a currency or unit conversion, a holiday date, sports scores or standings, or a quick percentage calculation. Not for sourced multi-item reports - use `research` instead.
 ---
 
 # Live Utilities
+
+## When to use
+- The user needs one deterministic answer such as arithmetic, a percentage, or a unit conversion.
+- The user asks for the current local time, a timezone conversion, a date, or a holiday.
+- The user asks for current weather or a forecast.
+- The user asks for currency or foreign-exchange rates.
+- The user asks for sports scores, fixtures, schedules, or standings.
+
+## When not to use
+- A multi-source report or product comparison with citations - use `research` instead.
+- A current or niche question that needs live citations across sources - use `research-current-information` instead.
+- Writing or editing the message that carries the result - use `writing-communication` instead.
 
 ## Supported work
 - Arithmetic, percentages, compound calculations, and unit conversions.
@@ -24,3 +36,12 @@ description: Use for narrow deterministic calculations or current weather, time,
 - Do not confuse indicative market or FX data with an executable quote.
 - Use exact dates when words such as today, tomorrow, or yesterday may be ambiguous.
 - For medical, legal, or financial decisions, treat utility results as supporting data rather than personalised professional advice.
+
+## Verification
+- Recompute or invert the calculation or conversion to confirm the result.
+- Confirm the result states units, timestamp or effective date, and any important conversion assumptions.
+
+## Related skills
+- `research` - multi-item deep reports and comparisons.
+- `research-current-information` - focused current questions that need sourced, dated citations.
+- `writing-communication` - drafting surrounding text around a computed or looked-up result.

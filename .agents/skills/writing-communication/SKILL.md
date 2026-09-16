@@ -1,9 +1,19 @@
 ---
 name: writing-communication
-description: Produces, rewrites, translates, proofreads, and adapts professional or creative text for email, chat, social, web, marketing, reports, scripts, proposals, and prompts.
+description: Use when the user asks to rewrite, proofread, shorten, expand, translate, or change the tone of an email, message, post, caption, headline, website copy, proposal, report, script, or prompt. Not for campaign or brand strategy - use `business-marketing` instead.
 ---
 
 # Writing & Communication
+
+## When to use
+- The user asks to write, rewrite, proofread, edit, shorten, expand, summarise, or translate text.
+- A tone change is requested for an email, reply, direct message, announcement, caption, or social post.
+- Copy is needed for a website, product description, headline, subtitle, call to action, proposal, report, script, speech, story, or prompt.
+
+## When not to use
+- Campaign strategy, brand positioning, SEO planning, or launch and channel plans - use `business-marketing` instead.
+- Sourced facts and current claims that need live citations - use `research-current-information` instead.
+- Producing the final PDF or document artifact from the text - use `pdf` instead.
 
 ## Supported work
 - Grammar correction, proofreading, rewriting, shortening, expansion, summarisation, and translation.
@@ -23,3 +33,13 @@ description: Produces, rewrites, translates, proofreads, and adapts professional
 - Keep subject lines, calls to action, and captions aligned with the requested channel.
 - For sensitive or high-stakes messages, prefer calm, respectful, unambiguous wording.
 - For sourced writing, keep citations attached to the claims they support.
+
+## Verification
+- Confirm meaning, facts, names, links, dates, and commitments are preserved.
+- Confirm tone, channel conventions, subject lines, and calls to action match the request.
+- For sourced writing, confirm each citation stays attached to the claim it supports.
+
+## Related skills
+- `business-marketing` - campaign, brand, and channel strategy behind the copy.
+- `research-current-information` - live sourcing for claims before they are written.
+- `pdf` - converting finished written content into a PDF document.

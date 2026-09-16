@@ -1,6 +1,6 @@
 ---
 name: user-learning
-description: Use when the user asks CoreZ to remember, recall, update, or forget durable facts about them — name, preferences, tech stack, project context, and goals; privacy-preserving and explicit-consent only.
+description: Use when the user says remember I prefer X, my name is, learn about me, what do you know about me, what are my preferences, or forget what you know about me. Not for raw /api/memory endpoint work - use `r2-mem0-memory` instead.
 ---
 
 # User Learning
@@ -15,6 +15,7 @@ it builds on `personalisation-context` (policy) + `r2-mem0-memory` (storage).
   "my name is Ada", "I use React + Vite", "my project is a 2D platformer".
 - User asks recall: "what do you know about me?", "what are my preferences?".
 - User asks forget: "forget my theme", "delete everything you know about me".
+- User asks to correct or update something already saved: "update my timezone".
 - User volunteers identity facts: "I am a marketer in the UAE",
   "I work with Fantoni", "my company represents brands across the UAE",
   "we provide full-service workplace design" — offer to save, never
@@ -22,6 +23,15 @@ it builds on `personalisation-context` (policy) + `r2-mem0-memory` (storage).
 - A durable preference repeats (tone, units, locale, stack, workflow) and is
   worth offering to save — offer first, never save silently.
 - Apply a saved fact quietly when it is relevant to the current task.
+
+## When not to use
+
+- Direct `/api/memory` endpoint or storage work with no consent conversation -
+  use `r2-mem0-memory`.
+- Session-level tone, units, locale, or formatting requests that need not be
+  remembered - use `personalisation-context`.
+- Conversation or task context records with ownership headers - use
+  `durable-task-context`.
 
 ## What may be learned
 
@@ -71,3 +81,16 @@ it builds on `personalisation-context` (policy) + `r2-mem0-memory` (storage).
   user's current instruction.
 - Keep acknowledgements short: what was saved, under which category, and
   how to remove it.
+
+## Verification
+
+- Treat a save, update, or delete as successful only from a 2xx response with
+  the expected `success`, `userId`, and `key` through
+  `src/services/userLearningService.js` - never from an offered save or a
+  stated intent to store.
+
+## Related skills
+
+- `r2-mem0-memory` - storage endpoints and security boundary behind these memories.
+- `personalisation-context` - how tone, units, locale, and appearance preferences are applied.
+- `durable-task-context` - per-task context records, separate from durable user facts.

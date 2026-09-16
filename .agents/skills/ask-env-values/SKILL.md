@@ -1,12 +1,26 @@
 ---
 name: ask-env-values
-description: Use when environment variables, deployment secrets, API keys, or runtime configuration values are required and unavailable; identify exact names and placement, then ask rather than guessing values.
+description: Use when a deploy or local run needs a missing API key, .env value, Replit Secret, or OPENCODE_GO_API_KEY / OPENROUTER_API_KEY and the user must supply it. Not for secret policy or provider routing - use `cursor-security-rules` instead.
 ---
 
 # Ask Env Values
 
 Use this skill before setting, documenting, or relying on environment variables,
 deployment secrets, API keys, Replit Secrets, or runtime configuration values.
+
+## When to use
+
+- A local run or deploy needs an environment variable, API key, or secret value that is missing or unverified.
+- You need to define exactly where a value belongs (local `.env`, Replit Secrets, Vercel, Netlify, or another deployment provider).
+- Documenting required configuration with placeholders such as `<value>` or `your_service_key`.
+- Confirming a provider key (`OPENCODE_GO_API_KEY`, `OPENROUTER_API_KEY`) or an optional override before using it.
+
+## When not to use
+
+- Writing or auditing secret-handling rules in code - use `cursor-security-rules`.
+- Choosing provider routing, fallback chains, or model selection - use `ai-infrastructure`.
+- Launching CoreZ to reproduce a runtime problem - use `verify`.
+- Ordinary feature implementation that raises no configuration question - use `software-engineering`.
 
 ## Required behavior
 
@@ -50,3 +64,9 @@ SERVICE_PROJECT_URL=your_project_url
 
 Do not ask public app users for deployment secrets. Those values belong to the
 application owner and the target deployment environment.
+
+## Related skills
+
+- `cursor-security-rules` - canonical secret and credential guardrails for these values.
+- `ai-infrastructure` - explains which provider keys the routing paths use.
+- `verify` - runtime verification depends on the environment values gathered here.

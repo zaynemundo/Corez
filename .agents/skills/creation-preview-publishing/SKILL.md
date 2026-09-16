@@ -1,6 +1,6 @@
 ---
 name: creation-preview-publishing
-description: Use when building, previewing, storing, or publishing CoreZ websites, apps, and multi-page creations; enforce sandbox, storage, privacy, navigation, and publish-verification contracts.
+description: Use when previewing a generated website or app in the sandbox iframe, storing creations in R2, publishing a share link, or debugging multi-page navigation and failed publishes. Not for visual design direction - use `frontend-design` instead.
 ---
 
 # Creation Preview And Publishing
@@ -8,6 +8,20 @@ description: Use when building, previewing, storing, or publishing CoreZ website
 Use this skill for the operational path from generated HTML to the in-app
 preview, R2 artifact storage, and a public share link. Use `frontend-design` for
 visual direction and `game-development` for game mechanics.
+
+## When to use
+
+- The user asks to preview, save, store, or publish a generated website or app.
+- You are wiring `src/components/CanvasPreview.jsx` or `src/services/appStorageService.js`.
+- A published share link must stay stable across revisions from the same session.
+- Publishing is blocked by a missing or malformed declared page.
+
+## When not to use
+
+- The user needs visual direction for the creation - use `frontend-design`.
+- The creation is a game and the question is mechanics or levels - use `game-development`.
+- The task is API contract or resilience work outside the `/api/apps` and `/api/publish` flow - use `backend-architecture`.
+- The user wants a PDF or document deliverable rather than a hosted creation - use `pdf` or `data-documents`.
 
 ## Repository contract
 
@@ -44,3 +58,9 @@ visual direction and `game-development` for game mechanics.
 ## Verification
 
 Run `npx vitest run tests/app-r2-storage.test.js tests/canvas-preview-multipage.test.jsx tests/preview-navigation-guard.test.js` and `npm run test:cloudflare`.
+
+## Related skills
+
+- `frontend-design` - visual direction for the creation this flow previews and publishes.
+- `game-development` - mechanics and playable-build concerns for game creations.
+- `backend-architecture` - API contracts and resilience behind `/api/apps` and `/api/publish`.

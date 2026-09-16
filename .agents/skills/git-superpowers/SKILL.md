@@ -1,6 +1,6 @@
 ---
 name: git-superpowers
-description: Use at task completion to commit verified work on the local main branch and push main to origin/main without merge commits.
+description: Use when a task completion requires verified changes to be committed on main, pushed to origin/main, or the auto_commit Stop hook in .agents/hooks.json did not fire. Not for writing tests or fixes - use `code-review-testing` instead.
 ---
 
 # Git Superpowers Skill
@@ -8,6 +8,20 @@ description: Use at task completion to commit verified work on the local main br
 Use this skill at the end of every repository task that leaves file changes.
 The required policy is: commit verified work on the local `main` branch, then
 push `main` to `origin/main`.
+
+## When to use
+
+- A task is complete and leaves tracked file changes that must be committed.
+- Verified work must be pushed from local `main` to `origin/main`.
+- The `Stop` hook in `.agents/hooks.json` (`.agents/scripts/auto_commit.py`) did not run or failed.
+- A commit attempt stopped on a branch mismatch and the policy must be restated.
+
+## When not to use
+
+- Verifying the change before committing - use `code-review-testing`.
+- Fixing a failing test or build - use `auto-debugging`.
+- Executing a long multi-step task plan that does not involve committing - use `autonomous-execution`.
+- Secret handling and credential policy for commits - use `cursor-security-rules`.
 
 ## Required behavior
 
@@ -29,3 +43,9 @@ The automation is driven by a `Stop` event hook defined in
 Self-verification: `bash tests/git-superpowers-contract.sh` asserts the policy
 (main-only commits, rebase, push `main:main`, no merge commits) against the
 script's behavior.
+
+## Related skills
+
+- `autonomous-execution` - structured execution of the task that precedes this commit step.
+- `code-review-testing` - verification that must pass before committing.
+- `cursor-security-rules` - secret-scanning gate that keeps credentials out of commits.

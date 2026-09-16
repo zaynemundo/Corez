@@ -1,12 +1,18 @@
 ---
 name: research-current-information
-description: Use for focused current or niche questions requiring live, source-grounded citations and date awareness; use research for a multi-item deep report and live-utilities for a narrow deterministic lookup.
+description: Use when the user asks for the latest or current price, law, policy, release, schedule, availability, or news with live sources, or a niche question where dates matter. Not for multi-item deep reports - use `research` instead; not for a single deterministic lookup - use `live-utilities` instead.
 ---
 
 # Research & Current Information
 
 ## When to use
 Use live research when information may have changed, the user asks for verification or sources, the topic is niche, or accuracy depends on current prices, policies, specifications, laws, schedules, availability, news, markets, travel, or public office-holders.
+
+## When not to use
+- A multi-item deep report with an outline, batches, and validation - use `research` instead.
+- A single deterministic lookup such as current time, weather, units, or currency - use `live-utilities` instead.
+- Writing, rewriting, or proofreading the answer text itself - use `writing-communication` instead.
+- Turning existing content into a PDF or document file - use `pdf` instead.
 
 ## Workflow
 1. Resolve the exact question, date range, location, product, organisation, or version.
@@ -27,3 +33,12 @@ Use live research when information may have changed, the user asks for verificat
 - Never fabricate citations, quotations, URLs, prices, policies, or release details.
 - Do not rely on stale memory for facts that could have changed.
 - If evidence is incomplete or conflicting, say so and present the strongest supported interpretation.
+
+## Verification
+- Confirm every material current or externally verified claim has a nearby citation and that publication dates were compared with the dates of the underlying events.
+- Confirm the answer distinguishes confirmed facts, source claims, estimates, community reports, and COREZ inferences.
+
+## Related skills
+- `research` - multi-item deep research with outline, batch execution, and validation scripts.
+- `live-utilities` - narrow deterministic lookups such as time, weather, currency, or scores.
+- `pdf` - inspecting PDFs whose charts, diagrams, or tables matter.

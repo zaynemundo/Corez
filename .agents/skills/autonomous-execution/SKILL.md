@@ -1,11 +1,26 @@
 ---
 name: autonomous-execution
-description: Guidance for executing tasks completely autonomously without step-by-step user approval. Outlines strategies for structured plan execution, command guards, automated test validation, and context management.
+description: Use when executing tasks autonomously without step-by-step approval, applying write-test-fix loops, validating commands before running them, or managing context and token budget in auto-approve mode. Not for plan-based subagent orchestration - use `superpowers` instead.
 ---
 
 # Autonomous Plan Execution
 
 This skill provides a robust operational framework for the agent when running in autonomous or auto-approve mode (opencode with permissive permissions). Since you are running without step-by-step human verification, you must be extremely rigorous, self-correcting, and safety-conscious.
+
+## When to use
+
+- Running in autonomous or auto-approve mode (opencode with permissive permissions).
+- Executing a structured plan without step-by-step human verification.
+- Applying small write-test-fix loops with immediate `npm test` and `npm run build` checks.
+- Dry-running or guarding commands that modify data (`git diff`, `git diff --check`).
+- Keeping context small with offset/limit reads and no repeated status loops.
+
+## When not to use
+
+- Orchestrating subagents or tracking a checkbox plan - use `superpowers` instead.
+- Long-horizon multi-turn work needing a ledger and ship checks - use `corez` instead.
+- Verifying a launched app end-to-end at runtime - use `verify` instead.
+- Resolving env values, keys, or deployment secrets - use `ask-env-values` instead.
 
 ## 1. Safety & Command Validation
 - **Dry-run verification**: Before executing commands that modify data, perform a dry-run or verify their impact (e.g., `git diff`, `git diff --check` for whitespace/conflict markers, `npm test` before deleting code).
@@ -28,3 +43,9 @@ This skill provides a robust operational framework for the agent when running in
 - **Interactive Plans**: Keep a checklist of tasks in a markdown plan file (e.g., in `docs/superpowers/plans/`). Check off steps as you complete them to maintain a clear trail of your progress.
 - **Self-Healing**: If a task fails or encounters a blocker, pause and write a brief analysis of the failure in your thinking block, refine the plan, and proceed with the updated strategy.
 - **Retry discipline**: When asked to re-run a failed task, re-execute from scratch rather than reusing partial output; stop and report when attempts are exhausted.
+
+## Related skills
+
+- `superpowers` - subagent-driven development and checkbox plan tracking.
+- `corez` - ledger and ship check for long-horizon tasks.
+- `verify` - runtime verification of launched endpoints.

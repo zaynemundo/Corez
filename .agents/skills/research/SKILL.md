@@ -1,6 +1,6 @@
 ---
 name: research
-description: Use for multi-item deep reports such as academic surveys, technology comparisons, market research, competitor analysis, or due diligence; use research-current-information for a focused current question.
+description: Use when the user asks for deep research, a full report, a survey or landscape of many items, competitor or market analysis across several products, or due diligence with sources. Not for one focused current question - use `research-current-information` instead.
 ---
 
 # Deep Research Skill
@@ -11,6 +11,17 @@ A two-phase structured research workflow (inspired by RhinoInsight and adapted f
 - **Phase B - Deep research + report**: investigate every item in parallel batches and produce `report.md`.
 
 Human-in-the-loop: confirm with the user at every stage. Do not skip checkpoints.
+
+## When to use
+- The user asks for deep research, a full report, or a systematic investigation of a topic.
+- A multi-item survey, technology comparison, market landscape, competitor analysis, or due-diligence report is requested.
+- The `/research <topic>` command is invoked.
+
+## When not to use
+- One focused current or niche question needing live citations - use `research-current-information` instead.
+- A narrow deterministic lookup such as current time, weather, units, or currency - use `live-utilities` instead.
+- Writing, rewriting, or proofreading text with no research phase - use `writing-communication` instead.
+- Generating a PDF from existing content - use `pdf` instead.
 
 ## Trigger
 
@@ -203,3 +214,14 @@ Run `python3 {topic_slug}/generate_report.py`. Fix any script errors, re-run unt
   URLs and analyze the fetched pages.
 - Mark every uncertain value with `[uncertain]` and list it in the `uncertain` array; the report skips those fields.
 - Keep all research output values in English.
+
+## Verification
+- Run `python .agents/skills/research/validate_json.py -f {fields_path} -j {output_path}` for each item and confirm it passes before treating the item as complete.
+- Run `python3 {topic_slug}/generate_report.py` and confirm `report.md` is produced without script errors.
+- Confirm every uncertain value is marked `[uncertain]` and listed in the `uncertain` array.
+
+## Related skills
+- `research-current-information` - focused current or niche questions that need live, dated citations.
+- `live-utilities` - narrow deterministic lookups such as time, weather, currency, or scores.
+- `pdf` - producing or processing the final report as a PDF document.
+- `writing-communication` - drafting and editing report prose after research is complete.

@@ -1,11 +1,25 @@
 ---
 name: apple-design
-description: Apple's approach to interface design and fluid, physical motion, translated for the web. Use when building or reviewing gesture-driven UI, spring animations, drag/swipe/sheet interactions, momentum and interruptible transitions, translucent materials and depth, typography (optical sizing, tracking, leading), reduced-motion, or the design foundations (feedback, spatial consistency, restraint) behind Apple-style interfaces.
+description: Use when adding gesture-driven drag, swipe or bottom-sheet interactions, spring animations, momentum projection, interruptible transitions or translucent depth. Pair with frontend-design or frontend-modern-design, never alone. Not for full page layout - use `frontend-modern-design` instead.
 ---
 
 # Apple Design
 
 > **Supplement — not a standalone:** This skill layers *gesture / spring / momentum* physics onto a primary design skill. Always pair with `frontend-modern-design` (system) **or** `frontend-design` (bespoke) as the base. Never use alone for a full page layout. Tokens and z-index remain canonical in `frontend-modern-design: §1 & §5`. See `capability-orchestrator: §1.1` decision tree.
+
+## When to use
+
+- You are implementing drag, swipe, flick, or bottom-sheet gestures with 1:1 pointer tracking.
+- You need spring parameters (damping, response, bounce) instead of fixed-duration easing.
+- The interaction must be interruptible, velocity-aware, or momentum-projected.
+- You are reviewing momentum, spatial consistency, or reduced-motion behavior in an existing interface.
+
+## When not to use
+
+- The task needs a full page layout or design system - use `frontend-modern-design` as the primary and layer this supplement on top.
+- The brief is bespoke art direction or brand identity - use `frontend-design` as the primary and layer this supplement on top.
+- The work is a WCAG contrast, focus-order, or ARIA audit with no motion component - use `accessibility-expert`.
+- The request is 3D or game physics simulation rather than interface motion - use `game-development`.
 
 How Apple builds interfaces that stop feeling like a computer and start feeling like an extension of you. This knowledge comes from Apple's WWDC design talks — chiefly *Designing Fluid Interfaces* (WWDC 2018) — distilled and translated into the web platform (CSS, Pointer Events, `requestAnimationFrame`, spring libraries like Motion/Framer Motion).
 
@@ -156,3 +170,14 @@ Apple motion is physical but never gratuitous — every animation serves feedbac
 ## 10. Integration with CoreZ layering
 
 Follow the canonical stacking order in `frontend-modern-design: §5` (Background `0` → Content `10` → HUD `20-30` → Overlays `40-50+`). Springs that move panels/modals must animate *within* that layer — never break stacking context during a gesture.
+
+## Verification
+
+- Run `npm run lint` and `npm run build` after wiring spring or gesture code.
+- Re-check §9 with `prefers-reduced-motion: reduce` active: gesture state must still commit or cancel while decorative motion is collapsed.
+
+## Related skills
+
+- `frontend-modern-design` - primary system base whose tokens and layering this skill follows.
+- `frontend-design` - primary bespoke base this skill supplements for gesture and motion work.
+- `accessibility-expert` - reduced-motion, focus, and keyboard behavior that complement §9.

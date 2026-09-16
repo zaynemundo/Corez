@@ -1,6 +1,6 @@
 ---
 name: corez
-description: Corez workspace for long-horizon tasks - selective ledger + ship checks. Extracted from Tiger380/J-Space-Cognition-Suite-V3.6 (Apache-2.0).
+description: Use when a task is long-horizon, spans multiple stages or files, or carries state across turns, or when a deliverable needs a ledger and ship check before delivery. Not for ordinary day-to-day coding - use `software-engineering` instead.
 ---
 
 # Corez Workspace
@@ -12,6 +12,13 @@ description: Corez workspace for long-horizon tasks - selective ledger + ship ch
 - **loop** tasks: multi-stage, multi-file, >5 steps, or state across turns -> use ledger + seam
 - **full** tasks: single deliverable, 2-4 steps -> use `ship` before delivery only
 - **fast** tasks: one step, checkable in one glance -> nothing
+
+## When not to use
+
+- One-step tasks checkable in one glance - use `software-engineering` instead of a ledger.
+- Orchestrating subagents or tracking a checkbox plan - use `superpowers` instead.
+- Running unattended auto-approve execution of a plan - use `autonomous-execution` instead.
+- End-to-end runtime verification of a launched app - use `verify` instead.
 
 ## Ledger (5 lines, re-read at every seam)
 
@@ -54,3 +61,9 @@ For `loop`, use the ledger file + `ship` check. No Python, no `jspace.py` needed
 ## Attribution
 
 Extracted from J-Space Cognition Suite V3.6 by Tiger380 (Apache-2.0). See `THIRD_PARTY_NOTICES.md` and `LICENSE` in original repo. Corez retains its own harness; this is a selective augmentation, not a replacement.
+
+## Related skills
+
+- `superpowers` - subagent orchestration and checkbox plan tracking.
+- `autonomous-execution` - operating framework for unattended runs.
+- `git-superpowers` - commits verified work on `main` after ship checks pass.

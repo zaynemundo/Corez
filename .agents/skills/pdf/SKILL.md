@@ -1,7 +1,21 @@
 ---
 name: pdf
-description: Professional PDF solution. Create PDFs using HTML+Paged.js (academic papers, reports, documents). Process existing PDFs using Python (read, extract, merge, split, fill forms). Supports KaTeX math formulas, Mermaid diagrams, three-line tables, citations, and other academic elements. Also use this skill when user explicitly requests LaTeX (.tex) or native LaTeX compilation.
+description: Use when creating a PDF report, paper, resume or invoice, converting HTML or LaTeX to PDF, compiling .tex with Tectonic, extracting text or tables, merging, splitting or filling PDF forms. Not for spreadsheets or slide decks - use `data-documents` instead.
 ---
+
+## When to use
+
+- The user asks to create a PDF, report, paper, resume, or invoice.
+- The user asks to extract text or tables, merge, split, or fill a PDF form.
+- The user explicitly requests LaTeX, a `.tex` file, or Tectonic compilation.
+- The deliverable needs KaTeX math, Mermaid diagrams, three-line tables, or citations.
+
+## When not to use
+
+- The user wants a spreadsheet, Word document, or slide deck instead of a PDF - use `data-documents`.
+- The user wants prose drafted or rewritten with no document format required - use `writing-communication`.
+- The ask is image editing or visual asset production - use `visual-creative`.
+- The deliverable is a hosted web page or app rather than a document - use `creation-preview-publishing`.
 
 ## Route Selection
 
@@ -204,3 +218,15 @@ See <a href="#sec3">Section 3</a>...
 | Process | pdfplumber | Text and table extraction |
 | Process | LibreOffice | Office → PDF conversion |
 | LaTeX | Tectonic | LaTeX → PDF compilation |
+
+## Verification
+
+- Run `./scripts/pdf.sh check` before conversion; exit code `0` means ready and `2` means dependencies are missing, so run `./scripts/pdf.sh fix`.
+- Confirm every citation is real and the output honors the requested word or page count before delivering.
+
+## Related skills
+
+- `data-documents` - spreadsheets, Word, and presentation deliverables that are not PDFs.
+- `research-current-information` - live source grounding when PDF content needs current facts.
+- `writing-communication` - prose drafting and rewriting when no document format is required.
+- `visual-creative` - SVG and artwork assets placed inside a PDF layout.

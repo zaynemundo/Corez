@@ -1,11 +1,26 @@
 ---
 name: backend-architecture
-description: Specialized skill for back-end architecture with a strict hierarchy prioritizing Security (validation, secret isolation, CORS, rate limiting) over Functionality (API contracts, resilience, fallbacks, caching, database indexing).
+description: Use when building or reviewing a REST API, Cloudflare Worker route, request validation, CORS and rate limiting, retry or failover logic, or database indexes. Not for general code review or test coverage - use `code-review-testing` instead.
 ---
 
 # Back-End Architecture & Design Hierarchy Skill
 
 Use this skill whenever designing, building, reviewing, or refactoring APIs, serverless functions, Cloudflare Workers, Node.js services, database schemas, and microservices.
+
+## When to use
+
+- Designing or refactoring an API route, Cloudflare Worker handler, or Node.js service endpoint.
+- Adding request validation, CORS origins, auth checks, or rate limiting to a public endpoint.
+- Reviewing response contracts, retries/backoff, idempotency, or caching for state-changing calls.
+- Choosing KV/R2 usage, database indexes, or batch fetching for read-heavy paths.
+- Wiring worker handlers to the repo helpers: `runJsonSafe` (defined in `worker/index.js`) and `jsonResponse`, `readBoundedJson`, `safeErrorDetail` (from `worker/utils.js`).
+
+## When not to use
+
+- Canonical secret, injection, and destructive-command policy - use `cursor-security-rules`.
+- Model/provider routing, token budgets, or RAG design - use `ai-infrastructure`.
+- General correctness review and unit coverage - use `code-review-testing`.
+- Launching the running app to reproduce a reported failure - use `verify`.
 
 ## Strict Design Hierarchy
 
@@ -87,8 +102,19 @@ Use this skill whenever designing, building, reviewing, or refactoring APIs, ser
 
 ## Repository integration (CoreZ worker)
 
-- Entry point is `worker/entry.js` (the `main` in `wrangler.jsonc`); the base worker and route dispatch live in `worker/index.js`. Wrap storage handlers with `runJsonSafe`, return uniform payloads via `jsonResponse`, parse bodies with `readBoundedJson`, and reuse `safeErrorDetail` for sanitized error messages — all from `worker/utils.js`.
+- Entry point is `worker/entry.js` (the `main` in `wrangler.jsonc`); the base worker and route dispatch live in `worker/index.js`. Wrap storage handlers with `runJsonSafe` (defined in `worker/index.js`), return uniform payloads via `jsonResponse`, parse bodies with `readBoundedJson`, and reuse `safeErrorDetail` for sanitized error messages — the last three from `worker/utils.js`.
 - Validate every path segment / storage key against `SAFE_STORAGE_SEGMENT` (letters, digits, dots, dashes, underscores; no slashes or leading dots) before touching R2 — this blocks `../` traversal on `/api/apps`, `/api/memory`, and `/api/assets`.
 - Rate limit public endpoints with `createRateLimiter` (see `/api/publish`, `/api/ai`, `/api/image`) and return HTTP 429 with `Retry-After`.
 - Env bindings: `ASSET_BUCKET` (R2, required for storage/memory/publish endpoints), `GAME_ROOMS` (Durable Object for multiplayer), `ASSETS` (static SPA).
 - Verify changes with `npm test` plus the worker contract suite: `npm run test:cloudflare` (includes `tests/cloudflare-worker-contract.mjs`).
+
+## Verification
+
+- After changing worker routes or handlers, run `npm test` and the worker contract suite `npm run test:cloudflare`.
+- Before considering the change complete, run `npm run lint` and `npm run build`.
+
+## Related skills
+
+- `cursor-security-rules` - canonical Level 1 security checks this skill references.
+- `ai-infrastructure` - provider routing and token budget topics above the API layer.
+- `code-review-testing` - review and test gates applied to API changes.

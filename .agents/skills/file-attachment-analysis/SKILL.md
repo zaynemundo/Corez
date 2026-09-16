@@ -1,9 +1,27 @@
 ---
 name: file-attachment-analysis
-description: Use when a CoreZ request includes attached files or attachment handling code; distinguish injected text from metadata-only binaries and never claim unsupported binary or vision inspection.
+description: Use when a request includes attachments - summarize this PDF, what is in the attached file, analyze this image, read my attachment, or debug attachment ingestion and the MiMo pre-pass. Not for generating or editing images - use `image-generation` instead.
 ---
 
 # File Attachment Analysis
+
+## When to use
+
+- The request has attachments - "summarize this PDF", "what is in the attached
+  file", "analyze this image", "read my attachment".
+- Debugging ingestion limits or the MiMo V2.5 pre-pass in
+  `src/components/ChatInput.jsx`, `src/utils/fileAttachmentUtils.js`, or
+  `worker/mimo.js`.
+- Deciding whether supplied `content` is real file text or only filename and
+  MIME metadata.
+
+## When not to use
+
+- Generating or editing images - use `image-generation`.
+- Visual inspection and art direction beyond supplied metadata - use
+  `visual-creative`.
+- Reviewing and testing attachment handling changes - use
+  `code-review-testing`.
 
 ## Current ingestion behavior (MiMo V2.5 -> DeepSeek V4.1 Flash pipeline)
 
@@ -36,3 +54,9 @@ description: Use when a CoreZ request includes attached files or attachment hand
 
 Run `npx vitest run tests/chat-attachments.test.jsx` and test both text-content
 and metadata-only attachments.
+
+## Related skills
+
+- `image-generation` - creating images, which this skill does not do.
+- `visual-creative` - visual inspection workflows beyond supplied metadata.
+- `code-review-testing` - tests and review for attachment handling changes.

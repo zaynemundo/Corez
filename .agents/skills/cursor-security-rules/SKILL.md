@@ -1,6 +1,6 @@
 ---
 name: cursor-security-rules
-description: Essential security rules and safety guardrails for AI coding agents to prevent secret exposure, command injection, and unsafe patterns.
+description: Use when scanning code for hardcoded API keys or secrets, command injection via child_process exec, innerHTML XSS, rm -rf or force push, or unsafe npm dependencies. Not for general code review - use `code-review-testing` instead.
 ---
 
 # Security Rules for AI Coding Agents
@@ -8,6 +8,21 @@ description: Essential security rules and safety guardrails for AI coding agents
 > **Canonical Security Contract:** This file is the **single canonical source** for secret, injection, destructive-op, web/API, and supply-chain guardrails. `backend-architecture: Level 1` and `code-review-testing: §2 Security & Privacy` reference this file instead of duplicating checks. When updating a rule, update here only and keep cross-links in sync.
 
 Mandatory security guardrails applied to ALL code written in this workspace. These rules prevent secret exposure, command injection, destructive operations, and unsafe dependency patterns. Violations must be fixed before any code is committed.
+
+## When to use
+
+- Scanning or reviewing code for hardcoded API keys, tokens, passwords, or committed `.env` / `.dev.vars` files.
+- Checking shell usage for command injection or unsafe `child_process.exec` string interpolation.
+- Reviewing web and API code for XSS, CORS, rate limiting, or server-side authorization gaps.
+- Judging whether a destructive command (`rm -rf`, force push, hard reset) needs explicit approval.
+- Auditing dependency installs, postinstall scripts, or lockfile usage for supply-chain risks.
+
+## When not to use
+
+- Full correctness review and test coverage of a change - use `code-review-testing`.
+- Designing backend API contracts, validation schemas, or retry/failover behavior - use `backend-architecture`.
+- Supplying the actual secret names and values for an environment - use `ask-env-values`.
+- AI provider routing and model selection - use `ai-infrastructure`.
 
 ---
 
@@ -80,3 +95,9 @@ fi
 ```
 
 Any hits must be resolved (or justified with an explicit comment) before the change is committed. Backend and review tasks should run this same canonical scan — see `backend-architecture: Level 1` and `code-review-testing: §2` which reference here.
+
+## Related skills
+
+- `backend-architecture` - Level 1 defers to this file as the canonical security contract.
+- `code-review-testing` - Section 2 review gates reference these checks.
+- `ask-env-values` - collects the real secret names and values these rules keep out of code.

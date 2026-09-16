@@ -1,6 +1,6 @@
 ---
 name: code-review-testing
-description: Specialized skill for thorough code review paired with automated unit/contract testing, static analysis, regression prevention, and empirical runtime verification.
+description: Use when reviewing code changes or diffs, auditing logic and security, writing unit or contract tests, preventing regressions, or verifying fixes with clean exit codes. Not for new feature implementation - use `software-engineering` instead.
 ---
 
 # Code Review & Automated Testing Skill
@@ -16,6 +16,23 @@ Use this skill whenever analyzing, auditing, reviewing code changes, debugging, 
   │  4. Empirical Runtime Verification                           │
   └─────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## When to use
+
+- Reviewing code changes or a diff for contract integrity, SOLID structure, and clean naming.
+- Auditing security during review (secrets, injection, XSS, CORS, rate limits).
+- Writing or extending Vitest/Jest unit and integration tests.
+- Maintaining repository contract scripts and verifying DOM classes, ARIA attributes, and API status codes.
+- Confirming a task resolved only after commands return clean exit codes (`0`).
+
+## When not to use
+
+- Implementing a new feature from scratch - use `software-engineering` instead.
+- Diagnosing a runtime crash or build error end-to-end - use `auto-debugging` instead.
+- Defining canonical secret, injection, and XSS policy - use `cursor-security-rules` instead.
+- Designing backend resilience, caching, or rate limiting - use `backend-architecture` instead.
 
 ---
 
@@ -70,3 +87,12 @@ Use this skill whenever analyzing, auditing, reviewing code changes, debugging, 
   npm run build
   npm run lint
   ```
+
+---
+
+## Related skills
+
+- `software-engineering` - implementation and refactoring workflow this skill reviews.
+- `auto-debugging` - log-first root cause tracing when a test failure needs diagnosis.
+- `cursor-security-rules` - canonical secret, injection, and XSS checks cited by the audit checklist.
+- `git-superpowers` - commits verified work on `main` once review gates pass.

@@ -49,102 +49,102 @@ const SPECIALIST_TRIGGER_PATTERNS = [
   {
     id: "research-report",
     pattern:
-      /\b(research report|research on|literature review|white paper|market research|deep dive|deep research|survey of|study of|case study)\b/i,
+      /\b(research report|research on|literature review|systematic review|evidence review|white paper|market research|deep dive|deep research|survey of|study of|case study|due diligence|state of the art|landscape of|comparative analysis|report on)\b/i,
   },
   {
     id: "document-generation",
     pattern:
-      /\b(invoice|contract|business letter|formal document|memo|pdf|docx|word document|letterhead)\b/i,
+      /\b(invoice|contract|service agreement|nda|non-disclosure agreement|statement of work|proposal|quotation|purchase order|receipt|offer letter|terms of (service|use)|privacy policy|business letter|formal document|memo|pdf|docx|word document|letterhead)\b/i,
   },
   {
     id: "data-analysis",
     pattern:
-      /\b(analyze\s+(this\s+)?(data|dataset|csv|sales)|spreadsheet|excel|statistics|sales data|metrics|budget tracker|data analysis)\b/i,
+      /\b(analy[sz]e\s+(this\s+)?(data|dataset|csv|sales)|data ?set|spreadsheet|excel|statistics|summary statistics|sales data|metrics|budget tracker|data analysis|pivot table|trend analysis|cohort analysis|correlat(e|ion)|regression analysis|visuali[sz]e (this|the|my) data|(chart|graph) (from|of) (this|the|my) data)\b/i,
   },
   {
     id: "marketing-copywriting",
     pattern:
-      /\b(marketing|ad copy|advertisement|advertising campaign|campaign|tagline|slogan|landing page copy|seo|blog post|social media|social post|linkedin post|instagram post|carousel post|carousel copy|carousel caption|caption|hashtags|newsletter|email campaign|content plan|content calendar|brand voice|brand identity|brand strategy|brand guidelines|rebrand)\b|post.{0,25}carousel|carousel.{0,25}(post|caption|copy|slides?)\b/i,
+      /\b(marketing|ad copy|advertisement|advertising campaign|campaign|tagline|slogan|landing page copy|seo|blog post|social media|social post|linkedin post|instagram post|carousel post|carousel copy|carousel caption|caption|hashtags|newsletter|email campaign|content plan|content calendar|brand voice|brand identity|brand strategy|brand guidelines|rebrand|press release|product description|sales page|cold email|email sequence|subject lines?|(google|facebook|meta|instagram|linkedin) ads?|ad creative|value proposition|brand name|copywriting|launch (copy|email|announcement))\b|post.{0,25}carousel|carousel.{0,25}(post|caption|copy|slides?)\b/i,
   },
   {
     id: "translation-localization",
     pattern:
-      /\b(translate|translation|localize|localization|multilingual)\b|(in|into)\s+(french|spanish|tagalog|japanese|german|korean|chinese|italian|portuguese|arabic|hindi)\b/i,
+      /\b(translate|translation|locali[sz]e|locali[sz]ation|multilingual|i18n|l10n)\b|(in|into)\s+(french|spanish|tagalog|japanese|german|korean|chinese|mandarin|cantonese|italian|portuguese|arabic|hindi|filipino|vietnamese|thai|dutch|turkish|russian|hebrew|indonesian|malay|swahili|polish|swedish|greek|norwegian|danish)\b/i,
   },
   {
     id: "live-data-utilities",
     pattern:
-      /(\bconvert\s+\d+\b|\bcurrency\b|\bexchange rate\b|\bweather\b|\bforecast\b|\btemperature\b|\btime zone\b|\bwhat time\b|\bunit conversion\b|\bcalculate\b|\bcalculator\b|\btime difference\b|\bdistance between\b|\bwhat'?s the (time|date)\b)/i,
+      /(\bconvert\s+\d+\b|\bcurrency\b|\bexchange rate\b|\bweather\b|\bforecast\b|\btemperature\b|\btime zone\b|\bwhat time\b|\bunit conversion\b|\bcalculate\b|\bcalculator\b|\btime difference\b|\bdistance between\b|\bwhat'?s the (time|date)\b|\b(public|bank) holiday(s)?\b|\bsunrise\b|\bsunset\b|\b(stock|share|crypto|bitcoin|ethereum|eth) (price|rate|value)\b|\bmarket price\b|\bhow much is \d|\d+(\.\d+)?\s*(kg|lbs?|pounds?|oz|ounces?|miles?|kms?|kilometers?|celsius|fahrenheit|°c|°f)\b|\b(who won|final score|what'?s the score|standings|fixtures)\b|\b(nba|nfl|nhl|mlb|premier league|la liga|world cup|super bowl|olympics).{0,40}(score|schedule|standings|result)\b)/i,
   },
   {
     id: "education-tutor",
     pattern:
-      /\b(teach me|tutorial|explain.{0,30}like|from zero|beginner|study plan|lesson|homework|exam prep|eli5|practice exercise)\b/i,
+      /\b(teach me|tutor me|tutorial|explain.{0,30}like|from zero|zero to (hero|advanced)|beginner|study plan|lesson|homework|exam prep|eli5|practice exercise|practice problems?|problem set|help me (understand|learn)|walk me through|learn (it |this )?from scratch|i'?m new to|syllabus|curriculum|course (outline|plan)|study for (the|my|an?|a))\b/i,
   },
   {
     id: "accessibility-compliance",
     pattern:
-      /\b(wcag|accessible|accessibility|screen reader|aria|contrast|keyboard navigation|a11y)\b/i,
+      /\b(wcag|accessible|accessibility|screen ?reader|aria|contrast|keyboard navigation|a11y|focus (trap|order|ring|management|visible)|keyboard (only|tab|focus)|skip link|alt text|alternative text|touch targets?|semantic (html|markup)|voiceover|nvda|jaws)\b/i,
   },
   {
     id: "business-planning",
     pattern:
-      /\b(business plan|go-to-market|pricing strategy|financial projection|pitch deck|business model|revenue model|mvp strategy|market entry|swot|business strategy|market sizing)\b/i,
+      /\b(business plan|business idea|go[- ]to[- ]market|pricing strategy|pricing (tiers?|model|page)|financial projection|financial model|unit economics|break-?even|burn rate|runway|funding round|raise (a )?(seed|round|series [abc])|valuation|pitch deck|business model|revenue model|monetization|monetisation|mvp strategy|market entry|market (sizing|size|opportunity)|swot|business strategy|competitor analysis|launch strategy)\b/i,
   },
   {
     id: "resume-career",
     pattern:
-      /\b(resume|cv|cover letter|job application|interview|career|linkedin profile|job posting|portfolio|job search|salary negotiation|career change)\b/i,
+      /\b(resume|cv|cover letter|job application|job posting|job search|job offer|interview|career|career (path|plan|switch|change)|linkedin profile|portfolio|salary negotiation|salary expectation|compensation (package|negotiation)|performance review|resignation|notice period|promotion at work)\b/i,
   },
   {
     id: "creative-writing",
     pattern:
-      /\b(story|short story|poem|poetry|novel|fiction|screenplay|script|dialogue|haiku|lyrics|fan fiction|worldbuilding|creative writing)\b/i,
+      /\b(story|short story|flash fiction|poem|poetry|sonnet|novel|fiction|screenplay|script|dialogue|monologue|haiku|lyrics|song lyrics|fan fiction|worldbuilding|creative writing|character (backstory|arc)|backstory|plot (twist|idea|outline)|ghostwrit\w*)\b/i,
   },
   {
     id: "presentation-design",
     pattern:
-      /\b(presentation|slide deck|powerpoint|google slides|slide outline|speaker notes|slideshow|\d+-slide|slides?)\b/i,
+      /\b(presentation|slide deck|powerpoint|google slides|keynote|slide outline|speaker notes|slideshow|\d+-slide|slides?|(pitch|sales|board|investor|product|strategy) deck|deck (outline|structure|flow)|slide (titles?|layout|design)|talk (outline|structure))\b/i,
   },
   {
     id: "personal-productivity",
     pattern:
-      /\b(to-do|todo|task list|plan my day|daily planner|weekly planner|prioritize\w*|time management|pomodoro|habit tracker|get organized|productivity plan)\b/i,
+      /\b(to-do|todo|task list|plan my day|plan my (week|schedule)|daily planner|weekly planner|prioritize\w*|time management|time block\w*|pomodoro|habit tracker|get organized|get organised|productivity plan|weekly review|eisenhower|morning routine|procrastinat\w*|focus (plan|session|block)|deep work|task (backlog|priorities|priority)|energy management)\b/i,
   },
   {
     id: "personal-finance",
     pattern:
-      /\b(budget\w*|savings plan|personal finance|debt payoff|emergency fund|investing basics|retirement planning|net worth)\b/i,
+      /\b(budget\w*|spending plan|savings plan|personal finance|debt payoff|debt|mortgage|home loan|credit (card|score)|tax return|income tax|401k|roth ira|college fund|retirement (plan|planning|savings|account)|emergency fund|emergency savings|net worth|life insurance)\b/i,
   },
   {
     id: "travel-planning",
     pattern:
-      /\b(itinerary|travel plan|vacation plan|packing list|road trip|trip planning|flight itinerary)\b/i,
+      /\b(itinerary|travel plan|vacation plan|packing list|road trip|trip planning|flight itinerary|things to do in|where to (stay|eat) in|(flights?|hotels?|hostels?|airbnbs?) (to|in|for|booking)|visa (requirements?|application)|day trip|weekend getaway|sightseeing|guided tour|cruise (ship|trip|booking)|travel (budget|checklist)|best time to visit)\b/i,
   },
   {
     id: "fitness-nutrition",
     pattern:
-      /\b(workout plan|exercise routine|training program|meal plan|diet plan|nutrition\w*|calorie target|fitness goal|weight loss plan|muscle gain)\b/i,
+      /\b(workout plan|exercise routine|training program|meal plan|diet plan|nutrition\w*|calorie target|fitness goal|weight loss plan|muscle gain|gym (plan|routine|workout|schedule)|strength training|resistance training|cardio|yoga|pilates|hiit|crossfit|protein (intake|target|shake)|macros|macronutrients|lose (weight|fat)|bulk (up|phase)|cutting phase|get (fit|in shape)|(5k|10k|marathon) (training|plan|race)|stretching routine|rest day)\b/i,
   },
   {
     id: "event-planning",
     pattern:
-      /\b(event planning|party planning|wedding planning|event checklist|celebration plan)\b/i,
+      /\b(event planning|party planning|wedding planning|event checklist|celebration plan|birthday party|anniversary|baby shower|bridal shower|engagement party|graduation party|wedding (checklist|timeline|budget|plan)|(conference|workshop|fundraiser|gala|retreat) (planning|checklist|agenda|budget)|guest list|catering|venue (booking|selection)|save the date|invitations|event (timeline|budget|vendors))\b/i,
   },
   {
     id: "study-aids",
     pattern:
-      /\b(quiz\w*|flashcard\w*|study guide|practice test|revision notes|exam questions|cheat sheet)\b/i,
+      /\b(quiz\w*|flashcard\w*|study guide|practice test|practice exam|revision notes|revision (plan|schedule)|exam questions|cheat sheet|mock exam|past paper|worksheet|mnemonic|test (me|yourself)|question bank|study (notes|sheet)|fill in the blank)\b/i,
   },
   {
     id: "meeting-notes",
     pattern:
-      /\b(meeting (notes|summary|minutes|recap)|action items|summarize\w* (the )?(meeting|call|conversation))\b/i,
+      /\b(meeting (notes|summary|minutes|recap)|action items|summari[sz]e\w* (the |our |this )?(meeting|call|conversation|standup|stand-up)|notes from (the|our|yesterday'?s) (meeting|call|standup|stand-up|sync)|stand-?up (notes|update)|what was decided|decisions (from|made|taken)|(call|meeting) transcript|recap of (the|our) (meeting|call))\b/i,
   },
   {
     id: "user-learning",
     pattern:
-      /\b(remember(\s+this|\s+that|\s+my|\s+me|\s+for)?\b|\bforget(\s+my|\s+this|\s+that|\s+everything)?\b|\bwhat do you know about me\b|\blearn about me\b|\bmy prefer\w+\b|\bmy name is\b|\bi prefer\b|\bmy tech stack\b|\bdelete (everything|what) you know about me\b|\bi\s+am\s+a\b|\bi\s+work\s+(with|at|for|in)\b|\bi\s+live\s+in\b|\bmy\s+(company|team|role|job|business|organisation|organization)\b|\b(based|located)\s+in\b|\bwe\s+(represent|provide|specialise|specialize)\b)/i,
+      /\b(remember(\s+this|\s+that|\s+my|\s+me|\s+for)?\b|\bforget(\s+my|\s+this|\s+that|\s+everything)?\b|\bwhat do you know about me\b|\bwhat do you remember about me\b|\blearn about me\b|\bmy prefer\w+\b|\bmy name is\b|\bi prefer\b|\bmy tech stack\b|\bdelete (everything|what) you know about me\b|\bi\s+am\s+a\b|\bi\s+work\s+(with|at|for|in)\b|\bi\s+live\s+in\b|\bmy\s+(company|team|role|job|business|organisation|organization)\b|\b(based|located)\s+in\b|\bwe\s+(represent|provide|specialise|specialize)\b)/i,
   },
 ];
 
@@ -153,7 +153,7 @@ const SPECIALIST_TRIGGER_PATTERNS = [
 // confirmation — this keeps questions ("Am I a good fit?") and pasted code
 // from triggering remember offers.
 const USER_LEARNING_EXPLICIT_PATTERN =
-  /\b(remember(\s+this|\s+that|\s+my|\s+me|\s+for)?\b|\bforget(\s+my|\s+this|\s+that|\s+everything)?\b|\bwhat do you know about me\b|\blearn about me\b|\bmy prefer\w+\b|\bmy name is\b|\bi prefer\b|\bmy tech stack\b|\bdelete (everything|what) you know about me\b)/i;
+  /\b(remember(\s+this|\s+that|\s+my|\s+me|\s+for)?\b|\bforget(\s+my|\s+this|\s+that|\s+everything)?\b|\bwhat do you know about me\b|\bwhat do you remember about me\b|\blearn about me\b|\bmy prefer\w+\b|\bmy name is\b|\bi prefer\b|\bmy tech stack\b|\bdelete (everything|what) you know about me\b)/i;
 
 // Runs specialist detection BEFORE the heavy-workflow early return so everyday
 // conversational requests still receive their matching capability. Returns the

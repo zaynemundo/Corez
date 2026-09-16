@@ -41,6 +41,68 @@ describe('CoreZ Specialist Skills', () => {
     }
   });
 
+  it('matches everyday phrasing variants for each specialist domain', () => {
+    const cases = [
+      ['live-data-utilities', 'How many kg is 180 pounds?'],
+      ['live-data-utilities', 'What is the bitcoin price right now?'],
+      ['live-data-utilities', 'Who won the NBA finals?'],
+      ['live-data-utilities', 'When is the next public holiday?'],
+      ['marketing-copywriting', 'Write a press release for our launch'],
+      ['marketing-copywriting', 'Draft a cold email sequence for leads'],
+      ['document-generation', 'Draft an NDA and a statement of work'],
+      ['document-generation', 'Write a proposal for a new client'],
+      ['data-analysis', 'Plot this sales dataset on a chart'],
+      ['data-analysis', 'What does the regression analysis show?'],
+      ['translation-localization', 'Translate this paragraph into Vietnamese'],
+      ['education-tutor', 'Walk me through recursion step by step'],
+      ['education-tutor', 'Help me understand compound interest'],
+      ['resume-career', 'Prepare me for a performance review'],
+      ['resume-career', 'How do I negotiate a job offer?'],
+      ['creative-writing', 'Write song lyrics about summer'],
+      ['creative-writing', 'Give my character a backstory'],
+      ['presentation-design', 'Outline a board deck for the quarter'],
+      ['personal-productivity', 'Help me plan my week'],
+      ['personal-productivity', 'I keep procrastinating on my tasks'],
+      ['personal-finance', 'Should I pay off my mortgage early?'],
+      ['travel-planning', 'Things to do in Kyoto in April'],
+      ['travel-planning', 'Where to stay in Cebu?'],
+      ['fitness-nutrition', 'Build me a gym routine for strength training'],
+      ['fitness-nutrition', 'How much protein intake do I need?'],
+      ['event-planning', 'Plan a baby shower for my sister'],
+      ['event-planning', 'Help me with the guest list'],
+      ['study-aids', 'Give me a mock exam on biology'],
+      ['study-aids', 'Create a revision plan for finals'],
+      ['meeting-notes', 'What was decided in the standup?'],
+      ['meeting-notes', 'Summarise this call transcript'],
+      ['research-report', 'Do a comparative analysis of EV batteries'],
+      ['research-report', 'Due diligence on this acquisition'],
+      ['accessibility-compliance', 'Add alt text and fix the focus order'],
+      ['user-learning', 'What do you remember about me?']
+    ];
+
+    for (const [id, prompt] of cases) {
+      const { skills } = resolveSkills({ intent: 'general', prompt });
+      expect(skills.map((s) => s.id), `scenario "${prompt}" should activate ${id}`).toContain(id);
+    }
+  });
+
+  it('keeps low-signal general chatter on the direct path', () => {
+    const prompts = [
+      'How do I convert JSON to YAML?',
+      'My camera lens has a scratch',
+      'What is the price of freedom?',
+      'Tell me about the political party history in my country',
+      'I bought a new mattress yesterday',
+      'Explain how CSS flexbox works',
+      'What is React state?'
+    ];
+
+    for (const prompt of prompts) {
+      const { skills } = resolveSkills({ intent: 'general', prompt });
+      expect(skills.map((s) => s.id), `"${prompt}" must not activate a specialist`).toEqual([]);
+    }
+  });
+
   it('works for writing and explanation intents on the fast path', () => {
     const research = resolveSkills({ intent: 'writing', prompt: 'Deep dive research report on EV adoption' });
     expect(research.skills.map(s => s.id)).toContain('research-report');

@@ -1,9 +1,19 @@
 ---
 name: scheduling-automation
-description: Use only when a real scheduler or automation tool is available; otherwise produce a precise schedule specification or reminder text without claiming background work was created.
+description: Use when the user asks to schedule a task, set a reminder, run something later, on a recurrence, or when a condition is met, and a concrete scheduler tool is available. Not for ordinary email or calendar coordination - use `productivity-connectors` instead.
 ---
 
 # Scheduling & Automation
+
+## When to use
+- The user asks to schedule a task, set a reminder, or run something later.
+- A recurring job, notification rule, or condition-based alert is requested.
+- A precise schedule specification or future-run prompt must be produced when no scheduler tool exists.
+
+## When not to use
+- Ordinary email or calendar coordination without a scheduler tool - use `productivity-connectors` instead.
+- A one-off current value such as time, weather, or scores - use `live-utilities` instead.
+- Wording the reminder message itself - use `writing-communication` instead.
 
 ## Capability gate
 
@@ -26,3 +36,12 @@ a successful task identifier.
 - Do not schedule more frequently than the platform supports.
 - Avoid duplicate tasks when an existing automation can be updated.
 - For high-volatility subjects, include source verification and timestamp requirements in the automation prompt.
+
+## Verification
+- If a scheduler tool exists, confirm the returned task identifier and normalized schedule before claiming the automation was created.
+- If no scheduler tool exists, confirm the result is labelled as a schedule specification only.
+
+## Related skills
+- `productivity-connectors` - email, calendar, and collaboration connectors when those tools exist.
+- `live-utilities` - one-off current time, date, and weather values.
+- `writing-communication` - wording for reminder text and notifications.

@@ -1,11 +1,25 @@
 ---
 name: game-development
-description: Full CoreZ AI Game Studio skill — designs, implements, optimizes, tests, and publishes complete 2D/3D web games. Routes the 18-stage pipeline and engine mechanics to on-demand part files: studio orchestration, brainstorming, spec, architecture, art direction, asset manifests, task graphs, TDD implementation, polish/audio, smoke/QA/regression testing, performance review, bug triage, code/visual review, release signoff, and publishing/marketing. Includes Three.js WebGL, HTML5 Canvas, Web Audio procedural SFX, physics simulators, and word games with dictionary validation.
+description: Use when building a game - make a 2D platformer, Canvas arcade game, Three.js WebGL scene, physics sim, procedural audio, or word puzzle for CoreZ. Not for a plain website or app build - use `frontend-design` instead.
 ---
 
 # CoreZ AI Game Studio — Router
 
+## When to use
+
 Use this skill whenever creating, debugging, or enhancing interactive web games, Three.js WebGL scenes, 2D HTML5 Canvas engines, physics simulators, procedural audio generators, or word puzzle games for CoreZ.
+
+- "make a 2D platformer", "build a snake game", "add screen shake and juice".
+- "my game stutters", "the canvas is blank", "fix the collision detection".
+- Running the game pipeline stages - spec, art direction, assets, TDD build, QA.
+
+## When not to use
+
+- A plain website or non-game app build - use `frontend-design`.
+- HUD-only styling or design tokens with no game logic - use
+  `frontend-modern-design`.
+- Generating a standalone image asset with no game attached - use
+  `image-generation`.
 
 > **This SKILL.md is a router, not the full manual.** The full former 18-part
 > manual lives in `parts/` and the engine mechanics live in
@@ -80,6 +94,13 @@ part 13, then part 14).
 - **Performance**: single `requestAnimationFrame` loop, delta-time updates,
   pooled particles (hard cap), no per-frame allocations or listener leaks.
 
+## Verification
+
+- Runnable evidence only - `exitCode === 0` from the smoke suite
+  (`parts/10-game-smoke-test.md`), the release gate
+  (`parts/17-game-release-check.md`), and the build; no agent text claim
+  substitutes for execution (see the Verification gate in Runtime rules).
+
 ## Related skills
 
 - `frontend-modern-design` — HUD/menu visual system and tokens (§1, §5).
@@ -90,3 +111,5 @@ part 13, then part 14).
   endpoints.
 - `verify` — launch and drive CoreZ end-to-end.
 - `git-superpowers` — commit/push policy at completion.
+- `superpowers` — subagent-driven development and plan execution tracking
+  across pipeline stages.

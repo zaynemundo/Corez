@@ -1,11 +1,30 @@
 ---
 name: r2-mem0-memory
-description: Use for explicit persistent-memory operations through CoreZ R2 endpoints; require an unguessable user identifier, avoid sensitive data, and confirm successful storage or deletion before claiming it occurred.
+description: Use when saving or recalling long-term memory via /api/memory - remember this preference, store a user fact, search my memories by keyword, recall a profile, or forget a key. Not for the consent-based remember flow in chat - use `user-learning` instead.
 ---
 
 # R2 Mem0 Persistent Memory Skill
 
+## When to use
+
+- The user says "remember this", "save this to memory", or "store my
+  preference", and it should persist across sessions.
+- The user asks "what do you know about me", "recall my preferences", or
+  "search my memories".
+- The user asks to forget or correct an outdated memory key.
+- Code needs direct long-term memory reads or writes through `/api/memory`.
+
 Use this skill whenever storing, recalling, updating, searching, or forgetting long-term persistent user facts, preferences, project memory, entity graph state, or context across user sessions.
+
+## When not to use
+
+- The consent-based remember, recall, or forget conversation flow - use
+  `user-learning`.
+- Tone, units, locale, or appearance personalization policy - use
+  `personalisation-context`.
+- Per-task conversation context records with ownership headers - use
+  `durable-task-context`.
+- Reviewing and testing memory endpoint changes - use `code-review-testing`.
 
 The memory engine stores per-user facts in SQLite (`user_memories` table in D1)
 via `/api/memory` endpoints, with the legacy R2 object layout (`memory/<userId>/<key>.json`
@@ -96,3 +115,9 @@ const { matches } = await res.json();
   `npm run test:cloudflare`.
 - Treat remember/forget as successful only after a 2xx response with the
   expected `success`, `userId`, and `key` fields.
+
+## Related skills
+
+- `user-learning` - consent-based remember, recall, and forget flow built on these endpoints.
+- `personalisation-context` - tone, units, locale, and appearance preference policy.
+- `durable-task-context` - per-task context records, separate from durable user memory.

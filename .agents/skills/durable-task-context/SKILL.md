@@ -1,9 +1,26 @@
 ---
 name: durable-task-context
-description: Use when implementing or operating CoreZ durable conversation tasks, SSE replay, cancellation, artifact retrieval, or context records; enforce R2, ownership, and public-deployment boundaries.
+description: Use when working with durable tasks - start a long-running task, stream or replay SSE events, resume or cancel my task, get task artifacts, or persist conversation context records. Not for local repository CLI work - use `corez-cli` instead.
 ---
 
 # Durable Task And Context
+
+## When to use
+
+- Starting or operating a durable conversation task through `/api/tasks` -
+  "start a long task", "resume my task", "cancel the task", "get the artifacts".
+- Streaming or replaying task events over SSE with `Last-Event-ID` after a
+  reconnect, deduplicating by event ID.
+- Persisting or reading bounded conversation context through
+  `/api/context/records`.
+- Enforcing task or record ownership with the `x-corez-user` header on the
+  public Worker.
+
+## When not to use
+
+- Local repository work through the CoreZ CLI - use `corez-cli`.
+- Long-term user facts and preferences across sessions - use `user-learning`.
+- Raw R2 memory storage and keyword recall - use `r2-mem0-memory`.
 
 ## API contract
 
@@ -20,8 +37,8 @@ description: Use when implementing or operating CoreZ durable conversation tasks
 
 ## Ownership boundary
 
-The `x-corez-user` header selects task and context ownership. It is not strong
-authentication on the public endpoint. Use an unguessable, stable identifier,
+The `x-corez-user` header selects task and context ownership.
+It is not strong authentication on the public endpoint. Use an unguessable, stable identifier,
 never rely on the `anonymous` default for private durable work, and never expose
 another user's task or record.
 
@@ -45,3 +62,9 @@ another user's task or record.
 ## Verification
 
 Run `npx vitest run tests/task-persistence.test.js tests/context-storage.test.js` and `npm run test:cloudflare`.
+
+## Related skills
+
+- `corez-cli` - local repository tasks, which the public Worker cannot run.
+- `r2-mem0-memory` - durable user memory behind the same storage bucket.
+- `user-learning` - consent-based durable user facts, separate from per-task context.

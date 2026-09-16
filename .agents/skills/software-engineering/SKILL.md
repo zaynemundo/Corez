@@ -1,11 +1,26 @@
 ---
 name: software-engineering
-description: General software engineering skill covering architecture, implementation, refactoring, code review, debugging, testing, performance optimization, and contract verification across TypeScript, React, Python, Node.js, and SQL.
+description: Use when implementing or refactoring TypeScript, React, Python, Node.js, or SQL code, fixing API contracts, optimizing performance, or adding typed validation. Not for isolated bug hunts - use `auto-debugging` instead.
 ---
 
 # Software Engineering Skill
 
 Use this skill whenever designing, engineering, refactoring, debugging, or reviewing full-stack applications, scripts, APIs, or database systems.
+
+## When to use
+
+- Implementing or refactoring full-stack applications, scripts, APIs, or database systems.
+- Modifying function signatures and updating every invocation site.
+- Adding TypeScript interfaces, JSDoc types, or runtime schema validation (Zod, TypeBox).
+- Auditing duplicate logic or applying DRY and SOLID principles.
+- Running unit tests, contract scripts, linter commands, and production builds before declaring a task finished.
+
+## When not to use
+
+- Code review or contract-test authoring as the primary task - use `code-review-testing` instead.
+- Isolating one failing stack trace or runtime crash - use `auto-debugging` instead.
+- Backend security, CORS, rate limiting, or API resilience design - use `backend-architecture` instead.
+- Committing or pushing verified work on `main` - use `git-superpowers` instead.
 
 ---
 
@@ -49,3 +64,12 @@ Use this skill whenever designing, engineering, refactoring, debugging, or revie
   npm run test:cloudflare # worker + contract suites (node/bash scripts)
   ```
 - **Git Completion**: Commit verified work on local `main`, rebase onto `origin/main`, and push without merge commits (use the `git-superpowers` skill).
+
+---
+
+## Related skills
+
+- `code-review-testing` - pairs automated unit and contract tests with review gates.
+- `auto-debugging` - log-first root cause workflow for runtime failures and build errors.
+- `backend-architecture` - security-first API, CORS, and rate-limiting design.
+- `git-superpowers` - commits verified work on `main` without merge commits.

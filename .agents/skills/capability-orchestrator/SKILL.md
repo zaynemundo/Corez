@@ -1,11 +1,26 @@
 ---
 name: capability-orchestrator
-description: Routes user requests to the smallest effective COREZ capability set, combining skills only when needed and preserving safety, privacy, latency, and cost controls.
+description: Use when a request spans multiple capabilities, needs the smallest effective skill set, or must be routed to the right engine and design skill. Not for a single-domain code change - use `software-engineering` instead.
 ---
 
 # Capability Orchestrator Skill
 
 Use this skill to analyze incoming user requests, determine the minimal required capability set, and delegate sub-tasks to specialized agent engines.
+
+## When to use
+
+- Requests that span multiple capabilities (UI, backend, images, tests).
+- Deciding the minimal skill set for a brief to conserve context and latency.
+- Resolving ambiguous design routing between `frontend-design` and `frontend-modern-design`.
+- Delegating broad research to the `research` subagent or `research-current-information`.
+- Enforcing `cursor-security-rules` and `git-superpowers` policies at completion.
+
+## When not to use
+
+- A single-domain code change with an obvious owner skill - use `software-engineering` instead.
+- Code review and contract testing as the whole task - use `code-review-testing` instead.
+- Runtime verification of a launched app as the whole task - use `verify` instead.
+- One narrow live fact such as weather, time, or rates - use `live-utilities` instead.
 
 ---
 
@@ -51,3 +66,12 @@ Use this skill to analyze incoming user requests, determine the minimal required
 3. **Subagent Delegation**: Delegate broad research tasks to the `research` subagent (or the `research-current-information` skill when live web research is required) to keep context clean.
 4. **Strict Policy Compliance**: Enforce `cursor-security-rules` (canonical security) and git completion policies (`git-superpowers`) upon finishing file modifications. Backend work must also satisfy `backend-architecture: Level 1`.
 5. **Verification**: End every implementation with `verify` checks (`npm test`, `npm run lint`, `npm run build`, `npm run test:cloudflare`) — see `software-engineering: §4` for canonical commands.
+
+---
+
+## Related skills
+
+- `software-engineering` - default owner for single-domain implementation work.
+- `ai-infrastructure` - provider routing, timeout, and retry behavior cited in §2.
+- `verify` - runtime verification commands used to close out implementations.
+- `git-superpowers` - git completion policy enforced on file modifications.

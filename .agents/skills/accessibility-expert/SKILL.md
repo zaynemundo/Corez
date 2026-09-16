@@ -1,11 +1,25 @@
 ---
 name: accessibility-expert
-description: Enforces strict WCAG 2.2 AA accessibility standards across all web interfaces, components, forms, keyboard interactions, screen reader announcements, color contrast, and dynamic focus management.
+description: Use when auditing WCAG 2.2 AA compliance, color contrast ratios, keyboard tab order, focus rings, ARIA labels, screen reader live regions or 44px touch targets. Not for spring and gesture motion physics - use `apple-design` instead.
 ---
 
 # Accessibility Expert Skill
 
 Enforces strict WCAG 2.2 AA accessibility standards on all generated UI elements, React/Vite components, HTML structures, and CSS styles.
+
+## When to use
+
+- The user asks for accessibility, a11y, WCAG 2.2 AA, or ADA-style compliance.
+- You are wiring keyboard navigation, tab order, focus traps, `Escape`-to-close, or visible focus rings.
+- You need ARIA labels, live regions, or screen reader announcements for dynamic UI.
+- You are checking touch target sizes, 200% zoom behavior, or reduced-motion support.
+
+## When not to use
+
+- The request is spring, gesture, or momentum motion design itself - use `apple-design`.
+- The request is a bespoke visual redesign or brand direction - use `frontend-design`.
+- The work is design tokens, light/dark themes, or z-index layering - use `frontend-modern-design`.
+- The topic is raster image generation or asset direction - use `visual-creative`.
 
 ## Core Accessibility Standards
 
@@ -46,3 +60,14 @@ Enforces strict WCAG 2.2 AA accessibility standards on all generated UI elements
 - **Z-index + tokens are canonical in `frontend-modern-design: §1 & §5`** — this skill references that contract instead of redefining it. Apply Background `0` → Content `10` → HUD `20-30` → Overlays/Modals `40-50+`, increments of 10, so modals, toasts, and drawers never sit outside the expected stacking context. See `capability-orchestrator: §1.1` for when to load `frontend-design` vs `frontend-modern-design`.
 - Respect the repo design tokens (`--text-primary`, `--text-secondary`, `--text-muted`, `--border-color` in `src/index.css`) when choosing colors so contrast pairs stay consistent.
 - Responsive/contrast contracts are asserted by the repository's `tests/ui-responsive-contract.sh` — run it directly with `bash tests/ui-responsive-contract.sh` before landing UI changes (it is not wired into `npm run test:cloudflare`).
+
+## Verification
+
+- Run `bash tests/ui-responsive-contract.sh` for the responsive and contrast contracts, then repeat the Audit Workflow passes above before marking UI work complete.
+
+## Related skills
+
+- `frontend-modern-design` - canonical token and z-index contract this skill's contrast and stacking checks reference.
+- `frontend-design` - bespoke primary design skill that must still satisfy these accessibility standards.
+- `apple-design` - motion supplement whose reduced-motion and gesture-state behavior this skill verifies.
+- `visual-creative` - SVG accessibility attributes such as `role="img"` and `<title>`.

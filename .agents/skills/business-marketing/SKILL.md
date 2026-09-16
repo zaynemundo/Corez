@@ -1,9 +1,20 @@
 ---
 name: business-marketing
-description: Develops brand positioning, campaigns, content plans, product launches, sales messaging, SEO, competitor analysis, advertising concepts, and business-process improvements.
+description: Use when the user asks for brand positioning, a marketing or content plan, a product launch, campaign or ad concepts, sales messaging, SEO keywords, competitor analysis, or a business-process improvement. Not for editing the final copy - use `writing-communication` instead.
 ---
 
 # Business & Marketing
+
+## When to use
+- The user asks for brand positioning, messaging frameworks, personas, or campaign concepts.
+- A content calendar, channel strategy, product launch, or sales-enablement plan is requested.
+- The user asks for SEO keyword planning, metadata, page structure, or conversion journeys.
+- A competitor analysis or business-process improvement is requested.
+
+## When not to use
+- Line editing, proofreading, or tone changes on finished copy - use `writing-communication` instead.
+- A multi-item market research report with sourced evidence - use `research` instead.
+- Current competitor or market claims that need live citations - use `research-current-information` instead.
 
 ## Supported work
 - Brand positioning, messaging frameworks, campaign concepts, content calendars, channel strategy, customer personas, competitor analysis, product launches, sales enablement, and process improvement.
@@ -23,3 +34,12 @@ description: Develops brand positioning, campaigns, content plans, product launc
 - Avoid deceptive targeting, dark patterns, fake urgency, and unsupported superlatives.
 - Clearly label strategic assumptions and estimated outcomes.
 - Respect brand guidelines, regional culture, platform rules, and applicable advertising requirements.
+
+## Verification
+- Confirm every stated product fact is either sourced or clearly labelled as an assumption.
+- Confirm success criteria are measurable and that estimated outcomes are labelled as estimates.
+
+## Related skills
+- `writing-communication` - drafting and editing the actual copy once the strategy is set.
+- `research` - multi-item market and competitor research reports.
+- `research-current-information` - verifying current competitor or market claims with live sources.

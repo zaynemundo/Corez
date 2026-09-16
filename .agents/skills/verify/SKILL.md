@@ -1,12 +1,27 @@
 ---
 name: verify
-description: How to launch and drive COREZ end-to-end for runtime verification
+description: Use when launching CoreZ with wrangler dev and npm run dev, driving /api/ai, /api/image, or /api/memory, reproducing 429/503 or retry-scheduled responses, or checking rate limits and the 24 MB body cap. Not for isolated unit debugging - use `auto-debugging` instead.
 ---
 
 # Verifying COREZ end-to-end
 
 > Config note: worker config lives in `wrangler.jsonc` (not `wrangler.toml`) and the worker
 > entry is `./worker/entry.js`. `wrangler dev` uses port 8787 by default.
+
+## When to use
+
+- Launching CoreZ locally (`npx wrangler dev --host localhost` plus `npm run dev`) to watch the app run.
+- Driving `POST /api/ai`, `POST /api/image`, `/api/memory/*`, or `/api/apps/*` and checking real responses.
+- Reproducing a runtime failure such as a 503, 429, or `retry-scheduled` response.
+- Confirming the pre-built static path (`npm run build`, `npm run deploy`) before shipping.
+- Validating gotchas such as the 24 MB body limit or the greeting short-circuit.
+
+## When not to use
+
+- Isolated stack-trace debugging with a reproduction script - use `auto-debugging`.
+- Diff review or unit test coverage - use `code-review-testing`.
+- Visual or art-direction inspection of the running screen - use `visual-creative`.
+- Committing and pushing the verified result - use `git-superpowers`.
 
 ## Launch
 
@@ -78,3 +93,9 @@ npm run build
   retryAfterSeconds}` and resending the same messages resumes the task.
 - `/api/ai` and `/api/image` are rate limited per client IP
   (20/min and 30/min; HTTP 429 with `Retry-After`).
+
+## Related skills
+
+- `auto-debugging` - isolation of a failure before this end-to-end pass.
+- `code-review-testing` - unit and static checks that precede runtime verification.
+- `git-superpowers` - commits the verified state on `main`.

@@ -1,9 +1,20 @@
 ---
 name: data-documents
-description: Use for deterministic dataset analysis and structured document content; create spreadsheet, PDF, Word, or presentation files only when an available tool can generate and validate the requested format.
+description: Use when the user supplies a dataset or CSV to inspect, clean, transform, analyse, chart, or summarise, or asks for spreadsheet formulas, tables, a workbook, or structured document and slide content. Not for generating the final PDF file - use `pdf` instead.
 ---
 
 # Data Analysis & Document Production
+
+## When to use
+- The user supplies a dataset or CSV and asks to inspect, clean, transform, calculate, compare, chart, or summarise it.
+- Spreadsheet formulas, tables, validation, or CSV output are requested.
+- Structured document or slide content is needed.
+- Information must be extracted from uploaded files while preserving source meaning.
+
+## When not to use
+- Creating or processing the final PDF document - use `pdf` instead.
+- Sourcing external facts, sources, or market evidence for a report - use `research` instead.
+- Writing or editing the prose that surrounds the data - use `writing-communication` instead.
 
 ## Supported work
 - Dataset inspection, cleaning, transformation, statistics, modelling, calculations, comparisons, backtesting logic, risk metrics, charts, and benchmark interpretation.
@@ -30,3 +41,13 @@ description: Use for deterministic dataset analysis and structured document cont
 
 ## Related skill
 - For PDF creation and processing (HTML/Paged.js, LaTeX, form filling, merge/split/extract), delegate to the `pdf` skill instead of generating PDFs ad hoc.
+
+## Verification
+- Confirm calculations, totals, formulas, date logic, and sample rows are deterministic and correct before delivering.
+- Confirm any generated file opens correctly and that formulas, links, charts, tables, and pagination render as intended.
+- Report file delivery only after the artifact has been generated and opened or parsed successfully.
+
+## Related skills
+- `pdf` - PDF creation and processing through dedicated tooling.
+- `writing-communication` - drafting and editing the prose around the data.
+- `research` - sourcing external facts and citations for a report.

@@ -1,6 +1,6 @@
 ---
 name: corez-cli
-description: Use when running, configuring, debugging, or extending the first-party CoreZ repository-agent CLI, including plan, build, fix, review, swarm, model routing, workspace tools, and permission modes.
+description: Use when running the local CoreZ CLI - corez plan a feature, corez build, corez fix, corez review my changes, corez swarm, or debug model routing and permission modes. Not for hosted browser task APIs - use `durable-task-context` instead.
 ---
 
 # CoreZ CLI
@@ -8,6 +8,23 @@ description: Use when running, configuring, debugging, or extending the first-pa
 This skill applies to `packages/cli` and `packages/agent-core`. It is distinct
 from the public browser task API: the local CLI can operate on a repository,
 while the public Worker cannot.
+
+## When to use
+
+- Running a repository task from the local CLI - `corez plan "feature"`,
+  `corez build "feature"`, `corez fix`, `corez review`, or `corez swarm "task"`.
+- Configuring or inspecting the CLI - `corez models`, `corez agents`,
+  `corez status`, `.corez/config.json`, `corez.config.json`.
+- Debugging model routing, workspace tools, permission modes, or
+  `COREZ_AUTO_APPROVE` / `YOLO` behavior.
+
+## When not to use
+
+- Hosted browser task APIs, SSE replay, or task artifacts - use
+  `durable-task-context`.
+- Missing environment or provider secret values - use `ask-env-values`.
+- Generic TypeScript refactors or bug fixes outside the CLI packages - use
+  `software-engineering`.
 
 ## Commands
 
@@ -45,3 +62,9 @@ Provider secrets belong in environment variables, never in those files. Load
 
 Run `npm run test:cli`, then `npm run lint` and `npm run build` for changes that
 affect shared web or agent-core modules.
+
+## Related skills
+
+- `durable-task-context` - hosted durable task API, distinct from the local CLI.
+- `ask-env-values` - required provider keys and their placement.
+- `git-superpowers` - commit and push policy after CLI changes.

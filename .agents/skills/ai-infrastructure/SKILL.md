@@ -1,6 +1,6 @@
 ---
 name: ai-infrastructure
-description: Use for AI deployment architecture, provider routing, local inference, GPU capacity, quantization, RAG, reranking, agent workflows, and token or cost optimization; not for ordinary application code changes.
+description: Use when routing LLM providers, tuning token budgets or context compaction, designing RAG, chunking, reranking, or SSE streaming, or cutting model cost. Not for executing a single image request - use `image-generation` instead.
 ---
 
 # AI Infrastructure Skill
@@ -13,6 +13,21 @@ Workers AI **is** used through the `AI` binding: `/api/image/cf`
 (FLUX.2 klein-4b, flux-1-schnell fallback), `/api/rerank`
 (`@cf/baai/bge-reranker-base`), `/api/embed` (`@cf/baai/bge-m3`), and the free
 `/api/search` ranking path — these need no third-party key.
+
+## When to use
+
+- Choosing or reviewing provider routing, failover, and retry behavior (`worker/providerChain.js`).
+- Deciding an image path - OpenRouter `POST /api/image` versus keyless Workers AI `POST /api/image/cf`.
+- Managing token budgets, context window compaction, or system prompt compression.
+- Designing RAG chunking, hybrid search, embedding, or reranking flows.
+- Adopting SSE streaming and `AbortController` cancellation for model output.
+
+## When not to use
+
+- Executing or debugging one image generation request - use `image-generation`.
+- Setting or documenting the actual key values - use `ask-env-values`.
+- Ordinary feature code with no model or provider concern - use `software-engineering`.
+- Isolating a reproducible endpoint bug - use `auto-debugging`.
 
 ```
   ┌─────────────────────────────────────────────────────────────┐
@@ -75,3 +90,9 @@ runtime. CoreZ memory search is keyword-based unless a vector store is added.
   `tests/workers-ai-provider-contract.sh`.
 - Public AI contracts: `npm run test:cloudflare`.
 - Full static and production checks: `npm run lint` and `npm run build`.
+
+## Related skills
+
+- `image-generation` - endpoint-level execution of the image paths described here.
+- `ask-env-values` - collects `OPENCODE_GO_API_KEY` and `OPENROUTER_API_KEY` used by these paths.
+- `backend-architecture` - API contracts and resilience around these providers.

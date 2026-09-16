@@ -1,9 +1,29 @@
 ---
 name: productivity-connectors
-description: Use only when concrete email, calendar, contacts, files, or collaboration connector tools are available; otherwise limit work to drafts and action plans and never claim a connected-service action occurred.
+description: Use when the request needs a real connector - send this email, add a calendar event, find a contact, search my inbox or cloud files, or summarize an email thread. Not for drafting message text with no connector available - use `writing-communication` instead.
 ---
 
 # Productivity Connectors
+
+## When to use
+
+- The request touches email, calendar, contacts, or cloud files and asks for an
+  action or a private-data lookup - "send this email", "add a calendar event",
+  "find a contact", "search my inbox", "summarize this thread".
+- A concrete connector tool is present and authorized, so a draft can become an
+  executed action.
+- The user wants a reviewable draft, meeting details, search query, or
+  step-by-step action plan that a connector could execute later.
+
+## When not to use
+
+- Pure message or document drafting with no connector available - use
+  `writing-communication`.
+- Producing a schedule, reminder, or calendar specification without a real
+  scheduler - use `scheduling-automation`.
+- Building or changing the connector implementation itself - use
+  `backend-architecture`.
+- Reviewing and testing a connector change - use `code-review-testing`.
 
 ## Capability gate
 
@@ -30,3 +50,9 @@ the request, determines whether an action can be executed.
 - Preserve recipients, threading, attachments, and calendar recurrence semantics.
 - Apply least privilege and minimise exposure of private content in the final answer.
 - Follow COREZ pending-action confirmation for destructive, sensitive, or costly operations.
+
+## Related skills
+
+- `writing-communication` - drafting the message copy this skill cannot send.
+- `scheduling-automation` - schedule and reminder specs when no scheduler tool exists.
+- `ask-env-values` - connector credentials or configuration that must be supplied.

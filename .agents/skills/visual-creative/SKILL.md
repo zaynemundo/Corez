@@ -1,11 +1,25 @@
 ---
 name: visual-creative
-description: Use for visual inspection, image-generation direction, SVG creation, product visualization, brand identity, and art direction; do not claim unsupported background-removal or image-editing operations.
+description: Use when writing AI image prompts, creating SVG icons or logos, inspecting screenshots and supplied artwork, product visualization, brand identity boards or art direction. Not for running the raster image endpoints - use `image-generation` instead.
 ---
 
 # Visual & Creative Production Skill
 
 Use this skill whenever analyzing visual artwork, designing UI graphics, crafting AI image prompts, generating SVG icons, or directing visual assets.
+
+## When to use
+
+- The user asks for SVG icons, logos, favicons, or vector illustrations.
+- You need an AI image prompt for a background, hero art, or product visual.
+- Artwork or a screenshot is supplied for visual inspection or critique.
+- You are defining brand identity direction such as palette, mood, and composition.
+
+## When not to use
+
+- The user wants a raster image generated through the CoreZ endpoints - use `image-generation`.
+- The user wants a chat attachment analyzed or read - use `file-attachment-analysis`.
+- The interface needs a full visual language, tokens, or responsive layout - use `frontend-design` or `frontend-modern-design`.
+- The task is game art direction for a playable build - use `game-development`.
 
 ---
 
@@ -51,3 +65,15 @@ Structure prompts with explicit visual dimensions:
 
 1. Inspect generated assets for correct aspect ratio, background isolation, contrast, and scaling artifacts.
 2. Ensure logo geometry, text legibility, and brand color palettes remain crisp across mobile and desktop displays.
+
+## Verification
+
+- Complete the §4 visual inspection pass (aspect ratio, background isolation, contrast, scaling) before delivering an asset.
+- Never report success for background removal or raster editing: CoreZ does not implement background removal and that boundary stays fixed.
+
+## Related skills
+
+- `image-generation` - executes `POST /api/image` and the keyless `POST /api/image/cf` once the prompt is directed.
+- `file-attachment-analysis` - owns the chat attachment metadata boundary this skill defers to.
+- `frontend-design` - consumes SVG and image assets inside a bespoke page layout.
+- `accessibility-expert` - verifies `role="img"` and `<title>` attributes on generated SVGs.

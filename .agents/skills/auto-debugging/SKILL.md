@@ -1,11 +1,26 @@
 ---
 name: auto-debugging
-description: Guidance for self-directed debugging, stack trace interpretation, log analysis, writing reproduction scripts, and validating fixes without user interaction.
+description: Use when a build or test fails, an unhandled exception or runtime crash appears, or behavior is unexpected and you must trace the root cause and verify a fix. Not for new feature work - use `software-engineering` instead.
 ---
 
 # Auto-Debugging Skill
 
 Use this skill whenever investigating build errors, test failures, unhandled exceptions, runtime crashes, or unexpected system behavior.
+
+## When to use
+
+- Build errors, test failures, unhandled exceptions, or runtime crashes.
+- Unexpected system behavior that needs a reproduction before a fix.
+- Interpreting full, untruncated stack traces and log files.
+- Writing an isolated reproduction script or running a targeted test.
+- Confirming a fix with `npm test`, `npm run lint`, and `npm run build` (plus `npm run test:cloudflare` when applicable).
+
+## When not to use
+
+- Reviewing a diff for regressions and missing tests - use `code-review-testing` instead.
+- Building or refactoring a feature that is not currently failing - use `software-engineering` instead.
+- Launching the app to verify endpoints at runtime - use `verify` instead.
+- Sourcing env values, keys, or deployment configuration - use `ask-env-values` instead.
 
 ---
 
@@ -45,3 +60,11 @@ Use this skill whenever investigating build errors, test failures, unhandled exc
 
 ### Step 4: Verification
 - Execute `npm test`, `npm run lint`, and `npm run build` (plus any applicable contract scripts, e.g. `npm run test:cloudflare`) and confirm every command exits 0 before declaring the fix done.
+
+---
+
+## Related skills
+
+- `software-engineering` - broader implementation workflow this skill unblocks.
+- `code-review-testing` - regression and contract coverage after the fix.
+- `verify` - launches the app for end-to-end runtime confirmation.
