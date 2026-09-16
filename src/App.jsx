@@ -36,6 +36,10 @@ import {
   deleteSessionAppsInR2,
 } from "./services/appStorageService";
 import * as chatService from "./services/chatService";
+import {
+  persistUserTurn,
+  persistAssistantTurnAfter,
+} from "./services/turnPersistence";
 import CompactedBanner from "./components/CompactedBanner";
 import {
   compactChatMessages,
@@ -908,20 +912,12 @@ function MainApp({ theme, setTheme }) {
     const updatedApiMessages = [...draftMessages, apiMsg];
 
     const isFreshSession = draftMessages.length === 0;
-    if (isFreshSession && (promptText || displayAttachments[0]?.name)) {
-      generateAISessionTitle(promptText || displayAttachments[0]?.name).then(
-        (aiTitle) => {
-          if (!aiTitle) return;
-          setSessions((prev) =>
-            prev.map((s) =>
-              s.id === targetSessionId ? { ...s, title: aiTitle } : s,
-            ),
-          );
-          // Persist title server-side
-          chatService.patchChatTitle(targetSessionId, aiTitle).catch(() => {});
-        },
-      );
-    }
+    // NOTE: the AI session title is requested AFTER this turn completes (see the
+    // end of this handler). Firing it here opened a second concurrent provider
+    // call the moment a new conversation started — a title request racing a long
+    // build can trip the provider's rate limit, which costs the build a bounded
+    // retry ladder (up to minutes). The deterministic heuristic title below is
+    // applied and persisted immediately, so nothing waits on the AI one.
 
     // Optimistic UI + local title update (move updated chat to top for recency)
     const nowTs = Date.now();
@@ -980,16 +976,20 @@ function MainApp({ theme, setTheme }) {
       return [target, ...mapped.filter((s) => s.id !== targetSessionId)];
     });
 
-    // Persist user message server-side (fire-and-forget, but await for ordering)
-    try {
-      await chatService.appendMessage(targetSessionId, {
-        role: "user",
-        content: displayPrompt,
-        attachments: displayAttachments,
-      });
-    } catch (e) {
-      console.warn("Failed to persist user message", e);
-    }
+    // Persist the user turn WITHOUT blocking the model request. The write is
+    // durability, not a precondition: the bubble is already on screen and the
+    // pending-request snapshot below covers a reload. Awaiting it put a full D1
+    // round trip (~290ms measured) in front of every single message. The
+    // assistant turn is chained on this promise, so stored order is unchanged.
+    const userMessagePersisted = persistUserTurn(
+      () =>
+        chatService.appendMessage(targetSessionId, {
+          role: "user",
+          content: displayPrompt,
+          attachments: displayAttachments,
+        }),
+      (e) => console.warn("Failed to persist user message", e),
+    );
 
     setIsThinking(true);
     setSwarmVisible(false);
@@ -1125,13 +1125,15 @@ function MainApp({ theme, setTheme }) {
           if (!target) return mapped;
           return [target, ...mapped.filter((s) => s.id !== targetSessionId)];
         });
-        // Persist assistant message server-side
-        chatService
-          .appendMessage(targetSessionId, {
+        // Persist the assistant turn after the user turn has been stored, so
+        // the stored conversation keeps its order even though the user write is
+        // no longer awaited before the model request.
+        persistAssistantTurnAfter(userMessagePersisted, () =>
+          chatService.appendMessage(targetSessionId, {
             role: "assistant",
             content: aiMsg.content,
-          })
-          .catch(() => {});
+          }),
+        );
       }
     } catch (err) {
       if (err?.name !== "AbortError") {
@@ -1146,6 +1148,24 @@ function MainApp({ theme, setTheme }) {
         setStreamingSessionId(null);
         abortControllerRef.current = null;
       }
+    }
+
+    // Name the conversation with the model only after the turn is over, so a new
+    // chat never opens two provider calls at once. Failures and empty titles
+    // leave the heuristic title in place.
+    if (isFreshSession && (promptText || displayAttachments[0]?.name)) {
+      generateAISessionTitle(promptText || displayAttachments[0]?.name).then(
+        (aiTitle) => {
+          if (!aiTitle) return;
+          setSessions((prev) =>
+            prev.map((s) =>
+              s.id === targetSessionId ? { ...s, title: aiTitle } : s,
+            ),
+          );
+          // Persist title server-side
+          chatService.patchChatTitle(targetSessionId, aiTitle).catch(() => {});
+        },
+      );
     }
   };
 
