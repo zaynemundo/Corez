@@ -91,12 +91,19 @@ export function PaymentSuccess() {
   return (
     <div
       style={{
-        minHeight: "100vh",
+        minHeight: "100dvh",
         display: "flex",
-        alignItems: "center",
+        /* flex-start + `margin: auto` on the card: centres while there is room
+           and never clips the top when the card overflows a short viewport
+           (plain `align-items: center` does clip). */
+        alignItems: "flex-start",
         justifyContent: "center",
         background: "var(--bg-primary)",
-        padding: "24px",
+        padding:
+          "max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left))",
+        /* Scrolls instead of clipping: body/#root are fixed to 100dvh with
+           overflow hidden, so a tall card used to be unreachable. */
+        overflowY: "auto",
       }}
     >
       <div
@@ -108,6 +115,9 @@ export function PaymentSuccess() {
           borderRadius: "16px",
           padding: "32px",
           textAlign: "center",
+          /* auto margins keep the card centred but let it align to the start
+             (and stay reachable) once it overflows a short viewport. */
+          margin: "auto",
         }}
       >
         <div
@@ -154,7 +164,7 @@ export function PaymentSuccess() {
                 borderRadius: "50%",
                 background: "var(--text-muted)",
                 display: "inline-block",
-                animation: "pulse 1.2s infinite",
+                animation: "thinkingDotPulse 1.4s infinite ease-in-out both",
               }}
             />
             <span
@@ -165,7 +175,7 @@ export function PaymentSuccess() {
                 borderRadius: "50%",
                 background: "var(--text-muted)",
                 display: "inline-block",
-                animation: "pulse 1.2s 0.2s infinite",
+                animation: "thinkingDotPulse 1.4s 0.2s infinite ease-in-out both",
               }}
             />
             <span
@@ -176,7 +186,7 @@ export function PaymentSuccess() {
                 borderRadius: "50%",
                 background: "var(--text-muted)",
                 display: "inline-block",
-                animation: "pulse 1.2s 0.4s infinite",
+                animation: "thinkingDotPulse 1.4s 0.4s infinite ease-in-out both",
               }}
             />
           </div>
