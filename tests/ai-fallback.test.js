@@ -239,6 +239,49 @@ describe('Hosted AI fallback behavior', () => {
     expect(fetchMock.mock.calls.filter(([url]) => url !== '/api/inspiration' && url !== '/api/embed')).toHaveLength(1);
   });
 
+  it('surfaces a same-origin 401 without a wasted cross-origin retry', async () => {
+    // Deployed clients must call same-origin /api/ai ONLY: the session cookie
+    // is HttpOnly and host-bound to the SPA's own domain, so a cross-origin
+    // call to the dedicated workers.dev host could never carry it and always
+    // answered 401 first — a red failed request on every message plus an extra
+    // ~0.6s before the same-origin retry. A genuine logged-out 401 is final.
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/inspiration') return Response.json({ sites: [] });
+      if (url === '/api/embed') return Response.json({ embeddings: [] });
+      expect(url).toBe('/api/ai');
+      return Response.json(
+        { error: 'Authentication required. Please log in.' },
+        { status: 401 }
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(generateHostedAIResponse('What is red?', undefined, [], null, {
+      stream: true,
+      onDelta: () => {}
+    })).rejects.toThrow('Authentication required. Please log in.');
+    expect(fetchMock.mock.calls.filter(([url]) => url !== '/api/inspiration' && url !== '/api/embed')).toHaveLength(1);
+  });
+
+  it('reports the transport failure, not a bogus login prompt, when the direct fallback has no session', async () => {
+    // Same-origin /api/ai is unreachable; the cross-origin direct host answers
+    // 401 because it cannot carry the host-bound cookie. That 401 must not be
+    // dressed up as "please log in" — the honest cause is the transport.
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/inspiration') return Response.json({ sites: [] });
+      if (url === '/api/embed') return Response.json({ embeddings: [] });
+      if (url === '/api/ai') throw new TypeError('Failed to fetch');
+      expect(url).toBe('https://chat.zayne-mayo.workers.dev/api/ai');
+      return Response.json({ error: 'Authentication required. Please log in.' }, { status: 401 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(generateHostedAIResponse('Build a game', undefined, [], null, {
+      stream: true,
+      onDelta: () => {}
+    })).rejects.toThrow(/Failed to fetch|never reached the AI worker/);
+  }, 15000);
+
   it('forwards harness phase and clear events and returns only the final artifact', async () => {
     const fetchMock = vi.fn(async (url) => {
       if (url === '/api/inspiration') return Response.json({ sites: [] });

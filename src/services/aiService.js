@@ -7,21 +7,21 @@ export const MODEL = {
     "Corez 1.0 — conversational AI creation platform for websites, apps, games, and tools.",
 };
 
-// AI traffic order. The raw workers.dev host (chat.zayne-mayo.workers.dev)
-// is a dedicated direct-AI endpoint: it serves ONLY /api/ai, requires an
-// approved CoreZ origin, and answers CORS — so deployed clients call it
-// FIRST and bypass the custom domain's WAF rules and challenge pages.
-// Same-origin /api/ai stays primary for local dev (the Vite proxy targets
-// the local worker) and doubles as the deployed fallback.
-const isPublicHost =
-  typeof window !== "undefined" &&
-  !["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
-export const AI_PROXY_ENDPOINT = isPublicHost
-  ? "https://chat.zayne-mayo.workers.dev/api/ai"
-  : "/api/ai";
-const AI_FALLBACK_ENDPOINT = isPublicHost
-  ? "/api/ai"
-  : "https://chat.zayne-mayo.workers.dev/api/ai";
+// AI traffic order. Same-origin /api/ai is ALWAYS first — in dev (the Vite
+// proxy targets the local worker) and deployed (corez.pro / chat.corez.pro
+// are custom-domain routes of this same Worker, so they serve the SPA and the
+// API together). The session cookie (corez_session) is HttpOnly and
+// host-bound to the SPA's own domain, so a cross-origin POST to the dedicated
+// workers.dev host can NEVER carry it: calling that host first produced a
+// guaranteed 401 on every deployed message, and the client paid an extra
+// ~0.6s cross-origin round trip (a red failed request in devtools on a
+// perfectly healthy app) before the same-origin retry could answer.
+// The raw workers.dev host (chat.zayne-mayo.workers.dev) remains the fallback
+// only: it serves ONLY /api/ai, requires an approved CoreZ origin, answers
+// CORS, and still bypasses custom-domain WAF rules and challenge pages when
+// corez.pro itself is challenged.
+export const AI_PROXY_ENDPOINT = "/api/ai";
+const AI_FALLBACK_ENDPOINT = "https://chat.zayne-mayo.workers.dev/api/ai";
 const CLOUDFLARE_CHALLENGE_PATTERN =
   /Just a moment|challenge-platform|__cf_chl_/i;
 export const IMAGE_PROXY_ENDPOINT = "/api/image";
@@ -1234,9 +1234,25 @@ export async function generateHostedAIResponse(
       response = await fetchWithTransportRetry(options, AI_PROXY_ENDPOINT);
     } catch (err) {
       if (err?.name === "AbortError" || signal?.aborted) throw err;
-      // If the primary endpoint failed to reach (e.g. dev server proxy
-      // offline, or the direct host unreachable), retry through the other.
-      return fetchWithTransportRetry(options, AI_FALLBACK_ENDPOINT);
+      // If same-origin /api/ai failed to reach (e.g. dev server proxy
+      // offline), retry through the Worker's direct live endpoint.
+      let fallback;
+      try {
+        fallback = await fetchWithTransportRetry(
+          options,
+          AI_FALLBACK_ENDPOINT,
+        );
+      } catch (fallbackErr) {
+        if (fallbackErr?.name === "AbortError" || signal?.aborted)
+          throw fallbackErr;
+        // Neither endpoint was reachable: report the primary failure.
+        throw err;
+      }
+      // The direct host is cross-origin, so it can never carry the host-bound
+      // session cookie: its 401 means "no cookie here", never "logged out".
+      // Report the original transport failure instead of a bogus login prompt.
+      if (fallback.status === 401) throw err;
+      return fallback;
     }
 
     if (response.status === 403) {
@@ -1271,26 +1287,12 @@ export async function generateHostedAIResponse(
       }
     }
 
-    // A 401 from the primary may be a cross-origin cookie artifact, not a
-    // missing login: session cookies are domain-bound, so a request from
-    // corez.pro to the direct workers.dev host carries no corez.pro cookie.
-    // Retry once through the other endpoint (same-origin carries the cookie)
-    // before reporting an auth failure. A genuine logged-out state 401s on
-    // both endpoints and still surfaces the login message.
-    if (response.status === 401) {
-      try {
-        const fallback = await fetchWithTransportRetry(
-          options,
-          AI_FALLBACK_ENDPOINT,
-        );
-        if (fallback && (fallback.ok || fallback.status !== 401))
-          return fallback;
-      } catch (fallbackErr) {
-        if (fallbackErr?.name === "AbortError" || signal?.aborted)
-          throw fallbackErr;
-      }
-    }
-
+    // A 401 from same-origin /api/ai is a genuine logged-out state, never a
+    // cross-origin cookie artifact: the session cookie is host-bound to the
+    // SPA's own domain, so the direct workers.dev host can never carry it and
+    // would answer 401 as well. Retrying there just added a wasted
+    // cross-origin round trip before the same login message — surface the 401
+    // as-is.
     return response;
   };
 

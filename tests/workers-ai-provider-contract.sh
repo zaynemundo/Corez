@@ -62,7 +62,8 @@ check 'Search prefers the free Workers AI rerank first' 'rerankWithWorkersAI' wo
 check 'Search falls back to Workers AI embeddings' 'rankWithEmbeddingsWorkersAI' worker/search.js
 check 'Workers AI ranking can be disabled' 'WORKERS_AI_RERANK_DISABLED' worker/search.js
 check 'frontend calls the public AI route' "fetch\(AI_PROXY_ENDPOINT" "$service"
-check 'frontend configures the public AI route' "AI_PROXY_ENDPOINT = isPublicHost" "$service"
+check 'frontend calls the same-origin AI route first on every host' "AI_PROXY_ENDPOINT = ['\"]/api/ai['\"]" "$service"
+check_absent 'frontend never makes the cross-origin direct host the primary endpoint' "AI_PROXY_ENDPOINT = isPublicHost" "$service"
 check 'frontend keeps the same-origin /api/ai fallback' "[\"']/api/ai[\"']" "$service"
 check 'frontend has a direct Worker fallback for zone WAF challenges' 'chat[.]zayne-mayo[.]workers[.]dev/api/ai' "$service"
 check 'frontend retains local fallback' 'generateLocalAIResponse' "$service"
