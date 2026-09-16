@@ -31,6 +31,7 @@ export const SPECIALIST_SKILL_IDS = [
   "live-data-utilities",
   "education-tutor",
   "accessibility-compliance",
+  "cloudflare-platform",
   "business-planning",
   "resume-career",
   "creative-writing",
@@ -85,6 +86,11 @@ const SPECIALIST_TRIGGER_PATTERNS = [
     id: "accessibility-compliance",
     pattern:
       /\b(wcag|accessible|accessibility|screen ?reader|aria|contrast|keyboard navigation|a11y|focus (trap|order|ring|management|visible)|keyboard (only|tab|focus)|skip link|alt text|alternative text|touch targets?|semantic (html|markup)|voiceover|nvda|jaws)\b/i,
+  },
+  {
+    id: "cloudflare-platform",
+    pattern:
+      /\b(cloudflare|wrangler|workers\.dev|workers ai|worker logs?|durable objects?|r2 bucket|d1 database|cloudflare pages|turnstile)\b/i,
   },
   {
     id: "business-planning",

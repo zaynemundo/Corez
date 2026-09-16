@@ -12,6 +12,7 @@ const scenarios = [
   { id: 'live-data-utilities', prompt: 'What is the weather in Tokyo right now?' },
   { id: 'education-tutor', prompt: 'Teach me JavaScript from zero' },
   { id: 'accessibility-compliance', prompt: 'Make my landing page WCAG 2.2 accessible' },
+  { id: 'cloudflare-platform', prompt: 'How do I deploy this project to Cloudflare with wrangler?' },
   { id: 'business-planning', prompt: 'Help me plan a startup: pricing strategy and go-to-market' },
   { id: 'resume-career', prompt: 'Rewrite my resume for a data science role' },
   { id: 'creative-writing', prompt: 'Write me a short story about a lighthouse keeper' },
@@ -77,6 +78,8 @@ describe('CoreZ Specialist Skills', () => {
       ['research-report', 'Do a comparative analysis of EV batteries'],
       ['research-report', 'Due diligence on this acquisition'],
       ['accessibility-compliance', 'Add alt text and fix the focus order'],
+      ['cloudflare-platform', 'Why is my Cloudflare worker returning 503?'],
+      ['cloudflare-platform', 'Check the R2 bucket and D1 database bindings for this project'],
       ['user-learning', 'What do you remember about me?']
     ];
 

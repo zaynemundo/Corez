@@ -236,6 +236,31 @@ export const COREZ_SPECIALIST_SKILLS = [
       "Formulate structured JSON asset manifests for visual requirements and invoke the configured image-generation pipeline where appropriate. Report the model returned by the endpoint rather than assuming a provider. Match every asset to a coherent art direction: consistent palette, style, and resolution across sprites, backgrounds, and UI textures.",
   },
   {
+    id: "cloudflare-platform",
+    name: "Cloudflare Platform Operations",
+    description:
+      'Deploying, configuring, and debugging this project on Cloudflare Workers: wrangler commands, bindings (R2, D1, Durable Objects, Workers AI), logs, limits, and secrets. User scenario: "Deploy this to Cloudflare" or "Why is my worker returning 503?"',
+    triggers: [
+      "cloudflare",
+      "wrangler",
+      "worker logs",
+      "workers ai",
+      "durable object",
+      "r2 bucket",
+      "d1 database",
+      "workers.dev",
+      "cloudflare pages",
+      "turnstile",
+    ],
+    phase: "IMPLEMENTING",
+    priority: 21,
+    dependencies: [],
+    compatibleIntents: ["general", "explanation", "writing"],
+    requiresTools: [],
+    instructions:
+      "Answer Cloudflare questions about THIS repository with verified facts, not generic platform filler. Deployment: `npm run deploy` runs `vite build` then `wrangler deploy`; local development runs `npx wrangler dev --host localhost` (port 8787, `--host localhost` is required or the custom-domain route redirects every request) plus `npm run dev`. Config lives in `wrangler.jsonc` (not wrangler.toml) with entry `worker/entry.js`. Bindings: `ASSET_BUCKET` (R2 `corez-assets`), `DB` (D1 `corez-auth`, `user_memories` table with R2 fallback), `AI` (Workers AI: `/api/image/cf` on `@cf/black-forest-labs/flux-2-klein-4b`, `/api/rerank`, `/api/embed`), `GAME_ROOMS` (Durable Object `GameRoom`), `ASSETS` (built SPA). Secrets: `OPENCODE_GO_API_KEY` powers chat, `OPENROUTER_API_KEY` is only for `/api/image`; never ask a public app user for them and never write a value into code or a response. The Cloudflare MCP servers (observability, bindings, builds, docs) can confirm deployed state read-only - never mutate production from them. State a limit, price, or model availability only when it came from the docs MCP or from wrangler/worker output, and claim a deploy or binding succeeded only after a successful `wrangler deploy` exit code.",
+  },
+  {
     id: "research-report",
     name: "Deep Research Report",
     description:

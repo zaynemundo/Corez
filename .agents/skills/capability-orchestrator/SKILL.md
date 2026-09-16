@@ -39,6 +39,7 @@ Use this skill to analyze incoming user requests, determine the minimal required
 | Scheduling / Reminders | `opencode-go/deepseek-flash` | `scheduling-automation` | Schedule specification (no durable scheduler yet) |
 | Credentials / Env Setup | `opencode-go/deepseek-flash` | `ask-env-values` | Explicitly confirmed env values |
 | Runtime Verification | `opencode-go/deepseek-flash` | `verify` | Launched app with verified endpoints |
+| Deployed Worker / Cloudflare Ops (logs, builds, bindings, D1/R2) | `opencode-go/deepseek-flash` | `verify` + read-only Cloudflare MCP calls (see `verify`), `backend-architecture` | Verified production state with evidence |
 | Data Analysis / Reports | `opencode-go/deepseek-flash` | `data-documents` | Validated spreadsheets, charts, docs |
 
 > **Provider (canonical):** `OPENCODE_GO_API_KEY` / `OPENCODE_API_KEY` (OpenCode Go only for chat). `OPENROUTER_API_KEY` required only for `POST /api/image`. See `verify` and `ai-infrastructure` for timeout/retry behavior. Never ask public app users for these keys — see `ask-env-values`.

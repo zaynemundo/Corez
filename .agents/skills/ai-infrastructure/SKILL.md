@@ -9,10 +9,13 @@ Use this skill when designing, building, or optimizing AI model integrations,
 LLM API proxies, model routing, RAG retrieval, and prompt token efficiency.
 CoreZ does not use a vector database; treat RAG/vector-retrieval topics as
 generic architecture work unless implementation is requested. Cloudflare
-Workers AI **is** used through the `AI` binding: `/api/image/cf`
-(FLUX.2 klein-4b, flux-1-schnell fallback), `/api/rerank`
-(`@cf/baai/bge-reranker-base`), `/api/embed` (`@cf/baai/bge-m3`), and the free
-`/api/search` ranking path — these need no third-party key.
+Workers AI **is** used through the `AI` binding and needs no third-party key:
+`/api/image/cf` (`@cf/black-forest-labs/flux-2-klein-4b`, falling back to
+`@cf/black-forest-labs/flux-1-schnell`), `/api/rerank`
+(`@cf/baai/bge-reranker-base`, 60/min), `/api/embed` (`@cf/baai/bge-m3`,
+1024-dim, 120/min), and the free `/api/search` ranking path. Ranking is
+disableable per deployment with `WORKERS_AI_RERANK_DISABLED=true` /
+`WORKERS_AI_EMBED_DISABLED=true` without affecting the image endpoints.
 
 ## When to use
 
@@ -76,6 +79,9 @@ runtime. CoreZ memory search is keyword-based unless a vector store is added.
 - **Chunking Strategy**: Chunk documents into 256–512 token segments with 10% overlap to preserve context across boundaries.
 - **Hybrid Search**: Combine vector similarity search (cosine distance) with keyword BM25 search for precise document recall.
 - **Reranking**: Apply cross-encoder reranking on top-N candidates before passing context to the LLM generation prompt.
+- **Repository primitives**: implement retrieval with `/api/embed`
+  (`@cf/baai/bge-m3`) and `/api/rerank` (`@cf/baai/bge-reranker-base`) before
+  adding any vector store; `/api/memory` search itself stays keyword-only.
 
 ---
 
@@ -90,9 +96,13 @@ runtime. CoreZ memory search is keyword-based unless a vector store is added.
   `tests/workers-ai-provider-contract.sh`.
 - Public AI contracts: `npm run test:cloudflare`.
 - Full static and production checks: `npm run lint` and `npm run build`.
+- Deployed Workers AI behavior (429/5xx, neuron limits, model availability):
+  confirm with the `cloudflare-observability` MCP server and
+  `cloudflare-docs`' `search_cloudflare_documentation` rather than memory.
 
 ## Related skills
 
 - `image-generation` - endpoint-level execution of the image paths described here.
 - `ask-env-values` - collects `OPENCODE_GO_API_KEY` and `OPENROUTER_API_KEY` used by these paths.
 - `backend-architecture` - API contracts and resilience around these providers.
+- `verify` - live inspection of the deployed Worker (logs, bindings, D1/R2) through the Cloudflare MCP servers.

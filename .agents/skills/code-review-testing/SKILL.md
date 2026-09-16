@@ -71,6 +71,7 @@ Use this skill whenever analyzing, auditing, reviewing code changes, debugging, 
 ### Contract Tests & Bash Verification Scripts
 - Maintain repository contract scripts (e.g. `tests/ui-responsive-contract.sh`, `tests/cloudflare-worker-contract.mjs`, `tests/search-worker-contract.mjs`, `tests/workers-ai-rerank-embed-contract.mjs`).
 - Verify CSS design tokens, DOM classes, ARIA attributes, responsive layout breakpoints, and API status codes against explicit contract specs.
+- The worker suites run fully offline. When a change is already deployed, confirm the real surface read-only through the Cloudflare MCP servers (`cloudflare-observability` for Worker logs, `cloudflare-bindings` for D1/R2) — see `verify`.
 
 ---
 
