@@ -39,6 +39,10 @@ Only the app document itself is published: conversation history, session IDs, an
 
 `OPENCODE_GO_API_KEY` (or `OPENCODE_API_KEY`) is the only required Worker secret for text AI; `OPENROUTER_API_KEY` is optional for image generation only.
 
+### Design references
+
+`/api/inspiration` returns real award-winning site references (title, live URL, design notes) that are injected into app/website build prompts. The scrape costs one Awwwards category page plus up to three site-detail pages, so the parsed result is cached per category in the `INSPIRATION_CACHE` KV namespace (`corez-inspiration-cache`): a fresh entry is served with no network call at all, older entries are refreshed, and a failed refresh falls back to the stale copy instead of returning nothing. The binding is optional — without it the endpoint behaves exactly as before, uncached. The response reports which path served it in `meta.cache` (`fresh`, `refreshed`, `stale`, `miss`).
+
 Repository-agent mode (`mode: "repository-agent"`) is disabled on deployments without a bound workspace. If a `WORKSPACE_BINDING` is ever configured, requests must present a matching `WORKSPACE_OPERATOR_KEY` bearer token; without that secret configured the mode is never executed.
 
 ### Online multiplayer
