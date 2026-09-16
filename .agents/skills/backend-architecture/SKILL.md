@@ -55,7 +55,7 @@ Use this skill whenever designing, building, reviewing, or refactoring APIs, ser
 - Enforce tenant isolation in all database queries (`WHERE tenant_id = ?`) to prevent unauthorized cross-tenant data access.
 - Implement rate limiting per IP / API key (`createRateLimiter` in `worker/utils.js`, used on `/api/ai`, `/api/image`, `/api/publish`, `/api/memory`, and the auth routes) to protect endpoints from denial-of-service or brute force attacks — see `cursor-security-rules: §4`.
   - The repository limiter is a **per-isolate, in-memory** sliding window keyed by `CF-Connecting-IP` (then `X-Forwarded-For`, then `anonymous`), capped at `maxClients` 1,000 entries. It is best-effort, not a global quota: each Worker isolate holds its own counters and a redeploy or eviction resets them. For a hard global limit use Cloudflare's native rate limiting or a Durable Object counter — never a KV read-modify-write on the hot path.
-  - Verified limits (per 60 s): `/api/ai` 20; `/api/image`, `/api/image/cf`, `/api/assets`, `/api/apps`, `/api/publish`, `/api/memory` 30; `/api/rerank` 60; `/api/embed` 120; `/api/auth/*` 10 and forgot-password 5. Over-limit responses are HTTP 429 with `Retry-After` seconds.
+  - Verified limits (per 60 s): `/api/ai` 20; `/api/image`, `/api/image/cf`, `/api/assets`, `/api/apps`, `/api/publish`, `/api/memory` 30; `/api/rerank` 60; `/api/embed` 120; `/api/auth/login` and `/api/auth/signup` 10; forgot-password 5. Over-limit responses are HTTP 429 with `Retry-After` seconds.
 
 ### 4. CORS & Network Defense
 - Enforce explicit CORS origins (`Access-Control-Allow-Origin: https://yourdomain.com`) for any route that carries cookies or `Authorization` credentials, and never pair a wildcard origin with `Access-Control-Allow-Credentials: true`.
