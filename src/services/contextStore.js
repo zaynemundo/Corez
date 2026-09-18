@@ -284,7 +284,10 @@ export function persistAndSummarize(messages) {
     // cross-refresh guarantee in the background.
     void client.saveRecord(record);
   }
-  const persisted = Boolean(saved.ok);
+  // Durability is only ever claimed for the server backend: the local index
+  // alone points at a record that is lost on refresh when the client is
+  // in-memory, so those backends report persisted: false (in-session only).
+  const persisted = Boolean(saved.ok) && client.backend === "server";
 
   const parts = persisted
     ? [

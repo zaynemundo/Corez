@@ -47,10 +47,17 @@ CoreZ provides a multi-agent swarm orchestration framework spanning both CLI/age
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| M1 | Pipeline & Harness Integration | Harmonize role catalogs, dynamic DAG routing, and creation harness specialist pre-pass. | none | IN_PROGRESS |
-| M2 | Dynamic DAG Mechanics & Retry Hardening | Verify atomic resource locking, upstream context isolation, verifier self-correction retry parity in orchestrators, and topological artifact merging. | M1 | PLANNED |
-| M3 | Concurrency, Benchmarks & Script Harmonization | Update `package.json` test scripts, run benchmark evaluator validation, and ensure rate-limited concurrency queues scale deterministically. | M2 | PLANNED |
-| M4 | Comprehensive E2E Swarm Verification & Audit | Execute all unit, integration, benchmark, and contract test suites, run challenger verification and forensic integrity audit. | M3 | PLANNED |
+| M1 | Pipeline & Harness Integration | Harmonize role catalogs, dynamic DAG routing, and creation harness specialist pre-pass. | none | COMPLETE |
+| M2 | Dynamic DAG Mechanics & Retry Hardening | Verify atomic resource locking, upstream context isolation, verifier self-correction retry parity in orchestrators, and topological artifact merging. | M1 | COMPLETE |
+| M3 | Concurrency, Benchmarks & Script Harmonization | Update `package.json` test scripts, run benchmark evaluator validation, and ensure rate-limited concurrency queues scale deterministically. | M2 | COMPLETE |
+| M4 | Comprehensive E2E Swarm Verification & Audit | Execute all unit, integration, benchmark, and contract test suites, run challenger verification and forensic integrity audit. | M3 | COMPLETE |
+
+> Status note (2026-09-18): M1–M4 are implemented and verified by the suites:
+> `npm test` passes 114 files / 1,278 tests, `npm run test:swarm` covers the
+> swarm/harness contract, and the swarm feature inventory in `TEST_INFRA.md`
+> is exercised by `tests/swarm-*.test.js`, `tests/harness-swarm.test.js` and
+> `tests/cli/generic-swarm.test.js`. The earlier IN_PROGRESS/PLANNED labels
+> predated the worker_1 handoff and reviewer verification.
 
 ## Interface Contracts
 ### `GenericSwarmOrchestrator` ↔ `TaskDependencyGraph`

@@ -1,5 +1,10 @@
 # CoreZ Intelligence, Reliability & Speed Upgrade — Final Report
 
+> **Historical document (2026-08-07).** It records the provider chain and
+> token-cap design of that date. The current runtime routes `/api/ai` through
+> OpenCode Go only (no DeepSeek/OpenRouter text fallback) and sends no output
+> token caps; see README.md for the live contract.
+
 Date: 2026-08-07 · Branch: `main` · Committed as part of the upgrade commit.
 
 This report covers the phased upgrade delivered against the 25-point

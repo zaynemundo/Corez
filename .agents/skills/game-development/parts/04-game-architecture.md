@@ -57,7 +57,7 @@ src/
     audio/                  # Generated or sourced audio files
     levels/                 # JSON level data files
 
-  __tests__/                # Mirror of src/ structure
+  tests/                # Mirror of src/ structure
 ```
 
 ### Module Boundary Rules
@@ -69,7 +69,7 @@ src/
 | `systems/` | May import from `core/`. Must NOT import from `entities/` — operate on entity interfaces only. |
 | `levels/` | May import from `core/` and `entities/`. Must NOT import from `ui/`. |
 | `ui/` | May import from `core/` and `entities/` (for read-only state). Must NOT import from `systems/` or `levels/`. |
-| `__tests__/` | May import from any module. Tests are the only exception to all boundary rules. |
+| `tests/` | May import from any module. Tests are the only exception to all boundary rules. |
 
 ### Interface/Contract Patterns Between Systems
 

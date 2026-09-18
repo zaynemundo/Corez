@@ -16,8 +16,8 @@ Note: this repo is JavaScript (no TypeScript), so there is no `typecheck` script
 plus `npm run lint` cover static correctness.
 
 #### Phase 2: Compare With Baseline
-- Baseline is stored in `test-results/baseline/` as a JSON snapshot
-- Vitest JSON output: `npm test -- --reporter=json --outputFile=test-results/current/latest.json`
+- Baseline is stored in `test_results/baseline/` as a JSON snapshot
+- Vitest JSON output: `npm test -- --reporter=json --outputFile=test_results/current/latest.json`
 - Compare current run against baseline with `scripts/compare-test-results.mjs`
 - Show pass/fail diff between current run and baseline
 
@@ -32,9 +32,9 @@ Test Results Diff:
 - Filter for tests that passed in baseline but fail now:
   ```bash
   node scripts/compare-test-results.mjs \
-    --baseline test-results/baseline/latest.json \
-    --current test-results/current/latest.json \
-    --output test-results/diff.json
+    --baseline test_results/baseline/latest.json \
+    --current test_results/current/latest.json \
+    --output test_results/diff.json
   ```
 - For each new failure, capture:
   - Test ID and description
@@ -68,19 +68,19 @@ Test Results Diff:
 
 ### 3. Baseline Comparison Method
 
-- Baseline snapshots stored at `test-results/baseline/YYYY-MM-DD--<commit-hash>.json`
-- Latest baseline symlink: `test-results/baseline/latest.json`
+- Baseline snapshots stored at `test_results/baseline/YYYY-MM-DD--<commit-hash>.json`
+- Latest baseline symlink: `test_results/baseline/latest.json`
 - Create a baseline from a known-good run:
   ```bash
-  mkdir -p test-results/baseline
-  npm test -- --reporter=json --outputFile=test-results/baseline/latest.json
+  mkdir -p test_results/baseline
+  npm test -- --reporter=json --outputFile=test_results/baseline/latest.json
   ```
 - Compare with:
   ```bash
   node scripts/compare-test-results.mjs \
-    --baseline test-results/baseline/latest.json \
-    --current test-results/current/latest.json \
-    --output test-results/diff.json
+    --baseline test_results/baseline/latest.json \
+    --current test_results/current/latest.json \
+    --output test_results/diff.json
   ```
 - Diff format: `{ added: [...], removed: [...], changed: [...], same: number }`
 

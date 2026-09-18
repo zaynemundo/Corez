@@ -6,7 +6,11 @@ import {
   retrieveContextRecords,
   storeContextRecords
 } from '../src/services/contextStore.js';
-import { memoryContextStore } from '../src/services/contextStoreClient.js';
+import {
+  memoryContextStore,
+  createContextClient,
+  setContextClient
+} from '../src/services/contextStoreClient.js';
 
 describe('context store exact retrieval', () => {
   beforeEach(() => {
@@ -117,6 +121,24 @@ describe('context store exact retrieval', () => {
     expect(retrieveContextRecord('ctx-unknown-0001')).toBeNull();
     expect(retrieveContextMessages('ctx-unknown-0001')).toEqual([]);
     expect(retrieveContextRecords(['ctx-unknown-0001'])).toEqual([[]]);
+  });
+
+  it('does not claim durable persistence for an in-session-only backend', () => {
+    const client = createContextClient({
+      backend: 'memory',
+      storage: globalThis.localStorage,
+      store: new Map()
+    });
+    setContextClient(client);
+    try {
+      const { persisted, summaryMessage } = persistAndSummarize([
+        { role: 'user', content: 'in-session only' }
+      ]);
+      expect(persisted).toBe(false);
+      expect(summaryMessage.content).toContain('persisted: false');
+    } finally {
+      setContextClient(null);
+    }
   });
 
   it('still returns a legacy .content record as-is', () => {
