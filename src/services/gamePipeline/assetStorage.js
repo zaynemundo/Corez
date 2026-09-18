@@ -219,15 +219,21 @@ export class AssetStorageService {
       blob = await response.blob();
     }
 
-    // 3. Validate MIME type
+    // 3. Validate MIME type. The blob's actual type is authoritative when
+    // present; expectedType is only a fallback for responses that omit it.
+    // (The previous `!valid(blob.type) && !valid(expectedType)` let any bad
+    // actual type through whenever the expected type was valid.)
     const validMimes = [
       "image/png",
       "image/jpeg",
       "image/webp",
       "image/svg+xml",
     ];
-    if (!validMimes.includes(blob.type) && !validMimes.includes(expectedType)) {
-      throw new Error(`Invalid image MIME type: ${blob.type}`);
+    const declaredType =
+      typeof blob.type === "string" && blob.type ? blob.type : "";
+    const resolvedType = declaredType || expectedType;
+    if (!validMimes.includes(resolvedType)) {
+      throw new Error(`Invalid image MIME type: ${resolvedType}`);
     }
 
     // 4. Save to permanent storage adapter
@@ -243,7 +249,7 @@ export class AssetStorageService {
       assetId,
       permanentUrl,
       sizeBytes: blob.size,
-      mimeType: blob.type,
+      mimeType: resolvedType,
     };
   }
 }

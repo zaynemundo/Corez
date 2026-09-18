@@ -780,7 +780,6 @@ function EmailCard({ content, renderBody }) {
           <label className="email-edit-field">
             <span className="email-edit-label">Recipients</span>
             <input
-              id="email-recipients"
               name="email-recipients"
               className="email-edit-input"
               value={recipients}
@@ -791,7 +790,6 @@ function EmailCard({ content, renderBody }) {
           <label className="email-edit-field">
             <span className="email-edit-label">Subject</span>
             <input
-              id="email-subject"
               name="email-subject"
               className="email-edit-input"
               value={subject}
@@ -802,7 +800,6 @@ function EmailCard({ content, renderBody }) {
           <label className="email-edit-field">
             <span className="email-edit-label">Message</span>
             <textarea
-              id="email-body"
               name="email-body"
               className="email-edit-textarea"
               value={body}

@@ -1,5 +1,10 @@
 import model from "../data/intent-classifier-model.json" with { type: "json" };
 
+// Built once at module load: classifyIntent is called several times per
+// message, and rebuilding a Set from 338 vocabulary entries each call was a
+// measurable hot-path allocation.
+const VOCAB_SET = new Set(model.vocabulary);
+
 // MUST stay byte-identical to scripts/train-intents.mjs tokenize(): the
 // runtime classifier and the training pipeline share the same tokenizer so
 // the committed model's vocabulary matches what runs in the browser.
@@ -173,7 +178,7 @@ export function classifyIntent(prompt) {
     };
   }
 
-  const vocabSet = new Set(model.vocabulary);
+  const vocabSet = VOCAB_SET;
   let oovCount = 0;
   for (const token of tokens) {
     if (!vocabSet.has(token)) {

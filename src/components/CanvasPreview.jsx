@@ -30,6 +30,7 @@ import {
 import { publishAppInR2 } from "../services/appStorageService";
 import { useAuth } from "../context/AuthContext";
 import { createZipBlob } from "../utils/zipPackager";
+import { repairMalformedHtml } from "../utils/htmlRepair";
 import { generateQrCodeSvg, generateEmbedSnippet } from "../utils/qrCode";
 
 export default function CanvasPreview({
@@ -444,10 +445,13 @@ export default function CanvasPreview({
     if (!editableCode) return;
 
     if (multiPage.isMultiPage && multiPage.pages.length > 0) {
-      // Multi-page site export: package all individual HTML files into a ZIP archive
+      // Multi-page site export: package all individual HTML files into a ZIP
+      // archive. Exports are meant to run on their own host: use the repaired
+      // source (no preview CSP/navigation guard), otherwise every relative
+      // link in the downloaded site would be blocked by the preview guard.
       const filesToZip = multiPage.pages.map((p) => ({
         name: p.name,
-        content: formatCodeForPreview(p.html),
+        content: repairMalformedHtml(p.html),
       }));
       const blob = createZipBlob(filesToZip);
       const url = URL.createObjectURL(blob);
@@ -464,8 +468,9 @@ export default function CanvasPreview({
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } else {
-      // Single-file HTML deliverable export
-      const blob = new Blob([formatCodeForPreview(editableCode)], {
+      // Single-file HTML deliverable export (standalone: repaired source,
+      // not the sandboxed preview document).
+      const blob = new Blob([repairMalformedHtml(editableCode)], {
         type: "text/html",
       });
       const url = URL.createObjectURL(blob);
@@ -506,6 +511,9 @@ export default function CanvasPreview({
   };
 
   const handleRefresh = () => {
+    // A reload replaces the document the error banner refers to; a stale
+    // banner would claim the fresh document is broken.
+    setRuntimeError(null);
     setKey((prev) => prev + 1);
   };
 

@@ -207,8 +207,8 @@ check 'mobile canvas stacks instead of forcing split pane' '\.main-content'
 check 'mobile chat pane can shrink below desktop width' 'min-width: 0'
 check_block_property 'prompt cards are rectangular, not oversized pills' '.sample-prompt-card' 'border-radius' 'var(--radius-sm)'
 check_block_property 'history rows use restrained rectangular radius' '.history-item' 'border-radius' 'var(--radius-sm)'
-check 'canvas iframe receives scalable width from component' "width: '100%'" "$canvas"
-check 'canvas iframe receives bounded max width from component' "maxWidth: '100%'" "$canvas"
+check 'canvas iframe receives scalable width from component' 'width: deviceSpecs\[deviceMode\]\.width' "$canvas"
+check 'canvas iframe receives bounded max width from component' 'maxWidth: "100%"' "$canvas"
 check_absent 'canvas iframe does not force fixed device height' 'height: deviceSpecs\[deviceMode\]\.height' "$canvas"
 check_absent 'canvas iframe does not combine forced height with aspect ratio' 'aspectRatio: deviceSpecs\[deviceMode\]\.aspectRatio' "$canvas"
 check 'canvas source editor uses a reusable class' 'className="canvas-source-editor"' "$canvas"

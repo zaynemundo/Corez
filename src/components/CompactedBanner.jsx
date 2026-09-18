@@ -108,7 +108,7 @@ export default function CompactedBanner({
           <span
             style={{
               marginLeft: "0.5rem",
-              color: "var(--text-tertiary)",
+          color: "var(--text-tertiary, var(--text-muted, #8a8a90))",
               fontStyle: "italic",
             }}
           >
@@ -116,7 +116,7 @@ export default function CompactedBanner({
           </span>
         )}
         {persisted && (
-          <span style={{ marginLeft: "0.5rem", color: "var(--text-tertiary)" }}>
+          <span style={{ marginLeft: "0.5rem", color: "var(--text-tertiary, var(--text-muted, #8a8a90))" }}>
             (retrievable)
           </span>
         )}

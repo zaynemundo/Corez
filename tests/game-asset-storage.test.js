@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { MemoryStorageAdapter, CloudflareR2StorageAdapter, AssetStorageService } from '../src/services/gamePipeline/assetStorage.js';
 import { validateAsset, generateAssetRepairPrompt } from '../src/services/gamePipeline/assetValidator.js';
 
@@ -76,4 +76,42 @@ describe('Asset Storage & Validation Pipeline', () => {
     expect(repairPrompt).toContain('The generated image asset for "background"');
     expect(repairPrompt).toContain('File size exceeds 5MB limit');
   });
+
+  it('rejects a blob whose actual MIME type is invalid even when expectedType is valid', async () => {
+    const adapter = new MemoryStorageAdapter();
+    const service = new AssetStorageService(adapter);
+
+    const textDataUrl = 'data:text/plain;base64,aGVsbG8gd29ybGQ=';
+    await expect(
+      service.fetchAndPersistAsset('job_bad', 'player', textDataUrl, 'image/png'),
+    ).rejects.toThrow(/Invalid image MIME type: text\/plain/);
+  });
+
+  it('falls back to expectedType only when the blob type is missing', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        blob: async () => new Blob([new Uint8Array([1, 2, 3])], { type: '' }),
+      })),
+    );
+    try {
+      const adapter = new MemoryStorageAdapter();
+      const service = new AssetStorageService(adapter);
+
+      const result = await service.fetchAndPersistAsset(
+        'job_fallback',
+        'player',
+        'https://cdn.example.com/player.png',
+        'image/png',
+      );
+      expect(result.mimeType).toBe('image/png');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });

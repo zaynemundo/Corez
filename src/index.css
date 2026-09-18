@@ -387,7 +387,9 @@ h6 {
   object-fit: contain;
 }
 
-[data-theme="dark"] .new-chat-icon {
+/* The legacy dark-theme filter only applied to the former raster icon; the
+   icon is now an SVG that inherits currentColor. */
+[data-theme="dark"] img.new-chat-icon {
   filter: invert(1);
 }
 
@@ -2341,6 +2343,9 @@ h6 {
   display: flex;
   flex-direction: column;
   transition: var(--transition-normal);
+  /* Anchors the absolutely-positioned publish-error toast to the pane rather
+     than to the viewport. */
+  position: relative;
 }
 
 .canvas-pane.full-width {

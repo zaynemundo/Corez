@@ -22,7 +22,6 @@ export default function SettingsModal({
   theme,
   onToggleTheme,
 }) {
-  if (!isOpen) return null;
   let auth;
   try {
     auth = useAuth();
@@ -61,6 +60,12 @@ export default function SettingsModal({
     ? new Date(sub.period_end).toLocaleDateString()
     : null;
   const navigate = useNavigate();
+
+  // Hooks above must run on every render (isOpen false included): the modal is
+  // always mounted by App and only its visibility changes. An early return
+  // before the hooks made the first open throw "Rendered more hooks than
+  // during the previous render" and dropped the app into the ErrorBoundary.
+  if (!isOpen) return null;
 
   return (
     <div className="modal-overlay" onClick={onClose}>

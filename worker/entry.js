@@ -200,6 +200,11 @@ export default {
       "/api/tasks",
       "/api/task",
       "/api/context",
+      // Payment-intent creation/reads use the server's Ziina key: only the
+      // signed-in account that is checking out may call them. (There is no
+      // public webhook route here; settlement is reconciled server-side.)
+      "/api/ziina",
+      "/api/payments/ziina",
     ];
     const baseAuthPath =
       authPaths.some(

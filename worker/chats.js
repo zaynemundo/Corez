@@ -555,11 +555,13 @@ export async function handleChats(request, env) {
       await env.DB.prepare("DELETE FROM chats WHERE id = ? AND user_id = ?")
         .bind(chatId, userId)
         .run();
-      // Best-effort R2 cleanup for this chat's apps
+      // Best-effort R2 cleanup for this chat's apps. App records are stored
+      // under apps/<userId>/<sessionId>/<appId>.json, so the session id alone
+      // never matches a prefix.
       if (env?.ASSET_BUCKET) {
         try {
           const list = await env.ASSET_BUCKET.list({
-            prefix: `apps/${chatId}/`,
+            prefix: `apps/${userId}/${chatId}/`,
           });
           if (list?.objects) {
             for (const obj of list.objects) {

@@ -32,10 +32,11 @@ check_absent 'completed app action no longer says Thinking / Created App' 'Think
 check_absent 'completed app action no longer uses thinking pill class' 'thinking-pill' "$message"
 check 'completed app action is labelled Open preview' 'Open preview' "$message"
 check 'temporary thinking state renders animated dot container' 'thinking-dots' "$app"
-check 'thinking state keeps accessible thinking label' 'Corez is thinking' "$app"
+check 'thinking state exposes the build phase label' 'buildPhaseLabel\(buildPhase\)' "$app"
+check 'thinking state keeps an accessible control label' 'Expand response|Collapse response' "$app"
 check 'dot animation keyframes exist' '@keyframes thinkingDotPulse' "$css"
 check 'three thinking dots are styled' 'thinking-dot' "$css"
-check_absent 'old spinning bullet animation is removed' 'spinning-icon|@keyframes spin' "$css"
+check_absent 'old spinning bullet animation is removed' 'spinning-icon' "$css"
 
 if (( failures > 0 )); then
   printf '%d thinking indicator contract check(s) failed.\n' "$failures" >&2

@@ -1,6 +1,12 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { Settings, PanelLeft, MoreVertical, Trash2 } from "lucide-react";
+import {
+  Settings,
+  PanelLeft,
+  MoreVertical,
+  Trash2,
+  SquarePen,
+} from "lucide-react";
 
 export default function Sidebar({
   isOpen,
@@ -59,10 +65,10 @@ export default function Sidebar({
           onClick={onNewChat}
           title="New Chat Session"
         >
-          <img
+          <SquarePen
             className="new-chat-icon"
-            src="https://cdn-icons-png.flaticon.com/512/1159/1159633.png"
-            alt=""
+            size={16}
+            strokeWidth={1.5}
             aria-hidden="true"
           />
           <span>New Chat</span>

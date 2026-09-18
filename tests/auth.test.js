@@ -357,6 +357,41 @@ describe('Worker Auth Engine', () => {
       expect(res.status).toBe(200);
       expect(res.headers.get('Set-Cookie')).toContain('Max-Age=0');
     });
+
+    it('never returns a password-reset token in the response by default', async () => {
+      mockEnv.DB.users.set('reset@corez.pro', {
+        id: 'u_reset', email: 'reset@corez.pro', password_hash: 'hash',
+        provider: 'local', created_at: Date.now(), plan: 'free'
+      });
+      const req = new Request('https://corez.pro/api/auth/forgot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'reset@corez.pro' })
+      });
+      const res = await handleAuth(req, mockEnv);
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.token).toBeUndefined();
+      expect(body.resetUrl).toBeUndefined();
+    });
+
+    it('returns a password-reset token only with the explicit dev opt-in', async () => {
+      mockEnv.DB.users.set('optin@corez.pro', {
+        id: 'u_optin', email: 'optin@corez.pro', password_hash: 'hash',
+        provider: 'local', created_at: Date.now(), plan: 'free'
+      });
+      mockEnv.AUTH_RESET_TOKEN_IN_RESPONSE = '1';
+      const req = new Request('https://corez.pro/api/auth/forgot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'optin@corez.pro' })
+      });
+      const res = await handleAuth(req, mockEnv);
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(typeof body.token).toBe('string');
+      expect(body.token.length).toBeGreaterThan(10);
+    });
   });
 
   describe('Session Verification & Require Auth', () => {

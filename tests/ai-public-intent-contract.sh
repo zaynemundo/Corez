@@ -19,11 +19,11 @@ check 'intent prompt explains public user language' 'public user intent'
 check 'intent prompt asks Corez to infer goals instead of matching only keywords' 'infer.*goal|goal.*infer'
 check 'app intent includes natural build verbs' 'launch|prototype|design|create|build|make'
 check 'app intent includes public-facing site terms' 'website|landing page|dashboard|portal|tool'
-check 'code-help intent exists' "type: 'code-help'"
-check 'writing intent exists' "type: 'writing'"
-check 'explanation intent exists' "type: 'explanation'"
-check 'response generation uses the analyzed public intent' 'const intent = analyzePublicUserIntent'
-check 'app creation condition uses intent type' "intent\\.type === 'app'"
+check 'code-help intent exists' "type:[[:space:]]*['\"]code-help['\"]"
+check 'writing intent exists' "type:[[:space:]]*['\"]writing['\"]"
+check 'explanation intent exists' "type:[[:space:]]*['\"]explanation['\"]"
+check 'response generation uses the analyzed public intent' 'analyzePublicUserIntent'
+check 'app creation condition uses intent type' "intent\.type[[:space:]]*===[[:space:]]*['\"]app['\"]"
 check 'fallback response references inferred intent summary' 'intent[.]summary'
 
 if (( failures > 0 )); then

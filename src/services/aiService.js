@@ -2378,8 +2378,7 @@ function detectRequestedImageModel(prompt, history) {
     haystack.includes("sdxl_lightning") ||
     haystack.includes("stable-diffusion-xl-lightning") ||
     haystack.includes("stable-diffusion-xl-lighting") ||
-    haystack.includes("sdxl lightning") ||
-    haystack.includes("lightning")
+    haystack.includes("sdxl lightning")
   ) {
     return WORKERS_AI_SDXL_LIGHTNING_MODEL;
   }
@@ -2837,10 +2836,13 @@ export function generateSessionTitle(prompt) {
 export async function generateAISessionTitle(prompt) {
   const clean = String(prompt || "").trim();
   if (!clean) return generateSessionTitle(clean);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
   try {
     const response = await fetch(AI_PROXY_ENDPOINT, {
       method: "POST",
       credentials: "include",
+      signal: controller.signal,
       headers: {
         "Content-Type": "application/json",
       },
@@ -2855,6 +2857,8 @@ export async function generateAISessionTitle(prompt) {
     return title ? title.slice(0, 60) : generateSessionTitle(clean);
   } catch {
     return generateSessionTitle(clean);
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

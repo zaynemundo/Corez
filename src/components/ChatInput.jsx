@@ -74,6 +74,7 @@ export default function ChatInput({
   const [activeIndex, setActiveIndex] = useState(0);
   const suggestionsRef = useRef(null);
   const fileInputRef = useRef(null);
+  const submitRetryRef = useRef(0);
 
   const [internalAttachments, setInternalAttachments] = useState([]);
   const attachments =
@@ -240,10 +241,19 @@ export default function ChatInput({
           a.size <= MAX_IMAGE_THUMB_BYTES),
     );
     if (hasPending) {
-      // Image thumb still generating or R2 upload in flight — wait briefly then retry; the chip shows loading/uploading
+      // Image thumb still generating or R2 upload in flight — wait briefly and
+      // retry (the chip shows loading/uploading). The wait is bounded: after
+      // ~6s the composer stops retrying instead of looping forever, and the
+      // user can press send again once the chip settles.
+      if (submitRetryRef.current >= 40) {
+        submitRetryRef.current = 0;
+        return;
+      }
+      submitRetryRef.current += 1;
       setTimeout(() => handleSubmit(e), 150);
       return;
     }
+    submitRetryRef.current = 0;
     onSendMessage(textToSend, attachments);
     setInput("");
     setAttachments([]);

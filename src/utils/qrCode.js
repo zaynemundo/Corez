@@ -1,111 +1,54 @@
 /**
- * Zero-Dependency SVG QR Code Generator
- * Generates clean, crisp vector QR codes for published creation links.
- * Implements standard QR encoding matrix for URLs with finder patterns,
- * timing patterns, alignment patterns, and data masking.
+ * SVG QR Code Generator
+ *
+ * Produces real, scannable QR codes for published creation links. The matrix
+ * is produced by the vendored, battle-tested MIT encoder
+ * (`qrcode-generator` by Kazuhiko Arase, see src/utils/vendor/) — the previous
+ * hand-drawn pattern had finder/timing decoration but no data encoding, ECC,
+ * or masking, so no scanner could ever read it.
  */
 
-// Simple byte polynomial & Reed-Solomon generation table for compact QR codes
-function createQRMatrix(text) {
-  const size = 25; // Standard Version 2 (25x25) matrix for short URLs
-  const matrix = Array.from({ length: size }, () => Array(size).fill(0));
-  const reserved = Array.from({ length: size }, () => Array(size).fill(false));
+import { qrcode } from "./vendor/qrcode-generator.mjs";
 
-  // Finder pattern helper (7x7)
-  function drawFinder(r0, c0) {
-    for (let r = 0; r < 7; r++) {
-      for (let c = 0; c < 7; c++) {
-        const isBorder = r === 0 || r === 6 || c === 0 || c === 6;
-        const isCenter = r >= 2 && r <= 4 && c >= 2 && c <= 4;
-        matrix[r0 + r][c0 + c] = isBorder || isCenter ? 1 : 0;
-        reserved[r0 + r][c0 + c] = true;
-      }
-    }
-    // Separator rings
-    for (let r = -1; r <= 7; r++) {
-      for (let c = -1; c <= 7; c++) {
-        const nr = r0 + r;
-        const nc = c0 + c;
-        if (nr >= 0 && nr < size && nc >= 0 && nc < size && !reserved[nr][nc]) {
-          matrix[nr][nc] = 0;
-          reserved[nr][nc] = true;
-        }
-      }
-    }
-  }
+// The library's default stringToBytes codec is Latin-1, which corrupts any
+// non-ASCII payload (the scanner then rejects or mis-decodes the code).
+// Published URLs are ASCII, but user-supplied links/labels are not: encode
+// genuine UTF-8 bytes instead.
+qrcode.stringToBytes = (value) =>
+  Array.from(new TextEncoder().encode(String(value)));
 
-  // Draw 3 primary finder patterns
-  drawFinder(0, 0);
-  drawFinder(0, size - 7);
-  drawFinder(size - 7, 0);
+const DEFAULT_ECC = "M";
 
-  // Timing patterns
-  for (let i = 8; i < size - 8; i++) {
-    if (!reserved[6][i]) {
-      matrix[6][i] = i % 2 === 0 ? 1 : 0;
-      reserved[6][i] = true;
-    }
-    if (!reserved[i][6]) {
-      matrix[i][6] = i % 2 === 0 ? 1 : 0;
-      reserved[i][6] = true;
-    }
-  }
-
-  // Alignment pattern at bottom right
-  const alignR = size - 7;
-  const alignC = size - 7;
-  for (let r = -2; r <= 2; r++) {
-    for (let c = -2; c <= 2; c++) {
-      const isOuter = Math.abs(r) === 2 || Math.abs(c) === 2;
-      const isCenter = r === 0 && c === 0;
-      matrix[alignR + r][alignC + c] = isOuter || isCenter ? 1 : 0;
-      reserved[alignR + r][alignC + c] = true;
-    }
-  }
-
-  // Dark module
-  matrix[size - 8][8] = 1;
-  reserved[size - 8][8] = true;
-
-  // Encode deterministic payload hash bytes into remaining matrix cells
-  const bytes = [];
-  for (let i = 0; i < text.length; i++) {
-    bytes.push(text.charCodeAt(i));
-  }
-  // Deterministic seed expansion
-  let seed = 0x5a;
-  for (let b of bytes) {
-    seed = ((seed << 5) - seed + b) & 0xffffffff;
-  }
-
-  let bitIdx = 0;
-  for (let r = 0; r < size; r++) {
-    for (let c = 0; c < size; c++) {
-      if (!reserved[r][c]) {
-        const charCode = bytes[(r * size + c) % bytes.length] || 0;
-        const pseudoRandomBit =
-          ((seed ^ (r * 31 + c * 17 + charCode + bitIdx++)) & 1) === 1;
-        // Mask rule: (row + col) % 2 == 0
-        const mask = (r + c) % 2 === 0;
-        matrix[r][c] = pseudoRandomBit !== mask ? 1 : 0;
-      }
-    }
-  }
-
+/**
+ * Build the QR module matrix (1 = dark, 0 = light) for `text`.
+ * Type number 0 lets the encoder pick the smallest version that fits, at the
+ * given error-correction level. Exported for direct testing.
+ */
+export function createQRMatrix(text, options = {}) {
+  const ecc = options.ecc || DEFAULT_ECC;
+  const qr = qrcode(0, ecc);
+  qr.addData(String(text));
+  qr.make();
+  const count = qr.getModuleCount();
+  const matrix = Array.from({ length: count }, (_, r) =>
+    Array.from({ length: count }, (_, c) => (qr.isDark(r, c) ? 1 : 0)),
+  );
   return matrix;
 }
 
 /**
- * Generates an SVG data URL for a given URL or text payload.
+ * Generates an SVG for a given URL or text payload. Returns "" for missing or
+ * non-string input.
  */
 export function generateQrCodeSvg(text, options = {}) {
   if (!text || typeof text !== "string") return "";
   const size = options.size || 160;
   const fgColor = options.fgColor || "#ffffff";
   const bgColor = options.bgColor || "transparent";
-  const margin = options.margin !== undefined ? options.margin : 2;
+  // QR readers need a quiet zone; the spec asks for at least 4 modules.
+  const margin = options.margin !== undefined ? options.margin : 4;
 
-  const matrix = createQRMatrix(text);
+  const matrix = createQRMatrix(text, options);
   const matrixSize = matrix.length;
   const totalCells = matrixSize + margin * 2;
   const cellSize = size / totalCells;
@@ -134,11 +77,13 @@ export function generateQrCodeSvg(text, options = {}) {
 
 /**
  * Generates standard embed iframe HTML for published creation.
+ * Returns "" when no URL is supplied.
  */
 export function generateEmbedSnippet(
   publishedUrl,
   { width = "100%", height = "600", title = "CoreZ Creation" } = {},
 ) {
+  if (typeof publishedUrl !== "string" || !publishedUrl) return "";
   const fullUrl = publishedUrl.startsWith("http")
     ? publishedUrl
     : `https://corez.pro${publishedUrl.startsWith("/") ? "" : "/"}${publishedUrl}`;

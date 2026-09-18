@@ -20,6 +20,7 @@ const PHASE_LABELS = Object.freeze({
   resuming: "Reconnecting — resuming your build…",
   "waiting-for-build": "Your build is still running…",
   retrying: "The AI service is busy — retrying…",
+  done: "Done.",
 });
 
 export function buildPhaseLabel(phase) {

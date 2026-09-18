@@ -664,8 +664,12 @@ export async function handleAuth(request, env) {
             `Password reset token for ${email}: ${token} -> ${resetUrl}`,
           );
         }
-        // In dev without RESEND, return token for testing (only when no Resend key)
-        if (!resendKey) {
+        // Dev escape hatch only: printing the token in the HTTP response would
+        // let anyone who knows an email take over the account when no email
+        // provider is configured. The token is always logged server-side; a
+        // deployment must opt in explicitly (AUTH_RESET_TOKEN_IN_RESPONSE=1)
+        // to include it in the response.
+        if (!resendKey && env.AUTH_RESET_TOKEN_IN_RESPONSE === "1") {
           return jsonResponse(200, {
             ok: true,
             message: "If that email exists, a reset link has been sent.",

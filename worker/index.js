@@ -3372,6 +3372,21 @@ async function handleR2Assets(request, env) {
       return jsonResponse(400, { error: "Invalid base64 payload." });
     }
 
+    // Keys are client-chosen and flat, so without an ownership check one
+    // session could overwrite another session's asset at the same public URL.
+    // Buckets without head() (older test doubles) proceed as before.
+    try {
+      const existing = await env.ASSET_BUCKET.head(key);
+      const existingOwner = existing?.customMetadata?.ownerId;
+      if (existing && existingOwner && existingOwner !== uid) {
+        return jsonResponse(409, {
+          error: "An asset with that key already exists.",
+        });
+      }
+    } catch {
+      // head() unavailable: fall through to the guarded put below.
+    }
+
     await env.ASSET_BUCKET.put(key, bytes, {
       httpMetadata: { contentType: mimeType },
       // Ownership binding: only the uploading session's uid may read or
@@ -3684,12 +3699,11 @@ function decodePathSegment(segment) {
   }
 }
 
-function publishedPageHeaders() {
-  return {
+function publishedPageHeaders({ frameable = false } = {}) {
+  const headers = {
     "Content-Type": "text/html; charset=utf-8",
     "Cache-Control": "no-cache",
     "X-Content-Type-Options": "nosniff",
-    "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",
     // Published creations are AI-generated user content: render them in an
     // originless sandbox (no cookies, storage, or same-origin access) but
@@ -3699,6 +3713,11 @@ function publishedPageHeaders() {
     "Content-Security-Policy":
       "sandbox allow-scripts allow-forms allow-pointer-lock allow-popups allow-popups-to-escape-sandbox; default-src 'none'; script-src 'unsafe-inline' https:; style-src 'unsafe-inline' https:; img-src data: https: blob:; font-src data: https:; media-src data: https: blob:; connect-src https:",
   };
+  // The publish modal offers an <iframe> embed, which X-Frame-Options: DENY
+  // silently broke. Published creations stay frameable (they run sandboxed,
+  // without cookies or same-origin access); private app previews keep DENY.
+  if (!frameable) headers["X-Frame-Options"] = "DENY";
+  return headers;
 }
 
 // Published links are public shareable URLs backed by R2 storage: bound the
@@ -4053,7 +4072,7 @@ async function handlePublish(request, env) {
       // would otherwise render the code as visible page text.
       return new Response(repairMalformedHtml(pageHtml), {
         headers: {
-          ...publishedPageHeaders(),
+          ...publishedPageHeaders({ frameable: true }),
           "Access-Control-Allow-Origin": "*",
         },
       });
@@ -4092,7 +4111,7 @@ async function handlePublish(request, env) {
       // Repair legacy artifacts whose missing/mangled <script> opening tag
       // would otherwise render the code as visible page text.
       return new Response(repairMalformedHtml(html), {
-        headers: publishedPageHeaders(),
+        headers: publishedPageHeaders({ frameable: true }),
       });
     }
   }
@@ -4146,7 +4165,7 @@ async function handlePublish(request, env) {
     // Repair legacy artifacts whose missing/mangled <script> opening tag
     // would otherwise render the code as visible page text.
     return new Response(repairMalformedHtml(html), {
-      headers: publishedPageHeaders(),
+      headers: publishedPageHeaders({ frameable: true }),
     });
   }
 
