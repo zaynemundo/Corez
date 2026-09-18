@@ -90,7 +90,7 @@ const FAQS = [
   },
   {
     q: "Is there a free plan?",
-    a: "Yes — the Free plan includes 20 generations a month and one project. Paid plans add more generations, more projects and publishing.",
+    a: "Yes — the Free plan includes 20 generations a month, one project and publishing. Free publications show a small \u201cMade with Corez\u201d badge; paid plans remove the badge and add more generations and projects.",
   },
   {
     q: "Can I download what I make?",
@@ -197,7 +197,7 @@ export default function Landing() {
             </button>
           </div>
           <p className="landing-note">
-            Free plan: 20 generations a month, no card required.
+            Free plan: 20 generations a month, publishing included, no card required.
           </p>
 
           <div className="landing-commands" aria-label="Chat commands">
@@ -290,8 +290,9 @@ export default function Landing() {
         <div>
           <h2 id="landing-pricing-heading">Start free, publish when you are ready</h2>
           <p>
-            The Free plan covers 20 generations a month. Standard adds 200 generations, more
-            projects, publishing and custom URL slugs.
+            The Free plan covers 20 generations a month and publishing with a small Corez
+            badge. Standard adds 200 generations, more projects, custom URL slugs and
+            badge-free pages.
           </p>
         </div>
         <button type="button" className="landing-btn landing-btn-solid landing-btn-lg" onClick={() => navigate("/pricing")}>

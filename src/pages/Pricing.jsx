@@ -24,6 +24,7 @@ const PLANS = [
     features: [
       "20 generations / month",
       "1 project",
+      "Publish with a Made with Corez badge",
       "Community support",
     ],
     cta: "Start for free",
@@ -40,7 +41,7 @@ const PLANS = [
     features: [
       "200 generations / month",
       "10 projects",
-      "Publish & share",
+      "Badge-free publishing",
       "Custom URL slug",
       "Priority queue",
       "Standard support",
@@ -60,7 +61,7 @@ const PLANS = [
     features: [
       "Unlimited generations",
       "Unlimited projects",
-      "Publish & share",
+      "Badge-free publishing",
       "Custom URL slug",
       "Priority support",
       "Early access to new models",

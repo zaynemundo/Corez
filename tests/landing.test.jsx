@@ -36,8 +36,9 @@ describe('public landing page', () => {
   it('answers common questions without inventing claims', () => {
     renderLanding();
     expect(
-      screen.getByText(/Paid plans add more generations, more projects and publishing/i),
+      screen.getByText(/Free plan includes 20 generations a month, one project and publishing/i),
     ).toBeTruthy();
+    expect(screen.getByText(/paid plans remove the badge/i)).toBeTruthy();
     expect(screen.getByText(/download as a ZIP/i)).toBeTruthy();
   });
 

@@ -1183,6 +1183,15 @@ async function run() {
 
   // Publish: creates a shareable slug, serves the creation with sandbox
   // headers, and falls through to static assets for non-slug bare paths.
+  // Free publishing is enabled and carries a marker-wrapped "Made with Corez"
+  // badge; strip it before comparing user content.
+  const BADGE_START = '<!-- corez-badge:start -->';
+  const BADGE_END = '<!-- corez-badge:end -->';
+  const stripBadge = (html) => {
+    const start = html.indexOf(BADGE_START);
+    const end = html.indexOf(BADGE_END);
+    return start === -1 || end === -1 ? html : html.slice(0, start) + html.slice(end + BADGE_END.length);
+  };
   const publishStore = await worker.fetch(
     new Request('https://corez.test/api/publish', {
       method: 'POST',
@@ -1195,6 +1204,8 @@ async function run() {
   const publishData = await json(publishStore);
   assert.match(publishData.slug, /^[a-z0-9]{4,8}-[0-9]{1,6}$/);
   assert.equal(publishData.url, `/${publishData.slug}`);
+  // Without a subscription store the caller is treated as free: badge shown.
+  assert.equal(publishData.badge, true);
 
   const publishedPage = await worker.fetch(
     new Request(`https://corez.test${publishData.url}`, { method: 'GET' }),
@@ -1206,7 +1217,9 @@ async function run() {
   assert.match(publishCsp, /sandbox allow-scripts/);
   assert.match(publishCsp, /script-src 'unsafe-inline'/);
   assert.match(publishCsp, /style-src 'unsafe-inline'/);
-  assert.equal(await publishedPage.text(), '<!DOCTYPE html><html><body><h1>Shared FPS</h1></body></html>');
+  const freePublishedHtml = await publishedPage.text();
+  assert.match(freePublishedHtml, /corez-badge:start/);
+  assert.equal(stripBadge(freePublishedHtml), '<!DOCTYPE html><html><body><h1>Shared FPS</h1></body></html>');
 
   // Republishing under the same slug updates the existing link
   const republish = await worker.fetch(
@@ -1223,7 +1236,9 @@ async function run() {
     memoryEnv()
   );
   assert.equal(republishedPage.status, 200);
-  assert.equal(await republishedPage.text(), '<h1>v2</h1>');
+  const republishedHtml = await republishedPage.text();
+  assert.match(republishedHtml, /corez-badge:start/);
+  assert.equal(stripBadge(republishedHtml), '<h1>v2</h1>');
 
   // 1-time custom slug migration: moves creation from auto-generated slug to custom slug
   const customSlugRes = await worker.fetch(
@@ -1324,7 +1339,8 @@ async function run() {
 
   const multiRecord = JSON.parse(memoryStore.get(`publish/${publishMultiData.slug}.json`).value);
   assert.ok(multiRecord.pages);
-  assert.equal(multiRecord.pages['about.html'], '<!DOCTYPE html><html><body><h1>About Page</h1></body></html>');
+  assert.equal(stripBadge(multiRecord.pages['about.html']), '<!DOCTYPE html><html><body><h1>About Page</h1></body></html>');
+  assert.match(multiRecord.pages['about.html'], /corez-badge:start/);
   assert.equal(multiRecord.pages['../escape.html'], undefined);
   assert.equal(multiRecord.pages['evil/name.html'], undefined);
 
@@ -1336,7 +1352,9 @@ async function run() {
   assert.match(aboutPage.headers.get('content-type'), /text\/html/);
   assert.equal(aboutPage.headers.get('access-control-allow-origin'), '*');
   assert.match(aboutPage.headers.get('content-security-policy'), /sandbox allow-scripts/);
-  assert.equal(await aboutPage.text(), '<!DOCTYPE html><html><body><h1>About Page</h1></body></html>');
+  const aboutHtml = await aboutPage.text();
+  assert.match(aboutHtml, /corez-badge:start/);
+  assert.equal(stripBadge(aboutHtml), '<!DOCTYPE html><html><body><h1>About Page</h1></body></html>');
 
   // Multi-page home pages serve at the trailing-slash root /<slug>/ so every
   // relative link (<a href="about.html">) resolves to /<slug>/about.html —
@@ -1354,7 +1372,7 @@ async function run() {
   );
   assert.equal(multiHome.status, 200);
   assert.match(multiHome.headers.get('content-type'), /text\/html/);
-  assert.equal(await multiHome.text(), '<!DOCTYPE html><html><body><h1>Home</h1><a href="about.html">About</a></body></html>');
+  assert.equal(stripBadge(await multiHome.text()), '<!DOCTYPE html><html><body><h1>Home</h1><a href="about.html">About</a></body></html>');
 
   // Unknown sub-pages are 404s, and traversal/invalid paths never match.
   const missingPage = await worker.fetch(
@@ -1419,8 +1437,8 @@ async function run() {
   assert.equal(publishWithJunk.status, 200);
   const junkData = await json(publishWithJunk);
   const junkRecord = JSON.parse(memoryStore.get(`publish/${junkData.slug}.json`).value);
-  assert.deepEqual(Object.keys(junkRecord).sort(), ['createdAt', 'customized', 'html', 'ownerUserId', 'slug', 'title']);
-  assert.equal(junkRecord.html, '<h1>App Only</h1>');
+  assert.deepEqual(Object.keys(junkRecord).sort(), ['badge', 'createdAt', 'customized', 'html', 'ownerUserId', 'slug', 'title']);
+  assert.equal(stripBadge(junkRecord.html), '<h1>App Only</h1>');
   assert.equal(junkRecord.sessionId, undefined);
   assert.equal(junkRecord.messages, undefined);
 
@@ -1429,7 +1447,7 @@ async function run() {
     memoryEnv()
   );
   assert.equal(junkPage.status, 200);
-  assert.equal(await junkPage.text(), '<h1>App Only</h1>');
+  assert.equal(stripBadge(await junkPage.text()), '<h1>App Only</h1>');
   // Asset upload validation: reject arbitrary content types, keys, and malformed data URLs
   const uploadBadType = await worker.fetch(
     new Request('https://corez.test/api/assets/upload', {

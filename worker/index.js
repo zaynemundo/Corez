@@ -3756,6 +3756,33 @@ async function sessionUid(request, env) {
   return null;
 }
 
+// Free-plan published creations carry a "Made with Corez" badge. The badge is
+// injected server-side behind markers so a later paid republish can strip it
+// again, and so re-publishing never stacks duplicate badges.
+const COREZ_BADGE_START = "<!-- corez-badge:start -->";
+const COREZ_BADGE_END = "<!-- corez-badge:end -->";
+const COREZ_BADGE_HTML =
+  COREZ_BADGE_START +
+  '<a href="https://corez.pro/?ref=badge" target="_blank" rel="noopener" aria-label="Made with Corez" style="position:fixed;right:12px;bottom:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border-radius:999px;background:rgba(10,10,10,0.82);color:#ffffff;font:600 12px/1 -apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif;text-decoration:none;letter-spacing:0.01em;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.14);pointer-events:auto"><span style="width:8px;height:8px;border-radius:50%;background:#ffffff;opacity:0.9"></span>Made with Corez</a>' +
+  COREZ_BADGE_END;
+
+function stripCorezBadge(html) {
+  if (typeof html !== "string") return html;
+  const start = html.indexOf(COREZ_BADGE_START);
+  const end = html.indexOf(COREZ_BADGE_END);
+  if (start === -1 || end === -1 || end < start) return html;
+  return html.slice(0, start) + html.slice(end + COREZ_BADGE_END.length);
+}
+
+function injectCorezBadge(html) {
+  const clean = stripCorezBadge(html);
+  const bodyClose = clean.toLowerCase().lastIndexOf("</body>");
+  if (bodyClose !== -1) {
+    return clean.slice(0, bodyClose) + COREZ_BADGE_HTML + clean.slice(bodyClose);
+  }
+  return clean + COREZ_BADGE_HTML;
+}
+
 async function handlePublish(request, env) {
   const url = new URL(request.url);
   const pathname = url.pathname;
@@ -3768,30 +3795,28 @@ async function handlePublish(request, env) {
     if (!uid) {
       return jsonResponse(401, { error: "Authentication required." });
     }
-    // Paid feature: publishing to corez.pro (including custom URL slugs)
-    // requires an active Standard or Premium plan. Fail open when the
-    // subscription store is unavailable (local dev without D1): only an
-    // explicit free/expired plan is rejected.
+    // Publishing is available on every plan. The badge split is the paid
+    // perk: Standard/Premium publish badge-free, while free (and
+    // expired/unknown) creations carry a small "Made with Corez" badge that
+    // keeps the share loop open for everyone. A subscription lookup failure
+    // never blocks publishing — it just means the badge is shown.
+    let planId = "free";
     if (env?.DB) {
-      let sub = null;
       try {
-        sub = await getActiveSubscription(env, uid);
-      } catch {
-        // Subscription lookup failed — fail open, only an explicit
-        // free/expired plan below is rejected.
-      }
-      if (sub) {
-        const plan = String(sub.plan || "free").toLowerCase();
-        const expired =
-          sub.status === "expired" || sub.isExpired === true;
-        if (!((plan === "standard" || plan === "premium") && !expired)) {
-          return jsonResponse(403, {
-            error:
-              "Publishing to corez.pro requires a Standard or Premium plan. Upgrade to share your creation with a public link.",
-          });
+        const sub = await getActiveSubscription(env, uid);
+        if (sub) {
+          const plan = String(sub.plan || "free").toLowerCase();
+          const expired = sub.status === "expired" || sub.isExpired === true;
+          planId =
+            !expired && (plan === "standard" || plan === "premium")
+              ? plan
+              : "free";
         }
+      } catch {
+        planId = "free";
       }
     }
+    const showBadge = planId !== "standard" && planId !== "premium";
     const retryAfter = publishRateLimiter(request);
     if (retryAfter !== null) {
       return jsonResponse(
@@ -3969,10 +3994,21 @@ async function handlePublish(request, env) {
       });
     }
 
+    // Apply the badge policy to the stored documents (home + sub-pages).
+    const publishedHtml = showBadge
+      ? injectCorezBadge(html)
+      : stripCorezBadge(html);
+    for (const pageName of Object.keys(pages)) {
+      pages[pageName] = showBadge
+        ? injectCorezBadge(pages[pageName])
+        : stripCorezBadge(pages[pageName]);
+    }
+
     const record = {
       slug,
       title,
-      html,
+      html: publishedHtml,
+      badge: showBadge,
       customized: isCustomized,
       ownerUserId: uid,
       createdAt: new Date().toISOString(),
@@ -4044,6 +4080,7 @@ async function handlePublish(request, env) {
       slug,
       url: `/${slug}`,
       customized: isCustomized,
+      badge: showBadge,
     });
   }
 

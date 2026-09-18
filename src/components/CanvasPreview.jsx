@@ -105,10 +105,16 @@ export default function CanvasPreview({
 
   const isPaidPublishPlan = (plan, expired) =>
     (plan === "standard" || plan === "premium") && !expired;
-  const publishBlocked =
+  // Publishing is available on every plan. Free (and expired) plans carry a
+  // small "Made with Corez" badge on the published page, applied server-side;
+  // Standard/Premium publish badge-free.
+  const publishShowsBadge =
     publishPlan !== null && !isPaidPublishPlan(publishPlan, planExpired);
-  const publishUpgradeMessage =
-    "Publishing to corez.pro is available on Standard and Premium plans. Upgrade to share your creation with a public link.";
+  // Custom URL slugs remain a paid perk even though publishing is not.
+  const customSlugRequiresUpgrade =
+    publishPlan !== null && !isPaidPublishPlan(publishPlan, planExpired);
+  const publishBadgeMessage =
+    "Free plan: your published page shows a small \u201cMade with Corez\u201d badge. Upgrade, then republish to remove it.";
 
   const resolvePublishPlan = async () => {
     if (publishPlan !== null)
@@ -264,16 +270,8 @@ export default function CanvasPreview({
       );
       return;
     }
-    // Plan gate: publishing to corez.pro is Standard/Premium only.
-    const { plan: effectivePlan, expired: effectiveExpired } =
-      await resolvePublishPlan();
-    if (
-      effectivePlan !== null &&
-      !isPaidPublishPlan(effectivePlan, effectiveExpired)
-    ) {
-      setPublishError(publishUpgradeMessage);
-      return;
-    }
+    // Publishing is available on every plan: the worker decides whether the
+    // published page carries the free-plan "Made with Corez" badge.
     setPublishing(true);
     setPublishError(null);
     try {
@@ -608,57 +606,25 @@ export default function CanvasPreview({
             corez-nav message, so no external tab bar is needed. */}
 
         <div className="canvas-controls">
-          {/* Publish: share the creation with anyone via a short link.
-              Paid feature — free plans see a disabled locked button. */}
+          {/* Publish: share the creation with anyone via a short link. Free
+              plans publish with a small "Made with Corez" badge. */}
           {editableCode && !isStreaming && (
             <>
               <button
                 type="button"
                 className="code-btn publish-btn"
                 onClick={handlePublish}
-                disabled={publishing || publishBlocked}
-                title={
-                  publishBlocked
-                    ? "Publishing to corez.pro requires Standard or Premium"
-                    : "Publish this creation and share the link"
-                }
-                aria-label={
-                  publishing
-                    ? "Publishing..."
-                    : publishBlocked
-                      ? "Publish (requires Standard or Premium plan)"
-                      : "Publish"
-                }
+                disabled={publishing}
+                title={"Publish this creation and share the link"}
+                aria-label={publishing ? "Publishing..." : "Publish"}
               >
                 {publishing ? (
                   <Loader2 size={13} className="spin-icon" />
-                ) : publishBlocked ? (
-                  <Lock size={13} />
                 ) : (
                   <Share2 size={13} />
                 )}
                 <span>{publishing ? "Publishing..." : "Publish"}</span>
               </button>
-              {publishBlocked && (
-                <span
-                  style={{
-                    fontSize: "0.7rem",
-                    color: "var(--text-secondary)",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  <a
-                    href="/pricing"
-                    style={{
-                      color: "var(--text-primary)",
-                      fontWeight: 600,
-                    }}
-                  >
-                    Upgrade
-                  </a>{" "}
-                  to publish
-                </span>
-              )}
             </>
           )}
 
@@ -939,6 +905,25 @@ export default function CanvasPreview({
               :
             </p>
 
+            {publishShowsBadge && (
+              <p
+                style={{
+                  fontSize: "0.72rem",
+                  color: "var(--text-muted, #8a8a90)",
+                  margin: "6px 0 0",
+                  lineHeight: 1.5,
+                }}
+              >
+                {publishBadgeMessage}{" "}
+                <a
+                  href="/pricing"
+                  style={{ color: "var(--text-primary)", fontWeight: 600 }}
+                >
+                  Upgrade
+                </a>
+              </p>
+            )}
+
             {/* Share Modal Tabs: Link | QR Code | Embed */}
             <div
               className="publish-modal-tabs"
@@ -1103,7 +1088,7 @@ export default function CanvasPreview({
                 </div>
 
                 {/* Slug Customization / 1-Time Change (Standard & Premium only) */}
-                {publishBlocked ? (
+                {customSlugRequiresUpgrade ? (
                   <p
                     style={{
                       fontSize: "0.74rem",
