@@ -1881,11 +1881,6 @@ export function extractCodeFromMessage(text) {
   return null;
 }
 
-// DYNAMIC GAME & APP SYNTHESIZER ENGINE (Kimi 2.7 Code Driven)
-function synthesizeCustomApp() {
-  return null;
-}
-
 // Detect requests that need live, up-to-date information from the web:
 // current events, latest news, live
 // scores, weather, or explicit "search the web / look up / google it"
@@ -2543,12 +2538,6 @@ Its core purpose is to remove the technical gap between having an idea and launc
     !hasEmbeddedCode &&
     !/^revise\s/i.test(cleanPrompt)
   ) {
-    const appResult = synthesizeCustomApp(cleanPrompt);
-    if (appResult) {
-      return `I've created **${appResult.title}** for you! Click below to open it live in the preview canvas on the right side.\n\n\`\`\`html\n${appResult.html}\n\`\`\``;
-    }
-    // Games are NEVER canned: the hosted CoreZ AI is the only creator. When
-    // it is unavailable, say so instead of substituting a template game.
     if (
       isGameDevIntent(cleanPrompt) ||
       intent.primaryIntent === "game_creation"
@@ -2557,7 +2546,7 @@ Its core purpose is to remove the technical gap between having an idea and launc
       return `I'd love to build that game for you, but ${reason.trim()} — so I can't create it right now. Your request was received; please try again in a moment.`;
     }
     const reason = describeHostedUnavailable(hostedError);
-    return `I'd love to build that for you, but it doesn't match any app template I can synthesize offline, and ${reason.trim()} — so I can't create this specific app right now. Please check the AI service configuration (e.g. OPENCODE_GO_API_KEY for local dev) and try again.`;
+    return `I'd love to build that for you, but ${reason.trim()} — so I can't create this specific app right now. Your request was received; please try again in a moment.`;
   }
 
   // 5. PUBLIC USER INTENT RESPONSES

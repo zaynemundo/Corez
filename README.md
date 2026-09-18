@@ -118,7 +118,7 @@ The client-computed execution prompt (with the Awwwards design principles) now a
 
 ## Cloudflare Worker deployment
 
-Corez deploys the Vite SPA, `/api/ai`, and `/api/image` together as the `ai` Cloudflare Worker. Local Wrangler commands require Node.js 22 or later.
+Corez deploys the Vite SPA, `/api/ai`, and `/api/image` together as the `chat` Cloudflare Worker. Local Wrangler commands require Node.js 22 or later.
 
 ```text
 Build command: npm run build

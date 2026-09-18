@@ -15,6 +15,7 @@ import CanvasPreview from "./components/CanvasPreview";
 import SettingsModal from "./components/SettingsModal";
 import DropZoneOverlay from "./components/DropZoneOverlay";
 import Login from "./pages/Login";
+import Landing from "./pages/Landing";
 import { PaymentSuccess } from "./pages/PaymentStatus";
 import Pricing from "./pages/Pricing";
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -1458,8 +1459,6 @@ function MainApp({ theme, setTheme }) {
 
 function AppInner() {
   const { user, loading } = useAuth();
-  const location = useLocation();
-  const isPublicPricing = location.pathname === "/pricing";
   const [theme, setTheme] = useState(() => {
     try {
       return localStorage.getItem("corez_theme") || "dark";
@@ -1494,15 +1493,17 @@ function AppInner() {
     return null;
   }
   if (!user) {
-    if (isPublicPricing) {
-      return (
-        <Routes>
-          <Route path="/pricing" element={<Pricing />} />
-          <Route path="*" element={<Login />} />
-        </Routes>
-      );
-    }
-    return <Login />;
+    // Public surface: the landing page is the front door, pricing stays
+    // reachable, and every other logged-out path falls back to the landing
+    // page (which links to /login).
+    return (
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    );
   }
   // Authenticated — render routed MainApp
   return (

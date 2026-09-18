@@ -9,6 +9,8 @@
  * Env: N8N_WEBHOOK_URL (optional default, e.g. https://<n8n>/webhook/<id>)
  *       N8N_WEBHOOK_SECRET (optional HMAC header for verification)
  *       N8N_WEBHOOK_TIMEOUT_MS (default 8000)
+ *       N8N_ALLOW_PRIVATE=1  (dev only: permit loopback/private targets)
+ *       N8N_ALLOW_HTTP=1     (dev only: permit plain-http targets)
  *
  * Endpoints:
  *  POST /api/n8n/webhook  { event, payload, webhookUrl? }
@@ -33,15 +35,68 @@ function getWebhookUrl(requestBody, env) {
   return null;
 }
 
-function isAllowedWebhookUrl(url) {
+// Block loopback, private, link-local, CGNAT, multicast and metadata
+// hostnames. Without this an authenticated user could make the Worker POST to
+// internal services (SSRF) — the shared secret header made that worse.
+function isPrivateHostname(hostname) {
+  const host = String(hostname || "")
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "");
+  if (!host) return true;
+  if (
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host.endsWith(".local") ||
+    host.endsWith(".internal") ||
+    host === "metadata.google.internal"
+  ) {
+    return true;
+  }
+  const v4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (v4) {
+    const a = Number(v4[1]);
+    const b = Number(v4[2]);
+    if ([a, b, Number(v4[3]), Number(v4[4])].some((n) => n > 255)) return true;
+    if (a === 0 || a === 10 || a === 127) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 100 && b >= 64 && b <= 127) return true;
+    if (a >= 224) return true;
+  }
+  if (
+    host === "::1" ||
+    host === "::" ||
+    host.startsWith("fe80:") ||
+    host.startsWith("fc") ||
+    host.startsWith("fd")
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function isAllowedWebhookUrl(url, env) {
   try {
     const u = new URL(url);
     if (u.protocol !== "https:" && u.protocol !== "http:") return false;
-    // Allow localhost for dev, otherwise prefer https
-    if (u.hostname === "localhost" || u.hostname === "127.0.0.1") return true;
-    return u.protocol === "https:";
+    // http and private targets are dev-only escape hatches.
+    if (u.protocol === "http:" && env?.N8N_ALLOW_HTTP !== "1") return false;
+    if (isPrivateHostname(u.hostname) && env?.N8N_ALLOW_PRIVATE !== "1")
+      return false;
+    return true;
   } catch {
     return false;
+  }
+}
+
+// The shared secret is only sent to the configured N8N_WEBHOOK_URL host: a
+// per-request URL must never be able to harvest it.
+function configuredWebhookHost(env) {
+  try {
+    return new URL(env?.N8N_WEBHOOK_URL).host;
+  } catch {
+    return null;
   }
 }
 
@@ -89,9 +144,10 @@ export async function handleN8nWebhook(request, env) {
         "Missing webhookUrl. Provide { webhookUrl } in body or set N8N_WEBHOOK_URL in worker env.",
     });
   }
-  if (!isAllowedWebhookUrl(webhookUrl)) {
+  if (!isAllowedWebhookUrl(webhookUrl, env)) {
     return jsonResponse(400, {
-      error: "Invalid webhookUrl — must be http(s) URL.",
+      error:
+        "Invalid webhookUrl — must be an https URL that is not a loopback or private address.",
     });
   }
 
@@ -119,8 +175,11 @@ export async function handleN8nWebhook(request, env) {
 
   try {
     const headers = { "Content-Type": "application/json" };
-    if (env?.N8N_WEBHOOK_SECRET) {
-      // Simple shared-secret header so the n8n workflow can verify origin without an API key
+    const targetHost = new URL(webhookUrl).host;
+    const trustedHost = configuredWebhookHost(env);
+    if (env?.N8N_WEBHOOK_SECRET && trustedHost && targetHost === trustedHost) {
+      // Shared-secret header so the n8n workflow can verify origin. Only ever
+      // sent to the operator-configured host, never to a caller-supplied one.
       headers["X-Corez-Secret"] = String(env.N8N_WEBHOOK_SECRET).slice(0, 256);
     }
     const res = await fetch(webhookUrl, {

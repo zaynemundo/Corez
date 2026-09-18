@@ -4223,6 +4223,14 @@ h6 {
   .thinking-dot {
     animation: none !important;
   }
+  /* Landing page: no typewriter caret blink, no build-bar pulse, no hover lift. */
+  .landing-caret,
+  .landing-demo-bar {
+    animation: none;
+  }
+  .landing-btn:hover {
+    transform: none;
+  }
 }
 
 /* FLUX Image & Typography Showcase Modal */
@@ -5542,4 +5550,597 @@ h6 {
 }
 .stream-elsewhere-banner button:hover {
   background: var(--bg-tertiary);
+}
+
+/* =====================================================================
+   Landing page (logged-out front door)
+   Design: the app's own monochrome language — hairline borders, Outfit
+   display type, JetBrains Mono for the chat voice. One signature moment:
+   the typewriter prompt card; everything else stays quiet.
+   ===================================================================== */
+
+.landing {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  z-index: 10;
+}
+
+.landing-nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem clamp(1rem, 4vw, 3rem);
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.landing-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--text-primary);
+  text-decoration: none;
+  font-family: "Outfit", sans-serif;
+  font-weight: 600;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+}
+
+.landing-brand img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+.landing-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 1.4rem;
+}
+
+.landing-nav-links a,
+.landing-nav-plain {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.85rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color var(--transition-fast);
+}
+
+.landing-nav-links a:hover,
+.landing-nav-plain:hover {
+  color: var(--text-primary);
+}
+
+.landing-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.landing-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 40px;
+  padding: 0 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.landing-btn:hover {
+  transform: translateY(-1px);
+}
+
+.landing-btn-solid {
+  background: var(--text-primary);
+  border-color: var(--text-primary);
+  color: var(--bg-primary);
+}
+
+.landing-btn-solid:hover {
+  background: var(--text-secondary);
+  border-color: var(--text-secondary);
+}
+
+.landing-btn-ghost {
+  background: transparent;
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.landing-btn-ghost:hover {
+  border-color: var(--border-hover);
+  background: var(--bg-tertiary);
+}
+
+.landing-btn-lg {
+  min-height: 48px;
+  padding: 0 1.35rem;
+  font-size: 0.92rem;
+}
+
+.landing-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: clamp(2rem, 5vw, 4.5rem);
+  align-items: center;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: clamp(2.5rem, 7vw, 5.5rem) clamp(1rem, 4vw, 3rem) clamp(2rem, 5vw, 4rem);
+}
+
+.landing-eyebrow {
+  margin: 0 0 1rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.landing-hero h1 {
+  margin: 0;
+  font-family: "Outfit", sans-serif;
+  font-size: clamp(2.4rem, 6vw, 4.3rem);
+  font-weight: 600;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+}
+
+.landing-lede {
+  max-width: 34rem;
+  margin: 1.2rem 0 0;
+  font-size: clamp(1rem, 1.6vw, 1.15rem);
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+
+.landing-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin-top: 1.8rem;
+}
+
+.landing-note {
+  margin: 0.9rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.landing-commands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1.6rem;
+}
+
+.landing-command {
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  transition: color var(--transition-normal), border-color var(--transition-normal);
+}
+
+.landing-command.is-active {
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+}
+
+.landing-demo-card {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  padding: 0.9rem;
+}
+
+.landing-demo-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.15rem 0.15rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.landing-demo-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--market-positive, #4ade80);
+  flex-shrink: 0;
+}
+
+.landing-demo-tag {
+  margin-left: auto;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+}
+
+.landing-demo-chat {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  min-height: 76px;
+}
+
+.landing-demo-command {
+  flex-shrink: 0;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+}
+
+.landing-demo-chat p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.landing-caret {
+  display: inline-block;
+  width: 7px;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--text-primary);
+  animation: landingCaret 1s steps(2, start) infinite;
+}
+
+@keyframes landingCaret {
+  50% {
+    opacity: 0;
+  }
+}
+
+.landing-demo-build {
+  position: relative;
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  overflow: hidden;
+}
+
+.landing-demo-phase {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.landing-demo-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-tertiary);
+  transform-origin: left center;
+  animation: landingBuild 2.4s ease-in-out infinite;
+}
+
+.landing-demo-bar-b {
+  width: 78%;
+  animation-delay: 0.25s;
+}
+
+.landing-demo-bar-c {
+  width: 56%;
+  animation-delay: 0.5s;
+}
+
+@keyframes landingBuild {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.landing-demo-preview {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+}
+
+.landing-preview-nav {
+  height: 10px;
+  width: 42%;
+  border-radius: 3px;
+  background: var(--bg-tertiary);
+}
+
+.landing-preview-hero {
+  height: 54px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+}
+
+.landing-preview-row {
+  height: 8px;
+  border-radius: 3px;
+  background: var(--bg-tertiary);
+  opacity: 0.7;
+}
+
+.landing-preview-row.short {
+  width: 64%;
+}
+
+.landing-preview-block {
+  height: 34px;
+  width: 40%;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.landing-section {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: clamp(2.5rem, 6vw, 5rem) clamp(1rem, 4vw, 3rem);
+  border-top: 1px solid var(--border-color);
+}
+
+.landing-section h2 {
+  margin: 0;
+  font-family: "Outfit", sans-serif;
+  font-size: clamp(1.6rem, 3.4vw, 2.4rem);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.landing-section-lede {
+  max-width: 42rem;
+  margin: 0.8rem 0 0;
+  font-size: 0.98rem;
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+
+.landing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 2.2rem;
+}
+
+.landing-card {
+  padding: 1.35rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+}
+
+.landing-card svg {
+  color: var(--text-secondary);
+}
+
+.landing-card h3 {
+  margin: 0.85rem 0 0.45rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.landing-card p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.landing-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 2.2rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.landing-steps li {
+  display: flex;
+  gap: 0.9rem;
+  padding: 1.35rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+}
+
+.landing-step-number {
+  flex-shrink: 0;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.landing-steps h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.landing-steps p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.landing-inline-cta {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-top: 1.4rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+}
+
+.landing-inline-cta svg {
+  flex-shrink: 0;
+}
+
+.landing-inline-cta p {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.landing-pricing-teaser {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.landing-pricing-teaser p {
+  max-width: 40rem;
+  margin: 0.7rem 0 0;
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+
+.landing-faq {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 2rem;
+  max-width: 46rem;
+}
+
+.landing-faq details {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  padding: 1rem 1.1rem;
+}
+
+.landing-faq summary {
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  list-style: none;
+}
+
+.landing-faq summary::-webkit-details-marker {
+  display: none;
+}
+
+.landing-faq summary::after {
+  content: "+";
+  float: right;
+  color: var(--text-muted);
+}
+
+.landing-faq details[open] summary::after {
+  content: "–";
+}
+
+.landing-faq p {
+  margin: 0.7rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+
+.landing-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  padding: 1.6rem clamp(1rem, 4vw, 3rem) 2.4rem;
+  border-top: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.landing-footer-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.landing-footer-brand img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+.landing-footer-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.landing-footer-links svg {
+  margin-left: 0.4rem;
+}
+
+@media (max-width: 1024px) {
+  .landing-main {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .landing-grid,
+  .landing-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .landing-nav-links {
+    display: none;
+  }
+
+  .landing-grid,
+  .landing-steps {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-pricing-teaser {
+    align-items: flex-start;
+  }
 }

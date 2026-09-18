@@ -3226,29 +3226,40 @@ async function isAssetPublished(env, key) {
   }
   if (typeof env.ASSET_BUCKET.list !== "function") return false;
   try {
-    const listing = await env.ASSET_BUCKET.list({
-      prefix: "publish/",
-      limit: 100,
-    });
-    const objects = Array.isArray(listing?.objects) ? listing.objects : [];
-    for (const obj of objects) {
-      const recordObj = await env.ASSET_BUCKET.get(obj.key);
-      if (!recordObj) continue;
-      let record;
-      try {
-        record = JSON.parse(await recordObj.text());
-      } catch {
-        continue;
-      }
-      const htmlParts = [typeof record?.html === "string" ? record.html : ""];
-      if (record?.pages && typeof record.pages === "object") {
-        for (const pageHtml of Object.values(record.pages)) {
-          if (typeof pageHtml === "string") htmlParts.push(pageHtml);
+    // Legacy records have no asset-pub marker. Scan live publish records in
+    // bounded pages (up to 1000) so an asset referenced only by an older
+    // publish is still served anonymously.
+    let cursor;
+    let scanned = 0;
+    const MAX_PUBLISH_SCAN = 1000;
+    do {
+      const listing = await env.ASSET_BUCKET.list({
+        prefix: "publish/",
+        limit: 100,
+        cursor,
+      });
+      const objects = Array.isArray(listing?.objects) ? listing.objects : [];
+      for (const obj of objects) {
+        scanned += 1;
+        const recordObj = await env.ASSET_BUCKET.get(obj.key);
+        if (!recordObj) continue;
+        let record;
+        try {
+          record = JSON.parse(await recordObj.text());
+        } catch {
+          continue;
         }
+        const htmlParts = [typeof record?.html === "string" ? record.html : ""];
+        if (record?.pages && typeof record.pages === "object") {
+          for (const pageHtml of Object.values(record.pages)) {
+            if (typeof pageHtml === "string") htmlParts.push(pageHtml);
+          }
+        }
+        if (htmlParts.some((html) => html.includes(`/api/assets/${key}`)))
+          return true;
       }
-      if (htmlParts.some((html) => html.includes(`/api/assets/${key}`)))
-        return true;
-    }
+      cursor = listing?.truncated ? listing.cursor : null;
+    } while (cursor && scanned < MAX_PUBLISH_SCAN);
   } catch {
     // Listing/read failures never block asset access: fall through to the
     // ownership check.

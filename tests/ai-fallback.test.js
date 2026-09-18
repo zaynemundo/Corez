@@ -555,7 +555,8 @@ describe('Hosted AI fallback behavior', () => {
 
     const response = await generateAIResponse('Build me a landing page for a bakery', []);
 
-    expect(response).toContain("doesn't match any app template");
+    expect(response).toContain("I'd love to build that for you");
+    expect(response).not.toMatch(/I've created/);
     expect(response).not.toContain('```html');
   });
 

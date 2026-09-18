@@ -51,6 +51,9 @@ jobs:
       - name: Run hosted AI contract suite
         run: npm run test:cloudflare
 
+      - name: Run swarm and harness contract suite
+        run: npm run test:swarm
+
   deploy:
     needs: [verify-fast, verify-contracts]
     runs-on: ubuntu-latest
