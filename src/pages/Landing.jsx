@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { openConsentPreferences } from "../services/consentService";
 import {
   ArrowRight,
   Gamepad2,
@@ -317,6 +318,19 @@ export default function Landing() {
           <img src="/corez-logo.png" alt="" aria-hidden="true" />
           <span>Corez — Turn ideas into websites, apps &amp; games.</span>
         </div>
+        <nav className="landing-footer-legal" aria-label="Legal">
+          <a href="/privacy">Privacy Policy</a>
+          <a href="/terms">Terms and Conditions</a>
+          <a href="/cookies">Cookie Policy</a>
+          <a href="/refunds">Refund Policy</a>
+          <button
+            type="button"
+            className="landing-nav-plain"
+            onClick={openConsentPreferences}
+          >
+            Cookie settings
+          </button>
+        </nav>
         <div className="landing-footer-links">
           <button type="button" className="landing-nav-plain" onClick={() => navigate("/pricing")}>
             Pricing

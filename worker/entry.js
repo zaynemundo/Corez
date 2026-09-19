@@ -19,6 +19,7 @@ import { handleChats } from "./chats.js";
 import { handleN8nWebhook } from "./n8nBridge.js";
 import { handleZiina } from "./ziina.js";
 import { handleSubscriptions } from "./subscriptions.js";
+import { handleAnalytics } from "./analytics.js";
 export { GameRoom } from "./gameRoom.js";
 
 // Per-client AI request rate bound: paid provider tokens are spent on every
@@ -156,6 +157,14 @@ export default {
     if (url.pathname === "/api/n8n/webhook") {
       const n8nRes = await handleN8nWebhook(request, env);
       if (n8nRes) return withDirectAiCors(n8nRes);
+    }
+
+    // First-party, consent-gated analytics counters. Public and cookie-free:
+    // visitors answer the consent banner before they are signed in, so this
+    // route must never require a session and must never read one.
+    if (url.pathname === "/api/analytics/collect") {
+      const analyticsRes = await handleAnalytics(request, env);
+      if (analyticsRes) return withDirectAiCors(analyticsRes);
     }
 
     // Ziina payment gateway — create & fetch payment intents

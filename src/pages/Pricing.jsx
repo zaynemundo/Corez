@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { openConsentPreferences } from "../services/consentService";
 
 const PLANS = [
   {
@@ -545,6 +546,20 @@ export default function Pricing() {
         </div>
 
       </main>
+
+      <footer className="pricing-footer">
+        <a href="/privacy">Privacy Policy</a>
+        <a href="/terms">Terms &amp; Conditions</a>
+        <a href="/cookies">Cookie Policy</a>
+        <a href="/refunds">Refund Policy</a>
+        <button
+          type="button"
+          className="pricing-footer-plain"
+          onClick={openConsentPreferences}
+        >
+          Cookie settings
+        </button>
+      </footer>
     </div>
   );
 }

@@ -45,12 +45,21 @@ export function AuthProvider({ children }) {
     return d.user;
   };
 
-  const signup = async (email, password, plan = "free") => {
+  const signup = async (email, password, plan = "free", consent = null) => {
+    const body = { email, password, plan };
+    // Consent evidence travels with the account creation: which policy version
+    // was accepted, when, and whether product email was opted into. It is
+    // optional so older callers keep working; the UI always sends it.
+    if (consent && typeof consent === "object") {
+      if (consent.termsVersion) body.terms_version = String(consent.termsVersion);
+      if (Number.isFinite(consent.acceptedAt)) body.terms_accepted_at = consent.acceptedAt;
+      body.marketing_consent = consent.marketingConsent === true;
+    }
     const r = await fetch("/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ email, password, plan }),
+      body: JSON.stringify(body),
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.error || "Signup failed");

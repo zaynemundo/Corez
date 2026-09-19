@@ -12,8 +12,10 @@ import {
   Zap,
   Sparkles,
   ArrowRight,
+  ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { openConsentPreferences } from "../services/consentService";
 
 export default function SettingsModal({
   isOpen,
@@ -254,6 +256,60 @@ export default function SettingsModal({
               View pricing <ArrowRight size={14} strokeWidth={1.75} />
             </span>
           </button>
+        </div>
+
+        <div className="settings-section">
+          <div className="settings-section-label">Privacy &amp; Cookies</div>
+          <button
+            type="button"
+            className="settings-row-btn"
+            onClick={openConsentPreferences}
+            aria-label="Open cookie preferences"
+          >
+            <span className="settings-row-left">
+              <ShieldCheck size={16} strokeWidth={1.5} />
+              <span>Cookie settings</span>
+            </span>
+            <span className="settings-row-hint">Change what is allowed</span>
+          </button>
+          <div className="settings-legal-links">
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                navigate("/privacy");
+              }}
+            >
+              Privacy Policy
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                navigate("/terms");
+              }}
+            >
+              Terms
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                navigate("/cookies");
+              }}
+            >
+              Cookies
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                navigate("/refunds");
+              }}
+            >
+              Refunds
+            </button>
+          </div>
         </div>
 
         <div className="settings-actions">

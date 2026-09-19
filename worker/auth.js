@@ -198,6 +198,24 @@ export async function ensureTables(env) {
     await env.DB.prepare(
       `CREATE TABLE IF NOT EXISTS password_resets (id TEXT PRIMARY KEY, email TEXT NOT NULL, token TEXT UNIQUE NOT NULL, expires_at INTEGER NOT NULL, used INTEGER DEFAULT 0, created_at INTEGER NOT NULL)`,
     ).run();
+    // Consent evidence: which version of the Terms/Privacy Policy the account
+    // holder accepted, when, and whether they opted into product email. Recorded
+    // when the client supplies it; older clients simply leave these NULL.
+    try {
+      await env.DB.prepare(
+        `ALTER TABLE users ADD COLUMN terms_version TEXT`,
+      ).run();
+    } catch {}
+    try {
+      await env.DB.prepare(
+        `ALTER TABLE users ADD COLUMN terms_accepted_at INTEGER`,
+      ).run();
+    } catch {}
+    try {
+      await env.DB.prepare(
+        `ALTER TABLE users ADD COLUMN marketing_consent INTEGER DEFAULT 0`,
+      ).run();
+    } catch {}
     await env.DB.prepare(
       `CREATE INDEX IF NOT EXISTS idx_resets_token ON password_resets(token)`,
     ).run();
@@ -371,6 +389,30 @@ export async function handleAuth(request, env) {
       try {
         await env.DB.prepare("UPDATE users SET plan=? WHERE id=?")
           .bind(plan, id)
+          .run();
+      } catch {}
+    }
+
+    // Best-effort consent evidence. A failure here never blocks account
+    // creation; the acceptance is still recorded client-side in the visitor's
+    // own consent record.
+    const termsVersion =
+      typeof body.terms_version === "string" && body.terms_version
+        ? body.terms_version.slice(0, 32)
+        : null;
+    const termsAcceptedAt = Number(body.terms_accepted_at);
+    const marketingConsent = body.marketing_consent === true ? 1 : 0;
+    if (termsVersion || Number.isFinite(termsAcceptedAt)) {
+      try {
+        await env.DB.prepare(
+          "UPDATE users SET terms_version=?, terms_accepted_at=?, marketing_consent=? WHERE id=?",
+        )
+          .bind(
+            termsVersion,
+            Number.isFinite(termsAcceptedAt) ? termsAcceptedAt : Date.now(),
+            marketingConsent,
+            id,
+          )
           .run();
       } catch {}
     }

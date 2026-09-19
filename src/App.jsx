@@ -18,6 +18,9 @@ import Login from "./pages/Login";
 import Landing from "./pages/Landing";
 import { PaymentSuccess } from "./pages/PaymentStatus";
 import Pricing from "./pages/Pricing";
+import Legal, { LegalIndex } from "./pages/Legal";
+import CookieConsent from "./components/CookieConsent";
+import { startAnalytics, trackPageView } from "./services/analytics";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import {
   formatBytes,
@@ -1457,6 +1460,49 @@ function MainApp({ theme, setTheme }) {
   );
 }
 
+// Legal pages must be reachable whether or not the visitor is signed in — a
+// policy you can only read after logging in is not a policy. Aliases keep the
+// longer spellings people and search engines use working.
+function legalRoutes() {
+  return [
+    <Route key="legal" path="/legal" element={<LegalIndex />} />,
+    <Route key="privacy" path="/privacy" element={<Legal docId="privacy" />} />,
+    <Route key="terms" path="/terms" element={<Legal docId="terms" />} />,
+    <Route key="cookies" path="/cookies" element={<Legal docId="cookies" />} />,
+    <Route key="refunds" path="/refunds" element={<Legal docId="refunds" />} />,
+    <Route
+      key="privacy-alias"
+      path="/privacy-policy"
+      element={<Navigate to="/privacy" replace />}
+    />,
+    <Route
+      key="terms-alias"
+      path="/terms-and-conditions"
+      element={<Navigate to="/terms" replace />}
+    />,
+    <Route
+      key="cookies-alias"
+      path="/cookie-policy"
+      element={<Navigate to="/cookies" replace />}
+    />,
+    <Route
+      key="refunds-alias"
+      path="/refund-policy"
+      element={<Navigate to="/refunds" replace />}
+    />,
+  ];
+}
+
+// Page views are tracked (only when analytics consent is present) from the
+// router's own location so a client-side navigation is not silently dropped.
+function RouteAnalytics() {
+  const location = useLocation();
+  useEffect(() => {
+    trackPageView(location.pathname);
+  }, [location.pathname]);
+  return null;
+}
+
 function AppInner() {
   const { user, loading } = useAuth();
   const [theme, setTheme] = useState(() => {
@@ -1466,6 +1512,10 @@ function AppInner() {
       return "dark";
     }
   });
+
+  // The tracker itself decides whether it may run; this only wires its
+  // listener so a consent change takes effect without a reload.
+  useEffect(() => startAnalytics(), []);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -1501,6 +1551,7 @@ function AppInner() {
         <Route path="/" element={<Landing />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/login" element={<Login />} />
+        {legalRoutes()}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );
@@ -1512,6 +1563,7 @@ function AppInner() {
       <Route path="/chat/:chatId" element={<MainApp theme={theme} setTheme={setTheme} />} />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/payment/success" element={<PaymentSuccess />} />
+      {legalRoutes()}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
@@ -1522,6 +1574,8 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <AppInner />
+        <RouteAnalytics />
+        <CookieConsent />
       </AuthProvider>
     </BrowserRouter>
   );

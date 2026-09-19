@@ -2,6 +2,10 @@ import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import ConsentCheckbox from "../components/ConsentCheckbox";
+import { LEGAL_DOCUMENT_VERSION } from "../data/legalDocuments";
+import { recordPolicyAcceptance } from "../services/consentService";
+import { track } from "../services/analytics";
 import mercuryBg from "../../assets/Mercury_5.jpeg";
 
 export default function Login() {
@@ -35,15 +39,28 @@ export default function Login() {
     }
   });
   const [newPassword, setNewPassword] = useState("");
+  const [acceptedPolicies, setAcceptedPolicies] = useState(false);
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
+  const [consentError, setConsentError] = useState("");
   const navigate = useNavigate();
 
   const submit = async (e) => {
     e.preventDefault();
     setError("");
+    // Consent is checked before anything is sent: an account cannot be created
+    // without the Terms and Privacy Policy having been actively accepted.
+    if (mode === "signup" && !acceptedPolicies) {
+      setConsentError(
+        "Please accept the Terms and Conditions and the Privacy Policy to create an account.",
+      );
+      return;
+    }
+    setConsentError("");
     setBusy(true);
     try {
       if (mode === "login") {
         await login(email, password);
+        track("sign_in_completed", { surface: "login_form" });
         // If user came from pricing with pending plan, go back to pricing
         try {
           const pending = localStorage.getItem("corez_pending_plan");
@@ -56,7 +73,17 @@ export default function Login() {
           }
         } catch {}
       } else if (mode === "signup") {
-        await signup(email, password, "free");
+        const acceptedAt = Date.now();
+        track("sign_up_started", { surface: "login_form" });
+        await signup(email, password, "free", {
+          termsVersion: LEGAL_DOCUMENT_VERSION,
+          acceptedAt,
+          marketingConsent: marketingOptIn,
+        });
+        // Local copy of the acceptance, kept with the cookie-consent record so
+        // the visitor can see what they agreed to without asking us.
+        recordPolicyAcceptance({ marketing: marketingOptIn, source: "signup" });
+        track("sign_up_completed", { plan: "free" });
         try {
           const pending = localStorage.getItem("corez_pending_plan");
           if (pending) {
@@ -274,6 +301,41 @@ export default function Login() {
               </div>
             )}
 
+            {mode === "signup" && (
+              <div className="auth-consent">
+                <ConsentCheckbox
+                  id="corez-accept-terms"
+                  checked={acceptedPolicies}
+                  onChange={(value) => {
+                    setAcceptedPolicies(value);
+                    if (value) setConsentError("");
+                  }}
+                  required
+                  error={consentError}
+                  testId="signup-accept-terms"
+                >
+                  I am 16 or older and I accept the{" "}
+                  <a href="/terms" target="_blank" rel="noopener noreferrer">
+                    Terms and Conditions
+                  </a>{" "}
+                  and the{" "}
+                  <a href="/privacy" target="_blank" rel="noopener noreferrer">
+                    Privacy Policy
+                  </a>
+                  .
+                </ConsentCheckbox>
+                <ConsentCheckbox
+                  id="corez-marketing-optin"
+                  checked={marketingOptIn}
+                  onChange={setMarketingOptIn}
+                  hint="Optional. We never sell your data, and every email has an unsubscribe link."
+                  testId="signup-marketing-optin"
+                >
+                  Send me occasional product news and offers.
+                </ConsentCheckbox>
+              </div>
+            )}
+
             <button type="submit" className="auth-submit" disabled={busy}>
               {busy
                 ? "Please wait…"
@@ -286,6 +348,15 @@ export default function Login() {
                       : "Reset password"}
             </button>
           </form>
+
+          {mode === "signup" && (
+            <p className="auth-legal-note">
+              By creating an account you agree to our{" "}
+              <a href="/terms">Terms</a>, <a href="/privacy">Privacy Policy</a>,{" "}
+              <a href="/cookies">Cookie Policy</a> and{" "}
+              <a href="/refunds">Refund Policy</a>.
+            </p>
+          )}
 
           <p className="auth-foot">
             {mode === "forgot" ? (
