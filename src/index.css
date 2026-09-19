@@ -2512,31 +2512,49 @@ h6 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-}
-.modal-title {
+}.modal-title {
   font-size: 0.875rem;
   font-weight: 400;
 }
 
 .settings-modal-card {
-  gap: 1.1rem;
+  gap: 0;
   /* One fixed size for every category: the card must not grow or shrink when
      the reader switches tabs, so the panel inside scrolls instead. */
   height: min(calc(100dvh - 48px), 780px);
   max-height: calc(100dvh - 48px);
   overflow: hidden;
+  padding: 0;
+  /* A hairline of light along the top edge reads as a raised surface. */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+
+[data-theme="light"] .settings-modal-card {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 24px 60px rgba(0, 0, 0, 0.18);
+}
+
+/* Header: a fixed band with a divider, so the title and close button never
+   scroll away. */
+.settings-modal-card .modal-header {
+  padding: 16px 18px 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.settings-modal-card .modal-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .settings-modal-body {
   display: flex;
   flex-direction: column;
-  gap: 1.1rem;
+  gap: 14px;
   min-height: 0;
+  flex: 1 1 auto;
   overflow-y: auto;
   overscroll-behavior: contain;
-  /* Room for focus rings so the scroll container does not clip them. */
-  padding: 2px;
-  margin: -2px;
+  padding: 14px 18px 18px;
 }
 
 /* Categories: a tab list that stays put while the panel below scrolls. The
@@ -2545,11 +2563,13 @@ h6 {
    break sticking). */
 .settings-tabs-scroll {
   position: sticky;
-  top: -2px;
+  top: -14px;
   z-index: 2;
   overflow-x: auto;
   scrollbar-width: none;
   background-color: var(--bg-secondary);
+  padding: 14px 0 2px;
+  margin: -14px 0 0;
 }
 
 .settings-tabs-scroll::-webkit-scrollbar {
@@ -2558,7 +2578,7 @@ h6 {
 
 .settings-tabs {
   display: flex;
-  gap: 4px;
+  gap: 3px;
   padding: 3px;
   width: max-content;
   min-width: 100%;
@@ -2568,9 +2588,9 @@ h6 {
 }
 
 .settings-tab {
-  flex: 0 0 auto;
+  flex: 1 1 0;
   min-height: 32px;
-  padding: 0 14px;
+  padding: 0 12px;
   border: none;
   border-radius: var(--radius-pill);
   background: transparent;
@@ -2591,12 +2611,13 @@ h6 {
 .settings-tab[aria-selected="true"] {
   background-color: var(--text-primary);
   color: var(--bg-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
 }
 
 .settings-panel {
   display: flex;
   flex-direction: column;
-  gap: 1.1rem;
+  gap: 18px;
 }
 
 /* `.settings-panel` sets display: flex, which would beat the user agent's
@@ -2604,26 +2625,85 @@ h6 {
 .settings-panel[hidden] {
   display: none;
 }
+
+/* Footer band: the same two session actions for every category, which also
+   gives the dialog a deliberate bottom edge. */
+.settings-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 18px 14px;
+  border-top: 1px solid var(--border-color);
+  background-color: var(--bg-secondary);
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+}
+
+.settings-logout-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill);
+  background-color: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+.settings-logout-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+  background-color: var(--sidebar-item-hover-bg);
+}
+
+.settings-modal-card .settings-danger-btn {
+  width: auto;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  font-size: 12.5px;
+  font-weight: 600;
+}
 .settings-section {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
 }
 .settings-section-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+/* A hairline running from the label to the edge turns a stack of rows into a
+   readable group without drawing another box. */
+.settings-section-label::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background-color: var(--border-color);
 }
 .settings-profile-card {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 0.85rem;
-  background: var(--bg-tertiary);
+  background: var(--bg-primary);
   border: 1px solid var(--border-color);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 .settings-avatar {
   width: 36px;
@@ -2660,18 +2740,20 @@ h6 {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  min-height: 46px;
   padding: 0.7rem 0.85rem;
-  background: var(--bg-tertiary);
+  background: var(--bg-primary);
   border: 1px solid var(--border-color);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   color: var(--text-primary);
+  font-family: inherit;
   font-size: 14px;
   cursor: pointer;
-  transition: var(--transition-fast);
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
 }
 .settings-row-btn:hover {
   border-color: var(--border-hover);
-  background: var(--bg-card);
+  background: var(--bg-tertiary);
 }
 .settings-row-left {
   display: flex;
@@ -2697,8 +2779,9 @@ h6 {
   padding: 0.7rem 0.85rem;
   background: transparent;
   border: 1px solid rgba(239, 68, 68, 0.22);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   color: #ef4444;
+  font-family: inherit;
   font-size: 14px;
   cursor: pointer;
   transition: var(--transition-fast);
@@ -7181,7 +7264,9 @@ body.corez-consent-visible .legal-page {
   display: flex;
   gap: 14px;
   flex-wrap: wrap;
-  padding: 10px 2px 0;
+  padding: 12px 2px 0;
+  border-top: 1px solid var(--border-color);
+  margin-top: 4px;
 }
 
 .settings-legal-links button {
@@ -7219,6 +7304,26 @@ body.corez-consent-visible .legal-page {
   padding: 8px 2px;
 }
 
+/* Nothing published: a dashed well rather than a bare sentence, so the empty
+   category still reads as a designed state. */
+.settings-published-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 22px 16px;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.settings-published-empty svg {
+  color: var(--text-muted);
+}
+
 .settings-published-list {
   list-style: none;
   display: flex;
@@ -7231,10 +7336,15 @@ body.corez-consent-visible .legal-page {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 9px 10px;
+  padding: 10px 12px;
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background-color: var(--bg-primary);
+  transition: border-color var(--transition-fast);
+}
+
+.settings-published-item:hover {
+  border-color: var(--border-hover);
 }
 
 .settings-published-meta {

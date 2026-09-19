@@ -449,7 +449,8 @@ export default function SettingsModal({
           )}
 
           {!publishedLoading && !publishedError && published.length === 0 && (
-            <p className="settings-published-state">
+            <p className="settings-published-empty">
+              <Globe size={18} strokeWidth={1.5} aria-hidden="true" />
               Nothing published yet. Publish from the preview pane and the link
               will appear here.
             </p>
@@ -571,32 +572,35 @@ export default function SettingsModal({
           </div>
         </div>
 
-        <div className="settings-actions">
+        </div>
+        </div>
+
+        {/* Fixed footer: the session actions are the same whatever category is
+            open, so they live here instead of inside one of them. It also gives
+            every category the same bottom edge, which is what makes a
+            fixed-height dialog look composed rather than half-empty. */}
+        <div className="settings-footer">
           <button
             type="button"
             className="settings-danger-btn"
             onClick={onClearAllHistory}
           >
             <Trash2 size={15} strokeWidth={1.5} />
-            <span>Clear Conversation History</span>
+            <span>Clear history</span>
           </button>
           {auth?.user && (
             <button
               type="button"
-              className="settings-row-btn"
+              className="settings-logout-btn"
               onClick={() => {
                 onClose();
                 auth.logout();
               }}
             >
-              <span className="settings-row-left">
-                <LogOut size={16} strokeWidth={1.5} />
-                <span>Log out</span>
-              </span>
+              <LogOut size={15} strokeWidth={1.5} />
+              <span>Log out</span>
             </button>
           )}
-        </div>
-        </div>
         </div>
       </div>
     </div>

@@ -18,11 +18,7 @@ const CATEGORIES = [
   { id: 'general', label: 'General', contains: ['Account', 'Appearance'] },
   { id: 'billing', label: 'Billing', contains: ['Plan & Billing'] },
   { id: 'publishing', label: 'Publishing', contains: ['Published pages'] },
-  {
-    id: 'privacy',
-    label: 'Privacy',
-    contains: ['Privacy & Cookies', 'Clear Conversation History', 'Log out'],
-  },
+  { id: 'privacy', label: 'Privacy', contains: ['Privacy & Cookies'] },
 ];
 
 function mockApi() {
@@ -143,6 +139,21 @@ describe('settings categories', () => {
 
     fireEvent.keyDown(document.activeElement, { key: 'Home' });
     expect(screen.getByRole('tab', { name: 'General' }).getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('keeps the session actions in a footer, reachable from every category', async () => {
+    renderSettings();
+    await screen.findByText(/demo@corez\.pro/);
+
+    for (const label of ['General', 'Billing', 'Publishing', 'Privacy']) {
+      fireEvent.click(screen.getByRole('tab', { name: label }));
+      const footer = document.querySelector('.settings-footer');
+      expect(footer, `footer missing on ${label}`).toBeTruthy();
+      expect(within(footer).getByRole('button', { name: /clear history/i })).toBeTruthy();
+      expect(within(footer).getByRole('button', { name: /log out/i })).toBeTruthy();
+      // The footer is outside the scrolling area, so it never scrolls away.
+      expect(document.querySelector('.settings-modal-body').contains(footer)).toBe(false);
+    }
   });
 
   it('uses a roving tab stop: only the selected tab is in the tab order', () => {

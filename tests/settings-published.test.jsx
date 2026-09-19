@@ -197,10 +197,11 @@ describe('settings: published pages', () => {
 
     const body = container.querySelector('.settings-modal-body');
     expect(body).toBeTruthy();
-    // Everything except the header lives in the scrollable body.
+    // Everything except the header and the footer lives in the scrollable body.
     expect(body.querySelector('.modal-header')).toBeNull();
+    expect(body.querySelector('.settings-footer')).toBeNull();
     expect(body.textContent).toMatch(/published pages/i);
-    expect(body.textContent).toMatch(/clear conversation history/i);
+    expect(container.querySelector('.settings-footer').textContent).toMatch(/clear history/i);
 
     const css = readFileSync(resolve(here, '../src/index.css'), 'utf8');
     const cardRule = css.match(/\.settings-modal-card\s*\{([^}]*)\}/);
