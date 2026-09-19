@@ -175,8 +175,7 @@ describe('settings categories', () => {
     expect(document.getElementById('settings-modal-title').textContent).toBe('Settings');
   });
 
-  it('is one fixed size for every category, with the panel scrolling instead', () => {
-    const css = readFileSync(resolve(here, '../src/index.css'), 'utf8');
+  it('is one fixed size for every category, with the panel scrolling instead', () => {    const css = readFileSync(resolve(here, '../src/index.css'), 'utf8');
     const cardRule = css.match(/\.settings-modal-card\s*\{([^}]*)\}/);
     // A declared height rather than a max-height: the card must not resize when
     // a shorter or longer category is selected.
@@ -191,6 +190,19 @@ describe('settings categories', () => {
 
     const bodyRule = css.match(/\.settings-modal-body\s*\{([^}]*)\}/);
     expect(bodyRule[1]).toMatch(/overflow-y:\s*auto/);
+  });
+
+  it('never squeezes the tab strip away when the panel overflows', () => {
+    const css = readFileSync(resolve(here, '../src/index.css'), 'utf8');
+    // The strip wrapper is a flex item of the dialog body. Because
+    // overflow-x: auto makes it a scroll container, its automatic minimum
+    // height is zero — so without an explicit no-shrink it collapses to its
+    // padding (16px) under pressure from a long published-pages list, and the
+    // tabs end up in an invisible nested scroller. Regression: the Publishing
+    // tab strip vanished on production exactly this way.
+    const wrapRule = css.match(/\.settings-tabs-scroll\s*\{([^}]*)\}/);
+    expect(wrapRule, '.settings-tabs-scroll rule not found').toBeTruthy();
+    expect(wrapRule[1]).toMatch(/flex:\s*0\s+0\s+auto|flex-shrink:\s*0/);
   });
 
   it('closes on Escape and reopens on the first category', () => {
