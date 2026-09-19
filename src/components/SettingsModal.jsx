@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   X,
@@ -20,6 +20,16 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { openConsentPreferences } from "../services/consentService";
 import { listPublishedPages, unpublishPage } from "../services/appStorageService";
+
+// Settings is grouped rather than one long scroll: everything about the account
+// in General, money in Billing, what is public in Publishing, and the choices
+// that are about data in Privacy.
+const SETTINGS_CATEGORIES = [
+  { id: "general", label: "General" },
+  { id: "billing", label: "Billing" },
+  { id: "publishing", label: "Publishing" },
+  { id: "privacy", label: "Privacy" },
+];
 
 export default function SettingsModal({
   isOpen,
@@ -45,6 +55,10 @@ export default function SettingsModal({
   const [publishedTruncated, setPublishedTruncated] = useState(false);
   const [removingSlug, setRemovingSlug] = useState("");
   const [removeError, setRemoveError] = useState("");
+  const [category, setCategory] = useState(SETTINGS_CATEGORIES[0].id);
+  const tabRefs = useRef({});
+  const wasOpenRef = useRef(false);
+  const titleId = "settings-modal-title";
 
   const refreshPublished = async () => {
     setPublishedLoading(true);
@@ -112,6 +126,46 @@ export default function SettingsModal({
     : null;
   const navigate = useNavigate();
 
+  // Opening the dialog starts on the first category and puts focus on its tab,
+  // so keyboard users land inside the dialog instead of behind it.
+  useEffect(() => {
+    if (!isOpen) {
+      wasOpenRef.current = false;
+      return;
+    }
+    if (wasOpenRef.current) return;
+    wasOpenRef.current = true;
+    setCategory(SETTINGS_CATEGORIES[0].id);
+    const firstTab = tabRefs.current[SETTINGS_CATEGORIES[0].id];
+    if (firstTab && typeof firstTab.focus === "function") firstTab.focus();
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, onClose]);
+
+  // Standard tab-list keyboard model: arrows move and select, Home/End jump.
+  const onTabsKeyDown = (event) => {
+    const ids = SETTINGS_CATEGORIES.map((entry) => entry.id);
+    const index = ids.indexOf(category);
+    let nextIndex = null;
+    if (event.key === "ArrowRight") nextIndex = (index + 1) % ids.length;
+    else if (event.key === "ArrowLeft") nextIndex = (index - 1 + ids.length) % ids.length;
+    else if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = ids.length - 1;
+    if (nextIndex === null) return;
+    event.preventDefault();
+    const nextId = ids[nextIndex];
+    setCategory(nextId);
+    const node = tabRefs.current[nextId];
+    if (node && typeof node.focus === "function") node.focus();
+  };
+
   // Hooks above must run on every render (isOpen false included): the modal is
   // always mounted by App and only its visibility changes. An early return
   // before the hooks made the first open throw "Rendered more hooks than
@@ -122,12 +176,15 @@ export default function SettingsModal({
     <div className="modal-overlay" onClick={onClose}>
       <div
         className="modal-card settings-modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="modal-header">
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <Settings size={18} strokeWidth={1.5} />
-            <span className="modal-title">Settings</span>
+            <span className="modal-title" id={titleId}>Settings</span>
           </div>
           <button
             className="icon-btn"
@@ -139,9 +196,44 @@ export default function SettingsModal({
         </div>
 
         {/* The card keeps a fixed height and only this body scrolls, so the
-            title and close button stay reachable however many pages the account
-            has published. */}
+            title, the categories and the close button stay reachable however
+            much there is to show. */}
         <div className="settings-modal-body">
+          <div className="settings-tabs-scroll">
+            <div
+              className="settings-tabs"
+              role="tablist"
+              aria-label="Settings categories"
+              onKeyDown={onTabsKeyDown}
+            >
+              {SETTINGS_CATEGORIES.map((entry) => (
+                <button
+                  key={entry.id}
+                  type="button"
+                  role="tab"
+                  id={`settings-tab-${entry.id}`}
+                  aria-selected={category === entry.id}
+                  aria-controls={`settings-panel-${entry.id}`}
+                  tabIndex={category === entry.id ? 0 : -1}
+                  className="settings-tab"
+                  ref={(node) => {
+                    if (node) tabRefs.current[entry.id] = node;
+                    else delete tabRefs.current[entry.id];
+                  }}
+                  onClick={() => setCategory(entry.id)}
+                >
+                  {entry.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div
+            className="settings-panel"
+            role="tabpanel"
+            id="settings-panel-general"
+            aria-labelledby="settings-tab-general"
+            hidden={category !== "general"}
+          >
         <div className="settings-section">
           <div className="settings-section-label">Account</div>
           <div className="settings-profile-card">
@@ -179,6 +271,15 @@ export default function SettingsModal({
           </button>
         </div>
 
+          </div>
+
+          <div
+            className="settings-panel"
+            role="tabpanel"
+            id="settings-panel-billing"
+            aria-labelledby="settings-tab-billing"
+            hidden={category !== "billing"}
+          >
         <div className="settings-section pricing-section">
           <div className="settings-section-label">Plan &amp; Billing</div>
           <div
@@ -311,6 +412,15 @@ export default function SettingsModal({
           </button>
         </div>
 
+          </div>
+
+          <div
+            className="settings-panel"
+            role="tabpanel"
+            id="settings-panel-publishing"
+            aria-labelledby="settings-tab-publishing"
+            hidden={category !== "publishing"}
+          >
         <div className="settings-section">
           <div className="settings-section-label">Published pages</div>
           <p className="settings-published-lede">
@@ -398,6 +508,15 @@ export default function SettingsModal({
           )}
         </div>
 
+          </div>
+
+          <div
+            className="settings-panel"
+            role="tabpanel"
+            id="settings-panel-privacy"
+            aria-labelledby="settings-tab-privacy"
+            hidden={category !== "privacy"}
+          >
         <div className="settings-section">
           <div className="settings-section-label">Privacy &amp; Cookies</div>
           <button
@@ -476,6 +595,7 @@ export default function SettingsModal({
               </span>
             </button>
           )}
+        </div>
         </div>
         </div>
       </div>

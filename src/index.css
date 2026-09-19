@@ -2538,6 +2538,72 @@ h6 {
   padding: 2px;
   margin: -2px;
 }
+
+/* Categories: a tab list that stays put while the panel below scrolls. The
+   wrapper takes the horizontal scrolling so the sticky element itself is never
+   a scroll container (overflow-x: auto would compute overflow-y to auto and
+   break sticking). */
+.settings-tabs-scroll {
+  position: sticky;
+  top: -2px;
+  z-index: 2;
+  overflow-x: auto;
+  scrollbar-width: none;
+  background-color: var(--bg-secondary);
+}
+
+.settings-tabs-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.settings-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  width: max-content;
+  min-width: 100%;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill);
+  background-color: var(--bg-primary);
+}
+
+.settings-tab {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 14px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.settings-tab:hover[aria-selected="false"] {
+  color: var(--text-primary);
+  background-color: var(--sidebar-item-hover-bg);
+}
+
+.settings-tab[aria-selected="true"] {
+  background-color: var(--text-primary);
+  color: var(--bg-primary);
+}
+
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+/* `.settings-panel` sets display: flex, which would beat the user agent's
+   [hidden] rule — inactive categories must not be visible. */
+.settings-panel[hidden] {
+  display: none;
+}
 .settings-section {
   display: flex;
   flex-direction: column;
@@ -3078,8 +3144,10 @@ h6 {
     transform: translateY(-2px);
   }
   .settings-modal-card {
+    /* Phone-sized: keep the card inside the viewport. The card itself does not
+       scroll (the body inside it does), so the category tabs stay in place. */
     max-height: 90vh;
-    overflow-y: auto;
+    overflow: hidden;
   }
 }
 

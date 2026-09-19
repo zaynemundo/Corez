@@ -62,8 +62,8 @@ function mockApi({ pages = PUBLISHED, listStatus = 200, deleteStatus = 200, dele
   return calls;
 }
 
-function renderSettings() {
-  return render(
+function renderSettings({ openCategory = 'publishing' } = {}) {
+  const view = render(
     <MemoryRouter>
       <AuthProvider>
         <SettingsModal
@@ -76,6 +76,12 @@ function renderSettings() {
       </AuthProvider>
     </MemoryRouter>,
   );
+  // Categories are tabs: a user opens the one they need before the content in
+  // it is reachable.
+  if (openCategory) {
+    fireEvent.click(screen.getByRole('tab', { name: new RegExp(openCategory, 'i') }));
+  }
+  return view;
 }
 
 beforeEach(() => {
