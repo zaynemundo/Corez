@@ -6,8 +6,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, cleanup, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 import SettingsModal from '../src/components/SettingsModal.jsx';
 import { AuthProvider } from '../src/context/AuthContext.jsx';
+
+const here = dirname(fileURLToPath(import.meta.url));
 
 const CATEGORIES = [
   { id: 'general', label: 'General', contains: ['Account', 'Appearance'] },
@@ -157,6 +162,24 @@ describe('settings categories', () => {
     expect(dialog.getAttribute('aria-modal')).toBe('true');
     expect(dialog.getAttribute('aria-labelledby')).toBe('settings-modal-title');
     expect(document.getElementById('settings-modal-title').textContent).toBe('Settings');
+  });
+
+  it('is one fixed size for every category, with the panel scrolling instead', () => {
+    const css = readFileSync(resolve(here, '../src/index.css'), 'utf8');
+    const cardRule = css.match(/\.settings-modal-card\s*\{([^}]*)\}/);
+    // A declared height rather than a max-height: the card must not resize when
+    // a shorter or longer category is selected.
+    expect(cardRule[1]).toMatch(/(^|[^-])height:/);
+    expect(cardRule[1]).toMatch(/min\(calc\(100dvh - 48px\), 780px\)/);
+    expect(cardRule[1]).toMatch(/overflow:\s*hidden/);
+
+    // The phone-sized override keeps the same promise.
+    const phoneRule = css.match(/@media \(max-width: 560px\)[\s\S]*?\.settings-modal-card\s*\{([^}]*)\}/);
+    expect(phoneRule[1]).toMatch(/(^|[^-])height:/);
+    expect(phoneRule[1]).toMatch(/overflow:\s*hidden/);
+
+    const bodyRule = css.match(/\.settings-modal-body\s*\{([^}]*)\}/);
+    expect(bodyRule[1]).toMatch(/overflow-y:\s*auto/);
   });
 
   it('closes on Escape and reopens on the first category', () => {

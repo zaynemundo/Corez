@@ -205,7 +205,9 @@ describe('settings: published pages', () => {
     const css = readFileSync(resolve(here, '../src/index.css'), 'utf8');
     const cardRule = css.match(/\.settings-modal-card\s*\{([^}]*)\}/);
     const bodyRule = css.match(/\.settings-modal-body\s*\{([^}]*)\}/);
-    expect(cardRule[1]).toMatch(/max-height:/);
+    // A declared height (not just a max) is what keeps the card one size for
+    // every category; the body is what scrolls.
+    expect(cardRule[1]).toMatch(/(^|[^-])height:/);
     expect(cardRule[1]).toMatch(/overflow:\s*hidden/);
     expect(bodyRule[1]).toMatch(/overflow-y:\s*auto/);
     expect(bodyRule[1]).toMatch(/min-height:\s*0/);

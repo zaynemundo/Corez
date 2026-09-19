@@ -2520,10 +2520,10 @@ h6 {
 
 .settings-modal-card {
   gap: 1.1rem;
-  /* Fixed height with an internal scroller: the panel grew a published-pages
-     list, and a centered overlay with no max-height would have clipped it with
-     no way to reach the rest. */
-  max-height: min(calc(100dvh - 32px), 880px);
+  /* One fixed size for every category: the card must not grow or shrink when
+     the reader switches tabs, so the panel inside scrolls instead. */
+  height: min(calc(100dvh - 48px), 780px);
+  max-height: calc(100dvh - 48px);
   overflow: hidden;
 }
 
@@ -3144,9 +3144,11 @@ h6 {
     transform: translateY(-2px);
   }
   .settings-modal-card {
-    /* Phone-sized: keep the card inside the viewport. The card itself does not
-       scroll (the body inside it does), so the category tabs stay in place. */
-    max-height: 90vh;
+    /* Phone-sized: same fixed size for every category, kept inside the
+       viewport. The card itself does not scroll (the body inside it does), so
+       the category tabs stay in place. */
+    height: min(90dvh, 720px);
+    max-height: 90dvh;
     overflow: hidden;
   }
 }
