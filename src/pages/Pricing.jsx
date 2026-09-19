@@ -9,7 +9,7 @@ import {
   Clock,
   X,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { openConsentPreferences } from "../services/consentService";
 
@@ -104,11 +104,17 @@ export default function Pricing() {
 
   const handleCheckout = async (planId) => {
     if (!user) {
+      // A visitor choosing Free goes straight to sign-in: the plan is free, so
+      // there is no checkout to resume and nothing to remember.
+      if (planId === "free") {
+        navigate("/login");
+        return;
+      }
       try {
         localStorage.setItem("corez_pending_plan", planId);
         localStorage.setItem("corez_next", "/pricing");
       } catch {}
-      navigate("/?next=/pricing");
+      navigate("/login");
       return;
     }
     // Handle same plan but different billing interval (monthly -> yearly is an upgrade)
@@ -296,7 +302,7 @@ export default function Pricing() {
           ) : (
             <>
               <button
-                onClick={() => navigate("/")}
+                onClick={() => navigate("/login")}
                 className="pricing-nav-login"
               >
                 Sign in
@@ -467,8 +473,10 @@ export default function Pricing() {
         <div className="pricing-grid-page">
           {PLANS.map((p) => {
             const isYearlySelected = billing === "yearly" && p.id !== "free";
-            // Same plan but yearly billing is an upgrade (monthly -> yearly)
-            const isCurrent = currentPlan === p.id && !isYearlySelected;
+            // "Current plan" only means something for a signed-in account: a
+            // visitor was shown Free as their current plan with the button
+            // disabled, so the free plan could not be started at all.
+            const isCurrent = Boolean(user) && currentPlan === p.id && !isYearlySelected;
             const Icon = p.icon;
             const busy = payBusy === p.id;
             const yearlyPrice =
@@ -548,10 +556,10 @@ export default function Pricing() {
       </main>
 
       <footer className="pricing-footer">
-        <a href="/privacy">Privacy Policy</a>
-        <a href="/terms">Terms &amp; Conditions</a>
-        <a href="/cookies">Cookie Policy</a>
-        <a href="/refunds">Refund Policy</a>
+        <Link to="/privacy">Privacy Policy</Link>
+        <Link to="/terms">Terms &amp; Conditions</Link>
+        <Link to="/cookies">Cookie Policy</Link>
+        <Link to="/refunds">Refund Policy</Link>
         <button
           type="button"
           className="pricing-footer-plain"

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { openConsentPreferences } from "../services/consentService";
 import {
   ArrowRight,
@@ -319,10 +319,10 @@ export default function Landing() {
           <span>Corez — Turn ideas into websites, apps &amp; games.</span>
         </div>
         <nav className="landing-footer-legal" aria-label="Legal">
-          <a href="/privacy">Privacy Policy</a>
-          <a href="/terms">Terms and Conditions</a>
-          <a href="/cookies">Cookie Policy</a>
-          <a href="/refunds">Refund Policy</a>
+          <Link to="/privacy">Privacy Policy</Link>
+          <Link to="/terms">Terms and Conditions</Link>
+          <Link to="/cookies">Cookie Policy</Link>
+          <Link to="/refunds">Refund Policy</Link>
           <button
             type="button"
             className="landing-nav-plain"

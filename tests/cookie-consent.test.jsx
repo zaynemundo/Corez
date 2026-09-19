@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, cleanup, act, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import CookieConsent from '../src/components/CookieConsent.jsx';
 import {
   CONSENT_STORAGE_KEY,
@@ -17,6 +18,16 @@ function resetAll() {
   } catch {
     /* ignore */
   }
+  document.body.classList.remove('corez-consent-visible');
+}
+
+// The banner's policy links are router links, so it must render inside a router.
+function renderBanner() {
+  return render(
+    <MemoryRouter>
+      <CookieConsent />
+    </MemoryRouter>,
+  );
 }
 
 beforeEach(resetAll);
@@ -27,7 +38,7 @@ afterEach(() => {
 
 describe('cookie consent banner', () => {
   it('asks before anything optional is allowed', () => {
-    render(<CookieConsent />);
+    renderBanner();
 
     expect(screen.getByRole('region', { name: /cookie consent/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /accept all/i })).toBeTruthy();
@@ -42,7 +53,7 @@ describe('cookie consent banner', () => {
   });
 
   it('records an accept-all decision and stops asking', () => {
-    render(<CookieConsent />);
+    renderBanner();
     fireEvent.click(screen.getByRole('button', { name: /accept all/i }));
 
     expect(hasConsent('analytics')).toBe(true);
@@ -53,7 +64,7 @@ describe('cookie consent banner', () => {
   });
 
   it('rejecting non-essential keeps every optional category off', () => {
-    render(<CookieConsent />);
+    renderBanner();
     fireEvent.click(screen.getByRole('button', { name: /reject non-essential/i }));
 
     const record = readConsent();
@@ -68,7 +79,7 @@ describe('cookie consent banner', () => {
   });
 
   it('lets a category be enabled individually and saved', () => {
-    render(<CookieConsent />);
+    renderBanner();
     fireEvent.click(screen.getByRole('button', { name: /preferences/i }));
 
     const dialog = screen.getByRole('dialog', { name: /cookie preferences/i });
@@ -87,7 +98,7 @@ describe('cookie consent banner', () => {
 
   it('reopens from a Cookie settings link anywhere in the app', () => {
     saveConsent({ analytics: false }, { source: 'banner' });
-    render(<CookieConsent />);
+    renderBanner();
     expect(screen.queryByRole('dialog')).toBeNull();
 
     act(() => {
@@ -99,7 +110,7 @@ describe('cookie consent banner', () => {
 
   it('withdrawing consent clears the record and brings the banner back', () => {
     saveConsent({ analytics: true, embeds: true, marketing: true }, { source: 'banner' });
-    render(<CookieConsent />);
+    renderBanner();
     act(() => {
       openConsentPreferences();
     });
@@ -117,14 +128,14 @@ describe('cookie consent banner', () => {
       value: true,
       configurable: true,
     });
-    render(<CookieConsent />);
+    renderBanner();
     fireEvent.click(screen.getByRole('button', { name: /preferences/i }));
     expect(screen.getByText(/global privacy control or do not track/i)).toBeTruthy();
     delete navigator.globalPrivacyControl;
   });
 
   it('closes the dialog with Escape and returns focus', () => {
-    render(<CookieConsent />);
+    renderBanner();
     const preferencesButton = screen.getByRole('button', { name: /preferences/i });
     preferencesButton.focus();
     fireEvent.click(preferencesButton);
@@ -133,5 +144,26 @@ describe('cookie consent banner', () => {
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.activeElement).toBe(preferencesButton);
+  });
+
+  it('reserves page space while it is on screen so it never covers a footer', () => {
+    renderBanner();
+    expect(document.body.classList.contains('corez-consent-visible')).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: /accept all/i }));
+    expect(document.body.classList.contains('corez-consent-visible')).toBe(false);
+  });
+
+  it('links to the policies through the router, not a full page load', () => {
+    renderBanner();
+    for (const [name, href] of [
+      [/cookie policy/i, '/cookies'],
+      [/privacy policy/i, '/privacy'],
+    ]) {
+      const link = screen.getByRole('link', { name });
+      expect(link.getAttribute('href')).toBe(href);
+      // A router Link never carries target=_blank on an in-app policy.
+      expect(link.getAttribute('target')).toBeNull();
+    }
   });
 });

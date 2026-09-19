@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { ArrowLeft, Cookie, FileText, Printer, Scale, Wallet } from "lucide-react";
 import {
   LEGAL_CONTACTS,
@@ -32,6 +33,8 @@ function safeHref(href) {
  * Render the tiny inline syntax used in legalDocuments.js:
  * [label](href) and **bold**. Nothing else is interpreted, and hrefs are
  * restricted to site paths, https and mailto — no HTML injection surface.
+ * Internal links go through the router so reading a policy never reloads the
+ * whole app.
  */
 export function renderInline(text) {
   const source = String(text ?? "");
@@ -45,17 +48,26 @@ export function renderInline(text) {
       nodes.push(source.slice(lastIndex, match.index));
     }
     if (match[1] !== undefined && match[2] !== undefined) {
-      nodes.push(
-        <a
-          key={`link-${key++}`}
-          href={safeHref(match[2])}
-          {...(/^https:\/\//i.test(match[2])
-            ? { target: "_blank", rel: "noopener noreferrer" }
-            : {})}
-        >
-          {match[1]}
-        </a>,
-      );
+      const href = safeHref(match[2]);
+      if (href.startsWith("/")) {
+        nodes.push(
+          <Link key={`link-${key++}`} to={href}>
+            {match[1]}
+          </Link>,
+        );
+      } else {
+        nodes.push(
+          <a
+            key={`link-${key++}`}
+            href={href}
+            {...(/^https:\/\//i.test(href)
+              ? { target: "_blank", rel: "noopener noreferrer" }
+              : {})}
+          >
+            {match[1]}
+          </a>,
+        );
+      }
     } else if (match[3] !== undefined) {
       nodes.push(<strong key={`strong-${key++}`}>{match[3]}</strong>);
     }
@@ -119,26 +131,26 @@ function LegalChrome({ currentId, children }) {
   return (
     <div className="legal-page">
       <header className="legal-nav">
-        <a className="legal-brand" href="/" aria-label="Corez home">
+        <Link className="legal-brand" to="/" aria-label="Corez home">
           <img src="/corez-logo.png" alt="" aria-hidden="true" />
           <span>Corez</span>
-        </a>
+        </Link>
         <nav className="legal-nav-links" aria-label="Legal documents">
           {LEGAL_ORDER.map((id) => (
-            <a
+            <Link
               key={id}
-              href={`/${id}`}
+              to={`/${id}`}
               aria-current={id === currentId ? "page" : undefined}
               className={id === currentId ? "is-current" : undefined}
             >
               {LEGAL_DOCUMENTS[id].title.replace(" and Conditions", "")}
-            </a>
+            </Link>
           ))}
         </nav>
-        <a className="legal-back" href="/">
+        <Link className="legal-back" to="/">
           <ArrowLeft size={14} strokeWidth={1.75} aria-hidden="true" />
           Back to Corez
-        </a>
+        </Link>
       </header>
 
       {children}
@@ -189,6 +201,7 @@ export default function Legal({ docId }) {
   const [activeSection, setActiveSection] = useState(
     () => document?.sections?.[0]?.id || "",
   );
+  const sectionRefs = useRef(new Map());
 
   useEffect(() => {
     if (!document) return undefined;
@@ -197,6 +210,32 @@ export default function Legal({ docId }) {
     return () => {
       window.document.title = previousTitle;
     };
+  }, [document]);
+
+  // Highlight the section the reader is actually in. IntersectionObserver is
+  // absent in some test environments, so this degrades to click-only
+  // highlighting instead of throwing.
+  useEffect(() => {
+    if (!document) return undefined;
+    if (typeof IntersectionObserver !== "function") return undefined;
+    const headings = document.sections
+      .map((section) => sectionRefs.current.get(section.id))
+      .filter(Boolean);
+    if (headings.length === 0) return undefined;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible[0]?.target?.id) setActiveSection(visible[0].target.id);
+      },
+      // A heading counts as "current" once it reaches the top quarter of the
+      // viewport and until the next one takes over.
+      { rootMargin: "-12% 0px -70% 0px", threshold: 0 },
+    );
+    for (const heading of headings) observer.observe(heading);
+    return () => observer.disconnect();
   }, [document]);
 
   const otherDocuments = useMemo(
@@ -255,7 +294,15 @@ export default function Legal({ docId }) {
                 id={section.id}
                 aria-labelledby={`${section.id}-heading`}
               >
-                <h2 id={`${section.id}-heading`}>{section.heading}</h2>
+                <h2
+                  id={`${section.id}-heading`}
+                  ref={(node) => {
+                    if (node) sectionRefs.current.set(section.id, node);
+                    else sectionRefs.current.delete(section.id);
+                  }}
+                >
+                  {section.heading}
+                </h2>
                 {section.blocks.map((block, index) => (
                   <DocumentBlock key={index} block={block} />
                 ))}
@@ -269,13 +316,13 @@ export default function Legal({ docId }) {
                   const Icon = DOC_ICONS[other.id] || FileText;
                   return (
                     <li key={other.id}>
-                      <a href={`/${other.id}`}>
+                      <Link to={`/${other.id}`}>
                         <Icon size={16} strokeWidth={1.5} aria-hidden="true" />
                         <span>
                           <strong>{other.title}</strong>
                           <em>{other.short}</em>
                         </span>
-                      </a>
+                      </Link>
                     </li>
                   );
                 })}
@@ -289,6 +336,14 @@ export default function Legal({ docId }) {
 }
 
 export function LegalIndex() {
+  useEffect(() => {
+    const previousTitle = window.document.title;
+    window.document.title = "Policies and terms · Corez";
+    return () => {
+      window.document.title = previousTitle;
+    };
+  }, []);
+
   return (
     <LegalChrome currentId="">
       <main className="legal-main">
@@ -307,13 +362,13 @@ export function LegalIndex() {
             const Icon = DOC_ICONS[id] || FileText;
             return (
               <li key={id}>
-                <a href={`/${id}`}>
+                <Link to={`/${id}`}>
                   <Icon size={18} strokeWidth={1.5} aria-hidden="true" />
                   <span>
                     <strong>{doc.title}</strong>
                     <em>{doc.short}</em>
                   </span>
-                </a>
+                </Link>
               </li>
             );
           })}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { Cookie, Settings2, ShieldCheck } from "lucide-react";
 import {
   CONSENT_CATEGORIES,
@@ -59,12 +60,49 @@ export default function CookieConsent() {
   );
   const [saved, setSaved] = useState(false);
   const dialogRef = useRef(null);
+  const bannerRef = useRef(null);
   const lastFocusedRef = useRef(null);
   const restoreFocusRef = useRef(false);
   const blockedByBrowser = useMemo(() => browserBlocksAnalytics(), []);
 
   useEffect(() => {
     if (bannerVisible) track("consent_banner_shown", { surface: "banner" });
+  }, [bannerVisible]);
+
+  // The page underneath reserves space for the fixed banner (see index.css) so
+  // it never covers a footer, a legal link or the submit button of a form. The
+  // space is measured from the rendered banner — its height changes with the
+  // viewport width and with how the buttons wrap — instead of a guessed number.
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    const body = document.body;
+    if (!bannerVisible) {
+      body.classList.remove("corez-consent-visible");
+      body.style.removeProperty("--corez-consent-space");
+      return undefined;
+    }
+    body.classList.add("corez-consent-visible");
+
+    const measure = () => {
+      const height = bannerRef.current?.getBoundingClientRect().height || 0;
+      if (height > 0) {
+        body.style.setProperty("--corez-consent-space", `${Math.ceil(height + 40)}px`);
+      }
+    };
+    measure();
+
+    let observer;
+    if (typeof ResizeObserver === "function" && bannerRef.current) {
+      observer = new ResizeObserver(measure);
+      observer.observe(bannerRef.current);
+    }
+    window.addEventListener("resize", measure);
+    return () => {
+      if (observer) observer.disconnect();
+      window.removeEventListener("resize", measure);
+      body.classList.remove("corez-consent-visible");
+      body.style.removeProperty("--corez-consent-space");
+    };
   }, [bannerVisible]);
 
   const openDialog = useCallback(() => {
@@ -164,6 +202,7 @@ export default function CookieConsent() {
       {bannerVisible && (
         <div
           className="consent-banner"
+          ref={bannerRef}
           role="region"
           aria-label="Cookie consent"
           // While the dialog is open the banner is behind a modal: it stays
@@ -180,8 +219,8 @@ export default function CookieConsent() {
               <p>
                 Strictly necessary storage keeps you signed in. Analytics and
                 external media stay switched off unless you allow them. Read the{" "}
-                <a href="/cookies">Cookie Policy</a> or the{" "}
-                <a href="/privacy">Privacy Policy</a>.
+                <Link to="/cookies">Cookie Policy</Link> or the{" "}
+                <Link to="/privacy">Privacy Policy</Link>.
               </p>
             </div>
           </div>
@@ -261,7 +300,7 @@ export default function CookieConsent() {
               {allowedCount === 0
                 ? "Only strictly necessary storage will be used."
                 : `${allowedCount} optional categor${allowedCount === 1 ? "y" : "ies"} allowed.`}{" "}
-              Details are in the <a href="/cookies">Cookie Policy</a>.
+              Details are in the <Link to="/cookies">Cookie Policy</Link>.
             </p>
 
             {saved && (

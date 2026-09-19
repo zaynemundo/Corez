@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import ConsentCheckbox from "../components/ConsentCheckbox";
 import { LEGAL_DOCUMENT_VERSION } from "../data/legalDocuments";
-import { recordPolicyAcceptance } from "../services/consentService";
+import { openConsentPreferences, recordPolicyAcceptance } from "../services/consentService";
 import { track } from "../services/analytics";
 import mercuryBg from "../../assets/Mercury_5.jpeg";
 
@@ -129,7 +129,7 @@ export default function Login() {
       <div className="auth-center">
         <div className="auth-card">
           <div className="auth-logo">
-            <span className="auth-logo-word">COREZ</span>
+            <h1 className="auth-logo-word">COREZ</h1>
             <span className="auth-logo-sub">
               {mode === "login"
                 ? "Sign in to your account"
@@ -315,13 +315,13 @@ export default function Login() {
                   testId="signup-accept-terms"
                 >
                   I am 16 or older and I accept the{" "}
-                  <a href="/terms" target="_blank" rel="noopener noreferrer">
+                  <Link to="/terms" target="_blank" rel="noopener noreferrer">
                     Terms and Conditions
-                  </a>{" "}
+                  </Link>{" "}
                   and the{" "}
-                  <a href="/privacy" target="_blank" rel="noopener noreferrer">
+                  <Link to="/privacy" target="_blank" rel="noopener noreferrer">
                     Privacy Policy
-                  </a>
+                  </Link>
                   .
                 </ConsentCheckbox>
                 <ConsentCheckbox
@@ -349,14 +349,20 @@ export default function Login() {
             </button>
           </form>
 
-          {mode === "signup" && (
-            <p className="auth-legal-note">
-              By creating an account you agree to our{" "}
-              <a href="/terms">Terms</a>, <a href="/privacy">Privacy Policy</a>,{" "}
-              <a href="/cookies">Cookie Policy</a> and{" "}
-              <a href="/refunds">Refund Policy</a>.
-            </p>
-          )}
+          <p className="auth-legal-note">
+            {mode === "signup"
+              ? "By creating an account you agree to our policies below."
+              : "Corez is built on a few promises you can read in full."}
+          </p>
+          <nav className="auth-legal-links" aria-label="Policies and cookie settings">
+            <Link to="/privacy">Privacy Policy</Link>
+            <Link to="/terms">Terms</Link>
+            <Link to="/cookies">Cookies</Link>
+            <Link to="/refunds">Refunds</Link>
+            <button type="button" onClick={openConsentPreferences}>
+              Cookie settings
+            </button>
+          </nav>
 
           <p className="auth-foot">
             {mode === "forgot" ? (
