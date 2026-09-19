@@ -2492,6 +2492,7 @@ h6 {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 16px;
   z-index: 100;
 }
 
@@ -2519,6 +2520,23 @@ h6 {
 
 .settings-modal-card {
   gap: 1.1rem;
+  /* Fixed height with an internal scroller: the panel grew a published-pages
+     list, and a centered overlay with no max-height would have clipped it with
+     no way to reach the rest. */
+  max-height: min(calc(100dvh - 32px), 880px);
+  overflow: hidden;
+}
+
+.settings-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Room for focus rings so the scroll container does not clip them. */
+  padding: 2px;
+  margin: -2px;
 }
 .settings-section {
   display: flex;
@@ -4234,6 +4252,10 @@ h6 {
   }
   .landing-btn:hover {
     transform: none;
+  }
+  /* Settings spinner: keep the label, drop the rotation. */
+  .spin {
+    animation: none !important;
   }
 }
 
@@ -7106,6 +7128,143 @@ body.corez-consent-visible .legal-page {
 
 .settings-legal-links button:hover {
   color: var(--text-primary);
+}
+
+/* ---------- Settings: published pages ---------- */
+
+.settings-published-lede {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  padding: 0 2px 8px;
+}
+
+.settings-published-state {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  padding: 8px 2px;
+}
+
+.settings-published-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-published-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-primary);
+}
+
+.settings-published-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.settings-published-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  min-width: 0;
+}
+
+.settings-published-title span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-published-title:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.settings-published-sub {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.settings-published-remove {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.settings-published-remove:hover:not(:disabled) {
+  color: var(--market-negative);
+  border-color: var(--market-negative);
+}
+
+.settings-published-remove:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.settings-published-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  border-radius: var(--radius-sm);
+  background-color: rgba(248, 113, 113, 0.08);
+  color: var(--market-negative);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.settings-published-retry {
+  flex: 0 0 auto;
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.spin {
+  animation: corezSpin 1s linear infinite;
+}
+
+@keyframes corezSpin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 767px) {

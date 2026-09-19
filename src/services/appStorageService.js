@@ -203,6 +203,111 @@ export async function deleteAppInR2(sessionId, appId) {
 }
 
 /**
+ * Lists the signed-in account's published pages.
+ *
+ * The server is the source of truth: a published link can be removed from
+ * another device, and the local registry only knows about this browser. Returns
+ * `{ pages, truncated, error }` so the caller can tell "nothing published" from
+ * "could not check".
+ */
+export async function listPublishedPages() {
+  try {
+    const res = await fetch("/api/publish", {
+      method: "GET",
+      credentials: "include",
+      headers: { Accept: "application/json" },
+    });
+    const data = await res.json().catch(() => null);
+    if (res.ok && Array.isArray(data?.pages)) {
+      return {
+        pages: data.pages,
+        truncated: data.truncated === true,
+        error: null,
+      };
+    }
+    if (res.status === 401) {
+      return { pages: [], truncated: false, error: "Please sign in again to see your published pages." };
+    }
+    if (res.status === 530 || data?.error) {
+      return {
+        pages: [],
+        truncated: false,
+        error: data?.error || "Published pages are unavailable on this deployment.",
+      };
+    }
+    return { pages: [], truncated: false, error: `Could not load published pages (${res.status}).` };
+  } catch (err) {
+    return {
+      pages: [],
+      truncated: false,
+      error: err?.message
+        ? `Could not load published pages: ${err.message}`
+        : "Could not load published pages.",
+    };
+  }
+}
+
+/**
+ * Removes a published page: the public URL stops working immediately.
+ * The creation itself stays in its chat.
+ */
+export async function unpublishPage(slug) {
+  if (!slug || typeof slug !== "string") {
+    return { success: false, error: "A slug is required." };
+  }
+  try {
+    const res = await fetch(`/api/publish/${encodeURIComponent(slug)}`, {
+      method: "DELETE",
+      credentials: "include",
+      headers: { Accept: "application/json" },
+    });
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.success !== false) {
+      forgetPublishedSlug(slug);
+      return { success: true, slug };
+    }
+    return {
+      success: false,
+      error: data?.error || `Could not remove the page (${res.status}).`,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err?.message
+        ? `Could not remove the page: ${err.message}`
+        : "Could not remove the page.",
+    };
+  }
+}
+
+/**
+ * Drops a removed slug from the local publish registry and per-session
+ * lineage. Without this, republishing the same content would try to reuse a
+ * link that no longer exists.
+ */
+function forgetPublishedSlug(slug) {
+  try {
+    const registry = loadPublishRegistry().filter((entry) => entry.slug !== slug);
+    savePublishRegistry(registry);
+  } catch {
+    /* best effort */
+  }
+  try {
+    const lineage = loadPublishLineage();
+    let changed = false;
+    for (const [sessionId, entry] of Object.entries(lineage)) {
+      if (entry?.slug === slug) {
+        delete lineage[sessionId];
+        changed = true;
+      }
+    }
+    if (changed) savePublishLineage(lineage);
+  } catch {
+    /* best effort */
+  }
+}
+
+/**
  * Publishes a creation so anyone with the returned share link can open it.
  * The html payload is the fully formatted preview document (what the user
  * sees in the canvas).

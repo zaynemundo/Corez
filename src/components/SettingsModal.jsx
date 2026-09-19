@@ -13,9 +13,13 @@ import {
   Sparkles,
   ArrowRight,
   ShieldCheck,
+  ExternalLink,
+  Globe,
+  Loader2,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { openConsentPreferences } from "../services/consentService";
+import { listPublishedPages, unpublishPage } from "../services/appStorageService";
 
 export default function SettingsModal({
   isOpen,
@@ -35,6 +39,22 @@ export default function SettingsModal({
   const isDark = theme === "dark";
   const [sub, setSub] = useState(null);
   const [subLoading, setSubLoading] = useState(false);
+  const [published, setPublished] = useState([]);
+  const [publishedLoading, setPublishedLoading] = useState(false);
+  const [publishedError, setPublishedError] = useState("");
+  const [publishedTruncated, setPublishedTruncated] = useState(false);
+  const [removingSlug, setRemovingSlug] = useState("");
+  const [removeError, setRemoveError] = useState("");
+
+  const refreshPublished = async () => {
+    setPublishedLoading(true);
+    setPublishedError("");
+    const result = await listPublishedPages();
+    setPublished(result.pages);
+    setPublishedTruncated(result.truncated);
+    setPublishedError(result.error || "");
+    setPublishedLoading(false);
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -55,6 +75,35 @@ export default function SettingsModal({
       cancelled = true;
     };
   }, [isOpen]);
+
+  // Published pages are owner data on the server, so they are fetched when the
+  // panel opens rather than read from this browser's local publish registry.
+  // The modal stays mounted while closed, so there is no unmount race here.
+  useEffect(() => {
+    if (!isOpen) return;
+    setRemoveError("");
+    refreshPublished();
+  }, [isOpen]);
+
+  const handleUnpublish = async (page) => {
+    const label = page.title || page.slug;
+    if (
+      !confirm(
+        `Remove the published page “${label}”?\n\nThe public link corez.pro${page.url} stops working immediately. The creation itself stays in its chat.`,
+      )
+    ) {
+      return;
+    }
+    setRemoveError("");
+    setRemovingSlug(page.slug);
+    const result = await unpublishPage(page.slug);
+    setRemovingSlug("");
+    if (result.success) {
+      setPublished((prev) => prev.filter((entry) => entry.slug !== page.slug));
+      return;
+    }
+    setRemoveError(result.error || "Could not remove that page.");
+  };
 
   const currentPlan = sub?.plan || userPlan || "free";
   const isExpired = sub?.status === "expired" || sub?.isExpired;
@@ -89,6 +138,10 @@ export default function SettingsModal({
           </button>
         </div>
 
+        {/* The card keeps a fixed height and only this body scrolls, so the
+            title and close button stay reachable however many pages the account
+            has published. */}
+        <div className="settings-modal-body">
         <div className="settings-section">
           <div className="settings-section-label">Account</div>
           <div className="settings-profile-card">
@@ -259,6 +312,93 @@ export default function SettingsModal({
         </div>
 
         <div className="settings-section">
+          <div className="settings-section-label">Published pages</div>
+          <p className="settings-published-lede">
+            Everything you have published to a public link. Removing a page takes
+            the link offline immediately — the creation stays in its chat.
+          </p>
+
+          {publishedLoading && (
+            <p className="settings-published-state" role="status">
+              <Loader2 size={14} strokeWidth={1.75} className="spin" aria-hidden="true" />
+              Checking your published pages…
+            </p>
+          )}
+
+          {!publishedLoading && publishedError && (
+            <div className="settings-published-error" role="alert">
+              <span>{publishedError}</span>
+              <button
+                type="button"
+                className="settings-published-retry"
+                onClick={refreshPublished}
+              >
+                Try again
+              </button>
+            </div>
+          )}
+
+          {!publishedLoading && !publishedError && published.length === 0 && (
+            <p className="settings-published-state">
+              Nothing published yet. Publish from the preview pane and the link
+              will appear here.
+            </p>
+          )}
+
+          {!publishedLoading && published.length > 0 && (
+            <ul className="settings-published-list">
+              {published.map((page) => (
+                <li key={page.slug} className="settings-published-item">
+                  <div className="settings-published-meta">
+                    <a
+                      className="settings-published-title"
+                      href={page.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`Open corez.pro${page.url}`}
+                    >
+                      <Globe size={13} strokeWidth={1.75} aria-hidden="true" />
+                      <span>{page.title || page.slug}</span>
+                      <ExternalLink size={12} strokeWidth={1.75} aria-hidden="true" />
+                    </a>
+                    <span className="settings-published-sub">
+                      corez.pro{page.url}
+                      {page.pages > 0 ? ` · ${page.pages + 1} pages` : ""}
+                      {page.createdAt
+                        ? ` · ${new Date(page.createdAt).toLocaleDateString()}`
+                        : ""}
+                      {page.badge ? " · shows the Made with Corez badge" : ""}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="settings-published-remove"
+                    onClick={() => handleUnpublish(page)}
+                    disabled={removingSlug === page.slug}
+                    aria-label={`Remove published page ${page.title || page.slug}`}
+                  >
+                    {removingSlug === page.slug ? "Removing…" : "Remove"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {publishedTruncated && !publishedLoading && (
+            <p className="settings-published-state">
+              You have more published pages than can be listed at once — the
+              oldest are not shown here.
+            </p>
+          )}
+
+          {removeError && (
+            <p className="settings-published-error" role="alert">
+              {removeError}
+            </p>
+          )}
+        </div>
+
+        <div className="settings-section">
           <div className="settings-section-label">Privacy &amp; Cookies</div>
           <button
             type="button"
@@ -336,6 +476,7 @@ export default function SettingsModal({
               </span>
             </button>
           )}
+        </div>
         </div>
       </div>
     </div>

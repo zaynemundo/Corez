@@ -376,6 +376,20 @@ const MAX_PUBLISH_PAGES = 12;
 // path here for the same reason.
 const PUBLISH_SLUG_ROOT_PATTERN = /^\/([a-z0-9][a-z0-9-]{1,48}[a-z0-9])\/$/;
 
+// Owner-facing unpublish endpoint: DELETE /api/publish/<slug>. Shared by the
+// route dispatch and the handler so they can never disagree about what is a
+// removable slug.
+const PUBLISH_UNPUBLISH_PATH_PATTERN =
+  /^\/api\/publish\/([a-z0-9][a-z0-9-]{1,48}[a-z0-9])$/;
+
+// Owner-facing publish management (list + unpublish). There is no per-user
+// index: records live at publish/<slug>.json and carry ownerUserId, so the
+// owner's pages are found by a bounded scan. The bounds keep a single request
+// from walking an unbounded bucket, and the response says when it truncated
+// instead of silently hiding pages.
+const MAX_PUBLISH_LIST_RECORDS = 1000;
+const MAX_OWNED_PUBLISHES = 200;
+
 const RESERVED_SLUGS = Object.freeze(
   new Set([
     "api",
@@ -3783,6 +3797,82 @@ function injectCorezBadge(html) {
   return clean + COREZ_BADGE_HTML;
 }
 
+/**
+ * Walk publish/<slug>.json records in bounded batches.
+ * Returns parsed records with their storage keys. `truncated` is true when the
+ * scan stopped at the bound, so callers can say so instead of implying the list
+ * is complete.
+ */
+async function scanPublishRecords(env, { limit = MAX_PUBLISH_LIST_RECORDS } = {}) {
+  if (!env?.ASSET_BUCKET || typeof env.ASSET_BUCKET.list !== "function") {
+    return { records: [], truncated: true, supported: false };
+  }
+  const records = [];
+  let cursor;
+  let scanned = 0;
+  let truncated = false;
+  try {
+    do {
+      const listing = await env.ASSET_BUCKET.list({
+        prefix: "publish/",
+        limit: 100,
+        cursor,
+      });
+      const objects = Array.isArray(listing?.objects) ? listing.objects : [];
+      for (const object of objects) {
+        scanned += 1;
+        if (scanned > limit) {
+          truncated = true;
+          break;
+        }
+        const stored = await env.ASSET_BUCKET.get(object.key);
+        if (!stored) continue;
+        let record;
+        try {
+          record = JSON.parse(await stored.text());
+        } catch {
+          continue; // unreadable record: skip rather than fail the whole list
+        }
+        records.push({ key: object.key, record });
+      }
+      cursor = listing?.truncated ? listing.cursor : null;
+    } while (cursor && !truncated);
+  } catch {
+    return { records, truncated: true, supported: false };
+  }
+  return { records, truncated, supported: true, scanned };
+}
+
+/**
+ * The owner-facing shape of a publish record: everything needed to recognise
+ * and manage a link, never the document bodies (each can be megabytes).
+ */
+function publishRecordSummary(key, record) {
+  const slug =
+    typeof record?.slug === "string" && PUBLISH_SLUG_PATTERN.test(record.slug)
+      ? record.slug
+      : String(key).replace(/^publish\//, "").replace(/\.json$/, "");
+  const pageHtml =
+    record?.pages && typeof record.pages === "object"
+      ? Object.values(record.pages).filter((value) => typeof value === "string")
+      : [];
+  return {
+    slug,
+    url: `/${slug}`,
+    title:
+      typeof record?.title === "string" && record.title.trim()
+        ? record.title.slice(0, 120)
+        : "Untitled Application",
+    createdAt: typeof record?.createdAt === "string" ? record.createdAt : null,
+    badge: record?.badge === true,
+    customized: record?.customized === true,
+    pages: pageHtml.length,
+    bytes:
+      (typeof record?.html === "string" ? record.html.length : 0) +
+      pageHtml.reduce((total, html) => total + html.length, 0),
+  };
+}
+
 async function handlePublish(request, env) {
   const url = new URL(request.url);
   const pathname = url.pathname;
@@ -4084,6 +4174,127 @@ async function handlePublish(request, env) {
     });
   }
 
+  // GET /api/publish - the caller's own published pages, for the settings
+  // panel. Only the owner's records are returned, and never the document
+  // bodies: the list is for recognising and removing a link.
+  if (pathname === "/api/publish" && request.method === "GET") {
+    const uid = await sessionUid(request, env);
+    if (!uid) {
+      return jsonResponse(401, { error: "Authentication required." });
+    }
+    if (!env?.ASSET_BUCKET || typeof env.ASSET_BUCKET.list !== "function") {
+      return jsonResponse(530, {
+        error: "R2 storage (ASSET_BUCKET) is not configured.",
+      });
+    }
+    const { records, truncated, supported } = await scanPublishRecords(env);
+    if (!supported && records.length === 0) {
+      return jsonResponse(500, {
+        error: "Could not read published pages right now.",
+      });
+    }
+    const pages = [];
+    let omitted = truncated;
+    for (const { key, record } of records) {
+      if (record?.ownerUserId !== uid) continue;
+      if (pages.length >= MAX_OWNED_PUBLISHES) {
+        omitted = true;
+        break;
+      }
+      pages.push(publishRecordSummary(key, record));
+    }
+    pages.sort((a, b) =>
+      String(b.createdAt || "").localeCompare(String(a.createdAt || "")),
+    );
+    return jsonResponse(200, { pages, truncated: omitted });
+  }
+
+  // DELETE /api/publish/<slug> - unpublish one of the caller's pages. The
+  // public URL stops working immediately; assets that were only public because
+  // this page referenced them lose their public marker again.
+  const unpublishMatch = pathname.match(PUBLISH_UNPUBLISH_PATH_PATTERN);
+  if (unpublishMatch && request.method === "DELETE") {
+    const uid = await sessionUid(request, env);
+    if (!uid) {
+      return jsonResponse(401, { error: "Authentication required." });
+    }
+    if (!env?.ASSET_BUCKET) {
+      return jsonResponse(530, {
+        error: "R2 storage (ASSET_BUCKET) is not configured.",
+      });
+    }
+    const retryAfter = publishRateLimiter(request);
+    if (retryAfter !== null) {
+      return jsonResponse(
+        429,
+        { error: "Too many publish requests. Try again shortly." },
+        { "Retry-After": String(retryAfter) },
+      );
+    }
+
+    const slug = unpublishMatch[1];
+    const key = `publish/${slug}.json`;
+    const stored = await env.ASSET_BUCKET.get(key);
+    if (!stored) {
+      return jsonResponse(404, { error: "Published page not found." });
+    }
+    let record = null;
+    try {
+      record = JSON.parse(await stored.text());
+    } catch {
+      // Unreadable record: leave it null so it is treated as unattributable.
+    }
+    if (!record?.ownerUserId) {
+      // Records written before ownership was recorded cannot be attributed, so
+      // removing one here could delete somebody else's page.
+      return jsonResponse(403, {
+        error:
+          "This published page predates ownership records, so it cannot be removed from settings.",
+      });
+    }
+    if (record.ownerUserId !== uid) {
+      return jsonResponse(403, {
+        error: "This published page belongs to another account.",
+      });
+    }
+
+    await env.ASSET_BUCKET.delete(key);
+
+    // Asset markers are what let anonymous visitors read an uploaded image.
+    // Drop the ones this page alone was keeping public.
+    try {
+      const referenced = extractReferencedAssetKeys([
+        typeof record.html === "string" ? record.html : "",
+        ...(record.pages && typeof record.pages === "object"
+          ? Object.values(record.pages).filter((v) => typeof v === "string")
+          : []),
+      ]);
+      if (referenced.length > 0) {
+        const { records } = await scanPublishRecords(env);
+        for (const assetKey of referenced) {
+          const stillReferenced = records.some(({ record: other }) => {
+            const parts = [typeof other?.html === "string" ? other.html : ""];
+            if (other?.pages && typeof other.pages === "object") {
+              for (const pageHtml of Object.values(other.pages)) {
+                if (typeof pageHtml === "string") parts.push(pageHtml);
+              }
+            }
+            return parts.some((html) => html.includes(`/api/assets/${assetKey}`));
+          });
+          if (!stillReferenced) {
+            await env.ASSET_BUCKET.delete(
+              `${ASSET_PUBLIC_MARKER_PREFIX}${assetKey}`,
+            );
+          }
+        }
+      }
+    } catch {
+      // Markers are an optimization; a failure here never un-deletes the page.
+    }
+
+    return jsonResponse(200, { success: true, slug, url: `/${slug}` });
+  }
+
   // GET /<slug>/<page>.html - serve one page of a published multi-page
   // creation. Same sandbox headers as the home page plus a CORS allow-origin
   // header: sandboxed pages run with an opaque origin, so their internal
@@ -4347,6 +4558,8 @@ export default {
     }
     if (
       pathname === "/api/publish" ||
+      (request.method === "DELETE" &&
+        PUBLISH_UNPUBLISH_PATH_PATTERN.test(pathname)) ||
       (request.method === "GET" &&
         !RESERVED_SLUGS.has(pathname.slice(1)) &&
         (PUBLISH_SLUG_PATTERN.test(pathname.slice(1)) ||

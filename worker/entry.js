@@ -221,12 +221,14 @@ export default {
       ) || url.pathname.startsWith("/api/game/");
     const isPublicAssetGet =
       url.pathname.startsWith("/api/assets/") && request.method === "GET";
+    // Published creations are public: /<slug> and its sub-pages. The API
+    // collection itself is not — listing and unpublishing are owner-only, so
+    // /api/publish goes through the auth gate like every other API route.
     const isPublicPublishGet =
       request.method === "GET" &&
-      (url.pathname === "/api/publish" ||
-        (!url.pathname.startsWith("/api/") &&
-          !url.pathname.startsWith("/dist/") &&
-          !url.pathname.startsWith("/assets/")));
+      !url.pathname.startsWith("/api/") &&
+      !url.pathname.startsWith("/dist/") &&
+      !url.pathname.startsWith("/assets/");
     const isPublicRoute = isPublicAssetGet || isPublicPublishGet;
     const needsAuth = baseAuthPath && !isPublicRoute;
     if (needsAuth) {
