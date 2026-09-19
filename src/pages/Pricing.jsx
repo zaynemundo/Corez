@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Check,
   Sparkles,
@@ -80,7 +80,15 @@ export default function Pricing() {
   const [payBusy, setPayBusy] = useState("");
   const [currentPlan, setCurrentPlan] = useState(user?.plan || "free");
   const [sub, setSub] = useState(null);
+  const pageRef = useRef(null);
   const tierRank = { free: 0, standard: 1, premium: 2 };
+
+  // The pricing page scrolls inside its own container, so keyboard scrolling
+  // needs focus inside it (the document itself is not the scroller).
+  useEffect(() => {
+    const node = pageRef.current;
+    if (node && typeof node.focus === "function") node.focus({ preventScroll: true });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -282,7 +290,7 @@ export default function Pricing() {
   }, [user]);
 
   return (
-    <div className="pricing-page">
+    <div className="pricing-page" ref={pageRef} tabIndex={-1}>
       <div className="pricing-bg" aria-hidden="true" />
       <div className="pricing-nav">
         <button onClick={() => navigate("/")} className="pricing-logo">

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { openConsentPreferences } from "../services/consentService";
 import {
@@ -127,8 +127,16 @@ export default function Landing() {
   const reducedMotion = usePrefersReducedMotion();
   const [promptIndex, setPromptIndex] = useState(0);
   const [typedCount, setTypedCount] = useState(0);
+  const pageRef = useRef(null);
 
   const active = DEMO_PROMPTS[promptIndex];
+
+  // The landing page scrolls inside its own container, so keyboard scrolling
+  // needs focus inside it (the document itself is not the scroller).
+  useEffect(() => {
+    const node = pageRef.current;
+    if (node && typeof node.focus === "function") node.focus({ preventScroll: true });
+  }, []);
 
   useEffect(() => {
     if (reducedMotion) return undefined;
@@ -151,7 +159,7 @@ export default function Landing() {
   );
 
   return (
-    <div className="landing">
+    <div className="landing" ref={pageRef} tabIndex={-1}>
       <header className="landing-nav">
         <a className="landing-brand" href="/" aria-label="Corez home">
           <img src="/corez-logo.png" alt="" aria-hidden="true" />

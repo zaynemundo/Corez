@@ -128,8 +128,21 @@ function DocumentBlock({ block }) {
 }
 
 function LegalChrome({ currentId, children }) {
+  const pageRef = useRef(null);
+
+  // The page is its own scroll container, so keyboard scrolling (PageDown,
+  // arrows, space) only reaches it when focus is inside it. Focusing the
+  // container on arrival also puts screen readers at the start of the new
+  // document, which is what a route change should do.
+  useEffect(() => {
+    const node = pageRef.current;
+    if (node && typeof node.focus === "function") {
+      node.focus({ preventScroll: true });
+    }
+  }, [currentId]);
+
   return (
-    <div className="legal-page">
+    <div className="legal-page" ref={pageRef} tabIndex={-1}>
       <header className="legal-nav">
         <Link className="legal-brand" to="/" aria-label="Corez home">
           <img src="/corez-logo.png" alt="" aria-hidden="true" />

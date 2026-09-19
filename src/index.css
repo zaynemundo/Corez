@@ -3073,7 +3073,11 @@ h6 {
   background: var(--bg-primary);
   color: var(--text-primary);
   position: relative;
+  /* Explicit rather than implied by the overflow-x pairing rule: this element
+     is the scroll container for the pricing page (see the page scroll contract
+     in tests/page-scroll-contract.test.js). */
   overflow-x: hidden;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
@@ -6166,20 +6170,32 @@ h6 {
   border: 0;
 }
 
+/* A full-page route container is focused on arrival so keyboard scrolling and
+   screen-reader reading start inside the scroll container. It is not an
+   interactive control, so it does not paint a focus ring. */
+.legal-page:focus,
+.landing:focus,
+.pricing-page:focus {
+  outline: none;
+}
+
 /* ---------- Legal pages ---------- */
 
-/* #root is a fixed-height flex row (height: 100dvh; display: flex), so a page
-   wrapper is a flex ITEM: without an explicit width it shrinks to its widest
-   child (the 1120px main column), which left the sticky glass nav ending mid
-   screen, and without align-self it was stretched to one viewport height, so
-   its background stopped at the fold and the sticky nav had no room to stick.
-   Full width + content height fixes all three. */
+/* The document itself cannot be the scroller: body carries overflow: hidden,
+   which propagates to the viewport and blocks user gestures (wheel, touch,
+   PageDown) even though window.scrollTo still moves the page. Chrome's
+   programmatic scroll is what made an earlier audit pass while a real reader
+   could not scroll at all. So the legal page is its own scroll container,
+   exactly like .landing and .pricing-page already are. It is also taken out of
+   #root's fixed-height flex row, so the page box covers the full viewport and
+   the sticky nav has the whole document to stick to. */
 .legal-page {
-  flex: 1 1 auto;
-  width: 100%;
-  min-width: 0;
-  align-self: flex-start;
-  min-height: 100dvh;
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   background-color: var(--bg-primary);
   color: var(--text-primary);
 }
@@ -6543,7 +6559,13 @@ h6 {
     display: none !important;
   }
 
+  /* The screen layout scrolls inside a fixed, viewport-sized box; printing
+     must return the page to normal flow or only the first screen is printed. */
   .legal-page {
+    position: static;
+    inset: auto;
+    overflow: visible;
+    height: auto;
     background: #ffffff;
     color: #000000;
   }
