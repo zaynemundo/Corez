@@ -13,6 +13,16 @@ import { fetchAwwwardsInspirationCached, handleInspiration } from "./inspiration
 import { verifySession } from "./auth.js";
 import { getActiveSubscription } from "./subscriptions.js";
 import {
+  addUsage,
+  consumeUsage,
+  estimateTokens,
+  evaluateLimit,
+  limitResponse,
+  meteringEnabled,
+  normalizePlan,
+  usageSummary,
+} from "./usage.js";
+import {
   safeErrorDetail,
   readBoundedJson,
   jsonResponse,
@@ -1196,6 +1206,84 @@ async function handleAi(request, env) {
     return jsonResponse(400, { error: "Prompt is required." });
   }
 
+  // Who is asking decides the plan and where usage is recorded. Resolved once
+  // and reused for the gateway session hint below.
+  let uid = null;
+  try {
+    uid = await sessionUid(request, env);
+  } catch {
+    uid = null;
+  }
+  const isTitleRequest = body.titleOnly === true;
+  const isHarnessRequest = body.harness === true;
+  const contextChars = Array.isArray(body.messages)
+    ? body.messages.reduce(
+        (total, message) =>
+          total + (typeof message?.content === "string" ? message.content.length : 0),
+        0,
+      )
+    : 0;
+  const requestTokensEstimate = estimateTokens(prompt) + Math.ceil(contextChars / 4);
+
+  // Token accounting for this request. The estimate is recorded up front (a
+  // request that dies mid-stream still counts something) and the provider's
+  // reported total tops it up if it is larger — never down, so the counter can
+  // never under-report what was actually spent. `tokensEstimated` keeps the
+  // estimated part visible so the number is never mistaken for billed truth.
+  let reportedTokens = 0;
+  const tokenAccount = {
+    record(tokens) {
+      const input = Number(tokens?.inputTokens);
+      const output = Number(tokens?.outputTokens);
+      if (!Number.isFinite(input) && !Number.isFinite(output)) return;
+      const total = (Number.isFinite(input) ? input : 0) + (Number.isFinite(output) ? output : 0);
+      if (total > 0) reportedTokens += total;
+    },
+    async flush() {
+      if (!meteringEnabled(env) || !uid) return false;
+      const extra = Math.round(reportedTokens) - requestTokensEstimate;
+      if (extra <= 0) return false;
+      return addUsage(env, uid, { tokens: extra });
+    },
+  };
+
+  // Plan resolution shared by the gate and the metering below.
+  const subscription = await getActiveSubscription(env, uid).catch(() => null);
+  const plan = normalizePlan(
+    subscription?.status === "expired" || subscription?.isExpired
+      ? "free"
+      : subscription?.plan || "free",
+  );
+
+  // One user turn is one generation. A harness build also draws on the separate
+  // build-run budget, because it is many provider calls rather than one. Title
+  // requests are not generations (they name a chat after the turn) but they do
+  // spend tokens, so they are metered without being gated.
+  if (!isTitleRequest) {
+    const metering = await consumeUsage(env, uid, {
+      metric: "messages",
+      plan,
+      increments: {
+        messages: 1,
+        tokens: requestTokensEstimate,
+        ...(isHarnessRequest ? { swarm_runs: 1 } : {}),
+      },
+    });
+    if (!metering.allowed && metering.limit !== null) {
+      return limitResponse("messages", metering, plan);
+    }
+    if (isHarnessRequest) {
+      const buildRuns = evaluateLimit(plan, metering.usage || {}, "swarm_runs");
+      if (!buildRuns.allowed) {
+        return limitResponse("swarm_runs", buildRuns, plan);
+      }
+    }
+    const tokensLeft = evaluateLimit(plan, metering.usage || {}, "tokens");
+    if (!tokensLeft.allowed) {
+      return limitResponse("tokens", tokensLeft, plan);
+    }
+  }
+
   // OpenCode gateway session affinity (required x-opencode-session header):
   // one id per incoming request — explicit client hint first, then the
   // authenticated user (stable across turns), else a fresh random id. Shared
@@ -1205,12 +1293,8 @@ async function handleAi(request, env) {
     typeof body.opencodeSession === "string" && body.opencodeSession.trim()
       ? body.opencodeSession
       : null;
-  if (!opencodeSessionHint) {
-    try {
-      opencodeSessionHint = await sessionUid(request, env);
-    } catch {
-      opencodeSessionHint = null;
-    }
+  if (!opencodeSessionHint && uid) {
+    opencodeSessionHint = uid;
   }
   const sessionId = resolveOpencodeSessionId(opencodeSessionHint);
 
@@ -1236,6 +1320,8 @@ async function handleAi(request, env) {
         sleep: retrySleepFor(env),
         sessionId,
       });
+      tokenAccount.record(titleResult?.usage);
+      await tokenAccount.flush();
       let title =
         typeof titleResult?.content === "string"
           ? titleResult.content.trim()
@@ -2095,6 +2181,16 @@ async function handleAi(request, env) {
         async start(controller) {
           try {
             for await (const event of runCreationHarness(harnessOptions)) {
+              // A build is many provider calls: capture the reported usage on
+              // the diagnostics event so the token counter reflects it.
+              if (event.type === "diagnostics") {
+                tokenAccount.record(
+                  event.diagnostics?.usage?.total ||
+                    event.diagnostics?.usage?.initial ||
+                    event.diagnostics?.usage,
+                );
+                await tokenAccount.flush();
+              }
               controller.enqueue(encoder.encode(sse(event)));
             }
           } catch (err) {
@@ -2141,6 +2237,12 @@ async function handleAi(request, env) {
           projectState = event.projectState ?? projectState;
         } else if (event.type === "diagnostics") {
           diagnostics = event.diagnostics;
+          tokenAccount.record(
+            event.diagnostics?.usage?.total ||
+              event.diagnostics?.usage?.initial ||
+              event.diagnostics?.usage,
+          );
+          await tokenAccount.flush();
         }
       }
       return jsonResponse(200, { content, projectState, diagnostics });
@@ -2428,6 +2530,18 @@ async function handleAi(request, env) {
                 controller.close();
                 return;
               }
+              const streamTotalInput = [inputTokens, ...repairUsage.map((u) => u.inputTokens)]
+                .filter((n) => Number.isFinite(n) && n !== null)
+                .reduce((a, b) => a + b, 0);
+              const streamTotalOutput = [outputTokens, ...repairUsage.map((u) => u.outputTokens)]
+                .filter((n) => Number.isFinite(n) && n !== null)
+                .reduce((a, b) => a + b, 0);
+              // Meter the provider's reported usage for this streamed turn.
+              tokenAccount.record({
+                inputTokens: streamTotalInput,
+                outputTokens: streamTotalOutput,
+              });
+              await tokenAccount.flush();
               controller.enqueue(
                 encoder.encode(
                   sse({
@@ -2465,32 +2579,12 @@ async function handleAi(request, env) {
                         initial: { inputTokens, outputTokens },
                         repairs: repairUsage,
                         total: {
-                          inputTokens: [
-                            inputTokens,
-                            ...repairUsage.map((u) => u.inputTokens),
-                          ]
-                            .filter((n) => Number.isFinite(n) && n !== null)
-                            .reduce((a, b) => a + b, 0),
-                          outputTokens: [
-                            outputTokens,
-                            ...repairUsage.map((u) => u.outputTokens),
-                          ]
-                            .filter((n) => Number.isFinite(n) && n !== null)
-                            .reduce((a, b) => a + b, 0),
+                          inputTokens: streamTotalInput,
+                          outputTokens: streamTotalOutput,
                         },
                         estimatedCostUsd: estimateCostUsd(
-                          [
-                            inputTokens,
-                            ...repairUsage.map((u) => u.inputTokens),
-                          ]
-                            .filter((n) => Number.isFinite(n) && n !== null)
-                            .reduce((a, b) => a + b, 0),
-                          [
-                            outputTokens,
-                            ...repairUsage.map((u) => u.outputTokens),
-                          ]
-                            .filter((n) => Number.isFinite(n) && n !== null)
-                            .reduce((a, b) => a + b, 0),
+                          streamTotalInput,
+                          streamTotalOutput,
                           env,
                         ),
                       },
@@ -2691,6 +2785,11 @@ async function handleAi(request, env) {
       .filter((n) => Number.isFinite(n) && n !== null)
       .reduce((acc, n) => acc + n, 0);
 
+    // Meter the provider's reported usage for this turn (the up-front estimate
+    // is topped up only if the provider reports more).
+    tokenAccount.record({ inputTokens: totalInput, outputTokens: totalOutput });
+    await tokenAccount.flush();
+
     // Project state returned to the client: the client-provided or
     // conversation-derived state, or — on first creation turns with no prior
     // code — the state derived from the just-generated answer, so the client
@@ -2792,6 +2891,27 @@ async function saveToR2IfAvailable(
   return null;
 }
 
+/**
+ * The image budget gate shared by both image routes. Returns a Response when
+ * the plan is out of images, otherwise null (and counts this request).
+ */
+async function meterImageRequest(request, env) {
+  const uid = await sessionUid(request, env);
+  const sub = await getActiveSubscription(env, uid).catch(() => null);
+  const plan = normalizePlan(
+    sub?.status === "expired" || sub?.isExpired ? "free" : sub?.plan || "free",
+  );
+  const metering = await consumeUsage(env, uid, {
+    metric: "images",
+    plan,
+    increments: { images: 1 },
+  });
+  if (!metering.allowed && metering.limit !== null) {
+    return limitResponse("images", metering, plan);
+  }
+  return null;
+}
+
 async function handleImage(request, env) {
   if (request.method !== "POST") {
     return jsonResponse(405, { error: "Method not allowed." });
@@ -2822,6 +2942,11 @@ async function handleImage(request, env) {
   if (!prompt) {
     return jsonResponse(400, { error: "Prompt is required." });
   }
+
+  // Image generations are billed per call: check the plan's image budget before
+  // calling the provider and count this one when it is allowed.
+  const imageGate = await meterImageRequest(request, env);
+  if (imageGate) return imageGate;
 
   // Optional reference image (the user's own image) sent to the image model
   // as multimodal input. Only validated data: image payloads or public https
@@ -3035,6 +3160,10 @@ async function handleWorkersAIImage(request, env) {
   if (!prompt) {
     return jsonResponse(400, { error: "Prompt is required." });
   }
+
+  // Same image budget as the OpenRouter route.
+  const imageGate = await meterImageRequest(request, env);
+  if (imageGate) return imageGate;
 
   const ai = env?.AI;
   if (!ai || typeof ai.run !== "function") {
@@ -3798,6 +3927,34 @@ function injectCorezBadge(html) {
 }
 
 /**
+ * GET /api/usage - the numbers behind the settings panel: this month's
+ * counters, the plan's limits, and how close each one is.
+ */
+async function handleUsageApi(request, env) {
+  if (request.method !== "GET") {
+    return jsonResponse(405, { error: "Method not allowed." });
+  }
+  const uid = await sessionUid(request, env);
+  if (!uid) {
+    return jsonResponse(401, { error: "Authentication required." });
+  }
+  const sub = await getActiveSubscription(env, uid).catch(() => null);
+  const plan = normalizePlan(
+    sub?.status === "expired" || sub?.isExpired ? "free" : sub?.plan || "free",
+  );
+
+  // Published pages are a live gauge, not a monthly counter.
+  let publishedPages = null;
+  if (env?.ASSET_BUCKET && typeof env.ASSET_BUCKET.list === "function") {
+    const { records } = await scanPublishRecords(env);
+    publishedPages = records.filter(({ record }) => record?.ownerUserId === uid).length;
+  }
+
+  const summary = await usageSummary(env, uid, { plan, publishedPages });
+  return jsonResponse(200, summary);
+}
+
+/**
  * Walk publish/<slug>.json records in bounded batches.
  * Returns parsed records with their storage keys. `truncated` is true when the
  * scan stopped at the bound, so callers can say so instead of implying the list
@@ -3907,6 +4064,16 @@ async function handlePublish(request, env) {
       }
     }
     const showBadge = planId !== "standard" && planId !== "premium";
+    // Publishing is metered: the monthly publish budget is what keeps a free
+    // account from using the deployment as free static hosting.
+    const publishMeter = await consumeUsage(env, uid, {
+      metric: "publishes",
+      plan: planId,
+      increments: { publishes: 1 },
+    });
+    if (!publishMeter.allowed && publishMeter.limit !== null) {
+      return limitResponse("publishes", publishMeter, planId);
+    }
     const retryAfter = publishRateLimiter(request);
     if (retryAfter !== null) {
       return jsonResponse(
@@ -4546,6 +4713,9 @@ export default {
     }
     if (pathname === "/api/inspiration") {
       return handleInspiration(request, env);
+    }
+    if (pathname === "/api/usage") {
+      return runJsonSafe(() => handleUsageApi(request, env));
     }
     if (pathname.startsWith("/api/assets")) {
       return runJsonSafe(() => handleR2Assets(request, env));

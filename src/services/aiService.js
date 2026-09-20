@@ -1380,6 +1380,21 @@ export async function generateHostedAIResponse(
         if (response.status === 401) {
           throw new Error("Authentication required. Please log in.");
         }
+        // The plan wall: the server says which limit ran out and when it comes
+        // back. Surface that sentence instead of a bare HTTP status, so the
+        // message in the chat is the one that tells the user what to do.
+        if (response.status === 402) {
+          let planMessage = "";
+          try {
+            planMessage = String(JSON.parse(errorText)?.error || "");
+          } catch {
+            /* not JSON: fall through to the generic message below */
+          }
+          throw new Error(
+            planMessage ||
+              "You have used up your plan's monthly allowance. Upgrade in Settings → Billing to keep going.",
+          );
+        }
         // A 403 with the Cloudflare challenge page ("Just a moment...") means
         // the WAF intercepted the request before it reached the worker — the
         // API needs a WAF bypass rule, not a retry.
@@ -1628,6 +1643,15 @@ export async function generateHostedAIResponse(
       typeof data?.error === "string"
         ? data.error
         : data?.error?.message || data?.message || `HTTP ${response.status}`;
+    // Plan walls and rate limits carry a sentence written for the user; keep it
+    // verbatim instead of wrapping it in transport language.
+    if (response.status === 402 || data?.code === "plan_limit") {
+      throw new Error(
+        serverMsg === `HTTP ${response.status}`
+          ? "You have used up your plan's monthly allowance. Upgrade in Settings → Billing to keep going."
+          : serverMsg,
+      );
+    }
     const detail =
       typeof data?.detail === "string" && data.detail.trim()
         ? ` (${data.detail.trim()})`

@@ -7266,6 +7266,133 @@ body.corez-consent-visible .legal-page {
   margin-top: 24px;
 }
 
+/* ---------- Settings: usage this month ---------- */
+
+.settings-usage {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-primary);
+}
+
+.settings-usage-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.settings-usage-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.settings-usage-reset {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.settings-usage-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "label value" "bar bar";
+  gap: 2px 10px;
+  align-items: baseline;
+}
+
+.settings-usage-label {
+  grid-area: label;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.settings-usage-value {
+  grid-area: value;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.settings-usage-limit {
+  color: var(--text-muted);
+}
+
+.settings-usage-bar {
+  grid-area: bar;
+  position: relative;
+  display: block;
+  height: 4px;
+  margin-top: 3px;
+  border-radius: var(--radius-pill);
+  background-color: var(--bg-tertiary);
+  overflow: hidden;
+}
+
+.settings-usage-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background-color: var(--text-secondary);
+  transition: width var(--transition-fast);
+}
+
+.settings-usage-row.is-spent .settings-usage-bar-fill {
+  background-color: var(--market-negative);
+}
+
+.settings-usage-row.is-spent .settings-usage-value {
+  color: var(--market-negative);
+}
+
+.settings-usage-error,
+.settings-usage-note {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.settings-usage-error {
+  color: var(--market-negative);
+}
+
+.settings-usage-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 8px;
+  margin-top: 2px;
+  border-top: 1px solid var(--border-color);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.settings-usage-upgrade {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--text-primary);
+  border-radius: var(--radius-pill);
+  background-color: var(--text-primary);
+  color: var(--bg-primary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.settings-usage-upgrade:hover {
+  opacity: 0.88;
+}
+
 .settings-legal-links {
   display: flex;
   gap: 14px;

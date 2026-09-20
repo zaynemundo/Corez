@@ -20,6 +20,12 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { openConsentPreferences } from "../services/consentService";
 import { listPublishedPages, unpublishPage } from "../services/appStorageService";
+import {
+  USAGE_METRIC_LABELS,
+  fetchUsage,
+  formatUsageValue,
+  usageRatio,
+} from "../services/usageService";
 
 // Settings is grouped rather than one long scroll: everything about the account
 // in General, money in Billing, what is public in Publishing, and the choices
@@ -56,6 +62,7 @@ export default function SettingsModal({
   const [removingSlug, setRemovingSlug] = useState("");
   const [removeError, setRemoveError] = useState("");
   const [category, setCategory] = useState(SETTINGS_CATEGORIES[0].id);
+  const [usage, setUsage] = useState(null);
   const tabRefs = useRef({});
   const wasOpenRef = useRef(false);
   const titleId = "settings-modal-title";
@@ -97,6 +104,7 @@ export default function SettingsModal({
     if (!isOpen) return;
     setRemoveError("");
     refreshPublished();
+    fetchUsage().then((summary) => setUsage(summary));
   }, [isOpen]);
 
   const handleUnpublish = async (page) => {
@@ -282,6 +290,84 @@ export default function SettingsModal({
           >
         <div className="settings-section pricing-section">
           <div className="settings-section-label">Plan &amp; Billing</div>
+
+          {usage && (
+            <div className="settings-usage" aria-label="Usage this month">
+              <div className="settings-usage-head">
+                <span className="settings-usage-title">Usage this month</span>
+                <span className="settings-usage-reset">
+                  {usage.resetsAt
+                    ? `Resets ${new Date(usage.resetsAt).toLocaleDateString()}`
+                    : ""}
+                </span>
+              </div>
+              {usage.error && (
+                <p className="settings-usage-error" role="alert">
+                  {usage.error}
+                </p>
+              )}
+              {!usage.error && usage.meteringEnabled === false && (
+                <p className="settings-usage-note">
+                  Usage is not metered on this deployment, so nothing is capped.
+                </p>
+              )}
+              {!usage.error &&
+                USAGE_METRIC_LABELS.filter((entry) =>
+                  Object.prototype.hasOwnProperty.call(usage.metrics, entry.id),
+                ).map((entry) => {
+                  const metric = usage.metrics[entry.id];
+                  const ratio = usageRatio(metric);
+                  const spent = metric.limit !== null && metric.used >= metric.limit;
+                  return (
+                    <div
+                      key={entry.id}
+                      className={`settings-usage-row${spent ? " is-spent" : ""}`}
+                      title={entry.hint}
+                    >
+                      <span className="settings-usage-label">{entry.label}</span>
+                      <span className="settings-usage-value">
+                        {formatUsageValue(metric.used)}
+                        <span className="settings-usage-limit">
+                          {metric.limit === null ? " / unlimited" : ` / ${formatUsageValue(metric.limit)}`}
+                        </span>
+                      </span>
+                      <span
+                        className="settings-usage-bar"
+                        role="progressbar"
+                        aria-label={`${entry.label} used`}
+                        aria-valuenow={Math.round(ratio * 100)}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                      >
+                        <span
+                          className="settings-usage-bar-fill"
+                          style={{ width: `${Math.round(ratio * 100)}%` }}
+                        />
+                      </span>
+                    </div>
+                  );
+                })}
+              {(usage.exceeded.length > 0 || usage.nearLimit.length > 0) && (
+                <div className="settings-usage-cta">
+                  <span>
+                    {usage.exceeded.length > 0
+                      ? "You have used up a limit on this plan."
+                      : "You are close to a limit on this plan."}
+                  </span>
+                  <button
+                    type="button"
+                    className="settings-usage-upgrade"
+                    onClick={() => {
+                      onClose();
+                      navigate("/pricing");
+                    }}
+                  >
+                    Compare plans <ArrowRight size={13} strokeWidth={1.75} aria-hidden="true" />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
           <div
             className={`pricing-status ${isExpired ? "expired" : sub?.isScheduledDowngrade ? "scheduled" : currentPlan}`}
           >
