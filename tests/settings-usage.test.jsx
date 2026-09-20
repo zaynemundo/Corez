@@ -3,7 +3,7 @@
 // to show what has been spent, what the plan allows, and point at upgrading
 // when a limit is reached or close.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent, cleanup, within } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import SettingsModal from '../src/components/SettingsModal.jsx';
 import { AuthProvider } from '../src/context/AuthContext.jsx';
@@ -48,6 +48,13 @@ function mockApi({ usage = usagePayload(), usageStatus = 200 } = {}) {
     }
     if (target === '/api/publish') {
       return new Response(JSON.stringify({ pages: [], truncated: false }), { status: 200 });
+    }
+    if (target === '/api/addons') {
+      // The panel also loads the add-on catalogue; this suite is about usage.
+      return new Response(
+        JSON.stringify({ enabled: true, skus: [], balances: {}, purchases: [], settledNow: [] }),
+        { status: 200 },
+      );
     }
     return new Response(null, { status: 404 });
   });
@@ -163,8 +170,12 @@ describe('settings: usage this month', () => {
   it('surfaces a failure to load usage instead of showing zeros', async () => {
     mockApi({ usageStatus: 500 });
     renderBilling();
-    const alert = await screen.findByRole('alert');
-    expect(within(alert).getByText(/could not load usage/i)).toBeTruthy();
+    const usageBlock = await waitFor(() => {
+      const block = document.querySelector('.settings-usage');
+      expect(block).toBeTruthy();
+      return block;
+    });
+    expect(within(usageBlock).getByRole('alert').textContent).toMatch(/could not load usage/i);
   });
 
   it('publishes the free plan limits it is showing', () => {

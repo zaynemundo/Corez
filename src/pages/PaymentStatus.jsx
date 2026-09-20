@@ -8,6 +8,9 @@ export function PaymentSuccess() {
   const [detail, setDetail] = useState("");
   const plan = search.get("plan") || "standard";
   const urlInterval = (search.get("interval") || "").toLowerCase();
+  // Add-on packs settle through their own ledger: the URL carries the SKU, and
+  // the payment id is matched back to the recorded purchase server-side.
+  const addonSku = search.get("addon");
 
   useEffect(() => {
     let cancelled = false;
@@ -17,6 +20,41 @@ export function PaymentSuccess() {
           search.get("payment_id") ||
           search.get("id") ||
           search.get("paymentId");
+
+        if (addonSku) {
+          const body = {};
+          if (paymentId) body.payment_id = paymentId;
+          if (search.get("purchaseId")) body.purchaseId = search.get("purchaseId");
+          const res = await fetch("/api/addons/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify(body),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (cancelled) return;
+          if (res.ok && data.granted) {
+            setStatus("success");
+            const label = data.purchase?.label || "Add-on";
+            const credits = data.purchase?.credits || 0;
+            const unit = data.purchase?.unitLabel || "credits";
+            setDetail(`Verified — ${credits} ${unit} added to your ${label} balance.`);
+          } else if (res.ok && data.alreadySettled) {
+            setStatus("success");
+            setDetail(data.message || "These credits were already added.");
+          } else if (res.ok) {
+            setStatus("verifying");
+            setDetail(data.message || "Payment is not completed yet.");
+            setTimeout(() => {
+              if (!cancelled) window.location.reload();
+            }, 3000);
+          } else {
+            setStatus("error");
+            setDetail(data.error || "Verification failed. Please contact support.");
+          }
+          return;
+        }
+
         let body = {};
         if (paymentId) body.payment_id = paymentId;
         if (plan) body.plan = plan;
@@ -86,7 +124,7 @@ export function PaymentSuccess() {
     return () => {
       cancelled = true;
     };
-  }, [search, plan]);
+  }, [search, plan, addonSku]);
 
   return (
     <div

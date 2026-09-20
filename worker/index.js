@@ -14,14 +14,14 @@ import { verifySession } from "./auth.js";
 import { getActiveSubscription } from "./subscriptions.js";
 import {
   addUsage,
-  consumeUsage,
+  checkUsage,
   estimateTokens,
-  evaluateLimit,
   limitResponse,
   meteringEnabled,
   normalizePlan,
   usageSummary,
 } from "./usage.js";
+import { handleAddonsApi, spendAddonCredit } from "./addons.js";
 import {
   safeErrorDetail,
   readBoundedJson,
@@ -1184,6 +1184,23 @@ function inferredVerb(text) {
     .replace(/^User may be associated with /i, "be connected to ");
 }
 
+/**
+ * A deep research request: the explicit @research command, or the classifier's
+ * research intent. It is a heuristic on purpose — it decides which budget a
+ * request draws on, and a missed classification only means the request is
+ * counted as an ordinary generation instead of a research report.
+ */
+function isDeepResearchRequest(prompt, body) {
+  if (/^\s*@research\b/i.test(String(prompt || ""))) return true;
+  const intents = [body?.intent, body?.fineIntent, body?.fine_intent];
+  for (const intent of intents) {
+    if (!intent || typeof intent !== "object") continue;
+    const primary = String(intent.primaryIntent || intent.type || "").toLowerCase();
+    if (primary === "research") return true;
+  }
+  return false;
+}
+
 async function handleAi(request, env) {
   if (request.method !== "POST") {
     return jsonResponse(405, { error: "Method not allowed." });
@@ -1256,32 +1273,45 @@ async function handleAi(request, env) {
   );
 
   // One user turn is one generation. A harness build also draws on the separate
-  // build-run budget, because it is many provider calls rather than one. Title
+  // build-run budget, because it is many provider calls rather than one. A deep
+  // research request additionally draws on the research budget, and can fall
+  // back to a purchased research pack when the plan's own is spent. Title
   // requests are not generations (they name a chat after the turn) but they do
   // spend tokens, so they are metered without being gated.
+  const isResearchRequest = !isTitleRequest && isDeepResearchRequest(prompt, body);
+  let addonCreditUsed = null;
   if (!isTitleRequest) {
-    const metering = await consumeUsage(env, uid, {
-      metric: "messages",
-      plan,
-      increments: {
-        messages: 1,
-        tokens: requestTokensEstimate,
-        ...(isHarnessRequest ? { swarm_runs: 1 } : {}),
-      },
-    });
-    if (!metering.allowed && metering.limit !== null) {
-      return limitResponse("messages", metering, plan);
+    const messagesCheck = await checkUsage(env, uid, { metric: "messages", plan });
+    if (!messagesCheck.allowed && messagesCheck.limit !== null) {
+      return limitResponse("messages", messagesCheck, plan);
     }
     if (isHarnessRequest) {
-      const buildRuns = evaluateLimit(plan, metering.usage || {}, "swarm_runs");
-      if (!buildRuns.allowed) {
+      const buildRuns = await checkUsage(env, uid, { metric: "swarm_runs", plan });
+      if (!buildRuns.allowed && buildRuns.limit !== null) {
         return limitResponse("swarm_runs", buildRuns, plan);
       }
     }
-    const tokensLeft = evaluateLimit(plan, metering.usage || {}, "tokens");
-    if (!tokensLeft.allowed) {
+    if (isResearchRequest) {
+      const research = await checkUsage(env, uid, { metric: "research_reports", plan });
+      if (!research.allowed && research.limit !== null) {
+        const credit = await spendAddonCredit(env, uid, "research_reports");
+        if (!credit.spent) {
+          return limitResponse("research_reports", research, plan);
+        }
+        addonCreditUsed = credit;
+      }
+    }
+    const tokensLeft = await checkUsage(env, uid, { metric: "tokens", plan });
+    if (!tokensLeft.allowed && tokensLeft.limit !== null) {
       return limitResponse("tokens", tokensLeft, plan);
     }
+    await addUsage(env, uid, {
+      messages: 1,
+      tokens: requestTokensEstimate,
+      ...(isHarnessRequest ? { swarm_runs: 1 } : {}),
+      // A credit already paid for this report, so the plan counter stays put.
+      ...(isResearchRequest && !addonCreditUsed ? { research_reports: 1 } : {}),
+    });
   }
 
   // OpenCode gateway session affinity (required x-opencode-session header):
@@ -2893,7 +2923,8 @@ async function saveToR2IfAvailable(
 
 /**
  * The image budget gate shared by both image routes. Returns a Response when
- * the plan is out of images, otherwise null (and counts this request).
+ * the plan is out of images and no purchased image pack can cover it, otherwise
+ * null (and counts the request against whichever budget paid for it).
  */
 async function meterImageRequest(request, env) {
   const uid = await sessionUid(request, env);
@@ -2901,13 +2932,18 @@ async function meterImageRequest(request, env) {
   const plan = normalizePlan(
     sub?.status === "expired" || sub?.isExpired ? "free" : sub?.plan || "free",
   );
-  const metering = await consumeUsage(env, uid, {
-    metric: "images",
-    plan,
-    increments: { images: 1 },
-  });
-  if (!metering.allowed && metering.limit !== null) {
-    return limitResponse("images", metering, plan);
+  const check = await checkUsage(env, uid, { metric: "images", plan });
+  if (check.allowed) {
+    await addUsage(env, uid, { images: 1 });
+    return null;
+  }
+  if (check.limit !== null) {
+    // Out of plan images: a purchased pack can take over.
+    const credit = await spendAddonCredit(env, uid, "images");
+    if (!credit.spent) {
+      return limitResponse("images", check, plan);
+    }
+    return null;
   }
   return null;
 }
@@ -4065,15 +4101,13 @@ async function handlePublish(request, env) {
     }
     const showBadge = planId !== "standard" && planId !== "premium";
     // Publishing is metered: the monthly publish budget is what keeps a free
-    // account from using the deployment as free static hosting.
-    const publishMeter = await consumeUsage(env, uid, {
-      metric: "publishes",
-      plan: planId,
-      increments: { publishes: 1 },
-    });
-    if (!publishMeter.allowed && publishMeter.limit !== null) {
-      return limitResponse("publishes", publishMeter, planId);
+    // account from using the deployment as free static hosting. There is no
+    // publish pack, so this wall is final until the plan changes.
+    const publishCheck = await checkUsage(env, uid, { metric: "publishes", plan: planId });
+    if (!publishCheck.allowed && publishCheck.limit !== null) {
+      return limitResponse("publishes", publishCheck, planId);
     }
+    await addUsage(env, uid, { publishes: 1 });
     const retryAfter = publishRateLimiter(request);
     if (retryAfter !== null) {
       return jsonResponse(
@@ -4716,6 +4750,9 @@ export default {
     }
     if (pathname === "/api/usage") {
       return runJsonSafe(() => handleUsageApi(request, env));
+    }
+    if (pathname.startsWith("/api/addons")) {
+      return runJsonSafe(() => handleAddonsApi(request, env));
     }
     if (pathname.startsWith("/api/assets")) {
       return runJsonSafe(() => handleR2Assets(request, env));

@@ -33,6 +33,7 @@ export const USAGE_METRICS = [
   "swarm_runs",
   "images",
   "publishes",
+  "research_reports",
 ];
 
 const UNLIMITED = null;
@@ -56,6 +57,7 @@ export const PLAN_LIMITS = Object.freeze({
     images: 10,
     publishes: 3,
     publishedPages: 1,
+    research_reports: 5,
   }),
   standard: Object.freeze({
     messages: 200,
@@ -64,6 +66,7 @@ export const PLAN_LIMITS = Object.freeze({
     images: 200,
     publishes: 50,
     publishedPages: 10,
+    research_reports: 50,
   }),
   premium: Object.freeze({
     messages: UNLIMITED,
@@ -72,6 +75,7 @@ export const PLAN_LIMITS = Object.freeze({
     images: UNLIMITED,
     publishes: UNLIMITED,
     publishedPages: UNLIMITED,
+    research_reports: UNLIMITED,
   }),
 });
 
@@ -223,6 +227,7 @@ export function limitResponse(metric, evaluation, plan, { now = new Date() } = {
     images: "images",
     publishes: "publishes",
     publishedPages: "published pages",
+    research_reports: "research reports",
   };
   const label = labels[metric] || metric;
   return jsonResponse(402, {
@@ -257,6 +262,20 @@ export async function consumeUsage(
   }
   const written = increments ? await addUsage(env, uid, increments) : true;
   return { allowed: true, ...evaluation, usage, recorded: Boolean(written) };
+}
+
+/**
+ * Inspect a metric without spending it, so a caller can decide whether to fall
+ * back to an add-on credit instead of counting against the plan. Mirrors
+ * consumeUsage's evaluation so the two can never disagree about the wall.
+ */
+export async function checkUsage(env, uid, { metric, plan = "free", extra = {} } = {}) {
+  if (!meteringEnabled(env) || !uid) {
+    return { allowed: true, skipped: true, used: 0, limit: null, remaining: null, usage: emptyUsage() };
+  }
+  const usage = await getUsage(env, uid);
+  const evaluation = metric ? evaluateLimit(plan, usage, metric, extra) : { allowed: true };
+  return { ...evaluation, usage };
 }
 
 /** The numbers the settings panel shows. */

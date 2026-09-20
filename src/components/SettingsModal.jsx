@@ -26,6 +26,12 @@ import {
   formatUsageValue,
   usageRatio,
 } from "../services/usageService";
+import {
+  balanceLabel,
+  buyAddon,
+  fetchAddons,
+  formatAed,
+} from "../services/addonService";
 
 // Settings is grouped rather than one long scroll: everything about the account
 // in General, money in Billing, what is public in Publishing, and the choices
@@ -63,6 +69,9 @@ export default function SettingsModal({
   const [removeError, setRemoveError] = useState("");
   const [category, setCategory] = useState(SETTINGS_CATEGORIES[0].id);
   const [usage, setUsage] = useState(null);
+  const [addons, setAddons] = useState(null);
+  const [buyingSku, setBuyingSku] = useState("");
+  const [addonError, setAddonError] = useState("");
   const tabRefs = useRef({});
   const wasOpenRef = useRef(false);
   const titleId = "settings-modal-title";
@@ -103,9 +112,31 @@ export default function SettingsModal({
   useEffect(() => {
     if (!isOpen) return;
     setRemoveError("");
+    setAddonError("");
     refreshPublished();
     fetchUsage().then((summary) => setUsage(summary));
+    fetchAddons().then((catalog) => setAddons(catalog));
   }, [isOpen]);
+
+  const handleBuyAddon = async (sku) => {
+    setAddonError("");
+    setBuyingSku(sku.id);
+    const result = await buyAddon(sku.id);
+    setBuyingSku("");
+    if (!result.success) {
+      setAddonError(result.error || "Could not start the purchase.");
+      return;
+    }
+    if (result.redirectUrl) {
+      // The payment page takes over; credits appear when the server reconciles
+      // the completed payment against the ledger.
+      window.location.href = result.redirectUrl;
+      return;
+    }
+    setAddonError(
+      "The payment page did not return a checkout link. Nothing was charged — please try again.",
+    );
+  };
 
   const handleUnpublish = async (page) => {
     const label = page.title || page.slug;
@@ -291,6 +322,81 @@ export default function SettingsModal({
         <div className="settings-section pricing-section">
           <div className="settings-section-label">Plan &amp; Billing</div>
 
+          {addons && (addons.skus.length > 0 || addons.error) && (
+            <div className="settings-addons" aria-label="Add-on packs">
+              <div className="settings-usage-head">
+                <span className="settings-usage-title">Add-on packs</span>
+                <span className="settings-usage-reset">One-off, in AED</span>
+              </div>
+              <p className="settings-addons-lede">
+                Extra capacity on top of your plan, kept until you use it. A pack
+                also covers work once the plan's own monthly budget is spent.
+              </p>
+              {addons.error && (
+                <p className="settings-usage-error" role="alert">
+                  {addons.error}
+                </p>
+              )}
+              {!addons.error && !addons.paymentsConfigured && (
+                <p className="settings-usage-note">
+                  Payments are not configured on this deployment, so packs cannot
+                  be bought here.
+                </p>
+              )}
+              <ul className="settings-addons-list">
+                {addons.skus.map((sku) => {
+                  const balance = addons.balances?.[sku.id];
+                  const buyable =
+                    sku.available && !addons.error && addons.paymentsConfigured;
+                  return (
+                    <li key={sku.id} className="settings-addon">
+                      <div className="settings-addon-head">
+                        <span className="settings-addon-name">{sku.label}</span>
+                        <span className="settings-addon-price">{formatAed(sku)}</span>
+                      </div>
+                      <p className="settings-addon-blurb">{sku.blurb}</p>
+                      <div className="settings-addon-foot">
+                        <span className="settings-addon-meta">
+                          {sku.credits} {sku.unitLabel} ·{" "}
+                          <strong>{balanceLabel(balance)}</strong>
+                        </span>
+                        <button
+                          type="button"
+                          className="settings-addon-buy"
+                          onClick={() => handleBuyAddon(sku)}
+                          disabled={!buyable || buyingSku === sku.id}
+                          title={
+                            sku.available
+                              ? `Buy ${sku.credits} ${sku.unitLabel} for ${formatAed(sku)}`
+                              : "Not available yet"
+                          }
+                        >
+                          {buyingSku === sku.id
+                            ? "Opening…"
+                            : sku.available
+                              ? "Buy"
+                              : "Soon"}
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+              {addonError && (
+                <p className="settings-usage-error" role="alert">
+                  {addonError}
+                </p>
+              )}
+              {addons.settledNow?.length > 0 && (
+                <p className="settings-addons-settled" role="status">
+                  {addons.settledNow.length} purchase
+                  {addons.settledNow.length === 1 ? "" : "s"} completed — credits
+                  added.
+                </p>
+              )}
+            </div>
+          )}
+
           {usage && (
             <div className="settings-usage" aria-label="Usage this month">
               <div className="settings-usage-head">
@@ -354,16 +460,40 @@ export default function SettingsModal({
                       ? "You have used up a limit on this plan."
                       : "You are close to a limit on this plan."}
                   </span>
-                  <button
-                    type="button"
-                    className="settings-usage-upgrade"
-                    onClick={() => {
-                      onClose();
-                      navigate("/pricing");
-                    }}
-                  >
-                    Compare plans <ArrowRight size={13} strokeWidth={1.75} aria-hidden="true" />
-                  </button>
+                  <span className="settings-usage-cta-actions">
+                    {(() => {
+                      const spentWithPack = usage.exceeded
+                        .map((metric) =>
+                          addons?.skus?.find(
+                            (sku) => sku.metric === metric && sku.available,
+                          ),
+                        )
+                        .find(Boolean);
+                      if (!spentWithPack) return null;
+                      return (
+                        <button
+                          type="button"
+                          className="settings-usage-pack"
+                          onClick={() => handleBuyAddon(spentWithPack)}
+                          disabled={buyingSku === spentWithPack.id}
+                        >
+                          {buyingSku === spentWithPack.id
+                            ? "Opening…"
+                            : `Buy ${spentWithPack.credits} ${spentWithPack.unitLabel}`}
+                        </button>
+                      );
+                    })()}
+                    <button
+                      type="button"
+                      className="settings-usage-upgrade"
+                      onClick={() => {
+                        onClose();
+                        navigate("/pricing");
+                      }}
+                    >
+                      Compare plans <ArrowRight size={13} strokeWidth={1.75} aria-hidden="true" />
+                    </button>
+                  </span>
                 </div>
               )}
             </div>

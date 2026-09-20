@@ -7373,6 +7373,143 @@ body.corez-consent-visible .legal-page {
   color: var(--text-secondary);
 }
 
+.settings-usage-cta-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.settings-usage-pack {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill);
+  background-color: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.settings-usage-pack:hover:not(:disabled) {
+  border-color: var(--border-hover);
+  background-color: var(--sidebar-item-hover-bg);
+}
+
+.settings-usage-pack:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ---------- Settings: add-on packs ---------- */
+
+.settings-addons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-primary);
+}
+
+.settings-addons-lede {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.settings-addons-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-addon {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-secondary);
+}
+
+.settings-addon-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.settings-addon-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.settings-addon-price {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.settings-addon-blurb {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.settings-addon-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.settings-addon-meta {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.settings-addon-buy {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 0 14px;
+  border: 1px solid var(--text-primary);
+  border-radius: var(--radius-pill);
+  background-color: var(--text-primary);
+  color: var(--bg-primary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.settings-addon-buy:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.settings-addon-buy:disabled {
+  background-color: transparent;
+  border-color: var(--border-color);
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.settings-addons-settled {
+  font-size: 12px;
+  color: var(--market-positive);
+}
+
 .settings-usage-upgrade {
   display: inline-flex;
   align-items: center;
