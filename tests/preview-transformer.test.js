@@ -309,6 +309,55 @@ describe('parseMultiPageSite', () => {
     expect(result.pages[0].name).toBe('index.html');
   });
 
+  it('adopts an unmarked leading document as index.html', () => {
+    // The model often writes the home page straight into the code block and
+    // only starts emitting markers from the second document. Dropping that
+    // leading document deleted the site's home page: the preview opened on an
+    // arbitrary sub-page and publishing was blocked as "Missing index.html".
+    const unmarkedHome = `<!DOCTYPE html><html><body><h1>Home</h1><a href="about.html">About</a></body></html>
+<!-- PAGE: about.html -->
+<!DOCTYPE html><html><body><h1>About Us</h1></body></html>`;
+
+    const result = parseMultiPageSite(unmarkedHome);
+    expect(result.isMultiPage).toBe(true);
+    expect(result.pages.map((p) => p.name)).toEqual(['index.html', 'about.html']);
+    expect(result.pages[0].html).toContain('<h1>Home</h1>');
+    expect(result.pages[0].html.startsWith('<!DOCTYPE html>')).toBe(true);
+    expect(validateMultiPageSite(result.pages).valid).toBe(true);
+  });
+
+  it('strips a leading CORESITE-PAGES header from an unmarked home document', () => {
+    const code = `<!-- CORESITE-PAGES: index.html, about.html -->
+<!DOCTYPE html><html><body><h1>Home</h1></body></html>
+<!-- PAGE: about.html -->
+<!DOCTYPE html><html><body><h1>About</h1></body></html>`;
+
+    const result = parseMultiPageSite(code);
+    expect(result.pages.map((p) => p.name)).toEqual(['index.html', 'about.html']);
+    expect(result.pages[0].html).not.toContain('CORESITE-PAGES');
+    expect(result.pages[0].html.startsWith('<!DOCTYPE html>')).toBe(true);
+  });
+
+  it('keeps a marked index.html when prose precedes the first marker', () => {
+    const code = `Here is your portfolio site:
+<!-- PAGE: index.html -->
+<!DOCTYPE html><html><body><h1>Home</h1></body></html>
+<!-- PAGE: about.html -->
+<!DOCTYPE html><html><body><h1>About</h1></body></html>`;
+
+    const result = parseMultiPageSite(code);
+    expect(result.pages.map((p) => p.name)).toEqual(['index.html', 'about.html']);
+    expect(result.pages[0].html).not.toContain('Here is your portfolio site');
+  });
+
+  it('does not adopt a marker-only preamble as a page', () => {
+    const result = parseMultiPageSite(
+      '<!-- CORESITE-PAGES: index.html, about.html -->\n<!-- PAGE: index.html -->\n<!DOCTYPE html><html><body><h1>Home</h1></body></html>'
+    );
+    expect(result.pages.map((p) => p.name)).toEqual(['index.html']);
+    expect(result.isMultiPage).toBe(false);
+  });
+
   it('skips pages with invalid names and caps the total page count', () => {
     let code = '<!-- PAGE: index.html -->\n<!DOCTYPE html><html><body>Home</body></html>';
     for (let i = 0; i < 20; i += 1) {

@@ -21,6 +21,14 @@ const INCOMPLETE_MULTI_PAGE_CODE = `<!-- PAGE: index.html -->
 <!-- PAGE: about.html -->
 <!DOCTYPE html><html><body><h1>About</h1></body></html>`;
 
+// The model commonly forgets the marker on the FIRST document, so the home
+// page arrives as text before the first `<!-- PAGE: ... -->` marker.
+const UNMARKED_HOME_MULTI_PAGE_CODE = `<!DOCTYPE html><html><body><a href="about.html">About</a><a href="contact.html">Contact</a><h1>Home</h1></body></html>
+<!-- PAGE: about.html -->
+<!DOCTYPE html><html><body><h1>About Us</h1></body></html>
+<!-- PAGE: contact.html -->
+<!DOCTYPE html><html><body><h1>Contact</h1></body></html>`;
+
 afterEach(cleanup);
 
 beforeEach(() => {
@@ -111,6 +119,29 @@ describe('CanvasPreview multi-page sites', () => {
   it('does not show a completeness warning for a complete multi-page site', () => {
     renderPreview();
     expect(screen.queryByText(/Incomplete site/)).toBeNull();
+  });
+
+  it('opens the unmarked leading document as the home page', () => {
+    // Regression: the home page is the document most often emitted without its
+    // own marker. It used to be dropped, so the preview opened on whichever
+    // sub-page sorted first and publishing was blocked as incomplete.
+    renderPreview(UNMARKED_HOME_MULTI_PAGE_CODE);
+    const iframe = screen.getByTitle('Live Application Preview (Desktop)');
+    expect(iframe.getAttribute('srcdoc')).toContain('<h1>Home</h1>');
+    expect(iframe.getAttribute('srcdoc')).not.toContain('<h1>About Us</h1>');
+    expect(screen.queryByText(/Incomplete site/)).toBeNull();
+  });
+
+  it('publishes every page when the home document carries no marker', async () => {
+    renderPreview(UNMARKED_HOME_MULTI_PAGE_CODE);
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
+    await act(async () => {});
+    expect(publishAppInR2).toHaveBeenCalledTimes(1);
+    const payload = publishAppInR2.mock.calls[0][0];
+    expect(payload.html).toContain('<h1>Home</h1>');
+    expect(payload.pages['index.html']).toContain('<h1>Home</h1>');
+    expect(payload.pages['about.html']).toContain('<h1>About Us</h1>');
+    expect(payload.pages['contact.html']).toContain('<h1>Contact</h1>');
   });
 
   it('shows an incompleteness banner when the site has broken internal links', () => {

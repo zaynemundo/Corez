@@ -14,8 +14,10 @@ import { repairMalformedHtml } from "./htmlRepair.js";
 //   <!-- PAGE: about.html -->
 //   <!DOCTYPE html>...
 //
-// The splitter below turns that into a { pages } list; any malformed or
-// marker-less output falls back to a single page (today's behaviour).
+// The splitter below turns that into a { pages } list. A leading document
+// without its own marker is adopted as index.html (see
+// extractLeadingPageDocument); any other malformed or marker-less output falls
+// back to a single page (today's behaviour).
 export const MULTI_PAGE_NAME_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}\.html$/i;
 export const MAX_MULTI_PAGE_COUNT = 12;
 export const MAX_MULTI_PAGE_TOTAL_BYTES = 2 * 1024 * 1024;
@@ -23,9 +25,29 @@ export const MAX_MULTI_PAGE_TOTAL_BYTES = 2 * 1024 * 1024;
 const MULTI_PAGE_MARKER_PATTERN = /^\s*<!--\s*PAGE:\s*([^\s>]+)\s*-->\s*$/gm;
 const MULTI_PAGE_HEADER_PATTERN = /^\s*<!--\s*CORESITE-PAGES:[\s\S]*?-->\s*$/gm;
 
+// A page document begins at its doctype or <html> tag. Anything the model put
+// before that (a CORESITE-PAGES header, a stray sentence) is not page content.
+const DOCUMENT_START_PATTERN = /<!DOCTYPE\s+html[^>]*>|<html[\s>]/i;
+
+/**
+ * The model routinely writes the home page straight into the code block and
+ * only starts emitting `<!-- PAGE: ... -->` markers from the SECOND document.
+ * The text before the first marker is then a complete page, not preamble junk,
+ * so it is returned as a document (sliced from its doctype) instead of being
+ * dropped. Returns "" when the preamble holds no document at all.
+ */
+function extractLeadingPageDocument(preamble) {
+  if (typeof preamble !== "string") return "";
+  const cleaned = preamble.replace(MULTI_PAGE_HEADER_PATTERN, "");
+  const start = cleaned.search(DOCUMENT_START_PATTERN);
+  if (start === -1) return "";
+  return cleaned.slice(start).trim();
+}
+
 /**
  * Splits a model output into pages when it uses the multi-page marker
- * convention. Returns { isMultiPage, pages: [{ name, html }] }. Falls back to
+ * convention. Returns { isMultiPage, pages: [{ name, html }] }. A complete
+ * document written before the first marker becomes index.html. Falls back to
  * a single "index.html" page for anything malformed so the preview contract
  * never breaks.
  */
@@ -64,6 +86,22 @@ export function parseMultiPageSite(rawCode) {
     if (totalBytes > MAX_MULTI_PAGE_TOTAL_BYTES) break;
 
     pages.push({ name, html });
+  }
+
+  // Adopt an unmarked leading document as the home page. Dropping it deleted
+  // index.html from the site: the preview opened on an arbitrary sub-page and
+  // the completeness gate blocked publishing with "Missing index.html home
+  // page", even though the model had emitted a perfectly good home document.
+  // An explicitly marked index.html always wins over the unmarked one.
+  if (!pages.some((page) => page.name === "index.html")) {
+    const leadingHtml = extractLeadingPageDocument(segments[0]);
+    if (
+      leadingHtml &&
+      pages.length < MAX_MULTI_PAGE_COUNT &&
+      totalBytes + leadingHtml.length <= MAX_MULTI_PAGE_TOTAL_BYTES
+    ) {
+      pages.unshift({ name: "index.html", html: leadingHtml });
+    }
   }
 
   if (pages.length === 0) {
