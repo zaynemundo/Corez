@@ -17,6 +17,24 @@ performance, memory management, specification compliance, security, and code qua
 
 ---
 
+> **Reviewing the Corez app itself:** there is no `game-project/` in the Corez
+> repository and therefore no `game-spec.json` or `art-direction.json`. When the
+> review target is the Corez app, use its real normative sources as the declared
+> baseline instead:
+>
+> | Baseline | Role |
+> | --- | --- |
+> | `src/index.css` | The declared "Corez Dynamic Monochrome Design System" — palette, surfaces, radii and the `--z-*` layer map. |
+> | `PROJECT.md` | Feature inventory, milestones and the interface contracts. |
+> | `AGENTS.md` | Architecture rules, the visual layering mandate and the verification gate. |
+>
+> Report the missing `game-spec.json` as a finding rather than certifying
+> compliance against nothing — a review that cannot cite a spec must say so, not
+> invent a PASS/FAIL table. Part 16 already documents the equivalent escape hatch
+> for screenshots (`artifacts/ui/`).
+
+---
+
 ### 1. Review Checklist Sections
 
 #### 1A. Frame-Rate Impact

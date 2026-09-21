@@ -16,6 +16,7 @@
     "test:cli": "vitest run tests/cli",
     "dev:cli": "node packages/cli/bin/corez.mjs",
     "lint": "eslint .",
+    "audit:skills": "node scripts/audit-skills.mjs",
     "preview": "vite preview",
     "train:intents": "node scripts/train-intents.mjs",
     "evaluate:intents": "node scripts/evaluate-local-intents.mjs",
