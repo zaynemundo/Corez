@@ -60,7 +60,7 @@ const SPECIALIST_TRIGGER_PATTERNS = [
   {
     id: "data-analysis",
     pattern:
-      /\b(analy[sz]e\s+(this\s+)?(data|dataset|csv|sales)|data ?set|spreadsheet|excel|statistics|summary statistics|sales data|metrics|budget tracker|data analysis|pivot table|trend analysis|cohort analysis|correlat(e|ion)|regression analysis|visuali[sz]e (this|the|my) data|(chart|graph) (from|of) (this|the|my) data)\b/i,
+      /\b(analy[sz]e\s+(this\s+|my\s+|the\s+)?(data|dataset|csv|sales|numbers|table)|csv|data ?set|spreadsheet|excel|statistics|summary statistics|sales data|metrics|budget tracker|data analysis|pivot table|trend analysis|cohort analysis|correlat(e|ion)|regression analysis|visuali[sz]e (this|the|my) data|(chart|graph) (from|of) (this|the|my) data|what stands out|find (trends|insights|patterns)|(clean|explore|parse|summari[sz]e) (this|the|my) (data|csv|dataset|spreadsheet))\b/i,
   },
   {
     id: "marketing-copywriting",
@@ -135,7 +135,7 @@ const SPECIALIST_TRIGGER_PATTERNS = [
   {
     id: "event-planning",
     pattern:
-      /\b(event planning|party planning|wedding planning|event checklist|celebration plan|birthday party|anniversary|baby shower|bridal shower|engagement party|graduation party|wedding (checklist|timeline|budget|plan)|(conference|workshop|fundraiser|gala|retreat) (planning|checklist|agenda|budget)|guest list|catering|venue (booking|selection)|save the date|invitations|event (timeline|budget|vendors))\b/i,
+      /\b(event planning|party planning|wedding planning|event checklist|celebration plan|birthday party|anniversary|baby shower|bridal shower|engagement party|graduation party|wedding (checklist|timeline|budget|plan)|(conference|workshop|fundraiser|gala|retreat) (planning|checklist|agenda|budget)|guest list|catering|venue (booking|selection)|save the date|save-the-date|invitations|event (timeline|budget|vendors)|(plan|plans|planning|organi[sz]e|organi[sz]es|organi[sz]ing|arrange|arranging|host|hosting) (my|a|an|the|our) (wedding|party|birthday|anniversary|reception|baby shower|bridal shower|engagement|graduation|event|celebration)|(wedding|engagement|birthday|graduation|party) reception)\b/i,
   },
   {
     id: "study-aids",
