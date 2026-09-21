@@ -46,6 +46,7 @@ import {
   CONTINUATION_INSTRUCTION,
   ANTI_REPEAT_CONTINUATION_INSTRUCTION,
 } from "./responseProcessor.js";
+import { toMultimodalMessage } from "./attachmentVision.js";
 import {
   parseProjectState,
   deriveProjectState,
@@ -69,58 +70,6 @@ import {
 // stores assetUrl; we append that URL as text so the model can copy it
 // verbatim, and patchLocalImageSrc still fixes any hallucinated filename
 // or Unsplash placeholder as a safety-net.
-function toMultimodalMessage(message) {
-  if (!message || typeof message !== "object") return message;
-  const attachments = Array.isArray(message.attachments)
-    ? message.attachments
-    : [];
-  const hasMedia = attachments.some(
-    (a) =>
-      (a?.assetUrl && String(a.assetUrl).includes("/api/assets/")) ||
-      (a?.thumb && String(a.thumb).startsWith("data:")) ||
-      (typeof a?.content === "string" && a.content.trim()),
-  );
-  if (!hasMedia) {
-    if (Array.isArray(message.content))
-      return { role: message.role, content: message.content };
-    return { role: message.role, content: message.content };
-  }
-  const base =
-    typeof message.content === "string"
-      ? message.content
-      : Array.isArray(message.content)
-        ? message.content.map((c) => c?.text || "").join("\n")
-        : String(message.content || "");
-  const urlHints = attachments
-    .map((a) => {
-      const name = a.name || "file";
-      const mime = String(a.type || "").toLowerCase();
-      const kind = mime.startsWith("image/")
-        ? "image"
-        : mime.startsWith("video/")
-          ? "video"
-          : mime.startsWith("audio/")
-            ? "audio"
-            : "file";
-      if (a?.assetUrl && String(a.assetUrl).includes("/api/assets/")) {
-        const absUrl = String(a.assetUrl).startsWith("http")
-          ? String(a.assetUrl)
-          : `https://corez.pro${String(a.assetUrl).startsWith("/") ? "" : "/"}${String(a.assetUrl)}`;
-        return `\n[Attached ${kind} "${name}" available at: ${absUrl} â€” USE THIS URL (must start with https://corez.pro/api/assets/) for <img>/<video>/<audio> src if needed]`;
-      }
-      if (a?.thumb && String(a.thumb).startsWith("data:"))
-        return `\n[Attached ${kind} "${name}" available as data URL â€” use this for src if needed]`;
-      if (typeof a?.content === "string" && a.content.trim())
-        return `\n[Attached file "${name}" content extracted has extracted text content supplied separately]`;
-      return "";
-    })
-    .join("");
-  const hinted = urlHints ? `${base}${urlHints}` : base;
-  if (Array.isArray(message.content))
-    return { role: message.role, content: hinted };
-  return { role: message.role, content: hinted };
-}
-
 // Fix common JS syntax errors introduced when model copies large base64 data URLs
 // (e.g. missing * in particle system: Math.random()canvas.width -> Math.random()*canvas.width)
 function fixCommonJSInHtml(html) {
@@ -894,7 +843,7 @@ Reasoning & Response Quality (Corez 1.0 â€” hidden chain-of-thought):
 Guidelines for Output:
 - FOLLOW THE USER'S REQUEST EXACTLY: deliver precisely what the user asked for â€” implement everything they requested and add nothing they did not ask for. When the user's instruction conflicts with any default or template behaviour, the user's explicit instruction wins.
 - SOCIAL CAROUSEL (GLOBAL): When the user asks for a social-media carousel post ("create a post for this carousel", "carousel post + caption", "LinkedIn/Instagram carousel"), output ONLY slide copy + caption + hashtags in plain markdown. NEVER output React/JSX, HTML, or preview code for these, and NEVER treat "carousel" alone as a UI component request. Only build a carousel UI when the user explicitly says "carousel component", "carousel UI", "carousel code/slider", or "carousel website".
-  - ATTACHMENTS: You cannot see image, video or audio content. Attachments are supplied to you as metadata (filename, type, size) plus an authoritative R2 URL to use in markup. If the user asks you to describe, analyse, OCR or recreate an attachment, say plainly that you cannot see the file and ask them to describe it or paste the relevant text. Never invent a description of an attachment, and never emit a generic "Layout & Structure / Typography / Color & Style" template as if you had seen it. Extracted text content from documents is supplied separately and may be used normally. When an attachment must appear in generated markup, use the absolute R2 URL https://corez.pro/api/assets/... verbatim (never a relative /api/assets/ path or a bare local filename), with meaningful alt text, object-fit:cover and an onerror fallback.
+  - ATTACHMENTS: Attached images are given to you as real image input - you can see them. Describe, analyse, OCR or recreate an attached image from what you actually observe, and never claim you cannot view an attached image. Video and audio attachments are not visible to you: only their metadata and URL reach you, so say plainly that you cannot watch or listen rather than inventing content. Never invent a description of an attachment you cannot see, and never emit a generic "Layout & Structure / Typography / Color & Style" template in place of real observation. When an attachment must appear in generated markup, use the absolute R2 URL https://corez.pro/api/assets/... verbatim (never a relative /api/assets/ path or a bare local filename), with meaningful alt text, object-fit:cover and an onerror fallback.
 - AMBIGUOUS REQUESTS: When a user's prompt is ambiguous, underspecified, or missing essential details (e.g. they say "make a game", "build a website", "create a plan", or give a vague prompt with multiple conflicting interpretations), do NOT ask clarifying questions and do NOT present choice menus or option lists. Instead, choose the most sensible default interpretation, state the key assumption you made in ONE short sentence, and deliver the complete result. The user can refine it in a follow-up message.
 - DEFAULT FORMAT (React/JSX): When writing code or building apps, components, tools, dashboards, or games without an explicitly requested format, default to clean, modern React/JSX components (using \`\`\`jsx ... \`\`\` code blocks). ALWAYS name your main top-level component "export default function App()".
 - REQUESTED FORMATS (HTML/CSS/JS): If the user explicitly requests HTML, CSS, vanilla JS, or plain web code, output complete single-file HTML/CSS/JS inside ONE SINGLE \`\`\`html ... \`\`\` code block.
@@ -1904,9 +1853,9 @@ async function handleAi(request, env) {
           apiMessages.push({
             role: "system",
             content:
-              "Attached media (metadata only - you cannot see image, video or audio content):\n" +
+              "Attached media:\n" +
               directAssetHints +
-              "\nThese files exist and their URLs are authoritative for markup. Their visual content is NOT available to you. If the user asks you to describe, analyse, OCR or recreate an attachment, say plainly that you cannot see the file and ask them to describe it or paste the relevant text - never invent a description, and never produce a generic layout/typography/colour template as if you had seen it. Extracted text content, when present, is supplied elsewhere in this conversation and may be used normally.",
+              "\nAttached IMAGES are supplied to you as real image input - you can see them. Describe, analyse, OCR or recreate them from what you actually observe, and never claim you cannot view an attached image. Video and audio attachments are NOT visible: only their metadata and URL reach you, so say plainly that you cannot watch or listen rather than inventing their content. Their URLs are authoritative for markup. Extracted text content, when present, is supplied elsewhere in this conversation and may be used normally.",
           });
         }
       }
