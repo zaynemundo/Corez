@@ -266,38 +266,71 @@ describe('Worker Auth Engine', () => {
       expect(setCookie).toContain(SESSION_COOKIE);
     });
 
-    it('registers with standard and premium plans and ignores invite codes', async () => {
-      const standardReq = new Request('https://corez.pro/api/auth/signup', {
+    it('refuses to grant a paid plan at signup', async () => {
+      // Paid plans come only from the verified payment flow (the Ziina webhook
+      // and reconcilePendingSubscriptions both confirm payment before
+      // activating). A signup request must never be able to self-provision one.
+      //
+      // Each request carries its own CF-Connecting-IP: the auth rate limiter is
+      // keyed by that header (10 attempts/min), so a shared bucket would make
+      // this test trip the limiter and mask the behaviour under test.
+      let ip = 0;
+      for (const plan of ['standard', 'premium', 'basic', 'enterprise']) {
+        const req = new Request('https://corez.pro/api/auth/signup', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'CF-Connecting-IP': `10.9.0.${++ip}`
+          },
+          body: JSON.stringify({
+            email: `${plan}@corez.pro`,
+            password: 'Password123!',
+            plan
+          })
+        });
+        const res = await handleAuth(req, mockEnv);
+        expect(res.status, `plan "${plan}" must not be granted at signup`).toBe(400);
+        const body = await res.json();
+        expect(body.code).toBe('plan_requires_payment');
+      }
+
+      // No account may have been created by those refused requests.
+      const loginReq = new Request('https://corez.pro/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '10.9.1.1' },
+        body: JSON.stringify({ email: 'premium@corez.pro', password: 'Password123!' })
+      });
+      expect((await handleAuth(loginReq, mockEnv)).status).not.toBe(200);
+    });
+
+    it('registers a free account and ignores invite codes', async () => {
+      const freeReq = new Request('https://corez.pro/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '10.9.2.1' },
         body: JSON.stringify({
-          email: 'standard@corez.pro',
+          email: 'explicit-free@corez.pro',
           password: 'Password123!',
-          plan: 'standard'
+          plan: 'free'
         })
       });
-      const standardRes = await handleAuth(standardReq, mockEnv);
-      expect(standardRes.status).toBe(200);
-      expect((await standardRes.json()).user.plan).toBe('standard');
+      const freeRes = await handleAuth(freeReq, mockEnv);
+      expect(freeRes.status).toBe(200);
+      expect((await freeRes.json()).user.plan).toBe('free');
 
-      const premiumReq = new Request('https://corez.pro/api/auth/signup', {
+      // No plan field at all still works (the browser sends none for a plain signup)
+      const noPlanReq = new Request('https://corez.pro/api/auth/signup', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: 'premium@corez.pro',
-          password: 'Password123!',
-          plan: 'premium',
-          inviteCode: 'IGNORED-CODE'
-        })
+        headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '10.9.2.2' },
+        body: JSON.stringify({ email: 'noplan@corez.pro', password: 'Password123!' })
       });
-      const premiumRes = await handleAuth(premiumReq, mockEnv);
-      expect(premiumRes.status).toBe(200);
-      expect((await premiumRes.json()).user.plan).toBe('premium');
+      const noPlanRes = await handleAuth(noPlanReq, mockEnv);
+      expect(noPlanRes.status).toBe(200);
+      expect((await noPlanRes.json()).user.plan).toBe('free');
 
-      // Invalid plan falls back to free, but invalid invite code no longer blocks
+      // Invalid invite code no longer blocks signup
       const badInviteReq = new Request('https://corez.pro/api/auth/signup', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '10.9.2.3' },
         body: JSON.stringify({
           email: 'bad@corez.pro',
           password: 'Password123!',

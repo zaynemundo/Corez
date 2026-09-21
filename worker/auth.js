@@ -341,15 +341,19 @@ export async function handleAuth(request, env) {
       .trim()
       .toLowerCase();
     const password = String(body.password || "");
-    const rawPlan = String(body.plan || body.tier || body.product || "free")
+    // Public signup ALWAYS creates a free account. The caller cannot choose a
+    // plan: a paid plan is granted only by the verified payment flow (the Ziina
+    // webhook and reconcilePendingSubscriptions both confirm the payment with
+    // Ziina before activating). Accepting `body.plan` here meant an anonymous
+    // request could self-provision permanent premium for free.
+    const plan = "free";
+    // Kept only to report an unusable value back to old clients; it never
+    // influences the account that gets created.
+    const requestedPlan = String(
+      body.plan || body.tier || body.product || "",
+    )
       .trim()
       .toLowerCase();
-    const allowedPlans = new Set(["free", "standard", "premium", "basic"]);
-    const plan = allowedPlans.has(rawPlan)
-      ? rawPlan === "basic"
-        ? "standard"
-        : rawPlan
-      : "free";
 
     if (!validEmail(email))
       return jsonResponse(400, { error: "Valid email required" });
@@ -357,11 +361,15 @@ export async function handleAuth(request, env) {
       return jsonResponse(400, {
         error: "Password must be at least 8 characters",
       });
-    if (!allowedPlans.has(plan))
+    if (requestedPlan && requestedPlan !== "free") {
+      // Explicitly refuse instead of silently downgrading, so a client that
+      // expected a paid account learns it must complete checkout.
       return jsonResponse(400, {
         error:
-          "Invalid plan. Use free, standard (18.36 AED) or premium (27.54 AED)",
+          "Accounts are created on the free plan. Choose Standard or Premium on the pricing page to pay for it after signing up.",
+        code: "plan_requires_payment",
       });
+    }
     if (!env?.DB)
       return jsonResponse(500, { error: "Auth database not configured" });
     if (!env?.AUTH_SECRET)

@@ -76,6 +76,17 @@ export function getPlanOrFree(plan) {
   return { key: "free", meta: ZIINA_PLANS["free"] };
 }
 
+/**
+ * Plan ordering, used to keep cancel/downgrade routes from ever moving a user
+ * UP the ladder. Only the verified payment flow may grant a higher plan.
+ */
+export const PLAN_RANK = Object.freeze({ free: 0, standard: 1, premium: 2 });
+
+/** True when `target` is a strictly lower plan than `current`. */
+export function isDowngrade(current, target) {
+  return (PLAN_RANK[target] ?? 0) < (PLAN_RANK[current] ?? 0);
+}
+
 export async function getActiveSubscription(env, userId) {
   if (!env?.DB || !userId) return null;
   try {
@@ -829,43 +840,23 @@ export async function handleSubscriptions(request, env) {
           raw: data,
         });
       }
-      // Payment completed — activate subscription (monthly or yearly)
+      // Payment completed — activate the subscription the payment actually buys.
+      //
+      // Both the plan and the interval are derived ONLY from the amount verified
+      // against Ziina above, never from the request body. Previously a
+      // client-supplied `plan` hint won, and any unmatched amount fell back to
+      // "standard": paying the 2 AED minimum therefore bought the 18.36 AED plan.
+      // The interval had the same flaw — sending interval=year on a monthly
+      // payment bought 365 days for the monthly price.
       const amount = Number(data.amount);
-      // Infer plan and interval from amount if not provided
-      let plan = planHint;
-      let interval = String(body.interval || body.billing || "").toLowerCase();
-      if (!interval || (interval !== "year" && interval !== "yearly" && interval !== "annual")) {
-        // Infer interval from amount
-        if (amount === 17628 || amount === 26436) interval = "year";
-        else interval = "month";
-      } else {
-        interval = interval === "year" || interval === "yearly" || interval === "annual" ? "year" : "month";
-      }
-      // Normalize plan for yearly amounts
-      if (amount === 17628) plan = "standard";
-      else if (amount === 26436) plan = "premium";
-      else if (!plan || !ZIINA_PLANS[plan] || ZIINA_PLANS[plan].amount !== amount) {
-        // Handle yearly suffix or fallback
-        const yearlyKey = plan ? `${plan}_yearly` : null;
-        if (yearlyKey && ZIINA_PLANS[yearlyKey] && ZIINA_PLANS[yearlyKey].amount === amount) {
-          // keep plan as base (standard/premium) and interval yearly
-          // plan already correct
-        } else {
-          // Infer by amount
-          for (const [k, v] of Object.entries(ZIINA_PLANS)) {
-            if (v.amount === amount) {
-              // If yearly, map back to base plan
-              if (k.endsWith("_yearly")) plan = k.replace("_yearly", "");
-              else plan = k;
-              break;
-            }
-          }
-        }
-      }
-      // Handle yearly suffix
-      if (plan && plan.endsWith("_yearly")) plan = plan.replace("_yearly", "");
-      if (!plan || plan === "free") {
-        // If free, just set free
+      const paidEntry = Object.entries(ZIINA_PLANS).find(
+        ([, meta]) => Number(meta.amount) === amount,
+      );
+      const paidKey = paidEntry ? paidEntry[0] : null;
+      const plan = paidKey ? paidKey.replace(/_yearly$/, "") : "free";
+      const interval = paidKey && paidKey.endsWith("_yearly") ? "year" : "month";
+
+      if (!paidKey || plan === "free") {
         await activateSubscription(env, userId, "free", paymentId, 0, "month");
         return jsonResponse(200, {
           verified: true,
@@ -874,9 +865,6 @@ export async function handleSubscriptions(request, env) {
           raw: data,
         });
       }
-      if (!ZIINA_PLANS[plan]) plan = amount === 2754 || amount === 26436 ? "premium" : "standard";
-      // Determine yearly from amount if not already set
-      if (amount === 17628 || amount === 26436) interval = "year";
       const isYearly = interval === "year";
       const activated = await activateSubscription(
         env,
@@ -971,6 +959,20 @@ export async function handleSubscriptions(request, env) {
         period_end: periodEnd,
         message: `Already scheduled to downgrade to ${targetPlan} on ${periodEnd ? new Date(periodEnd).toLocaleDateString() : "period end"}`,
         subscription: current,
+      });
+    }
+
+    // Cancel only ever moves a user DOWN the plan ladder. Without this guard a
+    // free account (no active period, so periodEnd is null) fell straight into
+    // the immediate-downgrade branch below and activateSubscription() granted it
+    // premium with no payment at all — a self-service upgrade for free.
+    if (!isDowngrade(currentPlan, targetPlan)) {
+      return jsonResponse(400, {
+        error:
+          "Cancel only downgrades an existing plan. To move to a higher plan, complete checkout on the pricing page.",
+        code: "not_a_downgrade",
+        current_plan: currentPlan,
+        requested_plan: targetPlan,
       });
     }
 
