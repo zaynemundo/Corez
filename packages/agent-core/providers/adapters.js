@@ -14,28 +14,20 @@ import { classifyFailureStatus } from './failure.js';
 import { resolveApiMode } from './endpoint.js';
 import { extractContentText, stripThinkingBlocks } from './text.js';
 
+// OpenCode Go is the only text provider CoreZ constructs. The DeepSeek-direct
+// and OpenRouter text adapters were removed, so their ids, env keys and
+// endpoints are gone too. OpenRouter still serves image generation, but that
+// path reads OPENROUTER_API_KEY directly and never goes through an adapter.
 export const PROVIDER_IDS = Object.freeze({
-  OPENCODE_GO: 'opencode-go',
-  DEEPSEEK: 'deepseek',
-  OPENROUTER: 'openrouter'
+  OPENCODE_GO: 'opencode-go'
 });
 
-export const DEFAULT_PROVIDER_ORDER = Object.freeze([
-  PROVIDER_IDS.OPENCODE_GO,
-  PROVIDER_IDS.DEEPSEEK,
-  PROVIDER_IDS.OPENROUTER
-]);
-
 export const PROVIDER_ENV_KEYS = Object.freeze({
-  [PROVIDER_IDS.OPENCODE_GO]: ['OPENCODE_GO_API_KEY', 'OPENCODE_API_KEY'],
-  [PROVIDER_IDS.DEEPSEEK]: ['DEEPSEEK_API_KEY'],
-  [PROVIDER_IDS.OPENROUTER]: ['OPENROUTER_API_KEY']
+  [PROVIDER_IDS.OPENCODE_GO]: ['OPENCODE_GO_API_KEY', 'OPENCODE_API_KEY']
 });
 
 export const PROVIDER_ENDPOINTS = Object.freeze({
-  [PROVIDER_IDS.OPENCODE_GO]: 'https://opencode.ai/zen/go/v1/chat/completions',
-  [PROVIDER_IDS.DEEPSEEK]: 'https://api.deepseek.com/chat/completions',
-  [PROVIDER_IDS.OPENROUTER]: 'https://openrouter.ai/api/v1/chat/completions'
+  [PROVIDER_IDS.OPENCODE_GO]: 'https://opencode.ai/zen/go/v1/chat/completions'
 });
 
 // 401/400/403/404 and the rest of the permanent status range can never be

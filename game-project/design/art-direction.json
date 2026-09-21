@@ -1,0 +1,101 @@
+{
+  "$comment": "DERIVED from src/index.css by scripts/generate-art-direction.mjs. Do not edit by hand: change the design tokens and regenerate. Run `npm run art:check` to detect drift. This is the Corez application's design contract, not an authored game art brief.",
+  "provenance": {
+    "derived": true,
+    "generated_by": "scripts/generate-art-direction.mjs",
+    "source": "src/index.css",
+    "source_sha256": "sha256:2711d91019e3fe6c01496157627700c2",
+    "note": "The app has no game-project/ directory and no authored art-direction.json. This file exists so Part 16 visual review and docs/review have a citable contract; every value is read from the declared design system rather than invented."
+  },
+  "project": "CoreZ",
+  "theme": "minimalist",
+  "palette": {
+    "source": "CUSTOM",
+    "colors": [
+      "#000000",
+      "#0a0a0a",
+      "#141414",
+      "#0d0d0d",
+      "#ffffff",
+      "#a1a1a6",
+      "#8e8e96",
+      "#4ade80",
+      "#f87171",
+      "#fbbf24",
+      "#f1fa8c"
+    ],
+    "background": "#000000",
+    "primary": "#ffffff",
+    "secondary": "#a1a1a6",
+    "highlight": "#575757",
+    "ui_text": "#ffffff",
+    "monochrome": true,
+    "themes": {
+      "dark": {
+        "bg_primary": "#000000",
+        "bg_secondary": "#0a0a0a",
+        "bg_tertiary": "#141414",
+        "bg_card": "#0d0d0d",
+        "text_primary": "#ffffff",
+        "text_secondary": "#a1a1a6",
+        "text_muted": "#8e8e96",
+        "market_positive": "#4ade80",
+        "market_negative": "#f87171",
+        "market_caution": "#fbbf24",
+        "inline_code": "#f1fa8c"
+      },
+      "light": {
+        "bg_primary": "#ffffff",
+        "bg_secondary": "#ffffff",
+        "bg_tertiary": "#eeeeef",
+        "bg_card": "#ffffff",
+        "text_primary": "#000000",
+        "text_secondary": "#5f5f66",
+        "text_muted": "#646469",
+        "market_positive": "#15803d",
+        "market_negative": "#b91c1c",
+        "market_caution": "#92400e",
+        "inline_code": "#7c5e10"
+      }
+    }
+  },
+  "sprites": {
+    "not_applicable": true,
+    "reason": "CoreZ is an application, not a pixel-art game: icons and marks are inline SVG.",
+    "default_size": 0,
+    "grid_snap": false,
+    "crisp_edges": false,
+    "max_colors": 0
+  },
+  "ui": {
+    "font_family": "-apple-system-body, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", Helvetica, Arial, sans-serif",
+    "font_branding_family": "\"Outfit\" (display), \"JetBrains Mono\" (code)",
+    "font_size_base": 17,
+    "button_style": "flat",
+    "panel_style": "bordered",
+    "border_radius": 12,
+    "elevation": "flat-by-design (box-shadow and text-shadow are globally suppressed)",
+    "z_index_layers": {
+      "background": 0,
+      "content": 10,
+      "content_raised": 20,
+      "hud": 30,
+      "hud_raised": 40,
+      "controls": 50,
+      "dropdown": 60,
+      "pane_fullscreen": 70,
+      "overlay": 80,
+      "overlay_raised": 90,
+      "sidebar_mobile": 95,
+      "modal": 100,
+      "modal_raised": 110,
+      "modal_toolbar": 120,
+      "lightbox": 200
+    }
+  },
+  "svg": {
+    "shape_rendering": "geometricPrecision",
+    "image_rendering": "auto",
+    "viewbox_strategy": "responsive"
+  }
+}

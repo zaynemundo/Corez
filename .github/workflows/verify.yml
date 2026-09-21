@@ -36,6 +36,20 @@ jobs:
       - name: Run production build
         run: npm run build
 
+      # Not part of npm test: the intent metric gates and the skill-rot audit
+      # enforce quality contracts that the unit suite does not cover, and both
+      # failed silently in the past when nothing ran them.
+      - name: Enforce intent classifier metric gates
+        run: npm run evaluate:intents
+
+      - name: Audit the skill library
+        run: npm run audit:skills
+
+      # The design contract is generated from src/index.css, so this fails when
+      # a token changes without regenerating the artifact reviewers cite.
+      - name: Check the design contract is current
+        run: npm run art:check
+
   verify-contracts:
     runs-on: ubuntu-latest
     steps:
