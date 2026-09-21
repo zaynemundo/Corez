@@ -3,8 +3,6 @@ import { ProviderChain } from '../packages/agent-core/providers/providerChain.js
 import { RetryScheduler } from '../packages/agent-core/providers/retryScheduler.js';
 import {
   OpenCodeGoAdapter,
-  DeepSeekAdapter,
-  OpenRouterAdapter,
   classifyProviderFailure,
   parseRetryAfter
 } from '../packages/agent-core/providers/adapters.js';
@@ -23,11 +21,17 @@ function memoryScheduler() {
   };
 }
 
-function makeAdapters({ opencode, deepseek, openrouter }) {
+/**
+ * CoreZ is a single-provider deployment: OpenCode Go is the only text route
+ * that exists, so the chain is built from one adapter. Passing no key models
+ * the "not configured" case.
+ */
+function makeAdapters({ opencode }) {
   return [
-    new OpenCodeGoAdapter({ opencodeApiKey: opencode ?? null, ...(opencode ? { endpoint: 'https://opencode.test/v1' } : {}) }),
-    new DeepSeekAdapter({ deepseekApiKey: deepseek ?? null, ...(deepseek ? { endpoint: 'https://deepseek.test/v1' } : {}) }),
-    new OpenRouterAdapter({ openrouterApiKey: openrouter ?? null, ...(openrouter ? { endpoint: 'https://openrouter.test/v1' } : {}) })
+    new OpenCodeGoAdapter({
+      opencodeApiKey: opencode ?? null,
+      ...(opencode ? { endpoint: 'https://opencode.test/v1' } : {})
+    })
   ];
 }
 
@@ -53,23 +57,15 @@ describe('ProviderChain', () => {
     fetchSpy.mockRestore();
   });
 
-  it('uses OpenCode Go -> DeepSeek -> OpenRouter order with the same messages and tools', async () => {
+  it('calls OpenCode Go with the same messages and tools, and no other provider', async () => {
     const calls = [];
     const opencode = new OpenCodeGoAdapter({
       opencodeApiKey: 'oc-key',
       endpoint: 'https://opencode.test/v1'
     });
-    const deepseek = new DeepSeekAdapter({
-      deepseekApiKey: 'ds-key',
-      endpoint: 'https://deepseek.test/v1'
-    });
-    const openrouter = new OpenRouterAdapter({
-      openrouterApiKey: 'or-key',
-      endpoint: 'https://openrouter.test/v1'
-    });
 
     const chain = new ProviderChain({
-      adapters: [opencode, deepseek, openrouter],
+      adapters: [opencode],
       waitBudgetMs: 5
     });
 
@@ -91,11 +87,10 @@ describe('ProviderChain', () => {
     expect(result.status).toBe('completed');
     expect(result.content).toBe('from opencode');
     expect(result.provider).toBe('opencode-go');
+    // Exactly one request: there is no second text provider to fall back to.
     expect(calls).toHaveLength(1);
-    // Same messages and tools are preserved verbatim on every provider.
     expect(calls[0].body.messages).toEqual(messages);
     expect(calls[0].body.tools).toEqual(tools);
-    // Each provider only ever sees its own key.
     expect(calls[0].auth).toBe('Bearer oc-key');
     // The OpenCode Go gateway requires a session-affinity header.
     expect(calls[0].session).toMatch(/^ses_[A-Za-z0-9]+$/);
@@ -138,10 +133,10 @@ describe('ProviderChain', () => {
     expect(res.content).toBe('Visible answer');
   });
 
-  it('falls back immediately when the preferred provider fails transiently and persists a retry schedule', async () => {
+  it('persists a retry schedule on a transient failure instead of falling back to another provider', async () => {
     const { scheduler, state } = memoryScheduler();
     const chain = new ProviderChain({
-      adapters: makeAdapters({ opencode: 'oc', deepseek: 'ds', openrouter: 'or' }),
+      adapters: makeAdapters({ opencode: 'oc' }),
       retryScheduler: scheduler,
       waitBudgetMs: 5
     });
@@ -149,27 +144,25 @@ describe('ProviderChain', () => {
     const events = [];
     chain.onEvent = (e) => events.push(e);
 
-    fetchSpy.mockImplementation(async (url) => {
-      if (String(url).includes('opencode.test')) {
-        return new Response('gateway down', { status: 503, headers: { 'Retry-After': '2' } });
-      }
-      return completionResponse('deepseek answer');
+    fetchSpy.mockImplementation(async () => {
+      return new Response('gateway down', { status: 503, headers: { 'Retry-After': '2' } });
     });
 
     const start = Date.now();
     const result = await chain.generate({ taskId: 'task-1', messages: [{ role: 'user', content: 'x' }] });
     const elapsed = Date.now() - start;
 
-    expect(result.status).toBe('completed');
-    expect(result.content).toBe('deepseek answer');
-    expect(result.provider).toBe('deepseek');
-    expect(elapsed).toBeLessThan(500); // fell back immediately, no backoff wait
-    // A schedule for opencode-go was persisted, honoring Retry-After: 2s.
+    // There is no second text provider, so a transient gateway failure is
+    // scheduled for retry (within the tiny wait budget) rather than served
+    // by another vendor.
+    expect(result.status).toBe('retry-scheduled');
+    expect(elapsed).toBeLessThan(1000);
     expect(state.get('task-1')).toBeDefined();
     expect(state.get('task-1').provider).toBe('opencode-go');
     expect(state.get('task-1').nextRetryAt).toBeGreaterThanOrEqual(Date.now() + 1500);
     expect(events.some((e) => e.type === 'provider.retry_scheduled' && e.provider === 'opencode-go')).toBe(true);
-    expect(events.some((e) => e.type === 'provider.fallback' && e.from === 'opencode-go' && e.to === 'deepseek')).toBe(true);
+    // No cross-provider fallback event may ever be emitted.
+    expect(events.some((e) => e.type === 'provider.fallback')).toBe(false);
   });
 
   it('resumes a persisted retry schedule when it is due', async () => {
@@ -183,15 +176,12 @@ describe('ProviderChain', () => {
     });
 
     const chain = new ProviderChain({
-      adapters: makeAdapters({ opencode: 'oc', deepseek: 'ds' }),
+      adapters: makeAdapters({ opencode: 'oc' }),
       retryScheduler: scheduler,
       waitBudgetMs: 5
     });
 
-    fetchSpy.mockImplementation(async (url) => {
-      if (String(url).includes('opencode.test')) return completionResponse('recovered');
-      return completionResponse('deepseek');
-    });
+    fetchSpy.mockImplementation(async () => completionResponse('recovered'));
 
     const result = await chain.generate({ taskId: 'task-due', messages: [{ role: 'user', content: 'x' }] });
 
@@ -359,12 +349,11 @@ describe('ProviderChain', () => {
     expect(result.error).toContain('No AI provider is configured');
   });
 
-  it('preserves assistant tool-call ids and tool-result messages across fallback', async () => {
+  it('preserves assistant tool-call ids and tool-result messages in the request', async () => {
     const opencode = new OpenCodeGoAdapter({ opencodeApiKey: 'oc', endpoint: 'https://opencode.test/v1' });
-    const openrouter = new OpenRouterAdapter({ openrouterApiKey: 'or', endpoint: 'https://openrouter.test/v1' });
 
     const chain = new ProviderChain({
-      adapters: [opencode, openrouter],
+      adapters: [opencode],
       waitBudgetMs: 5
     });
 
@@ -373,11 +362,9 @@ describe('ProviderChain', () => {
       { role: 'tool', tool_call_id: 'call_abc123', content: '{"content":"file body"}' }
     ];
 
-    let openrouterBody = null;
-    fetchSpy.mockImplementation(async (url, init) => {
-      const body = JSON.parse(init.body);
-      if (String(url).includes('opencode.test')) return new Response('down', { status: 502 });
-      openrouterBody = body;
+    let sentBody = null;
+    fetchSpy.mockImplementation(async (_url, init) => {
+      sentBody = JSON.parse(init.body);
       return completionResponse('synthesized');
     });
 
@@ -387,11 +374,11 @@ describe('ProviderChain', () => {
     });
 
     expect(result.status).toBe('completed');
-    expect(result.provider).toBe('openrouter');
-    // The exact assistant tool-call id and tool result survived the fallback.
-    const assistant = openrouterBody.messages.find((m) => m.tool_calls);
+    expect(result.provider).toBe('opencode-go');
+    // The exact assistant tool-call id and tool result survive request shaping.
+    const assistant = sentBody.messages.find((m) => m.tool_calls);
     expect(assistant.tool_calls[0].id).toBe('call_abc123');
-    const toolResult = openrouterBody.messages.find((m) => m.role === 'tool');
+    const toolResult = sentBody.messages.find((m) => m.role === 'tool');
     expect(toolResult.tool_call_id).toBe('call_abc123');
     expect(toolResult.content).toBe('{"content":"file body"}');
   });

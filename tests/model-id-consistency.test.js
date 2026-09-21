@@ -40,9 +40,10 @@ const NON_TEXT_ALLOWED = new Set([
 
 /**
  * Tokens that match the id shape but are not model ids: npm package scopes
- * such as `@deepseek-ai/dsh-agent-loop`.
+ * such as `@deepseek-ai/dsh-agent-loop`, and provider labels such as
+ * `DeepSeek-direct` used in comments about routes that no longer exist.
  */
-const NON_MODEL_TOKENS = new Set(['deepseek-ai']);
+const NON_MODEL_TOKENS = new Set(['deepseek-ai', 'deepseek-direct']);
 
 /**
  * The canonical module is exempt: it documents the retired id on purpose.

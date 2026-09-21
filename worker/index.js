@@ -40,11 +40,6 @@ import { runCreationHarness } from "./harness.js";
 import { repairMalformedHtml } from "./htmlRepair.js";
 import { selectModelForRequest, selectReasoningConfig } from "./modelRouter.js";
 import {
-  describeAttachmentsWithMimo,
-  buildMimoContextBlock,
-  isMimoAvailable,
-} from "./mimo.js";
-import {
   processResponse,
   detectTruncation,
   stitchContinuationChunk,
@@ -116,7 +111,7 @@ function toMultimodalMessage(message) {
       if (a?.thumb && String(a.thumb).startsWith("data:"))
         return `\n[Attached ${kind} "${name}" available as data URL â€” use this for src if needed]`;
       if (typeof a?.content === "string" && a.content.trim())
-        return `\n[Attached file "${name}" content extracted â€” see MiMo context]`;
+        return `\n[Attached file "${name}" content extracted has extracted text content supplied separately]`;
       return "";
     })
     .join("");
@@ -899,7 +894,7 @@ Reasoning & Response Quality (Corez 1.0 â€” hidden chain-of-thought):
 Guidelines for Output:
 - FOLLOW THE USER'S REQUEST EXACTLY: deliver precisely what the user asked for â€” implement everything they requested and add nothing they did not ask for. When the user's instruction conflicts with any default or template behaviour, the user's explicit instruction wins.
 - SOCIAL CAROUSEL (GLOBAL): When the user asks for a social-media carousel post ("create a post for this carousel", "carousel post + caption", "LinkedIn/Instagram carousel"), output ONLY slide copy + caption + hashtags in plain markdown. NEVER output React/JSX, HTML, or preview code for these, and NEVER treat "carousel" alone as a UI component request. Only build a carousel UI when the user explicitly says "carousel component", "carousel UI", "carousel code/slider", or "carousel website".
- - ATTACHED IMAGES & VISION: You DO have vision. Every user attachment (image, video, audio, file) is first described by MiMo V2.5 (vision/multimodal) and the description is injected as "MiMo V2.5 Media Understanding" â€” treat it as ground truth, never ignore it. If the user asks to describe, analyze, OCR, or recreate an attached image, answer FROM that MiMo block and never reply "I cannot view images", "I don't have the ability to view", or any denial. If the MiMo block is present, quote/summarize it verbatim and ground your recreation in it. If no MiMo block is present but the "Attached media" system block lists an image, acknowledge the attachment exists (filename/type/size) and explain vision pre-pass was temporarily unavailable â€” ask the user for a one-line description of what's visible so you can still recreate/extract, do NOT hallucinate a generic "Layout & Structure / Typography / Color & Style" template. When the task requires that image (e.g. a person's portrait, avatar, or any user-uploaded photo), use the absolute R2 URL https://corez.pro/api/assets/user-upload_...jpg if you know it (must start with https://corez.pro/api/assets/, never relative /api/assets/ or local filenames like 1716041183016.jpg), otherwise use the data URL verbatim in <img src="..."> â€” do NOT use invented URLs. The system also auto-patches any local filename or placeholder image to the correct https://corez.pro/api/assets/ URL after generation, so the user's photo always displays. Always include meaningful alt text, object-fit:cover, and onerror fallback.
+  - ATTACHMENTS: You cannot see image, video or audio content. Attachments are supplied to you as metadata (filename, type, size) plus an authoritative R2 URL to use in markup. If the user asks you to describe, analyse, OCR or recreate an attachment, say plainly that you cannot see the file and ask them to describe it or paste the relevant text. Never invent a description of an attachment, and never emit a generic "Layout & Structure / Typography / Color & Style" template as if you had seen it. Extracted text content from documents is supplied separately and may be used normally. When an attachment must appear in generated markup, use the absolute R2 URL https://corez.pro/api/assets/... verbatim (never a relative /api/assets/ path or a bare local filename), with meaningful alt text, object-fit:cover and an onerror fallback.
 - AMBIGUOUS REQUESTS: When a user's prompt is ambiguous, underspecified, or missing essential details (e.g. they say "make a game", "build a website", "create a plan", or give a vague prompt with multiple conflicting interpretations), do NOT ask clarifying questions and do NOT present choice menus or option lists. Instead, choose the most sensible default interpretation, state the key assumption you made in ONE short sentence, and deliver the complete result. The user can refine it in a follow-up message.
 - DEFAULT FORMAT (React/JSX): When writing code or building apps, components, tools, dashboards, or games without an explicitly requested format, default to clean, modern React/JSX components (using \`\`\`jsx ... \`\`\` code blocks). ALWAYS name your main top-level component "export default function App()".
 - REQUESTED FORMATS (HTML/CSS/JS): If the user explicitly requests HTML, CSS, vanilla JS, or plain web code, output complete single-file HTML/CSS/JS inside ONE SINGLE \`\`\`html ... \`\`\` code block.
@@ -1826,56 +1821,42 @@ async function handleAi(request, env) {
   // that still present current values as fabricated.
   // ---------------------------------------------------------------------
   // ---------------------------------------------------------------------
-  // MiMo V2.5 -> DeepSeek V4.1 Flash Two-Stage Pipeline (corez.pro)
-  // Every user attachment (image, file, video, audio, any media) is first
-  // understood by MiMo V2.5 (vision + multimodal file understanding), then
-  // its textual description is fed as grounded context to DeepSeek V4.1 Flash
-  // for the final generation. DeepSeek itself is text-only through the gateway,
-  // so this pre-pass gives it true vision/file knowledge. Failures are
-  // silent â€” the DeepSeek build always proceeds even if MiMo is unavailable.
+  // Attachment metadata block.
+  //
+  // CoreZ runs a single text model (DeepSeek V4.1 Flash) with no vision
+  // pre-pass, so attachments reach the model as metadata only: kind, name,
+  // size, and the authoritative R2 URL to use in markup. The model cannot see
+  // pixel content, and the system block below states that plainly so it never
+  // invents a description of something it cannot see.
   // Covers: image/*, video/*, audio/*, pdf, text, and generic files.
   // ---------------------------------------------------------------------
-  // MiMo pre-pass outcome for diagnostics (proves whether vision ran).
-  let mimoStatus = "skipped-no-attachments";
-  if (!env?.__DISABLE_MIMO_PREFETCH) {
+  {
     try {
       const allAttachments = [];
-      const seenMimo = new Set();
+      const seenAttachments = new Set();
+      const collectAttachments = (list) => {
+        for (const a of Array.isArray(list) ? list : []) {
+          const key = String(
+            a?.assetUrl || a?.thumb || a?.name + "|" + a?.type || "",
+          );
+          if (!key || seenAttachments.has(key)) continue;
+          seenAttachments.add(key);
+          if (
+            a?.thumb ||
+            a?.assetUrl ||
+            (typeof a?.content === "string" && a.content.trim()) ||
+            a?.type
+          ) {
+            allAttachments.push(a);
+          }
+        }
+      };
       for (const m of Array.isArray(messages) ? messages : []) {
-        for (const a of Array.isArray(m?.attachments) ? m.attachments : []) {
-          const key = String(
-            a?.assetUrl || a?.thumb || a?.name + "|" + a?.type || "",
-          );
-          if (!key || seenMimo.has(key)) continue;
-          seenMimo.add(key);
-          if (
-            a?.thumb ||
-            a?.assetUrl ||
-            (typeof a?.content === "string" && a.content.trim()) ||
-            a?.type
-          )
-            allAttachments.push(a);
-        }
+        collectAttachments(m?.attachments);
       }
-      // Also include top-level body attachments if present (some clients send separately)
-      if (Array.isArray(body?.attachments)) {
-        for (const a of body.attachments) {
-          const key = String(
-            a?.assetUrl || a?.thumb || a?.name + "|" + a?.type || "",
-          );
-          if (!key || seenMimo.has(key)) continue;
-          seenMimo.add(key);
-          if (
-            a?.thumb ||
-            a?.assetUrl ||
-            (typeof a?.content === "string" && a.content.trim()) ||
-            a?.type
-          )
-            allAttachments.push(a);
-        }
-      }
+      collectAttachments(body?.attachments);
+
       if (allAttachments.length > 0) {
-        // Always hint attached media explicitly so DeepSeek never denies vision
         const directAssetHints = allAttachments
           .map((a) => {
             const mime = String(a.type || "").toLowerCase();
@@ -1892,23 +1873,30 @@ async function handleAi(request, env) {
               a?.thumb && String(a.thumb).startsWith("data:");
             const hasContent =
               typeof a?.content === "string" && a.content.trim();
+            const sizeHint = a.size ? " (" + (a.size / 1024).toFixed(1) + "KB)" : "";
             if (hasR2) {
-              // Always use absolute corez.pro URL for storage assets
-              const absoluteUrl = String(a.assetUrl).startsWith("http")
-                ? String(a.assetUrl)
-                : `https://corez.pro${String(a.assetUrl).startsWith("/") ? "" : "/"}${String(a.assetUrl)}`;
-              return `[Attached ${kind} "${a.name}" R2 URL: ${absoluteUrl} â€” USE THIS EXACT URL (must start with https://corez.pro/api/assets/) for <img>/<video>/<audio> src, never hallucinate local filenames like "${a.name}"]`;
+              const raw = String(a.assetUrl);
+              const absoluteUrl = raw.startsWith("http")
+                ? raw
+                : "https://corez.pro" + (raw.startsWith("/") ? "" : "/") + raw;
+              return `[Attached ${kind} "${a.name}"${sizeHint} R2 URL: ${absoluteUrl} - USE THIS EXACT URL (must start with https://corez.pro/api/assets/) for <img>/<video>/<audio> src, never hallucinate a local filename like "${a.name}"]`;
             }
             if (hasThumb) {
-              const sizeHint = a.size
-                ? ` (${(a.size / 1024).toFixed(1)}KB)`
-                : "";
-              return `[Attached ${kind} "${a.name}"${sizeHint} available as data URL thumb â€” vision via MiMo V2.5 will describe it; for <img src> use the data URL if no R2 URL]`;
+              return (
+                '[Attached ' + kind + ' "' + a.name + '"' + sizeHint +
+                " available as a data URL thumb - for <img src> use the data URL when no R2 URL exists]"
+              );
             }
             if (hasContent) {
-              return `[Attached file "${a.name}" content length ${a.content.length} â€” see MiMo context]`;
+              return (
+                '[Attached file "' + a.name + '"' + sizeHint +
+                " has extracted text content (" + a.content.length + " chars) supplied separately]"
+              );
             }
-            return `[Attached ${kind} "${a.name}" (${mime || "unknown"}) â€” metadata only]`;
+            return (
+              '[Attached ' + kind + ' "' + a.name + '" (' + (mime || "unknown") + ")" +
+              sizeHint + " - metadata only]"
+            );
           })
           .filter(Boolean)
           .join("\n");
@@ -1916,41 +1904,18 @@ async function handleAi(request, env) {
           apiMessages.push({
             role: "system",
             content:
-              "Attached media (authoritative â€” you DO have vision via MiMo V2.5, never claim you cannot view images when this block is present):\n" +
+              "Attached media (metadata only - you cannot see image, video or audio content):\n" +
               directAssetHints +
-              "\nIf the user asks to describe, analyze, or recreate an attached image, use the MiMo V2.5 Media Understanding block as ground truth and never respond with 'I cannot view images'.",
+              "\nThese files exist and their URLs are authoritative for markup. Their visual content is NOT available to you. If the user asks you to describe, analyse, OCR or recreate an attachment, say plainly that you cannot see the file and ask them to describe it or paste the relevant text - never invent a description, and never produce a generic layout/typography/colour template as if you had seen it. Extracted text content, when present, is supplied elsewhere in this conversation and may be used normally.",
           });
         }
       }
-      if (allAttachments.length > 0) {
-        if (!isMimoAvailable(env)) {
-          mimoStatus = "unavailable-no-key";
-        } else {
-          const mimoDescriptions = await describeAttachmentsWithMimo(
-            allAttachments,
-            executionPrompt || prompt,
-            env,
-            clientDisconnectSignal,
-          );
-          mimoStatus =
-            mimoDescriptions.length > 0
-              ? `ok:${mimoDescriptions.length}/${allAttachments.length}`
-              : `failed:0/${allAttachments.length}`;
-          const mimoBlock = buildMimoContextBlock(mimoDescriptions);
-          if (mimoBlock) {
-            apiMessages.push({ role: "system", content: mimoBlock });
-          }
-        }
-      }
-    } catch (mimoErr) {
-      mimoStatus = `error:${mimoErr?.message || mimoErr}`.slice(0, 120);
+    } catch (attachmentErr) {
       console.warn(
-        "MiMo pre-pass failed (continuing to DeepSeek):",
-        mimoErr?.message || mimoErr,
+        "Attachment metadata block failed (continuing):",
+        attachmentErr?.message || attachmentErr,
       );
     }
-  } else {
-    mimoStatus = "disabled-flag";
   }
 
   const runtimeContext = buildRuntimeContext();
@@ -2861,7 +2826,6 @@ async function handleAi(request, env) {
       totalMs: Date.now() - requestStartedAt,
       provider: result.provider || null,
       model: result.model || null,
-      mimoStatus,
       inputTokens: result.usage?.inputTokens ?? null,
       outputTokens: result.usage?.outputTokens ?? null,
       fallbackUsed: Boolean(result.resumed),
@@ -3512,7 +3476,7 @@ async function handleR2Assets(request, env) {
     }
 
     // Asset types accepted by /api/assets/upload â€” images always, plus
-    // video/audio/file types used by the MiMo V2.5 -> DeepSeek V4.1 Flash pipeline.
+    // video/audio/file types accepted as attachments.
     // All are stored in R2 and served as static assets; the worker never
     // executes them.
     const ALLOWED_ASSET_TYPES = [
@@ -3560,7 +3524,7 @@ async function handleR2Assets(request, env) {
         error: `Unsupported content type "${mimeType}".`,
       });
     }
-    // Data URL must match the declared mime type (generic for all media used by MiMo pipeline).
+    // Data URL must match the declared mime type (generic for all accepted media types).
     const expectedPrefix = `data:${mimeType};base64,`;
     if (!dataUrl.startsWith(expectedPrefix)) {
       return jsonResponse(400, {

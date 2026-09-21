@@ -5,13 +5,18 @@ export { AWWWARDS_DESIGN_SYSTEM, AWWWARDS_CATEGORIES, detectAwwwardsCategory, bu
 export { DESIGN_ARCHETYPES, FORBIDDEN_DESIGN_TROPES, QUALITY_DESIGN_STANDARDS, formatAntiSlopPrompt, detectDesignArchetype, generateTokensCss, buildDesignSystemPrompt } from './designSystems/index.js';
 export { ToolRegistry } from './tools/index.js';
 export { ModelProviderRouter, MODEL_CATALOG, cosineSimilarity } from './providers/index.js';
+export {
+  DEFAULT_TEXT_MODEL,
+  DEEPSEEK_V4_1_FLASH,
+  ALLOWED_TEXT_MODELS,
+  isAllowedTextModel,
+  resolveTextModel
+} from './providers/modelIds.js';
 export { ProviderChain } from './providers/providerChain.js';
 export { RetryScheduler } from './providers/retryScheduler.js';
 export {
   ProviderAdapter,
   OpenCodeGoAdapter,
-  DeepSeekAdapter,
-  OpenRouterAdapter,
   PROVIDER_IDS,
   classifyProviderFailure,
   parseRetryAfter,

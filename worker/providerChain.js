@@ -161,14 +161,9 @@ export function buildProviderChain(env = {}, extra = {}) {
 
   const opencodeKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY;
   if (opencodeKey && !isDisabled(env?.OPENCODE_GO_DISABLED)) {
-    const rawModel =
-      String(env?.OPENCODE_MODEL || DEFAULT_MODEL).trim() || DEFAULT_MODEL;
-    // Guard against a misconfigured env that points the main text model at the
-    // vision-only MiMo family (vendor-prefixed or future ids included), then
-    // clamp to the allow-list so text traffic can never leave the approved model.
-    const model = /^(?:xiaomi\/)?mimo(?:-|$)/i.test(rawModel)
-      ? DEFAULT_MODEL
-      : resolveTextModel(rawModel);
+    // Clamp to the allow-list so text traffic can never leave the approved
+    // model, whatever a stale env var, an unapproved id or a typo asks for.
+    const model = resolveTextModel(env?.OPENCODE_MODEL || DEFAULT_MODEL);
     const endpoint = env?.OPENCODE_ENDPOINT || OPENCODE_DEFAULT_ENDPOINT;
     const api = resolveApiMode({ endpoint, api: env?.OPENCODE_API_MODE });
     const callOptions = (sessionId) => ({

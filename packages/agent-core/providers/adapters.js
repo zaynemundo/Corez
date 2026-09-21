@@ -5,7 +5,7 @@
 // another provider's API key, and no adapter ever sends max_tokens /
 // max_completion_tokens (generations run as long as the model needs).
 
-import { DEFAULT_TEXT_MODEL, resolveTextModel } from './modelIds.js';
+import { resolveTextModel } from './modelIds.js';
 import {
   OPENCODE_SESSION_HEADER,
   newOpencodeSessionId,
@@ -222,6 +222,7 @@ export class OpenCodeGoAdapter extends ProviderAdapter {
       id: PROVIDER_IDS.OPENCODE_GO,
       apiKey,
       endpoint: options.endpoint ?? process.env.OPENCODE_ENDPOINT ?? PROVIDER_ENDPOINTS[PROVIDER_IDS.OPENCODE_GO],
+      // Clamped to the allow-list: this is the only text route CoreZ permits.
       model: resolveTextModel(options.model ?? process.env.OPENCODE_MODEL),
       api: options.api ?? process.env.OPENCODE_API_MODE,
       referer: 'https://corez.ai',
@@ -238,38 +239,6 @@ export class OpenCodeGoAdapter extends ProviderAdapter {
       ...super.buildHeaders(),
       [OPENCODE_SESSION_HEADER]: sessionId || this.sessionId
     };
-  }
-}
-
-export class DeepSeekAdapter extends ProviderAdapter {
-  constructor(options = {}) {
-    const apiKey = options.deepseekApiKey !== undefined
-      ? options.deepseekApiKey
-      : (options.apiKey !== undefined ? options.apiKey : firstEnv(PROVIDER_ENV_KEYS[PROVIDER_IDS.DEEPSEEK]));
-    super({
-      id: PROVIDER_IDS.DEEPSEEK,
-      apiKey,
-      endpoint: options.endpoint ?? process.env.DEEPSEEK_ENDPOINT ?? PROVIDER_ENDPOINTS[PROVIDER_IDS.DEEPSEEK],
-      model: options.model ?? process.env.DEEPSEEK_MODEL ?? DEFAULT_TEXT_MODEL,
-      api: options.api
-    });
-  }
-}
-
-export class OpenRouterAdapter extends ProviderAdapter {
-  constructor(options = {}) {
-    const apiKey = options.openrouterApiKey !== undefined
-      ? options.openrouterApiKey
-      : (options.apiKey !== undefined ? options.apiKey : firstEnv(PROVIDER_ENV_KEYS[PROVIDER_IDS.OPENROUTER]));
-    super({
-      id: PROVIDER_IDS.OPENROUTER,
-      apiKey,
-      endpoint: options.endpoint ?? process.env.OPENROUTER_ENDPOINT ?? PROVIDER_ENDPOINTS[PROVIDER_IDS.OPENROUTER],
-      model: options.model ?? process.env.OPENROUTER_MODEL ?? DEFAULT_TEXT_MODEL,
-      api: options.api,
-      referer: 'https://corez.ai',
-      title: 'COREZ AI'
-    });
   }
 }
 

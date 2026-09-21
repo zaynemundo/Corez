@@ -1,17 +1,11 @@
 /**
- * Dynamic Model Router — Two-Stage Media Pipeline for corez.pro
+ * Model Router — single-text-model deployment for corez.pro
  *
- * 1) MiMo V2.5 (mimo-v2.5) — vision + multimodal file understanding.
- *    Every user attachment (image/*, video/*, audio/*, pdf, text, generic file)
- *    is first described by MiMo V2.5 via worker/mimo.js. MiMo runs on the same
- *    OpenCode Zen Go gateway as DeepSeek (same endpoint + key, different model).
- * 2) DeepSeek V4.1 Flash (deepseek-v4.1-flash) — the unified site-wide
- *    builder for visual tasks, backend logic, algorithms, scripting, general
- *    chat, writing, data and Q&A. It receives MiMo's textual description as
- *    grounded system context and does the final generation.
- *
- * Text-only DeepSeek benefits from MiMo's hidden vision reasoning: MiMo is the
- * eyes/ears, DeepSeek is the hands. See worker/mimo.js for the pre-pass.
+ * CoreZ runs exactly one text model: DeepSeek V4.1 Flash. There is no second
+ * text model and no vision pre-pass — attachments reach the model as metadata
+ * (filename, type, size, authoritative R2 URL) only, built in worker/index.js.
+ * The pinned id and allow-list live in
+ * packages/agent-core/providers/modelIds.js.
  */
 
 import { DEFAULT_TEXT_MODEL } from "../packages/agent-core/providers/modelIds.js";

@@ -11,11 +11,7 @@ import { DEFAULT_TEXT_MODEL } from "../packages/agent-core/providers/modelIds.js
 import { CancellationManager } from "../packages/agent-core/harness/CancellationManager.js";
 import { R2TaskStore } from "../packages/agent-core/persistence/R2TaskStore.js";
 import { ContextStore } from "../packages/agent-core/persistence/ContextStore.js";
-import {
-  OpenCodeGoAdapter,
-  DeepSeekAdapter,
-  OpenRouterAdapter,
-} from "../packages/agent-core/providers/adapters.js";
+import { OpenCodeGoAdapter } from "../packages/agent-core/providers/adapters.js";
 import { TERMINAL_TASK_STATUSES } from "../packages/agent-core/harness/TaskState.js";
 import { verifySession } from "./auth.js";
 import { jsonResponse, readBoundedJson, safeErrorDetail } from "./utils.js";
@@ -45,8 +41,9 @@ async function getUserId(request, env) {
 // Cross-isolate cancellation is honored by the loop's store-level check.
 const sharedCancellations = new CancellationManager();
 
-// Workers provide secrets through the env binding, never process.env. Each
-// adapter carries only its own provider credentials.
+// Workers provide secrets through the env binding, never process.env.
+// OpenCode Go is the only text route CoreZ constructs: there is no
+// DeepSeek-direct or OpenRouter text fallback.
 export function buildHarness(env) {
   const store = new R2TaskStore({ bucket: env?.ASSET_BUCKET });
   const adapters = [
@@ -54,16 +51,6 @@ export function buildHarness(env) {
       opencodeApiKey: env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY,
       endpoint: env?.OPENCODE_ENDPOINT,
       model: env?.OPENCODE_MODEL,
-    }),
-    new DeepSeekAdapter({
-      deepseekApiKey: env?.DEEPSEEK_API_KEY,
-      endpoint: env?.DEEPSEEK_ENDPOINT,
-      model: env?.DEEPSEEK_MODEL,
-    }),
-    new OpenRouterAdapter({
-      openrouterApiKey: env?.OPENROUTER_API_KEY,
-      endpoint: env?.OPENROUTER_ENDPOINT,
-      model: env?.OPENROUTER_MODEL,
     }),
   ];
   return new AgentHarness({

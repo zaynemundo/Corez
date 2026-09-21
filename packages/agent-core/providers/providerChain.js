@@ -1,24 +1,23 @@
 // Unified CoreZ provider chain.
 //
-// Preferred order: OpenCode Go -> Official DeepSeek -> OpenRouter.
+// Single provider: OpenCode Go. CoreZ runs one text model (DeepSeek V4.1
+// Flash) and no other text route exists — there is no DeepSeek-direct or
+// OpenRouter text fallback to fail over to.
 //
 // Behavior contract:
 // - One provider interface: generate({ taskId, model, messages, tools, signal }).
 // - Structured results: { status: completed|retry-scheduled|cancelled|failed,
 //   content, toolCalls, provider, model, taskId, retryAfterSeconds, error }.
-// - Transient preferred-provider failure falls back to the next provider
-//   immediately and persists a retry schedule so the task can resume.
-// - Permanent failures (401/400/...) are never retried.
 // - Transient failures are retried with exponential backoff + jitter and
-//   Retry-After is honored. There is no fixed attempt count: schedules grow
-//   until recovery or an operator hang guard.
+//   Retry-After is honored, persisting a retry schedule so the task resumes.
+// - Permanent failures (401/400/...) are never retried.
+// - There is no fixed attempt count: schedules grow until recovery or an
+//   operator hang guard.
 // - Cancellation (AbortSignal) stops generation and backoff waits.
 // - A failure to persist a retry schedule never claims resumability.
 
 import {
   OpenCodeGoAdapter,
-  DeepSeekAdapter,
-  OpenRouterAdapter,
   classifyProviderFailure,
   computeBackoffMs,
   safeDetail
@@ -48,11 +47,7 @@ function readPositiveNumber(value, fallback) {
 }
 
 function buildDefaultAdapters(options = {}) {
-  return [
-    new OpenCodeGoAdapter(options),
-    new DeepSeekAdapter(options),
-    new OpenRouterAdapter(options)
-  ];
+  return [new OpenCodeGoAdapter(options)];
 }
 
 export class ProviderChain {
