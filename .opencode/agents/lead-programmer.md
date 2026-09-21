@@ -1,7 +1,7 @@
 ---
 description: Converts game specs into modular software engineering architecture, task decomposition, and code review coordination.
 mode: subagent
-model: opencode-go/deepseek-flash
+model: opencode-go/deepseek-v4.1-flash
 temperature: 0.1
 
 permission:

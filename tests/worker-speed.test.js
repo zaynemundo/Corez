@@ -178,7 +178,7 @@ describe('AI response speed optimizations', () => {
     });
 
     expect(generalPayload).not.toBeNull();
-    expect(generalPayload.model).toBe('deepseek-flash');
+    expect(generalPayload.model).toBe('deepseek-v4.1-flash');
     expect(generalPayload.reasoning).toEqual({ effort: 'low', exclude: true });
     expect(generalPayload.temperature).toBeDefined();
     expect(generalPayload.max_completion_tokens).toBeUndefined();
@@ -201,7 +201,7 @@ describe('AI response speed optimizations', () => {
     });
 
     expect(complexPayload).not.toBeNull();
-    expect(complexPayload.model).toBe('deepseek-flash');
+    expect(complexPayload.model).toBe('deepseek-v4.1-flash');
     expect(complexPayload.reasoning).toEqual({ effort: 'xhigh', exclude: true });
     expect(complexPayload.temperature).toBeDefined();
     expect(complexPayload.max_tokens).toBeUndefined();

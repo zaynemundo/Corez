@@ -22,10 +22,10 @@ Orchestration entry point for the CoreZ AI Game Studio. Analyzes game request, s
 **Agents needed:**
 | Role | Agent | Mode |
 |------|-------|------|
-| Creative Director | deepseek-flash | read-only advisory |
-| Lead Programmer | deepseek-flash | implement |
-| UI Programmer | deepseek-flash | implement |
-| QA Tester | deepseek-flash | test |
+| Creative Director | deepseek-v4.1-flash | read-only advisory |
+| Lead Programmer | deepseek-v4.1-flash | implement |
+| UI Programmer | deepseek-v4.1-flash | implement |
+| QA Tester | deepseek-v4.1-flash | test |
 
 #### MEDIUM (5-7 agents, 3-6 hours implementation)
 
@@ -44,13 +44,13 @@ Orchestration entry point for the CoreZ AI Game Studio. Analyzes game request, s
 **Agents needed:**
 | Role | Agent | Mode |
 |------|-------|------|
-| Creative Director | deepseek-flash | read-only advisory |
-| Game Designer | deepseek-flash | spec writer |
-| Lead Programmer | deepseek-flash | implement |
-| UI Programmer | deepseek-flash | implement |
+| Creative Director | deepseek-v4.1-flash | read-only advisory |
+| Game Designer | deepseek-v4.1-flash | spec writer |
+| Lead Programmer | deepseek-v4.1-flash | implement |
+| UI Programmer | deepseek-v4.1-flash | implement |
 | Art Director | flux-2-klein-4b | asset generation |
-| Technical Artist | deepseek-flash | asset integration |
-| QA Tester | deepseek-flash | test |
+| Technical Artist | deepseek-v4.1-flash | asset integration |
+| QA Tester | deepseek-v4.1-flash | test |
 
 #### LARGE (8+ agents, 8+ hours implementation)
 
@@ -71,16 +71,16 @@ Orchestration entry point for the CoreZ AI Game Studio. Analyzes game request, s
 **Agents needed:**
 | Role | Agent | Mode |
 |------|-------|------|
-| Producer | deepseek-flash | orchestration lead |
-| Creative Director | deepseek-flash | read-only |
-| Game Designer | deepseek-flash | spec |
-| Lead Programmer | deepseek-flash | architecture + core |
-| UI Programmer | deepseek-flash | HUD/menus |
+| Producer | deepseek-v4.1-flash | orchestration lead |
+| Creative Director | deepseek-v4.1-flash | read-only |
+| Game Designer | deepseek-v4.1-flash | spec |
+| Lead Programmer | deepseek-v4.1-flash | architecture + core |
+| UI Programmer | deepseek-v4.1-flash | HUD/menus |
 | Art Director | flux-2-klein-4b | backgrounds/assets |
-| Technical Artist | deepseek-flash | sprite pipeline |
-| Physics Advisor | deepseek-flash | read-only advisory |
-| QA Tester | deepseek-flash | test |
-| Code Reviewer | deepseek-flash | read-only review |
+| Technical Artist | deepseek-v4.1-flash | sprite pipeline |
+| Physics Advisor | deepseek-v4.1-flash | read-only advisory |
+| QA Tester | deepseek-v4.1-flash | test |
+| Code Reviewer | deepseek-v4.1-flash | read-only review |
 
 ---
 
@@ -168,20 +168,20 @@ estimated_hours: "1-2"  # per complexity: SMALL 1-2, MEDIUM 3-6, LARGE 8+
 
 team:
   - role: "Lead Programmer"
-    agent: "deepseek-flash"
+    agent: "deepseek-v4.1-flash"
     mode: "implement"
     tasks:
       - "Set up project structure and build config"
       - "Implement core game loop and rendering"
       - "Implement player controls and physics"
   - role: "UI Programmer"
-    agent: "deepseek-flash"
+    agent: "deepseek-v4.1-flash"
     mode: "implement"
     tasks:
       - "Build HUD (score, health, pause button)"
       - "Implement start screen and game-over overlay"
   - role: "QA Tester"
-    agent: "deepseek-flash"
+    agent: "deepseek-v4.1-flash"
     mode: "implement"
     tasks:
       - "Write smoke tests for core loop"

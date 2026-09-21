@@ -5,6 +5,7 @@
 // another provider's API key, and no adapter ever sends max_tokens /
 // max_completion_tokens (generations run as long as the model needs).
 
+import { DEFAULT_TEXT_MODEL, resolveTextModel } from './modelIds.js';
 import {
   OPENCODE_SESSION_HEADER,
   newOpencodeSessionId,
@@ -221,7 +222,7 @@ export class OpenCodeGoAdapter extends ProviderAdapter {
       id: PROVIDER_IDS.OPENCODE_GO,
       apiKey,
       endpoint: options.endpoint ?? process.env.OPENCODE_ENDPOINT ?? PROVIDER_ENDPOINTS[PROVIDER_IDS.OPENCODE_GO],
-      model: options.model ?? process.env.OPENCODE_MODEL ?? 'deepseek-flash',
+      model: resolveTextModel(options.model ?? process.env.OPENCODE_MODEL),
       api: options.api ?? process.env.OPENCODE_API_MODE,
       referer: 'https://corez.ai',
       title: 'COREZ AI'
@@ -249,7 +250,7 @@ export class DeepSeekAdapter extends ProviderAdapter {
       id: PROVIDER_IDS.DEEPSEEK,
       apiKey,
       endpoint: options.endpoint ?? process.env.DEEPSEEK_ENDPOINT ?? PROVIDER_ENDPOINTS[PROVIDER_IDS.DEEPSEEK],
-      model: options.model ?? process.env.DEEPSEEK_MODEL ?? 'deepseek-flash',
+      model: options.model ?? process.env.DEEPSEEK_MODEL ?? DEFAULT_TEXT_MODEL,
       api: options.api
     });
   }
@@ -264,7 +265,7 @@ export class OpenRouterAdapter extends ProviderAdapter {
       id: PROVIDER_IDS.OPENROUTER,
       apiKey,
       endpoint: options.endpoint ?? process.env.OPENROUTER_ENDPOINT ?? PROVIDER_ENDPOINTS[PROVIDER_IDS.OPENROUTER],
-      model: options.model ?? process.env.OPENROUTER_MODEL ?? 'deepseek-flash',
+      model: options.model ?? process.env.OPENROUTER_MODEL ?? DEFAULT_TEXT_MODEL,
       api: options.api,
       referer: 'https://corez.ai',
       title: 'COREZ AI'

@@ -22,7 +22,12 @@ import {
   streamChatEndpoint,
 } from "./opencodeClient.js";
 
-export const DEFAULT_MODEL = "deepseek-flash";
+import {
+  DEFAULT_TEXT_MODEL,
+  resolveTextModel,
+} from "../packages/agent-core/providers/modelIds.js";
+
+export const DEFAULT_MODEL = DEFAULT_TEXT_MODEL;
 
 // Transient failures are retried with adaptive exponential backoff (base
 // 750ms doubling, jittered, honouring the provider's Retry-After) until
@@ -159,10 +164,11 @@ export function buildProviderChain(env = {}, extra = {}) {
     const rawModel =
       String(env?.OPENCODE_MODEL || DEFAULT_MODEL).trim() || DEFAULT_MODEL;
     // Guard against a misconfigured env that points the main text model at the
-    // vision-only MiMo family (vendor-prefixed or future ids included).
+    // vision-only MiMo family (vendor-prefixed or future ids included), then
+    // clamp to the allow-list so text traffic can never leave the approved model.
     const model = /^(?:xiaomi\/)?mimo(?:-|$)/i.test(rawModel)
       ? DEFAULT_MODEL
-      : rawModel;
+      : resolveTextModel(rawModel);
     const endpoint = env?.OPENCODE_ENDPOINT || OPENCODE_DEFAULT_ENDPOINT;
     const api = resolveApiMode({ endpoint, api: env?.OPENCODE_API_MODE });
     const callOptions = (sessionId) => ({
@@ -240,7 +246,7 @@ export function buildProviderChain(env = {}, extra = {}) {
  * taskHash, taskId, model, reasoning, temperature, bodyExtra, sessionId } —
  * sleep/clock/jitter are injectable for deterministic tests. `model` overrides
  * the provider's configured model for this call (e.g. the harness build phase
- * pins deepseek-flash). `reasoning` and `temperature` are forwarded as body
+ * pins deepseek-v4.1-flash). `reasoning` and `temperature` are forwarded as body
  * fields for reasoning models. Every request is uncapped: the provider decides
  * how long it generates, and no output ceiling is ever sent.
  */

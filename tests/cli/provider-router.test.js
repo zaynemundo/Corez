@@ -12,7 +12,7 @@ describe('ModelProviderRouter', () => {
 
     expect(Array.isArray(models)).toBe(true);
     expect(models.length).toBeGreaterThan(0);
-    expect(models.some(m => m.id === 'deepseek-flash')).toBe(true);
+    expect(models.some(m => m.id === 'deepseek-v4.1-flash')).toBe(true);
     const ids = models.map(m => m.id);
     expect(new Set(ids).size).toBe(ids.length);
   });

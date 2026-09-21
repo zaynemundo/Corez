@@ -9,6 +9,7 @@
 
 import { runProviderChain, runStreamingChain } from "./providerChain.js";
 import { selectModelForRequest, selectReasoningConfig } from "./modelRouter.js";
+import { resolveTextModel } from "../packages/agent-core/providers/modelIds.js";
 import {
   verifyCreation,
   verifySpecCoverage,
@@ -167,13 +168,15 @@ export async function* runCreationHarness(options) {
       : DEFAULT_BUILD_CHECKPOINT_MS,
   } = options;
 
-  // Build phase model: all tasks use DeepSeek V4.1 Flash (deepseek-flash)
-  // as the unified site-wide model. OPENCODE_BUILD_MODEL overrides per
-  // deployment and is checked first so it wins for any task type.
-  const buildModel =
+  // Build phase model: all tasks use DeepSeek V4.1 Flash as the unified
+  // site-wide model. OPENCODE_BUILD_MODEL overrides per deployment, but the
+  // value is clamped to the allow-list so a stale or unapproved id can never
+  // route a build to a different model.
+  const buildModel = resolveTextModel(
     options.model ||
-    env?.OPENCODE_BUILD_MODEL ||
-    selectModelForRequest({ prompt, primaryIntent, complexity }, env);
+      env?.OPENCODE_BUILD_MODEL ||
+      selectModelForRequest({ prompt, primaryIntent, complexity }, env),
+  );
   // Reasoning config: harness computes complexity-aware reasoning & temperature
   // so DeepSeek V4.1 Flash can think thoroughly for builds but cheaply for trivial.
   const buildReasoning =

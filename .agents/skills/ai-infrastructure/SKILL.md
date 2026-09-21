@@ -46,7 +46,7 @@ disableable per deployment with `WORKERS_AI_RERANK_DISABLED=true` /
 
 ## 1. Model Routing & Primary/Secondary Failovers
 
-- **Routing Logic**: Direct fast structured classification tasks to lightweight local logic (e.g. the repo's `src/services/intentClassifier.js`) and complex reasoning/art direction to the primary model (DeepSeek V4.1 Flash, `deepseek-flash`).
+- **Routing Logic**: Direct fast structured classification tasks to lightweight local logic (e.g. the repo's `src/services/intentClassifier.js`) and complex reasoning/art direction to the primary model (DeepSeek V4.1 Flash, `deepseek-v4.1-flash`).
 - **Graceful Failover**: chat uses OpenCode Go only
   (`OPENCODE_GO_API_KEY`, `worker/providerChain.js`) — there is no DeepSeek or
   OpenRouter text fallback. Transient failures use bounded per-request retries

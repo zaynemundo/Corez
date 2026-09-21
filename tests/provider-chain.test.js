@@ -86,7 +86,7 @@ describe('ProviderChain', () => {
     ];
     const tools = [{ name: 'read_file', description: 'Read a file' }];
 
-    const result = await chain.generate({ model: 'deepseek-flash', messages, tools });
+    const result = await chain.generate({ model: 'deepseek-v4.1-flash', messages, tools });
 
     expect(result.status).toBe('completed');
     expect(result.content).toBe('from opencode');
@@ -382,7 +382,7 @@ describe('ProviderChain', () => {
     });
 
     const result = await chain.generate({
-      model: 'deepseek-flash',
+      model: 'deepseek-v4.1-flash',
       messages: [...toolMessages, { role: 'user', content: 'continue' }]
     });
 

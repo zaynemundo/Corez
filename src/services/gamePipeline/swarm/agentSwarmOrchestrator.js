@@ -9,7 +9,7 @@ import { AdaptiveConcurrencyQueue } from "./adaptiveQueue.js";
 
 export const OPENROUTER_SWARM_ROUTING = {
   // DeepSeek V4.1 Flash is the unified site-wide model.
-  model: "deepseek-flash",
+  model: "deepseek-v4.1-flash",
   provider: {
     sort: "throughput",
     allow_fallbacks: true,

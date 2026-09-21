@@ -1,7 +1,7 @@
 ---
 description: Implements enemy behavior trees, finite state machines, pathing, attack patterns, difficulty scaling, and boss AI logic.
 mode: subagent
-model: opencode-go/deepseek-flash
+model: opencode-go/deepseek-v4.1-flash
 temperature: 0.1
 
 permission:

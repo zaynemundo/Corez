@@ -5,10 +5,14 @@ import {
 import { resolveApiMode } from './endpoint.js';
 import { extractContentText, stripThinkingBlocks } from './text.js';
 import { PROVIDER_ENDPOINTS, PROVIDER_IDS } from './adapters.js';
+import {
+  DEEPSEEK_V4_1_FLASH,
+  OPENCODE_GO_PROVIDER,
+  resolveTextModel,
+} from './modelIds.js';
 
 export const MODEL_CATALOG = Object.freeze([
-  { id: 'deepseek-flash', name: 'DeepSeek V4.1 Flash', provider: 'opencode-go', role: 'Primary Executor (Orchestration, Coding, UI, Building & Verification)' },
-  { id: 'kimi-k3', name: 'Kimi K3 Code', provider: 'opencode-go', role: 'Physics & Engine Advisor (specialized math/physics guidance)' },
+  { id: DEEPSEEK_V4_1_FLASH, name: 'DeepSeek V4.1 Flash', provider: OPENCODE_GO_PROVIDER, role: 'Primary Executor (Orchestration, Coding, UI, Building & Verification)' },
   { id: 'flux-1-schnell', name: 'FLUX 1 Schnell', provider: 'cloudflare-workers-ai', role: 'Visual Asset & Art Director' }
 ]);
 
@@ -34,7 +38,7 @@ function extractAssistantText(data) {
 export class ModelProviderRouter {
   constructor(options = {}) {
     this.opencodeApiKey = process.env.OPENCODE_GO_API_KEY || process.env.OPENCODE_API_KEY || options.opencodeApiKey;
-    this.defaultModel = options.defaultModel || 'deepseek-flash';
+    this.defaultModel = resolveTextModel(options.defaultModel);
     this.endpoint =
       options.endpoint ||
       process.env.OPENCODE_ENDPOINT ||

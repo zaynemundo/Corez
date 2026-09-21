@@ -80,7 +80,7 @@ describe('provider fallback chain recovery', () => {
     });
 
     expect(result.content).toBe('finally recovered');
-    expect(result.model).toBe('opencode:deepseek-flash');
+    expect(result.model).toBe('opencode:deepseek-v4.1-flash');
     expect(attempts).toBe(6);
   });
 
@@ -368,7 +368,7 @@ describe('provider fallback chain recovery', () => {
       sleep: async () => {},
       jitter: () => 0
     });
-    expect(opencodeResult.model).toBe('opencode:deepseek-flash');
+    expect(opencodeResult.model).toBe('opencode:deepseek-v4.1-flash');
 
     vi.stubGlobal('fetch', vi.fn(async () => errorResponse(401, 'unauthorized')));
     const noFallbackResult = await runProviderChain([{ role: 'user', content: 'label' }], {
@@ -841,7 +841,7 @@ describe('OpenCode gateway client behavior', () => {
       clock: () => 0,
       jitter: () => 0
     });
-    expect(payload.model).toBe('deepseek-flash');
+    expect(payload.model).toBe('deepseek-v4.1-flash');
 
     const oversized = 'a'.repeat(128);
     expect(resolveOpencodeSessionId(oversized)).toMatch(/^ses_[A-Za-z0-9]{26}$/);

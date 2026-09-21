@@ -2,6 +2,7 @@
 // concurrency and cancellation coordination. Every task is isolated; two
 // tasks may not write the same workspace checkout simultaneously.
 
+import { DEFAULT_TEXT_MODEL } from '../providers/modelIds.js';
 import { TaskState, TASK_STATUSES } from './TaskState.js';
 import { nowIso } from './utils.js';
 
@@ -28,7 +29,7 @@ export class TaskManager {
       sessionId: sessionId || null,
       workspaceId: workspaceId || null,
       prompt: prompt.trim(),
-      model: model || 'deepseek-flash',
+      model: model || DEFAULT_TEXT_MODEL,
       mode
     });
     task.contract = contract && typeof contract === 'object' ? contract : null;

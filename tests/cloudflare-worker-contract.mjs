@@ -196,12 +196,12 @@ async function run() {
     // New API contract: the worker returns provider + diagnostics alongside
     // content/model so clients can report truncation, repairs and latency.
     assert.equal(successBody.content, 'Worker response');
-    assert.equal(successBody.model, 'opencode:deepseek-flash');
+    assert.equal(successBody.model, 'opencode:deepseek-v4.1-flash');
     assert.equal(successBody.provider, 'opencode-go');
     assert.equal(successBody.diagnostics.truncationDetected, false);
     assert.equal(successBody.diagnostics.repaired, false);
     assert.equal(typeof successBody.diagnostics.ttftMs, 'number');
-    assert.equal(invocation.payload.model, 'deepseek-flash');
+    assert.equal(invocation.payload.model, 'deepseek-v4.1-flash');
     assert.ok(Array.isArray(invocation.payload.input || invocation.payload.messages));
     assert.ok(['model', 'messages', 'input', 'reasoning', 'temperature'].includes(Object.keys(invocation.payload)[0]) || Object.keys(invocation.payload).includes('model'));
     // Payload must contain model + input/messages and may include reasoning/temperature for DeepSeek V4.1 Flash
@@ -291,8 +291,8 @@ async function run() {
       assert.equal(opencodeKeyResp.status, 200);
       const opencodeKeyData = await opencodeKeyResp.json();
       assert.equal(opencodeKeyData.content, 'OpenCode Go response');
-      assert.equal(opencodeKeyData.model, 'opencode:deepseek-flash');
-      assert.equal(opencodePayload.model, 'deepseek-flash');
+      assert.equal(opencodeKeyData.model, 'opencode:deepseek-v4.1-flash');
+      assert.equal(opencodePayload.model, 'deepseek-v4.1-flash');
       // No output-token caps anywhere: general requests are uncapped too.
       assert.equal(opencodePayload.max_tokens, undefined);
       assert.ok(Array.isArray(opencodePayload.input || opencodePayload.messages));
@@ -380,7 +380,7 @@ async function run() {
         assert.equal(url, 'https://opencode.ai/zen/go/v1/chat/completions');
         const payload = JSON.parse(init.body);
         capturedPayloads.push(payload);
-        assert.equal(payload.model, 'deepseek-flash');
+        assert.equal(payload.model, 'deepseek-v4.1-flash');
         assert.ok(payload.reasoning && typeof payload.reasoning === 'object');
         assert.ok(['low', 'medium', 'high', 'xhigh'].includes(payload.reasoning.effort));
         return new Response(JSON.stringify({
@@ -401,14 +401,14 @@ async function run() {
       assert.equal(opencodePreferredResp.status, 200);
       const opencodePreferredData = await opencodePreferredResp.json();
       assert.equal(opencodePreferredData.content, 'OpenCode Go preferred response');
-      assert.equal(opencodePreferredData.model, 'opencode:deepseek-flash');
+      assert.equal(opencodePreferredData.model, 'opencode:deepseek-v4.1-flash');
 
       // Client-supplied body.model is never trusted: the server-controlled
       // model list always wins.
       globalThis.fetch = async (_url, init) => {
         const payload = JSON.parse(init.body);
         capturedPayloads.push(payload);
-        assert.equal(payload.model, 'deepseek-flash');
+        assert.equal(payload.model, 'deepseek-v4.1-flash');
         return new Response(JSON.stringify({
           choices: [{ message: { content: 'Server model used' } }]
         }), {
@@ -458,7 +458,7 @@ async function run() {
       assert.equal(opencodeRetryResp.status, 200);
       const opencodeRetryData = await json(opencodeRetryResp);
       assert.equal(opencodeRetryData.content, 'Recovered on the OpenCode Go retry');
-      assert.equal(opencodeRetryData.model, 'opencode:deepseek-flash');
+      assert.equal(opencodeRetryData.model, 'opencode:deepseek-v4.1-flash');
       assert.equal(opencodeRetryCalls, 2);
 
       // Transient-only OpenCode failure with no further provider: the retry
@@ -571,8 +571,8 @@ async function run() {
         // The harness always streams FROM the provider; only the
         // client-facing delivery is non-streaming.
         assert.equal(body.stream, true);
-        // The build phase runs on deepseek-flash (the designated build executor).
-        assert.equal(body.model, 'deepseek-flash');
+        // The build phase runs on deepseek-v4.1-flash (the designated build executor).
+        assert.equal(body.model, 'deepseek-v4.1-flash');
         const sse = (event) => `data: ${JSON.stringify(event)}\n\n`;
         return new Response(
           sse({ choices: [{ delta: { content: harnessArtifact }, finish_reason: null }] })

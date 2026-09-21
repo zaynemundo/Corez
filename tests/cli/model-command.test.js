@@ -16,8 +16,8 @@ describe('/model CLI Command', () => {
     expect(res.model).toBeDefined();
   });
 
-  it('switches active model cleanly when valid model ID is provided', async () => {
-    const res = await handleModelCommand(['kimi-k3'], { cwd: process.cwd() }, {
+  it('switches active model cleanly when the approved model ID is provided', async () => {
+    const res = await handleModelCommand(['deepseek-v4.1-flash'], { cwd: process.cwd() }, {
       banner: () => {},
       status: () => {},
       success: () => {},
@@ -25,18 +25,26 @@ describe('/model CLI Command', () => {
     });
 
     expect(res.success).toBe(true);
-    expect(res.model).toBe('kimi-k3');
+    expect(res.model).toBe('deepseek-v4.1-flash');
 
     const config = loadCorezConfig(process.cwd());
-    expect(config.model).toBe('kimi-k3');
+    expect(config.model).toBe('deepseek-v4.1-flash');
+  });
 
-    // Switch back to default deepseek-flash
-    await handleModelCommand(['deepseek-flash'], { cwd: process.cwd() }, {
-      banner: () => {},
-      status: () => {},
-      success: () => {},
-      error: () => {}
-    });
+  it('rejects every text model outside the single-model allow-list', async () => {
+    // CoreZ is pinned to DeepSeek V4.1 Flash; the catalog exposes no second
+    // text model, so switching attempts must fail loudly rather than silently
+    // routing text traffic elsewhere.
+    for (const rejected of ['kimi-k3', 'deepseek-flash', 'deepseek-v4-flash']) {
+      const res = await handleModelCommand([rejected], { cwd: process.cwd() }, {
+        banner: () => {},
+        status: () => {},
+        success: () => {},
+        error: () => {}
+      });
+      expect(res.success, `${rejected} must be rejected`).toBe(false);
+      expect(res.model).toBe('deepseek-v4.1-flash');
+    }
   });
 
   it('returns failure response when invalid model ID is passed', async () => {
@@ -55,8 +63,8 @@ describe('/model CLI Command', () => {
     expect(code).toBe(0);
   });
 
-  it('runs corez-code /model kimi-k3 via CLI router cleanly', async () => {
-    const code = await runCli(['/model', 'deepseek-flash']);
+  it('runs corez-code /model deepseek-v4.1-flash via CLI router cleanly', async () => {
+    const code = await runCli(['/model', 'deepseek-v4.1-flash']);
     expect(code).toBe(0);
   });
 });

@@ -7,6 +7,7 @@
 // enforced per user.
 
 import { AgentHarness } from "../packages/agent-core/harness/AgentHarness.js";
+import { DEFAULT_TEXT_MODEL } from "../packages/agent-core/providers/modelIds.js";
 import { CancellationManager } from "../packages/agent-core/harness/CancellationManager.js";
 import { R2TaskStore } from "../packages/agent-core/persistence/R2TaskStore.js";
 import { ContextStore } from "../packages/agent-core/persistence/ContextStore.js";
@@ -68,7 +69,7 @@ export function buildHarness(env) {
   return new AgentHarness({
     taskStore: store,
     adapters,
-    defaultModel: "deepseek-flash",
+    defaultModel: DEFAULT_TEXT_MODEL,
     persistEvents: true,
     cancellationManager: sharedCancellations,
     maxRetryWaitMs: 0, // no in-process retry waits in the Worker; resume via API

@@ -2,7 +2,7 @@
 
 ## Roles and authority
 
-- **DeepSeek V4.1 Flash** (`deepseek-flash` / opencode-go) is the lead engineering agent, handling orchestration, development, vision, visual inspection, UI layout, game design, SVG creation, and overall implementation strategy.
+- **DeepSeek V4.1 Flash** (`deepseek-v4.1-flash` / opencode-go) is the lead engineering agent, handling orchestration, development, vision, visual inspection, UI layout, game design, SVG creation, and overall implementation strategy.
 - **FLUX (Workers AI)** is used for fast, free background image generation and visual artwork: `@cf/black-forest-labs/flux-2-klein-4b` primary with `@cf/black-forest-labs/flux-1-schnell` fallback via keyless `POST /api/image/cf`; OpenRouter (`google/gemini-3.1-flash-lite-image`) serves `POST /api/image` when `OPENROUTER_API_KEY` is configured.
 
 ## Verification & Git completion policy
@@ -35,7 +35,7 @@ Roles match `SWARM_ROLES` in `packages/agent-core/swarm`: `orchestrator`, `explo
 
 > **Primary Model Rule**: **DeepSeek V4.1 Flash** operates as the lead primary executor for all code execution, component building, UI work, task graph routing, architectural guidance, code review, and empirical verification.
 
-- `primary-executor` — `deepseek-flash` / `opencode-go` — Coder / Tester: writes code, builds components, edits files, runs tests.
+- `primary-executor` — `deepseek-v4.1-flash` / `opencode-go` — Coder / Tester: writes code, builds components, edits files, runs tests.
 - `art-director` — `flux-2-klein-4b` / `cloudflare-workers-ai` — Creative Lead: visual direction, color palettes, background textures, art assets.
 
 ### File Ownership & Context Rules

@@ -8,10 +8,10 @@ function makeHarness({ provider, store, repositoryRunner, maxRetryWaitMs = 0 } =
     taskStore: store || new MemoryTaskStore(),
     providerChain: provider || {
       async generate() {
-        return { status: 'completed', content: 'answer', toolCalls: [], provider: 'test', model: 'deepseek-flash' };
+        return { status: 'completed', content: 'answer', toolCalls: [], provider: 'test', model: 'deepseek-v4.1-flash' };
       }
     },
-    defaultModel: 'deepseek-flash',
+    defaultModel: 'deepseek-v4.1-flash',
     maxRetryWaitMs,
     repositoryRunner: repositoryRunner || null
   });
@@ -116,7 +116,7 @@ describe('AgentHarness', () => {
           if (calls === 1) {
             return { status: 'retry-scheduled', provider: 'opencode-go', retryAfterSeconds: 120, error: 'rate limited', content: '', toolCalls: [] };
           }
-          return { status: 'completed', content: 'recovered answer', toolCalls: [], provider: 'opencode-go', model: 'deepseek-flash' };
+          return { status: 'completed', content: 'recovered answer', toolCalls: [], provider: 'opencode-go', model: 'deepseek-v4.1-flash' };
         }
       }
     });

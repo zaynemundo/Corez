@@ -1,8 +1,9 @@
+import { DEFAULT_TEXT_MODEL } from '../providers/modelIds.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
 export const DEFAULT_CONFIG = Object.freeze({
-  model: 'deepseek-flash',
+  model: DEFAULT_TEXT_MODEL,
   reasoning: 'high',
   mode: 'agent',
   permissions: {

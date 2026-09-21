@@ -1,6 +1,8 @@
 // Task state model. Every task owns an isolated instance; no global mutable
 // runtime is shared between users, sessions or workspaces.
 
+import { DEFAULT_TEXT_MODEL } from '../providers/modelIds.js';
+
 export const TASK_STATUSES = Object.freeze({
   PENDING: 'pending',
   RUNNING: 'running',
@@ -33,7 +35,7 @@ export class TaskState {
     this.workspaceId = workspaceId || null;
     this.status = TASK_STATUSES.PENDING;
     this.prompt = prompt || '';
-    this.model = model || 'deepseek-flash';
+    this.model = model || DEFAULT_TEXT_MODEL;
     this.mode = mode;
     this.messages = [];
     this.plan = null;

@@ -344,7 +344,7 @@ describe('Challenger 2: HierarchicalSynthesis 1,000+ Workstreams & Wave Persiste
     const result = await synthesis.synthesize({
       outputs,
       prompt: 'Synthesize all 1200 specialist workstreams into unified system specification',
-      model: 'deepseek-flash'
+      model: 'deepseek-v4.1-flash'
     });
 
     expect(result.content).toContain('FINAL HIERARCHICAL SYNTHESIS COMPLETE');
@@ -383,7 +383,7 @@ describe('Challenger 2: HierarchicalSynthesis 1,000+ Workstreams & Wave Persiste
     await synthesis1.synthesize({
       outputs,
       prompt: 'Initial wave execution',
-      model: 'deepseek-flash'
+      model: 'deepseek-v4.1-flash'
     });
 
     const stateAfterWave0 = (await store.getTask(taskId)).synthesisState;
@@ -396,7 +396,7 @@ describe('Challenger 2: HierarchicalSynthesis 1,000+ Workstreams & Wave Persiste
 
     const resumedResult = await synthesis2.resume({
       prompt: 'Resumed wave execution',
-      model: 'deepseek-flash'
+      model: 'deepseek-v4.1-flash'
     });
 
     expect(resumedResult).not.toBeNull();

@@ -5,7 +5,7 @@
  *    Every user attachment (image/*, video/*, audio/*, pdf, text, generic file)
  *    is first described by MiMo V2.5 via worker/mimo.js. MiMo runs on the same
  *    OpenCode Zen Go gateway as DeepSeek (same endpoint + key, different model).
- * 2) DeepSeek V4.1 Flash (deepseek-flash) — the unified site-wide
+ * 2) DeepSeek V4.1 Flash (deepseek-v4.1-flash) — the unified site-wide
  *    builder for visual tasks, backend logic, algorithms, scripting, general
  *    chat, writing, data and Q&A. It receives MiMo's textual description as
  *    grounded system context and does the final generation.
@@ -14,8 +14,10 @@
  * eyes/ears, DeepSeek is the hands. See worker/mimo.js for the pre-pass.
  */
 
-export const MODEL_VISUAL = "deepseek-flash";
-export const MODEL_DEFAULT = "deepseek-flash";
+import { DEFAULT_TEXT_MODEL } from "../packages/agent-core/providers/modelIds.js";
+
+export const MODEL_VISUAL = DEFAULT_TEXT_MODEL;
+export const MODEL_DEFAULT = DEFAULT_TEXT_MODEL;
 
 const VISUAL_SKILL_IDS = new Set([
   "visual-creative",

@@ -15,6 +15,7 @@
 // - Profiles/bundles composition (web/headless/agy) via ProfileRegistry + --patch overlays
 // - Capability seams: llm (ProviderChain), tools, sessions, fs/shell/subagents via context
 
+import { DEFAULT_TEXT_MODEL } from '../providers/modelIds.js';
 import { EventBus } from './EventBus.js';
 import { TASK_STATUSES } from './TaskState.js';
 import { CancellationManager } from './CancellationManager.js';
@@ -98,7 +99,7 @@ export class AgentHarness {
     // Repository-mode delegation target (Node CLI AgentRuntime). Without it,
     // repository tasks are honestly blocked in the browser runtime.
     this.repositoryRunner = options.repositoryRunner || null;
-    this.defaultModel = options.defaultModel || 'deepseek-flash';
+    this.defaultModel = options.defaultModel || DEFAULT_TEXT_MODEL;
     this.autoApprove = options.autoApprove === true;
     // Durable event persistence: every emitted event is appended to the task
     // store so SSE consumers can reconnect and replay what they missed.

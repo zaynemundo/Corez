@@ -6,6 +6,7 @@
 // agent/pre-step and agent/request, streaming assistant/chunk, and tool
 // execution through the ToolRegistry pipeline.
 
+import { DEFAULT_TEXT_MODEL } from '../providers/modelIds.js';
 import { SessionLog } from './SessionLog.js';
 import { BlockAssembler } from '../llm/BlockAssembler.js';
 import { LlmService } from '../llm/LlmService.js';
@@ -112,7 +113,7 @@ export class AgentLoop {
     this.session = this.sessionLog; // alias for DSH parity
     this.options = {
       provider: options.provider || '',
-      model: options.model || 'deepseek-flash',
+      model: options.model || DEFAULT_TEXT_MODEL,
       maxTokens: options.maxTokens
     };
     this.inbox = new Inbox(this.sessionLog, {

@@ -63,7 +63,7 @@ test production by mutating data.
 ## Drive
 
 - Chat: open http://localhost:3000, send a message; watch Network for
-  `POST /api/ai` returning `{content, model}` (chat is `opencode:deepseek-flash` only).
+  `POST /api/ai` returning `{content, model}` (chat is `opencode:deepseek-v4.1-flash` only).
 - Images: prompts matching the image intent hit `POST /api/image` and
   return `{image, model}` — the OpenRouter path uses
   `google/gemini-3.1-flash-lite-image` (`OPENROUTER_IMAGE_MODEL` overrides)

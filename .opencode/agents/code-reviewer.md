@@ -1,7 +1,7 @@
 ---
 description: Read-only code reviewer inspecting correctness, game-loop performance, memory leaks, security, and architecture violations.
 mode: subagent
-model: opencode-go/deepseek-flash
+model: opencode-go/deepseek-v4.1-flash
 temperature: 0.1
 
 permission:
