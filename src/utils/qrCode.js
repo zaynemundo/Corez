@@ -76,10 +76,23 @@ export function generateQrCodeSvg(text, options = {}) {
 }
 
 /**
+ * Encodes a generated QR SVG as a `data:` URL so it can be rendered with an
+ * `<img src>` instead of injecting markup into the document. An SVG loaded via
+ * `<img>` cannot execute script or event handlers, so the QR — whose colour
+ * options and matrix are the only inputs — no longer needs an HTML sink.
+ */
+export function generateQrCodeDataUrl(text, options = {}) {
+  const svg = generateQrCodeSvg(text, options);
+  if (!svg) return "";
+  // encodeURIComponent keeps the URL valid without requiring atob/btoa in
+  // every runtime that imports this module.
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+/**
  * Generates standard embed iframe HTML for published creation.
  * Returns "" when no URL is supplied.
- */
-export function generateEmbedSnippet(
+ */export function generateEmbedSnippet(
   publishedUrl,
   { width = "100%", height = "600", title = "CoreZ Creation" } = {},
 ) {

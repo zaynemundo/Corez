@@ -61,6 +61,43 @@
 
   --transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   --transition-normal: 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Layering map — the canonical stacking order, declared once and referenced
+     by every positioned element instead of ad-hoc integers. Reading order is
+     the paint order: a layer may only sit above the ones before it.
+       0   background      page backdrop
+       10  content         content inside a panel
+       20  content-raised  content stacked over content
+       30  hud             headers, composer bar, in-pane live overlays
+       40  hud-raised      sidebar and top-level navigation chrome
+       50  controls        floating controls above the shell
+       60  dropdown        menus and suggestion popovers
+       70  pane-fullscreen expanded preview pane (covers the shell, never overlays)
+       80  overlay         banners and non-blocking notices
+       90  overlay-raised  scrim above the backdrop it dims
+       95  sidebar-mobile  drawer above its own scrim
+       100 modal           dialogs
+       110 modal-raised    dialog body above its own backdrop
+       120 modal-toolbar   dialog chrome above its body
+       200 lightbox        fullscreen media viewer, always the topmost layer
+     The expanded preview pane deliberately ranks BELOW overlay/modal/lightbox:
+     it is a content surface, so an open dialog or lightbox must never be
+     occluded by it. */
+  --z-background: 0;
+  --z-content: 10;
+  --z-content-raised: 20;
+  --z-hud: 30;
+  --z-hud-raised: 40;
+  --z-controls: 50;
+  --z-dropdown: 60;
+  --z-pane-fullscreen: 70;
+  --z-overlay: 80;
+  --z-overlay-raised: 90;
+  --z-sidebar-mobile: 95;
+  --z-modal: 100;
+  --z-modal-raised: 110;
+  --z-modal-toolbar: 120;
+  --z-lightbox: 200;
 }
 
 [data-theme="light"] {
@@ -76,10 +113,16 @@
   --border-hover: rgba(0, 0, 0, 0.42);
 
   --text-primary: #000000;
-  --text-secondary: #6e6e73;
-  /* #98989d was 2.87:1 on white (WCAG AA fail, 33 usages). #6b6b70 is
-     5.30:1 on white and 4.57:1 on --bg-tertiary surfaces. */
-  --text-muted: #6b6b70;
+  /* #98989d was 2.87:1 on white (WCAG AA fail, 33 usages) and its
+     replacement #6e6e73 still failed at 4.03:1 on --code-header-bg. #5f5f66
+     is 5.03:1 on --code-header-bg, 5.46:1 on --bg-tertiary and 6.33:1 on
+     white, so every light surface this token lands on clears 4.5:1. */
+  --text-secondary: #5f5f66;
+  /* Muted must clear AA on the darkest light surface as well: #6b6b70 was
+     4.21:1 on --code-header-bg. #646469 is 4.67:1 there, 5.07:1 on
+     --bg-tertiary and 5.88:1 on white, and stays a step lighter than
+     --text-secondary so it still reads as the quieter tone. */
+  --text-muted: #646469;
 
   --market-positive: #15803d;
   --market-negative: #b91c1c;
@@ -222,7 +265,7 @@ h6 {
     transform var(--transition-normal),
     width var(--transition-normal),
     margin-left var(--transition-normal);
-  z-index: 20;
+  z-index: var(--z-hud-raised);
   flex-shrink: 0;
   visibility: visible;
   overflow: hidden;
@@ -535,7 +578,7 @@ h6 {
   position: absolute;
   top: calc(100% + 4px);
   right: 0;
-  z-index: 50;
+  z-index: var(--z-dropdown);
   min-width: 140px;
   padding: 4px;
   background: var(--bg-secondary);
@@ -702,7 +745,7 @@ h6 {
   position: fixed;
   top: 0.75rem;
   left: 0.75rem;
-  z-index: 40;
+  z-index: var(--z-controls);
   width: 36px;
   height: 36px;
   border-radius: var(--radius-pill);
@@ -1038,7 +1081,7 @@ h6 {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  z-index: 20;
+  z-index: var(--z-hud-raised);
 }
 
 .rate-option-btn {
@@ -1592,7 +1635,7 @@ h6 {
   transition:
     opacity var(--transition-fast),
     transform var(--transition-fast);
-  z-index: 2;
+  z-index: var(--z-content);
 }
 
 .markdown-image-card:hover .markdown-image-overlay,
@@ -1674,7 +1717,7 @@ h6 {
 .image-fullscreen-modal {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: var(--z-modal);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1696,7 +1739,7 @@ h6 {
 
 .image-fullscreen-container {
   position: relative;
-  z-index: 101;
+  z-index: var(--z-modal-raised);
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -1714,7 +1757,7 @@ h6 {
   padding: 0.5rem 0.75rem;
   min-height: 48px;
   flex-shrink: 0;
-  z-index: 102;
+  z-index: var(--z-modal-toolbar);
 }
 
 .image-fullscreen-title {
@@ -2112,7 +2155,7 @@ h6 {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  z-index: 50;
+  z-index: var(--z-dropdown);
   padding: 0.35rem;
   display: flex;
   flex-direction: column;
@@ -2177,7 +2220,7 @@ h6 {
   position: sticky;
   bottom: 1.5rem;
   flex-shrink: 0;
-  z-index: 10;
+  z-index: var(--z-hud);
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
@@ -2353,7 +2396,7 @@ h6 {
   inset: 0;
   width: 100vw;
   height: 100vh;
-  z-index: 1000;
+  z-index: var(--z-pane-fullscreen);
   border-left: none;
   border-top: none;
   margin: 0;
@@ -2459,7 +2502,7 @@ h6 {
   position: absolute;
   top: 12px;
   right: 12px;
-  z-index: 10;
+  z-index: var(--z-hud);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -2493,7 +2536,7 @@ h6 {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  z-index: 100;
+  z-index: var(--z-modal);
 }
 
 .modal-card {
@@ -2564,7 +2607,7 @@ h6 {
 .settings-tabs-scroll {
   position: sticky;
   top: -14px;
-  z-index: 2;
+  z-index: var(--z-content);
   /* Never shrink: this wrapper is a flex item of the dialog body, and because
      overflow-x: auto makes it a scroll container its automatic minimum height
      is zero — without flex: none a long published-pages list squeezes it down
@@ -3522,7 +3565,7 @@ h6 {
   padding: 5px 12px;
   border-radius: 999px;
   white-space: nowrap;
-  z-index: 3;
+  z-index: var(--z-content-raised);
   border: 1px solid var(--border-color);
 }
 .pricing-card-page--premium .pricing-popular-page {
@@ -4053,7 +4096,7 @@ h6 {
     border-right: 1px solid var(--sidebar-border);
     border-radius: var(--sidebar-radius);
     overflow-x: hidden;
-    z-index: 80;
+    z-index: var(--z-sidebar-mobile);
   }
 
   .sidebar.collapsed {
@@ -4067,7 +4110,7 @@ h6 {
   .sidebar-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 70;
+    z-index: var(--z-overlay-raised);
     display: block;
     background: rgba(0, 0, 0, 0.58);
     border: 0;
@@ -4199,7 +4242,7 @@ h6 {
   .canvas-pane.full-width {
     position: fixed;
     inset: 0;
-    z-index: 1000;
+    z-index: var(--z-pane-fullscreen);
     flex: none;
     width: 100%;
     height: 100dvh;
@@ -4357,7 +4400,7 @@ h6 {
   .canvas-pane.full-width {
     position: fixed;
     inset: 0;
-    z-index: 1000;
+    z-index: var(--z-pane-fullscreen);
     width: 100vw;
     height: 100vh;
     border-left: none;
@@ -4655,7 +4698,7 @@ h6 {
 .file-drop-overlay {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: var(--z-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4899,7 +4942,7 @@ h6 {
 .image-lightbox-modal {
   position: fixed;
   inset: 0;
-  z-index: 999;
+  z-index: var(--z-lightbox);
   background: rgba(0, 0, 0, 0.85);
   display: flex;
   align-items: center;
@@ -5403,12 +5446,12 @@ h6 {
     rgba(0, 0, 0, 0.16) 0%,
     rgba(0, 0, 0, 0.48) 100%
   );
-  z-index: 1;
+  z-index: var(--z-background);
   pointer-events: none;
 }
 .auth-center {
   position: relative;
-  z-index: 2;
+  z-index: var(--z-content);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5753,13 +5796,13 @@ h6 {
   background: var(--bg-primary);
   color: var(--text-primary);
   font-family: var(--font-sans);
-  z-index: 10;
+  z-index: var(--z-hud);
 }
 
 .landing-nav {
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: var(--z-hud-raised);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -6392,7 +6435,7 @@ h6 {
   border-bottom: 1px solid var(--border-color);
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: var(--z-hud-raised);
   background-color: var(--bg-glass);
   backdrop-filter: blur(12px);
 }
@@ -6782,7 +6825,7 @@ body.corez-consent-visible .legal-page {
   bottom: 20px;
   transform: translateX(-50%);
   width: min(960px, calc(100vw - 32px));
-  z-index: 60;
+  z-index: var(--z-overlay);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -6844,7 +6887,7 @@ body.corez-consent-visible .legal-page {
 .consent-overlay {
   position: fixed;
   inset: 0;
-  z-index: 70;
+  z-index: var(--z-overlay-raised);
   display: flex;
   align-items: center;
   justify-content: center;

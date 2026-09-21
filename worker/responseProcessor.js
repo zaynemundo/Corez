@@ -2,6 +2,7 @@
 // Reliability + continuity checks for /api/ai responses.
 
 import { safeErrorDetail } from "./utils.js";
+import { parse } from "acorn";
 
 export const CONTINUATION_INSTRUCTION =
   "[CONTINUATION] Do NOT restart from the beginning. Do NOT repeat previous lines. Continue writing from the exact stopping point until the entire file/document is complete. Ensure all <script>, <body>, and <html> tags and markdown code blocks are properly closed.";
@@ -288,7 +289,17 @@ export function syntaxCheckJS(code) {
       : { ok: false, error: "unbalanced brackets (jsx/module code)" };
   }
   try {
-    new Function(trimmed);
+    // Parse with acorn rather than `new Function`: the same real parser used by
+    // worker/jsSyntax.js. Compiling untrusted model output through the
+    // Function constructor is flagged as unsafe even though the body is only
+    // compiled and never invoked, and acorn reports the precise failure.
+    parse(trimmed, {
+      ecmaVersion: "latest",
+      sourceType: "script",
+      allowReturnOutsideFunction: true,
+      allowAwaitOutsideFunction: true,
+      allowHashBang: true,
+    });
     return { ok: true, checked: "parse" };
   } catch (err) {
     return { ok: false, error: safeErrorDetail(err) || "syntax error" };

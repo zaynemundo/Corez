@@ -1,0 +1,969 @@
+{
+  "review": {
+    "tool": "scripts/ui-visual-audit.mjs",
+    "art_direction_ref": "src/index.css (declared design contract; game-project/design/art-direction.json absent)",
+    "ui_dir": "artifacts/ui",
+    "screenshots": [
+      {
+        "file": "artifacts\\ui\\corez-desktop-1440.png",
+        "width": 1440,
+        "height": 960,
+        "neutralShare": 0.98278,
+        "chromaticPixels": 349
+      },
+      {
+        "file": "artifacts\\ui\\corez-laptop-1024.png",
+        "width": 1024,
+        "height": 768,
+        "neutralShare": 0.96968,
+        "chromaticPixels": 346
+      },
+      {
+        "file": "artifacts\\ui\\corez-phone-390.png",
+        "width": 390,
+        "height": 844,
+        "neutralShare": 0.95089,
+        "chromaticPixels": 353
+      },
+      {
+        "file": "artifacts\\ui\\corez-tablet-768.png",
+        "width": 768,
+        "height": 1024,
+        "neutralShare": 0.96908,
+        "chromaticPixels": 423
+      },
+      {
+        "file": "artifacts\\ui\\corez-thinking-laptop-1024.png",
+        "width": 1024,
+        "height": 768,
+        "neutralShare": 0.97158,
+        "chromaticPixels": 322
+      }
+    ],
+    "contested": {
+      "images": 5,
+      "contrast_pairs_checked": 48,
+      "contrast_failures": 0
+    },
+    "result": "PASS",
+    "findings": [],
+    "summary": {
+      "total": 0,
+      "errors": 0,
+      "warnings": 0,
+      "passes": 48
+    },
+    "top_colors": {
+      "corez-desktop-1440.png": [
+        {
+          "hex": "#000000",
+          "rgb": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          },
+          "count": 110126,
+          "share": 0.71697,
+          "nearest": "bg-primary",
+          "nearestHex": "#000000",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#0a0a0a",
+          "rgb": {
+            "r": 10,
+            "g": 10,
+            "b": 10,
+            "a": 1
+          },
+          "count": 31600,
+          "share": 0.20573,
+          "nearest": "bg-secondary",
+          "nearestHex": "#0a0a0a",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#141414",
+          "rgb": {
+            "r": 20,
+            "g": 20,
+            "b": 20,
+            "a": 1
+          },
+          "count": 5646,
+          "share": 0.03676,
+          "nearest": "bg-tertiary",
+          "nearestHex": "#141414",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#0d0d0d",
+          "rgb": {
+            "r": 13,
+            "g": 13,
+            "b": 13,
+            "a": 1
+          },
+          "count": 804,
+          "share": 0.00523,
+          "nearest": "bg-card",
+          "nearestHex": "#0d0d0d",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#101010",
+          "rgb": {
+            "r": 16,
+            "g": 16,
+            "b": 16,
+            "a": 1
+          },
+          "count": 580,
+          "share": 0.00378,
+          "nearest": "code-header-bg",
+          "nearestHex": "#101010",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#1a1a1a",
+          "rgb": {
+            "r": 26,
+            "g": 26,
+            "b": 26,
+            "a": 1
+          },
+          "count": 439,
+          "share": 0.00286,
+          "nearest": "sidebar-item-active-bg",
+          "nearestHex": "#1a1a1a",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#070707",
+          "rgb": {
+            "r": 7,
+            "g": 7,
+            "b": 7,
+            "a": 1
+          },
+          "count": 397,
+          "share": 0.00258,
+          "nearest": "code-bg",
+          "nearestHex": "#080808",
+          "distance": 1.73,
+          "declared": true
+        },
+        {
+          "hex": "#0c0c0c",
+          "rgb": {
+            "r": 12,
+            "g": 12,
+            "b": 12,
+            "a": 1
+          },
+          "count": 100,
+          "share": 0.00065,
+          "nearest": "bg-card",
+          "nearestHex": "#0d0d0d",
+          "distance": 1.73,
+          "declared": true
+        },
+        {
+          "hex": "#111111",
+          "rgb": {
+            "r": 17,
+            "g": 17,
+            "b": 17,
+            "a": 1
+          },
+          "count": 87,
+          "share": 0.00057,
+          "nearest": "code-header-bg",
+          "nearestHex": "#101010",
+          "distance": 1.73,
+          "declared": true
+        },
+        {
+          "hex": "#5c5c5c",
+          "rgb": {
+            "r": 92,
+            "g": 92,
+            "b": 92,
+            "a": 1
+          },
+          "count": 73,
+          "share": 0.00048,
+          "nearest": "border-hover",
+          "nearestHex": "#575757",
+          "distance": 8.66,
+          "declared": true
+        },
+        {
+          "hex": "#131313",
+          "rgb": {
+            "r": 19,
+            "g": 19,
+            "b": 19,
+            "a": 1
+          },
+          "count": 43,
+          "share": 0.00028,
+          "nearest": "bg-tertiary",
+          "nearestHex": "#141414",
+          "distance": 1.73,
+          "declared": true
+        },
+        {
+          "hex": "#0b0b0b",
+          "rgb": {
+            "r": 11,
+            "g": 11,
+            "b": 11,
+            "a": 1
+          },
+          "count": 36,
+          "share": 0.00023,
+          "nearest": "bg-secondary",
+          "nearestHex": "#0a0a0a",
+          "distance": 1.73,
+          "declared": true
+        }
+      ],
+      "corez-laptop-1024.png": [
+        {
+          "hex": "#000000",
+          "rgb": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          },
+          "count": 53193,
+          "share": 0.60875,
+          "nearest": "bg-primary",
+          "nearestHex": "#000000",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#0a0a0a",
+          "rgb": {
+            "r": 10,
+            "g": 10,
+            "b": 10,
+            "a": 1
+          },
+          "count": 23243,
+          "share": 0.266,
+          "nearest": "bg-secondary",
+          "nearestHex": "#0a0a0a",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#141414",
+          "rgb": {
+            "r": 20,
+            "g": 20,
+            "b": 20,
+            "a": 1
+          },
+          "count": 4950,
+          "share": 0.05665,
+          "nearest": "bg-tertiary",
+          "nearestHex": "#141414",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#0d0d0d",
+          "rgb": {
+            "r": 13,
+            "g": 13,
+            "b": 13,
+            "a": 1
+          },
+          "count": 701,
+          "share": 0.00802,
+          "nearest": "bg-card",
+          "nearestHex": "#0d0d0d",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#101010",
+          "rgb": {
+            "r": 16,
+            "g": 16,
+            "b": 16,
+            "a": 1
+          },
+          "count": 547,
+          "share": 0.00626,
+          "nearest": "code-header-bg",
+          "nearestHex": "#101010",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#1a1a1a",
+          "rgb": {
+            "r": 26,
+            "g": 26,
+            "b": 26,
+            "a": 1
+          },
+          "count": 433,
+          "share": 0.00496,
+          "nearest": "sidebar-item-active-bg",
+          "nearestHex": "#1a1a1a",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#070707",
+          "rgb": {
+            "r": 7,
+            "g": 7,
+            "b": 7,
+            "a": 1
+          },
+          "count": 270,
+          "share": 0.00309,
+          "nearest": "code-bg",
+          "nearestHex": "#080808",
+          "distance": 1.73,
+          "declared": true
+        },
+        {
+          "hex": "#0c0c0c",
+          "rgb": {
+            "r": 12,
+            "g": 12,
+            "b": 12,
+            "a": 1
+          },
+          "count": 98,
+          "share": 0.00112,
+          "nearest": "bg-card",
+          "nearestHex": "#0d0d0d",
+          "distance": 1.73,
+          "declared": true
+        },
+        {
+          "hex": "#111111",
+          "rgb": {
+            "r": 17,
+            "g": 17,
+            "b": 17,
+            "a": 1
+          },
+          "count": 74,
+          "share": 0.00085,
+          "nearest": "code-header-bg",
+          "nearestHex": "#101010",
+          "distance": 1.73,
+          "declared": true
+        },
+        {
+          "hex": "#5c5c5c",
+          "rgb": {
+            "r": 92,
+            "g": 92,
+            "b": 92,
+            "a": 1
+          },
+          "count": 67,
+          "share": 0.00077,
+          "nearest": "border-hover",
+          "nearestHex": "#575757",
+          "distance": 8.66,
+          "declared": true
+        },
+        {
+          "hex": "#0b0b0b",
+          "rgb": {
+            "r": 11,
+            "g": 11,
+            "b": 11,
+            "a": 1
+          },
+          "count": 36,
+          "share": 0.00041,
+          "nearest": "bg-secondary",
+          "nearestHex": "#0a0a0a",
+          "distance": 1.73,
+          "declared": true
+        },
+        {
+          "hex": "#171717",
+          "rgb": {
+            "r": 23,
+            "g": 23,
+            "b": 23,
+            "a": 1
+          },
+          "count": 30,
+          "share": 0.00034,
+          "nearest": "bg-tertiary",
+          "nearestHex": "#141414",
+          "distance": 5.2,
+          "declared": true
+        }
+      ],
+      "corez-phone-390.png": [
+        {
+          "hex": "#000000",
+          "rgb": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          },
+          "count": 26479,
+          "share": 0.724,
+          "nearest": "bg-primary",
+          "nearestHex": "#000000",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#0a0a0a",
+          "rgb": {
+            "r": 10,
+            "g": 10,
+            "b": 10,
+            "a": 1
+          },
+          "count": 3611,
+          "share": 0.09873,
+          "nearest": "bg-secondary",
+          "nearestHex": "#0a0a0a",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#141414",
+          "rgb": {
+            "r": 20,
+            "g": 20,
+            "b": 20,
+            "a": 1
+          },
+          "count": 3064,
+          "share": 0.08378,
+          "nearest": "bg-tertiary",
+          "nearestHex": "#141414",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#0d0d0d",
+          "rgb": {
+            "r": 13,
+            "g": 13,
+            "b": 13,
+            "a": 1
+          },
+          "count": 365,
+          "share": 0.00998,
+          "nearest": "bg-card",
+          "nearestHex": "#0d0d0d",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#070707",
+          "rgb": {
+            "r": 7,
+            "g": 7,
+            "b": 7,
+            "a": 1
+          },
+          "count": 139,
+          "share": 0.0038,
+          "nearest": "code-bg",
+          "nearestHex": "#080808",
+          "distance": 1.73,
+          "declared": true
+        },
+        {
+          "hex": "#1a1a1a",
+          "rgb": {
+            "r": 26,
+            "g": 26,
+            "b": 26,
+            "a": 1
+          },
+          "count": 131,
+          "share": 0.00358,
+          "nearest": "sidebar-item-active-bg",
+          "nearestHex": "#1a1a1a",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#101010",
+          "rgb": {
+            "r": 16,
+            "g": 16,
+            "b": 16,
+            "a": 1
+          },
+          "count": 119,
+          "share": 0.00325,
+          "nearest": "code-header-bg",
+          "nearestHex": "#101010",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#0c0c0c",
+          "rgb": {
+            "r": 12,
+            "g": 12,
+            "b": 12,
+            "a": 1
+          },
+          "count": 93,
+          "share": 0.00254,
+          "nearest": "bg-card",
+          "nearestHex": "#0d0d0d",
+          "distance": 1.73,
+          "declared": true
+        },
+        {
+          "hex": "#131313",
+          "rgb": {
+            "r": 19,
+            "g": 19,
+            "b": 19,
+            "a": 1
+          },
+          "count": 72,
+          "share": 0.00197,
+          "nearest": "bg-tertiary",
+          "nearestHex": "#141414",
+          "distance": 1.73,
+          "declared": true
+        },
+        {
+          "hex": "#060606",
+          "rgb": {
+            "r": 6,
+            "g": 6,
+            "b": 6,
+            "a": 1
+          },
+          "count": 44,
+          "share": 0.0012,
+          "nearest": "code-bg",
+          "nearestHex": "#080808",
+          "distance": 3.46,
+          "declared": true
+        },
+        {
+          "hex": "#0b0b0b",
+          "rgb": {
+            "r": 11,
+            "g": 11,
+            "b": 11,
+            "a": 1
+          },
+          "count": 21,
+          "share": 0.00057,
+          "nearest": "bg-secondary",
+          "nearestHex": "#0a0a0a",
+          "distance": 1.73,
+          "declared": true
+        },
+        {
+          "hex": "#161616",
+          "rgb": {
+            "r": 22,
+            "g": 22,
+            "b": 22,
+            "a": 1
+          },
+          "count": 21,
+          "share": 0.00057,
+          "nearest": "bg-tertiary",
+          "nearestHex": "#141414",
+          "distance": 3.46,
+          "declared": true
+        }
+      ],
+      "corez-tablet-768.png": [
+        {
+          "hex": "#000000",
+          "rgb": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          },
+          "count": 51117,
+          "share": 0.58499,
+          "nearest": "bg-primary",
+          "nearestHex": "#000000",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#0a0a0a",
+          "rgb": {
+            "r": 10,
+            "g": 10,
+            "b": 10,
+            "a": 1
+          },
+          "count": 25836,
+          "share": 0.29567,
+          "nearest": "bg-secondary",
+          "nearestHex": "#0a0a0a",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#141414",
+          "rgb": {
+            "r": 20,
+            "g": 20,
+            "b": 20,
+            "a": 1
+          },
+          "count": 4696,
+          "share": 0.05374,
+          "nearest": "bg-tertiary",
+          "nearestHex": "#141414",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#101010",
+          "rgb": {
+            "r": 16,
+            "g": 16,
+            "b": 16,
+            "a": 1
+          },
+          "count": 819,
+          "share": 0.00937,
+          "nearest": "code-header-bg",
+          "nearestHex": "#101010",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#0d0d0d",
+          "rgb": {
+            "r": 13,
+            "g": 13,
+            "b": 13,
+            "a": 1
+          },
+          "count": 497,
+          "share": 0.00569,
+          "nearest": "bg-card",
+          "nearestHex": "#0d0d0d",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#1a1a1a",
+          "rgb": {
+            "r": 26,
+            "g": 26,
+            "b": 26,
+            "a": 1
+          },
+          "count": 211,
+          "share": 0.00241,
+          "nearest": "sidebar-item-active-bg",
+          "nearestHex": "#1a1a1a",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#070707",
+          "rgb": {
+            "r": 7,
+            "g": 7,
+            "b": 7,
+            "a": 1
+          },
+          "count": 193,
+          "share": 0.00221,
+          "nearest": "code-bg",
+          "nearestHex": "#080808",
+          "distance": 1.73,
+          "declared": true
+        },
+        {
+          "hex": "#0c0c0c",
+          "rgb": {
+            "r": 12,
+            "g": 12,
+            "b": 12,
+            "a": 1
+          },
+          "count": 99,
+          "share": 0.00113,
+          "nearest": "bg-card",
+          "nearestHex": "#0d0d0d",
+          "distance": 1.73,
+          "declared": true
+        },
+        {
+          "hex": "#5c5c5c",
+          "rgb": {
+            "r": 92,
+            "g": 92,
+            "b": 92,
+            "a": 1
+          },
+          "count": 71,
+          "share": 0.00081,
+          "nearest": "border-hover",
+          "nearestHex": "#575757",
+          "distance": 8.66,
+          "declared": true
+        },
+        {
+          "hex": "#111111",
+          "rgb": {
+            "r": 17,
+            "g": 17,
+            "b": 17,
+            "a": 1
+          },
+          "count": 68,
+          "share": 0.00078,
+          "nearest": "code-header-bg",
+          "nearestHex": "#101010",
+          "distance": 1.73,
+          "declared": true
+        },
+        {
+          "hex": "#171717",
+          "rgb": {
+            "r": 23,
+            "g": 23,
+            "b": 23,
+            "a": 1
+          },
+          "count": 36,
+          "share": 0.00041,
+          "nearest": "bg-tertiary",
+          "nearestHex": "#141414",
+          "distance": 5.2,
+          "declared": true
+        },
+        {
+          "hex": "#0b0b0b",
+          "rgb": {
+            "r": 11,
+            "g": 11,
+            "b": 11,
+            "a": 1
+          },
+          "count": 35,
+          "share": 0.0004,
+          "nearest": "bg-secondary",
+          "nearestHex": "#0a0a0a",
+          "distance": 1.73,
+          "declared": true
+        }
+      ],
+      "corez-thinking-laptop-1024.png": [
+        {
+          "hex": "#000000",
+          "rgb": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          },
+          "count": 53379,
+          "share": 0.61087,
+          "nearest": "bg-primary",
+          "nearestHex": "#000000",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#0a0a0a",
+          "rgb": {
+            "r": 10,
+            "g": 10,
+            "b": 10,
+            "a": 1
+          },
+          "count": 23449,
+          "share": 0.26835,
+          "nearest": "bg-secondary",
+          "nearestHex": "#0a0a0a",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#141414",
+          "rgb": {
+            "r": 20,
+            "g": 20,
+            "b": 20,
+            "a": 1
+          },
+          "count": 4836,
+          "share": 0.05534,
+          "nearest": "bg-tertiary",
+          "nearestHex": "#141414",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#0d0d0d",
+          "rgb": {
+            "r": 13,
+            "g": 13,
+            "b": 13,
+            "a": 1
+          },
+          "count": 700,
+          "share": 0.00801,
+          "nearest": "bg-card",
+          "nearestHex": "#0d0d0d",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#101010",
+          "rgb": {
+            "r": 16,
+            "g": 16,
+            "b": 16,
+            "a": 1
+          },
+          "count": 543,
+          "share": 0.00621,
+          "nearest": "code-header-bg",
+          "nearestHex": "#101010",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#1a1a1a",
+          "rgb": {
+            "r": 26,
+            "g": 26,
+            "b": 26,
+            "a": 1
+          },
+          "count": 406,
+          "share": 0.00465,
+          "nearest": "sidebar-item-active-bg",
+          "nearestHex": "#1a1a1a",
+          "distance": 0,
+          "declared": true
+        },
+        {
+          "hex": "#070707",
+          "rgb": {
+            "r": 7,
+            "g": 7,
+            "b": 7,
+            "a": 1
+          },
+          "count": 270,
+          "share": 0.00309,
+          "nearest": "code-bg",
+          "nearestHex": "#080808",
+          "distance": 1.73,
+          "declared": true
+        },
+        {
+          "hex": "#0c0c0c",
+          "rgb": {
+            "r": 12,
+            "g": 12,
+            "b": 12,
+            "a": 1
+          },
+          "count": 94,
+          "share": 0.00108,
+          "nearest": "bg-card",
+          "nearestHex": "#0d0d0d",
+          "distance": 1.73,
+          "declared": true
+        },
+        {
+          "hex": "#111111",
+          "rgb": {
+            "r": 17,
+            "g": 17,
+            "b": 17,
+            "a": 1
+          },
+          "count": 74,
+          "share": 0.00085,
+          "nearest": "code-header-bg",
+          "nearestHex": "#101010",
+          "distance": 1.73,
+          "declared": true
+        },
+        {
+          "hex": "#5c5c5c",
+          "rgb": {
+            "r": 92,
+            "g": 92,
+            "b": 92,
+            "a": 1
+          },
+          "count": 66,
+          "share": 0.00076,
+          "nearest": "border-hover",
+          "nearestHex": "#575757",
+          "distance": 8.66,
+          "declared": true
+        },
+        {
+          "hex": "#0b0b0b",
+          "rgb": {
+            "r": 11,
+            "g": 11,
+            "b": 11,
+            "a": 1
+          },
+          "count": 38,
+          "share": 0.00043,
+          "nearest": "bg-secondary",
+          "nearestHex": "#0a0a0a",
+          "distance": 1.73,
+          "declared": true
+        },
+        {
+          "hex": "#0f0f0f",
+          "rgb": {
+            "r": 15,
+            "g": 15,
+            "b": 15,
+            "a": 1
+          },
+          "count": 27,
+          "share": 0.00031,
+          "nearest": "white@0.06",
+          "nearestHex": "#0f0f0f",
+          "distance": 0,
+          "declared": true
+        }
+      ]
+    }
+  }
+}

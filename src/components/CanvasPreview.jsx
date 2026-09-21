@@ -31,7 +31,7 @@ import { publishAppInR2 } from "../services/appStorageService";
 import { useAuth } from "../context/AuthContext";
 import { createZipBlob } from "../utils/zipPackager";
 import { repairMalformedHtml } from "../utils/htmlRepair";
-import { generateQrCodeSvg, generateEmbedSnippet } from "../utils/qrCode";
+import { generateQrCodeDataUrl, generateEmbedSnippet } from "../utils/qrCode";
 
 export default function CanvasPreview({
   code,
@@ -1324,14 +1324,19 @@ export default function CanvasPreview({
                     alignItems: "center",
                     justifyContent: "center",
                   }}
-                  dangerouslySetInnerHTML={{
-                    __html: generateQrCodeSvg(publishLink, {
+                >
+                  <img
+                    src={generateQrCodeDataUrl(publishLink, {
                       size: 140,
                       fgColor: "#090a0f",
                       bgColor: "#ffffff",
-                    }),
-                  }}
-                />
+                    })}
+                    alt={`QR code linking to ${publishLink}`}
+                    width="140"
+                    height="140"
+                    style={{ display: "block" }}
+                  />
+                </div>
                 <p
                   style={{
                     fontSize: "0.75rem",

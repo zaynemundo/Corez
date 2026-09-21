@@ -497,11 +497,18 @@ export function formatCodeForPreview(rawCode) {
   <script>
     window.onerror = function(msg, url, lineNo, columnNo, error) {
       var root = document.body;
-      if (root && (!root.innerHTML || root.innerHTML.trim() === '')) {
-        root.innerHTML = '<div style="padding: 2rem; background: #18181b; color: #f87171; font-family: monospace; border-radius: 12px; margin: 2rem; border: 1px solid #ef444433;">' +
-          '<h3 style="margin-top:0; color:#ef4444; font-size:1.1rem;">Preview Execution Error</h3>' +
-          '<p style="color:#e4e4e7; font-size:0.9rem; white-space:pre-wrap;">' + String(msg || error) + '</p>' +
-          '</div>';
+      if (root && !root.hasChildNodes()) {
+        var box = document.createElement('div');
+        box.setAttribute('style', 'padding: 2rem; background: #18181b; color: #f87171; font-family: monospace; border-radius: 12px; margin: 2rem; border: 1px solid #ef444433;');
+        var heading = document.createElement('h3');
+        heading.setAttribute('style', 'margin-top:0; color:#ef4444; font-size:1.1rem;');
+        heading.textContent = 'Preview Execution Error';
+        var detail = document.createElement('p');
+        detail.setAttribute('style', 'color:#e4e4e7; font-size:0.9rem; white-space:pre-wrap;');
+        detail.textContent = String(msg || error);
+        box.appendChild(heading);
+        box.appendChild(detail);
+        root.appendChild(box);
       }
       return false;
     };
@@ -694,11 +701,18 @@ export function formatCodeForPreview(rawCode) {
   <script>
     window.onerror = function(msg, url, lineNo, columnNo, error) {
       var root = document.getElementById('root');
-      if (root && (!root.innerHTML || root.innerHTML.trim() === '')) {
-        root.innerHTML = '<div style="padding: 2rem; background: #18181b; color: #f87171; font-family: monospace; border-radius: 12px; margin: 2rem; border: 1px solid #ef444433;">' +
-          '<h3 style="margin-top:0; color:#ef4444; font-size:1.1rem;">Preview Compilation Error</h3>' +
-          '<p style="color:#e4e4e7; font-size:0.9rem; white-space:pre-wrap;">' + String(msg || error) + '</p>' +
-          '</div>';
+      if (root && !root.hasChildNodes()) {
+        var box = document.createElement('div');
+        box.setAttribute('style', 'padding: 2rem; background: #18181b; color: #f87171; font-family: monospace; border-radius: 12px; margin: 2rem; border: 1px solid #ef444433;');
+        var heading = document.createElement('h3');
+        heading.setAttribute('style', 'margin-top:0; color:#ef4444; font-size:1.1rem;');
+        heading.textContent = 'Preview Compilation Error';
+        var detail = document.createElement('p');
+        detail.setAttribute('style', 'color:#e4e4e7; font-size:0.9rem; white-space:pre-wrap;');
+        detail.textContent = String(msg || error);
+        box.appendChild(heading);
+        box.appendChild(detail);
+        root.appendChild(box);
       }
       return false;
     };
@@ -935,10 +949,26 @@ export function formatCodeForPreview(rawCode) {
       if (TargetComponent) {
         ReactDOM.createRoot(document.getElementById('root')).render(<TargetComponent />);
       } else {
-        document.getElementById('root').innerHTML = '<div style="padding: 2rem; color: #ef4444; font-family: sans-serif;"><h3>Preview Warning</h3><p>Could not auto-detect a React component. Please ensure your code exports or defines a React component.</p></div>';
+        renderPreviewMessage('Preview Warning', 'Could not auto-detect a React component. Please ensure your code exports or defines a React component.');
       }
       } catch (err) {
-      document.getElementById('root').innerHTML = '<div style="padding: 2rem; color: #ef4444; font-family: sans-serif; white-space: pre-wrap;"><h3>Runtime Error</h3><p>' + err.message + '</p></div>';
+      renderPreviewMessage('Runtime Error', err && err.message ? err.message : String(err));
+    }
+
+    // Preview status messages are assembled from DOM nodes and textContent, so
+    // a runtime error message can never be re-parsed as markup.
+    function renderPreviewMessage(title, detail) {
+      const root = document.getElementById('root');
+      if (!root) return;
+      const box = document.createElement('div');
+      box.setAttribute('style', 'padding: 2rem; color: #ef4444; font-family: sans-serif; white-space: pre-wrap;');
+      const heading = document.createElement('h3');
+      heading.textContent = title;
+      const body = document.createElement('p');
+      body.textContent = detail;
+      box.appendChild(heading);
+      box.appendChild(body);
+      root.replaceChildren(box);
     }
   </script>
   <script>${FULLSCREEN_GAME_PATCH}</script>
