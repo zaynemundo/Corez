@@ -279,10 +279,10 @@ export function injectMultiPageRouter(html, pageNames) {
  * Fullscreen game patch injected into every canvas-based preview/published
  * document. Many generated games are authored as a fixed-resolution canvas
  * (e.g. 960x540) wrapped in a bordered, max-width "block" that leaves the
- * background cut off. This patch forces the main canvas to cover the entire
- * viewport with a scale-to-cover transform (game logic keeps running in its
- * own internal coordinates) and strips the bordered wrapper, so games fill
- * the whole screen on desktop and mobile.
+ * background cut off. This patch strips the bordered wrapper and stretches the
+ * main canvas to the viewport with plain CSS box sizing — no transform, so the
+ * game is never magnified past the screen (game logic keeps running in its own
+ * internal coordinates) and games fill the whole screen on desktop and mobile.
  */
 export const FULLSCREEN_GAME_PATCH = `
 (function () {
@@ -310,22 +310,19 @@ export const FULLSCREEN_GAME_PATCH = `
       var style = document.createElement('style');
       style.textContent = '#game-container, .game-container, #gameCanvasContainer, .canvas-container { position: fixed !important; inset: 0 !important; width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important; margin: 0 !important; padding: 0 !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; background: #0c0d14 !important; }';
       (document.head || document.documentElement).appendChild(style);
+      // Fill the viewport with plain CSS box sizing and no transform at all.
+      // The previous scale-to-cover multiplied the viewport by devicePixelRatio
+      // (min(dpr, 2)) while the canvas was already laid out in CSS pixels, so on
+      // any HiDPI display the canvas was scaled roughly twice as far as needed
+      // and magnified past the viewport - only the middle of the game stayed
+      // visible. Layout size is now the viewport and nothing is transformed.
       canvas.style.position = 'fixed';
-      canvas.style.left = '50%';
-      canvas.style.top = '50%';
+      canvas.style.left = '0';
+      canvas.style.top = '0';
       canvas.style.maxWidth = 'none';
       canvas.style.maxHeight = 'none';
-      canvas.style.width = w + 'px';
-      canvas.style.height = h + 'px';
-      var dpr = Math.min(window.devicePixelRatio || 1, 2);
-      var apply = function () {
-        var s = Math.max((window.innerWidth * dpr) / w, (window.innerHeight * dpr) / h);
-        canvas.style.transform = 'translate(-50%, -50%) scale(' + s + ')';
-        canvas.style.transformOrigin = 'center center';
-      };
-      apply();
-      window.addEventListener('resize', apply);
-      window.addEventListener('orientationchange', apply);
+      canvas.style.width = '100%';
+      canvas.style.height = '100%';
       return true;
     } catch (e) { return false; }
   }
