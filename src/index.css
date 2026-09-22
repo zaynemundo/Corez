@@ -4448,7 +4448,8 @@ h6 {
     animation: none !important;
   }
   /* Settings spinner: keep the label, drop the rotation. */
-  .spin {
+  .spin,
+  .spin-icon {
     animation: none !important;
   }
 }
@@ -5398,10 +5399,17 @@ h6 {
 .auth-loading {
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 12px;
+  /* Its own paint layer, so the spinner is not covered by the fixed backdrop
+     a page may mount while the session check is still in flight. */
+  position: relative;
+  z-index: var(--z-content);
+  font-size: 14px;
+  color: var(--text-secondary);
   background: var(--bg-primary);
-  color: var(--text-primary);
 }
 .auth-page {
   min-height: 100vh;
@@ -6215,6 +6223,7 @@ h6 {
    sets --corez-consent-space on <body>; the fallback covers the first paint. */
 body.corez-consent-visible .pricing-page,
 body.corez-consent-visible .auth-page,
+body.corez-consent-visible .auth-loading,
 body.corez-consent-visible .legal-page {
   padding-bottom: var(--corez-consent-space, 160px);
 }

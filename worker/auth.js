@@ -162,69 +162,80 @@ export function validEmail(email) {
 }
 
 // D1 helpers
+//
+// Setup is idempotent, but it used to run on every auth request: fourteen
+// sequential D1 round-trips before the handler even looked at the request,
+// which made an anonymous GET /api/auth/me - a 401 with no database work to do
+// - take seconds. The work is now memoised per D1 binding and issued in
+// parallel, and the read-only session check does not trigger it at all.
+const tablesReady = new WeakMap();
+
 export async function ensureTables(env) {
   if (!env?.DB) return;
-  // Create tables if not exist - idempotent, cheap on every auth request
-  try {
-    await env.DB.prepare(
-      `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, password_hash TEXT, provider TEXT DEFAULT 'local', google_id TEXT, created_at INTEGER NOT NULL, plan TEXT DEFAULT 'free')`,
-    ).run();
-    // Migrate old users tables without plan column
+  const cached = tablesReady.get(env.DB);
+  if (cached) return cached;
+
+  const ready = (async () => {
     try {
-      await env.DB.prepare(
-        `ALTER TABLE users ADD COLUMN plan TEXT DEFAULT 'free'`,
-      ).run();
-    } catch {}
-    try {
-      await env.DB.prepare(
-        `ALTER TABLE users ADD COLUMN subscription_status TEXT DEFAULT 'active'`,
-      ).run();
-    } catch {}
-    await env.DB.prepare(
-      `CREATE TABLE IF NOT EXISTS invite_codes (code TEXT PRIMARY KEY, used_by TEXT, used_at INTEGER, max_uses INTEGER DEFAULT 1, uses INTEGER DEFAULT 0)`,
-    ).run();
-    await env.DB.prepare(
-      `CREATE TABLE IF NOT EXISTS chats (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, title TEXT NOT NULL DEFAULT 'New Conversation', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
-    ).run();
-    await env.DB.prepare(
-      `CREATE TABLE IF NOT EXISTS chat_messages (id TEXT PRIMARY KEY, chat_id TEXT NOT NULL, user_id TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, attachments TEXT, created_at INTEGER NOT NULL)`,
-    ).run();
-    await env.DB.prepare(
-      `CREATE INDEX IF NOT EXISTS idx_chats_user_updated ON chats(user_id, updated_at DESC)`,
-    ).run();
-    await env.DB.prepare(
-      `CREATE INDEX IF NOT EXISTS idx_messages_chat_created ON chat_messages(chat_id, created_at ASC)`,
-    ).run();
-    await env.DB.prepare(
-      `CREATE TABLE IF NOT EXISTS password_resets (id TEXT PRIMARY KEY, email TEXT NOT NULL, token TEXT UNIQUE NOT NULL, expires_at INTEGER NOT NULL, used INTEGER DEFAULT 0, created_at INTEGER NOT NULL)`,
-    ).run();
-    // Consent evidence: which version of the Terms/Privacy Policy the account
-    // holder accepted, when, and whether they opted into product email. Recorded
-    // when the client supplies it; older clients simply leave these NULL.
-    try {
-      await env.DB.prepare(
-        `ALTER TABLE users ADD COLUMN terms_version TEXT`,
-      ).run();
-    } catch {}
-    try {
-      await env.DB.prepare(
-        `ALTER TABLE users ADD COLUMN terms_accepted_at INTEGER`,
-      ).run();
-    } catch {}
-    try {
-      await env.DB.prepare(
-        `ALTER TABLE users ADD COLUMN marketing_consent INTEGER DEFAULT 0`,
-      ).run();
-    } catch {}
-    await env.DB.prepare(
-      `CREATE INDEX IF NOT EXISTS idx_resets_token ON password_resets(token)`,
-    ).run();
-    await env.DB.prepare(
-      `CREATE INDEX IF NOT EXISTS idx_resets_email ON password_resets(email)`,
-    ).run();
-    // Invite codes are now optional (kept for backward compat, not required for signup)
-    // No seeding needed for new installs — free signup is open
-  } catch {}
+      await Promise.all([
+        env.DB.prepare(
+          `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, password_hash TEXT, provider TEXT DEFAULT 'local', google_id TEXT, created_at INTEGER NOT NULL, plan TEXT DEFAULT 'free')`,
+        ).run(),
+        env.DB.prepare(
+          `CREATE TABLE IF NOT EXISTS invite_codes (code TEXT PRIMARY KEY, used_by TEXT, used_at INTEGER, max_uses INTEGER DEFAULT 1, uses INTEGER DEFAULT 0)`,
+        ).run(),
+        env.DB.prepare(
+          `CREATE TABLE IF NOT EXISTS chats (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, title TEXT NOT NULL DEFAULT 'New Conversation', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
+        ).run(),
+        env.DB.prepare(
+          `CREATE TABLE IF NOT EXISTS chat_messages (id TEXT PRIMARY KEY, chat_id TEXT NOT NULL, user_id TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, attachments TEXT, created_at INTEGER NOT NULL)`,
+        ).run(),
+        env.DB.prepare(
+          `CREATE TABLE IF NOT EXISTS password_resets (id TEXT PRIMARY KEY, email TEXT NOT NULL, token TEXT UNIQUE NOT NULL, expires_at INTEGER NOT NULL, used INTEGER DEFAULT 0, created_at INTEGER NOT NULL)`,
+        ).run(),
+      ]);
+      await Promise.all([
+        env.DB.prepare(
+          `CREATE INDEX IF NOT EXISTS idx_chats_user_updated ON chats(user_id, updated_at DESC)`,
+        ).run(),
+        env.DB.prepare(
+          `CREATE INDEX IF NOT EXISTS idx_messages_chat_created ON chat_messages(chat_id, created_at ASC)`,
+        ).run(),
+        env.DB.prepare(
+          `CREATE INDEX IF NOT EXISTS idx_resets_token ON password_resets(token)`,
+        ).run(),
+        env.DB.prepare(
+          `CREATE INDEX IF NOT EXISTS idx_resets_email ON password_resets(email)`,
+        ).run(),
+      ]);
+      // Columns added after the first release: migrations of old users tables,
+      // plus the consent evidence (which version of the Terms/Privacy Policy an
+      // account accepted, when, and whether product email was opted into). Each
+      // ALTER fails harmlessly once the column exists, so they settle together
+      // instead of costing a round-trip apiece.
+      await Promise.allSettled([
+        env.DB.prepare(
+          `ALTER TABLE users ADD COLUMN plan TEXT DEFAULT 'free'`,
+        ).run(),
+        env.DB.prepare(
+          `ALTER TABLE users ADD COLUMN subscription_status TEXT DEFAULT 'active'`,
+        ).run(),
+        env.DB.prepare(`ALTER TABLE users ADD COLUMN terms_version TEXT`).run(),
+        env.DB.prepare(`ALTER TABLE users ADD COLUMN terms_accepted_at INTEGER`).run(),
+        env.DB.prepare(`ALTER TABLE users ADD COLUMN marketing_consent INTEGER DEFAULT 0`).run(),
+      ]);
+      // Invite codes are now optional (kept for backward compat, not required
+      // for signup). No seeding needed for new installs - free signup is open.
+    } catch (e) {
+      // Setup must never fail the request: forget the result so the next
+      // request tries again, and leave a trace of why.
+      tablesReady.delete(env.DB);
+      console.warn("ensureTables failed:", safeErrorDetail(e));
+    }
+  })();
+
+  tablesReady.set(env.DB, ready);
+  return ready;
 }
 
 export async function findUserByEmail(env, email) {
@@ -282,12 +293,13 @@ export async function handleAuth(request, env) {
     });
   }
 
-  await ensureTables(env);
-
   // GET /api/auth/me
   if (path === "/api/auth/me" && request.method === "GET") {
     const sess = await verifySession(request, env);
     if (!sess) return jsonResponse(401, { error: "Not authenticated" });
+    // Only a signed-in reader touches the database (for the plan), so this is
+    // the one branch of the session check that has to ensure setup first.
+    await ensureTables(env);
     // Prefer DB plan (source of truth), fallback to JWT
     let plan = sess.plan || "free";
     try {
@@ -299,6 +311,10 @@ export async function handleAuth(request, env) {
       user: { id: sess.uid, email: sess.email, plan },
     });
   }
+
+  // Every remaining route writes, so the tables must exist first. This costs
+  // one round of setup per isolate - ensureTables memoises the work.
+  await ensureTables(env);
 
   // Rate limiting for auth mutations (login & signup)
   if (

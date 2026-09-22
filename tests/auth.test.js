@@ -15,6 +15,7 @@ import {
   verifySession as _verifySession,
   requireAuth,
   handleAuth,
+  ensureTables,
   SESSION_COOKIE
 } from '../worker/auth.js';
 
@@ -227,6 +228,45 @@ describe('Worker Auth Engine', () => {
       expect(res.status).toBe(401);
       const body = await res.json();
       expect(body.error).toBe('Not authenticated');
+    });
+
+    it('does not run table setup for the anonymous session check', async () => {
+      // The 401 path reads nothing: running fourteen DDL round-trips before it
+      // made the public front door wait seconds for an empty answer.
+      const ddl = [];
+      const db = mockEnv.DB;
+      const prepare = db.prepare.bind(db);
+      db.prepare = (query) => {
+        if (/^\s*(CREATE|ALTER)\b/i.test(query)) ddl.push(query.trim().slice(0, 60));
+        return prepare(query);
+      };
+
+      const res = await handleAuth(
+        new Request('https://corez.pro/api/auth/me', { method: 'GET' }),
+        mockEnv
+      );
+
+      expect(res.status).toBe(401);
+      expect(ddl).toEqual([]);
+    });
+
+    it('creates tables once per D1 binding instead of on every call', async () => {
+      const ddl = [];
+      const db = mockEnv.DB;
+      const prepare = db.prepare.bind(db);
+      db.prepare = (query) => {
+        if (/^\s*(CREATE|ALTER)\b/i.test(query)) ddl.push(query.trim().slice(0, 60));
+        return prepare(query);
+      };
+
+      await ensureTables(mockEnv);
+      const afterFirstPass = ddl.length;
+      expect(afterFirstPass).toBeGreaterThan(0);
+
+      await ensureTables(mockEnv);
+      await ensureTables(mockEnv);
+
+      expect(ddl.length).toBe(afterFirstPass);
     });
 
     it('returns user on GET /api/auth/me when valid session cookie is provided', async () => {

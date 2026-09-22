@@ -52,6 +52,30 @@ function linkHrefs(name) {
 }
 
 describe('public surface for a signed-out visitor', () => {
+  it('shows a loading state while the session check is in flight', async () => {
+    // A blank frame during the session check read as a broken site on the
+    // front door, so the wait must say something.
+    let releaseSessionCheck;
+    vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      if (String(url).includes('/api/auth/me')) {
+        return new Promise((resolve) => {
+          releaseSessionCheck = () =>
+            resolve(new Response(JSON.stringify({ error: 'Not authenticated' }), { status: 401 }));
+        });
+      }
+      return Promise.resolve(new Response(null, { status: 404 }));
+    });
+    window.history.pushState({}, '', '/');
+
+    render(<App />);
+
+    expect(await screen.findByRole('status')).toBeTruthy();
+    expect(screen.getByText(/loading corez/i)).toBeTruthy();
+
+    releaseSessionCheck();
+    await waitForSignIn();
+  });
+
   it('sends the site root to sign-in instead of a landing or policies page', async () => {
     openAt('/');
     await waitForSignIn();

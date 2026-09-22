@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { PanelLeft } from "lucide-react";
+import { PanelLeft, Loader2 } from "lucide-react";
 import {
   BrowserRouter,
   Routes,
@@ -1540,7 +1540,17 @@ function AppInner() {
   }, []);
 
   if (loading) {
-    return null;
+    // The session check decides between the app and the public pages, and it is
+    // a network round-trip on every cold load. Returning null here painted a
+    // blank page — on the sign-in front door it read as a broken site — so the
+    // wait is shown instead. `role="status"` announces it once for screen
+    // readers rather than on every repaint.
+    return (
+      <div className="auth-loading" role="status" aria-live="polite">
+        <Loader2 className="spin-icon" size={22} strokeWidth={1.75} aria-hidden="true" />
+        <span>Loading Corez…</span>
+      </div>
+    );
   }
   if (!user) {
     // Public surface: sign-in is the front door. Pricing stays reachable, the
