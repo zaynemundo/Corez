@@ -49,14 +49,15 @@ afterEach(() => {
 });
 
 describe('signup form consent', () => {
-  it('shows an unticked, required policy checkbox and an optional marketing one', () => {
+  it('shows an unticked, required policy checkbox and nothing else to tick', () => {
     renderSignup();
 
     const required = screen.getByTestId('signup-accept-terms');
-    const marketing = screen.getByTestId('signup-marketing-optin');
     expect(required.checked).toBe(false);
-    expect(marketing.checked).toBe(false);
     expect(required.getAttribute('aria-required')).toBe('true');
+    // The marketing opt-in was removed from signup: that question is answered in
+    // the consent dialog, so the form must not ask it a second time.
+    expect(screen.queryByTestId('signup-marketing-optin')).toBeNull();
 
     // Scope to the consent field itself: the page also carries a summary line
     // with the same links.
@@ -90,7 +91,7 @@ describe('signup form consent', () => {
     expect(calls.some((call) => call.url.includes('/api/auth/signup'))).toBe(false);
   });
 
-  it('sends the accepted policy version and marketing choice with the signup', async () => {
+  it('sends the accepted policy version with the signup, and no marketing opt-in', async () => {
     const calls = mockAuthFetch();
     renderSignup();
 
@@ -101,7 +102,6 @@ describe('signup form consent', () => {
       target: { value: 'LongEnoughPassword1' },
     });
     fireEvent.click(screen.getByTestId('signup-accept-terms'));
-    fireEvent.click(screen.getByTestId('signup-marketing-optin'));
     fireEvent.click(screen.getByRole('button', { name: /^Create Account$/i }));
 
     await waitFor(() => {
@@ -111,7 +111,9 @@ describe('signup form consent', () => {
     const signupCall = calls.find((call) => call.url.includes('/api/auth/signup'));
     expect(signupCall.body.terms_version).toBe('1.0');
     expect(typeof signupCall.body.terms_accepted_at).toBe('number');
-    expect(signupCall.body.marketing_consent).toBe(true);
+    // Signup no longer asks about product email, so it records "not opted in"
+    // rather than claiming a consent the visitor was never offered.
+    expect(signupCall.body.marketing_consent).toBe(false);
   });
 
   it('keeps a local receipt of the acceptance without touching other categories', async () => {

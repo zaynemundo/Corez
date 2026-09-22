@@ -13,7 +13,7 @@
 // Inline links use [label](href) and are rendered by src/pages/Legal.jsx.
 
 export const LEGAL_DOCUMENT_VERSION = "1.0";
-export const LEGAL_UPDATED = "20 September 2026";
+export const LEGAL_UPDATED = "22 September 2026";
 export const LEGAL_ENTITY = "Corez (United Arab Emirates)";
 
 export const LEGAL_CONTACTS = {
@@ -83,7 +83,7 @@ export const LEGAL_DOCUMENTS = {
             ["Keeping the Service secure: abuse prevention, rate limiting, fraud and misuse detection", "Technical data, account data", "Legitimate interests in protecting the Service and its users"],
             ["Support: diagnosing a failed build or a broken page", "Account data, your content, technical data", "Contract and legitimate interests"],
             ["Product analytics that shows which features are used and where flows break", "Analytics data, only after you allow the Analytics category", "Consent (withdrawable at any time)"],
-            ["News and offers by email, if you opt in when signing up", "Email address", "Consent (withdrawable at any time)"],
+            ["News and offers by email, if you allow the Marketing category", "Email address", "Consent (withdrawable at any time)"],
             ["Responding to legal requests and enforcing our Terms", "As necessary and proportionate", "Legal obligation and legitimate interests"],
           ]},
         ],
@@ -486,7 +486,7 @@ export const LEGAL_DOCUMENTS = {
         blocks: [
           {
             type: "p",
-            text: "Corez does not use advertising, retargeting or cross-site tracking cookies, and there are none on this site today. If advertising measurement is ever introduced, it will run only under the Marketing category, only after you allow it. Your choice to receive product emails is separate and is recorded when you sign up or in the consent dialog; unsubscribing is always available from the email footer.",
+            text: "Corez does not use advertising, retargeting or cross-site tracking cookies, and there are none on this site today. If advertising measurement is ever introduced, it will run only under the Marketing category, only after you allow it. Your choice to receive product emails is made in the consent dialog, and unsubscribing is always available from the email footer.",
           },
         ],
       },

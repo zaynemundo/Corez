@@ -211,18 +211,22 @@ export function clearConsent() {
 }
 
 /**
- * Record that the user accepted the Terms / Privacy Policy (and optionally
- * opted into marketing email) while creating an account. Terms and privacy
- * acceptance is not a toggleable cookie category, so it is kept as a receipt
- * on the same record rather than as a category.
+ * Record that the user accepted the Terms / Privacy Policy while creating an
+ * account. Terms and privacy acceptance is not a toggleable cookie category, so
+ * it is kept as a receipt on the same record rather than as a category.
+ *
+ * `marketing` is only written when it is passed: account creation does not ask
+ * the marketing question (the consent dialog does), so a signup must not
+ * overwrite an answer the visitor already gave there.
  */
-export function recordPolicyAcceptance({ marketing = false, source = "signup", now = Date.now() } = {}) {
+export function recordPolicyAcceptance({ marketing, source = "signup", now = Date.now() } = {}) {
   const current = readConsent();
   const base = current?.categories || defaultConsentCategories();
-  return saveConsent(
-    { ...base, marketing: Boolean(marketing) },
-    { source, now },
-  );
+  const categories =
+    marketing === undefined
+      ? { ...base }
+      : { ...base, marketing: Boolean(marketing) };
+  return saveConsent(categories, { source, now });
 }
 
 export function browserBlocksAnalytics() {

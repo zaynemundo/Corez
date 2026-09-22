@@ -40,7 +40,6 @@ export default function Login() {
   });
   const [newPassword, setNewPassword] = useState("");
   const [acceptedPolicies, setAcceptedPolicies] = useState(false);
-  const [marketingOptIn, setMarketingOptIn] = useState(false);
   const [consentError, setConsentError] = useState("");
   const navigate = useNavigate();
 
@@ -78,11 +77,12 @@ export default function Login() {
         await signup(email, password, "free", {
           termsVersion: LEGAL_DOCUMENT_VERSION,
           acceptedAt,
-          marketingConsent: marketingOptIn,
         });
         // Local copy of the acceptance, kept with the cookie-consent record so
-        // the visitor can see what they agreed to without asking us.
-        recordPolicyAcceptance({ marketing: marketingOptIn, source: "signup" });
+        // the visitor can see what they agreed to without asking us. Signing up
+        // no longer answers the marketing question: that lives in the consent
+        // dialog, and this receipt must not overwrite an answer given there.
+        recordPolicyAcceptance({ source: "signup" });
         track("sign_up_completed", { plan: "free" });
         try {
           const pending = localStorage.getItem("corez_pending_plan");
@@ -323,15 +323,6 @@ export default function Login() {
                     Privacy Policy
                   </Link>
                   .
-                </ConsentCheckbox>
-                <ConsentCheckbox
-                  id="corez-marketing-optin"
-                  checked={marketingOptIn}
-                  onChange={setMarketingOptIn}
-                  hint="Optional. We never sell your data, and every email has an unsubscribe link."
-                  testId="signup-marketing-optin"
-                >
-                  Send me occasional product news and offers.
                 </ConsentCheckbox>
               </div>
             )}
