@@ -78,6 +78,16 @@ describe('full-page routes scroll without relying on the document', () => {
     expect(printBlock).toMatch(/\.legal-page\s*\{[^}]*overflow:\s*visible/);
   });
 
+  it('anchors the auth card to the top of the page instead of centring it', () => {
+    // Login and Sign Up differ in height by the consent rows. A vertically
+    // centred card shifted its top edge - and with it the logo, both tabs and
+    // every field - each time the mode changed.
+    const block = blockFor('.auth-center');
+    expect(block, '.auth-center block not found').not.toBe('');
+    expect(block).toMatch(/align-items:\s*flex-start/);
+    expect(block).not.toMatch(/align-items:\s*center/);
+  });
+
   it('the consent banner reserves space inside whichever container scrolls', () => {
     const rule = css.match(/body\.corez-consent-visible[^{]*\{([^}]*)\}/);
     expect(rule).toBeTruthy();

@@ -5417,7 +5417,12 @@ h6 {
   width: 100%;
   width: 100vw;
   display: flex;
-  align-items: center;
+  /* Anchored rather than centred: the consent banner reserves space at the
+     bottom of this page, and centring a card taller than the space that is
+     left pushed its top above the viewport (the logo was cut off on a phone).
+     A stable top edge also keeps Login and Sign Up from moving the card when
+     the mode changes. */
+  align-items: flex-start;
   justify-content: center;
   position: relative;
   /* Theme-aware fallback behind the backdrop image (was forced #000). */
@@ -5467,12 +5472,20 @@ h6 {
   position: relative;
   z-index: var(--z-content);
   display: flex;
-  align-items: center;
+  /* The card is anchored to the top instead of being centred. Login and Sign
+     Up differ in height by the consent rows, and a centred card moved the
+     logo, both tabs and every field on the screen each time the mode changed.
+     A fixed top offset keeps the card's top edge - and so everything above the
+     field the mode adds - exactly where it was. */
+  align-items: flex-start;
   justify-content: center;
   width: 100%;
-  min-height: 100vh;
+  /* No min-height: it would add a viewport of empty space below the card, and
+     with the consent banner's reserved padding that made the page scroll even
+     when nothing needed to. The card defines the height, the page paints the
+     rest. */
   /* Respect notched/rounded displays. */
-  padding: max(24px, env(safe-area-inset-top))
+  padding: max(24px, 8vh, env(safe-area-inset-top))
     max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom))
     max(24px, env(safe-area-inset-left));
 }
