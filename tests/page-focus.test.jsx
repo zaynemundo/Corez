@@ -6,7 +6,6 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import Landing from '../src/pages/Landing.jsx';
 import Pricing from '../src/pages/Pricing.jsx';
 import Login from '../src/pages/Login.jsx';
 import Legal from '../src/pages/Legal.jsx';
@@ -32,7 +31,6 @@ function renderRoute(element) {
 }
 
 const ROUTES = [
-  ['landing', '.landing', <Landing />],
   ['pricing', '.pricing-page', <Pricing />],
   ['privacy', '.legal-page', <Legal docId="privacy" />],
   ['cookies', '.legal-page', <Legal docId="cookies" />],

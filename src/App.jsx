@@ -15,7 +15,6 @@ import CanvasPreview from "./components/CanvasPreview";
 import SettingsModal from "./components/SettingsModal";
 import DropZoneOverlay from "./components/DropZoneOverlay";
 import Login from "./pages/Login";
-import Landing from "./pages/Landing";
 import { PaymentSuccess } from "./pages/PaymentStatus";
 import Pricing from "./pages/Pricing";
 import Legal, { LegalIndex } from "./pages/Legal";
@@ -1543,16 +1542,16 @@ function AppInner() {
     return null;
   }
   if (!user) {
-    // Public surface: the landing page is the front door, pricing stays
-    // reachable, and every other logged-out path falls back to the landing
-    // page (which links to /login).
+    // Public surface: the policies index is the front door, sign-in and
+    // pricing stay reachable from it, and every other logged-out path falls
+    // back to the policies index.
     return (
       <Routes>
-        <Route path="/" element={<Landing />} />
+        <Route path="/" element={<Navigate to="/legal" replace />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/login" element={<Login />} />
         {legalRoutes()}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/legal" replace />} />
       </Routes>
     );
   }

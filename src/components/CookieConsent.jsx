@@ -16,7 +16,7 @@ import {
 import { track } from "../services/analytics";
 
 // One banner, one preferences dialog, mounted once at the App level so every
-// surface (landing, pricing, login and the signed-in app) is covered. The
+// surface (policies, pricing, login and the signed-in app) is covered. The
 // decision is stored by consentService; this component only renders it.
 
 function CategoryToggle({ category, checked, onChange }) {

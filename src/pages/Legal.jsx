@@ -160,10 +160,24 @@ function LegalChrome({ currentId, children }) {
             </Link>
           ))}
         </nav>
-        <Link className="legal-back" to="/">
-          <ArrowLeft size={14} strokeWidth={1.75} aria-hidden="true" />
-          Back to Corez
-        </Link>
+        {/* The policies are the public front door, so the header carries the
+            way back into the product: pricing and sign-in for a visitor, and
+            the app itself once they are signed in. The "back" link is left off
+            the index, where it would only point at the page you are reading. */}
+        <div className="legal-nav-actions">
+          <Link className="legal-back" to="/pricing">
+            Pricing
+          </Link>
+          <Link className="legal-back" to="/login">
+            Sign in
+          </Link>
+          {currentId ? (
+            <Link className="legal-back" to="/">
+              <ArrowLeft size={14} strokeWidth={1.75} aria-hidden="true" />
+              Back to Corez
+            </Link>
+          ) : null}
+        </div>
       </header>
 
       {children}

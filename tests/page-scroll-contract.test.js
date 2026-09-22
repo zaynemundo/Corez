@@ -31,12 +31,12 @@ function rulesMatching(pattern) {
     .filter((rule) => pattern.test(rule.block));
 }
 
-const FULL_PAGE_ROUTES = ['.landing', '.pricing-page', '.auth-page', '.legal-page'];
+const FULL_PAGE_ROUTES = ['.pricing-page', '.auth-page', '.legal-page'];
 
 // Containers that take focus on arrival. The auth page is excluded on purpose:
 // its email field carries autoFocus, so focus already lands inside the scroller
 // (asserted in tests/page-focus.test.jsx).
-const FOCUS_ON_ARRIVAL = ['.landing', '.pricing-page', '.legal-page'];
+const FOCUS_ON_ARRIVAL = ['.pricing-page', '.legal-page'];
 
 describe('full-page routes scroll without relying on the document', () => {
   it('body still hides overflow, which is why the pattern is required', () => {
@@ -66,7 +66,14 @@ describe('full-page routes scroll without relying on the document', () => {
   it('printing returns the legal page to normal flow', () => {
     const printStart = css.indexOf('@media print');
     expect(printStart).toBeGreaterThan(-1);
-    const printBlock = css.slice(printStart, css.indexOf('\n}\n', css.indexOf('.legal-article p', printStart)) + 3);
+    // The end of the block is found with a line-ending-agnostic pattern: a
+    // Windows checkout has CRLF in the working copy, and a literal '\n}\n'
+    // search silently returns -1 there, emptying the block and failing this
+    // assertion for a reason that has nothing to do with print styles.
+    const articleRule = css.indexOf('.legal-article p', printStart);
+    const blockEnd = /\r?\n\}\r?\n/.exec(css.slice(articleRule));
+    expect(blockEnd, 'print block for .legal-article p not found').toBeTruthy();
+    const printBlock = css.slice(printStart, articleRule + blockEnd.index + blockEnd[0].length);
     expect(printBlock).toMatch(/\.legal-page\s*\{[^}]*position:\s*static/);
     expect(printBlock).toMatch(/\.legal-page\s*\{[^}]*overflow:\s*visible/);
   });

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // Page-level regressions found by rendering the deployed pages: a signed-out
 // visitor could not start the free plan, the pricing "Sign in" button went to
-// the landing page, and the sign-in screen had no heading and no way to read a
+// the wrong place, and the sign-in screen had no heading and no way to read a
 // policy outside signup mode.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
@@ -59,7 +59,7 @@ describe('pricing page for a signed-out visitor', () => {
     await waitFor(() => expect(screen.getByText('sign-in-screen')).toBeTruthy());
   });
 
-  it('signs a visitor in from the nav instead of going to the landing page', async () => {
+  it('signs a visitor in from the pricing nav', async () => {
     renderPricing();
     fireEvent.click(await screen.findByRole('button', { name: /^sign in$/i }));
     await waitFor(() => expect(screen.getByText('sign-in-screen')).toBeTruthy());
