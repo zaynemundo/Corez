@@ -1384,10 +1384,14 @@ function MainApp({ theme, setTheme }) {
                               : "Collapse response"
                           }
                         >
+                          {/* The phase is announced, not printed: the visible
+                              row is just the animated dots, and a screen reader
+                              still hears "Planning…", "Verifying…" through this
+                              live region. */}
                           {buildPhaseLabel(buildPhase)
                             ? (
                               <span
-                                className="thinking-phase-label"
+                                className="sr-only"
                                 role="status"
                                 aria-live="polite"
                               >
@@ -1395,7 +1399,7 @@ function MainApp({ theme, setTheme }) {
                               </span>
                             )
                             : swarmVisible && (
-                              <span className="thinking-phase-label">
+                              <span className="sr-only" role="status" aria-live="polite">
                                 Swarm planning…
                               </span>
                             )}

@@ -3,10 +3,10 @@
  *
  * A build can legitimately run for minutes: the model reasons before its first
  * visible token, and the harness then verifies, repairs and reviews the
- * artifact. The stream itself is silent during most of that, so the UI must say
- * which step is running instead of showing an unexplained spinner. Unknown
- * phases return an empty string so a new server phase can never render a raw
- * identifier to the user.
+ * artifact. The stream itself is silent during most of that, so the label is
+ * announced through the thinking indicator's live region - the row itself stays
+ * just the animated dots. Unknown phases return an empty string so a new server
+ * phase can never read a raw identifier aloud.
  */
 
 const PHASE_LABELS = Object.freeze({

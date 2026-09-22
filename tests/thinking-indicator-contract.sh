@@ -33,6 +33,8 @@ check_absent 'completed app action no longer uses thinking pill class' 'thinking
 check 'completed app action is labelled Open preview' 'Open preview' "$message"
 check 'temporary thinking state renders animated dot container' 'thinking-dots' "$app"
 check 'thinking state exposes the build phase label' 'buildPhaseLabel\(buildPhase\)' "$app"
+check_absent 'thinking state no longer prints the phase beside the dots' 'thinking-phase-label' "$app"
+check_absent 'phase label styling is gone' 'thinking-phase-label' "$css"
 check 'thinking state keeps an accessible control label' 'Expand response|Collapse response' "$app"
 check 'dot animation keyframes exist' '@keyframes thinkingDotPulse' "$css"
 check 'three thinking dots are styled' 'thinking-dot' "$css"
