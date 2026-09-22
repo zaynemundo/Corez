@@ -160,10 +160,8 @@ function LegalChrome({ currentId, children }) {
             </Link>
           ))}
         </nav>
-        {/* The policies are the public front door, so the header carries the
-            way back into the product: pricing and sign-in for a visitor, and
-            the app itself once they are signed in. The "back" link is left off
-            the index, where it would only point at the page you are reading. */}
+        {/* The header carries the way back into the product: pricing and
+            sign-in for a visitor, and the app itself once they are signed in. */}
         <div className="legal-nav-actions">
           <Link className="legal-back" to="/pricing">
             Pricing
@@ -171,12 +169,10 @@ function LegalChrome({ currentId, children }) {
           <Link className="legal-back" to="/login">
             Sign in
           </Link>
-          {currentId ? (
-            <Link className="legal-back" to="/">
-              <ArrowLeft size={14} strokeWidth={1.75} aria-hidden="true" />
-              Back to Corez
-            </Link>
-          ) : null}
+          <Link className="legal-back" to="/">
+            <ArrowLeft size={14} strokeWidth={1.75} aria-hidden="true" />
+            Back to Corez
+          </Link>
         </div>
       </header>
 
@@ -362,45 +358,3 @@ export default function Legal({ docId }) {
   );
 }
 
-export function LegalIndex() {
-  useEffect(() => {
-    const previousTitle = window.document.title;
-    window.document.title = "Policies and terms · Corez";
-    return () => {
-      window.document.title = previousTitle;
-    };
-  }, []);
-
-  return (
-    <LegalChrome currentId="">
-      <main className="legal-main">
-        <div className="legal-head">
-          <p className="legal-eyebrow">Legal</p>
-          <h1>Policies and terms</h1>
-          <p className="legal-summary">
-            Everything that governs your use of Corez, written to be read rather
-            than skipped.
-          </p>
-          <p className="legal-meta">Last updated {LEGAL_UPDATED}</p>
-        </div>
-        <ul className="legal-related-list legal-index-list">
-          {LEGAL_ORDER.map((id) => {
-            const doc = LEGAL_DOCUMENTS[id];
-            const Icon = DOC_ICONS[id] || FileText;
-            return (
-              <li key={id}>
-                <Link to={`/${id}`}>
-                  <Icon size={18} strokeWidth={1.5} aria-hidden="true" />
-                  <span>
-                    <strong>{doc.title}</strong>
-                    <em>{doc.short}</em>
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </main>
-    </LegalChrome>
-  );
-}

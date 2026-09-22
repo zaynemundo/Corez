@@ -6121,10 +6121,6 @@ h6 {
   line-height: 1.45;
 }
 
-.legal-index-list {
-  margin-top: 32px;
-}
-
 .legal-footer {
   border-top: 1px solid var(--border-color);
   padding: 28px 32px 40px;

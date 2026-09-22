@@ -17,7 +17,7 @@ import DropZoneOverlay from "./components/DropZoneOverlay";
 import Login from "./pages/Login";
 import { PaymentSuccess } from "./pages/PaymentStatus";
 import Pricing from "./pages/Pricing";
-import Legal, { LegalIndex } from "./pages/Legal";
+import Legal from "./pages/Legal";
 import CookieConsent from "./components/CookieConsent";
 import { startAnalytics, trackPageView } from "./services/analytics";
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -1461,10 +1461,11 @@ function MainApp({ theme, setTheme }) {
 
 // Legal pages must be reachable whether or not the visitor is signed in — a
 // policy you can only read after logging in is not a policy. Aliases keep the
-// longer spellings people and search engines use working.
+// longer spellings people and search engines use working. There is no index
+// page: the documents are reached from Settings, the sign-in footer and the
+// cookie banner, and they cross-link each other.
 function legalRoutes() {
   return [
-    <Route key="legal" path="/legal" element={<LegalIndex />} />,
     <Route key="privacy" path="/privacy" element={<Legal docId="privacy" />} />,
     <Route key="terms" path="/terms" element={<Legal docId="terms" />} />,
     <Route key="cookies" path="/cookies" element={<Legal docId="cookies" />} />,
@@ -1542,16 +1543,16 @@ function AppInner() {
     return null;
   }
   if (!user) {
-    // Public surface: the policies index is the front door, sign-in and
-    // pricing stay reachable from it, and every other logged-out path falls
-    // back to the policies index.
+    // Public surface: sign-in is the front door. Pricing stays reachable, the
+    // policies are linked from the sign-in footer and the cookie banner, and
+    // every other logged-out path falls back to sign-in.
     return (
       <Routes>
-        <Route path="/" element={<Navigate to="/legal" replace />} />
+        <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/login" element={<Login />} />
         {legalRoutes()}
-        <Route path="*" element={<Navigate to="/legal" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );
   }

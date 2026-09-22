@@ -1,8 +1,9 @@
 ﻿// @vitest-environment jsdom
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, cleanup, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import Legal, { LegalIndex } from '../src/pages/Legal.jsx';
+import Legal from '../src/pages/Legal.jsx';
+import SettingsModal from '../src/components/SettingsModal.jsx';
 import {
   LEGAL_CONTACTS,
   LEGAL_DOCUMENTS,
@@ -20,7 +21,6 @@ const KNOWN_ROUTES = new Set([
   '/',
   '/pricing',
   '/login',
-  '/legal',
   '/privacy',
   '/terms',
   '/cookies',
@@ -115,12 +115,7 @@ describe('legal documents', () => {
     expect(screen.getByRole('button', { name: /print or save as pdf/i })).toBeTruthy();
   });
 
-  it('lists all policies on the index and handles an unknown document', () => {
-    renderWithRouter(<LegalIndex />);
-    for (const id of LEGAL_ORDER) {
-      expect(screen.getAllByText(LEGAL_DOCUMENTS[id].title).length).toBeGreaterThan(0);
-    }
-    cleanup();
+  it('handles an unknown document', () => {
     renderWithRouter(<Legal docId="does-not-exist" />);
     expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/not found/i);
   });
@@ -145,10 +140,10 @@ describe('legal documents', () => {
     expect(screen.queryByText('home')).toBeNull();
   });
 
-  it('gives the index its own document title', () => {
+  it('gives each document its own document title', () => {
     const previous = document.title;
-    renderWithRouter(<LegalIndex />);
-    expect(document.title).toMatch(/Policies and terms/);
+    renderWithRouter(<Legal docId="cookies" />);
+    expect(document.title).toMatch(/Cookie Policy/);
     cleanup();
     document.title = previous;
   });
@@ -159,5 +154,67 @@ describe('legal documents', () => {
     const current = toc.querySelector('[aria-current="true"]');
     expect(current).toBeTruthy();
     expect(current.getAttribute('href')).toBe('#what-they-are');
+  });
+});
+
+// With no public policies index, Settings is the in-app path to the documents:
+// the Privacy category must list all four and route to them.
+describe('policies from Settings', () => {
+  const noop = () => {};
+
+  function renderSettings() {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).includes('/api/subscriptions/me')) {
+        return new Response(JSON.stringify({ plan: 'free' }), { status: 200 });
+      }
+      return new Response(null, { status: 404 });
+    });
+    return render(
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <SettingsModal
+                isOpen
+                onClose={noop}
+                onClearAllHistory={noop}
+                theme="dark"
+                onToggleTheme={noop}
+              />
+            }
+          />
+          <Route path="/terms" element={<div>terms-route</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+  }
+
+  function privacyPanel() {
+    fireEvent.click(screen.getByRole('tab', { name: /privacy/i }));
+    return within(screen.getByRole('tabpanel', { name: /privacy/i }));
+  }
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it('lists every policy and the cookie settings control in the Privacy category', () => {
+    renderSettings();
+    const panel = privacyPanel();
+    for (const name of ['Privacy Policy', 'Terms', 'Cookies', 'Refunds']) {
+      expect(panel.getByRole('button', { name }), `${name} missing from Settings`).toBeTruthy();
+    }
+    // The row shows "Cookie settings" visually; its accessible name is the
+    // more explicit "Open cookie preferences".
+    expect(panel.getByRole('button', { name: /open cookie preferences/i })).toBeTruthy();
+  });
+
+  it('closes the dialog and routes to the chosen document', () => {
+    renderSettings();
+    const panel = privacyPanel();
+    fireEvent.click(panel.getByRole('button', { name: 'Terms' }));
+    expect(screen.getByText('terms-route')).toBeTruthy();
   });
 });
