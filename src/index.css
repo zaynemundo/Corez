@@ -5449,6 +5449,20 @@ h6 {
   z-index: var(--z-background);
   pointer-events: none;
 }
+/* The scrim has to follow the theme, not the picture: a dark gradient under
+   light-theme text (#000 on white surfaces) left the sign-in page unreadable —
+   the card is transparent, so the document text sat straight on a darkened
+   photo. Light theme brightens the backdrop instead of dimming it. */
+[data-theme="light"] .auth-bg {
+  filter: blur(8px) saturate(0.92) brightness(1.08);
+}
+[data-theme="light"] .auth-bg-overlay {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.74) 0%,
+    rgba(255, 255, 255, 0.9) 100%
+  );
+}
 .auth-center {
   position: relative;
   z-index: var(--z-content);
@@ -5560,8 +5574,16 @@ h6 {
   width: 100%;
   max-width: 420px;
   margin: 0 auto;
-  background: transparent;
-  border: none;
+  /* The card carries its own surface. The backdrop is a photograph, so a
+     transparent card made every label's contrast depend on which part of the
+     picture happened to sit behind it - the light-theme form and the tall
+     mobile card both read as blank because of it. */
+  background: var(--bg-glass);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   padding: 32px;
 }
 .auth-logo {
