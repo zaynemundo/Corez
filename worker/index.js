@@ -3896,9 +3896,18 @@ function stripCorezBadge(html) {
 
 function injectCorezBadge(html) {
   const clean = stripCorezBadge(html);
-  const bodyClose = clean.toLowerCase().lastIndexOf("</body>");
+  const lower = clean.toLowerCase();
+  const bodyClose = lower.lastIndexOf("</body>");
   if (bodyClose !== -1) {
     return clean.slice(0, bodyClose) + COREZ_BADGE_HTML + clean.slice(bodyClose);
+  }
+  // No </body>: place the badge before </html> so it stays part of the
+  // document. Appending it AFTER the closing tag made it trailing text, which
+  // the serve-time HTML repair now strips as junk — the free-plan badge would
+  // silently disappear from a page the model closed without </body>.
+  const htmlClose = lower.lastIndexOf("</html>");
+  if (htmlClose !== -1) {
+    return clean.slice(0, htmlClose) + COREZ_BADGE_HTML + clean.slice(htmlClose);
   }
   return clean + COREZ_BADGE_HTML;
 }

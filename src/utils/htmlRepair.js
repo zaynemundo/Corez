@@ -9,6 +9,55 @@
 // modes before the artifact is previewed, stored, or published. It is kept
 // in sync with worker/htmlRepair.js (same logic, no imports).
 
+// What a document may legitimately carry AFTER its closing </html>: whitespace,
+// comments (page markers), stray closing tags, and a trailing script/style
+// block. Anything else is model commentary — prose, a markdown "Verification
+// checklist", a stray code fence — and browsers happily render it as page text.
+// The old heuristic kept the tail whenever it merely CONTAINED a tag-like token
+// ("open with `<!DOCTYPE html>`, include `<head>` …" names tags while staying
+// prose), so a checklist printed itself at the bottom of the page.
+const DOCUMENT_TAIL_PATTERN =
+  /^(?:\s|<!--[\s\S]*?-->|<\/[a-z][a-z0-9-]*\s*>|<script\b[\s\S]*?<\/script\s*>|<style\b[\s\S]*?<\/style\s*>)*$/i;
+
+// The structural close of a real document.
+const STRUCTURAL_CLOSE_PATTERN = /<\/body\s*>\s*(?:<!--[\s\S]*?-->\s*)*<\/html\s*>/gi;
+
+// Commentary that starts another page or another document is not commentary.
+const FOLLOWING_DOCUMENT_PATTERN = /^\s*(?:<!DOCTYPE\s+html|<html[\s>])|<!--\s*PAGE:/i;
+
+// Platform-injected markup (the free-plan "Made with Corez" badge) is never
+// model commentary and must survive the tail trim.
+const PLATFORM_BADGE_PATTERN = /<!--\s*corez-badge:start/i;
+
+// Drop everything after the final </html> unless it is document-shaped markup.
+export function stripJunkAfterDocumentEnd(html) {
+  if (!html || typeof html !== "string") return html;
+  const lastEnd = html.toLowerCase().lastIndexOf("</html>");
+  if (lastEnd === -1) return html;
+
+  // Anchor on the last structural </body></html>. A model that quotes the tag
+  // inside its closing prose ("… and close with `</html>`") leaves a bare end
+  // tag in the commentary, and a document cannot end there — anchoring on the
+  // last </html> alone picked that one up and kept every note above it.
+  let end = lastEnd + "</html>".length;
+  STRUCTURAL_CLOSE_PATTERN.lastIndex = 0;
+  let match;
+  let structuralEnd = -1;
+  while ((match = STRUCTURAL_CLOSE_PATTERN.exec(html)) !== null) {
+    structuralEnd = match.index + match[0].length;
+  }
+  if (structuralEnd !== -1 && structuralEnd < end) end = structuralEnd;
+
+  const tail = html.slice(end);
+  if (!tail.trim() || DOCUMENT_TAIL_PATTERN.test(tail)) return html;
+  // Platform-injected markup (the free-plan badge) is not model commentary.
+  if (PLATFORM_BADGE_PATTERN.test(tail)) return html;
+  // Text that opens another document or page is a multi-page artifact, not
+  // trailing commentary: leave it for the page splitter.
+  if (FOLLOWING_DOCUMENT_PATTERN.test(tail)) return html;
+  return html.slice(0, end);
+}
+
 // JS body hints: lines that can only be JavaScript, not markup.
 const JS_LINE_START =
   /^\s*(\/\/|const\s+|let\s+|var\s+|function\s+|async\s+function\s+|document\.|window\.|\(function\s*\(|\(\s*\(|\$\()/;
@@ -209,16 +258,11 @@ export function repairMalformedHtml(html) {
     out = wrapOrphanBlocks(out);
   }
 
-  // 4. Junk after the final </html> (stray "<fpoq/>", stray "}", fragments).
-  //    Browsers keep rendering text after </html>, so a stray fragment would
+  // 4. Junk after the final </html> (stray "<fpoq/>", stray "}", fragments,
+  //    markdown commentary). Browsers keep rendering text after </html>, so a
+  //    stray fragment — or the model's "Verification checklist" prose — would
   //    appear at the bottom of the page.
-  const lastHtmlClose = out.lastIndexOf("</html>");
-  if (lastHtmlClose !== -1) {
-    const tail = out.slice(lastHtmlClose + "</html>".length);
-    if (tail.trim() && !/<[a-z][a-z0-9-]*[\s>]/.test(tail)) {
-      out = out.slice(0, lastHtmlClose + "</html>".length);
-    }
-  }
+  out = stripJunkAfterDocumentEnd(out);
 
   // 5. Truncation repair: deterministically close truncated documents.
   //    When the provider hits a token limit, the HTML often ends mid-script/style

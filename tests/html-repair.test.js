@@ -129,6 +129,33 @@ p{color:red}
         expect(repair(GOOD_DOC + '<fpoq/>}')).toBe(GOOD_DOC);
       });
 
+      it('strips a markdown checklist that follows the final </html>', () => {
+        // Prose about a document names its tags, so the tail looks tag-like
+        // while staying commentary. It used to survive the trim and print
+        // itself at the bottom of the previewed and published page.
+        const checklist = `
+**Verification checklist**
+- **Complete documents:** all 8 pages open with \`<!DOCTYPE html>\`, include \`<head>\`, \`<body>\`, and close with \`</html>\`.
+- **Links:** every anchor is a plain relative path.`;
+        expect(repair(GOOD_DOC + checklist)).toBe(GOOD_DOC);
+      });
+
+      it('keeps a trailing script block and page marker comments', () => {
+        const tail = '\n<script>window.ready = true;</script>\n<!-- PAGE: about.html -->';
+        expect(repair(GOOD_DOC + tail)).toBe(GOOD_DOC + tail);
+      });
+
+      it('keeps the platform badge even when it sits after the document', () => {
+        // Older free-plan pages were stored with the badge appended after
+        // </html> (the publish code had no </body> to anchor on). The badge is
+        // platform markup, not model commentary, so serving must not strip it.
+        const legacyBadge =
+          '\n<!-- corez-badge:start --><style>.corez-badge{position:fixed}</style>' +
+          '<a href="https://corez.pro/?ref=badge" rel="noopener">Made with Corez</a>' +
+          '<!-- corez-badge:end -->';
+        expect(repair(GOOD_DOC + legacyBadge)).toBe(GOOD_DOC + legacyBadge);
+      });
+
       it('never touches React/JSX code', () => {
         const jsx = `import React from 'react';
 const App = () => <div className="a">{'</script>'}</div>;
@@ -141,5 +168,9 @@ export default App;`;
   it('worker and client copies behave identically', () => {
     expect(clientRepair(BROKEN_SCRIPT)).toBe(workerRepair(BROKEN_SCRIPT));
     expect(clientRepair(GOOD_DOC)).toBe(workerRepair(GOOD_DOC));
+    const withChecklist = `${GOOD_DOC}
+**Verification checklist**
+- **Links:** every anchor is a plain relative path.`;
+    expect(clientRepair(withChecklist)).toBe(workerRepair(withChecklist));
   });
 });

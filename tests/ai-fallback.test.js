@@ -814,6 +814,37 @@ Fullscreen
     expect(htmlCode).toContain('<h1>App</h1>');
   });
 
+  it('never leaves the model\'s post-document commentary in the extracted artifact', () => {
+    // The observed failure: the model ships the whole site and then writes a
+    // markdown "Verification checklist" after the last </html>. A browser
+    // renders that text at the bottom of the page, so the extracted artifact
+    // must end at its closing tag.
+    const checklist = `**Verification checklist**
+- **Complete documents:** all 8 pages open with \`<!DOCTYPE html>\`, include \`<head>\`, \`<body>\`, and close with \`</html>\`.
+- **Links:** every anchor is a plain relative path.`;
+
+    const unfenced = `<!-- PAGE: index.html -->
+<!DOCTYPE html><html><body><h1>Home</h1></body></html>
+<!-- PAGE: about.html -->
+<!DOCTYPE html><html><body><h1>About</h1></body></html>
+
+${checklist}`;
+    const unfencedCode = extractCodeFromMessage(unfenced);
+    expect(unfencedCode).not.toMatch(/Verification checklist/i);
+    expect(unfencedCode.endsWith('</html>')).toBe(true);
+    expect(unfencedCode).toContain('<!-- PAGE: index.html -->');
+
+    // Same shape behind an unterminated fence (a long answer that ran out of
+    // tokens), and for a single-page document.
+    const truncated = `Here is your site:\n\n\`\`\`html\n<!-- PAGE: index.html -->\n<!DOCTYPE html><html><body><h1>Home</h1></body></html>\n\n${checklist}`;
+    expect(extractCodeFromMessage(truncated)).not.toMatch(/Verification checklist/i);
+
+    const singlePage = `<html><body><h1>App</h1></body></html>\n\n${checklist}`;
+    const singleCode = extractCodeFromMessage(singlePage);
+    expect(singleCode).not.toMatch(/Verification checklist/i);
+    expect(singleCode.endsWith('</html>')).toBe(true);
+  });
+
   it('preserves PAGE markers the model places BETWEEN separate fenced blocks', () => {
     // The model frequently emits ONE fence per page with the multi-page
     // markers sitting between the fences. Dropping those markers collapsed

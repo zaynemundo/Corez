@@ -3,7 +3,7 @@
  * ready to be rendered safely inside an iframe.
  */
 
-import { repairMalformedHtml } from "./htmlRepair.js";
+import { repairMalformedHtml, stripJunkAfterDocumentEnd } from "./htmlRepair.js";
 
 // Multi-page site support: the model may emit multiple full HTML documents
 // inside ONE code block, separated by page markers:
@@ -30,6 +30,24 @@ const MULTI_PAGE_HEADER_PATTERN = /^\s*<!--\s*CORESITE-PAGES:[\s\S]*?-->\s*$/gm;
 const DOCUMENT_START_PATTERN = /<!DOCTYPE\s+html[^>]*>|<html[\s>]/i;
 
 /**
+ * A page is exactly one HTML document. Models routinely keep writing after the
+ * last `</html>`: a markdown "Verification checklist", a summary paragraph, a
+ * stray code fence. Browsers render all of that as page text, so an untrimmed
+ * page showed the model's notes at the bottom of the preview and of the
+ * published site. This normaliser slices a page from its document start
+ * (dropping any prose or fence line before it) and cuts the commentary that
+ * trails its closing tag. Documents missing the closing tag are left intact so
+ * the truncation repair still sees them.
+ */
+export function normalizePageDocument(html) {
+  if (!html || typeof html !== "string") return "";
+  let out = html;
+  const start = DOCUMENT_START_PATTERN.exec(out);
+  if (start && start.index > 0) out = out.slice(start.index);
+  return stripJunkAfterDocumentEnd(out).trim();
+}
+
+/**
  * The model routinely writes the home page straight into the code block and
  * only starts emitting `<!-- PAGE: ... -->` markers from the SECOND document.
  * The text before the first marker is then a complete page, not preamble junk,
@@ -41,7 +59,7 @@ function extractLeadingPageDocument(preamble) {
   const cleaned = preamble.replace(MULTI_PAGE_HEADER_PATTERN, "");
   const start = cleaned.search(DOCUMENT_START_PATTERN);
   if (start === -1) return "";
-  return cleaned.slice(start).trim();
+  return normalizePageDocument(cleaned.slice(start));
 }
 
 /**
@@ -65,26 +83,34 @@ export function parseMultiPageSite(rawCode) {
   if (!hasMarker) {
     return {
       isMultiPage: false,
-      pages: [{ name: "index.html", html: trimmed }],
+      pages: [{ name: "index.html", html: normalizePageDocument(trimmed) }],
     };
   }
 
   const segments = trimmed.split(MULTI_PAGE_MARKER_PATTERN);
   // segments = [preamble, name1, html1, name2, html2, ...]
   const pages = [];
+  const seenNames = new Set();
   let totalBytes = 0;
 
   for (let i = 1; i + 1 < segments.length; i += 2) {
     const name = segments[i].trim();
     if (!MULTI_PAGE_NAME_PATTERN.test(name)) continue;
+    // A duplicated emission of the same page (the model restarts and writes
+    // the whole site twice) must not turn into two preview tabs: the first
+    // complete version of a page wins.
+    if (seenNames.has(name)) continue;
 
-    let html = segments[i + 1].replace(MULTI_PAGE_HEADER_PATTERN, "").trim();
+    const html = normalizePageDocument(
+      segments[i + 1].replace(MULTI_PAGE_HEADER_PATTERN, ""),
+    );
     if (!html) continue;
     if (pages.length >= MAX_MULTI_PAGE_COUNT) break;
 
     totalBytes += html.length;
     if (totalBytes > MAX_MULTI_PAGE_TOTAL_BYTES) break;
 
+    seenNames.add(name);
     pages.push({ name, html });
   }
 
@@ -107,7 +133,7 @@ export function parseMultiPageSite(rawCode) {
   if (pages.length === 0) {
     return {
       isMultiPage: false,
-      pages: [{ name: "index.html", html: trimmed }],
+      pages: [{ name: "index.html", html: normalizePageDocument(trimmed) }],
     };
   }
 
@@ -460,10 +486,14 @@ export function formatCodeForPreview(rawCode) {
   const trimmed = repairMalformedHtml(rawCode.trim());
   const stripped = trimmed.replace(/^(?:\s*<!--[\s\S]*?-->\s*)+/i, "").trim();
 
-  // 1. If it's already a full HTML document, return as-is
+  // 1. If it's already a full HTML document, return as-is. The page is
+  //    normalised to its own document first: commentary the model left after
+  //    the closing </html> renders as page text, and the preview iframe is the
+  //    last place before a user sees it.
   if (/^<!DOCTYPE html/i.test(stripped) || /^<html/i.test(stripped)) {
+    const page = normalizePageDocument(trimmed) || trimmed;
     return withPreviewCsp(
-      injectNavigationGuard(injectFullscreenGamePatch(trimmed)),
+      injectNavigationGuard(injectFullscreenGamePatch(page)),
     );
   }
 

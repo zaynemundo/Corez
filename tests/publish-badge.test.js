@@ -151,4 +151,25 @@ describe('free publishing with a Made with Corez badge', () => {
     expect(res.status).toBe(200);
     expect((await res.json()).badge).toBe(true);
   });
+
+  it('keeps the badge on a page that closes without </body>', async () => {
+    // The badge must sit INSIDE the document: appended after </html> it is
+    // trailing text, and the serve-time repair strips trailing text as junk.
+    const bucket = memoryBucket();
+    const htmlWithoutBody = '<!DOCTYPE html><html><head><title>No body</title></head><h1>Hi</h1></html>';
+    const res = await publish({ ASSET_BUCKET: bucket }, { title: 'No body', html: htmlWithoutBody });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+
+    const record = JSON.parse(bucket.map.get(`publish/${data.slug}.json`).value);
+    expect(record.html.indexOf('corez-badge:start')).toBeLessThan(record.html.indexOf('</html>'));
+
+    const served = await worker.fetch(
+      new Request(`https://corez.test/${data.slug}`, { method: 'GET' }),
+      { ASSET_BUCKET: bucket },
+    );
+    const servedHtml = await served.text();
+    expect(servedHtml).toContain('Made with Corez');
+    expect(servedHtml).toContain('<h1>Hi</h1>');
+  });
 });

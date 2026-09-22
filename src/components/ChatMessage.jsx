@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { extractCodeFromMessage } from "../services/aiService";
+import { stripJunkAfterDocumentEnd } from "../utils/htmlRepair";
 
 function safeImageUrl(url) {
   if (!url || typeof url !== "string") return "";
@@ -123,7 +124,7 @@ function extractUnfencedDeliverable(text) {
     .replace(/(?:\r?\n|^)\s*(?:Fullscreen|Preview)\s*$/i, "")
     .trim();
 
-  const code = text.slice(matchIdx).trim();
+  const code = stripJunkAfterDocumentEnd(text.slice(matchIdx)).trim();
   const isExecutable = isExecutableCodeBlock("html", code);
 
   if (!isExecutable) return null;

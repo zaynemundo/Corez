@@ -29,6 +29,17 @@ const UNMARKED_HOME_MULTI_PAGE_CODE = `<!DOCTYPE html><html><body><a href="about
 <!-- PAGE: contact.html -->
 <!DOCTYPE html><html><body><h1>Contact</h1></body></html>`;
 
+// The model finishes the site and keeps writing: a markdown checklist after
+// the last </html>. Browsers render text after </html>, so it shows up at the
+// bottom of the previewed and published page unless the page is trimmed.
+const MULTI_PAGE_CODE_WITH_COMMENTARY = `<!-- PAGE: index.html -->
+<!DOCTYPE html><html><body><h1>Home</h1><a href="about.html">About</a></body></html>
+<!-- PAGE: about.html -->
+<!DOCTYPE html><html><body><h1>About Us</h1></body></html>
+
+**Verification checklist**
+- **Links:** every anchor is a plain relative path.`;
+
 afterEach(cleanup);
 
 beforeEach(() => {
@@ -130,6 +141,28 @@ describe('CanvasPreview multi-page sites', () => {
     expect(iframe.getAttribute('srcdoc')).toContain('<h1>Home</h1>');
     expect(iframe.getAttribute('srcdoc')).not.toContain('<h1>About Us</h1>');
     expect(screen.queryByText(/Incomplete site/)).toBeNull();
+  });
+
+  it('never renders the model\'s post-document commentary in a page', () => {
+    // Regression: the model ended its answer with a markdown "Verification
+    // checklist" after the last </html>. A browser renders text after </html>,
+    // so the checklist printed itself at the bottom of the previewed page.
+    renderPreview(MULTI_PAGE_CODE_WITH_COMMENTARY);
+    const iframe = screen.getByTitle('Live Application Preview (Desktop)');
+    expect(iframe.getAttribute('srcdoc')).not.toMatch(/Verification checklist/i);
+    expect(iframe.getAttribute('srcdoc')).toContain('<h1>Home</h1>');
+  });
+
+  it('never publishes the model\'s post-document commentary either', async () => {
+    renderPreview(MULTI_PAGE_CODE_WITH_COMMENTARY);
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
+    await act(async () => {});
+    expect(publishAppInR2).toHaveBeenCalledTimes(1);
+    const payload = publishAppInR2.mock.calls[0][0];
+    for (const html of [payload.html, ...Object.values(payload.pages || {})]) {
+      expect(html).not.toMatch(/Verification checklist/i);
+      expect(html).toContain('<html');
+    }
   });
 
   it('publishes every page when the home document carries no marker', async () => {

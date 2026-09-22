@@ -45,6 +45,7 @@ import {
 import { buildAwwwardsDesignPrompt } from "../../packages/agent-core/context/designTokens.js";
 import { stripThinkingBlocks } from "../../packages/agent-core/providers/text.js";
 import { resolveSkills } from "../skills/resolver.js";
+import { stripJunkAfterDocumentEnd } from "../utils/htmlRepair.js";
 import { classifyExecutionMode } from "./executionModes.js";
 import { persistAndSummarize } from "./contextStore.js";
 import { fetchWebSearch } from "./searchService.js";
@@ -1723,6 +1724,13 @@ const MULTI_PAGE_MARKER_ANY_PATTERN =
 export function extractCodeFromMessage(text) {
   if (!text) return null;
 
+  // Every path below returns the artifact that the preview renders and the
+  // canvas edits. Models like to keep writing after the final </html> — a
+  // markdown "Verification checklist", a summary, a stray fence — and a
+  // browser renders that as page text, so the extracted artifact is cut at its
+  // closing tag before it leaves this function.
+  const finish = (code) => stripJunkAfterDocumentEnd(code).trim();
+
   const codeBlocks = text.match(
     /```(?:html|xml|jsx|tsx|js|javascript|react)?\s*([\s\S]*?)```/gi,
   );
@@ -1811,15 +1819,15 @@ export function extractCodeFromMessage(text) {
         lastFenceIdx > -1 ? text.slice(lastFenceIdx + 3).trim() : "";
       const ORPHANED_CLOSE = /^\s*(?:<\/(?:script|style|body|html)>\s*)+$/i;
       if (trailing && ORPHANED_CLOSE.test(trailing)) {
-        return joined + "\n" + trailing;
+        return finish(joined + "\n" + trailing);
       }
-      return joined;
+      return finish(joined);
     }
   }
 
   const matchAny = text.match(/```\s*([\s\S]*?)```/);
   if (matchAny && matchAny[1].trim()) {
-    return matchAny[1].trim();
+    return finish(matchAny[1]);
   }
 
   // Salvage truncated responses: a long generated app is often cut off
@@ -1857,7 +1865,7 @@ export function extractCodeFromMessage(text) {
       code.includes("import ") ||
       code.includes("const ")
     ) {
-      return code;
+      return finish(code);
     }
   }
 
@@ -1874,7 +1882,7 @@ export function extractCodeFromMessage(text) {
       candidate.includes("<body") ||
       candidate.includes("<head")
     ) {
-      return candidate;
+      return finish(candidate);
     }
   }
 
@@ -1888,7 +1896,7 @@ export function extractCodeFromMessage(text) {
       candidate.includes("<style") ||
       candidate.includes("<script")
     ) {
-      return candidate;
+      return finish(candidate);
     }
   }
 
@@ -1899,7 +1907,7 @@ export function extractCodeFromMessage(text) {
     (/\.getContext\s*\(/i.test(text) || /requestAnimationFrame/i.test(text))
   ) {
     const candidate = text.slice(canvasIdx).trim();
-    return candidate;
+    return finish(candidate);
   }
 
   return null;

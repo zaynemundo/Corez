@@ -370,6 +370,84 @@ describe('parseMultiPageSite', () => {
     }
   });
 
+  it('never carries the model\'s post-document commentary into a page', () => {
+    // The model finishes the site and then keeps writing: a markdown
+    // "Verification checklist" after the last </html>. Browsers render text
+    // after </html>, so an untrimmed page showed the checklist at the bottom
+    // of the preview (and of the published site).
+    const code = `<!-- PAGE: index.html -->
+<!DOCTYPE html><html><body><h1>Home</h1><a href="about.html">About</a></body></html>
+
+<!-- PAGE: about.html -->
+<!DOCTYPE html><html><body><h1>About</h1></body></html>
+
+**Verification checklist**
+- **Complete documents:** all 8 pages open with \`<!DOCTYPE html>\`, include \`<head>\`, \`<body>\`, and close with \`</html>\`.
+- **Links:** every anchor is a plain relative path.`;
+
+    const result = parseMultiPageSite(code);
+    expect(result.pages.map((p) => p.name)).toEqual(['index.html', 'about.html']);
+    for (const page of result.pages) {
+      expect(page.html).not.toMatch(/Verification checklist/i);
+      expect(page.html.endsWith('</html>')).toBe(true);
+    }
+  });
+
+  it('drops commentary that lands between two pages', () => {
+    const code = `<!-- PAGE: index.html -->
+<!DOCTYPE html><html><body><h1>Home</h1></body></html>
+
+Here is a note about the next page that must not render anywhere.
+
+<!-- PAGE: about.html -->
+<!DOCTYPE html><html><body><h1>About</h1></body></html>`;
+
+    const result = parseMultiPageSite(code);
+    expect(result.pages.map((p) => p.name)).toEqual(['index.html', 'about.html']);
+    expect(result.pages[0].html).not.toContain('must not render anywhere');
+    expect(result.pages[0].html.endsWith('</html>')).toBe(true);
+  });
+
+  it('keeps document-shaped markup that follows the closing tag', () => {
+    // A stray closing tag or a script block after </html> is still markup the
+    // browser runs; only prose and fences are commentary.
+    const code = `<!-- PAGE: index.html -->
+<!DOCTYPE html><html><body><h1>Home</h1></body></html>
+<script>window.homeReady = true;</script>
+<!-- PAGE: about.html -->
+<!DOCTYPE html><html><body><h1>About</h1></body></html>
+</body></html>`;
+
+    const result = parseMultiPageSite(code);
+    expect(result.pages[0].html).toContain('window.homeReady = true;');
+    expect(result.pages[1].html.endsWith('</html>')).toBe(true);
+  });
+
+  it('keeps the first version when the model emits a page twice', () => {
+    // A duplicated emission (the model restarts and writes the whole site
+    // again) must not become two preview entries with the same name.
+    const code = `<!-- PAGE: index.html -->
+<!DOCTYPE html><html><body><h1>Home</h1></body></html>
+<!-- PAGE: about.html -->
+<!DOCTYPE html><html><body><h1>About</h1></body></html>
+<!-- PAGE: index.html -->
+<!DOCTYPE html><html><body><h1>Home (second copy)</h1></body></html>`;
+
+    const result = parseMultiPageSite(code);
+    expect(result.pages.map((p) => p.name)).toEqual(['index.html', 'about.html']);
+    expect(result.pages[0].html).toContain('<h1>Home</h1>');
+    expect(result.pages[0].html).not.toContain('Home (second copy)');
+  });
+
+  it('trims commentary from a single-page document too', () => {
+    const result = parseMultiPageSite(
+      '<!DOCTYPE html><html><body><h1>Single</h1></body></html>\n\nAll checks passed.'
+    );
+    expect(result.isMultiPage).toBe(false);
+    expect(result.pages[0].html).not.toContain('All checks passed');
+    expect(result.pages[0].html.endsWith('</html>')).toBe(true);
+  });
+
   it('formats each page independently through the preview pipeline', () => {
     const result = parseMultiPageSite(multiPageCode);
     const formatted = formatCodeForPreview(result.pages[1].html);
