@@ -39,7 +39,6 @@ their own idempotent DDL:
 - `worker/auth.js` → `users` (+ plan/subscription/consent columns), `invite_codes`, `chats`, `chat_messages`, `password_resets`
 - `worker/subscriptions.js` → `subscriptions` + `users.subscription_*`
 - `worker/usage.js` → usage counters
-- `worker/addons.js` → `addon_balances`, `addon_purchases`
 - `worker/analytics.js` → the analytics table
 - `worker/customDomains.js` → domain records
 

@@ -210,7 +210,6 @@ export default {
       "/api/task",
       "/api/context",
       "/api/usage",
-      "/api/addons",
       // Payment-intent creation/reads use the server's Ziina key: only the
       // signed-in account that is checking out may call them. (There is no
       // public webhook route here; settlement is reconciled server-side.)

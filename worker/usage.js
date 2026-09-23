@@ -265,9 +265,9 @@ export async function consumeUsage(
 }
 
 /**
- * Inspect a metric without spending it, so a caller can decide whether to fall
- * back to an add-on credit instead of counting against the plan. Mirrors
- * consumeUsage's evaluation so the two can never disagree about the wall.
+ * Inspect a metric without spending it, so a caller can gate a request before
+ * doing expensive work. Mirrors consumeUsage's evaluation so the two can never
+ * disagree about the wall.
  */
 export async function checkUsage(env, uid, { metric, plan = "free", extra = {} } = {}) {
   if (!meteringEnabled(env) || !uid) {

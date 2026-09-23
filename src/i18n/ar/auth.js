@@ -61,18 +61,13 @@ export default {
     success: "تمت إعادة تعيين كلمة المرور. يمكنك الآن تسجيل الدخول.",
   },
 
-  // Payment status screen shown after a Ziina checkout or add-on purchase.
+  // Payment status screen shown after a Ziina checkout.
   status: {
     brandPayment: "Corez — الدفع",
     verifying: "جارٍ التحقق من الدفع…",
     success: "تم الدفع بنجاح ✓",
     issue: "مشكلة في الدفع",
     checking: "جارٍ التحقق من اشتراكك…",
-    addonLabel: "الحزم الإضافية",
-    creditsUnit: "نقطة",
-    addonVerified: "تم التحقق — أُضيفت {credits} {unit} إلى رصيد {label}.",
-    addonAlready: "تمت إضافة هذه النقاط مسبقاً.",
-    paymentNotCompleted: "لم يكتمل الدفع بعد.",
     verifyFailedSupport: "فشل التحقق. يرجى التواصل مع الدعم.",
     verifyFailed: "فشل التحقق",
     planYearly:

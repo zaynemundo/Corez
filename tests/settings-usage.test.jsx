@@ -49,13 +49,6 @@ function mockApi({ usage = usagePayload(), usageStatus = 200 } = {}) {
     if (target === '/api/publish') {
       return new Response(JSON.stringify({ pages: [], truncated: false }), { status: 200 });
     }
-    if (target === '/api/addons') {
-      // The panel also loads the add-on catalogue; this suite is about usage.
-      return new Response(
-        JSON.stringify({ enabled: true, skus: [], balances: {}, purchases: [], settledNow: [] }),
-        { status: 200 },
-      );
-    }
     return new Response(null, { status: 404 });
   });
 }

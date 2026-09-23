@@ -62,18 +62,13 @@ export default {
     success: "Password has been reset. You can now login.",
   },
 
-  // Payment status screen shown after a Ziina checkout or add-on purchase.
+  // Payment status screen shown after a Ziina checkout.
   status: {
     brandPayment: "Corez — Payment",
     verifying: "Verifying payment…",
     success: "Payment successful ✓",
     issue: "Payment issue",
     checking: "Checking your subscription…",
-    addonLabel: "Add-on",
-    creditsUnit: "credits",
-    addonVerified: "Verified — {credits} {unit} added to your {label} balance.",
-    addonAlready: "These credits were already added.",
-    paymentNotCompleted: "Payment is not completed yet.",
     verifyFailedSupport: "Verification failed. Please contact support.",
     verifyFailed: "Verification failed",
     planYearly:

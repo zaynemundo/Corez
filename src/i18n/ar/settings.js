@@ -34,22 +34,6 @@ export default {
 
   billing: {
     title: "الخطة والفواتير",
-    addons: "حزم إضافية",
-    addonsOneOff: "دفعة واحدة، بعملة AED",
-    addonsLede:
-      "سعة إضافية تُضاف إلى خطتك وتبقى حتى تستخدمها. كما تغطي الحزمة العمل بعد استنفاد الميزانية الشهرية للخطة.",
-    paymentsNotConfigured:
-      "لم تُهيَّأ المدفوعات على هذا النشر، لذا لا يمكن شراء الحزم من هنا.",
-    buyTitle: "اشترِ {credits} {unit} مقابل {price}",
-    notAvailableYet: "غير متاح بعد",
-    opening: "جارٍ الفتح…",
-    buy: "شراء",
-    soon: "قريباً",
-    purchaseSettledOne: "اكتملت {count} عملية شراء — أُضيفت النقاط.",
-    purchaseSettledOther: "اكتملت {count} عمليات شراء — أُضيفت النقاط.",
-    purchaseStartFailed: "تعذّر بدء عملية الشراء.",
-    checkoutLinkMissing:
-      "لم تُرجع صفحة الدفع رابط إتمام الشراء. لم يُخصم أي مبلغ — يرجى المحاولة مرة أخرى.",
     usageTitle: "الاستخدام هذا الشهر",
     metricUsed: "استخدام {metric}",
     resets: "يتجدد في {date}",
@@ -59,7 +43,6 @@ export default {
     limitSuffix: " من {limit}",
     limitUsed: "لقد استنفدت أحد حدود هذه الخطة.",
     limitNear: "أنت قريب من أحد حدود هذه الخطة.",
-    buyPack: "اشترِ {credits} {unit}",
     comparePlans: "مقارنة الخطط",
     planExpired: "{plan} (منتهية)",
     planScheduled: "{plan} (مجدولة)",

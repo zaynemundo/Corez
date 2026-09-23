@@ -1,6 +1,6 @@
 ---
 name: usage-metering
-description: Use when changing plan quotas, monthly limits, the usage counters, 402 quota responses, add-on credit packs, or when a user is wrongly blocked or wrongly allowed past a limit. Not for the payment and plan-granting flow - use `payments-billing`; not for auth or session checks - use `auth-sessions`.
+description: Use when changing plan quotas, monthly limits, the usage counters, 402 quota responses, or when a user is wrongly blocked or wrongly allowed past a limit. Not for the payment and plan-granting flow - use `payments-billing`; not for auth or session checks - use `auth-sessions`.
 ---
 
 # Usage Metering & Limits
@@ -9,7 +9,6 @@ description: Use when changing plan quotas, monthly limits, the usage counters, 
 
 - Changing what a plan is allowed to do (messages, builds, images, publishes).
 - Working on the usage counters, the monthly period, or the `402` response.
-- Add-on packs: buying, spending, or the credit ledger.
 - A bug where a user is blocked despite having quota, or allowed past it.
 
 ## When not to use
@@ -23,7 +22,6 @@ description: Use when changing plan quotas, monthly limits, the usage counters, 
 | Concern | File |
 | --- | --- |
 | Plan limits, counters, quota gate | `worker/usage.js` |
-| Add-on SKUs, balances, purchases | `worker/addons.js` |
 | Plan gate for a specific feature (example) | `worker/customDomains.js` |
 
 ## The two halves of a plan
@@ -64,18 +62,6 @@ is never accidentally unlimited. That is the safe default - keep it.
   counter. Do not build logic that assumes exact token counts.
 - A refused request must not increment the counter.
 
-## Add-on packs
-
-Add-ons exist so a limit is never a dead end: when a plan's monthly budget for a
-metric is exhausted, a purchased pack is spent before refusing.
-
-- Credits are granted **only** when the payment provider reports the payment
-  completed, and the ledger makes the grant idempotent - a replayed webhook must
-  not double-credit.
-- A SKU whose pipeline does not exist yet is listed but not purchasable.
-- Without a database or without the payment key, nothing is purchasable and the
-  API must say so plainly rather than failing silently.
-
 ## Degradation, not breakage
 
 Nothing is metered when there is no database bound, and nothing is ever blocked
@@ -91,8 +77,6 @@ it. Use it to isolate whether a bug is metering-related.
 ```bash
 npx vitest run tests/usage-metering-contract.mjs
 ```
-
-Add-ons: `node tests/addons-contract.mjs`.
 
 When you change a limit, assert **both** sides: the request at the limit is
 refused with `402`, and the request just below it succeeds. A test that only

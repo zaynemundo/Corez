@@ -21,7 +21,6 @@ import {
   normalizePlan,
   usageSummary,
 } from "./usage.js";
-import { handleAddonsApi, spendAddonCredit } from "./addons.js";
 import {
   safeErrorDetail,
   readBoundedJson,
@@ -1269,7 +1268,6 @@ async function handleAi(request, env) {
   // requests are not generations (they name a chat after the turn) but they do
   // spend tokens, so they are metered without being gated.
   const isResearchRequest = !isTitleRequest && isDeepResearchRequest(prompt, body);
-  let addonCreditUsed = null;
   if (!isTitleRequest) {
     const messagesCheck = await checkUsage(env, uid, { metric: "messages", plan });
     if (!messagesCheck.allowed && messagesCheck.limit !== null) {
@@ -1284,11 +1282,7 @@ async function handleAi(request, env) {
     if (isResearchRequest) {
       const research = await checkUsage(env, uid, { metric: "research_reports", plan });
       if (!research.allowed && research.limit !== null) {
-        const credit = await spendAddonCredit(env, uid, "research_reports");
-        if (!credit.spent) {
-          return limitResponse("research_reports", research, plan);
-        }
-        addonCreditUsed = credit;
+        return limitResponse("research_reports", research, plan);
       }
     }
     const tokensLeft = await checkUsage(env, uid, { metric: "tokens", plan });
@@ -1299,8 +1293,7 @@ async function handleAi(request, env) {
       messages: 1,
       tokens: requestTokensEstimate,
       ...(isHarnessRequest ? { swarm_runs: 1 } : {}),
-      // A credit already paid for this report, so the plan counter stays put.
-      ...(isResearchRequest && !addonCreditUsed ? { research_reports: 1 } : {}),
+      ...(isResearchRequest ? { research_reports: 1 } : {}),
     });
   }
 
@@ -2879,12 +2872,7 @@ async function meterImageRequest(request, env) {
     return null;
   }
   if (check.limit !== null) {
-    // Out of plan images: a purchased pack can take over.
-    const credit = await spendAddonCredit(env, uid, "images");
-    if (!credit.spent) {
-      return limitResponse("images", check, plan);
-    }
-    return null;
+    return limitResponse("images", check, plan);
   }
   return null;
 }
@@ -4700,9 +4688,6 @@ export default {
     }
     if (pathname === "/api/usage") {
       return runJsonSafe(() => handleUsageApi(request, env));
-    }
-    if (pathname.startsWith("/api/addons")) {
-      return runJsonSafe(() => handleAddonsApi(request, env));
     }
     if (pathname.startsWith("/api/assets")) {
       return runJsonSafe(() => handleR2Assets(request, env));

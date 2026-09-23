@@ -35,22 +35,6 @@ export default {
 
   billing: {
     title: "Plan & Billing",
-    addons: "Add-on packs",
-    addonsOneOff: "One-off, in AED",
-    addonsLede:
-      "Extra capacity on top of your plan, kept until you use it. A pack also covers work once the plan's own monthly budget is spent.",
-    paymentsNotConfigured:
-      "Payments are not configured on this deployment, so packs cannot be bought here.",
-    buyTitle: "Buy {credits} {unit} for {price}",
-    notAvailableYet: "Not available yet",
-    opening: "Opening…",
-    buy: "Buy",
-    soon: "Soon",
-    purchaseSettledOne: "{count} purchase completed — credits added.",
-    purchaseSettledOther: "{count} purchases completed — credits added.",
-    purchaseStartFailed: "Could not start the purchase.",
-    checkoutLinkMissing:
-      "The payment page did not return a checkout link. Nothing was charged — please try again.",
     usageTitle: "Usage this month",
     metricUsed: "{metric} used",
     resets: "Resets {date}",
@@ -60,7 +44,6 @@ export default {
     limitSuffix: " / {limit}",
     limitUsed: "You have used up a limit on this plan.",
     limitNear: "You are close to a limit on this plan.",
-    buyPack: "Buy {credits} {unit}",
     comparePlans: "Compare plans",
     planExpired: "{plan} (expired)",
     planScheduled: "{plan} (scheduled)",
