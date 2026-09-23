@@ -1,4 +1,5 @@
 import { Archive, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
+import { useI18n } from "../i18n/index.jsx";
 
 export default function CompactedBanner({
   meta,
@@ -6,11 +7,13 @@ export default function CompactedBanner({
   onCollapse,
   isExpanded,
 }) {
+  const { t } = useI18n();
   if (!meta || !meta.isCompactSummary) return null;
   const count = meta.compactedCount || 0;
   const topics = Array.isArray(meta.topics) ? meta.topics.slice(0, 6) : [];
   const summaryLine =
-    meta.summaryLine || `${count} earlier messages summarized`;
+    meta.summaryLine ||
+    t("chat.message.compacted.summaryLine", { count });
   const persisted = meta.persisted;
 
   return (
@@ -49,7 +52,7 @@ export default function CompactedBanner({
           }}
         >
           <Archive size={13} strokeWidth={1.7} />
-          Compacted {count} messages
+          {t("chat.message.compacted.badge", { count })}
         </span>
         {topics.length > 0 && (
           <span
@@ -86,11 +89,12 @@ export default function CompactedBanner({
           >
             {isExpanded ? (
               <>
-                <ChevronUp size={13} /> Collapse
+                <ChevronUp size={13} /> {t("chat.message.compacted.collapse")}
               </>
             ) : (
               <>
-                <ChevronDown size={13} /> Show full history
+                <ChevronDown size={13} />{" "}
+                {t("chat.message.compacted.showFullHistory")}
               </>
             )}
           </button>
@@ -112,12 +116,12 @@ export default function CompactedBanner({
               fontStyle: "italic",
             }}
           >
-            (in-session only — refresh may lose older content)
+            {t("chat.message.compacted.inSessionOnly")}
           </span>
         )}
         {persisted && (
           <span style={{ marginLeft: "0.5rem", color: "var(--text-tertiary, var(--text-muted, #8a8a90))" }}>
-            (retrievable)
+            {t("chat.message.compacted.retrievable")}
           </span>
         )}
       </div>

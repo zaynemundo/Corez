@@ -212,7 +212,7 @@ check 'canvas iframe receives bounded max width from component' 'maxWidth: "100%
 check_absent 'canvas iframe does not force fixed device height' 'height: deviceSpecs\[deviceMode\]\.height' "$canvas"
 check_absent 'canvas iframe does not combine forced height with aspect ratio' 'aspectRatio: deviceSpecs\[deviceMode\]\.aspectRatio' "$canvas"
 check 'canvas source editor uses a reusable class' 'className="canvas-source-editor"' "$canvas"
-check 'canvas source editor is labelled for assistive tech' 'aria-label="Source code editor"' "$canvas"
+check 'canvas source editor is labelled for assistive tech' 'aria-label=\{t\("canvas\.header\.sourceEditor"\)\}' "$canvas"
 check 'mobile sidebar has a dismiss backdrop' 'isMobileViewport && sidebarOpen' "$app"
 check 'escape key closes the mobile sidebar' 'Escape' "$app"
 check 'collapsed sidebar is hidden from focus flow' 'visibility: hidden'

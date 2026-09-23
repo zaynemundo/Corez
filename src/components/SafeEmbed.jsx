@@ -12,6 +12,7 @@ import {
   subscribeConsent,
 } from "../services/consentService";
 import { track } from "../services/analytics";
+import { useI18n } from "../i18n/index.jsx";
 
 // Click-to-load third-party embed.
 //
@@ -28,6 +29,7 @@ export default function SafeEmbed({
   forceLoad = false,
 }) {
   const resolved = resolveEmbed(url);
+  const { t } = useI18n();
   const [loaded, setLoaded] = useState(
     () => Boolean(forceLoad) || hasConsent("embeds"),
   );
@@ -50,7 +52,7 @@ export default function SafeEmbed({
       <div className={`safe-embed safe-embed--unsupported ${className}`.trim()}>
         <p className="safe-embed-unsupported">
           <ShieldCheck size={15} strokeWidth={1.75} aria-hidden="true" />
-          This embed is not from an allowed provider, so it was not loaded.
+          {t("common.embed.notAllowed")}
         </p>
       </div>
     );
@@ -88,9 +90,7 @@ export default function SafeEmbed({
           <ShieldCheck size={22} strokeWidth={1.5} aria-hidden="true" />
           <p className="safe-embed-title">{title}</p>
           <p className="safe-embed-copy">
-            Loading this {resolved.label} embed would let {resolved.label} set
-            cookies and see your IP address. It stays blocked until you choose to
-            load it.
+            {t("common.embed.cookieNotice", { provider: resolved.label })}
           </p>
           <div className="safe-embed-actions">
             <button
@@ -99,14 +99,14 @@ export default function SafeEmbed({
               onClick={loadEmbed}
             >
               <Play size={14} strokeWidth={1.75} aria-hidden="true" />
-              Load embed
+              {t("common.embed.load")}
             </button>
             <button
               type="button"
               className="consent-btn consent-btn-ghost"
               onClick={allowAllEmbeds}
             >
-              Always allow embeds
+              {t("common.embed.alwaysAllow")}
             </button>
           </div>
         </div>

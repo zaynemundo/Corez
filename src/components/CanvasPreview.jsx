@@ -32,6 +32,12 @@ import { useAuth } from "../context/AuthContext";
 import { createZipBlob } from "../utils/zipPackager";
 import { repairMalformedHtml } from "../utils/htmlRepair";
 import { generateQrCodeDataUrl, generateEmbedSnippet } from "../utils/qrCode";
+import { useI18n } from "../i18n/index.jsx";
+
+// Sentinel stored when a preview error carries no message. Compared against at
+// render time so the runtime-error message listener keeps its existing
+// dependencies and the visible text comes from canvas.error.messageFallback.
+const PREVIEW_ERROR_DEFAULT = "Preview error";
 
 export default function CanvasPreview({
   code,
@@ -42,6 +48,7 @@ export default function CanvasPreview({
   sessionId = null,
   isStreaming = false,
 }) {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState("preview");
   const [deviceMode, setDeviceMode] = useState("desktop"); // 'desktop' | 'laptop' | 'tablet' | 'mobile'
   const [editableCode, setEditableCode] = useState(code || "");
@@ -113,8 +120,7 @@ export default function CanvasPreview({
   // Custom URL slugs remain a paid perk even though publishing is not.
   const customSlugRequiresUpgrade =
     publishPlan !== null && !isPaidPublishPlan(publishPlan, planExpired);
-  const publishBadgeMessage =
-    "Free plan: your published page shows a small \u201cMade with Corez\u201d badge. Upgrade, then republish to remove it.";
+  const publishBadgeMessage = t("canvas.publish.badge");
 
   const resolvePublishPlan = async () => {
     if (publishPlan !== null)
@@ -204,7 +210,7 @@ export default function CanvasPreview({
       if (data.type === "corez-preview-error") {
         setRuntimeError({
           kind: typeof data.kind === "string" ? data.kind : "error",
-          message: String(data.message || "Preview error").slice(0, 500),
+          message: String(data.message || PREVIEW_ERROR_DEFAULT).slice(0, 500),
           source: data.source ? String(data.source).slice(0, 200) : "",
           line: Number(data.line) || 0,
         });
@@ -266,7 +272,7 @@ export default function CanvasPreview({
         .map((issue) => issue.message)
         .slice(0, 3);
       setPublishError(
-        `This site is incomplete: ${errors.join("; ")}. Ask Corez to fix it before publishing.`,
+        t("canvas.publish.errorIncomplete", { errors: errors.join("; ") }),
       );
       return;
     }
@@ -315,24 +321,22 @@ export default function CanvasPreview({
           serverError.includes("530") ||
           serverError.toLowerCase().includes("not configured");
         if (isServiceUnavailable) {
-          setPublishError(
-            "Publishing failed: R2 storage is not configured on the hosted service — contact support.",
-          );
+          setPublishError(t("canvas.publish.errorR2"));
         } else if (serverError) {
-          setPublishError(`Publishing failed: ${serverError}`);
+          setPublishError(t("canvas.publish.errorWith", { error: serverError }));
         } else {
-          setPublishError(
-            "Publishing failed. The hosted service may be unavailable — try again.",
-          );
+          setPublishError(t("canvas.publish.errorUnavailable"));
         }
       }
     } catch (err) {
       console.warn("Publish error:", err);
       const msg = err?.message
         ? String(err.message)
-        : "Publishing failed. Please try again.";
+        : t("canvas.publish.errorRetry");
       setPublishError(
-        msg.includes("Publish") ? msg : `Publishing failed: ${msg}`,
+        msg.includes("Publish")
+          ? msg
+          : t("canvas.publish.errorWith", { error: msg }),
       );
     } finally {
       setPublishing(false);
@@ -350,9 +354,7 @@ export default function CanvasPreview({
     const { plan: slugPlan, expired: slugExpired } =
       await resolvePublishPlan();
     if (slugPlan !== null && !isPaidPublishPlan(slugPlan, slugExpired)) {
-      setSlugError(
-        "Custom URL slugs are available on Standard and Premium plans.",
-      );
+      setSlugError(t("canvas.publish.slugUpgrade"));
       setSlugSuccess(null);
       return;
     }
@@ -363,9 +365,7 @@ export default function CanvasPreview({
       !/^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/.test(cleaned) ||
       cleaned.includes("--")
     ) {
-      setSlugError(
-        "Slug must be 3-50 characters with lowercase letters, numbers, and single hyphens.",
-      );
+      setSlugError(t("canvas.publish.slugInvalid"));
       setSlugSuccess(null);
       return;
     }
@@ -406,14 +406,12 @@ export default function CanvasPreview({
           url: result.url,
           customized: true,
         });
-        setSlugSuccess("URL updated successfully!");
+        setSlugSuccess(t("canvas.publish.slugUpdated"));
       } else {
-        setSlugError(
-          result?.error || "Slug already in use or unavailable. Try another.",
-        );
+        setSlugError(result?.error || t("canvas.publish.slugTaken"));
       }
     } catch {
-      setSlugError("Failed to update slug. Please try again.");
+      setSlugError(t("canvas.publish.slugFailed"));
     } finally {
       setIsUpdatingSlug(false);
     }
@@ -517,25 +515,25 @@ export default function CanvasPreview({
 
   const deviceSpecs = {
     desktop: {
-      label: "Desktop",
+      label: t("canvas.header.device.desktop"),
       width: "100%",
       res: "Fluid / 1920px",
       ratio: null,
     },
     laptop: {
-      label: "Laptop",
+      label: t("canvas.header.device.laptop"),
       width: "1100px",
       res: "1366 × 768",
       ratio: "16 / 9",
     },
     tablet: {
-      label: "Tablet",
+      label: t("canvas.header.device.tablet"),
       width: "768px",
       res: "768 × 1024",
       ratio: "3 / 4",
     },
     mobile: {
-      label: "Mobile",
+      label: t("canvas.header.device.mobile"),
       width: "375px",
       res: "375 × 812",
       ratio: "375 / 812",
@@ -554,13 +552,19 @@ export default function CanvasPreview({
               setActiveTab(activeTab === "preview" ? "code" : "preview")
             }
             title={
-              activeTab === "preview" ? "View source code" : "Back to preview"
+              activeTab === "preview"
+                ? t("canvas.header.viewSource")
+                : t("canvas.header.backToPreview")
             }
             aria-label={
-              activeTab === "preview" ? "View source code" : "Back to preview"
+              activeTab === "preview"
+                ? t("canvas.header.viewSource")
+                : t("canvas.header.backToPreview")
             }
           >
-            {activeTab === "preview" ? "Source" : "Preview"}
+            {activeTab === "preview"
+              ? t("canvas.header.source")
+              : t("canvas.header.preview")}
           </button>
         </div>
 
@@ -569,7 +573,7 @@ export default function CanvasPreview({
           <div className="device-mode-bar">
             <button
               onClick={() => setDeviceMode("desktop")}
-              title="Desktop Screen View"
+              title={t("canvas.header.desktopView")}
               className={`device-btn ${deviceMode === "desktop" ? "active" : ""}`}
             >
               <Monitor size={15} strokeWidth={1.5} />
@@ -577,7 +581,7 @@ export default function CanvasPreview({
 
             <button
               onClick={() => setDeviceMode("laptop")}
-              title="Laptop View (1366 × 768)"
+              title={t("canvas.header.laptopView")}
               className={`device-btn ${deviceMode === "laptop" ? "active" : ""}`}
             >
               <Laptop size={15} strokeWidth={1.5} />
@@ -585,7 +589,7 @@ export default function CanvasPreview({
 
             <button
               onClick={() => setDeviceMode("tablet")}
-              title="Tablet View (768 × 1024)"
+              title={t("canvas.header.tableView")}
               className={`device-btn ${deviceMode === "tablet" ? "active" : ""}`}
             >
               <Tablet size={15} strokeWidth={1.5} />
@@ -593,7 +597,7 @@ export default function CanvasPreview({
 
             <button
               onClick={() => setDeviceMode("mobile")}
-              title="Mobile View (375 × 812)"
+              title={t("canvas.header.mobileView")}
               className={`device-btn ${deviceMode === "mobile" ? "active" : ""}`}
             >
               <Smartphone size={15} strokeWidth={1.5} />
@@ -615,15 +619,23 @@ export default function CanvasPreview({
                 className="code-btn publish-btn"
                 onClick={handlePublish}
                 disabled={publishing}
-                title={"Publish this creation and share the link"}
-                aria-label={publishing ? "Publishing..." : "Publish"}
+                title={t("canvas.publish.shareTitle")}
+                aria-label={
+                  publishing
+                    ? t("canvas.publish.publishing")
+                    : t("canvas.publish.action")
+                }
               >
                 {publishing ? (
                   <Loader2 size={13} className="spin-icon" />
                 ) : (
                   <Share2 size={13} />
                 )}
-                <span>{publishing ? "Publishing..." : "Publish"}</span>
+                <span>
+                  {publishing
+                    ? t("canvas.publish.publishing")
+                    : t("canvas.publish.action")}
+                </span>
               </button>
             </>
           )}
@@ -631,14 +643,14 @@ export default function CanvasPreview({
           <button
             className="icon-btn"
             onClick={handleRefresh}
-            title="Reload Preview"
+            title={t("canvas.header.reloadPreview")}
           >
             <RotateCw size={14} strokeWidth={1.5} />
           </button>
           <button
             className="icon-btn"
             onClick={handleCopy}
-            title="Copy Source Code"
+            title={t("canvas.header.copySource")}
           >
             {copied ? (
               <Check size={14} strokeWidth={1.5} style={{ color: "#ffffff" }} />
@@ -651,8 +663,8 @@ export default function CanvasPreview({
             onClick={handleDownload}
             title={
               multiPage.isMultiPage
-                ? "Download Website (.zip)"
-                : "Download .html file"
+                ? t("canvas.header.downloadZip")
+                : t("canvas.header.downloadHtml")
             }
           >
             <Download size={14} strokeWidth={1.5} />
@@ -660,14 +672,14 @@ export default function CanvasPreview({
           <button
             className="icon-btn"
             onClick={handlePrint}
-            title="Export to PDF / Print"
+            title={t("canvas.header.exportPrint")}
           >
             <Printer size={14} strokeWidth={1.5} />
           </button>
           <button
             className="icon-btn"
             onClick={onToggleFullScreen}
-            title="Toggle Fullscreen"
+            title={t("canvas.header.toggleFullscreen")}
           >
             {isFullScreen ? (
               <Minimize2 size={14} strokeWidth={1.5} />
@@ -675,7 +687,7 @@ export default function CanvasPreview({
               <Maximize2 size={14} strokeWidth={1.5} />
             )}
           </button>
-          <button className="icon-btn" onClick={onClose} title="Close Preview">
+          <button className="icon-btn" onClick={onClose} title={t("canvas.header.closePreview")}>
             <X size={14} strokeWidth={1.5} />
           </button>
         </div>
@@ -709,14 +721,14 @@ export default function CanvasPreview({
                 whiteSpace: "nowrap",
               }}
             >
-              Incomplete site
+              {t("canvas.validation.incomplete")}
             </span>
             <span>
               {multiPageValidation.issues
                 .filter((issue) => issue.severity === "error")
                 .map((issue) => issue.message)
                 .join(" · ")}{" "}
-              Publishing is blocked until fixed.
+              {t("canvas.validation.publishingBlocked")}
             </span>
           </div>
         )}
@@ -728,14 +740,18 @@ export default function CanvasPreview({
                   <div className="preview-error-text">
                     <strong>
                       {runtimeError.kind === "csp"
-                        ? "Blocked by security policy"
+                        ? t("canvas.error.kindCsp")
                         : runtimeError.kind === "resource"
-                          ? "Preview asset failed to load"
+                          ? t("canvas.error.kindResource")
                           : runtimeError.kind === "unhandledrejection"
-                            ? "Unhandled preview promise rejection"
-                            : "Preview runtime error"}
+                            ? t("canvas.error.kindUnhandledRejection")
+                            : t("canvas.error.kindRuntime")}
                     </strong>
-                    <span>{runtimeError.message}</span>
+                    <span>
+                      {runtimeError.message === PREVIEW_ERROR_DEFAULT
+                        ? t("canvas.error.messageFallback")
+                        : runtimeError.message}
+                    </span>
                     {runtimeError.source ? (
                       <span className="preview-error-source">
                         {runtimeError.source}
@@ -749,13 +765,15 @@ export default function CanvasPreview({
                       className="preview-error-btn"
                       onClick={copyRuntimeError}
                     >
-                      {errorCopied ? "Copied ✓" : "Copy"}
+                      {errorCopied
+                        ? t("canvas.error.copied")
+                        : t("common.action.copy")}
                     </button>
                     <button
                       type="button"
                       className="preview-error-btn"
                       onClick={() => setRuntimeError(null)}
-                      aria-label="Dismiss preview error"
+                      aria-label={t("canvas.error.dismiss")}
                     >
                       ✕
                     </button>
@@ -777,7 +795,9 @@ export default function CanvasPreview({
                 <iframe
                   key={`${key}-${activePage}`}
                   ref={iframeRef}
-                  title={`Live Application Preview (${deviceSpecs[deviceMode].label})`}
+                  title={t("canvas.header.iframeTitle", {
+                    device: deviceSpecs[deviceMode].label,
+                  })}
                   srcDoc={formattedSrcDoc}
                   className="preview-iframe"
                   sandbox="allow-scripts allow-forms allow-pointer-lock allow-downloads allow-popups"
@@ -806,7 +826,7 @@ export default function CanvasPreview({
               id="canvas-source-editor"
               name="source-code"
               className="canvas-source-editor"
-              aria-label="Source code editor"
+              aria-label={t("canvas.header.sourceEditor")}
               value={editableCode}
               onChange={(e) => setEditableCode(e.target.value)}
             />
@@ -827,7 +847,7 @@ export default function CanvasPreview({
                 fontWeight: 500,
               }}
             >
-              Live Designing & Building...
+              {t("canvas.empty.building")}
             </h3>
             <p
               style={{
@@ -837,8 +857,7 @@ export default function CanvasPreview({
                 margin: 0,
               }}
             >
-              Streaming visual components, layout shaders & logic into preview
-              canvas.
+              {t("canvas.empty.buildingDetail")}
             </p>
           </div>
         ) : (
@@ -846,10 +865,11 @@ export default function CanvasPreview({
             <div className="canvas-empty-icon">
               <Code2 size={22} strokeWidth={1.5} />
             </div>
-            <h3 style={{ fontSize: "0.95rem" }}>No Active App Running</h3>
+            <h3 style={{ fontSize: "0.95rem" }}>{t("canvas.empty.noApp")}</h3>
             <p style={{ maxWidth: "280px", fontSize: "0.8rem" }}>
-              Ask Corez to build an application or click <b>"Run Preview"</b> on
-              any code block.
+              {t("canvas.empty.intro")}
+              <b>{t("canvas.empty.runPreview")}</b>
+              {t("canvas.empty.end")}
             </p>
           </div>
         )}
@@ -861,7 +881,7 @@ export default function CanvasPreview({
           className="modal-overlay"
           role="dialog"
           aria-modal="true"
-          aria-label="Share your published creation"
+          aria-label={t("canvas.publish.modalLabel")}
           onClick={() => setPublishResult(null)}
         >
           <div
@@ -884,8 +904,8 @@ export default function CanvasPreview({
                 type="button"
                 className="icon-btn"
                 onClick={() => setPublishResult(null)}
-                title="Close"
-                aria-label="Close"
+                title={t("common.action.close")}
+                aria-label={t("common.action.close")}
               >
                 <X size={15} />
               </button>
@@ -898,11 +918,11 @@ export default function CanvasPreview({
                 margin: 0,
               }}
             >
-              Anyone with this link can open{" "}
+              {t("canvas.publish.shareIntro")}
               <b style={{ color: "var(--text-primary)" }}>
                 {title.slice(0, 60)}
               </b>
-              :
+              {t("canvas.publish.shareEnd")}
             </p>
 
             {publishShowsBadge && (
@@ -919,7 +939,7 @@ export default function CanvasPreview({
                   href="/pricing"
                   style={{ color: "var(--text-primary)", fontWeight: 600 }}
                 >
-                  Upgrade
+                  {t("canvas.publish.upgrade")}
                 </a>
               </p>
             )}
@@ -964,7 +984,7 @@ export default function CanvasPreview({
                 }}
               >
                 <Link2 size={13} />
-                <span>Share Link</span>
+                <span>{t("canvas.publish.tabLink")}</span>
               </button>
               <button
                 type="button"
@@ -994,7 +1014,7 @@ export default function CanvasPreview({
                 }}
               >
                 <QrCode size={13} />
-                <span>QR Code</span>
+                <span>{t("canvas.publish.tabQr")}</span>
               </button>
               <button
                 type="button"
@@ -1024,7 +1044,7 @@ export default function CanvasPreview({
                 }}
               >
                 <Code size={13} />
-                <span>Embed Code</span>
+                <span>{t("canvas.publish.tabEmbed")}</span>
               </button>
             </div>
 
@@ -1048,7 +1068,7 @@ export default function CanvasPreview({
                     name="share-link"
                     value={publishLink}
                     onFocus={(e) => e.target.select()}
-                    aria-label="Published share link"
+                    aria-label={t("canvas.publish.shareLinkLabel")}
                     style={{
                       flex: 1,
                       minWidth: 0,
@@ -1064,17 +1084,21 @@ export default function CanvasPreview({
                     type="button"
                     className="code-btn"
                     onClick={handleCopyLink}
-                    title="Copy link"
+                    title={t("canvas.publish.copyLinkTitle")}
                   >
                     {copied ? <Check size={14} /> : <Copy size={14} />}
-                    <span>{copied ? "Copied" : "Copy"}</span>
+                    <span>
+                      {copied
+                        ? t("common.action.copied")
+                        : t("common.action.copy")}
+                    </span>
                   </button>
                   <a
                     className="code-btn"
                     href={publishLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title="Open in new tab"
+                    title={t("canvas.publish.openNewTab")}
                     style={{
                       display: "inline-flex",
                       alignItems: "center",
@@ -1083,7 +1107,7 @@ export default function CanvasPreview({
                     }}
                   >
                     <ExternalLink size={14} />
-                    <span>Open</span>
+                    <span>{t("common.action.open")}</span>
                   </a>
                 </div>
 
@@ -1096,8 +1120,7 @@ export default function CanvasPreview({
                       margin: "2px 0 0",
                     }}
                   >
-                    Custom URL slugs are available on Standard and Premium
-                    plans.{" "}
+                    {t("canvas.publish.slugLockedIntro")}
                     <a
                       href="/pricing"
                       style={{
@@ -1105,9 +1128,9 @@ export default function CanvasPreview({
                         fontWeight: 600,
                       }}
                     >
-                      Upgrade
-                    </a>{" "}
-                    to choose a custom link.
+                      {t("canvas.publish.slugLockedCta")}
+                    </a>
+                    {t("canvas.publish.slugLockedEnd")}
                   </p>
                 ) : publishResult.customized ||
                   (publishResult.slug &&
@@ -1139,7 +1162,7 @@ export default function CanvasPreview({
                           margin: 0,
                         }}
                       >
-                        Custom slug locked (1-time change used)
+                        {t("canvas.publish.slugLocked")}
                       </p>
                       <p
                         style={{
@@ -1148,7 +1171,7 @@ export default function CanvasPreview({
                           margin: "1px 0 0",
                         }}
                       >
-                        Republishing automatically updates this link.
+                        {t("canvas.publish.slugLockedDetail")}
                       </p>
                     </div>
                   </div>
@@ -1177,7 +1200,7 @@ export default function CanvasPreview({
                           color: "var(--text-secondary)",
                         }}
                       >
-                        Customize URL slug:
+                        {t("canvas.publish.slugLabel")}
                       </label>
                       <span
                         style={{
@@ -1185,7 +1208,7 @@ export default function CanvasPreview({
                           color: "var(--text-secondary)",
                         }}
                       >
-                        1-time change
+                        {t("canvas.publish.slugOneTime")}
                       </span>
                     </div>
                     <div
@@ -1231,7 +1254,7 @@ export default function CanvasPreview({
                             setSlugSuccess(null);
                           }}
                           placeholder="my-custom-slug"
-                          aria-label="Custom slug"
+                          aria-label={t("canvas.publish.slugAriaLabel")}
                           style={{
                             flex: 1,
                             minWidth: 0,
@@ -1266,7 +1289,7 @@ export default function CanvasPreview({
                         {isUpdatingSlug ? (
                           <Loader2 size={13} className="spin-icon" />
                         ) : (
-                          "Save Slug"
+                          t("canvas.publish.saveSlug")
                         )}
                       </button>
                     </div>
@@ -1331,7 +1354,7 @@ export default function CanvasPreview({
                       fgColor: "#090a0f",
                       bgColor: "#ffffff",
                     })}
-                    alt={`QR code linking to ${publishLink}`}
+                    alt={t("canvas.publish.qrAlt", { url: publishLink })}
                     width="140"
                     height="140"
                     style={{ display: "block" }}
@@ -1345,7 +1368,7 @@ export default function CanvasPreview({
                     textAlign: "center",
                   }}
                 >
-                  Scan with your phone's camera to preview live on mobile.
+                  {t("canvas.publish.qrScan")}
                 </p>
               </div>
             )}
@@ -1361,7 +1384,7 @@ export default function CanvasPreview({
                   name="embed-html"
                   value={generateEmbedSnippet(publishLink, { title })}
                   onFocus={(e) => e.target.select()}
-                  aria-label="Embed iframe HTML"
+                  aria-label={t("canvas.publish.embedLabel")}
                   style={{
                     width: "100%",
                     height: "80px",
@@ -1388,7 +1411,9 @@ export default function CanvasPreview({
                 >
                   {embedCopied ? <Check size={13} /> : <Copy size={13} />}
                   <span>
-                    {embedCopied ? "Copied Embed Code" : "Copy Embed Code"}
+                    {embedCopied
+                      ? t("canvas.publish.embedCopied")
+                      : t("canvas.publish.embedCopy")}
                   </span>
                 </button>
               </div>
@@ -1401,7 +1426,7 @@ export default function CanvasPreview({
                 margin: 0,
               }}
             >
-              Only this app is shared — your chat stays private.
+              {t("canvas.publish.privacy")}
             </p>
           </div>
         </div>
@@ -1429,8 +1454,8 @@ export default function CanvasPreview({
             type="button"
             className="icon-btn"
             onClick={() => setPublishError(null)}
-            title="Dismiss"
-            aria-label="Dismiss"
+            title={t("common.action.dismiss")}
+            aria-label={t("common.action.dismiss")}
             style={{ marginLeft: "8px", verticalAlign: "middle" }}
           >
             <X size={13} />

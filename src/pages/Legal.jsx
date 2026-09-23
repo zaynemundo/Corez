@@ -9,6 +9,7 @@ import {
   getLegalDocument,
 } from "../data/legalDocuments";
 import { openConsentPreferences } from "../services/consentService";
+import { useI18n } from "../i18n/index.jsx";
 
 // Public legal surface. One component renders any of the documents so the
 // layout, "last updated" date, cross-links and contact block cannot drift
@@ -78,6 +79,7 @@ export function renderInline(text) {
 }
 
 function DocumentBlock({ block }) {
+  const { t } = useI18n();
   if (!block) return null;
   if (block.type === "ul") {
     return (
@@ -120,7 +122,7 @@ function DocumentBlock({ block }) {
   if (block.type === "note") {
     return (
       <p className="legal-note">
-        <strong>Note:</strong> {renderInline(block.text)}
+        <strong>{t("legal.chrome.note")}</strong> {renderInline(block.text)}
       </p>
     );
   }
@@ -128,6 +130,7 @@ function DocumentBlock({ block }) {
 }
 
 function LegalChrome({ currentId, children }) {
+  const { t } = useI18n();
   const pageRef = useRef(null);
 
   // The page is its own scroll container, so keyboard scrolling (PageDown,
@@ -144,11 +147,11 @@ function LegalChrome({ currentId, children }) {
   return (
     <div className="legal-page" ref={pageRef} tabIndex={-1}>
       <header className="legal-nav">
-        <Link className="legal-brand" to="/" aria-label="Corez home">
+        <Link className="legal-brand" to="/" aria-label={t("legal.chrome.brandHome")}>
           <img src="/corez-logo.png" alt="" aria-hidden="true" />
           <span>Corez</span>
         </Link>
-        <nav className="legal-nav-links" aria-label="Legal documents">
+        <nav className="legal-nav-links" aria-label={t("legal.chrome.legalDocuments")}>
           {LEGAL_ORDER.map((id) => (
             <Link
               key={id}
@@ -164,14 +167,14 @@ function LegalChrome({ currentId, children }) {
             sign-in for a visitor, and the app itself once they are signed in. */}
         <div className="legal-nav-actions">
           <Link className="legal-back" to="/pricing">
-            Pricing
+            {t("legal.chrome.pricing")}
           </Link>
           <Link className="legal-back" to="/login">
-            Sign in
+            {t("legal.chrome.signIn")}
           </Link>
           <Link className="legal-back" to="/">
             <ArrowLeft size={14} strokeWidth={1.75} aria-hidden="true" />
-            Back to Corez
+            {t("legal.chrome.backToCorez")}
           </Link>
         </div>
       </header>
@@ -180,7 +183,7 @@ function LegalChrome({ currentId, children }) {
 
       <footer className="legal-footer">
         <p>
-          Contact{" "}
+          {t("legal.chrome.contact")}{" "}
           <a href={`mailto:${LEGAL_CONTACTS.support}`}>{LEGAL_CONTACTS.support}</a>
           {" · "}
           <a href={`mailto:${LEGAL_CONTACTS.privacy}`}>{LEGAL_CONTACTS.privacy}</a>
@@ -194,7 +197,7 @@ function LegalChrome({ currentId, children }) {
             onClick={openConsentPreferences}
           >
             <Cookie size={14} strokeWidth={1.75} aria-hidden="true" />
-            Cookie settings
+            {t("legal.chrome.cookieSettings")}
           </button>
           <button
             type="button"
@@ -208,11 +211,11 @@ function LegalChrome({ currentId, children }) {
             }}
           >
             <Printer size={14} strokeWidth={1.75} aria-hidden="true" />
-            Print or save as PDF
+            {t("legal.chrome.print")}
           </button>
         </div>
         <p className="legal-footer-meta">
-          Version 1.0 · Last updated {LEGAL_UPDATED}
+          {t("legal.chrome.versionUpdated", { date: LEGAL_UPDATED })}
         </p>
       </footer>
     </div>
@@ -220,6 +223,7 @@ function LegalChrome({ currentId, children }) {
 }
 
 export default function Legal({ docId }) {
+  const { t } = useI18n();
   const document = getLegalDocument(docId);
   const [activeSection, setActiveSection] = useState(
     () => document?.sections?.[0]?.id || "",
@@ -270,10 +274,8 @@ export default function Legal({ docId }) {
     return (
       <LegalChrome currentId={docId}>
         <main className="legal-main">
-          <h1>Document not found</h1>
-          <p>
-            That legal document does not exist. Choose one from the list above.
-          </p>
+          <h1>{t("legal.chrome.documentNotFound")}</h1>
+          <p>{t("legal.chrome.documentNotFoundBody")}</p>
         </main>
       </LegalChrome>
     );
@@ -283,18 +285,17 @@ export default function Legal({ docId }) {
     <LegalChrome currentId={document.id}>
       <main className="legal-main">
         <div className="legal-head">
-          <p className="legal-eyebrow">Legal</p>
+          <p className="legal-eyebrow">{t("legal.chrome.eyebrow")}</p>
           <h1>{document.title}</h1>
           <p className="legal-summary">{document.summary}</p>
           <p className="legal-meta">
-            Version 1.0 · Last updated {LEGAL_UPDATED} · Governed by the laws of
-            the United Arab Emirates
+            {t("legal.chrome.versionGoverned", { date: LEGAL_UPDATED })}
           </p>
         </div>
 
         <div className="legal-body">
-          <nav className="legal-toc" aria-label="On this page">
-            <p className="legal-toc-title">On this page</p>
+          <nav className="legal-toc" aria-label={t("legal.chrome.onThisPage")}>
+            <p className="legal-toc-title">{t("legal.chrome.onThisPage")}</p>
             <ol>
               {document.sections.map((section) => (
                 <li key={section.id}>
@@ -333,7 +334,9 @@ export default function Legal({ docId }) {
             ))}
 
             <section className="legal-related" aria-labelledby="legal-related-heading">
-              <h2 id="legal-related-heading">Other policies</h2>
+              <h2 id="legal-related-heading">
+                {t("legal.chrome.otherPolicies")}
+              </h2>
               <ul className="legal-related-list">
                 {otherDocuments.map((other) => {
                   const Icon = DOC_ICONS[other.id] || FileText;

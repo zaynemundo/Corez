@@ -14,12 +14,14 @@ import {
   saveConsent,
 } from "../services/consentService";
 import { track } from "../services/analytics";
+import { useI18n } from "../i18n/index.jsx";
 
 // One banner, one preferences dialog, mounted once at the App level so every
 // surface (policies, pricing, login and the signed-in app) is covered. The
 // decision is stored by consentService; this component only renders it.
 
 function CategoryToggle({ category, checked, onChange }) {
+  const { t } = useI18n();
   const descriptionId = `consent-desc-${category.id}`;
   return (
     <div className="consent-category">
@@ -28,7 +30,7 @@ function CategoryToggle({ category, checked, onChange }) {
           {category.label}
         </span>
         {category.required ? (
-          <span className="consent-category-required">Always on</span>
+          <span className="consent-category-required">{t("consent.preferences.alwaysOn")}</span>
         ) : (
           <label className="consent-switch">
             <input
@@ -39,7 +41,9 @@ function CategoryToggle({ category, checked, onChange }) {
               aria-describedby={descriptionId}
             />
             <span className="consent-switch-track" aria-hidden="true" />
-            <span className="consent-switch-text">{checked ? "Allowed" : "Blocked"}</span>
+            <span className="consent-switch-text">
+              {checked ? t("consent.preferences.allowed") : t("consent.preferences.blocked")}
+            </span>
           </label>
         )}
       </div>
@@ -51,6 +55,7 @@ function CategoryToggle({ category, checked, onChange }) {
 }
 
 export default function CookieConsent() {
+  const { t } = useI18n();
   const [bannerVisible, setBannerVisible] = useState(
     () => !hasConsentDecision() || isConsentStale(),
   );
@@ -204,7 +209,7 @@ export default function CookieConsent() {
           className="consent-banner"
           ref={bannerRef}
           role="region"
-          aria-label="Cookie consent"
+          aria-label={t("consent.banner.regionLabel")}
           // While the dialog is open the banner is behind a modal: it stays
           // mounted (so focus can return to the exact control that opened the
           // dialog) but is removed from the accessibility tree.
@@ -215,12 +220,13 @@ export default function CookieConsent() {
               <Cookie size={18} strokeWidth={1.5} />
             </span>
             <div className="consent-banner-text">
-              <p className="consent-banner-title">Your choice, not our default</p>
+              <p className="consent-banner-title">{t("consent.banner.title")}</p>
               <p>
-                Strictly necessary storage keeps you signed in. Analytics and
-                external media stay switched off unless you allow them. Read the{" "}
-                <Link to="/cookies">Cookie Policy</Link> or the{" "}
-                <Link to="/privacy">Privacy Policy</Link>.
+                {t("consent.banner.bodyIntro")}
+                <Link to="/cookies">{t("consent.banner.cookiePolicy")}</Link>
+                {t("consent.banner.bodyOr")}
+                <Link to="/privacy">{t("consent.banner.privacyPolicy")}</Link>
+                {t("consent.banner.bodyEnd")}
               </p>
             </div>
           </div>
@@ -231,21 +237,21 @@ export default function CookieConsent() {
               onClick={openDialog}
             >
               <Settings2 size={14} strokeWidth={1.75} aria-hidden="true" />
-              Preferences
+              {t("consent.banner.preferences")}
             </button>
             <button
               type="button"
               className="consent-btn consent-btn-ghost"
               onClick={rejectOptional}
             >
-              Reject non-essential
+              {t("consent.actions.rejectNonEssential")}
             </button>
             <button
               type="button"
               className="consent-btn consent-btn-solid"
               onClick={acceptAll}
             >
-              Accept all
+              {t("consent.banner.acceptAll")}
             </button>
           </div>
         </div>
@@ -263,9 +269,9 @@ export default function CookieConsent() {
           >
             <div className="consent-dialog-head">
               <div>
-                <h2 id="consent-dialog-title">Cookie preferences</h2>
+                <h2 id="consent-dialog-title">{t("consent.dialog.title")}</h2>
                 <p className="consent-dialog-sub">
-                  Version {CONSENT_VERSION} · you can change this at any time
+                  {t("consent.dialog.version", { version: CONSENT_VERSION })}
                 </p>
               </div>
               <button
@@ -273,15 +279,14 @@ export default function CookieConsent() {
                 className="consent-btn consent-btn-ghost"
                 onClick={closeDialog}
               >
-                Close
+                {t("common.action.close")}
               </button>
             </div>
 
             {blockedByBrowser && (
               <p className="consent-note" role="status">
                 <ShieldCheck size={14} strokeWidth={1.75} aria-hidden="true" />
-                Your browser is sending a Global Privacy Control or Do Not Track
-                signal, so analytics stays off even if you allow it here.
+                {t("consent.dialog.gpc")}
               </p>
             )}
 
@@ -298,14 +303,18 @@ export default function CookieConsent() {
 
             <p className="consent-dialog-foot">
               {allowedCount === 0
-                ? "Only strictly necessary storage will be used."
-                : `${allowedCount} optional categor${allowedCount === 1 ? "y" : "ies"} allowed.`}{" "}
-              Details are in the <Link to="/cookies">Cookie Policy</Link>.
+                ? t("consent.dialog.footNone")
+                : allowedCount === 1
+                  ? t("consent.dialog.footOne", { count: allowedCount })
+                  : t("consent.dialog.footOther", { count: allowedCount })}
+              {t("consent.dialog.footPolicyIntro")}
+              <Link to="/cookies">{t("consent.dialog.footPolicyLink")}</Link>
+              {t("consent.dialog.footPolicyEnd")}
             </p>
 
             {saved && (
               <p className="consent-saved" role="status">
-                Preferences saved.
+                {t("consent.dialog.saved")}
               </p>
             )}
 
@@ -315,7 +324,7 @@ export default function CookieConsent() {
                 className="consent-btn consent-btn-ghost"
                 onClick={withdrawAll}
               >
-                Withdraw consent
+                {t("consent.dialog.withdraw")}
               </button>
               <span className="consent-dialog-actions-right">
                 <button
@@ -323,14 +332,14 @@ export default function CookieConsent() {
                   className="consent-btn consent-btn-ghost"
                   onClick={rejectOptional}
                 >
-                  Reject non-essential
+                  {t("consent.actions.rejectNonEssential")}
                 </button>
                 <button
                   type="button"
                   className="consent-btn consent-btn-solid"
                   onClick={saveChoices}
                 >
-                  Save choices
+                  {t("consent.dialog.save")}
                 </button>
               </span>
             </div>

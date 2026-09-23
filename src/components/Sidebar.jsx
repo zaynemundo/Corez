@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useI18n } from "../i18n/index.jsx";
 import {
   Settings,
   PanelLeft,
@@ -24,6 +25,7 @@ export default function Sidebar({
   // theme/onToggleTheme kept for backwards compat but now live inside SettingsModal
   void theme;
   void onToggleTheme;
+  const { t } = useI18n();
   const [openMenuId, setOpenMenuId] = useState(null);
 
   useEffect(() => {
@@ -45,15 +47,15 @@ export default function Sidebar({
         <button
           className="brand-icon-toggle"
           onClick={onCloseSidebar}
-          title="Collapse Sidebar"
+          title={t("common.sidebar.collapse")}
         >
           <span className="brand-wordmark">COREZ</span>
         </button>
         <button
           className="sidebar-close-btn"
           onClick={onCloseSidebar}
-          title="Collapse Sidebar"
-          aria-label="Collapse Sidebar"
+          title={t("common.sidebar.collapse")}
+          aria-label={t("common.sidebar.collapse")}
         >
           <PanelLeft size={16} strokeWidth={1.5} />
         </button>
@@ -63,7 +65,7 @@ export default function Sidebar({
         <button
           className="new-chat-btn"
           onClick={onNewChat}
-          title="New Chat Session"
+          title={t("common.sidebar.newChatTitle")}
         >
           <SquarePen
             className="new-chat-icon"
@@ -71,12 +73,12 @@ export default function Sidebar({
             strokeWidth={1.5}
             aria-hidden="true"
           />
-          <span>New Chat</span>
+          <span>{t("common.sidebar.newChat")}</span>
         </button>
       </div>
 
       <div className="chat-history-list">
-        <div className="sidebar-chats-label">Chats</div>
+        <div className="sidebar-chats-label">{t("common.sidebar.chats")}</div>
         {sessions.map((session) => (
           <div
             key={session.id}
@@ -95,7 +97,9 @@ export default function Sidebar({
             }}
             role="button"
             tabIndex={0}
-            aria-label={`Open conversation ${session.title}`}
+            aria-label={t("common.sidebar.openConversation", {
+              title: session.title,
+            })}
             title={session.title}
           >
             <span className="history-item-title">{session.title}</span>
@@ -107,8 +111,10 @@ export default function Sidebar({
                   e.stopPropagation();
                   setOpenMenuId(openMenuId === session.id ? null : session.id);
                 }}
-                title="Chat options"
-                aria-label={`Options for ${session.title}`}
+                title={t("common.sidebar.chatOptions")}
+                aria-label={t("common.sidebar.optionsFor", {
+                  title: session.title,
+                })}
                 aria-expanded={openMenuId === session.id}
               >
                 <MoreVertical size={14} strokeWidth={1.5} />
@@ -130,7 +136,7 @@ export default function Sidebar({
                     }}
                   >
                     <Trash2 size={14} strokeWidth={1.5} />
-                    <span>Delete</span>
+                    <span>{t("common.sidebar.delete")}</span>
                   </button>
                 </div>
               )}
@@ -147,6 +153,7 @@ export default function Sidebar({
 }
 
 function SidebarProfileRow({ onOpenSettings }) {
+  const { t } = useI18n();
   let auth;
   try {
     auth = useAuth();
@@ -154,7 +161,7 @@ function SidebarProfileRow({ onOpenSettings }) {
     auth = null;
   }
   const email = auth?.user?.email || "";
-  const username = email ? email.split("@")[0] : "Guest";
+  const username = email ? email.split("@")[0] : t("common.sidebar.guest");
   const displayName = username.charAt(0).toUpperCase() + username.slice(1);
   const initial = displayName.charAt(0).toUpperCase() || "G";
   return (
@@ -169,8 +176,8 @@ function SidebarProfileRow({ onOpenSettings }) {
         type="button"
         className="sidebar-settings-icon"
         onClick={onOpenSettings}
-        aria-label="Open settings"
-        title="Settings"
+        aria-label={t("common.sidebar.openSettings")}
+        title={t("common.sidebar.settings")}
       >
         <Settings size={16} strokeWidth={1.5} />
       </button>

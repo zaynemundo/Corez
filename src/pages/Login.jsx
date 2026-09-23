@@ -6,6 +6,7 @@ import ConsentCheckbox from "../components/ConsentCheckbox";
 import { LEGAL_DOCUMENT_VERSION } from "../data/legalDocuments";
 import { openConsentPreferences, recordPolicyAcceptance } from "../services/consentService";
 import { track } from "../services/analytics";
+import { useI18n } from "../i18n/index.jsx";
 import mercuryBg from "../../assets/Mercury_5.jpeg";
 
 export default function Login() {
@@ -42,6 +43,7 @@ export default function Login() {
   const [acceptedPolicies, setAcceptedPolicies] = useState(false);
   const [consentError, setConsentError] = useState("");
   const navigate = useNavigate();
+  const { t } = useI18n();
 
   const submit = async (e) => {
     e.preventDefault();
@@ -49,9 +51,7 @@ export default function Login() {
     // Consent is checked before anything is sent: an account cannot be created
     // without the Terms and Privacy Policy having been actively accepted.
     if (mode === "signup" && !acceptedPolicies) {
-      setConsentError(
-        "Please accept the Terms and Conditions and the Privacy Policy to create an account.",
-      );
+      setConsentError(t("auth.signup.consentError"));
       return;
     }
     setConsentError("");
@@ -94,15 +94,13 @@ export default function Login() {
         } catch {}
       } else if (mode === "forgot") {
         const res = await forgot(email);
-        setForgotSent(
-          res.message || "If that email exists, a reset link has been sent.",
-        );
+        setForgotSent(res.message || t("auth.forgot.sent"));
         // In dev without RESEND, token is returned - prefill for testing
         if (res.token) setResetToken(res.token);
       } else if (mode === "reset") {
         await reset(resetToken, newPassword);
         setError("");
-        setForgotSent("Password has been reset. You can now login.");
+        setForgotSent(t("auth.reset.success"));
         setMode("login");
         setNewPassword("");
         setResetToken("");
@@ -112,7 +110,7 @@ export default function Login() {
         } catch {}
       }
     } catch (err) {
-      setError(err.message || "Something went wrong. Please try again.");
+      setError(err.message || t("common.error.generic"));
     } finally {
       setBusy(false);
     }
@@ -132,12 +130,12 @@ export default function Login() {
             <h1 className="auth-logo-word">COREZ</h1>
             <span className="auth-logo-sub">
               {mode === "login"
-                ? "Sign in to your account"
+                ? t("auth.login.subtitle")
                 : mode === "signup"
-                  ? "Create your account"
+                  ? t("auth.signup.subtitle")
                   : mode === "forgot"
-                    ? "Reset your password"
-                    : "Set a new password"}
+                    ? t("auth.forgot.subtitle")
+                    : t("auth.reset.subtitle")}
             </span>
           </div>
 
@@ -145,7 +143,7 @@ export default function Login() {
             <div
               className="auth-tabs"
               role="tablist"
-              aria-label="Authentication modes"
+              aria-label={t("auth.common.authenticationModes")}
             >
               <button
                 type="button"
@@ -158,7 +156,7 @@ export default function Login() {
                   setForgotSent("");
                 }}
               >
-                Login
+                {t("auth.common.login")}
               </button>
               <button
                 type="button"
@@ -171,7 +169,7 @@ export default function Login() {
                   setForgotSent("");
                 }}
               >
-                Sign Up
+                {t("auth.common.signUpTab")}
               </button>
             </div>
           )}
@@ -179,14 +177,14 @@ export default function Login() {
           <form className="auth-form" onSubmit={submit}>
             {(mode === "login" || mode === "signup" || mode === "forgot") && (
               <label>
-                <span>Email</span>
+                <span>{t("auth.common.emailLabel")}</span>
                 <input
                   id="corez-email"
                   name="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@corez.pro"
+                  placeholder={t("auth.common.emailPlaceholder")}
                   required
                   autoComplete="email"
                   autoFocus={mode !== "reset"}
@@ -196,7 +194,7 @@ export default function Login() {
 
             {(mode === "login" || mode === "signup") && (
               <label>
-                <span>Password</span>
+                <span>{t("auth.common.passwordLabel")}</span>
                 <div className="auth-password-wrapper">
                   <input
                     id="corez-password"
@@ -204,7 +202,7 @@ export default function Login() {
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
+                    placeholder={t("auth.common.passwordPlaceholder")}
                     required
                     autoComplete={
                       mode === "login" ? "current-password" : "new-password"
@@ -216,9 +214,15 @@ export default function Login() {
                     className="auth-password-toggle"
                     onClick={() => setShowPassword((prev) => !prev)}
                     aria-label={
-                      showPassword ? "Hide password" : "Show password"
+                      showPassword
+                        ? t("auth.common.hidePassword")
+                        : t("auth.common.showPassword")
                     }
-                    title={showPassword ? "Hide password" : "Show password"}
+                    title={
+                      showPassword
+                        ? t("auth.common.hidePassword")
+                        : t("auth.common.showPassword")
+                    }
                   >
                     {showPassword ? (
                       <EyeOff size={16} strokeWidth={1.5} />
@@ -242,7 +246,7 @@ export default function Login() {
                     setForgotSent("");
                   }}
                 >
-                  Forgot password?
+                  {t("auth.login.forgotPassword")}
                 </button>
               </div>
             )}
@@ -250,7 +254,7 @@ export default function Login() {
             {mode === "reset" && (
               <>
                 <label>
-                  <span>New Password</span>
+                  <span>{t("auth.common.newPasswordLabel")}</span>
                   <div className="auth-password-wrapper">
                     <input
                       id="corez-new-password"
@@ -258,7 +262,7 @@ export default function Login() {
                       type={showPassword ? "text" : "password"}
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="••••••••"
+                      placeholder={t("auth.common.passwordPlaceholder")}
                       required
                       minLength={8}
                       autoComplete="new-password"
@@ -268,7 +272,9 @@ export default function Login() {
                       className="auth-password-toggle"
                       onClick={() => setShowPassword((prev) => !prev)}
                       aria-label={
-                        showPassword ? "Hide password" : "Show password"
+                        showPassword
+                          ? t("auth.common.hidePassword")
+                          : t("auth.common.showPassword")
                       }
                     >
                       {showPassword ? (
@@ -314,51 +320,54 @@ export default function Login() {
                   error={consentError}
                   testId="signup-accept-terms"
                 >
-                  I am 16 or older and I accept the{" "}
+                  {t("auth.signup.consentIntro")}
                   <Link to="/terms" target="_blank" rel="noopener noreferrer">
-                    Terms and Conditions
-                  </Link>{" "}
-                  and the{" "}
-                  <Link to="/privacy" target="_blank" rel="noopener noreferrer">
-                    Privacy Policy
+                    {t("auth.signup.consentTerms")}
                   </Link>
-                  .
+                  {t("auth.signup.consentAnd")}
+                  <Link to="/privacy" target="_blank" rel="noopener noreferrer">
+                    {t("auth.signup.consentPrivacy")}
+                  </Link>
+                  {t("auth.signup.consentEnd")}
                 </ConsentCheckbox>
               </div>
             )}
 
             <button type="submit" className="auth-submit" disabled={busy}>
               {busy
-                ? "Please wait…"
+                ? t("auth.common.pleaseWait")
                 : mode === "login"
-                  ? "Login"
+                  ? t("auth.common.login")
                   : mode === "signup"
-                    ? "Create Account"
+                    ? t("auth.signup.submit")
                     : mode === "forgot"
-                      ? "Send reset link"
-                      : "Reset password"}
+                      ? t("auth.forgot.submit")
+                      : t("auth.reset.submit")}
             </button>
           </form>
 
           <p className="auth-legal-note">
             {mode === "signup"
-              ? "By creating an account you agree to our policies below."
-              : "Corez is built on a few promises you can read in full."}
+              ? t("auth.signup.legalNote")
+              : t("auth.login.legalNote")}
           </p>
-          <nav className="auth-legal-links" aria-label="Policies and cookie settings">
-            <Link to="/privacy">Privacy Policy</Link>
-            <Link to="/terms">Terms</Link>
-            <Link to="/cookies">Cookies</Link>
-            <Link to="/refunds">Refunds</Link>
+          <nav
+            className="auth-legal-links"
+            aria-label={t("auth.common.policiesNav")}
+          >
+            <Link to="/privacy">{t("auth.common.privacyPolicy")}</Link>
+            <Link to="/terms">{t("auth.common.terms")}</Link>
+            <Link to="/cookies">{t("auth.common.cookies")}</Link>
+            <Link to="/refunds">{t("auth.common.refunds")}</Link>
             <button type="button" onClick={openConsentPreferences}>
-              Cookie settings
+              {t("auth.common.cookieSettings")}
             </button>
           </nav>
 
           <p className="auth-foot">
             {mode === "forgot" ? (
               <>
-                Remembered?{" "}
+                {t("auth.forgot.remembered")}{" "}
                 <button
                   type="button"
                   className="auth-link"
@@ -368,7 +377,7 @@ export default function Login() {
                     setForgotSent("");
                   }}
                 >
-                  Back to login
+                  {t("auth.common.backToLogin")}
                 </button>
               </>
             ) : mode === "reset" ? (
@@ -382,7 +391,7 @@ export default function Login() {
                     setForgotSent("");
                   }}
                 >
-                  Back to login
+                  {t("auth.common.backToLogin")}
                 </button>
                 <span style={{ margin: "0 8px", color: "var(--text-muted)" }}>
                   ·
@@ -395,13 +404,13 @@ export default function Login() {
                     setError("");
                   }}
                 >
-                  Resend email
+                  {t("auth.forgot.resend")}
                 </button>
               </>
             ) : mode === "login" ? (
-              "Don't have an account? "
+              t("auth.login.noAccount")
             ) : (
-              "Already have an account? "
+              t("auth.signup.alreadyHaveAccount")
             )}
             {(mode === "login" || mode === "signup") && (
               <button
@@ -413,7 +422,9 @@ export default function Login() {
                   setForgotSent("");
                 }}
               >
-                {mode === "login" ? "Sign up" : "Login"}
+                {mode === "login"
+                  ? t("auth.login.signUpLink")
+                  : t("auth.common.login")}
               </button>
             )}
           </p>

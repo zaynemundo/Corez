@@ -249,6 +249,52 @@ h6 {
 }
 
 /* Fully Rounded Sidebar Elements */
+/* Language row (Settings → General). The control is a native <select> so the
+   browser handles the picker and the option list stays readable in both
+   directions. */
+.settings-language-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.settings-language-select {
+  min-width: 8.5rem;
+  max-width: 60%;
+  padding: 0.35rem 0.5rem;
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.settings-language-select:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
+}
+
+/* The row mirrors with the document direction, so no RTL branch is needed. */
+.settings-language-row .settings-row-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-language-hint {
+  margin: 0.4rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
 .sidebar {
   width: var(--sidebar-width);
   height: 100%;

@@ -45,6 +45,7 @@ import {
   persistAssistantTurnAfter,
 } from "./services/turnPersistence";
 import CompactedBanner from "./components/CompactedBanner";
+import { useI18n } from "./i18n/index.jsx";
 import {
   compactChatMessages,
   shouldCompact,
@@ -104,6 +105,7 @@ function MainApp({ theme, setTheme }) {
   const _location = useLocation();
   const chatIdFromUrl = useChatIdFromUrl();
   const { user } = useAuth();
+  const { t } = useI18n();
 
   const [sessions, setSessions] = useState([]);
   const [sessionsLoaded, setSessionsLoaded] = useState(false);
@@ -1277,7 +1279,7 @@ function MainApp({ theme, setTheme }) {
         <button
           type="button"
           className="sidebar-backdrop"
-          aria-label="Close sidebar"
+          aria-label={t("common.shell.closeSidebar")}
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -1290,8 +1292,8 @@ function MainApp({ theme, setTheme }) {
                 type="button"
                 className="sidebar-toggle-btn"
                 onClick={() => setSidebarOpen(true)}
-                title="Open Sidebar"
-                aria-label="Open Sidebar"
+                title={t("common.shell.openSidebar")}
+                aria-label={t("common.shell.openSidebar")}
               >
                 <PanelLeft size={16} strokeWidth={1.5} />
               </button>
@@ -1306,19 +1308,20 @@ function MainApp({ theme, setTheme }) {
                 <div
                   className="stream-elsewhere-banner"
                   role="status"
-                  aria-label="Response streaming in another chat"
+                  aria-label={t("common.shell.streamingElsewhere")}
                 >
                   <span>
-                    Responding in “
-                    {sessions.find((s) => s.id === streamingSessionId)
-                      ?.title || "another chat"}
-                    ”…
+                    {t("common.shell.respondingIn", {
+                      title:
+                        sessions.find((s) => s.id === streamingSessionId)
+                          ?.title || t("common.shell.anotherChat"),
+                    })}
                   </span>
                   <button
                     type="button"
                     onClick={() => navigate(`/chat/${streamingSessionId}`)}
                   >
-                    View
+                    {t("common.shell.view")}
                   </button>
                 </div>
               )}
@@ -1334,7 +1337,9 @@ function MainApp({ theme, setTheme }) {
                 <div className="welcome-container">
                   <h1 className="welcome-title">COREZ</h1>
                   {activeSessionId && (
-                    <p className="welcome-subtitle">Start a new conversation</p>
+                    <p className="welcome-subtitle">
+                      {t("common.shell.startNewConversation")}
+                    </p>
                   )}
                 </div>
               ) : (
@@ -1375,13 +1380,13 @@ function MainApp({ theme, setTheme }) {
                           onClick={() => setIsStreamCollapsed((prev) => !prev)}
                           title={
                             isStreamCollapsed
-                              ? "Click to expand response stream"
-                              : "Click to collapse response stream"
+                              ? t("common.shell.expandStream")
+                              : t("common.shell.collapseStream")
                           }
                           aria-label={
                             isStreamCollapsed
-                              ? "Expand response"
-                              : "Collapse response"
+                              ? t("common.shell.expandResponse")
+                              : t("common.shell.collapseResponse")
                           }
                         >
                           {/* The phase is announced, not printed: the visible
@@ -1400,7 +1405,7 @@ function MainApp({ theme, setTheme }) {
                             )
                             : swarmVisible && (
                               <span className="sr-only" role="status" aria-live="polite">
-                                Swarm planning…
+                                {t("common.phase.swarmPlanning")}
                               </span>
                             )}
                           <span className="thinking-dot" />
@@ -1411,7 +1416,7 @@ function MainApp({ theme, setTheme }) {
                           <div
                             className="message-content streaming-text"
                             role="status"
-                            aria-label="Corez is responding"
+                            aria-label={t("common.shell.responding")}
                           >
                             {streamingContent}
                           </div>
@@ -1439,7 +1444,7 @@ function MainApp({ theme, setTheme }) {
           {canvasOpen && (
             <CanvasPreview
               code={activeCanvasCode}
-              title={activeSession?.title || "Untitled Application"}
+              title={activeSession?.title || t("common.shell.untitledApplication")}
               onClose={handleCloseCanvas}
               isFullScreen={canvasFullScreen}
               onToggleFullScreen={() => setCanvasFullScreen((prev) => !prev)}
@@ -1509,6 +1514,7 @@ function RouteAnalytics() {
 
 function AppInner() {
   const { user, loading } = useAuth();
+  const { t } = useI18n();
   const [theme, setTheme] = useState(() => {
     try {
       return localStorage.getItem("corez_theme") || "dark";
@@ -1552,7 +1558,7 @@ function AppInner() {
     return (
       <div className="auth-loading" role="status" aria-live="polite">
         <Loader2 className="spin-icon" size={22} strokeWidth={1.75} aria-hidden="true" />
-        <span>Loading Corez…</span>
+        <span>{t("common.status.loadingCorez")}</span>
       </div>
     );
   }

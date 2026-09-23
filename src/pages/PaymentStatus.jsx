@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useI18n } from "../i18n/index.jsx";
+import { formatDate } from "../i18n/format.js";
 
 export function PaymentSuccess() {
+  const { t, language } = useI18n();
   const [search] = useSearchParams();
   const navigate = useNavigate();
   const [status, setStatus] = useState("verifying"); // verifying | success | expired | error
@@ -35,22 +38,24 @@ export function PaymentSuccess() {
           if (cancelled) return;
           if (res.ok && data.granted) {
             setStatus("success");
-            const label = data.purchase?.label || "Add-on";
+            const label = data.purchase?.label || t("auth.status.addonLabel");
             const credits = data.purchase?.credits || 0;
-            const unit = data.purchase?.unitLabel || "credits";
-            setDetail(`Verified — ${credits} ${unit} added to your ${label} balance.`);
+            const unit = data.purchase?.unitLabel || t("auth.status.creditsUnit");
+            setDetail(
+              t("auth.status.addonVerified", { credits, unit, label }),
+            );
           } else if (res.ok && data.alreadySettled) {
             setStatus("success");
-            setDetail(data.message || "These credits were already added.");
+            setDetail(data.message || t("auth.status.addonAlready"));
           } else if (res.ok) {
             setStatus("verifying");
-            setDetail(data.message || "Payment is not completed yet.");
+            setDetail(data.message || t("auth.status.paymentNotCompleted"));
             setTimeout(() => {
               if (!cancelled) window.location.reload();
             }, 3000);
           } else {
             setStatus("error");
-            setDetail(data.error || "Verification failed. Please contact support.");
+            setDetail(data.error || t("auth.status.verifyFailedSupport"));
           }
           return;
         }
@@ -87,20 +92,28 @@ export function PaymentSuccess() {
                   ? "176.28"
                   : "18.36");
             const end = data.period_end
-              ? new Date(data.period_end).toLocaleDateString()
+              ? formatDate(data.period_end, language)
               : isYearly
-                ? "365 days from now"
-                : "30 days from now";
+                ? t("auth.status.yearFromNow")
+                : t("auth.status.monthFromNow");
             setDetail(
               isYearly
-                ? `Verified — ${data.plan || plan} active. ${aed} AED / year. Valid until ${end}.`
-                : `Verified — ${data.plan || plan} active. ${aed} AED / month. Renews on ${end}.`,
+                ? t("auth.status.planYearly", {
+                    plan: data.plan || plan,
+                    amount: aed,
+                    end,
+                  })
+                : t("auth.status.planMonthly", {
+                    plan: data.plan || plan,
+                    amount: aed,
+                    end,
+                  }),
             );
           } else if (data.verified === false) {
             setStatus("verifying");
             setDetail(
               data.message ||
-                `Payment status: ${data.status}. Please complete payment on Ziina and try again.`,
+                t("auth.status.paymentStatus", { status: data.status }),
             );
             // Poll once more after 2s
             setTimeout(() => {
@@ -109,14 +122,14 @@ export function PaymentSuccess() {
           } else {
             setStatus("error");
             setDetail(
-              data.error || "Verification failed. Please contact support.",
+              data.error || t("auth.status.verifyFailedSupport"),
             );
           }
         }
       } catch (e) {
         if (!cancelled) {
           setStatus("error");
-          setDetail(e.message || "Verification failed");
+          setDetail(e.message || t("auth.status.verifyFailed"));
         }
       }
     };
@@ -167,14 +180,14 @@ export function PaymentSuccess() {
             fontWeight: 600,
           }}
         >
-          Corez — Payment
+          {t("auth.status.brandPayment")}
         </div>
         <h1 style={{ margin: "12px 0 8px", fontSize: "24px", fontWeight: 800 }}>
           {status === "verifying"
-            ? "Verifying payment…"
+            ? t("auth.status.verifying")
             : status === "success"
-              ? "Payment successful ✓"
-              : "Payment issue"}
+              ? t("auth.status.success")
+              : t("auth.status.issue")}
         </h1>
         <p
           style={{
@@ -183,7 +196,7 @@ export function PaymentSuccess() {
             lineHeight: 1.6,
           }}
         >
-          {detail || "Checking your subscription…"}
+          {detail || t("auth.status.checking")}
         </p>
         {status === "verifying" && (
           <div
@@ -249,7 +262,7 @@ export function PaymentSuccess() {
               cursor: "pointer",
             }}
           >
-            Go to Corez
+            {t("auth.status.goToCorez")}
           </button>
           <button
             onClick={() => window.location.reload()}
@@ -263,7 +276,7 @@ export function PaymentSuccess() {
               cursor: "pointer",
             }}
           >
-            Refresh
+            {t("auth.status.refresh")}
           </button>
         </div>
         <p
@@ -273,8 +286,7 @@ export function PaymentSuccess() {
             color: "var(--text-muted)",
           }}
         >
-          Standard 18.36 AED / month • Premium 27.54 AED / month • Billed
-          monthly via Ziina • Cancel anytime
+          {t("auth.status.footerNote")}
         </p>
       </div>
     </div>

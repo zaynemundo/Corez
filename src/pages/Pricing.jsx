@@ -12,68 +12,71 @@ import {
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { openConsentPreferences } from "../services/consentService";
+import { useI18n } from "../i18n/index.jsx";
+import { formatDate } from "../i18n/format.js";
 
 const PLANS = [
   {
     id: "free",
-    name: "Free",
+    name: "pricing.plans.free.name",
     price: "0",
     currency: "AED",
-    interval: "forever",
-    desc: "Perfect to explore Corez",
+    interval: "pricing.plans.intervalForever",
+    desc: "pricing.plans.free.desc",
     icon: Sparkles,
     features: [
-      "20 generations / month",
-      "1 project",
-      "Publish with a Made with Corez badge",
-      "Community support",
+      "pricing.plans.free.generations",
+      "pricing.plans.free.projects",
+      "pricing.plans.free.badge",
+      "pricing.plans.free.support",
     ],
-    cta: "Start for free",
+    cta: "pricing.plans.free.cta",
     popular: false,
   },
   {
     id: "standard",
-    name: "Standard",
+    name: "pricing.plans.standard.name",
     price: "18.36",
     currency: "AED",
-    interval: "/ month",
-    desc: "Most popular for creators",
+    interval: "pricing.plans.intervalMonth",
+    desc: "pricing.plans.standard.desc",
     icon: Zap,
     features: [
-      "200 generations / month",
-      "10 projects",
-      "Badge-free publishing",
-      "Custom URL slug",
-      "Priority queue",
-      "Standard support",
+      "pricing.plans.standard.generations",
+      "pricing.plans.standard.projects",
+      "pricing.plans.features.badgeFree",
+      "pricing.plans.features.customSlug",
+      "pricing.plans.standard.priorityQueue",
+      "pricing.plans.standard.support",
     ],
-    cta: "Upgrade to Standard",
+    cta: "pricing.plans.standard.cta",
     popular: true,
     highlight: true,
   },
   {
     id: "premium",
-    name: "Premium",
+    name: "pricing.plans.premium.name",
     price: "27.54",
     currency: "AED",
-    interval: "/ month",
-    desc: "Full power for pros",
+    interval: "pricing.plans.intervalMonth",
+    desc: "pricing.plans.premium.desc",
     icon: Crown,
     features: [
-      "Unlimited generations",
-      "Unlimited projects",
-      "Badge-free publishing",
-      "Custom URL slug",
-      "Priority support",
-      "Early access to new models",
-      "Custom domains (soon)",
+      "pricing.plans.premium.generations",
+      "pricing.plans.premium.projects",
+      "pricing.plans.features.badgeFree",
+      "pricing.plans.features.customSlug",
+      "pricing.plans.premium.prioritySupport",
+      "pricing.plans.premium.earlyAccess",
+      "pricing.plans.premium.customDomains",
     ],
-    cta: "Go Premium",
+    cta: "pricing.plans.premium.cta",
     premium: true,
   },
 ];
 
 export default function Pricing() {
+  const { t, language } = useI18n();
   const { user } = useAuth() || {};
   const navigate = useNavigate();
   const [billing, setBilling] = useState("monthly"); // monthly | yearly (yearly shows save)
@@ -135,11 +138,14 @@ export default function Pricing() {
 
     // Downgrade or cancel — schedule after period_end (but not for yearly upgrade)
     if ((isDowngrade || planId === "free") && !isSamePlanYearlyUpgrade) {
-      const targetLabel = planId === "free" ? "Free" : planId;
+      const targetLabel = planId === "free" ? t("pricing.plans.free.name") : planId;
       const confirmMsg =
         planId === "free"
-          ? "Downgrade to Free? You will keep current plan until period end, then switch to Free."
-          : `Downgrade to ${targetLabel}? You will keep ${currentPlan} until period end, then switch to ${targetLabel}.`;
+          ? t("pricing.dialogs.downgradeFree")
+          : t("pricing.dialogs.downgrade", {
+              target: targetLabel,
+              current: currentPlan,
+            });
       if (!confirm(confirmMsg)) return;
       setPayBusy(planId);
       try {
@@ -151,7 +157,10 @@ export default function Pricing() {
         });
         const d = await r.json().catch(() => ({}));
         if (r.ok) {
-          alert(d.message || `Scheduled to downgrade to ${targetLabel} after current period`);
+          alert(
+            d.message ||
+              t("pricing.dialogs.downgradeScheduled", { target: targetLabel }),
+          );
           // Refresh current plan — backend keeps current until period_end, but show scheduled
           try {
             const mr = await fetch("/api/subscriptions/me", { credentials: "include" });
@@ -161,7 +170,7 @@ export default function Pricing() {
               if (md?.plan) setCurrentPlan(md.plan);
             }
           } catch {}
-        } else alert(d.error || "Failed to schedule downgrade");
+        } else alert(d.error || t("pricing.dialogs.downgradeFailed"));
       } finally {
         setPayBusy("");
       }
@@ -198,12 +207,14 @@ export default function Pricing() {
             if (md?.plan) setCurrentPlan(md.plan);
           }
         } catch {}
-        alert(d.message || `Payment found completed — ${planId} activated`);
+        alert(
+          d.message || t("pricing.dialogs.paymentFound", { plan: planId }),
+        );
       } else {
-        alert(d.error || "Checkout failed");
+        alert(d.error || t("pricing.dialogs.checkoutFailed"));
       }
     } catch (e) {
-      alert(e.message || "Checkout failed");
+      alert(e.message || t("pricing.dialogs.checkoutFailed"));
     } finally {
       setPayBusy("");
     }
@@ -235,21 +246,21 @@ export default function Pricing() {
           const md = await mr.json().catch(() => ({}));
           setSub(md);
           if (md?.plan) setCurrentPlan(md.plan);
-          alert(vd.message || "Payment verified — plan activated");
+          alert(vd.message || t("pricing.dialogs.paymentVerified"));
           return;
         }
       }
       if (pendingInfo.redirect_url) window.location.href = pendingInfo.redirect_url;
-      else alert("This checkout is no longer available — please try again.");
+      else alert(t("pricing.dialogs.checkoutUnavailable"));
     } catch (e) {
-      alert(e.message || "Could not resume payment");
+      alert(e.message || t("pricing.dialogs.resumeFailed"));
     } finally {
       setPayBusy("");
     }
   };
 
   const abandonPendingCheckout = async () => {
-    if (!confirm("Cancel this pending payment? Your current plan stays unchanged.")) return;
+    if (!confirm(t("pricing.dialogs.cancelPending"))) return;
     setPayBusy(sub?.pending_plan || "pending");
     try {
       const r = await fetch("/api/subscriptions/abandon", {
@@ -264,10 +275,10 @@ export default function Pricing() {
         const md = await mr.json().catch(() => ({}));
         setSub(md);
         if (md?.plan) setCurrentPlan(md.plan);
-        if (d?.activated) alert("Payment had completed on Ziina — plan activated.");
-      } else alert(d.error || "Failed to cancel pending payment");
+        if (d?.activated) alert(t("pricing.dialogs.paymentCompleted"));
+      } else alert(d.error || t("pricing.dialogs.cancelPendingFailed"));
     } catch (e) {
-      alert(e.message || "Failed");
+      alert(e.message || t("pricing.dialogs.failed"));
     } finally {
       setPayBusy("");
     }
@@ -302,7 +313,7 @@ export default function Pricing() {
               <button
                 onClick={() => navigate("/")}
                 className="pricing-nav-close"
-                aria-label="Back to Corez"
+                aria-label={t("pricing.page.backToCorez")}
               >
                 <X size={16} strokeWidth={2} />
               </button>
@@ -313,7 +324,7 @@ export default function Pricing() {
                 onClick={() => navigate("/login")}
                 className="pricing-nav-login"
               >
-                Sign in
+                {t("pricing.page.signIn")}
               </button>
             </>
           )}
@@ -321,16 +332,12 @@ export default function Pricing() {
       </div>
       <header className="pricing-header">
         <div className="pricing-hero">
-          <h1 className="pricing-title">Plans that grow with you</h1>
-          <p className="pricing-subtitle">
-            Start free, upgrade when you need more. All plans include live
-            preview, one-click publish and monthly billing via Ziina. Cancel
-            anytime.
-          </p>
+          <h1 className="pricing-title">{t("pricing.page.title")}</h1>
+          <p className="pricing-subtitle">{t("pricing.page.subtitle")}</p>
           <div
             className="pricing-toggle"
             role="radiogroup"
-            aria-label="Billing interval"
+            aria-label={t("pricing.page.billingInterval")}
           >
             <button
               type="button"
@@ -339,7 +346,7 @@ export default function Pricing() {
               className={billing === "monthly" ? "active" : ""}
               onClick={() => setBilling("monthly")}
             >
-              Monthly
+              {t("pricing.page.monthly")}
             </button>
             <button
               type="button"
@@ -348,7 +355,9 @@ export default function Pricing() {
               className={billing === "yearly" ? "active" : ""}
               onClick={() => setBilling("yearly")}
             >
-              Yearly <span className="pricing-save">Save 20%</span>
+              {t("pricing.page.yearly")}
+              {" "}
+              <span className="pricing-save">{t("pricing.page.saveYearly")}</span>
             </button>
           </div>
         </div>
@@ -371,7 +380,11 @@ export default function Pricing() {
             }}
           >
             <span style={{ color: "var(--text-secondary)", lineHeight: 1.4 }}>
-              An unfinished <strong style={{ color: "var(--text-primary)", textTransform: "capitalize" }}>{sub.pending_plan}</strong> checkout is waiting — you still have <strong style={{ textTransform: "capitalize" }}>{currentPlan}</strong> until you complete or cancel it.
+              {t("pricing.pending.intro")}
+              <strong style={{ color: "var(--text-primary)", textTransform: "capitalize" }}>{sub.pending_plan}</strong>
+              {t("pricing.pending.middle")}
+              <strong style={{ textTransform: "capitalize" }}>{currentPlan}</strong>
+              {t("pricing.pending.end")}
             </span>
             <span style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
               <button
@@ -390,7 +403,9 @@ export default function Pricing() {
                   whiteSpace: "nowrap",
                 }}
               >
-                {payBusy === sub.pending_plan ? "Loading…" : "Continue payment"}
+                {payBusy === sub.pending_plan
+                  ? t("common.status.loading")
+                  : t("pricing.page.continuePayment")}
               </button>
               <button
                 type="button"
@@ -408,7 +423,7 @@ export default function Pricing() {
                   whiteSpace: "nowrap",
                 }}
               >
-                Cancel
+                {t("common.action.cancel")}
               </button>
             </span>
           </div>
@@ -431,13 +446,18 @@ export default function Pricing() {
             }}
           >
             <span style={{ color: "var(--text-secondary)", lineHeight: 1.4 }}>
-              Scheduled to downgrade to <strong style={{ color: "var(--text-primary)", textTransform: "capitalize" }}>{sub.downgrade_plan}</strong> on{" "}
-              {sub.period_end ? new Date(sub.period_end).toLocaleDateString() : "period end"} — you keep <strong style={{ textTransform: "capitalize" }}>{currentPlan}</strong> until then.
+              {t("pricing.scheduled.intro")}
+              <strong style={{ color: "var(--text-primary)", textTransform: "capitalize" }}>{sub.downgrade_plan}</strong>
+              {t("pricing.scheduled.on")}
+              {sub.period_end ? formatDate(sub.period_end, language) : t("pricing.page.periodEnd")}
+              {t("pricing.scheduled.end")}
+              <strong style={{ textTransform: "capitalize" }}>{currentPlan}</strong>
+              {t("pricing.scheduled.until")}
             </span>
             <button
               type="button"
               onClick={async () => {
-                if (!confirm("Keep current plan? Cancel scheduled downgrade.")) return;
+                if (!confirm(t("pricing.dialogs.keepPlan"))) return;
                 try {
                   const r = await fetch("/api/subscriptions/cancel", {
                     method: "POST",
@@ -447,16 +467,20 @@ export default function Pricing() {
                   });
                   const d = await r.json().catch(() => ({}));
                   if (r.ok) {
-                    alert("Scheduled downgrade canceled — keeping " + currentPlan);
+                    alert(
+                      t("pricing.dialogs.downgradeCanceled", {
+                        plan: currentPlan,
+                      }),
+                    );
                     const mr = await fetch("/api/subscriptions/me", { credentials: "include" });
                     const md = await mr.json().catch(() => ({}));
                     if (mr.ok) {
                       setSub(md);
                       if (md?.plan) setCurrentPlan(md.plan);
                     }
-                  } else alert(d.error || "Failed");
+                  } else alert(d.error || t("pricing.dialogs.failed"));
                 } catch (e) {
-                  alert(e.message || "Failed");
+                  alert(e.message || t("pricing.dialogs.failed"));
                 }
               }}
               style={{
@@ -471,7 +495,7 @@ export default function Pricing() {
                 whiteSpace: "nowrap",
               }}
             >
-              Keep {currentPlan}
+              {t("pricing.page.keepPlan", { plan: currentPlan })}
             </button>
           </div>
         </div>
@@ -496,29 +520,30 @@ export default function Pricing() {
                 className={`pricing-card-page ${p.premium ? "pricing-card-page--premium" : ""} ${p.highlight ? "pricing-card-page--highlight" : ""} ${isCurrent ? "pricing-card-page--current" : ""}`}
               >
                 {p.popular && (
-                  <span className="pricing-popular-page">Most popular</span>
+                  <span className="pricing-popular-page">
+                    {t("pricing.page.mostPopular")}
+                  </span>
                 )}
                 {isCurrent && (
                   <span className="pricing-current-page">
-                    <Check size={11} /> Current
+                    <Check size={11} /> {t("pricing.page.current")}
                   </span>
                 )}
                 <div className="pricing-card-page-icon">
                   <Icon size={18} strokeWidth={1.75} />
                 </div>
-                <div className="pricing-card-page-name">{p.name}</div>
-                <div className="pricing-card-page-desc">{p.desc}</div>
+                <div className="pricing-card-page-name">{t(p.name)}</div>
+                <div className="pricing-card-page-desc">{t(p.desc)}</div>
                 <div className="pricing-card-page-price">
                   <span className="pricing-amount">{displayPrice}</span>
                   <span className="pricing-currency">{p.currency}</span>
-                  <span className="pricing-interval">{p.interval}</span>
+                  <span className="pricing-interval">{t(p.interval)}</span>
                 </div>
                 {billing === "yearly" && p.id !== "free" && (
                   <div className="pricing-billed-yearly">
-                    Billed yearly •{" "}
-                    {p.id === "standard"
-                      ? "176.28 AED / year"
-                      : "264.36 AED / year"}
+                    {t("pricing.page.billedYearly", {
+                      amount: p.id === "standard" ? "176.28" : "264.36",
+                    })}
                   </div>
                 )}
                 <button
@@ -528,14 +553,14 @@ export default function Pricing() {
                   className={`pricing-cta-page ${p.premium ? "premium" : p.id === "standard" ? "standard" : "free"} ${isCurrent || sub?.downgrade_plan === p.id ? "current" : ""}`}
                 >
                   {busy
-                    ? "Processing…"
+                    ? t("pricing.page.processing")
                     : isCurrent
-                      ? "Current plan"
+                      ? t("pricing.page.currentPlan")
                       : sub?.downgrade_plan === p.id
-                        ? "Scheduled"
+                        ? t("pricing.page.scheduled")
                         : tierRank[p.id] < tierRank[currentPlan]
-                          ? "Downgrade"
-                          : p.cta}
+                          ? t("pricing.page.downgrade")
+                          : t(p.cta)}
                   {!isCurrent && sub?.downgrade_plan !== p.id && tierRank[p.id] >= tierRank[currentPlan] && p.id !== "free" && (
                     <ArrowRight size={14} strokeWidth={1.75} />
                   )}
@@ -546,14 +571,14 @@ export default function Pricing() {
                       <span className="pricing-check">
                         <Check size={12} strokeWidth={2} />
                       </span>
-                      {f}
+                      {t(f)}
                     </li>
                   ))}
                 </ul>
                 {p.id !== "free" && (
                   <div className="pricing-secure">
-                    <Shield size={12} /> Secure checkout via Ziina •{" "}
-                    <Clock size={12} /> Monthly • Cancel anytime
+                    <Shield size={12} /> {t("pricing.page.secureCheckout")}{" "}
+                    <Clock size={12} /> {t("pricing.page.monthlyCancel")}
                   </div>
                 )}
               </div>
@@ -564,16 +589,16 @@ export default function Pricing() {
       </main>
 
       <footer className="pricing-footer">
-        <Link to="/privacy">Privacy Policy</Link>
-        <Link to="/terms">Terms &amp; Conditions</Link>
-        <Link to="/cookies">Cookie Policy</Link>
-        <Link to="/refunds">Refund Policy</Link>
+        <Link to="/privacy">{t("pricing.page.privacyPolicy")}</Link>
+        <Link to="/terms">{t("pricing.page.terms")}</Link>
+        <Link to="/cookies">{t("pricing.page.cookiePolicy")}</Link>
+        <Link to="/refunds">{t("pricing.page.refundPolicy")}</Link>
         <button
           type="button"
           className="pricing-footer-plain"
           onClick={openConsentPreferences}
         >
-          Cookie settings
+          {t("pricing.page.cookieSettings")}
         </button>
       </footer>
     </div>

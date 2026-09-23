@@ -12,6 +12,12 @@ import {
   CheckCircle2,
   Loader2,
 } from "lucide-react";
+import { useI18n } from "../i18n/index.jsx";
+
+// Sentinel stored when a game error carries no message. Compared against at
+// render time so the message listener keeps its existing dependencies and the
+// visible text comes from canvas.game.runtimeError.
+const GAME_RUNTIME_ERROR_DEFAULT = "An error occurred inside the game runtime.";
 
 export function sanitizeGameHtml(rawHtml) {
   if (!rawHtml) return "";
@@ -71,6 +77,7 @@ export default function SecureGamePreview({
   isFullScreen,
   onToggleFullScreen,
 }) {
+  const { t } = useI18n();
   const [gameState, setGameState] = useState("LOADING"); // 'LOADING' | 'READY' | 'PLAYING' | 'GAMEOVER' | 'ERROR'
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState(null);
@@ -105,9 +112,7 @@ export default function SecureGamePreview({
 
         case "GAME_ERROR":
           setGameState("ERROR");
-          setErrorMessage(
-            payload?.message || "An error occurred inside the game runtime.",
-          );
+          setErrorMessage(payload?.message || GAME_RUNTIME_ERROR_DEFAULT);
           if (onGameStatusChange) onGameStatusChange("ERROR", payload);
           break;
 
@@ -176,12 +181,14 @@ export default function SecureGamePreview({
           )}
           <span style={{ fontWeight: 600 }}>
             {gameState === "LOADING"
-              ? `Loading Game Assets (${loadingProgress}%)...`
+              ? t("canvas.game.loadingAssets", { progress: loadingProgress })
               : gameState === "READY"
-                ? "Game Ready to Play"
+                ? t("canvas.game.ready")
                 : gameState === "GAMEOVER"
-                  ? `Game Over ${gameScore !== null ? `- Score: ${gameScore}` : ""}`
-                  : "Secure Game Sandbox"}
+                  ? gameScore !== null
+                    ? t("canvas.game.overWithScore", { score: gameScore })
+                    : t("canvas.game.over")
+                  : t("canvas.game.sandbox")}
           </span>
         </div>
 
@@ -190,7 +197,7 @@ export default function SecureGamePreview({
             type="button"
             className="code-btn"
             onClick={handleRestart}
-            title="Restart Game"
+            title={t("canvas.game.restartTitle")}
             style={{
               padding: "4px 8px",
               fontSize: "0.75rem",
@@ -200,14 +207,18 @@ export default function SecureGamePreview({
             }}
           >
             <RotateCw size={12} />
-            <span>Restart</span>
+            <span>{t("canvas.game.restart")}</span>
           </button>
           {onToggleFullScreen && (
             <button
               type="button"
               className="code-btn"
               onClick={onToggleFullScreen}
-              title={isFullScreen ? "Exit Fullscreen" : "Fullscreen"}
+              title={
+                isFullScreen
+                  ? t("chat.message.image.exitFullscreenLabel")
+                  : t("chat.message.image.fullscreen")
+              }
               style={{ padding: "4px 8px", fontSize: "0.75rem" }}
             >
               {isFullScreen ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
@@ -228,7 +239,7 @@ export default function SecureGamePreview({
       >
         <iframe
           ref={iframeRef}
-          title="COREZ Secure Game Sandbox"
+          title={t("canvas.game.iframeTitle")}
           referrerPolicy="no-referrer"
           srcDoc={sanitizedHtml}
           sandbox="allow-scripts allow-pointer-lock allow-downloads allow-popups"
@@ -257,7 +268,7 @@ export default function SecureGamePreview({
           >
             <AlertTriangle size={32} style={{ marginBottom: "12px" }} />
             <p style={{ fontWeight: 600, marginBottom: "8px" }}>
-              Runtime Game Error
+              {t("canvas.game.errorTitle")}
             </p>
             <p
               style={{
@@ -267,7 +278,9 @@ export default function SecureGamePreview({
                 maxWidth: "480px",
               }}
             >
-              {errorMessage}
+              {errorMessage === GAME_RUNTIME_ERROR_DEFAULT
+                ? t("canvas.game.runtimeError")
+                : errorMessage}
             </p>
             <button
               type="button"
@@ -275,7 +288,7 @@ export default function SecureGamePreview({
               onClick={handleRestart}
               style={{ marginTop: "16px" }}
             >
-              Retry Game
+              {t("canvas.game.retry")}
             </button>
           </div>
         )}

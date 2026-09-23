@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { PlusIcon } from "./icons";
+import { useI18n } from "../i18n/index.jsx";
 import {
   processFiles,
   formatBytes,
@@ -25,7 +26,7 @@ const COMMANDS = [
     command: "website",
     label: "@website",
     name: "Website",
-    description: "Create a website or web page",
+    descriptionKey: "chat.composer.commands.website",
     icon: Globe,
     placeholder: "Describe the website you want to build...",
   },
@@ -33,7 +34,7 @@ const COMMANDS = [
     command: "game",
     label: "@game",
     name: "Game",
-    description: "Create a playable game",
+    descriptionKey: "chat.composer.commands.game",
     icon: Gamepad2,
     placeholder: "Describe the game you want to build...",
   },
@@ -41,7 +42,7 @@ const COMMANDS = [
     command: "research",
     label: "@research",
     name: "Research",
-    description: "Deep research: multi-item web search + PDF report",
+    descriptionKey: "chat.composer.commands.research",
     icon: Search,
     placeholder: "Enter a research topic or question...",
   },
@@ -49,7 +50,7 @@ const COMMANDS = [
     command: "image",
     label: "@image",
     name: "Image",
-    description: "Generate an AI image or artwork",
+    descriptionKey: "chat.composer.commands.image",
     icon: ImageIcon,
     placeholder: "Describe the image you want to generate...",
   },
@@ -66,6 +67,7 @@ export default function ChatInput({
   setAttachments: externalSetAttachments,
   onAddFiles,
 }) {
+  const { t } = useI18n();
   const internalRef = useRef(null);
   const refToUse = textareaRef || internalRef;
   const [showSuggestions, setShowSuggestions] = useState(() =>
@@ -310,7 +312,7 @@ export default function ChatInput({
             className="slash-suggestions"
             ref={suggestionsRef}
             role="listbox"
-            aria-label="Commands"
+            aria-label={t("chat.composer.commandsLabel")}
           >
             {filtered.map((entry, index) => {
               const Icon = entry.icon;
@@ -320,7 +322,10 @@ export default function ChatInput({
                   type="button"
                   role="option"
                   aria-selected={index === activeIndex}
-                  aria-label={`${entry.label}: ${entry.description}`}
+                  aria-label={t("chat.composer.suggestionLabel", {
+                    label: entry.label,
+                    description: t(entry.descriptionKey),
+                  })}
                   className={`slash-suggestion-item ${index === activeIndex ? "active" : ""}`}
                   onMouseEnter={() => setActiveIndex(index)}
                   onClick={() => applySuggestion(entry.command)}
@@ -329,7 +334,7 @@ export default function ChatInput({
                     <Icon size={15} strokeWidth={1.5} />
                   </span>
                   <span className="slash-suggestion-desc">
-                    {entry.description}
+                    {t(entry.descriptionKey)}
                   </span>
                   <ChevronRight
                     size={14}
@@ -342,7 +347,7 @@ export default function ChatInput({
           </div>
         )}
         {attachments.length > 0 && (
-          <div className="attachment-chips-bar" aria-label="Attached files">
+          <div className="attachment-chips-bar" aria-label={t("chat.attachments.label")}>
             {attachments.map((attachment) => {
               const isPendingThumb =
                 attachment.type?.startsWith("image/") &&
@@ -379,13 +384,16 @@ export default function ChatInput({
                   ) : null}
                   <span
                     className="chip-filename"
-                    title={`${attachment.name} (${formatBytes(attachment.size)})`}
+                    title={t("chat.attachments.fileTitle", {
+                      name: attachment.name,
+                      size: formatBytes(attachment.size),
+                    })}
                   >
                     {attachment.name}{" "}
                     {isPending
                       ? isUploading
-                        ? "(uploading...)"
-                        : "(loading...)"
+                        ? t("chat.attachments.uploading")
+                        : t("chat.attachments.loading")
                       : attachment.assetUrl
                         ? "✓"
                         : ""}
@@ -394,8 +402,10 @@ export default function ChatInput({
                     type="button"
                     className="remove-chip-btn"
                     onClick={() => removeAttachment(attachment.id)}
-                    aria-label={`Remove ${attachment.name}`}
-                    title="Remove attachment"
+                    aria-label={t("chat.attachments.remove", {
+                      name: attachment.name,
+                    })}
+                    title={t("chat.attachments.removeTitle")}
                     disabled={isStreaming}
                   >
                     <X size={12} strokeWidth={1.5} />
@@ -410,8 +420,8 @@ export default function ChatInput({
           type="button"
           className="attach-btn"
           onClick={() => fileInputRef.current?.click()}
-          title="Attach files"
-          aria-label="Attach files"
+          title={t("chat.composer.attachFiles")}
+          aria-label={t("chat.composer.attachFiles")}
           disabled={isStreaming}
         >
           <PlusIcon size={18} strokeWidth={2} />
@@ -439,8 +449,16 @@ export default function ChatInput({
           }}
           onKeyDown={handleKeyDown}
           onPaste={handleInputPaste}
-          placeholder={isStreaming ? "Corez is generating..." : "Ask Corez..."}
-          aria-label={isStreaming ? "Corez is generating" : "Message Corez"}
+          placeholder={
+            isStreaming
+              ? t("chat.composer.placeholderStreaming")
+              : t("chat.composer.placeholder")
+          }
+          aria-label={
+            isStreaming
+              ? t("chat.composer.ariaStreaming")
+              : t("chat.composer.ariaMessage")
+          }
           rows={1}
         />
         <div className="input-actions-bar">
@@ -449,7 +467,7 @@ export default function ChatInput({
               type="button"
               className="send-btn stop-btn"
               onClick={onStopMessage}
-              title="Stop Generation"
+              title={t("chat.composer.stopGeneration")}
             >
               <Square size={13} fill="currentColor" strokeWidth={1.5} />
             </button>
@@ -461,7 +479,9 @@ export default function ChatInput({
                 (!input.trim() && attachments.length === 0) || hasPendingImage
               }
               title={
-                hasPendingImage ? "Image still loading..." : "Send Message"
+                hasPendingImage
+                  ? t("chat.composer.imageLoading")
+                  : t("chat.composer.sendMessage")
               }
             >
               <Send size={15} strokeWidth={1.5} />

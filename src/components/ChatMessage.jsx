@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { extractCodeFromMessage } from "../services/aiService";
 import { stripJunkAfterDocumentEnd } from "../utils/htmlRepair";
+import { useI18n } from "../i18n/index.jsx";
 
 function safeImageUrl(url) {
   if (!url || typeof url !== "string") return "";
@@ -133,6 +134,7 @@ function extractUnfencedDeliverable(text) {
 }
 
 function CodeSnippetBlock({ code, lang, onRunInCanvas, onReviseCode }) {
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -165,10 +167,10 @@ function CodeSnippetBlock({ code, lang, onRunInCanvas, onReviseCode }) {
                 gap: "0.35rem",
               }}
               onClick={() => onRunInCanvas(code)}
-              title="Run app live in preview canvas"
+              title={t("chat.message.code.runLive")}
             >
               <Layers size={13} strokeWidth={2} />
-              <span>Open preview</span>
+              <span>{t("chat.message.code.openPreview")}</span>
             </button>
           )}
           {onReviseCode && (
@@ -184,19 +186,21 @@ function CodeSnippetBlock({ code, lang, onRunInCanvas, onReviseCode }) {
                 gap: "0.35rem",
               }}
               onClick={() => onReviseCode(code)}
-              title="Ask AI to revise this code"
+              title={t("chat.message.code.reviseTitle")}
             >
               <Wand2 size={13} strokeWidth={1.5} />
-              <span>Revise</span>
+              <span>{t("chat.message.code.revise")}</span>
             </button>
           )}
-          <button className="code-btn" onClick={handleCopy} title="Copy code">
+          <button className="code-btn" onClick={handleCopy} title={t("chat.message.code.copyTitle")}>
             {copied ? (
               <Check size={12} strokeWidth={1.5} />
             ) : (
               <Copy size={12} strokeWidth={1.5} />
             )}
-            <span>{copied ? "Copied" : "Copy"}</span>
+            <span>
+              {copied ? t("common.action.copied") : t("common.action.copy")}
+            </span>
           </button>
         </div>
       </div>
@@ -208,6 +212,7 @@ function CodeSnippetBlock({ code, lang, onRunInCanvas, onReviseCode }) {
 }
 
 function ExecutableCodeBlock({ code, onRunInCanvas, onReviseCode }) {
+  const { t } = useI18n();
   return (
     <div
       className="executable-code-action-bar"
@@ -240,10 +245,10 @@ function ExecutableCodeBlock({ code, onRunInCanvas, onReviseCode }) {
             transition: "var(--transition-fast)",
           }}
           onClick={() => onRunInCanvas(code)}
-          title="Run app live in preview canvas"
+          title={t("chat.message.code.runLive")}
         >
           <Layers size={16} strokeWidth={2} />
-          <span>Open Canvas Preview</span>
+          <span>{t("chat.message.code.openCanvasPreview")}</span>
         </button>
       )}
       {onReviseCode && (
@@ -266,10 +271,10 @@ function ExecutableCodeBlock({ code, onRunInCanvas, onReviseCode }) {
             transition: "var(--transition-fast)",
           }}
           onClick={() => onReviseCode(code)}
-          title="Ask AI to revise this code"
+          title={t("chat.message.code.reviseTitle")}
         >
           <Wand2 size={16} strokeWidth={1.5} />
-          <span>Revise</span>
+          <span>{t("chat.message.code.revise")}</span>
         </button>
       )}
     </div>
@@ -370,6 +375,7 @@ export async function copyImageToClipboard(url) {
 }
 
 function MessageActions({ content }) {
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   const [rating, setRating] = useState(null); // 'like' | 'dislike' | null
   const [rateOpen, setRateOpen] = useState(false);
@@ -425,7 +431,7 @@ function MessageActions({ content }) {
   const handleShare = async () => {
     const imgMatch = content.match(/^!\[(.*?)\]\((.*?)\)\s*$/);
     const shareData = {
-      title: "COREZ AI Response",
+      title: t("chat.actions.shareTitle"),
       text: imgMatch
         ? new URL(imgMatch[2], window.location.origin).href
         : content,
@@ -448,13 +454,21 @@ function MessageActions({ content }) {
   };
 
   return (
-    <div className="message-actions" aria-label="Message actions">
+    <div className="message-actions" aria-label={t("chat.actions.label")}>
       <button
         type="button"
         className={`message-action-btn copy-action ${copied ? "active" : ""}`}
         onClick={handleCopy}
-        title={copied ? "Response copied" : "Copy response"}
-        aria-label={copied ? "Response copied" : "Copy response"}
+        title={
+          copied
+            ? t("chat.actions.responseCopied")
+            : t("chat.actions.copyResponse")
+        }
+        aria-label={
+          copied
+            ? t("chat.actions.responseCopied")
+            : t("chat.actions.copyResponse")
+        }
       >
         {copied ? (
           <Check size={14} strokeWidth={1.5} />
@@ -470,11 +484,15 @@ function MessageActions({ content }) {
           title={
             rating
               ? rating === "good"
-                ? "Good response (click to change)"
-                : "Bad response (click to change)"
-              : "Rate response"
+                ? t("chat.actions.goodResponseChange")
+                : t("chat.actions.badResponseChange")
+              : t("chat.actions.rateResponse")
           }
-          aria-label={rating ? "Change rating" : "Rate response"}
+          aria-label={
+            rating
+              ? t("chat.actions.changeRating")
+              : t("chat.actions.rateResponse")
+          }
           aria-pressed={!!rating}
           aria-expanded={rateOpen}
           aria-haspopup="true"
@@ -491,14 +509,14 @@ function MessageActions({ content }) {
           <div
             className="rate-options"
             role="group"
-            aria-label="Rate this response"
+            aria-label={t("chat.actions.rateThisResponse")}
           >
             <button
               type="button"
               className={`rate-option-btn ${rating === "good" ? "active good" : ""}`}
               onClick={() => handleRateChoice("good")}
-              title="Good response"
-              aria-label="Good response"
+              title={t("chat.actions.goodResponse")}
+              aria-label={t("chat.actions.goodResponse")}
               aria-pressed={rating === "good"}
             >
               <ThumbsUp size={13} strokeWidth={1.5} />
@@ -507,8 +525,8 @@ function MessageActions({ content }) {
               type="button"
               className={`rate-option-btn ${rating === "bad" ? "active bad" : ""}`}
               onClick={() => handleRateChoice("bad")}
-              title="Bad response"
-              aria-label="Bad response"
+              title={t("chat.actions.badResponse")}
+              aria-label={t("chat.actions.badResponse")}
               aria-pressed={rating === "bad"}
             >
               <ThumbsDown size={13} strokeWidth={1.5} />
@@ -520,8 +538,8 @@ function MessageActions({ content }) {
         type="button"
         className={`message-action-btn ${shared ? "active" : ""}`}
         onClick={handleShare}
-        title={shared ? "Copied" : "Share response"}
-        aria-label={shared ? "Copied" : "Share response"}
+        title={shared ? t("common.action.copied") : t("chat.actions.shareResponse")}
+        aria-label={shared ? t("common.action.copied") : t("chat.actions.shareResponse")}
       >
         <Share2 size={14} strokeWidth={1.5} />
       </button>
@@ -676,6 +694,7 @@ export function splitTextAndEmail(text) {
 }
 
 function EmailCard({ content, renderBody }) {
+  const { t } = useI18n();
   const initial = parseEmailContent(content);
   const [editing, setEditing] = useState(false);
   const [subject, setSubject] = useState(initial.subject);
@@ -733,13 +752,15 @@ function EmailCard({ content, renderBody }) {
             type="button"
             className={`email-action-btn ${editing ? "active" : ""}`}
             onClick={editing ? cancelEdit : startEdit}
-            aria-label={editing ? "Cancel editing" : "Edit email"}
-            title={editing ? "Cancel" : "Edit"}
+            aria-label={
+              editing ? t("chat.message.email.cancelEditing") : t("chat.message.email.edit")
+            }
+            title={editing ? t("common.action.cancel") : t("chat.message.email.editAction")}
           >
             {editing ? <X size={13} /> : <Pencil size={13} />}
           </button>
           <span className="email-action-label">
-            {editing ? "Cancel" : "Edit"}
+            {editing ? t("common.action.cancel") : t("chat.message.email.editAction")}
           </span>
         </div>
         <div className="email-toolbar-right">
@@ -749,9 +770,9 @@ function EmailCard({ content, renderBody }) {
                 type="button"
                 className="email-save-btn"
                 onClick={saveEdit}
-                aria-label="Save email"
+                aria-label={t("chat.message.email.save")}
               >
-                <Check size={14} /> Save
+                <Check size={14} /> {t("common.action.save")}
               </button>
             </>
           ) : (
@@ -760,8 +781,10 @@ function EmailCard({ content, renderBody }) {
                 type="button"
                 className={`email-icon-btn ${copied ? "active" : ""}`}
                 onClick={handleCopy}
-                aria-label={copied ? "Email copied" : "Copy email"}
-                title={copied ? "Copied" : "Copy email"}
+                aria-label={
+                  copied ? t("chat.message.email.copied") : t("chat.message.email.copy")
+                }
+                title={copied ? t("common.action.copied") : t("chat.message.email.copy")}
               >
                 {copied ? <Check size={15} /> : <Copy size={15} />}
               </button>
@@ -779,7 +802,7 @@ function EmailCard({ content, renderBody }) {
       {editing ? (
         <div className="email-edit-fields">
           <label className="email-edit-field">
-            <span className="email-edit-label">Recipients</span>
+            <span className="email-edit-label">{t("chat.message.email.recipients")}</span>
             <input
               name="email-recipients"
               className="email-edit-input"
@@ -789,17 +812,17 @@ function EmailCard({ content, renderBody }) {
             />
           </label>
           <label className="email-edit-field">
-            <span className="email-edit-label">Subject</span>
+            <span className="email-edit-label">{t("chat.message.email.subject")}</span>
             <input
               name="email-subject"
               className="email-edit-input"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              placeholder="Email subject"
+              placeholder={t("chat.message.email.subjectPlaceholder")}
             />
           </label>
           <label className="email-edit-field">
-            <span className="email-edit-label">Message</span>
+            <span className="email-edit-label">{t("chat.message.email.message")}</span>
             <textarea
               name="email-body"
               className="email-edit-textarea"
@@ -825,6 +848,7 @@ function EmailCard({ content, renderBody }) {
 }
 
 export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
+  const { t } = useI18n();
   const isUser = message.role === "user";
   const [fullscreenImage, setFullscreenImage] = useState(null);
   const [imageCopied, setImageCopied] = useState(false);
@@ -914,7 +938,7 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
   const renderAttachments = (attachments) => {
     if (!Array.isArray(attachments) || attachments.length === 0) return null;
     return (
-      <div className="message-attachments" aria-label="Attached files">
+      <div className="message-attachments" aria-label={t("chat.attachments.label")}>
         {attachments.map((attachment) => (
           <span
             key={attachment.id || attachment.name}
@@ -958,7 +982,9 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
             className="markdown-inline-img-wrapper"
             role="button"
             tabIndex={0}
-            aria-label={`View fullscreen: ${altText || "image"}`}
+            aria-label={t("chat.message.image.viewFullscreenAria", {
+              alt: altText || t("chat.message.image.imageFallback"),
+            })}
             onClick={() =>
               safeUrl && setFullscreenImage({ url: safeUrl, alt: altText })
             }
@@ -1135,7 +1161,9 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
               className="markdown-image-card"
               role="button"
               tabIndex={0}
-              aria-label={`View fullscreen: ${altText || "image"}`}
+              aria-label={t("chat.message.image.viewFullscreenAria", {
+                alt: altText || t("chat.message.image.imageFallback"),
+              })}
               onClick={() =>
                 safeUrl && setFullscreenImage({ url: safeUrl, alt: altText })
               }
@@ -1156,11 +1184,11 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
                     if (safeUrl)
                       setFullscreenImage({ url: safeUrl, alt: altText });
                   }}
-                  aria-label="View fullscreen"
-                  title="View fullscreen"
+                  aria-label={t("chat.message.image.viewFullscreen")}
+                  title={t("chat.message.image.viewFullscreen")}
                 >
                   <Maximize2 size={13} strokeWidth={2} />
-                  <span>Fullscreen</span>
+                  <span>{t("chat.message.image.fullscreen")}</span>
                 </button>
               </div>
             </div>
@@ -1491,7 +1519,9 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
             >
               <Layers size={14} strokeWidth={1.5} />
               <span>
-                Attached code block ({part.code.split("\n").length} lines)
+                {t("chat.message.attachedCodeBlock", {
+                  count: part.code.split("\n").length,
+                })}
               </span>
             </div>
           );
@@ -1534,7 +1564,9 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
           className="image-fullscreen-modal"
           role="dialog"
           aria-modal="true"
-          aria-label={fullscreenImage.alt || "Fullscreen Image Preview"}
+          aria-label={
+            fullscreenImage.alt || t("chat.message.image.fullscreenPreview")
+          }
           onClick={() => setFullscreenImage(null)}
         >
           <div className="image-fullscreen-backdrop" />
@@ -1544,7 +1576,7 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
           >
             <div className="image-fullscreen-toolbar">
               <span className="image-fullscreen-title">
-                {fullscreenImage.alt || "Generated Image"}
+                {fullscreenImage.alt || t("chat.message.image.generatedImage")}
               </span>
               <div className="image-fullscreen-actions">
                 <button
@@ -1553,11 +1585,13 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
                   onClick={handleCopyImage}
                   title={
                     imageCopied
-                      ? "Image copied to clipboard"
-                      : "Copy image to clipboard"
+                      ? t("chat.message.image.copiedToClipboard")
+                      : t("chat.message.image.copyToClipboard")
                   }
                   aria-label={
-                    imageCopied ? "Image copied to clipboard" : "Copy image"
+                    imageCopied
+                      ? t("chat.message.image.copiedToClipboard")
+                      : t("chat.message.image.copy")
                   }
                 >
                   {imageCopied ? (
@@ -1565,27 +1599,31 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
                   ) : (
                     <Copy size={15} strokeWidth={1.75} />
                   )}
-                  <span>{imageCopied ? "Copied Image" : "Copy Image"}</span>
+                  <span>
+                    {imageCopied
+                      ? t("chat.message.image.copied")
+                      : t("chat.message.image.copyImage")}
+                  </span>
                 </button>
                 <button
                   type="button"
                   className="image-fullscreen-btn"
                   onClick={handleDownloadImage}
-                  title="Download image"
-                  aria-label="Download image"
+                  title={t("chat.message.image.download")}
+                  aria-label={t("chat.message.image.download")}
                 >
                   <Download size={15} strokeWidth={1.75} />
-                  <span>Download</span>
+                  <span>{t("common.action.download")}</span>
                 </button>
                 <button
                   type="button"
                   className="image-fullscreen-btn exit-fullscreen-btn"
                   onClick={handleExitFullscreen}
-                  title="Exit fullscreen (Esc)"
-                  aria-label="Exit fullscreen"
+                  title={t("chat.message.image.exitFullscreenTitle")}
+                  aria-label={t("chat.message.image.exitFullscreen")}
                 >
                   <Minimize2 size={15} strokeWidth={1.75} />
-                  <span>Exit Fullscreen</span>
+                  <span>{t("chat.message.image.exitFullscreenLabel")}</span>
                 </button>
               </div>
             </div>
@@ -1595,7 +1633,7 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
             >
               <img
                 src={fullscreenImage.url}
-                alt={fullscreenImage.alt || "Generated Image"}
+                alt={fullscreenImage.alt || t("chat.message.image.generatedImage")}
                 className="image-fullscreen-img"
                 onClick={(e) => e.stopPropagation()}
               />

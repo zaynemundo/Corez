@@ -1,4 +1,22 @@
 import { Component } from "react";
+import { useI18n } from "../i18n/index.jsx";
+
+function ErrorBoundaryFallback({ error, onReload }) {
+  const { t } = useI18n();
+  return (
+    <div className="error-boundary-fallback">
+      <div className="error-boundary-content">
+        <h2>{t("canvas.errorBoundary.title")}</h2>
+        <p className="error-boundary-detail">
+          {error?.message || t("canvas.errorBoundary.detail")}
+        </p>
+        <button type="button" className="code-btn" onClick={onReload}>
+          {t("canvas.errorBoundary.reload")}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
@@ -17,24 +35,13 @@ export default class ErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="error-boundary-fallback">
-          <div className="error-boundary-content">
-            <h2>Something went wrong</h2>
-            <p className="error-boundary-detail">
-              {this.state.error?.message || "An unexpected error occurred."}
-            </p>
-            <button
-              type="button"
-              className="code-btn"
-              onClick={() => {
-                this.setState({ hasError: false, error: null });
-                window.location.reload();
-              }}
-            >
-              Reload Application
-            </button>
-          </div>
-        </div>
+        <ErrorBoundaryFallback
+          error={this.state.error}
+          onReload={() => {
+            this.setState({ hasError: false, error: null });
+            window.location.reload();
+          }}
+        />
       );
     }
     return this.props.children;

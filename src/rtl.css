@@ -1,0 +1,219 @@
+/* Right-to-left layout for languages such as Arabic.
+ *
+ * The shell is flexbox-based, so setting `dir="rtl"` on <html> already flips
+ * the sidebar to the right and reverses every row. What direction alone cannot
+ * fix is the handful of PHYSICAL rules in index.css (text-align: left,
+ * padding-left, border-left, inset left/right, a translateX on the collapsed
+ * sidebar). Everything of that kind is corrected here, in one reviewable file,
+ * instead of sprinkling [dir="rtl"] branches through index.css.
+ *
+ * Loaded after index.css (see src/main.jsx). LTR is untouched: every rule below
+ * is scoped to [dir="rtl"].
+ */
+
+/* Arabic-first font stack. Segoe UI / Tahoma / Geeza Pro / Noto Naskh Arabic
+   cover Windows, macOS, iOS and Android without shipping another webfont. */
+[dir="rtl"] body,
+[dir="rtl"] button,
+[dir="rtl"] input,
+[dir="rtl"] textarea,
+[dir="rtl"] select {
+  font-family:
+    "Segoe UI",
+    Tahoma,
+    "Noto Naskh Arabic",
+    "Noto Sans Arabic",
+    "Geeza Pro",
+    "Arial",
+    sans-serif;
+}
+
+/* Keep code, numbers and file paths readable left-to-right inside RTL text. */
+[dir="rtl"] pre,
+[dir="rtl"] code,
+[dir="rtl"] .code-content,
+[dir="rtl"] .canvas-source-editor,
+[dir="rtl"] .batch-input,
+[dir="rtl"] input[type="email"],
+[dir="rtl"] input[type="password"],
+[dir="rtl"] input[type="url"],
+[dir="rtl"] input[type="tel"] {
+  direction: ltr;
+  text-align: left;
+}
+
+/* ---------------------------------------------------------------- sidebar */
+[dir="rtl"] .sidebar {
+  border-right: none;
+  border-left: 1px solid var(--sidebar-border);
+}
+
+/* The collapsed sidebar slides out to the left in LTR; mirror the motion. */
+[dir="rtl"] .sidebar.collapsed {
+  transform: translateX(100%);
+}
+
+[dir="rtl"] .sidebar-toggle-btn {
+  left: auto;
+  right: 0.75rem;
+}
+
+/* ------------------------------------------------------- chat conversation */
+[dir="rtl"] .message-actions {
+  padding-left: 0;
+  padding-right: 0.15rem;
+}
+
+[dir="rtl"] .message-actions,
+[dir="rtl"] .message-body,
+[dir="rtl"] .message-content {
+  text-align: right;
+}
+
+/* ------------------------------------------------------------ markdown body */
+[dir="rtl"] .markdown-list {
+  padding-left: 0;
+  padding-right: 1.2rem;
+}
+
+[dir="rtl"] .markdown-list.ordered {
+  padding-left: 0;
+  padding-right: 1.45rem;
+}
+
+[dir="rtl"] .markdown-task-list-item {
+  margin-left: 0;
+  margin-right: -1.2rem;
+}
+
+[dir="rtl"] .markdown-callout {
+  border-left: none;
+  border-right: 3px solid var(--border-hover);
+}
+
+[dir="rtl"] .markdown-table th,
+[dir="rtl"] .markdown-table td {
+  text-align: right;
+}
+
+[dir="rtl"] .markdown-image-overlay {
+  right: auto;
+  left: 0.6rem;
+}
+
+/* --------------------------------------------------------------- composer */
+[dir="rtl"] .slash-suggestion-item,
+[dir="rtl"] .slash-suggestion-desc {
+  text-align: right;
+}
+
+/* ------------------------------------------------------- canvas / preview */
+[dir="rtl"] .canvas-pane {
+  border-left: none;
+  border-right: 1px solid var(--border-color);
+}
+
+[dir="rtl"] .canvas-pane.full-width {
+  border-right: none;
+}
+
+[dir="rtl"] .canvas-controls {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+[dir="rtl"] .preview-error-banner {
+  text-align: right;
+}
+
+/* -------------------------------------------------------- menus / dropdowns */
+[dir="rtl"] .history-menu-dropdown {
+  right: auto;
+  left: 0;
+}
+
+/* ------------------------------------------------------------ pricing page */
+[dir="rtl"] .pricing-card-features,
+[dir="rtl"] .pricing-features-page,
+[dir="rtl"] .pricing-manage-btn,
+[dir="rtl"] .sample-prompt-card {
+  text-align: right;
+}
+
+[dir="rtl"] .pricing-save {
+  margin-left: 0;
+  margin-right: 6px;
+}
+
+[dir="rtl"] .device-mode-bar {
+  margin-left: 0;
+  margin-right: 0.5rem;
+}
+
+[dir="rtl"] .linkedin-icon {
+  margin-right: 0;
+  margin-left: 5px;
+}
+
+[dir="rtl"] .showcase-body,
+[dir="rtl"] .showcase-gallery-section {
+  padding-right: 0;
+  padding-left: 0.25rem;
+}
+
+/* -------------------------------------------------------------- auth pages */
+/* The password field reserves room on the right for the show/hide button. */
+[dir="rtl"] .auth-password-wrapper input {
+  padding-right: 0;
+  padding-left: 42px;
+}
+
+/* ------------------------------------------------------------- legal pages */
+[dir="rtl"] .legal-toc ol {
+  border-left: none;
+  border-right: 1px solid var(--border-color);
+  padding-left: 0;
+  padding-right: 14px;
+}
+
+[dir="rtl"] .legal-list li {
+  padding-left: 0;
+  padding-right: 18px;
+}
+
+[dir="rtl"] .legal-list li::before {
+  left: auto;
+  right: 0;
+}
+
+[dir="rtl"] .legal-note {
+  border-left: none;
+  border-right: 2px solid var(--border-hover);
+}
+
+[dir="rtl"] .legal-table td,
+[dir="rtl"] .legal-table th {
+  text-align: right;
+}
+
+[dir="rtl"] .legal-footer {
+  padding-left: 18px;
+  padding-right: 18px;
+}
+
+/* ---------------------------------------------------------------- consent */
+[dir="rtl"] .consent-field-hint,
+[dir="rtl"] .consent-field-error {
+  padding-left: 0;
+  padding-right: 26px;
+}
+
+/* Directional glyphs point the other way in RTL. */
+[dir="rtl"] .lucide-arrow-left,
+[dir="rtl"] .lucide-arrow-right,
+[dir="rtl"] .lucide-chevron-left,
+[dir="rtl"] .lucide-chevron-right,
+[dir="rtl"] .lucide-panel-left,
+[dir="rtl"] .lucide-send {
+  transform: scaleX(-1);
+}

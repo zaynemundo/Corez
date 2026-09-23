@@ -18,6 +18,8 @@ import {
   Loader2,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useI18n } from "../i18n/index.jsx";
+import { formatDate } from "../i18n/format.js";
 import { openConsentPreferences } from "../services/consentService";
 import { listPublishedPages, unpublishPage } from "../services/appStorageService";
 import {
@@ -37,10 +39,10 @@ import {
 // in General, money in Billing, what is public in Publishing, and the choices
 // that are about data in Privacy.
 const SETTINGS_CATEGORIES = [
-  { id: "general", label: "General" },
-  { id: "billing", label: "Billing" },
-  { id: "publishing", label: "Publishing" },
-  { id: "privacy", label: "Privacy" },
+  { id: "general", labelKey: "settings.tabs.general" },
+  { id: "billing", labelKey: "settings.tabs.billing" },
+  { id: "publishing", labelKey: "settings.tabs.publishing" },
+  { id: "privacy", labelKey: "settings.tabs.privacy" },
 ];
 
 export default function SettingsModal({
@@ -59,6 +61,7 @@ export default function SettingsModal({
   const email = auth?.user?.email || "";
   const userPlan = auth?.user?.plan || "free";
   const isDark = theme === "dark";
+  const { t, language, setLanguage, languages } = useI18n();
   const [sub, setSub] = useState(null);
   const [subLoading, setSubLoading] = useState(false);
   const [published, setPublished] = useState([]);
@@ -124,7 +127,7 @@ export default function SettingsModal({
     const result = await buyAddon(sku.id);
     setBuyingSku("");
     if (!result.success) {
-      setAddonError(result.error || "Could not start the purchase.");
+      setAddonError(result.error || t("settings.billing.purchaseStartFailed"));
       return;
     }
     if (result.redirectUrl) {
@@ -133,16 +136,14 @@ export default function SettingsModal({
       window.location.href = result.redirectUrl;
       return;
     }
-    setAddonError(
-      "The payment page did not return a checkout link. Nothing was charged — please try again.",
-    );
+    setAddonError(t("settings.billing.checkoutLinkMissing"));
   };
 
   const handleUnpublish = async (page) => {
     const label = page.title || page.slug;
     if (
       !confirm(
-        `Remove the published page “${label}”?\n\nThe public link corez.pro${page.url} stops working immediately. The creation itself stays in its chat.`,
+        t("settings.publishing.confirmRemove", { title: label, url: page.url }),
       )
     ) {
       return;
@@ -155,13 +156,22 @@ export default function SettingsModal({
       setPublished((prev) => prev.filter((entry) => entry.slug !== page.slug));
       return;
     }
-    setRemoveError(result.error || "Could not remove that page.");
+    setRemoveError(result.error || t("settings.publishing.removeFailed"));
   };
 
   const currentPlan = sub?.plan || userPlan || "free";
   const isExpired = sub?.status === "expired" || sub?.isExpired;
+  // Plan ids ("free", "standard", "premium") are API values, not copy: show the
+  // translated plan name whenever the id is one we know, and fall back to the id
+  // itself so an unknown plan from the server still renders something honest.
+  const planName = (id) => {
+    if (!id) return "";
+    const key = `pricing.plans.${String(id).toLowerCase()}.name`;
+    const label = t(key);
+    return label === key ? String(id) : label;
+  };
   const periodEnd = sub?.period_end
-    ? new Date(sub.period_end).toLocaleDateString()
+    ? formatDate(sub.period_end, language)
     : null;
   const navigate = useNavigate();
 
@@ -223,12 +233,12 @@ export default function SettingsModal({
         <div className="modal-header">
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <Settings size={18} strokeWidth={1.5} />
-            <span className="modal-title" id={titleId}>Settings</span>
+            <span className="modal-title" id={titleId}>{t("common.sidebar.settings")}</span>
           </div>
           <button
             className="icon-btn"
             onClick={onClose}
-            aria-label="Close settings"
+            aria-label={t("settings.dialog.close")}
           >
             <X size={15} strokeWidth={1.5} />
           </button>
@@ -242,7 +252,7 @@ export default function SettingsModal({
             <div
               className="settings-tabs"
               role="tablist"
-              aria-label="Settings categories"
+              aria-label={t("settings.tabs.label")}
               onKeyDown={onTabsKeyDown}
             >
               {SETTINGS_CATEGORIES.map((entry) => (
@@ -261,7 +271,7 @@ export default function SettingsModal({
                   }}
                   onClick={() => setCategory(entry.id)}
                 >
-                  {entry.label}
+                  {t(entry.labelKey)}
                 </button>
               ))}
             </div>
@@ -274,27 +284,27 @@ export default function SettingsModal({
             hidden={category !== "general"}
           >
         <div className="settings-section">
-          <div className="settings-section-label">Account</div>
+          <div className="settings-section-label">{t("settings.general.account")}</div>
           <div className="settings-profile-card">
             <div className="settings-avatar" aria-hidden="true">
               <User size={16} strokeWidth={1.5} />
             </div>
             <div className="settings-profile-meta">
               <span className="settings-profile-email" title={email}>
-                {email || "Guest"}
+                {email || t("common.sidebar.guest")}
               </span>
-              <span className="settings-profile-sub">Signed in to Corez</span>
+              <span className="settings-profile-sub">{t("settings.general.signedIn")}</span>
             </div>
           </div>
         </div>
 
         <div className="settings-section">
-          <div className="settings-section-label">Appearance</div>
+          <div className="settings-section-label">{t("settings.general.appearance")}</div>
           <button
             type="button"
             className="settings-row-btn"
             onClick={onToggleTheme}
-            aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+            aria-label={isDark ? t("settings.general.switchToLightMode") : t("settings.general.switchToDarkMode")}
           >
             <span className="settings-row-left">
               {isDark ? (
@@ -302,12 +312,39 @@ export default function SettingsModal({
               ) : (
                 <Moon size={16} strokeWidth={1.5} />
               )}
-              <span>{isDark ? "Light mode" : "Dark mode"}</span>
+              <span>{isDark ? t("settings.general.lightMode") : t("settings.general.darkMode")}</span>
             </span>
             <span className="settings-row-hint">
-              {isDark ? "Switch to light" : "Switch to dark"}
+              {isDark ? t("settings.general.switchToLight") : t("settings.general.switchToDark")}
             </span>
           </button>
+        </div>
+
+        <div className="settings-section">
+          <div className="settings-section-label">{t("settings.languageSection")}</div>
+          <div className="settings-row settings-language-row">
+            <span className="settings-row-left">
+              <Globe size={16} strokeWidth={1.5} />
+              <span id="settings-language-label">{t("settings.language")}</span>
+            </span>
+            <select
+              id="settings-language"
+              className="settings-language-select"
+              value={language}
+              onChange={(event) => setLanguage(event.target.value)}
+              aria-labelledby="settings-language-label"
+              aria-describedby="settings-language-hint"
+            >
+              {languages.map((entry) => (
+                <option key={entry.id} value={entry.id}>
+                  {entry.nativeLabel}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="settings-language-hint" id="settings-language-hint">
+            {t("settings.languageHint")}
+          </p>
         </div>
 
           </div>
@@ -320,17 +357,16 @@ export default function SettingsModal({
             hidden={category !== "billing"}
           >
         <div className="settings-section pricing-section">
-          <div className="settings-section-label">Plan &amp; Billing</div>
+          <div className="settings-section-label">{t("settings.billing.title")}</div>
 
           {addons && (addons.skus.length > 0 || addons.error) && (
-            <div className="settings-addons" aria-label="Add-on packs">
+            <div className="settings-addons" aria-label={t("settings.billing.addons")}>
               <div className="settings-usage-head">
-                <span className="settings-usage-title">Add-on packs</span>
-                <span className="settings-usage-reset">One-off, in AED</span>
+                <span className="settings-usage-title">{t("settings.billing.addons")}</span>
+                <span className="settings-usage-reset">{t("settings.billing.addonsOneOff")}</span>
               </div>
               <p className="settings-addons-lede">
-                Extra capacity on top of your plan, kept until you use it. A pack
-                also covers work once the plan's own monthly budget is spent.
+                {t("settings.billing.addonsLede")}
               </p>
               {addons.error && (
                 <p className="settings-usage-error" role="alert">
@@ -339,8 +375,7 @@ export default function SettingsModal({
               )}
               {!addons.error && !addons.paymentsConfigured && (
                 <p className="settings-usage-note">
-                  Payments are not configured on this deployment, so packs cannot
-                  be bought here.
+                  {t("settings.billing.paymentsNotConfigured")}
                 </p>
               )}
               <ul className="settings-addons-list">
@@ -367,15 +402,19 @@ export default function SettingsModal({
                           disabled={!buyable || buyingSku === sku.id}
                           title={
                             sku.available
-                              ? `Buy ${sku.credits} ${sku.unitLabel} for ${formatAed(sku)}`
-                              : "Not available yet"
+                              ? t("settings.billing.buyTitle", {
+                                  credits: sku.credits,
+                                  unit: sku.unitLabel,
+                                  price: formatAed(sku),
+                                })
+                              : t("settings.billing.notAvailableYet")
                           }
                         >
                           {buyingSku === sku.id
-                            ? "Opening…"
+                            ? t("settings.billing.opening")
                             : sku.available
-                              ? "Buy"
-                              : "Soon"}
+                              ? t("settings.billing.buy")
+                              : t("settings.billing.soon")}
                         </button>
                       </div>
                     </li>
@@ -389,21 +428,27 @@ export default function SettingsModal({
               )}
               {addons.settledNow?.length > 0 && (
                 <p className="settings-addons-settled" role="status">
-                  {addons.settledNow.length} purchase
-                  {addons.settledNow.length === 1 ? "" : "s"} completed — credits
-                  added.
+                  {addons.settledNow.length === 1
+                    ? t("settings.billing.purchaseSettledOne", {
+                        count: addons.settledNow.length,
+                      })
+                    : t("settings.billing.purchaseSettledOther", {
+                        count: addons.settledNow.length,
+                      })}
                 </p>
               )}
             </div>
           )}
 
           {usage && (
-            <div className="settings-usage" aria-label="Usage this month">
+            <div className="settings-usage" aria-label={t("settings.billing.usageTitle")}>
               <div className="settings-usage-head">
-                <span className="settings-usage-title">Usage this month</span>
+                <span className="settings-usage-title">{t("settings.billing.usageTitle")}</span>
                 <span className="settings-usage-reset">
                   {usage.resetsAt
-                    ? `Resets ${new Date(usage.resetsAt).toLocaleDateString()}`
+                    ? t("settings.billing.resets", {
+                        date: formatDate(usage.resetsAt, language),
+                      })
                     : ""}
                 </span>
               </div>
@@ -414,7 +459,7 @@ export default function SettingsModal({
               )}
               {!usage.error && usage.meteringEnabled === false && (
                 <p className="settings-usage-note">
-                  Usage is not metered on this deployment, so nothing is capped.
+                  {t("settings.billing.notMetered")}
                 </p>
               )}
               {!usage.error &&
@@ -434,13 +479,17 @@ export default function SettingsModal({
                       <span className="settings-usage-value">
                         {formatUsageValue(metric.used)}
                         <span className="settings-usage-limit">
-                          {metric.limit === null ? " / unlimited" : ` / ${formatUsageValue(metric.limit)}`}
+                          {metric.limit === null
+                            ? t("settings.billing.unlimited")
+                            : t("settings.billing.limitSuffix", {
+                                limit: formatUsageValue(metric.limit),
+                              })}
                         </span>
                       </span>
                       <span
                         className="settings-usage-bar"
                         role="progressbar"
-                        aria-label={`${entry.label} used`}
+                        aria-label={t("settings.billing.metricUsed", { metric: entry.label })}
                         aria-valuenow={Math.round(ratio * 100)}
                         aria-valuemin={0}
                         aria-valuemax={100}
@@ -457,8 +506,8 @@ export default function SettingsModal({
                 <div className="settings-usage-cta">
                   <span>
                     {usage.exceeded.length > 0
-                      ? "You have used up a limit on this plan."
-                      : "You are close to a limit on this plan."}
+                      ? t("settings.billing.limitUsed")
+                      : t("settings.billing.limitNear")}
                   </span>
                   <span className="settings-usage-cta-actions">
                     {(() => {
@@ -478,8 +527,11 @@ export default function SettingsModal({
                           disabled={buyingSku === spentWithPack.id}
                         >
                           {buyingSku === spentWithPack.id
-                            ? "Opening…"
-                            : `Buy ${spentWithPack.credits} ${spentWithPack.unitLabel}`}
+                            ? t("settings.billing.opening")
+                            : t("settings.billing.buyPack", {
+                                credits: spentWithPack.credits,
+                                unit: spentWithPack.unitLabel,
+                              })}
                         </button>
                       );
                     })()}
@@ -491,7 +543,7 @@ export default function SettingsModal({
                         navigate("/pricing");
                       }}
                     >
-                      Compare plans <ArrowRight size={13} strokeWidth={1.75} aria-hidden="true" />
+                      {t("settings.billing.comparePlans")} <ArrowRight size={13} strokeWidth={1.75} aria-hidden="true" />
                     </button>
                   </span>
                 </div>
@@ -513,20 +565,28 @@ export default function SettingsModal({
               </span>
               <div>
                 <div className="pricing-status-plan">
-                  {currentPlan} {isExpired ? "(expired)" : sub?.isScheduledDowngrade ? "(scheduled)" : ""}
+                  {isExpired
+                    ? t("settings.billing.planExpired", { plan: planName(currentPlan) })
+                    : sub?.isScheduledDowngrade
+                      ? t("settings.billing.planScheduled", { plan: planName(currentPlan) })
+                      : planName(currentPlan)}
                 </div>
                 <div className="pricing-status-desc">
                   {subLoading
-                    ? "Loading…"
+                    ? t("common.status.loading")
                     : sub?.isScheduledDowngrade && sub?.downgrade_plan
-                      ? `Scheduled to downgrade to ${sub.downgrade_plan} on ${periodEnd} — you keep ${currentPlan} until then`
+                      ? t("settings.billing.downgradeScheduled", {
+                          plan: planName(sub.downgrade_plan),
+                          date: periodEnd,
+                          current: planName(currentPlan),
+                        })
                       : currentPlan === "free"
-                        ? "Free forever — upgrade anytime"
+                        ? t("settings.billing.freeForever")
                         : periodEnd
                           ? isExpired
-                            ? `Expired on ${periodEnd} — renew to continue`
-                            : `Renews on ${periodEnd} • Monthly via Ziina`
-                          : "Monthly via Ziina • Cancel anytime"}
+                            ? t("settings.billing.expiredOn", { date: periodEnd })
+                            : t("settings.billing.renewsOn", { date: periodEnd })
+                          : t("settings.billing.monthlyCancel")}
                 </div>
               </div>
             </div>
@@ -539,14 +599,14 @@ export default function SettingsModal({
               }
             >
               {isExpired
-                ? "Expired"
+                ? t("settings.billing.badgeExpired")
                 : sub?.isScheduledDowngrade
-                  ? "Scheduled"
+                  ? t("settings.billing.badgeScheduled")
                   : sub?.status === "active"
-                    ? "Active"
+                    ? t("settings.billing.badgeActive")
                     : currentPlan === "free"
-                      ? "Active"
-                      : sub?.status || "Active"}
+                      ? t("settings.billing.badgeActive")
+                      : sub?.status || t("settings.billing.badgeActive")}
             </span>
           </div>
 
@@ -565,12 +625,14 @@ export default function SettingsModal({
               }}
             >
               <span style={{ color: "var(--text-secondary)", lineHeight: 1.4 }}>
-                Will downgrade to <strong style={{ color: "var(--text-primary)", textTransform: "capitalize" }}>{sub.downgrade_plan}</strong> on {periodEnd}
+                {t("settings.billing.downgradeIntro")}
+                <strong style={{ color: "var(--text-primary)", textTransform: "capitalize" }}>{sub.downgrade_plan}</strong>
+                {t("settings.billing.downgradeOn", { date: periodEnd })}
               </span>
               <button
                 type="button"
                 onClick={async () => {
-                  if (!confirm("Keep current plan? Cancel scheduled downgrade.")) return;
+                  if (!confirm(t("settings.billing.confirmKeep"))) return;
                   try {
                     const r = await fetch("/api/subscriptions/cancel", {
                       method: "POST",
@@ -580,14 +642,18 @@ export default function SettingsModal({
                     });
                     const d = await r.json().catch(() => ({}));
                     if (r.ok) {
-                      alert("Scheduled downgrade canceled — keeping " + currentPlan);
+                      alert(
+                        t("settings.billing.downgradeCanceled", {
+                          plan: planName(currentPlan),
+                        }),
+                      );
                       const mr = await fetch("/api/subscriptions/me", { credentials: "include" });
                       const md = await mr.json().catch(() => ({}));
                       if (mr.ok) setSub(md);
                       try { await auth?.refresh?.(); } catch {}
-                    } else alert(d.error || "Failed");
+                    } else alert(d.error || t("settings.billing.failed"));
                   } catch (e) {
-                    alert(e.message || "Failed");
+                    alert(e.message || t("settings.billing.failed"));
                   }
                 }}
                 style={{
@@ -602,7 +668,7 @@ export default function SettingsModal({
                   whiteSpace: "nowrap",
                 }}
               >
-                Keep {currentPlan}
+                {t("settings.billing.keepPlan", { plan: planName(currentPlan) })}
               </button>
             </div>
           )}
@@ -614,16 +680,16 @@ export default function SettingsModal({
               onClose();
               navigate("/pricing");
             }}
-            aria-label="Manage plan — go to pricing page"
+            aria-label={t("settings.billing.managePlanLabel")}
           >
             <span className="pricing-manage-left">
-              <span className="pricing-manage-title">Manage plan</span>
+              <span className="pricing-manage-title">{t("settings.billing.managePlan")}</span>
               <span className="pricing-manage-sub">
-                View pricing • Upgrade or downgrade • Monthly via Ziina
+                {t("settings.billing.manageSub")}
               </span>
             </span>
             <span className="pricing-manage-cta">
-              View pricing <ArrowRight size={14} strokeWidth={1.75} />
+              {t("settings.billing.viewPricing")} <ArrowRight size={14} strokeWidth={1.75} />
             </span>
           </button>
         </div>
@@ -638,16 +704,15 @@ export default function SettingsModal({
             hidden={category !== "publishing"}
           >
         <div className="settings-section">
-          <div className="settings-section-label">Published pages</div>
+          <div className="settings-section-label">{t("settings.publishing.title")}</div>
           <p className="settings-published-lede">
-            Everything you have published to a public link. Removing a page takes
-            the link offline immediately — the creation stays in its chat.
+            {t("settings.publishing.lede")}
           </p>
 
           {publishedLoading && (
             <p className="settings-published-state" role="status">
               <Loader2 size={14} strokeWidth={1.75} className="spin" aria-hidden="true" />
-              Checking your published pages…
+              {t("settings.publishing.checking")}
             </p>
           )}
 
@@ -659,7 +724,7 @@ export default function SettingsModal({
                 className="settings-published-retry"
                 onClick={refreshPublished}
               >
-                Try again
+                {t("settings.publishing.tryAgain")}
               </button>
             </div>
           )}
@@ -667,8 +732,7 @@ export default function SettingsModal({
           {!publishedLoading && !publishedError && published.length === 0 && (
             <p className="settings-published-empty">
               <Globe size={18} strokeWidth={1.5} aria-hidden="true" />
-              Nothing published yet. Publish from the preview pane and the link
-              will appear here.
+              {t("settings.publishing.empty")}
             </p>
           )}
 
@@ -682,7 +746,7 @@ export default function SettingsModal({
                       href={page.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      title={`Open corez.pro${page.url}`}
+                      title={t("settings.publishing.openTitle", { url: page.url })}
                     >
                       <Globe size={13} strokeWidth={1.75} aria-hidden="true" />
                       <span>{page.title || page.slug}</span>
@@ -690,11 +754,17 @@ export default function SettingsModal({
                     </a>
                     <span className="settings-published-sub">
                       corez.pro{page.url}
-                      {page.pages > 0 ? ` · ${page.pages + 1} pages` : ""}
-                      {page.createdAt
-                        ? ` · ${new Date(page.createdAt).toLocaleDateString()}`
+                      {page.pages > 0
+                        ? t("settings.publishing.pagesSuffix", {
+                            count: page.pages + 1,
+                          })
                         : ""}
-                      {page.badge ? " · shows the Made with Corez badge" : ""}
+                      {page.createdAt
+                        ? t("settings.publishing.dateSuffix", {
+                            date: formatDate(page.createdAt, language),
+                          })
+                        : ""}
+                      {page.badge ? t("settings.publishing.badgeSuffix") : ""}
                     </span>
                   </div>
                   <button
@@ -702,9 +772,13 @@ export default function SettingsModal({
                     className="settings-published-remove"
                     onClick={() => handleUnpublish(page)}
                     disabled={removingSlug === page.slug}
-                    aria-label={`Remove published page ${page.title || page.slug}`}
+                    aria-label={t("settings.publishing.removeLabel", {
+                      title: page.title || page.slug,
+                    })}
                   >
-                    {removingSlug === page.slug ? "Removing…" : "Remove"}
+                    {removingSlug === page.slug
+                      ? t("settings.publishing.removing")
+                      : t("settings.publishing.remove")}
                   </button>
                 </li>
               ))}
@@ -713,8 +787,7 @@ export default function SettingsModal({
 
           {publishedTruncated && !publishedLoading && (
             <p className="settings-published-state">
-              You have more published pages than can be listed at once — the
-              oldest are not shown here.
+              {t("settings.publishing.truncated")}
             </p>
           )}
 
@@ -735,18 +808,18 @@ export default function SettingsModal({
             hidden={category !== "privacy"}
           >
         <div className="settings-section">
-          <div className="settings-section-label">Privacy &amp; Cookies</div>
+          <div className="settings-section-label">{t("settings.privacy.title")}</div>
           <button
             type="button"
             className="settings-row-btn"
             onClick={openConsentPreferences}
-            aria-label="Open cookie preferences"
+            aria-label={t("settings.privacy.openPreferences")}
           >
             <span className="settings-row-left">
               <ShieldCheck size={16} strokeWidth={1.5} />
-              <span>Cookie settings</span>
+              <span>{t("settings.privacy.cookieSettings")}</span>
             </span>
-            <span className="settings-row-hint">Change what is allowed</span>
+            <span className="settings-row-hint">{t("settings.privacy.changeAllowed")}</span>
           </button>
           <div className="settings-legal-links">
             <button
@@ -756,7 +829,7 @@ export default function SettingsModal({
                 navigate("/privacy");
               }}
             >
-              Privacy Policy
+              {t("settings.privacy.privacyPolicy")}
             </button>
             <button
               type="button"
@@ -765,7 +838,7 @@ export default function SettingsModal({
                 navigate("/terms");
               }}
             >
-              Terms
+              {t("settings.privacy.terms")}
             </button>
             <button
               type="button"
@@ -774,7 +847,7 @@ export default function SettingsModal({
                 navigate("/cookies");
               }}
             >
-              Cookies
+              {t("settings.privacy.cookies")}
             </button>
             <button
               type="button"
@@ -783,7 +856,7 @@ export default function SettingsModal({
                 navigate("/refunds");
               }}
             >
-              Refunds
+              {t("settings.privacy.refunds")}
             </button>
           </div>
         </div>
@@ -802,7 +875,7 @@ export default function SettingsModal({
             onClick={onClearAllHistory}
           >
             <Trash2 size={15} strokeWidth={1.5} />
-            <span>Clear history</span>
+            <span>{t("settings.footer.clearHistory")}</span>
           </button>
           {auth?.user && (
             <button
@@ -814,7 +887,7 @@ export default function SettingsModal({
               }}
             >
               <LogOut size={15} strokeWidth={1.5} />
-              <span>Log out</span>
+              <span>{t("settings.footer.logOut")}</span>
             </button>
           )}
         </div>
