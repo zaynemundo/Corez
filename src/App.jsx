@@ -1468,6 +1468,13 @@ function MainApp({ theme, setTheme }) {
   );
 }
 
+// Routes that must render without waiting for the session check: the sign-in
+// front door, pricing, the payment return page and every policy (including the
+// search-engine aliases). They read the account only to label themselves, so a
+// visitor should never stare at a spinner to reach them.
+const PUBLIC_ROUTES =
+  /^\/(?:login|pricing|payment\/success|privacy|terms|cookies|refunds|privacy-policy|terms-and-conditions|cookie-policy|refund-policy)\/?$/;
+
 // Legal pages must be reachable whether or not the visitor is signed in — a
 // policy you can only read after logging in is not a policy. Aliases keep the
 // longer spellings people and search engines use working. There is no index
@@ -1513,8 +1520,9 @@ function RouteAnalytics() {
 }
 
 function AppInner() {
-  const { user, loading } = useAuth();
+  const { user, loading, sessionCheckFailed, refresh } = useAuth();
   const { t } = useI18n();
+  const location = useLocation();
   const [theme, setTheme] = useState(() => {
     try {
       return localStorage.getItem("corez_theme") || "dark";
@@ -1549,16 +1557,42 @@ function AppInner() {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  if (loading) {
-    // The session check decides between the app and the public pages, and it is
-    // a network round-trip on every cold load. Returning null here painted a
-    // blank page — on the sign-in front door it read as a broken site — so the
-    // wait is shown instead. `role="status"` announces it once for screen
-    // readers rather than on every repaint.
+  // The session check decides between the app and the public pages, and it is a
+  // network round-trip on every cold load. Two rules keep it from becoming a
+  // wall:
+  //  - routes that do not depend on the answer (sign-in, pricing, the policies)
+  //    render immediately, so a visitor never waits to read a page;
+  //  - the chat shell waits, but only for a bounded time (see AuthContext), and
+  //    a check that could not complete says so with a retry instead of quietly
+  //    presenting the visitor as signed out.
+  const onPublicRoute = PUBLIC_ROUTES.test(location.pathname);
+  if (!onPublicRoute && loading) {
+    // A blank frame during the session check read as a broken site on the front
+    // door, so the wait must say something. `role="status"` announces it once
+    // for screen readers rather than on every repaint.
     return (
       <div className="auth-loading" role="status" aria-live="polite">
         <Loader2 className="spin-icon" size={22} strokeWidth={1.75} aria-hidden="true" />
         <span>{t("common.status.loadingCorez")}</span>
+      </div>
+    );
+  }
+  if (!onPublicRoute && sessionCheckFailed) {
+    return (
+      <div className="auth-loading" role="alert">
+        <span className="auth-loading-title">
+          {t("common.status.sessionFailedTitle")}
+        </span>
+        <span className="auth-loading-body">
+          {t("common.status.sessionFailedBody")}
+        </span>
+        <button
+          type="button"
+          className="auth-loading-retry"
+          onClick={() => refresh()}
+        >
+          {t("common.action.retry")}
+        </button>
       </div>
     );
   }

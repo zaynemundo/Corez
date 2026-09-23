@@ -53,6 +53,7 @@ export default {
     close: "إغلاق",
     cancel: "إلغاء",
     save: "حفظ",
+    retry: "إعادة المحاولة",
     download: "تنزيل",
     dismiss: "تجاهل",
     open: "فتح",
@@ -70,6 +71,9 @@ export default {
   status: {
     loading: "جارٍ التحميل…",
     loadingCorez: "جارٍ تحميل Corez…",
+    sessionFailedTitle: "تعذّر التحقق من جلستك",
+    sessionFailedBody:
+      "لم يتمكن Corez من الوصول إلى الخادم، لذا لا يعرف ما إذا كنت مسجّلاً للدخول. لم يُفقد أي شيء — حاول مرة أخرى.",
   },
 
   error: {

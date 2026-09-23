@@ -4480,6 +4480,11 @@ h6 {
   .input-box {
     transition: none !important;
   }
+  /* The session-check spinner is decorative: a user who asked for reduced
+     motion gets a still icon instead of a loop that never ends. */
+  .spin-icon {
+    animation: none !important;
+  }
   /* Restored thinking dots (PaymentStatus used a removed `pulse` animation)
      must not pulse for users who ask for reduced motion. */
   .thinking-dot {
@@ -5448,7 +5453,41 @@ h6 {
   font-size: 14px;
   color: var(--text-secondary);
   background: var(--bg-primary);
+  padding: 24px;
+  text-align: center;
 }
+
+/* The failed session check reuses the wait screen's layout: a short title, one
+   plain sentence about what is unknown, and a retry. */
+.auth-loading-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.auth-loading-body {
+  max-width: 44ch;
+  line-height: 1.5;
+}
+
+.auth-loading-retry {
+  margin-top: 4px;
+  min-height: 38px;
+  padding: 0 18px;
+  border: 1px solid var(--text-primary);
+  border-radius: var(--radius-pill);
+  background-color: var(--text-primary);
+  color: var(--bg-primary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.auth-loading-retry:hover {
+  border-color: var(--border-hover);
+}
+
 .auth-page {
   min-height: 100vh;
   min-height: 100dvh;

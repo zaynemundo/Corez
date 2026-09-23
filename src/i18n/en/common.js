@@ -61,6 +61,7 @@ export default {
     close: "Close",
     cancel: "Cancel",
     save: "Save",
+    retry: "Retry",
     download: "Download",
     dismiss: "Dismiss",
     open: "Open",
@@ -78,6 +79,9 @@ export default {
   status: {
     loading: "Loading…",
     loadingCorez: "Loading Corez…",
+    sessionFailedTitle: "We couldn't check your session",
+    sessionFailedBody:
+      "Corez could not reach the server, so it doesn't know whether you are signed in. Nothing was lost — try again.",
   },
 
   error: {

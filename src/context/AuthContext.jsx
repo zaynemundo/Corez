@@ -8,24 +8,75 @@ import {
 
 const AuthContext = createContext(null);
 
+// The session check is a network round-trip on every cold load. It must never
+// pin the interface: after this long without an answer the app stops waiting and
+// says it could not check, with a retry. Eight seconds is long enough for a cold
+// Worker plus a slow mobile connection and short enough to feel like a decision.
+const SESSION_CHECK_TIMEOUT_MS = 8000;
+
+/**
+ * fetch() with a hard time limit. The AbortController cancels the request, and
+ * the race makes the helper deterministic even when a transport ignores the
+ * signal (or a test stands in for the network) instead of hanging forever.
+ */
+async function fetchWithTimeout(url, options, timeoutMs) {
+  const controller =
+    typeof AbortController === "function" ? new AbortController() : null;
+  let timer = null;
+  const timedOut = new Promise((resolve) => {
+    timer = setTimeout(() => {
+      controller?.abort();
+      resolve({ timedOut: true });
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([
+      fetch(url, { ...options, signal: controller?.signal }).then(
+        (response) => ({ response }),
+        (error) => ({ error }),
+      ),
+      timedOut,
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  // A failed check is NOT the same as "signed out": the app does not know, so it
+  // says so and offers a retry instead of silently showing the sign-in form.
+  const [sessionCheckFailed, setSessionCheckFailed] = useState(false);
 
   const fetchMe = useCallback(async () => {
-    try {
-      const r = await fetch("/api/auth/me", { credentials: "include" });
-      if (r.ok) {
-        const d = await r.json();
-        setUser(d.user);
-      } else {
+    setLoading(true);
+    setSessionCheckFailed(false);
+    const result = await fetchWithTimeout(
+      "/api/auth/me",
+      { credentials: "include" },
+      SESSION_CHECK_TIMEOUT_MS,
+    );
+
+    if (result?.response) {
+      const { response } = result;
+      if (response.ok) {
+        const d = await response.json().catch(() => ({}));
+        setUser(d?.user || null);
+      } else if (
+        // An answer that means "not signed in" — not a failure.
+        response.status === 401 ||
+        response.status === 403
+      ) {
         setUser(null);
+      } else {
+        setSessionCheckFailed(true);
       }
-    } catch {
-      setUser(null);
-    } finally {
-      setLoading(false);
+    } else {
+      // Timeout, abort or a transport error: the answer is unknown.
+      setSessionCheckFailed(true);
     }
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -101,6 +152,7 @@ export function AuthProvider({ children }) {
       value={{
         user,
         loading,
+        sessionCheckFailed,
         login,
         signup,
         logout,
