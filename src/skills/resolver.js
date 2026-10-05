@@ -10,8 +10,19 @@ import { detectUserFactCandidates } from "../services/userLearningService.js";
 
 const BUG_REPORT_PATTERNS =
   /\b(crash|crashes|bug|error|exception|fail|failed|fails|stack trace|not working|broken|issue|fix|debug)\b/i;
+// A bare mention of an app noun is NOT a build brief. This pattern gates the
+// heaviest workflow in the resolver (writing-plans + TDD + code review +
+// verification, pulled in transitively), so a loose match is expensive: it was
+// firing on "What is a content management system?", "Explain how a payment
+// service works", "How do I become a system administrator?" and "any app
+// recommendations?" — turning ordinary questions into a six-skill engineering
+// plan. The noun must therefore be the object of a build verb, or be bound to a
+// deliverable phrase ("a dashboard for my team", "a game with a login"). The
+// vague nouns that caused the false positives (`system`, `service`, `admin`,
+// `authentication`, `billing`) are dropped from the bare-noun branch entirely;
+// they still match when a build verb governs them.
 const SUBSTANTIAL_APP_PATTERNS =
-  /\b(build|create|make|develop|design|launch)\b.*\b(dashboard|app|saas|portal|system|platform|website|game|service|admin|authentication|billing)\b|\b(dashboard|app|saas|portal|system|platform|website|game|service|admin)\b/i;
+  /\b(build|create|make|develop|design|launch|ship|implement|scaffold)\b.{0,60}\b(dashboard|app|application|saas|portal|system|platform|website|web ?app|game|service|admin panel|authentication|billing)\b|\b(dashboard|app|application|saas|portal|platform|website|web ?app|game)\b.{0,40}\b(from scratch|for (my|our|the) (team|company|business|users|clients|customers|shop|store|organisation|organization)|with (a |an )?(login|auth|signup|sign-?in|payment|checkout|database|api|admin))\b/i;
 const SMALL_EDIT_PATTERNS =
   /\b(tweak|minor edit|minor change|small edit|typo|fix typo|margin|padding|button text|change text|update link|rename)\b/i;
 const REPO_REVIEW_PATTERNS =
@@ -84,8 +95,12 @@ const SPECIALIST_TRIGGER_PATTERNS = [
   },
   {
     id: "accessibility-compliance",
+    // `contrast` must be qualified. Unqualified it is ordinary prose — the
+    // comparative verb in "compare and contrast these two papers/novels" — and
+    // it was stealing genuine research-report requests. Only contrast in an
+    // accessibility sense (a ratio, a check, a colour pairing) activates this.
     pattern:
-      /\b(wcag|accessible|accessibility|screen ?reader|aria|contrast|keyboard navigation|a11y|focus (trap|order|ring|management|visible)|keyboard (only|tab|focus)|skip link|alt text|alternative text|touch targets?|semantic (html|markup)|voiceover|nvda|jaws)\b/i,
+      /\b(wcag|accessible|accessibility|screen ?reader|aria|keyboard navigation|a11y|focus (trap|order|ring|management|visible)|keyboard (only|tab|focus)|skip link|alt text|alternative text|touch targets?|semantic (html|markup)|voiceover|nvda|jaws|(?:colou?r )?contrast (?:ratio|check|level|requirement|guideline|issue|problem|audit)|(?:low|insufficient|poor|bad) contrast|contrast (?:of|on|for) (?:my|the|this|our))\b/i,
   },
   {
     id: "cloudflare-platform",
@@ -104,13 +119,24 @@ const SPECIALIST_TRIGGER_PATTERNS = [
   },
   {
     id: "creative-writing",
+    // Narrative context is required. The bare nouns this pattern used to accept
+    // are ordinary technical and business vocabulary, and each produced a
+    // verified false positive: `script` ("write a script to parse a CSV file",
+    // "add a script tag to my HTML"), `story` ("the user story format",
+    // "a success story"), `novel` ("a novel approach to caching") and
+    // `dialogue` ("the dialogue between the two services"). A narrative framing
+    // (a genre, or "write/tell me a …") keeps the real requests working.
     pattern:
-      /\b(story|short story|flash fiction|poem|poetry|sonnet|novel|fiction|screenplay|script|dialogue|monologue|haiku|lyrics|song lyrics|fan fiction|worldbuilding|creative writing|character (backstory|arc)|backstory|plot (twist|idea|outline)|ghostwrit\w*)\b/i,
+      /\b(short story|flash fiction|bedtime story|ghost story|love story|children'?s story|fairy tale|folk ?tale|poem|poetry|sonnet|novella?|fiction|screenplay|(?:film|movie|tv|television|theatre|theater|stage|radio|podcast) script|stage play|monologue|haiku|song lyrics|lyrics for|fan fiction|worldbuilding|creative writing|character (backstory|arc)|backstory|plot (twist|idea|outline)|ghostwrit\w*|(?:write|draft|tell)(?: me)?(?: a| an| the)?(?: short| brief)? (?:story|tale|poem|novel|scene|dialogue)|story (?:idea|outline|plot)|dialogue for (?:a|an|the|my|our))\b|\bnovel\b(?!\s+(?:approach|idea|method|way|technique|use|strategy|insight|finding|solution|mechanism|algorithm|feature|concept))/i,
   },
   {
     id: "presentation-design",
+    // Bare `slides?` matched any UI talk about a slide ("add slide animations to
+    // my carousel", "the slide transition is janky"). Deck-shaped phrasing is
+    // required instead; `\d+-slide` and the named deck types already carry the
+    // real requests.
     pattern:
-      /\b(presentation|slide deck|powerpoint|google slides|keynote|slide outline|speaker notes|slideshow|\d+-slide|slides?|(pitch|sales|board|investor|product|strategy) deck|deck (outline|structure|flow)|slide (titles?|layout|design)|talk (outline|structure))\b/i,
+      /\b(presentation|slide deck|powerpoint|google slides|keynote|slide outline|speaker notes|slideshow|\d+-slide|slides? for (?:my|our|a|an|the)|(pitch|sales|board|investor|product|strategy) deck|deck (outline|structure|flow)|slide (titles?|layout|design)|talk (outline|structure))\b/i,
   },
   {
     id: "personal-productivity",
@@ -241,8 +267,25 @@ export function resolveSkills({
   // Specialist capabilities apply to everyday conversational requests even on
   // the fast path — but they must never hijack engineering workflows (apps,
   // games, websites, code). Those intents keep their dedicated heavy
-  // workflow below; specialists only fire for non-engineering intents and are
-  // matched against the raw user prompt, never the enriched coding prompt.
+  // workflow below; specialists are matched against the raw user prompt, never
+  // the enriched coding prompt.
+  //
+  // The gate is prompt EVIDENCE, not the intent label. It used to be the label
+  // alone, which starved most specialists in production: the 5-way classifier
+  // is trained on a software-heavy corpus, so everyday requests land on an
+  // engineering label and the gate dropped them before any specialist could
+  // match — "help me plan my wedding reception" → code-help (0.81), "make me
+  // flashcards for Spanish verbs" → app, "help me budget my monthly spending" →
+  // code-help. Nine of the 21 specialists were unreachable for their own
+  // canonical phrasing. tests/skill-intent-coverage.test.js could not see it
+  // because it passes intent='general' directly instead of running the
+  // classifier the product actually runs.
+  //
+  // A label of `app`/`code-help` now only suppresses specialists when the
+  // prompt itself shows engineering evidence (a code/tech term, an app-artifact
+  // noun, a build brief, or a bug report). "Build me a quiz app with a
+  // scoreboard" still stays on the engineering path; "make me flashcards for
+  // Spanish verbs" no longer does.
   const ENGINEERING_INTENTS = new Set([
     "app",
     "code-help",
@@ -258,9 +301,20 @@ export function resolveSkills({
   const isEngineeringIntent =
     ENGINEERING_INTENTS.has(legacyIntent) ||
     ENGINEERING_INTENTS.has(primaryIntent);
-  const specialistMatches = isEngineeringIntent
-    ? null
-    : matchSpecialistSkills(cleanPrompt);
+  // Only consulted when the label already claims engineering work. Kept
+  // deliberately broad so an engineering brief that merely happens to share a
+  // word with a specialist ("make an interactive mortgage calculator widget"
+  // vs. live-data-utilities' `calculator`) still stays on the engineering path.
+  const ENGINEERING_EVIDENCE_PATTERNS =
+    /\b(code|codebase|function|component|class|method|variable|api|endpoint|database|schema|migration|deploy|deployment|wrangler|worker|bug|error|exception|crash|stack trace|refactor|compile|compiler|npm|git|repo|repository|regex|sql|query|json|yaml|css|html|javascript|typescript|python|react|node|server|backend|frontend|unit test|test suite|webhook|http|graphql|docker|kubernetes|pull request|commit|website|web ?app|web application|landing page|dashboard|app|application|saas|portal|platform|widget|tool|tracker|simulator|calculator|editor|admin panel|game|canvas|production|staging|hosting|domain|dns|spreadsheet|excel|csv|pdf|docx)\b/i;
+  const hasEngineeringEvidence =
+    ENGINEERING_EVIDENCE_PATTERNS.test(cleanPrompt) ||
+    SUBSTANTIAL_APP_PATTERNS.test(cleanPrompt) ||
+    BUG_REPORT_PATTERNS.test(cleanPrompt);
+  const specialistMatches =
+    isEngineeringIntent && hasEngineeringEvidence
+      ? null
+      : matchSpecialistSkills(cleanPrompt);
   if (specialistMatches) {
     const specialistSkills = [];
     for (const id of specialistMatches) {

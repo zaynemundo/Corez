@@ -104,6 +104,11 @@ export function PaymentSuccess() {
     <div
       style={{
         minHeight: "100dvh",
+        /* #root is a flex row: without this the screen shrank to its content
+           (568px) and hugged the left edge, so the card was centred inside that
+           sliver instead of in the viewport - 436px off centre on a 1440px
+           display. Phones only looked right because flex-shrink clamped it. */
+        width: "100%",
         display: "flex",
         /* flex-start + `margin: auto` on the card: centres while there is room
            and never clips the top when the card overflows a short viewport

@@ -3490,6 +3490,21 @@ h6 {
   border-radius: 999px;
   border: 1px solid rgba(74, 222, 128, 0.25);
 }
+/* The badge's green is tuned for the dark card behind it, so it fails wherever
+   that assumption breaks. On the light theme's pale surface it is 4.02:1, and
+   inside the toggle's inverted (active) pill a light green lands on white at
+   1.59:1. Both get an explicit pairing that clears AA at this size. */
+[data-theme="light"] .pricing-save {
+  color: #166534;
+}
+.pricing-toggle button.active .pricing-save {
+  background: rgba(74, 222, 128, 0.2);
+  border-color: rgba(74, 222, 128, 0.45);
+  color: #14532d;
+}
+[data-theme="light"] .pricing-toggle button.active .pricing-save {
+  color: #4ade80;
+}
 .pricing-main {
   max-width: 1120px;
   margin: 0 auto;
@@ -3728,7 +3743,11 @@ h6 {
   color: var(--bg-primary);
 }
 .pricing-cta-page.standard:hover {
-  background: #e8e8e8;
+  /* Was a hardcoded #e8e8e8, which paired with `color: var(--bg-primary)`
+     left white text on a near-white pill in light theme (1.23:1 - the label
+     vanished). --text-secondary is a light grey on the dark theme and a dark
+     grey on the light one, so the label keeps its contrast in both. */
+  background: var(--text-secondary);
   transform: translateY(-1px);
 }
 .pricing-cta-page.premium {
@@ -5438,9 +5457,43 @@ h6 {
   gap: 0.5rem;
   margin-top: 0.5rem;
 }
+
+/* Error surfaces are drawn as pale red on a pale red wash. That pairing is
+   only legible on the dark theme, where the wash stays dark: over white the
+   wash composites to ~#feeeee and the hardcoded pale text lands at 1.3-1.7:1,
+   so sign-in failures, form errors, preview runtime errors and an expired
+   subscription all read as blank in light theme. --market-negative is the
+   theme-aware red (light #b91c1c is 5.75:1 on the same wash); these rules give
+   each surface that colour and a wash deep enough to match. */
+[data-theme="light"] .auth-error,
+[data-theme="light"] .form-alert.error,
+[data-theme="light"] .preview-error-banner,
+[data-theme="light"] .preview-error-banner strong,
+[data-theme="light"] .pricing-status-badge.expired {
+  color: var(--market-negative);
+}
+[data-theme="light"] .auth-error,
+[data-theme="light"] .form-alert.error,
+[data-theme="light"] .preview-error-banner,
+[data-theme="light"] .pricing-status-badge.expired {
+  border-color: rgba(185, 28, 28, 0.3);
+}
+[data-theme="light"] .stop-btn {
+  color: var(--market-negative);
+}
+[data-theme="light"] .stop-btn:hover {
+  background: rgba(185, 28, 28, 0.14);
+  color: var(--market-negative);
+}
 /* ===== Auth Gate ===== */
 .auth-loading {
   min-height: 100vh;
+  /* #root is a flex row, so without an explicit width this screen shrank to
+     its own content (161px of "Loading Corez…") and sat against the left edge
+     with its centring applied inside that sliver. The other full-page screens
+     all declare their own width; this one was missing it. */
+  width: 100%;
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -5494,12 +5547,12 @@ h6 {
   width: 100%;
   width: 100vw;
   display: flex;
-  /* Anchored rather than centred: the consent banner reserves space at the
-     bottom of this page, and centring a card taller than the space that is
-     left pushed its top above the viewport (the logo was cut off on a phone).
-     A stable top edge also keeps Login and Sign Up from moving the card when
-     the mode changes. */
-  align-items: flex-start;
+  /* Centred in whatever space is left after the consent banner's reserved
+     padding. `.auth-center` stretches to that height and the card's own auto
+     margins absorb the free space. A card taller than the viewport collapses
+     those margins to zero, so its top edge lands on the padding edge instead
+     of being pushed above it, where `overflow-y: auto` cannot reach it. */
+  align-items: stretch;
   justify-content: center;
   position: relative;
   /* Theme-aware fallback behind the backdrop image (was forced #000). */
@@ -5549,20 +5602,19 @@ h6 {
   position: relative;
   z-index: var(--z-content);
   display: flex;
-  /* The card is anchored to the top instead of being centred. Login and Sign
-     Up differ in height by the consent rows, and a centred card moved the
-     logo, both tabs and every field on the screen each time the mode changed.
-     A fixed top offset keeps the card's top edge - and so everything above the
-     field the mode adds - exactly where it was. */
+  /* `flex-start` is the fallback, not the placement: the card's auto margins
+     take any free space there is, which is what centres it. Keeping
+     `flex-start` means that when the card is taller than the space available
+     it aligns to the padding edge instead of overflowing the top, where it
+     could not be scrolled to. */
   align-items: flex-start;
   justify-content: center;
   width: 100%;
-  /* No min-height: it would add a viewport of empty space below the card, and
-     with the consent banner's reserved padding that made the page scroll even
-     when nothing needed to. The card defines the height, the page paints the
-     rest. */
-  /* Respect notched/rounded displays. */
-  padding: max(24px, 8vh, env(safe-area-inset-top))
+  /* No min-height: the card defines the height and stretching to the page's
+     content box is what gives the auto margins something to centre inside. */
+  /* Respect notched/rounded displays, and keep the vertical padding symmetric
+     so the card's centre really is the space's centre. */
+  padding: max(24px, env(safe-area-inset-top))
     max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom))
     max(24px, env(safe-area-inset-left));
 }
@@ -5663,7 +5715,10 @@ h6 {
 .auth-card {
   width: 100%;
   max-width: 420px;
-  margin: 0 auto;
+  /* Auto on all four sides: horizontally it centres in the row, vertically it
+     absorbs the free space `.auth-center` stretched to. Both collapse to zero
+     when the card is larger than the space, which keeps it reachable. */
+  margin: auto;
   /* The card carries its own surface. The backdrop is a photograph, so a
      transparent card made every label's contrast depend on which part of the
      picture happened to sit behind it - the light-theme form and the tall
@@ -6332,11 +6387,16 @@ h6 {
    the page underneath reserves room for it: otherwise it sat on top of the
    pricing footer's legal links and (on shorter screens) the sign-in form's
    submit button. CookieConsent measures the rendered banner and
-   sets --corez-consent-space on <body>; the fallback covers the first paint. */
+   sets --corez-consent-space on <body>; the fallback covers the first paint.
+   The signed-in shell reserves it too: the composer sits at the bottom of the
+   chat pane, so without this the banner covered the textarea, the attach button
+   and the send button on a first visit, and the banner's z-index meant every
+   click landed on the banner instead. */
 body.corez-consent-visible .pricing-page,
 body.corez-consent-visible .auth-page,
 body.corez-consent-visible .auth-loading,
-body.corez-consent-visible .legal-page {
+body.corez-consent-visible .legal-page,
+body.corez-consent-visible .app-container {
   padding-bottom: var(--corez-consent-space, 160px);
 }
 

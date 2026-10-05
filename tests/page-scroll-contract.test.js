@@ -78,14 +78,26 @@ describe('full-page routes scroll without relying on the document', () => {
     expect(printBlock).toMatch(/\.legal-page\s*\{[^}]*overflow:\s*visible/);
   });
 
-  it('anchors the auth card to the top of the page instead of centring it', () => {
-    // Login and Sign Up differ in height by the consent rows. A vertically
-    // centred card shifted its top edge - and with it the logo, both tabs and
-    // every field - each time the mode changed.
-    const block = blockFor('.auth-center');
-    expect(block, '.auth-center block not found').not.toBe('');
-    expect(block).toMatch(/align-items:\s*flex-start/);
-    expect(block).not.toMatch(/align-items:\s*center/);
+  it('centres the auth card in the space available without clipping it when it does not fit', () => {
+    // The card is centred by its own auto margins, not by the container's
+    // alignment. `margin: auto` absorbs whatever free space exists, and
+    // collapses to zero when the card is taller than the space (a landscape
+    // phone), leaving its top edge on the padding edge instead of pushing it
+    // above the viewport where `overflow-y: auto` could never reach it.
+    const page = blockFor('.auth-page');
+    expect(page, '.auth-page block not found').not.toBe('');
+    // The page must stretch its child, or the card has no height to centre in.
+    expect(page).toMatch(/align-items:\s*stretch/);
+
+    const center = blockFor('.auth-center');
+    expect(center, '.auth-center block not found').not.toBe('');
+    // `flex-start` is the fallback for when there is no free space to absorb.
+    expect(center).toMatch(/align-items:\s*flex-start/);
+    expect(center).not.toMatch(/align-items:\s*center/);
+
+    const card = blockFor('.auth-card');
+    expect(card, '.auth-card block not found').not.toBe('');
+    expect(card).toMatch(/margin:\s*auto/);
   });
 
   it('the consent banner reserves space inside whichever container scrolls', () => {

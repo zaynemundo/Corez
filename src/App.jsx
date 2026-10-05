@@ -1600,11 +1600,19 @@ function AppInner() {
     // Public surface: sign-in is the front door. Pricing stays reachable, the
     // policies are linked from the sign-in footer and the cookie banner, and
     // every other logged-out path falls back to sign-in.
+    //
+    // payment/success is declared here as well as in the signed-in routes
+    // below, because PUBLIC_ROUTES already treats it as a route that must not
+    // wait for the session check. Without it this branch's catch-all matched
+    // first and replaced the URL with /login, so a signed-in payer returning
+    // from checkout was bounced to / by the second catch-all and never saw a
+    // confirmation at all.
     return (
       <Routes>
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/payment/success" element={<PaymentSuccess />} />
         {legalRoutes()}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
