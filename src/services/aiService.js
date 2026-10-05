@@ -1255,6 +1255,15 @@ export async function generateHostedAIResponse(
     throw new Error("Hosted AI request failed to reach the AI worker.");
   };
 
+  // The direct Worker host is cross-origin, so it can never carry the
+  // host-bound, HttpOnly session cookie. Its 401/403 replies describe the
+  // fallback's inability to authenticate — never the visitor's session — so
+  // they must never replace the primary response (that would turn a WAF
+  // challenge or a gateway outage into a false "please log in"). Every other
+  // status is a genuine answer (success, rate limit or a provider error).
+  const fallbackAnswerIsUsable = (fallback) =>
+    Boolean(fallback) && fallback.status !== 401 && fallback.status !== 403;
+
   const fetchHostedResponse = async (options) => {
     let response;
     try {
@@ -1295,7 +1304,19 @@ export async function generateHostedAIResponse(
         }
       }
       if (challengePage) {
-        return fetchWithTransportRetry(options, AI_FALLBACK_ENDPOINT);
+        try {
+          const fallback = await fetchWithTransportRetry(
+            options,
+            AI_FALLBACK_ENDPOINT,
+          );
+          if (fallbackAnswerIsUsable(fallback)) return fallback;
+        } catch (fallbackErr) {
+          if (fallbackErr?.name === "AbortError" || signal?.aborted)
+            throw fallbackErr;
+        }
+        // Neither host could answer: report the primary challenge page so the
+        // caller's WAF diagnosis surfaces instead of a bogus login prompt.
+        return response;
       }
     }
 
@@ -1307,7 +1328,7 @@ export async function generateHostedAIResponse(
           options,
           AI_FALLBACK_ENDPOINT,
         );
-        if (fallback && (fallback.ok || fallback.status < 500)) return fallback;
+        if (fallbackAnswerIsUsable(fallback)) return fallback;
       } catch (fallbackErr) {
         if (fallbackErr?.name === "AbortError" || signal?.aborted)
           throw fallbackErr;

@@ -282,6 +282,62 @@ describe('Hosted AI fallback behavior', () => {
     })).rejects.toThrow(/Failed to fetch|never reached the AI worker/);
   }, 15000);
 
+  it('reports the WAF challenge instead of a false login prompt when the fallback cannot authenticate', async () => {
+    // Same-origin /api/ai is challenged by the zone WAF; the cross-origin
+    // direct host answers 401 because the HttpOnly, host-bound session cookie
+    // cannot travel to it. That 401 describes the fallback, not the signed-in
+    // user: it must never replace the challenge with "please log in".
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/inspiration') return Response.json({ sites: [] });
+      if (url === '/api/embed') return Response.json({ embeddings: [] });
+      if (url === '/api/ai') {
+        return new Response(
+          '<!DOCTYPE html><html><head><title>Just a moment...</title></head><body>challenge</body></html>',
+          { status: 403, headers: { 'Content-Type': 'text/html', 'cf-mitigated': 'challenge' } }
+        );
+      }
+      expect(url).toBe('https://chat.zayne-mayo.workers.dev/api/ai');
+      return Response.json({ error: 'Authentication required. Please log in.' }, { status: 401 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const error = await generateHostedAIResponse('Build a game', undefined, [], null, {
+      stream: true,
+      onDelta: () => {}
+    }).catch((err) => err);
+
+    expect(error.message).toMatch(/WAF bypass rule for \/api\//i);
+    expect(error.message).not.toMatch(/please log in/i);
+    const hostedCalls = fetchMock.mock.calls.filter(
+      ([url]) => url === '/api/ai' || url === 'https://chat.zayne-mayo.workers.dev/api/ai'
+    );
+    expect(hostedCalls).toHaveLength(2);
+  });
+
+  it('reports the gateway failure instead of a false login prompt when the 5xx fallback cannot authenticate', async () => {
+    // A transient 5xx on the primary must not become "please log in" just
+    // because the cross-origin fallback answered 401 without the host-bound
+    // session cookie.
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/inspiration') return Response.json({ sites: [] });
+      if (url === '/api/embed') return Response.json({ embeddings: [] });
+      if (url === '/api/ai') {
+        return Response.json({ error: 'upstream down' }, { status: 503 });
+      }
+      expect(url).toBe('https://chat.zayne-mayo.workers.dev/api/ai');
+      return Response.json({ error: 'Authentication required. Please log in.' }, { status: 401 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const error = await generateHostedAIResponse('Build a game', undefined, [], null, {
+      stream: true,
+      onDelta: () => {}
+    }).catch((err) => err);
+
+    expect(error.message).toMatch(/503|upstream down/i);
+    expect(error.message).not.toMatch(/please log in/i);
+  });
+
   it('starts the inspiration and semantic-retrieval lookups together instead of one after the other', async () => {
     // Both enrichments are optional network round trips. Running them in
     // series made the model request wait for the sum of both (the worker's
