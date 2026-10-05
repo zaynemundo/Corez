@@ -65,8 +65,15 @@ describe this endpoint as authenticated user storage.
 
 ## Usage in Client Code
 
-The client service wrapper (`src/services/r2MemoryService.js`) is not implemented
-yet — call the worker endpoints directly with `fetch`:
+**The implemented client wrapper is `src/services/userLearningService.js`** —
+prefer it over hand-rolled requests. It exports `rememberUserFact`,
+`recallUserFacts`, `listUserFacts`, `forgetUserFact`, `detectUserFactCandidates`,
+`assertSafeUserId` and `assertSafeText`, and it is the only such wrapper that
+exists.
+
+The older `src/services/r2MemoryService.js` is not implemented yet - do not
+import it. For an endpoint this wrapper does not expose, call the worker
+endpoints directly with `fetch`:
 
 ```javascript
 // Save user preference

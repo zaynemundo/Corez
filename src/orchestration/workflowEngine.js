@@ -50,7 +50,17 @@ export class SuperpowersWorkflowEngine {
     try {
       // 1. Intent Classification
       const intentResult = classifyIntent(userPrompt);
-      const canonicalIntent = options.intent || intentResult.label || "general";
+      // A rejected classification is not a label. `classifyIntent` returns the
+      // argmax label even when it rejects the input (out-of-vocabulary or
+      // low-confidence), so gibberish reads as `app` — and reading `.label`
+      // unconditionally started the full six-skill engineering workflow
+      // (brainstorming, writing-plans, TDD, code review, verification) for
+      // input like "asdfghjkl" or "zzzz qqqq". The classifier's own contract
+      // requires a rejected result to fall back to `general`, which is what
+      // `analyzePublicUserIntent` already does.
+      const canonicalIntent =
+        options.intent ||
+        (intentResult.accepted ? intentResult.label : "general");
       workflow.intent = canonicalIntent;
       workflow.startStage(WORKFLOW_STAGES.INTENT_CLASSIFIED, {
         intentResult,

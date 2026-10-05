@@ -27,8 +27,14 @@ import {
 const INTENT_HANDLERS = [
   {
     type: INTENT_TYPES.WEBSITE_CREATION,
+    // `dashboard`/`portal`/`saas` are web-app artifacts too. Without them a new
+    // app build ("Build a responsive React user dashboard for managing customer
+    // subscriptions") was claimed by feature_implementation, which owns
+    // "dashboard" for the *additive* case ("add a dashboard to my app") — and
+    // feature_implementation marks the project as existing, so a greenfield
+    // build was reported as a change to an existing project.
     pattern:
-      /\b(build|make|create|generate|design|code|develop)\b.*\b(website|site|landing page|webpage|web app|web application|homepage|portfolio site)\b|\b(website|site|landing page|portfolio)\b.*\b(build|make|create|generate|design|code|develop)\b/i,
+      /\b(build|make|create|generate|design|code|develop)\b.*\b(website|site|landing page|webpage|web app|web application|homepage|portfolio site|dashboard|admin panel|portal|saas)\b|\b(website|site|landing page|portfolio|dashboard|admin panel|portal)\b.*\b(build|make|create|generate|design|code|develop)\b/i,
     signals: [
       "website",
       "landing page",
@@ -37,6 +43,9 @@ const INTENT_HANDLERS = [
       "web application",
       "site",
       "portfolio site",
+      "dashboard",
+      "portal",
+      "saas",
     ],
     extract(prompt, lower) {
       const domain = extractDomain(lower) || "general";
@@ -440,11 +449,34 @@ const OPTIONAL_QUESTIONS = [
 // Main classifier
 // ---------------------------------------------------------------------------
 
+// Signal matching is word-boundary, not substring. A plain `includes` test let
+// short signals match inside unrelated words, silently reassigning the intent:
+// "build" matched `ui`, "address" matched `add`, "prefix" matched `fix`,
+// "display" matched `play` and "silicon" matched `icon` — so a bare "build" was
+// classified design_task, "address" feature_implementation, "prefix" bug_fix,
+// "display" game_creation (domain "browser gaming") and "silicon"
+// image_generation. Every signal is lowercase alphanumeric-plus-space, so a
+// word-boundary wrap is safe; the compiled regexes are cached per handler
+// because this runs for every handler on every classification.
+const SIGNAL_REGEX_CACHE = new WeakMap();
+
+function signalRegexes(handler) {
+  let compiled = SIGNAL_REGEX_CACHE.get(handler);
+  if (!compiled) {
+    compiled = (handler.signals || []).map(
+      (signal) =>
+        new RegExp(`\\b${signal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`),
+    );
+    SIGNAL_REGEX_CACHE.set(handler, compiled);
+  }
+  return compiled;
+}
+
 function computeConfidence(handler, lower) {
   const maxSignals = Math.min(handler.signals.length || 1, 8);
   let matchedSignals = 0;
-  for (const s of handler.signals) {
-    if (lower.includes(s)) matchedSignals += 1;
+  for (const signalPattern of signalRegexes(handler)) {
+    if (signalPattern.test(lower)) matchedSignals += 1;
   }
   let score = Math.min(1, matchedSignals / Math.max(1, maxSignals * 0.4));
   if (handler.pattern.test(lower)) score = Math.min(1, score + 0.25);
@@ -549,6 +581,16 @@ function hasExplicitWebCreationInInstruction(instructionLower) {
 // "carousel UI", "carousel code/slider/website") is a build.
 function isSocialCarouselCopyInstruction(instructionLower) {
   if (!instructionLower) return false;
+  // `post` is also the HTTP verb, and the social-instruction test below is
+  // case-insensitive, so an API task read as social copy: "Make a POST request
+  // to the /api/users endpoint" was classified content_creation 0.9 with domain
+  // "social / marketing" — legacy intent `writing`. An HTTP/API context vetoes
+  // the social reading outright.
+  const isHttpRequestContext =
+    /\b(get|post|put|patch|delete|head|options)\s+(request|call|endpoint|route|handler|response)\b|\bhttp\s+(get|post|put|patch|delete)\b|\b(api|endpoint|route|handler|curl|fetch|axios|webhook|rest)\b.{0,40}\b(get|post|put|patch|delete)\b|\b(get|post|put|patch|delete)\b.{0,40}\b(api|endpoint|route|handler|curl|fetch|axios|webhook|rest|request)\b/i.test(
+      instructionLower,
+    );
+  if (isHttpRequestContext) return false;
   const hasSocialInstruction =
     /\b(create|write|draft|compose|make|generate|need|want)\b.{0,60}\b(post|caption|carousel post|linkedin post|instagram post|social post)\b/i.test(
       instructionLower,
@@ -876,8 +918,13 @@ export function extractRequirements(prompt, intent) {
   );
   if (actionMatch) {
     const subjectStart = prompt.indexOf(actionMatch[0]) + actionMatch[0].length;
-    const subjectChunk = prompt.slice(subjectStart).trim();
-    if (subjectChunk)
+    // Bound the captured subject. Unbounded, this took the entire remainder of
+    // the prompt: on a ~4.8 KB paste it produced a single 4,817-character
+    // "requirement", which is copied verbatim into `contract.mustAchieve` and
+    // injected into the execution prompt. A requirement is a short clause, and
+    // a subject shorter than a word is not one.
+    const subjectChunk = prompt.slice(subjectStart).trim().slice(0, 160);
+    if (subjectChunk.length >= 3)
       explicit.push(`${actionMatch[0].toLowerCase()} ${subjectChunk}`);
   }
 

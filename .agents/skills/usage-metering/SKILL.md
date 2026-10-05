@@ -75,8 +75,13 @@ it. Use it to isolate whether a bug is metering-related.
 ## Verification
 
 ```bash
-npx vitest run tests/usage-metering-contract.mjs
+node tests/usage-metering-contract.mjs
 ```
+
+It is a plain Node contract script, not a Vitest suite: `npx vitest run
+tests/usage-metering-contract.mjs` matches no test file and exits 1, which reads
+as a failure when nothing is wrong. It also runs inside
+`npm run test:cloudflare`.
 
 When you change a limit, assert **both** sides: the request at the limit is
 refused with `402`, and the request just below it succeeds. A test that only

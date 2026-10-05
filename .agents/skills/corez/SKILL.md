@@ -56,7 +56,7 @@ See `packages/agent-core/verification/corez/ship.js` (port of `jspace.py ship`).
 
 ## Controller (optional)
 
-For `loop`, use the ledger file + `ship` check. No Python, no `jspace.py` needed - Corez handles it via JS. For hand-execution, restate the 5 lines at each seam in conversation.
+For `loop`, use the ledger file + the `ship.js` check. No Python, no `jspace.py` needed - Corez handles it via JS. For hand-execution, restate the 5 lines at each seam in conversation.
 
 ## Attribution
 

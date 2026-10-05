@@ -236,9 +236,14 @@ export function shouldUseFullPipeline(intent) {
  */
 export function toLegacyIntentType(intentType) {
   switch (intentType) {
+    // `design_task` is UI/visual build work and was missing from this switch, so
+    // it fell through to `default: "general"` — demoting every design request to
+    // the conversational bucket. The resolver's ENGINEERING_INTENTS already
+    // treats `design_task` as engineering, so `app` is the consistent mapping.
     case INTENT_TYPES.WEBSITE_CREATION:
     case INTENT_TYPES.GAME_CREATION:
     case INTENT_TYPES.IMAGE_GENERATION:
+    case INTENT_TYPES.DESIGN_TASK:
       return "app";
     case INTENT_TYPES.FEATURE_IMPLEMENTATION:
     case INTENT_TYPES.CODE_REFACTOR:

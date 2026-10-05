@@ -12,7 +12,7 @@ Use this skill whenever designing, building, reviewing, or refactoring APIs, ser
 - Designing or refactoring an API route, Cloudflare Worker handler, or Node.js service endpoint.
 - Adding request validation, CORS origins, auth checks, or rate limiting to a public endpoint.
 - Reviewing response contracts, retries/backoff, idempotency, or caching for state-changing calls.
-- Choosing R2, D1, or KV usage (this deployment has no KV namespace bound), database indexes, or batch fetching for read-heavy paths.
+- Choosing R2, D1, or KV usage (`INSPIRATION_CACHE` is the one bound KV namespace), database indexes, or batch fetching for read-heavy paths.
 - Wiring worker handlers to the repo helpers: `runJsonSafe` (defined in `worker/index.js`) and `jsonResponse`, `readBoundedJson`, `safeErrorDetail` (from `worker/utils.js`).
 
 ## When not to use
@@ -96,7 +96,7 @@ Use this skill whenever designing, building, reviewing, or refactoring APIs, ser
 ### 1. Stateless Execution & Distributed Caching
 - Design APIs to be stateless so Cloudflare Workers or server instances can scale horizontally.
 - Cache read-heavy or deterministic responses with HTTP `Cache-Control` headers (e.g., `public, max-age=300, s-maxage=3600`), the Cloudflare Cache API, or R2 for artifacts.
-  - No KV namespace is bound in this deployment (`wrangler.jsonc`), so add the binding before recommending KV. Never cache metered or user-specific responses such as `/api/ai`, `/api/image`, or `/api/memory`.
+  - One KV namespace is bound: `INSPIRATION_CACHE` (`wrangler.jsonc`), used by `worker/inspiration.js` for cached inspiration payloads. Reuse it rather than binding a second namespace. Never cache metered or user-specific responses such as `/api/ai`, `/api/image`, or `/api/memory`.
 
 ### 2. Database & Search Optimization
 - Add indexes on frequently queried foreign keys, filter attributes, and timestamp sort fields.
@@ -125,4 +125,4 @@ Use this skill whenever designing, building, reviewing, or refactoring APIs, ser
 - `ai-infrastructure` - provider routing and token budget topics above the API layer.
 - `code-review-testing` - review and test gates applied to API changes.
 - `verify` - runtime and deployed-Cloudflare inspection commands for the endpoints above.
-- Cloudflare platform skills (`cloudflare`, `wrangler`, `workers-best-practices`) - load these for platform-level questions (bindings, deploy flow, limits) and let this skill cover only the CoreZ-specific contract.
+- `cloudflare-platform` - platform-level questions (bindings, deploy flow, limits, secrets); this skill covers only the CoreZ-specific contract.

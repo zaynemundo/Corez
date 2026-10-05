@@ -52,6 +52,22 @@ Ask only for providers needed by the requested deployment. Never ask a public
 app user for these values, and never expose them in browser code or responses.
 Cloudflare deployment credentials are CI/CD secrets and must not be committed.
 
+## Other CoreZ secrets
+
+The provider keys above are not the only values this deployment needs. These are
+read by real code paths and were previously undocumented, so ask for them by
+name when the requested work touches their feature:
+
+| Variable | Read by | Needed for |
+|---|---|---|
+| `ZIINA_API_KEY` | `worker/ziina.js`, `worker/subscriptions.js` | Payment endpoints; `ZIINA_API_TOKEN` is an accepted alias. Missing means payments are simply unconfigured. |
+| `RESEND_API_KEY` | `worker/auth.js` | Password-reset email delivery. |
+| `AUTH_SECRET` | `worker/auth.js` and 7 other worker modules | Session signing. **Security-relevant:** when it is unset the login wall is bypassed and requests resolve to a `dev` user (`worker/auth.js:272-273`), so an unset value in production is a hole, not a default. |
+| `EXA_API_KEY` | `worker/search.js` | Optional. Enables the Exa neural-search tier; without it search falls back to the keyless chain. |
+
+Do not present these as required for every deploy — most are optional and degrade
+to a documented fallback. State which feature stops working without each one.
+
 ## Provider wording
 
 When the target is Replit, ask the user to add required values in Replit

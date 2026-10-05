@@ -83,7 +83,7 @@ part 13, then part 14).
   suite per `game-smoke-test`. See `code-review-testing` for the repo-wide
   verification protocol.
 - **File ownership**: no two parallel agents edit the same file; every task
-  brief names its allowed files (see `game-task-plan`).
+  brief names its allowed files (see `parts/07-game-task-plan.md`).
 - **Context isolation**: give each specialist only its brief (task, role,
   goal, allowed files, acceptance criteria) — never the full conversation.
 - **Visual layering**: HUD and menus follow the canonical stacking order in

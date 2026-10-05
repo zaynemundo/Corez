@@ -59,7 +59,7 @@ Enforces strict WCAG 2.2 AA accessibility standards on all generated UI elements
 
 - **Z-index + tokens are canonical in `frontend-modern-design: §1 & §5`** — this skill references that contract instead of redefining it. Apply Background `0` → Content `10` → HUD `20-30` → Overlays/Modals `40-50+`, increments of 10, so modals, toasts, and drawers never sit outside the expected stacking context. See `capability-orchestrator: §1.1` for when to load `frontend-design` vs `frontend-modern-design`.
 - Respect the repo design tokens (`--text-primary`, `--text-secondary`, `--text-muted`, `--border-color` in `src/index.css`) when choosing colors so contrast pairs stay consistent.
-- Responsive/contrast contracts are asserted by the repository's `tests/ui-responsive-contract.sh` — run it directly with `bash tests/ui-responsive-contract.sh` before landing UI changes (it is not wired into `npm run test:cloudflare`).
+- Responsive/contrast contracts are asserted by the repository's `tests/ui-responsive-contract.sh` — run it directly with `bash tests/ui-responsive-contract.sh` before landing UI changes. It is also part of `npm run test:cloudflare`, so that suite covers it.
 
 ## Verification
 

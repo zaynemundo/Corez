@@ -16,7 +16,7 @@ description: Use when adding or changing a D1 table, column, index or constraint
 
 - Index design and query performance - `backend-architecture`.
 - The plan/subscription columns specifically - `payments-billing`.
-- Deploying the Worker itself - `wrangler`.
+- Deploying the Worker itself - `cloudflare-platform`.
 
 ## The binding
 
@@ -37,10 +37,16 @@ production schema is created **at runtime** by `ensure*` functions that each run
 their own idempotent DDL:
 
 - `worker/auth.js` → `users` (+ plan/subscription/consent columns), `invite_codes`, `chats`, `chat_messages`, `password_resets`
+- `worker/chats.js` → `chats`, `chat_messages` (a second owner of the same two tables)
+- `worker/memory.js` → `user_memories`, `memory_migrations`
 - `worker/subscriptions.js` → `subscriptions` + `users.subscription_*`
 - `worker/usage.js` → usage counters
 - `worker/analytics.js` → the analytics table
-- `worker/customDomains.js` → domain records
+
+Not every persisted record is D1: `worker/customDomains.js` stores domain
+records as **R2 objects** in `ASSET_BUCKET` (deliberately, so a per-request
+lookup is a direct `get()` rather than a query), and it contains no DDL at all.
+Do not add a D1 table for a feature that already persists to R2.
 
 So **grep for `CREATE TABLE IF NOT EXISTS` before concluding a table does not
 exist**, and add a new table to the `ensure*` function for its feature rather
@@ -104,8 +110,16 @@ Two behaviours that waste time if you do not know them:
 - Migrations run on request path - keep them cheap and idempotent; a full table
   scan on every request is a performance bug.
 - Deleting a user does not cascade to every feature table. If a feature stores
-  per-user rows, clean them up explicitly. `users` has
-  `ON DELETE CASCADE` for `chats` and `chat_messages` only.
+  per-user rows, clean them up explicitly.
+- **Do not assume CASCADE exists at all.** Three competing definitions of
+  `chats` / `chat_messages` are in play, and they disagree: `worker/schema.sql`
+  declares `FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE` and the
+  same for `chat_id`, but the runtime bootstrap in `worker/auth.js` creates both
+  tables with **no FOREIGN KEY clause** (and `worker/chats.js` creates them a
+  third time). Since the runtime `ensure*` path is what actually builds a
+  deployed database, CASCADE holds only on a database bootstrapped from
+  `schema.sql`. Treat per-user cleanup as explicit work, never as an inherited
+  guarantee, and check the live table definition before relying on it.
 
 ## Verification
 
@@ -121,4 +135,4 @@ you ran manually.
 
 - `backend-architecture` - query shape and index design.
 - `payments-billing` / `usage-metering` - the tables those features own.
-- `wrangler` - CLI syntax and non-D1 commands.
+- `cloudflare-platform` - wrangler CLI syntax, bindings, and non-D1 commands.

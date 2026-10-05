@@ -188,6 +188,20 @@ export function classifyIntent(prompt) {
 
   const oovRatio = roundToFixed(oovCount / tokens.length, 4);
 
+  // Every token out of vocabulary: every class score collapses to its prior,
+  // and because the priors are identical (the dataset is exactly balanced) the
+  // softmax ties and argmax falls through to `model.labels[0]` — which is
+  // "app". That is how gibberish acquired an app-build label and, downstream,
+  // the six-skill engineering workflow. Report the honest answer instead.
+  if (oovCount === tokens.length) {
+    return {
+      label: "general",
+      confidence: 0,
+      oovRatio,
+      accepted: false,
+    };
+  }
+
   const scores = {};
   for (const label of model.labels) {
     let score = model.logPriors[label];

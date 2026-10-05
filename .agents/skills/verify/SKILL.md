@@ -133,4 +133,4 @@ it.
 - `code-review-testing` - unit and static checks that precede runtime verification.
 - `git-superpowers` - commits the verified state on `main`.
 - `backend-architecture` - binding map and API contracts behind the endpoints verified here.
-- Cloudflare platform skills (`cloudflare`, `wrangler`, `workers-best-practices`) - load these for platform mechanics (bindings, deploy, limits) that are not CoreZ-specific.
+- `cloudflare-platform` - platform mechanics (bindings, deploy flow, limits, secrets) that are not CoreZ-specific.
