@@ -1,4 +1,4 @@
-﻿import { handleSearch } from "./search.js";
+import { handleSearch } from "./search.js";
 import {
   handleMemory,
   ensureMemoryTables,
@@ -662,7 +662,7 @@ Adaptive Routing - Code Revision Path:
 - If the existing code is HTML, output the full HTML document inside one \`\`\`html block.
 - If repairing missing sub-page links:
   - If single-page: convert <a href="page.html"> to in-page anchors (<a href="#section">).
-  - If multi-page: include all referenced pages with \`<!-- PAGE: page.html -->\` markers.
+  - If multi-page: write ONE \`<!-- PAGE: page.html -->\` marker line immediately BEFORE each page, INCLUDING the home page (the first line of the artifact is \`<!-- PAGE: index.html -->). Never write a page before its marker.
 - Output the complete, working updated file inside a single code block so the live canvas preview immediately updates.`;
   } else if (
     intentType === "code-help" ||

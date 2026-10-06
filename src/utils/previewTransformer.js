@@ -63,6 +63,75 @@ function extractLeadingPageDocument(preamble) {
 }
 
 /**
+ * Where does a multi-page artifact begin inside a model reply?
+ *
+ * This is the ONE place that decides. Two independent copies of this rule used
+ * to exist — one in `ChatMessage.extractUnfencedDeliverable`, one in the
+ * truncated-response salvage inside `aiService.extractCodeFromMessage` — and
+ * both searched for the first `<!-- PAGE: ... -->` marker and sliced from
+ * there. Because models write the home page UNMARKED and only start marking
+ * from the second document, both silently deleted index.html, which surfaced as
+ * "Missing index.html home page" plus a dangling link per navigation element,
+ * with publishing blocked.
+ *
+ * A document start that precedes the first marker is the unmarked home page, so
+ * the earliest of the two wins. Returns -1 when the text holds no artifact.
+ */
+export function findArtifactStartIndex(text) {
+  if (!text || typeof text !== "string") return -1;
+
+  const markerIdx = text.search(/<!--\s*(?:PAGE|CORESITE-PAGES):\s*[^\s>]+\s*-->/i);
+  const documentIdx = text.search(DOCUMENT_START_PATTERN);
+
+  // A document that begins before the first marker is the unmarked home page.
+  if (documentIdx !== -1 && (markerIdx === -1 || documentIdx < markerIdx)) {
+    const remaining = text.slice(documentIdx);
+    // Only trust it when it actually looks like a document, so a stray
+    // "<html" mentioned in prose does not become the artifact start.
+    if (
+      remaining.includes("</html>") ||
+      remaining.includes("</body>") ||
+      remaining.includes("</head>") ||
+      remaining.includes("<style") ||
+      remaining.includes("<script")
+    ) {
+      return documentIdx;
+    }
+  }
+
+  return markerIdx;
+}
+
+/**
+ * Canonicalises the marker convention on a multi-page artifact by giving an
+ * unmarked leading document its own `<!-- PAGE: index.html -->` marker.
+ *
+ * Models are told every page is delimited by its own marker, but they reliably
+ * read "separated by markers" as "markers go BETWEEN pages" and write the home
+ * page before the first marker. The parser tolerates that, but every other
+ * consumer — a copy-paste of the artifact, a repair round-trip, the user
+ * reading the code — then sees a site whose first page has no name. Making the
+ * marker explicit here means the convention holds no matter what the model did.
+ *
+ * A single-page artifact (no markers at all) is returned untouched: adding a
+ * marker would falsely turn it into a multi-page site.
+ */
+export function ensureLeadingPageMarker(code) {
+  if (!code || typeof code !== "string") return code;
+
+  const firstMarker = code.search(/<!--\s*PAGE:\s*[^\s>]+\s*-->/i);
+  if (firstMarker === -1) return code;
+
+  // An explicit index.html marker already exists: nothing to add.
+  if (/<!--\s*PAGE:\s*index\.html\s*-->/i.test(code)) return code;
+
+  const documentStart = code.search(DOCUMENT_START_PATTERN);
+  if (documentStart === -1 || documentStart > firstMarker) return code;
+
+  return `<!-- PAGE: index.html -->\n${code}`;
+}
+
+/**
  * Splits a model output into pages when it uses the multi-page marker
  * convention. Returns { isMultiPage, pages: [{ name, html }] }. A complete
  * document written before the first marker becomes index.html. Falls back to

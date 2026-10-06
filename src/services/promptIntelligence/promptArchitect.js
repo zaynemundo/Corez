@@ -201,13 +201,16 @@ function buildWebsitePrompt(rawPrompt, intent, requirements, context) {
     result += `ONE-SHOT MODE: the user asked for a single page only. Output ONE single complete HTML document and nothing else — no sub-pages, no markers.\n\n`;
   } else {
     // Multi-page by default: output each page as its own complete HTML
-    // document inside the SAME single code block, separated by
-    // <!-- PAGE: name.html --> markers and linked with plain
-    // <a href="name.html"> anchors.
-    result += `MULTI-PAGE BY DEFAULT: output a multi-page website. Every page is a complete standalone HTML document inside the SAME single code block, one per page, separated by markers:\n`;
-    result += `<!-- PAGE: index.html -->\n<!DOCTYPE html>... complete page ...\n`;
+    // document inside the SAME single code block. EVERY page — including the
+    // home page — is PRECEDED by its own marker. Markers DELIMIT pages; they do
+    // not merely separate them. Wording this as "separated by markers" made
+    // models write the home page before the first marker, leaving index.html
+    // unnamed and breaking the completeness gate.
+    result += `MULTI-PAGE BY DEFAULT: output a multi-page website. Every page is a complete standalone HTML document inside the SAME single code block. Write ONE marker line immediately BEFORE each page, including the FIRST page:\n`;
+    result += `<!-- PAGE: index.html -->\n<!DOCTYPE html>... complete home page ...\n<!-- PAGE: about.html -->\n<!DOCTYPE html>... complete about page ...\n`;
+    result += `The home page MUST have its own <!-- PAGE: index.html --> line above it, and nothing (no HTML, no prose) may appear before that first marker. Never write a page before its marker.\n`;
     result += `Link pages with PLAIN RELATIVE anchors ONLY: <a href="about.html">About</a>. Never use a leading slash or absolute URL for internal links (never "/about.html", "https://...", or "corez.pro/...") — the preview and the published site serve every page under its own folder (corez.pro/<slug>/about.html), so only bare relative filenames resolve to the right URL. Keep lowercase filenames (index.html, about.html, contact.html), max 12 pages.\n`;
-    result += `COMPLETENESS CHECK before finishing: always include an index.html home page, only link to pages that exist in your output, and keep every page a complete HTML document.\n\n`;
+    result += `COMPLETENESS CHECK before finishing: the FIRST line of the artifact is <!-- PAGE: index.html -->, only link to pages that exist in your output, and keep every page a complete HTML document.\n\n`;
   }
 
   // Sections

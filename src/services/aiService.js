@@ -46,6 +46,10 @@ import { buildAwwwardsDesignPrompt } from "../../packages/agent-core/context/des
 import { stripThinkingBlocks } from "../../packages/agent-core/providers/text.js";
 import { resolveSkills } from "../skills/resolver.js";
 import { stripJunkAfterDocumentEnd } from "../utils/htmlRepair.js";
+import {
+  ensureLeadingPageMarker,
+  findArtifactStartIndex,
+} from "../utils/previewTransformer.js";
 import { classifyExecutionMode } from "./executionModes.js";
 import { persistAndSummarize } from "./contextStore.js";
 import { fetchWebSearch } from "./searchService.js";
@@ -963,10 +967,13 @@ ${designSpec}${liveInspiration}${semanticPatternsPrompt}
 - NEVER mention "Awwwards", "Awwwards-inspired", or internal prompt buzzwords in your output or preamble text. Describe your creation naturally without meta-commentary.
 - Ensure proper visual layering and z-index stacking hierarchy (Background z-index:0 -> Content z-index:10 -> HUD/Toolbars z-index:20-30 -> Modals/Overlays z-index:40-50+) so elements don't obscure interactive controls!
 - Output complete, clean HTML/CSS/JS code inside ONE SINGLE \`\`\`html ... \`\`\` code block including inline \`<style>\` and \`<script>\` tags.
-- ${isOneShot ? "ONE-SHOT MODE: output ONE single page only — no sub-pages, no markers." : "MULTI-PAGE BY DEFAULT: output a multi-page website unless the user explicitly asked for ONE-SHOT (single page only). For multi-page output, put every page as its own complete standalone HTML document inside the SAME single code block, separated by markers:"}
+- ${isOneShot ? "ONE-SHOT MODE: output ONE single page only — no sub-pages, no markers." : "MULTI-PAGE BY DEFAULT: output a multi-page website unless the user explicitly asked for ONE-SHOT (single page only). For multi-page output, put every page as its own complete standalone HTML document inside the SAME single code block. Write ONE marker line immediately BEFORE each page, INCLUDING the home page:"}
   <!-- PAGE: index.html -->
-  <!DOCTYPE html>... complete page with inline <style>/<script> ...
-  Link pages with PLAIN RELATIVE anchors ONLY: <a href="about.html">About</a>. Never use a leading slash or absolute URL for internal links (never "/about.html", "https://...", or "corez.pro/...") — the preview and the published site serve every page under its own folder (corez.pro/<slug>/about.html), so only bare relative filenames resolve to the right URL. Keep filenames lowercase like index.html, about.html, contact.html (max 12 pages). COMPLETENESS CHECK before you finish: ALWAYS output an index.html home page, make every <a href="..."> point to a page you actually output (a link to a page you never created is a broken site), and keep every page a complete standalone HTML document.
+  <!DOCTYPE html>... complete home page with inline <style>/<script> ...
+  <!-- PAGE: about.html -->
+  <!DOCTYPE html>... complete about page ...
+  The home page MUST have its own <!-- PAGE: index.html --> line above it, and nothing (no HTML, no prose) may appear before that first marker — never write a page before its marker.
+  Link pages with PLAIN RELATIVE anchors ONLY: <a href="about.html">About</a>. Never use a leading slash or absolute URL for internal links (never "/about.html", "https://...", or "corez.pro/...") — the preview and the published site serve every page under its own folder (corez.pro/<slug>/about.html), so only bare relative filenames resolve to the right URL. Keep filenames lowercase like index.html, about.html, contact.html (max 12 pages). COMPLETENESS CHECK before you finish: the FIRST line of the artifact is <!-- PAGE: index.html -->, make every <a href="..."> point to a page you actually output (a link to a page you never created is a broken site), and keep every page a complete standalone HTML document.
 - ONE-SHOT MODE: ONLY when the user explicitly asked for "oneshot" (or "one shot", "single page", "one page"), output ONE single page only (no sub-pages, no markers).
 - Build a complete, responsive, standalone experience ready for the preview canvas.
 - IMPLEMENTATION CHECK before you finish: implement EVERY feature you describe in the overview and every control the user asked for — no stubs, no TODOs, no placeholder functions; every button, form, and interactive element must actually work.
@@ -985,10 +992,13 @@ ${designSpec}${liveInspiration}${semanticPatternsPrompt}
 - DO NOT wrap React code inside HTML boilerplate (\`<!DOCTYPE html>\`, \`<head>\`, \`<script type="text/babel">\`, or \`ReactDOM.createRoot()\`) because the preview canvas automatically compiles and renders React/JSX code!
 - Do NOT split your output into multiple separate code blocks, file headers (// App.tsx, // components/Navbar.tsx), or relative file imports (import Navbar from './components/Navbar').
 - Define all child components (Navbar, Hero, Footer, etc.) inline within the SAME file BEFORE the main App component!
-- MULTI-PAGE BY DEFAULT: build a multi-page website unless the user explicitly asked for ONE-SHOT (single page only). For multi-page output, switch to plain HTML and output every page as its own complete standalone HTML document inside the SAME single \`\`\`html ... \`\`\` code block, separated by markers:
+- MULTI-PAGE BY DEFAULT: build a multi-page website unless the user explicitly asked for ONE-SHOT (single page only). For multi-page output, switch to plain HTML and output every page as its own complete standalone HTML document inside the SAME single \`\`\`html ... \`\`\` code block. Write ONE marker line immediately BEFORE each page, INCLUDING the home page:
   <!-- PAGE: index.html -->
-  <!DOCTYPE html>... complete page ...
-  Link pages with PLAIN RELATIVE anchors ONLY: <a href="about.html">About</a>. Never use a leading slash or absolute URL for internal links (never "/about.html", "https://...", or "corez.pro/...") — the preview and the published site serve every page under its own folder (corez.pro/<slug>/about.html), so only bare relative filenames resolve to the right URL. Keep filenames lowercase like index.html, about.html, contact.html (max 12 pages). COMPLETENESS CHECK before you finish: ALWAYS output an index.html home page, make every <a href="..."> point to a page you actually output (a link to a page you never created is a broken site), and keep every page a complete standalone HTML document.
+  <!DOCTYPE html>... complete home page ...
+  <!-- PAGE: about.html -->
+  <!DOCTYPE html>... complete about page ...
+  The home page MUST have its own <!-- PAGE: index.html --> line above it, and nothing (no HTML, no prose) may appear before that first marker — never write a page before its marker.
+  Link pages with PLAIN RELATIVE anchors ONLY: <a href="about.html">About</a>. Never use a leading slash or absolute URL for internal links (never "/about.html", "https://...", or "corez.pro/...") — the preview and the published site serve every page under its own folder (corez.pro/<slug>/about.html), so only bare relative filenames resolve to the right URL. Keep filenames lowercase like index.html, about.html, contact.html (max 12 pages). COMPLETENESS CHECK before you finish: the FIRST line of the artifact is <!-- PAGE: index.html -->, make every <a href="..."> point to a page you actually output (a link to a page you never created is a broken site), and keep every page a complete standalone HTML document.
 - ONE-SHOT MODE: ONLY when the user explicitly asked for "oneshot" (or "one shot", "single page", "one page"), output a single React component exactly as described above (no sub-pages, no markers).
 - IMPLEMENTATION CHECK before you finish: implement EVERY feature you describe in the overview and every control the user asked for — no stubs, no TODOs, no placeholder functions; every button and interactive element must actually work.
 - ALWAYS end your response with a step-by-step user guide and feature summary after the code block! Never output ONLY a bare code block.`;
@@ -1750,7 +1760,11 @@ export function extractCodeFromMessage(text) {
   // markdown "Verification checklist", a summary, a stray fence — and a
   // browser renders that as page text, so the extracted artifact is cut at its
   // closing tag before it leaves this function.
-  const finish = (code) => stripJunkAfterDocumentEnd(code).trim();
+  // Every artifact leaving this function is normalised: the multi-page marker
+  // convention is applied here so no caller — canvas, copy, publish — can
+  // receive a site whose home page has no marker.
+  const finish = (code) =>
+    ensureLeadingPageMarker(stripJunkAfterDocumentEnd(code).trim());
 
   const codeBlocks = text.match(
     /```(?:html|xml|jsx|tsx|js|javascript|react)?\s*([\s\S]*?)```/gi,
@@ -1855,9 +1869,14 @@ export function extractCodeFromMessage(text) {
   // mid-code-block (no closing ```), so the strict matchers above miss it.
   // Extract everything after the last recognized fence when it still looks
   // like code, so the preview canvas can open anyway. Multi-page output
-  // truncated mid-way keeps ALL pages: start from the first page marker
-  // (when present) instead of the last fence, which would isolate the final
-  // page and drop every earlier page's markers.
+  // truncated mid-way keeps ALL pages: start from where the artifact begins
+  // rather than from the last fence, which would isolate the final page and
+  // drop every earlier page's markers.
+  //
+  // The start is resolved by findArtifactStartIndex — the single shared rule.
+  // Searching for the first `<!-- PAGE: -->` marker here (as this code used to)
+  // dropped the unmarked home page, the same defect that blocked publishing
+  // from the unfenced path.
   const truncatedBlock = text.match(
     /```(?:html|xml|jsx|tsx|js|javascript|react)?\s*([\s\S]*)$/i,
   );
@@ -1867,15 +1886,15 @@ export function extractCodeFromMessage(text) {
       MULTI_PAGE_MARKER_ANY_PATTERN.test(code) ||
       MULTI_PAGE_MARKER_ANY_PATTERN.test(text)
     ) {
-      const markerIdx = text.search(MULTI_PAGE_MARKER_ANY_PATTERN);
-      if (markerIdx !== -1) {
-        const fromFirstMarker = text.slice(markerIdx).trim();
+      const artifactStart = findArtifactStartIndex(text);
+      if (artifactStart !== -1) {
+        const fromArtifactStart = text.slice(artifactStart).trim();
         if (
-          fromFirstMarker.includes("<html") ||
-          fromFirstMarker.includes("<!DOCTYPE") ||
-          fromFirstMarker.includes("</html>")
+          fromArtifactStart.includes("<html") ||
+          fromArtifactStart.includes("<!DOCTYPE") ||
+          fromArtifactStart.includes("</html>")
         ) {
-          code = fromFirstMarker;
+          code = fromArtifactStart;
         }
       }
     }

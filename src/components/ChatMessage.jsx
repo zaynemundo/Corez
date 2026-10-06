@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { extractCodeFromMessage } from "../services/aiService";
 import { stripJunkAfterDocumentEnd } from "../utils/htmlRepair";
+import { ensureLeadingPageMarker, findArtifactStartIndex } from "../utils/previewTransformer";
 import { useI18n } from "../i18n/index.jsx";
 
 function safeImageUrl(url) {
@@ -94,28 +95,15 @@ function isExecutableCodeBlock(lang, code) {
   return false;
 }
 
-function extractUnfencedDeliverable(text) {
+export function extractUnfencedDeliverable(text) {
   if (!text || typeof text !== "string") return null;
 
-  // Check for multi-page site marker or document root
-  let matchIdx = text.search(
-    /<!--\s*(?:PAGE|CORESITE-PAGES):\s*[^\s>]+\s*-->/i,
-  );
-  if (matchIdx === -1) {
-    matchIdx = text.search(/(?:<!DOCTYPE\s+html|<html[\s>])/i);
-    if (matchIdx !== -1) {
-      const remaining = text.slice(matchIdx);
-      if (
-        !remaining.includes("</html>") &&
-        !remaining.includes("</body>") &&
-        !remaining.includes("</head>") &&
-        !remaining.includes("<style") &&
-        !remaining.includes("<script")
-      ) {
-        matchIdx = -1;
-      }
-    }
-  }
+  // Where the artifact begins is decided in ONE place (see
+  // findArtifactStartIndex): a `<!-- PAGE: ... -->` marker is NOT necessarily
+  // the start of the site, because models write the home page unmarked and only
+  // start marking from the second document. Slicing from the first marker
+  // deleted index.html and blocked publishing.
+  const matchIdx = findArtifactStartIndex(text);
 
   if (matchIdx === -1) return null;
 
@@ -125,7 +113,12 @@ function extractUnfencedDeliverable(text) {
     .replace(/(?:\r?\n|^)\s*(?:Fullscreen|Preview)\s*$/i, "")
     .trim();
 
-  const code = stripJunkAfterDocumentEnd(text.slice(matchIdx)).trim();
+  // Normalise the marker convention: an unmarked leading document (the home
+  // page) gets its own explicit marker, so every consumer downstream sees a
+  // site whose first page is named — regardless of how the model framed it.
+  const code = ensureLeadingPageMarker(
+    stripJunkAfterDocumentEnd(text.slice(matchIdx)).trim(),
+  );
   const isExecutable = isExecutableCodeBlock("html", code);
 
   if (!isExecutable) return null;
