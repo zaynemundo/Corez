@@ -39,6 +39,13 @@ import {
   deleteSessionAppsInR2,
 } from "./services/appStorageService";
 import * as chatService from "./services/chatService";
+import {
+  dropChatPrefetches,
+  prefetchChat,
+  prefetchChatList,
+  takeChat,
+  takeChatList,
+} from "./services/chatPrefetch";
 import { buildPhaseLabel } from "./utils/buildPhaseLabel";
 import {
   persistUserTurn,
@@ -178,7 +185,9 @@ function MainApp({ theme, setTheme }) {
   const fetchChatList = useCallback(async () => {
     if (!user) return;
     try {
-      const chats = await chatService.listChats();
+      // AppInner started this request while the session check was still in
+      // flight; consume it rather than asking a second time.
+      const chats = await (takeChatList() ?? chatService.listChats());
       const mapped = chats.map((c) => ({
         id: c.id,
         title: c.title,
@@ -301,12 +310,20 @@ function MainApp({ theme, setTheme }) {
       setChatLoading(true);
       try {
         const isExpanded = expandedCompactIds.has(activeSessionId);
-        const data = isExpanded
-          ? await chatService.getChat(activeSessionId, { compact: false })
-          : await chatService.getChat(activeSessionId, {
-              compact: true,
-              keep: 30,
-            });
+        // AppInner prefetched the default (compact) read. An expanded read is a
+        // different request, so the prefetch is taken either way — it must not
+        // stay behind to answer a later call — and used only when it is the one
+        // that was actually asked for.
+        const prefetched = takeChat(activeSessionId);
+        const data =
+          !isExpanded && prefetched
+            ? await prefetched
+            : isExpanded
+              ? await chatService.getChat(activeSessionId, { compact: false })
+              : await chatService.getChat(activeSessionId, {
+                  compact: true,
+                  keep: 30,
+                });
         if (cancelled) return;
         let msgs = Array.isArray(data.messages)
           ? data.messages.map((m) => ({
@@ -1556,6 +1573,32 @@ function AppInner() {
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);
+
+  // The chat requests do not depend on the answer to the session check: the
+  // Worker authorises them from the `corez_session` cookie itself, so the
+  // identity `/api/auth/me` returns is not an input to `/api/chats`. Starting
+  // them here — this effect is declared above the early returns below, so it
+  // runs while the check is still in flight — takes the session check off the
+  // chat's critical path. `MainApp` then consumes these promises instead of
+  // issuing its own. Public routes never prefetch: they render without the
+  // check and have no chats to show.
+  const prefetchChatId = useChatIdFromUrl();
+  useEffect(() => {
+    if (PUBLIC_ROUTES.test(location.pathname)) return;
+    prefetchChatList();
+    prefetchChat(prefetchChatId);
+    // Once, on boot: later navigation fetches normally through MainApp.
+  }, []);
+
+  // The prefetch above is a bet that the visitor is signed in, and the session
+  // check settles it. If the check answers that nobody is (or that it could not
+  // tell), the bet is off and the unconsumed entries have to go: they were 401s,
+  // and holding on to them would hand a stale rejection to MainApp the moment
+  // the visitor signs in, dropping the account's chats on the floor.
+  useEffect(() => {
+    if (loading) return;
+    if (!user) dropChatPrefetches();
+  }, [loading, user]);
 
   // The session check decides between the app and the public pages, and it is a
   // network round-trip on every cold load. Two rules keep it from becoming a
