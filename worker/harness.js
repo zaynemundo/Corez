@@ -8,7 +8,11 @@
 // route; the harness only changes HOW the work is sequenced.
 
 import { runProviderChain, runStreamingChain } from "./providerChain.js";
-import { selectModelForRequest, selectReasoningConfig } from "./modelRouter.js";
+import {
+  selectModelForRequest,
+  selectReasoningConfig,
+  withVisibleReasoning,
+} from "./modelRouter.js";
 import { resolveTextModel } from "../packages/agent-core/providers/modelIds.js";
 import {
   verifyCreation,
@@ -180,9 +184,14 @@ export async function* runCreationHarness(options) {
   );
   // Reasoning config: harness computes complexity-aware reasoning & temperature
   // so DeepSeek V4.1 Flash can think thoroughly for builds but cheaply for trivial.
-  const buildReasoning =
+  // The build stream is user-facing and renders its reasoning as a live
+  // thinking panel, so reasoning must be returned rather than excluded.
+  // Spec and review calls below set their own exclude:true and are unaffected.
+  const buildReasoning = withVisibleReasoning(
     options.reasoning ||
-    selectReasoningConfig({ prompt, primaryIntent, complexity }, env).reasoning;
+      selectReasoningConfig({ prompt, primaryIntent, complexity }, env)
+        .reasoning,
+  );
   const buildTemperature = Number.isFinite(options.temperature)
     ? options.temperature
     : selectReasoningConfig({ prompt, primaryIntent, complexity }, env)
@@ -577,6 +586,11 @@ export async function* runCreationHarness(options) {
               await persist(store, taskId, state);
               lastCheckpointAt = now;
             }
+          } else if (event.type === "thinking") {
+            // The model's (redacted) reasoning, surfaced live so a long build
+            // shows progress instead of three dots. Never part of the
+            // artifact: `collected` stays content-only.
+            yield { type: "thinking", text: event.text };
           } else if (event.type === "meta") {
             provider = provider || event.provider || null;
             model = model || event.model || null;
@@ -664,6 +678,10 @@ export async function* runCreationHarness(options) {
           })) {
             if (event.type === "delta") {
               continuationChunk += event.text;
+            } else if (event.type === "thinking") {
+              // A continuation is still the model working: keep the thinking
+              // panel alive across passes.
+              yield { type: "thinking", text: event.text };
             } else if (event.type === "usage" && event.outputTokens) {
               outputTokens = (outputTokens || 0) + event.outputTokens;
             } else if (event.type === "done") {

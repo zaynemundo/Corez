@@ -40,6 +40,14 @@ export default {
     done: "Done.",
   },
 
+  // Live reasoning panel: the model's thinking streams here before the answer
+  // starts, so a long generation shows progress instead of only a spinner.
+  thinking: {
+    label: "Thinking",
+    show: "Show thinking",
+    hide: "Hide thinking",
+  },
+
   sidebar: {
     collapse: "Collapse Sidebar",
     newChat: "New Chat",

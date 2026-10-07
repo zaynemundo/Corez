@@ -68,15 +68,22 @@ function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-export function toAssistantMessage(response) {
+export function toAssistantMessage(response, thinking = "") {
+  // The reasoning is attached to the message so the collapsed "Thinking"
+  // disclosure survives after the turn completes, exactly like the streaming
+  // panel that produced it. It is display-only: never part of `content`.
+  const withThinking = (message) => {
+    const text = typeof thinking === "string" ? thinking.trim() : "";
+    return text ? { ...message, thinking: text } : message;
+  };
   if (typeof response === "string") {
-    return { role: "assistant", content: response };
+    return withThinking({ role: "assistant", content: response });
   }
   if (isObject(response)) {
-    return {
+    return withThinking({
       role: "assistant",
       content: typeof response.content === "string" ? response.content : "",
-    };
+    });
   }
   return { role: "assistant", content: "" };
 }
@@ -134,6 +141,15 @@ function MainApp({ theme, setTheme }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [streamingContent, setStreamingContent] = useState(null);
+  // The model's live reasoning, streamed before the answer. Kept separate from
+  // streamingContent so it is never mixed into the reply, and mirrored into a
+  // ref so the finished message can carry it once the turn resolves.
+  const [streamingThinking, setStreamingThinking] = useState("");
+  const streamingThinkingRef = useRef("");
+  // The reasoning panel starts open (that is the whole point — the user watches
+  // it think) and auto-collapses once the answer starts, like a first-party
+  // chat app. The user can reopen it at any time.
+  const [isThinkingOpen, setIsThinkingOpen] = useState(true);
   // Which chat the live stream belongs to. The user may switch chats
   // mid-stream; the stream must only render in its originating chat.
   const [streamingSessionId, setStreamingSessionId] = useState(null);
@@ -529,6 +545,9 @@ function MainApp({ theme, setTheme }) {
           setSwarmVisible(false);
           setBuildPhase(null);
           setStreamingSessionId(targetSessionId);
+          setStreamingThinking("");
+          streamingThinkingRef.current = "";
+          setIsThinkingOpen(true);
           const controller = new AbortController();
           abortControllerRef.current = controller;
 
@@ -538,15 +557,25 @@ function MainApp({ theme, setTheme }) {
             controller.signal,
             (delta) => {
               setStreamingContent((prev) => (prev || "") + delta);
+              setIsThinkingOpen((prev) => (prev ? false : prev));
             },
             (phaseEvent) => {
               setSwarmVisible(phaseEvent.phase === "swarm-planning");
               setBuildPhase(phaseEvent.phase || null);
             },
+            null,
+            {},
+            (text) => {
+              streamingThinkingRef.current += text;
+              setStreamingThinking(streamingThinkingRef.current);
+            },
           )
             .then((response) => {
               if (!response) return;
-              const aiMsg = toAssistantMessage(response);
+              const aiMsg = toAssistantMessage(
+                response,
+                streamingThinkingRef.current,
+              );
               const extractedCode = extractCodeFromMessage(aiMsg.content);
               if (
                 extractedCode &&
@@ -585,6 +614,9 @@ function MainApp({ theme, setTheme }) {
               setBuildPhase(null);
               setStreamingContent(null);
               setStreamingSessionId(null);
+              setStreamingThinking("");
+              streamingThinkingRef.current = "";
+              setIsThinkingOpen(true);
               if (abortControllerRef.current === controller)
                 abortControllerRef.current = null;
             });
@@ -1086,12 +1118,18 @@ function MainApp({ theme, setTheme }) {
     try {
       setIsStreamCollapsed(false);
       setStreamingContent("");
+      setStreamingThinking("");
+      streamingThinkingRef.current = "";
+      setIsThinkingOpen(true);
       const response = await generateAIResponse(
         apiPrompt,
         updatedApiMessages,
         controller.signal,
         (delta) => {
           setStreamingContent((prev) => (prev || "") + delta);
+          // The answer has started: collapse the reasoning panel so the
+          // response owns the view, exactly like a first-party chat app.
+          setIsThinkingOpen((prev) => (prev ? false : prev));
         },
         (phaseEvent) => {
           setSwarmVisible(phaseEvent.phase === "swarm-planning");
@@ -1099,10 +1137,18 @@ function MainApp({ theme, setTheme }) {
         },
         () => {
           setStreamingContent("");
+          setStreamingThinking("");
+          streamingThinkingRef.current = "";
+          setIsThinkingOpen(true);
+        },
+        {},
+        (text) => {
+          streamingThinkingRef.current += text;
+          setStreamingThinking(streamingThinkingRef.current);
         },
       );
       if (response) {
-        const aiMsg = toAssistantMessage(response);
+        const aiMsg = toAssistantMessage(response, streamingThinkingRef.current);
         const extractedCode = extractCodeFromMessage(aiMsg.content);
         // Only auto-open canvas when the USER explicitly intended creation.
         // Writing/explanation prompts that happen to contain ```html from the model
@@ -1430,6 +1476,34 @@ function MainApp({ theme, setTheme }) {
                           <span className="thinking-dot" />
                           <span className="thinking-dot" />
                         </button>
+                        {streamingThinking && !isStreamCollapsed && (
+                          <div className="thinking-panel">
+                            <button
+                              type="button"
+                              className="thinking-panel-toggle"
+                              onClick={() => setIsThinkingOpen((prev) => !prev)}
+                              aria-expanded={isThinkingOpen}
+                              aria-controls="corez-thinking-body"
+                            >
+                              <span className="thinking-panel-title">
+                                {t("common.thinking.label")}
+                              </span>
+                              <span className="thinking-panel-action">
+                                {isThinkingOpen
+                                  ? t("common.thinking.hide")
+                                  : t("common.thinking.show")}
+                              </span>
+                            </button>
+                            {isThinkingOpen && (
+                              <div
+                                className="thinking-panel-body"
+                                id="corez-thinking-body"
+                              >
+                                {streamingThinking}
+                              </div>
+                            )}
+                          </div>
+                        )}
                         {streamingContent && !isStreamCollapsed && (
                           <div
                             className="message-content streaming-text"

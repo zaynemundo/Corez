@@ -171,6 +171,19 @@ const TEMPERATURE_BY_INTENT = Object.freeze({
   general: 0.48,
 });
 
+/**
+ * Flip a reasoning config so the provider INCLUDES the model's reasoning in
+ * the response.
+ *
+ * Internal calls (spec, review, swarm briefs) keep `exclude: true`: their
+ * reasoning is a retry signal, never read by anyone, so shipping it would
+ * waste bandwidth. Only the user-facing chat and build streams ask for it,
+ * because they render it as a live "thinking" panel.
+ */
+export function withVisibleReasoning(reasoning) {
+  return reasoning ? { ...reasoning, exclude: false } : reasoning;
+}
+
 export function selectReasoningConfig(options = {}, env = {}) {
   if (env?.OPENCODE_REASONING_EFFORT) {
     const eff = String(env.OPENCODE_REASONING_EFFORT).trim().toLowerCase();

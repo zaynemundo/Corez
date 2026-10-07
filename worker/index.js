@@ -37,7 +37,11 @@ import { callOpenRouterImage } from "./imageProvider.js";
 import { resolveOpencodeSessionId } from "./opencodeClient.js";
 import { runCreationHarness } from "./harness.js";
 import { repairMalformedHtml } from "./htmlRepair.js";
-import { selectModelForRequest, selectReasoningConfig } from "./modelRouter.js";
+import {
+  selectModelForRequest,
+  selectReasoningConfig,
+  withVisibleReasoning,
+} from "./modelRouter.js";
 import {
   processResponse,
   detectTruncation,
@@ -2140,7 +2144,9 @@ async function handleAi(request, env) {
       sessionId,
       complexity: body.complexity,
       model: selectedModel,
-      reasoning: selectedReasoning.reasoning,
+      // The build stream renders its reasoning as a live thinking panel, so
+      // the provider must return it. Spec/review calls keep exclude:true.
+      reasoning: withVisibleReasoning(selectedReasoning.reasoning),
       temperature: selectedReasoning.temperature,
     };
     if (body.stream === true) {
@@ -2238,7 +2244,9 @@ async function handleAi(request, env) {
       sleep: retrySleepFor(env),
       sessionId,
       model: selectedModel,
-      reasoning: selectedReasoning.reasoning,
+      // Streaming chat shows the reasoning as a live thinking panel, so the
+      // provider must return it rather than discard it server-side.
+      reasoning: withVisibleReasoning(selectedReasoning.reasoning),
       temperature: selectedReasoning.temperature,
     };
     const encoder = new TextEncoder();
@@ -2258,6 +2266,11 @@ async function handleAi(request, env) {
           )) {
             if (event.type === "delta") {
               collected += event.text;
+              controller.enqueue(encoder.encode(sse(event)));
+            } else if (event.type === "thinking") {
+              // The model's (redacted) reasoning: a live progress signal the
+              // client renders as a thinking panel. It is never part of the
+              // answer, so `collected` stays content-only.
               controller.enqueue(encoder.encode(sse(event)));
             } else if (event.type === "meta") {
               providerId = providerId || event.provider || null;

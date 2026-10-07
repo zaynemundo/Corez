@@ -1466,6 +1466,11 @@ export async function generateHostedAIResponse(
         if (event.type === "delta" && typeof event.text === "string") {
           streamed += event.text;
           options.onDelta?.(event.text);
+        } else if (event.type === "thinking" && typeof event.text === "string") {
+          // The model's (already redacted server-side) reasoning. It streams
+          // before the answer so the user watches progress instead of a
+          // spinner; it is never part of the returned content.
+          options.onThinking?.(event.text);
         } else if (event.type === "clear") {
           streamed = "";
           options.onClear?.();
@@ -3157,6 +3162,7 @@ export async function generateAIResponse(
   onPhase = null,
   onClear = null,
   retryOpts = {},
+  onThinking = null,
 ) {
   // Explicit commands first: @website, @game, @research, @image. The command
   // token is stripped before any model sees the prompt, so the AI is never
@@ -3279,6 +3285,7 @@ export async function generateAIResponse(
     onDelta,
     onPhase,
     onClear,
+    ...(typeof onThinking === "function" ? { onThinking } : {}),
     ...(innerRetryDelaysMs ? { retryDelaysMs: innerRetryDelaysMs } : {}),
   });
 

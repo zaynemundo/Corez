@@ -27,6 +27,8 @@ import {
   resolveTextModel,
 } from "../packages/agent-core/providers/modelIds.js";
 
+import { createThinkingStream } from "./thinkingStream.js";
+
 export const DEFAULT_MODEL = DEFAULT_TEXT_MODEL;
 
 // Transient failures are retried with adaptive exponential backoff (base
@@ -540,15 +542,27 @@ export function runStreamingChain(messages, options = {}) {
             let text = "";
             let usage = null;
             let finishReason = null;
+            // Reasoning deltas are surfaced to the client as `thinking`
+            // events (the model's visible progress) after redaction, so a
+            // chain of thought can never name the infrastructure behind it.
+            // Only content counts towards streamedChars: a retry after partial
+            // *thinking* must still be allowed, since nothing user-visible has
+            // been committed yet.
+            const thinking = createThinkingStream();
             for await (const chunk of iter) {
               if (chunk.text) {
                 streamedChars += chunk.text.length;
                 text += chunk.text;
                 yield { type: "delta", text: chunk.text };
+              } else if (chunk.reasoning) {
+                const visible = thinking.push(chunk.reasoning);
+                if (visible) yield { type: "thinking", text: visible };
               }
               if (chunk.usage) usage = chunk.usage;
               if (chunk.finishReason) finishReason = chunk.finishReason;
             }
+            const thinkingTail = thinking.flush();
+            if (thinkingTail) yield { type: "thinking", text: thinkingTail };
             return { text, usage, finishReason };
           }
           let got = yield* tryStream(messages);

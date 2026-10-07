@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   Layers,
   Copy,
@@ -840,6 +840,42 @@ function EmailCard({ content, renderBody }) {
   );
 }
 
+/**
+ * Collapsed reasoning disclosure attached to a finished assistant message.
+ * The same text streamed live while the model worked (App renders that panel);
+ * keeping it afterwards lets the user inspect how the answer was reached. It is
+ * collapsed by default so the answer owns the view, and it is display-only —
+ * `message.thinking` is never part of `message.content`.
+ */
+export function ThinkingDisclosure({ text }) {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  const bodyId = useId();
+  const value = typeof text === "string" ? text.trim() : "";
+  if (!value) return null;
+  return (
+    <div className="thinking-panel thinking-panel-persisted">
+      <button
+        type="button"
+        className="thinking-panel-toggle"
+        onClick={() => setOpen((prev) => !prev)}
+        aria-expanded={open}
+        aria-controls={bodyId}
+      >
+        <span className="thinking-panel-title">{t("common.thinking.label")}</span>
+        <span className="thinking-panel-action">
+          {open ? t("common.thinking.hide") : t("common.thinking.show")}
+        </span>
+      </button>
+      {open && (
+        <div className="thinking-panel-body" id={bodyId}>
+          {value}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
   const { t } = useI18n();
   const isUser = message.role === "user";
@@ -1544,6 +1580,9 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
   return (
     <div className={`message-wrapper ${isUser ? "user" : "ai"}`}>
       <div className="message-body">
+        {!isUser && message.thinking && (
+          <ThinkingDisclosure text={message.thinking} />
+        )}
         <div className="message-content">
           {isUser && renderAttachments(message.attachments)}
           {renderFormattedText(message.content)}
