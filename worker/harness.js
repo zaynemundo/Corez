@@ -17,6 +17,7 @@ import {
   VERIFIER_VERSION,
 } from "./creationVerifier.js";
 import { repairMalformedHtml } from "./htmlRepair.js";
+import { buildDesignSystemPrompt } from "../packages/agent-core/designSystems/index.js";
 import { estimateCostUsd } from "./utils.js";
 import {
   swarmEnabledFor,
@@ -460,22 +461,37 @@ export async function* runCreationHarness(options) {
     }
 
     // 2/3/4. BUILD -> VERIFY -> REPAIR (adaptive, capped).
+    const swarmCarriesDesign =
+      state.swarm?.enabled &&
+      Array.isArray(state.swarm.contributions) &&
+      state.swarm.contributions.length > 0;
     const buildContext = {
       role: "system",
-      content:
-        state.swarm?.enabled &&
-        Array.isArray(state.swarm.contributions) &&
-        state.swarm.contributions.length > 0
-          ? buildSwarmContext(state.spec, state.swarm.contributions, {
-              prompt: originalPrompt,
-            })
-          : `Build specification:\n${state.spec}\n\nDeliver ONLY the complete, finished artifact as a single self-contained HTML document.`,
+      content: swarmCarriesDesign
+        ? buildSwarmContext(state.spec, state.swarm.contributions, {
+            prompt: originalPrompt,
+            seed: taskId,
+          })
+        : `Build specification:\n${state.spec}\n\nDeliver ONLY the complete, finished artifact as a single self-contained HTML document.`,
     };
     // Games are verified for function before delivery (and repaired until
     // they pass), so the first attempt is told the bar up front. Zero extra
     // provider cost: this rides inside the existing build context.
     if (isGameRequest) {
       buildContext.content += `\n\nFunctional requirements for games: a visible clickable start control (Play/Start/Deploy); keyboard AND touch input where every movement direction maps to the on-screen/camera facing with no dead or unused movement code; a win path AND a lose path with restart; a render loop that draws every frame; valid JavaScript with no runtime errors on load, on start, or on input.`;
+    } else if (!swarmCarriesDesign) {
+      // The design system engine was only ever wired into the coding swarm, so
+      // the website path got no design direction at all: no tokens, no
+      // typography, and none of the anti-slop rules. What the model produced
+      // was its own default template -- which is why every site looked like
+      // every other AI-built site. The swarm path already carries the design
+      // block, so this covers the plain build only, and never twice.
+      //
+      // `taskId` seeds the choice: a resume or a repair re-emits the same look,
+      // while a different brief gets a different one.
+      buildContext.content += `\n\n${buildDesignSystemPrompt(originalPrompt, {
+        seed: taskId,
+      })}`;
     }
     let buildMessages = [...baseSystem, buildContext, ...userMessages];
     // Tracks whether this run streamed build content (build/continuation

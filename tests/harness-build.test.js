@@ -589,3 +589,108 @@ describe('runCreationHarness', () => {
     expect(events.some((e) => e.type === 'done')).toBe(false);
   }, 15000);
 });
+
+// The design system engine was only ever wired into the coding swarm, so the
+// website path sent no design direction at all and every site came back as the
+// model's own default template. These tests pin the wiring: a website build
+// carries a design system and a direction chosen for that brief, two different
+// briefs do not get the same one, and games keep their own art direction.
+describe('design direction on the build path', () => {
+  const WEBSITE_MESSAGES = [
+    { role: 'system', content: 'You are COREZ AI, a website-building engine.' },
+    { role: 'user', content: 'build me a landing page' },
+  ];
+
+  function captureBuildProvider() {
+    const builds = [];
+    const fetchMock = vi.fn(async (_url, init) => {
+      const body = JSON.parse(init.body);
+      const messages = JSON.stringify(body.input || body.messages || []);
+      const isStreaming = body.stream === true;
+      if (messages.includes('Produce a concise build specification')) {
+        return jsonCompletion('A landing page with a hero and three sections.');
+      }
+      if (messages.includes('final reviewer of a finished artifact')) {
+        return jsonCompletion('APPROVED');
+      }
+      if (messages.includes('did not pass functional verification')) {
+        return isStreaming ? sseDelta([GOOD_ARTIFACT]) : jsonCompletion(GOOD_ARTIFACT);
+      }
+      builds.push({ messages, stream: isStreaming });
+      return isStreaming ? sseDelta([GOOD_ARTIFACT]) : jsonCompletion(GOOD_ARTIFACT);
+    });
+    return { fetchMock, builds };
+  }
+
+  async function runWebsite(prompt) {
+    const { fetchMock, builds } = captureBuildProvider();
+    vi.stubGlobal('fetch', fetchMock);
+    const events = [];
+    const store = createTaskStateStore({});
+    const iterable = runCreationHarness({
+      prompt,
+      primaryIntent: 'website_creation',
+      intentType: 'website_creation',
+      apiMessages: WEBSITE_MESSAGES,
+      env: ENV,
+      signal: null,
+      store,
+    });
+    for await (const event of iterable) events.push(event);
+    vi.unstubAllGlobals();
+    return { builds, events };
+  }
+
+  // The swarm runs several non-streaming specialist calls that also quote the
+  // build specification, so the build is the streaming request, not the first
+  // one that mentions it.
+  const buildOf = (builds) => {
+    const build = builds.find((b) => b.stream);
+    return build ? String(build.messages) : '';
+  };
+
+  it('sends a design system and a distinctive direction with the build', async () => {
+    const { builds } = await runWebsite('a landing page for a bakery');
+    const build = buildOf(builds);
+    expect(build).toBeTruthy();
+    expect(build).toContain('Active Design System:');
+    expect(build).toContain(':root {');
+    expect(build).toContain('--bg-primary');
+    expect(build).toContain('Anti-Slop & Quality Design Guidelines');
+    expect(build).toContain("This Build's Distinctive Direction");
+    // The design block must appear exactly once, swarm or not.
+    expect(String(build).match(/Active Design System:/g)).toHaveLength(1);
+  });
+
+  it('does not give two different briefs the same direction', async () => {
+    const a = await runWebsite('a landing page for a bakery');
+    const b = await runWebsite('a portfolio site for a photographer');
+
+    // `builds` holds the JSON-stringified message arrays, so match inside the
+    // string rather than indexing it.
+    const directionOf = (builds) => {
+      const match = String(buildOf(builds)).match(
+        /This Build's Distinctive Direction[\s\S]{0,700}/,
+      );
+      return match ? match[0] : '';
+    };
+    const first = directionOf(a.builds);
+    const second = directionOf(b.builds);
+    expect(first).toBeTruthy();
+    expect(second).toBeTruthy();
+    expect(second).not.toBe(first);
+  });
+
+  it('leaves games to their own art direction', async () => {
+    const { fetchMock } = buildMockProvider();
+    vi.stubGlobal('fetch', fetchMock);
+    const { events } = await runHarness();
+    expect(events.some((e) => e.type === 'done')).toBe(true);
+    // The mock records nothing, so assert on the request the harness made.
+    const buildBody = fetchMock.mock.calls
+      .map(([, init]) => String(init.body))
+      .find((body) => body.includes('Play') || body.includes('Deliver ONLY'));
+    expect(buildBody).toBeTruthy();
+    expect(buildBody).not.toContain('Active Design System:');
+  });
+});
