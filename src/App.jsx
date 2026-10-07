@@ -47,6 +47,7 @@ import {
   takeChatList,
 } from "./services/chatPrefetch";
 import { buildPhaseLabel } from "./utils/buildPhaseLabel";
+import { applyRouteMeta } from "./utils/seo";
 import {
   persistUserTurn,
   persistAssistantTurnAfter,
@@ -1599,6 +1600,15 @@ function AppInner() {
     if (loading) return;
     if (!user) dropChatPrefetches();
   }, [loading, user]);
+
+  // The document head is static, so the route-specific parts of it -- the
+  // canonical link, the title, the social tags -- have to be corrected on every
+  // navigation. Without this, /pricing and every policy claimed the front door
+  // as their canonical and were treated as duplicates, and the chat carried the
+  // marketing title into the browser tab.
+  useEffect(() => {
+    applyRouteMeta(location.pathname, { signedIn: Boolean(user) });
+  }, [location.pathname, user]);
 
   // The session check decides between the app and the public pages, and it is a
   // network round-trip on every cold load. Two rules keep it from becoming a
