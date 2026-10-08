@@ -1,15 +1,16 @@
 /**
  * Model id consistency contract.
  *
- * The specialist swarm was unroutable for an unknown period because the id
- * `deepseek-flash` was duplicated across the worker, the agent core, the CLI
- * and 17 `.opencode/agents/*.md` bindings, while the OpenCode Go catalog only
- * serves versioned ids (`deepseek-v4.1-flash`). Nothing failed loudly: the
- * agent configs simply could not be resolved.
+ * CoreZ's text pipeline runs exactly one model at a time, and nothing fails
+ * loudly when its id drifts: the specialist swarm was once unroutable for an
+ * unknown period because `deepseek-flash` was duplicated across the worker,
+ * the agent core, the CLI and 17 `.opencode/agents/*.md` bindings while the
+ * OpenCode Go catalog only served versioned ids. The same class of failure
+ * applies to the current single model, `muse-spark-1.3-contributor`.
  *
- * These tests make that class of drift fail in CI instead:
+ * These tests make that drift fail in CI instead:
  *   1. `resolveTextModel` clamps anything outside the allow-list.
- *   2. Every DeepSeek model id referenced in first-party source must be an
+ *   2. Every text-model id referenced in first-party source must be an
  *      allowed (or explicitly retired) id.
  */
 
@@ -20,7 +21,7 @@ import { join, extname } from 'node:path';
 import {
   ALLOWED_TEXT_MODELS,
   DEFAULT_TEXT_MODEL,
-  DEEPSEEK_V4_1_FLASH,
+  MUSE_SPARK_1_3_CONTRIBUTOR,
   isAllowedTextModel,
   resolveTextModel,
 } from '../packages/agent-core/providers/modelIds.js';
@@ -39,6 +40,13 @@ const NON_TEXT_ALLOWED = new Set([
 ]);
 
 /**
+ * Text-model id shapes policed in first-party source: DeepSeek (historical)
+ * and Muse Spark (current). Other vendors and the image/vision models are
+ * separate capabilities.
+ */
+const TEXT_MODEL_ID_PATTERN = /(?:deepseek|muse-spark)-[a-z0-9][a-z0-9.-]*/gi;
+
+/**
  * Tokens that match the id shape but are not model ids: npm package scopes
  * such as `@deepseek-ai/dsh-agent-loop`, and provider labels such as
  * `DeepSeek-direct` used in comments about routes that no longer exist.
@@ -46,7 +54,7 @@ const NON_TEXT_ALLOWED = new Set([
 const NON_MODEL_TOKENS = new Set(['deepseek-ai', 'deepseek-direct']);
 
 /**
- * The canonical module is exempt: it documents the retired id on purpose.
+ * The canonical module is exempt: it documents the replaced id on purpose.
  */
 const CANONICAL_MODULE = 'packages/agent-core/providers/modelIds.js';
 
@@ -70,29 +78,41 @@ function walk(dir, out = []) {
 }
 
 describe('model id contract', () => {
-  it('pins DeepSeek V4.1 Flash as the default text model', () => {
-    expect(DEFAULT_TEXT_MODEL).toBe(DEEPSEEK_V4_1_FLASH);
-    expect(DEEPSEEK_V4_1_FLASH).toBe('deepseek-v4.1-flash');
-    expect(ALLOWED_TEXT_MODELS).toContain('deepseek-v4.1-flash');
+  it('pins Muse Spark 1.3 Contributor as the default text model', () => {
+    expect(DEFAULT_TEXT_MODEL).toBe(MUSE_SPARK_1_3_CONTRIBUTOR);
+    expect(MUSE_SPARK_1_3_CONTRIBUTOR).toBe('muse-spark-1.3-contributor');
+    expect(ALLOWED_TEXT_MODELS).toContain('muse-spark-1.3-contributor');
   });
 
   it('allows only ids on the allow-list', () => {
-    expect(isAllowedTextModel('deepseek-v4.1-flash')).toBe(true);
-    for (const bad of ['deepseek-flash', 'deepseek-v4-flash', 'kimi-k3', '', '  ', null, undefined, 42]) {
+    expect(isAllowedTextModel('muse-spark-1.3-contributor')).toBe(true);
+    for (const bad of [
+      'deepseek-v4.1-flash',
+      'deepseek-flash',
+      'deepseek-v4-flash',
+      'muse-spark-1.2-contributor',
+      'muse-spark-1.3-contributor-free',
+      'kimi-k3',
+      '',
+      '  ',
+      null,
+      undefined,
+      42,
+    ]) {
       expect(isAllowedTextModel(bad), `${String(bad)} must not be allowed`).toBe(false);
     }
   });
 
   it('clamps every rejected candidate to the pinned default', () => {
-    // The exact stale id that broke the swarm, plus a typo and an empty value.
-    for (const bad of ['deepseek-flash', 'deepseek-v4.1-falsh', '', undefined, null]) {
-      expect(resolveTextModel(bad)).toBe(DEEPSEEK_V4_1_FLASH);
+    // The stale ids that previously broke the swarm, plus typos and empties.
+    for (const bad of ['deepseek-v4.1-flash', 'deepseek-flash', 'muse-spark-1.3-contributr', '', undefined, null]) {
+      expect(resolveTextModel(bad)).toBe(MUSE_SPARK_1_3_CONTRIBUTOR);
     }
-    expect(resolveTextModel('deepseek-v4.1-flash')).toBe('deepseek-v4.1-flash');
-    expect(resolveTextModel('  deepseek-v4.1-flash  ')).toBe('deepseek-v4.1-flash');
+    expect(resolveTextModel('muse-spark-1.3-contributor')).toBe('muse-spark-1.3-contributor');
+    expect(resolveTextModel('  muse-spark-1.3-contributor  ')).toBe('muse-spark-1.3-contributor');
   });
 
-  it('uses no stale or unknown DeepSeek model id anywhere in first-party source', () => {
+  it('uses no stale or unknown text-model id anywhere in first-party source', () => {
     const offenders = [];
 
     for (const root of SCAN_ROOTS) {
@@ -105,9 +125,7 @@ describe('model id contract', () => {
         } catch {
           continue;
         }
-        // Only DeepSeek-family ids are policed here; other vendors and the
-        // image/vision models are separate capabilities.
-        const ids = text.match(/deepseek-[a-z0-9][a-z0-9.-]*/gi) || [];
+        const ids = text.match(TEXT_MODEL_ID_PATTERN) || [];
         for (const id of ids) {
           const normalized = id.toLowerCase();
           if (
@@ -125,7 +143,7 @@ describe('model id contract', () => {
 
     expect(
       offenders,
-      `Unknown DeepSeek model id(s) found. Update modelIds.js or the reference:\n${offenders.join('\n')}`,
+      `Unknown text-model id(s) found. Update modelIds.js or the reference:\n${offenders.join('\n')}`,
     ).toEqual([]);
   });
 });

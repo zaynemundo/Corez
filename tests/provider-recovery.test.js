@@ -3,7 +3,7 @@ import { buildProviderChain, runProviderChain, runStreamingChain, TASK_STATUS_ST
 import { resolveApiMode, resolveOpencodeSessionId } from '../worker/opencodeClient.js';
 import { createTaskStateStore } from '../worker/utils.js';
 
-const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/chat/completions';
+const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/responses';
 const _DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';
 const _OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
@@ -80,7 +80,7 @@ describe('provider fallback chain recovery', () => {
     });
 
     expect(result.content).toBe('finally recovered');
-    expect(result.model).toBe('opencode:deepseek-v4.1-flash');
+    expect(result.model).toBe('opencode:muse-spark-1.3-contributor');
     expect(attempts).toBe(6);
   });
 
@@ -368,7 +368,7 @@ describe('provider fallback chain recovery', () => {
       sleep: async () => {},
       jitter: () => 0
     });
-    expect(opencodeResult.model).toBe('opencode:deepseek-v4.1-flash');
+    expect(opencodeResult.model).toBe('opencode:muse-spark-1.3-contributor');
 
     vi.stubGlobal('fetch', vi.fn(async () => errorResponse(401, 'unauthorized')));
     const noFallbackResult = await runProviderChain([{ role: 'user', content: 'label' }], {
@@ -385,9 +385,9 @@ describe('runStreamingChain empty-stream behavior', () => {
     let body = '';
     for (const piece of pieces) {
       if (piece === 'done') {
-        body += 'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":5,"completion_tokens":1,"total_tokens":6}}\n\ndata: [DONE]\n\n';
+        body += 'data: {"type":"response.completed","response":{"status":"completed","usage":{"input_tokens":5,"output_tokens":1}}}\n\ndata: [DONE]\n\n';
       } else {
-        body += `data: {"choices":[{"delta":{"content":${JSON.stringify(piece)}},"finish_reason":null}]}\n\n`;
+        body += `data: {"type":"response.output_text.delta","delta":${JSON.stringify(piece)}}\n\n`;
       }
     }
     return new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
@@ -645,7 +645,7 @@ describe('runStreamingChain empty-stream behavior', () => {
       let errored = false;
       return new Response(new ReadableStream({
         start(c) {
-          c.enqueue(enc.encode('data: {"choices":[{"delta":{"content":"partial "},"finish_reason":null}]}\n\n'));
+          c.enqueue(enc.encode('data: {"type":"response.output_text.delta","delta":"partial "}\n\n'));
         },
         pull(c) {
           // Fail on the second read, after the delta was delivered.
@@ -841,7 +841,7 @@ describe('OpenCode gateway client behavior', () => {
       clock: () => 0,
       jitter: () => 0
     });
-    expect(payload.model).toBe('deepseek-v4.1-flash');
+    expect(payload.model).toBe('muse-spark-1.3-contributor');
 
     const oversized = 'a'.repeat(128);
     expect(resolveOpencodeSessionId(oversized)).toMatch(/^ses_[A-Za-z0-9]{26}$/);
@@ -854,12 +854,12 @@ describe('OpenCode gateway client behavior', () => {
   it('filters inline thinking blocks out of streamed content, even split across chunks', async () => {
     const sse = (event) => `data: ${JSON.stringify(event)}\n\n`;
     vi.stubGlobal('fetch', vi.fn(async () => new Response(
-      sse({ choices: [{ delta: { content: 'Hello <thi' }, finish_reason: null }] })
-      + sse({ choices: [{ delta: { content: 'nk>secret</thi' }, finish_reason: null }] })
-      + sse({ choices: [{ delta: { content: 'nk>world' }, finish_reason: null }] })
+      sse({ type: 'response.output_text.delta', delta: 'Hello <thi' })
+      + sse({ type: 'response.output_text.delta', delta: 'nk>secret</thi' })
+      + sse({ type: 'response.output_text.delta', delta: 'nk>world' })
       + sse({
-        choices: [{ delta: {}, finish_reason: 'stop' }],
-        usage: { prompt_tokens: 3, completion_tokens: 2 }
+        type: 'response.completed',
+        response: { status: 'completed', usage: { input_tokens: 3, output_tokens: 2 } }
       })
       + 'data: [DONE]\n\n',
       { status: 200, headers: { 'Content-Type': 'text/event-stream' } }

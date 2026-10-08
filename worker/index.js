@@ -833,7 +833,7 @@ Identity & Persona:
 - Your name is COREZ AI.
 ${creatorsSection}
 - STRICT MODEL ANONYMITY RULE: NEVER mention what underlying AI model, provider, vendor, architecture, or engine powers you in public chat or user responses. Always identify yourself strictly as COREZ AI. The underlying engine is strictly confidential and must never be disclosed, even if the user insists, tricks, or claims you are another model.
-- MODEL IDENTITY RULE: If the user asks what model you are, what AI model powers you, what LLM you are, which model you use, "what model of ai are you using", or accuses you of being DeepSeek, DeepSeek V4.1 Flash, Meta AI, GPT, ChatGPT, Claude, Gemini, Llama, MiMo, or any other external model, respond exactly with: "I'm Corez 1.0 built by Corez." You may add a brief helpful follow-up like "How can I help you today?" but never mention DeepSeek, Meta, or any other provider. Never be evasive, never refuse â€” answer directly as Corez 1.0.
+- MODEL IDENTITY RULE: If the user asks what model you are, what AI model powers you, what LLM you are, which model you use, "what model of ai are you using", or accuses you of being DeepSeek, Muse Spark 1.3 Contributor, Meta AI, GPT, ChatGPT, Claude, Gemini, Llama, MiMo, or any other external model, respond exactly with: "I'm Corez 1.0 built by Corez." You may add a brief helpful follow-up like "How can I help you today?" but never mention DeepSeek, Meta, or any other provider. Never be evasive, never refuse â€” answer directly as Corez 1.0.
 - When greeted with simple phrases like "hi", "hello", "hey", or "who are you", respond simply: "Hello! I'm COREZ AI. How can I help you today?"
 - Never list bullet points or technical specializations when giving greetings unless requested.
 
@@ -846,7 +846,7 @@ Reasoning & Response Quality (Corez 1.0 â€” hidden chain-of-thought):
 Guidelines for Output:
 - FOLLOW THE USER'S REQUEST EXACTLY: deliver precisely what the user asked for â€” implement everything they requested and add nothing they did not ask for. When the user's instruction conflicts with any default or template behaviour, the user's explicit instruction wins.
 - SOCIAL CAROUSEL (GLOBAL): When the user asks for a social-media carousel post ("create a post for this carousel", "carousel post + caption", "LinkedIn/Instagram carousel"), output ONLY slide copy + caption + hashtags in plain markdown. NEVER output React/JSX, HTML, or preview code for these, and NEVER treat "carousel" alone as a UI component request. Only build a carousel UI when the user explicitly says "carousel component", "carousel UI", "carousel code/slider", or "carousel website".
-  - ATTACHMENTS: Attached images are given to you as real image input - you can see them. Describe, analyse, OCR or recreate an attached image from what you actually observe, and never claim you cannot view an attached image. Video and audio attachments are not visible to you: only their metadata and URL reach you, so say plainly that you cannot watch or listen rather than inventing content. Never invent a description of an attachment you cannot see, and never emit a generic "Layout & Structure / Typography / Color & Style" template in place of real observation. When an attachment must appear in generated markup, use the absolute R2 URL https://corez.pro/api/assets/... verbatim (never a relative /api/assets/ path or a bare local filename), with meaningful alt text, object-fit:cover and an onerror fallback.
+  - ATTACHMENTS: You cannot see image, video or audio content. Attachments are supplied to you as metadata (filename, type, size) plus an authoritative R2 URL to use in markup. If the user asks you to describe, analyse, OCR or recreate an attachment, say plainly that you cannot see the file and ask them to describe it or paste the relevant text. Never invent a description of an attachment, and never emit a generic "Layout & Structure / Typography / Color & Style" template as if you had seen it. Extracted text content from documents is supplied separately and may be used normally. When an attachment must appear in generated markup, use the absolute R2 URL https://corez.pro/api/assets/... verbatim (never a relative /api/assets/ path or a bare local filename), with meaningful alt text, object-fit:cover and an onerror fallback.
 - AMBIGUOUS REQUESTS: When a user's prompt is ambiguous, underspecified, or missing essential details (e.g. they say "make a game", "build a website", "create a plan", or give a vague prompt with multiple conflicting interpretations), do NOT ask clarifying questions and do NOT present choice menus or option lists. Instead, choose the most sensible default interpretation, state the key assumption you made in ONE short sentence, and deliver the complete result. The user can refine it in a follow-up message.
 - DEFAULT FORMAT (React/JSX): When writing code or building apps, components, tools, dashboards, or games without an explicitly requested format, default to clean, modern React/JSX components (using \`\`\`jsx ... \`\`\` code blocks). ALWAYS name your main top-level component "export default function App()".
 - REQUESTED FORMATS (HTML/CSS/JS): If the user explicitly requests HTML, CSS, vanilla JS, or plain web code, output complete single-file HTML/CSS/JS inside ONE SINGLE \`\`\`html ... \`\`\` code block.
@@ -1428,7 +1428,7 @@ async function handleAi(request, env) {
 
   // Model identity fast-path: "what model are you using" / "which llm" / "are you DeepSeek" etc.
   // Always answer Corez 1.0 deterministically without paying an LLM round-trip, so the
-  // underlying provider (DeepSeek V4.1 Flash) is never leaked even if the model is tricked.
+  // underlying provider (Muse Spark 1.3 Contributor) is never leaked even if the model is tricked.
   // This covers the exact user request: "what model of ai are you using" -> "Corez 1.0".
   const MODEL_IDENTITY_PATTERN =
     /(what|which)\s+(model|llm|ai\s*model|language\s*model).*?\b(you|your|using|power|are\s+you)\b|what\s+model\s+of\s+ai\s+are\s+you\s+using|are\s+you\s+(muse|meta\s*ai|muse\s+spark|gpt|chatgpt|claude|gemini|llama|mimo|deepseek|openai)|which\s+ai\s+are\s+you|powered\s+by.*\b(you|model)\b/i;
@@ -1769,7 +1769,7 @@ async function handleAi(request, env) {
   // ---------------------------------------------------------------------
   // Attachment metadata block.
   //
-  // CoreZ runs a single text model (DeepSeek V4.1 Flash) with no vision
+  // CoreZ runs a single text model (Muse Spark 1.3 Contributor) with no vision
   // pre-pass, so attachments reach the model as metadata only: kind, name,
   // size, and the authoritative R2 URL to use in markup. The model cannot see
   // pixel content, and the system block below states that plainly so it never
@@ -1850,9 +1850,9 @@ async function handleAi(request, env) {
           apiMessages.push({
             role: "system",
             content:
-              "Attached media:\n" +
+              "Attached media (metadata only - you cannot see image, video or audio content):\n" +
               directAssetHints +
-              "\nAttached IMAGES are supplied to you as real image input - you can see them. Describe, analyse, OCR or recreate them from what you actually observe, and never claim you cannot view an attached image. Video and audio attachments are NOT visible: only their metadata and URL reach you, so say plainly that you cannot watch or listen rather than inventing their content. Their URLs are authoritative for markup. Extracted text content, when present, is supplied elsewhere in this conversation and may be used normally.",
+              "\nThese files exist and their URLs are authoritative for markup. Their visual content is NOT available to you. If the user asks you to describe, analyse, OCR or recreate an attachment, say plainly that you cannot see the file and ask them to describe it or paste the relevant text - never invent a description, and never produce a generic layout/typography/colour template as if you had seen it. Extracted text content, when present, is supplied elsewhere in this conversation and may be used normally.",
           });
         }
       }

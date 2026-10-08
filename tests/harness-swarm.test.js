@@ -12,9 +12,9 @@ const SPEC = 'A landing page with a hero section, pricing table, and a contact f
 function sseDelta(chunks) {
   let body = '';
   for (const piece of chunks) {
-    body += `data: ${JSON.stringify({ choices: [{ delta: { content: piece }, finish_reason: null }] })}\n\n`;
+    body += `data: ${JSON.stringify({ type: 'response.output_text.delta', delta: piece })}\n\n`;
   }
-  body += `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 5, completion_tokens: 5, total_tokens: 10 } })}\n\n`;
+  body += `data: ${JSON.stringify({ type: 'response.completed', response: { status: 'completed', usage: { input_tokens: 5, output_tokens: 5 } } })}\n\n`;
   body += 'data: [DONE]\n\n';
   return new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
 }

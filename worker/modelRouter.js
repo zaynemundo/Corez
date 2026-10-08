@@ -1,7 +1,7 @@
 /**
  * Model Router — single-text-model deployment for corez.pro
  *
- * CoreZ runs exactly one text model: DeepSeek V4.1 Flash. There is no second
+ * CoreZ runs exactly one text model: Muse Spark 1.3 Contributor. There is no second
  * text model and no vision pre-pass — attachments reach the model as metadata
  * (filename, type, size, authoritative R2 URL) only, built in worker/index.js.
  * The pinned id and allow-list live in
@@ -102,7 +102,7 @@ export function isVisualRequest({
 
 /**
  * Selects the optimal model for a given request:
- * - DeepSeek V4.1 Flash for all tasks (unified model)
+ * - Muse Spark 1.3 Contributor for all tasks (unified model)
  *
  * @param {Object} options Request options (prompt, intent, skills, messages)
  * @param {Object} [env] Worker environment variables
@@ -129,7 +129,7 @@ export function selectModelForRequest(options = {}, env = {}) {
 }
 
 /**
- * Complexity-aware reasoning & temperature selection for DeepSeek V4.1 Flash.
+ * Complexity-aware reasoning & temperature selection for Muse Spark 1.3 Contributor.
  *
  * Reasoning models benefit from explicit effort hints: trivial prompts should
  * not waste reasoning tokens, while high/epic tasks (games, apps, research)
@@ -141,7 +141,7 @@ const REASONING_BY_COMPLEXITY = Object.freeze({
   low: "low",
   medium: "medium",
   // High and epic work (SaaS builds, multiplayer/RPG games, research) gets
-  // the maximum xhigh reasoning effort — DeepSeek V4.1 Flash's top tier. Override
+  // the maximum xhigh reasoning effort — Muse Spark 1.3 Contributor's top tier. Override
   // down with AI_REASONING_EFFORT if latency/token cost matters more.
   high: "xhigh",
   epic: "xhigh",

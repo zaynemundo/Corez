@@ -243,7 +243,7 @@ export function buildProviderChain(env = {}, extra = {}) {
  * taskHash, taskId, model, reasoning, temperature, bodyExtra, sessionId } —
  * sleep/clock/jitter are injectable for deterministic tests. `model` overrides
  * the provider's configured model for this call (e.g. the harness build phase
- * pins deepseek-v4.1-flash). `reasoning` and `temperature` are forwarded as body
+ * pins muse-spark-1.3-contributor). `reasoning` and `temperature` are forwarded as body
  * fields for reasoning models. Every request is uncapped: the provider decides
  * how long it generates, and no output ceiling is ever sent.
  */

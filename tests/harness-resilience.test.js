@@ -249,7 +249,7 @@ describe('runCreationHarness resilience', () => {
     expect(final.build).toBe(GOOD_ARTIFACT);
   });
 
-  it('H1.6: pins the build phase to DeepSeek V4.1 Flash and clamps any other OPENCODE_BUILD_MODEL', async () => {
+  it('H1.6: pins the build phase to Muse Spark 1.3 Contributor and clamps any other OPENCODE_BUILD_MODEL', async () => {
     const buildCalls = [];
     runStreamingChain.mockImplementation(async function* (messages, options) {
       buildCalls.push({ serialized: JSON.stringify(messages || []), options });
@@ -259,11 +259,11 @@ describe('runCreationHarness resilience', () => {
 
     const isBuildCall = (c) => c.serialized.includes('Deliver ONLY the complete, finished artifact');
 
-    // Default build model: DeepSeek V4.1 Flash (planning/review keep the general model).
+    // Default build model: Muse Spark 1.3 Contributor (planning/review keep the general model).
     const storeDefault = createTaskStateStore({});
     await drain(runCreationHarness(harnessOptions(storeDefault)), []);
     const defaultBuild = buildCalls.find(isBuildCall);
-    expect(defaultBuild?.options.model).toBe('deepseek-v4.1-flash');
+    expect(defaultBuild?.options.model).toBe('muse-spark-1.3-contributor');
 
     // CoreZ is a single-model deployment: an env override that names anything
     // else is clamped back to the pinned model rather than routing the build
@@ -274,7 +274,7 @@ describe('runCreationHarness resilience', () => {
       env: { ...ENV, OPENCODE_BUILD_MODEL: 'deepseek-flash' }
     })), []);
     const overrideBuild = buildCalls.find(isBuildCall);
-    expect(overrideBuild?.options.model).toBe('deepseek-v4.1-flash');
+    expect(overrideBuild?.options.model).toBe('muse-spark-1.3-contributor');
   });
 
   it('H2: the lease heartbeat is refreshed while a long build streams', async () => {

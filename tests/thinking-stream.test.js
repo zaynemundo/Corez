@@ -14,14 +14,14 @@ import {
 } from '../worker/thinkingStream.js';
 import { withVisibleReasoning } from '../worker/modelRouter.js';
 
-const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/chat/completions';
+const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/responses';
 
 function reasoningDelta(text) {
-  return { choices: [{ delta: { reasoning_content: text } }] };
+  return { type: 'response.reasoning_summary_text.delta', delta: text };
 }
 
 function contentDelta(text) {
-  return { choices: [{ delta: { content: text } }] };
+  return { type: 'response.output_text.delta', delta: text };
 }
 
 function sseResponse(chunks) {
@@ -61,6 +61,7 @@ afterEach(() => {
 
 describe('thinking redaction', () => {
   it('never emits the provider behind the model', () => {
+    expect(scrubThinkingText('I run on Muse Spark 1.3 Contributor.')).not.toMatch(/muse|spark/i);
     expect(scrubThinkingText('I run on DeepSeek V4.1 Flash.')).not.toMatch(/deepseek/i);
     expect(scrubThinkingText('Routed through OpenCode Go.')).not.toMatch(/opencode/i);
     expect(scrubThinkingText('Served via OpenRouter.')).not.toMatch(/openrouter/i);
@@ -77,6 +78,17 @@ describe('thinking redaction', () => {
     out += stream.push('seek based, obviously. ');
     out += stream.flush();
     expect(out).not.toMatch(/deepseek/i);
+    expect(out).toContain('Corez');
+  });
+
+  it('redacts the two-word model name split across two deltas', () => {
+    const stream = createThinkingStream();
+    // The first push is long enough to cross the guard, so the trailing word
+    // would normally be emitted before "spark" arrives.
+    let out = stream.push('The stack serving me is definitely Muse ');
+    out += stream.push('Spark 1.3 Contributor, obviously. ');
+    out += stream.flush();
+    expect(out).not.toMatch(/muse|spark/i);
     expect(out).toContain('Corez');
   });
 
@@ -149,7 +161,7 @@ describe('/api/ai streaming thinking', () => {
       'fetch',
       vi.fn(async () =>
         sseResponse([
-          reasoningDelta('I am DeepSeek V4.1 Flash served by OpenCode Go and OpenRouter. '),
+          reasoningDelta('I am Muse Spark 1.3 Contributor served by OpenCode Go and OpenRouter. '),
           contentDelta('Here is the answer.'),
         ]),
       ),
@@ -164,6 +176,7 @@ describe('/api/ai streaming thinking', () => {
     const events = parseSseEvents(await response.text());
     const thinking = thinkingOf(events);
     expect(thinking.length).toBeGreaterThan(0);
+    expect(thinking).not.toMatch(/muse|spark/i);
     expect(thinking).not.toMatch(/deepseek/i);
     expect(thinking).not.toMatch(/opencode/i);
     expect(thinking).not.toMatch(/openrouter/i);

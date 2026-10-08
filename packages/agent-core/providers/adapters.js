@@ -27,7 +27,7 @@ export const PROVIDER_ENV_KEYS = Object.freeze({
 });
 
 export const PROVIDER_ENDPOINTS = Object.freeze({
-  [PROVIDER_IDS.OPENCODE_GO]: 'https://opencode.ai/zen/go/v1/chat/completions'
+  [PROVIDER_IDS.OPENCODE_GO]: 'https://opencode.ai/zen/go/v1/responses'
 });
 
 // 401/400/403/404 and the rest of the permanent status range can never be

@@ -7,7 +7,7 @@ export { ToolRegistry } from './tools/index.js';
 export { ModelProviderRouter, MODEL_CATALOG, cosineSimilarity } from './providers/index.js';
 export {
   DEFAULT_TEXT_MODEL,
-  DEEPSEEK_V4_1_FLASH,
+  MUSE_SPARK_1_3_CONTRIBUTOR,
   ALLOWED_TEXT_MODELS,
   isAllowedTextModel,
   resolveTextModel

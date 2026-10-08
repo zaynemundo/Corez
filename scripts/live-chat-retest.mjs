@@ -212,7 +212,7 @@ md.push(`# CoreZ Chat Live Retest — ${today} (test_results_0708)`);
 md.push('');
 md.push(`Re-run of the same 7 chat cases from the original 0708 live test, against the current worker.`);
 md.push('- Driver: real worker module (worker/entry.js), full /api/ai code path');
-md.push(`- Provider: OpenCode Go (deepseek-v4-flash) via OPENCODE_GO_API_KEY`);
+md.push(`- Provider: OpenCode Go (muse-spark-1.3-contributor) via OPENCODE_GO_API_KEY`);
 md.push(`- Total cases: ${results.length} | Passed: ${passed.length} | Failed: ${results.length - passed.length}`);
 md.push('');
 md.push('## Case summary');

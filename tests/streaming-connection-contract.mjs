@@ -23,8 +23,8 @@ function sseStream() {
     if (target.includes('opencode.ai') || target.includes('openrouter.ai')) {
       await new Promise((resolve) => setTimeout(resolve, 260));
       const body = [
-        'data: {"choices":[{"delta":{"content":"hello"}}]}',
-        'data: {"choices":[{"delta":{}}],"usage":{"prompt_tokens":10,"completion_tokens":2}}',
+        'data: {"type":"response.output_text.delta","delta":"hello"}',
+        'data: {"type":"response.completed","response":{"status":"completed","usage":{"input_tokens":10,"output_tokens":2}}}',
         'data: [DONE]',
         '',
       ].join('\n\n');

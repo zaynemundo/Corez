@@ -10,7 +10,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import swarmWorker from '../worker/entry.js';
 
-const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/chat/completions';
+const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/responses';
 const env = { OPENCODE_GO_API_KEY: 'sk-test', __COREZ_RETRY_SLEEP_MS: '0' };
 
 function post(worker, body, customEnv = env) {
@@ -32,11 +32,14 @@ function mockOpenAI(content, extra = {}) {
   });
 }
 
-function mockSSEBody(chunks, usage = { prompt_tokens: 10, completion_tokens: 20 }) {
+function mockSSEBody(chunks, usage = { input_tokens: 10, output_tokens: 20 }) {
   const parts = chunks.map((text) => `data: ${JSON.stringify({
-    choices: [{ delta: { content: text }, finish_reason: null }]
+    type: 'response.output_text.delta', delta: text
   })}\n\n`);
-  parts.push(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }], usage })}\n\n`);
+  parts.push(`data: ${JSON.stringify({
+    type: 'response.completed',
+    response: { status: 'completed', usage }
+  })}\n\n`);
   parts.push('data: [DONE]\n\n');
   return new Response(parts.join(''), {
     status: 200,
@@ -57,7 +60,7 @@ describe('E2E /api/ai pipeline', () => {
     const fetchMock = vi.fn(async (url, init) => {
       expect(url).toBe(OPENCODE_URL);
       const body = JSON.parse(init.body);
-      expect(body.model).toBe('deepseek-v4.1-flash');
+      expect(body.model).toBe('muse-spark-1.3-contributor');
       const msgs = body.input || body.messages;
       expect(msgs[0].role).toBe('system');
       return mockOpenAI('This is a complete and correct answer about compilers. A compiler translates source code into machine code. An interpreter runs code line by line.');
@@ -315,7 +318,7 @@ describe('E2E /api/ai pipeline', () => {
       const stream = new ReadableStream({
         start(controller) {
           push = controller;
-          controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"hi"}}]}\n\n'));
+          controller.enqueue(new TextEncoder().encode('data: {"type":"response.output_text.delta","delta":"hi"}\n\n'));
         }
       });
       abortStream = () => push.error(new DOMException('Aborted', 'AbortError'));

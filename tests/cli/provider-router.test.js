@@ -12,7 +12,7 @@ describe('ModelProviderRouter', () => {
 
     expect(Array.isArray(models)).toBe(true);
     expect(models.length).toBeGreaterThan(0);
-    expect(models.some(m => m.id === 'deepseek-v4.1-flash')).toBe(true);
+    expect(models.some(m => m.id === 'muse-spark-1.3-contributor')).toBe(true);
     const ids = models.map(m => m.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
@@ -51,7 +51,7 @@ describe('ModelProviderRouter', () => {
     const originalFetch = globalThis.fetch;
     try {
       globalThis.fetch = async (url, init) => {
-        expect(url).toBe('https://opencode.ai/zen/go/v1/chat/completions');
+        expect(url).toBe('https://opencode.ai/zen/go/v1/responses');
         expect(init.headers.Authorization).toBe('Bearer test-key');
         expect(init.headers['x-opencode-session']).toMatch(/^ses_[A-Za-z0-9]+$/);
         return new Response(JSON.stringify({

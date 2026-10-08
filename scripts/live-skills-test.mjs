@@ -232,7 +232,7 @@ const md = [];
 md.push(`# CoreZ Live Skills Test — ${today}`);
 md.push('');
 md.push(`Every specialist skill driven through the real worker module (worker/entry.js), full /api/ai code path, with the resolved skill instructions injected exactly like the frontend does.`);
-md.push(`- Provider: OpenCode Go (deepseek-v4-flash) via OPENCODE_GO_API_KEY`);
+md.push(`- Provider: OpenCode Go (muse-spark-1.3-contributor) via OPENCODE_GO_API_KEY`);
 md.push(`- Total skills: ${results.length} | Passed: ${passed.length} | Failed: ${results.length - passed.length}`);
 md.push(`- Average score: ${averageScore}/5 | Grounded live/research answers: ${grounded} | Honest live-data refusals: ${refusals}`);
 md.push('');

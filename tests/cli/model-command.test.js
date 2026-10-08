@@ -17,7 +17,7 @@ describe('/model CLI Command', () => {
   });
 
   it('switches active model cleanly when the approved model ID is provided', async () => {
-    const res = await handleModelCommand(['deepseek-v4.1-flash'], { cwd: process.cwd() }, {
+    const res = await handleModelCommand(['muse-spark-1.3-contributor'], { cwd: process.cwd() }, {
       banner: () => {},
       status: () => {},
       success: () => {},
@@ -25,17 +25,17 @@ describe('/model CLI Command', () => {
     });
 
     expect(res.success).toBe(true);
-    expect(res.model).toBe('deepseek-v4.1-flash');
+    expect(res.model).toBe('muse-spark-1.3-contributor');
 
     const config = loadCorezConfig(process.cwd());
-    expect(config.model).toBe('deepseek-v4.1-flash');
+    expect(config.model).toBe('muse-spark-1.3-contributor');
   });
 
   it('rejects every text model outside the single-model allow-list', async () => {
-    // CoreZ is pinned to DeepSeek V4.1 Flash; the catalog exposes no second
+    // CoreZ is pinned to Muse Spark 1.3 Contributor; the catalog exposes no second
     // text model, so switching attempts must fail loudly rather than silently
     // routing text traffic elsewhere.
-    for (const rejected of ['kimi-k3', 'deepseek-flash', 'deepseek-v4-flash']) {
+    for (const rejected of ['kimi-k3', 'deepseek-flash', 'deepseek-v4-flash', 'deepseek-v4.1-flash']) {
       const res = await handleModelCommand([rejected], { cwd: process.cwd() }, {
         banner: () => {},
         status: () => {},
@@ -43,7 +43,7 @@ describe('/model CLI Command', () => {
         error: () => {}
       });
       expect(res.success, `${rejected} must be rejected`).toBe(false);
-      expect(res.model).toBe('deepseek-v4.1-flash');
+      expect(res.model).toBe('muse-spark-1.3-contributor');
     }
   });
 
@@ -63,8 +63,8 @@ describe('/model CLI Command', () => {
     expect(code).toBe(0);
   });
 
-  it('runs corez-code /model deepseek-v4.1-flash via CLI router cleanly', async () => {
-    const code = await runCli(['/model', 'deepseek-v4.1-flash']);
+  it('runs corez-code /model muse-spark-1.3-contributor via CLI router cleanly', async () => {
+    const code = await runCli(['/model', 'muse-spark-1.3-contributor']);
     expect(code).toBe(0);
   });
 });

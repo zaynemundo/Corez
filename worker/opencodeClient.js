@@ -1,11 +1,11 @@
-// OpenCode Go / Zen chat client.
+// OpenCode Go / Zen client.
 //
-// One client for the gateway's chat-completions API (plus the retired
-// /responses API when an endpoint override explicitly selects it): request
-// shaping, deadline guards, SSE streaming, usage mapping, and empty-response
-// detection. Failure classification, retries and scheduling live in
-// providerChain.js; this module never retries on its own and never sends
-// output-token caps.
+// One client for the gateway's Responses API (the default — required by the
+// configured Muse Spark model) and its chat-completions API (selected only
+// when an endpoint override explicitly asks for it): request shaping, deadline
+// guards, SSE streaming, usage mapping, and empty-response detection. Failure
+// classification, retries and scheduling live in providerChain.js; this module
+// never retries on its own and never sends output-token caps.
 
 import { safeErrorDetail } from "./utils.js";
 import {
@@ -28,7 +28,7 @@ export {
 };
 
 export const OPENCODE_DEFAULT_ENDPOINT =
-  "https://opencode.ai/zen/go/v1/chat/completions";
+  "https://opencode.ai/zen/go/v1/responses";
 
 // Timeout guards for upstream provider calls. A provider that hangs before
 // its first token (or stalls mid-stream, or never answers a non-stream call)
@@ -273,6 +273,15 @@ export async function* streamChatEndpoint({
               } else {
                 yield { text: delta };
               }
+            } else if (
+              (parsed.type === "response.reasoning_summary_text.delta" ||
+                parsed.type === "response.reasoning_text.delta") &&
+              typeof parsed.delta === "string" &&
+              parsed.delta
+            ) {
+              // Reasoning stays an internal signal for the thinking panel;
+              // it is never yielded as answer content.
+              yield { text: "", reasoning: parsed.delta };
             } else if (
               parsed.type === "response.completed" &&
               parsed.response

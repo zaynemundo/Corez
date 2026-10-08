@@ -196,7 +196,7 @@ export function extractFilesFromClipboard(clipboardData) {
  *
  * Two-stage pipeline for corez.pro: every attachment (image, video, audio,
  * file) is first understood by MiMo V2.5 (vision/multimodal), then its
- * textual description is fed to DeepSeek V4.1 Flash for generation. This
+ * textual description is fed to Muse Spark 1.3 Contributor for generation. This
  * function prepares the attachments so the worker's MiMo pre-pass can
  * describe them.
  *

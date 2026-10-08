@@ -30,10 +30,18 @@ export const THINKING_MAX_CARRY_CHARS = 512;
  * them, naming them in the reasoning is correct rather than a leak.
  */
 const REDACTIONS = Object.freeze([
+  [/\bmuse[-\s]?spark(?:[-\s]?(?:v?\d[\w.-]*)?(?:[-\s]?contributor)?)?/gi, "Corez"],
   [/\bdeep\s?seek(?:[-\s]?v?\d[\w.-]*)?/gi, "Corez"],
-  [/\bopencode(?:\s?go)?\b/gi, "Corez"],
+  [/\bopen\s?code(?:\s?go)?\b/gi, "Corez"],
   [/\bopen\s?router\b/gi, "Corez"],
 ]);
+
+/**
+ * Complete trailing words that can still grow into a redacted name. They are
+ * held back one boundary so a brand split across deltas ("muse" + " spark")
+ * cannot leak its first word.
+ */
+const REDACTION_PREFIX = /\b(?:deep|muse|open)$/i;
 
 /** Redact infrastructure names from one chunk of reasoning text. */
 export function scrubThinkingText(text) {
@@ -69,8 +77,22 @@ export function createThinkingStream() {
       // two emissions; a word that never arrives still drains at the cap.
       const lastBreak = lastBreakIndex(carry);
       let emitUpTo = 0;
+      let forcedDrain = false;
       if (lastBreak > 0) emitUpTo = lastBreak + 1;
-      else if (carry.length > THINKING_MAX_CARRY_CHARS) emitUpTo = carry.length;
+      else if (carry.length > THINKING_MAX_CARRY_CHARS) {
+        emitUpTo = carry.length;
+        forcedDrain = true;
+      }
+      if (emitUpTo <= 0) return "";
+
+      // A trailing complete word may still be the start of a redacted name
+      // ("muse" + " spark"): hold it back until the next boundary proves the
+      // name cannot form, unless the buffer is being force-drained.
+      if (!forcedDrain) {
+        const edge = carry.slice(0, emitUpTo).trimEnd();
+        const prefix = REDACTION_PREFIX.exec(edge);
+        if (prefix) emitUpTo = prefix.index;
+      }
       if (emitUpTo <= 0) return "";
 
       const head = carry.slice(0, emitUpTo);

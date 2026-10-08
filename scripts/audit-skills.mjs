@@ -41,10 +41,11 @@ const DOCUMENTED_ABSENT = /\b(?:not implemented|unimplemented|planned|todo|does 
 
 /** Retired identifiers that must not reappear anywhere in the skill tree. */
 const STALE = [
-  [/deepseek-flash(?!-)/, "stale model id `deepseek-flash` (now deepseek-v4.1-flash)"],
+  [/deepseek-flash(?!-)/, "stale model id `deepseek-flash` (now muse-spark-1.3-contributor)"],
   [/xiaomi\/mimo-v2[.]5/, "removed MiMo model id"],
   [/worker\/mimo\.js/, "deleted file `worker/mimo.js`"],
   [/deepseek-v4-flash(?!-vision)/, "old DeepSeek V4 Flash id"],
+  [/deepseek-v4\.1-flash/, "replaced model id `deepseek-v4.1-flash` (now muse-spark-1.3-contributor)"],
   [/kimi-k3/, "`kimi-k3` removed from the model catalog"],
 ];
 

@@ -6,13 +6,13 @@ import { resolveApiMode } from './endpoint.js';
 import { extractContentText, stripThinkingBlocks } from './text.js';
 import { PROVIDER_ENDPOINTS, PROVIDER_IDS } from './adapters.js';
 import {
-  DEEPSEEK_V4_1_FLASH,
+  MUSE_SPARK_1_3_CONTRIBUTOR,
   OPENCODE_GO_PROVIDER,
   resolveTextModel,
 } from './modelIds.js';
 
 export const MODEL_CATALOG = Object.freeze([
-  { id: DEEPSEEK_V4_1_FLASH, name: 'DeepSeek V4.1 Flash', provider: OPENCODE_GO_PROVIDER, role: 'Primary Executor (Orchestration, Coding, UI, Building & Verification)' },
+  { id: MUSE_SPARK_1_3_CONTRIBUTOR, name: 'Muse Spark 1.3 Contributor', provider: OPENCODE_GO_PROVIDER, role: 'Primary Executor (Orchestration, Coding, UI, Building & Verification)' },
   { id: 'flux-1-schnell', name: 'FLUX 1 Schnell', provider: 'cloudflare-workers-ai', role: 'Visual Asset & Art Director' }
 ]);
 

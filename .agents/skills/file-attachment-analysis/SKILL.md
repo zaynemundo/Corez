@@ -23,22 +23,22 @@ description: Use when a request includes attachments - summarize this PDF, what 
 - Reviewing and testing attachment handling changes - use
   `code-review-testing`.
 
-## Current ingestion behavior (attachments -> DeepSeek V4.1 Flash)
+## Current ingestion behavior (attachments -> Muse Spark 1.3 Contributor)
 
 - `src/components/ChatInput.jsx` + `src/utils/fileAttachmentUtils.js` accept multiple files: image/*, video/*, audio/*, pdf, and text-like files.
 - Text-like files up to 200 KiB (`MAX_TEXT_CONTENT_BYTES`) are read and injected with filename/type/size.
 - Images up to 1.5 MiB (`MAX_IMAGE_THUMB_BYTES`), and video/audio up to 8 MiB (`MAX_MEDIA_THUMB_BYTES`), get a data URL thumb plus an R2 upload (`/api/assets/upload`) for persistence. The Worker stores all types (image/png, video/mp4, audio/mpeg, application/pdf, etc.).
-- `worker/attachmentVision.js` builds the request: the message text gains a URL hint per attachment, and every image that carries a data-URL thumb is appended as a real image part. **DeepSeek V4.1 Flash has native vision**, so attached images are genuinely seen by the model rather than described by a separate vision model.
-- An R2 URL is never used as image input. The gateway cannot fetch remote URLs - it answers HTTP 400 "Failed to download image", which fails the entire request - so R2 URLs remain text hints for markup and only a self-contained data-URL thumb becomes image input. Capped at 4 images and 4 MB per thumb per request.
-- Video and audio are **metadata only**: the model receives filename, type, size and a URL, never the stream, so it cannot watch or listen.
+- `worker/attachmentVision.js` builds the request: the message text gains a metadata/URL hint per attachment, and content is always plain text. **Muse Spark 1.3 Contributor is text-only through the gateway**, so no image data is ever sent - the model never sees pixels and the system prompt states that plainly so it cannot invent a description.
+- No attachment is ever used as image input, so the gateway's remote-URL HTTP 400 trap ("Failed to download image") cannot be triggered by attachments; R2 URLs remain text hints for markup.
+- Image, video and audio are all **metadata only**: the model receives filename, type, size and a URL, never the stream or the pixels, so it cannot describe, watch or listen.
 - Attachment content is omitted from local session persistence to avoid storing large or private payloads indefinitely.
 
 ## Workflow
 
 1. Inventory each attachment by name, type, size, and whether `content` exists.
-2. Attached images are visible to you - describe them from what you actually
-   observe. For everything else, analyze only the supplied text content and
-   treat metadata as metadata, not as evidence about a file's contents.
+2. No attachment pixel content is available - analyze only the supplied text
+   content, and treat metadata as metadata, not as evidence about a file's
+   contents. State plainly when something cannot be inspected.
 3. Quote or transform bounded excerpts and preserve source meaning.
 4. If a binary must be inspected and it is not an image, state that the current
    path cannot read it and request a supported text export or a separate
@@ -50,9 +50,9 @@ description: Use when a request includes attachments - summarize this PDF, what 
 
 - Never say an image, PDF, archive, office document, or executable was visually
   or structurally inspected when only its filename and MIME type were supplied.
-- Attached images ARE visible, so do not claim you cannot view an image that was
-  actually supplied - but never extend that to video and audio, which arrive as
-  metadata only, or to files whose text was never extracted.
+- Attachments arrive as metadata only: do not claim to have seen, watched or
+  heard any attachment, and do not treat a supplied filename or URL as evidence
+  about its contents. Files whose text was never extracted stay unreadable.
 - Never infer hidden content from a filename.
 - Do not increase ingestion limits without reviewing prompt size, browser
   memory, local storage, and privacy impact.
