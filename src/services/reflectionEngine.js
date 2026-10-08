@@ -119,6 +119,16 @@ export function evaluateResponse(responseContent, contract = {}, intent = {}) {
       missingRequirements.push(
         "Game chat brief (1-2 sentences: title, goal, controls)",
       );
+    } else if (
+      ["website_creation", "app", "design_task"].includes(
+        intent?.type || intent?.primaryIntent,
+      ) &&
+      !hasSiteChatBrief(text)
+    ) {
+      violations.push("Missing short site brief before code block");
+      missingRequirements.push(
+        "Site chat brief (1-2 sentences: title, contents)",
+      );
     }
   } else if (
     (intent?.type === "game_creation" ||
@@ -219,6 +229,81 @@ export function hasGameChatBrief(content) {
 }
 
 /**
+ * Deterministic client-side fallback: every website/app deliverable must
+ * reach chat with a short description BEFORE the code. Mirrors the worker's
+ * ensureSiteChatBrief so bare artifacts (harness streams especially) still
+ * get a description. Game-like content is owned by ensureGameChatBrief;
+ * fragments and non-deliverables pass through unchanged.
+ */
+export function ensureSiteChatBrief(content, userPrompt = "") {
+  const text = String(content || "");
+  if (!text.trim()) return text;
+  const fenceIdx = text.search(/```/);
+  const htmlIdx = text.search(/(?:<!DOCTYPE\s+html|<html[\s>])/i);
+  if (fenceIdx === -1 && htmlIdx === -1) return text;
+  const start =
+    fenceIdx !== -1 && (htmlIdx === -1 || fenceIdx < htmlIdx)
+      ? fenceIdx
+      : htmlIdx;
+  const code = text.slice(start);
+  if (!/(?:<!DOCTYPE\s+html|<html[\s>])/i.test(code)) return text;
+
+  const hasLoop = /requestAnimationFrame|getContext\s*\(/i.test(code);
+  const hasControls = /keydown|keyup|touchstart|touchend|pointerdown/i.test(code);
+  // Game-intent output is owned by ensureGameChatBrief even when the
+  // artifact itself carries no game signals yet (worker parity).
+  const gameLike =
+    (hasLoop && hasControls) ||
+    /\b(score|collision|collide|overlap)\b/i.test(code) ||
+    /\b(game|playable|player|enemy|level|win\b|lose\b)/i.test(
+      `${userPrompt} ${code.slice(0, 2000)}`,
+    );
+  if (gameLike) return text;
+
+  const rawPreamble = start > 0 ? text.slice(0, start).trim() : "";
+  const preamble = rawPreamble
+    .replace(/(?:\r?\n|^)\s*(?:Fullscreen|Preview)\s*$/i, "")
+    .trim();
+  if (preamble.length >= 20 && /[a-zA-Z]{3,}/.test(preamble)) return text;
+
+  const titleMatch =
+    code.match(/<title>([^<]{3,80})<\/title>/i) ||
+    code.match(/<h1[^>]*>([^<]{3,60})</i);
+  let title = (titleMatch && titleMatch[1].trim()) || "Your new site";
+  title = title.replace(/\s+/g, " ").slice(0, 60);
+
+  const sections = [...code.matchAll(/<h2[^>]*>([^<]{2,60})</gi)]
+    .map((m) => m[1].replace(/\s+/g, " ").trim().replace(/[.\s]+$/, ""))
+    .filter(Boolean)
+    .slice(0, 5);
+
+  const brief =
+    sections.length > 0
+      ? `Here's **${title}** — featuring ${sections.join(" • ")}.`
+      : `Here's **${title}** — built from your brief, ready to preview.`;
+  return `${brief}\n\n${text.trimStart()}`;
+}
+
+/**
+ * True when a website/app response carries a usable short description
+ * before its deliverable.
+ */
+export function hasSiteChatBrief(content) {
+  const text = String(content || "");
+  const fenceIdx = text.search(/```/);
+  const htmlIdx = text.search(/(?:<!DOCTYPE\s+html|<html[\s>])/i);
+  if (fenceIdx === -1 && htmlIdx === -1) return false;
+  const start =
+    fenceIdx !== -1 && (htmlIdx === -1 || fenceIdx < htmlIdx)
+      ? fenceIdx
+      : htmlIdx;
+  const preamble = (start > 0 ? text.slice(0, start).trim() : "")
+    .replace(/(?:\r?\n|^)\s*(?:Fullscreen|Preview)\s*$/i, "")
+    .trim();
+  return preamble.length >= 20 && /[a-zA-Z]{3,}/.test(preamble);
+}
+
+/**
  * Progress-aware repair loop: performs deterministic local repairs when
  * material issues are found and iterates while each pass makes a measurable
  * change to the content. It stops when the response is compliant, when a
@@ -254,6 +339,12 @@ export function repairResponse(
         !hasGameChatBrief(content)
       ) {
         content = ensureGameChatBrief(content);
+      }
+      if (
+        violation.includes("Missing short site brief") &&
+        !hasSiteChatBrief(content)
+      ) {
+        content = ensureSiteChatBrief(content);
       }
       if (violation.includes("code output block") && !content.includes("```")) {
         content +=

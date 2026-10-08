@@ -209,13 +209,17 @@ describe('CoreZ AI Reasoning & Skill Orchestration Pipeline', () => {
     expect(evaluation.violations.some(v => v.includes('React/JSX'))).toBe(true);
   });
 
-  it('15. accepts HTML output when the user explicitly requested plain HTML', () => {
+  it('15. accepts bare HTML format but requires a short description for website_creation', () => {
     const evaluation = evaluateResponse(
       '<!DOCTYPE html><html><body><h1>Page</h1></body></html>',
       { mustAchieve: [], mustNotChange: [] },
       { type: 'website_creation', outputFormat: 'html' }
     );
-    expect(evaluation.isCompliant).toBe(true);
+    // The HTML itself is accepted (no format violation) ...
+    expect(evaluation.violations.some(v => v.includes('Expected HTML'))).toBe(false);
+    // ... but chat needs a short description before the deliverable.
+    expect(evaluation.isCompliant).toBe(false);
+    expect(evaluation.violations.some(v => v.includes('site brief'))).toBe(true);
   });
 
   it('16. detects spaced usage limit mutations too', () => {

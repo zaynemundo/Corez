@@ -425,6 +425,67 @@ export function ensureGameChatBrief(content, userPrompt = "") {
   return `${brief}\n\n${text.trimStart()}`;
 }
 
+// Every website/app deliverable must reach chat with a short description
+// BEFORE the code. The system prompt requires it, but models sometimes
+// return a bare code block or raw HTML — harness builds especially, since
+// they stream the artifact with no preamble — leaving chat with code and
+// no description. This deterministic fallback prepends a 1-2 sentence
+// brief derived from the artifact's own <title>/headings so chat always
+// has one. Game-like content is owned by ensureGameChatBrief; fragments,
+// components and non-deliverables pass through byte-identical.
+export function ensureSiteChatBrief(content, userPrompt = "") {
+  const text = String(content || "");
+  if (!text.trim()) return text;
+
+  const fenceIdx = text.search(/```/);
+  const htmlIdx = text.search(/(?:<!DOCTYPE\s+html|<html[\s>])/i);
+  if (fenceIdx === -1 && htmlIdx === -1) return text;
+  const start =
+    fenceIdx !== -1 && (htmlIdx === -1 || fenceIdx < htmlIdx)
+      ? fenceIdx
+      : htmlIdx;
+  const code = text.slice(start);
+
+  // Must present as a site/app document, not a snippet or explanation.
+  if (!/(?:<!DOCTYPE\s+html|<html[\s>])/i.test(code)) return text;
+
+  // Games are owned by the game brief — never double-brief.
+  const signals = checkGameRequirements(code);
+  const gameLike =
+    (signals.includes("controls") &&
+      (signals.includes("game-loop") || signals.includes("canvas"))) ||
+    signals.includes("scoring") ||
+    signals.includes("collision") ||
+    /\b(game|playable|player|enemy|level)\b/i.test(
+      `${userPrompt} ${code.slice(0, 2000)}`,
+    );
+  if (gameLike) return text;
+
+  const rawPreamble = start > 0 ? text.slice(0, start).trim() : "";
+  const preamble = rawPreamble
+    .replace(/(?:\r?\n|^)\s*(?:Fullscreen|Preview)\s*$/i, "")
+    .trim();
+  // An existing 20+ char prose preamble counts as the description — keep it.
+  if (preamble.length >= 20 && /[a-zA-Z]{3,}/.test(preamble)) return text;
+
+  const titleMatch =
+    code.match(/<title>([^<]{3,80})<\/title>/i) ||
+    code.match(/<h1[^>]*>([^<]{3,60})</i);
+  let title = (titleMatch && titleMatch[1].trim()) || "Your new site";
+  title = title.replace(/\s+/g, " ").slice(0, 60);
+
+  const sections = [...code.matchAll(/<h2[^>]*>([^<]{2,60})</gi)]
+    .map((m) => m[1].replace(/\s+/g, " ").trim().replace(/[.\s]+$/, ""))
+    .filter(Boolean)
+    .slice(0, 5);
+
+  const brief =
+    sections.length > 0
+      ? `Here's **${title}** — featuring ${sections.join(" • ")}.`
+      : `Here's **${title}** — built from your brief, ready to preview.`;
+  return `${brief}\n\n${text.trimStart()}`;
+}
+
 export function analyzeProjectState(messages) {
   const history = Array.isArray(messages) ? messages : [];
   const assistantReplies = history
@@ -957,6 +1018,12 @@ export async function processResponse(messages, content, options = {}) {
   const beforeBrief = answer;
   answer = ensureGameChatBrief(answer, userPrompt);
   diagnostics.gameBriefInjected = answer !== beforeBrief;
+
+  // Same guarantee for website/app deliverables (bare artifact, no preamble).
+  // Game-like content is owned by the game brief above and passes through.
+  const beforeSiteBrief = answer;
+  answer = ensureSiteChatBrief(answer, userPrompt);
+  diagnostics.siteBriefInjected = answer !== beforeSiteBrief;
 
   const finalTruncation = detectTruncation(answer, {
     stopReason: finalStopReason,

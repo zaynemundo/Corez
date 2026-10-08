@@ -40,6 +40,8 @@ import { createIntentContract } from "./promptIntelligence/intentContract.js";
 import {
   evaluateResponse,
   repairResponse,
+  ensureGameChatBrief,
+  ensureSiteChatBrief,
   recordQualitySignal,
 } from "./reflectionEngine.js";
 import { buildAwwwardsDesignPrompt } from "../../packages/agent-core/context/designTokens.js";
@@ -1554,7 +1556,30 @@ export async function generateHostedAIResponse(
       if (retryableError) {
         throw new Error(retryableError.message || "Hosted AI stream error.");
       }
-      if (streamed.trim()) return streamed;
+      // Streamed creation deliverables (harness builds especially) arrive as
+      // a bare artifact with no chat description — the worker never sees a
+      // final content string to brief on this path. Prepend the deterministic
+      // brief here so chat always has one; preview extraction slices from the
+      // artifact start, so leading prose never reaches the canvas.
+      if (streamed.trim()) {
+        const streamIntent =
+          fineIntent?.primaryIntent ||
+          fineIntent?.type ||
+          intent?.primaryIntent ||
+          intent?.type;
+        if (
+          useCreationHarness ||
+          ["game_creation", "website_creation", "design_task", "app"].includes(
+            streamIntent,
+          )
+        ) {
+          return ensureSiteChatBrief(
+            ensureGameChatBrief(streamed),
+            prompt,
+          );
+        }
+        return streamed;
+      }
 
       // The stream completed with zero deltas and no error event: the response
       // was NOT valid SSE. Diagnose the body so the user sees the real cause
