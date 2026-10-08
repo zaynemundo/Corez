@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { buildProviderChain, runProviderChain, runStreamingChain, TASK_STATUS_STORE_PREFIX } from '../worker/providerChain.js';
-import { resolveApiMode, resolveOpencodeSessionId } from '../worker/opencodeClient.js';
+import { resolveApiMode, resolveOpencodeSessionId, toGatewayReasoning } from '../worker/opencodeClient.js';
 import { createTaskStateStore } from '../worker/utils.js';
 
 const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/responses';
@@ -730,6 +730,20 @@ describe('OpenCode gateway client behavior', () => {
     expect(resolveApiMode({ endpoint: 'https://opencode.ai/zen/go/v1/responses' })).toBe('responses');
     expect(resolveApiMode({ endpoint: 'https://x/v1/responses', api: 'chat' })).toBe('chat');
     expect(resolveApiMode({ endpoint: 'https://x/v1/chat/completions', api: 'responses' })).toBe('responses');
+  });
+
+  it('maps the canonical reasoning shape to the Responses wire shape', () => {
+    // Hidden: effort only — no `exclude` (invalid on Responses) and no
+    // summary, so zero reasoning bytes ship.
+    expect(toGatewayReasoning({ effort: 'high', exclude: true }, 'responses')).toEqual({ effort: 'high' });
+    // Visible: summaries stream back as reasoning deltas for the thinking panel.
+    expect(toGatewayReasoning({ effort: 'medium', exclude: false }, 'responses')).toEqual({ effort: 'medium', summary: 'auto' });
+    // Chat-completions keeps the OpenRouter-style shape untouched.
+    expect(toGatewayReasoning({ effort: 'high', exclude: true }, 'chat')).toEqual({ effort: 'high', exclude: true });
+    expect(toGatewayReasoning({ effort: 'high', exclude: false }, 'chat')).toEqual({ effort: 'high', exclude: false });
+    // Non-objects pass through for the caller to shape.
+    expect(toGatewayReasoning(undefined, 'responses')).toBeUndefined();
+    expect(toGatewayReasoning(null, 'responses')).toBeNull();
   });
 
   it('sends the responses body shape when OPENCODE_API_MODE=responses', async () => {

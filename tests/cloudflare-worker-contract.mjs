@@ -212,7 +212,10 @@ async function run() {
     if (invocation.payload.reasoning !== undefined) {
       assert.ok(typeof invocation.payload.reasoning === 'object');
       assert.ok(['low', 'medium', 'high', 'xhigh'].includes(invocation.payload.reasoning.effort));
-      assert.equal(invocation.payload.reasoning.exclude, true);
+      // Responses wire shape: no `exclude` field, and hidden reasoning ships
+      // no summary so zero reasoning bytes are returned.
+      assert.equal(invocation.payload.reasoning.exclude, undefined);
+      assert.equal(invocation.payload.reasoning.summary, undefined);
     }
     // The execution prompt (with the Awwwards design spec) reaches the model
     // as the user message instead of the bare prompt.
@@ -299,7 +302,10 @@ async function run() {
       assert.equal((opencodePayload.input || opencodePayload.messages).at(-1).content, 'Explain black roses');
       assert.ok(opencodePayload.reasoning && typeof opencodePayload.reasoning === 'object');
       assert.ok(['low', 'medium', 'high', 'xhigh'].includes(opencodePayload.reasoning.effort));
-      assert.equal(opencodePayload.reasoning.exclude, true);
+      // Responses wire shape: hidden reasoning is effort-only (no `exclude`,
+      // no summary).
+      assert.equal(opencodePayload.reasoning.exclude, undefined);
+      assert.equal(opencodePayload.reasoning.summary, undefined);
       assert.equal(opencodePayload.provider, undefined);
 
       // Inline <think> blocks in the content field are stripped before the

@@ -13,7 +13,7 @@ import {
   newOpencodeSessionId,
   resolveOpencodeSessionId,
 } from "../packages/agent-core/providers/session.js";
-import { resolveApiMode } from "../packages/agent-core/providers/endpoint.js";
+import { resolveApiMode, toGatewayReasoning } from "../packages/agent-core/providers/endpoint.js";
 import {
   createThinkingStreamFilter,
   extractContentText,
@@ -25,6 +25,7 @@ export {
   newOpencodeSessionId,
   resolveApiMode,
   resolveOpencodeSessionId,
+  toGatewayReasoning,
 };
 
 export const OPENCODE_DEFAULT_ENDPOINT =
@@ -191,6 +192,15 @@ export async function* streamChatEndpoint({
   const requestBody = responsesApi
     ? { model, input: toResponsesInput(messages), stream: true, ...bodyExtra }
     : { model, messages, stream: true, ...bodyExtra };
+  // The Responses API has no `exclude` field and only returns reasoning text
+  // when a summary is requested — map the canonical { effort, exclude }
+  // shape to the wire format (see toGatewayReasoning).
+  if (requestBody.reasoning !== undefined) {
+    requestBody.reasoning = toGatewayReasoning(
+      requestBody.reasoning,
+      responsesApi ? "responses" : "chat",
+    );
+  }
 
   try {
     const response = await fetch(endpoint, {
@@ -399,6 +409,13 @@ export async function callChatEndpoint({
   const requestBody = responsesApi
     ? { model, input: toResponsesInput(messages), ...bodyExtra }
     : { model, messages, ...bodyExtra };
+  // Same wire-shape mapping as the streaming path (see toGatewayReasoning).
+  if (requestBody.reasoning !== undefined) {
+    requestBody.reasoning = toGatewayReasoning(
+      requestBody.reasoning,
+      responsesApi ? "responses" : "chat",
+    );
+  }
 
   try {
     // Every provider gets its own Authorization header from its own key:

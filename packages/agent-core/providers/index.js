@@ -2,7 +2,7 @@ import {
   OPENCODE_SESSION_HEADER,
   newOpencodeSessionId,
 } from './session.js';
-import { resolveApiMode } from './endpoint.js';
+import { resolveApiMode, toGatewayReasoning } from './endpoint.js';
 import { extractContentText, stripThinkingBlocks } from './text.js';
 import { PROVIDER_ENDPOINTS, PROVIDER_IDS } from './adapters.js';
 import {
@@ -66,10 +66,12 @@ export class ModelProviderRouter {
     const body = {
       model,
       temperature: Number.isFinite(temperature) ? temperature : 0.42,
-      reasoning:
+      reasoning: toGatewayReasoning(
         reasoning && typeof reasoning === 'object'
           ? reasoning
-          : { effort: String(reasoning || 'high'), exclude: true }
+          : { effort: String(reasoning || 'high'), exclude: true },
+        api
+      )
     };
     if (api === 'responses') body.input = messages;
     else body.messages = messages;

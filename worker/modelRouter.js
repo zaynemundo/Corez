@@ -175,6 +175,11 @@ const TEMPERATURE_BY_INTENT = Object.freeze({
  * Flip a reasoning config so the provider INCLUDES the model's reasoning in
  * the response.
  *
+ * The canonical shape stays `{ effort, exclude }`; each transport maps it to
+ * its wire format at send time (the Responses API has no `exclude` — visible
+ * maps to `summary: 'auto'`, hidden omits the summary; see
+ * toGatewayReasoning in packages/agent-core/providers/endpoint.js).
+ *
  * Internal calls (spec, review, swarm briefs) keep `exclude: true`: their
  * reasoning is a retry signal, never read by anyone, so shipping it would
  * waste bandwidth. Only the user-facing chat and build streams ask for it,

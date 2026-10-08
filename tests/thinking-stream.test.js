@@ -152,8 +152,9 @@ describe('/api/ai streaming thinking', () => {
     expect(answerOf(events)).toBe('DNS resolves in steps.');
     // The reasoning must never be mixed into the reply.
     expect(answerOf(events)).not.toContain('resolver chain');
-    // The provider is asked to return the reasoning, not to drop it.
-    expect(payload.reasoning?.exclude).toBe(false);
+    // The provider is asked to return the reasoning, not to drop it: the
+    // Responses wire shape carries `summary: 'auto'` (there is no `exclude`).
+    expect(payload.reasoning).toEqual({ effort: 'medium', summary: 'auto' });
   });
 
   it('never leaks the provider stack through the thinking stream', async () => {

@@ -11,7 +11,7 @@ import {
   newOpencodeSessionId,
 } from './session.js';
 import { classifyFailureStatus } from './failure.js';
-import { resolveApiMode } from './endpoint.js';
+import { resolveApiMode, toGatewayReasoning } from './endpoint.js';
 import { extractContentText, stripThinkingBlocks } from './text.js';
 
 // OpenCode Go is the only text provider CoreZ constructs. The DeepSeek-direct
@@ -177,6 +177,11 @@ export class ProviderAdapter {
     }
     if (reasoning && typeof reasoning === 'object') body.reasoning = reasoning;
     else if (reasoning) body.reasoning = { effort: String(reasoning), exclude: true };
+    // Responses has no `exclude` and needs `summary: 'auto'` for visible
+    // reasoning (see toGatewayReasoning); chat keeps { effort, exclude }.
+    if (body.reasoning !== undefined) {
+      body.reasoning = toGatewayReasoning(body.reasoning, this.api);
+    }
     if (Array.isArray(tools) && tools.length > 0) body.tools = tools;
     return body;
   }
