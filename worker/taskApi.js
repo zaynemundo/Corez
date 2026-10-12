@@ -33,6 +33,7 @@ import {
   consumeAllowance,
   estimateTokens,
   limitResponse,
+  refundUsage,
   normalizePlan,
   usageUnavailableResponse,
 } from "./usage.js";
@@ -57,14 +58,16 @@ async function resolvePlanForUser(env, userId) {
 // the request must be refused (402 out of quota, 503 accounting down),
 // otherwise null. The charge is one generation plus the prompt's token
 // estimate, exactly like a direct /api/ai turn.
+const GENERATION_CHARGES = (prompt) => [
+  { metric: "messages", amount: 1 },
+  { metric: "tokens", amount: estimateTokens(prompt) },
+];
+
 async function admitGeneration(env, userId, plan, prompt) {
   try {
     const admission = await consumeAllowance(env, userId, {
       plan,
-      charges: [
-        { metric: "messages", amount: 1 },
-        { metric: "tokens", amount: estimateTokens(prompt) },
-      ],
+      charges: GENERATION_CHARGES(prompt),
     });
     if (!admission.ok && admission.reason === "limit") {
       return limitResponse(admission.metric, admission.evaluation, plan);
@@ -75,6 +78,28 @@ async function admitGeneration(env, userId, plan, prompt) {
       return usageUnavailableResponse();
     }
     throw err;
+  }
+}
+
+// Give back an admission whose task never became accepted work (creation threw,
+// or dispatch could not be made durable). Without this the account keeps paying
+// for a generation that was never queued, which is what the reservation pattern
+// exists to prevent — here the compensation is the durable equivalent, applied
+// at the only two points where acceptance can fail.
+async function refundAdmission(env, userId, prompt) {
+  try {
+    await refundUsage(env, userId, {
+      charges: GENERATION_CHARGES(prompt),
+    });
+    return true;
+  } catch (err) {
+    // The account is charged for work that did not start. Never hide this: it
+    // is the one direction the compensation cannot cover, so it must be visible
+    // in the logs rather than silent.
+    console.error(
+      `task admission refund failed for ${userId}: ${err?.message || err}`,
+    );
+    return false;
   }
 }
 
@@ -213,26 +238,37 @@ export async function handleTaskApi(request, env, ctx = null) {
     // dispatch record the sweeper retries. The HTTP invocation never silently
     // owns the long-running work; a dispatch that cannot be made durable is a
     // retryable 503, not an accepted task.
-    const task = await harness.startTask({
-      userId,
-      sessionId:
-        typeof body?.sessionId === "string"
-          ? body.sessionId.slice(0, 160)
-          : null,
-      workspaceId: null,
-      prompt,
-      model:
-        typeof body?.model === "string" ? body.model.slice(0, 120) : undefined,
-      mode: "conversation",
-      autoApprove: false,
-      deferExecution: true,
-    });
+    let task;
+    try {
+      task = await harness.startTask({
+        userId,
+        sessionId:
+          typeof body?.sessionId === "string"
+            ? body.sessionId.slice(0, 160)
+            : null,
+        workspaceId: null,
+        prompt,
+        model:
+          typeof body?.model === "string" ? body.model.slice(0, 120) : undefined,
+        mode: "conversation",
+        autoApprove: false,
+        deferExecution: true,
+      });
+    } catch (err) {
+      // Nothing was accepted, so the admission is given back rather than kept
+      // as payment for a task that does not exist.
+      await refundAdmission(env, userId, prompt);
+      throw err;
+    }
     let dispatch;
     try {
       dispatch = await dispatchTaskExecution(env, ctx, harness, task.taskId, {
         task,
       });
     } catch (err) {
+      // No durable record owns this work, so the client is told it was not
+      // accepted — and the charge goes back with it.
+      await refundAdmission(env, userId, prompt);
       return dispatchFailureResponse(err);
     }
     // `dispatch: "deferred"` is the honest form of acceptance here: the record

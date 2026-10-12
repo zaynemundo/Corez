@@ -279,13 +279,37 @@ export async function getUsage(env, uid, { period = periodKey() } = {}) {
   return usage;
 }
 
+// Run a set of statements as ONE transaction where the binding supports it.
+// A statement that throws must roll back the statements before it, because a
+// half-applied admission is exactly the bug this guards against.
+async function runCharges(env, statements) {
+  try {
+    if (typeof env.DB.batch === "function") return await env.DB.batch(statements);
+    const results = [];
+    for (const statement of statements) results.push(await statement.run());
+    return results;
+  } catch (err) {
+    if (err instanceof UsageUnavailableError) throw err;
+    throw new UsageUnavailableError(
+      `Usage counters could not be charged: ${err?.message || err}`,
+    );
+  }
+}
+
 /**
  * Atomically admit (and charge) a set of metrics before billable work starts.
  *
- * Each metric is one guarded upsert, so two concurrent requests can never both
- * pass against the same remaining allowance. When a later charge is refused the
- * earlier charges of this request are refunded (best effort), so a multi-metric
- * request never half-charges.
+ * The whole charge set is applied as one transaction, so a statement that fails
+ * rolls back every charge of this request — a failure can never leave a
+ * half-applied admission behind. Each metric is still one guarded upsert, so
+ * two concurrent requests can never both pass against the same remaining
+ * allowance.
+ *
+ * A metric that is *refused* (rather than failing) does not roll anything back,
+ * because a guard that declines is not an error; the charges this request
+ * already applied are therefore refunded by compensation. The refund is written
+ * in its own transaction, so it is all-or-nothing too, and a failed refund is
+ * reported instead of being assumed.
  *
  * @returns {Promise<{ok: true, consumed: Array<{metric: string, amount: number}>, period: string}
  *   | {ok: false, reason: 'limit', metric: string, evaluation: object, refunded: boolean, period: string}>}
@@ -300,25 +324,30 @@ export async function consumeAllowance(
   if (!meteringEnabled(env) || !uid) {
     return { ok: true, skipped: true, consumed: [], period };
   }
+  if (entries.length === 0) return { ok: true, consumed: [], period };
   await ensureUsageTables(env);
+
+  const statements = entries.map((entry) =>
+    env.DB.prepare(CHARGE_SQL).bind(
+      uid,
+      period,
+      entry.metric,
+      entry.amount,
+      now,
+      limitFor(plan, entry.metric),
+      entry.amount,
+      limitFor(plan, entry.metric),
+      limitFor(plan, entry.metric),
+      limitFor(plan, entry.metric),
+    ),
+  );
+
+  const results = await runCharges(env, statements);
+
   const applied = [];
-  for (const entry of entries) {
-    const limit = limitFor(plan, entry.metric);
-    const result = await env.DB.prepare(CHARGE_SQL)
-      .bind(
-        uid,
-        period,
-        entry.metric,
-        entry.amount,
-        now,
-        limit,
-        entry.amount,
-        limit,
-        limit,
-        limit,
-      )
-      .run();
-    const changes = changesOf(result, entry.metric);
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = entries[index];
+    const changes = changesOf(results?.[index], entry.metric);
     if (changes === 0) {
       const refunded = await refundCharges(env, uid, period, applied, now);
       const usage = await getUsage(env, uid, { period });
@@ -333,22 +362,57 @@ export async function consumeAllowance(
   return { ok: true, consumed: applied, period };
 }
 
+/**
+ * Give back an admission that never became billable work.
+ *
+ * The counterpart to `consumeAllowance`, for the case where the allowance was
+ * reserved and the work was then refused acceptance — a task that could not be
+ * created or durably dispatched. The refund is one transaction and can never
+ * take a counter below zero, so a repeated failure cannot be used to mint
+ * quota.
+ *
+ * @throws {UsageUnavailableError} when the accounting database is unusable.
+ */
+export async function refundUsage(
+  env,
+  uid,
+  { period = periodKey(), charges = [], now = Date.now() } = {},
+) {
+  const entries = normalizeCharges(charges);
+  if (!meteringEnabled(env) || !uid) {
+    return { ok: true, skipped: true, refunded: [] };
+  }
+  if (entries.length === 0) return { ok: true, refunded: [] };
+  await ensureUsageTables(env);
+  if (!(await refundCharges(env, uid, period, entries, now))) {
+    throw new UsageUnavailableError("Usage counters could not be refunded.");
+  }
+  return { ok: true, refunded: entries };
+}
+
 async function refundCharges(env, uid, period, charges, now) {
   if (charges.length === 0) return true;
   try {
     const statements = charges.map((charge) =>
       env.DB.prepare(REFUND_SQL).bind(charge.amount, now, uid, period, charge.metric),
     );
+    // One transaction: a partial refund would leave the account charged for a
+    // request that was refused.
     if (typeof env.DB.batch === "function") {
       await env.DB.batch(statements);
     } else {
       for (const statement of statements) await statement.run();
     }
     return true;
-  } catch {
-    // A failed refund only means the account is charged for work that was not
-    // admitted — conservative, never an over-allowance. The next request
-    // reports the limit, so no provider work starts either way.
+  } catch (err) {
+    // A failed refund means the account is charged for work that was refused.
+    // That is never an over-allowance, but it is a real accounting error, so it
+    // is logged rather than quietly swallowed.
+    console.error(
+      `usage refund failed for ${uid} (${period}): ${err?.message || err}; ${charges
+        .map((charge) => `${charge.metric}+${charge.amount}`)
+        .join(", ")}`,
+    );
     return false;
   }
 }

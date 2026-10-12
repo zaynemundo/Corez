@@ -110,14 +110,17 @@ function createFaultyD1(faults) {
       const inner = d1.prepare(sql);
       let values = [];
       return {
+        __runSync() {
+          if (faults(sql, values)) throw new Error('injected storage failure');
+          return inner.__runSync();
+        },
         bind(...args) {
           values = args;
           inner.bind(...args);
           return this;
         },
         async run() {
-          if (faults(sql, values)) throw new Error('injected storage failure');
-          return inner.run();
+          return this.__runSync();
         },
         async all() {
           return inner.all();
@@ -421,6 +424,42 @@ describe('durable task execution', () => {
     expect(response.headers.get('Retry-After')).toBeTruthy();
     expect(providerCalls).toBe(0);
     expect(waits).toHaveLength(0);
+  });
+
+  it('returns the allowance when a task could not be accepted durably', async () => {
+    // The charge lands before the task exists, and dispatch cannot be made
+    // durable here (the outbox write fails and the queue send fails), so the
+    // client is told the task was NOT accepted. The account must not keep
+    // paying for a generation that will never run.
+    const env = environment({
+      ASSET_BUCKET: memoryBucket(),
+      DB: createFaultyD1((sql) => /INSERT INTO harness_task_dispatches/i.test(sql)),
+      TASKS_QUEUE: {
+        async send() {
+          throw new Error('queue unavailable');
+        }
+      },
+      OPENCODE_GO_API_KEY: 'test-key'
+    });
+    let providerCalls = 0;
+    globalThis.fetch = async () => {
+      providerCalls += 1;
+      return providerResponse('must not run');
+    };
+
+    const response = await postTask(env, 'no durable dispatch with accounting on');
+    expect(response.status).toBe(503);
+    expect((await response.json()).retryable).toBe(true);
+    expect(providerCalls).toBe(0);
+
+    const rows = await env.DB.prepare(
+      "SELECT metric, count FROM usage_counters WHERE user_id='alice'"
+    ).all();
+    const byMetric = Object.fromEntries(
+      (rows.results || []).map((row) => [row.metric, Number(row.count) || 0])
+    );
+    expect(byMetric.messages ?? 0).toBe(0);
+    expect(byMetric.tokens ?? 0).toBe(0);
   });
 
   it('records a durable dispatch and reports deferred when the queue send fails', async () => {

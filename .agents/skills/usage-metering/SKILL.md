@@ -59,8 +59,18 @@ is never accidentally unlimited. That is the safe default - keep it.
   one guarded upsert that only succeeds while the result stays within the plan
   limit. Never split "check" from "record" — that window is exactly how two
   simultaneous requests both pass against the same remaining allowance.
-- Refusals refund metrics already charged by the same request, so a
-  multi-metric request never half-charges.
+- **The charge set is one transaction.** Every metric is applied in a single
+  `DB.batch()`, so a statement that *throws* rolls back the charges before it
+  and a failure can never leave a half-applied admission behind. A metric that
+  is *refused* is not an error and rolls nothing back, so the charges already
+  applied are refunded by compensation in their own transaction. A refund that
+  fails is logged — the account is charged for refused work, which is never an
+  over-allowance but is a real accounting error — and reported as
+  `refunded: false`.
+- **An admission whose work was never accepted is refunded.** Task creation
+  charges before the task exists, so `refundUsage()` returns the allowance when
+  creation throws or dispatch cannot be made durable. It floors each counter at
+  zero, so a repeated failure can never be used to mint quota.
 - **Tokens are best-effort**: the prompt estimate is charged at admission and
   the provider's larger reported total is reconciled afterwards with
   `recordUsageOnce(receiptKey)`; the receipt makes a replay a no-op, never a

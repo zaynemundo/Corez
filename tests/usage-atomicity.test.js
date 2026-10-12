@@ -13,6 +13,7 @@ import {
   getUsage,
   periodKey,
   recordUsageOnce,
+  refundUsage,
   usageSummary,
 } from '../worker/usage.js';
 
@@ -69,6 +70,47 @@ function noChangeMetaD1() {
     },
     async batch(statements) {
       return statements.map(() => ({ success: true }));
+    },
+  };
+}
+
+// A database that fails the SECOND counter write of a multi-metric admission.
+// When the charges ran as separate statements the first one stayed behind, so
+// the account was permanently charged for work that never started.
+function secondChargeFailsD1() {
+  const db = createSqliteD1();
+  let charges = 0;
+  return {
+    __sqlite: db.__sqlite,
+    prepare(sql) {
+      const inner = db.prepare(sql);
+      return {
+        __runSync() {
+          const isCharge =
+            /INSERT INTO usage_counters/i.test(sql) && !/receipt_key/i.test(sql);
+          if (isCharge) {
+            charges += 1;
+            if (charges === 2) throw new Error('simulated write failure');
+          }
+          return inner.__runSync();
+        },
+        bind(...args) {
+          inner.bind(...args);
+          return this;
+        },
+        async run() {
+          return this.__runSync();
+        },
+        async all() {
+          return inner.all();
+        },
+        async first() {
+          return inner.first();
+        },
+      };
+    },
+    batch(statements) {
+      return db.batch(statements);
     },
   };
 }
@@ -200,6 +242,55 @@ describe('atomic budget admission', () => {
     expect(within.ok).toBe(true);
     // A check never spends.
     expect((await getUsage(env, uid)).tokens).toBe(PLAN_LIMITS.free.tokens - 5);
+  });
+
+  it('leaves no partial charge behind when a later counter write fails', async () => {
+    const env = { DB: secondChargeFailsD1() };
+
+    await expect(
+      consumeAllowance(env, 'partial', {
+        plan: 'free',
+        charges: [
+          { metric: 'messages', amount: 1 },
+          { metric: 'tokens', amount: 100 },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(UsageUnavailableError);
+
+    // The first charge rolled back with the failure. A half-applied admission
+    // would have charged this account for a generation it never got.
+    const usage = await getUsage(env, 'partial');
+    expect(usage.messages).toBe(0);
+    expect(usage.tokens).toBe(0);
+  });
+
+  it('refunds a reservation whose work was never accepted, and never below zero', async () => {
+    const db = createSqliteD1();
+    const env = { DB: db };
+    const uid = 'refunded';
+
+    await consumeAllowance(env, uid, {
+      plan: 'free',
+      charges: [
+        { metric: 'messages', amount: 1 },
+        { metric: 'tokens', amount: 250 },
+      ],
+    });
+    expect((await getUsage(env, uid)).messages).toBe(1);
+
+    await refundUsage(env, uid, {
+      charges: [
+        { metric: 'messages', amount: 1 },
+        { metric: 'tokens', amount: 250 },
+      ],
+    });
+    const usage = await getUsage(env, uid);
+    expect(usage.messages).toBe(0);
+    expect(usage.tokens).toBe(0);
+
+    // A repeated refund is a floor, not a credit: it can never mint quota.
+    await refundUsage(env, uid, { charges: [{ metric: 'messages', amount: 5 }] });
+    expect((await getUsage(env, uid)).messages).toBe(0);
   });
 
   it('fails closed when the accounting database is unreachable', async () => {
