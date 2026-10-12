@@ -1,5 +1,10 @@
 import { jsonResponse, readBoundedJson, safeErrorDetail } from "./utils.js";
-import { ZIINA_PLANS, ZIINA_PLANS_YEARLY } from "./ziina.js";
+import {
+  ZIINA_PLANS,
+  ZIINA_PLANS_YEARLY,
+  isTestPayment,
+  isZiinaTestMode,
+} from "./ziina.js";
 
 const ZIINA_BASE = "https://api-v2.ziina.com/api";
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -21,6 +26,7 @@ export async function ensureSubscriptionTables(env) {
       period_start INTEGER,
       period_end INTEGER,
       ziina_payment_id TEXT,
+      test_mode INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     )`,
@@ -30,6 +36,37 @@ export async function ensureSubscriptionTables(env) {
     ).run();
     await env.DB.prepare(
       `CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status)`,
+    ).run();
+    try {
+      await env.DB.prepare(
+        `ALTER TABLE subscriptions ADD COLUMN test_mode INTEGER NOT NULL DEFAULT 0`,
+      ).run();
+    } catch {}
+    // Exactly-once payment settlement ledger. The Ziina payment id is the
+    // primary key, so concurrent/duplicate verifications of the same payment
+    // race on one atomic INSERT — only the claim holder activates, and every
+    // later verification reads back the original period instead of minting a
+    // new one.
+    await env.DB.prepare(
+      `CREATE TABLE IF NOT EXISTS payment_ledger (
+      payment_id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      plan TEXT NOT NULL,
+      amount INTEGER NOT NULL DEFAULT 0,
+      currency_code TEXT NOT NULL DEFAULT 'AED',
+      interval TEXT NOT NULL DEFAULT 'month',
+      status TEXT NOT NULL DEFAULT 'processing',
+      claim_token TEXT,
+      subscription_id TEXT,
+      period_start INTEGER,
+      period_end INTEGER,
+      test_mode INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )`,
+    ).run();
+    await env.DB.prepare(
+      `CREATE INDEX IF NOT EXISTS idx_payment_ledger_user ON payment_ledger(user_id, created_at DESC)`,
     ).run();
     // Ensure users has subscription fields
     try {
@@ -85,6 +122,61 @@ export const PLAN_RANK = Object.freeze({ free: 0, standard: 1, premium: 2 });
 /** True when `target` is a strictly lower plan than `current`. */
 export function isDowngrade(current, target) {
   return (PLAN_RANK[target] ?? 0) < (PLAN_RANK[current] ?? 0);
+}
+
+/** A claim this old was abandoned (failed batch or crashed Worker) — retryable. */
+const STALE_SETTLEMENT_MS = 2 * 60 * 1000;
+
+/**
+ * Amount (fils) -> canonical plan + interval.
+ *
+ * The amount is the only thing Ziina verifies, so it is the only thing that
+ * decides what a payment buys. Unmatched amounts grant free; a client `plan`
+ * hint can never raise it. `basic` is an alias and resolves to standard.
+ */
+export function derivePlanFromAmount(amount) {
+  const paid = Number(amount);
+  if (!Number.isFinite(paid)) {
+    return { planKey: null, plan: "free", interval: "month", amount: NaN };
+  }
+  const paidEntry = Object.entries(ZIINA_PLANS).find(
+    ([, meta]) => Number(meta.amount) === paid,
+  );
+  const planKey = paidEntry ? paidEntry[0] : null;
+  if (!planKey || planKey === "free") {
+    return { planKey: planKey || null, plan: "free", interval: "month", amount: paid };
+  }
+  const base = planKey.replace(/_yearly$/, "");
+  return {
+    planKey,
+    plan: base === "basic" ? "standard" : base,
+    interval: planKey.endsWith("_yearly") ? "year" : "month",
+    amount: paid,
+  };
+}
+
+/**
+ * Turn a Ziina payment object into a grant decision. The caller must already
+ * have established ownership (a local checkout belonging to the user); this
+ * rejects payments that must not buy a production entitlement: unfinished,
+ * non-AED, or test payments on a live deployment.
+ */
+export function inspectCompletedPayment(env, data, localTestMode = false) {
+  const status = String(data?.status || "").toLowerCase();
+  if (status !== "completed") {
+    return { ok: false, reason: "not_completed", status: data?.status ?? null };
+  }
+  const currency = String(data?.currency_code || "")
+    .trim()
+    .toUpperCase();
+  if (currency !== "AED") {
+    return { ok: false, reason: "currency_mismatch", currency };
+  }
+  const testPayment = Boolean(localTestMode) || isTestPayment(data);
+  if (testPayment && !isZiinaTestMode(env)) {
+    return { ok: false, reason: "test_payment", testPayment: true };
+  }
+  return { ok: true, ...derivePlanFromAmount(data?.amount), testPayment };
 }
 
 export async function getActiveSubscription(env, userId) {
@@ -277,6 +369,104 @@ export async function getActiveSubscription(env, userId) {
   }
 }
 
+function isFreePlan(plan) {
+  return plan === "free" || plan === FREE_PLAN;
+}
+
+/**
+ * Activation statements for one user, executed as a single transaction.
+ *
+ * Database failures MUST propagate: a swallowed error here used to make a
+ * failed activation look like a successful one. Callers either handle the
+ * throw (and report failure) or run inside settleVerifiedPayment(), whose
+ * ledger claim makes the retry safe.
+ */
+function buildActivationStatements(
+  env,
+  userId,
+  plan,
+  ziinaPaymentId,
+  amount,
+  interval = "month",
+  now,
+) {
+  const isFree = isFreePlan(plan);
+  const intervalKey = String(interval || "month").toLowerCase();
+  const isYearly =
+    intervalKey === "year" ||
+    intervalKey === "yearly" ||
+    intervalKey === "annual" ||
+    intervalKey === "annually";
+  const periodDays = isYearly ? YEAR_DAYS : MONTH_DAYS;
+  const periodEnd = isFree ? null : now + periodDays * DAY_MS;
+  const id = crypto.randomUUID();
+  const meta = ZIINA_PLANS[plan] || ZIINA_PLANS["standard"];
+  // For yearly, use the yearly amount when the caller did not pass one.
+  let finalAmount = isFree ? 0 : Number(amount) || meta.amount;
+  if (isYearly && !Number(amount)) {
+    const yearlyMeta = ZIINA_PLANS[`${plan}_yearly`] || ZIINA_PLANS_YEARLY?.[plan];
+    if (yearlyMeta) finalAmount = yearlyMeta.amount;
+  }
+
+  const statements = [
+    // Mark any previous ACTIVE rows as completed (one true current plan) and drop
+    // abandoned/finished pending rows so they can never activate later.
+    env.DB.prepare(
+      `UPDATE subscriptions SET status='completed', updated_at=? WHERE user_id=? AND status='active'`,
+    ).bind(now, userId),
+    env.DB.prepare(
+      `DELETE FROM subscriptions WHERE user_id=? AND status='pending'`,
+    ).bind(userId),
+    env.DB.prepare(
+      `INSERT INTO subscriptions (id, user_id, plan, amount, currency_code, status, period_start, period_end, ziina_payment_id, created_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+    ).bind(
+      id,
+      userId,
+      plan,
+      finalAmount,
+      "AED",
+      "active",
+      now,
+      periodEnd,
+      ziinaPaymentId || null,
+      now,
+      now,
+    ),
+    // Update users table — clear any scheduled downgrade on activation.
+    env.DB.prepare(
+      `UPDATE users SET plan=?, subscription_plan=?, subscription_status=?, subscription_period_end=?, subscription_ziina_id=?, downgrade_plan=NULL, downgrade_scheduled_at=NULL WHERE id=?`,
+    ).bind(plan, plan, "active", periodEnd, ziinaPaymentId || null, userId),
+  ];
+  return {
+    statements,
+    result: {
+      id,
+      plan,
+      amount: finalAmount,
+      period_start: now,
+      period_end: periodEnd,
+      ziina_payment_id: ziinaPaymentId || null,
+    },
+  };
+}
+
+/**
+ * Execute prepared statements. D1's batch() wraps them in one transaction
+ * (all-or-nothing); the sequential fallback keeps minimal test doubles and
+ * older local shims working while still surfacing every failure.
+ */
+async function executeStatements(env, statements) {
+  if (!env?.DB) throw new Error("Database not configured");
+  if (typeof env.DB.batch === "function") {
+    await env.DB.batch(statements);
+    return;
+  }
+  for (const statement of statements) {
+    await statement.run();
+  }
+}
+
 export async function activateSubscription(
   env,
   userId,
@@ -286,100 +476,169 @@ export async function activateSubscription(
   interval = "month",
 ) {
   const now = Date.now();
-  const isFree = plan === "free" || plan === FREE_PLAN;
-  const isYearly = String(interval).toLowerCase() === "year" || String(interval).toLowerCase() === "yearly" || String(interval).toLowerCase() === "annual";
-  const periodDays = isYearly ? YEAR_DAYS : MONTH_DAYS;
-  const periodEnd = isFree ? null : now + periodDays * DAY_MS;
-  const id = crypto.randomUUID();
-  const meta = ZIINA_PLANS[plan] || ZIINA_PLANS["standard"];
-  // For yearly, use yearly amount if not explicitly passed
-  let finalAmount = isFree ? 0 : amount || meta.amount;
-  if (isYearly && !amount) {
-    const yearlyMeta = ZIINA_PLANS[`${plan}_yearly`] || ZIINA_PLANS_YEARLY?.[plan];
-    if (yearlyMeta) finalAmount = yearlyMeta.amount;
-  }
-
-  try {
-    // Mark any previous ACTIVE rows as completed (one true current plan) and drop
-    // abandoned/finished pending rows so they can never activate later.
-    try {
-      await env.DB.prepare(
-        `UPDATE subscriptions SET status='completed', updated_at=? WHERE user_id=? AND status='active'`,
-      )
-        .bind(now, userId)
-        .run();
-    } catch {}
-    try {
-      await env.DB.prepare(
-        `DELETE FROM subscriptions WHERE user_id=? AND status='pending'`,
-      )
-        .bind(userId)
-        .run();
-    } catch {}
-    // Insert subscription record
-    await env.DB.prepare(
-      `INSERT INTO subscriptions (id, user_id, plan, amount, currency_code, status, period_start, period_end, ziina_payment_id, created_at, updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-    )
-      .bind(
-        id,
-        userId,
-        plan,
-        finalAmount,
-        "AED",
-        "active",
-        now,
-        periodEnd,
-        ziinaPaymentId || null,
-        now,
-        now,
-      )
-      .run();
-  } catch (e) {
-    console.warn("activateSubscription insert failed", safeErrorDetail(e));
-  }
-  try {
-    // Update users table — clear any scheduled downgrade on activation
-    await env.DB.prepare(
-      `UPDATE users SET plan=?, subscription_plan=?, subscription_status=?, subscription_period_end=?, subscription_ziina_id=?, downgrade_plan=NULL, downgrade_scheduled_at=NULL WHERE id=?`,
-    )
-      .bind(plan, plan, "active", periodEnd, ziinaPaymentId || null, userId)
-      .run();
-  } catch {
-    // Fallback for old schema without new cols
-    try {
-      await env.DB.prepare(`UPDATE users SET plan=? WHERE id=?`)
-        .bind(plan, userId)
-        .run();
-    } catch {}
-    // Try to clear downgrade if columns exist
-    try {
-      await env.DB.prepare(
-        `UPDATE users SET downgrade_plan=NULL, downgrade_scheduled_at=NULL WHERE id=?`,
-      )
-        .bind(userId)
-        .run();
-    } catch {}
-  }
-  return {
-    id,
+  const { statements, result } = buildActivationStatements(
+    env,
+    userId,
     plan,
-    amount: finalAmount,
-    period_start: now,
-    period_end: periodEnd,
-    ziina_payment_id: ziinaPaymentId,
+    ziinaPaymentId,
+    amount,
+    interval,
+    now,
+  );
+  await executeStatements(env, statements);
+  return result;
+}
+
+function ledgerResult(row) {
+  return {
+    id: row.subscription_id,
+    plan: String(row.plan || "free"),
+    amount: Number(row.amount) || 0,
+    period_start: row.period_start == null ? null : Number(row.period_start),
+    period_end: row.period_end == null ? null : Number(row.period_end),
+    ziina_payment_id: row.payment_id,
+    interval: String(row.interval || "month"),
   };
 }
 
+/**
+ * Settle a verified Ziina payment exactly once.
+ *
+ * The payment_ledger row is claimed with one atomic INSERT (payment id is the
+ * primary key), so of N concurrent/duplicate verifications exactly one runs
+ * the activation transaction. Everybody else reads the ledger back:
+ *
+ *   - settled    -> the ORIGINAL result (period_end included), never a freshly
+ *                   computed period;
+ *   - processing -> another verification is mid-flight; report in progress;
+ *   - failed or stale processing -> re-claim and retry (safe: D1 batches are
+ *                   atomic, so a rolled-back attempt activated nothing).
+ *
+ * A database failure marks the claim failed and rethrows — callers must never
+ * translate it into a successful-looking response.
+ */
+export async function settleVerifiedPayment(env, options) {
+  const {
+    userId,
+    paymentId,
+    plan,
+    amount,
+    interval = "month",
+    testMode = false,
+  } = options || {};
+  const paymentKey = String(paymentId || "").trim();
+  if (!env?.DB) throw new Error("Database not configured");
+  if (!userId) throw new Error("user id is required for settlement");
+  if (!paymentKey) throw new Error("payment id is required for settlement");
+
+  const now = Date.now();
+  const claimToken = crypto.randomUUID();
+
+  // Claim the payment (no-op when it was already claimed).
+  await env.DB.prepare(
+    `INSERT INTO payment_ledger (payment_id, user_id, plan, amount, currency_code, interval, status, claim_token, test_mode, created_at, updated_at)
+     VALUES (?,?,?,?,?,?,'processing',?,?,?,?)
+     ON CONFLICT(payment_id) DO NOTHING`,
+  )
+    .bind(
+      paymentKey,
+      userId,
+      plan,
+      Number(amount) || 0,
+      "AED",
+      interval,
+      claimToken,
+      testMode ? 1 : 0,
+      now,
+      now,
+    )
+    .run();
+
+  // Take over a claim left behind by a failed batch or a crashed Worker.
+  await env.DB.prepare(
+    `UPDATE payment_ledger SET claim_token=?, plan=?, amount=?, interval=?, test_mode=?, status='processing', updated_at=?
+     WHERE payment_id=? AND user_id=? AND (status='failed' OR (status='processing' AND updated_at<=?))`,
+  )
+    .bind(
+      claimToken,
+      plan,
+      Number(amount) || 0,
+      interval,
+      testMode ? 1 : 0,
+      now,
+      paymentKey,
+      userId,
+      now - STALE_SETTLEMENT_MS,
+    )
+    .run();
+
+  const claim = await env.DB.prepare(
+    `SELECT payment_id, user_id, plan, amount, interval, status, claim_token, subscription_id, period_start, period_end FROM payment_ledger WHERE payment_id=?`,
+  )
+    .bind(paymentKey)
+    .first();
+
+  if (!claim || String(claim.user_id) !== String(userId)) {
+    return { ok: false, code: "payment_owned_by_another_account" };
+  }
+  if (claim.claim_token !== claimToken) {
+    if (String(claim.status) === "settled") {
+      return { ok: true, duplicate: true, result: ledgerResult(claim) };
+    }
+    return { ok: true, inProgress: true, result: null };
+  }
+
+  const activationNow = Date.now();
+  const { statements, result } = buildActivationStatements(
+    env,
+    userId,
+    plan,
+    paymentKey,
+    amount,
+    interval,
+    activationNow,
+  );
+  statements.push(
+    env.DB.prepare(
+      `UPDATE payment_ledger SET status='settled', subscription_id=?, period_start=?, period_end=?, claim_token=NULL, updated_at=? WHERE payment_id=? AND claim_token=?`,
+    ).bind(
+      result.id,
+      result.period_start,
+      result.period_end,
+      activationNow,
+      paymentKey,
+      claimToken,
+    ),
+  );
+
+  try {
+    await executeStatements(env, statements);
+  } catch (error) {
+    try {
+      await env.DB.prepare(
+        `UPDATE payment_ledger SET status='failed', claim_token=NULL, updated_at=? WHERE payment_id=? AND claim_token=?`,
+      )
+        .bind(Date.now(), paymentKey, claimToken)
+        .run();
+    } catch {
+      // The original error is the one that matters.
+    }
+    throw error;
+  }
+
+  return { ok: true, duplicate: false, result };
+}
+
 // Reconcile pending (in-flight / abandoned) checkouts against Ziina.
-// Any pending that was actually completed activates immediately — money is
-// never silently discarded. Everything else is dropped so a stale pending
-// can never overwrite the user's real current plan later.
+// Any pending that was actually completed settles exactly once — money is
+// never silently discarded. Abandoned intents are dropped so a stale pending
+// can never overwrite the user's real current plan later. Transient Ziina or
+// database failures keep the row for a later retry instead of guessing.
 export async function reconcilePendingSubscriptions(env, userId) {
   let pendingRows;
   try {
     const rows = await env.DB.prepare(
-      "SELECT id, plan, ziina_payment_id FROM subscriptions WHERE user_id=? AND status='pending'",
+      "SELECT id, plan, amount, ziina_payment_id, test_mode FROM subscriptions WHERE user_id=? AND status='pending'",
     )
       .bind(userId).all();
     pendingRows = Array.isArray(rows?.results) ? rows.results : [];
@@ -389,25 +648,52 @@ export async function reconcilePendingSubscriptions(env, userId) {
   if (pendingRows.length === 0) return { reconciled: true, activated: null };
   const apiKey = env?.ZIINA_API_KEY || env?.ZIINA_API_TOKEN;
   let activated = null;
+  const dropPending = async (rowId) => {
+    try {
+      await env.DB.prepare(`DELETE FROM subscriptions WHERE id=?`).bind(rowId).run();
+    } catch {}
+  };
   for (const row of pendingRows) {
     if (!row.ziina_payment_id || !apiKey) {
-      try { await env.DB.prepare(`DELETE FROM subscriptions WHERE id=?`).bind(row.id).run(); } catch {}
+      await dropPending(row.id);
       continue;
     }
+    let data;
     try {
       const ziinaRes = await fetch(
         `${ZIINA_BASE}/payment_intent/${encodeURIComponent(row.ziina_payment_id)}`,
         { headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" } },
       );
-      const data = ziinaRes.ok ? await ziinaRes.json().catch(() => ({})) : {};
-      if (String(data?.status || "").toLowerCase() === "completed") {
-        activated = await activateSubscription(env, userId, row.plan, row.ziina_payment_id, Number(data?.amount) || ZIINA_PLANS[row.plan]?.amount);
-        // activateSubscription deleted all pending rows already
-        break;
-      }
-      await env.DB.prepare(`DELETE FROM subscriptions WHERE id=?`).bind(row.id).run();
+      if (!ziinaRes.ok) continue; // Ziina unavailable — keep the row and retry later.
+      data = await ziinaRes.json().catch(() => ({}));
     } catch {
-      try { await env.DB.prepare(`DELETE FROM subscriptions WHERE id=?`).bind(row.id).run(); } catch {}
+      continue; // Network failure — the payment may still be captured; retry later.
+    }
+    const inspection = inspectCompletedPayment(env, data, row.test_mode);
+    if (!inspection.ok) {
+      if (inspection.reason !== "not_completed") {
+        // A completed payment that must not buy a production entitlement
+        // (test-mode payment on a live deployment, or a foreign currency).
+        console.warn(
+          `reconcilePendingSubscriptions: refusing ${inspection.reason} payment ${row.ziina_payment_id}`,
+        );
+      }
+      await dropPending(row.id);
+      continue;
+    }
+    try {
+      const settlement = await settleVerifiedPayment(env, {
+        userId,
+        paymentId: row.ziina_payment_id,
+        plan: inspection.plan,
+        amount: inspection.amount,
+        interval: inspection.interval,
+        testMode: inspection.testPayment,
+      });
+      if (settlement?.ok && !settlement.inProgress) activated = settlement.result;
+    } catch (e) {
+      console.warn("reconcilePendingSubscriptions settlement failed", safeErrorDetail(e));
+      // Keep the pending row: a later reconcile retries the settlement.
     }
   }
   return { reconciled: true, activated };
@@ -590,8 +876,16 @@ export async function handleSubscriptions(request, env) {
       });
 
     if (plan === "free") {
-      // Free needs no payment — just activate
-      await activateSubscription(env, userId, "free", null, 0, "month");
+      // Free needs no payment — just activate. A database failure must fail the
+      // request, never return a success-shaped "activated" response.
+      try {
+        await activateSubscription(env, userId, "free", null, 0, "month");
+      } catch (err) {
+        return jsonResponse(502, {
+          error: "Failed to activate the free plan",
+          detail: safeErrorDetail(err),
+        });
+      }
       return jsonResponse(200, {
         free: true,
         plan: "free",
@@ -614,47 +908,115 @@ export async function handleSubscriptions(request, env) {
     // Reuse an existing in-flight checkout for this same plan+interval instead of
     // creating a duplicate Ziina intent — repeated Upgrade clicks resume.
     const pendingAmount = meta.amount;
+    let existing = null;
     try {
-      const existing = await env.DB.prepare(
-        "SELECT ziina_payment_id, amount FROM subscriptions WHERE user_id=? AND status='pending' AND lower(plan)=? AND amount=? ORDER BY created_at DESC LIMIT 1",
+      existing = await env.DB.prepare(
+        "SELECT ziina_payment_id, amount, test_mode FROM subscriptions WHERE user_id=? AND status='pending' AND lower(plan)=? AND amount=? ORDER BY created_at DESC LIMIT 1",
       )
         .bind(userId, plan, pendingAmount)
         .first();
-      if (existing?.ziina_payment_id) {
+    } catch {}
+    if (existing?.ziina_payment_id) {
+      let existingPayment = null;
+      let fetchOk = false;
+      try {
         const r = await fetch(
           `${ZIINA_BASE}/payment_intent/${encodeURIComponent(existing.ziina_payment_id)}`,
           { headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" } },
         );
-        const data = r.ok ? await r.json().catch(() => ({})) : {};
-        if (r.ok && data?.id && !["completed", "failed", "canceled"].includes(String(data.status || "").toLowerCase())) {
-          return jsonResponse(200, {
-            plan,
-            amount: meta.amount,
-            aed: meta.aed,
-            interval: intervalLabel,
-            resumed: true,
-            ziina_id: data.id,
-            redirect_url: data.redirect_url,
-            embedded_url: data.embedded_url,
-            success_url: data.success_url,
-            cancel_url: data.cancel_url,
-            status: data.status,
-            raw: data,
+        fetchOk = r.ok;
+        existingPayment = r.ok ? await r.json().catch(() => ({})) : null;
+      } catch {}
+      if (
+        fetchOk &&
+        existingPayment?.id &&
+        !["completed", "failed", "canceled"].includes(
+          String(existingPayment.status || "").toLowerCase(),
+        )
+      ) {
+        return jsonResponse(200, {
+          plan,
+          amount: meta.amount,
+          aed: meta.aed,
+          interval: intervalLabel,
+          resumed: true,
+          ziina_id: existingPayment.id,
+          redirect_url: existingPayment.redirect_url,
+          embedded_url: existingPayment.embedded_url,
+          success_url: existingPayment.success_url,
+          cancel_url: existingPayment.cancel_url,
+          status: existingPayment.status,
+          raw: existingPayment,
+        });
+      }
+      // Completed but unverified → settle exactly once here; failed/canceled →
+      // drop and create fresh.
+      if (fetchOk && String(existingPayment?.status || "").toLowerCase() === "completed") {
+        const inspection = inspectCompletedPayment(env, existingPayment, existing.test_mode);
+        if (!inspection.ok) {
+          // A completed payment that must not buy an entitlement can never be
+          // useful — drop the phantom pending checkout and report it.
+          try {
+            await env.DB.prepare(
+              `DELETE FROM subscriptions WHERE user_id=? AND status='pending' AND lower(plan)=? AND amount=?`,
+            )
+              .bind(userId, plan, pendingAmount)
+              .run();
+          } catch {}
+          return jsonResponse(409, {
+            verified: false,
+            code: inspection.reason,
+            error:
+              inspection.reason === "test_payment"
+                ? "Test payments do not grant a subscription on this deployment."
+                : `Payment was made in ${inspection.currency || "an unsupported currency"}, not AED.`,
           });
         }
-        // Completed but unverified → activate now; failed/canceled → drop and create fresh.
-        if (r.ok && String(data?.status || "").toLowerCase() === "completed") {
-          const activated = await activateSubscription(env, userId, plan, data.id, Number(data?.amount) || meta.amount, interval);
-          return jsonResponse(200, {
-            plan,
-            verified: true,
-            status: "completed",
-            period_end: activated.period_end,
-            aed: meta.aed,
-            interval: intervalLabel,
-            message: `Subscription activated — ${meta.label} valid for ${periodLabel}`,
+        let settlement;
+        try {
+          settlement = await settleVerifiedPayment(env, {
+            userId,
+            paymentId: existingPayment.id,
+            plan: inspection.plan,
+            amount: inspection.amount,
+            interval: inspection.interval,
+            testMode: inspection.testPayment,
+          });
+        } catch (err) {
+          // The payment is captured; do not hand out a new checkout link that
+          // could be paid on top of it. The pending row stays for a retry.
+          return jsonResponse(502, {
+            error: "Payment completed but activation failed. Please retry verification.",
+            detail: safeErrorDetail(err),
           });
         }
+        if (!settlement.ok) {
+          return jsonResponse(409, {
+            verified: false,
+            code: settlement.code,
+            error: "This payment is already linked to another account.",
+          });
+        }
+        if (settlement.inProgress) {
+          return jsonResponse(202, {
+            verified: false,
+            pending: true,
+            code: "settlement_in_progress",
+            message: "Verification is already in progress. Check your subscription in a moment.",
+          });
+        }
+        return jsonResponse(200, {
+          plan: settlement.result.plan,
+          verified: true,
+          status: "completed",
+          alreadySettled: settlement.duplicate === true,
+          period_end: settlement.result.period_end,
+          aed: meta.aed,
+          interval: intervalLabel,
+          message: `Subscription activated — ${meta.label} valid for ${periodLabel}`,
+        });
+      }
+      if (fetchOk) {
         try {
           await env.DB.prepare(
             `DELETE FROM subscriptions WHERE user_id=? AND status='pending' AND lower(plan)=? AND amount=?`,
@@ -663,7 +1025,7 @@ export async function handleSubscriptions(request, env) {
             .run();
         } catch {}
       }
-    } catch {}
+    }
 
     const origin = url.origin;
     const successUrl =
@@ -674,7 +1036,10 @@ export async function handleSubscriptions(request, env) {
       body.cancel_url ||
       body.cancelUrl ||
       `${origin}/pricing`;
-    const testFlag = body.test ?? false; // default live for subscriptions
+    // Test/live is a deployment setting (ZIINA_TEST_MODE), never a client
+    // choice: a test payment captures no money, so on a live deployment a
+    // body.test flag must not be able to mint one.
+    const testMode = isZiinaTestMode(env);
 
     // Validate URLs
     const isValidHttps = (v) => {
@@ -697,8 +1062,8 @@ export async function handleSubscriptions(request, env) {
       message: body.message || `Corez ${meta.label} — ${meta.aed} AED / ${interval}`,
       success_url: successUrl,
       cancel_url: cancelUrl,
-      test: Boolean(testFlag),
     };
+    if (testMode) ziinaPayload.test = true;
     if (body.failure_url) ziinaPayload.failure_url = body.failure_url;
 
     try {
@@ -724,13 +1089,15 @@ export async function handleSubscriptions(request, env) {
           detail: data,
         });
       }
-      // Store pending subscription
+      // Store pending subscription. A failed insert would leave a captured
+      // payment with no local checkout to verify against, so it must fail the
+      // request instead of being swallowed.
       const pendingId = crypto.randomUUID();
       const now = Date.now();
       try {
         await env.DB.prepare(
-          `INSERT INTO subscriptions (id, user_id, plan, amount, currency_code, status, period_start, period_end, ziina_payment_id, created_at, updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+          `INSERT INTO subscriptions (id, user_id, plan, amount, currency_code, status, period_start, period_end, ziina_payment_id, test_mode, created_at, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
         )
           .bind(
             pendingId,
@@ -742,11 +1109,18 @@ export async function handleSubscriptions(request, env) {
             null,
             null,
             data.id || null,
+            testMode ? 1 : 0,
             now,
             now,
           )
           .run();
-      } catch {}
+      } catch (err) {
+        console.warn("checkout: failed to record pending subscription", safeErrorDetail(err));
+        return jsonResponse(502, {
+          error:
+            "Checkout could not be recorded, so no payment link was issued. Please try again.",
+        });
+      }
 
       return jsonResponse(200, {
         plan,
@@ -769,7 +1143,7 @@ export async function handleSubscriptions(request, env) {
     }
   }
 
-  // POST /api/subscriptions/verify  -> verify Ziina payment and activate monthly subscription
+  // POST /api/subscriptions/verify  -> verify Ziina payment and activate subscription
   if (pathname === "/api/subscriptions/verify" && request.method === "POST") {
     let body;
     try {
@@ -780,21 +1154,26 @@ export async function handleSubscriptions(request, env) {
     let paymentId = String(
       body.payment_id || body.paymentId || body.ziina_id || body.id || "",
     ).trim();
-    const planHint = String(body.plan || "")
-      .trim()
-      .toLowerCase();
-    // If no id supplied, try latest pending for this user
+    // If no id supplied, resolve it against local checkouts only: the newest
+    // pending checkout, then the most recent settled one (a repeated verify of
+    // an already-settled payment must return the original result, not a new
+    // period).
     if (!paymentId) {
       try {
         const pending = await env.DB.prepare(
-          `SELECT ziina_payment_id, plan FROM subscriptions WHERE user_id=? AND status='pending' ORDER BY created_at DESC LIMIT 1`,
+          `SELECT ziina_payment_id FROM subscriptions WHERE user_id=? AND status='pending' AND ziina_payment_id IS NOT NULL ORDER BY created_at DESC LIMIT 1`,
         )
           .bind(userId)
           .first();
-        if (pending && pending.ziina_payment_id) {
+        if (pending?.ziina_payment_id) {
           paymentId = String(pending.ziina_payment_id).trim();
-          // Use pending plan if no hint
-          if (!planHint && pending.plan) body.plan = pending.plan;
+        } else {
+          const settled = await env.DB.prepare(
+            `SELECT ziina_payment_id FROM subscriptions WHERE user_id=? AND ziina_payment_id IS NOT NULL ORDER BY created_at DESC LIMIT 1`,
+          )
+            .bind(userId)
+            .first();
+          if (settled?.ziina_payment_id) paymentId = String(settled.ziina_payment_id).trim();
         }
       } catch {}
     }
@@ -803,9 +1182,37 @@ export async function handleSubscriptions(request, env) {
         error:
           "payment_id (Ziina payment intent id) is required — no pending payment found",
       });
+    if (!/^[A-Za-z0-9._-]{1,128}$/.test(paymentId))
+      return jsonResponse(400, { error: "Invalid payment id" });
 
     const apiKey = env?.ZIINA_API_KEY || env?.ZIINA_API_TOKEN;
     if (!apiKey) return jsonResponse(500, { error: "Ziina not configured" });
+
+    // Ownership first: the payment must be tied to a local checkout that
+    // belongs to the authenticated user. A completed payment the user never
+    // started (including one belonging to another account) must never activate
+    // a plan here, no matter what amount it reports.
+    let checkout;
+    try {
+      checkout = await env.DB.prepare(
+        `SELECT id, plan, amount, ziina_payment_id, status, test_mode FROM subscriptions WHERE user_id=? AND ziina_payment_id=? ORDER BY created_at DESC LIMIT 1`,
+      )
+        .bind(userId, paymentId)
+        .first();
+    } catch (err) {
+      return jsonResponse(502, {
+        error: "Verification failed",
+        detail: safeErrorDetail(err),
+      });
+    }
+    if (!checkout) {
+      return jsonResponse(403, {
+        verified: false,
+        code: "payment_not_owned",
+        error:
+          "This payment was not started for this account. Return to the pricing page to subscribe.",
+      });
+    }
 
     try {
       const ziinaRes = await fetch(
@@ -830,64 +1237,92 @@ export async function handleSubscriptions(request, env) {
           detail: data,
         });
       }
-      const status = String(data.status || "").toLowerCase();
-      // Ziina statuses: requires_payment_instrument, requires_user_action, pending, completed, failed, canceled
-      if (status !== "completed") {
-        return jsonResponse(200, {
+      // Payment completed — activate the subscription the payment actually
+      // buys. Both the plan and the interval are derived ONLY from the amount
+      // verified against Ziina above, never from the request body. Test-mode
+      // payments, non-AED payments, and unfinished payments grant nothing.
+      const inspection = inspectCompletedPayment(env, data, checkout.test_mode);
+      if (!inspection.ok) {
+        const messages = {
+          not_completed: `Payment not completed yet (status: ${data?.status}). Complete it on Ziina first.`,
+          currency_mismatch: `Payment was made in ${inspection.currency || "an unsupported currency"}, not AED — subscriptions are priced in AED.`,
+          test_payment: "Test payments do not grant a subscription on this deployment.",
+        };
+        const rejectionStatus =
+          inspection.reason === "not_completed"
+            ? 200
+            : inspection.reason === "test_payment"
+              ? 403
+              : 400; // currency_mismatch and any future refusal
+        return jsonResponse(rejectionStatus, {
           verified: false,
-          status: data.status,
-          message: `Payment not completed yet (status: ${data.status}). Complete it on Ziina first.`,
+          code: inspection.reason,
+          status: data?.status,
+          message: messages[inspection.reason] || "Payment cannot activate a subscription.",
           raw: data,
         });
       }
-      // Payment completed — activate the subscription the payment actually buys.
-      //
-      // Both the plan and the interval are derived ONLY from the amount verified
-      // against Ziina above, never from the request body. Previously a
-      // client-supplied `plan` hint won, and any unmatched amount fell back to
-      // "standard": paying the 2 AED minimum therefore bought the 18.36 AED plan.
-      // The interval had the same flaw — sending interval=year on a monthly
-      // payment bought 365 days for the monthly price.
-      const amount = Number(data.amount);
-      const paidEntry = Object.entries(ZIINA_PLANS).find(
-        ([, meta]) => Number(meta.amount) === amount,
-      );
-      const paidKey = paidEntry ? paidEntry[0] : null;
-      const plan = paidKey ? paidKey.replace(/_yearly$/, "") : "free";
-      const interval = paidKey && paidKey.endsWith("_yearly") ? "year" : "month";
 
-      if (!paidKey || plan === "free") {
-        await activateSubscription(env, userId, "free", paymentId, 0, "month");
+      // Exactly-once settlement: duplicates read back the original period.
+      const settlement = await settleVerifiedPayment(env, {
+        userId,
+        paymentId,
+        plan: inspection.plan,
+        amount: inspection.amount,
+        interval: inspection.interval,
+        testMode: inspection.testPayment,
+      });
+      if (!settlement.ok) {
+        return jsonResponse(409, {
+          verified: false,
+          code: settlement.code,
+          error: "This payment is already linked to another account and cannot be verified here.",
+        });
+      }
+      if (settlement.inProgress) {
+        return jsonResponse(202, {
+          verified: false,
+          pending: true,
+          code: "settlement_in_progress",
+          message: "Verification is already in progress. Check your subscription in a moment.",
+        });
+      }
+
+      const activated = settlement.result;
+      const alreadySettled = settlement.duplicate === true;
+      if (inspection.plan === "free") {
         return jsonResponse(200, {
           verified: true,
           plan: "free",
           status: "completed",
+          alreadySettled,
           raw: data,
         });
       }
-      const isYearly = interval === "year";
-      const activated = await activateSubscription(
-        env,
-        userId,
-        plan,
-        paymentId,
-        amount,
-        interval,
-      );
+      const isYearly = inspection.interval === "year";
       const periodLabel = isYearly ? "365 days" : "30 days";
+      const planMeta = ZIINA_PLANS[inspection.plan] || ZIINA_PLANS.standard;
       return jsonResponse(200, {
         verified: true,
-        plan,
+        plan: inspection.plan,
         status: "completed",
+        alreadySettled,
+        subscription_id: activated.id,
         period_start: activated.period_start,
         period_end: activated.period_end,
         amount: activated.amount,
-        aed: ZIINA_PLANS[plan]?.aed ? (isYearly ? ZIINA_PLANS[`${plan}_yearly`]?.aed || ZIINA_PLANS[plan].aed : ZIINA_PLANS[plan].aed) : String((amount/100).toFixed(2)),
-        interval,
-        message: `Subscription activated — ${ZIINA_PLANS[plan].label} valid for ${periodLabel}`,
+        aed: isYearly
+          ? ZIINA_PLANS[`${inspection.plan}_yearly`]?.aed || planMeta.aed
+          : planMeta.aed,
+        interval: inspection.interval,
+        message: alreadySettled
+          ? `Payment already settled — ${planMeta.label} active until ${new Date(activated.period_end).toLocaleDateString()}`
+          : `Subscription activated — ${planMeta.label} valid for ${periodLabel}`,
         raw: data,
       });
     } catch (err) {
+      // A database (or Ziina) failure must never produce a success-shaped
+      // response: the ledger claim is released for a safe retry.
       return jsonResponse(502, {
         error: "Verification failed",
         detail: safeErrorDetail(err),
@@ -978,7 +1413,14 @@ export async function handleSubscriptions(request, env) {
 
     // If no active period or already expired, downgrade immediately
     if (!periodEnd || periodEnd <= now || current?.isExpired) {
-      await activateSubscription(env, userId, targetPlan, null, ZIINA_PLANS[targetPlan].amount);
+      try {
+        await activateSubscription(env, userId, targetPlan, null, ZIINA_PLANS[targetPlan].amount);
+      } catch (err) {
+        return jsonResponse(502, {
+          error: "Failed to apply the downgrade",
+          detail: safeErrorDetail(err),
+        });
+      }
       const updated = await getActiveSubscription(env, userId);
       return jsonResponse(200, {
         ok: true,

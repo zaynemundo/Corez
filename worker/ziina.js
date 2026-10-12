@@ -18,6 +18,41 @@ export const ZIINA_PLANS_YEARLY = {
   premium: { amount: 26436, label: "Premium", aed: "264.36", interval: "year" },
 };
 
+/**
+ * Deployment-controlled Ziina test mode.
+ *
+ * Test payments do not charge real money, so test/live must NEVER be a client
+ * choice: request bodies that carry `test`/`testMode` are ignored. A deployment
+ * opts in once with ZIINA_TEST_MODE=true (billing smoke tests); anything else
+ * is live, which is the safe default.
+ */
+export function isZiinaTestMode(env) {
+  const raw = String(env?.ZIINA_TEST_MODE ?? env?.ZIINA_MODE ?? "")
+    .trim()
+    .toLowerCase();
+  return raw === "true" || raw === "1" || raw === "test" || raw === "sandbox";
+}
+
+/**
+ * Detect a test-mode payment from a Ziina payment object. The documented
+ * PaymentIntent schema does not expose the create-time `test` flag, but some
+ * responses and webhook payloads include it — honour it whenever present.
+ */
+export function isTestPayment(data) {
+  if (!data || typeof data !== "object") return false;
+  const flags = [
+    data.test,
+    data.test_mode,
+    data.testMode,
+    data.is_test,
+    data.isTest,
+  ];
+  if (flags.some((value) => value === true || value === 1 || value === "true" || value === "1")) {
+    return true;
+  }
+  return String(data.mode || "").trim().toLowerCase() === "test";
+}
+
 export function resolvePlanAmount(plan, fallbackAmount) {
   if (typeof plan === "string") {
     const key = plan.trim().toLowerCase();
@@ -277,14 +312,9 @@ export async function handleZiina(request, env) {
     if (success_url) ziinaPayload.success_url = String(success_url).trim();
     if (cancel_url) ziinaPayload.cancel_url = String(cancel_url).trim();
     if (failure_url) ziinaPayload.failure_url = String(failure_url).trim();
-    // test flag: accept test, is_test, testMode
-    const testFlag =
-      body.test ??
-      body.is_test ??
-      body.isTest ??
-      body.test_mode ??
-      body.testMode;
-    if (testFlag !== undefined) ziinaPayload.test = Boolean(testFlag);
+    // Test mode is deployment-controlled, never client-controlled: a test
+    // payment captures no money and only smoke tests should create one.
+    if (isZiinaTestMode(env)) ziinaPayload.test = true;
     if (body.expiry) ziinaPayload.expiry = String(body.expiry).trim();
     if (body.allow_tips !== undefined || body.allowTips !== undefined) {
       const at = body.allow_tips ?? body.allowTips;

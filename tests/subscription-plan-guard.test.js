@@ -17,6 +17,7 @@ import {
   isDowngrade,
   handleSubscriptions,
 } from '../worker/subscriptions.js';
+import { createSubscriptionEnv } from './helpers/subscriptionEnv.js';
 
 /** Minimal D1 stand-in: enough for the users/subscriptions reads the route makes. */
 function createMockD1(user) {
@@ -144,83 +145,97 @@ describe('plan escalation guards', () => {
   describe('POST /api/subscriptions/verify', () => {
     afterEach(() => vi.restoreAllMocks());
 
-    /** Pretend Ziina reports a completed payment for `amount` fils. */
-    function mockZiina(amount) {
+    /**
+     * A real local checkout (pending row owned by the dev account) plus a Ziina
+     * mock reporting `amount` fils as completed. The grant is then derived only
+     * from that verified amount — never from the request body.
+     */
+    async function verifyCompleted({
+      amount,
+      local = { plan: 'standard', amount: 1836 },
+      body = {},
+      env = {},
+    } = {}) {
+      const ctx = await createSubscriptionEnv({
+        subscriptions: [{ ziina_payment_id: 'pi_test', ...local }],
+        env,
+      });
       vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
         new Response(
           JSON.stringify({ id: 'pi_test', status: 'completed', amount, currency_code: 'AED' }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
       );
-    }
-
-    function verifyRequest({ plan, interval } = {}) {
-      return new Request('https://corez.pro/api/subscriptions/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          payment_id: 'pi_test',
-          ...(plan ? { plan } : {}),
-          ...(interval ? { interval } : {}),
+      const res = await handleSubscriptions(
+        new Request('https://corez.pro/api/subscriptions/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ payment_id: 'pi_test', ...body }),
         }),
-      });
+        ctx.env,
+      );
+      return { res, body: await res.json(), ...ctx };
     }
-
-    const verifyEnv = () => ({
-      ...baseEnv({
-        id: 'dev', email: 'dev@corez.pro', plan: 'free',
-        subscription_plan: 'free', subscription_status: 'active',
-        subscription_period_end: null, downgrade_plan: null,
-      }),
-      ZIINA_API_KEY: 'test-key',
-    });
 
     it('grants only what the paid amount buys — an underpayment cannot upgrade', async () => {
       // 200 fils is Ziina's 2 AED minimum, well below every plan price. The old
       // code fell through to "standard" for any unmatched amount, so this paid
       // 18.36 AED worth of plan for 2 AED.
-      mockZiina(200);
-      const res = await handleSubscriptions(verifyRequest({ plan: 'premium' }), verifyEnv());
+      const { res, body } = await verifyCompleted({
+        amount: 200,
+        local: { plan: 'standard', amount: 1836 },
+      });
       expect(res.status).toBe(200);
-      const body = await res.json();
       expect(body.plan).toBe('free');
     });
 
     it('does not let a plan hint raise the plan above the amount paid', async () => {
-      mockZiina(1836); // standard price
-      const res = await handleSubscriptions(verifyRequest({ plan: 'premium' }), verifyEnv());
-      const body = await res.json();
+      const { body } = await verifyCompleted({
+        amount: 1836, // standard price
+        local: { plan: 'standard', amount: 1836 },
+        body: { plan: 'premium' },
+      });
       expect(body.plan).toBe('standard');
     });
 
     it('derives standard and premium from their monthly amounts', async () => {
-      mockZiina(1836);
-      const standard = await (await handleSubscriptions(verifyRequest(), verifyEnv())).json();
-      expect(standard.plan).toBe('standard');
-      expect(standard.interval).toBe('month');
+      const standard = await verifyCompleted({
+        amount: 1836,
+        local: { plan: 'standard', amount: 1836 },
+      });
+      expect(standard.body.plan).toBe('standard');
+      expect(standard.body.interval).toBe('month');
 
-      mockZiina(2754);
-      const premium = await (await handleSubscriptions(verifyRequest(), verifyEnv())).json();
-      expect(premium.plan).toBe('premium');
-      expect(premium.interval).toBe('month');
+      const premium = await verifyCompleted({
+        amount: 2754,
+        local: { plan: 'premium', amount: 2754 },
+      });
+      expect(premium.body.plan).toBe('premium');
+      expect(premium.body.interval).toBe('month');
     });
 
     it('derives the yearly interval from the yearly amount', async () => {
-      mockZiina(17628);
-      const standardYearly = await (await handleSubscriptions(verifyRequest(), verifyEnv())).json();
-      expect(standardYearly.plan).toBe('standard');
-      expect(standardYearly.interval).toBe('year');
+      const standardYearly = await verifyCompleted({
+        amount: 17628,
+        local: { plan: 'standard', amount: 17628 },
+      });
+      expect(standardYearly.body.plan).toBe('standard');
+      expect(standardYearly.body.interval).toBe('year');
 
-      mockZiina(26436);
-      const premiumYearly = await (await handleSubscriptions(verifyRequest(), verifyEnv())).json();
-      expect(premiumYearly.plan).toBe('premium');
-      expect(premiumYearly.interval).toBe('year');
+      const premiumYearly = await verifyCompleted({
+        amount: 26436,
+        local: { plan: 'premium', amount: 26436 },
+      });
+      expect(premiumYearly.body.plan).toBe('premium');
+      expect(premiumYearly.body.interval).toBe('year');
     });
 
     it('does not let interval=year stretch a monthly payment into a year', async () => {
-      mockZiina(1836); // one month of Standard
-      const res = await handleSubscriptions(verifyRequest({ interval: 'year' }), verifyEnv());
-      const body = await res.json();
+      const { body } = await verifyCompleted({
+        amount: 1836, // one month of Standard
+        local: { plan: 'standard', amount: 1836 },
+        body: { interval: 'year' },
+      });
       expect(body.plan).toBe('standard');
       expect(body.interval).toBe('month');
     });

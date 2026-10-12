@@ -37,18 +37,38 @@ regression-tested; keep them fixed:
 | 3 | `/verify` resolved the plan from a client `plan` hint and fell back to `"standard"` for any unmatched amount | Paying Ziina's 2 AED minimum bought the 18.36 AED plan. Derive the plan **only** from the amount Ziina reports as paid; unmatched grants free. |
 | 4 | `/verify` took `interval` from the request body | `interval=year` on a monthly payment bought 365 days. Derive the interval from the paid amount too. |
 
+A second round closed the boundaries around those amount checks. Keep these
+fixed too:
+
+| # | Boundary | Rule |
+|---|----------|------|
+| 5 | Test mode was a client flag (`body.test`) forwarded to Ziina | **`ZIINA_TEST_MODE` controls test/live**, never the request body. On a live deployment, test payments (Ziina's `test` flag or a checkout row recorded with `test_mode=1`) are refused with `403 test_payment` before any entitlement is written. |
+| 6 | `/verify` accepted any client-supplied payment id that Ziina reported as completed | **Ownership first**: the payment id must match a local `subscriptions` checkout row for the authenticated user, or the request is refused with `403 payment_not_owned` before Ziina is even consulted. |
+| 7 | A completed payment in any currency activated an AED-priced plan | `currency_code` must be `AED`; anything else is refused with `400 currency_mismatch`. |
+| 8 | Repeating a completed verification minted a fresh period from the current time | **Exactly-once settlement** through `payment_ledger` (payment id = primary key). The atomic claim INSERT elects one settler; duplicates replay the stored `period_start`/`period_end`. |
+| 9 | `activateSubscription()` swallowed database errors and returned a success-shaped result | Activation runs as one D1 `batch()` (atomic); failures propagate, the ledger claim is marked `failed` for a safe retry, and the caller returns `502` — never `verified: true`. |
+
+`settleVerifiedPayment(env, { userId, paymentId, plan, amount, interval, testMode })`
+in `worker/subscriptions.js` is the one place that turns a verified payment into
+a subscription. `/verify`, checkout-resume, and `reconcilePendingSubscriptions`
+all call it. Do not write a competing settlement path.
+
 If you add a route that can change a plan, it needs a test proving a
 free/low-paying caller cannot raise it. `tests/subscription-plan-guard.test.js`
-is the pattern to copy.
+and `tests/subscription-payment-verification.test.js` are the patterns to copy.
 
 ## Where things live
 
 | Concern | File |
 | --- | --- |
-| Ziina client, plan table, checkout | `worker/ziina.js` |
-| Subscription lifecycle, routes, `activateSubscription` | `worker/subscriptions.js` |
+| Ziina client, plan table, checkout, test-mode helper | `worker/ziina.js` |
+| Subscription lifecycle, routes, settlement ledger | `worker/subscriptions.js` |
 | Signup/login and the plan write | `worker/auth.js` |
 | Paid-plan feature gate (custom domains) | `worker/customDomains.js` |
+
+Deployment knobs: `ZIINA_API_KEY` (required to charge), `ZIINA_TEST_MODE=true`
+to create test intents that grant entitlements (local/dev smoke tests only —
+never set on production).
 
 ## Plan table
 
@@ -93,13 +113,19 @@ GET  /api/subscriptions/me        current plan (reconciles pending first)
 
 `checkout` reuses an existing in-flight intent for the same plan+interval rather
 than creating duplicates, so repeated Upgrade clicks **resume** rather than
-double-charge.
+double-charge. Resuming a checkout whose intent already completed settles it
+through the ledger (same path as `/verify`); test/live comes from
+`ZIINA_TEST_MODE`, never the request body.
 
 ## Verification
 
 ```bash
-npx vitest run tests/subscription-plan-guard.test.js tests/auth.test.js
+npx vitest run tests/subscription-plan-guard.test.js tests/subscription-payment-verification.test.js tests/auth.test.js
 ```
+
+The payment-path tests run against a real SQLite D1 adapter
+(`tests/helpers/subscriptionEnv.js` + `tests/helpers/sqliteD1.js`), so the
+ledger upserts and conditional claims are exercised as actual SQL.
 
 Prove a fix by mutation: restore the vulnerable logic and confirm the test
 fails. A passing test against already-correct code proves nothing.
