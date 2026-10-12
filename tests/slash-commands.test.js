@@ -322,6 +322,196 @@ describe('@image command', () => {
 });
 
 describe('PDF generator', () => {
+  // The exported .pdf is written byte by byte in the browser, so these tests
+  // inspect the bytes a PDF reader actually walks. The previous builder counted
+  // JavaScript characters while the Blob encoded UTF-8, which produced a
+  // startxref pointing at the wrong byte and a wrong /Length — every report
+  // containing a bullet failed to parse with "Broken xref table".
+  const PAGE_WIDTH = 595.28;
+  const MARGIN = 56.69;
+  const TEXT_WIDTH = PAGE_WIDTH - MARGIN * 2;
+  // Adobe core Helvetica widths (units/1000 em), ASCII 32..126: the same metric
+  // the builder wraps against, used here to re-measure the drawn lines.
+  const HELVETICA = [
+    278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278,
+    556, 556, 556, 556, 556, 556, 556, 556, 556, 556,
+    278, 278, 584, 584, 584, 556, 1015,
+    667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778, 667,
+    778, 722, 667, 611, 722, 667, 944, 667, 667, 611,
+    278, 278, 278, 469, 556, 333,
+    556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556, 556,
+    556, 333, 500, 278, 556, 500, 722, 500, 500, 500,
+    334, 260, 334, 584
+  ];
+
+  function textWidth(text, size) {
+    return [...text].reduce((sum, ch) => {
+      const index = ch.charCodeAt(0) - 32;
+      const width = index >= 0 && index < HELVETICA.length ? HELVETICA[index] : 556;
+      return sum + (width * size) / 1000;
+    }, 0);
+  }
+
+  // Run the emitted script exactly as the sandboxed preview iframe would.
+  function buildPdf(doc) {
+    const script = doc.html.match(/<script>([\s\S]*?)<\/script>/)[1];
+    let captured = null;
+    const blobShim = function (parts) {
+      captured = parts.join('');
+      return { type: 'application/pdf' };
+    };
+    const api = new Function('Blob', `${script}\n;return { buildPdf };`)(blobShim);
+    api.buildPdf();
+    return Buffer.from(captured, 'utf8'); // what new Blob([...]) produces
+  }
+
+  function drawnLines(bytes) {
+    const raw = bytes.toString('latin1');
+    const start = raw.indexOf('stream\n') + 7;
+    const stream = raw.slice(start, raw.indexOf('\nendstream', start));
+    return [...stream.matchAll(/\/F1 (\d+(?:\.\d+)?) Tf [\d.]+ [\d.]+ Td \((.*)\) Tj ET/g)].map(
+      (match) => ({
+        size: Number(match[1]),
+        raw: match[2],
+        // A content-stream string escapes ( ) and backslash. The glyphs drawn —
+        // and therefore the rendered width — are the decoded characters.
+        text: match[2].replace(/\\([()\\])/g, '$1')
+      })
+    );
+  }
+
+  it('writes a PDF whose cross-reference table a strict reader can follow', () => {
+    const bytes = buildPdf(
+      synthesizePdfDocumentHtml({
+        title: 'Quarterly Briefing',
+        body: '## Executive Summary\n\nThe market grew by 12%.\n\n- First finding.\n- Second finding.',
+        sources: [{ title: 'Example', url: 'https://example.com/a' }]
+      })
+    );
+    const raw = bytes.toString('latin1');
+
+    // startxref must land on the xref table IN BYTES: a character offset drifts
+    // by one byte per non-ASCII character and breaks the whole table.
+    const startxref = Number(raw.match(/startxref\s+(\d+)\s+%%EOF/)[1]);
+    expect(bytes.subarray(startxref, startxref + 4).toString('latin1')).toBe('xref');
+
+    // Every entry must resolve to its object, and every /Length must be the real
+    // byte length of its stream.
+    const lines = raw.slice(startxref).split('\n');
+    const count = Number(lines[1].trim().split(' ')[1]);
+    for (let objectNumber = 1; objectNumber < count; objectNumber += 1) {
+      const offset = Number(lines[2 + objectNumber].slice(0, 10));
+      expect(
+        bytes.subarray(offset, offset + 16).toString('latin1'),
+        `xref entry ${objectNumber} does not point at object ${objectNumber}`
+      ).toMatch(new RegExp(`^${objectNumber} 0 obj`));
+    }
+    for (const match of raw.matchAll(/<< \/Length (\d+) >>\nstream\n([\s\S]*?)\nendstream/g)) {
+      expect(Number(match[1])).toBe(Buffer.byteLength(match[2], 'utf8'));
+    }
+
+    // One byte per character is what makes the offsets above stable.
+    expect([...raw].every((ch) => ch.charCodeAt(0) < 128)).toBe(true);
+  });
+
+  it('folds text the base-14 font cannot address instead of emitting broken bytes', () => {
+    const bytes = buildPdf(
+      synthesizePdfDocumentHtml({
+        title: 'Résumé 2026',
+        body: '## Résumé du marché\n\nCosts rose 12% at 20°C in the café — a “must read”.\n\n- Beyoncé © 2026, naïve façade, jalapeño.',
+        sources: []
+      })
+    );
+    const lines = drawnLines(bytes);
+    expect(lines.map((line) => line.raw).join('\n')).toContain('Beyonce \\(C\\)');
+    const text = lines.map((line) => line.text).join('\n');
+    // Accents decompose, typographic punctuation normalises, symbols expand.
+    expect(text).toContain('Resume du marche');
+    expect(text).toContain('cafe');
+    expect(text).toContain('20 degC');
+    expect(text).toContain('"must read"');
+    expect(text).toContain('Beyonce (C) 2026, naive facade, jalapeno');
+    // Nothing unrepresentable survives to be rendered as two wrong glyphs.
+    for (const line of lines) {
+      expect(line.text, `unrepresentable character in ${JSON.stringify(line.text)}`).not.toMatch(
+        /[^\x20-\x7e]/
+      );
+    }
+  });
+
+  it('never draws a line wider than the text area, even for wide glyphs or long URLs', () => {
+    const bodies = [
+      '## Wide\n\n' + 'MMMM WWWW @@@@ WWWWW MMMM WWWWWW @@@@@ WWWW MMMMM WWW @@@ WWWWW MMM WWWWWWW @@@@ MMMM WWWWW'.repeat(3),
+      '## Long\n\n' + 'extraordinarily straightforward internationalization characterization counterrevolutionaries'.repeat(2),
+      '## THE COMPLETE INTERNATIONAL MARKET OUTLOOK AND STRATEGIC POSITIONING SUMMARY FOR ENTERPRISE BUYERS\n\nBody.',
+      '## Ordinary\n\n' + 'This paragraph describes conditions in some detail so the wrapper has to break it somewhere sensible.'.repeat(4)
+    ];
+    const sources = [
+      {
+        title: 'Long source',
+        url: 'https://example.com/a/very/long/path/that/keeps/going/without/any/break/opportunity/at/all/abcdefghijklmnop'
+      }
+    ];
+    for (const body of bodies) {
+      for (const line of drawnLines(buildPdf(synthesizePdfDocumentHtml({ title: 'Wide', body, sources })))) {
+        expect(
+          textWidth(line.text, line.size),
+          `line overflows the text area: ${JSON.stringify(line.text)}`
+        ).toBeLessThanOrEqual(TEXT_WIDTH + 0.5);
+      }
+    }
+  });
+
+  it('folds the download filename too', () => {
+    const doc = synthesizePdfDocumentHtml({ title: 'Résumé — Q3 2026', body: 'x', sources: [] });
+    // The filename is derived from the folded title and collapsed to a safe
+    // pattern, so it can never contain a path separator or a mangled character.
+    expect(doc.html).toContain('foldToAscii(REPORT_TITLE).replace(/[^A-Za-z0-9]+/g');
+  });
+
+  it('runs the download action end to end and names the file safely', () => {
+    const doc = synthesizePdfDocumentHtml({ title: 'Résumé — Q3 2026', body: 'Body.', sources: [] });
+    const script = doc.html.match(/<script>([\s\S]*?)<\/script>/)[1];
+
+    const created = [];
+    const revoked = [];
+    let clicked = null;
+    const originalCreate = URL.createObjectURL;
+    const originalRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = (blob) => {
+      created.push(blob);
+      return 'blob:corez-test';
+    };
+    URL.revokeObjectURL = (url) => revoked.push(url);
+    // This suite runs without a DOM, so the anchor the builder appends to is
+    // stubbed: the point is that the click path runs and names the file safely.
+    vi.stubGlobal('document', {
+      createElement: () => ({
+        href: '',
+        download: '',
+        click() {
+          clicked = { href: this.href, download: this.download };
+        },
+        remove() {}
+      }),
+      body: { appendChild() {} }
+    });
+    try {
+      const api = new Function(`${script}\n;return { downloadPdf };`)();
+      expect(() => api.downloadPdf()).not.toThrow();
+    } finally {
+      vi.unstubAllGlobals();
+      URL.createObjectURL = originalCreate;
+      URL.revokeObjectURL = originalRevoke;
+    }
+
+    expect(created).toHaveLength(1);
+    expect(clicked).not.toBeNull();
+    // A folded, filesystem-safe name with collapsed separators: accents and em
+    // dashes must not survive into a download filename.
+    expect(clicked.download).toBe('Resume-Q3-2026.pdf');
+    expect(clicked.download).toMatch(/^[\x20-\x7e]+\.pdf$/);
+  });
 
   it('builds an editable research document with sources', () => {
     const doc = synthesizePdfDocumentHtml({

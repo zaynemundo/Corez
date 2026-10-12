@@ -39,6 +39,24 @@ function stripInlineMarkdown(text) {
   return String(text).replace(/\*\*/g, "").replace(/\*/g, "");
 }
 
+// Adobe core Helvetica advance widths, in units per 1000 em, for ASCII 32..126.
+// The exported PDF draws with base-14 Helvetica, so the wrapper can measure a
+// real line instead of guessing from a character count: a line of W/M/@ is about
+// 1.8x wider than mixed prose, which is how an "88 character" line ran off the
+// page. Defined here (not inside the emitted script) so it stays one reviewed
+// table rather than hand-typed numbers in a template string.
+const HELVETICA_WIDTHS = [
+  278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278,
+  556, 556, 556, 556, 556, 556, 556, 556, 556, 556,
+  278, 278, 584, 584, 584, 556, 1015,
+  667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778, 667,
+  778, 722, 667, 611, 722, 667, 944, 667, 667, 611,
+  278, 278, 278, 469, 556, 333,
+  556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556, 556,
+  556, 333, 500, 278, 556, 500, 722, 500, 500, 500,
+  334, 260, 334, 584,
+];
+
 const HORIZONTAL_RULE = /^[-*_]{3,}\s*$/;
 const NUMBERED_ITEM = /^(\d+)[.)]\s+/;
 
@@ -181,6 +199,7 @@ export function synthesizePdfDocumentHtml({
   // editable form anymore.
   const jsTitle = JSON.stringify(safeTitle);
   const jsParagraphs = JSON.stringify(pdfBlocks);
+  const jsWidths = JSON.stringify(HELVETICA_WIDTHS);
 
   return {
     title: `COREZ Research Report — ${safeTitle}`,
@@ -265,34 +284,111 @@ export function synthesizePdfDocumentHtml({
 <script>
   var REPORT_TITLE = ${jsTitle};
   var REPORT_PARAGRAPHS = ${jsParagraphs};
-  function escapePdfText(t){ t=String(t).replace(/[—–]/g,'-').replace(/•/g,'·').replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/…/g,'...');
-    return t.replace(/\\\\/g,'\\\\\\\\').replace(/\\(/g,'\\\\(').replace(/\\)/g,'\\\\)').replace(/[^\\x00-\\xff]/g,''); }
-  function wrapPdfText(t, maxChars){ var words = String(t).split(/\\s+/).filter(Boolean), lines = [], cur = '';
-    for (var i=0;i<words.length;i++){ var w=words[i]; if ((cur+' '+w).trim().length>maxChars){ if(cur) lines.push(cur); cur=w; } else { cur=(cur+' '+w).trim(); } }
-    if (cur) lines.push(cur); return lines; }
+  var HELVETICA_WIDTHS = ${jsWidths};
+
+  // Base-14 Helvetica addresses a single-byte encoding, so every string is
+  // folded to printable ASCII before it becomes a PDF string. Folding also keeps
+  // one character equal to one byte, which the xref offsets and /Length depend
+  // on: é used to be emitted as two UTF-8 bytes inside a string that counted as
+  // one, so accented text rendered as garbage AND drifted every later byte
+  // offset. The "Print / Save as PDF" button renders full Unicode via the
+  // browser and is the path for text this export cannot represent.
+  function foldToAscii(t){
+    var s = String(t);
+    try { s = s.normalize('NFD').replace(/[\\u0300-\\u036f]/g, ''); } catch (e) {}
+    return s
+      .replace(/[\\u2018\\u2019\\u201a\\u201b]/g, "'")
+      .replace(/[\\u201c\\u201d\\u201e\\u201f]/g, '"')
+      .replace(/[\\u2013\\u2014]/g, '-')
+      .replace(/\\u2026/g, '...')
+      .replace(/[\\u2022\\u00b7\\u25cf\\u25aa\\u2043]/g, '-')
+      .replace(/[\\u00ae]/g, '(R)')
+      .replace(/[\\u00a9]/g, '(C)')
+      .replace(/[\\u2122]/g, '(TM)')
+      .replace(/\\u00b0/g, ' deg')
+      .replace(/\\u00d7/g, 'x')
+      .replace(/\\u00f7/g, '/')
+      .replace(/\\u20ac/g, 'EUR')
+      .replace(/\\u00a3/g, 'GBP')
+      .replace(/\\u00a5/g, 'JPY')
+      .replace(/[^\\x20-\\x7e]/g, '');
+  }
+  function escapePdfText(t){
+    return foldToAscii(t)
+      .replace(/\\\\/g,'\\\\\\\\').replace(/\\(/g,'\\\\(').replace(/\\)/g,'\\\\)');
+  }
+  // UTF-8 length, because the Blob encodes the string as UTF-8 and PDF offsets
+  // are byte offsets. Folded text is one byte per character, so this is a
+  // belt-and-braces guarantee rather than the mechanism.
+  function pdfByteLength(t){
+    try { return new TextEncoder().encode(String(t)).length; } catch (e) { return String(t).length; }
+  }
+  // Real rendered width of a string in the PDF's font, in points.
+  function pdfTextWidth(t, size){
+    var s = String(t), total = 0;
+    for (var i = 0; i < s.length; i++) {
+      var idx = s.charCodeAt(i) - 32;
+      var w = (idx >= 0 && idx < HELVETICA_WIDTHS.length) ? HELVETICA_WIDTHS[idx] : 556;
+      total += w * size / 1000;
+    }
+    return total;
+  }
+  // Wrap to a measured width. A word too long to fit (a URL in a source list)
+  // is hard-broken instead of being allowed to run off the page.
+  function wrapPdfText(t, maxWidth, size){
+    var words = String(t).split(/\\s+/).filter(Boolean), lines = [], cur = '';
+    function breakWord(word){
+      var piece = '';
+      for (var i = 0; i < word.length; i++) {
+        if (piece && pdfTextWidth(piece + word[i], size) > maxWidth) { lines.push(piece); piece = word[i]; }
+        else { piece += word[i]; }
+      }
+      return piece;
+    }
+    for (var i = 0; i < words.length; i++) {
+      var next = cur ? cur + ' ' + words[i] : words[i];
+      if (cur && pdfTextWidth(next, size) > maxWidth) {
+        lines.push(cur);
+        cur = breakWord(words[i]);
+      } else {
+        cur = next;
+      }
+    }
+    if (cur) lines.push(cur);
+    return lines;
+  }
   function buildPdf(){
     var pageW=595.28, pageH=841.89, margin=56.69, lineH=16;
-    var items=[]; items.push({t:REPORT_TITLE||'Untitled',s:18,g:10}); items.push({t:'',s:12,g:4});
+    // Measured, not counted: A4 width minus the margins, less a small safety
+    // margin so no metric wobble can push a line past the page edge.
+    var wrapWidth=(pageW-margin*2)-6;
+    var items=[];
+    var titleLines = wrapPdfText(escapePdfText(REPORT_TITLE||'Untitled'), wrapWidth, 18);
+    for (var ti=0;ti<titleLines.length;ti++) items.push({t:titleLines[ti],s:18,g:10});
+    items.push({t:'',s:12,g:6});
     for (var i=0;i<REPORT_PARAGRAPHS.length;i++){
       var block = REPORT_PARAGRAPHS[i];
+      var text = escapePdfText(block.text);
       if (block.kind === 'heading') {
-        items.push({t:block.text,s:14,g:12});
+        var hl = wrapPdfText(text, wrapWidth, 14);
+        for (var h=0;h<hl.length;h++) items.push({t:hl[h],s:14,g:14});
         items.push({t:'',s:12,g:6});
       } else if (block.kind === 'subheading') {
-        items.push({t:block.text,s:13,g:10});
+        var sl = wrapPdfText(text, wrapWidth, 13);
+        for (var s2=0;s2<sl.length;s2++) items.push({t:sl[s2],s:13,g:13});
         items.push({t:'',s:12,g:5});
       } else if (block.kind === 'bullet') {
-        var bw = wrapPdfText(block.text, 82);
-        for (var k=0;k<bw.length;k++) items.push({t:(k===0?'\\u00b7 ':'    ')+bw[k], s:12, g:lineH});
+        var bl = wrapPdfText(text, wrapWidth-14, 12);
+        for (var k=0;k<bl.length;k++) items.push({t:(k===0?'- ':'  ')+bl[k], s:12, g:lineH});
         items.push({t:'',s:12,g:6});
       } else if (block.kind === 'numbered') {
         // Numbered items keep their number in the text (server-side).
-        var nw = wrapPdfText(block.text, 84);
-        for (var q=0;q<nw.length;q++) items.push({t:nw[q],s:12,g:lineH});
+        var nl = wrapPdfText(text, wrapWidth-16, 12);
+        for (var q=0;q<nl.length;q++) items.push({t:nl[q],s:12,g:lineH});
         items.push({t:'',s:12,g:6});
       } else {
-        var pw = wrapPdfText(block.text, 88);
-        for (var j=0;j<pw.length;j++) items.push({t:pw[j],s:12,g:lineH});
+        var pl = wrapPdfText(text, wrapWidth, 12);
+        for (var j=0;j<pl.length;j++) items.push({t:pl[j],s:12,g:lineH});
         items.push({t:'',s:12,g:6});
       }
     }
@@ -300,7 +396,7 @@ export function synthesizePdfDocumentHtml({
     for (var n=0;n<items.length;n++){ var it=items[n];
       if (it.t && it.s>13){ if (y-24<margin){ pages.push(cur); cur=[]; y=pageH-margin; } }
       if (it.t && y-it.s-4<margin){ pages.push(cur); cur=[]; y=pageH-margin; }
-      if (it.t){ cur.push('BT /F1 '+it.s+' Tf '+margin+' '+y+' Td ('+escapePdfText(it.t)+') Tj ET'); y-=it.g; } else { y-=it.g; } }
+      if (it.t){ cur.push('BT /F1 '+it.s+' Tf '+margin+' '+y+' Td ('+it.t+') Tj ET'); y-=it.g; } else { y-=it.g; } }
     if (cur.length>0||pages.length===0) pages.push(cur);
     var fontObjectNumber = 3 + pages.length * 2;
     var objects=[];
@@ -311,21 +407,31 @@ export function synthesizePdfDocumentHtml({
     for (var pi=0;pi<pages.length;pi++){ var cid=3+pi*2; var sid=cid+1;
       addObj('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 '+pageW+' '+pageH+'] /Contents '+sid+' 0 R /Resources << /Font << /F1 '+fontObjectNumber+' 0 R >> >> >>');
       var stream=pages[pi].join('\\n');
-      addObj('<< /Length '+stream.length+' >>\\nstream\\n'+stream+'\\nendstream'); }
+      addObj('<< /Length '+pdfByteLength(stream)+' >>\\nstream\\n'+stream+'\\nendstream'); }
     addObj('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
-    var out='%PDF-1.4\\n', offsets=[];
-    for (var oi=0;oi<objects.length;oi++){ offsets[oi]=out.length; out+=(oi+1)+' 0 obj '+objects[oi]+' endobj\\n'; }
-    var xrefStart=out.length;
-    out+='xref\\n0 '+(objects.length+1)+'\\n0000000000 65535 f \\n';
-    for (var x=0;x<offsets.length;x++) out+=String(offsets[x]).padStart(10,'0')+' 00000 n \\n';
-    out+='trailer\\n<< /Size '+(objects.length+1)+' /Root 1 0 R >>\\nstartxref\\n'+xrefStart+'\\n%%EOF';
-    return new Blob([out], { type: 'application/pdf' });
+    // Offsets are BYTE offsets measured as the document is assembled, because
+    // that is what a reader walks. Counting characters produced a startxref that
+    // pointed at the wrong byte and a "Broken xref table" on every report that
+    // contained a bullet.
+    var parts=[], offsets=[], cursor=0;
+    function push(chunk){ parts.push(chunk); cursor+=pdfByteLength(chunk); }
+    push('%PDF-1.4\\n');
+    for (var oi=0;oi<objects.length;oi++){ offsets[oi]=cursor; push((oi+1)+' 0 obj '+objects[oi]+' endobj\\n'); }
+    var xrefStart=cursor;
+    push('xref\\n0 '+(objects.length+1)+'\\n0000000000 65535 f \\n');
+    for (var x=0;x<offsets.length;x++) push(String(offsets[x]).padStart(10,'0')+' 00000 n \\n');
+    push('trailer\\n<< /Size '+(objects.length+1)+' /Root 1 0 R >>\\nstartxref\\n'+xrefStart+'\\n%%EOF');
+    return new Blob(parts, { type: 'application/pdf' });
   }
   function downloadPdf(){
     var blob = buildPdf();
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
-    a.href = url; a.download = (REPORT_TITLE || 'research-report').replace(/[^A-Za-z0-9 _-]/g,'') + '.pdf';
+    // A folded, filesystem-safe name: runs of punctuation collapse to one dash
+    // and the ends are trimmed, so "Résumé — Q3 2026" becomes Resume-Q3-2026.pdf
+    // rather than Resume---Q3-2026.pdf.
+    var name = foldToAscii(REPORT_TITLE).replace(/[^A-Za-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+    a.href = url; a.download = (name || 'research-report').slice(0,80) + '.pdf';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
   }
