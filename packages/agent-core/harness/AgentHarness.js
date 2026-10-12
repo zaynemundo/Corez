@@ -30,6 +30,7 @@ import { CancellationManager } from './CancellationManager.js';
 import { SessionManager } from './SessionManager.js';
 import { TaskManager } from './TaskManager.js';
 import { abortableSleep } from './utils.js';
+import { LeaseLostError } from '../persistence/TaskStore.js';
 import { RetryScheduler } from '../providers/retryScheduler.js';
 import { ProviderChain } from '../providers/providerChain.js';
 import { CompactionEngine } from '../context/CompactionEngine.js';
@@ -41,6 +42,10 @@ import { verifyTaskCompletion } from './VerificationGate.js';
 import { registerCoreCapabilities } from '../capabilities/index.js';
 import { ToolRegistry } from '../tools/index.js';
 
+// Retry delay reported when a runner cannot (or no longer can) hold the task
+// lease. The caller — the queue consumer, primarily — redelivers after this.
+const LEASE_RETRY_SECONDS = 30;
+
 export class AgentHarness {
   constructor(options = {}) {
     this.eventBus = options.eventBus || new EventBus();
@@ -48,6 +53,10 @@ export class AgentHarness {
     const persistDir = options.persistDir || (options.persistSessions === false ? null : `${options.cwd || process.cwd()}/artifacts/sessions`);
     this.sessions = options.sessionManager || new SessionManager({ persistDir });
     this.store = options.taskStore || null;
+    // taskId -> live lease state for runs this harness is currently executing.
+    // Progress writes are fenced with the holder token so a runner that lost
+    // its lease can never keep updating the task.
+    this.activeTaskLeases = new Map();
     this.compactionEngine = options.compactionEngine || new CompactionEngine();
     this.taskManager = options.taskManager || new TaskManager({
       store: this.store,
@@ -143,7 +152,23 @@ export class AgentHarness {
         const task = await store.getTask(taskId).catch(() => null);
         return task?.retryState ?? null;
       },
+      // Retry-schedule writes are progress writes: while this harness holds a
+      // lease they go through the fenced path, so a runner that lost the lease
+      // cannot keep touching the task document.
       save: async (taskId, state) => {
+        const leaseState = this.activeTaskLeases.get(String(taskId));
+        if (leaseState) {
+          if (leaseState.lost) {
+            throw new LeaseLostError(taskId, leaseState.lost.message);
+          }
+          const updated = await store.updateTaskFenced(taskId, { retryState: state }, leaseState.holder);
+          if (!updated) {
+            const error = new LeaseLostError(taskId, 'Task lease is no longer held by this runner.');
+            leaseState.markLost(error);
+            throw error;
+          }
+          return;
+        }
         await store.updateTask(taskId, { retryState: state });
       }
     });
@@ -284,12 +309,35 @@ export class AgentHarness {
 
     const outcome = await this.#executeWithLease(task, options);
     const finished = outcome.task;
+    if (outcome.leaseUnavailable) {
+      // Acquisition failed at the storage layer: ownership is unknown, so
+      // nothing ran. Retryable — the caller redelivers once storage recovers.
+      return {
+        task: finished,
+        outcome: 'lease-unavailable',
+        executed: false,
+        leaseError: outcome.leaseError || null,
+        retryAfterSeconds: LEASE_RETRY_SECONDS
+      };
+    }
+    if (outcome.leaseLost) {
+      // This runner stopped because it no longer owns the task. The task
+      // itself is not failed or cancelled: redeliver for the current owner.
+      return {
+        task: finished,
+        outcome: 'lease-lost',
+        executed: false,
+        leaseError: outcome.leaseError || null,
+        retryAfterSeconds: LEASE_RETRY_SECONDS
+      };
+    }
     if (!outcome.leaseAcquired) {
+      // Another live lease holds the task: do not run, do not touch state.
       return {
         task: finished,
         outcome: 'lease-held',
         executed: false,
-        leaseError: outcome.leaseError || null,
+        leaseError: outcome.leaseError || 'Task is already executing elsewhere.',
         retryAfterSeconds: secondsUntil(outcome.leaseExpiresAt)
       };
     }
@@ -366,6 +414,12 @@ export class AgentHarness {
   // ---- Internals ----
 
   async #handleLoopError(task, err) {
+    if (err?.code === 'TASK_LEASE_LOST') {
+      // The task belongs to another runner now; writing a terminal failure
+      // here would corrupt state this process no longer owns.
+      this.cancellations.dispose(task.taskId);
+      return;
+    }
     if (task.isTerminal) return;
     const message = err?.message || 'Unexpected harness failure.';
     task.markTerminal(TASK_STATUSES.FAILED, null, message);
@@ -389,60 +443,120 @@ export class AgentHarness {
     }
 
     // Task lease: prevents duplicate execution (a resume racing a live loop,
-    // or a durable runner redelivering a message). Released on every terminal
-    // path; renewed by a heartbeat while the run is active; expires
-    // automatically if the process dies mid-run so a restart can resume.
+    // or a durable runner redelivering a message). Acquisition is mandatory
+    // whenever a store is present: a thrown or unconfirmed acquire leaves
+    // ownership unknown, and unknown ownership is never permission to run.
+    // The lease is released on every terminal path, renewed by a heartbeat
+    // while the run is active, and expires automatically if the process dies
+    // mid-run so the next delivery can resume.
     const leaseHolder = `run-${task.taskId}-${Math.random().toString(36).slice(2, 10)}`;
     const leaseTtlMs = Number.isFinite(options.leaseTtlMs) && options.leaseTtlMs > 0
       ? options.leaseTtlMs
       : this.leaseTtlMs;
-    let lease;
-    try {
-      lease = await this.store?.acquireLease(task.taskId, leaseHolder, leaseTtlMs);
-    } catch {
-      lease = null; // transient lease-store failure: proceed without a lease
-    }
-    if (lease && lease.acquired === false) {
-      // Another execution holds the task: leave the persisted state alone.
-      this.eventBus.emit({ type: 'task.blocked', taskId: task.taskId, reason: lease.error || 'Task is already executing elsewhere.' });
-      return {
-        task,
-        leaseAcquired: false,
-        leaseError: lease.error || 'Task is already executing elsewhere.',
-        leaseExpiresAt: lease.expiresAt ?? null
-      };
-    }
-    const renewLease = async () => {
+    let lease = null;
+    if (this.store) {
+      let acquired;
       try {
-        await this.store?.renewLease(task.taskId, leaseHolder, leaseTtlMs);
-      } catch {
-        // best-effort
+        acquired = await this.store.acquireLease(task.taskId, leaseHolder, leaseTtlMs);
+      } catch (err) {
+        const message = err?.message || 'lease backend unavailable';
+        this.eventBus.emit({ type: 'task.lease_unavailable', taskId: task.taskId, error: message });
+        return {
+          task,
+          leaseAcquired: false,
+          leaseUnavailable: true,
+          leaseError: `Task lease could not be acquired: ${message}`,
+          leaseExpiresAt: null
+        };
       }
+      if (!acquired || acquired.acquired !== true) {
+        // Explicit rejection: another live lease holds the task. Do not run.
+        const reason = acquired?.error || 'Lease acquisition did not confirm ownership.';
+        this.eventBus.emit({ type: 'task.blocked', taskId: task.taskId, reason });
+        return {
+          task,
+          leaseAcquired: false,
+          leaseError: reason,
+          leaseExpiresAt: acquired?.expiresAt ?? null
+        };
+      }
+      lease = acquired;
+    }
+
+    const leaseState = { holder: leaseHolder, lost: null, markLost: null };
+    leaseState.markLost = (error) => {
+      if (leaseState.lost) return;
+      leaseState.lost = error instanceof Error ? error : new Error(String(error));
+      this.eventBus.emit({ type: 'task.lease_lost', taskId: task.taskId, error: leaseState.lost.message });
+      // Promptly stop in-flight work; the loop and the fenced writes also check.
+      this.cancellations.abort(task.taskId, `Task lease lost: ${leaseState.lost.message}`);
     };
+
+    // Renewal is not best-effort: a renewal that throws or is rejected means
+    // this runner no longer owns the task, so the run must stop. Nothing from
+    // this point may write task state (writes are fenced with the holder).
+    const renewLease = async () => {
+      if (!this.store) return true;
+      if (leaseState.lost) return false;
+      let renewed;
+      try {
+        renewed = await this.store.renewLease(task.taskId, leaseHolder, leaseTtlMs);
+      } catch (err) {
+        leaseState.markLost(err instanceof Error ? err : new Error(String(err)));
+        return false;
+      }
+      if (renewed !== true) {
+        leaseState.markLost(new Error('Lease renewal was rejected; another runner may own the task.'));
+        return false;
+      }
+      return true;
+    };
+
     // Lease heartbeat: a single provider call can outlive the base TTL, so
     // ownership is refreshed on a timer for as long as this run is active.
     // Without it a slow call would let the lease expire mid-run and admit a
     // duplicate execution (the exact "interrupted or duplicated work" bug).
     let heartbeat = null;
-    if (lease) {
+    if (this.store) {
       const intervalMs = Math.max(5_000, Math.floor(leaseTtlMs / 3));
-      heartbeat = setInterval(() => { renewLease(); }, intervalMs);
+      heartbeat = setInterval(() => { renewLease().catch(() => {}); }, intervalMs);
       if (typeof heartbeat?.unref === 'function') heartbeat.unref();
     }
+
+    this.activeTaskLeases.set(String(task.taskId), leaseState);
     try {
-      const finished = await this.#executeCore(task, { ...options, signal, renewLease });
+      const finished = await this.#executeCore(task, { ...options, signal, renewLease, lease: leaseState });
       return {
         task: finished,
         leaseAcquired: true,
-        leaseError: null,
-        leaseExpiresAt: lease?.expiresAt ?? null
+        leaseLost: Boolean(leaseState.lost),
+        leaseError: leaseState.lost?.message ?? null,
+        leaseExpiresAt: leaseState.lost ? null : lease?.expiresAt ?? null
       };
+    } catch (err) {
+      if (err?.code === 'TASK_LEASE_LOST' || leaseState.lost) {
+        return {
+          task,
+          leaseAcquired: true,
+          leaseLost: true,
+          leaseError: (leaseState.lost || err).message,
+          leaseExpiresAt: null
+        };
+      }
+      throw err;
     } finally {
       if (heartbeat) clearInterval(heartbeat);
-      try {
-        await this.store?.releaseLease(task.taskId, leaseHolder);
-      } catch {
-        // best-effort
+      this.activeTaskLeases.delete(String(task.taskId));
+      if (leaseState.lost) {
+        // The lease is no longer ours to release; drop the aborted controller
+        // too, so a later resume in this isolate starts with a clean signal.
+        this.cancellations.dispose(task.taskId);
+      } else if (this.store) {
+        try {
+          await this.store.releaseLease(task.taskId, leaseHolder);
+        } catch {
+          // best-effort
+        }
       }
     }
   }
@@ -462,7 +576,7 @@ export class AgentHarness {
   // AgentRuntime with its evidence-backed completion gate). The browser
   // runtime has no runner, so repository tasks are honestly blocked there.
   async #executeRepository(task, options = {}) {
-    const { signal } = options;
+    const { signal, lease } = options;
     if (!this.repositoryRunner || typeof this.repositoryRunner.runTask !== 'function') {
       const reason = 'Repository tasks require a repository runner (Node CLI). The browser runtime cannot execute file or shell tools.';
       task.markTerminal(TASK_STATUSES.BLOCKED, null, reason);
@@ -478,7 +592,10 @@ export class AgentHarness {
         signal,
         autoApprove: options.autoApprove === true
       });
-      if (signal.aborted) return this.#finishCancelled(task);
+      if (signal.aborted) {
+        if (lease?.lost) return this.#stopForLostLease(task);
+        return this.#finishCancelled(task);
+      }
       if (result?.success === true || result?.status === 'completed') {
         const response = result?.response || result?.result || 'Task completed.';
         // Mirror any file activity the runner reports into task state so
@@ -504,6 +621,7 @@ export class AgentHarness {
         return task;
       }
       if (result?.status === 'cancelled' || result?.cancelled === true) {
+        if (lease?.lost) return this.#stopForLostLease(task);
         return this.#finishCancelled(task);
       }
       const reason = result?.blockedReason || result?.blocked
@@ -519,6 +637,7 @@ export class AgentHarness {
       await this.#persist(task);
       return task;
     } catch (err) {
+      if (lease?.lost) return this.#stopForLostLease(task);
       task.markTerminal(TASK_STATUSES.FAILED, null, err?.message || 'Repository runner failed.');
       this.eventBus.emit({ type: 'task.failed', taskId: task.taskId, error: err?.message || 'Repository runner failed.' });
       await this.#persist(task);
@@ -528,7 +647,7 @@ export class AgentHarness {
 
   // Agentic turn/step loop (DSH-lite) - single task, multi-step, tool-aware
   async #executeAgentLoop(task, options = {}) {
-    const { signal, renewLease: _renewLease } = options;
+    const { signal, lease } = options;
     const log = this._ensureSessionLog(task);
     const llmService = this.harnessContext?.llm || null;
     const loop = new AgentLoop({
@@ -573,7 +692,10 @@ export class AgentHarness {
       const finalContent = lastAssistant ? (typeof lastAssistant.content === 'string' ? lastAssistant.content : JSON.stringify(lastAssistant.content)) : '';
       task.messages = msgs;
       task.currentStep = log.events.filter((e) => e.type === 'step/end').length;
-      if (signal?.aborted) return this.#finishCancelled(task);
+      if (signal?.aborted) {
+        if (lease?.lost) return this.#stopForLostLease(task);
+        return this.#finishCancelled(task);
+      }
       if (!finalContent || !finalContent.trim()) {
         task.markTerminal(TASK_STATUSES.FAILED, null, 'The model returned an empty conversation response.');
         this.eventBus.emit({ type: 'task.failed', taskId: task.taskId, error: 'The model returned an empty conversation response.' });
@@ -582,6 +704,7 @@ export class AgentHarness {
       }
       return this.#finishCompleted(task, finalContent);
     } catch (err) {
+      if (lease?.lost) return this.#stopForLostLease(task);
       if (signal?.aborted) return this.#finishCancelled(task);
       task.markTerminal(TASK_STATUSES.FAILED, null, err?.message || 'Agent loop failed.');
       this.eventBus.emit({ type: 'task.failed', taskId: task.taskId, error: err?.message || 'Agent loop failed.' });
@@ -596,7 +719,7 @@ export class AgentHarness {
   // no repository tools. Stops only on completion, cancellation, a permanent
   // provider failure across every configured provider, or an empty response.
   async #executeConversation(task, options = {}) {
-    const { signal, renewLease } = options;
+    const { signal, renewLease, lease } = options;
     const log = this._ensureSessionLog(task);
     // Also mirror into log for deriveMessages parity (even when using legacy path)
     try { log.append('turn/start', { turn: 1 }); } catch {}
@@ -612,7 +735,11 @@ export class AgentHarness {
     await this.#persist(task);
 
     while (!signal.aborted) {
-      if (typeof renewLease === 'function') await renewLease();
+      if (typeof renewLease === 'function') {
+        // A failed renewal ends the run: this runner no longer owns the task.
+        const renewed = await renewLease();
+        if (!renewed) return this.#stopForLostLease(task);
+      }
 
       // Durable cancellation: a cancel issued from another process (website
       // API request) marks the task cancelled in the store; the running loop
@@ -660,6 +787,9 @@ export class AgentHarness {
         persistRetries: true
       });
 
+      // Lease loss takes precedence over cancellation: the run must stop
+      // without marking the task cancelled (or anything else).
+      if (lease?.lost) return this.#stopForLostLease(task);
       if (chainResult.status === 'cancelled' || signal.aborted) {
         return this.#finishCancelled(task);
       }
@@ -683,6 +813,7 @@ export class AgentHarness {
           try {
             await abortableSleep(waitMs, signal);
           } catch {
+            if (lease?.lost) return this.#stopForLostLease(task);
             return this.#finishCancelled(task);
           }
           continue; // resume the loop once the schedule is due
@@ -692,6 +823,7 @@ export class AgentHarness {
       }
 
       if (chainResult.status === 'failed') {
+        if (lease?.lost) return this.#stopForLostLease(task);
         task.markTerminal(TASK_STATUSES.FAILED, null, chainResult.error);
         this.eventBus.emit({ type: 'task.failed', taskId: task.taskId, error: chainResult.error });
         await this.#persist(task);
@@ -723,7 +855,15 @@ export class AgentHarness {
       return this.#finishCompleted(task, content);
     }
 
+    if (lease?.lost) return this.#stopForLostLease(task);
     return this.#finishCancelled(task);
+  }
+
+  // Lease loss ends this run without a terminal transition: the task is not
+  // failed and not cancelled — it belongs to whoever holds the lease now, or
+  // to the next delivery after expiry. Nothing is written here.
+  #stopForLostLease(task) {
+    return task;
   }
 
   async #finishCompleted(task, response) {
@@ -763,6 +903,9 @@ export class AgentHarness {
     try {
       await this.#persistUnsafe(task);
     } catch (err) {
+      // Losing the lease is not a storage blip: stop the run and never retry
+      // the write against a task this runner no longer owns.
+      if (err?.code === 'TASK_LEASE_LOST') throw err;
       // Transient storage failure: keep the in-memory task alive and track
       // the failure honestly instead of pretending persistence succeeded.
       task.persistFailures = (task.persistFailures || 0) + 1;
@@ -802,6 +945,22 @@ export class AgentHarness {
       updatedAt: task.updatedAt,
       sessionLog: sessionLogSnapshot
     };
+    // Progress writes are fenced: while this harness holds a lease, only the
+    // current holder may update the task document. A stale owner's write is
+    // rejected and treated as lease loss, ending the run.
+    const leaseState = this.activeTaskLeases.get(String(task.taskId));
+    if (leaseState) {
+      if (leaseState.lost) {
+        throw new LeaseLostError(task.taskId, leaseState.lost.message);
+      }
+      const updated = await this.store.updateTaskFenced(task.taskId, snapshot, leaseState.holder);
+      if (!updated) {
+        const error = new LeaseLostError(task.taskId, 'Task lease is no longer held by this runner.');
+        leaseState.markLost(error);
+        throw error;
+      }
+      return;
+    }
     await this.store.updateTask(task.taskId, snapshot);
   }
 }

@@ -76,6 +76,19 @@ const UPDATE_TASK = `
   SET user_id = ?, session_id = ?, status = ?, doc = ?, updated_at = ?, terminal_at = ?
   WHERE task_id = ?`;
 
+// Fenced write: the task document only changes while the caller still holds a
+// live lease row. The lease check is part of the same UPDATE statement, so a
+// previous owner cannot overwrite the new owner's progress even if its write
+// is already in flight when the lease moves on.
+const UPDATE_TASK_FENCED = `
+  UPDATE ${TASKS_TABLE}
+  SET user_id = ?, session_id = ?, status = ?, doc = ?, updated_at = ?, terminal_at = ?
+  WHERE task_id = ?
+    AND EXISTS (
+      SELECT 1 FROM ${LEASES_TABLE}
+      WHERE task_id = ? AND holder = ? AND expires_at > ?
+    )`;
+
 // One statement wins the lease: insert when free, replace when expired or
 // when the same holder is re-acquiring. The WHERE clause applies to the
 // conflict update, so a live foreign lease changes nothing (changes === 0).
@@ -201,6 +214,31 @@ export class D1TaskStore extends TaskStore {
       epochMs(doc.terminalAt, null),
       String(taskId)
     ).run();
+    await this.#storeSessionLog(taskId, sessionLog);
+    return next;
+  }
+
+  async updateTaskFenced(taskId, patch, leaseToken) {
+    if (!this.available) return null;
+    await this.#ensureSchema();
+    const current = await this.getTask(taskId);
+    if (!current) return null;
+    const next = { ...current, ...clone(patch), taskId, updatedAt: new Date().toISOString() };
+    const { doc, sessionLog } = this.#splitArtifacts(next);
+    const now = Date.now();
+    const result = await this.db.prepare(UPDATE_TASK_FENCED).bind(
+      doc.userId ?? null,
+      doc.sessionId ?? null,
+      doc.status || 'pending',
+      JSON.stringify(doc),
+      now,
+      epochMs(doc.terminalAt, null),
+      String(taskId),
+      String(taskId),
+      String(leaseToken),
+      now
+    ).run();
+    if ((Number(result?.meta?.changes) || 0) === 0) return null;
     await this.#storeSessionLog(taskId, sessionLog);
     return next;
   }

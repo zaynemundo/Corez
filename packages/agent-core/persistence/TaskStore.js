@@ -5,6 +5,18 @@
 // atomic leases and ordered events). Leases provide task ownership; each
 // backend is honest about its atomicity guarantees.
 
+// Thrown when a run discovers it no longer holds the task lease. Lease loss is
+// not a task failure: the stored task belongs to whoever holds the lease now,
+// and the losing runner must stop writing instead of marking the task.
+export class LeaseLostError extends Error {
+  constructor(taskId, message) {
+    super(message || `Task lease lost for ${taskId}.`);
+    this.name = 'LeaseLostError';
+    this.code = 'TASK_LEASE_LOST';
+    this.taskId = taskId;
+  }
+}
+
 export class TaskStore {
   async createTask(_task) {
     throw new Error('TaskStore.createTask is not implemented');
@@ -16,6 +28,14 @@ export class TaskStore {
 
   async updateTask(_taskId, _patch) {
     throw new Error('TaskStore.updateTask is not implemented');
+  }
+
+  // Fenced write: apply the patch only when `leaseToken` still holds a live
+  // lease for the task. Returns the updated task, or null when the lease is
+  // not held, so the write is rejected. Stores that cannot check a lease must
+  // not implement this by falling back to an unfenced write.
+  async updateTaskFenced(_taskId, _patch, _leaseToken) {
+    throw new Error('TaskStore.updateTaskFenced is not implemented');
   }
 
   async listTasks(_filter = {}) {
@@ -72,6 +92,14 @@ export class MemoryTaskStore extends TaskStore {
     const next = { ...task, ...JSON.parse(JSON.stringify(patch)), taskId, updatedAt: new Date().toISOString() };
     this.tasks.set(taskId, next);
     return next;
+  }
+
+  async updateTaskFenced(taskId, patch, leaseToken) {
+    const lease = this.leases.get(taskId);
+    if (!lease || lease.holder !== String(leaseToken) || lease.expiresAt <= Date.now()) {
+      return null;
+    }
+    return this.updateTask(taskId, patch);
   }
 
   async listTasks(filter = {}) {

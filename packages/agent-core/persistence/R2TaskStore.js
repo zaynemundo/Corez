@@ -63,6 +63,23 @@ export class R2TaskStore extends TaskStore {
     return next;
   }
 
+  // Best-effort fenced write: the lease record is checked before the
+  // read-modify-write. R2 has no atomic compare-and-swap, so this narrows —
+  // but cannot fully close — the window where a stale owner writes; D1's
+  // conditional UPDATE is the atomic implementation.
+  async updateTaskFenced(taskId, patch, leaseToken) {
+    if (!this.available) return null;
+    const lease = await this.#getJson(this.#leaseKey(taskId));
+    if (
+      !lease ||
+      lease.holder !== String(leaseToken) ||
+      Number(lease.expiresAt) <= Date.now()
+    ) {
+      return null;
+    }
+    return this.updateTask(taskId, patch);
+  }
+
   async listTasks(filter = {}) {
     if (!this.available) return [];
     const list = await this.bucket.list({ prefix: 'tasks/', limit: 1000 });
