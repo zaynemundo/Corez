@@ -1,8 +1,9 @@
 // Durable task storage contract for the CoreZ harness.
 //
 // Implementations: MemoryTaskStore (tests/CLI), DiskTaskStore (CLI restarts),
-// R2TaskStore (Cloudflare Worker). Leases provide task ownership/coordination;
-// each backend is honest about its atomicity guarantees.
+// R2TaskStore (Worker fallback without D1), D1TaskStore (Worker coordination:
+// atomic leases and ordered events). Leases provide task ownership; each
+// backend is honest about its atomicity guarantees.
 
 export class TaskStore {
   async createTask(_task) {

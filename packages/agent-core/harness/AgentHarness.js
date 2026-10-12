@@ -7,6 +7,14 @@
 // evidence-backed gate); the browser runtime has no such runner and honestly
 // blocks repository tasks instead of pretending files were touched.
 //
+// Durable execution: startTask({ deferExecution: true }) only creates and
+// persists the task; a durable scheduler (the Worker's Cloudflare Queue
+// consumer, or any external runner) then calls executeTask(taskId). That
+// entry point is idempotent — terminal tasks are never re-executed, an atomic
+// lease with a heartbeat blocks duplicates, and every step persists progress —
+// so at-least-once delivery and process eviction resume instead of
+// duplicating or dropping work.
+//
 // B-upgrade: DSH-lite
 // - Everything is a plugin via HarnessContext (ctx) + Cordis-style effects
 // - SessionLog append-only log is source of truth for model-visible history (deriveMessages)
@@ -120,6 +128,12 @@ export class AgentHarness {
     this.maxRetryWaitMs = Number.isFinite(options.maxRetryWaitMs)
       ? options.maxRetryWaitMs
       : readPositiveEnv('COREZ_RETRY_WAIT_MS', 120_000);
+    // Task lease TTL. A heartbeat renews the lease every TTL/3 while a run is
+    // active, so the TTL only bounds how quickly a crashed runner's task can
+    // be picked up again — never how long a healthy run may last.
+    this.leaseTtlMs = Number.isFinite(options.leaseTtlMs)
+      ? options.leaseTtlMs
+      : readPositiveEnv('COREZ_TASK_LEASE_MS', 60_000);
   }
 
   #buildRetryScheduler(store) {
@@ -191,10 +205,15 @@ export class AgentHarness {
 
   // ---- Public API ----
 
-  async startTask({ userId, sessionId, workspaceId, prompt, model, mode = 'repository', autoApprove, contract } = {}) {
+  async startTask({ userId, sessionId, workspaceId, prompt, model, mode = 'repository', autoApprove, contract, deferExecution = false } = {}) {
     const task = await this.taskManager.createTask({ userId, sessionId, workspaceId, prompt, model, mode, contract });
     this._ensureSessionLog(task);
-    this.#execute(task, { autoApprove }).catch((err) => this.#handleLoopError(task, err));
+    // Inline execution is the default (CLI, tests). A durable runner (Worker
+    // queue consumer) starts the task with deferExecution so the HTTP
+    // invocation does not own the long-running work at all.
+    if (!deferExecution) {
+      this.#execute(task, { autoApprove }).catch((err) => this.#handleLoopError(task, err));
+    }
     return task;
   }
 
@@ -225,7 +244,68 @@ export class AgentHarness {
     this.eventBus.emit({ type: 'task.resumed', taskId, userId: task.userId });
     // re-ensure log exists even after restart
     this._ensureSessionLog(task);
+    // A durable runner re-dispatches the resumed task itself (executeTask);
+    // it must not start a second computation inside this invocation.
+    if (options.deferExecution === true) return task;
     return this.#execute(task, options);
+  }
+
+  // Durable, idempotent execution entry point for external runners (queue
+  // consumers, schedulers, cron). Safe under at-least-once delivery:
+  // - a terminal task is never re-executed,
+  // - a live lease reports `lease-held` instead of running a duplicate,
+  // - a crashed runner's expired lease lets the next delivery resume.
+  // Progress is persisted between steps by the loop itself, so a retry
+  // continues from the stored task document. Passing `options.task` (the
+  // freshly created/resumed instance the caller already holds) skips the
+  // initial read so a transient storage read failure cannot drop the work.
+  async executeTask(taskId, options = {}) {
+    let task = options.task && options.task.taskId === taskId ? options.task : null;
+    if (!task) {
+      try {
+        task = await this.taskManager.getTask(taskId);
+      } catch (err) {
+        const message = err?.message || `Task not found: ${taskId}`;
+        const missing = /not found/i.test(message);
+        return {
+          task: null,
+          outcome: missing ? 'not-found' : 'load-failed',
+          executed: false,
+          error: message
+        };
+      }
+    }
+    if (task.status === TASK_STATUSES.CANCELLED) {
+      return { task, outcome: 'cancelled', executed: false };
+    }
+    if (task.isTerminal) {
+      return { task, outcome: 'terminal', executed: false };
+    }
+
+    const outcome = await this.#executeWithLease(task, options);
+    const finished = outcome.task;
+    if (!outcome.leaseAcquired) {
+      return {
+        task: finished,
+        outcome: 'lease-held',
+        executed: false,
+        leaseError: outcome.leaseError || null,
+        retryAfterSeconds: secondsUntil(outcome.leaseExpiresAt)
+      };
+    }
+    if (finished.status === TASK_STATUSES.CANCELLED) {
+      return { task: finished, outcome: 'cancelled', executed: true };
+    }
+    if (finished.isTerminal) {
+      return { task: finished, outcome: 'terminal', executed: true };
+    }
+    // The provider asked for a later retry and this runtime does not sleep
+    // in-process: report the schedule so the caller can retry durably.
+    const retryAfterSeconds = Number(finished.retryState?.retryAfterSeconds);
+    if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+      return { task: finished, outcome: 'retry-scheduled', executed: true, retryAfterSeconds };
+    }
+    return { task: finished, outcome: 'running', executed: true };
   }
 
   async cancelTask(taskId, userId = null) {
@@ -298,16 +378,24 @@ export class AgentHarness {
   }
 
   async #execute(task, options = {}) {
+    const outcome = await this.#executeWithLease(task, options);
+    return outcome.task;
+  }
+
+  async #executeWithLease(task, options = {}) {
     const signal = options.signal || this.cancellations.create(task.taskId).signal;
     if (options.signal) {
       options.signal.addEventListener('abort', () => this.cancellations.abort(task.taskId), { once: true });
     }
 
-    // Task lease: prevents duplicate execution (a resume racing a live loop).
-    // Released on every terminal path; expires automatically if the process
-    // dies mid-run so a restart can resume.
+    // Task lease: prevents duplicate execution (a resume racing a live loop,
+    // or a durable runner redelivering a message). Released on every terminal
+    // path; renewed by a heartbeat while the run is active; expires
+    // automatically if the process dies mid-run so a restart can resume.
     const leaseHolder = `run-${task.taskId}-${Math.random().toString(36).slice(2, 10)}`;
-    const leaseTtlMs = 60_000;
+    const leaseTtlMs = Number.isFinite(options.leaseTtlMs) && options.leaseTtlMs > 0
+      ? options.leaseTtlMs
+      : this.leaseTtlMs;
     let lease;
     try {
       lease = await this.store?.acquireLease(task.taskId, leaseHolder, leaseTtlMs);
@@ -317,7 +405,12 @@ export class AgentHarness {
     if (lease && lease.acquired === false) {
       // Another execution holds the task: leave the persisted state alone.
       this.eventBus.emit({ type: 'task.blocked', taskId: task.taskId, reason: lease.error || 'Task is already executing elsewhere.' });
-      return task;
+      return {
+        task,
+        leaseAcquired: false,
+        leaseError: lease.error || 'Task is already executing elsewhere.',
+        leaseExpiresAt: lease.expiresAt ?? null
+      };
     }
     const renewLease = async () => {
       try {
@@ -326,9 +419,26 @@ export class AgentHarness {
         // best-effort
       }
     };
+    // Lease heartbeat: a single provider call can outlive the base TTL, so
+    // ownership is refreshed on a timer for as long as this run is active.
+    // Without it a slow call would let the lease expire mid-run and admit a
+    // duplicate execution (the exact "interrupted or duplicated work" bug).
+    let heartbeat = null;
+    if (lease) {
+      const intervalMs = Math.max(5_000, Math.floor(leaseTtlMs / 3));
+      heartbeat = setInterval(() => { renewLease(); }, intervalMs);
+      if (typeof heartbeat?.unref === 'function') heartbeat.unref();
+    }
     try {
-      return await this.#executeCore(task, { ...options, signal, renewLease });
+      const finished = await this.#executeCore(task, { ...options, signal, renewLease });
+      return {
+        task: finished,
+        leaseAcquired: true,
+        leaseError: null,
+        leaseExpiresAt: lease?.expiresAt ?? null
+      };
     } finally {
+      if (heartbeat) clearInterval(heartbeat);
       try {
         await this.store?.releaseLease(task.taskId, leaseHolder);
       } catch {
@@ -699,4 +809,10 @@ export class AgentHarness {
 function readPositiveEnv(name, fallback) {
   const value = Number(process.env[name]);
   return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
+function secondsUntil(timestampMs) {
+  const parsed = Number(timestampMs);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.max(1, Math.ceil((parsed - Date.now()) / 1000));
 }

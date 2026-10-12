@@ -14,6 +14,7 @@ import {
 } from "./utils.js";
 import { TASK_STATUS_STORE_PREFIX } from "./providerChain.js";
 import { handleTaskApi } from "./taskApi.js";
+import { runTaskQueueBatch } from "./taskRunner.js";
 import { handleAuth, verifySession } from "./auth.js";
 import { handleChats } from "./chats.js";
 import { handleN8nWebhook } from "./n8nBridge.js";
@@ -263,7 +264,7 @@ export default {
       url.pathname.startsWith("/api/tasks") ||
       url.pathname.startsWith("/api/context/records")
     ) {
-      const taskResponse = await handleTaskApi(request, env);
+      const taskResponse = await handleTaskApi(request, env, ctx);
       if (taskResponse) return taskResponse;
     }
 
@@ -345,5 +346,15 @@ export default {
     }
 
     return withDirectAiCors(await baseWorker.fetch(request, env, ctx));
+  },
+
+  // Durable task execution consumer. Each message carries a task id produced
+  // by POST /api/tasks (or /resume); the consumer runs it to a terminal state
+  // and uses queue redelivery as the durable retry/backoff mechanism. This
+  // handler is what makes execution independent of the browser connection:
+  // once the 202 is returned, the task runs inside the Queue consumer, not
+  // inside the (soon to be torn down) HTTP invocation.
+  async queue(batch, env) {
+    return runTaskQueueBatch(batch, env);
   },
 };

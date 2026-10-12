@@ -126,3 +126,29 @@ Deploy command: npx wrangler deploy
 Root directory: /
 Production branch: main
 ```
+
+### Durable task execution
+
+`POST /api/tasks` never runs model work inside the HTTP invocation. The task
+document is persisted first (D1 when the `DB` binding exists, R2 otherwise),
+then execution is handed to the `TASKS_QUEUE` Cloudflare Queue consumer. The
+consumer runs the same `AgentHarness` with `executeTask(taskId)`, which is
+idempotent: terminal tasks are skipped, an atomic lease blocks duplicates, and
+provider retry schedules become queue redeliveries. An HTTP disconnect or an
+evicted isolate therefore cannot cancel or duplicate a task — only an explicit
+`POST /api/tasks/:id/cancel` does.
+
+Create the queue once before the first deploy that uses it (the versioned
+deploy pipeline in CI does not create queues itself):
+
+```text
+npx wrangler queues create corez-tasks
+```
+
+Without the queue binding the API still works: execution runs inline and is
+attached to `ctx.waitUntil`, which extends the invocation for up to 30 seconds
+after the response — enough for tests and local development, not a durability
+guarantee for long jobs. Task ownership (leases) and event ordering live in
+SQLite-backed D1 tables (`harness_tasks`, `harness_task_events`,
+`harness_task_leases`); R2 keeps the larger session-log artifacts under
+`tasks/<taskId>.session.json`.

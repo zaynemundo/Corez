@@ -75,6 +75,16 @@ jobs:
       - name: Run build
         run: npm run build
 
+      # The durable task queue must exist before a version that binds it is
+      # uploaded. `wrangler deploy` creates missing producer queues itself, but
+      # this pipeline uses `wrangler versions`, so the queue is ensured here.
+      - name: Ensure durable task queue exists
+        run: |
+          npx wrangler queues list | grep -q '\bcorez-tasks\b' || npx wrangler queues create corez-tasks
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
       - name: Upload Worker version
         # Custom domains are provisioned separately with a zone-enabled token.
         # Code releases use versions so this Worker-only token never resyncs routes.

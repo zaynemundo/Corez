@@ -56,6 +56,35 @@
       "bucket_name": "corez-assets"
     }
   ],
+  // Durable task execution. POST /api/tasks hands each task to this queue
+  // instead of running it inside the HTTP invocation, so an HTTP disconnect
+  // or isolate eviction can never cancel a task: the consumer (entry.js
+  // `queue()` -> worker/taskRunner.js) redelivers and resumes from the
+  // persisted D1 state. Run `npx wrangler queues create corez-tasks` once
+  // before the first deploy that uses it; `wrangler deploy` creates missing
+  // producer queues automatically but the versioned pipeline
+  // (`wrangler versions upload`) does not, hence the explicit step.
+  // max_batch_size 1: one long model task per invocation. retry_delay 30s
+  // bounds provider backoff redelivery; the consumer also fails the stored
+  // task honestly once its own attempt cap is spent.
+  "queues": {
+    "producers": [
+      {
+        "binding": "TASKS_QUEUE",
+        "queue": "corez-tasks"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "corez-tasks",
+        "max_batch_size": 1,
+        "max_batch_timeout": 2,
+        "max_retries": 12,
+        "retry_delay": 30,
+        "max_concurrency": 6
+      }
+    ]
+  },
   // Read-through cache for the Awwwards design references (/api/inspiration and
   // the app-build prompt enrichment). The scrape costs one category page plus
   // up to three detail pages on every build; the category listing changes on

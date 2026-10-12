@@ -3,18 +3,23 @@
 // The same AgentHarness that powers the CLI runs here (conversation mode: the
 // browser runtime cannot execute shell/filesystem tools — repository mode
 // honestly returns 400 until a Node-side runner is attached). Tasks persist in
-// R2, events stream over SSE with Last-Event-ID replay, and task ownership is
-// enforced per user.
+// D1 when the binding exists (atomic leases + ordered events) and fall back to
+// R2 otherwise; execution is handed to a durable Cloudflare Queue consumer so
+// the HTTP invocation never owns long-running work. Events stream over SSE
+// with Last-Event-ID replay, and task ownership is enforced per user.
+//
+// Browser disconnection is not task cancellation: the POST only creates and
+// dispatches the task, and only an explicit /cancel marks it cancelled.
 
-import { AgentHarness } from "../packages/agent-core/harness/AgentHarness.js";
-import { DEFAULT_TEXT_MODEL } from "../packages/agent-core/providers/modelIds.js";
-import { CancellationManager } from "../packages/agent-core/harness/CancellationManager.js";
-import { R2TaskStore } from "../packages/agent-core/persistence/R2TaskStore.js";
-import { ContextStore } from "../packages/agent-core/persistence/ContextStore.js";
-import { OpenCodeGoAdapter } from "../packages/agent-core/providers/adapters.js";
 import { TERMINAL_TASK_STATUSES } from "../packages/agent-core/harness/TaskState.js";
+import { ContextStore } from "../packages/agent-core/persistence/ContextStore.js";
 import { verifySession } from "./auth.js";
 import { jsonResponse, readBoundedJson, safeErrorDetail } from "./utils.js";
+import {
+  buildHarness,
+  dispatchTaskExecution,
+  taskStoreFor,
+} from "./taskRunner.js";
 
 export const OWNER_HEADER = "x-corez-user";
 const TASK_ID_PATTERN = /^[A-Za-z0-9._:-]{1,160}$/;
@@ -38,32 +43,9 @@ async function getUserId(request, env) {
 
 // One shared cancellation registry per Worker isolate: a cancel request in
 // one fetch aborts the signal the running task loop listens to in another.
-// Cross-isolate cancellation is honored by the loop's store-level check.
-const sharedCancellations = new CancellationManager();
-
-// Workers provide secrets through the env binding, never process.env.
-// OpenCode Go is the only text route CoreZ constructs: there is no
-// DeepSeek-direct or OpenRouter text fallback.
-export function buildHarness(env) {
-  const store = new R2TaskStore({ bucket: env?.ASSET_BUCKET });
-  const adapters = [
-    new OpenCodeGoAdapter({
-      opencodeApiKey: env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY,
-      endpoint: env?.OPENCODE_ENDPOINT,
-      model: env?.OPENCODE_MODEL,
-    }),
-  ];
-  return new AgentHarness({
-    taskStore: store,
-    adapters,
-    defaultModel: DEFAULT_TEXT_MODEL,
-    persistEvents: true,
-    cancellationManager: sharedCancellations,
-    maxRetryWaitMs: 0, // no in-process retry waits in the Worker; resume via API
-    // Repository tasks are never executed on this deployment: the public
-    // Worker has no repository workspace and never delegates to one.
-  });
-}
+// Cross-isolate cancellation is honored by the loop's store-level check. The
+// harness factory itself lives in taskRunner.js (shared with the queue
+// consumer), so this file only owns HTTP semantics.
 
 function publicTask(task) {
   if (!task || typeof task !== "object") return task;
@@ -97,7 +79,7 @@ function parseTaskId(raw) {
   return TASK_ID_PATTERN.test(value) ? value : null;
 }
 
-export async function handleTaskApi(request, env) {
+export async function handleTaskApi(request, env, ctx = null) {
   const url = new URL(request.url);
   const pathname = url.pathname;
   const userId = await getUserId(request, env);
@@ -129,6 +111,12 @@ export async function handleTaskApi(request, env) {
     }
 
     const harness = buildHarness(env);
+    if (!harness.store?.available) {
+      return jsonResponse(503, { error: "Task storage is not configured." });
+    }
+    // Execution is always handed to the runner seam: the queue when the
+    // binding exists, otherwise inline execution attached to ctx.waitUntil.
+    // The HTTP invocation never silently owns the long-running work.
     const task = await harness.startTask({
       userId,
       sessionId:
@@ -141,7 +129,9 @@ export async function handleTaskApi(request, env) {
         typeof body?.model === "string" ? body.model.slice(0, 120) : undefined,
       mode: "conversation",
       autoApprove: false,
+      deferExecution: true,
     });
+    await dispatchTaskExecution(env, ctx, harness, task.taskId, { task });
     return jsonResponse(202, publicTask(task));
   }
 
@@ -153,7 +143,8 @@ export async function handleTaskApi(request, env) {
     const sub = taskMatch[2] || null;
 
     if (request.method === "GET" && sub === null) {
-      const task = env.ASSET_BUCKET ? await readTask(env, taskId) : null;
+      const store = taskStoreFor(env);
+      const task = store.available ? await store.getTask(taskId) : null;
       if (!task) return jsonResponse(404, { error: "Task not found." });
       if (task.userId !== userId)
         return jsonResponse(403, { error: "Access denied." });
@@ -162,15 +153,24 @@ export async function handleTaskApi(request, env) {
 
     if (request.method === "POST" && sub === "resume") {
       const harness = buildHarness(env);
+      if (!harness.store?.available) {
+        return jsonResponse(503, { error: "Task storage is not configured." });
+      }
       let task;
       try {
-        task = await harness.resumeTask(taskId, userId);
+        task = await harness.resumeTask(taskId, userId, { deferExecution: true });
       } catch (err) {
         if (err?.message?.includes("Access denied"))
           return jsonResponse(403, { error: "Access denied." });
         if (err?.message?.includes("Task not found"))
           return jsonResponse(404, { error: "Task not found." });
         return jsonResponse(500, { error: safeErrorDetail(err) });
+      }
+      // Resumed work goes back through the same durable dispatch as a new
+      // task; the queue redelivers it on failure instead of tying the retry
+      // to this HTTP invocation.
+      if (!task.isTerminal) {
+        await dispatchTaskExecution(env, ctx, harness, task.taskId, { task });
       }
       return jsonResponse(200, publicTask(task));
     }
@@ -284,7 +284,8 @@ export async function handleTaskApi(request, env) {
 }
 
 async function readTask(env, taskId) {
-  const store = new R2TaskStore({ bucket: env?.ASSET_BUCKET });
+  const store = taskStoreFor(env);
+  if (!store.available) return null;
   const task = await store.getTask(taskId);
   return task;
 }
@@ -305,7 +306,7 @@ function parseLastEventId(value) {
 }
 
 async function streamTaskEvents(request, env, taskId, userId) {
-  const store = new R2TaskStore({ bucket: env?.ASSET_BUCKET });
+  const store = taskStoreFor(env);
   let initialTask;
   try {
     initialTask = await store.getTask(taskId);

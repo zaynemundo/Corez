@@ -26,14 +26,22 @@ description: Use when working with durable tasks - start a long-running task, st
 
 - `POST /api/tasks` starts a conversation task and returns `202` with task
   state. The public Worker rejects repository `workspaceId` requests.
+  Execution is durable: the task is persisted first, then run by the
+  Cloudflare Queue consumer (`TASKS_QUEUE`) when bound, or inline under
+  `ctx.waitUntil` otherwise. A browser disconnect is not cancellation; only
+  `POST .../cancel` is.
 - `GET /api/tasks/:taskId`, `POST .../resume`, and `POST .../cancel` read or
-  change an owned task.
-- `GET .../events` streams SSE and supports `Last-Event-ID` replay.
+  change an owned task. `/resume` re-dispatches through the same durable path.
+- `GET .../events` streams SSE and supports `Last-Event-ID` replay. Ownership
+  is proven from the task record before the stream opens: missing metadata is
+  `404`, a different owner is `403`, and unreadable storage is `503` - event
+  data never flows without a verified owner.
 - `GET .../artifacts` returns the plan, evidence, inspected or modified files,
   and provider history recorded by the task.
 - `POST /api/context/records` and `GET /api/context/records/:recordId` persist
   bounded conversation context.
-- Durable task and context operations require `ASSET_BUCKET`.
+- Durable task state requires a task store: D1 (`DB` binding) when present,
+  R2 (`ASSET_BUCKET`) otherwise. Session-log artifacts stay in R2.
 
 ## Ownership boundary
 
@@ -61,7 +69,7 @@ another user's task or record.
 
 ## Verification
 
-Run `npx vitest run tests/task-persistence.test.js tests/context-storage.test.js` and `npm run test:cloudflare`.
+Run `npx vitest run tests/task-persistence.test.js tests/context-storage.test.js tests/d1-task-store.test.js tests/task-durable-execution.test.js` and `npm run test:cloudflare`.
 
 ## Related skills
 
