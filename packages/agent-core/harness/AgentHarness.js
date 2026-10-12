@@ -46,6 +46,12 @@ import { ToolRegistry } from '../tools/index.js';
 // lease. The caller — the queue consumer, primarily — redelivers after this.
 const LEASE_RETRY_SECONDS = 30;
 
+// Lease acquisition is retried briefly in-process so a transient lease-store
+// failure does not force a full redelivery; a prolonged outage is still
+// reported as retryable and handled by the durable caller.
+const LEASE_ACQUIRE_ATTEMPTS = 8;
+const LEASE_ACQUIRE_RETRY_CAP_MS = 200;
+
 export class AgentHarness {
   constructor(options = {}) {
     this.eventBus = options.eventBus || new EventBus();
@@ -309,6 +315,15 @@ export class AgentHarness {
 
     const outcome = await this.#executeWithLease(task, options);
     const finished = outcome.task;
+    if (outcome.cancelled && !outcome.leaseAcquired) {
+      // Cancelled while waiting for the lease: nothing ran, nothing is owned.
+      return {
+        task: finished,
+        outcome: 'cancelled',
+        executed: false,
+        leaseError: outcome.leaseError || null
+      };
+    }
     if (outcome.leaseUnavailable) {
       // Acquisition failed at the storage layer: ownership is unknown, so
       // nothing ran. Retryable — the caller redelivers once storage recovers.
@@ -455,11 +470,37 @@ export class AgentHarness {
       : this.leaseTtlMs;
     let lease = null;
     if (this.store) {
-      let acquired;
-      try {
-        acquired = await this.store.acquireLease(task.taskId, leaseHolder, leaseTtlMs);
-      } catch (err) {
-        const message = err?.message || 'lease backend unavailable';
+      // Acquisition retries transient storage failures in-process. It never
+      // falls back to running unleased, and an abort during the wait stops
+      // immediately instead of waiting out the remaining attempts.
+      let acquired = null;
+      let acquireError = null;
+      for (let attempt = 0; attempt < LEASE_ACQUIRE_ATTEMPTS; attempt += 1) {
+        if (attempt > 0) {
+          const delayMs = Math.min(LEASE_ACQUIRE_RETRY_CAP_MS, 25 * 2 ** (attempt - 1));
+          try {
+            await abortableSleep(delayMs, signal);
+          } catch {
+            return {
+              task,
+              leaseAcquired: false,
+              cancelled: true,
+              leaseError: 'Task cancelled while acquiring the lease.',
+              leaseExpiresAt: null
+            };
+          }
+        }
+        try {
+          acquired = await this.store.acquireLease(task.taskId, leaseHolder, leaseTtlMs);
+          acquireError = null;
+          break;
+        } catch (err) {
+          acquired = null;
+          acquireError = err;
+        }
+      }
+      if (acquireError) {
+        const message = acquireError.message || 'lease backend unavailable';
         this.eventBus.emit({ type: 'task.lease_unavailable', taskId: task.taskId, error: message });
         return {
           task,
