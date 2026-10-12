@@ -14,6 +14,7 @@ import {
   periodKey,
   recordUsageOnce,
   refundUsage,
+  settlePendingCompensations,
   usageSummary,
 } from '../worker/usage.js';
 
@@ -29,6 +30,11 @@ async function seedCounter(db, uid, metric, count) {
     )
     .bind(uid, PERIOD, metric, count, Date.now())
     .run();
+}
+
+async function getRows(db, sql, ...params) {
+  const result = await db.prepare(sql).bind(...params).all();
+  return result.results || [];
 }
 
 // A configured accounting database that cannot answer: every statement throws.
@@ -92,6 +98,49 @@ function secondChargeFailsD1() {
             charges += 1;
             if (charges === 2) throw new Error('simulated write failure');
           }
+          return inner.__runSync();
+        },
+        bind(...args) {
+          inner.bind(...args);
+          return this;
+        },
+        async run() {
+          return this.__runSync();
+        },
+        async all() {
+          return inner.all();
+        },
+        async first() {
+          return inner.first();
+        },
+      };
+    },
+    batch(statements) {
+      return db.batch(statements);
+    },
+  };
+}
+
+// A database whose refund write fails while everything else answers. The
+// charges have already committed by then, so the allowance is genuinely owed.
+function refundFailsD1() {
+  const db = createSqliteD1();
+  let failing = true;
+  return {
+    __sqlite: db.__sqlite,
+    setFailing(value) {
+      failing = value;
+    },
+    prepare(sql) {
+      const inner = db.prepare(sql);
+      // The plain refund, but NOT the compensation recovery — which is the
+      // statement that has to work once storage is healthy again.
+      const isPlainRefund =
+        /UPDATE usage_counters SET count = MAX\(0, count - \?\)/i.test(sql) &&
+        !/usage_compensations/i.test(sql);
+      return {
+        __runSync() {
+          if (failing && isPlainRefund) throw new Error('simulated refund write failure');
           return inner.__runSync();
         },
         bind(...args) {
@@ -391,6 +440,87 @@ describe('atomic budget admission', () => {
     // A repeated refund is a floor, not a credit: it can never mint quota.
     await refundUsage(env, uid, { charges: [{ metric: 'messages', amount: 5 }] });
     expect((await getUsage(env, uid)).messages).toBe(0);
+  });
+
+  it('records a failed refund durably and returns it exactly once when storage recovers', async () => {
+    const db = refundFailsD1();
+    const env = { DB: db };
+    const uid = 'owed';
+    await seedCounter(db, uid, 'tokens', 1000);
+    await seedCounter(db, uid, 'messages', PLAN_LIMITS.free.messages);
+
+    // tokens charges fine, messages is at its limit, and the refund of the
+    // tokens charge cannot be written.
+    const refused = await consumeAllowance(env, uid, {
+      plan: 'free',
+      charges: [
+        { metric: 'tokens', amount: 100 },
+        { metric: 'messages', amount: 1 },
+      ],
+    });
+
+    expect(refused.ok).toBe(false);
+    expect(refused.refunded).toBe(false);
+    // The account is told the truth: the allowance is owed, not returned.
+    expect(refused.refundDeferred).toBe(true);
+    expect(refused.refundedCharges).toEqual([{ metric: 'tokens', amount: 100 }]);
+    expect((await getUsage(env, uid)).tokens).toBe(1100);
+
+    // The debt is durable, not just a log line.
+    const owed = await getRows(
+      db,
+      "SELECT * FROM usage_compensations WHERE user_id='owed' AND status='pending'",
+    );
+    expect(owed).toHaveLength(1);
+    expect(owed[0].metric).toBe('tokens');
+    expect(Number(owed[0].amount)).toBe(100);
+
+    // Storage recovers.
+    db.setFailing(false);
+    const first = await settlePendingCompensations(env, uid);
+    expect(first.settled).toBe(1);
+    expect((await getUsage(env, uid)).tokens).toBe(1000);
+
+    // Recovery is exactly-once: running it again must not return the allowance
+    // a second time, which would erase usage belonging to other work.
+    const replay = await settlePendingCompensations(env, uid);
+    expect(replay.settled).toBe(0);
+    expect((await getUsage(env, uid)).tokens).toBe(1000);
+    expect(
+      await getRows(
+        db,
+        "SELECT * FROM usage_compensations WHERE user_id='owed' AND status='pending'",
+      ),
+    ).toHaveLength(0);
+  });
+
+  it('sweeps owed allowance before admitting, so a retry sees the restored balance', async () => {
+    const db = refundFailsD1();
+    const env = { DB: db };
+    const uid = 'owed-retry';
+    await seedCounter(db, uid, 'tokens', 1000);
+    await seedCounter(db, uid, 'messages', PLAN_LIMITS.free.messages);
+
+    await consumeAllowance(env, uid, {
+      plan: 'free',
+      charges: [
+        { metric: 'tokens', amount: 100 },
+        { metric: 'messages', amount: 1 },
+      ],
+    });
+    expect((await getUsage(env, uid)).tokens).toBe(1100);
+
+    db.setFailing(false);
+    // A plain retry of the same request: admission sweeps the debt first, so the
+    // balance the guard reads is the one the account is actually entitled to.
+    const retry = await consumeAllowance(env, uid, {
+      plan: 'free',
+      charges: [{ metric: 'tokens', amount: 100 }],
+    });
+
+    expect(retry.ok).toBe(true);
+    // 1100 - 100 (returned) + 100 (this charge) = 1100.
+    expect((await getUsage(env, uid)).tokens).toBe(1100);
   });
 
   it('fails closed when the accounting database is unreachable', async () => {

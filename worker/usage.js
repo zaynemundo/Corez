@@ -34,6 +34,7 @@ import { jsonResponse } from "./utils.js";
 
 export const USAGE_TABLE = "usage_counters";
 export const USAGE_RECEIPTS_TABLE = "usage_receipts";
+export const USAGE_COMPENSATIONS_TABLE = "usage_compensations";
 
 /** Metrics that are summed over the month. */
 export const USAGE_METRICS = [
@@ -177,6 +178,23 @@ export async function ensureUsageTables(env) {
     `CREATE INDEX IF NOT EXISTS idx_usage_period ON ${USAGE_TABLE}(period)`,
     `CREATE TABLE IF NOT EXISTS ${USAGE_RECEIPTS_TABLE} (receipt_key TEXT PRIMARY KEY, user_id TEXT NOT NULL, period TEXT NOT NULL, metric TEXT, created_at INTEGER NOT NULL)`,
     `CREATE INDEX IF NOT EXISTS idx_usage_receipts_user ON ${USAGE_RECEIPTS_TABLE}(user_id, period)`,
+    // Owed allowance. A refund that could not be written leaves the account
+    // charged for work that was refused, and the charges have already
+    // committed, so the debt is recorded here instead of being remembered only
+    // by the log line that reported the failure. Each row is one metric of one
+    // operation: `pending` until `settlePendingCompensations` applies it, and
+    // the transition is the guard that makes recovery exactly-once.
+    `CREATE TABLE IF NOT EXISTS ${USAGE_COMPENSATIONS_TABLE} (
+       compensation_key TEXT PRIMARY KEY,
+       user_id TEXT NOT NULL,
+       period TEXT NOT NULL,
+       metric TEXT NOT NULL,
+       amount INTEGER NOT NULL,
+       status TEXT NOT NULL DEFAULT 'pending',
+       created_at INTEGER NOT NULL,
+       updated_at INTEGER NOT NULL
+     )`,
+    `CREATE INDEX IF NOT EXISTS idx_usage_compensations_pending ON ${USAGE_COMPENSATIONS_TABLE}(user_id, period, status)`,
   ];
   try {
     if (typeof db.batch === "function") {
@@ -210,6 +228,35 @@ const CHARGE_SQL = `
 const REFUND_SQL = `
   UPDATE ${USAGE_TABLE} SET count = MAX(0, count - ?), updated_at = ?
   WHERE user_id = ? AND period = ? AND metric = ?`;
+
+// Owed allowance that could not be written when it was owed. Recording is
+// idempotent per key so a retried failure cannot queue the same debt twice.
+const COMPENSATION_INSERT_SQL = `
+  INSERT INTO ${USAGE_COMPENSATIONS_TABLE}
+    (compensation_key, user_id, period, metric, amount, status, created_at, updated_at)
+  VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)
+  ON CONFLICT(compensation_key) DO NOTHING`;
+
+const PENDING_COMPENSATIONS_SQL = `
+  SELECT compensation_key, metric, amount FROM ${USAGE_COMPENSATIONS_TABLE}
+  WHERE user_id = ? AND period = ? AND status = 'pending'
+  ORDER BY created_at ASC LIMIT 50`;
+
+// Recovery is exactly-once because the counter moves only while the row is
+// still pending, and the same transaction then marks it applied. A replay finds
+// the row applied, the guard fails, and no counter is touched — a second refund
+// can never erase usage that belongs to other work.
+const COMPENSATE_COUNTER_SQL = `
+  UPDATE ${USAGE_TABLE} SET count = MAX(0, count - ?), updated_at = ?
+  WHERE user_id = ? AND period = ? AND metric = ?
+    AND EXISTS (
+      SELECT 1 FROM ${USAGE_COMPENSATIONS_TABLE}
+      WHERE compensation_key = ? AND status = 'pending'
+    )`;
+
+const MARK_COMPENSATION_APPLIED_SQL = `
+  UPDATE ${USAGE_COMPENSATIONS_TABLE} SET status = 'applied', updated_at = ?
+  WHERE compensation_key = ? AND status = 'pending'`;
 
 // Receipt-guarded top-up: the counter moves only when no receipt with this key
 // exists yet, and the receipt is written in the same batch. A replay changes
@@ -329,6 +376,19 @@ export async function consumeAllowance(
   if (entries.length === 0) return { ok: true, consumed: [], period };
   await ensureUsageTables(env);
 
+  // Return any allowance a previous refund could not return, before the guards
+  // below read the counters — otherwise a retry after a failed refund would be
+  // refused against a balance that already owes the account. Best effort: the
+  // debt is durable, so a failure here costs a later retry rather than the
+  // allowance, and it must not block this admission.
+  try {
+    await settlePendingCompensations(env, uid, { period, now });
+  } catch (err) {
+    console.warn(
+      `usage compensation sweep failed for ${uid} (${period}): ${err?.message || err}`,
+    );
+  }
+
   const statements = entries.map((entry) =>
     env.DB.prepare(CHARGE_SQL).bind(
       uid,
@@ -365,10 +425,11 @@ export async function consumeAllowance(
 
   if (refusal) {
     // Any failed limit rejects the whole request; every charge the batch did
-    // apply is compensated. The refund is one transaction (all-or-nothing)
-    // and `refunded: false` tells the caller it could not be applied, so a
-    // durably retryable compensation is never assumed to have succeeded.
-    const refunded = await refundCharges(env, uid, period, applied, now);
+    // apply is compensated. The refund is one transaction (all-or-nothing). If
+    // it cannot be written the debt is recorded durably and `refundDeferred`
+    // reports that the allowance is owed rather than returned — a caller must
+    // never be told a refund happened when the counters still hold it.
+    const refund = await refundCharges(env, uid, period, applied, now);
     const usage = await getUsage(env, uid, { period });
     const evaluation = {
       ...evaluateLimit(plan, usage, refusal.entry.metric),
@@ -379,8 +440,9 @@ export async function consumeAllowance(
       reason: "limit",
       metric: refusal.entry.metric,
       evaluation,
-      refunded,
-      refundedCharges: refunded ? applied : [],
+      refunded: refund.refunded,
+      refundDeferred: refund.deferred,
+      refundedCharges: refund.refunded || refund.deferred ? applied : [],
       period,
     };
   }
@@ -410,14 +472,18 @@ export async function refundUsage(
   }
   if (entries.length === 0) return { ok: true, refunded: [] };
   await ensureUsageTables(env);
-  if (!(await refundCharges(env, uid, period, entries, now))) {
+  const refund = await refundCharges(env, uid, period, entries, now);
+  if (!refund.refunded && !refund.deferred) {
     throw new UsageUnavailableError("Usage counters could not be refunded.");
   }
-  return { ok: true, refunded: entries };
+  // Deferred means the debt is durable and will be returned on the next
+  // admission for this account. Reporting that as a failure would be wrong, and
+  // reporting it as "already returned" would be worse.
+  return { ok: true, refunded: entries, deferred: refund.deferred };
 }
 
 async function refundCharges(env, uid, period, charges, now) {
-  if (charges.length === 0) return true;
+  if (charges.length === 0) return { refunded: true, deferred: false, recorded: [] };
   try {
     const statements = charges.map((charge) =>
       env.DB.prepare(REFUND_SQL).bind(charge.amount, now, uid, period, charge.metric),
@@ -429,18 +495,132 @@ async function refundCharges(env, uid, period, charges, now) {
     } else {
       for (const statement of statements) await statement.run();
     }
-    return true;
+    return { refunded: true, deferred: false, recorded: [] };
   } catch (err) {
-    // A failed refund means the account is charged for work that was refused.
-    // That is never an over-allowance, but it is a real accounting error, so it
-    // is logged rather than quietly swallowed.
+    // The charges have already committed, so the allowance is genuinely owed.
+    // Losing it must not depend on this call being retried: the debt is written
+    // down durably and `settlePendingCompensations` returns it later.
     console.error(
       `usage refund failed for ${uid} (${period}): ${err?.message || err}; ${charges
         .map((charge) => `${charge.metric}+${charge.amount}`)
         .join(", ")}`,
     );
-    return false;
+    const recorded = await recordCompensations(env, uid, period, charges, now);
+    return {
+      refunded: false,
+      deferred: recorded.length === charges.length,
+      recorded,
+    };
   }
+}
+
+/**
+ * Write down allowance that is owed but could not be returned.
+ *
+ * Each metric becomes its own row keyed by a fresh id: queuing the same debt
+ * twice is a no-op, and one metric failing to record cannot make another metric
+ * refundable twice.
+ */
+async function recordCompensations(env, uid, period, charges, now) {
+  const keyFor = (charge) => {
+    const unique =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `${now}-${Math.random().toString(36).slice(2)}`;
+    return `${uid}:${period}:${charge.metric}:${unique}`;
+  };
+  const statements = charges.map((charge) =>
+    env.DB.prepare(COMPENSATION_INSERT_SQL).bind(
+      keyFor(charge),
+      uid,
+      period,
+      charge.metric,
+      charge.amount,
+      now,
+      now,
+    ),
+  );
+  try {
+    if (typeof env.DB.batch === "function") {
+      await env.DB.batch(statements);
+    } else {
+      for (const statement of statements) await statement.run();
+    }
+    return charges;
+  } catch (err) {
+    // The last resort: the debt could not even be written down. Nothing more
+    // can be done here, so it must be loud.
+    console.error(
+      `usage compensation could not be recorded for ${uid} (${period}): ${err?.message || err}; ${charges
+        .map((charge) => `${charge.metric}+${charge.amount}`)
+        .join(", ")}`,
+    );
+    return [];
+  }
+}
+
+/**
+ * Return allowance that a previous refund could not return.
+ *
+ * Runs the owed counters back down and marks each debt applied in one
+ * transaction. The guard is the `pending` status, so recovery is exactly-once
+ * however many times it runs: a replay touches nothing. The decrement is floored
+ * at zero, so even a corrupted ledger cannot mint a negative balance.
+ *
+ * @returns {Promise<{settled: number, skipped?: boolean}>}
+ * @throws {UsageUnavailableError} when the accounting database is unusable.
+ */
+export async function settlePendingCompensations(
+  env,
+  uid,
+  { period = periodKey(), now = Date.now() } = {},
+) {
+  if (!meteringEnabled(env) || !uid) return { settled: 0, skipped: true };
+  await ensureUsageTables(env);
+  let rows;
+  try {
+    const result = await env.DB.prepare(PENDING_COMPENSATIONS_SQL)
+      .bind(uid, period)
+      .all();
+    rows = Array.isArray(result?.results) ? result.results : [];
+  } catch (err) {
+    throw new UsageUnavailableError(
+      `Usage compensations could not be read: ${err?.message || err}`,
+    );
+  }
+  if (rows.length === 0) return { settled: 0 };
+
+  const statements = [];
+  for (const row of rows) {
+    statements.push(
+      env.DB.prepare(COMPENSATE_COUNTER_SQL).bind(
+        Number(row.amount) || 0,
+        now,
+        uid,
+        period,
+        String(row.metric || ""),
+        String(row.compensation_key || ""),
+      ),
+    );
+    statements.push(
+      env.DB.prepare(MARK_COMPENSATION_APPLIED_SQL).bind(
+        now,
+        String(row.compensation_key || ""),
+      ),
+    );
+  }
+  try {
+    if (typeof env.DB.batch === "function") {
+      await env.DB.batch(statements);
+    } else {
+      for (const statement of statements) await statement.run();
+    }
+  } catch (err) {
+    throw new UsageUnavailableError(
+      `Usage compensations could not be applied: ${err?.message || err}`,
+    );
+  }
+  return { settled: rows.length };
 }
 
 /**

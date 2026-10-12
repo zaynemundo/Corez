@@ -71,6 +71,16 @@ is never accidentally unlimited. That is the safe default - keep it.
   charges before the task exists, so `refundUsage()` returns the allowance when
   creation throws or dispatch cannot be made durable. It floors each counter at
   zero, so a repeated failure can never be used to mint quota.
+- **A refund that cannot be written is owed, not lost.** The charges have
+  already committed when the refund runs, so a failed refund records the debt in
+  `usage_compensations` and reports `refundDeferred: true` instead of claiming
+  the allowance came back. `settlePendingCompensations()` runs before the next
+  admission for that account and returns the owed allowance exactly once: the
+  counter moves only while the row is still `pending`, and the same transaction
+  marks it applied, so recovery is idempotent by construction and a replay
+  cannot erase usage belonging to other work. `refunded: false` with
+  `refundDeferred: false` means the debt could not even be recorded — the one
+  case that is logged loudly because nothing can recover it.
 - **Tokens are best-effort**: the prompt estimate is charged at admission and
   the provider's larger reported total is reconciled afterwards with
   `recordUsageOnce(receiptKey)`; the receipt makes a replay a no-op, never a
