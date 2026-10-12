@@ -214,6 +214,7 @@ export function buildProviderChain(env = {}, extra = {}) {
           ...callOptions(options.sessionId),
           messages,
           signal: options.signal,
+          env,
           onTtft: options.onTtft,
           bodyExtra: buildBodyExtra(options),
           ...(options.model ? { model: options.model } : {}),

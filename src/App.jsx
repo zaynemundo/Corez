@@ -146,6 +146,10 @@ function MainApp({ theme, setTheme }) {
   // ref so the finished message can carry it once the turn resolves.
   const [streamingThinking, setStreamingThinking] = useState("");
   const streamingThinkingRef = useRef("");
+  // True once any reasoning text actually arrived this turn. The answer
+  // handler uses it to keep a backed reasoning panel readable and to record an
+  // honest empty state when the gateway returned no reasoning at all.
+  const sawReasoningRef = useRef(false);
   // The reasoning panel starts open (that is the whole point — the user watches
   // it think) and auto-collapses once the answer starts, like a first-party
   // chat app. The user can reopen it at any time.
@@ -547,6 +551,7 @@ function MainApp({ theme, setTheme }) {
           setStreamingSessionId(targetSessionId);
           setStreamingThinking("");
           streamingThinkingRef.current = "";
+          sawReasoningRef.current = false;
           setIsThinkingOpen(true);
           const controller = new AbortController();
           abortControllerRef.current = controller;
@@ -557,7 +562,11 @@ function MainApp({ theme, setTheme }) {
             controller.signal,
             (delta) => {
               setStreamingContent((prev) => (prev || "") + delta);
-              setIsThinkingOpen((prev) => (prev ? false : prev));
+              // Collapse only with real reasoning to read (see the main
+              // send path for why an empty panel must not auto-hide).
+              if (streamingThinkingRef.current) {
+                setIsThinkingOpen((prev) => (prev ? false : prev));
+              }
             },
             (phaseEvent) => {
               setSwarmVisible(phaseEvent.phase === "swarm-planning");
@@ -566,16 +575,19 @@ function MainApp({ theme, setTheme }) {
             null,
             {},
             (text) => {
+              if (text) sawReasoningRef.current = true;
               streamingThinkingRef.current += text;
               setStreamingThinking(streamingThinkingRef.current);
             },
           )
             .then((response) => {
               if (!response) return;
-              const aiMsg = toAssistantMessage(
-                response,
-                streamingThinkingRef.current,
-              );
+              const reasoningText = streamingThinkingRef.current
+                ? streamingThinkingRef.current
+                : sawReasoningRef.current
+                  ? ""
+                  : t("common.thinking.empty");
+              const aiMsg = toAssistantMessage(response, reasoningText);
               const extractedCode = extractCodeFromMessage(aiMsg.content);
               if (
                 extractedCode &&
@@ -1120,6 +1132,7 @@ function MainApp({ theme, setTheme }) {
       setStreamingContent("");
       setStreamingThinking("");
       streamingThinkingRef.current = "";
+      sawReasoningRef.current = false;
       setIsThinkingOpen(true);
       const response = await generateAIResponse(
         apiPrompt,
@@ -1127,9 +1140,14 @@ function MainApp({ theme, setTheme }) {
         controller.signal,
         (delta) => {
           setStreamingContent((prev) => (prev || "") + delta);
-          // The answer has started: collapse the reasoning panel so the
-          // response owns the view, exactly like a first-party chat app.
-          setIsThinkingOpen((prev) => (prev ? false : prev));
+          // The answer has started. Collapse the reasoning panel ONLY when
+          // there is reasoning to read: collapsing before any thinking text
+          // arrived hid the empty panel and — on gateways that emit reasoning
+          // late — made the panel look broken. With no reasoning yet the panel
+          // is already showing its wait state, so leave it as it is.
+          if (streamingThinkingRef.current) {
+            setIsThinkingOpen((prev) => (prev ? false : prev));
+          }
         },
         (phaseEvent) => {
           setSwarmVisible(phaseEvent.phase === "swarm-planning");
@@ -1139,16 +1157,23 @@ function MainApp({ theme, setTheme }) {
           setStreamingContent("");
           setStreamingThinking("");
           streamingThinkingRef.current = "";
+          sawReasoningRef.current = false;
           setIsThinkingOpen(true);
         },
         {},
         (text) => {
+          if (text) sawReasoningRef.current = true;
           streamingThinkingRef.current += text;
           setStreamingThinking(streamingThinkingRef.current);
         },
       );
       if (response) {
-        const aiMsg = toAssistantMessage(response, streamingThinkingRef.current);
+        const reasoningText = streamingThinkingRef.current
+          ? streamingThinkingRef.current
+          : sawReasoningRef.current
+            ? ""
+            : t("common.thinking.empty");
+        const aiMsg = toAssistantMessage(response, reasoningText);
         const extractedCode = extractCodeFromMessage(aiMsg.content);
         // Only auto-open canvas when the USER explicitly intended creation.
         // Writing/explanation prompts that happen to contain ```html from the model
@@ -1226,6 +1251,13 @@ function MainApp({ theme, setTheme }) {
         setBuildPhase(null);
         setStreamingContent(null);
         setStreamingSessionId(null);
+        // The turn is over and the finished message now carries the reasoning
+        // disclosure. Leaving the live copy set rendered a duplicate panel
+        // next to the answer until the next send.
+        setStreamingThinking("");
+        streamingThinkingRef.current = "";
+        sawReasoningRef.current = false;
+        setIsThinkingOpen(true);
         abortControllerRef.current = null;
       }
     }

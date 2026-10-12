@@ -43,3 +43,50 @@ export function toGatewayReasoning(reasoning, api) {
   if (wantsSummary) out.summary = 'auto';
   return out;
 }
+
+/**
+ * True when a canonical reasoning config asks for user-visible reasoning
+ * (`exclude: false`) or already carries the Responses summary request.
+ */
+export function wantsResponsesReasoning(reasoning) {
+  if (!reasoning || typeof reasoning !== 'object') return false;
+  return reasoning.exclude === false || reasoning.summary === 'auto';
+}
+
+/**
+ * Additional `include` paths a visible Responses request needs.
+ *
+ * `include: ['reasoning.encrypted_content']` is the documented way to carry
+ * the model's reasoning back to a stateless client. It keeps the key a
+ * decision of the caller (`responsesStoreEnabled`): storing responses may be
+ * disabled in some deployments, and a gateway that rejects the parameter
+ * still gets a one-shot retry without it (see worker/opencodeClient.js and
+ * the agent-core adapter).
+ */
+export function responsesReasoningIncludes(reasoning, { storeEnabled = true } = {}) {
+  if (!wantsResponsesReasoning(reasoning)) return [];
+  return storeEnabled ? ['reasoning.encrypted_content'] : [];
+}
+
+/**
+ * Visibility/transport fields for one Responses request. Merges the base body
+ * with the visible-reasoning extras without mutating the caller's payload:
+ * `store: true` is required for the OpenAI Responses API to emit reasoning
+ * summaries, and `include` carries the encrypted reasoning content. Existing
+ * caller values win (an explicit `store: false` is respected).
+ */
+export function withResponsesReasoningPayload(body, reasoning, { storeEnabled = true } = {}) {
+  const base = body && typeof body === 'object' ? body : {};
+  const includes = responsesReasoningIncludes(reasoning, { storeEnabled });
+  if (includes.length === 0) return base;
+  const existing = Array.isArray(base.include) ? base.include : [];
+  const merged = [...existing];
+  for (const item of includes) {
+    if (!merged.includes(item)) merged.push(item);
+  }
+  return {
+    ...base,
+    ...(base.store === undefined && storeEnabled ? { store: true } : {}),
+    ...(merged.length > 0 ? { include: merged } : {}),
+  };
+}

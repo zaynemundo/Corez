@@ -11,7 +11,11 @@ import {
   newOpencodeSessionId,
 } from './session.js';
 import { classifyFailureStatus } from './failure.js';
-import { resolveApiMode, toGatewayReasoning } from './endpoint.js';
+import {
+  resolveApiMode,
+  toGatewayReasoning,
+  withResponsesReasoningPayload,
+} from './endpoint.js';
 import { extractContentText, stripThinkingBlocks } from './text.js';
 
 // OpenCode Go is the only text provider CoreZ constructs. The DeepSeek-direct
@@ -162,6 +166,9 @@ export class ProviderAdapter {
     // Explicit endpoint shape; the URL is only sniffed as a documented
     // fallback for legacy endpoint values.
     this.api = resolveApiMode({ endpoint: this.endpoint, api: options.api });
+    // Visible reasoning on the Responses API needs `store: true` unless the
+    // caller/deployment opted out (see OPENCODE_RESPONSES_STORE in the worker).
+    this.storeEnabled = options.responsesStoreEnabled !== false;
     this.configured = Boolean(this.apiKey);
   }
 
@@ -182,8 +189,18 @@ export class ProviderAdapter {
     if (body.reasoning !== undefined) {
       body.reasoning = toGatewayReasoning(body.reasoning, this.api);
     }
-    if (Array.isArray(tools) && tools.length > 0) body.tools = tools;
-    return body;
+    // Visible reasoning on the Responses API also carries the summary request
+    // plus the transport fields (`store`, `include`) the gateway needs to
+    // emit it. A caller-supplied `store: false` wins; hidden reasoning stays
+    // untouched (zero reasoning bytes ship).
+    const withTransport =
+      this.api === 'responses'
+        ? withResponsesReasoningPayload(body, body.reasoning, {
+            storeEnabled: this.storeEnabled,
+          })
+        : body;
+    if (Array.isArray(tools) && tools.length > 0) withTransport.tools = tools;
+    return withTransport;
   }
 
   buildHeaders(_sessionId) {

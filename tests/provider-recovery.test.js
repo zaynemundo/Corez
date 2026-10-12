@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { buildProviderChain, runProviderChain, runStreamingChain, TASK_STATUS_STORE_PREFIX } from '../worker/providerChain.js';
-import { resolveApiMode, resolveOpencodeSessionId, toGatewayReasoning } from '../worker/opencodeClient.js';
+import {
+  resolveApiMode,
+  resolveOpencodeSessionId,
+  streamChatEndpoint,
+  toGatewayReasoning,
+  wantsResponsesReasoning,
+  withResponsesReasoningPayload,
+} from '../worker/opencodeClient.js';
 import { createTaskStateStore } from '../worker/utils.js';
 
 const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/responses';
@@ -894,6 +901,168 @@ describe('OpenCode gateway client behavior', () => {
     expect(text).not.toContain('secret');
     expect(events.find((e) => e.type === 'done')).toBeTruthy();
     expect(events.find((e) => e.type === 'error')).toBeUndefined();
+  });
+
+  it('requests the reasoning transport fields only for visible Responses reasoning', async () => {
+    // Hidden (internal) reasoning: effort only — no summary, no transport
+    // fields, so zero reasoning bytes and no stored response are requested.
+    expect(wantsResponsesReasoning({ effort: 'high', exclude: true })).toBe(false);
+    const hidden = withResponsesReasoningPayload(
+      { model: 'm', reasoning: { effort: 'high' } },
+      { effort: 'high', exclude: true }
+    );
+    expect(hidden).toEqual({ model: 'm', reasoning: { effort: 'high' } });
+    expect(hidden.store).toBeUndefined();
+    expect(hidden.include).toBeUndefined();
+
+    // Visible (live thinking panel): store + encrypted reasoning content.
+    expect(wantsResponsesReasoning({ effort: 'medium', exclude: false })).toBe(true);
+    const visible = withResponsesReasoningPayload(
+      { model: 'm', reasoning: { effort: 'medium', summary: 'auto' } },
+      { effort: 'medium', exclude: false }
+    );
+    expect(visible).toEqual({
+      model: 'm',
+      reasoning: { effort: 'medium', summary: 'auto' },
+      store: true,
+      include: ['reasoning.encrypted_content'],
+    });
+
+    // A deployment or caller can opt out of storing responses.
+    const unStore = withResponsesReasoningPayload(
+      { model: 'm', reasoning: { effort: 'medium', summary: 'auto' } },
+      { effort: 'medium', exclude: false },
+      { storeEnabled: false }
+    );
+    expect(unStore.store).toBeUndefined();
+    expect(unStore.include).toBeUndefined();
+
+    // An explicit caller value wins (never overridden by the transport layer).
+    const explicit = withResponsesReasoningPayload(
+      { model: 'm', store: false, include: ['custom.path'] },
+      { effort: 'medium', exclude: false }
+    );
+    expect(explicit.store).toBe(false);
+    expect(explicit.include).toEqual(['custom.path', 'reasoning.encrypted_content']);
+  });
+
+  it('sends the visible reasoning transport on the streaming Responses request', async () => {
+    let payload;
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+      payload = JSON.parse(init.body);
+      return new Response(
+        'data: {"type":"response.output_text.delta","delta":"answer"}\n\n' +
+          'data: {"type":"response.completed","response":{"status":"completed"}}\n\n' +
+          'data: [DONE]\n\n',
+        { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+      );
+    }));
+
+    const events = [];
+    for await (const event of runStreamingChain([{ role: 'user', content: 'hi' }], {
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode' },
+      reasoning: { effort: 'medium', exclude: false },
+      sleep: async () => {},
+      clock: () => 0,
+      jitter: () => 0
+    })) {
+      events.push(event);
+    }
+
+    expect(payload.reasoning).toEqual({ effort: 'medium', summary: 'auto' });
+    expect(payload.store).toBe(true);
+    expect(payload.include).toEqual(['reasoning.encrypted_content']);
+    expect(events.filter((e) => e.type === 'delta').map((e) => e.text).join('')).toBe('answer');
+  });
+
+  it('retries without the reasoning transport when the gateway rejects those fields', async () => {
+    const payloads = [];
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+      payloads.push(JSON.parse(init.body));
+      if (payloads.length === 1) {
+        return Response.json(
+          { error: { message: 'Unknown parameter: include' } },
+          { status: 400 }
+        );
+      }
+      return new Response(
+        'data: {"type":"response.reasoning_summary_text.delta","delta":"thinking out loud"}\n\n' +
+          'data: {"type":"response.output_text.delta","delta":"answer"}\n\n' +
+          'data: {"type":"response.completed","response":{"status":"completed"}}\n\n' +
+          'data: [DONE]\n\n',
+        { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+      );
+    }));
+
+    const events = [];
+    for await (const event of runStreamingChain([{ role: 'user', content: 'hi' }], {
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode' },
+      reasoning: { effort: 'medium', exclude: false },
+      sleep: async () => {},
+      clock: () => 0,
+      jitter: () => 0
+    })) {
+      events.push(event);
+    }
+
+    // First attempt carried the transport fields; the retry dropped them but
+    // kept the reasoning request itself, so the answer still streams.
+    expect(payloads).toHaveLength(2);
+    expect(payloads[0].store).toBe(true);
+    expect(payloads[0].include).toEqual(['reasoning.encrypted_content']);
+    expect(payloads[1].store).toBeUndefined();
+    expect(payloads[1].include).toBeUndefined();
+    expect(payloads[1].reasoning).toEqual({ effort: 'medium', summary: 'auto' });
+    const thinking = events.filter((e) => e.type === 'thinking');
+    expect(thinking.map((e) => e.text).join('')).toContain('thinking out loud');
+    const answer = events.filter((e) => e.type === 'delta').map((e) => e.text).join('');
+    expect(answer).toBe('answer');
+    expect(events.find((e) => e.type === 'error')).toBeUndefined();
+  });
+
+  it('streams reasoning segments delivered as done events or output items', async () => {
+    const sse = (event) => `data: ${JSON.stringify(event)}\n\n`;
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      sse({ type: 'response.reasoning_summary_text.done', text: 'first thought. ' })
+      + sse({
+        type: 'response.output_item.done',
+        item: {
+          type: 'reasoning',
+          summary: [{ type: 'summary_text', text: 'second thought.' }],
+        },
+      })
+      + sse({
+        type: 'response.output_item.done',
+        item: {
+          type: 'reasoning',
+          encrypted_content: 'ENCRYPTED-BLOB-MUST-NOT-LEAK',
+        },
+      })
+      + sse({ type: 'response.output_text.delta', delta: 'answer' })
+      + sse({ type: 'response.completed', response: { status: 'completed' } })
+      + 'data: [DONE]\n\n',
+      { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+    )));
+
+    const events = [];
+    for await (const event of streamChatEndpoint({
+      endpoint: OPENCODE_URL,
+      api: 'responses',
+      key: 'sk-opencode',
+      model: 'muse-spark-1.3-contributor',
+      label: 'opencode',
+      messages: [{ role: 'user', content: 'hi' }],
+      signal: null,
+    })) {
+      events.push(event);
+    }
+
+    const thinking = events.filter((e) => e.reasoning).map((e) => e.reasoning).join('');
+    expect(thinking).toBe('first thought. second thought.');
+    expect(thinking).not.toContain('ENCRYPTED');
+    const answer = events.filter((e) => e.text).map((e) => e.text).join('');
+    expect(answer).toBe('answer');
+    expect(thinking).not.toContain('answer');
   });
 
   it('returns cancelled without calling the provider when the signal is already aborted', async () => {

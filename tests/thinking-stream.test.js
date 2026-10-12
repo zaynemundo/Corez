@@ -153,8 +153,11 @@ describe('/api/ai streaming thinking', () => {
     // The reasoning must never be mixed into the reply.
     expect(answerOf(events)).not.toContain('resolver chain');
     // The provider is asked to return the reasoning, not to drop it: the
-    // Responses wire shape carries `summary: 'auto'` (there is no `exclude`).
+    // Responses wire shape carries `summary: 'auto'` (there is no `exclude`)
+    // plus the transport fields the gateway needs to emit summaries at all.
     expect(payload.reasoning).toEqual({ effort: 'medium', summary: 'auto' });
+    expect(payload.store).toBe(true);
+    expect(payload.include).toEqual(['reasoning.encrypted_content']);
   });
 
   it('never leaks the provider stack through the thinking stream', async () => {

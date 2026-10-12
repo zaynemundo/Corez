@@ -13,7 +13,12 @@ import {
   newOpencodeSessionId,
   resolveOpencodeSessionId,
 } from "../packages/agent-core/providers/session.js";
-import { resolveApiMode, toGatewayReasoning } from "../packages/agent-core/providers/endpoint.js";
+import {
+  resolveApiMode,
+  toGatewayReasoning,
+  wantsResponsesReasoning,
+  withResponsesReasoningPayload,
+} from "../packages/agent-core/providers/endpoint.js";
 import {
   createThinkingStreamFilter,
   extractContentText,
@@ -26,7 +31,16 @@ export {
   resolveApiMode,
   resolveOpencodeSessionId,
   toGatewayReasoning,
+  wantsResponsesReasoning,
+  withResponsesReasoningPayload,
 };
+
+// "1" / "true" / "yes" / "on" disable the feature; empty / "false" / "0" keep it.
+function isDisabled(value) {
+  if (value === undefined || value === null) return false;
+  const str = String(value).trim().toLowerCase();
+  return str !== "" && str !== "false" && str !== "0" && str !== "no";
+}
 
 export const OPENCODE_DEFAULT_ENDPOINT =
   "https://opencode.ai/zen/go/v1/responses";
@@ -87,6 +101,25 @@ function reasoningDeltaOf(delta) {
   return extractContentText(delta?.reasoning_content || delta?.reasoning);
 }
 
+// Text out of a Responses reasoning item. The gateway may deliver reasoning
+// as a summary part (summary_text) or a full reasoning part (reasoning_text /
+// content), and either may arrive as a delta or as one completed segment.
+function reasoningItemText(item) {
+  if (!item || typeof item !== "object") return "";
+  const parts = Array.isArray(item.summary)
+    ? item.summary
+    : Array.isArray(item.content)
+      ? item.content
+      : [];
+  return parts
+    .map((part) => {
+      if (!part || typeof part !== "object") return "";
+      if (typeof part.text === "string") return part.text;
+      return extractContentText(part);
+    })
+    .join("");
+}
+
 function extractResponsesContent(data) {
   if (!data || typeof data !== "object")
     return { content: "", reasoning: false, usage: null, stopReason: null };
@@ -143,6 +176,42 @@ function parseSseData(line) {
   }
 }
 
+// A gateway that does not implement the optional reasoning transport fields
+// answers 400 naming them. Only that specific rejection triggers the one-shot
+// retry with the base body: any other 400 is a real error the caller must see.
+const REASONING_TRANSPORT_REJECTED =
+  /\b(store|include|encrypted[\s_-]?content|reasoning)\b/i;
+
+async function sendStreamRequest(
+  attempts,
+  { endpoint, key, extraHeaders, signal },
+) {
+  let lastResponse = null;
+  // Sequential by design: the fallback is only tried after the primary
+  // rejection is observed, so the two attempts can never race.
+  for (const [index, body] of attempts.entries()) {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        ...extraHeaders,
+      },
+      body: JSON.stringify(body),
+      signal,
+    });
+    lastResponse = response;
+    const isLast = index === attempts.length - 1;
+    if (!isLast && response.status === 400) {
+      const detail = await response.text().catch(() => "");
+      if (!REASONING_TRANSPORT_REJECTED.test(detail)) return response;
+      continue;
+    }
+    return response;
+  }
+  return lastResponse;
+}
+
 /**
  * Streaming chat completion. Returns an async iterable of
  * { text, usage, finishReason, ttftMs } — text deltas as they arrive plus a
@@ -158,6 +227,7 @@ export async function* streamChatEndpoint({
   label,
   messages,
   signal,
+  env = null,
   extraHeaders = {},
   bodyExtra = {},
   onTtft,
@@ -201,16 +271,26 @@ export async function* streamChatEndpoint({
       responsesApi ? "responses" : "chat",
     );
   }
+  // Visible reasoning on the Responses API also needs `store: true` and
+  // `include: ['reasoning.encrypted_content']` for the gateway to emit the
+  // reasoning stream. `OPENCODE_RESPONSES_STORE=false` opts a deployment out.
+  const reasoningVisible =
+    responsesApi && wantsResponsesReasoning(requestBody.reasoning);
+  const storeEnabled = !isDisabled(env?.OPENCODE_RESPONSES_STORE);
+  const primaryBody = reasoningVisible
+    ? withResponsesReasoningPayload(requestBody, requestBody.reasoning, {
+        storeEnabled,
+      })
+    : requestBody;
+  // A gateway that rejects the reasoning transport fields still gets the
+  // model to answer: retry once without them instead of failing the stream.
+  const attempts = reasoningVisible ? [primaryBody, requestBody] : [requestBody];
 
   try {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-        ...extraHeaders,
-      },
-      body: JSON.stringify(requestBody),
+    const response = await sendStreamRequest(attempts, {
+      endpoint,
+      key,
+      extraHeaders,
       signal: controller.signal,
     });
 
@@ -292,6 +372,24 @@ export async function* streamChatEndpoint({
               // Reasoning stays an internal signal for the thinking panel;
               // it is never yielded as answer content.
               yield { text: "", reasoning: parsed.delta };
+            } else if (
+              // Some gateways deliver reasoning as one completed segment
+              // instead of token deltas.
+              (parsed.type === "response.reasoning_summary_text.done" ||
+                parsed.type === "response.reasoning_text.done") &&
+              typeof parsed.text === "string" &&
+              parsed.text
+            ) {
+              yield { text: "", reasoning: parsed.text };
+            } else if (
+              // Reasoning may also arrive as a completed output item with
+              // summary/content parts (encrypted blobs carry no text and are
+              // ignored by reasoningItemText).
+              parsed.type === "response.output_item.done" &&
+              parsed.item?.type === "reasoning"
+            ) {
+              const reasoningText = reasoningItemText(parsed.item);
+              if (reasoningText) yield { text: "", reasoning: reasoningText };
             } else if (
               parsed.type === "response.completed" &&
               parsed.response

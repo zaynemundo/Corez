@@ -46,6 +46,9 @@ export default {
     label: "Thinking",
     show: "Show thinking",
     hide: "Hide thinking",
+    // Honest empty state: the model answered without returning a visible
+    // reasoning summary (the gateway can decline summaries); never fake one.
+    empty: "No live reasoning summary was returned for this response.",
   },
 
   sidebar: {

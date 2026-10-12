@@ -25,6 +25,10 @@ Transient failures (408, 429, 5xx, network) are retried with adaptive exponentia
 
 Generations run as long as the model needs: no timeouts and no output token caps (`max_tokens` is never sent to any provider). The only abort is the client disconnecting (Stop button).
 
+### The live "Thinking" panel
+
+The chat UI renders the model's reasoning as a collapsible "Thinking" panel while it works. On the Responses API the request carries `reasoning: { effort, summary: 'auto' }` plus `store: true` and `include: ['reasoning.encrypted_content']` — the transport fields the gateway needs to emit summaries. A gateway that rejects those fields answers `400`, and the request is retried once without them so the answer still streams. Set `OPENCODE_RESPONSES_STORE=false` when responses must not be stored; the panel then records an honest "no live reasoning summary was returned" state instead of inventing one. Reasoning is redacted before it reaches the client (provider names never appear) and is never mixed into the answer; when the answer starts, the panel collapses only once there is reasoning to hide, so it cannot silently disappear before the model has streamed any.
+
 Conversation history is sent in full below the platform body guard; only when a request approaches the guard are older redundant turns compacted with a real generated summary and persisted retrievable records (exact code, errors, requirements and the latest user turn are always preserved verbatim).
 
 ### Publishing creations
