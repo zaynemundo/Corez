@@ -328,6 +328,34 @@ export async function requireAuth(request, env) {
   return null;
 }
 
+/**
+ * Mint a session token for an account.
+ *
+ * EVERY entry point that signs a user in goes through here — password login,
+ * signup and the Google callback. The token must carry the account's current
+ * revocation value, because `verifySession` refuses a session whose `pwd_at`
+ * claim does not match a positive `password_changed_at`. Google login used to
+ * mint its own token without the claim, so for any account that had ever reset
+ * its password the callback set a cookie that the verifier rejected on the very
+ * next request: a successful Google login that left the user signed out.
+ *
+ * A missing `password_changed_at` (a new local or Google account) is 0, which
+ * the verifier treats as "never changed".
+ */
+export async function createSessionToken(env, user) {
+  const plan = (user?.plan && String(user.plan).trim().toLowerCase()) || "free";
+  return createJWT(
+    {
+      uid: user.id,
+      email: user.email,
+      plan,
+      pwd_at: Number(user?.password_changed_at) || 0,
+      exp: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE,
+    },
+    env.AUTH_SECRET,
+  );
+}
+
 // ---------- route handler ----------
 export async function handleAuth(request, env) {
   const url = new URL(request.url);
@@ -494,15 +522,7 @@ export async function handleAuth(request, env) {
       } catch {}
     }
 
-    const token = await createJWT(
-      {
-        uid: id,
-        email,
-        plan,
-        exp: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE,
-      },
-      env.AUTH_SECRET,
-    );
+    const token = await createSessionToken(env, { id, email, plan });
     return new Response(
       JSON.stringify({ ok: true, user: { id, email, plan } }),
       {
@@ -543,18 +563,12 @@ export async function handleAuth(request, env) {
 
     const plan =
       (user.plan && String(user.plan).trim().toLowerCase()) || "free";
-    const token = await createJWT(
-      {
-        uid: user.id,
-        email: user.email,
-        plan,
-        // Revocation anchor: a later password change records a newer
-        // `password_changed_at`, and this session stops verifying.
-        pwd_at: Number(user.password_changed_at) || 0,
-        exp: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE,
-      },
-      env.AUTH_SECRET,
-    );
+    const token = await createSessionToken(env, {
+      id: user.id,
+      email: user.email,
+      plan,
+      password_changed_at: user.password_changed_at,
+    });
     return new Response(
       JSON.stringify({
         ok: true,
@@ -678,15 +692,15 @@ export async function handleAuth(request, env) {
     }
     const plan =
       (user.plan && String(user.plan).trim().toLowerCase()) || "free";
-    const token = await createJWT(
-      {
-        uid: user.id,
-        email: user.email,
-        plan,
-        exp: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE,
-      },
-      env.AUTH_SECRET,
-    );
+    // Shared factory: carries the account's revocation value, so a Google
+    // sign-in for an account that has reset its password is not rejected the
+    // moment it is issued.
+    const token = await createSessionToken(env, {
+      id: user.id,
+      email: user.email,
+      plan,
+      password_changed_at: user.password_changed_at,
+    });
 
     const headers = new Headers();
     headers.set("Location", "/");

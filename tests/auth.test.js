@@ -695,6 +695,80 @@ describe('Worker Auth Engine', () => {
       expect(await verify(relogin.session)).not.toBeNull();
     });
 
+    it('signs in through Google after a password reset without reviving the old session', async () => {
+      // Google login minted its own token and omitted the revocation claim, so
+      // for an account that had ever reset its password the callback handed out
+      // a session the verifier refused on the very next request.
+      const email = 'googleafterreset@corez.pro';
+      const oldSession = await signup(email, 'OldPassword123!', '10.23.0.1');
+      expect(await verify(oldSession)).not.toBeNull();
+
+      const { token } = await forgot(email, '10.23.0.2');
+      expect((await reset(token, 'NewPassword123!', '10.23.0.3')).status).toBe(200);
+      // The reset revoked the session issued before it.
+      expect(await verify(oldSession)).toBeNull();
+
+      const idToken = [
+        b64urlEncode(new TextEncoder().encode(JSON.stringify({ alg: 'RS256' }))),
+        b64urlEncode(
+          new TextEncoder().encode(JSON.stringify({ email, sub: 'google-sub-123' })),
+        ),
+        'signature',
+      ].join('.');
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = async () =>
+        new Response(JSON.stringify({ id_token: idToken }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      let response;
+      try {
+        response = await handleAuth(
+          new Request(
+            'https://corez.pro/api/auth/google/callback?code=code123&state=state123',
+            { headers: { Cookie: 'oauth_state=state123' } },
+          ),
+          {
+            ...mockEnv,
+            GOOGLE_CLIENT_ID: 'google-client-id',
+            GOOGLE_CLIENT_SECRET: 'google-client-secret',
+          },
+        );
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+
+      expect(response.status).toBe(302);
+      const session = (response.headers.get('Set-Cookie') || '').match(
+        new RegExp(`${SESSION_COOKIE}=([^;]+)`),
+      )?.[1];
+      expect(session).toBeTruthy();
+
+      // The new Google session works...
+      expect(await verify(session)).not.toBeNull();
+      // ...and the pre-reset session is still dead: sharing the factory must not
+      // have loosened revocation.
+      expect(await verify(oldSession)).toBeNull();
+    });
+
+    it('sends the account revocation value from every sign-in entry point', async () => {
+      // A shared factory is the point: password login, signup and Google all
+      // have to agree, so no entry point can drift again.
+      const email = 'sharedfactory@corez.pro';
+      const session = await signup(email, 'OldPassword123!', '10.24.0.1');
+      const payload = await verifyJWT(session, TEST_SECRET);
+      expect(Number(payload.pwd_at)).toBe(0);
+
+      const { token } = await forgot(email, '10.24.0.2');
+      expect((await reset(token, 'NewPassword123!', '10.24.0.3')).status).toBe(200);
+
+      const relogin = await login(email, 'NewPassword123!', '10.24.0.4');
+      const reloginPayload = await verifyJWT(relogin.session, TEST_SECRET);
+      const user = mockEnv.DB.users.get(email);
+      expect(Number(reloginPayload.pwd_at)).toBe(Number(user.password_changed_at));
+      expect(Number(reloginPayload.pwd_at)).toBeGreaterThan(0);
+    });
+
     it('consumes a reset token atomically: simultaneous uses cannot both succeed', async () => {
       const email = 'race@corez.pro';
       await signup(email, 'OldPassword123!', '10.21.0.1');
