@@ -1,11 +1,20 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import worker from '../worker/entry.js';
+import { R2TaskStore } from '../packages/agent-core/persistence/R2TaskStore.js';
 
-function memoryBucket({ failGets = 0 } = {}) {
+function memoryBucket({ failGets = 0, failGet = null } = {}) {
   const map = new Map();
   let getFailures = failGets;
+  let getFailure = failGet;
   return {
+    /** Fail every read whose key matches the predicate (until reset). */
+    setFailGet(predicate) {
+      getFailure = predicate;
+    },
     async get(key) {
+      if (getFailure && getFailure(key)) {
+        throw new Error('simulated R2 read failure');
+      }
       if (getFailures > 0) {
         getFailures -= 1;
         throw new Error(`simulated R2 read failure (${getFailures} left)`);
@@ -54,6 +63,35 @@ async function readStream(response) {
     text += decoder.decode(value, { stream: true });
   }
   return text;
+}
+
+// Reads a response for a bounded time and returns exactly what the client saw.
+// A stream that stays open (the disclosure behavior this suite guards against)
+// is aborted at the deadline, so leaked bytes surface in the assertion instead
+// of wedging the test until the harness timeout.
+async function collectWithin(env, request, timeoutMs = 1500) {
+  const controller = new AbortController();
+  const bounded = new Request(request, { signal: controller.signal });
+  const response = await worker.fetch(bounded, env);
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let text = '';
+  const timer = setTimeout(() => {
+    controller.abort();
+    reader.cancel().catch(() => {});
+  }, timeoutMs);
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value, { stream: true });
+    }
+  } catch {
+    // Deadline abort or cancel: keep the bytes already collected.
+  } finally {
+    clearTimeout(timer);
+  }
+  return { status: response.status, body: text };
 }
 
 function parseSse(text) {
@@ -158,6 +196,79 @@ describe('website task API + SSE reconnection', () => {
     const completed = events.find((e) => e.type === 'task.completed');
     expect(completed).toBeDefined();
     expect(completed.data.response).toContain('recover from network failures');
+  });
+
+  // Security regression: ownership is a precondition of the stream. When the
+  // task metadata cannot be read, ownership is unverifiable and the event log
+  // must not be disclosed — even though it is perfectly readable.
+  it('delivers zero task events when metadata is unreadable but the event log is readable', async () => {
+    const bucket = memoryBucket();
+    const env = environment({ ASSET_BUCKET: bucket, OPENCODE_GO_API_KEY: 'test-key' });
+    const store = new R2TaskStore({ bucket });
+    const taskId = 'task_unreadable_metadata';
+    const secret = 'EVENT-LOG-PAYLOAD-ALICE-ONLY';
+    await store.createTask({
+      taskId,
+      userId: 'alice',
+      sessionId: 's',
+      workspaceId: null,
+      status: 'running',
+      prompt: 'owner only',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+    await store.appendEvent(taskId, { type: 'task.started', taskId });
+    await store.appendEvent(taskId, { type: 'task.completed', taskId, response: secret });
+
+    // The event log stays readable; every task-metadata read fails.
+    bucket.setFailGet((key) => key === `tasks/${taskId}.json`);
+
+    const owner = await collectWithin(env, fetchRequest(`https://corez.test/api/tasks/${taskId}/events`));
+    expect(owner.status).toBe(503);
+    expect(owner.body).not.toContain(secret);
+    expect(owner.body).not.toContain('task.started');
+
+    // Another account must never receive the log either.
+    const stranger = await collectWithin(env, new Request(`https://corez.test/api/tasks/${taskId}/events`, {
+      headers: { 'x-corez-user': 'bob' }
+    }));
+    expect(stranger.status).toBe(503);
+    expect(stranger.body).not.toContain(secret);
+    expect(stranger.body).not.toContain('task.started');
+  });
+
+  it('rejects a stream when the task record is gone but its event log remains', async () => {
+    const bucket = memoryBucket();
+    const env = environment({ ASSET_BUCKET: bucket, OPENCODE_GO_API_KEY: 'test-key' });
+    const store = new R2TaskStore({ bucket });
+    const taskId = 'task_deleted_record';
+    const secret = 'ORPHANED-EVENT-PAYLOAD';
+    await store.createTask({
+      taskId,
+      userId: 'alice',
+      sessionId: 's',
+      workspaceId: null,
+      status: 'completed',
+      prompt: 'owner only',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+    await store.appendEvent(taskId, { type: 'task.completed', taskId, response: secret });
+
+    // The metadata record is gone (partially deleted task); the log survives.
+    await bucket.delete(`tasks/${taskId}.json`);
+
+    const response = await collectWithin(env, fetchRequest(`https://corez.test/api/tasks/${taskId}/events`));
+    expect(response.status).toBe(404);
+    expect(response.body).not.toContain(secret);
+    expect(response.body).not.toContain('task.completed');
+  });
+
+  it('does not open an event stream when task storage is not configured', async () => {
+    const env = environment({ OPENCODE_GO_API_KEY: 'test-key' });
+    const response = await collectWithin(env, fetchRequest('https://corez.test/api/tasks/task_no_storage/events'));
+    expect(response.status).toBe(503);
+    expect(response.body).not.toContain('event:');
   });
 
   it('cancel aborts the running task and exposes the cancelled terminal state', async () => {

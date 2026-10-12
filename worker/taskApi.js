@@ -305,21 +305,47 @@ function parseLastEventId(value) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
+// The event stream may only open after the task record has been read and the
+// caller's ownership of it confirmed. A metadata read that fails leaves the
+// owner unknown, which is NOT permission to stream: without a verified owner
+// the event log must not be disclosed. Transient read failures get a small
+// bounded retry, then the request fails closed with 503.
+const STREAM_OWNERSHIP_ATTEMPTS = 3;
+const STREAM_OWNERSHIP_RETRY_MS = 150;
+
+// Returns null when ownership is established, otherwise the error response.
+async function establishTaskOwnership(store, taskId, userId) {
+  if (!store.available) {
+    return jsonResponse(503, {
+      error: "Task storage (ASSET_BUCKET) is not configured.",
+    });
+  }
+  for (let attempt = 0; attempt < STREAM_OWNERSHIP_ATTEMPTS; attempt += 1) {
+    if (attempt > 0) {
+      await sleep(STREAM_OWNERSHIP_RETRY_MS + Math.floor(Math.random() * 100));
+    }
+    let task;
+    try {
+      task = await store.getTask(taskId);
+    } catch {
+      continue; // transient read failure: retry, then fail closed below
+    }
+    if (!task) return jsonResponse(404, { error: "Task not found." });
+    if (task.userId !== userId) {
+      return jsonResponse(403, { error: "Access denied." });
+    }
+    return null; // ownership established: the stream may open
+  }
+  return jsonResponse(503, {
+    error:
+      "Task storage is temporarily unavailable; ownership could not be verified.",
+  });
+}
+
 async function streamTaskEvents(request, env, taskId, userId) {
   const store = taskStoreFor(env);
-  let initialTask;
-  try {
-    initialTask = await store.getTask(taskId);
-  } catch {
-    initialTask = null; // transient read failure: recover inside the poll loop
-  }
-  if (initialTask === null) {
-    // The task record may be temporarily unreadable; poll for it briefly.
-  } else if (initialTask === undefined || !initialTask) {
-    return jsonResponse(404, { error: "Task not found." });
-  } else if (initialTask.userId !== userId) {
-    return jsonResponse(403, { error: "Access denied." });
-  }
+  const denied = await establishTaskOwnership(store, taskId, userId);
+  if (denied) return denied;
 
   const encoder = new TextEncoder();
   const { readable, writable } = new TransformStream();
@@ -382,6 +408,10 @@ async function streamTaskEvents(request, env, taskId, userId) {
       } catch {
         current = null;
       }
+      // Ownership was verified before the stream opened; a readable record
+      // that no longer belongs to the verified caller is an inconsistent
+      // store, and no further event may be sent from it.
+      if (current && current.userId !== userId) break;
       if (current && TERMINAL_TASK_STATUSES.has(current.status)) {
         await sendEvent({
           id: sinceId + 1,
