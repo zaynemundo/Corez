@@ -20,6 +20,7 @@ import {
   isProductionRequest,
   SESSION_COOKIE
 } from '../worker/auth.js';
+import { createSqliteD1 } from './helpers/sqliteD1.js';
 
 function createMockD1() {
   const users = new Map();
@@ -115,7 +116,30 @@ function createMockD1() {
             }
             return { success: true };
           }
-          if (q.startsWith('UPDATE users SET')) {
+          if (q.startsWith('UPDATE users SET password_hash=?')) {
+          // The guarded password write: bound is (hash, changed_at, user_id,
+          // reset_id). Mirrors the SQL guard — when the token is no longer
+          // unused this request owns nothing, so it writes nothing. Modelling
+          // the guard is what makes the race test below meaningful: without it
+          // both passwords were written and the test still passed.
+          const [hash, changedAt, id, resetId] = bound;
+          let claimable = false;
+          for (const row of passwordResets.values()) {
+            if (row.id === resetId && Number(row.used) === 0) {
+              claimable = true;
+              break;
+            }
+          }
+          if (!claimable) return { success: true, meta: { changes: 0 } };
+          for (const u of users.values()) {
+            if (u.id === id) {
+              u.password_hash = hash;
+              u.password_changed_at = changedAt;
+            }
+          }
+          return { success: true, meta: { changes: 1 } };
+        }
+        if (q.startsWith('UPDATE users SET')) {
             const id = bound[bound.length - 1];
             for (const u of users.values()) {
               if (u.id === id) {
@@ -707,6 +731,114 @@ describe('Worker Auth Engine', () => {
       const logged = warnings.join('\n');
       expect(logged).not.toContain(token);
       expect(logged).not.toContain(`token=${token}`);
+    });
+  });
+
+  // The mock above models change metadata but not SQL guards, so it cannot tell
+  // "the token claim was refused" from "the password was written anyway" — its
+  // unconditional `UPDATE users SET` branch applies both writes and the test
+  // still passes. These run the real statements through SQLite, where a guarded
+  // UPDATE matching no rows is a SUCCESSFUL statement: the exact property that
+  // let a rejected request change the password.
+  describe('password reset token atomicity (real SQL)', () => {
+    const post = (path, body, ip) =>
+      new Request(`https://corez.pro${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': ip },
+        body: JSON.stringify(body)
+      });
+
+    // Wrap a real SQLite D1 so the token read can be interleaved with the write.
+    function withResetRace(db) {
+      let readers = 0;
+      let release;
+      const bothRead = new Promise((resolve) => {
+        release = resolve;
+      });
+      return {
+        __sqlite: db.__sqlite,
+        prepare(sql) {
+          const inner = db.prepare(sql);
+          return {
+            __runSync: () => inner.__runSync(),
+            bind(...values) {
+              inner.bind(...values);
+              return this;
+            },
+            async run() {
+              return inner.__runSync();
+            },
+            async all() {
+              return inner.all();
+            },
+            async first() {
+              if (/FROM password_resets WHERE token=/i.test(sql)) {
+                readers += 1;
+                if (readers === 2) release();
+                await bothRead;
+              }
+              return inner.first();
+            }
+          };
+        },
+        batch(statements) {
+          return db.batch(statements);
+        }
+      };
+    }
+
+    async function seedAccountAndToken(db, email, token) {
+      const env = { DB: db, AUTH_SECRET: 'reset-race-secret' };
+      await ensureTables(env);
+      const signupRes = await handleAuth(
+        post('/api/auth/signup', { email, password: 'Original123!' }, '10.30.0.1'),
+        env
+      );
+      expect(signupRes.status).toBe(200);
+      const user = await db.prepare('SELECT * FROM users WHERE email=?').bind(email).first();
+      await db
+        .prepare(
+          'INSERT INTO password_resets (id, email, token, expires_at, used, created_at, user_id) VALUES (?,?,?,?,0,?,?)'
+        )
+        .bind('pr_race', email, token, Date.now() + 3600_000, Date.now(), user.id)
+        .run();
+      return { env, user };
+    }
+
+    it('never lets the request that lost the token race change the password', async () => {
+      const db = createSqliteD1();
+      const { env, user } = await seedAccountAndToken(db, 'resettrace@corez.pro', 'tok_reset_race');
+      const racing = { ...env, DB: withResetRace(db) };
+      const originalHash = user.password_hash;
+
+      const responses = await Promise.all([
+        handleAuth(post('/api/auth/reset', { token: 'tok_reset_race', password: 'Winner111!' }, '10.30.0.2'), racing),
+        handleAuth(post('/api/auth/reset', { token: 'tok_reset_race', password: 'Loser222!' }, '10.30.0.3'), racing)
+      ]);
+
+      const statuses = responses.map((res) => res.status).sort();
+      expect(statuses).toEqual([200, 400]);
+
+      // The decisive assertion. Checking only that one of the two passwords
+      // works passes even when the REJECTED request wrote its own, because the
+      // last write wins — that is how this shipped.
+      const winner = responses[0].status === 200 ? 'Winner111!' : 'Loser222!';
+      const loser = winner === 'Winner111!' ? 'Loser222!' : 'Winner111!';
+      const stored = await db
+        .prepare('SELECT password_hash, password_changed_at FROM users WHERE id=?')
+        .bind(user.id)
+        .first();
+      expect(stored.password_hash).not.toBe(originalHash);
+      expect(await verifyPassword(winner, stored.password_hash)).toBe(true);
+      expect(await verifyPassword(loser, stored.password_hash)).toBe(false);
+      expect(await verifyPassword('Original123!', stored.password_hash)).toBe(false);
+
+      // The token is spent exactly once.
+      const spent = await db
+        .prepare('SELECT used FROM password_resets WHERE id=?')
+        .bind('pr_race')
+        .first();
+      expect(Number(spent.used)).toBe(1);
     });
   });
 });

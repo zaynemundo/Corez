@@ -860,21 +860,36 @@ export async function handleAuth(request, env) {
 
     const now = Date.now();
     const hash = await hashPassword(password);
-    // Two writes, one transaction: the password replacement and the
-    // single-use token claim commit together, and the claim is conditional
-    // (`used=0`). Two requests racing on one token therefore cannot both
-    // succeed — the loser sees zero changed rows and gets the "already used"
-    // answer instead of a second password write.
+    // The password write is CONDITIONAL on this request still owning a valid,
+    // unused reset token, and both writes commit in one transaction.
+    //
+    // The claim alone is not enough. A guarded UPDATE that matches no rows is a
+    // *successful* statement in SQL, so a batch whose claim lost the race still
+    // committed the password write that preceded it — the rejected request's
+    // password was the one left in the database. Repeating the token guard on
+    // the password write means the loser of the race writes nothing at all.
+    //
+    // Order matters: the guard has to be evaluated while the token still reads
+    // `used=0`, so the password write is first and the claim that spends the
+    // token is second. The token's expiry and existence were established by the
+    // read above; what this transaction has to settle is OWNERSHIP of the
+    // single-use claim.
+    let passwordResult;
     let claimResult;
     try {
       const results = await env.DB.batch([
         env.DB.prepare(
-          "UPDATE users SET password_hash=?, password_changed_at=? WHERE id=?",
-        ).bind(hash, now, user.id),
+          `UPDATE users SET password_hash=?, password_changed_at=?
+           WHERE id=?
+             AND EXISTS (
+               SELECT 1 FROM password_resets WHERE id=? AND used=0
+             )`,
+        ).bind(hash, now, user.id, row.id),
         env.DB.prepare(
           "UPDATE password_resets SET used=1 WHERE id=? AND used=0",
         ).bind(row.id),
       ]);
+      passwordResult = results?.[0];
       claimResult = results?.[1];
     } catch (err) {
       // D1 batches are atomic: a failure means neither write happened.
@@ -883,9 +898,12 @@ export async function handleAuth(request, env) {
         error: "Password reset failed. Please request a new link.",
       });
     }
+    const passwordWritten = Number(passwordResult?.meta?.changes) > 0;
     const claimed = Number(claimResult?.meta?.changes) > 0;
-    if (!claimed) {
-      return jsonResponse(400, { error: "Reset token already used" });
+    if (!passwordWritten || !claimed) {
+      // The token lost a race or expired between the read and the write.
+      // Nothing was stored, so the existing password is untouched.
+      return jsonResponse(400, { error: "Reset token already used or expired" });
     }
     // Session revocation is the password_changed_at write above: every token
     // issued before `now` now fails verifySession's comparison, so a stolen
