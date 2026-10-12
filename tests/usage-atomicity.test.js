@@ -446,52 +446,103 @@ describe('atomic budget admission', () => {
     const db = refundFailsD1();
     const env = { DB: db };
     const uid = 'owed';
-    await seedCounter(db, uid, 'tokens', 1000);
+    // The reported shape: messages is at its limit and refused, while titles and
+    // tokens both apply — so the failed refund owes TWO metrics, not one.
     await seedCounter(db, uid, 'messages', PLAN_LIMITS.free.messages);
+    await seedCounter(db, uid, 'titles', 3);
+    await seedCounter(db, uid, 'tokens', 1000);
 
-    // tokens charges fine, messages is at its limit, and the refund of the
-    // tokens charge cannot be written.
     const refused = await consumeAllowance(env, uid, {
       plan: 'free',
       charges: [
-        { metric: 'tokens', amount: 100 },
         { metric: 'messages', amount: 1 },
+        { metric: 'titles', amount: 1 },
+        { metric: 'tokens', amount: 100 },
       ],
     });
 
     expect(refused.ok).toBe(false);
+    expect(refused.metric).toBe('messages');
     expect(refused.refunded).toBe(false);
     // The account is told the truth: the allowance is owed, not returned.
     expect(refused.refundDeferred).toBe(true);
-    expect(refused.refundedCharges).toEqual([{ metric: 'tokens', amount: 100 }]);
-    expect((await getUsage(env, uid)).tokens).toBe(1100);
+    expect(refused.refundedCharges).toEqual([
+      { metric: 'titles', amount: 1 },
+      { metric: 'tokens', amount: 100 },
+    ]);
 
-    // The debt is durable, not just a log line.
+    // Counters after the failed refund: exactly the numbers from the report.
+    const leaked = await getUsage(env, uid);
+    expect(leaked.messages).toBe(PLAN_LIMITS.free.messages);
+    expect(leaked.titles).toBe(4);
+    expect(leaked.tokens).toBe(1100);
+
+    // The debt is durable, not just a log line: one row per owed metric.
     const owed = await getRows(
       db,
-      "SELECT * FROM usage_compensations WHERE user_id='owed' AND status='pending'",
+      "SELECT * FROM usage_compensations WHERE user_id='owed' AND status='pending' ORDER BY metric",
     );
-    expect(owed).toHaveLength(1);
-    expect(owed[0].metric).toBe('tokens');
-    expect(Number(owed[0].amount)).toBe(100);
+    expect(owed.map((row) => [row.metric, Number(row.amount)])).toEqual([
+      ['titles', 1],
+      ['tokens', 100],
+    ]);
 
     // Storage recovers.
     db.setFailing(false);
     const first = await settlePendingCompensations(env, uid);
-    expect(first.settled).toBe(1);
-    expect((await getUsage(env, uid)).tokens).toBe(1000);
+    expect(first.settled).toBe(2);
+    const restored = await getUsage(env, uid);
+    expect(restored.messages).toBe(PLAN_LIMITS.free.messages);
+    expect(restored.titles).toBe(3);
+    expect(restored.tokens).toBe(1000);
 
     // Recovery is exactly-once: running it again must not return the allowance
     // a second time, which would erase usage belonging to other work.
     const replay = await settlePendingCompensations(env, uid);
     expect(replay.settled).toBe(0);
-    expect((await getUsage(env, uid)).tokens).toBe(1000);
+    const stillRestored = await getUsage(env, uid);
+    expect(stillRestored.titles).toBe(3);
+    expect(stillRestored.tokens).toBe(1000);
     expect(
       await getRows(
         db,
         "SELECT * FROM usage_compensations WHERE user_id='owed' AND status='pending'",
       ),
     ).toHaveLength(0);
+  });
+
+  it('returns owed allowance once when two sweeps run at the same time', async () => {
+    // The guard's real job. A replay is already a no-op because the sweep only
+    // selects `pending` rows, but two sweeps that both read the row as pending
+    // before either writes would each decrement the counter, returning the same
+    // allowance twice and erasing usage that belongs to other work.
+    const db = createSqliteD1();
+    const env = { DB: db };
+    const uid = 'owed-race';
+    await seedCounter(db, uid, 'tokens', 1100);
+    await ensureUsageTables(env);
+    await db
+      .prepare(
+        `INSERT INTO usage_compensations (compensation_key, user_id, period, metric, amount, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)`,
+      )
+      .bind('owed-race-key', uid, PERIOD, 'tokens', 100, Date.now(), Date.now())
+      .run();
+
+    const [first, second] = await Promise.all([
+      settlePendingCompensations(env, uid),
+      settlePendingCompensations(env, uid),
+    ]);
+
+    // Both sweeps saw the row; only one may move the counter.
+    expect(first.settled + second.settled).toBeGreaterThanOrEqual(1);
+    expect((await getUsage(env, uid)).tokens).toBe(1000);
+    const rows = await getRows(
+      db,
+      "SELECT status FROM usage_compensations WHERE compensation_key='owed-race-key'",
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe('applied');
   });
 
   it('sweeps owed allowance before admitting, so a retry sees the restored balance', async () => {
