@@ -1,0 +1,80 @@
+# The one definition of "the change is verified".
+#
+# Both pipelines call this workflow, so a gate can never be added to one lane and
+# forgotten in the other. That happened before: the pull-request lane ran
+# `evaluate:intents`, `audit:skills` and `art:check` while the deploy lane ran
+# only lint, unit tests and the build — and `art:check` was failing in the lane
+# nobody watched.
+#
+# Callers: `.github/workflows/verify.yml` (pull requests) and
+# `.github/workflows/deploy.yml` (push to main, which gates deployment).
+name: Verify (shared)
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  # Fast feedback lane: lint, unit tests, and the production build. Contract
+  # suites run in parallel below so a unit regression never waits on the
+  # slower hosted-worker contracts.
+  verify-fast:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Run unit test suite
+        run: npm test
+
+      - name: Run production build
+        run: npm run build
+
+      # Not part of npm test: the intent metric gates and the skill-rot audit
+      # enforce quality contracts that the unit suite does not cover, and both
+      # failed silently in the past when nothing ran them.
+      - name: Enforce intent classifier metric gates
+        run: npm run evaluate:intents
+
+      - name: Audit the skill library
+        run: npm run audit:skills
+
+      # The design contract is generated from src/index.css, so this fails when
+      # a token changes without regenerating the artifact reviewers cite.
+      - name: Check the design contract is current
+        run: npm run art:check
+
+  verify-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run hosted AI contract suite
+        run: npm run test:cloudflare
+
+      - name: Run swarm and harness contract suite
+        run: npm run test:swarm

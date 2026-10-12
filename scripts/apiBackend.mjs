@@ -44,29 +44,60 @@ export function isLocalTarget(target) {
 }
 
 /**
- * @param {{ probe: () => Promise<boolean>, envTarget?: string|null }} input
- * @returns {Promise<string>} the target the proxy should use
+ * The backend the proxy must use.
+ *
+ * Production is NEVER selected implicitly. A dev session that silently talks to
+ * the deployed Worker writes real subscriptions, tasks and published creations
+ * for someone who only ran `npm run dev`, so the deployed backend must be named
+ * explicitly:
+ *
+ *   API_BACKEND_URL=https://corez.pro npm run dev
+ *
+ * Without it the target is the local Worker, and a local Worker that is not
+ * listening is reported as such instead of being papered over by a failover.
+ *
+ * @param {{ probe?: () => Promise<boolean>, envTarget?: string|null }} input
+ * @returns {Promise<{ target: string, explicit: boolean, localWorkerUp: boolean|null }>}
  */
-export async function chooseBackend({ probe, envTarget = null }) {
-  if (envTarget) return envTarget;
+export async function chooseBackend({ probe, envTarget = null } = {}) {
+  if (envTarget) return { target: envTarget, explicit: true, localWorkerUp: null };
+  let localWorkerUp = false;
   try {
-    const localUp = await probe();
-    return localUp ? DEFAULT_LOCAL_TARGET : DEFAULT_LIVE_TARGET;
+    localWorkerUp = Boolean(await probe?.());
   } catch {
-    return DEFAULT_LIVE_TARGET;
+    // A probe that throws means nothing answered the probe: not listening.
   }
+  return { target: DEFAULT_LOCAL_TARGET, explicit: false, localWorkerUp };
 }
 
 /**
  * The message a developer sees when a request could not be delivered. It names
- * the target that actually failed — after a failover the current target is no
- * longer the one that refused the connection, and reporting the new one sends
- * people looking in the wrong place.
+ * the target that actually failed, and the advice distinguishes "nothing is
+ * listening" from "something answered and the answer was bad" — restarting a
+ * healthy Worker does not fix an HTTP error.
  */
-export function backendErrorMessage({ attemptedTarget, error, liveTarget = DEFAULT_LIVE_TARGET, hasExplicitTarget = false }) {
+export function backendErrorMessage({
+  attemptedTarget,
+  error,
+  liveTarget = DEFAULT_LIVE_TARGET,
+  hasExplicitTarget = false,
+}) {
   const detail = error?.code || error?.message || 'proxy error';
-  const advice = hasExplicitTarget
-    ? 'Check API_BACKEND_URL.'
-    : `Start one with "npm run dev:worker", or leave it off to use ${liveTarget}`;
-  return `Could not reach a Worker at ${attemptedTarget} (${detail}). ${advice}.`;
+  if (hasExplicitTarget) {
+    return `Could not reach a Worker at ${attemptedTarget} (${detail}). Check API_BACKEND_URL.`;
+  }
+  const advice = isConnectionFailure(error)
+    ? `Start one with "npm run dev:worker", or set API_BACKEND_URL=${liveTarget} to use the deployed Worker.`
+    : `The Worker at ${attemptedTarget} answered with an error. Set API_BACKEND_URL=${liveTarget} to use the deployed Worker instead.`;
+  return `Could not reach a Worker at ${attemptedTarget} (${detail}). ${advice}`;
+}
+
+/**
+ * The startup warning when the chosen backend is a local Worker that is not
+ * answering. Returns null when there is nothing to warn about, so the caller can
+ * log unconditionally.
+ */
+export function localBackendWarning(choice) {
+  if (!choice || choice.explicit || choice.localWorkerUp !== false) return null;
+  return `[api-proxy] no Worker is listening at ${choice.target}. Start one with "npm run dev:worker", or set API_BACKEND_URL to point at a deployed Worker.`;
 }

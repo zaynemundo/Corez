@@ -5,6 +5,8 @@ config="wrangler.jsonc"
 package="package.json"
 readme="README.md"
 workflow=".github/workflows/deploy.yml"
+shared_workflow=".github/workflows/verify-shared.yml"
+pr_workflow=".github/workflows/verify.yml"
 failures=0
 
 check() {
@@ -50,11 +52,24 @@ check 'Wrangler deploy script exists' '"deploy"' "$package"
 check 'README documents Cloudflare deployment' 'Cloudflare Worker' "$readme"
 check 'README documents the build command' 'npm run build' "$readme"
 check 'README documents the deploy command' 'npx wrangler deploy' "$readme"
-check 'GitHub Actions uses the current setup-node action' 'actions/setup-node@v4' "$workflow"
-check 'deployment runs the hosted AI contract suite' 'npm run test:cloudflare' "$workflow"
+check 'GitHub Actions uses the current setup-node action' 'actions/setup-node@v4' "$shared_workflow"
+# The deploy lane and the pull-request lane both run the SAME gate, so a check
+# can never exist in one and be missing from the other.
+check 'deployment runs the shared verification gate' 'verify-shared[.]yml' "$workflow"
+check 'pull-request lane runs the shared verification gate' 'verify-shared[.]yml' "$pr_workflow"
+check 'shared gate runs the hosted AI contract suite' 'npm run test:cloudflare' "$shared_workflow"
+check 'shared gate runs the swarm contract suite' 'npm run test:swarm' "$shared_workflow"
+check 'shared gate runs the intent metric gates' 'npm run evaluate:intents' "$shared_workflow"
+check 'shared gate audits the skill library' 'npm run audit:skills' "$shared_workflow"
+check 'shared gate checks the design contract' 'npm run art:check' "$shared_workflow"
+check 'deployment gates the release on the shared verification' 'needs:[[:space:]]*\[verify\]' "$workflow"
 check 'deployment uploads a tagged Worker version without resyncing routes' 'wrangler versions upload --tag' "$workflow"
 check 'deployment promotes the tagged Worker version' 'wrangler versions deploy --version-tag' "$workflow"
 check 'deployment tags reruns uniquely' 'GITHUB_RUN_ATTEMPT' "$workflow"
+# The versioned pipeline does not sync triggers, so the recovery cron declared in
+# wrangler.jsonc is applied explicitly and then confirmed on the live Worker.
+check 'deployment applies the declared triggers' 'wrangler triggers deploy' "$workflow"
+check 'deployment verifies the recovery cron is attached' 'workers/scripts/chat/schedules' "$workflow"
 check_absent 'deployment does not use route-syncing wrangler deploy' 'run:[[:space:]]*(npx[[:space:]]+)?wrangler deploy([[:space:]]|$)|run:[[:space:]]*npm run deploy([[:space:]]|$)|cloudflare/wrangler-action' "$workflow"
 
 if (( failures > 0 )); then

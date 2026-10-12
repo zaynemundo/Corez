@@ -5,57 +5,19 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
-  # Fast feedback lane: lint, unit tests, and the production build. Contract
-  # suites run in parallel so a unit regression never waits on the slower
-  # hosted-worker contracts.
-  verify-fast:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run linter
-        run: npm run lint
-
-      - name: Run unit test suite
-        run: npm test
-
-      - name: Run build
-        run: npm run build
-
-  verify-contracts:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run hosted AI contract suite
-        run: npm run test:cloudflare
-
-      - name: Run swarm and harness contract suite
-        run: npm run test:swarm
+  # The SAME gate the pull-request lane runs. Previously this lane ran only
+  # lint, unit tests and the build, so `evaluate:intents`, `audit:skills` and
+  # `art:check` could fail in the pull-request lane without ever blocking a
+  # deploy.
+  verify:
+    uses: ./.github/workflows/verify-shared.yml
 
   deploy:
-    needs: [verify-fast, verify-contracts]
+    needs: [verify]
     runs-on: ubuntu-latest
     environment: production
     concurrency: production
@@ -95,6 +57,45 @@ jobs:
 
       - name: Deploy Worker version
         run: npx wrangler versions deploy --version-tag "${GITHUB_SHA}-${GITHUB_RUN_ATTEMPT}" --message "GitHub ${GITHUB_SHA} attempt ${GITHUB_RUN_ATTEMPT}" --yes
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # `wrangler versions` deliberately does not sync triggers, so the
+      # dispatch-outbox recovery cron declared in wrangler.jsonc was never
+      # applied by this pipeline — it existed only if someone ran the command by
+      # hand. The queue consumer also sweeps on every batch, so a missing cron
+      # costs latency on recovery rather than data, but the declared trigger is
+      # infrastructure and belongs in the release.
+      - name: Deploy recovery cron trigger
+        run: npx wrangler triggers deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # Confirm the trigger is actually attached to the deployed Worker. A
+      # confirmed absence fails the release; an unreadable answer (the token
+      # lacking Workers Scripts:Read) warns instead, because the deploy itself
+      # has already succeeded and guessing either way would be dishonest.
+      - name: Verify recovery cron trigger
+        run: |
+          set -uo pipefail
+          url="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/chat/schedules"
+          body="$(curl -sS -w '\n%{http_code}' -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" "$url" || true)"
+          code="$(printf '%s' "$body" | tail -n1)"
+          payload="$(printf '%s' "$body" | sed '$d')"
+          echo "schedules API responded ${code}"
+          echo "$payload"
+          if [ "$code" != "200" ]; then
+            echo "::warning::Could not read the cron schedules (HTTP ${code}). Grant the deploy token Workers Scripts:Read to verify this automatically."
+            exit 0
+          fi
+          if printf '%s' "$payload" | grep -q '\*/2 \* \* \* \*'; then
+            echo "Recovery cron is attached."
+            exit 0
+          fi
+          echo "::error::The recovery cron (*/2 * * * *) is NOT attached to the deployed Worker."
+          exit 1
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

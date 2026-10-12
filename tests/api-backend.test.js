@@ -12,39 +12,64 @@ import {
   chooseBackend,
   isConnectionFailure,
   isLocalTarget,
+  localBackendWarning,
 } from '../scripts/apiBackend.mjs';
 
 describe('dev proxy backend selection', () => {
   it('prefers a Worker running on this machine', async () => {
-    const target = await chooseBackend({ probe: async () => true });
-    expect(target).toBe(DEFAULT_LOCAL_TARGET);
+    const choice = await chooseBackend({ probe: async () => true });
+    expect(choice.target).toBe(DEFAULT_LOCAL_TARGET);
+    expect(choice.explicit).toBe(false);
+    expect(choice.localWorkerUp).toBe(true);
   });
 
-  it('falls back to the deployed Worker, so the app works with no local backend', async () => {
-    const target = await chooseBackend({ probe: async () => false });
-    expect(target).toBe(DEFAULT_LIVE_TARGET);
+  it('never selects the deployed Worker implicitly', async () => {
+    // A dev session that silently talks to production writes real
+    // subscriptions, tasks and published creations. The deployed backend must
+    // be named with API_BACKEND_URL instead.
+    const choice = await chooseBackend({ probe: async () => false });
+    expect(choice.target).toBe(DEFAULT_LOCAL_TARGET);
+    expect(choice.target).not.toBe(DEFAULT_LIVE_TARGET);
+    expect(choice.explicit).toBe(false);
+    expect(choice.localWorkerUp).toBe(false);
   });
 
   it('treats a throwing probe as "not available" instead of failing config load', async () => {
-    const target = await chooseBackend({
+    const choice = await chooseBackend({
       probe: async () => {
         throw new Error('ECONNREFUSED');
       },
     });
-    expect(target).toBe(DEFAULT_LIVE_TARGET);
+    expect(choice.target).toBe(DEFAULT_LOCAL_TARGET);
+    expect(choice.localWorkerUp).toBe(false);
   });
 
   it('never second-guesses an explicit API_BACKEND_URL', async () => {
     let probed = false;
-    const target = await chooseBackend({
+    const choice = await chooseBackend({
       envTarget: 'http://192.168.1.50:8787',
       probe: async () => {
         probed = true;
         return false;
       },
     });
-    expect(target).toBe('http://192.168.1.50:8787');
+    expect(choice.target).toBe('http://192.168.1.50:8787');
+    expect(choice.explicit).toBe(true);
     expect(probed).toBe(false);
+  });
+
+  it('warns once when the local Worker is not listening, and never for an explicit backend', async () => {
+    const down = await chooseBackend({ probe: async () => false });
+    const warning = localBackendWarning(down);
+    expect(warning).toContain(DEFAULT_LOCAL_TARGET);
+    expect(warning).toContain('npm run dev:worker');
+    expect(warning).toContain('API_BACKEND_URL');
+
+    expect(localBackendWarning(await chooseBackend({ probe: async () => true }))).toBeNull();
+    expect(
+      localBackendWarning(await chooseBackend({ envTarget: DEFAULT_LIVE_TARGET })),
+    ).toBeNull();
+    expect(localBackendWarning(null)).toBeNull();
   });
 
   it('probes a route that exists on every deployment', () => {
