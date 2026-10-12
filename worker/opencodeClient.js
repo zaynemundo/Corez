@@ -14,6 +14,8 @@ import {
   resolveOpencodeSessionId,
 } from "../packages/agent-core/providers/session.js";
 import {
+  parseResponsesStore,
+  rejectsReasoningTransport,
   resolveApiMode,
   toGatewayReasoning,
   wantsResponsesReasoning,
@@ -28,19 +30,14 @@ import {
 export {
   OPENCODE_SESSION_HEADER,
   newOpencodeSessionId,
+  parseResponsesStore,
+  rejectsReasoningTransport,
   resolveApiMode,
   resolveOpencodeSessionId,
   toGatewayReasoning,
   wantsResponsesReasoning,
   withResponsesReasoningPayload,
 };
-
-// "1" / "true" / "yes" / "on" disable the feature; empty / "false" / "0" keep it.
-function isDisabled(value) {
-  if (value === undefined || value === null) return false;
-  const str = String(value).trim().toLowerCase();
-  return str !== "" && str !== "false" && str !== "0" && str !== "no";
-}
 
 export const OPENCODE_DEFAULT_ENDPOINT =
   "https://opencode.ai/zen/go/v1/responses";
@@ -177,18 +174,16 @@ function parseSseData(line) {
 }
 
 // A gateway that does not implement the optional reasoning transport fields
-// answers 400 naming them. Only that specific rejection triggers the one-shot
-// retry with the base body: any other 400 is a real error the caller must see.
-const REASONING_TRANSPORT_REJECTED =
-  /\b(store|include|encrypted[\s_-]?content|reasoning)\b/i;
-
+// answers 400 naming them. Only that specific rejection triggers the fallback
+// ladder (see rejectsReasoningTransport); any other status is returned as-is
+// so the caller sees the real error.
 async function sendStreamRequest(
   attempts,
   { endpoint, key, extraHeaders, signal },
 ) {
   let lastResponse = null;
-  // Sequential by design: the fallback is only tried after the primary
-  // rejection is observed, so the two attempts can never race.
+  // Sequential by design: the next fallback is only tried after the previous
+  // rejection is observed, so the attempts can never race.
   for (const [index, body] of attempts.entries()) {
     const response = await fetch(endpoint, {
       method: "POST",
@@ -204,7 +199,7 @@ async function sendStreamRequest(
     const isLast = index === attempts.length - 1;
     if (!isLast && response.status === 400) {
       const detail = await response.text().catch(() => "");
-      if (!REASONING_TRANSPORT_REJECTED.test(detail)) return response;
+      if (!rejectsReasoningTransport(response.status, detail)) return response;
       continue;
     }
     return response;
@@ -273,18 +268,28 @@ export async function* streamChatEndpoint({
   }
   // Visible reasoning on the Responses API also needs `store: true` and
   // `include: ['reasoning.encrypted_content']` for the gateway to emit the
-  // reasoning stream. `OPENCODE_RESPONSES_STORE=false` opts a deployment out.
+  // reasoning stream. `OPENCODE_RESPONSES_STORE` is a positive
+  // "storage enabled" setting: `false`/`0`/`no`/`off` send an explicit
+  // `store: false` (never an omitted field) and omit the include path.
   const reasoningVisible =
     responsesApi && wantsResponsesReasoning(requestBody.reasoning);
-  const storeEnabled = !isDisabled(env?.OPENCODE_RESPONSES_STORE);
-  const primaryBody = reasoningVisible
-    ? withResponsesReasoningPayload(requestBody, requestBody.reasoning, {
-        storeEnabled,
-      })
-    : requestBody;
-  // A gateway that rejects the reasoning transport fields still gets the
-  // model to answer: retry once without them instead of failing the stream.
-  const attempts = reasoningVisible ? [primaryBody, requestBody] : [requestBody];
+  const storeEnabled = parseResponsesStore(env?.OPENCODE_RESPONSES_STORE);
+  // Three-tier fallback for strict gateways, most-capable first:
+  //   1. transport fields as configured (store explicit, include when storing)
+  //   2. store explicitly denied, summary request kept
+  //   3. the plain body with no transport fields at all
+  const attempts = reasoningVisible
+    ? [
+        withResponsesReasoningPayload(requestBody, requestBody.reasoning, {
+          storeEnabled,
+        }),
+        withResponsesReasoningPayload(requestBody, requestBody.reasoning, {
+          storeEnabled: false,
+          includeReasoningContent: true,
+        }),
+        requestBody,
+      ]
+    : [requestBody];
 
   try {
     const response = await sendStreamRequest(attempts, {

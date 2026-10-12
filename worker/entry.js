@@ -19,7 +19,11 @@ import {
   runTaskQueueBatch,
   sweepPendingTaskDispatches,
 } from "./taskRunner.js";
-import { handleAuth, verifySession } from "./auth.js";
+import {
+  handleAuth,
+  isProductionRequest,
+  verifySession,
+} from "./auth.js";
 import { handleChats } from "./chats.js";
 import { handleN8nWebhook } from "./n8nBridge.js";
 import { handleZiina } from "./ziina.js";
@@ -197,12 +201,17 @@ export default {
       if (chatsRes) return withDirectAiCors(chatsRes);
     }
 
-    // Auth gate - protect AI and app APIs when AUTH_SECRET is set. Published
-    // creations (/api/publish output at /<slug> and their referenced assets
-    // at /api/assets/<key>) must stay OPEN to anonymous visitors so share
-    // links render for everyone. The publish handler enforces auth for POST
-    // /api/publish, and handleR2Assets enforces ownership + publish-reference
-    // for asset GETs. All other /api/assets writes stay auth-gated.
+    // Auth gate - protect AI and app APIs. Published creations (/api/publish
+    // output at /<slug> and their referenced assets at /api/assets/<key>) must
+    // stay OPEN to anonymous visitors so share links render for everyone. The
+    // publish handler enforces auth for POST /api/publish, and handleR2Assets
+    // enforces ownership + publish-reference for asset GETs. All other
+    // /api/assets writes stay auth-gated.
+    //
+    // Fail closed in production: a deployment whose AUTH_SECRET is missing
+    // must refuse protected routes instead of treating bearer-less requests
+    // as the dev identity. Local development hosts keep the dev convenience
+    // (see isProductionRequest in auth.js).
     const authPaths = [
       "/api/ai",
       "/api/image",
@@ -239,11 +248,33 @@ export default {
     const needsAuth = baseAuthPath && !isPublicRoute;
     if (needsAuth) {
       const sess = await verifySession(request, env);
-      if (!sess && env.AUTH_SECRET) {
-        return new Response(
-          JSON.stringify({ error: "Authentication required. Please log in." }),
-          { status: 401, headers: jsonHeaders },
-        );
+      if (!sess) {
+        if (!env.AUTH_SECRET && isProductionRequest(request, env)) {
+          // A production deployment that lost its secret must fail loudly:
+          // 503 is retryable and unmistakably a configuration fault, while
+          // 401 would read as "please log in" to a user who cannot.
+          console.error(
+            "AUTH_SECRET is not configured: refusing an authenticated route on a production host.",
+          );
+          return new Response(
+            JSON.stringify({
+              error:
+                "Authentication is not configured on this deployment. Contact the operator.",
+              code: "auth_not_configured",
+              retryable: true,
+            }),
+            {
+              status: 503,
+              headers: { ...jsonHeaders, "Retry-After": "60" },
+            },
+          );
+        }
+        if (env.AUTH_SECRET) {
+          return new Response(
+            JSON.stringify({ error: "Authentication required. Please log in." }),
+            { status: 401, headers: jsonHeaders },
+          );
+        }
       }
     }
     // SPA gate - redirect unauthenticated browser navigations to login (client also gates, this is defense)

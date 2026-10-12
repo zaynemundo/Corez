@@ -475,6 +475,70 @@ describe('payment verification boundaries', () => {
       expect(meAfter.period_end).toBe(body.period_end);
     });
 
+    // Regression: activation used to DELETE every non-abandoned pending row
+    // for the user, not just the checkout being settled. Starting checkout A,
+    // starting checkout B for a different plan, and settling B erased A's
+    // ownership record — so a late completion of A could never verify.
+    it('keeps both checkouts attributable when one of two pending checkouts settles', async () => {
+      const { DB, env } = await createSubscriptionEnv({
+        subscriptions: [
+          { id: 'sub_A', plan: 'standard', amount: 1836, ziina_payment_id: 'pi_A' },
+          { id: 'sub_B', plan: 'premium', amount: 2754, ziina_payment_id: 'pi_B' },
+        ],
+      });
+      let statusA = 'requires_user_action';
+      let statusB = 'requires_user_action';
+      mockZiina(({ url }) => {
+        if (url.includes('pi_A')) {
+          return jsonResponse({ id: 'pi_A', status: statusA, amount: 1836, currency_code: 'AED' });
+        }
+        if (url.includes('pi_B')) {
+          return jsonResponse({ id: 'pi_B', status: statusB, amount: 2754, currency_code: 'AED' });
+        }
+        return jsonResponse({ message: 'unexpected' }, 500);
+      });
+
+      // Checkout B completes first and activates the premium plan.
+      statusB = 'completed';
+      const settledB = await handleSubscriptions(verifyRequest('pi_B'), env);
+      expect(settledB.status).toBe(200);
+      expect((await settledB.json()).verified).toBe(true);
+
+      // Checkout A's ownership record must survive B's activation: it is the
+      // only local proof that its eventual payment belongs to this account.
+      const rowA = await getRows(DB, `SELECT * FROM subscriptions WHERE ziina_payment_id='pi_A'`);
+      expect(rowA).toHaveLength(1);
+      expect(rowA[0].user_id).toBe('dev');
+      // It is retired from the resume flow (superseded), not attributed away.
+      expect(Number(rowA[0].abandoned_at)).toBeGreaterThan(0);
+
+      // A completes later: verification still finds the local checkout and
+      // settles it exactly once for the right account (standard takes over as
+      // the current single plan).
+      statusA = 'completed';
+      const settledA = await handleSubscriptions(verifyRequest('pi_A'), env);
+      expect(settledA.status).toBe(200);
+      const bodyA = await settledA.json();
+      expect(bodyA.verified).toBe(true);
+      expect(bodyA.plan).toBe('standard');
+
+      // Every payment remains attributable: B as its completed row plus its
+      // settled ledger claim, A as the single active period.
+      const ledgerA = await getLedger(DB, 'pi_A');
+      const ledgerB = await getLedger(DB, 'pi_B');
+      expect(ledgerA.status).toBe('settled');
+      expect(ledgerA.user_id).toBe('dev');
+      expect(ledgerB.status).toBe('settled');
+      expect(ledgerB.user_id).toBe('dev');
+      const rowB = await getRows(DB, `SELECT * FROM subscriptions WHERE ziina_payment_id='pi_B'`);
+      expect(rowB).toHaveLength(1);
+      expect(rowB[0].user_id).toBe('dev');
+      const active = await getRows(DB, "SELECT * FROM subscriptions WHERE status='active'");
+      expect(active).toHaveLength(1);
+      expect(active[0].user_id).toBe('dev');
+      expect(active[0].ziina_payment_id).toBe('pi_A');
+    });
+
     it('keeps a completed payment that cannot buy an entitlement for review', async () => {
       const { DB, env } = await createSubscriptionEnv({
         subscriptions: [

@@ -12,15 +12,18 @@ import {
   hashPassword,
   verifyPassword,
   validEmail,
+  verifySession,
   verifySession as _verifySession,
   requireAuth,
   handleAuth,
   ensureTables,
+  isProductionRequest,
   SESSION_COOKIE
 } from '../worker/auth.js';
 
 function createMockD1() {
   const users = new Map();
+  const passwordResets = new Map();
   const inviteCodes = new Map([
     ['COREZ-INVITE-2026', { code: 'COREZ-INVITE-2026', used_by: null, used_at: null, max_uses: 5, uses: 0 }],
     ['COREZ-EXHAUSTED', { code: 'COREZ-EXHAUSTED', used_by: 'used@corez.pro', used_at: Date.now(), max_uses: 1, uses: 1 }]
@@ -28,7 +31,17 @@ function createMockD1() {
 
   return {
     users,
+    passwordResets,
     inviteCodes,
+    async batch(statements) {
+      // Sequential with real change metadata, mirroring D1's atomic batch for
+      // the single-use token claim (used=0 conditional update).
+      const results = [];
+      for (const statement of statements) {
+        results.push(await statement.run());
+      }
+      return results;
+    },
     prepare(query) {
       const q = query.trim();
       let bound = [];
@@ -56,6 +69,9 @@ function createMockD1() {
           if (q.includes('SELECT * FROM invite_codes WHERE code=?')) {
             const code = bound[0];
             return inviteCodes.get(code) || null;
+          }
+          if (q.includes('SELECT * FROM password_resets WHERE token=?')) {
+            return passwordResets.get(String(bound[0] || '')) || null;
           }
           return null;
         },
@@ -98,6 +114,40 @@ function createMockD1() {
               row.used_at = used_at;
             }
             return { success: true };
+          }
+          if (q.startsWith('UPDATE users SET')) {
+            const id = bound[bound.length - 1];
+            for (const u of users.values()) {
+              if (u.id === id) {
+                if (/password_hash\s*=/.test(q)) u.password_hash = bound[0];
+                if (/password_changed_at\s*=/.test(q)) u.password_changed_at = bound[1];
+                if (/SET plan=/.test(q)) u.plan = bound[0];
+              }
+            }
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (q.startsWith('INSERT INTO password_resets')) {
+            const [id, email, token, expires_at, created_at, user_id] = bound;
+            passwordResets.set(token, {
+              id,
+              email,
+              token,
+              expires_at,
+              created_at,
+              user_id: user_id ?? null,
+              used: 0,
+            });
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (q.startsWith('UPDATE password_resets SET used=1 WHERE id=? AND used=0')) {
+            const [id] = bound;
+            for (const row of passwordResets.values()) {
+              if (row.id === id && Number(row.used) === 0) {
+                row.used = 1;
+                return { success: true, meta: { changes: 1 } };
+              }
+            }
+            return { success: true, meta: { changes: 0 } };
           }
           return { success: true };
         }
@@ -468,11 +518,52 @@ describe('Worker Auth Engine', () => {
   });
 
   describe('Session Verification & Require Auth', () => {
-    it('bypasses auth when AUTH_SECRET is unset in dev environment', async () => {
+    it('bypasses auth only on non-production hosts when AUTH_SECRET is unset', async () => {
+      // Local development and the contract-test harness keep the convenience.
       const devEnv = {};
-      const req = new Request('https://corez.pro/api/ai');
-      const user = await requireAuth(req, devEnv);
-      expect(user).toEqual({ uid: 'dev', email: 'dev@corez.pro' });
+      expect(await requireAuth(new Request('http://localhost:8787/api/ai'), devEnv)).toEqual({
+        uid: 'dev',
+        email: 'dev@corez.pro',
+      });
+      expect(await requireAuth(new Request('https://corez.test/api/ai'), devEnv)).toEqual({
+        uid: 'dev',
+        email: 'dev@corez.pro',
+      });
+      // A production host without a secret must fail closed, never hand out
+      // the development identity.
+      expect(await requireAuth(new Request('https://corez.pro/api/ai'), devEnv)).toBeNull();
+      // An explicit production marker beats a localhost-looking host.
+      expect(
+        await requireAuth(new Request('http://localhost:8787/api/ai'), {
+          ENVIRONMENT: 'production',
+        }),
+      ).toBeNull();
+    });
+
+    it('fails closed for a production deployment whose AUTH_SECRET is missing', async () => {
+      const missingSecretEnv = { DB: createMockD1() };
+      expect(isProductionRequest(new Request('https://corez.pro/api/ai'), missingSecretEnv)).toBe(true);
+      expect(isProductionRequest(new Request('https://corez.test/api/ai'), missingSecretEnv)).toBe(false);
+      expect(
+        isProductionRequest(new Request('https://corez.test/api/ai'), { COREZ_ENV: 'production' }),
+      ).toBe(true);
+
+      // The worker entrypoint refuses protected routes with a retryable 503
+      // (not a login prompt the user can never satisfy).
+      const worker = (await import('../worker/entry.js')).default;
+      const res = await worker.fetch(new Request('https://corez.pro/api/ai', { method: 'POST' }), missingSecretEnv);
+      expect(res.status).toBe(503);
+      const body = await res.json();
+      expect(body.code).toBe('auth_not_configured');
+      expect(body.retryable).toBe(true);
+      expect(res.headers.get('Retry-After')).toBeTruthy();
+
+      // The same request on a local/dev host stays available.
+      const devRes = await worker.fetch(
+        new Request('https://corez.test/api/tasks/none/events'),
+        { ...missingSecretEnv, ASSET_BUCKET: null },
+      );
+      expect(devRes.status).not.toBe(503);
     });
 
     it('strictly enforces session when AUTH_SECRET is set', async () => {
@@ -487,6 +578,135 @@ describe('Worker Auth Engine', () => {
       });
       const authUser = await requireAuth(reqAuth, prodEnv);
       expect(authUser?.email).toBe('admin@corez.pro');
+    });
+  });
+
+  describe('Password recovery boundaries', () => {
+    let mockEnv;
+
+    beforeEach(() => {
+      mockEnv = {
+        DB: createMockD1(),
+        AUTH_SECRET: TEST_SECRET,
+        AUTH_RESET_TOKEN_IN_RESPONSE: '1',
+      };
+    });
+
+    const signup = async (email, password, ip) => {
+      const res = await handleAuth(
+        new Request('https://corez.pro/api/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': ip },
+          body: JSON.stringify({ email, password, plan: 'free' }),
+        }),
+        mockEnv,
+      );
+      expect(res.status).toBe(200);
+      const setCookie = res.headers.get('Set-Cookie') || '';
+      const session = setCookie.match(new RegExp(`${SESSION_COOKIE}=([^;]+)`))?.[1] || null;
+      return session;
+    };
+
+    const login = async (email, password, ip) => {
+      const res = await handleAuth(
+        new Request('https://corez.pro/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': ip },
+          body: JSON.stringify({ email, password }),
+        }),
+        mockEnv,
+      );
+      const setCookie = res.headers.get('Set-Cookie') || '';
+      return {
+        status: res.status,
+        session: setCookie.match(new RegExp(`${SESSION_COOKIE}=([^;]+)`))?.[1] || null,
+      };
+    };
+
+    const forgot = async (email, ip) => {
+      const res = await handleAuth(
+        new Request('https://corez.pro/api/auth/forgot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': ip },
+          body: JSON.stringify({ email }),
+        }),
+        mockEnv,
+      );
+      return res.json();
+    };
+
+    const reset = (token, password, ip) =>
+      handleAuth(
+        new Request('https://corez.pro/api/auth/reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': ip },
+          body: JSON.stringify({ token, password }),
+        }),
+        mockEnv,
+      );
+
+    const verify = (session) =>
+      verifySession(
+        new Request('https://corez.pro/api/auth/me', {
+          headers: { Cookie: `${SESSION_COOKIE}=${session}` },
+        }),
+        mockEnv,
+      );
+
+    it('revokes previously issued sessions when the password is reset', async () => {
+      const email = 'revoke@corez.pro';
+      const oldSession = await signup(email, 'OldPassword123!', '10.20.0.1');
+      expect(oldSession).toBeTruthy();
+      expect(await verify(oldSession)).not.toBeNull();
+
+      const { token } = await forgot(email, '10.20.0.2');
+      expect(typeof token).toBe('string');
+      const res = await reset(token, 'NewPassword123!', '10.20.0.3');
+      expect(res.status).toBe(200);
+
+      // The session issued before the reset is dead; the new password works.
+      expect(await verify(oldSession)).toBeNull();
+      const relogin = await login(email, 'NewPassword123!', '10.20.0.4');
+      expect(relogin.status).toBe(200);
+      expect(await verify(relogin.session)).not.toBeNull();
+    });
+
+    it('consumes a reset token atomically: simultaneous uses cannot both succeed', async () => {
+      const email = 'race@corez.pro';
+      await signup(email, 'OldPassword123!', '10.21.0.1');
+      const { token } = await forgot(email, '10.21.0.2');
+
+      const [first, second] = await Promise.all([
+        reset(token, 'RacePasswordOne1!', '10.21.0.3'),
+        reset(token, 'RacePasswordTwo2!', '10.21.0.4'),
+      ]);
+      const statuses = [first.status, second.status].sort();
+      expect(statuses).toEqual([200, 400]);
+      const body = await (first.status === 400 ? first : second).json();
+      expect(body.error).toMatch(/already used/i);
+
+      // Exactly one of the two passwords is current; the token is spent.
+      const one = await login(email, 'RacePasswordOne1!', '10.21.0.5');
+      const two = await login(email, 'RacePasswordTwo2!', '10.21.0.6');
+      expect([one.status, two.status].filter((s) => s === 200)).toHaveLength(1);
+    });
+
+    it('never logs the reset secret when no email provider is configured', async () => {
+      const email = 'nolog@corez.pro';
+      await signup(email, 'OldPassword123!', '10.22.0.1');
+      const warnings = [];
+      const originalWarn = console.warn;
+      console.warn = (...args) => warnings.push(args.join(' '));
+      let token;
+      try {
+        ({ token } = await forgot(email, '10.22.0.2'));
+      } finally {
+        console.warn = originalWarn;
+      }
+      expect(typeof token).toBe('string');
+      const logged = warnings.join('\n');
+      expect(logged).not.toContain(token);
+      expect(logged).not.toContain(`token=${token}`);
     });
   });
 });

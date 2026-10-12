@@ -12,6 +12,8 @@ import {
 } from './session.js';
 import { classifyFailureStatus } from './failure.js';
 import {
+  parseResponsesStore,
+  rejectsReasoningTransport,
   resolveApiMode,
   toGatewayReasoning,
   withResponsesReasoningPayload,
@@ -167,8 +169,9 @@ export class ProviderAdapter {
     // fallback for legacy endpoint values.
     this.api = resolveApiMode({ endpoint: this.endpoint, api: options.api });
     // Visible reasoning on the Responses API needs `store: true` unless the
-    // caller/deployment opted out (see OPENCODE_RESPONSES_STORE in the worker).
-    this.storeEnabled = options.responsesStoreEnabled !== false;
+    // caller/deployment opted out with an explicit false-like value (see
+    // OPENCODE_RESPONSES_STORE in the worker: false/0/no/off disable it).
+    this.storeEnabled = parseResponsesStore(options.responsesStoreEnabled);
     this.configured = Boolean(this.apiKey);
   }
 
@@ -217,12 +220,24 @@ export class ProviderAdapter {
     if (!this.configured) {
       return { ok: false, status: null, detail: `${this.id} is not configured` };
     }
-    return requestProvider({
+    const headers = this.buildHeaders(sessionId);
+    const body = this.buildBody({ model, messages, tools, reasoning, temperature });
+    const result = await requestProvider({
       endpoint: this.endpoint,
-      headers: this.buildHeaders(sessionId),
-      body: this.buildBody({ model, messages, tools, reasoning, temperature }),
+      headers,
+      body,
       signal
     });
+    // A gateway that rejects the optional reasoning transport fields still
+    // gets to answer: retry once with the shared summary request but without
+    // `store`/`include` instead of failing the whole call.
+    if (!result.ok && rejectsReasoningTransport(result.status, result.detail)) {
+      const stripped = { ...body };
+      delete stripped.store;
+      delete stripped.include;
+      return requestProvider({ endpoint: this.endpoint, headers, body: stripped, signal });
+    }
+    return result;
   }
 }
 

@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { buildProviderChain, runProviderChain, runStreamingChain, TASK_STATUS_STORE_PREFIX } from '../worker/providerChain.js';
 import {
+  parseResponsesStore,
+  rejectsReasoningTransport,
   resolveApiMode,
   resolveOpencodeSessionId,
   streamChatEndpoint,
@@ -928,13 +930,15 @@ describe('OpenCode gateway client behavior', () => {
       include: ['reasoning.encrypted_content'],
     });
 
-    // A deployment or caller can opt out of storing responses.
+    // A deployment or caller can opt out of storing responses: the opt-out is
+    // an EXPLICIT `store: false` (never an omitted field the gateway could
+    // default back to true), and the encrypted-content include is dropped.
     const unStore = withResponsesReasoningPayload(
       { model: 'm', reasoning: { effort: 'medium', summary: 'auto' } },
       { effort: 'medium', exclude: false },
       { storeEnabled: false }
     );
-    expect(unStore.store).toBeUndefined();
+    expect(unStore.store).toBe(false);
     expect(unStore.include).toBeUndefined();
 
     // An explicit caller value wins (never overridden by the transport layer).
@@ -975,23 +979,121 @@ describe('OpenCode gateway client behavior', () => {
     expect(events.filter((e) => e.type === 'delta').map((e) => e.text).join('')).toBe('answer');
   });
 
-  it('retries without the reasoning transport when the gateway rejects those fields', async () => {
-    const payloads = [];
-    vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
-      payloads.push(JSON.parse(init.body));
-      if (payloads.length === 1) {
-        return Response.json(
-          { error: { message: 'Unknown parameter: include' } },
-          { status: 400 }
+  it('honours OPENCODE_RESPONSES_STORE as a positive storage setting on the wire', async () => {
+    // Regression: the setting was parsed with a "feature disabled" helper and
+    // negated, so `false` (the documented opt-out) ENABLED storage. These
+    // assertions inspect the actual outgoing JSON, not the helper's return.
+    const capture = async (rawValue) => {
+      let payload = null;
+      vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+        payload = JSON.parse(init.body);
+        return new Response(
+          'data: {"type":"response.output_text.delta","delta":"answer"}\n\n' +
+            'data: {"type":"response.completed","response":{"status":"completed"}}\n\n' +
+            'data: [DONE]\n\n',
+          { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
         );
+      }));
+      const env = { OPENCODE_GO_API_KEY: 'sk-opencode' };
+      if (rawValue !== undefined) env.OPENCODE_RESPONSES_STORE = rawValue;
+      for await (const _event of runStreamingChain([{ role: 'user', content: 'hi' }], {
+        env,
+        reasoning: { effort: 'medium', exclude: false },
+        sleep: async () => {},
+        clock: () => 0,
+        jitter: () => 0
+      })) {
+        // drain the stream
       }
-      return new Response(
+      return payload;
+    };
+
+    const disabled = ['false', '0', 'no', 'off'];
+    for (const value of disabled) {
+      const payload = await capture(value);
+      expect(payload.store, `OPENCODE_RESPONSES_STORE=${value}`).toBe(false);
+      expect(payload.include, `OPENCODE_RESPONSES_STORE=${value}`).toBeUndefined();
+      expect(payload.reasoning).toEqual({ effort: 'medium', summary: 'auto' });
+    }
+    const enabled = ['true', '1', 'yes', 'on', 'bogus', '', undefined];
+    for (const value of enabled) {
+      const payload = await capture(value);
+      expect(payload.store, `OPENCODE_RESPONSES_STORE=${value}`).toBe(true);
+      expect(payload.include, `OPENCODE_RESPONSES_STORE=${value}`).toEqual([
+        'reasoning.encrypted_content'
+      ]);
+    }
+    // Hidden/internal reasoning never requests storage or carries reasoning
+    // bytes, whatever the setting says.
+    let hiddenPayload = null;
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+      hiddenPayload = JSON.parse(init.body);
+      return okResponse('plain answer');
+    }));
+    await runProviderChain([{ role: 'user', content: 'hi' }], {
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode', OPENCODE_RESPONSES_STORE: 'true' },
+      reasoning: { effort: 'medium', exclude: true },
+      sleep: async () => {},
+      clock: () => 0,
+      jitter: () => 0
+    });
+    expect(hiddenPayload.store).toBeUndefined();
+    expect(hiddenPayload.include).toBeUndefined();
+    expect(hiddenPayload.reasoning).toEqual({ effort: 'medium' });
+  });
+
+  it('parses OPENCODE_RESPONSES_STORE-like values with a strict true/false contract', () => {
+    // The positive setting must not be run through a "disabled" parser.
+    expect(parseResponsesStore(undefined)).toBe(true);
+    expect(parseResponsesStore(null)).toBe(true);
+    expect(parseResponsesStore('')).toBe(true);
+    expect(parseResponsesStore('true')).toBe(true);
+    expect(parseResponsesStore('TRUE')).toBe(true);
+    expect(parseResponsesStore('1')).toBe(true);
+    expect(parseResponsesStore('yes')).toBe(true);
+    expect(parseResponsesStore('on')).toBe(true);
+    expect(parseResponsesStore('false')).toBe(false);
+    expect(parseResponsesStore('FALSE')).toBe(false);
+    expect(parseResponsesStore('0')).toBe(false);
+    expect(parseResponsesStore('no')).toBe(false);
+    expect(parseResponsesStore('off')).toBe(false);
+    // Unknown values fall back to the documented default (enabled).
+    expect(parseResponsesStore('bogus')).toBe(true);
+    // A 400 is only a transport rejection when it names the fields.
+    expect(rejectsReasoningTransport(400, 'Unknown parameter: include')).toBe(true);
+    expect(rejectsReasoningTransport(400, 'store is not supported')).toBe(true);
+    expect(rejectsReasoningTransport(400, 'bad model')).toBe(false);
+    expect(rejectsReasoningTransport(500, 'store exploded')).toBe(false);
+  });
+
+  it('falls back through the reasoning transport ladder when the gateway rejects those fields', async () => {
+    const payloads = [];
+    const streamOk = () =>
+      new Response(
         'data: {"type":"response.reasoning_summary_text.delta","delta":"thinking out loud"}\n\n' +
           'data: {"type":"response.output_text.delta","delta":"answer"}\n\n' +
           'data: {"type":"response.completed","response":{"status":"completed"}}\n\n' +
           'data: [DONE]\n\n',
         { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
       );
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+      payloads.push(JSON.parse(init.body));
+      // Tier 1 (store: true + include): rejected naming `include`.
+      if (payloads.length === 1) {
+        return Response.json(
+          { error: { message: 'Unknown parameter: include' } },
+          { status: 400 }
+        );
+      }
+      // Tier 2 (store: false): this gateway rejects any `store` field.
+      if (payloads.length === 2) {
+        return Response.json(
+          { error: { message: 'Unknown parameter: store' } },
+          { status: 400 }
+        );
+      }
+      // Tier 3 (plain body): accepted.
+      return streamOk();
     }));
 
     const events = [];
@@ -1005,14 +1107,18 @@ describe('OpenCode gateway client behavior', () => {
       events.push(event);
     }
 
-    // First attempt carried the transport fields; the retry dropped them but
-    // kept the reasoning request itself, so the answer still streams.
-    expect(payloads).toHaveLength(2);
+    // Every attempt kept the summary request; the transport fields stepped
+    // down until the gateway accepted the call.
+    expect(payloads).toHaveLength(3);
     expect(payloads[0].store).toBe(true);
     expect(payloads[0].include).toEqual(['reasoning.encrypted_content']);
-    expect(payloads[1].store).toBeUndefined();
-    expect(payloads[1].include).toBeUndefined();
-    expect(payloads[1].reasoning).toEqual({ effort: 'medium', summary: 'auto' });
+    expect(payloads[1].store).toBe(false);
+    expect(payloads[1].include).toEqual(['reasoning.encrypted_content']);
+    expect(payloads[2].store).toBeUndefined();
+    expect(payloads[2].include).toBeUndefined();
+    for (const payload of payloads) {
+      expect(payload.reasoning).toEqual({ effort: 'medium', summary: 'auto' });
+    }
     const thinking = events.filter((e) => e.type === 'thinking');
     expect(thinking.map((e) => e.text).join('')).toContain('thinking out loud');
     const answer = events.filter((e) => e.type === 'delta').map((e) => e.text).join('');

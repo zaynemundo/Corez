@@ -74,6 +74,9 @@ The server simulates movement and bullet hits authoritatively; clients render th
 - AI-generated apps and games render inside sandboxed iframes (`allow-scripts`, no same-origin, no modals/popups). Generated code cannot read the page, cookies, or local storage, and it cannot navigate the parent.
 - `/api/apps` and `/api/memory` are anonymous: the `sessionId`/`userId` string is the only access credential, so choose unguessable values — anyone who knows one can read or delete that data. All storage key segments are validated (`[A-Za-z0-9._-]`, no slashes, no leading dots) on every R2-backed endpoint.
 - Provider requests abort when the client disconnects (Stop button), so no tokens are spent on abandoned generations.
+- Authentication fails closed: `wrangler.jsonc` declares `ENVIRONMENT=production`, and a production deployment without `AUTH_SECRET` refuses protected `/api/*` routes with a retryable 503 (`code: auth_not_configured`) instead of granting the development identity. The dev bypass exists only on non-production hosts (localhost, `*.test`) or when an environment explicitly declares itself development.
+- Password recovery is single-use and revokes sessions: the reset token is claimed with a conditional update in the same batch as the password write (two simultaneous uses cannot both succeed), the reset bumps `users.password_changed_at`, and every session JWT issued before it carries an older `pwd_at` claim and stops verifying. Reset links are never written to logs when no email provider is configured.
+- One Ziina checkout can never erase another's ownership: activating a plan marks other live pending checkouts as superseded (kept as attribution) instead of deleting them, so a late-completing payment can still be verified and settled for the right account.
 
 ## Local Intent Training & Classification
 

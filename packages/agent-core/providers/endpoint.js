@@ -54,14 +54,32 @@ export function wantsResponsesReasoning(reasoning) {
 }
 
 /**
+ * Strict boolean for the positive "response storage enabled" setting.
+ *
+ * `OPENCODE_RESPONSES_STORE` is documented as `false` to opt OUT of storing
+ * responses. Parsing it with a "feature disabled" helper inverts it
+ * (`!isDisabled('false') === true`), which silently enabled storage exactly
+ * when the deployment asked to disable it. Only explicit true-like values
+ * enable; unset and anything unrecognised default to the safe documented
+ * default (enabled, because the live thinking panel needs the summary).
+ */
+export function parseResponsesStore(value) {
+  if (value === undefined || value === null) return true;
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === '') return true;
+  if (['false', '0', 'no', 'off'].includes(normalized)) return false;
+  if (['true', '1', 'yes', 'on'].includes(normalized)) return true;
+  return true;
+}
+
+/**
  * Additional `include` paths a visible Responses request needs.
  *
  * `include: ['reasoning.encrypted_content']` is the documented way to carry
- * the model's reasoning back to a stateless client. It keeps the key a
- * decision of the caller (`responsesStoreEnabled`): storing responses may be
- * disabled in some deployments, and a gateway that rejects the parameter
- * still gets a one-shot retry without it (see worker/opencodeClient.js and
- * the agent-core adapter).
+ * the model's reasoning back to a stateless client. Storing responses may be
+ * disabled in some deployments; the caller keeps that decision and a gateway
+ * that rejects the parameter still gets a one-shot retry without it (see
+ * worker/opencodeClient.js and the agent-core adapter).
  */
 export function responsesReasoningIncludes(reasoning, { storeEnabled = true } = {}) {
   if (!wantsResponsesReasoning(reasoning)) return [];
@@ -72,13 +90,21 @@ export function responsesReasoningIncludes(reasoning, { storeEnabled = true } = 
  * Visibility/transport fields for one Responses request. Merges the base body
  * with the visible-reasoning extras without mutating the caller's payload:
  * `store: true` is required for the OpenAI Responses API to emit reasoning
- * summaries, and `include` carries the encrypted reasoning content. Existing
- * caller values win (an explicit `store: false` is respected).
+ * summaries, `include` carries the encrypted reasoning content, and a
+ * disabled store is sent as an explicit `store: false` — never as an omitted
+ * field that the gateway may default back to true. A caller-supplied `store`
+ * value always wins; the opt-out cannot silently re-enable it.
  */
-export function withResponsesReasoningPayload(body, reasoning, { storeEnabled = true } = {}) {
+export function withResponsesReasoningPayload(
+  body,
+  reasoning,
+  { storeEnabled = true, includeReasoningContent = storeEnabled } = {},
+) {
   const base = body && typeof body === 'object' ? body : {};
-  const includes = responsesReasoningIncludes(reasoning, { storeEnabled });
-  if (includes.length === 0) return base;
+  if (!wantsResponsesReasoning(reasoning)) return base;
+  const includes = responsesReasoningIncludes(reasoning, {
+    storeEnabled: includeReasoningContent,
+  });
   const existing = Array.isArray(base.include) ? base.include : [];
   const merged = [...existing];
   for (const item of includes) {
@@ -86,7 +112,20 @@ export function withResponsesReasoningPayload(body, reasoning, { storeEnabled = 
   }
   return {
     ...base,
-    ...(base.store === undefined && storeEnabled ? { store: true } : {}),
+    store: base.store !== undefined ? base.store : storeEnabled,
     ...(merged.length > 0 ? { include: merged } : {}),
   };
+}
+
+/**
+ * True when a gateway 400 names the optional reasoning transport fields
+ * (`store` / `include` / encrypted reasoning content). Only that specific
+ * rejection justifies the one-shot retry without them; any other error must
+ * reach the caller unchanged.
+ */
+export function rejectsReasoningTransport(status, detail) {
+  if (Number(status) !== 400) return false;
+  return /\b(store|include|encrypted[\s_-]?content|reasoning)\b/i.test(
+    String(detail || ''),
+  );
 }

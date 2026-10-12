@@ -5,6 +5,14 @@
   "compatibility_date": "2026-07-18",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
+  // Production marker for the auth gate (worker/auth.js isProductionRequest):
+  // with `production` declared, a deployment that loses its AUTH_SECRET
+  // refuses protected routes (retryable 503) instead of accepting bearer-less
+  // requests as the development identity. Every real deployment must keep
+  // this; `wrangler dev` can override it locally with ENVIRONMENT=development.
+  "vars": {
+    "ENVIRONMENT": "production"
+  },
   // CPU ceiling per invocation: 30s on Workers Paid (the Free plan rejected
   // this with code 100328 and hard-caps at 10ms, which caused the recurring
   // exceededCpu mid-build stream deaths). 30s gives the harness ~300x the

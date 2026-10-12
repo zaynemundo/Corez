@@ -418,18 +418,32 @@ function buildActivationStatements(
     if (yearlyMeta) finalAmount = yearlyMeta.amount;
   }
 
+  const paymentKey = ziinaPaymentId || "";
   const statements = [
-    // Mark any previous ACTIVE rows as completed (one true current plan) and drop
-    // superseded pending rows so they can never activate later. Abandoned rows
-    // are deliberately kept: they are the ownership record a late-completing
-    // payment is settled or refunded through, and deleting one here would
-    // reintroduce exactly the loss that marking replaced.
+    // Mark any previous ACTIVE rows as completed (one true current plan).
     env.DB.prepare(
       `UPDATE subscriptions SET status='completed', updated_at=? WHERE user_id=? AND status='active'`,
     ).bind(now, userId),
+    // Supersede every OTHER live pending checkout without deleting its
+    // attribution. Activation used to delete all of them, so finishing
+    // checkout B erased checkout A's ownership record — a later A completion
+    // then had no local row to prove it belonged to this account and could
+    // never be settled or refunded. Marking (abandoned_at) keeps the record
+    // verifiable while still retiring the checkout from resume/reuse UI.
+    // A row with no payment id can never settle, so that dead checkout is
+    // dropped instead of marked.
     env.DB.prepare(
-      `DELETE FROM subscriptions WHERE user_id=? AND status='pending' AND abandoned_at IS NULL`,
+      `DELETE FROM subscriptions WHERE user_id=? AND status='pending' AND abandoned_at IS NULL AND ziina_payment_id IS NULL`,
     ).bind(userId),
+    env.DB.prepare(
+      `UPDATE subscriptions SET abandoned_at=?, updated_at=? WHERE user_id=? AND status='pending' AND abandoned_at IS NULL AND ziina_payment_id IS NOT NULL AND ziina_payment_id!=?`,
+    ).bind(now, now, userId, paymentKey),
+    // The settled checkout itself: its attribution now lives on the active
+    // row inserted below (same user + payment id), so the pending record
+    // retires exactly like reconcilePendingSubscriptions' retireSettled.
+    env.DB.prepare(
+      `DELETE FROM subscriptions WHERE id IN (SELECT id FROM subscriptions WHERE user_id=? AND status='pending' AND abandoned_at IS NULL AND ziina_payment_id=? ORDER BY created_at DESC LIMIT 1)`,
+    ).bind(userId, paymentKey),
     env.DB.prepare(
       `INSERT INTO subscriptions (id, user_id, plan, amount, currency_code, status, period_start, period_end, ziina_payment_id, created_at, updated_at)
        VALUES (?,?,?,?,?,?,?,?,?,?,?)`,

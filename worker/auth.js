@@ -223,6 +223,15 @@ export async function ensureTables(env) {
         env.DB.prepare(`ALTER TABLE users ADD COLUMN terms_version TEXT`).run(),
         env.DB.prepare(`ALTER TABLE users ADD COLUMN terms_accepted_at INTEGER`).run(),
         env.DB.prepare(`ALTER TABLE users ADD COLUMN marketing_consent INTEGER DEFAULT 0`).run(),
+        // Revocation timestamp: when the password is changed, every session
+        // issued before it must stop working. Sessions carry a `pwd_at` claim
+        // copied from this column at login; a reset bumps the column so old
+        // tokens fail the comparison in verifySession.
+        env.DB.prepare(`ALTER TABLE users ADD COLUMN password_changed_at INTEGER`).run(),
+        // Which account a reset token belongs to. A token is consumed for the
+        // account it was created for, even if the email is later reused or
+        // reassigned.
+        env.DB.prepare(`ALTER TABLE password_resets ADD COLUMN user_id TEXT`).run(),
       ]);
       // Invite codes are now optional (kept for backward compat, not required
       // for signup). No seeding needed for new installs - free signup is open.
@@ -253,9 +262,42 @@ export async function findUserById(env, id) {
 }
 
 // ---------- session ----------
+
+// Hosts that are unambiguously local development, never a production
+// deployment. `*.test` covers the contract-test harness; localhost/127.0.0.1
+// cover `wrangler dev`.
+const NON_PRODUCTION_HOST =
+  /^(localhost|127\.0\.0\.1|\[::1\]|.*\.test)$/i;
+
+// The dev identity exists for local development and contract tests only. A
+// production deployment whose AUTH_SECRET is missing must fail closed instead
+// of silently accepting bearer-less requests as this identity: the bypass is
+// granted only when the request targets a non-production host AND the
+// environment does not declare itself production. Production (or an explicit
+// production marker) without a secret returns null, so every protected route
+// answers 401.
+export function isProductionRequest(request, env = {}) {
+  const declared = String(
+    env?.ENVIRONMENT || env?.COREZ_ENV || "",
+  ).toLowerCase();
+  // An explicit environment declaration wins over the request host: a
+  // deployment can mark itself production even on a workers.dev hostname, and
+  // development/test harnesses can mark themselves non-production.
+  if (["production", "prod"].includes(declared)) return true;
+  if (["development", "dev", "local", "test", "testing"].includes(declared)) {
+    return false;
+  }
+  try {
+    const host = new URL(request.url).hostname;
+    return !NON_PRODUCTION_HOST.test(host);
+  } catch {
+    return true; // unparseable target: fail closed
+  }
+}
+
 export async function verifySession(request, env) {
   const secret = env?.AUTH_SECRET;
-  if (!secret) return null; // if no secret configured, auth disabled (dev)
+  if (!secret) return null; // no secret: nothing can be verified
   const token = getCookie(request, SESSION_COOKIE);
   if (!token) return null;
   const payload = await verifyJWT(token, secret);
@@ -264,15 +306,33 @@ export async function verifySession(request, env) {
   if (env?.DB) {
     const u = await findUserById(env, payload.uid);
     if (!u) return null;
+    // Password-change revocation: a session issued before the stored
+    // `password_changed_at` is no longer valid. Tokens that predate the
+    // column (no `pwd_at` claim) stay valid until the next password change.
+    const changedAt = Number(u.password_changed_at);
+    if (Number.isFinite(changedAt) && changedAt > 0) {
+      const claim = Number(payload.pwd_at);
+      if (!Number.isFinite(claim) || claim < changedAt) return null;
+    }
   }
   return payload;
 }
 
 export async function requireAuth(request, env) {
-  // allow bypass when AUTH_SECRET not set (dev)
-  if (!env?.AUTH_SECRET) return { uid: "dev", email: "dev@corez.pro" };
   const sess = await verifySession(request, env);
-  return sess;
+  if (sess) return sess;
+  // Development bypass: explicit local/dev environment only.
+  if (!env?.AUTH_SECRET && !isProductionRequest(request, env)) {
+    return { uid: "dev", email: "dev@corez.pro" };
+  }
+  return null;
+}
+
+// True when a deployment is missing AUTH_SECRET on a production request:
+// protected routes must answer with a clear, retryable failure instead of
+// the development identity. Exposed so the entrypoint can decide the same.
+export function authConfigurationMissing(request, env = {}) {
+  return !env?.AUTH_SECRET && isProductionRequest(request, env);
 }
 
 // ---------- route handler ----------
@@ -495,6 +555,9 @@ export async function handleAuth(request, env) {
         uid: user.id,
         email: user.email,
         plan,
+        // Revocation anchor: a later password change records a newer
+        // `password_changed_at`, and this session stops verifying.
+        pwd_at: Number(user.password_changed_at) || 0,
         exp: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE,
       },
       env.AUTH_SECRET,
@@ -674,9 +737,9 @@ export async function handleAuth(request, env) {
       const expiresAt = Date.now() + 60 * 60 * 1000; // 1 hour
       try {
         await env.DB.prepare(
-          "INSERT INTO password_resets (id, email, token, expires_at, created_at) VALUES (?,?,?,?,?)",
+          "INSERT INTO password_resets (id, email, token, expires_at, created_at, user_id) VALUES (?,?,?,?,?,?)",
         )
-          .bind(id, email, token, expiresAt, Date.now())
+          .bind(id, email, token, expiresAt, Date.now(), user.id)
           .run();
         const resetUrl = `${url.origin}/?token=${encodeURIComponent(token)}`;
         // Try to send via Resend if configured, otherwise log
@@ -726,15 +789,18 @@ export async function handleAuth(request, env) {
             console.warn("Resend failed:", safeErrorDetail(e));
           }
         } else {
+          // No email provider: never write the reset secret to the logs. The
+          // reset URL is a bearer credential — an operator reading logs could
+          // otherwise take over any account that requested a reset. Log only
+          // that a token was created, for whom, and when it expires.
           console.warn(
-            `Password reset token for ${email}: ${token} -> ${resetUrl}`,
+            `Password reset requested for ${email}: email provider (RESEND_API_KEY) is not configured; the reset link was not delivered and the token was not logged. Expires at ${new Date(expiresAt).toISOString()}.`,
           );
         }
         // Dev escape hatch only: printing the token in the HTTP response would
         // let anyone who knows an email take over the account when no email
-        // provider is configured. The token is always logged server-side; a
-        // deployment must opt in explicitly (AUTH_RESET_TOKEN_IN_RESPONSE=1)
-        // to include it in the response.
+        // provider is configured. A deployment must opt in explicitly
+        // (AUTH_RESET_TOKEN_IN_RESPONSE=1) to include it in the response.
         if (!resendKey && env.AUTH_RESET_TOKEN_IN_RESPONSE === "1") {
           return jsonResponse(200, {
             ok: true,
@@ -791,16 +857,46 @@ export async function handleAuth(request, env) {
     if (Date.now() > Number(row.expires_at))
       return jsonResponse(400, { error: "Reset token expired" });
 
-    const user = await findUserByEmail(env, String(row.email));
+    // The token is bound to the account it was created for. Falling back to
+    // email lookup keeps tokens issued before the user_id column existed
+    // working for the same account; it can never resolve to a different one.
+    const user = row.user_id
+      ? await findUserById(env, String(row.user_id))
+      : await findUserByEmail(env, String(row.email));
     if (!user) return jsonResponse(400, { error: "User not found" });
 
+    const now = Date.now();
     const hash = await hashPassword(password);
-    await env.DB.prepare("UPDATE users SET password_hash=? WHERE id=?")
-      .bind(hash, user.id)
-      .run();
-    await env.DB.prepare("UPDATE password_resets SET used=1 WHERE id=?")
-      .bind(row.id)
-      .run();
+    // Two writes, one transaction: the password replacement and the
+    // single-use token claim commit together, and the claim is conditional
+    // (`used=0`). Two requests racing on one token therefore cannot both
+    // succeed — the loser sees zero changed rows and gets the "already used"
+    // answer instead of a second password write.
+    let claimResult;
+    try {
+      const results = await env.DB.batch([
+        env.DB.prepare(
+          "UPDATE users SET password_hash=?, password_changed_at=? WHERE id=?",
+        ).bind(hash, now, user.id),
+        env.DB.prepare(
+          "UPDATE password_resets SET used=1 WHERE id=? AND used=0",
+        ).bind(row.id),
+      ]);
+      claimResult = results?.[1];
+    } catch (err) {
+      // D1 batches are atomic: a failure means neither write happened.
+      console.warn("Password reset failed:", safeErrorDetail(err));
+      return jsonResponse(500, {
+        error: "Password reset failed. Please request a new link.",
+      });
+    }
+    const claimed = Number(claimResult?.meta?.changes) > 0;
+    if (!claimed) {
+      return jsonResponse(400, { error: "Reset token already used" });
+    }
+    // Session revocation is the password_changed_at write above: every token
+    // issued before `now` now fails verifySession's comparison, so a stolen
+    // session cannot survive the password change.
 
     return jsonResponse(200, {
       ok: true,

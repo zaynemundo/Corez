@@ -11,7 +11,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import swarmWorker from '../worker/entry.js';
 
 const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/responses';
-const env = { OPENCODE_GO_API_KEY: 'sk-test', __COREZ_RETRY_SLEEP_MS: '0' };
+// ENVIRONMENT: development marks this harness's direct-worker-hostname cases
+// as non-production, so the auth gate's dev bypass applies (no session cookie
+// is sent by these tests). A real production deployment never sets it.
+const env = {
+  OPENCODE_GO_API_KEY: 'sk-test',
+  __COREZ_RETRY_SLEEP_MS: '0',
+  ENVIRONMENT: 'development',
+};
 
 function post(worker, body, customEnv = env) {
   return worker.fetch(

@@ -192,6 +192,106 @@ describe('atomic budget admission', () => {
     expect(usage.messages).toBe(PLAN_LIMITS.free.messages);
   });
 
+  // Regression: the result loop used to stop at the first refused metric and
+  // refund only the charges seen BEFORE it. The batch had already applied the
+  // later charges, so the synthetic account lost tokens with no work admitted
+  // and the outcome depended on the order of the metrics.
+  it('refunds every applied charge when the FIRST metric is refused', async () => {
+    const db = createSqliteD1();
+    const env = { DB: db };
+    const uid = 'order-first';
+    await seedCounter(db, uid, 'messages', PLAN_LIMITS.free.messages);
+    await seedCounter(db, uid, 'tokens', 1000);
+
+    const result = await consumeAllowance(env, uid, {
+      plan: 'free',
+      charges: [
+        { metric: 'messages', amount: 1 },
+        { metric: 'tokens', amount: 100 },
+      ],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.metric).toBe('messages');
+    expect(result.refunded).toBe(true);
+    // The token charge ran AFTER the refusal in the batch and must be
+    // compensated: no work was admitted, so nothing may be spent.
+    const usage = await getUsage(env, uid);
+    expect(usage.messages).toBe(PLAN_LIMITS.free.messages);
+    expect(usage.tokens).toBe(1000);
+  });
+
+  it('refunds every applied charge when the MIDDLE metric is refused', async () => {
+    const db = createSqliteD1();
+    const env = { DB: db };
+    const uid = 'order-middle';
+    await seedCounter(db, uid, 'messages', 5);
+    await seedCounter(db, uid, 'tokens', PLAN_LIMITS.free.tokens);
+    await seedCounter(db, uid, 'images', 3);
+
+    const result = await consumeAllowance(env, uid, {
+      plan: 'free',
+      charges: [
+        { metric: 'messages', amount: 1 },
+        { metric: 'tokens', amount: 100 },
+        { metric: 'images', amount: 1 },
+      ],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.metric).toBe('tokens');
+    const usage = await getUsage(env, uid);
+    expect(usage.messages).toBe(5);
+    expect(usage.tokens).toBe(PLAN_LIMITS.free.tokens);
+    expect(usage.images).toBe(3);
+  });
+
+  it('refunds every applied charge when the LAST metric is refused', async () => {
+    const db = createSqliteD1();
+    const env = { DB: db };
+    const uid = 'order-last';
+    await seedCounter(db, uid, 'messages', 5);
+    await seedCounter(db, uid, 'tokens', 1000);
+    await seedCounter(db, uid, 'images', PLAN_LIMITS.free.images);
+
+    const result = await consumeAllowance(env, uid, {
+      plan: 'free',
+      charges: [
+        { metric: 'messages', amount: 1 },
+        { metric: 'tokens', amount: 100 },
+        { metric: 'images', amount: 1 },
+      ],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.metric).toBe('images');
+    const usage = await getUsage(env, uid);
+    expect(usage.messages).toBe(5);
+    expect(usage.tokens).toBe(1000);
+    expect(usage.images).toBe(PLAN_LIMITS.free.images);
+  });
+
+  it('reports the applied charges it refunded so a failed refund can be retried', async () => {
+    const db = createSqliteD1();
+    const env = { DB: db };
+    const uid = 'refund-list';
+    await seedCounter(db, uid, 'messages', PLAN_LIMITS.free.messages);
+    await seedCounter(db, uid, 'tokens', 1000);
+
+    const result = await consumeAllowance(env, uid, {
+      plan: 'free',
+      charges: [
+        { metric: 'tokens', amount: 100 },
+        { metric: 'messages', amount: 1 },
+      ],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.refunded).toBe(true);
+    expect(result.refundedCharges).toEqual([{ metric: 'tokens', amount: 100 }]);
+    expect((await getUsage(env, uid)).tokens).toBe(1000);
+  });
+
   it('never refuses a charge on an unlimited plan', async () => {
     const db = createSqliteD1();
     const env = { DB: db };

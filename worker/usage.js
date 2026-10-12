@@ -306,13 +306,15 @@ async function runCharges(env, statements) {
  * allowance.
  *
  * A metric that is *refused* (rather than failing) does not roll anything back,
- * because a guard that declines is not an error; the charges this request
- * already applied are therefore refunded by compensation. The refund is written
- * in its own transaction, so it is all-or-nothing too, and a failed refund is
- * reported instead of being assumed.
+ * because a guard that declines is not an error. The whole result set is
+ * inspected first, so a refused metric anywhere in the set causes every charge
+ * the batch DID apply — including ones after the refusal — to be refunded by
+ * compensation. The refund is written in its own transaction, so it is
+ * all-or-nothing too, and a failed refund is reported (`refunded: false`)
+ * instead of being assumed; the caller can retry it durably.
  *
  * @returns {Promise<{ok: true, consumed: Array<{metric: string, amount: number}>, period: string}
- *   | {ok: false, reason: 'limit', metric: string, evaluation: object, refunded: boolean, period: string}>}
+ *   | {ok: false, reason: 'limit', metric: string, evaluation: object, refunded: boolean, refundedCharges: Array<{metric: string, amount: number}>, period: string}>}
  * @throws {UsageUnavailableError} when the accounting database is unusable.
  */
 export async function consumeAllowance(
@@ -344,21 +346,45 @@ export async function consumeAllowance(
 
   const results = await runCharges(env, statements);
 
+  // Inspect EVERY result before deciding anything. A guarded upsert that
+  // declines is a successful statement with zero changed rows, so the batch
+  // still applied the charges after the refused metric — refunding only the
+  // entries seen before the first refusal left those later charges on the
+  // counter with no work admitted (the ordering-dependent leak).
   const applied = [];
+  let refusal = null;
   for (let index = 0; index < entries.length; index += 1) {
     const entry = entries[index];
     const changes = changesOf(results?.[index], entry.metric);
     if (changes === 0) {
-      const refunded = await refundCharges(env, uid, period, applied, now);
-      const usage = await getUsage(env, uid, { period });
-      const evaluation = {
-        ...evaluateLimit(plan, usage, entry.metric),
-        allowed: false,
-      };
-      return { ok: false, reason: "limit", metric: entry.metric, evaluation, refunded, period };
+      if (!refusal) refusal = { index, entry };
+      continue;
     }
     applied.push(entry);
   }
+
+  if (refusal) {
+    // Any failed limit rejects the whole request; every charge the batch did
+    // apply is compensated. The refund is one transaction (all-or-nothing)
+    // and `refunded: false` tells the caller it could not be applied, so a
+    // durably retryable compensation is never assumed to have succeeded.
+    const refunded = await refundCharges(env, uid, period, applied, now);
+    const usage = await getUsage(env, uid, { period });
+    const evaluation = {
+      ...evaluateLimit(plan, usage, refusal.entry.metric),
+      allowed: false,
+    };
+    return {
+      ok: false,
+      reason: "limit",
+      metric: refusal.entry.metric,
+      evaluation,
+      refunded,
+      refundedCharges: refunded ? applied : [],
+      period,
+    };
+  }
+
   return { ok: true, consumed: applied, period };
 }
 
