@@ -17,6 +17,7 @@ import {
   resolveApiMode,
   toGatewayReasoning,
   withResponsesReasoningPayload,
+  withResponsesStoreOptOut,
 } from './endpoint.js';
 import { extractContentText, stripThinkingBlocks } from './text.js';
 
@@ -195,12 +196,16 @@ export class ProviderAdapter {
     // Visible reasoning on the Responses API also carries the summary request
     // plus the transport fields (`store`, `include`) the gateway needs to
     // emit it. A caller-supplied `store: false` wins; hidden reasoning stays
-    // untouched (zero reasoning bytes ship).
+    // untouched (zero reasoning bytes ship). The deployment's storage opt-out is
+    // stamped on every body, including ones with no visible reasoning.
     const withTransport =
       this.api === 'responses'
-        ? withResponsesReasoningPayload(body, body.reasoning, {
-            storeEnabled: this.storeEnabled,
-          })
+        ? withResponsesStoreOptOut(
+            withResponsesReasoningPayload(body, body.reasoning, {
+              storeEnabled: this.storeEnabled,
+            }),
+            this.storeEnabled,
+          )
         : body;
     if (Array.isArray(tools) && tools.length > 0) withTransport.tools = tools;
     return withTransport;
@@ -230,12 +235,35 @@ export class ProviderAdapter {
     });
     // A gateway that rejects the optional reasoning transport fields still
     // gets to answer: retry once with the shared summary request but without
-    // `store`/`include` instead of failing the whole call.
+    // the optional `include`/reasoning transport fields instead of failing the
+    // whole call.
     if (!result.ok && rejectsReasoningTransport(result.status, result.detail)) {
       const stripped = { ...body };
-      delete stripped.store;
       delete stripped.include;
-      return requestProvider({ endpoint: this.endpoint, headers, body: stripped, signal });
+      // `store: false` is the deployment's storage opt-out, not an optional
+      // reasoning field: it is kept across the retry. Deleting it here sent the
+      // request with no `store` at all, leaving retention to the gateway's
+      // default — the opt-out silently disappeared on the fallback path. A
+      // gateway that cannot honour it fails the call instead, which is the
+      // honest outcome.
+      if (this.storeEnabled === false) {
+        stripped.store = false;
+      } else {
+        delete stripped.store;
+      }
+      const retry = await requestProvider({
+        endpoint: this.endpoint,
+        headers,
+        body: stripped,
+        signal,
+      });
+      if (!retry.ok && this.storeEnabled === false && retry.status === 400) {
+        return {
+          ...retry,
+          detail: `${retry.detail ?? ''} — the request was rejected while carrying this deployment's storage opt-out (store: false), which is not removed on retry.`,
+        };
+      }
+      return retry;
     }
     return result;
   }
@@ -254,6 +282,12 @@ export class OpenCodeGoAdapter extends ProviderAdapter {
       // Clamped to the allow-list: this is the only text route CoreZ permits.
       model: resolveTextModel(options.model ?? process.env.OPENCODE_MODEL),
       api: options.api ?? process.env.OPENCODE_API_MODE,
+      // A deployment's storage opt-out has to reach this path too. Without it
+      // the adapter fell back to the default (storage allowed) while the
+      // streaming path honoured the opt-out, so the same deployment asked for
+      // two different retention behaviours.
+      responsesStoreEnabled:
+        options.responsesStoreEnabled ?? process.env.OPENCODE_RESPONSES_STORE,
       referer: 'https://corez.ai',
       title: 'COREZ AI'
     });

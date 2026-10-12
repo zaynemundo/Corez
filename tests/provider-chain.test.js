@@ -119,6 +119,68 @@ describe('ProviderChain', () => {
     expect(sessions[2]).toBe('ses_custom12345');
   });
 
+  it('keeps the storage opt-out on the retry that drops the reasoning fields', async () => {
+    // Regression: the retry deleted `store` along with the optional reasoning
+    // fields, so a deployment that opted out of retention sent its fallback with
+    // no `store` at all and left the decision to the gateway's default.
+    const bodies = [];
+    fetchSpy.mockImplementation(async (_url, init) => {
+      const body = JSON.parse(init.body);
+      bodies.push(body);
+      if (bodies.length === 1) {
+        return new Response('unsupported parameter: include', { status: 400 });
+      }
+      return completionResponse('answer');
+    });
+    const adapter = new OpenCodeGoAdapter({
+      opencodeApiKey: 'oc-key',
+      endpoint: 'https://opencode.test/v1',
+      api: 'responses',
+      responsesStoreEnabled: false
+    });
+
+    const res = await adapter.generate({
+      messages: [{ role: 'user', content: 'hi' }],
+      reasoning: { effort: 'medium', exclude: false }
+    });
+
+    expect(res.content).toBe('answer');
+    expect(bodies.length).toBeGreaterThanOrEqual(2);
+    for (const [index, body] of bodies.entries()) {
+      expect(body.store, `attempt ${index + 1} dropped the storage opt-out`).toBe(false);
+      // Carrying encrypted reasoning content would require storing it, so the
+      // opt-out means the include path is never requested either.
+      expect(body.include, `attempt ${index + 1} requested stored reasoning`).toBeUndefined();
+    }
+    // The visible summary request itself survives the retry.
+    expect(bodies[1].reasoning).toEqual({ effort: 'medium', summary: 'auto' });
+  });
+
+  it('reports the storage opt-out as the blocker when a gateway refuses it', async () => {
+    // When the deployment requires no storage, a gateway that cannot accept it
+    // fails the call: the opt-out is never dropped to make the request succeed.
+    const bodies = [];
+    fetchSpy.mockImplementation(async (_url, init) => {
+      bodies.push(JSON.parse(init.body));
+      return new Response('unsupported parameter: store', { status: 400 });
+    });
+    const adapter = new OpenCodeGoAdapter({
+      opencodeApiKey: 'oc-key',
+      endpoint: 'https://opencode.test/v1',
+      api: 'responses',
+      responsesStoreEnabled: false
+    });
+
+    const res = await adapter.generate({
+      messages: [{ role: 'user', content: 'hi' }],
+      reasoning: { effort: 'medium', exclude: false }
+    });
+
+    expect(res.ok).toBe(false);
+    expect(res.detail).toMatch(/storage opt-out/);
+    for (const body of bodies) expect(body.store).toBe(false);
+  });
+
   it('strips inline thinking blocks from adapter content', async () => {
     fetchSpy.mockImplementation(async () =>
       completionResponse('Visible <thinking>secret</thinking>answer')

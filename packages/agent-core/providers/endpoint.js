@@ -118,6 +118,28 @@ export function withResponsesReasoningPayload(
 }
 
 /**
+ * Carry a deployment's storage opt-out onto any Responses request body.
+ *
+ * `OPENCODE_RESPONSES_STORE=false` is a privacy requirement, not one of the
+ * optional reasoning fields: a body that simply omits `store` leaves the gateway
+ * free to default it back on, so the opt-out has to be an explicit
+ * `store: false` on EVERY outgoing attempt — including the plain fallback and
+ * requests that never asked for a visible reasoning summary. Those are exactly
+ * the paths that used to drop it.
+ *
+ * Only the opt-out is stamped. An enabled store keeps the existing shape (the
+ * field is added by the reasoning payload, or left to the gateway's default)
+ * rather than asserting `store: true` where the deployment never asked for it.
+ * A caller-supplied `store` still wins.
+ */
+export function withResponsesStoreOptOut(body, storeEnabled) {
+  const base = body && typeof body === 'object' ? body : {};
+  if (storeEnabled !== false) return base;
+  if (base.store !== undefined) return base;
+  return { ...base, store: false };
+}
+
+/**
  * True when a gateway 400 names the optional reasoning transport fields
  * (`store` / `include` / encrypted reasoning content). Only that specific
  * rejection justifies the one-shot retry without them; any other error must

@@ -979,6 +979,88 @@ describe('OpenCode gateway client behavior', () => {
     expect(events.filter((e) => e.type === 'delta').map((e) => e.text).join('')).toBe('answer');
   });
 
+  it('carries the storage opt-out on every attempt, including the plain fallback', async () => {
+    // Regression: only the requests that asked for a visible reasoning summary
+    // carried `store: false`. The plain fallback attempt and every request
+    // without visible reasoning sent NO store field at all, so a deployment
+    // that opted out of retention had the opt-out silently dropped and left the
+    // decision to the gateway's default. These assertions inspect every
+    // outgoing body, not just the first one.
+    const bodies = [];
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+      bodies.push(JSON.parse(init.body));
+      // Reject the optional reasoning transport fields so the whole fallback
+      // chain runs, and answer the final attempt.
+      if (bodies.length < 3) {
+        return new Response('unsupported parameter: include', { status: 400 });
+      }
+      return new Response(
+        'data: {"type":"response.output_text.delta","delta":"answer"}\n\n' +
+          'data: {"type":"response.completed","response":{"status":"completed"}}\n\n' +
+          'data: [DONE]\n\n',
+        { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+      );
+    }));
+    const env = { OPENCODE_GO_API_KEY: 'sk-opencode', OPENCODE_RESPONSES_STORE: 'false' };
+    for await (const _event of runStreamingChain([{ role: 'user', content: 'hi' }], {
+      env,
+      reasoning: { effort: 'medium', exclude: false },
+      sleep: async () => {},
+      clock: () => 0,
+      jitter: () => 0
+    })) {
+      // drain the stream
+    }
+
+    expect(bodies.length).toBeGreaterThanOrEqual(3);
+    for (const [index, body] of bodies.entries()) {
+      expect(body.store, `attempt ${index + 1} dropped the storage opt-out`).toBe(false);
+    }
+  });
+
+  it('carries the storage opt-out even when no reasoning is requested', async () => {
+    // The opt-out is a transport requirement, not part of the optional reasoning
+    // payload: a request with hidden reasoning is a single attempt with no
+    // reasoning fields, and it used to send no `store` at all.
+    let visiblePayload = null;
+    let hiddenPayload = null;
+    const respond = (capture) => vi.fn(async (_url, init) => {
+      capture(JSON.parse(init.body));
+      return new Response(
+        'data: {"type":"response.output_text.delta","delta":"answer"}\n\n' +
+          'data: {"type":"response.completed","response":{"status":"completed"}}\n\n' +
+          'data: [DONE]\n\n',
+        { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+      );
+    });
+
+    vi.stubGlobal('fetch', respond((p) => { visiblePayload = p; }));
+    for await (const _event of runStreamingChain([{ role: 'user', content: 'hi' }], {
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode', OPENCODE_RESPONSES_STORE: 'false' },
+      sleep: async () => {},
+      clock: () => 0,
+      jitter: () => 0
+    })) {
+      // no reasoning option at all: nothing to make visible
+    }
+    expect(visiblePayload.store).toBe(false);
+    expect(visiblePayload.reasoning).toBeUndefined();
+
+    vi.stubGlobal('fetch', respond((p) => { hiddenPayload = p; }));
+    for await (const _event of runStreamingChain([{ role: 'user', content: 'hi' }], {
+      env: { OPENCODE_GO_API_KEY: 'sk-opencode', OPENCODE_RESPONSES_STORE: 'false' },
+      reasoning: { effort: 'medium', exclude: true },
+      sleep: async () => {},
+      clock: () => 0,
+      jitter: () => 0
+    })) {
+      // internal reasoning stays hidden
+    }
+    expect(hiddenPayload.store).toBe(false);
+    expect(hiddenPayload.include).toBeUndefined();
+    expect(hiddenPayload.reasoning).toEqual({ effort: 'medium' });
+  });
+
   it('honours OPENCODE_RESPONSES_STORE as a positive storage setting on the wire', async () => {
     // Regression: the setting was parsed with a "feature disabled" helper and
     // negated, so `false` (the documented opt-out) ENABLED storage. These

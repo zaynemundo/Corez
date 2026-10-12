@@ -20,6 +20,7 @@ import {
   toGatewayReasoning,
   wantsResponsesReasoning,
   withResponsesReasoningPayload,
+  withResponsesStoreOptOut,
 } from "../packages/agent-core/providers/endpoint.js";
 import {
   createThinkingStreamFilter,
@@ -277,8 +278,8 @@ export async function* streamChatEndpoint({
   // Three-tier fallback for strict gateways, most-capable first:
   //   1. transport fields as configured (store explicit, include when storing)
   //   2. store explicitly denied, summary request kept
-  //   3. the plain body with no transport fields at all
-  const attempts = reasoningVisible
+  //   3. the plain body with no optional reasoning transport fields
+  const reasoningAttempts = reasoningVisible
     ? [
         withResponsesReasoningPayload(requestBody, requestBody.reasoning, {
           storeEnabled,
@@ -290,6 +291,14 @@ export async function* streamChatEndpoint({
         requestBody,
       ]
     : [requestBody];
+  // Every attempt carries the deployment's storage opt-out. The plain fallback
+  // and the no-visible-reasoning path used to send no `store` field at all,
+  // which silently dropped the opt-out and left retention to the gateway's
+  // default. The opt-out is a transport requirement, not an optional reasoning
+  // field, so stripping reasoning fields never strips it.
+  const attempts = reasoningAttempts.map((attempt) =>
+    withResponsesStoreOptOut(attempt, storeEnabled),
+  );
 
   try {
     const response = await sendStreamRequest(attempts, {

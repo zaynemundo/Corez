@@ -67,6 +67,10 @@ export function buildHarness(env) {
       opencodeApiKey: env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY,
       endpoint: env?.OPENCODE_ENDPOINT,
       model: env?.OPENCODE_MODEL,
+      // The queued/durable path must honour the same storage opt-out as the
+      // streaming path: a privacy-sensitive deployment that sets
+      // OPENCODE_RESPONSES_STORE=false cannot have task runs silently retaining.
+      responsesStoreEnabled: env?.OPENCODE_RESPONSES_STORE,
     }),
   ];
   return new AgentHarness({
