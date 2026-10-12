@@ -356,6 +356,18 @@ export class AgentHarness {
         retryAfterSeconds: secondsUntil(outcome.leaseExpiresAt)
       };
     }
+    if (finished.isTerminal && finished.persistenceFailed) {
+      // The run reached a terminal state in memory but could not record it
+      // durably. Report a retryable outcome so the caller redelivers instead of
+      // acknowledging work whose outcome is not stored anywhere; a staged
+      // completion lets the redelivery finish without another provider call.
+      return {
+        task: finished,
+        outcome: 'persist-failed',
+        executed: true,
+        retryAfterSeconds: LEASE_RETRY_SECONDS
+      };
+    }
     if (finished.status === TASK_STATUSES.CANCELLED) {
       return { task: finished, outcome: 'cancelled', executed: true };
     }
@@ -603,6 +615,11 @@ export class AgentHarness {
   }
 
   async #executeCore(task, options = {}) {
+    // A redelivery after a failed terminal write carries a staged result: the
+    // generation is already paid for, so finish from the stage rather than
+    // calling the provider again.
+    const resumed = await this.#resumeStagedCompletion(task);
+    if (resumed) return resumed;
     const mode = task.mode || 'repository';
     if (mode === 'repository') {
       return this.#executeRepository(task, options);
@@ -867,7 +884,7 @@ export class AgentHarness {
         if (lease?.lost) return this.#stopForLostLease(task);
         task.markTerminal(TASK_STATUSES.FAILED, null, chainResult.error);
         this.eventBus.emit({ type: 'task.failed', taskId: task.taskId, error: chainResult.error });
-        await this.#persist(task);
+        await this.#persistRequired(task);
         return task;
       }
 
@@ -888,7 +905,7 @@ export class AgentHarness {
       if (!content.trim()) {
         task.markTerminal(TASK_STATUSES.FAILED, null, 'The model returned an empty conversation response.');
         this.eventBus.emit({ type: 'task.failed', taskId: task.taskId, error: 'The model returned an empty conversation response.' });
-        await this.#persist(task);
+        await this.#persistRequired(task);
         return task;
       }
 
@@ -919,7 +936,7 @@ export class AgentHarness {
         const msg = `Verification failed: agy must test before saying its done. Missing: ${verdict.missing.join('; ')}. Evidence: ${verdict.evidence.join(', ') || 'none'}. Re-run the required checks (run_build, run_tests, git diff --check) and retry.`;
         task.markTerminal(TASK_STATUSES.FAILED, null, msg);
         this.eventBus.emit({ type: 'task.failed', taskId: task.taskId, error: msg, missing: verdict.missing });
-        await this.#persist(task);
+        await this.#persistRequired(task);
         this.cancellations.dispose(task.taskId);
         return task;
       }
@@ -927,7 +944,7 @@ export class AgentHarness {
     }
     task.markTerminal(TASK_STATUSES.COMPLETED, response, null);
     this.eventBus.emit({ type: 'task.completed', taskId: task.taskId, response });
-    await this.#persist(task);
+    await this.#persistCompletion(task, response);
     this.cancellations.dispose(task.taskId);
     return task;
   }
@@ -935,14 +952,18 @@ export class AgentHarness {
   async #finishCancelled(task) {
     task.markTerminal(TASK_STATUSES.CANCELLED, null, this.cancellations.reason(task.taskId));
     this.eventBus.emit({ type: 'task.cancelled', taskId: task.taskId });
-    await this.#persist(task);
+    await this.#persistRequired(task);
     return task;
   }
 
-  async #persist(task) {
-    if (!this.store) return;
+  // A progress write may fail without ending the run: the task keeps going and
+  // the failure is recorded on the task. Returns whether the write landed, so a
+  // terminal transition can insist on durability (#persistRequired).
+  async #persist(task, patch = null) {
+    if (!this.store) return true;
     try {
-      await this.#persistUnsafe(task);
+      await this.#persistUnsafe(task, patch);
+      return true;
     } catch (err) {
       // Losing the lease is not a storage blip: stop the run and never retry
       // the write against a task this runner no longer owns.
@@ -955,11 +976,80 @@ export class AgentHarness {
         taskId: task.taskId,
         error: err?.message || 'storage failure'
       });
+      return false;
     }
   }
 
-  async #persistUnsafe(task) {
+  // A terminal state is only real once it is stored. Unlike #persist, a failure
+  // here marks the run as not durable, which executeTask turns into a redelivery
+  // instead of an acknowledgement.
+  async #persistRequired(task, patch = null) {
+    const stored = await this.#persist(task, patch);
+    if (!stored) task.persistenceFailed = true;
+    return stored;
+  }
+
+  // The two-step terminal write. The result is staged on its own first, so a
+  // failure of the larger terminal document cannot lose it: the next delivery
+  // completes the task from the stage without paying for the same generation
+  // twice. When the stage itself cannot be written nothing was promised, so
+  // running the provider again is the honest outcome.
+  async #persistCompletion(task, response) {
+    const staged = await this.#persist(task, {
+      pendingCompletion: { result: response, stagedAt: new Date().toISOString() }
+    });
+    if (!staged) {
+      task.persistenceFailed = true;
+      return false;
+    }
+    // The terminal write is the full document: it carries the status and the
+    // result, and clears the stage in the same statement.
+    const finalized = await this.#persist(task, this.#snapshot(task, { pendingCompletion: null }));
+    task.persistenceFailed = !finalized;
+    return finalized;
+  }
+
+  // A redelivery after a failed terminal write finds the result already staged.
+  // Completing from the stage costs no provider call: the generation was paid
+  // for once, and its output is the one that gets stored.
+  async #resumeStagedCompletion(task) {
+    const staged = task?.pendingCompletion;
+    if (!staged || typeof staged.result !== 'string' || task.isTerminal) return null;
+    task.markTerminal(TASK_STATUSES.COMPLETED, staged.result, null);
+    this.eventBus.emit({
+      type: 'task.completed',
+      taskId: task.taskId,
+      response: staged.result,
+      resumedFromStage: true
+    });
+    await this.#persistRequired(task, this.#snapshot(task, { pendingCompletion: null }));
+    this.cancellations.dispose(task.taskId);
+    return task;
+  }
+
+  async #persistUnsafe(task, patch = null) {
     if (!this.store) return;
+    const snapshot = patch || this.#snapshot(task);
+    // Progress writes are fenced: while this harness holds a lease, only the
+    // current holder may update the task document. A stale owner's write is
+    // rejected and treated as lease loss, ending the run.
+    const leaseState = this.activeTaskLeases.get(String(task.taskId));
+    if (leaseState) {
+      if (leaseState.lost) {
+        throw new LeaseLostError(task.taskId, leaseState.lost.message);
+      }
+      const updated = await this.store.updateTaskFenced(task.taskId, snapshot, leaseState.holder);
+      if (!updated) {
+        const error = new LeaseLostError(task.taskId, 'Task lease is no longer held by this runner.');
+        leaseState.markLost(error);
+        throw error;
+      }
+      return;
+    }
+    await this.store.updateTask(task.taskId, snapshot);
+  }
+
+  #snapshot(task, extra = null) {
     const log = this.sessionLogs.get(String(task.taskId));
     const sessionLogSnapshot = log ? log.toJSON() : null;
     const snapshot = {
@@ -986,23 +1076,7 @@ export class AgentHarness {
       updatedAt: task.updatedAt,
       sessionLog: sessionLogSnapshot
     };
-    // Progress writes are fenced: while this harness holds a lease, only the
-    // current holder may update the task document. A stale owner's write is
-    // rejected and treated as lease loss, ending the run.
-    const leaseState = this.activeTaskLeases.get(String(task.taskId));
-    if (leaseState) {
-      if (leaseState.lost) {
-        throw new LeaseLostError(task.taskId, leaseState.lost.message);
-      }
-      const updated = await this.store.updateTaskFenced(task.taskId, snapshot, leaseState.holder);
-      if (!updated) {
-        const error = new LeaseLostError(task.taskId, 'Task lease is no longer held by this runner.');
-        leaseState.markLost(error);
-        throw error;
-      }
-      return;
-    }
-    await this.store.updateTask(task.taskId, snapshot);
+    return extra ? { ...snapshot, ...extra } : snapshot;
   }
 }
 

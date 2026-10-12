@@ -99,6 +99,53 @@ function rateLimitedResponse(retryAfterSeconds = 60) {
   });
 }
 
+// A D1 whose terminal task write can be failed on demand, so the window between
+// "the provider succeeded" and "the task is completed" is reproducible: the
+// write that records the completed task is exactly the one that fails.
+function createFaultyD1(faults) {
+  const d1 = createSqliteD1();
+  return {
+    __sqlite: d1.__sqlite,
+    prepare(sql) {
+      const inner = d1.prepare(sql);
+      let values = [];
+      return {
+        bind(...args) {
+          values = args;
+          inner.bind(...args);
+          return this;
+        },
+        async run() {
+          if (faults(sql, values)) throw new Error('injected storage failure');
+          return inner.run();
+        },
+        async all() {
+          return inner.all();
+        },
+        async first() {
+          return inner.first();
+        }
+      };
+    },
+    batch(statements) {
+      return d1.batch(statements);
+    }
+  };
+}
+
+// The terminal task write: an UPDATE of harness_tasks carrying a document whose
+// status is already completed. Bind order is (user_id, session_id, status, doc).
+function isCompletedTaskWrite(sql, values) {
+  if (!/^\s*UPDATE\s+harness_tasks/i.test(sql)) return false;
+  const doc = values?.[3];
+  if (typeof doc !== 'string') return false;
+  try {
+    return JSON.parse(doc).status === TASK_STATUSES.COMPLETED;
+  } catch {
+    return false;
+  }
+}
+
 async function postTask(env, prompt, ctx = undefined) {
   return entryWorker.fetch(
     fetchRequest('https://corez.test/api/tasks', {
@@ -276,6 +323,52 @@ describe('durable task execution', () => {
     const store = new D1TaskStore({ db: env.DB, bucket: env.ASSET_BUCKET });
     const failureEvents = (await store.listEvents(taskId)).filter((event) => event.type === 'task.failed');
     expect(failureEvents.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('does not ack a completed task until its result is durable, then recovers it without a second generation', async () => {
+    let failTerminalWrite = true;
+    const env = environment({
+      ASSET_BUCKET: memoryBucket(),
+      DB: createFaultyD1((sql, values) => failTerminalWrite && isCompletedTaskWrite(sql, values)),
+      TASKS_QUEUE: createQueue(),
+      OPENCODE_GO_API_KEY: 'test-key'
+    });
+    let providerCalls = 0;
+    globalThis.fetch = async () => {
+      providerCalls += 1;
+      return providerResponse('durable answer');
+    };
+
+    const { taskId } = await (await postTask(env, 'store the result before acknowledging')).json();
+
+    // The provider succeeds but the terminal write fails. The message must not
+    // be acknowledged: acknowledging work whose outcome was never stored is how
+    // a finished task is lost.
+    const first = fakeMessage(taskId);
+    await entryWorker.queue({ messages: [first] }, env);
+    expect(providerCalls).toBe(1);
+    expect(first.acked).toBe(false);
+    expect(first.retries).toHaveLength(1);
+
+    // The generated answer survived the failure: it is staged on the document,
+    // while the stored status deliberately stays non-terminal.
+    const store = new D1TaskStore({ db: env.DB, bucket: env.ASSET_BUCKET });
+    const staged = await store.getTask(taskId);
+    expect(staged.status).toBe(TASK_STATUSES.RUNNING);
+    expect(staged.pendingCompletion.result).toBe('durable answer');
+
+    // Storage recovered: the redelivery completes the task from the stage. No
+    // second provider call means no second charge for the same generation.
+    failTerminalWrite = false;
+    const second = fakeMessage(taskId, 2);
+    await entryWorker.queue({ messages: [second] }, env);
+    expect(second.acked).toBe(true);
+    expect(providerCalls).toBe(1);
+
+    const finished = await getTask(env, taskId);
+    expect(finished.status).toBe(TASK_STATUSES.COMPLETED);
+    expect(finished.result).toBe('durable answer');
+    expect((await store.getTask(taskId)).pendingCompletion ?? null).toBe(null);
   });
 
   it('re-dispatches resumed tasks through the queue', async () => {

@@ -336,12 +336,31 @@ function retryDelaySeconds(seconds) {
 
 // Bounded retries must end honestly: when the delivery budget is spent the
 // stored task is failed instead of silently dropping the message and leaving
-// the task "running" forever.
+// the task "running" forever. A staged completion is the exception — the
+// provider already produced the answer and storing it is strictly better than
+// reporting a failure for work that succeeded.
 async function failExhaustedTask(store, taskId, reason) {
   if (!store) return;
   try {
     const task = await store.getTask(taskId);
     if (!task || TERMINAL_TASK_STATUSES.has(task.status)) return;
+    const staged = task.pendingCompletion;
+    if (staged && typeof staged.result === 'string') {
+      await store.updateTask(taskId, {
+        status: TASK_STATUSES.COMPLETED,
+        result: staged.result,
+        error: null,
+        pendingCompletion: null,
+        terminalAt: new Date().toISOString(),
+      });
+      await store.appendEvent(taskId, {
+        type: 'task.completed',
+        taskId,
+        response: staged.result,
+        resumedFromStage: true,
+      });
+      return;
+    }
     const message = `Task retries exhausted: ${reason}`;
     await store.updateTask(taskId, {
       status: TASK_STATUSES.FAILED,
@@ -446,7 +465,9 @@ export async function handleTaskQueueMessage(message, env) {
   // durable sleeper. lease-held/running: another runner owns the task (or it
   // is mid-flight without a schedule); lease-unavailable: ownership could not
   // be confirmed because the lease store failed; lease-lost: this runner
-  // stopped owning the task mid-run. All are redelivered after a delay.
+  // stopped owning the task mid-run; persist-failed: the run reached a terminal
+  // state that could not be stored, so acknowledging it would lose the result.
+  // All are redelivered after a delay.
   const delaySeconds = retryDelaySeconds(outcome.retryAfterSeconds);
   message.retry({ delaySeconds });
   return { action: "retry", taskId, outcome: outcome.outcome, delaySeconds };
