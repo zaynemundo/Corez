@@ -16,6 +16,7 @@ import {
   mergeResponse,
   processResponse,
   stripMetaCommentary,
+  trimMetaTail,
   isMetaOnlyReply,
   isRestartedReply
 } from '../worker/responseProcessor.js';
@@ -457,6 +458,66 @@ describe('processResponse', () => {
   it('strips trailing meta-commentary during continuation stitching', () => {
     const stitched = stitchContinuationChunk('The game ends here.', 'The game ends here.My previous reply was already complete — nothing left to continue.');
     expect(stitched.stitched).toBe('The game ends here.');
+  });
+
+  // Regression from a real chat: a completed document plus continuation
+  // requests produced pages of "All tags are properly closed... You can open
+  // the previous output... No further lines to add" appended after the code
+  // block. These fragments are longer than one sentence and never matched the
+  // anchored pattern, so they were stitched into the visible reply.
+  it('rejects the multi-sentence document-status boilerplate variants', () => {
+    const fragments = [
+      'All tags are properly closed at the stopping point with </div>, </body>, </html> and the markdown code block is closed with ```.',
+      'The file is already complete — no further lines are needed.',
+      'You can open the previous output and use Print / Save as PDF directly.',
+      'No further lines to add — document ends at the previous closing tags.',
+      'The file is fully complete and printable as-is.',
+      'Your PDF file is already complete from the previous output — no missing lines.',
+      'All sections, tables, and closing `</div>`, `</body>`, `</html>` tags plus the markdown code block are already closed and printable as-is.',
+      'Your file is already complete and properly closed —No further lines to add — your PDF file is already complete through to `</html>` and the closing code block.',
+    ];
+    for (const fragment of fragments) {
+      expect(isMetaOnlyReply(fragment)).toBe(true);
+      const stitched = stitchContinuationChunk('```html\n<div>done</div>\n```', fragment);
+      expect(stitched.deltaText).toBe('');
+      expect(stitched.stitched).toBe('```html\n<div>done</div>\n```');
+    }
+  });
+
+  it('never appends document-status narration after a real deliverable', async () => {
+    const document = 'Here are the planets.\n\n```html\n<html><body><div>Planets</div></body></html>\n```';
+    const original = [
+      document,
+      'All tags are properly closed at the stopping point with </div>, </body>, </html> and the markdown code block is closed with ```.',
+      'You can open the previous output and use Print / Save as PDF directly.',
+      'No further lines to add — document ends at the previous closing tags.',
+      'The file is fully complete and printable as-is.',
+      'Your PDF file is already complete from the previous output — no missing lines.',
+    ].join('\n\n');
+    const generate = vi.fn(async () => ({ content: 'Done.' }));
+    const result = await processResponse([{ role: 'user', content: 'make a pdf' }], original, {
+      userPrompt: 'make a pdf',
+      generate,
+      maxRepairs: 2,
+    });
+    expect(result.content).toBe(document);
+    expect(result.content).not.toMatch(/already complete|No further lines|Print \/ Save as PDF/);
+  });
+
+  it('trimMetaTail removes only trailing narration and keeps real prose', () => {
+    const document = 'The eight planets are Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune.';
+    expect(
+      trimMetaTail(`${document}\nThe file is already complete — no further lines are needed.`),
+    ).toBe(document);
+    expect(
+      trimMetaTail(`${document}\nAll tags are properly closed at the stopping point with </div>.`),
+    ).toBe(document);
+    // Legitimate prose that merely mentions completion keeps its tail.
+    const legit = 'That completes the file. The editor is now open.';
+    expect(trimMetaTail(`${document}\n${legit}`)).toBe(`${document}\n${legit}`);
+    // "The closing brace is on the last line" is real documentation.
+    const docs = 'The closing brace is on the last line of the function.';
+    expect(trimMetaTail(`${document}\n${docs}`)).toBe(`${document}\n${docs}`);
   });
 
   it('respects the repair attempt ceiling', async () => {

@@ -49,6 +49,7 @@ import {
   processResponse,
   detectTruncation,
   stitchContinuationChunk,
+  isMetaOnlyReply,
   CONTINUATION_INSTRUCTION,
   ANTI_REPEAT_CONTINUATION_INSTRUCTION,
 } from "./responseProcessor.js";
@@ -2385,6 +2386,11 @@ async function handleAi(request, env) {
                 }
 
                 if (!contChunk.trim()) break;
+                // A continuation that only narrates completion ("All tags are
+                // properly closed...", "No further lines to add...") carries no
+                // missing content: stop continuing and never stream the noise
+                // after the deliverable.
+                if (isMetaOnlyReply(contChunk)) break;
                 const { stitched, deltaText, restarted } =
                   stitchContinuationChunk(collected, contChunk);
                 if (deltaText) {

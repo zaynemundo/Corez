@@ -653,8 +653,15 @@ export function scoreContinuity({ project, response, userPrompt }) {
 // "paste the partial content...", "I can't continue from a stopping
 // point..."). Any such text is noise: strip from the first meta phrase to
 // the end of the chunk.
+//
+// The pattern also covers the "document status" boilerplate models emit when
+// a repair request hits an answer that already ends at a closing tag: "All
+// tags are properly closed at the stopping point...", "You can open the
+// previous output and use Print / Save as PDF directly", "No further lines
+// to add", "your PDF file is already complete...". These fragments are pure
+// narration — a file is not made complete by asserting that it is.
 const META_COMMENTARY_PATTERN =
-  /(?:(?:^|\n)##[^\n]{0,80}\n+)?(?:My (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|The (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|Your (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|(?:The|This) (?:response|reply|answer) is already (?:complete|finished)|There (?:is|was) (?:no|nothing) (?:dangling|open|more|unfinished|partial) (?:file|code|tag|expression|block|content)|No continuation (?:is )?needed|Nothing (?:to|left to|more to) continu|No (?:partial|incomplete) (?:file|document|output|content)|There is no (?:prior |unfinished )?(?:partial )?(?:file|document|content|output|code block)|No open (?:document|file|content|conversation)[\s\S]{0,120}?(?:unfinished|remains|needed|to continue|to resume)[^]*$|No prior (?:file|document|content|conversation) found|is left unfinished[^]*$|(?:starting|start) from (?:your|the) stopping-point instruction|stopping-point instruction as the baseline|Assuming (?:you meant|the active file|no prior partial|the previous|the last|a complete)|I can'?t continue from a stopping point|Paste (?:your|the) partial|Provide the partial content|No active (?:partial|document|file|content|conversation)|None found (?:in the conversation|to resume|to continue|yet)|What to Provide to Resume|Required to Proceed|To proceed, please paste|#{1,3}\s*Continuation (?:Status|Check)|nothing (?:further|more|else) (?:to append|to add|can be appended)|no (?:stopping|stop) points? (?:to resume|for resuming) from|paste the (?:partial content|last lines)|continue directly from that exact|No (?:open|unclosed) [`<])[^]*$/i;
+  /(?:(?:^|\n)##[^\n]{0,80}\n+)?(?:My (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|The (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|Your (?:previous|prior) (?:reply|response|answer) was already (?:complete|finished)|(?:The|This) (?:response|reply|answer) is already (?:complete|finished)|There (?:is|was) (?:no|nothing) (?:dangling|open|more|unfinished|partial) (?:file|code|tag|expression|block|content)|No continuation (?:is )?needed|Nothing (?:to|left to|more to) continu|No (?:partial|incomplete) (?:file|document|output|content)|There is no (?:prior |unfinished )?(?:partial )?(?:file|document|content|output|code block)|No open (?:document|file|content|conversation)[\s\S]{0,120}?(?:unfinished|remains|needed|to continue|to resume)|No prior (?:file|document|content|conversation) found|is left unfinished|(?:starting|start) from (?:your|the) stopping-point instruction|stopping-point instruction as the baseline|Assuming (?:you meant|the active file|no prior partial|the previous|the last|a complete)|I can'?t continue from a stopping point|Paste (?:your|the) partial|Provide the partial content|No active (?:partial|document|file|content|conversation)|None found (?:in the conversation|to resume|to continue|yet)|What to Provide to Resume|Required to Proceed|To proceed, please paste|#{1,3}\s*Continuation (?:Status|Check)|nothing (?:further|more|else) (?:to append|to add|can be appended)|no (?:stopping|stop) points? (?:to resume|for resuming) from|paste the (?:partial content|last lines)|continue directly from that exact|No (?:open|unclosed) [`<]|(?:Your |The )?(?:file|document|output|document file|code|content) is (?:already|fully) complete|(?:this|the) (?:file|document) ends? at (?:the )?previous|All (?:the )?(?:tags|sections|elements|blocks) are (?:properly |fully )?closed|All tags? and (?:markdown )?code blocks? are (?:properly |already )?closed|tags? (?:and|plus) (?:the )?(?:markdown )?code blocks? (?:are|is) (?:already|properly) closed|You can open (?:the )?previous (?:output|message|reply)|use Print \/ Save as PDF|Print \/ Save as PDF directly|No further lines? (?:to add|needed|are needed)|No (?:more|additional) lines? (?:to add|needed|are needed)|document ends at the previous closing tags?|(?:is|are) printable as-is|printable as-is|is complete (?:and printable|through to)|complete and properly closed|complete from the previous output|no missing lines|(?:is )?already closed and printable|Open (?:that|the full) (?:HTML|code) (?:block|output)[\s\S]{0,80}?(?:button|save it|save the|to save)|Press Ctrl\+P|\/ Cmd\+P|choose Destination: Save as PDF|in the chat above|from (?:two|three|the previous) messages? above|the closing code block|the closing [`]|closing code block|previous closing tags?)[^]*$/i;
 
 export function stripMetaCommentary(text) {
   const value = String(text || "");
@@ -664,13 +671,156 @@ export function stripMetaCommentary(text) {
   return stripped === value ? value : stripped.replace(/\s+$/, "");
 }
 
-// A repair that is ONLY self-referential meta-commentary (no code, no
-// substantive content) means the original answer was already complete and
-// the truncation flag was a false positive — never stitch it into the reply.
+// Meta fragments that start mid-sentence ("...</html> and the markdown code
+// block is closed with ```. You can open...") are not caught by the anchored
+// META_COMMENTARY_PATTERN above, so noise detection removes them first.
+const META_BOILERPLATE_PATTERN =
+  /(?:All tags? are properly closed at the stopping point|All (?:the )?(?:tags|sections|elements|blocks) (?:and (?:(?:the )?markdown )?code blocks? )?are (?:properly |fully |already )?closed|(?:tags?|sections|elements|blocks)(?:,? and)?[^.!?\n]{0,40}?(?:markdown\s+)?code\s+blocks?[^.!?\n]{0,20}?(?:are|is|were|was)[^.!?\n]{0,20}?(?:closed|complete)(?:\s+with\s+`{0,3}\s*\.?)?|You can open (?:the )?previous (?:output|message|reply)|use Print \/ Save as PDF|Print \/ Save as PDF directly|No further lines? (?:to add|needed|are needed)|No (?:more|additional) lines? (?:to add|needed|are needed)(?: — document ends at the previous closing tags?)?|document ends at the previous closing tags?|(?:is|are) printable as-is|is complete (?:and printable|through to|from the previous output)|complete and properly closed|no missing lines|(?:is )?already closed and printable|Open (?:that|the full) (?:HTML|code) (?:block|output)[\s\S]{0,80}?(?:button|save it|save the|to save)|Press Ctrl\+P|\/ Cmd\+P|choose Destination: Save as PDF|in the chat above|from (?:two|three|the previous) messages? above|the closing (?:code block|tags?)|previous closing tags?)/gi;
+
+// Remove document-status narration from the END of a real answer. The
+// anchored META_COMMENTARY_PATTERN only fires mid-text when the first meta
+// phrase starts a sentence; the observed failure had a real deliverable
+// first and the narration appended after it. This walks from the end and
+// drops every trailing paragraph (newline-delimited, as the boilerplate
+// arrives) whose every sentence is narration. Only the tail is touched:
+// the first paragraph with real content (or any line inside the artifact)
+// stops the walk and everything before it stays byte-identical.
+export function trimMetaTail(text) {
+  const value = String(text || "");
+  const lines = value.split("\n");
+  let end = lines.length;
+  while (end > 1) {
+    const line = lines[end - 1];
+    if (isMetaParagraph(line)) {
+      end -= 1;
+      continue;
+    }
+    if (isMetaLine(line) || !line.trim()) {
+      end -= 1;
+      continue;
+    }
+    break;
+  }
+  if (end === lines.length) return value;
+  return lines.slice(0, end).join("\n").replace(/\s+$/, "");
+}
+
+// True when a paragraph (one or more sentences) is entirely document-status
+// narration: every sentence loses its meta fragments and nothing substantive
+// remains. A single real content word is enough to keep the paragraph.
+function isMetaParagraph(text) {
+  const value = String(text || "").trim();
+  if (!value) return true;
+  const sentences = value.split(/(?<=[.!?])\s+/);
+  return sentences.every((sentence) => isMetaLine(sentence));
+}
+
+// Distinct closure markers. One marker may legitimately appear in a real
+// answer ("the closing brace is on the last line"); a document-status
+// narration line carries several of them ("tags ... closed ... code block
+// ... print ... save as PDF"). Gaps are dot- and newline-tolerant because
+// markup review lines embed ".</div>, </body>, </html>" sequences.
+const META_MARKER_PATTERNS = [
+  /\bclosing\s+`?<\/(?:div|body|html)>`?/i,
+  /\b(?:markdown\s+|code\s+)?code\s+blocks?\b[^A-Za-z0-9]{0,30}?(?:are|is|were|was)\b[^A-Za-z0-9]{0,30}?(?:closed|complete)/i,
+  /\b(?:tags?|sections?|elements?|blocks?)\b[^A-Za-z0-9]{0,40}?(?:are|is|were|was)\b[^A-Za-z0-9]{0,40}?(?:closed|complete)(?!\s+in\b|\s+on\b|\s+with\b|\s+by\b|\s+at\b)/i,
+  /\b(?:is|are)\s+closed\s+with\b/i,
+  /\bat the stopping[- ]point\b/i,
+  /\b(?:stopping|stop)\s+points?\b/i,
+  /\bno\s+(?:further|more|additional|missing)\s+(?:lines?|content|text)\b/i,
+  /\bno\s+missing\s+lines?\b/i,
+  /\bdocument\s+ends\s+at\s+the\s+previous\b/i,
+  /\b(?:file|document)\s+(?:is|was)\s+(?:already|fully|now)?\s*(?:complete|finished|done|closed|printable)\b(?!\s+(?:in|on|with|by|at)\b)/i,
+  /\b(?:is|are)\s+(?:fully\s+|already\s+)?printable\s+as-is\b/i,
+  /\bprintable\s+as-is\b/i,
+  /\bprint\s*\/\s*save\s+as\s+pdf\b/i,
+  /\bpress\s+(?:ctrl|cmd)\s*\+\s*p\b/i,
+  /\bchoose\s+destination\b/i,
+  /\b(?:you\s+can\s+open|open)\s+(?:the\s+)?previous\s+(?:output|message|reply)\b/i,
+  /\bprevious\s+(?:output|message|reply|response|closing\s+tags?)\b/i,
+  /\b(?:in\s+the\s+chat|from\s+(?:two|three|the\s+previous)\s+messages?)\s+above\b/i,
+  /\bcomplete\s+and\s+properly\s+closed\b(?!\s+in\b|\s+on\b|\s+with\b|\s+by\b|\s+at\b)/i,
+  /\balready\s+closed\s+and\s+printable\b/i,
+  /\bproperly\s+closed\s+at\s+the\s+stopping\s+point\b/i,
+  /\bno\s+(?:further|more)\s+lines?\s+(?:to\s+add|needed|are\s+needed)\b/i,
+  /\b(?:my|the|your)\s+(?:previous|prior)\s+(?:reply|response|answer)\s+(?:is|was)\s+already\s+(?:complete|finished)\b/i,
+  /\b(?:the|this)\s+(?:response|reply|answer)\s+is\s+already\s+(?:complete|finished)\b/i,
+  /\bno\s+continuation\s+(?:is\s+)?needed\b/i,
+  /\bnothing\s+(?:to|left\s+to|more\s+to)\s+continu/i,
+];
+
+// Words that survive marker stripping but carry no factual content. A line
+// that keeps only these is narration rather than a real answer.
+const META_RESIDUE_WORDS = new Set([
+  "a", "an", "the", "and", "or", "plus", "with", "without", "of", "to", "in",
+  "on", "at", "from", "for", "by", "as", "is", "are", "was", "were", "be",
+  "been", "this", "that", "these", "those", "it", "its", "your", "you", "my",
+  "our", "here", "there", "all", "any", "each", "every", "no", "not", "none",
+  "nothing", "properly", "fully", "already", "now", "complete", "completed",
+  "completing", "finishing", "finished", "done", "closed", "close", "open",
+  "opened", "closing", "end", "ends", "ended", "point", "points", "stopping",
+  "stop", "line", "lines", "needed", "add", "added", "adding", "further",
+  "more", "additional", "missing", "printable", "print", "prints", "save",
+  "pdf", "directly", "previous", "above", "below", "file", "files",
+  "document", "documents", "output", "message", "messages", "reply",
+  "replies", "response", "answer", "code", "codes", "block", "blocks", "tag",
+  "tags", "section", "sections", "element", "elements", "markdown", "button",
+  "chat", "press", "ctrl", "cmd", "choose", "destination", "html", "as-is",
+  "can", "could", "would", "should", "will", "may", "might", "do", "does",
+  "did", "so", "then", "than", "but", "however", "therefore", "thus", "hence",
+  "just", "only", "even", "also", "too", "very", "up", "down", "out", "over",
+  "under", "into", "onto", "upon", "proper", "correct", "right", "here",
+]);
+
+function isMetaLine(line) {
+  const value = String(line || "").trim();
+  if (!value) return true;
+  // A line opening a real code fence is artifact, never narration.
+  if (/^\s*```[a-zA-Z0-9+#-]+\s*$/.test(value)) return false;
+  const markers = META_MARKER_PATTERNS.filter((pattern) =>
+    pattern.test(value),
+  ).length;
+  if (markers >= 2) return true;
+  if (markers === 0) return false;
+  // One marker: narration only when nothing real survives removing it.
+  const cleaned = META_MARKER_PATTERNS.reduce(
+    (text, pattern) => text.replace(new RegExp(pattern.source, "gi"), " "),
+    value,
+  )
+    .replace(/`[^`\n]*`/g, " ")
+    .replace(/\]\([^)]*\)/g, " ")
+    .trim();
+  if (!cleaned) return true;
+  const words = (cleaned.match(/[A-Za-z][A-Za-z'_-]*/g) || []).map((word) =>
+    word.toLowerCase(),
+  );
+  return words.every((word) => META_RESIDUE_WORDS.has(word));
+}
+
 export function isMetaOnlyReply(text) {
   const value = String(text || "").trim();
-  if (!value || value.length >= 400 || value.includes("```")) return false;
-  return META_COMMENTARY_PATTERN.test(value);
+  if (!value) return false;
+  // A reply that opens a language-tagged code fence is producing a real
+  // deliverable. A bare inline ``` mention ("the code block is closed with
+  // ```.") is exactly the narration this guard exists to catch, so only the
+  // opening-fence form disqualifies a reply.
+  if (/^\s*```[a-zA-Z0-9+#-]+\s*\n/m.test(value)) return false;
+  // A genuinely huge reply (a real tail) is never treated as commentary.
+  if (value.length > 4000) return false;
+  // The earlier single-sentence phrasings ("My previous reply was already
+  // complete...") remain valid markers.
+  if (
+    META_COMMENTARY_PATTERN.test(value) &&
+    META_BOILERPLATE_PATTERN.test(value)
+  ) {
+    return true;
+  }
+  // The whole reply must be self-referential: every sentence has to be
+  // narration once the markers are removed. Legitimate content — a real
+  // continuation, a code segment, or ordinary prose — keeps real words, and
+  // exactly one such sentence is enough to keep the reply.
+  const sentences = value.split(/(?<=[.!?])\s+/);
+  return sentences.every((sentence) => isMetaLine(sentence));
 }
 
 // True when a continuation chunk regenerates the answer from the beginning
@@ -696,6 +846,13 @@ export function stitchContinuationChunk(original, continuation) {
   let cont = String(continuation || "");
 
   if (!cont.trim()) {
+    return { stitched: orig, deltaText: "", overlapLength: 0, restarted: false };
+  }
+
+  // A continuation that only narrates document status has nothing to append:
+  // stitching it would put "All tags are properly closed..." after the real
+  // deliverable. Treat it like an empty chunk.
+  if (isMetaOnlyReply(cont)) {
     return { stitched: orig, deltaText: "", overlapLength: 0, restarted: false };
   }
 
@@ -815,6 +972,10 @@ function buildContinuationMessages(messages, originalContent, reason) {
 export function mergeResponse(original, repair, reason) {
   if (!repair || !String(repair).trim()) return original;
   const repairText = String(repair).trim();
+  // A continuation that is only document-status narration ("All tags are
+  // properly closed...", "No further lines to add...") adds nothing: keep the
+  // original instead of appending noise after the deliverable.
+  if (isMetaOnlyReply(repairText)) return original;
   const originalText = String(original || "").replace(/\s+$/, "");
   const originalHead = originalText.slice(0, 120);
   if (
@@ -1010,8 +1171,11 @@ export async function processResponse(messages, content, options = {}) {
   }
 
   // Belt-and-braces: never deliver trailing self-referential continuation
-  // meta-commentary in the final answer.
+  // meta-commentary in the final answer (both the mid-text anchor and the
+  // trailing-sentence cleanup, which catches narration appended after a real
+  // deliverable).
   answer = stripMetaCommentary(answer);
+  answer = trimMetaTail(answer);
 
   // Guarantee: every game deliverable carries its 1-2 sentence chat brief.
   // If the model returned a bare code block, derive one deterministically.
