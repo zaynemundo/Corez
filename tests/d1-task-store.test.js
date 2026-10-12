@@ -202,4 +202,91 @@ describe('D1TaskStore', () => {
     const third = new D1TaskStore({ db, bucket });
     expect(await third.getTask('first')).not.toBeNull();
   });
+
+  // ---- Durable dispatch outbox ----------------------------------------
+
+  it('persists a dispatch record queued behind a failed send', async () => {
+    await store.createTask(makeTask({ taskId: 'task_dispatch' }));
+    await store.recordDispatch('task_dispatch');
+    const pending = await store.listPendingDispatches({ limit: 10 });
+    expect(pending.map((row) => row.taskId)).toEqual(['task_dispatch']);
+    expect(pending[0].attempts).toBe(0);
+
+    // Idempotent: recording again does not duplicate or reset the window.
+    await store.recordDispatch('task_dispatch');
+    expect((await store.listPendingDispatches({ limit: 10 })).length).toBe(1);
+  });
+
+  it('claims a dispatch atomically and only lists it again after expiry', async () => {
+    await store.createTask(makeTask({ taskId: 'task_claim' }));
+    await store.recordDispatch('task_claim', { delaySeconds: 0 });
+
+    // Only the first claim wins while the claim window is live.
+    const first = await store.claimDispatch('task_claim', { leaseMs: 60_000 });
+    const second = await store.claimDispatch('task_claim', { leaseMs: 60_000 });
+    expect(first).toBe(true);
+    expect(second).toBe(false);
+    expect(await store.listPendingDispatches({ limit: 10 })).toEqual([]);
+
+    // A successful send deletes the record.
+    expect(await store.deleteDispatch('task_claim')).toBe(true);
+    expect(await store.listPendingDispatches({ limit: 10 })).toEqual([]);
+  });
+
+  it('lets exactly one of concurrent sweepers claim a dispatch', async () => {
+    await store.createTask(makeTask({ taskId: 'task_race' }));
+    await store.recordDispatch('task_race', { delaySeconds: 0 });
+
+    // Interleaved read-then-claim races: the attempts compare-and-set means
+    // only one contender can win, so a failed send is never duplicated.
+    const claims = await Promise.all(
+      Array.from({ length: 8 }, () => store.claimDispatch('task_race', { leaseMs: 60_000 }))
+    );
+    expect(claims.filter(Boolean).length).toBe(1);
+    expect(await store.listPendingDispatches({ limit: 10 })).toEqual([]);
+  });
+
+  it('returns a failed send to pending with a backoff', async () => {
+    await store.createTask(makeTask({ taskId: 'task_retry' }));
+    await store.recordDispatch('task_retry', { delaySeconds: 0 });
+    expect(await store.claimDispatch('task_retry', { leaseMs: 60_000 })).toBe(true);
+
+    // The send failed: hand it back with a future retry window.
+    expect(
+      await store.resetDispatch('task_retry', { attempt: 1, delaySeconds: 3600 })
+    ).toBe(true);
+    expect(await store.listPendingDispatches({ limit: 10 })).toEqual([]);
+
+    // Due now: it is listed and claimable again.
+    await store.resetDispatch('task_retry', { attempt: 1, delaySeconds: 0 });
+    const due = await store.listPendingDispatches({ limit: 10 });
+    expect(due.map((row) => row.taskId)).toEqual(['task_retry']);
+    expect(due[0].attempts).toBe(1);
+    expect(await store.claimDispatch('task_retry', { leaseMs: 60_000 })).toBe(true);
+  });
+
+  it('never lists dispatch records for terminal tasks', async () => {
+    await store.createTask(makeTask({ taskId: 'task_done' }));
+    await store.createTask(makeTask({ taskId: 'task_failed' }));
+    await store.updateTask('task_done', { status: TASK_STATUSES.COMPLETED });
+    await store.updateTask('task_failed', { status: TASK_STATUSES.FAILED });
+    await store.recordDispatch('task_done');
+    await store.recordDispatch('task_failed');
+    await store.recordDispatch('task_missing');
+
+    // A record left behind for a removed task is still listed so the sweeper
+    // can clear it; a terminal task is never re-dispatched.
+    expect((await store.listPendingDispatches({ limit: 10 })).map((r) => r.taskId)).toEqual([
+      'task_missing'
+    ]);
+  });
+
+  it('reports dispatch state as unavailable without a database', async () => {
+    const empty = new D1TaskStore({});
+    expect(await empty.recordDispatch('task_store_1')).toBeNull();
+    expect(await empty.claimDispatch('task_store_1')).toBe(false);
+    expect(await empty.resetDispatch('task_store_1')).toBe(false);
+    expect(await empty.deleteDispatch('task_store_1')).toBe(false);
+    expect(await empty.listPendingDispatches()).toEqual([]);
+  });
 });

@@ -26,10 +26,18 @@ description: Use when working with durable tasks - start a long-running task, st
 
 - `POST /api/tasks` starts a conversation task and returns `202` with task
   state. The public Worker rejects repository `workspaceId` requests.
-  Execution is durable: the task is persisted first, then run by the
-  Cloudflare Queue consumer (`TASKS_QUEUE`) when bound, or inline under
-  `ctx.waitUntil` otherwise. A browser disconnect is not cancellation; only
-  `POST .../cancel` is.
+  Execution is durable: the task is persisted first, then handed to the
+  Cloudflare Queue consumer (`TASKS_QUEUE`). The response reports how it was
+  dispatched: `dispatch: "queue"`, or `dispatch: "deferred"` when the send
+  failed but a durable D1 dispatch record was persisted for the sweeper to
+  retry. When neither path is available the API answers a retryable `503` -
+  it never silently falls back to inline execution. Inline execution requires
+  an explicit `TASK_INLINE_FALLBACK=true`. A browser disconnect is not
+  cancellation; only `POST .../cancel` is.
+- A `503` with `retryable: true` means the task exists but could not be
+  durably dispatched: retry the POST instead of polling for a task that has
+  no runner. A `dispatch: "deferred"` response is accepted work - do not
+  resubmit it; poll `GET /api/tasks/:taskId` or the event stream as usual.
 - `GET /api/tasks/:taskId`, `POST .../resume`, and `POST .../cancel` read or
   change an owned task. `/resume` re-dispatches through the same durable path.
 - `GET .../events` streams SSE and supports `Last-Event-ID` replay. Ownership
@@ -54,11 +62,14 @@ another user's task or record.
 
 1. Start with a non-empty prompt and explicit owner identifier.
 2. Persist and surface the returned `taskId` before polling or subscribing.
+   Record how it was dispatched (`queue` or `deferred`).
 3. Resume only retryable or interrupted work; do not duplicate a running task.
 4. Treat cancel as complete only after the API returns the owned task's updated
    status.
 5. Replay events from the last observed ID and deduplicate by event ID.
 6. Claim context persistence only when `persisted: true` is returned.
+7. On a `503` with `retryable: true`, resubmit the task instead of polling it;
+   on `dispatch: "deferred"`, wait for the sweeper and poll normally.
 
 ## Guardrails
 

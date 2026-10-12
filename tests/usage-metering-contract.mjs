@@ -5,6 +5,11 @@
 //   - the refusal names the metric, the limit, the plan and when it resets
 //   - counters are per account and per UTC month
 //   - Standard/Premium budgets are larger, Premium is unlimited
+//   - admission is atomic: with one generation left, two simultaneous requests
+//     admit exactly one, for direct AI turns AND queued task creation
+//   - an unavailable accounting database refuses retryably (503) and starts no
+//     provider work
+//   - title generation has its own bounded allowance instead of an exemption
 //   - a deployment without D1 never blocks anybody
 //
 // Requests carry a distinct CF-Connecting-IP because entry.js rate-limits AI
@@ -21,24 +26,60 @@ const CURRENT_PERIOD = periodKey();
 
 function createD1({ plan = 'free', status = 'active' } = {}) {
   const counters = new Map(); // `${user}|${period}|${metric}` -> count
+  const receipts = new Set(); // settlement receipt keys applied once
+  const keyOf = (userId, period, metric) => `${userId}|${period}|${metric}`;
   return {
     counters,
+    receipts,
     prepare(query) {
       const statement = {
+        __sql: query,
         values: [],
         bind(...values) {
           statement.values = values;
           return statement;
         },
         async run() {
-          if (/CREATE TABLE|CREATE INDEX/i.test(query)) return { success: true };
-          if (/INSERT INTO usage_counters/i.test(query)) {
-            const [userId, period, metric, amount] = statement.values;
-            const key = `${userId}|${period}|${metric}`;
-            counters.set(key, (counters.get(key) || 0) + Number(amount));
-            return { success: true };
+          const values = statement.values;
+          if (/CREATE TABLE|CREATE INDEX/i.test(query)) {
+            return { success: true, meta: { changes: 0 } };
           }
-          return { success: true };
+          if (/INSERT INTO usage_receipts/i.test(query)) {
+            const [receiptKey] = values;
+            if (receipts.has(receiptKey)) {
+              return { success: true, meta: { changes: 0 } };
+            }
+            receipts.add(receiptKey);
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (/INSERT INTO usage_counters/i.test(query)) {
+            const [userId, period, metric, amount] = values;
+            const key = keyOf(userId, period, metric);
+            if (/receipt_key/i.test(query)) {
+              // Reconciliation is receipt-guarded: a replay changes nothing.
+              const receiptKey = values[5];
+              if (receipts.has(receiptKey)) {
+                return { success: true, meta: { changes: 0 } };
+              }
+              counters.set(key, (counters.get(key) || 0) + Number(amount));
+              return { success: true, meta: { changes: 1 } };
+            }
+            // Guarded charge: values[5] is the plan limit (null = unlimited).
+            const limit = values[5];
+            const next = (counters.get(key) || 0) + Number(amount);
+            if (limit !== null && next > Number(limit)) {
+              return { success: true, meta: { changes: 0 } };
+            }
+            counters.set(key, next);
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (/UPDATE usage_counters/i.test(query)) {
+            const [amount, , userId, period, metric] = values;
+            const key = keyOf(userId, period, metric);
+            counters.set(key, Math.max(0, (counters.get(key) || 0) - Number(amount)));
+            return { success: true, meta: { changes: 1 } };
+          }
+          return { success: true, meta: { changes: 0 } };
         },
         async all() {
           if (/SELECT metric, count FROM usage_counters/i.test(query)) {
@@ -70,10 +111,59 @@ function createD1({ plan = 'free', status = 'active' } = {}) {
       return statement;
     },
     async batch(statements) {
-      for (const statement of statements) await statement.run();
-      return [];
+      const results = [];
+      for (const statement of statements) results.push(await statement.run());
+      return results;
     },
   };
+}
+
+// The accounting store is the part of D1 that is unavailable: auth and
+// subscription reads still answer, every usage_* statement fails. This is the
+// real failure mode the review calls out — the balance cannot be read or
+// charged — and the API must refuse retryably instead of starting work.
+function accountingOutageD1(options) {
+  const base = createD1(options);
+  const fail = async () => {
+    throw new Error('simulated accounting outage');
+  };
+  const failingStatement = () => {
+    const statement = { __sql: '', bind() { return statement; }, run: fail, all: fail, first: fail };
+    return statement;
+  };
+  return {
+    ...base,
+    counters: base.counters,
+    receipts: base.receipts,
+    prepare(query) {
+      if (/usage_/i.test(query)) return failingStatement();
+      return base.prepare(query);
+    },
+    async batch(statements) {
+      if (statements.some((statement) => /usage_/i.test(String(statement?.__sql || '')))) {
+        return fail();
+      }
+      return base.batch(statements);
+    },
+  };
+}
+
+// Run `fn` with the provider endpoint mocked, counting provider calls.
+async function withMockProvider(fn) {
+  const original = globalThis.fetch;
+  let providerCalls = 0;
+  globalThis.fetch = async () => {
+    providerCalls += 1;
+    return new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+  try {
+    return { result: await fn(), providerCalls };
+  } finally {
+    globalThis.fetch = original;
+  }
 }
 
 function memoryBucket() {
@@ -189,6 +279,130 @@ async function run() {
       (db.counters.get(`alice-uid|${CURRENT_PERIOD}|tokens`) || 0) > 0,
       'tokens are metered even when the provider never answered',
     );
+  }
+
+  // ------------------------------------------------------- title allowance
+  {
+    const db = createD1({ plan: 'free' });
+    const env = { AUTH_SECRET: SECRET, DB: db };
+    const limit = PLAN_LIMITS.free.titles;
+    for (let i = 0; i < limit; i += 1) {
+      const response = await aiTurn(env, alice, { titleOnly: true });
+      assert.equal(response.status, 200, `title ${i + 1} of ${limit} is served`);
+    }
+    assert.equal(
+      db.counters.get(`alice-uid|${CURRENT_PERIOD}|titles`),
+      limit,
+      'title generation has its own bounded allowance',
+    );
+    assert.equal(
+      db.counters.get(`alice-uid|${CURRENT_PERIOD}|messages`) || 0,
+      0,
+      'titles never consume a generation',
+    );
+
+    // At the wall the title call is skipped entirely (no provider work) and
+    // the client falls back to its deterministic heuristic naming.
+    const blocked = await aiTurn(env, alice, { titleOnly: true });
+    assert.equal(blocked.status, 200);
+    const payload = await blocked.json();
+    assert.equal(payload.title, null);
+    assert.equal(payload.code, 'plan_limit');
+    assert.equal(payload.metric, 'titles');
+    assert.equal(
+      db.counters.get(`alice-uid|${CURRENT_PERIOD}|titles`),
+      limit,
+      'a refused title does not increment the counter',
+    );
+  }
+
+  // ------------------------------------ simultaneous admission (direct AI)
+  {
+    const db = createD1({ plan: 'free' });
+    const env = { AUTH_SECRET: SECRET, DB: db, OPENCODE_GO_API_KEY: 'test-key' };
+    db.counters.set(`alice-uid|${CURRENT_PERIOD}|messages`, PLAN_LIMITS.free.messages - 1);
+
+    const { result: responses } = await withMockProvider(() =>
+      Promise.all([aiTurn(env, alice), aiTurn(env, alice)]),
+    );
+    const statuses = responses.map((response) => response.status).sort((a, b) => a - b);
+    assert.deepEqual(
+      statuses,
+      [200, 402],
+      'with one generation left, exactly one of two simultaneous requests is admitted',
+    );
+    assert.equal(
+      db.counters.get(`alice-uid|${CURRENT_PERIOD}|messages`),
+      PLAN_LIMITS.free.messages,
+      'the budget is spent exactly once',
+    );
+    const refused = responses.find((response) => response.status === 402);
+    assert.equal((await refused.json()).metric, 'messages');
+  }
+
+  // -------------------------------------------- accounting outage (direct AI)
+  {
+    const env = { AUTH_SECRET: SECRET, DB: accountingOutageD1({ plan: 'free' }) };
+    const { result: response, providerCalls } = await withMockProvider(() => aiTurn(env, alice));
+    assert.equal(response.status, 503, 'an unavailable accounting store is refused');
+    const payload = await response.json();
+    assert.equal(payload.code, 'usage_unavailable');
+    assert.equal(payload.retryable, true);
+    assert.equal(response.headers.get('Retry-After'), '5');
+    assert.equal(providerCalls, 0, 'a database outage starts no provider work');
+
+    const usage = await call(env, '/api/usage', { method: 'GET', cookie: alice });
+    assert.equal(usage.status, 503, 'the usage panel never reports fabricated zeros');
+  }
+
+  // --------------------------------------------------- queued task admission
+  {
+    const db = createD1({ plan: 'free' });
+    const queue = { sent: [], async send(body) { this.sent.push(body); } };
+    const env = { AUTH_SECRET: SECRET, DB: db, ASSET_BUCKET: memoryBucket(), TASKS_QUEUE: queue };
+    const limit = PLAN_LIMITS.free.messages;
+    db.counters.set(`alice-uid|${CURRENT_PERIOD}|messages`, limit - 1);
+
+    const { result: responses } = await withMockProvider(() =>
+      Promise.all([
+        call(env, '/api/tasks', { cookie: alice, body: { prompt: 'first queued task' } }),
+        call(env, '/api/tasks', { cookie: alice, body: { prompt: 'second queued task' } }),
+      ]),
+    );
+    const statuses = responses.map((response) => response.status).sort((a, b) => a - b);
+    assert.deepEqual(
+      statuses,
+      [202, 402],
+      'with one generation left, exactly one of two simultaneous task creations is admitted',
+    );
+    assert.equal(queue.sent.length, 1, 'only the admitted task is dispatched');
+    assert.equal(
+      db.counters.get(`alice-uid|${CURRENT_PERIOD}|messages`),
+      limit,
+      'the task budget is spent exactly once',
+    );
+    assert.ok(
+      (db.counters.get(`alice-uid|${CURRENT_PERIOD}|tokens`) || 0) > 0,
+      'queued tasks charge their prompt token estimate up front',
+    );
+  }
+
+  // ----------------------------------------------- accounting outage (tasks)
+  {
+    const queue = { sent: [], async send(body) { this.sent.push(body); } };
+    const env = {
+      AUTH_SECRET: SECRET,
+      DB: accountingOutageD1({ plan: 'free' }),
+      ASSET_BUCKET: memoryBucket(),
+      TASKS_QUEUE: queue,
+    };
+    const { result: response, providerCalls } = await withMockProvider(() =>
+      call(env, '/api/tasks', { cookie: alice, body: { prompt: 'unaccounted task' } }),
+    );
+    assert.equal(response.status, 503, 'a task cannot start without accounting');
+    assert.equal((await response.json()).code, 'usage_unavailable');
+    assert.equal(queue.sent.length, 0, 'no task is dispatched during an outage');
+    assert.equal(providerCalls, 0, 'a task outage starts no provider work');
   }
 
   // -------------------------------------------------------------- new month

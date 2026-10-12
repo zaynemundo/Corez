@@ -19,6 +19,14 @@ export const TERMINAL_TASK_STATUSES = new Set([
   TASK_STATUSES.FAILED
 ]);
 
+// Statuses a durable dispatcher will still hand to a runner. `pending` is a
+// freshly created task; `running` may be mid-flight (the lease decides) or
+// waiting for a retry. Terminal work must never be re-dispatched.
+export const DISPATCHABLE_TASK_STATUSES = new Set([
+  TASK_STATUSES.PENDING,
+  TASK_STATUSES.RUNNING
+]);
+
 export class TaskState {
   constructor({
     taskId,

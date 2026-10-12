@@ -13,13 +13,16 @@ import { fetchAwwwardsInspirationCached, handleInspiration } from "./inspiration
 import { verifySession } from "./auth.js";
 import { getActiveSubscription } from "./subscriptions.js";
 import {
-  addUsage,
-  checkUsage,
+  UsageUnavailableError,
+  consumeAllowance,
   estimateTokens,
   limitResponse,
   meteringEnabled,
   normalizePlan,
+  periodKey,
+  recordUsageOnce,
   usageSummary,
+  usageUnavailableResponse,
 } from "./usage.js";
 import {
   safeErrorDetail,
@@ -1235,12 +1238,14 @@ async function handleAi(request, env) {
     : 0;
   const requestTokensEstimate = estimateTokens(prompt) + Math.ceil(contextChars / 4);
 
-  // Token accounting for this request. The estimate is recorded up front (a
-  // request that dies mid-stream still counts something) and the provider's
-  // reported total tops it up if it is larger â€” never down, so the counter can
-  // never under-report what was actually spent. `tokensEstimated` keeps the
-  // estimated part visible so the number is never mistaken for billed truth.
+  // Token accounting for this request. The estimated tokens are charged
+  // atomically at admission (so an unaccounted call can never start); when the
+  // provider reports more than the estimate, the difference is reconciled
+  // afterwards through an idempotent receipt, so a repeated flush can never
+  // double-charge. `tokensEstimated` keeps the estimated part visible so the
+  // number is never mistaken for billed truth.
   let reportedTokens = 0;
+  const usageReceiptKey = `ai:${uid || "anonymous"}:${periodKey()}:${crypto.randomUUID()}`;
   const tokenAccount = {
     record(tokens) {
       const input = Number(tokens?.inputTokens);
@@ -1253,7 +1258,17 @@ async function handleAi(request, env) {
       if (!meteringEnabled(env) || !uid) return false;
       const extra = Math.round(reportedTokens) - requestTokensEstimate;
       if (extra <= 0) return false;
-      return addUsage(env, uid, { tokens: extra });
+      try {
+        const result = await recordUsageOnce(env, uid, {
+          key: usageReceiptKey,
+          increments: { tokens: extra },
+        });
+        return Boolean(result.recorded);
+      } catch {
+        // The estimate was already charged; a failed top-up under-reports the
+        // overshoot but never allows unaccounted work or double-charges.
+        return false;
+      }
     },
   };
 
@@ -1267,38 +1282,36 @@ async function handleAi(request, env) {
 
   // One user turn is one generation. A harness build also draws on the separate
   // build-run budget, because it is many provider calls rather than one. A deep
-  // research request additionally draws on the research budget, and can fall
-  // back to a purchased research pack when the plan's own is spent. Title
-  // requests are not generations (they name a chat after the turn) but they do
-  // spend tokens, so they are metered without being gated.
+  // research request additionally draws on the research budget. All of a
+  // request's budgets are charged atomically before any provider work starts:
+  // the guarded increments are the check, so two simultaneous requests can
+  // never both pass against the same remaining allowance, and a failed charge
+  // never leaves the request running unaccounted. Title requests are not
+  // generations (they name a chat after the turn) and have their own bounded
+  // allowance below.
   const isResearchRequest = !isTitleRequest && isDeepResearchRequest(prompt, body);
   if (!isTitleRequest) {
-    const messagesCheck = await checkUsage(env, uid, { metric: "messages", plan });
-    if (!messagesCheck.allowed && messagesCheck.limit !== null) {
-      return limitResponse("messages", messagesCheck, plan);
-    }
-    if (isHarnessRequest) {
-      const buildRuns = await checkUsage(env, uid, { metric: "swarm_runs", plan });
-      if (!buildRuns.allowed && buildRuns.limit !== null) {
-        return limitResponse("swarm_runs", buildRuns, plan);
+    try {
+      const admission = await consumeAllowance(env, uid, {
+        plan,
+        charges: [
+          { metric: "messages", amount: 1 },
+          ...(isHarnessRequest ? [{ metric: "swarm_runs", amount: 1 }] : []),
+          ...(isResearchRequest ? [{ metric: "research_reports", amount: 1 }] : []),
+          { metric: "tokens", amount: requestTokensEstimate },
+        ],
+      });
+      if (!admission.ok && admission.reason === "limit") {
+        return limitResponse(admission.metric, admission.evaluation, plan);
       }
-    }
-    if (isResearchRequest) {
-      const research = await checkUsage(env, uid, { metric: "research_reports", plan });
-      if (!research.allowed && research.limit !== null) {
-        return limitResponse("research_reports", research, plan);
+    } catch (err) {
+      if (err instanceof UsageUnavailableError) {
+        // The account cannot be charged, so the provider must not run: the
+        // client gets a retryable 503 instead of an unaccounted generation.
+        return usageUnavailableResponse();
       }
+      throw err;
     }
-    const tokensLeft = await checkUsage(env, uid, { metric: "tokens", plan });
-    if (!tokensLeft.allowed && tokensLeft.limit !== null) {
-      return limitResponse("tokens", tokensLeft, plan);
-    }
-    await addUsage(env, uid, {
-      messages: 1,
-      tokens: requestTokensEstimate,
-      ...(isHarnessRequest ? { swarm_runs: 1 } : {}),
-      ...(isResearchRequest ? { research_reports: 1 } : {}),
-    });
   }
 
   // OpenCode gateway session affinity (required x-opencode-session header):
@@ -1319,10 +1332,36 @@ async function handleAi(request, env) {
   // session from its first message. A tiny dedicated system prompt and a
   // strict output cap keep this near-free; failures resolve to title: null
   // so the client falls back to its deterministic heuristic naming.
+  // Title generation is billed work, so it draws on its own bounded `titles`
+  // allowance (never the generation budget) and an unavailable accounting
+  // store stops it before the provider is called.
   // NOTE: the provider is a reasoning model that spends tokens thinking
   // before answering â€” a 30-token cap was entirely consumed by reasoning
   // (content: ""), so the budget must leave room for the actual title.
   if (body.titleOnly === true) {
+    try {
+      const titleAdmission = await consumeAllowance(env, uid, {
+        plan,
+        charges: [
+          { metric: "titles", amount: 1 },
+          { metric: "tokens", amount: requestTokensEstimate },
+        ],
+      });
+      if (!titleAdmission.ok && titleAdmission.reason === "limit") {
+        // A title is optional: the client falls back to heuristic naming
+        // instead of failing the chat. Nothing reached the provider.
+        return jsonResponse(200, {
+          title: null,
+          code: "plan_limit",
+          metric: titleAdmission.metric,
+        });
+      }
+    } catch (err) {
+      if (err instanceof UsageUnavailableError) {
+        return usageUnavailableResponse();
+      }
+      throw err;
+    }
     const TITLE_SYSTEM_PROMPT =
       "You name chat conversations. Given the user's first message, reply with ONLY a short descriptive title for the conversation (5 words or fewer, no quotes, no ending punctuation, no markdown, no explanations). Capture the topic or the deliverable the user is asking for.";
     const titleMessages = [
@@ -2869,9 +2908,9 @@ async function saveToR2IfAvailable(
 }
 
 /**
- * The image budget gate shared by both image routes. Returns a Response when
- * the plan is out of images and no purchased image pack can cover it, otherwise
- * null (and counts the request against whichever budget paid for it).
+ * The image budget gate shared by both image routes. Charges the image budget
+ * atomically before either provider runs; returns a Response when the plan is
+ * out of images or the accounting store is unavailable, otherwise null.
  */
 async function meterImageRequest(request, env) {
   const uid = await sessionUid(request, env);
@@ -2879,13 +2918,19 @@ async function meterImageRequest(request, env) {
   const plan = normalizePlan(
     sub?.status === "expired" || sub?.isExpired ? "free" : sub?.plan || "free",
   );
-  const check = await checkUsage(env, uid, { metric: "images", plan });
-  if (check.allowed) {
-    await addUsage(env, uid, { images: 1 });
-    return null;
-  }
-  if (check.limit !== null) {
-    return limitResponse("images", check, plan);
+  try {
+    const admission = await consumeAllowance(env, uid, {
+      plan,
+      charges: [{ metric: "images", amount: 1 }],
+    });
+    if (!admission.ok && admission.reason === "limit") {
+      return limitResponse("images", admission.evaluation, plan);
+    }
+  } catch (err) {
+    if (err instanceof UsageUnavailableError) {
+      return usageUnavailableResponse();
+    }
+    throw err;
   }
   return null;
 }
@@ -3937,7 +3982,16 @@ async function handleUsageApi(request, env) {
     publishedPages = records.filter(({ record }) => record?.ownerUserId === uid).length;
   }
 
-  const summary = await usageSummary(env, uid, { plan, publishedPages });
+  let summary;
+  try {
+    summary = await usageSummary(env, uid, { plan, publishedPages });
+  } catch (err) {
+    if (err instanceof UsageUnavailableError) {
+      // Never report fabricated zeros: the panel shows a retryable error.
+      return usageUnavailableResponse();
+    }
+    throw err;
+  }
   return jsonResponse(200, summary);
 }
 
@@ -4052,13 +4106,23 @@ async function handlePublish(request, env) {
     }
     const showBadge = planId !== "standard" && planId !== "premium";
     // Publishing is metered: the monthly publish budget is what keeps a free
-    // account from using the deployment as free static hosting. There is no
-    // publish pack, so this wall is final until the plan changes.
-    const publishCheck = await checkUsage(env, uid, { metric: "publishes", plan: planId });
-    if (!publishCheck.allowed && publishCheck.limit !== null) {
-      return limitResponse("publishes", publishCheck, planId);
+    // account from using the deployment as free static hosting. The charge is
+    // atomic and happens before any storage work; an unavailable accounting
+    // store refuses retryably instead of publishing unaccounted.
+    try {
+      const publishAdmission = await consumeAllowance(env, uid, {
+        plan: planId,
+        charges: [{ metric: "publishes", amount: 1 }],
+      });
+      if (!publishAdmission.ok && publishAdmission.reason === "limit") {
+        return limitResponse("publishes", publishAdmission.evaluation, planId);
+      }
+    } catch (err) {
+      if (err instanceof UsageUnavailableError) {
+        return usageUnavailableResponse();
+      }
+      throw err;
     }
-    await addUsage(env, uid, { publishes: 1 });
     const retryAfter = publishRateLimiter(request);
     if (retryAfter !== null) {
       return jsonResponse(

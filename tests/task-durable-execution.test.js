@@ -8,8 +8,11 @@
 //     harness + D1 coordination store, and duplicate deliveries are no-ops.
 //   - Provider retry schedules become queue redeliveries; cancelled tasks are
 //     acked, never redelivered.
-//   - Without a Queue binding, execution stays inline and attaches to
-//     ctx.waitUntil.
+//   - A failed queue send does NOT silently downgrade to inline execution:
+//     with D1 it persists a durable dispatch record and answers `deferred`
+//     (the sweeper re-sends it); with no durable record it answers a
+//     retryable 503. Inline execution only happens with an explicit
+//     TASK_INLINE_FALLBACK=true.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import entryWorker from '../worker/entry.js';
 import { AgentHarness } from '../packages/agent-core/harness/AgentHarness.js';
@@ -301,9 +304,93 @@ describe('durable task execution', () => {
     expect((await getTask(env, taskId)).status).toBe(TASK_STATUSES.COMPLETED);
   });
 
-  it('runs inline and attaches to waitUntil when no queue binding exists', async () => {
+  it('rejects dispatch when neither the queue nor a durable record is available', async () => {
+    // R2-only deployment (no D1 outbox) with no queue binding and no explicit
+    // inline opt-in: the API must fail retryably instead of executing inside
+    // the HTTP invocation, so it never promises durability it cannot keep.
     const env = environment({
       ASSET_BUCKET: memoryBucket(),
+      OPENCODE_GO_API_KEY: 'test-key'
+    });
+    let providerCalls = 0;
+    globalThis.fetch = async () => {
+      providerCalls += 1;
+      return providerResponse('must not run');
+    };
+
+    const waits = [];
+    const ctx = { waitUntil: (promise) => waits.push(promise) };
+    const response = await postTask(env, 'no durable dispatch', ctx);
+    expect(response.status).toBe(503);
+    const body = await response.json();
+    expect(body).not.toHaveProperty('taskId');
+    expect(body.retryable).toBe(true);
+    expect(response.headers.get('Retry-After')).toBeTruthy();
+    expect(providerCalls).toBe(0);
+    expect(waits).toHaveLength(0);
+  });
+
+  it('records a durable dispatch and reports deferred when the queue send fails', async () => {
+    // The regression: a failed queue submission must not silently downgrade
+    // to inline execution. With D1 present the dispatch intent is persisted
+    // before the send, so the accepted task has a recoverable record.
+    const env = environment({
+      ASSET_BUCKET: memoryBucket(),
+      DB: createSqliteD1(),
+      TASKS_QUEUE: {
+        async send() {
+          throw new Error('queue unavailable');
+        }
+      },
+      TASK_DISPATCH_RETRY_DELAY_SECONDS: '1',
+      OPENCODE_GO_API_KEY: 'test-key'
+    });
+    let providerCalls = 0;
+    globalThis.fetch = async () => {
+      providerCalls += 1;
+      return providerResponse('deferred answer');
+    };
+
+    const waits = [];
+    const ctx = { waitUntil: (promise) => waits.push(promise) };
+    const response = await postTask(env, 'queue down', ctx);
+    expect(response.status).toBe(202);
+    const body = await response.json();
+    expect(body.taskId).toBeTruthy();
+    expect(body.dispatch).toBe('deferred');
+    expect(body.retryAfterSeconds).toBeGreaterThan(0);
+    // Nothing ran inline: the HTTP invocation does not own the work.
+    expect(providerCalls).toBe(0);
+    expect(waits).toHaveLength(0);
+
+    // The record is durable: a later sweep re-sends it through the queue.
+    const row = await env.DB.prepare(
+      'SELECT COUNT(*) AS count FROM harness_task_dispatches WHERE task_id = ?'
+    ).bind(body.taskId).first();
+    expect(Number(row.count)).toBe(1);
+
+    // Queue recovered: the sweep re-sends, the record is cleared, and the
+    // consumer completes the task through the normal path.
+    const queue = createQueue();
+    env.TASKS_QUEUE = queue;
+    await entryWorker.scheduled({}, env, {});
+    expect(queue.sent).toEqual([{ taskId: body.taskId }]);
+    const cleared = await env.DB.prepare(
+      'SELECT COUNT(*) AS count FROM harness_task_dispatches WHERE task_id = ?'
+    ).bind(body.taskId).first();
+    expect(Number(cleared.count)).toBe(0);
+
+    const message = fakeMessage(body.taskId);
+    await entryWorker.queue({ messages: [message] }, env);
+    expect(message.acked).toBe(true);
+    expect(providerCalls).toBe(1);
+    expect((await getTask(env, body.taskId)).status).toBe(TASK_STATUSES.COMPLETED);
+  });
+
+  it('runs inline only with an explicit TASK_INLINE_FALLBACK opt-in', async () => {
+    const env = environment({
+      ASSET_BUCKET: memoryBucket(),
+      TASK_INLINE_FALLBACK: 'true',
       OPENCODE_GO_API_KEY: 'test-key'
     });
     globalThis.fetch = async () => providerResponse('inline answer');
@@ -319,10 +406,11 @@ describe('durable task execution', () => {
     expect((await getTask(env, taskId)).status).toBe(TASK_STATUSES.COMPLETED);
   });
 
-  it('falls back to inline execution when the queue send fails', async () => {
+  it('uses the explicit inline fallback on a failed send only when opted in', async () => {
     const env = environment({
       ASSET_BUCKET: memoryBucket(),
       DB: createSqliteD1(),
+      TASK_INLINE_FALLBACK: 'true',
       TASKS_QUEUE: {
         async send() {
           throw new Error('queue unavailable');
@@ -336,11 +424,19 @@ describe('durable task execution', () => {
     const ctx = { waitUntil: (promise) => waits.push(promise) };
     const response = await postTask(env, 'queue down', ctx);
     expect(response.status).toBe(202);
+    const body = await response.json();
+    expect(body.dispatch).toBe('inline');
     expect(waits).toHaveLength(1);
 
     await waits[0];
-    const { taskId } = await response.json();
-    expect((await getTask(env, taskId)).status).toBe(TASK_STATUSES.COMPLETED);
+    expect((await getTask(env, body.taskId)).status).toBe(TASK_STATUSES.COMPLETED);
+
+    // The explicit fallback owns the work now: the pre-send dispatch record
+    // must not be left behind for the sweeper to re-dispatch it.
+    const leftover = await env.DB.prepare(
+      'SELECT COUNT(*) AS count FROM harness_task_dispatches'
+    ).first();
+    expect(Number(leftover.count)).toBe(0);
   });
 
   it('persists a deferred task without executing until a runner calls executeTask', async () => {

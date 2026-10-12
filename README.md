@@ -145,10 +145,19 @@ deploy pipeline in CI does not create queues itself):
 npx wrangler queues create corez-tasks
 ```
 
-Without the queue binding the API still works: execution runs inline and is
-attached to `ctx.waitUntil`, which extends the invocation for up to 30 seconds
-after the response — enough for tests and local development, not a durability
-guarantee for long jobs. Task ownership (leases) and event ordering live in
-SQLite-backed D1 tables (`harness_tasks`, `harness_task_events`,
-`harness_task_leases`); R2 keeps the larger session-log artifacts under
+A failed queue send never downgrades to inline execution. The dispatcher
+writes the intent to the D1 dispatch outbox (`harness_task_dispatches`) before
+every send; if the send throws, the accepted response is `dispatch:
+"deferred"` and a sweeper re-sends the record — from the Worker scheduled
+handler (cron `*/2 * * * *`, deployed with `npx wrangler triggers deploy`) and
+from every queue batch. When neither the queue nor a durable record is
+available the API answers a retryable `503` instead of accepting work it
+cannot dispatch. Inline execution happens only with an explicit
+`TASK_INLINE_FALLBACK=true` opt-in; attached to `ctx.waitUntil` it extends the
+invocation for up to 30 seconds after the response — enough for tests and
+local development, not a durability guarantee for long jobs.
+
+Task ownership (leases) and event ordering live in SQLite-backed D1 tables
+(`harness_tasks`, `harness_task_events`, `harness_task_leases`,
+`harness_task_dispatches`); R2 keeps the larger session-log artifacts under
 `tasks/<taskId>.session.json`.

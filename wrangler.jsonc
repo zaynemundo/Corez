@@ -85,6 +85,16 @@
       }
     ]
   },
+  // Dispatch-outbox recovery. When a queue send fails, POST /api/tasks
+  // persists the dispatch in D1 (`harness_task_dispatches`) and returns
+  // `dispatch: "deferred"`; the Worker scheduled handler re-sends due records.
+  // Queue batches also sweep, so a queue that recovers heals deferred work
+  // without cron. Deploy the trigger once with
+  // `npx wrangler triggers deploy` (the versioned pipeline does not sync
+  // triggers).
+  "triggers": {
+    "crons": ["*/2 * * * *"]
+  },
   // Read-through cache for the Awwwards design references (/api/inspiration and
   // the app-build prompt enrichment). The scrape costs one category page plus
   // up to three detail pages on every build; the category listing changes on

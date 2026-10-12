@@ -55,33 +55,55 @@ is never accidentally unlimited. That is the safe default - keep it.
 - Counters live in one table keyed `(user_id, period, metric)` with a `count`.
   The `period` is the **UTC month**, so a new month starts a fresh budget with no
   reset job.
-- Every counted metric is incremented through the same helper so that a metric
-  cannot be half-counted from one call site.
-- **Tokens are best-effort**: the provider reports usage when it does, and
-  otherwise an estimate (~4 characters per token) is recorded in the same
-  counter. Do not build logic that assumes exact token counts.
+- **Admission is the charge**: `consumeAllowance()` increments the counter with
+  one guarded upsert that only succeeds while the result stays within the plan
+  limit. Never split "check" from "record" — that window is exactly how two
+  simultaneous requests both pass against the same remaining allowance.
+- Refusals refund metrics already charged by the same request, so a
+  multi-metric request never half-charges.
+- **Tokens are best-effort**: the prompt estimate is charged at admission and
+  the provider's larger reported total is reconciled afterwards with
+  `recordUsageOnce(receiptKey)`; the receipt makes a replay a no-op, never a
+  double charge. Do not build logic that assumes exact token counts.
+- `titles` is the bounded allowance for chat-title generation (a small billed
+  provider call that is not a generation). It is never silently exempt.
+- Queued tasks charge at `POST /api/tasks` (one generation + prompt estimate)
+  and reconcile the output estimate when the runner reaches a terminal state.
+  Resuming a task does not re-charge the generation it already paid for.
 - A refused request must not increment the counter.
 
-## Degradation, not breakage
+## Fail closed when accounting is unavailable
 
-Nothing is metered when there is no database bound, and nothing is ever blocked
-in that case. Metering is a gate on top of a working product - a metering fault
-must never take the product down. Preserve that property: wrap counter writes so
-a failure degrades to "not metered" rather than to a `500`.
+The accounting database is a security boundary, not a nice-to-have:
 
-`USAGE_METERING_DISABLED=1` accepts every request without counting or limiting
-it. Use it to isolate whether a bug is metering-related.
+- **No D1 binding, or `USAGE_METERING_DISABLED=1`**: the documented unmetered
+  mode. Nothing is counted and nothing is blocked (local dev, tests, an
+  operator explicitly running without accounting).
+- **D1 configured but failing**: `consumeAllowance` / `getUsage` /
+  `checkAllowance` / `recordUsageOnce` throw `UsageUnavailableError`. Callers
+  return the retryable `503` from `usageUnavailableResponse()` (code
+  `usage_unavailable`) and **must not start provider work**. A failed read is
+  never reported as a zero balance, and a missing `meta.changes` on a write is
+  treated as an outage, not as success.
+- Wrap each gate in `try/catch`: limit refusals are `402`
+  (`limitResponse`), unavailability is `503`. Never let a non-`limit` refusal
+  fall through as "allowed".
 
 ## Verification
 
 ```bash
 node tests/usage-metering-contract.mjs
+npx vitest run tests/usage-atomicity.test.js
 ```
 
-It is a plain Node contract script, not a Vitest suite: `npx vitest run
+The contract is a plain Node script, not a Vitest suite: `npx vitest run
 tests/usage-metering-contract.mjs` matches no test file and exits 1, which reads
 as a failure when nothing is wrong. It also runs inside
 `npm run test:cloudflare`.
+
+`tests/usage-atomicity.test.js` runs the real SQL against SQLite (node:sqlite)
+and proves the exactly-one-admitted race, the refund path, receipt idempotency
+and the unavailable-store refusals.
 
 When you change a limit, assert **both** sides: the request at the limit is
 refused with `402`, and the request just below it succeeds. A test that only

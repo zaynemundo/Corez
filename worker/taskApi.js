@@ -8,13 +8,34 @@
 // the HTTP invocation never owns long-running work. Events stream over SSE
 // with Last-Event-ID replay, and task ownership is enforced per user.
 //
+// Dispatch honesty: an accepted task is always backed by the queue or by a
+// durable D1 dispatch record (`dispatch: "queue" | "deferred"`). When neither
+// is available the request fails 503 with a retryable error instead of
+// silently downgrading to inline execution in the HTTP invocation.
+//
+// Budget honesty: creating a task charges the account atomically (one
+// generation + the prompt's token estimate) BEFORE the task exists, so two
+// simultaneous creations cannot both pass against the last remaining
+// generation and a task never runs unaccounted. An unavailable accounting
+// store refuses the request retryably instead of letting the work start.
+//
 // Browser disconnection is not task cancellation: the POST only creates and
 // dispatches the task, and only an explicit /cancel marks it cancelled.
 
 import { TERMINAL_TASK_STATUSES } from "../packages/agent-core/harness/TaskState.js";
 import { ContextStore } from "../packages/agent-core/persistence/ContextStore.js";
 import { verifySession } from "./auth.js";
+import { getActiveSubscription } from "./subscriptions.js";
 import { jsonResponse, readBoundedJson, safeErrorDetail } from "./utils.js";
+import {
+  UsageUnavailableError,
+  checkAllowance,
+  consumeAllowance,
+  estimateTokens,
+  limitResponse,
+  normalizePlan,
+  usageUnavailableResponse,
+} from "./usage.js";
 import {
   buildHarness,
   dispatchTaskExecution,
@@ -24,6 +45,38 @@ import {
 export const OWNER_HEADER = "x-corez-user";
 const TASK_ID_PATTERN = /^[A-Za-z0-9._:-]{1,160}$/;
 const RECORD_ID_PATTERN = /^[A-Za-z0-9._-]{1,160}$/;
+
+async function resolvePlanForUser(env, userId) {
+  const sub = await getActiveSubscription(env, userId).catch(() => null);
+  return normalizePlan(
+    sub?.status === "expired" || sub?.isExpired ? "free" : sub?.plan || "free",
+  );
+}
+
+// Atomic budget admission for one queued generation. Returns a Response when
+// the request must be refused (402 out of quota, 503 accounting down),
+// otherwise null. The charge is one generation plus the prompt's token
+// estimate, exactly like a direct /api/ai turn.
+async function admitGeneration(env, userId, plan, prompt) {
+  try {
+    const admission = await consumeAllowance(env, userId, {
+      plan,
+      charges: [
+        { metric: "messages", amount: 1 },
+        { metric: "tokens", amount: estimateTokens(prompt) },
+      ],
+    });
+    if (!admission.ok && admission.reason === "limit") {
+      return limitResponse(admission.metric, admission.evaluation, plan);
+    }
+    return null;
+  } catch (err) {
+    if (err instanceof UsageUnavailableError) {
+      return usageUnavailableResponse();
+    }
+    throw err;
+  }
+}
 
 // Caller identity: the verified session is the ONLY trusted source. The
 // legacy X-Corez-User header is honored solely when AUTH_SECRET is unset
@@ -79,6 +132,41 @@ function parseTaskId(raw) {
   return TASK_ID_PATTERN.test(value) ? value : null;
 }
 
+// Dispatch failure with no durable record: the task itself is safe (it was
+// persisted before dispatch), but nothing owns its execution, so the API must
+// not claim acceptance. A retry either dispatches it or lands on the same
+// clear failure.
+function dispatchFailureResponse(err) {
+  return jsonResponse(
+    503,
+    {
+      error:
+        "The task was created but could not be durably dispatched. Retry the request.",
+      detail: safeErrorDetail(err),
+      retryable: true,
+    },
+    { "Retry-After": "30" },
+  );
+}
+
+// The dispatch result drives the response: `queue` is the normal path;
+// `deferred` means the queue send failed but a durable D1 dispatch record was
+// persisted and a sweeper will retry it, so the accepted status still holds.
+function dispatchedTaskResponse(status, task, dispatch) {
+  if (dispatch.dispatched === "deferred") {
+    return jsonResponse(
+      status,
+      {
+        ...publicTask(task),
+        dispatch: "deferred",
+        retryAfterSeconds: dispatch.retryAfterSeconds,
+      },
+      { "Retry-After": String(dispatch.retryAfterSeconds) },
+    );
+  }
+  return jsonResponse(status, { ...publicTask(task), dispatch: dispatch.dispatched });
+}
+
 export async function handleTaskApi(request, env, ctx = null) {
   const url = new URL(request.url);
   const pathname = url.pathname;
@@ -114,9 +202,17 @@ export async function handleTaskApi(request, env, ctx = null) {
     if (!harness.store?.available) {
       return jsonResponse(503, { error: "Task storage is not configured." });
     }
-    // Execution is always handed to the runner seam: the queue when the
-    // binding exists, otherwise inline execution attached to ctx.waitUntil.
-    // The HTTP invocation never silently owns the long-running work.
+    // Charge the generation before the task exists. A concurrent pair with one
+    // slot left admits exactly one; if the process dies after this charge but
+    // before the task is created, the account is charged for a task it did not
+    // get — the conservative direction (never an unaccounted generation).
+    const plan = await resolvePlanForUser(env, userId);
+    const denied = await admitGeneration(env, userId, plan, prompt);
+    if (denied) return denied;
+    // Execution is always handed to the runner seam: the queue, or a durable
+    // dispatch record the sweeper retries. The HTTP invocation never silently
+    // owns the long-running work; a dispatch that cannot be made durable is a
+    // retryable 503, not an accepted task.
     const task = await harness.startTask({
       userId,
       sessionId:
@@ -131,8 +227,18 @@ export async function handleTaskApi(request, env, ctx = null) {
       autoApprove: false,
       deferExecution: true,
     });
-    await dispatchTaskExecution(env, ctx, harness, task.taskId, { task });
-    return jsonResponse(202, publicTask(task));
+    let dispatch;
+    try {
+      dispatch = await dispatchTaskExecution(env, ctx, harness, task.taskId, {
+        task,
+      });
+    } catch (err) {
+      return dispatchFailureResponse(err);
+    }
+    // `dispatch: "deferred"` is the honest form of acceptance here: the record
+    // is durable in D1 and the sweeper will re-send it, so the task will run
+    // even if this isolate never does.
+    return dispatchedTaskResponse(202, task, dispatch);
   }
 
   // GET /api/tasks/:taskId, POST /resume, POST /cancel, GET /events, GET /artifacts
@@ -156,6 +262,28 @@ export async function handleTaskApi(request, env, ctx = null) {
       if (!harness.store?.available) {
         return jsonResponse(503, { error: "Task storage is not configured." });
       }
+      // Resuming continues the generation the account was already charged for
+      // at creation, so it does not consume another generation. It still
+      // requires the accounting store to answer (an outage must not start
+      // unaccounted work) and the token backstop still bounds provider spend.
+      const existing = await harness.store.getTask(taskId).catch(() => null);
+      if (existing && existing.userId === userId) {
+        const plan = await resolvePlanForUser(env, userId);
+        try {
+          const check = await checkAllowance(env, userId, {
+            plan,
+            charges: [{ metric: "tokens", amount: estimateTokens(existing.prompt) }],
+          });
+          if (!check.ok && check.reason === "limit") {
+            return limitResponse(check.metric, check.evaluation, plan);
+          }
+        } catch (err) {
+          if (err instanceof UsageUnavailableError) {
+            return usageUnavailableResponse();
+          }
+          throw err;
+        }
+      }
       let task;
       try {
         task = await harness.resumeTask(taskId, userId, { deferExecution: true });
@@ -168,9 +296,18 @@ export async function handleTaskApi(request, env, ctx = null) {
       }
       // Resumed work goes back through the same durable dispatch as a new
       // task; the queue redelivers it on failure instead of tying the retry
-      // to this HTTP invocation.
+      // to this HTTP invocation. An undispatchable resume is a retryable 503
+      // (the task stays running and resumable, never silently inline).
       if (!task.isTerminal) {
-        await dispatchTaskExecution(env, ctx, harness, task.taskId, { task });
+        let dispatch;
+        try {
+          dispatch = await dispatchTaskExecution(env, ctx, harness, task.taskId, {
+            task,
+          });
+        } catch (err) {
+          return dispatchFailureResponse(err);
+        }
+        return dispatchedTaskResponse(200, task, dispatch);
       }
       return jsonResponse(200, publicTask(task));
     }

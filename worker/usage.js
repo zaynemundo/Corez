@@ -1,33 +1,44 @@
 // Per-plan usage metering.
 //
-// Every paid provider call in this Worker costs money, and until now nothing
-// counted them: a free account could run unlimited generations. This module is
-// the single place that decides what a plan may use in a month and records what
-// it has used.
+// Every paid provider call in this Worker costs money. This module is the one
+// place that decides what a plan may use in a month and records what it used.
 //
-// Storage: one D1 row per (user, month, metric) in `usage_counters`. An upsert
-// with `count = count + excluded.count` is atomic in D1, so concurrent requests
-// from the same account cannot lose increments. The period is the UTC month
-// ('2026-09'), which is also the reset boundary: a new month simply starts at
-// zero because the key changes, so there is no cleanup job to forget.
+// Storage: `usage_counters` holds one row per (user, month, metric). Admission
+// is a SINGLE atomic statement — a guarded upsert that increments the counter
+// only when the result stays within the plan's limit — so checking a budget and
+// spending it can never race: with one generation remaining, two simultaneous
+// requests admit exactly one. There is no separate check-then-record window.
+//
+// Reconciliation: actual consumption that exceeds the reserved estimate (the
+// provider reports more tokens than were charged up front) is added afterwards
+// through `recordUsageOnce`, which is idempotent via a `usage_receipts` row in
+// the same D1 batch — a retried settlement is a no-op, never a double charge.
+//
+// Failure model (fail closed):
+//   - No D1 binding or `USAGE_METERING_DISABLED=1` is the documented unmetered
+//     mode: nothing is counted and nothing is blocked (local dev, tests, an
+//     operator explicitly running without accounting).
+//   - A configured accounting database that is unreachable or returns an
+//     unusable result throws `UsageUnavailableError`. Callers return a
+//     retryable 503 and MUST NOT start billable provider work. A read failure
+//     is never reported as a fabricated zero balance.
 //
 // Honesty rules:
-//  - Tokens are the provider's reported usage when the response carries it, and
-//    otherwise an estimate (characters / 4, which is conservative for English
-//    and code). `tokensEstimated` counts how much of the total was estimated so
-//    the number can never be mistaken for billed truth.
-//  - Without D1 there is nothing to count against, so metering is skipped and
-//    requests are never blocked. A deployment cannot silently start refusing
-//    work because its database is missing.
+//  - Tokens are the provider's reported usage when the response carries it,
+//    and otherwise an estimate (characters / 4). `tokensEstimated` counts how
+//    much of the total was estimated so the number is never mistaken for
+//    billed truth.
 //  - A plan may be unlimited (null limit). Unlimited is never a number.
 
 import { jsonResponse } from "./utils.js";
 
 export const USAGE_TABLE = "usage_counters";
+export const USAGE_RECEIPTS_TABLE = "usage_receipts";
 
 /** Metrics that are summed over the month. */
 export const USAGE_METRICS = [
   "messages",
+  "titles",
   "tokens",
   "tokensEstimated",
   "swarm_runs",
@@ -35,6 +46,10 @@ export const USAGE_METRICS = [
   "publishes",
   "research_reports",
 ];
+
+// tokensEstimated is a diagnostic of `tokens`, never a budget of its own, so it
+// can never be charged by admission.
+const CHARGEABLE_METRICS = new Set(USAGE_METRICS.filter((metric) => metric !== "tokensEstimated"));
 
 const UNLIMITED = null;
 
@@ -44,14 +59,17 @@ const UNLIMITED = null;
  *   Standard  200 generations a month, 10 projects, badge-free
  *   Premium   unlimited generations and projects
  *
- * `messages` is a generation (one user turn), `swarm_runs` bounds the expensive
- * multi-call build harness separately from a one-shot answer, `tokens` is the
- * provider-cost backstop, and `images`/`publishes` cover the two other paid
- * paths. `publishedPages` is a live gauge rather than a monthly counter.
+ * `messages` is a generation (one user turn), `titles` is the bounded
+ * allowance for chat-title generation (a small provider call that is NOT a
+ * generation but is still billed work), `swarm_runs` bounds the expensive
+ * multi-call build harness separately, `tokens` is the provider-cost backstop,
+ * and `images`/`publishes` cover the two other paid paths. `publishedPages` is
+ * a live gauge rather than a monthly counter.
  */
 export const PLAN_LIMITS = Object.freeze({
   free: Object.freeze({
     messages: 20,
+    titles: 50,
     tokens: 250_000,
     swarm_runs: 10,
     images: 10,
@@ -61,6 +79,7 @@ export const PLAN_LIMITS = Object.freeze({
   }),
   standard: Object.freeze({
     messages: 200,
+    titles: 500,
     tokens: 5_000_000,
     swarm_runs: 100,
     images: 200,
@@ -70,6 +89,7 @@ export const PLAN_LIMITS = Object.freeze({
   }),
   premium: Object.freeze({
     messages: UNLIMITED,
+    titles: UNLIMITED,
     tokens: UNLIMITED,
     swarm_runs: UNLIMITED,
     images: UNLIMITED,
@@ -84,6 +104,32 @@ export const DOMAIN_LIMITS = Object.freeze({
   standard: 5,
   premium: 20,
 });
+
+/**
+ * Raised when the accounting database is configured but unusable. Callers
+ * must translate it into a retryable error and must not start provider work.
+ */
+export class UsageUnavailableError extends Error {
+  constructor(message = "Usage accounting is unavailable.") {
+    super(message);
+    this.name = "UsageUnavailableError";
+    this.code = "usage_unavailable";
+    this.retryable = true;
+  }
+}
+
+/** The retryable refusal used when the accounting store cannot be reached. */
+export function usageUnavailableResponse() {
+  return jsonResponse(
+    503,
+    {
+      error: "Usage accounting is temporarily unavailable. Retry shortly.",
+      code: "usage_unavailable",
+      retryable: true,
+    },
+    { "Retry-After": "5" },
+  );
+}
 
 export function normalizePlan(plan) {
   const value = String(plan || "free").toLowerCase();
@@ -117,72 +163,296 @@ export function meteringEnabled(env) {
   return Boolean(env?.DB);
 }
 
-let tableReady = false;
+// Schema creation is idempotent and cached per D1 binding object so a busy
+// isolate does not re-run DDL on every request. A failed attempt is not
+// cached: the next request may find the database healthy again.
+const usageSchemaReady = new WeakSet();
 
-export async function ensureUsageTable(env) {
-  if (tableReady || !env?.DB) return tableReady;
+export async function ensureUsageTables(env) {
+  if (!meteringEnabled(env)) return false;
+  const db = env.DB;
+  if (usageSchemaReady.has(db)) return true;
+  const ddl = [
+    `CREATE TABLE IF NOT EXISTS ${USAGE_TABLE} (user_id TEXT NOT NULL, period TEXT NOT NULL, metric TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL, PRIMARY KEY (user_id, period, metric))`,
+    `CREATE INDEX IF NOT EXISTS idx_usage_period ON ${USAGE_TABLE}(period)`,
+    `CREATE TABLE IF NOT EXISTS ${USAGE_RECEIPTS_TABLE} (receipt_key TEXT PRIMARY KEY, user_id TEXT NOT NULL, period TEXT NOT NULL, metric TEXT, created_at INTEGER NOT NULL)`,
+    `CREATE INDEX IF NOT EXISTS idx_usage_receipts_user ON ${USAGE_RECEIPTS_TABLE}(user_id, period)`,
+  ];
   try {
-    await env.DB.prepare(
-      `CREATE TABLE IF NOT EXISTS ${USAGE_TABLE} (user_id TEXT NOT NULL, period TEXT NOT NULL, metric TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL, PRIMARY KEY (user_id, period, metric))`,
-    ).run();
-    await env.DB.prepare(
-      `CREATE INDEX IF NOT EXISTS idx_usage_period ON ${USAGE_TABLE}(period)`,
-    ).run().catch(() => null);
-    tableReady = true;
-  } catch {
-    tableReady = false;
+    if (typeof db.batch === "function") {
+      await db.batch(ddl.map((statement) => db.prepare(statement)));
+    } else {
+      for (const statement of ddl) {
+        await db.prepare(statement).run();
+      }
+    }
+  } catch (err) {
+    throw new UsageUnavailableError(
+      `Usage accounting tables are unavailable: ${err?.message || err}`,
+    );
   }
-  return tableReady;
+  usageSchemaReady.add(db);
+  return true;
 }
 
-/** Read this month's counters for one account. Skipped reads return zeros. */
+// One statement decides admission atomically: the row is inserted/updated only
+// when the charged amount keeps the counter within the plan limit. A NULL
+// limit (unlimited) always charges. `meta.changes === 0` is the refusal.
+const CHARGE_SQL = `
+  INSERT INTO ${USAGE_TABLE} (user_id, period, metric, count, updated_at)
+  SELECT ?, ?, ?, ?, ?
+  WHERE ? IS NULL OR ? <= ?
+  ON CONFLICT(user_id, period, metric) DO UPDATE SET
+    count = ${USAGE_TABLE}.count + excluded.count,
+    updated_at = excluded.updated_at
+  WHERE ? IS NULL OR ${USAGE_TABLE}.count + excluded.count <= ?`;
+
+const REFUND_SQL = `
+  UPDATE ${USAGE_TABLE} SET count = MAX(0, count - ?), updated_at = ?
+  WHERE user_id = ? AND period = ? AND metric = ?`;
+
+// Receipt-guarded top-up: the counter moves only when no receipt with this key
+// exists yet, and the receipt is written in the same batch. A replay changes
+// nothing — idempotent reconciliation.
+const RECEIPT_CHARGE_SQL = `
+  INSERT INTO ${USAGE_TABLE} (user_id, period, metric, count, updated_at)
+  SELECT ?, ?, ?, ?, ?
+  WHERE NOT EXISTS (SELECT 1 FROM ${USAGE_RECEIPTS_TABLE} WHERE receipt_key = ?)
+  ON CONFLICT(user_id, period, metric) DO UPDATE SET
+    count = ${USAGE_TABLE}.count + excluded.count,
+    updated_at = excluded.updated_at
+  WHERE NOT EXISTS (SELECT 1 FROM ${USAGE_RECEIPTS_TABLE} WHERE receipt_key = ?)`;
+
+const RECEIPT_INSERT_SQL = `
+  INSERT INTO ${USAGE_RECEIPTS_TABLE} (receipt_key, user_id, period, metric, created_at)
+  VALUES (?, ?, ?, ?, ?)
+  ON CONFLICT(receipt_key) DO NOTHING`;
+
+const SELECT_USAGE_SQL = `SELECT metric, count FROM ${USAGE_TABLE} WHERE user_id=? AND period=?`;
+
+function changesOf(result, context) {
+  const changes = result?.meta?.changes;
+  if (!Number.isFinite(changes)) {
+    throw new UsageUnavailableError(
+      `Usage accounting write returned no change metadata (${context}).`,
+    );
+  }
+  return changes;
+}
+
+function limitFor(plan, metric) {
+  const limits = limitsForPlan(plan);
+  return Object.prototype.hasOwnProperty.call(limits, metric) ? limits[metric] : null;
+}
+
+function normalizeCharges(charges) {
+  const entries = [];
+  for (const charge of Array.isArray(charges) ? charges : []) {
+    const metric = String(charge?.metric || "");
+    const amount = Math.trunc(Number(charge?.amount));
+    if (!CHARGEABLE_METRICS.has(metric)) continue;
+    if (!Number.isFinite(amount) || amount <= 0) continue;
+    entries.push({ metric, amount });
+  }
+  return entries;
+}
+
+/** Read this month's counters for one account. Throws when the store fails. */
 export async function getUsage(env, uid, { period = periodKey() } = {}) {
   const usage = emptyUsage();
   if (!meteringEnabled(env) || !uid) return usage;
+  await ensureUsageTables(env);
+  let result;
   try {
-    const ready = await ensureUsageTable(env);
-    if (!ready) return usage;
-    const result = await env.DB.prepare(
-      `SELECT metric, count FROM ${USAGE_TABLE} WHERE user_id=? AND period=?`,
-    )
-      .bind(uid, period)
-      .all();
-    const rows = Array.isArray(result?.results) ? result.results : [];
-    for (const row of rows) {
-      const metric = String(row?.metric || "");
-      if (!USAGE_METRICS.includes(metric)) continue;
-      usage[metric] = Number(row.count) || 0;
-    }
-  } catch {
-    // A read failure must never block a request: report zeros.
+    result = await env.DB.prepare(SELECT_USAGE_SQL).bind(uid, period).all();
+  } catch (err) {
+    throw new UsageUnavailableError(
+      `Usage counters could not be read: ${err?.message || err}`,
+    );
+  }
+  const rows = Array.isArray(result?.results) ? result.results : [];
+  for (const row of rows) {
+    const metric = String(row?.metric || "");
+    if (!USAGE_METRICS.includes(metric)) continue;
+    usage[metric] = Number(row.count) || 0;
   }
   return usage;
 }
 
 /**
- * Add to one or more counters. Never throws: a metering failure is logged by
- * the caller's `onError` at most, and never fails the user's request.
- * @returns {Promise<boolean>} whether the counters were written
+ * Atomically admit (and charge) a set of metrics before billable work starts.
+ *
+ * Each metric is one guarded upsert, so two concurrent requests can never both
+ * pass against the same remaining allowance. When a later charge is refused the
+ * earlier charges of this request are refunded (best effort), so a multi-metric
+ * request never half-charges.
+ *
+ * @returns {Promise<{ok: true, consumed: Array<{metric: string, amount: number}>, period: string}
+ *   | {ok: false, reason: 'limit', metric: string, evaluation: object, refunded: boolean, period: string}>}
+ * @throws {UsageUnavailableError} when the accounting database is unusable.
  */
-export async function addUsage(env, uid, increments, { period = periodKey(), now = Date.now() } = {}) {
-  if (!meteringEnabled(env) || !uid) return false;
-  const entries = Object.entries(increments || {}).filter(
-    ([metric, amount]) => USAGE_METRICS.includes(metric) && Number.isFinite(amount) && amount !== 0,
-  );
-  if (entries.length === 0) return false;
+export async function consumeAllowance(
+  env,
+  uid,
+  { plan = "free", period = periodKey(), charges = [], now = Date.now() } = {},
+) {
+  const entries = normalizeCharges(charges);
+  if (!meteringEnabled(env) || !uid) {
+    return { ok: true, skipped: true, consumed: [], period };
+  }
+  await ensureUsageTables(env);
+  const applied = [];
+  for (const entry of entries) {
+    const limit = limitFor(plan, entry.metric);
+    const result = await env.DB.prepare(CHARGE_SQL)
+      .bind(
+        uid,
+        period,
+        entry.metric,
+        entry.amount,
+        now,
+        limit,
+        entry.amount,
+        limit,
+        limit,
+        limit,
+      )
+      .run();
+    const changes = changesOf(result, entry.metric);
+    if (changes === 0) {
+      const refunded = await refundCharges(env, uid, period, applied, now);
+      const usage = await getUsage(env, uid, { period });
+      const evaluation = {
+        ...evaluateLimit(plan, usage, entry.metric),
+        allowed: false,
+      };
+      return { ok: false, reason: "limit", metric: entry.metric, evaluation, refunded, period };
+    }
+    applied.push(entry);
+  }
+  return { ok: true, consumed: applied, period };
+}
+
+async function refundCharges(env, uid, period, charges, now) {
+  if (charges.length === 0) return true;
   try {
-    const ready = await ensureUsageTable(env);
-    if (!ready) return false;
-    const statements = entries.map(([metric, amount]) =>
-      env.DB.prepare(
-        `INSERT INTO ${USAGE_TABLE} (user_id, period, metric, count, updated_at) VALUES (?,?,?,?,?) ON CONFLICT (user_id, period, metric) DO UPDATE SET count = count + excluded.count, updated_at = excluded.updated_at`,
-      ).bind(uid, period, metric, Math.trunc(amount), now),
+    const statements = charges.map((charge) =>
+      env.DB.prepare(REFUND_SQL).bind(charge.amount, now, uid, period, charge.metric),
     );
-    await env.DB.batch(statements);
+    if (typeof env.DB.batch === "function") {
+      await env.DB.batch(statements);
+    } else {
+      for (const statement of statements) await statement.run();
+    }
     return true;
   } catch {
+    // A failed refund only means the account is charged for work that was not
+    // admitted — conservative, never an over-allowance. The next request
+    // reports the limit, so no provider work starts either way.
     return false;
   }
+}
+
+/**
+ * Read-only admission check (no charge). Used where the account has already
+ * been charged for the work and only a gate on the remaining backstop budget is
+ * wanted (e.g. resuming a task the account already paid for). Still strict:
+ * an unavailable accounting database throws instead of allowing the work.
+ *
+ * @throws {UsageUnavailableError} when the accounting database is unusable.
+ */
+export async function checkAllowance(
+  env,
+  uid,
+  { plan = "free", period = periodKey(), charges = [] } = {},
+) {
+  const entries = normalizeCharges(charges);
+  if (!meteringEnabled(env) || !uid) {
+    return { ok: true, skipped: true, period };
+  }
+  const usage = await getUsage(env, uid, { period });
+  for (const entry of entries) {
+    const limit = limitFor(plan, entry.metric);
+    const used = Number(usage[entry.metric] || 0);
+    if (limit !== null && used + entry.amount > limit) {
+      return {
+        ok: false,
+        reason: "limit",
+        metric: entry.metric,
+        evaluation: { allowed: false, used, limit, remaining: Math.max(0, limit - used) },
+        period,
+      };
+    }
+  }
+  return { ok: true, period };
+}
+
+/**
+ * Idempotently add actual consumption after the fact (reconciliation).
+ *
+ * The same `key` applied twice records once: the counter moves and the receipt
+ * is written in one D1 batch (a transaction), and the replay's guard finds the
+ * receipt and changes nothing. A missing `batch` still writes but is not
+ * atomic, so callers running on real D1 always get the idempotent path.
+ *
+ * @returns {Promise<{recorded: boolean, skipped?: boolean}>}
+ * @throws {UsageUnavailableError} when the accounting database is unusable.
+ */
+export async function recordUsageOnce(
+  env,
+  uid,
+  { key, increments, period = periodKey(), now = Date.now() } = {},
+) {
+  if (!meteringEnabled(env) || !uid || !key) {
+    return { recorded: false, skipped: true };
+  }
+  const entries = normalizeIncrements(increments);
+  if (entries.length === 0) return { recorded: false, skipped: true };
+  await ensureUsageTables(env);
+  const metricLabel = entries.map(([metric]) => metric).join(",");
+  const chargeStatements = entries.map(([metric, amount]) =>
+    env.DB.prepare(RECEIPT_CHARGE_SQL).bind(uid, period, metric, amount, now, key, key),
+  );
+  const receiptStatement = env.DB.prepare(RECEIPT_INSERT_SQL).bind(
+    key,
+    uid,
+    period,
+    metricLabel,
+    now,
+  );
+  try {
+    if (typeof env.DB.batch === "function") {
+      const results = await env.DB.batch([...chargeStatements, receiptStatement]);
+      const recorded = chargeStatements.some(
+        (_, index) => Number(results?.[index]?.meta?.changes) > 0,
+      );
+      return { recorded };
+    }
+    // No batch support (test doubles): sequential, still receipt-guarded.
+    let recorded = false;
+    for (const statement of chargeStatements) {
+      const result = await statement.run();
+      if (Number(result?.meta?.changes) > 0) recorded = true;
+    }
+    await receiptStatement.run();
+    return { recorded };
+  } catch (err) {
+    if (err instanceof UsageUnavailableError) throw err;
+    throw new UsageUnavailableError(
+      `Usage reconciliation failed: ${err?.message || err}`,
+    );
+  }
+}
+
+function normalizeIncrements(increments) {
+  const entries = [];
+  for (const [metric, amount] of Object.entries(increments || {})) {
+    const value = Math.trunc(Number(amount));
+    if (!CHARGEABLE_METRICS.has(metric)) continue;
+    if (!Number.isFinite(value) || value <= 0) continue;
+    entries.push([metric, value]);
+  }
+  return entries;
 }
 
 /**
@@ -199,14 +469,11 @@ export function estimateTokens(...texts) {
 }
 
 /**
- * Whether `metric` still has room on this plan.
+ * Whether `metric` still has room on this plan, for display and evaluation.
  * @returns {{allowed: boolean, used: number, limit: number|null, remaining: number|null}}
  */
 export function evaluateLimit(plan, usage, metric, extra = {}) {
-  const limits = limitsForPlan(plan);
-  const limit = Object.prototype.hasOwnProperty.call(limits, metric)
-    ? limits[metric]
-    : null;
+  const limit = limitFor(plan, metric);
   const used = Number(usage?.[metric] || 0) + Number(extra?.pending || 0);
   if (limit === null) {
     return { allowed: true, used, limit: null, remaining: null };
@@ -222,6 +489,7 @@ export function evaluateLimit(plan, usage, metric, extra = {}) {
 export function limitResponse(metric, evaluation, plan, { now = new Date() } = {}) {
   const labels = {
     messages: "generations",
+    titles: "chat titles",
     tokens: "tokens",
     swarm_runs: "build runs",
     images: "images",
@@ -242,43 +510,7 @@ export function limitResponse(metric, evaluation, plan, { now = new Date() } = {
   });
 }
 
-/**
- * Check a metric before spending money, and record it when allowed.
- * `increments` lets a request count into several metrics at once (a build is a
- * message AND a swarm run AND some tokens).
- */
-export async function consumeUsage(
-  env,
-  uid,
-  { metric, increments = null, plan = "free", extra = {} } = {},
-) {
-  if (!meteringEnabled(env) || !uid) {
-    return { allowed: true, skipped: true, used: 0, limit: null, remaining: null };
-  }
-  const usage = await getUsage(env, uid);
-  const evaluation = metric ? evaluateLimit(plan, usage, metric, extra) : { allowed: true };
-  if (!evaluation.allowed) {
-    return { allowed: false, ...evaluation, usage };
-  }
-  const written = increments ? await addUsage(env, uid, increments) : true;
-  return { allowed: true, ...evaluation, usage, recorded: Boolean(written) };
-}
-
-/**
- * Inspect a metric without spending it, so a caller can gate a request before
- * doing expensive work. Mirrors consumeUsage's evaluation so the two can never
- * disagree about the wall.
- */
-export async function checkUsage(env, uid, { metric, plan = "free", extra = {} } = {}) {
-  if (!meteringEnabled(env) || !uid) {
-    return { allowed: true, skipped: true, used: 0, limit: null, remaining: null, usage: emptyUsage() };
-  }
-  const usage = await getUsage(env, uid);
-  const evaluation = metric ? evaluateLimit(plan, usage, metric, extra) : { allowed: true };
-  return { ...evaluation, usage };
-}
-
-/** The numbers the settings panel shows. */
+/** The numbers the settings panel shows. Throws when the store is unusable. */
 export async function usageSummary(env, uid, { plan = "free", publishedPages = null, now = new Date() } = {}) {
   const period = periodKey(now);
   const usage = await getUsage(env, uid, { period });

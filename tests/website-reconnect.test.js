@@ -144,7 +144,13 @@ describe('website task API + SSE reconnection', () => {
   }
 
   it('starts a task, streams events over SSE, and supports Last-Event-ID reconnect', async () => {
-    const env = environment({ ASSET_BUCKET: memoryBucket(), OPENCODE_GO_API_KEY: 'test-key' });
+    // R2-only test deployment: no queue binding, so inline execution must be
+    // opted in explicitly (taskRunner's TASK_INLINE_FALLBACK).
+    const env = environment({
+      ASSET_BUCKET: memoryBucket(),
+      OPENCODE_GO_API_KEY: 'test-key',
+      TASK_INLINE_FALLBACK: 'true'
+    });
     const taskId = await startTask(env, 'build me something');
 
     // First connection: wait for the terminal state and collect events.
@@ -187,7 +193,8 @@ describe('website task API + SSE reconnection', () => {
   it('keeps recovering through more than three transient read failures', async () => {
     const env = environment({
       ASSET_BUCKET: memoryBucket({ failGets: 6 }), // six transient failures
-      OPENCODE_GO_API_KEY: 'test-key'
+      OPENCODE_GO_API_KEY: 'test-key',
+      TASK_INLINE_FALLBACK: 'true'
     });
     const taskId = await startTask(env, 'recover from network failures');
 
@@ -272,7 +279,11 @@ describe('website task API + SSE reconnection', () => {
   });
 
   it('cancel aborts the running task and exposes the cancelled terminal state', async () => {
-    const env = environment({ ASSET_BUCKET: memoryBucket(), OPENCODE_GO_API_KEY: 'test-key' });
+    const env = environment({
+      ASSET_BUCKET: memoryBucket(),
+      OPENCODE_GO_API_KEY: 'test-key',
+      TASK_INLINE_FALLBACK: 'true'
+    });
     let release;
     const started = new Promise((resolve) => { release = resolve; });
     globalThis.fetch = async (url, init) => {

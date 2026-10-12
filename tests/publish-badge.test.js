@@ -61,7 +61,7 @@ function planDb(plan, status = 'active') {
           return null;
         },
         async run() {
-          return { success: true };
+          return { success: true, meta: { changes: 1 } };
         },
       };
       return stmt;

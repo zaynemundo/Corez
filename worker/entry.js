@@ -14,7 +14,11 @@ import {
 } from "./utils.js";
 import { TASK_STATUS_STORE_PREFIX } from "./providerChain.js";
 import { handleTaskApi } from "./taskApi.js";
-import { runTaskQueueBatch } from "./taskRunner.js";
+import {
+  buildHarness,
+  runTaskQueueBatch,
+  sweepPendingTaskDispatches,
+} from "./taskRunner.js";
 import { handleAuth, verifySession } from "./auth.js";
 import { handleChats } from "./chats.js";
 import { handleN8nWebhook } from "./n8nBridge.js";
@@ -354,7 +358,42 @@ export default {
   // handler is what makes execution independent of the browser connection:
   // once the 202 is returned, the task runs inside the Queue consumer, not
   // inside the (soon to be torn down) HTTP invocation.
-  async queue(batch, env) {
-    return runTaskQueueBatch(batch, env);
+  //
+  // The third parameter stays in the signature for runtime compatibility; the
+  // sweep runs inside this invocation, so it needs no waitUntil bridge.
+  async queue(batch, env, _ctx = null) {
+    // Any queue traffic is also a signal that the broker is reachable: flush
+    // deferred dispatches from the D1 outbox before running this batch.
+    try {
+      await sweepPendingTaskDispatches(env, buildHarness(env));
+    } catch {
+      // Recovery is retried by the next sweep; never block the batch on it.
+    }
+    const results = await runTaskQueueBatch(batch, env);
+    return results;
+  },
+
+  // Cron recovery for the dispatch outbox. When the queue is unreachable,
+  // POST /api/tasks persists a dispatch record and returns `deferred`; this
+  // handler re-sends every due record so deferred work runs even if no other
+  // traffic arrives. Queue batches also sweep, so this is the second line of
+  // defence rather than the only one.
+  async scheduled(_controller, env, ctx) {
+    const task = (async () => {
+      try {
+        const result = await sweepPendingTaskDispatches(env, buildHarness(env));
+        if (result.sent || result.failed) {
+          console.log(
+            `task dispatch sweep: sent=${result.sent} failed=${result.failed} skipped=${result.skipped}`,
+          );
+        }
+      } catch {
+        // A failed sweep leaves the records pending for the next trigger.
+      }
+    })();
+    // Keep the invocation alive for the sweep; the promise is also returned so
+    // a test harness or manual trigger can await it.
+    if (typeof ctx?.waitUntil === "function") ctx.waitUntil(task);
+    return task;
   },
 };

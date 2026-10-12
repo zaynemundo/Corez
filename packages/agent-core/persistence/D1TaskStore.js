@@ -26,6 +26,7 @@ import { TaskStore } from './TaskStore.js';
 const TASKS_TABLE = 'harness_tasks';
 const EVENTS_TABLE = 'harness_task_events';
 const LEASES_TABLE = 'harness_task_leases';
+const DISPATCHES_TABLE = 'harness_task_dispatches';
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS ${TASKS_TABLE} (
@@ -53,7 +54,23 @@ const SCHEMA = [
      holder TEXT NOT NULL,
      expires_at INTEGER NOT NULL,
      acquired_at INTEGER NOT NULL
-   )`
+   )`,
+  // Durable dispatch outbox: a queue-backed dispatcher writes the record
+  // BEFORE attempting the send, so a Queue outage, a lost send response or an
+  // evicted invocation can never strand an accepted task. A sweeper reclaims
+  // `pending`/expired-`claimed` rows and re-sends them; the record is deleted
+  // only after a successful send (or when the task is already terminal or
+  // running under another live runner, which makes the record unnecessary).
+  `CREATE TABLE IF NOT EXISTS ${DISPATCHES_TABLE} (
+     task_id TEXT PRIMARY KEY,
+     status TEXT NOT NULL,
+     attempts INTEGER NOT NULL DEFAULT 0,
+     next_attempt_at INTEGER NOT NULL,
+     created_at INTEGER NOT NULL,
+     updated_at INTEGER NOT NULL
+   )`,
+  `CREATE INDEX IF NOT EXISTS idx_harness_task_dispatches_pending
+     ON ${DISPATCHES_TABLE} (next_attempt_at)`
 ];
 
 // Schema creation is idempotent and cached per D1 binding object so a busy
@@ -111,6 +128,66 @@ const RELEASE_LEASE = `
 
 const READ_LEASE = `
   SELECT holder, expires_at FROM ${LEASES_TABLE} WHERE task_id = ?`;
+
+// Idempotent: re-recording a dispatch for the same task is a no-op (the
+// original pending window is preserved). A record still in flight is never
+// reset by a later record call.
+const RECORD_DISPATCH = `
+  INSERT INTO ${DISPATCHES_TABLE} (task_id, status, attempts, next_attempt_at, created_at, updated_at)
+  VALUES (?, 'pending', 0, ?, ?, ?)
+  ON CONFLICT(task_id) DO NOTHING`;
+
+// The read that decides the expected attempts value before a conditional
+// claim. Kept separate from the leased `claimed` window: this only answers
+// "does the row exist and what is its attempt counter".
+const READ_DISPATCH = `
+  SELECT attempts, status FROM ${DISPATCHES_TABLE} WHERE task_id = ?`;
+
+// Claim is atomic and time-bounded: a row is claimable while pending and due,
+// or when a previous claim went stale (the claiming worker died). The
+// attempts compare-and-set (`attempts` unchanged since the read) makes two
+// sweepers that read the same version race safely — exactly one update wins.
+// A successful claim sets next_attempt_at a full claim window ahead.
+const CLAIM_DISPATCH = `
+  UPDATE ${DISPATCHES_TABLE}
+  SET status = 'claimed',
+      attempts = attempts + 1,
+      next_attempt_at = ?,
+      updated_at = ?
+  WHERE task_id = ?
+    AND attempts = ?
+    AND (status = 'pending' OR (status = 'claimed' AND next_attempt_at <= ?))
+    AND next_attempt_at <= ?`;
+
+// The dispatch is done (send accepted, task terminal, or the explicit inline
+// fallback took ownership): the record must not be retried. Deletion is
+// idempotent and unconditional — "remove whatever record exists for this
+// task" is correct even if a concurrent claim just bumped the attempts.
+const DELETE_DISPATCH = `
+  DELETE FROM ${DISPATCHES_TABLE} WHERE task_id = ?`;
+
+// The send failed: hand the record back for a later sweep with a backoff. The
+// attempts guard makes this a no-op if another worker already claimed it.
+const RESET_DISPATCH = `
+  UPDATE ${DISPATCHES_TABLE}
+  SET status = 'pending', next_attempt_at = ?, updated_at = ?
+  WHERE task_id = ? AND attempts = ?`;
+
+// The outbox row is joined to the live task so terminal work is never
+// re-sent and a removed task does not leave an immortal record. A task with no
+// row yet (in flight between createTask and dispatchTaskExecution) is still
+// swept: the caller holds the task document, which is what executeTask needs.
+// `claimed` rows are only listed once the claim window expired (a crashed
+// claimant), so a healthy send is never duplicated.
+const SELECT_DISPATCHES = `
+  SELECT d.task_id, d.attempts, t.status AS task_status
+  FROM ${DISPATCHES_TABLE} AS d
+  LEFT JOIN ${TASKS_TABLE} AS t ON t.task_id = d.task_id
+  WHERE (d.status = 'pending' OR (d.status = 'claimed' AND d.next_attempt_at <= ?))
+    AND d.next_attempt_at <= ?
+    AND (t.status IS NULL OR t.status IN ('pending', 'running'))
+  ORDER BY d.next_attempt_at ASC
+  LIMIT ?`;
 
 export class D1TaskStore extends TaskStore {
   constructor({ db, bucket = null } = {}) {
@@ -354,6 +431,116 @@ export class D1TaskStore extends TaskStore {
       .bind(String(taskId), String(holder))
       .run();
     return (Number(result?.meta?.changes) || 0) > 0;
+  }
+
+  // ---- Durable dispatch outbox -----------------------------------------
+  // The queue-backed dispatcher records the intent to dispatch BEFORE the
+  // send, so a Queue outage can never silently strand an accepted task. The
+  // sweeper (`worker/taskRunner.js` sweepPendingTaskDispatches) reclaims due
+  // rows and re-sends them; duplicate sends are safe because executeTask is
+  // idempotent (terminal skip + atomic lease).
+
+  // Persist the dispatch intent. Idempotent per task. With no delay the row is
+  // immediately due (`Date.now() - 1`) so a claim in the same millisecond — or
+  // across a clock that ticks backwards — still satisfies `next_attempt_at <= now`.
+  async recordDispatch(taskId, { delaySeconds = 0 } = {}) {
+    if (!this.available) return null;
+    await this.#ensureSchema();
+    const now = Date.now();
+    const delayMs =
+      Number.isFinite(delaySeconds) && delaySeconds > 0
+        ? Math.floor(delaySeconds * 1000)
+        : 0;
+    const dueAt = now + delayMs - (delayMs > 0 ? 0 : 1);
+    await this.db.prepare(RECORD_DISPATCH).bind(
+      String(taskId),
+      dueAt,
+      now,
+      now
+    ).run();
+    return { taskId: String(taskId), status: 'pending', nextAttemptAt: dueAt };
+  }
+
+  // Atomically take ownership of a due dispatch record. The read decides
+  // `attempts`; the conditional update then wins only if the row still holds
+  // that value and is due/claimable, so exactly one concurrent sweeper can
+  // claim it. `leaseMs` bounds how long the claim blocks other sweepers.
+  // Returns false when the row is gone, not due, claimed elsewhere, or the
+  // task already reached a terminal state.
+  async claimDispatch(taskId, { leaseMs = 120_000 } = {}) {
+    if (!this.available) return false;
+    await this.#ensureSchema();
+    const now = Date.now();
+    let row;
+    try {
+      row = await this.db.prepare(READ_DISPATCH)
+        .bind(String(taskId))
+        .first();
+    } catch {
+      return false;
+    }
+    if (!row) return false;
+    const attempts = Number(row.attempts) || 0;
+    const result = await this.db.prepare(CLAIM_DISPATCH).bind(
+      now + Math.max(1, Math.floor(leaseMs)),
+      now,
+      String(taskId),
+      attempts,
+      now,
+      now
+    ).run();
+    return (Number(result?.meta?.changes) || 0) > 0;
+  }
+
+  // The send was accepted (or the task is terminal / running elsewhere): the
+  // record must never be re-sent.
+  async deleteDispatch(taskId) {
+    if (!this.available) return false;
+    await this.#ensureSchema();
+    const result = await this.db.prepare(DELETE_DISPATCH)
+      .bind(String(taskId))
+      .run();
+    return (Number(result?.meta?.changes) || 0) > 0;
+  }
+
+  // Release a failed send back to `pending` with a backoff so the next sweep
+  // retries it. `attempt` is the attempts value the caller observed at claim
+  // time (the compare-and-set guard); without it the call is refused rather
+  // than risking a blind reset of a record another worker now owns.
+  async resetDispatch(taskId, { attempt, delaySeconds = 0 } = {}) {
+    if (!this.available) return false;
+    if (!Number.isFinite(attempt) || attempt < 0) return false;
+    await this.#ensureSchema();
+    const now = Date.now();
+    const delayMs =
+      Number.isFinite(delaySeconds) && delaySeconds > 0
+        ? Math.floor(delaySeconds * 1000)
+        : 0;
+    const result = await this.db.prepare(RESET_DISPATCH).bind(
+      now + delayMs,
+      now,
+      String(taskId),
+      Math.floor(attempt)
+    ).run();
+    return (Number(result?.meta?.changes) || 0) > 0;
+  }
+
+  // Pending dispatch records that are due (or whose claim expired) and whose
+  // task is still dispatchable. `limit` bounds one sweep pass.
+  async listPendingDispatches({ limit = 10 } = {}) {
+    if (!this.available) return [];
+    await this.#ensureSchema();
+    const now = Date.now();
+    const rows = await this.db.prepare(SELECT_DISPATCHES).bind(
+      now,
+      now,
+      clampLimit(limit)
+    ).all();
+    return (rows?.results || []).map((row) => ({
+      taskId: String(row.task_id),
+      attempts: Number(row.attempts) || 0,
+      taskStatus: row.task_status ?? null
+    }));
   }
 
   // Session-log snapshots live in R2, not D1. Nothing in the harness reads

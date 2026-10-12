@@ -16,7 +16,9 @@ function makeMockDb() {
     users,
     memories,
     prepare(sql) {
-      const runNoop = async () => ({ success: true });
+      // Real D1 always reports change metadata on run(); the usage store
+      // treats a missing meta as an unusable accounting database.
+      const runNoop = async () => ({ success: true, meta: { changes: 1 } });
       return {
         // Real D1 statements support .run() without .bind().
         run: runNoop,
@@ -77,7 +79,7 @@ function makeMockDb() {
                 if (ix >= 0) memories.splice(ix, 1);
               }
               // CREATE TABLE / CREATE INDEX are no-ops on the mock.
-              return { success: true };
+              return { success: true, meta: { changes: 1 } };
             },
           };
         },
