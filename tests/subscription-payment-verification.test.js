@@ -507,34 +507,134 @@ describe('payment verification boundaries', () => {
       expect(await getRows(DB, "SELECT * FROM subscriptions WHERE status='pending'")).toHaveLength(0);
     });
 
-    it('removes unfinished checkouts only through explicit /abandon', async () => {
+    it('keeps the abandoned checkout as ownership proof and settles a late completion', async () => {
       const { DB, env } = await createSubscriptionEnv({
         subscriptions: [
-          { plan: 'standard', amount: 1836, ziina_payment_id: 'pi_abandon' },
+          { plan: 'standard', amount: 1836, ziina_payment_id: 'pi_late' },
         ],
       });
+      // The payment is still unfinished when the user walks away from it.
+      let ziinaStatus = 'requires_user_action';
       mockZiina(({ method }) =>
         method === 'GET'
           ? jsonResponse({
-              id: 'pi_abandon',
-              status: 'requires_user_action',
+              id: 'pi_late',
+              status: ziinaStatus,
               amount: 1836,
               currency_code: 'AED',
             })
           : jsonResponse({}, 500),
       );
 
-      const request = new Request('https://corez.pro/api/subscriptions/abandon', {
+      const abandonRequest = new Request('https://corez.pro/api/subscriptions/abandon', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ plan: 'standard' }),
       });
-      const res = await handleSubscriptions(request, env);
-
+      const res = await handleSubscriptions(abandonRequest, env);
       expect(res.status).toBe(200);
-      expect(
-        await getRows(DB, `SELECT * FROM subscriptions WHERE ziina_payment_id='pi_abandon'`),
-      ).toHaveLength(0);
+      expect((await res.clone().json()).activated).toBe(false);
+
+      // The checkout is MARKED, not deleted: the row is the only local proof
+      // that pi_late belongs to this account. Deleting it here is what turned a
+      // later capture into an unrecoverable `payment_not_owned` refusal.
+      const rows = await getRows(
+        DB,
+        `SELECT * FROM subscriptions WHERE ziina_payment_id='pi_late'`,
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].abandoned_at).toBeTruthy();
+
+      // Abandoning removes the checkout from the resume flows, so the user is
+      // not pushed back into a payment they walked away from.
+      const pending = await (
+        await handleSubscriptions(
+          new Request('https://corez.pro/api/subscriptions/pending', { method: 'GET' }),
+          env,
+        )
+      ).json();
+      expect(pending.pending).toBeNull();
+      const me = await (await handleSubscriptions(meRequest(), env)).json();
+      expect(me.pending_payment_id ?? null).toBeNull();
+
+      // It completes afterwards anyway. Ownership survived the abandonment, so
+      // the payment is still recoverable rather than refused.
+      ziinaStatus = 'completed';
+      const verified = await handleSubscriptions(verifyRequest('pi_late'), env);
+      expect(verified.status).toBe(200);
+      const body = await verified.json();
+      expect(body.verified).toBe(true);
+      expect(body.plan).toBe('standard');
+      expect((await getLedger(DB, 'pi_late')).status).toBe('settled');
+      expect(await getUser(DB)).toMatchObject({ plan: 'standard' });
+    });
+
+    it('marks the checkout abandoned even when Ziina cannot be reached, and says so', async () => {
+      const { DB, env } = await createSubscriptionEnv({
+        subscriptions: [
+          { plan: 'standard', amount: 1836, ziina_payment_id: 'pi_offline' },
+        ],
+      });
+      // Ziina is unreachable: "not confirmed" must never be reported as
+      // "confirmed not completed".
+      mockZiina(() => {
+        throw new Error('network down');
+      });
+
+      const res = await handleSubscriptions(
+        new Request('https://corez.pro/api/subscriptions/abandon', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        }),
+        env,
+      );
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.confirmation_pending).toBe(true);
+
+      // Marking is not destructive, so the ownership row survives an
+      // unconfirmable reconciliation and can still settle later.
+      const rows = await getRows(
+        DB,
+        `SELECT * FROM subscriptions WHERE ziina_payment_id='pi_offline'`,
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].abandoned_at).toBeTruthy();
+    });
+
+    it('settles a checkout abandoned before completion through reconciliation', async () => {
+      const { DB, env } = await createSubscriptionEnv({
+        subscriptions: [
+          {
+            plan: 'standard',
+            amount: 1836,
+            ziina_payment_id: 'pi_reconcile',
+            abandoned_at: Date.now(),
+          },
+        ],
+      });
+      mockZiina(({ method }) =>
+        method === 'GET'
+          ? jsonResponse(completedPayment({ id: 'pi_reconcile' }))
+          : jsonResponse({}, 500),
+      );
+
+      // The passive status read is the recovery path: abandoned is a UI state,
+      // so a captured payment still activates from it.
+      const me = await (await handleSubscriptions(meRequest(), env)).json();
+      expect(me.plan).toBe('standard');
+      expect((await getLedger(DB, 'pi_reconcile')).status).toBe('settled');
+
+      // The settled checkout row retires because activation wrote the same
+      // user_id + payment_id onto the active row: attribution is transferred,
+      // not dropped.
+      const rows = await getRows(
+        DB,
+        `SELECT * FROM subscriptions WHERE ziina_payment_id='pi_reconcile'`,
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].status).toBe('active');
     });
   });
 

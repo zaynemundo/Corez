@@ -47,7 +47,13 @@ fixed too:
 | 7 | A completed payment in any currency activated an AED-priced plan | `currency_code` must be `AED`; anything else is refused with `400 currency_mismatch`. |
 | 8 | Repeating a completed verification minted a fresh period from the current time | **Exactly-once settlement** through `payment_ledger` (payment id = primary key). The atomic claim INSERT elects one settler; duplicates replay the stored `period_start`/`period_end`. |
 | 9 | `activateSubscription()` swallowed database errors and returned a success-shaped result | Activation runs as one D1 `batch()` (atomic); failures propagate, the ledger claim is marked `failed` for a safe retry, and the caller returns `502` — never `verified: true`. |
-| 10 | `reconcilePendingSubscriptions()` (called by `GET /me`) deleted any checkout whose payment was not completed | Ownership must survive passive status checks. Reconciliation deletes nothing except rows with **no payment id**; unfinished, failed, canceled, test, and refused payments keep their local checkout row, so a later completion can still verify. Removal is only via explicit `POST /abandon`, a replacement checkout for the same plan, or activation. |
+| 10 | `reconcilePendingSubscriptions()` (called by `GET /me`) deleted any checkout whose payment was not completed | Ownership must survive passive status checks. Reconciliation deletes nothing except rows with **no payment id**; unfinished, failed, canceled, test, and refused payments keep their local checkout row, so a later completion can still verify. |
+| 11 | `POST /abandon` deleted the checkout row whenever reconciliation did not report activation — including when Ziina could not be reached, so the route could not tell "unfinished" from "unconfirmed" | **Abandoning marks, it never deletes.** The row is the only local proof that a payment id belongs to an account, so `abandoned_at` records the UI decision while attribution stays. A payment that completes afterwards is still owned, reconcile settles it into activation, and the resume flows (`/pending`, `pending_*` on `/me`, checkout reuse) filter abandoned rows out so the user is not pushed back into a checkout they walked away from. The settled row retires only *after* activation has written the same `user_id` + `payment_id` onto the active row — attribution is transferred, never dropped. |
+
+Ownership is therefore a property of a `subscriptions` row keyed by
+`(user_id, ziina_payment_id)` and outlives every UI state: `abandoned_at`,
+`status`, and the pending fields are presentation, while the row itself is the
+claim. Never delete such a row while its payment could still complete.
 
 `settleVerifiedPayment(env, { userId, paymentId, plan, amount, interval, testMode })`
 in `worker/subscriptions.js` is the one place that turns a verified payment into
@@ -108,7 +114,7 @@ POST /api/subscriptions/checkout  create a Ziina intent for a plan
 GET  /api/subscriptions/pending   resume an in-flight checkout
 POST /api/subscriptions/verify    confirm a payment with Ziina, then activate
 POST /api/subscriptions/cancel    downgrade (and undo a scheduled downgrade)
-POST /api/subscriptions/abandon   drop an abandoned checkout
+POST /api/subscriptions/abandon   mark a checkout abandoned (keeps ownership)
 GET  /api/subscriptions/me        current plan (reconciles pending first)
 ```
 

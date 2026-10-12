@@ -19,6 +19,7 @@ export function subscriptionRow(overrides = {}) {
     period_end: null,
     ziina_payment_id: null,
     test_mode: 0,
+    abandoned_at: null,
     created_at: now,
     updated_at: now,
     ...overrides,
@@ -48,8 +49,8 @@ export function ledgerRow(overrides = {}) {
 
 async function insertSubscription(DB, row) {
   await DB.prepare(
-    `INSERT INTO subscriptions (id, user_id, plan, amount, currency_code, status, period_start, period_end, ziina_payment_id, test_mode, created_at, updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO subscriptions (id, user_id, plan, amount, currency_code, status, period_start, period_end, ziina_payment_id, test_mode, abandoned_at, created_at, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
   )
     .bind(
       row.id,
@@ -62,6 +63,7 @@ async function insertSubscription(DB, row) {
       row.period_end,
       row.ziina_payment_id,
       row.test_mode,
+      row.abandoned_at,
       row.created_at,
       row.updated_at,
     )

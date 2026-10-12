@@ -42,6 +42,16 @@ export async function ensureSubscriptionTables(env) {
         `ALTER TABLE subscriptions ADD COLUMN test_mode INTEGER NOT NULL DEFAULT 0`,
       ).run();
     } catch {}
+    // Ownership outlives the checkout UI state. `abandoned_at` marks a checkout
+    // the user no longer wants to finish; the row itself is kept, because it is
+    // the only local proof that a Ziina payment id belongs to this account. A
+    // payment that completes after abandonment can therefore still be settled
+    // instead of being refused as `payment_not_owned`.
+    try {
+      await env.DB.prepare(
+        `ALTER TABLE subscriptions ADD COLUMN abandoned_at INTEGER`,
+      ).run();
+    } catch {}
     // Exactly-once payment settlement ledger. The Ziina payment id is the
     // primary key, so concurrent/duplicate verifications of the same payment
     // race on one atomic INSERT — only the claim holder activates, and every
@@ -184,7 +194,7 @@ export async function getActiveSubscription(env, userId) {
   try {
     // Latest pending (abandoned or in-flight upgrade) — reported but never current
     const pending = await env.DB.prepare(
-      "SELECT plan, ziina_payment_id FROM subscriptions WHERE user_id=? AND status='pending' ORDER BY created_at DESC LIMIT 1",
+      "SELECT plan, ziina_payment_id FROM subscriptions WHERE user_id=? AND status='pending' AND abandoned_at IS NULL ORDER BY created_at DESC LIMIT 1",
     )
       .bind(userId)
       .first()
@@ -410,12 +420,15 @@ function buildActivationStatements(
 
   const statements = [
     // Mark any previous ACTIVE rows as completed (one true current plan) and drop
-    // abandoned/finished pending rows so they can never activate later.
+    // superseded pending rows so they can never activate later. Abandoned rows
+    // are deliberately kept: they are the ownership record a late-completing
+    // payment is settled or refunded through, and deleting one here would
+    // reintroduce exactly the loss that marking replaced.
     env.DB.prepare(
       `UPDATE subscriptions SET status='completed', updated_at=? WHERE user_id=? AND status='active'`,
     ).bind(now, userId),
     env.DB.prepare(
-      `DELETE FROM subscriptions WHERE user_id=? AND status='pending'`,
+      `DELETE FROM subscriptions WHERE user_id=? AND status='pending' AND abandoned_at IS NULL`,
     ).bind(userId),
     env.DB.prepare(
       `INSERT INTO subscriptions (id, user_id, plan, amount, currency_code, status, period_start, period_end, ziina_payment_id, created_at, updated_at)
@@ -655,10 +668,22 @@ export async function reconcilePendingSubscriptions(env, userId) {
   } catch {
     return { reconciled: false };
   }
-  if (pendingRows.length === 0) return { reconciled: true, activated: null };
+  if (pendingRows.length === 0) return { reconciled: true, activated: null, unconfirmed: false };
   const apiKey = env?.ZIINA_API_KEY || env?.ZIINA_API_TOKEN;
   let activated = null;
+  // True when at least one row could not be checked with Ziina. The caller must
+  // not treat "we could not ask" as "we know it did not complete".
+  let unconfirmed = false;
   const dropPending = async (rowId) => {
+    try {
+      await env.DB.prepare(`DELETE FROM subscriptions WHERE id=?`).bind(rowId).run();
+    } catch {}
+  };
+  // Once a row has settled, its attribution has moved onto the active row the
+  // activation inserted (same user_id + payment_id), so the live checkout record
+  // retires. This is the one place deleting a row is safe: the payment is
+  // already provably owned by an active subscription, so nothing is lost.
+  const retireSettled = async (rowId) => {
     try {
       await env.DB.prepare(`DELETE FROM subscriptions WHERE id=?`).bind(rowId).run();
     } catch {}
@@ -671,16 +696,23 @@ export async function reconcilePendingSubscriptions(env, userId) {
     }
     // No Ziina credentials: keep the ownership row so a later reconcile (with
     // credentials restored) can still settle it.
-    if (!apiKey) continue;
+    if (!apiKey) {
+      unconfirmed = true;
+      continue;
+    }
     let data;
     try {
       const ziinaRes = await fetch(
         `${ZIINA_BASE}/payment_intent/${encodeURIComponent(row.ziina_payment_id)}`,
         { headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" } },
       );
-      if (!ziinaRes.ok) continue; // Ziina unavailable — keep the row and retry later.
+      if (!ziinaRes.ok) {
+        unconfirmed = true;
+        continue; // Ziina unavailable — keep the row and retry later.
+      }
       data = await ziinaRes.json().catch(() => ({}));
     } catch {
+      unconfirmed = true;
       continue; // Network failure — the payment may still be captured; retry later.
     }
     const inspection = inspectCompletedPayment(env, data, row.test_mode);
@@ -706,13 +738,16 @@ export async function reconcilePendingSubscriptions(env, userId) {
         interval: inspection.interval,
         testMode: inspection.testPayment,
       });
-      if (settlement?.ok && !settlement.inProgress) activated = settlement.result;
+      if (settlement?.ok && !settlement.inProgress) {
+        activated = settlement.result;
+        await retireSettled(row.id);
+      }
     } catch (e) {
       console.warn("reconcilePendingSubscriptions settlement failed", safeErrorDetail(e));
       // Keep the pending row: a later reconcile retries the settlement.
     }
   }
-  return { reconciled: true, activated };
+  return { reconciled: true, activated, unconfirmed };
 }
 
 export async function handleSubscriptions(request, env) {
@@ -763,7 +798,7 @@ export async function handleSubscriptions(request, env) {
     const apiKey = env?.ZIINA_API_KEY || env?.ZIINA_API_TOKEN;
     try {
       const row = await env.DB.prepare(
-        "SELECT plan, ziina_payment_id FROM subscriptions WHERE user_id=? AND status='pending' ORDER BY created_at DESC LIMIT 1",
+        "SELECT plan, ziina_payment_id FROM subscriptions WHERE user_id=? AND status='pending' AND abandoned_at IS NULL ORDER BY created_at DESC LIMIT 1",
       )
         .bind(userId)
         .first();
@@ -790,8 +825,14 @@ export async function handleSubscriptions(request, env) {
     }
   }
 
-  // POST /api/subscriptions/abandon -> drop an unfinished checkout (cancel upgrade)
+  // POST /api/subscriptions/abandon -> stop an unfinished checkout (cancel upgrade)
   // Body: { plan? } — omit to abandon every pending checkout for this user.
+  //
+  // Abandoning is a UI decision, not a statement about the money. The row is
+  // MARKED, never deleted: it is the local proof that a Ziina payment id
+  // belongs to this account, so a payment that completes afterwards must still
+  // be settleable. Deleting it turned a captured payment into an
+  // unrecoverable `payment_not_owned` refusal on the next verification.
   if (pathname === "/api/subscriptions/abandon" && request.method === "POST") {
     let body;
     try { body = await readBoundedJson(request); } catch { body = {}; }
@@ -800,29 +841,52 @@ export async function handleSubscriptions(request, env) {
     // Reconcile first: if the "abandoned" payment actually completed on Ziina,
     // it must activate — abandoning must never lose a captured payment.
     const reconciled = await reconcilePendingSubscriptions(env, userId);
+    if (reconciled?.reconciled === false) {
+      // The checkout rows could not be read, so which ones are safe to mark is
+      // unknown. Report a retryable failure instead of guessing.
+      return jsonResponse(503, {
+        ok: false,
+        code: "reconcile_unavailable",
+        error: "Could not read the pending checkout right now. Try again shortly.",
+      });
+    }
     if (!reconciled?.activated) {
+      const now = Date.now();
       try {
         if (plan && ZIINA_PLANS[plan]) {
           await env.DB.prepare(
-            `DELETE FROM subscriptions WHERE user_id=? AND status='pending' AND lower(plan)=?`,
+            `UPDATE subscriptions SET abandoned_at=?, updated_at=? WHERE user_id=? AND status='pending' AND abandoned_at IS NULL AND lower(plan)=?`,
           )
-            .bind(userId, plan)
+            .bind(now, now, userId, plan)
             .run();
         } else {
           await env.DB.prepare(
-            `DELETE FROM subscriptions WHERE user_id=? AND status='pending'`,
+            `UPDATE subscriptions SET abandoned_at=?, updated_at=? WHERE user_id=? AND status='pending' AND abandoned_at IS NULL`,
           )
-            .bind(userId)
+            .bind(now, now, userId)
             .run();
         }
-      } catch {}
+      } catch (err) {
+        return jsonResponse(503, {
+          ok: false,
+          code: "abandon_unavailable",
+          error: "Could not abandon the pending checkout right now. Try again shortly.",
+          detail: safeErrorDetail(err),
+        });
+      }
     }
     const sub = await getActiveSubscription(env, userId);
+    const confirmationPending = Boolean(reconciled?.unconfirmed);
     return jsonResponse(200, {
       ok: true,
       plan: sub?.plan || "free",
       activated: Boolean(reconciled?.activated),
-      message: reconciled?.activated ? "Payment completed — plan activated" : "Pending checkout removed",
+      message: reconciled?.activated
+        ? "Payment completed — plan activated"
+        : confirmationPending
+          ? "Checkout abandoned. Ziina could not be reached, so the payment is still tracked and will be settled automatically if it completed."
+          : "Checkout abandoned",
+      confirmation_pending: confirmationPending,
       subscription: sub,
     });
   }
@@ -927,7 +991,7 @@ export async function handleSubscriptions(request, env) {
     let existing = null;
     try {
       existing = await env.DB.prepare(
-        "SELECT ziina_payment_id, amount, test_mode FROM subscriptions WHERE user_id=? AND status='pending' AND lower(plan)=? AND amount=? ORDER BY created_at DESC LIMIT 1",
+        "SELECT ziina_payment_id, amount, test_mode FROM subscriptions WHERE user_id=? AND status='pending' AND abandoned_at IS NULL AND lower(plan)=? AND amount=? ORDER BY created_at DESC LIMIT 1",
       )
         .bind(userId, plan, pendingAmount)
         .first();
