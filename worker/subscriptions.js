@@ -630,10 +630,20 @@ export async function settleVerifiedPayment(env, options) {
 }
 
 // Reconcile pending (in-flight / abandoned) checkouts against Ziina.
-// Any pending that was actually completed settles exactly once — money is
-// never silently discarded. Abandoned intents are dropped so a stale pending
-// can never overwrite the user's real current plan later. Transient Ziina or
-// database failures keep the row for a later retry instead of guessing.
+//
+// Settlement only — never cleanup. A completed payment settles exactly once
+// (money is never silently discarded), and a transient Ziina/database failure
+// keeps the row for a later retry.
+//
+// Crucially, this must NOT delete the local checkout row for a payment that
+// may still complete. Since verification proves ownership by matching this
+// row, a passive status check (GET /api/subscriptions/me calls this function)
+// deleting an unfinished checkout would leave a later captured payment with
+// no way to activate. Rows are removed only by:
+//   - explicit POST /api/subscriptions/abandon,
+//   - a fresh checkout for the same plan (which replaces dead intents),
+//   - activation (which clears pending rows), or
+//   - having no payment id at all (nothing could ever settle it).
 export async function reconcilePendingSubscriptions(env, userId) {
   let pendingRows;
   try {
@@ -654,10 +664,14 @@ export async function reconcilePendingSubscriptions(env, userId) {
     } catch {}
   };
   for (const row of pendingRows) {
-    if (!row.ziina_payment_id || !apiKey) {
+    // Without a payment id there is nothing that could ever settle this row.
+    if (!row.ziina_payment_id) {
       await dropPending(row.id);
       continue;
     }
+    // No Ziina credentials: keep the ownership row so a later reconcile (with
+    // credentials restored) can still settle it.
+    if (!apiKey) continue;
     let data;
     try {
       const ziinaRes = await fetch(
@@ -671,14 +685,16 @@ export async function reconcilePendingSubscriptions(env, userId) {
     }
     const inspection = inspectCompletedPayment(env, data, row.test_mode);
     if (!inspection.ok) {
-      if (inspection.reason !== "not_completed") {
-        // A completed payment that must not buy a production entitlement
-        // (test-mode payment on a live deployment, or a foreign currency).
+      // Unfinished (requires_user_action / pending / ...), failed, canceled,
+      // test, or foreign-currency: keep the ownership record and retry later.
+      // An in-flight payment is not abandoned — it may still complete — and a
+      // completed payment that cannot buy an entitlement is re-reported on
+      // every reconcile until the user retries checkout or calls /abandon.
+      if (inspection.reason === "test_payment" || inspection.reason === "currency_mismatch") {
         console.warn(
           `reconcilePendingSubscriptions: refusing ${inspection.reason} payment ${row.ziina_payment_id}`,
         );
       }
-      await dropPending(row.id);
       continue;
     }
     try {
@@ -1342,9 +1358,10 @@ export async function handleSubscriptions(request, env) {
       body = {};
     }
     if (!body || typeof body !== "object" || Array.isArray(body)) body = {};
-    // Any cancel action means abandoned pending checkouts must not survive as
-    // phantom "pending" plans: reconcile them against Ziina first (a completed
-    // payment activates — money is never silently discarded), drop the rest.
+    // Reconcile first: if an in-flight payment actually completed on Ziina it
+    // settles now (money is never silently discarded). Unfinished checkouts
+    // keep their ownership rows so they can still be verified later — use
+    // /abandon to drop them explicitly.
     await reconcilePendingSubscriptions(env, userId);
     // Handle undo of scheduled downgrade
     if (body.undo === true || body.keep === true || body.undo_downgrade === true) {

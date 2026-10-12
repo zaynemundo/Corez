@@ -417,6 +417,127 @@ describe('payment verification boundaries', () => {
     });
   });
 
+  describe('reconciliation preserves checkout ownership', () => {
+    it('survives pending status checks and still activates exactly once when completed', async () => {
+      const { DB, env } = await createSubscriptionEnv({
+        subscriptions: [
+          { id: 'sub_pending', plan: 'standard', amount: 1836, ziina_payment_id: 'pi_slow' },
+        ],
+      });
+      let ziinaStatus = 'requires_user_action';
+      mockZiina(({ method }) =>
+        method === 'GET'
+          ? jsonResponse({
+              id: 'pi_slow',
+              status: ziinaStatus,
+              amount: 1836,
+              currency_code: 'AED',
+            })
+          : jsonResponse({}, 500),
+      );
+
+      // Checking the subscription while the user is still on the Ziina page
+      // must not delete the only local proof that this checkout belongs to
+      // them, or the later capture could never be verified.
+      for (const status of [
+        'requires_user_action',
+        'pending',
+        'requires_payment_instrument',
+      ]) {
+        ziinaStatus = status;
+        const me = await (await handleSubscriptions(meRequest(), env)).json();
+        expect(me.plan).toBe('free');
+        const rows = await getRows(
+          DB,
+          `SELECT * FROM subscriptions WHERE ziina_payment_id='pi_slow'`,
+        );
+        expect(rows, `checkout deleted while Ziina reported ${status}`).toHaveLength(1);
+        expect(await getLedger(DB, 'pi_slow')).toBeNull();
+      }
+
+      // The payment completes later: verification still finds the local
+      // checkout and settles it exactly once for the right account.
+      ziinaStatus = 'completed';
+      const res = await handleSubscriptions(verifyRequest('pi_slow'), env);
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.verified).toBe(true);
+      expect(body.plan).toBe('standard');
+
+      const active = await getRows(DB, "SELECT * FROM subscriptions WHERE status='active'");
+      expect(active).toHaveLength(1);
+      expect(active[0].user_id).toBe('dev');
+      expect((await getLedger(DB, 'pi_slow')).status).toBe('settled');
+
+      // Later reads replay the same period instead of minting a new one.
+      const meAfter = await (await handleSubscriptions(meRequest(), env)).json();
+      expect(meAfter.plan).toBe('standard');
+      expect(meAfter.period_end).toBe(body.period_end);
+    });
+
+    it('keeps a completed payment that cannot buy an entitlement for review', async () => {
+      const { DB, env } = await createSubscriptionEnv({
+        subscriptions: [
+          { plan: 'standard', amount: 1836, ziina_payment_id: 'pi_refused', test_mode: 1 },
+        ],
+      });
+      mockZiina(({ method }) =>
+        method === 'GET'
+          ? jsonResponse(completedPayment({ id: 'pi_refused' }))
+          : jsonResponse({}, 500),
+      );
+
+      await handleSubscriptions(meRequest(), env);
+
+      expect(
+        await getRows(DB, `SELECT * FROM subscriptions WHERE ziina_payment_id='pi_refused'`),
+      ).toHaveLength(1);
+      expect((await getUser(DB)).plan).toBe('free');
+      expect(await getLedger(DB, 'pi_refused')).toBeNull();
+    });
+
+    it('drops only checkouts that have no payment id at all', async () => {
+      const { DB, env } = await createSubscriptionEnv({
+        subscriptions: [{ plan: 'standard', amount: 1836, ziina_payment_id: null }],
+      });
+      mockZiina(() => jsonResponse({}, 500));
+
+      await handleSubscriptions(meRequest(), env);
+
+      expect(await getRows(DB, "SELECT * FROM subscriptions WHERE status='pending'")).toHaveLength(0);
+    });
+
+    it('removes unfinished checkouts only through explicit /abandon', async () => {
+      const { DB, env } = await createSubscriptionEnv({
+        subscriptions: [
+          { plan: 'standard', amount: 1836, ziina_payment_id: 'pi_abandon' },
+        ],
+      });
+      mockZiina(({ method }) =>
+        method === 'GET'
+          ? jsonResponse({
+              id: 'pi_abandon',
+              status: 'requires_user_action',
+              amount: 1836,
+              currency_code: 'AED',
+            })
+          : jsonResponse({}, 500),
+      );
+
+      const request = new Request('https://corez.pro/api/subscriptions/abandon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: 'standard' }),
+      });
+      const res = await handleSubscriptions(request, env);
+
+      expect(res.status).toBe(200);
+      expect(
+        await getRows(DB, `SELECT * FROM subscriptions WHERE ziina_payment_id='pi_abandon'`),
+      ).toHaveLength(0);
+    });
+  });
+
   describe('amount-derived grants (retained)', () => {
     it('resolves every price and no other amount', () => {
       expect(derivePlanFromAmount(1836)).toMatchObject({ plan: 'standard', interval: 'month' });

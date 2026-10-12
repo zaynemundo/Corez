@@ -47,6 +47,7 @@ fixed too:
 | 7 | A completed payment in any currency activated an AED-priced plan | `currency_code` must be `AED`; anything else is refused with `400 currency_mismatch`. |
 | 8 | Repeating a completed verification minted a fresh period from the current time | **Exactly-once settlement** through `payment_ledger` (payment id = primary key). The atomic claim INSERT elects one settler; duplicates replay the stored `period_start`/`period_end`. |
 | 9 | `activateSubscription()` swallowed database errors and returned a success-shaped result | Activation runs as one D1 `batch()` (atomic); failures propagate, the ledger claim is marked `failed` for a safe retry, and the caller returns `502` — never `verified: true`. |
+| 10 | `reconcilePendingSubscriptions()` (called by `GET /me`) deleted any checkout whose payment was not completed | Ownership must survive passive status checks. Reconciliation deletes nothing except rows with **no payment id**; unfinished, failed, canceled, test, and refused payments keep their local checkout row, so a later completion can still verify. Removal is only via explicit `POST /abandon`, a replacement checkout for the same plan, or activation. |
 
 `settleVerifiedPayment(env, { userId, paymentId, plan, amount, interval, testMode })`
 in `worker/subscriptions.js` is the one place that turns a verified payment into
