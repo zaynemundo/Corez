@@ -328,13 +328,6 @@ export async function requireAuth(request, env) {
   return null;
 }
 
-// True when a deployment is missing AUTH_SECRET on a production request:
-// protected routes must answer with a clear, retryable failure instead of
-// the development identity. Exposed so the entrypoint can decide the same.
-export function authConfigurationMissing(request, env = {}) {
-  return !env?.AUTH_SECRET && isProductionRequest(request, env);
-}
-
 // ---------- route handler ----------
 export async function handleAuth(request, env) {
   const url = new URL(request.url);
