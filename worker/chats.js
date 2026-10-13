@@ -23,16 +23,22 @@ const VALID_TITLE_LEN = 120;
 // ---------------------------------------------------------------------
 // D1 schema helpers
 // ---------------------------------------------------------------------
-let tablesEnsured = false;
-let tablesPromise = null;
+// Per-D1-binding setup state: a boolean module flag treated a NEW binding
+// (another database in tests, or a replaced binding) as already set up, and it
+// could not dedupe concurrent callers either. A WeakSet keyed by the binding
+// gives both: once per database, one in-flight promise per database.
+const chatsTablesReady = new WeakSet();
+const chatsTablesPromises = new WeakMap();
 export async function ensureChatsTables(env) {
   if (!env?.DB) return;
-  if (tablesEnsured) return;
-  if (tablesPromise) {
-    await tablesPromise;
+  const db = env.DB;
+  if (chatsTablesReady.has(db)) return;
+  const inFlight = chatsTablesPromises.get(db);
+  if (inFlight) {
+    await inFlight;
     return;
   }
-  tablesPromise = (async () => {
+  const promise = (async () => {
     try {
       // Run table creates in parallel, not 4 sequential round-trips
       await Promise.all([
@@ -66,15 +72,33 @@ export async function ensureChatsTables(env) {
           `CREATE INDEX IF NOT EXISTS idx_messages_chat_created ON chat_messages(chat_id, created_at ASC)`,
         ).run(),
       ]);
-      tablesEnsured = true;
+      // Migrations for columns added after the first release. The reasoning a
+      // turn carried used to live only in the client's memory, so a refresh
+      // silently dropped it; it is persisted with the message now. Each ALTER
+      // fails harmlessly once the column exists.
+      await Promise.allSettled([
+        env.DB.prepare(
+          `ALTER TABLE chat_messages ADD COLUMN thinking TEXT`,
+        ).run(),
+        env.DB.prepare(
+          `ALTER TABLE chat_messages ADD COLUMN thinking_seconds INTEGER`,
+        ).run(),
+      ]);
+      chatsTablesReady.add(db);
     } catch (e) {
       console.warn("ensureChatsTables failed:", safeErrorDetail(e));
-      // Allow retry on next request
-      tablesPromise = null;
+      // The failed promise must not be cached: the next request retries.
+      chatsTablesPromises.delete(db);
       throw e;
     }
   })();
-  await tablesPromise;
+  chatsTablesPromises.set(db, promise);
+  // The in-flight entry is cleared once it settles, so a later request either
+  // sees `ready` (success) or starts a fresh attempt (failure).
+  promise.catch(() => {}).finally(() => {
+    if (chatsTablesPromises.get(db) === promise) chatsTablesPromises.delete(db);
+  });
+  await promise;
 }
 
 function sanitizeTitle(title) {
@@ -87,6 +111,23 @@ function sanitizeContent(content) {
   if (typeof content === "string") return content;
   if (content == null) return "";
   return String(content);
+}
+
+// Reasoning is display-only context, never part of the answer: cap what is
+// stored so one turn cannot bloat the row or the reload payload. Null/blank
+// stores as NULL (the finished message then renders no disclosure at all).
+const MAX_THINKING_CHARS = 8000;
+function sanitizeThinking(thinking) {
+  if (typeof thinking !== "string") return null;
+  const value = thinking.trim();
+  return value ? value.slice(0, MAX_THINKING_CHARS) : null;
+}
+
+function sanitizeThinkingSeconds(seconds) {
+  const value = Number(seconds);
+  return Number.isFinite(value) && value > 0
+    ? Math.min(Math.round(value), 24 * 60 * 60)
+    : null;
 }
 
 // Smart compact summary builder for server-side compaction
@@ -325,11 +366,23 @@ export async function handleChats(request, env) {
         const attachments = fm.attachments
           ? JSON.stringify(fm.attachments)
           : null;
+        const thinking = sanitizeThinking(fm.thinking);
+        const thinkingSeconds = sanitizeThinkingSeconds(fm.thinkingSeconds);
         const msgId = crypto.randomUUID();
         await env.DB.prepare(
-          "INSERT INTO chat_messages (id, chat_id, user_id, role, content, attachments, created_at) VALUES (?,?,?,?,?,?,?)",
+          "INSERT INTO chat_messages (id, chat_id, user_id, role, content, attachments, thinking, thinking_seconds, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
         )
-          .bind(msgId, id, userId, role, content, attachments, now)
+          .bind(
+            msgId,
+            id,
+            userId,
+            role,
+            content,
+            attachments,
+            thinking,
+            thinkingSeconds,
+            now,
+          )
           .run();
       }
 
@@ -412,7 +465,7 @@ export async function handleChats(request, env) {
   if (!isMessagesSubroute && request.method === "GET") {
     try {
       const msgRows = await env.DB.prepare(
-        "SELECT id, role, content, attachments, created_at as createdAt FROM chat_messages WHERE chat_id = ? AND user_id = ? ORDER BY created_at ASC LIMIT 500",
+        "SELECT id, role, content, attachments, thinking, thinking_seconds as thinkingSeconds, created_at as createdAt FROM chat_messages WHERE chat_id = ? AND user_id = ? ORDER BY created_at ASC LIMIT 500",
       )
         .bind(chatId, userId)
         .all();
@@ -430,6 +483,12 @@ export async function handleChats(request, env) {
           role: r.role,
           content: r.content,
           attachments,
+          // The reasoning disclosure a finished turn carried. Absent for
+          // messages stored before the column existed.
+          ...(r.thinking ? { thinking: r.thinking } : {}),
+          ...(Number(r.thinkingSeconds) > 0
+            ? { thinkingSeconds: Number(r.thinkingSeconds) }
+            : {}),
           createdAt: r.createdAt,
         };
       });
@@ -524,13 +583,25 @@ export async function handleChats(request, env) {
           const attachments = m.attachments
             ? JSON.stringify(m.attachments)
             : null;
+          const thinking = sanitizeThinking(m.thinking);
+          const thinkingSeconds = sanitizeThinkingSeconds(m.thinkingSeconds);
           const createdAt = Number(m.createdAt) || now + i;
           const msgId =
             m.id && typeof m.id === "string" ? m.id : crypto.randomUUID();
           await env.DB.prepare(
-            "INSERT INTO chat_messages (id, chat_id, user_id, role, content, attachments, created_at) VALUES (?,?,?,?,?,?,?)",
+            "INSERT INTO chat_messages (id, chat_id, user_id, role, content, attachments, thinking, thinking_seconds, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
           )
-            .bind(msgId, chatId, userId, role, content, attachments, createdAt)
+            .bind(
+              msgId,
+              chatId,
+              userId,
+              role,
+              content,
+              attachments,
+              thinking,
+              thinkingSeconds,
+              createdAt,
+            )
             .run();
         }
       }
@@ -602,13 +673,28 @@ export async function handleChats(request, env) {
     const attachments = body?.attachments
       ? JSON.stringify(body.attachments)
       : null;
+    // Reasoning rides along with the assistant turn so the collapsed "Show
+    // thinking" disclosure survives a reload. It is stored separately and
+    // never mixed into `content`.
+    const thinking = sanitizeThinking(body?.thinking);
+    const thinkingSeconds = sanitizeThinkingSeconds(body?.thinkingSeconds);
     const now = Date.now();
     const msgId = crypto.randomUUID();
     try {
       await env.DB.prepare(
-        "INSERT INTO chat_messages (id, chat_id, user_id, role, content, attachments, created_at) VALUES (?,?,?,?,?,?,?)",
+        "INSERT INTO chat_messages (id, chat_id, user_id, role, content, attachments, thinking, thinking_seconds, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
       )
-        .bind(msgId, chatId, userId, role, content, attachments, now)
+        .bind(
+          msgId,
+          chatId,
+          userId,
+          role,
+          content,
+          attachments,
+          thinking,
+          thinkingSeconds,
+          now,
+        )
         .run();
       await env.DB.prepare(
         "UPDATE chats SET updated_at = ? WHERE id = ? AND user_id = ?",
@@ -621,6 +707,8 @@ export async function handleChats(request, env) {
         role,
         content,
         attachments: body?.attachments || null,
+        thinking,
+        thinkingSeconds,
         createdAt: now,
       });
     } catch (e) {
@@ -635,7 +723,7 @@ export async function handleChats(request, env) {
   if (isMessagesSubroute && request.method === "GET") {
     try {
       const msgRows = await env.DB.prepare(
-        "SELECT id, role, content, attachments, created_at as createdAt FROM chat_messages WHERE chat_id = ? AND user_id = ? ORDER BY created_at ASC LIMIT 500",
+        "SELECT id, role, content, attachments, thinking, thinking_seconds as thinkingSeconds, created_at as createdAt FROM chat_messages WHERE chat_id = ? AND user_id = ? ORDER BY created_at ASC LIMIT 500",
       )
         .bind(chatId, userId)
         .all();
@@ -653,6 +741,10 @@ export async function handleChats(request, env) {
           role: r.role,
           content: r.content,
           attachments,
+          ...(r.thinking ? { thinking: r.thinking } : {}),
+          ...(Number(r.thinkingSeconds) > 0
+            ? { thinkingSeconds: Number(r.thinkingSeconds) }
+            : {}),
           createdAt: r.createdAt,
         };
       });
