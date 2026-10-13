@@ -69,23 +69,6 @@ function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-// One mapper for the server message shape. Every load path uses it so the
-// reasoning disclosure (and the server compact banner) cannot drift between
-// them — a missing field here silently dropped the thinking on reload.
-function mapServerMessage(m) {
-  return {
-    role: m.role,
-    content: m.content,
-    attachments: m.attachments || undefined,
-    ...(m.thinking ? { thinking: m.thinking } : {}),
-    ...(Number(m.thinkingSeconds) > 0
-      ? { thinkingSeconds: Number(m.thinkingSeconds) }
-      : {}),
-    // Preserve server compact meta on the banner message if present.
-    ...(m._compactMeta ? { _compactMeta: m._compactMeta } : {}),
-  };
-}
-
 export function toAssistantMessage(response, thinking = "", thinkingSeconds = 0) {
   // The reasoning is attached to the message so the collapsed "Thought for Ns"
   // disclosure survives after the turn completes, exactly like the streaming
@@ -271,13 +254,6 @@ function MainApp({ theme, setTheme }) {
                               content:
                                 typeof m.content === "string" ? m.content : "",
                               attachments: m.attachments || null,
-                              // Carry local reasoning into the migrated copy.
-                              ...(typeof m.thinking === "string" && m.thinking
-                                ? { thinking: m.thinking }
-                                : {}),
-                              ...(Number(m.thinkingSeconds) > 0
-                                ? { thinkingSeconds: Number(m.thinkingSeconds) }
-                                : {}),
                               createdAt: Date.now() + idx,
                             }));
                             await chatService.putChat(created.id, {
@@ -374,7 +350,13 @@ function MainApp({ theme, setTheme }) {
                 });
         if (cancelled) return;
         let msgs = Array.isArray(data.messages)
-          ? data.messages.map(mapServerMessage)
+          ? data.messages.map((m) => ({
+              role: m.role,
+              content: m.content,
+              attachments: m.attachments || undefined,
+              // Preserve server compact meta on the banner message if present
+              ...(m._compactMeta ? { _compactMeta: m._compactMeta } : {}),
+            }))
           : [];
         let compactMeta = data.compactMeta || null;
         let fullMessages = null;
@@ -724,7 +706,11 @@ function MainApp({ theme, setTheme }) {
         compact: false,
       });
       const msgs = Array.isArray(data.messages)
-        ? data.messages.map(mapServerMessage)
+        ? data.messages.map((m) => ({
+            role: m.role,
+            content: m.content,
+            attachments: m.attachments || undefined,
+          }))
         : [];
       setSessions((prev) =>
         prev.map((s) =>
@@ -931,7 +917,12 @@ function MainApp({ theme, setTheme }) {
                 keep: 30,
               });
           let msgs = Array.isArray(data.messages)
-            ? data.messages.map(mapServerMessage)
+            ? data.messages.map((m) => ({
+                role: m.role,
+                content: m.content,
+                attachments: m.attachments || undefined,
+                ...(m._compactMeta ? { _compactMeta: m._compactMeta } : {}),
+              }))
             : [];
           let compactMeta = data.compactMeta || null;
           const bannerFromServer = msgs.find(
@@ -1271,10 +1262,6 @@ function MainApp({ theme, setTheme }) {
           chatService.appendMessage(targetSessionId, {
             role: "assistant",
             content: aiMsg.content,
-            // The reasoning is persisted with the turn so a refresh keeps the
-            // "Show thinking" disclosure instead of losing it.
-            thinking: aiMsg.thinking,
-            thinkingSeconds: aiMsg.thinkingSeconds,
           }),
         );
       }

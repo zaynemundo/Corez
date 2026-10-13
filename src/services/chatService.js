@@ -88,24 +88,11 @@ export async function putChat(chatId, { title, messages } = {}) {
   return await r.json();
 }
 
-export async function appendMessage(
-  chatId,
-  { role, content, attachments, thinking, thinkingSeconds } = {},
-) {
-  // `thinking` (and its duration) ride along with the assistant turn so the
-  // reasoning disclosure survives a reload; the server stores them separately
-  // from `content` and never mixes them into the answer.
-  const body = { role, content, attachments };
-  if (typeof thinking === "string" && thinking.trim()) {
-    body.thinking = thinking;
-  }
-  if (Number(thinkingSeconds) > 0) {
-    body.thinkingSeconds = Math.round(Number(thinkingSeconds));
-  }
+export async function appendMessage(chatId, { role, content, attachments }) {
   const r = await fetchJson(`${BASE}/${encodeURIComponent(chatId)}/messages`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ role, content, attachments }),
   });
   if (!r.ok) {
     const e = await r.json().catch(() => ({}));
