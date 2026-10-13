@@ -1978,30 +1978,29 @@ h6 {
   animation-delay: -0.16s;
 }
 
-/* Live reasoning panel. The model's thinking streams here before the answer
-   starts, so a long generation shows progress instead of only dots. Kept
-   deliberately quiet: it is context, not the deliverable. */
+/* Reasoning panel. The model's thinking streams here before the answer
+   starts, then stays on the finished message as a collapsed "Thought for Ns"
+   disclosure. Header: the CoreZ mark, the status label and a chevron; the body
+   renders markdown-lite reasoning (nested lists, bold lead-ins, inline code).
+   Deliberately quiet: it is context, not the deliverable. */
 .thinking-panel {
-  margin: 0.35rem 0 0.5rem;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  background-color: rgba(0, 0, 0, 0.18);
-  overflow: hidden;
+  margin: 0.3rem 0 0.55rem;
+  max-width: 100%;
 }
 
 .thinking-panel-toggle {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  width: 100%;
-  padding: 0.4rem 0.65rem;
+  gap: 0.45rem;
+  padding: 0.25rem 0.45rem 0.25rem 0.15rem;
+  margin-left: -0.15rem;
   background: none;
   border: none;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  text-align: left;
   color: var(--text-secondary);
-  font-size: 0.75rem;
+  font-size: 0.78rem;
+  line-height: 1.2;
 }
 
 .thinking-panel-toggle:hover {
@@ -2010,28 +2009,85 @@ h6 {
 
 .thinking-panel-toggle:focus-visible {
   outline: 2px solid var(--accent-color, var(--text-primary));
-  outline-offset: -2px;
+  outline-offset: 1px;
+}
+
+/* The CoreZ mark, masked so it inherits the text color in either theme. */
+.thinking-panel-logo {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  background-color: currentColor;
+  opacity: 0.82;
+  -webkit-mask: url("/corez.svg") center / contain no-repeat;
+  mask: url("/corez.svg") center / contain no-repeat;
 }
 
 .thinking-panel-title {
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.01em;
 }
 
-.thinking-panel-action {
-  opacity: 0.75;
+.thinking-panel-chevron {
+  flex: none;
+  opacity: 0.7;
+  transform: rotate(-90deg);
+  transition: transform 0.18s ease;
+}
+
+.thinking-panel-chevron.is-open {
+  transform: rotate(0deg);
 }
 
 .thinking-panel-body {
-  max-height: 16rem;
+  /* Aligned with the title, like the reference chat panels: the reasoning
+     reads as an indented note under the header, not as a boxed-off log. */
+  margin: 0.45rem 0 0.15rem 1.45rem;
+  max-height: 18rem;
   overflow-y: auto;
-  padding: 0 0.75rem 0.65rem;
-  border-top: 1px solid var(--border-color);
   color: var(--text-secondary);
-  font-size: 0.78rem;
-  line-height: 1.55;
-  white-space: pre-wrap;
+  font-size: 0.8rem;
+  line-height: 1.6;
   overflow-wrap: anywhere;
+}
+
+.thinking-panel-body-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.thinking-panel-body-inner p {
+  margin: 0;
+}
+
+.thinking-panel-body-inner strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.thinking-panel-body-inner code {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.92em;
+  background: rgba(127, 127, 127, 0.16);
+  border-radius: 4px;
+  padding: 0.05rem 0.3rem;
+}
+
+.thinking-list {
+  margin: 0;
+  padding-left: 1.05rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.thinking-list li {
+  padding-left: 0.1rem;
+}
+
+.thinking-list li::marker {
+  opacity: 0.75;
 }
 
 /* HTML: <div class="loader"></div> */

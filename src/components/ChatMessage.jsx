@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { extractCodeFromMessage } from "../services/aiService";
+import ThinkingPanel from "./ThinkingPanel.jsx";
 import { stripJunkAfterDocumentEnd } from "../utils/htmlRepair";
 import { ensureLeadingPageMarker, findArtifactStartIndex } from "../utils/previewTransformer";
 import { useI18n } from "../i18n/index.jsx";
@@ -841,38 +842,25 @@ function EmailCard({ content, renderBody }) {
 }
 
 /**
- * Collapsed reasoning disclosure attached to a finished assistant message.
- * The same text streamed live while the model worked (App renders that panel);
+ * Reasoning disclosure attached to a finished assistant message.
+ * The same panel streams live while the model works (App renders that one);
  * keeping it afterwards lets the user inspect how the answer was reached. It is
  * collapsed by default so the answer owns the view, and it is display-only —
  * `message.thinking` is never part of `message.content`.
  */
-export function ThinkingDisclosure({ text }) {
-  const { t } = useI18n();
+export function ThinkingDisclosure({ text, seconds = 0 }) {
   const [open, setOpen] = useState(false);
   const bodyId = useId();
   const value = typeof text === "string" ? text.trim() : "";
   if (!value) return null;
   return (
-    <div className="thinking-panel thinking-panel-persisted">
-      <button
-        type="button"
-        className="thinking-panel-toggle"
-        onClick={() => setOpen((prev) => !prev)}
-        aria-expanded={open}
-        aria-controls={bodyId}
-      >
-        <span className="thinking-panel-title">{t("common.thinking.label")}</span>
-        <span className="thinking-panel-action">
-          {open ? t("common.thinking.hide") : t("common.thinking.show")}
-        </span>
-      </button>
-      {open && (
-        <div className="thinking-panel-body" id={bodyId}>
-          {value}
-        </div>
-      )}
-    </div>
+    <ThinkingPanel
+      text={value}
+      seconds={seconds}
+      expanded={open}
+      onToggle={() => setOpen((prev) => !prev)}
+      bodyId={bodyId}
+    />
   );
 }
 
@@ -1581,7 +1569,10 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
     <div className={`message-wrapper ${isUser ? "user" : "ai"}`}>
       <div className="message-body">
         {!isUser && message.thinking && (
-          <ThinkingDisclosure text={message.thinking} />
+          <ThinkingDisclosure
+            text={message.thinking}
+            seconds={message.thinkingSeconds}
+          />
         )}
         <div className="message-content">
           {isUser && renderAttachments(message.attachments)}

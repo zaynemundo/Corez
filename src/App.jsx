@@ -10,6 +10,7 @@ import {
 } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
 import ChatMessage from "./components/ChatMessage";
+import ThinkingPanel from "./components/ThinkingPanel.jsx";
 import ChatInput from "./components/ChatInput";
 import CanvasPreview from "./components/CanvasPreview";
 import SettingsModal from "./components/SettingsModal";
@@ -68,13 +69,17 @@ function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-export function toAssistantMessage(response, thinking = "") {
-  // The reasoning is attached to the message so the collapsed "Thinking"
+export function toAssistantMessage(response, thinking = "", thinkingSeconds = 0) {
+  // The reasoning is attached to the message so the collapsed "Thought for Ns"
   // disclosure survives after the turn completes, exactly like the streaming
   // panel that produced it. It is display-only: never part of `content`.
   const withThinking = (message) => {
     const text = typeof thinking === "string" ? thinking.trim() : "";
-    return text ? { ...message, thinking: text } : message;
+    if (!text) return message;
+    const seconds = Number(thinkingSeconds);
+    return Number.isFinite(seconds) && seconds > 0
+      ? { ...message, thinking: text, thinkingSeconds: Math.round(seconds) }
+      : { ...message, thinking: text };
   };
   if (typeof response === "string") {
     return withThinking({ role: "assistant", content: response });
@@ -150,6 +155,9 @@ function MainApp({ theme, setTheme }) {
   // handler uses it to keep a backed reasoning panel readable and to record an
   // honest empty state when the gateway returned no reasoning at all.
   const sawReasoningRef = useRef(false);
+  // When this turn's first reasoning delta arrived. The finished message shows
+  // "Thought for Ns" from it; 0 means no reasoning this turn.
+  const thinkingStartedAtRef = useRef(0);
   // The reasoning panel starts open (that is the whole point — the user watches
   // it think) and auto-collapses once the answer starts, like a first-party
   // chat app. The user can reopen it at any time.
@@ -552,6 +560,7 @@ function MainApp({ theme, setTheme }) {
           setStreamingThinking("");
           streamingThinkingRef.current = "";
           sawReasoningRef.current = false;
+          thinkingStartedAtRef.current = 0;
           setIsThinkingOpen(true);
           const controller = new AbortController();
           abortControllerRef.current = controller;
@@ -587,7 +596,19 @@ function MainApp({ theme, setTheme }) {
                 : sawReasoningRef.current
                   ? ""
                   : t("common.thinking.empty");
-              const aiMsg = toAssistantMessage(response, reasoningText);
+              const thinkingSeconds = thinkingStartedAtRef.current
+                ? Math.max(
+                    1,
+                    Math.round(
+                      (Date.now() - thinkingStartedAtRef.current) / 1000,
+                    ),
+                  )
+                : 0;
+              const aiMsg = toAssistantMessage(
+                response,
+                reasoningText,
+                thinkingSeconds,
+              );
               const extractedCode = extractCodeFromMessage(aiMsg.content);
               if (
                 extractedCode &&
@@ -1158,11 +1179,17 @@ function MainApp({ theme, setTheme }) {
           setStreamingThinking("");
           streamingThinkingRef.current = "";
           sawReasoningRef.current = false;
+          thinkingStartedAtRef.current = 0;
           setIsThinkingOpen(true);
         },
         {},
         (text) => {
-          if (text) sawReasoningRef.current = true;
+          if (text) {
+            sawReasoningRef.current = true;
+            if (!thinkingStartedAtRef.current) {
+              thinkingStartedAtRef.current = Date.now();
+            }
+          }
           streamingThinkingRef.current += text;
           setStreamingThinking(streamingThinkingRef.current);
         },
@@ -1173,7 +1200,17 @@ function MainApp({ theme, setTheme }) {
           : sawReasoningRef.current
             ? ""
             : t("common.thinking.empty");
-        const aiMsg = toAssistantMessage(response, reasoningText);
+        const thinkingSeconds = thinkingStartedAtRef.current
+          ? Math.max(
+              1,
+              Math.round((Date.now() - thinkingStartedAtRef.current) / 1000),
+            )
+          : 0;
+        const aiMsg = toAssistantMessage(
+          response,
+          reasoningText,
+          thinkingSeconds,
+        );
         const extractedCode = extractCodeFromMessage(aiMsg.content);
         // Only auto-open canvas when the USER explicitly intended creation.
         // Writing/explanation prompts that happen to contain ```html from the model
@@ -1509,32 +1546,15 @@ function MainApp({ theme, setTheme }) {
                           <span className="thinking-dot" />
                         </button>
                         {streamingThinking && !isStreamCollapsed && (
-                          <div className="thinking-panel">
-                            <button
-                              type="button"
-                              className="thinking-panel-toggle"
-                              onClick={() => setIsThinkingOpen((prev) => !prev)}
-                              aria-expanded={isThinkingOpen}
-                              aria-controls="corez-thinking-body"
-                            >
-                              <span className="thinking-panel-title">
-                                {t("common.thinking.label")}
-                              </span>
-                              <span className="thinking-panel-action">
-                                {isThinkingOpen
-                                  ? t("common.thinking.hide")
-                                  : t("common.thinking.show")}
-                              </span>
-                            </button>
-                            {isThinkingOpen && (
-                              <div
-                                className="thinking-panel-body"
-                                id="corez-thinking-body"
-                              >
-                                {streamingThinking}
-                              </div>
-                            )}
-                          </div>
+                          <ThinkingPanel
+                            text={streamingThinking}
+                            live
+                            expanded={isThinkingOpen}
+                            onToggle={() =>
+                              setIsThinkingOpen((prev) => !prev)
+                            }
+                            bodyId="corez-thinking-body"
+                          />
                         )}
                         {streamingContent && !isStreamCollapsed && (
                           <div

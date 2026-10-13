@@ -14,7 +14,7 @@ afterEach(() => {
 });
 
 function thinkingToggle() {
-  return screen.getByRole('button', { name: /Thinking/i });
+  return screen.getByRole('button', { name: /Thought|Thinking/i });
 }
 
 describe('ChatMessage thinking disclosure', () => {
@@ -76,7 +76,24 @@ describe('ChatMessage thinking disclosure', () => {
       />,
     );
     expect(
-      screen.queryByRole('button', { name: /Thinking/i }),
+      screen.queryByRole('button', { name: /Thought|Thinking/i }),
     ).toBeNull();
+  });
+
+  it('shows the thinking duration when the message carries one', () => {
+    render(
+      <ChatMessage
+        message={{
+          role: 'assistant',
+          content: 'The answer.',
+          thinking: 'Step one.',
+          thinkingSeconds: 5,
+        }}
+      />,
+    );
+    const toggle = screen.getByRole('button', { name: /Thought for 5s/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(toggle);
+    expect(screen.getByText('Step one.')).toBeInTheDocument();
   });
 });
