@@ -151,10 +151,6 @@ function MainApp({ theme, setTheme }) {
   // ref so the finished message can carry it once the turn resolves.
   const [streamingThinking, setStreamingThinking] = useState("");
   const streamingThinkingRef = useRef("");
-  // True once any reasoning text actually arrived this turn. The answer
-  // handler uses it to keep a backed reasoning panel readable and to record an
-  // honest empty state when the gateway returned no reasoning at all.
-  const sawReasoningRef = useRef(false);
   // When this turn's first reasoning delta arrived. The finished message shows
   // "Thought for Ns" from it; 0 means no reasoning this turn.
   const thinkingStartedAtRef = useRef(0);
@@ -559,7 +555,6 @@ function MainApp({ theme, setTheme }) {
           setStreamingSessionId(targetSessionId);
           setStreamingThinking("");
           streamingThinkingRef.current = "";
-          sawReasoningRef.current = false;
           thinkingStartedAtRef.current = 0;
           setIsThinkingOpen(true);
           const controller = new AbortController();
@@ -584,18 +579,17 @@ function MainApp({ theme, setTheme }) {
             null,
             {},
             (text) => {
-              if (text) sawReasoningRef.current = true;
+              if (text && !thinkingStartedAtRef.current) {
+                thinkingStartedAtRef.current = Date.now();
+              }
               streamingThinkingRef.current += text;
               setStreamingThinking(streamingThinkingRef.current);
             },
           )
             .then((response) => {
               if (!response) return;
-              const reasoningText = streamingThinkingRef.current
-                ? streamingThinkingRef.current
-                : sawReasoningRef.current
-                  ? ""
-                  : t("common.thinking.empty");
+              // Real thinking only: when the gateway returns no reasoning the
+              // finished message carries no panel at all — never a placeholder.
               const thinkingSeconds = thinkingStartedAtRef.current
                 ? Math.max(
                     1,
@@ -606,7 +600,7 @@ function MainApp({ theme, setTheme }) {
                 : 0;
               const aiMsg = toAssistantMessage(
                 response,
-                reasoningText,
+                streamingThinkingRef.current,
                 thinkingSeconds,
               );
               const extractedCode = extractCodeFromMessage(aiMsg.content);
@@ -1153,7 +1147,6 @@ function MainApp({ theme, setTheme }) {
       setStreamingContent("");
       setStreamingThinking("");
       streamingThinkingRef.current = "";
-      sawReasoningRef.current = false;
       setIsThinkingOpen(true);
       const response = await generateAIResponse(
         apiPrompt,
@@ -1178,28 +1171,21 @@ function MainApp({ theme, setTheme }) {
           setStreamingContent("");
           setStreamingThinking("");
           streamingThinkingRef.current = "";
-          sawReasoningRef.current = false;
           thinkingStartedAtRef.current = 0;
           setIsThinkingOpen(true);
         },
         {},
         (text) => {
-          if (text) {
-            sawReasoningRef.current = true;
-            if (!thinkingStartedAtRef.current) {
-              thinkingStartedAtRef.current = Date.now();
-            }
+          if (text && !thinkingStartedAtRef.current) {
+            thinkingStartedAtRef.current = Date.now();
           }
           streamingThinkingRef.current += text;
           setStreamingThinking(streamingThinkingRef.current);
         },
       );
       if (response) {
-        const reasoningText = streamingThinkingRef.current
-          ? streamingThinkingRef.current
-          : sawReasoningRef.current
-            ? ""
-            : t("common.thinking.empty");
+        // Real thinking only: when the gateway returns no reasoning the
+        // finished message carries no panel at all — never a placeholder.
         const thinkingSeconds = thinkingStartedAtRef.current
           ? Math.max(
               1,
@@ -1208,7 +1194,7 @@ function MainApp({ theme, setTheme }) {
           : 0;
         const aiMsg = toAssistantMessage(
           response,
-          reasoningText,
+          streamingThinkingRef.current,
           thinkingSeconds,
         );
         const extractedCode = extractCodeFromMessage(aiMsg.content);
@@ -1293,7 +1279,6 @@ function MainApp({ theme, setTheme }) {
         // next to the answer until the next send.
         setStreamingThinking("");
         streamingThinkingRef.current = "";
-        sawReasoningRef.current = false;
         setIsThinkingOpen(true);
         abortControllerRef.current = null;
       }

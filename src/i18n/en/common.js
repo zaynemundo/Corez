@@ -44,11 +44,10 @@ export default {
   // starts, so a long generation shows progress instead of only a spinner.
   thinking: {
     label: "Thinking",
-    // Shown on a finished message once the thinking duration is known.
+    // Shown on a finished message once the thinking duration is known. The
+    // panel renders only when the gateway returns real reasoning — there is
+    // no placeholder text when it does not.
     thoughtForSeconds: "Thought for {seconds}s",
-    // Honest empty state: the model answered without returning a visible
-    // reasoning summary (the gateway can decline summaries); never fake one.
-    empty: "No live reasoning summary was returned for this response.",
   },
 
   sidebar: {
