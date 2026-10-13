@@ -1,13 +1,15 @@
 /**
- * Attachment → message conversion contract for a text-only model.
+ * Attachment → message conversion contract.
  *
- * Muse Spark 1.3 Contributor has no vision input on the OpenCode Go gateway,
- * so attachments must reach the model as metadata only (kind, name, size,
- * authoritative R2 URL) and no image_url part may ever be built. Stored
- * multimodal content is flattened to text for the same reason. These tests
- * make that rule explicit so a future change cannot silently reintroduce
- * pixel input the model cannot consume (an unsupported image part risks a
- * 400 that fails the whole request).
+ * Two modes, deliberately explicit:
+ *   - default (no options): metadata only — video/audio and documents must
+ *     never send bytes, and a stored multimodal array is flattened to text.
+ *   - `{ vision: true }`: user-turn images travel as real `input_image` parts
+ *     (the inline thumb data URL when present, otherwise the R2 URL). Muse
+ *     Spark 1.3 Contributor was verified live on the gateway's Responses API
+ *     against randomized striped-color images (correct color names), so image
+ *     input is a supported capability — but only the opt-in path may build it.
+ *     Assistant turns never carry image parts, and video/audio never do.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -99,6 +101,81 @@ describe('attachment vision', () => {
           toMultimodalMessage({ role: 'user', content: 'x', attachments: [bad] })
         ).not.toThrow();
       }
+    });
+  });
+
+  describe('toMultimodalMessage with { vision: true }', () => {
+    it('sends the image thumb as an input_image part', () => {
+      const out = toMultimodalMessage(
+        {
+          role: 'user',
+          content: 'what is this?',
+          attachments: [{ name: 'shot.png', type: 'image/png', thumb: DATA_URL }]
+        },
+        { vision: true }
+      );
+      expect(Array.isArray(out.content)).toBe(true);
+      const imagePart = out.content.find((c) => c.type === 'input_image');
+      expect(imagePart).toEqual({ type: 'input_image', image_url: DATA_URL });
+      const textPart = out.content.find((c) => c.type === 'input_text');
+      expect(textPart.text).toContain('what is this?');
+      expect(textPart.text).toContain('shot.png');
+    });
+
+    it('falls back to the absolute R2 URL when no inline thumb exists', () => {
+      const out = toMultimodalMessage(
+        {
+          role: 'user',
+          content: 'see this',
+          attachments: [{ name: 'me.jpg', type: 'image/jpeg', assetUrl: R2_URL }]
+        },
+        { vision: true }
+      );
+      const imagePart = out.content.find((c) => c.type === 'input_image');
+      expect(imagePart.image_url).toBe(
+        'https://corez.pro/api/assets/user-upload_1716041183016.jpg'
+      );
+    });
+
+    it('never sends video or audio bytes, even in vision mode', () => {
+      const out = toMultimodalMessage(
+        {
+          role: 'user',
+          content: 'clip',
+          attachments: [
+            { name: 'demo.mp4', type: 'video/mp4', thumb: `${DATA_URL}`, assetUrl: R2_URL },
+            { name: 'voice.mp3', type: 'audio/mpeg', assetUrl: R2_URL }
+          ]
+        },
+        { vision: true }
+      );
+      // No image part exists for video/audio, and content stays a plain string.
+      expect(typeof out.content).toBe('string');
+      expect(out.content).not.toContain('base64');
+    });
+
+    it('keeps assistant turns text-only even with vision enabled', () => {
+      const out = toMultimodalMessage(
+        {
+          role: 'assistant',
+          content: 'here it is',
+          attachments: [{ name: 'shot.png', type: 'image/png', thumb: DATA_URL }]
+        },
+        { vision: true }
+      );
+      expect(typeof out.content).toBe('string');
+    });
+
+    it('falls back to a text message when an image has no usable URL', () => {
+      const out = toMultimodalMessage(
+        {
+          role: 'user',
+          content: 'x',
+          attachments: [{ name: 'broken.png', type: 'image/png' }]
+        },
+        { vision: true }
+      );
+      expect(typeof out.content).toBe('string');
     });
   });
 });

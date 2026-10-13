@@ -1,11 +1,12 @@
 /**
  * Model Router — single-text-model deployment for corez.pro
  *
- * CoreZ runs exactly one text model: Muse Spark 1.3 Contributor. There is no second
- * text model and no vision pre-pass — attachments reach the model as metadata
- * (filename, type, size, authoritative R2 URL) only, built in worker/index.js.
- * The pinned id and allow-list live in
- * packages/agent-core/providers/modelIds.js.
+ * CoreZ runs exactly one text model: Muse Spark 1.3 Contributor. There is no
+ * second text model. Image attachments are NOT a routing signal: the same
+ * model reads the real pixels as `input_image` parts (built in
+ * worker/attachmentVision.js when a request carries images), while video,
+ * audio and documents reach it as metadata plus extracted text. The pinned id
+ * and allow-list live in packages/agent-core/providers/modelIds.js.
  */
 
 import { DEFAULT_TEXT_MODEL } from "../packages/agent-core/providers/modelIds.js";

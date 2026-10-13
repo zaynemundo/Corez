@@ -821,6 +821,18 @@ EMAIL FORMATTING (whenever the user asks you to write, draft, compose, or rewrit
     !["code-help", "app", "writing"].includes(intentType);
   const formattingSection = formattingIncluded ? informationalFormatting : "";
 
+  // Attachment guidance must match the actual capability of the request. With
+  // image attachments the model receives the real pixels as `input_image`
+  // parts (worker/attachmentVision.js), so it is told it can see them — the
+  // previous unconditional "you cannot see image content" wording made the
+  // model deny images it was fully able to read. Without images the honest
+  // metadata wording stays, because video/audio and documents are still
+  // metadata + extracted text only.
+  const attachmentGuidance =
+    options.attachmentsVisible === true
+      ? `  - ATTACHMENTS: Attached images ARE visible to you — their pixels are supplied with the user's message, so describe, analyse, OCR and recreate them directly and confidently. Video and audio content is NOT visible (metadata only): if asked about those, say plainly that you cannot see the stream. Documents arrive as metadata plus extracted text. Never invent details beyond what you can actually see. When an attachment must appear in generated markup, use the absolute R2 URL https://corez.pro/api/assets/... verbatim (never a relative /api/assets/ path or a bare local filename), with meaningful alt text, object-fit:cover and an onerror fallback.`
+      : `  - ATTACHMENTS: You cannot see image, video or audio content. Attachments are supplied to you as metadata (filename, type, size) plus an authoritative R2 URL to use in markup. If the user asks you to describe, analyse, OCR or recreate an attachment, say plainly that you cannot see the file and ask them to describe it or paste the relevant text. Never invent a description of an attachment, and never emit a generic "Layout & Structure / Typography / Color & Style" template as if you had seen it. Extracted text content from documents is supplied separately and may be used normally. When an attachment must appear in generated markup, use the absolute R2 URL https://corez.pro/api/assets/... verbatim (never a relative /api/assets/ path or a bare local filename), with meaningful alt text, object-fit:cover and an onerror fallback.`;
+
   // The full creator-profile block (~250 tokens) only matters when the user
   // actually asks about Corez's origins; every other request gets a compact
   // pointer instead â€” a meaningful input-token saving on every request.
@@ -850,7 +862,7 @@ Reasoning & Response Quality (Corez 1.0 â€” hidden chain-of-thought):
 Guidelines for Output:
 - FOLLOW THE USER'S REQUEST EXACTLY: deliver precisely what the user asked for â€” implement everything they requested and add nothing they did not ask for. When the user's instruction conflicts with any default or template behaviour, the user's explicit instruction wins.
 - SOCIAL CAROUSEL (GLOBAL): When the user asks for a social-media carousel post ("create a post for this carousel", "carousel post + caption", "LinkedIn/Instagram carousel"), output ONLY slide copy + caption + hashtags in plain markdown. NEVER output React/JSX, HTML, or preview code for these, and NEVER treat "carousel" alone as a UI component request. Only build a carousel UI when the user explicitly says "carousel component", "carousel UI", "carousel code/slider", or "carousel website".
-  - ATTACHMENTS: You cannot see image, video or audio content. Attachments are supplied to you as metadata (filename, type, size) plus an authoritative R2 URL to use in markup. If the user asks you to describe, analyse, OCR or recreate an attachment, say plainly that you cannot see the file and ask them to describe it or paste the relevant text. Never invent a description of an attachment, and never emit a generic "Layout & Structure / Typography / Color & Style" template as if you had seen it. Extracted text content from documents is supplied separately and may be used normally. When an attachment must appear in generated markup, use the absolute R2 URL https://corez.pro/api/assets/... verbatim (never a relative /api/assets/ path or a bare local filename), with meaningful alt text, object-fit:cover and an onerror fallback.
+${attachmentGuidance}
 - AMBIGUOUS REQUESTS: When a user's prompt is ambiguous, underspecified, or missing essential details (e.g. they say "make a game", "build a website", "create a plan", or give a vague prompt with multiple conflicting interpretations), do NOT ask clarifying questions and do NOT present choice menus or option lists. Instead, choose the most sensible default interpretation, state the key assumption you made in ONE short sentence, and deliver the complete result. The user can refine it in a follow-up message.
 - DEFAULT FORMAT (React/JSX): When writing code or building apps, components, tools, dashboards, or games without an explicitly requested format, default to clean, modern React/JSX components (using \`\`\`jsx ... \`\`\` code blocks). ALWAYS name your main top-level component "export default function App()".
 - REQUESTED FORMATS (HTML/CSS/JS): If the user explicitly requests HTML, CSS, vanilla JS, or plain web code, output complete single-file HTML/CSS/JS inside ONE SINGLE \`\`\`html ... \`\`\` code block.
@@ -1743,6 +1755,25 @@ async function handleAi(request, env) {
       : null;
 
   const messages = Array.isArray(body.messages) ? body.messages : [];
+  // Vision for the CURRENT turn only: the latest user message is the one the
+  // user just sent, so its images travel as real `input_image` pixels. Older
+  // attachments in the history stay metadata + R2 URL text: re-sending them
+  // would make the gateway re-download every old asset on every follow-up
+  // (and a deleted asset 400s the whole request with "failed to download
+  // media", observed live). Capability verified live on the gateway's
+  // Responses API — Muse Spark 1.3 Contributor read randomized striped-color
+  // images correctly through this exact pipeline. Video/audio never send bytes.
+  const lastUserMessage = (() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i]?.role !== "assistant") return messages[i];
+    }
+    return null;
+  })();
+  const imageAttachmentsPresent =
+    Array.isArray(lastUserMessage?.attachments) &&
+    lastUserMessage.attachments.some((a) =>
+      String(a?.type || "").toLowerCase().startsWith("image/"),
+    );
   const systemPrompt = buildSystemPrompt({
     prompt,
     intent,
@@ -1751,6 +1782,7 @@ async function handleAi(request, env) {
     skills,
     contract,
     executionPlan,
+    attachmentsVisible: imageAttachmentsPresent,
   });
   const apiMessages = [{ role: "system", content: systemPrompt }];
 
@@ -1809,11 +1841,13 @@ async function handleAi(request, env) {
   // ---------------------------------------------------------------------
   // Attachment metadata block.
   //
-  // CoreZ runs a single text model (Muse Spark 1.3 Contributor) with no vision
-  // pre-pass, so attachments reach the model as metadata only: kind, name,
-  // size, and the authoritative R2 URL to use in markup. The model cannot see
-  // pixel content, and the system block below states that plainly so it never
-  // invents a description of something it cannot see.
+  // Image attachments are sent to the model as real vision input (input_image
+  // parts built in worker/attachmentVision.js; verified live against the
+  // gateway's Responses API), while every attachment ALSO gets a metadata hint
+  // here: kind, name, size, and the authoritative R2 URL to use in markup.
+  // Video and audio never send pixel/stream bytes — metadata only — and the
+  // system block below states which of the two cases applies for this request
+  // so the model never invents a description of something it cannot see.
   // Covers: image/*, video/*, audio/*, pdf, text, and generic files.
   // ---------------------------------------------------------------------
   {
@@ -1889,10 +1923,13 @@ async function handleAi(request, env) {
         if (directAssetHints) {
           apiMessages.push({
             role: "system",
-            content:
-              "Attached media (metadata only - you cannot see image, video or audio content):\n" +
-              directAssetHints +
-              "\nThese files exist and their URLs are authoritative for markup. Their visual content is NOT available to you. If the user asks you to describe, analyse, OCR or recreate an attachment, say plainly that you cannot see the file and ask them to describe it or paste the relevant text - never invent a description, and never produce a generic layout/typography/colour template as if you had seen it. Extracted text content, when present, is supplied elsewhere in this conversation and may be used normally.",
+            content: imageAttachmentsPresent
+              ? "Attached media (images ARE visible to you — their pixels are supplied; video and audio are metadata only):\n" +
+                directAssetHints +
+                "\nUse the exact URLs above for markup. Image attachments are readable: describe, analyse and recreate them directly. Video and audio content is NOT available to you — if asked about those, say plainly that you cannot see the stream. Extracted text content, when present, is supplied elsewhere in this conversation and may be used normally."
+              : "Attached media (metadata only - you cannot see image, video or audio content):\n" +
+                directAssetHints +
+                "\nThese files exist and their URLs are authoritative for markup. Their visual content is NOT available to you. If the user asks you to describe, analyse, OCR or recreate an attachment, say plainly that you cannot see the file and ask them to describe it or paste the relevant text - never invent a description, and never produce a generic layout/typography/colour template as if you had seen it. Extracted text content, when present, is supplied elsewhere in this conversation and may be used normally.",
           });
         }
       }
@@ -2051,11 +2088,17 @@ async function handleAi(request, env) {
   let hasAppendedPrompt = false;
   for (const m of fastMessages) {
     if (m.role && m.content) {
-      const converted = toMultimodalMessage({
-        role: m.role === "assistant" ? "assistant" : "user",
-        content: m.content,
-        attachments: m.attachments,
-      });
+      const converted = toMultimodalMessage(
+        {
+          role: m.role === "assistant" ? "assistant" : "user",
+          content: m.content,
+          attachments: m.attachments,
+        },
+        // Pixels only for the current turn's message (the one the user just
+        // sent); assistant turns and older history stay text/metadata. See the
+        // current-turn note above and worker/attachmentVision.js.
+        { vision: imageAttachmentsPresent && m === lastUserMessage },
+      );
       apiMessages.push(converted);
       const contentStr =
         typeof m.content === "string"
@@ -2101,9 +2144,10 @@ async function handleAi(request, env) {
     });
   }
 
-  // Provider fallback chain: OpenCode Go is preferred and stays preferred;
-  // the official DeepSeek API and OpenRouter are fallbacks tried in order
-  // only when the preferred provider cannot serve. The same messages travel
+  // Provider chain: OpenCode Go only — the single approved text gateway
+  // (worker/providerChain.js owns retry scheduling and the resume contract).
+  // There is no DeepSeek-direct or OpenRouter text fallback; a failure fails
+  // honestly with an explicit SSE error event. The same messages travel
   // to every provider, so a fallback resumes the same task â€” completed work
   // is never restarted.
   //
