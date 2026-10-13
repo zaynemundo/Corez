@@ -68,7 +68,7 @@ part 13, then part 14).
   fixed internal resolution scaled with `ctx.setTransform` + a resize
   listener).
 - **Image assets**: backgrounds go through the keyless Workers AI path
-  `POST /api/image/cf` (`@cf/black-forest-labs/flux-2-klein-4b` primary,
+  `POST /api/image/cf` (`@cf/black-forest-labs/flux-2-klein-9b` default,
   `@cf/black-forest-labs/flux-1-schnell` fallback) or `POST /api/image`
   (OpenRouter). Sprites are hand-authored SVG/canvas, not generated raster.
   Report the `model` the endpoint actually returned; never hard-code a

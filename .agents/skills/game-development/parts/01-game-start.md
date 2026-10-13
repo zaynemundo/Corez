@@ -48,7 +48,7 @@ Orchestration entry point for the CoreZ AI Game Studio. Analyzes game request, s
 | Game Designer | muse-spark-1.3-contributor | spec writer |
 | Lead Programmer | muse-spark-1.3-contributor | implement |
 | UI Programmer | muse-spark-1.3-contributor | implement |
-| Art Director | flux-2-klein-4b | asset generation |
+| Art Director | flux-2-klein-9b | asset generation |
 | Technical Artist | muse-spark-1.3-contributor | asset integration |
 | QA Tester | muse-spark-1.3-contributor | test |
 
@@ -76,7 +76,7 @@ Orchestration entry point for the CoreZ AI Game Studio. Analyzes game request, s
 | Game Designer | muse-spark-1.3-contributor | spec |
 | Lead Programmer | muse-spark-1.3-contributor | architecture + core |
 | UI Programmer | muse-spark-1.3-contributor | HUD/menus |
-| Art Director | flux-2-klein-4b | backgrounds/assets |
+| Art Director | flux-2-klein-9b | backgrounds/assets |
 | Technical Artist | muse-spark-1.3-contributor | sprite pipeline |
 | Physics Advisor | muse-spark-1.3-contributor | read-only advisory |
 | QA Tester | muse-spark-1.3-contributor | test |
@@ -104,7 +104,7 @@ Orchestration entry point for the CoreZ AI Game Studio. Analyzes game request, s
 - QA Tester is always required (even SMALL games need smoke tests)
 - Creative Director is always read-only (never edits files)
 - Physics Advisor only activates for games with velocity, acceleration, collision response, or spatial queries
-- Art Director uses flux-2-klein-4b (flux-1-schnell fallback) for background generation, NOT for sprites (sprites are SVG by Technical Artist)
+- Art Director uses flux-2-klein-9b (flux-1-schnell fallback) for background generation, NOT for sprites (sprites are SVG by Technical Artist)
 
 ---
 

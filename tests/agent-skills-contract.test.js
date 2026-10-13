@@ -160,7 +160,7 @@ describe('agent skill catalog contract', () => {
       join(SKILLS_ROOT, 'game-development', 'parts', '01-game-start.md'),
       'utf8'
     );
-    expect(partOne).toContain('flux-2-klein-4b');
+    expect(partOne).toContain('flux-2-klein-9b');
     expect(partOne).not.toContain('flux-1-schnell | asset generation');
   });
 });

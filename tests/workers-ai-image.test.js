@@ -34,7 +34,7 @@ function mockAI(overrides = {}) {
 }
 
 // The handler serializes the FormData through a Response (the documented
-// klein-4b pattern), so the binding receives a multipart ReadableStream.
+// klein multipart pattern), so the binding receives a multipart ReadableStream.
 async function multipartText(inputs) {
   const body = inputs?.multipart?.body;
   if (body && typeof body.getReader === 'function') return new Response(body).text();
@@ -51,7 +51,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('/api/image/cf (Workers AI FLUX.2 klein-4b)', () => {
+describe('/api/image/cf (Workers AI FLUX.2 klein, default 9b)', () => {
   it('rejects non-POST requests', async () => {
     const response = await swarmWorker.fetch(
       new Request('https://corez.test/api/image/cf'),
@@ -80,12 +80,12 @@ describe('/api/image/cf (Workers AI FLUX.2 klein-4b)', () => {
     expect(response.status).toBe(200);
     const data = await response.json();
     expect(data.image).toBe(`data:image/png;base64,${FAKE_IMAGE_B64}`);
-    expect(data.model).toBe('@cf/black-forest-labs/flux-2-klein-4b');
+    expect(data.model).toBe('@cf/black-forest-labs/flux-2-klein-9b');
     // The binding is called with a serialized multipart stream (the model
     // rejects JSON bodies) carrying the prompt.
     expect(ai.run).toHaveBeenCalledTimes(1);
     const [model, inputs] = ai.run.mock.calls[0];
-    expect(model).toBe('@cf/black-forest-labs/flux-2-klein-4b');
+    expect(model).toBe('@cf/black-forest-labs/flux-2-klein-9b');
     const text = await multipartText(inputs);
     expect(hasField(text, 'prompt', 'a red castle on a hill')).toBe(true);
     // The content type carries the boundary the runner requires.
@@ -112,6 +112,24 @@ describe('/api/image/cf (Workers AI FLUX.2 klein-4b)', () => {
       );
       const data = await response.json();
       expect(data.model).toBe('@cf/black-forest-labs/flux-2-klein-9b');
+    }
+  });
+
+  it('routes the fast-tier aliases to flux-2-klein-4b', async () => {
+    const ai = mockAI();
+    for (const alias of ['klein-4b', 'flux-4b', 'flux-klein-4b', 'fast']) {
+      ai.run.mockClear();
+      const response = await post(
+        swarmWorker,
+        { prompt: 'a castle', model: alias },
+        { ...BASE_ENV, AI: ai }
+      );
+      expect(response.status).toBe(200);
+      expect(ai.run.mock.calls[0][0]).toBe(
+        '@cf/black-forest-labs/flux-2-klein-4b'
+      );
+      const data = await response.json();
+      expect(data.model).toBe('@cf/black-forest-labs/flux-2-klein-4b');
     }
   });
 

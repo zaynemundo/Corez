@@ -46,7 +46,7 @@ npm run deploy   # deploys worker + dist assets to Cloudflare
   `google/gemini-3.1-flash-lite-image` (`OPENROUTER_IMAGE_MODEL` overrides)
   and reports the model that served the image (R2 URL when `ASSET_BUCKET`
   is configured; honest 503 without `OPENROUTER_API_KEY`). `POST /api/image/cf`
-  is the keyless Workers AI path (`flux-2-klein-4b` primary, `flux-1-schnell`
+  is the keyless Workers AI path (`flux-2-klein-9b` default, `flux-1-schnell`
   fallback) and needs the `AI` binding.
 - Memory/apps: `/api/memory/*` and `/api/apps/*` require the `ASSET_BUCKET`
   binding (503/530 without it); `wrangler dev` only provides real R2 with

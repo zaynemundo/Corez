@@ -29,7 +29,7 @@ Use this skill to analyze incoming user requests, determine the minimal required
 | Request Type | Lead Engine | Required Skills | Output Artifact |
 | --- | --- | --- | --- |
 | Web Application / UI Layout | `opencode-go/muse-spark-1.3-contributor` (OpenCode Go only) | *see §1.1 Design Decision Tree* + `accessibility-expert` | React / HTML / CSS components |
-| Image Generation / Artwork | OpenRouter `google/gemini-3.1-flash-lite-image` via `POST /api/image`; keyless Workers AI FLUX (`flux-2-klein-4b`, fallback `flux-1-schnell`) via `/api/image/cf` | `visual-creative` (+ `image-generation` for endpoint) | R2 stored image URLs & gallery cards |
+| Image Generation / Artwork | OpenRouter `google/gemini-3.1-flash-lite-image` via `POST /api/image`; keyless Workers AI FLUX (`flux-2-klein-9b` default, `flux-2-klein-4b` via `"fast"`, fallback `flux-1-schnell`) via `/api/image/cf` | `visual-creative` (+ `image-generation` for endpoint) | R2 stored image URLs & gallery cards |
 | Web Game / Canvas Arcade | `opencode-go/muse-spark-1.3-contributor` (OpenCode Go only) | `game-development`, `frontend-modern-design` | Canvas 2D / JS physics engine |
 | Back-End API / Worker Router | `opencode-go/muse-spark-1.3-contributor` (OpenCode Go only) | `backend-architecture`, `ai-infrastructure` | Cloudflare Worker / Node route handlers |
 | Bug Investigation / Refactoring | `opencode-go/muse-spark-1.3-contributor` (preferred) | `auto-debugging`, `code-review-testing`, `software-engineering` | Verified code fix & green test run |

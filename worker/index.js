@@ -3170,22 +3170,22 @@ async function handleImage(request, env) {
 
 // Workers AI text-to-image endpoint: runs FLUX on the account's OWN Workers AI
 // (env.AI binding) â€” no third-party key, billed inside the daily free neuron allocation.
-// Default is flux-2-klein-4b (4B, fast); flux-2-klein-9b (9B, same family and
-// input shape, slower, finer detail) is the opt-in quality tier. Failure of
-// any selected model falls back to flux-1-schnell (stable).
+// Default is flux-2-klein-9b (9B, finer detail); flux-2-klein-4b (4B, fast)
+// is the opt-in speed tier. Failure of any selected model falls back to
+// flux-1-schnell (stable).
 // Same response contract as /api/image: { image: <r2 url | data url>, model }.
 //
 // Input contract: prompt (required) + optional width/height (256-1920) and
 // seed + optional model. The model consumes multipart/form-data (the JSON body shape is
 // rejected by the runner), so the binding call builds a FormData part.
-const WORKERS_AI_IMAGE_MODEL = "@cf/black-forest-labs/flux-2-klein-4b";
-const WORKERS_AI_IMAGE_QUALITY_MODEL = "@cf/black-forest-labs/flux-2-klein-9b";
+const WORKERS_AI_IMAGE_MODEL = "@cf/black-forest-labs/flux-2-klein-9b";
+const WORKERS_AI_IMAGE_FAST_MODEL = "@cf/black-forest-labs/flux-2-klein-4b";
 const WORKERS_AI_FALLBACK_MODEL = "@cf/black-forest-labs/flux-1-schnell";
 const WORKERS_AI_SDXL_LIGHTNING_MODEL =
   "@cf/bytedance/stable-diffusion-xl-lightning";
 const ALLOWED_WORKERS_AI_IMAGE_MODELS = new Set([
   WORKERS_AI_IMAGE_MODEL,
-  WORKERS_AI_IMAGE_QUALITY_MODEL,
+  WORKERS_AI_IMAGE_FAST_MODEL,
   WORKERS_AI_FALLBACK_MODEL,
   WORKERS_AI_SDXL_LIGHTNING_MODEL,
   "@cf/stabilityai/stable-diffusion-xl-base-1.0",
@@ -3280,9 +3280,13 @@ async function handleWorkersAIImage(request, env) {
     "stable-diffusion-xl-lightning": WORKERS_AI_SDXL_LIGHTNING_MODEL,
     "stable-diffusion-xl-lighting": WORKERS_AI_SDXL_LIGHTNING_MODEL,
     "flux-klein": WORKERS_AI_IMAGE_MODEL,
-    "flux-klein-9b": WORKERS_AI_IMAGE_QUALITY_MODEL,
-    "klein-9b": WORKERS_AI_IMAGE_QUALITY_MODEL,
-    "flux-9b": WORKERS_AI_IMAGE_QUALITY_MODEL,
+    "flux-klein-9b": WORKERS_AI_IMAGE_MODEL,
+    "klein-9b": WORKERS_AI_IMAGE_MODEL,
+    "flux-9b": WORKERS_AI_IMAGE_MODEL,
+    "flux-klein-4b": WORKERS_AI_IMAGE_FAST_MODEL,
+    "klein-4b": WORKERS_AI_IMAGE_FAST_MODEL,
+    "flux-4b": WORKERS_AI_IMAGE_FAST_MODEL,
+    fast: WORKERS_AI_IMAGE_FAST_MODEL,
     "flux-schnell": WORKERS_AI_FALLBACK_MODEL,
     flux: WORKERS_AI_IMAGE_MODEL,
     schnell: WORKERS_AI_FALLBACK_MODEL,

@@ -699,7 +699,7 @@ export async function generateImage(
     typeof referenceImage === "string" &&
     referenceImage.startsWith("data:image");
 
-  // Primary: Workers AI FLUX.2 klein-4b (free, no key) via /api/image/cf.
+  // Primary: Workers AI FLUX.2 klein-9b (free, no key) via /api/image/cf.
   // OpenRouter reference images require multimodal support, so skip Workers AI
   // when the user supplied one — fall through to the OpenRouter path.
   if (!hasReferenceImage) {
@@ -751,7 +751,7 @@ export async function generateImage(
 // Workers AI text-to-image: runs FLUX/SDXL on the account's own Workers AI
 // (no third-party key). Returns the image URL (R2 or data URL) or null on failure.
 // options: width/height (256-1920), seed (integer), model (flux/sdxl-lightning alias).
-export const WORKERS_AI_IMAGE_MODEL = "@cf/black-forest-labs/flux-2-klein-4b";
+export const WORKERS_AI_IMAGE_MODEL = "@cf/black-forest-labs/flux-2-klein-9b";
 export const WORKERS_AI_SDXL_LIGHTNING_MODEL =
   "@cf/bytedance/stable-diffusion-xl-lightning";
 export const WORKERS_AI_IMAGE_ENDPOINT = "/api/image/cf";
