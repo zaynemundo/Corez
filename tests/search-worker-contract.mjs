@@ -475,6 +475,73 @@ async function run() {
   const realResult = adsData.results.find((r) => r.url === 'https://example.com/real-result');
   assert.equal(realResult.snippet, "Real content with 'apostrophe' and & entities.");
 
+  // Workers AI path: rerank and embedding similarity fuse (reciprocal rank
+  // fusion) when both serve — Gamma wins here because the rerank order
+  // (Gamma > Alpha > Beta) and the embedding order (Beta > Gamma > Alpha)
+  // agree most strongly on it.
+  const fusionResponse = await post(
+    { query: 'fusion check' },
+    {
+      __SEARCH_FETCH: wikipediaResults(['Alpha', 'Beta', 'Gamma']),
+      AI: {
+        run: async (model, input) => {
+          if (String(model).includes('reranker')) {
+            assert.ok(Array.isArray(input.contexts) && input.contexts.length === 3);
+            return {
+              response: [
+                { id: 2, score: 0.9 },
+                { id: 0, score: 0.5 },
+                { id: 1, score: 0.1 },
+              ],
+            };
+          }
+          assert.ok(String(model).includes('bge-m3'));
+          assert.ok(Array.isArray(input.text) && input.text.length === 4);
+          return {
+            data: [
+              [1, 0, 0], // query
+              [0, 1, 0], // Alpha: similarity 0
+              [1, 0, 0], // Beta: similarity 1
+              [0.7, 0.71, 0], // Gamma: similarity ~0.7
+            ],
+          };
+        },
+      },
+    }
+  );
+  assert.equal(fusionResponse.status, 200);
+  const fusionData = await fusionResponse.json();
+  assert.equal(fusionData.meta.rerank, 'fusion');
+  assert.equal(fusionData.meta.rerankProvider, 'workers-ai');
+  assert.deepEqual(
+    fusionData.results.map((r) => r.title),
+    ['Gamma', 'Beta', 'Alpha']
+  );
+
+  // Workers AI rerank down but embeddings up: the lone signal still ranks.
+  const embedOnlyResponse = await post(
+    { query: 'fusion check' },
+    {
+      __SEARCH_FETCH: wikipediaResults(['Alpha', 'Beta', 'Gamma']),
+      AI: {
+        run: async (model) => {
+          if (String(model).includes('reranker')) throw new Error('reranker down');
+          return {
+            data: [
+              [1, 0, 0], // query
+              [0, 1, 0], // Alpha: similarity 0
+              [1, 0, 0], // Beta: similarity 1
+              [0.7, 0.71, 0], // Gamma: similarity ~0.7
+            ],
+          };
+        },
+      },
+    }
+  );
+  const embedOnlyData = await embedOnlyResponse.json();
+  assert.equal(embedOnlyData.meta.rerank, 'embeddings');
+  assert.equal(embedOnlyData.results[0].title, 'Beta');
+
   console.log('Web search Worker contract passed.');
 }
 

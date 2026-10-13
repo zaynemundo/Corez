@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { generateAIResponse, isWebSearchRequest, formatSearchResults } from '../src/services/aiService.js';
 import { fetchWebSearch, SearchApiError } from '../src/services/searchService.js';
-import { handleSearch, cleanSearchQuery } from '../worker/search.js';
+import { handleSearch, cleanSearchQuery, reciprocalRankFusion } from '../worker/search.js';
 
 describe('Web search detection', () => {
   it('detects recency/news/search requests', () => {
@@ -601,8 +601,7 @@ describe('Worker /api/search query relevance', () => {  it('searches the cleaned
     expect(titles).toContain('Gold standard');
   });
 
-  it('falls back to the raw query when cleaning empties it', async () => {
-    const capturedQueries = [];
+  it('falls back to the raw query when cleaning empties it', async () => {    const capturedQueries = [];
     const response = await handleSearch(
       new Request('https://corez.test/api/search', {
         method: 'POST',
@@ -621,5 +620,34 @@ describe('Worker /api/search query relevance', () => {  it('searches the cleaned
     );
     expect(response.status).toBe(200);
     expect(capturedQueries).toContain('what is');
+  });
+});
+
+describe('reciprocalRankFusion', () => {
+  it('rewards consensus across signals instead of trusting one scale', () => {
+    // Rerank: Gamma > Alpha > Beta; embeddings: Beta > Gamma > Alpha.
+    // Gamma wins (2nd + 1st), Beta second (3rd + 1st), Alpha last.
+    expect(
+      reciprocalRankFusion(
+        [
+          [2, 0, 1],
+          [1, 2, 0],
+        ],
+        3
+      )
+    ).toEqual([2, 1, 0]);
+  });
+
+  it('passes a lone signal order through unchanged', () => {
+    expect(reciprocalRankFusion([[2, 0, 1]], 3)).toEqual([2, 0, 1]);
+  });
+
+  it('breaks exact ties by original merged position', () => {
+    // Perfect disagreement: identical fused scores, so index order wins.
+    expect(reciprocalRankFusion([[0, 1], [1, 0]], 2)).toEqual([0, 1]);
+  });
+
+  it('ignores out-of-range indices and appends uncovered ones at the tail', () => {
+    expect(reciprocalRankFusion([[5, 0, -1]], 3)).toEqual([0, 1, 2]);
   });
 });

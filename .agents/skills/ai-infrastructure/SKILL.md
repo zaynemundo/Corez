@@ -10,10 +10,12 @@ LLM API proxies, model routing, RAG retrieval, and prompt token efficiency.
 CoreZ does not use a vector database; treat RAG/vector-retrieval topics as
 generic architecture work unless implementation is requested. Cloudflare
 Workers AI **is** used through the `AI` binding and needs no third-party key:
-`/api/image/cf` (`@cf/black-forest-labs/flux-2-klein-4b`, falling back to
+`/api/image/cf` (`@cf/black-forest-labs/flux-2-klein-4b` by default,
+`flux-2-klein-9b` as the opt-in quality tier, falling back to
 `@cf/black-forest-labs/flux-1-schnell`), `/api/rerank`
 (`@cf/baai/bge-reranker-base`, 60/min), `/api/embed` (`@cf/baai/bge-m3`,
-1024-dim, 120/min), and the free `/api/search` ranking path. Ranking is
+1024-dim, 120/min), and the free `/api/search` ranking path (rerank +
+embeddings fused with reciprocal rank fusion). Ranking is
 disableable per deployment with `WORKERS_AI_RERANK_DISABLED=true` /
 `WORKERS_AI_EMBED_DISABLED=true` without affecting the image endpoints.
 

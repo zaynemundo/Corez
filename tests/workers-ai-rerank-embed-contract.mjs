@@ -1,8 +1,8 @@
 /**
  * Contract tests for the Workers AI ranking models: POST /api/rerank
  * (@cf/baai/bge-reranker-base) and POST /api/embed (@cf/baai/bge-m3), plus
- * the free Workers AI ranking path in /api/search (rerank first, embedding
- * cosine similarity as fallback, before any keyed provider).
+ * the free Workers AI ranking path in /api/search (rerank and embedding
+ * similarity fused with reciprocal rank fusion, before any keyed provider).
  */
 import assert from 'node:assert/strict';
 import worker from '../worker/index.js';
@@ -148,27 +148,40 @@ async function run() {
   assert.equal(embedMismatch.status, 502);
 
   // ---------- /api/search uses the free Workers AI ranking first ----------
-  let rankingModel = null;
+  // Rerank AND embedding similarity both run and fuse (reciprocal rank
+  // fusion): agreement wins. Here both signals prefer Beta, so Beta leads
+  // and the method reports "fusion".
+  const rankingModels = [];
   const searchAi = mockAI(async (model, inputs) => {
-    rankingModel = model;
-    assert.equal(model, RERANK_MODEL);
-    assert.equal(inputs.query, 'red turtles');
-    assert.ok(Array.isArray(inputs.contexts) && inputs.contexts.length === 2);
-    assert.equal(typeof inputs.contexts[0].text, 'string');
-    // Rerank input stays compact (<=160 chars per doc) so the whole result
-    // list fits the ~512-token input window of bge-reranker-base.
-    assert.ok(inputs.contexts.every((entry) => entry.text.length <= 160));
-    // Reverse scores: Beta is more relevant. Real provider shape.
-    return { response: [{ id: 1, score: 3.0 }, { id: 0, score: 0.5 }] };
+    rankingModels.push(model);
+    if (model === RERANK_MODEL) {
+      assert.equal(inputs.query, 'red turtles');
+      assert.ok(Array.isArray(inputs.contexts) && inputs.contexts.length === 2);
+      assert.equal(typeof inputs.contexts[0].text, 'string');
+      // Rerank input stays compact (<=160 chars per doc) so the whole result
+      // list fits the ~512-token input window of bge-reranker-base.
+      assert.ok(inputs.contexts.every((entry) => entry.text.length <= 160));
+      // Reverse scores: Beta is more relevant. Real provider shape.
+      return { response: [{ id: 1, score: 3.0 }, { id: 0, score: 0.5 }] };
+    }
+    assert.equal(model, EMBED_MODEL);
+    return {
+      shape: [3, 2],
+      data: [
+        [1, 0], // query
+        [0, 1], // Alpha (low similarity)
+        [1, 0], // Beta (high similarity)
+      ],
+    };
   });
   const searchResponse = await post('/api/search', { query: 'red turtles' }, {
     AI: searchAi,
     __SEARCH_FETCH: wikipediaResults(['Alpha', 'Beta'])
   });
   assert.equal(searchResponse.status, 200);
-  assert.equal(rankingModel, RERANK_MODEL);
+  assert.deepEqual(rankingModels.sort(), [EMBED_MODEL, RERANK_MODEL].sort());
   const searchData = await searchResponse.json();
-  assert.equal(searchData.meta.rerank, 'rerank');
+  assert.equal(searchData.meta.rerank, 'fusion');
   assert.equal(searchData.meta.rerankProvider, 'workers-ai');
   assert.equal(searchData.results[0].title, 'Beta');
   assert.equal(searchData.results[1].title, 'Alpha');

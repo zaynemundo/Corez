@@ -34,7 +34,10 @@ when code must call, test, or debug the actual CoreZ image endpoint.
 - `POST /api/image/cf` is the keyless Workers AI path and requires the `AI`
   binding (no provider key). Body: `{ prompt, width?, height?, seed?, model? }`
   (dimensions 256-1920). Default model `@cf/black-forest-labs/flux-2-klein-4b`
-  with `@cf/black-forest-labs/flux-1-schnell` fallback; success also returns
+  (fast); `"model": "klein-9b"` (aliases `flux-9b`, `flux-klein-9b`) selects
+  `@cf/black-forest-labs/flux-2-klein-9b` for finer detail at slower speed.
+  Any selected-model failure falls back to
+  `@cf/black-forest-labs/flux-1-schnell`; success also returns
   `{ image, model }`, and 503 without the binding.
 - `OPENROUTER_API_KEY` is required. `OPENROUTER_IMAGE_MODEL` may override the
   server-controlled default with one model.

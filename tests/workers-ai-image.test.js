@@ -92,6 +92,29 @@ describe('/api/image/cf (Workers AI FLUX.2 klein-4b)', () => {
     expect(inputs.multipart.contentType).toMatch(/^multipart\/form-data; boundary=/);
   });
 
+  it('routes the klein-9b quality alias to flux-2-klein-9b', async () => {
+    const ai = mockAI();
+    for (const alias of [
+      'klein-9b',
+      'flux-9b',
+      'flux-klein-9b',
+      '@cf/black-forest-labs/flux-2-klein-9b',
+    ]) {
+      ai.run.mockClear();
+      const response = await post(
+        swarmWorker,
+        { prompt: 'a castle', model: alias },
+        { ...BASE_ENV, AI: ai }
+      );
+      expect(response.status).toBe(200);
+      expect(ai.run.mock.calls[0][0]).toBe(
+        '@cf/black-forest-labs/flux-2-klein-9b'
+      );
+      const data = await response.json();
+      expect(data.model).toBe('@cf/black-forest-labs/flux-2-klein-9b');
+    }
+  });
+
   it('passes width/height/seed through with bounds', async () => {
     const ai = mockAI();
     await post(swarmWorker, { prompt: 'x', width: 512, height: 512, seed: 7 }, { ...BASE_ENV, AI: ai });

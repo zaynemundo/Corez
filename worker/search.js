@@ -529,23 +529,17 @@ async function rankWithEmbeddingsProvider(query, results, provider) {
   };
 }
 
-// Rank merged results across every configured provider: rerank first,
-// embeddings similarity as the fallback. Never throws — returns null when
-// neither can rank. The free Workers AI path (bge-reranker-base rerank then
-// bge-m3 embeddings, both inside the daily neuron allocation) is tried
-// BEFORE the keyed providers so search ranking never costs a third-party
-// API call when the account's own AI binding can serve it. Rerank is tried
-// on each provider before embeddings so the strongest ranking wins; a
-// provider that cannot serve either is skipped.
+// Rank merged results across every configured provider: the free Workers AI
+// path first, then the keyed providers. The Workers AI path fuses BOTH of its
+// signals — bge-reranker-base relevance plus bge-m3 embedding similarity —
+// with Reciprocal Rank Fusion instead of trusting one score scale, so a
+// result that both signals agree on always outranks one that only a single
+// signal likes. Never throws — returns null when neither can rank. Both
+// signals run inside the daily neuron allocation, so fusing them never costs
+// a third-party API call. A provider that cannot serve either is skipped.
 async function rankSearchResults(query, results, env) {
-  const workersAIReranked = await rerankWithWorkersAI(query, results, env);
-  if (workersAIReranked) return workersAIReranked;
-  const workersAIEmbedded = await rankWithEmbeddingsWorkersAI(
-    query,
-    results,
-    env,
-  );
-  if (workersAIEmbedded) return workersAIEmbedded;
+  const workersAIFused = await rankWithWorkersAI(query, results, env);
+  if (workersAIFused) return workersAIFused;
   const providers = rankingProviders(env);
   for (const provider of providers) {
     const reranked = await rerankWithProvider(query, results, provider);
@@ -556,6 +550,71 @@ async function rankSearchResults(query, results, env) {
     if (embedded) return embedded;
   }
   return null;
+}
+
+/**
+ * Reciprocal Rank Fusion over best-first index orders (one per ranking
+ * signal). score(i) = SUM 1/(k + rank). A result both signals rank highly
+ * outscores one that a single signal loves — the standard fix for
+ * winner-takes-all rerank-vs-embeddings disagreements. Indices absent from
+ * every order (defensive: both rankers cover all results or fail) keep their
+ * original merged position at the tail. Ties break by original position so
+ * the output is deterministic. k=60 is the literature standard.
+ *
+ * @param {number[][]} orders Best-first result indices per signal.
+ * @param {number} count Total result count.
+ * @param {number} [k] Fusion constant.
+ * @returns {number[]} Fused best-first result indices.
+ */
+export function reciprocalRankFusion(orders, count, k = 60) {
+  const fused = new Map();
+  for (const order of orders) {
+    if (!Array.isArray(order)) continue;
+    order.forEach((index, rank) => {
+      if (!Number.isInteger(index) || index < 0 || index >= count) return;
+      fused.set(index, (fused.get(index) || 0) + 1 / (k + rank + 1));
+    });
+  }
+  const ranked = [...fused.keys()].sort((a, b) => {
+    const diff = fused.get(b) - fused.get(a);
+    return diff !== 0 ? diff : a - b;
+  });
+  for (let index = 0; index < count; index += 1) {
+    if (!fused.has(index)) ranked.push(index);
+  }
+  return ranked;
+}
+
+/** Best-first original indices of an already-ranked result list. */
+function orderOf(rankedResults, originals) {
+  return rankedResults
+    .map((result) => originals.indexOf(result))
+    .filter((index) => index >= 0);
+}
+
+/**
+ * Free ranking with the account's own Workers AI: rerank and embedding
+ * similarity run in parallel and fuse when both succeed (method "fusion");
+ * a lone surviving signal is used as-is. Best effort — null when neither
+ * serves, and the caller keeps the original order.
+ */
+async function rankWithWorkersAI(query, results, env) {
+  const [reranked, embedded] = await Promise.all([
+    rerankWithWorkersAI(query, results, env),
+    rankWithEmbeddingsWorkersAI(query, results, env),
+  ]);
+  if (reranked && embedded) {
+    const fused = reciprocalRankFusion(
+      [orderOf(reranked.results, results), orderOf(embedded.results, results)],
+      results.length,
+    );
+    return {
+      method: "fusion",
+      provider: "workers-ai",
+      results: fused.map((index) => results[index]),
+    };
+  }
+  return reranked || embedded;
 }
 
 /**
