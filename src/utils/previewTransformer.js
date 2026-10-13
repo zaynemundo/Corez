@@ -540,15 +540,22 @@ export const PREVIEW_ERROR_REPORTER_SCRIPT = `
 // while the preview document stays originless. Mirrors the worker's
 // published-page policy (publishedPageHeaders in worker/index.js) so
 // in-app previews and published links behave identically.
-// `blob:` on default-src lets a generated document download a file it built
+// `default-src blob:` lets a generated document download a file it built
 // locally: the research report's "Download .pdf" button creates a Blob URL and
 // clicks an anchor on it, and `default-src 'none'` blocked that navigation —
 // the button silently did nothing in the preview. Blob URLs are same-origin
-// and never leave the sandbox, so they add no network surface. `navigate-to`
-// is not required for downloads and is omitted deliberately (a report's links
-// must still be blocked from navigating the frame away).
+// and never leave the sandbox, so they add no network surface.
+//
+// The source list must NOT contain `'none'`: per CSP, `'none'` is only valid
+// as the SOLE source expression, and a directive that breaks that rule is
+// discarded by the browser — `default-src 'none' blob:` therefore failed open
+// (the whole directive was ignored) while still looking correct in the file.
+// `default-src blob:` keeps the directive valid and blocks every network
+// fetch. `navigate-to` is not required for downloads and is omitted
+// deliberately (a report's links must still be blocked from navigating the
+// frame away).
 const PREVIEW_CSP =
-  "default-src 'none' blob:; script-src 'unsafe-inline' https:; style-src 'unsafe-inline' https:; img-src data: https: blob:; font-src data: https:; media-src data: https: blob:; connect-src https:";
+  "default-src blob:; script-src 'unsafe-inline' https:; style-src 'unsafe-inline' https:; img-src data: https: blob:; font-src data: https:; media-src data: https: blob:; connect-src https:";
 
 function withPreviewCsp(html) {
   if (!html || typeof html !== "string") return html;

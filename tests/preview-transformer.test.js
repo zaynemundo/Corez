@@ -19,6 +19,54 @@ describe('previewTransformer', () => {
     expect(formatted).toContain('about.html');
   });
 
+  it('emits a valid preview CSP that allows blob: downloads', () => {
+    // Regression: `default-src 'none' blob:` is INVALID CSP — `'none'` must be
+    // the sole source expression — so the browser discarded the whole
+    // directive (failing open) and the research report's "Download .pdf"
+    // button (a blob: anchor click) was blocked. The directive must be valid
+    // AND allow blob:.
+    const formatted = formatCodeForPreview('<!DOCTYPE html><html><body><p>x</p></body></html>');
+    const csp = formatted.match(
+      /<meta http-equiv="Content-Security-Policy" content="([^"]+)">/,
+    )?.[1];
+    expect(csp).toBeTruthy();
+    const defaultSrc = csp.match(/default-src ([^;]+)/)?.[1] || '';
+    expect(defaultSrc).toContain('blob:');
+    expect(defaultSrc).not.toContain("'none'");
+    // Every directive that mixes sources must not contain `'none'`.
+    for (const directive of csp.split(';')) {
+      if (directive.includes("'none'")) {
+        expect(directive.trim()).toBe("default-src 'none'");
+      }
+    }
+  });
+
+  it('lets blob: and data: anchor clicks through the navigation guard', () => {
+    // The guard used to preventDefault every non-http(s) link, which silently
+    // swallowed the download button's blob: click. A source guard would still
+    // be broken if someone restored that branch.
+    expect(NAVIGATION_GUARD_SCRIPT).toMatch(/blob:\|data:/);
+    const listeners = {};
+    const fakeDocument = {
+      addEventListener: (type, fn) => {
+        listeners[type] = fn;
+      },
+    };
+    new Function('window', 'document', NAVIGATION_GUARD_SCRIPT)({}, fakeDocument);
+    const click = listeners.click;
+    for (const href of ['blob:corez-test', 'data:text/plain,hi']) {
+      let prevented = false;
+      const anchor = { getAttribute: () => href, closest: () => anchor };
+      click({ target: anchor, preventDefault: () => { prevented = true; } });
+      expect(prevented, `${href} must be allowed through`).toBe(false);
+    }
+    // A relative navigation is still prevented (it would blank the preview).
+    let prevented = false;
+    const relative = { getAttribute: () => 'about.html', closest: () => relative };
+    click({ target: relative, preventDefault: () => { prevented = true; } });
+    expect(prevented).toBe(true);
+  });
+
   it('keeps the multi-page router as the first-registered click handler ahead of the guard', () => {
     const page = '<!DOCTYPE html><html><head></head><body><a href="about.html">About</a></body></html>';
     const formatted = injectMultiPageRouter(formatCodeForPreview(page), ['index.html', 'about.html']);

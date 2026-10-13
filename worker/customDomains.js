@@ -473,7 +473,12 @@ export async function handleCustomDomainRequest(request, env) {
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "no-referrer",
       "Content-Security-Policy":
-        "sandbox allow-scripts allow-forms allow-pointer-lock allow-popups allow-popups-to-escape-sandbox; default-src 'none'; script-src 'unsafe-inline' https:; style-src 'unsafe-inline' https:; img-src data: https: blob:; font-src data: https:; media-src data: https: blob:; connect-src https:",
+        // `default-src blob:` lets a page download a file it built locally
+        // (the same Blob-URL anchor mechanism as the in-app preview and
+        // published pages). `'none' blob:` would be rejected by CSP — `'none'`
+        // must be the only source expression, or the whole directive is
+        // discarded — so this must stay `default-src blob:`.
+        "sandbox allow-scripts allow-forms allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-downloads; default-src blob:; script-src 'unsafe-inline' https:; style-src 'unsafe-inline' https:; img-src data: https: blob:; font-src data: https:; media-src data: https: blob:; connect-src https:",
     },
   });
 }

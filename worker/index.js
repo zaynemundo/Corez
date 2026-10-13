@@ -3949,11 +3949,13 @@ function publishedPageHeaders({ frameable = false } = {}) {
     // scripts/styles, CDN libraries, embedded images/fonts, and external
     // links (popups escape the sandbox so links open in real tabs).
     "Content-Security-Policy":
-      // `blob:` on default-src lets a published document download a file it
-      // built locally (same Blob-URL anchor mechanism as the in-app preview);
-      // the sandbox also carries allow-downloads so the download is not
-      // silently dropped. Matches the preview CSP in src/utils/previewTransformer.js.
-      "sandbox allow-scripts allow-forms allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-downloads; default-src 'none' blob:; script-src 'unsafe-inline' https:; style-src 'unsafe-inline' https:; img-src data: https: blob:; font-src data: https:; media-src data: https: blob:; connect-src https:",
+      // `default-src blob:` lets a published document download a file it built
+      // locally (same Blob-URL anchor mechanism as the in-app preview); the
+      // sandbox also carries allow-downloads so the download is not silently
+      // dropped. It must NOT be `'none' blob:`: CSP rejects `'none'` combined
+      // with other sources and discards the whole directive. Matches the
+      // preview CSP in src/utils/previewTransformer.js.
+      "sandbox allow-scripts allow-forms allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-downloads; default-src blob:; script-src 'unsafe-inline' https:; style-src 'unsafe-inline' https:; img-src data: https: blob:; font-src data: https:; media-src data: https: blob:; connect-src https:",
   };
   // The publish modal offers an <iframe> embed, which X-Frame-Options: DENY
   // silently broke. Published creations stay frameable (they run sandboxed,
