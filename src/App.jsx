@@ -1191,13 +1191,23 @@ function MainApp({ theme, setTheme }) {
           thinkingSeconds,
         );
         const extractedCode = extractCodeFromMessage(aiMsg.content);
-        // Only auto-open canvas when the USER explicitly intended creation.
-        // Writing/explanation prompts that happen to contain ```html from the model
-        // stay as chat code blocks with a manual "Run in Canvas" button.
-        // No auto-population of canvas state for non-creation intents.
+        // A research report is a PDF-preview artifact with its own "Download
+        // .pdf" button. It is not a creation intent, but the user asked for a
+        // document: opening the preview is the shortest path to the download
+        // (canvas sandbox allows downloads), so it auto-opens like a build.
+        const isResearchReport = Boolean(
+          extractedCode &&
+            (/^\s*[@/]research\b/i.test(promptText) ||
+              (extractedCode.includes("var REPORT_PARAGRAPHS") &&
+                extractedCode.includes("COREZ Research Report"))),
+        );
+        // Only auto-open canvas when the USER explicitly intended creation (or
+        // asked for a research report). Writing/explanation prompts that happen
+        // to contain ```html from the model stay as chat code blocks with a
+        // manual "Run in Canvas" button.
         const shouldAutoOpenCanvas = Boolean(
           extractedCode &&
-          (isCreationIntent || isRevision) &&
+          (isCreationIntent || isRevision || isResearchReport) &&
           !userDismissedCanvasRef.current &&
           // Never pop the canvas over a chat the user switched to mid-stream;
           // the code stays in its own chat with a manual "Run in Canvas".

@@ -457,6 +457,12 @@ export const NAVIGATION_GUARD_SCRIPT = `
       var href = (a.getAttribute('href') || '').trim();
       if (href === '' || href.charAt(0) === '#') return;
       if (/^javascript:/i.test(href)) return;
+      // blob:/data: are same-origin local resources: the download button of a
+      // generated document creates one and clicks an anchor on it. Blocking
+      // those clicks (or letting CSP block the navigation) made "Download
+      // .pdf" do nothing in the preview; they never leave the sandbox, so the
+      // default action is allowed through.
+      if (/^(blob:|data:)/i.test(href)) return;
       e.preventDefault();
       if (/^(https?:|mailto:|tel:)/i.test(href)) {
         window.open(href, '_blank', 'noopener');
@@ -534,8 +540,15 @@ export const PREVIEW_ERROR_REPORTER_SCRIPT = `
 // while the preview document stays originless. Mirrors the worker's
 // published-page policy (publishedPageHeaders in worker/index.js) so
 // in-app previews and published links behave identically.
+// `blob:` on default-src lets a generated document download a file it built
+// locally: the research report's "Download .pdf" button creates a Blob URL and
+// clicks an anchor on it, and `default-src 'none'` blocked that navigation —
+// the button silently did nothing in the preview. Blob URLs are same-origin
+// and never leave the sandbox, so they add no network surface. `navigate-to`
+// is not required for downloads and is omitted deliberately (a report's links
+// must still be blocked from navigating the frame away).
 const PREVIEW_CSP =
-  "default-src 'none'; script-src 'unsafe-inline' https:; style-src 'unsafe-inline' https:; img-src data: https: blob:; font-src data: https:; media-src data: https: blob:; connect-src https:";
+  "default-src 'none' blob:; script-src 'unsafe-inline' https:; style-src 'unsafe-inline' https:; img-src data: https: blob:; font-src data: https:; media-src data: https: blob:; connect-src https:";
 
 function withPreviewCsp(html) {
   if (!html || typeof html !== "string") return html;

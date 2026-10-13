@@ -62,6 +62,10 @@ export default {
       revise: "Revise",
       reviseTitle: "Ask AI to revise this code",
       copyTitle: "Copy code",
+      // One-click save of a generated research report, without opening the
+      // preview first.
+      downloadPdf: "Download PDF",
+      downloadPdfTitle: "Save this research report as a PDF",
     },
     image: {
       viewFullscreen: "View fullscreen",

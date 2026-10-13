@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   Layers,
   Copy,
@@ -15,6 +15,10 @@ import {
   X,
 } from "lucide-react";
 import { extractCodeFromMessage } from "../services/aiService";
+import {
+  downloadResearchReportPdf,
+  isResearchReportDocument,
+} from "../services/pdfDownload.js";
 import ThinkingPanel from "./ThinkingPanel.jsx";
 import { stripJunkAfterDocumentEnd } from "../utils/htmlRepair";
 import { ensureLeadingPageMarker, findArtifactStartIndex } from "../utils/previewTransformer";
@@ -130,6 +134,9 @@ export function extractUnfencedDeliverable(text) {
 function CodeSnippetBlock({ code, lang, onRunInCanvas, onReviseCode }) {
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
+  // A research report is a document, not a runnable app: its most useful
+  // action is saving the PDF, and it should not need the preview first.
+  const isReport = useMemo(() => isResearchReportDocument(code), [code]);
 
   const handleCopy = () => {
     if (navigator.clipboard) {
@@ -139,11 +146,42 @@ function CodeSnippetBlock({ code, lang, onRunInCanvas, onReviseCode }) {
     }
   };
 
+  const handleDownloadPdf = () => {
+    try {
+      downloadResearchReportPdf(code);
+    } catch (err) {
+      console.warn("PDF download failed:", err);
+    }
+  };
+
   return (
     <div className="code-block-container">
       <div className="code-header">
         <span className="code-lang">{lang || "code"}</span>
         <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+          {isReport && (
+            <button
+              className="code-btn primary-preview-btn"
+              style={{
+                padding: "0.35rem 0.75rem",
+                background: "var(--text-primary)",
+                color: "var(--bg-primary)",
+                fontWeight: 600,
+                fontSize: "0.75rem",
+                borderRadius: "5px",
+                border: "none",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.35rem",
+              }}
+              onClick={handleDownloadPdf}
+              title={t("chat.message.code.downloadPdfTitle")}
+            >
+              <Download size={13} strokeWidth={2} />
+              <span>{t("chat.message.code.downloadPdf")}</span>
+            </button>
+          )}
           {onRunInCanvas && (
             <button
               className="code-btn"
@@ -207,6 +245,18 @@ function CodeSnippetBlock({ code, lang, onRunInCanvas, onReviseCode }) {
 
 function ExecutableCodeBlock({ code, onRunInCanvas, onReviseCode }) {
   const { t } = useI18n();
+  // A research report is a document deliverable: saving its PDF is the primary
+  // action, so the button comes first and does not require the preview.
+  const isReport = useMemo(() => isResearchReportDocument(code), [code]);
+
+  const handleDownloadPdf = () => {
+    try {
+      downloadResearchReportPdf(code);
+    } catch (err) {
+      console.warn("PDF download failed:", err);
+    }
+  };
+
   return (
     <div
       className="executable-code-action-bar"
@@ -218,6 +268,33 @@ function ExecutableCodeBlock({ code, onRunInCanvas, onReviseCode }) {
         alignItems: "stretch",
       }}
     >
+      {isReport && (
+        <button
+          className="code-btn primary-preview-btn"
+          style={{
+            flex: 1,
+            padding: "0.75rem 1rem",
+            background: "var(--text-primary)",
+            color: "var(--bg-primary)",
+            fontWeight: 600,
+            fontSize: "0.875rem",
+            borderRadius: "var(--radius-md, 12px)",
+            border: "none",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.5rem",
+            boxShadow: "none",
+            transition: "var(--transition-fast)",
+          }}
+          onClick={handleDownloadPdf}
+          title={t("chat.message.code.downloadPdfTitle")}
+        >
+          <Download size={16} strokeWidth={2} />
+          <span>{t("chat.message.code.downloadPdf")}</span>
+        </button>
+      )}
       {onRunInCanvas && (
         <button
           className="code-btn primary-preview-btn"

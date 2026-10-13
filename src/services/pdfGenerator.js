@@ -5,7 +5,21 @@
  * multi-page) entirely in the browser — used by the /research command to
  * deliver a downloadable research report. No external dependencies and no
  * API keys; nothing is ever fabricated.
+ *
+ * The PDF builder itself lives in ./pdfBuilder.js so the preview iframe's
+ * "Download .pdf" button and the chat message's one-click download share one
+ * implementation. This module owns the report document (HTML + the data the
+ * builder consumes) and injects the shared functions into the page.
  */
+import {
+  buildResearchPdfBlob,
+  escapePdfText,
+  foldToAscii,
+  pdfByteLength,
+  pdfTextWidth,
+  reportFileName,
+  wrapPdfText,
+} from "./pdfBuilder.js";
 
 /**
  * Build the self-contained HTML document for the preview canvas: a polished
@@ -200,6 +214,20 @@ export function synthesizePdfDocumentHtml({
   const jsTitle = JSON.stringify(safeTitle);
   const jsParagraphs = JSON.stringify(pdfBlocks);
   const jsWidths = JSON.stringify(HELVETICA_WIDTHS);
+  // The shared builder, injected into the page. The download button and the
+  // chat's one-click action therefore produce byte-identical PDFs; the inline
+  // script only wires the button, the filename and the Blob download. Every
+  // helper the builder calls is injected too (the preview iframe has no module
+  // scope), and their names stay visible to the emitted-script tests.
+  const builderSource = [
+    foldToAscii.toString(),
+    escapePdfText.toString(),
+    pdfByteLength.toString(),
+    pdfTextWidth.toString(),
+    wrapPdfText.toString(),
+    buildResearchPdfBlob.toString(),
+    reportFileName.toString(),
+  ].join("\n");
 
   return {
     title: `COREZ Research Report — ${safeTitle}`,
@@ -286,143 +314,13 @@ export function synthesizePdfDocumentHtml({
   var REPORT_PARAGRAPHS = ${jsParagraphs};
   var HELVETICA_WIDTHS = ${jsWidths};
 
-  // Base-14 Helvetica addresses a single-byte encoding, so every string is
-  // folded to printable ASCII before it becomes a PDF string. Folding also keeps
-  // one character equal to one byte, which the xref offsets and /Length depend
-  // on: é used to be emitted as two UTF-8 bytes inside a string that counted as
-  // one, so accented text rendered as garbage AND drifted every later byte
-  // offset. The "Print / Save as PDF" button renders full Unicode via the
-  // browser and is the path for text this export cannot represent.
-  function foldToAscii(t){
-    var s = String(t);
-    try { s = s.normalize('NFD').replace(/[\\u0300-\\u036f]/g, ''); } catch (e) {}
-    return s
-      .replace(/[\\u2018\\u2019\\u201a\\u201b]/g, "'")
-      .replace(/[\\u201c\\u201d\\u201e\\u201f]/g, '"')
-      .replace(/[\\u2013\\u2014]/g, '-')
-      .replace(/\\u2026/g, '...')
-      .replace(/[\\u2022\\u00b7\\u25cf\\u25aa\\u2043]/g, '-')
-      .replace(/[\\u00ae]/g, '(R)')
-      .replace(/[\\u00a9]/g, '(C)')
-      .replace(/[\\u2122]/g, '(TM)')
-      .replace(/\\u00b0/g, ' deg')
-      .replace(/\\u00d7/g, 'x')
-      .replace(/\\u00f7/g, '/')
-      .replace(/\\u20ac/g, 'EUR')
-      .replace(/\\u00a3/g, 'GBP')
-      .replace(/\\u00a5/g, 'JPY')
-      .replace(/[^\\x20-\\x7e]/g, '');
-  }
-  function escapePdfText(t){
-    return foldToAscii(t)
-      .replace(/\\\\/g,'\\\\\\\\').replace(/\\(/g,'\\\\(').replace(/\\)/g,'\\\\)');
-  }
-  // UTF-8 length, because the Blob encodes the string as UTF-8 and PDF offsets
-  // are byte offsets. Folded text is one byte per character, so this is a
-  // belt-and-braces guarantee rather than the mechanism.
-  function pdfByteLength(t){
-    try { return new TextEncoder().encode(String(t)).length; } catch (e) { return String(t).length; }
-  }
-  // Real rendered width of a string in the PDF's font, in points.
-  function pdfTextWidth(t, size){
-    var s = String(t), total = 0;
-    for (var i = 0; i < s.length; i++) {
-      var idx = s.charCodeAt(i) - 32;
-      var w = (idx >= 0 && idx < HELVETICA_WIDTHS.length) ? HELVETICA_WIDTHS[idx] : 556;
-      total += w * size / 1000;
-    }
-    return total;
-  }
-  // Wrap to a measured width. A word too long to fit (a URL in a source list)
-  // is hard-broken instead of being allowed to run off the page.
-  function wrapPdfText(t, maxWidth, size){
-    var words = String(t).split(/\\s+/).filter(Boolean), lines = [], cur = '';
-    function breakWord(word){
-      var piece = '';
-      for (var i = 0; i < word.length; i++) {
-        if (piece && pdfTextWidth(piece + word[i], size) > maxWidth) { lines.push(piece); piece = word[i]; }
-        else { piece += word[i]; }
-      }
-      return piece;
-    }
-    for (var i = 0; i < words.length; i++) {
-      var next = cur ? cur + ' ' + words[i] : words[i];
-      if (cur && pdfTextWidth(next, size) > maxWidth) {
-        lines.push(cur);
-        cur = breakWord(words[i]);
-      } else {
-        cur = next;
-      }
-    }
-    if (cur) lines.push(cur);
-    return lines;
-  }
-  function buildPdf(){
-    var pageW=595.28, pageH=841.89, margin=56.69, lineH=16;
-    // Measured, not counted: A4 width minus the margins, less a small safety
-    // margin so no metric wobble can push a line past the page edge.
-    var wrapWidth=(pageW-margin*2)-6;
-    var items=[];
-    var titleLines = wrapPdfText(escapePdfText(REPORT_TITLE||'Untitled'), wrapWidth, 18);
-    for (var ti=0;ti<titleLines.length;ti++) items.push({t:titleLines[ti],s:18,g:10});
-    items.push({t:'',s:12,g:6});
-    for (var i=0;i<REPORT_PARAGRAPHS.length;i++){
-      var block = REPORT_PARAGRAPHS[i];
-      var text = escapePdfText(block.text);
-      if (block.kind === 'heading') {
-        var hl = wrapPdfText(text, wrapWidth, 14);
-        for (var h=0;h<hl.length;h++) items.push({t:hl[h],s:14,g:14});
-        items.push({t:'',s:12,g:6});
-      } else if (block.kind === 'subheading') {
-        var sl = wrapPdfText(text, wrapWidth, 13);
-        for (var s2=0;s2<sl.length;s2++) items.push({t:sl[s2],s:13,g:13});
-        items.push({t:'',s:12,g:5});
-      } else if (block.kind === 'bullet') {
-        var bl = wrapPdfText(text, wrapWidth-14, 12);
-        for (var k=0;k<bl.length;k++) items.push({t:(k===0?'- ':'  ')+bl[k], s:12, g:lineH});
-        items.push({t:'',s:12,g:6});
-      } else if (block.kind === 'numbered') {
-        // Numbered items keep their number in the text (server-side).
-        var nl = wrapPdfText(text, wrapWidth-16, 12);
-        for (var q=0;q<nl.length;q++) items.push({t:nl[q],s:12,g:lineH});
-        items.push({t:'',s:12,g:6});
-      } else {
-        var pl = wrapPdfText(text, wrapWidth, 12);
-        for (var j=0;j<pl.length;j++) items.push({t:pl[j],s:12,g:lineH});
-        items.push({t:'',s:12,g:6});
-      }
-    }
-    var pages=[], cur=[], y=pageH-margin;
-    for (var n=0;n<items.length;n++){ var it=items[n];
-      if (it.t && it.s>13){ if (y-24<margin){ pages.push(cur); cur=[]; y=pageH-margin; } }
-      if (it.t && y-it.s-4<margin){ pages.push(cur); cur=[]; y=pageH-margin; }
-      if (it.t){ cur.push('BT /F1 '+it.s+' Tf '+margin+' '+y+' Td ('+it.t+') Tj ET'); y-=it.g; } else { y-=it.g; } }
-    if (cur.length>0||pages.length===0) pages.push(cur);
-    var fontObjectNumber = 3 + pages.length * 2;
-    var objects=[];
-    var addObj=function(b){ objects.push(b); return objects.length; };
-    addObj('<< /Type /Catalog /Pages 2 0 R >>');
-    var refs=[]; for (var pn=0;pn<pages.length;pn++) refs.push((3+pn*2)+' 0 R');
-    addObj('<< /Type /Pages /Kids ['+refs.join(' ')+'] /Count '+pages.length+' >>');
-    for (var pi=0;pi<pages.length;pi++){ var cid=3+pi*2; var sid=cid+1;
-      addObj('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 '+pageW+' '+pageH+'] /Contents '+sid+' 0 R /Resources << /Font << /F1 '+fontObjectNumber+' 0 R >> >> >>');
-      var stream=pages[pi].join('\\n');
-      addObj('<< /Length '+pdfByteLength(stream)+' >>\\nstream\\n'+stream+'\\nendstream'); }
-    addObj('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
-    // Offsets are BYTE offsets measured as the document is assembled, because
-    // that is what a reader walks. Counting characters produced a startxref that
-    // pointed at the wrong byte and a "Broken xref table" on every report that
-    // contained a bullet.
-    var parts=[], offsets=[], cursor=0;
-    function push(chunk){ parts.push(chunk); cursor+=pdfByteLength(chunk); }
-    push('%PDF-1.4\\n');
-    for (var oi=0;oi<objects.length;oi++){ offsets[oi]=cursor; push((oi+1)+' 0 obj '+objects[oi]+' endobj\\n'); }
-    var xrefStart=cursor;
-    push('xref\\n0 '+(objects.length+1)+'\\n0000000000 65535 f \\n');
-    for (var x=0;x<offsets.length;x++) push(String(offsets[x]).padStart(10,'0')+' 00000 n \\n');
-    push('trailer\\n<< /Size '+(objects.length+1)+' /Root 1 0 R >>\\nstartxref\\n'+xrefStart+'\\n%%EOF');
-    return new Blob(parts, { type: 'application/pdf' });
-  }
+  // The shared builder (src/services/pdfBuilder.js) is injected above: the
+  // preview's "Download .pdf" button and the chat's one-click download run the
+  // same code, so both produce byte-identical PDFs.
+${builderSource}
+
+  // Alias kept for callers/tests that exercise the builder by name.
+  function buildPdf(){ return buildResearchPdfBlob(REPORT_TITLE, REPORT_PARAGRAPHS, HELVETICA_WIDTHS); }
   function downloadPdf(){
     var blob = buildPdf();
     var url = URL.createObjectURL(blob);
@@ -432,7 +330,8 @@ export function synthesizePdfDocumentHtml({
     // rather than Resume---Q3-2026.pdf.
     var name = foldToAscii(REPORT_TITLE).replace(/[^A-Za-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
     a.href = url; a.download = (name || 'research-report').slice(0,80) + '.pdf';
-    document.body.appendChild(a); a.click(); a.remove();
+    document.body.appendChild(a); a.click();
+    if (a.remove) a.remove();
     setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
   }
 </script>

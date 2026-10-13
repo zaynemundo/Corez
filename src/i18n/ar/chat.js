@@ -52,6 +52,8 @@ export default {
       revise: "تحسين",
       reviseTitle: "اطلب من الذكاء الاصطناعي تحسين هذه الشيفرة",
       copyTitle: "نسخ الشيفرة",
+      downloadPdf: "تنزيل PDF",
+      downloadPdfTitle: "حفظ تقرير البحث بصيغة PDF",
     },
     image: {
       viewFullscreen: "عرض بملء الشاشة",
