@@ -12,10 +12,6 @@ export default {
     startNewConversation: "ابدأ محادثة جديدة",
     responding: "Corez يرد الآن",
     untitledApplication: "تطبيق بدون عنوان",
-    expandStream: "اضغط لتوسيع بث الرد",
-    collapseStream: "اضغط لطي بث الرد",
-    expandResponse: "توسيع الرد",
-    collapseResponse: "طي الرد",
   },
 
   // Announced by the thinking indicator's live region while a build runs.
@@ -36,6 +32,7 @@ export default {
   // لوحة التفكير المباشرة: يظهر تفكير النموذج هنا قبل بدء الإجابة.
   thinking: {
     label: "التفكير",
+    working: "جارٍ العمل…",
     thoughtForSeconds: "فكّر لمدة {seconds} ثانية",
   },
 

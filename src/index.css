@@ -1921,15 +1921,9 @@ h6 {
   display: inline-block;
 }
 
-.thinking-indicator-box {
-  display: flex;
-  align-items: center;
-  padding: 0.35rem 0;
-  background-color: transparent;
-  color: var(--text-secondary);
-  width: fit-content;
-}
-
+/* The three-dot row is gone from the chat stream: the thinking panel itself
+   is the live indicator. PaymentStatus still renders its own dots with inline
+   styles, so the pulse keyframes stay for it. */
 @keyframes thinkingDotPulse {
   0%,
   80%,
@@ -1941,41 +1935,6 @@ h6 {
     opacity: 1;
     transform: scale(1.1);
   }
-}
-
-.thinking-dots {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-}
-
-.thinking-dots-toggle {
-  background: transparent;
-  border: none;
-  padding: 4px 0;
-  cursor: pointer;
-  margin-bottom: 0.35rem;
-  transition: opacity var(--transition-fast);
-}
-
-.thinking-dots-toggle:hover {
-  opacity: 0.75;
-}
-
-.thinking-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: var(--text-secondary);
-  animation: thinkingDotPulse 1.4s infinite ease-in-out both;
-}
-
-.thinking-dot:nth-child(1) {
-  animation-delay: -0.32s;
-}
-.thinking-dot:nth-child(2) {
-  animation-delay: -0.16s;
 }
 
 /* Reasoning panel. The model's thinking streams here before the answer
@@ -2026,6 +1985,25 @@ h6 {
 .thinking-panel-title {
   font-weight: 500;
   letter-spacing: 0.01em;
+}
+
+/* Live status while the model works and no reasoning has streamed yet
+   ("Working…"). Replaced by the reasoning text the moment it arrives; a soft
+   pulse keeps the header visibly alive during that wait. */
+.thinking-panel-status {
+  color: var(--text-secondary);
+  opacity: 0.75;
+  animation: thinkingStatusPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes thinkingStatusPulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.9;
+  }
 }
 
 .thinking-panel-chevron {
@@ -4620,6 +4598,11 @@ h6 {
      must not pulse for users who ask for reduced motion. */
   .thinking-dot {
     animation: none !important;
+  }
+  /* The live "Working…" status must not pulse either; the text stays. */
+  .thinking-panel-status {
+    animation: none !important;
+    opacity: 0.75;
   }
   /* Settings spinner: keep the label, drop the rotation. */
   .spin,

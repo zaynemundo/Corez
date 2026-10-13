@@ -116,13 +116,17 @@ function ThinkingBody({ text }) {
 
 /**
  * @param {object} props
- * @param {string} props.text Reasoning text (blank renders nothing).
+ * @param {string} props.text Reasoning text (blank renders nothing unless a
+ *   live placeholder is provided).
  * @param {number} [props.seconds] Thinking duration; > 0 switches the label to
  *   "Thought for Ns" on the finished message.
  * @param {boolean} [props.expanded] Whether the body is visible.
  * @param {() => void} props.onToggle Header activation handler.
  * @param {string} props.bodyId id of the expandable body (aria-controls).
  * @param {boolean} [props.live] True while the model is still working.
+ * @param {string} [props.placeholder] Live status shown while no reasoning has
+ *   arrived yet (e.g. "Working…"). It is replaced by the reasoning the moment
+ *   the first event streams in, so the panel itself is the progress indicator.
  */
 export function ThinkingPanel({
   text,
@@ -131,17 +135,19 @@ export function ThinkingPanel({
   onToggle,
   bodyId,
   live = false,
+  placeholder = "",
 }) {
   const { t } = useI18n();
   const value = typeof text === "string" ? text.trim() : "";
-  if (!value) return null;
+  const waiting = !value && live && Boolean(placeholder);
+  if (!value && !waiting) return null;
   const label =
     !live && seconds > 0
       ? t("common.thinking.thoughtForSeconds", { seconds })
       : t("common.thinking.label");
   return (
     <div
-      className={`thinking-panel${live ? " thinking-panel-live" : " thinking-panel-persisted"}`}
+      className={`thinking-panel${live ? " thinking-panel-live" : " thinking-panel-persisted"}${waiting ? " is-waiting" : ""}`}
     >
       <button
         type="button"
@@ -152,13 +158,18 @@ export function ThinkingPanel({
       >
         <span className="thinking-panel-logo" aria-hidden="true" />
         <span className="thinking-panel-title">{label}</span>
+        {waiting && (
+          <span className="thinking-panel-status" role="status">
+            {placeholder}
+          </span>
+        )}
         <ChevronDown
           className={`thinking-panel-chevron${expanded ? " is-open" : ""}`}
           size={15}
           aria-hidden="true"
         />
       </button>
-      {expanded && (
+      {expanded && value && (
         <div className="thinking-panel-body" id={bodyId}>
           <ThinkingBody text={value} />
         </div>

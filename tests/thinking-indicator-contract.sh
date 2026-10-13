@@ -41,14 +41,18 @@ check_absent() {
 check_absent 'completed app action no longer says Thinking / Created App' 'Thinking / Created App' "$message"
 check_absent 'completed app action no longer uses thinking pill class' 'thinking-pill' "$message"
 check 'completed app action wires the preview label key' 'chat\.message\.code\.openPreview' "$message"
-check 'temporary thinking state renders animated dot container' 'thinking-dots' "$app"
+# The three-dot row was removed from the chat stream: the live thinking panel
+# is the only indicator, showing a working status until reasoning streams in.
+check_absent 'chat stream no longer renders the three-dot row' 'thinking-dots|thinking-dot' "$app"
 check 'thinking state exposes the build phase label' 'buildPhaseLabel\(buildPhase\)' "$app"
 check_absent 'thinking state no longer prints the phase beside the dots' 'thinking-phase-label' "$app"
 check_absent 'phase label styling is gone' 'thinking-phase-label' "$css"
-check 'thinking state wires the expand control label' 'common\.shell\.expandResponse' "$app"
-check 'thinking state wires the collapse control label' 'common\.shell\.collapseResponse' "$app"
-check 'dot animation keyframes exist' '@keyframes thinkingDotPulse' "$css"
-check 'three thinking dots are styled' 'thinking-dot' "$css"
+check 'live panel wires the waiting status key' 'common\.thinking\.working' "$app"
+check 'live panel receives the waiting placeholder' 'placeholder=\{t\("common\.thinking\.working"\)\}' "$app"
+check_absent 'the whole-stream collapse toggle is gone' 'isStreamCollapsed|expandResponse|collapseResponse' "$app"
+check 'dot animation keyframes exist for PaymentStatus dots' '@keyframes thinkingDotPulse' "$css"
+check 'payment-status dots keep their class styling' '\.thinking-dot' "$css"
+check 'waiting status has a pulse animation' '@keyframes thinkingStatusPulse' "$css"
 check_absent 'old spinning bullet animation is removed' 'spinning-icon' "$css"
 
 if (( failures > 0 )); then

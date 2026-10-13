@@ -19,10 +19,6 @@ export default {
     startNewConversation: "Start a new conversation",
     responding: "Corez is responding",
     untitledApplication: "Untitled Application",
-    expandStream: "Click to expand response stream",
-    collapseStream: "Click to collapse response stream",
-    expandResponse: "Expand response",
-    collapseResponse: "Collapse response",
   },
 
   // Announced by the thinking indicator's live region while a build runs.
@@ -44,6 +40,10 @@ export default {
   // starts, so a long generation shows progress instead of only a spinner.
   thinking: {
     label: "Thinking",
+    // Live status shown while the model works but has not streamed any
+    // reasoning yet. It is replaced by the reasoning itself the moment the
+    // first thinking event arrives.
+    working: "Working…",
     // Shown on a finished message once the thinking duration is known. The
     // panel renders only when the gateway returns real reasoning — there is
     // no placeholder text when it does not.

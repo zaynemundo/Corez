@@ -161,7 +161,6 @@ function MainApp({ theme, setTheme }) {
   // Which chat the live stream belongs to. The user may switch chats
   // mid-stream; the stream must only render in its originating chat.
   const [streamingSessionId, setStreamingSessionId] = useState(null);
-  const [isStreamCollapsed, setIsStreamCollapsed] = useState(false);
   const [swarmVisible, setSwarmVisible] = useState(false);
   // Live harness phase (planning/building/verifying/repairing/reviewing/…).
   // A build can stream for minutes and is silent while the model reasons or
@@ -1143,7 +1142,6 @@ function MainApp({ theme, setTheme }) {
     }
 
     try {
-      setIsStreamCollapsed(false);
       setStreamingContent("");
       setStreamingThinking("");
       streamingThinkingRef.current = "";
@@ -1154,14 +1152,9 @@ function MainApp({ theme, setTheme }) {
         controller.signal,
         (delta) => {
           setStreamingContent((prev) => (prev || "") + delta);
-          // The answer has started. Collapse the reasoning panel ONLY when
-          // there is reasoning to read: collapsing before any thinking text
-          // arrived hid the empty panel and — on gateways that emit reasoning
-          // late — made the panel look broken. With no reasoning yet the panel
-          // is already showing its wait state, so leave it as it is.
-          if (streamingThinkingRef.current) {
-            setIsThinkingOpen((prev) => (prev ? false : prev));
-          }
+          // The reasoning panel stays open while the answer streams below it:
+          // the live view is the thinking process plus the streaming answer,
+          // not a dots row that hides the reasoning.
         },
         (phaseEvent) => {
           setSwarmVisible(phaseEvent.phase === "swarm-planning");
@@ -1492,56 +1485,28 @@ function MainApp({ theme, setTheme }) {
                   }) && (
                     <div className="message-wrapper ai">
                       <div className="message-body">
-                        <button
-                          type="button"
-                          className="thinking-indicator-box thinking-dots thinking-dots-toggle"
-                          onClick={() => setIsStreamCollapsed((prev) => !prev)}
-                          title={
-                            isStreamCollapsed
-                              ? t("common.shell.expandStream")
-                              : t("common.shell.collapseStream")
-                          }
-                          aria-label={
-                            isStreamCollapsed
-                              ? t("common.shell.expandResponse")
-                              : t("common.shell.collapseResponse")
-                          }
-                        >
-                          {/* The phase is announced, not printed: the visible
-                              row is just the animated dots, and a screen reader
-                              still hears "Planning…", "Verifying…" through this
-                              live region. */}
-                          {buildPhaseLabel(buildPhase)
-                            ? (
-                              <span
-                                className="sr-only"
-                                role="status"
-                                aria-live="polite"
-                              >
-                                {buildPhaseLabel(buildPhase)}
-                              </span>
-                            )
-                            : swarmVisible && (
-                              <span className="sr-only" role="status" aria-live="polite">
-                                {t("common.phase.swarmPlanning")}
-                              </span>
-                            )}
-                          <span className="thinking-dot" />
-                          <span className="thinking-dot" />
-                          <span className="thinking-dot" />
-                        </button>
-                        {streamingThinking && !isStreamCollapsed && (
-                          <ThinkingPanel
-                            text={streamingThinking}
-                            live
-                            expanded={isThinkingOpen}
-                            onToggle={() =>
-                              setIsThinkingOpen((prev) => !prev)
-                            }
-                            bodyId="corez-thinking-body"
-                          />
+                        {/* The three-dot row is gone: the thinking panel itself
+                            is the live indicator. It appears the moment the
+                            request starts — showing a working status until the
+                            first reasoning event — and the reasoning streams
+                            into it while the answer streams below. The phase
+                            ("Planning…", "Verifying…") is still announced, not
+                            printed, through the sr-only live region. */}
+                        {(buildPhaseLabel(buildPhase) || swarmVisible) && (
+                          <span className="sr-only" role="status" aria-live="polite">
+                            {buildPhaseLabel(buildPhase) ||
+                              t("common.phase.swarmPlanning")}
+                          </span>
                         )}
-                        {streamingContent && !isStreamCollapsed && (
+                        <ThinkingPanel
+                          text={streamingThinking}
+                          live
+                          expanded={isThinkingOpen}
+                          onToggle={() => setIsThinkingOpen((prev) => !prev)}
+                          bodyId="corez-thinking-body"
+                          placeholder={t("common.thinking.working")}
+                        />
+                        {streamingContent && (
                           <div
                             className="message-content streaming-text"
                             role="status"
