@@ -120,3 +120,90 @@ export async function deleteAllChats() {
   }
   return await r.json();
 }
+
+// ---------------------------------------------------------------------------
+// Project folders — group chats under a named project (ChatGPT-style).
+// A project is owned by the signed-in account; assigning a chat writes
+// `chats.project_id` server-side, so the grouping roams with the account.
+// ---------------------------------------------------------------------------
+
+const PROJECTS_BASE = "/api/projects";
+
+export async function listProjects() {
+  const r = await fetchJson(PROJECTS_BASE, { method: "GET" });
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw new Error(e.error || `listProjects failed: ${r.status}`);
+  }
+  const d = await r.json();
+  return d.projects || [];
+}
+
+export async function createProject({ name } = {}) {
+  const r = await fetchJson(PROJECTS_BASE, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw new Error(e.error || `createProject failed: ${r.status}`);
+  }
+  return await r.json();
+}
+
+export async function renameProject(projectId, name) {
+  const r = await fetchJson(
+    `${PROJECTS_BASE}/${encodeURIComponent(projectId)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    },
+  );
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw new Error(e.error || `renameProject failed: ${r.status}`);
+  }
+  return await r.json();
+}
+
+export async function deleteProject(projectId) {
+  const r = await fetchJson(
+    `${PROJECTS_BASE}/${encodeURIComponent(projectId)}`,
+    { method: "DELETE" },
+  );
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw new Error(e.error || `deleteProject failed: ${r.status}`);
+  }
+  return await r.json();
+}
+
+export async function addChatToProject(projectId, chatId) {
+  const r = await fetchJson(
+    `${PROJECTS_BASE}/${encodeURIComponent(projectId)}/chats`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chatId }),
+    },
+  );
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw new Error(e.error || `addChatToProject failed: ${r.status}`);
+  }
+  return await r.json();
+}
+
+export async function removeChatFromProject(projectId, chatId) {
+  const r = await fetchJson(
+    `${PROJECTS_BASE}/${encodeURIComponent(projectId)}/chats/${encodeURIComponent(chatId)}`,
+    { method: "DELETE" },
+  );
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw new Error(e.error || `removeChatFromProject failed: ${r.status}`);
+  }
+  return await r.json();
+}

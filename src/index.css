@@ -626,6 +626,7 @@ h6 {
   right: 0;
   z-index: var(--z-dropdown);
   min-width: 140px;
+  max-width: 220px;
   padding: 4px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
@@ -653,6 +654,155 @@ h6 {
 
 .history-menu-item.delete {
   color: var(--market-negative);
+}
+
+/* ------------------------------------------------------------- projects */
+
+.sidebar-section-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+  padding-right: 4px;
+}
+
+.sidebar-section-add {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.sidebar-section-add:hover {
+  color: var(--text-primary);
+  background: var(--sidebar-item-hover-bg);
+}
+
+.sidebar-section-add:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 1px;
+}
+
+.project-name-form {
+  padding: 2px 2px 4px;
+}
+
+.project-name-input {
+  width: 100%;
+  height: 34px;
+  min-height: 34px;
+  padding: 0 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.project-name-input:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 1px;
+}
+
+.project-item {
+  gap: 0.45rem;
+}
+
+.project-chevron {
+  color: var(--text-muted);
+  transition: transform var(--transition-fast);
+}
+
+.project-chevron.expanded {
+  transform: rotate(90deg);
+}
+
+.project-chat-count {
+  flex-shrink: 0;
+  min-width: 16px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: right;
+}
+
+/* Chats filed under a project sit inside a rail, so the grouping is visible
+   without a second colour. */
+.project-chats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin: 2px 0 4px 14px;
+  padding-left: 8px;
+  border-left: 1px solid var(--sidebar-border);
+}
+
+.project-chats .history-item {
+  min-height: 32px;
+  font-size: 13.5px;
+}
+
+.project-new-chat {
+  color: var(--text-muted);
+  min-height: 32px;
+  font-size: 13.5px;
+}
+
+.project-new-chat:hover {
+  color: var(--text-primary);
+}
+
+.project-new-chat:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.project-empty {
+  padding: 6px 10px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.history-menu-label {
+  padding: 6px 8px 2px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.history-menu-scroll {
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.history-menu-item-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.history-menu-item.selected {
+  font-weight: 600;
+}
+
+.history-menu-separator {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--border-color);
 }
 
 .sidebar-footer {

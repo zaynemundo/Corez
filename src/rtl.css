@@ -132,6 +132,38 @@
   left: 0;
 }
 
+[dir="rtl"] .history-menu-item-title,
+[dir="rtl"] .project-chat-count {
+  text-align: right;
+}
+
+/* The project chat rail is a left-edge rule in LTR (index.css); mirror it and
+   the indent. Applies with or without expanded rows. */
+[dir="rtl"] .project-chats {
+  margin: 2px 14px 4px 0;
+  padding-left: 0;
+  padding-right: 8px;
+  border-left: none;
+  border-right: 1px solid var(--sidebar-border);
+}
+
+/* Collapsed folders open to the right in LTR, so the chevron points right;
+   in RTL it points left. Expanded it points down either way. */
+[dir="rtl"] .project-chevron {
+  transform: scaleX(-1);
+}
+
+[dir="rtl"] .project-chevron.expanded {
+  transform: scaleX(-1) rotate(-90deg);
+}
+
+/* Letter-spacing detaches the glyphs of a joined script, and uppercase does
+   nothing for Arabic: the menu label keeps its natural spacing. */
+[dir="rtl"] .history-menu-label {
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 /* ------------------------------------------------------------ pricing page */
 [dir="rtl"] .pricing-card-features,
 [dir="rtl"] .pricing-features-page,

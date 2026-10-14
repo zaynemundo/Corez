@@ -23,30 +23,28 @@ const VALID_TITLE_LEN = 120;
 // ---------------------------------------------------------------------
 // D1 schema helpers
 // ---------------------------------------------------------------------
-let tablesEnsured = false;
-let tablesPromise = null;
+// Keyed by the D1 binding, not a module flag: a long-lived isolate keeps one
+// binding, while tests and local dev swap the database between runs and must
+// get their schema bootstrapped again.
+const tablesReady = new WeakMap();
 export async function ensureChatsTables(env) {
   if (!env?.DB) return;
-  if (tablesEnsured) return;
-  if (tablesPromise) {
-    await tablesPromise;
-    return;
-  }
-  tablesPromise = (async () => {
-    try {
-      // Run table creates in parallel, not 4 sequential round-trips
-      await Promise.all([
-        env.DB.prepare(
-          `CREATE TABLE IF NOT EXISTS chats (
+  const cached = tablesReady.get(env.DB);
+  if (cached) return cached;
+  const ready = (async () => {
+    // Run table creates in parallel, not 4 sequential round-trips
+    await Promise.all([
+      env.DB.prepare(
+        `CREATE TABLE IF NOT EXISTS chats (
             id TEXT PRIMARY KEY,
             user_id TEXT NOT NULL,
             title TEXT NOT NULL DEFAULT 'New Conversation',
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
           )`,
-        ).run(),
-        env.DB.prepare(
-          `CREATE TABLE IF NOT EXISTS chat_messages (
+      ).run(),
+      env.DB.prepare(
+        `CREATE TABLE IF NOT EXISTS chat_messages (
             id TEXT PRIMARY KEY,
             chat_id TEXT NOT NULL,
             user_id TEXT NOT NULL,
@@ -56,25 +54,41 @@ export async function ensureChatsTables(env) {
             created_at INTEGER NOT NULL,
             FOREIGN KEY(chat_id) REFERENCES chats(id) ON DELETE CASCADE
           )`,
-        ).run(),
-      ]);
-      await Promise.all([
-        env.DB.prepare(
-          `CREATE INDEX IF NOT EXISTS idx_chats_user_updated ON chats(user_id, updated_at DESC)`,
-        ).run(),
-        env.DB.prepare(
-          `CREATE INDEX IF NOT EXISTS idx_messages_chat_created ON chat_messages(chat_id, created_at ASC)`,
-        ).run(),
-      ]);
-      tablesEnsured = true;
+      ).run(),
+    ]);
+    // `project_id` belongs to the projects feature, but it is added here with
+    // the rest of the chats schema: every chats read selects the column, so
+    // it must exist as soon as the chats table does. A second run fails with
+    // "duplicate column name" and is ignored on purpose.
+    try {
+      await env.DB.prepare(`ALTER TABLE chats ADD COLUMN project_id TEXT`).run();
     } catch (e) {
-      console.warn("ensureChatsTables failed:", safeErrorDetail(e));
-      // Allow retry on next request
-      tablesPromise = null;
-      throw e;
+      // "duplicate column name" is the expected answer on every run after the
+      // first. Any other failure is real and must not be swallowed: the very
+      // next chats read selects this column.
+      if (!/duplicate column/i.test(String(e?.message || e))) throw e;
     }
+    await Promise.all([
+      env.DB.prepare(
+        `CREATE INDEX IF NOT EXISTS idx_chats_user_updated ON chats(user_id, updated_at DESC)`,
+      ).run(),
+      env.DB.prepare(
+        `CREATE INDEX IF NOT EXISTS idx_chats_project ON chats(project_id, user_id)`,
+      ).run(),
+      env.DB.prepare(
+        `CREATE INDEX IF NOT EXISTS idx_messages_chat_created ON chat_messages(chat_id, created_at ASC)`,
+      ).run(),
+    ]);
   })();
-  await tablesPromise;
+  tablesReady.set(env.DB, ready);
+  try {
+    await ready;
+  } catch (e) {
+    console.warn("ensureChatsTables failed:", safeErrorDetail(e));
+    // Allow retry on next request
+    tablesReady.delete(env.DB);
+    throw e;
+  }
 }
 
 function sanitizeTitle(title) {
@@ -280,7 +294,7 @@ export async function handleChats(request, env) {
   if (pathname === "/api/chats" && request.method === "GET") {
     try {
       const rows = await env.DB.prepare(
-        "SELECT id, title, created_at as createdAt, updated_at as updatedAt FROM chats WHERE user_id = ? ORDER BY updated_at DESC LIMIT 100",
+        "SELECT id, title, created_at as createdAt, updated_at as updatedAt, project_id as projectId FROM chats WHERE user_id = ? ORDER BY updated_at DESC LIMIT 100",
       )
         .bind(userId)
         .all();
@@ -289,6 +303,7 @@ export async function handleChats(request, env) {
         title: r.title,
         createdAt: r.createdAt,
         updatedAt: r.updatedAt,
+        projectId: r.projectId || null,
       }));
       return jsonResponse(200, { chats });
     } catch (e) {
@@ -345,6 +360,18 @@ export async function handleChats(request, env) {
   // -------------------------------------------------------------------
   if (pathname === "/api/chats" && request.method === "DELETE") {
     try {
+      // "Clear history" clears folders too — an empty project list is what the
+      // user asked for. The projects table belongs to worker/projects.js, so
+      // it may not exist on a deployment that never used folders (tolerated);
+      // folders go first so a real database fault aborts before any chat is
+      // deleted, leaving nothing half-erased.
+      try {
+        await env.DB.prepare("DELETE FROM projects WHERE user_id = ?")
+          .bind(userId)
+          .run();
+      } catch (e) {
+        if (!/no such table/i.test(String(e?.message || e))) throw e;
+      }
       // Delete messages first
       await env.DB.prepare("DELETE FROM chat_messages WHERE user_id = ?")
         .bind(userId)
@@ -391,7 +418,7 @@ export async function handleChats(request, env) {
   let chatRow;
   try {
     chatRow = await env.DB.prepare(
-      "SELECT id, title, user_id, created_at, updated_at FROM chats WHERE id = ?",
+      "SELECT id, title, user_id, created_at, updated_at, project_id FROM chats WHERE id = ?",
     )
       .bind(chatId)
       .first();
@@ -445,6 +472,7 @@ export async function handleChats(request, env) {
           title: chatRow.title,
           createdAt: chatRow.created_at,
           updatedAt: chatRow.updated_at,
+          projectId: chatRow.project_id || null,
           messages,
           ...(compacted.meta ? { compactMeta: compacted.meta } : {}),
         },

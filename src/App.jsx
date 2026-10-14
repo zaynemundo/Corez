@@ -129,6 +129,7 @@ function MainApp({ theme, setTheme }) {
 
   const [sessions, setSessions] = useState([]);
   const [sessionsLoaded, setSessionsLoaded] = useState(false);
+  const [projects, setProjects] = useState([]);
   const [chatLoading, setChatLoading] = useState(false);
   const [activeView, setActiveView] = useState("chat");
 
@@ -190,6 +191,12 @@ function MainApp({ theme, setTheme }) {
   useEffect(() => {
     sessionsRef.current = sessions;
   }, [sessions]);
+  // Same mirror for folders: the revert-on-failure paths must know what was on
+  // screen before the optimistic change.
+  const projectsRef = useRef(projects);
+  useEffect(() => {
+    projectsRef.current = projects;
+  }, [projects]);
 
   const activeSessionId = chatIdFromUrl;
   // Ref mirror: async stream completions must compare against the chat the
@@ -211,16 +218,33 @@ function MainApp({ theme, setTheme }) {
     try {
       // AppInner started this request while the session check was still in
       // flight; consume it rather than asking a second time.
-      const chats = await (takeChatList() ?? chatService.listChats());
+      const [chats, projectList] = await Promise.all([
+        takeChatList() ?? chatService.listChats(),
+        // Project folders are additive: a deployment without the endpoint (or
+        // a transient failure) must still render the plain chat list.
+        chatService.listProjects().catch((e) => {
+          console.warn("Failed to list projects:", e);
+          return [];
+        }),
+      ]);
       const mapped = chats.map((c) => ({
         id: c.id,
         title: c.title,
         messages: [],
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
+        projectId: c.projectId || null,
         _loaded: false,
       }));
       setSessions(mapped);
+      setProjects(
+        projectList.map((p) => ({
+          id: p.id,
+          name: p.name,
+          createdAt: p.createdAt,
+          updatedAt: p.updatedAt,
+        })),
+      );
       setSessionsLoaded(true);
 
       // Migration: if server has 0 chats but localStorage has sessions, migrate in BACKGROUND
@@ -277,6 +301,7 @@ function MainApp({ theme, setTheme }) {
                         messages: [],
                         createdAt: c.createdAt,
                         updatedAt: c.updatedAt,
+                        projectId: c.projectId || null,
                         _loaded: false,
                       })),
                     );
@@ -397,6 +422,9 @@ function MainApp({ theme, setTheme }) {
               messages: msgs,
               createdAt: data.createdAt,
               updatedAt: data.updatedAt,
+              // Keep the folder the server reports, so a deep-linked chat is
+              // grouped the moment it appears (the list arrives later).
+              projectId: data.projectId || null,
               _loaded: true,
               _compactMeta: compactMeta,
               _fullMessages: fullMessages,
@@ -800,6 +828,9 @@ function MainApp({ theme, setTheme }) {
   const handleClearAllHistory = async () => {
     const ids = sessions.map((s) => s.id);
     setSessions([]);
+    // Folders go with the history they organise: DELETE /api/chats clears the
+    // account's projects in the same call.
+    setProjects([]);
     navigate("/");
     setActiveCanvasCode("");
     setSettingsOpen(false);
@@ -814,6 +845,149 @@ function MainApp({ theme, setTheme }) {
     }
     ids.forEach((id) => deleteSessionAppsInR2(id).catch(() => {}));
   };
+
+  // -------------------------------------------------------------
+  // Project folders — group chats under a named project. The link is stored
+  // server-side on the chat (`chats.project_id`), so the sidebar grouping
+  // roams with the account like the chats themselves.
+  // -------------------------------------------------------------
+  const handleCreateProject = useCallback(async (name) => {
+    const created = await chatService.createProject({ name });
+    const project = {
+      id: created.id,
+      name: created.name,
+      createdAt: created.createdAt,
+      updatedAt: created.updatedAt,
+    };
+    setProjects((prev) => [
+      project,
+      ...prev.filter((p) => p.id !== project.id),
+    ]);
+    return project;
+  }, []);
+
+  const handleRenameProject = useCallback(async (projectId, name) => {
+    const previousName =
+      projectsRef.current.find((p) => p.id === projectId)?.name ?? null;
+    // Optimistic: the row shows the new name at once and the write follows.
+    setProjects((prev) =>
+      prev.map((p) => (p.id === projectId ? { ...p, name } : p)),
+    );
+    try {
+      await chatService.renameProject(projectId, name);
+    } catch (e) {
+      console.warn("Failed to rename project:", e);
+      // The rename editor has closed by now, so a silent failure would leave
+      // a name the account does not have until the next reload. Put it back.
+      if (previousName != null) {
+        setProjects((prev) =>
+          prev.map((p) => (p.id === projectId ? { ...p, name: previousName } : p)),
+        );
+      }
+    }
+  }, []);
+
+  const handleDeleteProject = useCallback(async (projectId) => {
+    const index = projectsRef.current.findIndex((p) => p.id === projectId);
+    const project = index >= 0 ? projectsRef.current[index] : null;
+    const affectedChatIds = sessionsRef.current
+      .filter((s) => s.projectId === projectId)
+      .map((s) => s.id);
+    // Chats are kept: deleting a folder only files its chats back into the
+    // plain Chats list (server-side the same unassignment happens).
+    setProjects((prev) => prev.filter((p) => p.id !== projectId));
+    setSessions((prev) =>
+      prev.map((s) => (s.projectId === projectId ? { ...s, projectId: null } : s)),
+    );
+    try {
+      await chatService.deleteProject(projectId);
+    } catch (e) {
+      console.warn("Failed to delete project:", e);
+      // The server still has the folder: restore it in place rather than
+      // showing its chats as ungrouped until the next reload.
+      if (project) {
+        setProjects((prev) => {
+          if (prev.some((p) => p.id === projectId)) return prev;
+          const next = [...prev];
+          next.splice(Math.min(Math.max(index, 0), next.length), 0, project);
+          return next;
+        });
+      }
+      if (affectedChatIds.length > 0) {
+        const affected = new Set(affectedChatIds);
+        setSessions((prev) =>
+          prev.map((s) =>
+            affected.has(s.id) ? { ...s, projectId } : s,
+          ),
+        );
+      }
+    }
+  }, []);
+
+  const handleMoveSessionToProject = useCallback(async (sessionId, projectId) => {
+    const session = sessionsRef.current.find((s) => s.id === sessionId);
+    const previousProjectId = session?.projectId || null;
+    if (previousProjectId === projectId) return;
+    const next = sessionsRef.current.map((s) =>
+      s.id === sessionId ? { ...s, projectId: projectId || null } : s,
+    );
+    // Keep the synchronous mirror ahead of the render: a second move (or the
+    // failure path below) must never read the grouping this one replaced.
+    sessionsRef.current = next;
+    setSessions(next);
+    try {
+      if (projectId) {
+        await chatService.addChatToProject(projectId, sessionId);
+      } else if (previousProjectId) {
+        await chatService.removeChatFromProject(previousProjectId, sessionId);
+      }
+    } catch (e) {
+      console.warn("Failed to move the chat:", e);
+      // Revert: the sidebar must never show a grouping the account does not
+      // actually have, so a reload cannot "lose" the chat from its folder.
+      const reverted = sessionsRef.current.map((s) =>
+        s.id === sessionId ? { ...s, projectId: previousProjectId } : s,
+      );
+      sessionsRef.current = reverted;
+      setSessions(reverted);
+    }
+  }, []);
+
+  const handleNewChatInProject = useCallback(
+    async (projectId) => {
+      setActiveView("chat");
+      setCanvasOpen(false);
+      setCanvasFullScreen(false);
+      setActiveCanvasCode(null);
+      setRevisionContextCode("");
+      try {
+        const created = await chatService.createChat({});
+        let assigned = true;
+        try {
+          await chatService.addChatToProject(projectId, created.id);
+        } catch (e) {
+          // The chat exists; it simply falls back to the plain list.
+          assigned = false;
+          console.warn("Failed to file the new chat into its project:", e);
+        }
+        const newSession = {
+          id: created.id,
+          title: created.title,
+          messages: [],
+          createdAt: created.createdAt,
+          updatedAt: created.updatedAt,
+          projectId: assigned ? projectId : null,
+          _loaded: true,
+        };
+        setSessions((prev) => [newSession, ...prev]);
+        navigate(`/chat/${created.id}`);
+      } catch (e) {
+        console.warn("Failed to create a chat in the project:", e);
+        navigate("/");
+      }
+    },
+    [navigate],
+  );
 
   const handleCloseCanvas = () => {
     userDismissedCanvasRef.current = true;
@@ -882,6 +1056,7 @@ function MainApp({ theme, setTheme }) {
           messages: [],
           createdAt: created.createdAt,
           updatedAt: created.updatedAt,
+          projectId: created.projectId || null,
           _loaded: true,
         };
         setSessions((prev) => [newSession, ...prev]);
@@ -898,6 +1073,7 @@ function MainApp({ theme, setTheme }) {
           id: targetSessionId,
           title: provisionalTitle,
           messages: [],
+          projectId: null,
           _loaded: true,
         };
         setSessions((prev) => [fallbackSession, ...prev]);
@@ -1394,6 +1570,12 @@ function MainApp({ theme, setTheme }) {
           setTheme((prev) => (prev === "dark" ? "light" : "dark"))
         }
         onCloseSidebar={() => setSidebarOpen(false)}
+        projects={projects}
+        onCreateProject={handleCreateProject}
+        onRenameProject={handleRenameProject}
+        onDeleteProject={handleDeleteProject}
+        onMoveSessionToProject={handleMoveSessionToProject}
+        onNewChatInProject={handleNewChatInProject}
       />
 
       {isMobileViewport && sidebarOpen && (

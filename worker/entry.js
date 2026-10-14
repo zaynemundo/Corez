@@ -25,6 +25,7 @@ import {
   verifySession,
 } from "./auth.js";
 import { handleChats } from "./chats.js";
+import { handleProjects } from "./projects.js";
 import { handleN8nWebhook } from "./n8nBridge.js";
 import { handleZiina } from "./ziina.js";
 import { handleSubscriptions } from "./subscriptions.js";
@@ -201,6 +202,17 @@ export default {
       if (chatsRes) return withDirectAiCors(chatsRes);
     }
 
+    // Project folders — same pre-gate placement as chats: the handler
+    // authorises with verifySession itself so a missing AUTH_SECRET follows the
+    // chats path rather than the generic gate.
+    if (
+      url.pathname === "/api/projects" ||
+      url.pathname.startsWith("/api/projects/")
+    ) {
+      const projectsRes = await handleProjects(request, env);
+      if (projectsRes) return withDirectAiCors(projectsRes);
+    }
+
     // Auth gate - protect AI and app APIs. Published creations (/api/publish
     // output at /<slug> and their referenced assets at /api/assets/<key>) must
     // stay OPEN to anonymous visitors so share links render for everyone. The
@@ -217,6 +229,7 @@ export default {
       "/api/image",
       "/api/apps",
       "/api/memory",
+      "/api/projects",
       "/api/publish",
       "/api/assets",
       "/api/chats",
