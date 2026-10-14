@@ -230,6 +230,12 @@ check_block_property_in_media 'projects add button stays visible on touch device
 check_block_property 'sidebar list reserves its scrollbar gutter' '.chat-history-list' 'scrollbar-gutter' 'stable'
 check_block_property 'menus flip upward when the list has no room below' '.history-menu-dropdown.drop-up' 'top' 'auto'
 check_block_property 'menu project list contains its own scroll' '.history-menu-scroll' 'overscroll-behavior' 'contain'
+# The new-chat control belongs to the folder row, beside its options menu: an
+# open project never repeats a full-width new-chat row inside the nested list.
+check 'project row carries the new-chat icon button' 'className="project-new-chat-btn"' "$sidebar"
+check_absent 'nested project list does not repeat the new-chat row' 'history-item project-new-chat"' "$sidebar"
+check_block_property 'the row new-chat control is sized like the menu button' '.project-new-chat-btn' 'width' '26px'
+check_block_property 'the row new-chat control is always visible while its project is open' '.project-new-chat-btn' 'opacity' '0.65'
 check 'recent chats section is a disclosure' 'aria-controls="sidebar-chats-list"' "$sidebar"
 check 'recent chats list is identified for the toggle' 'id="sidebar-chats-list"' "$sidebar"
 check 'recent chats disclosure state is exposed' 'aria-expanded=\{chatsOpen\}' "$sidebar"

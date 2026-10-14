@@ -868,18 +868,33 @@ h6 {
   font-size: 13.5px;
 }
 
-.project-new-chat {
-  color: var(--text-muted);
-  min-height: 32px;
-  font-size: 13.5px;
+/* The folder row's new-chat control: an icon button beside the options menu,
+   live whenever the project is open. Sized like the menu button so the two
+   read as one trailing control cluster. */
+.project-new-chat-btn {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0.65;
+  transition: var(--transition-fast);
 }
 
-.project-new-chat:hover {
+.project-new-chat-btn:hover:not(:disabled) {
   color: var(--text-primary);
+  background: var(--sidebar-item-hover-bg);
+  opacity: 1;
 }
 
-.project-new-chat:disabled {
-  opacity: 0.5;
+.project-new-chat-btn:disabled {
+  opacity: 0.35;
   cursor: default;
 }
 

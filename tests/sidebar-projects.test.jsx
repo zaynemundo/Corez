@@ -286,7 +286,7 @@ describe("sidebar project folders", () => {
     expect(handlers.onMoveSessionToProject).toHaveBeenCalledWith("chat-1", null);
   });
 
-  it("starts a new chat inside an open project", async () => {
+  it("starts a new chat from the icon beside the project options", async () => {
     const user = userEvent.setup();
     const handlers = renderSidebar({
       sessions: sessions(),
@@ -294,8 +294,23 @@ describe("sidebar project folders", () => {
       activeSessionId: "chat-2",
     });
 
-    await user.click(screen.getByRole("button", { name: "Open project Marketing" }));
-    await user.click(screen.getByTitle("New chat in Marketing"));
+    const row = screen.getByRole("button", { name: "Open project Marketing" });
+    // A closed folder keeps just its mark: the control arrives with the
+    // open project.
+    expect(screen.queryByTitle("New chat in Marketing")).toBeNull();
+
+    await user.click(row);
+
+    const newChat = screen.getByTitle("New chat in Marketing");
+    // On the folder row itself, immediately beside the options menu — not
+    // inside the nested chats list.
+    expect(row.contains(newChat)).toBe(true);
+    expect(newChat.closest(".project-chats")).toBeNull();
+    expect(
+      newChat.nextElementSibling.classList.contains("history-item-menu"),
+    ).toBe(true);
+
+    await user.click(newChat);
 
     expect(handlers.onNewChatInProject).toHaveBeenCalledWith("proj-1");
   });

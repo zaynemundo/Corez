@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Folder,
   FolderOpen,
+  MessageSquarePlus,
   Check,
   Pencil,
   Plus,
@@ -490,6 +491,32 @@ export default function Sidebar({
                         {projectSessions.length}
                       </span>
                     )}
+                    {/* New chat lives on the folder row, beside the options
+                        menu, so an open project never needs a trip into the
+                        nested list to start its next chat. */}
+                    {isExpanded && (
+                      <button
+                        type="button"
+                        className="project-new-chat-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startChatInProject(project.id);
+                        }}
+                        disabled={busyProjectId === project.id}
+                        title={t("common.sidebar.newChatInProject", {
+                          name: project.name,
+                        })}
+                        aria-label={t("common.sidebar.newChatInProject", {
+                          name: project.name,
+                        })}
+                      >
+                        <MessageSquarePlus
+                          size={14}
+                          strokeWidth={1.5}
+                          aria-hidden="true"
+                        />
+                      </button>
+                    )}
                     <div className="history-item-menu project-item-menu">
                       <button
                         type="button"
@@ -546,23 +573,6 @@ export default function Sidebar({
 
                   {isExpanded && (
                     <div className="project-chats" id={chatsRegionId}>
-                      <button
-                        type="button"
-                        className="history-item project-new-chat"
-                        onClick={() => startChatInProject(project.id)}
-                        disabled={busyProjectId === project.id}
-                        title={t("common.sidebar.newChatInProject", {
-                          name: project.name,
-                        })}
-                        aria-label={t("common.sidebar.newChatInProject", {
-                          name: project.name,
-                        })}
-                      >
-                        <Plus size={14} strokeWidth={1.5} aria-hidden="true" />
-                        <span className="history-item-title">
-                          {t("common.sidebar.newChat")}
-                        </span>
-                      </button>
                       {projectSessions.length === 0 ? (
                         <div className="project-empty">
                           {t("common.sidebar.emptyProject")}
