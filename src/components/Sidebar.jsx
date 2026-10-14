@@ -8,6 +8,8 @@ import {
   Trash2,
   SquarePen,
   ChevronRight,
+  Folder,
+  FolderOpen,
   Check,
   Pencil,
   Plus,
@@ -443,12 +445,21 @@ export default function Sidebar({
                       }
                     }}
                   >
-                    <ChevronRight
-                      className={`sidebar-chevron ${isExpanded ? "expanded" : ""}`}
-                      size={14}
-                      strokeWidth={1.5}
-                      aria-hidden="true"
-                    />
+                    {isExpanded ? (
+                      <FolderOpen
+                        className="project-folder-icon"
+                        size={15}
+                        strokeWidth={1.5}
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <Folder
+                        className="project-folder-icon"
+                        size={15}
+                        strokeWidth={1.5}
+                        aria-hidden="true"
+                      />
+                    )}
                     {isEditing ? (
                       <input
                         className="project-name-input project-rename-input"

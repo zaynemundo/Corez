@@ -825,6 +825,14 @@ h6 {
   gap: 0.45rem;
 }
 
+/* A project row leads with a folder mark instead of a disclosure caret: the
+   open/closed folder glyph carries the expanded state, so the icon never
+   rotates and the row keeps the folder metaphor. */
+.project-folder-icon {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
 .sidebar-chevron {
   color: var(--text-muted);
   transition: transform var(--transition-fast);

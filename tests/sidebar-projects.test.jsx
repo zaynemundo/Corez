@@ -118,6 +118,29 @@ describe("sidebar project folders", () => {
     expect(screen.getByText("Alpha")).toBeTruthy();
   });
 
+  it("leads a project with a folder mark that opens with the project", async () => {
+    const user = userEvent.setup();
+    renderSidebar({
+      sessions: sessions(),
+      projects: [PROJECT],
+      activeSessionId: "chat-2",
+    });
+
+    const row = () => screen.getByRole("button", { name: "Open project Marketing" });
+    // Collapsed: a closed folder, not a disclosure caret.
+    expect(
+      row().querySelector(".project-folder-icon.lucide-folder"),
+    ).toBeTruthy();
+
+    await user.click(row());
+
+    // Expanded: the same mark opens rather than rotating.
+    expect(
+      row().querySelector(".project-folder-icon.lucide-folder-open"),
+    ).toBeTruthy();
+    expect(row().querySelector(".project-folder-icon.lucide-folder")).toBeNull();
+  });
+
   it("creates a project from the inline name field", async () => {
     const user = userEvent.setup();
     const handlers = renderSidebar({ sessions: [], projects: [] });
