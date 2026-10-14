@@ -238,7 +238,7 @@ check 'projects list is identified for the toggle' 'id="sidebar-projects-list"' 
 check 'projects disclosure state is exposed' 'aria-expanded=\{projectsOpen\}' "$sidebar"
 # Section labels and chat titles line up on the same left edge: the heading row
 # carries a 12px inset and the list adds the same 8px it gives every row.
-check_block_property 'section headings use the chat rows left inset' '.sidebar-section-toggle' 'padding' '8px 6px 4px 12px'
+check_block_property 'section headings use the chat rows left inset' '.sidebar-section-toggle' 'padding' '12px'
 check_block_property 'chat rows keep the matching left inset' '.history-item' 'padding' '0 0.75rem'
 
 # Polished Glass Sidebar Contract Checks
@@ -250,6 +250,8 @@ check 'sidebar radius token set to 0px' '--sidebar-radius: 0px;'
 check 'sidebar heading size token set to 11px' '--sidebar-heading-size: 11px;'
 check 'sidebar body size token set to 14px' '--sidebar-body-size: 14px;'
 check 'sidebar hit target min height set to 38px' '--sidebar-item-min-height: 38px;'
+check 'sidebar section gap token set to 10px' '--sidebar-section-gap: 10px;'
+check_block_property 'sidebar sections consume the section gap token' '.sidebar-section-row' 'margin-top' 'var(--sidebar-section-gap)'
 check_block_property 'sidebar block consumes margin token' '.sidebar' 'margin' 'var(--sidebar-margin)'
 check_block_property 'sidebar block consumes radius token' '.sidebar' 'border-radius' 'var(--sidebar-radius)'
 check_block_property 'sidebar block consumes background token' '.sidebar' 'background-color' 'var(--sidebar-bg)'
