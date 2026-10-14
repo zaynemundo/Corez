@@ -228,7 +228,8 @@ check_block_property 'projects add button marks keyboard focus without a ring' '
 check_block_property 'the project name field draws no focus ring' '.project-name-input:focus-visible' 'outline' 'none'
 check_block_property_in_media 'projects add button stays visible on touch devices' 'hover: none' '.sidebar-section-add' 'opacity' '0.65'
 check_block_property 'sidebar list reserves its scrollbar gutter' '.chat-history-list' 'scrollbar-gutter' 'stable'
-check_block_property 'menus flip upward when the list has no room below' '.history-menu-dropdown.drop-up' 'top' 'auto'
+check_block_property 'row menus float beside the sidebar' '.history-menu-dropdown' 'position' 'fixed'
+check_block_property 'floating menus stay above the mobile drawer' '.history-menu-dropdown' 'z-index' 'var(--z-sidebar-mobile)'
 check_block_property 'menu project list contains its own scroll' '.history-menu-scroll' 'overscroll-behavior' 'contain'
 # Every row menu paints one fixed size and every entry stays on one line: a
 # long label or project name truncates with an ellipsis instead of growing the

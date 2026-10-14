@@ -22,18 +22,18 @@ import { I18nProvider } from "../src/i18n/index.jsx";
 
 const PROJECT = { id: "proj-1", name: "Marketing" };
 
-/** A measured element, for the tests that exercise menu geometry: jsdom has no
- *  layout, so they supply the rects the drop-up decision reads. */
-function rectAt(bottom) {
+/** A measured row rect for the menu-placement tests. jsdom has no layout, so
+ *  the tests supply the geometry the floating menu reads. */
+function rowRect(top, left = 200) {
   return {
-    top: bottom - 38,
-    bottom,
-    left: 0,
-    right: 240,
-    width: 240,
+    top,
+    bottom: top + 38,
+    left,
+    right: left + 40,
+    width: 40,
     height: 38,
-    x: 0,
-    y: bottom - 38,
+    x: left,
+    y: top,
     toJSON: () => ({}),
   };
 }
@@ -448,7 +448,7 @@ describe("sidebar project folders", () => {
     expect(handlers.onNewChat).toHaveBeenCalledTimes(1);
   });
 
-  it("opens the chat menu upward when the list has no room below the row", async () => {
+  it("floats the row menu beside the sidebar, next to its row", async () => {
     const user = userEvent.setup();
     renderSidebar({
       sessions: sessions(),
@@ -456,19 +456,43 @@ describe("sidebar project folders", () => {
       activeSessionId: "chat-2",
     });
 
-    // The row sits at the list's bottom edge, so a menu growing down would be
-    // clipped by the sidebar's scroll container. jsdom has no layout: the test
-    // provides the geometry the decision reads.
-    document.querySelector(".chat-history-list").getBoundingClientRect = () =>
-      rectAt(600);
+    // jsdom has no layout: supply the rect the placement reads.
     const button = screen.getByRole("button", { name: "Options for Beta" });
-    button.getBoundingClientRect = () => rectAt(590);
+    button.getBoundingClientRect = () => rowRect(120);
 
     await user.click(button);
-    expect(screen.getByRole("menu").className).toContain("drop-up");
+
+    const menu = screen.getByRole("menu");
+    // Portaled out of the sidebar and pinned to viewport coordinates: it opens
+    // to the RIGHT of the row (right 240 + 8), not over the narrow sidebar.
+    expect(menu.closest(".sidebar")).toBeNull();
+    expect(menu.style.left).toBe("248px");
+    expect(menu.style.top).toBe("120px");
   });
 
-  it("keeps the chat menu downward when the row has room below it", async () => {
+  it("floats the row menu on the sidebar's other side in Arabic", async () => {
+    const user = userEvent.setup();
+    renderSidebar({
+      sessions: sessions(),
+      projects: [PROJECT],
+      activeSessionId: "chat-2",
+    });
+    // After mount, so the i18n provider's own dir write cannot overwrite it.
+    document.documentElement.setAttribute("dir", "rtl");
+    try {
+      const button = screen.getByRole("button", { name: "Options for Beta" });
+      button.getBoundingClientRect = () => rowRect(120, 600);
+
+      await user.click(button);
+
+      // RTL puts the sidebar on the right, so the panel opens to its left.
+      expect(screen.getByRole("menu").style.left).toBe("372px");
+    } finally {
+      document.documentElement.removeAttribute("dir");
+    }
+  });
+
+  it("nudges a floating menu up when it would run past the viewport", async () => {
     const user = userEvent.setup();
     renderSidebar({
       sessions: sessions(),
@@ -476,13 +500,25 @@ describe("sidebar project folders", () => {
       activeSessionId: "chat-2",
     });
 
-    document.querySelector(".chat-history-list").getBoundingClientRect = () =>
-      rectAt(800);
-    const button = screen.getByRole("button", { name: "Options for Beta" });
-    button.getBoundingClientRect = () => rectAt(300);
+    // The row sits low on an 768px-tall viewport and the panel measures 600px:
+    // the top must be pulled up to 768 - 600 - 8.
+    const original = HTMLElement.prototype.getBoundingClientRect;
+    HTMLElement.prototype.getBoundingClientRect = function () {
+      if (this.classList?.contains("history-menu-dropdown")) {
+        return { ...rowRect(0), height: 600, bottom: 600 };
+      }
+      return original.call(this);
+    };
+    try {
+      const button = screen.getByRole("button", { name: "Options for Beta" });
+      button.getBoundingClientRect = () => rowRect(500);
 
-    await user.click(button);
-    expect(screen.getByRole("menu").className).not.toContain("drop-up");
+      await user.click(button);
+
+      expect(screen.getByRole("menu").style.top).toBe("160px");
+    } finally {
+      HTMLElement.prototype.getBoundingClientRect = original;
+    }
   });
 
   it("leaves an open section truly empty when it has nothing to show", () => {

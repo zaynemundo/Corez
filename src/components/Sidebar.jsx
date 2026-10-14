@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../i18n/index.jsx";
 import {
@@ -15,23 +16,30 @@ import {
   Plus,
 } from "lucide-react";
 
-// The tallest menu a row can open: move-to-project (label + its 180px list +
-// separator + delete). Less room than this below the row means the menu would
-// be clipped by the sidebar's scroll container.
-const MENU_ROOM_PX = 260;
+// Fixed width of `.history-menu-dropdown` in index.css. The floating menu is
+// placed from this number before it has ever rendered, so the two must stay in
+// step (the responsive contract pins the 220px width).
+const MENU_WIDTH_PX = 220;
+const MENU_GAP_PX = 8;
 
 /**
- * True when a menu opened from `element` must grow upward. The menus are
- * absolutely positioned inside the sidebar's scrolling list, which clips
- * whatever passes its bottom edge — the user sees half a menu and no way to
- * scroll to the rest.
+ * Where a row's menu floats for a given trigger. The menu is portaled to the
+ * document body and pinned with `position: fixed`, so it escapes the sidebar's
+ * clipping entirely: it opens just OUTSIDE the sidebar, beside its row, over
+ * the content area — mirrored in RTL, where the sidebar sits on the right.
+ * Both axes are clamped so a menu opened near an edge stays fully visible.
  */
-function menuOpensUp(element) {
-  const list = element?.closest?.(".chat-history-list");
-  if (!list) return false;
-  const row = element.getBoundingClientRect();
-  const boundary = list.getBoundingClientRect();
-  return boundary.bottom - row.bottom < MENU_ROOM_PX;
+function menuPlacement(trigger) {
+  const rect = trigger.getBoundingClientRect();
+  const rtl = document.documentElement.getAttribute("dir") === "rtl";
+  const beside = rtl
+    ? rect.left - MENU_WIDTH_PX - MENU_GAP_PX
+    : rect.right + MENU_GAP_PX;
+  const maxLeft = window.innerWidth - MENU_WIDTH_PX - MENU_GAP_PX;
+  return {
+    left: Math.max(MENU_GAP_PX, Math.min(beside, maxLeft)),
+    top: rect.top,
+  };
 }
 
 export default function Sidebar({
@@ -61,9 +69,11 @@ export default function Sidebar({
   const { t } = useI18n();
   const [openMenuId, setOpenMenuId] = useState(null);
   const [openProjectMenuId, setOpenProjectMenuId] = useState(null);
-  // Which way the open menu grows. Recomputed on every open, never while it is
-  // open, so scrolling under an open menu cannot flip it mid-interaction.
-  const [menuDropUp, setMenuDropUp] = useState(false);
+  // Viewport position of the open menu (only one is ever open at a time).
+  // Recomputed on every open; scrolling or resizing dismisses the menu instead
+  // of letting it drift away from the row it belongs to.
+  const [menuPos, setMenuPos] = useState(null);
+  const menuRef = useRef(null);
   const [expandedProjectIds, setExpandedProjectIds] = useState(() => new Set());
   const [creatingProject, setCreatingProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
@@ -78,16 +88,57 @@ export default function Sidebar({
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (!event.target.closest(".history-item-menu")) {
+      // The menu is portaled to the body, so it is no longer a descendant of
+      // the row that owns it: a mousedown inside the panel must not be read as
+      // a click outside, or the item under the pointer would unmount before
+      // its click fires.
+      const insideMenu = Boolean(
+        event.target.closest?.(".history-menu-dropdown"),
+      );
+      if (!insideMenu && !event.target.closest(".history-item-menu")) {
         setOpenMenuId(null);
       }
-      if (!event.target.closest(".project-item-menu")) {
+      if (!insideMenu && !event.target.closest(".project-item-menu")) {
         setOpenProjectMenuId(null);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // The panel is measured after paint and nudged up when it would run past the
+  // bottom edge; a panel taller than the viewport pins to the top gap.
+  useLayoutEffect(() => {
+    if (!menuPos || !menuRef.current) return;
+    const { height } = menuRef.current.getBoundingClientRect();
+    const maxTop = window.innerHeight - height - MENU_GAP_PX;
+    const top = Math.max(MENU_GAP_PX, Math.min(menuPos.top, maxTop));
+    if (top !== menuPos.top) setMenuPos((prev) => ({ ...prev, top }));
+  }, [menuPos]);
+
+  const anyMenuOpen = openMenuId !== null || openProjectMenuId !== null;
+  useEffect(() => {
+    if (!anyMenuOpen) return undefined;
+    // A floating menu is pinned to viewport coordinates: the shell moving
+    // under it would leave it pointing at nothing, so dismiss instead.
+    // Scrolling the menu's own project list must not dismiss it.
+    const dismiss = (event) => {
+      if (
+        event.target instanceof Element &&
+        event.target.closest(".history-menu-dropdown")
+      ) {
+        return;
+      }
+      setOpenMenuId(null);
+      setOpenProjectMenuId(null);
+    };
+    window.addEventListener("scroll", dismiss, true);
+    window.addEventListener("resize", dismiss);
+    return () => {
+      window.removeEventListener("scroll", dismiss, true);
+      window.removeEventListener("resize", dismiss);
+    };
+  }, [anyMenuOpen]);
 
   const projectIds = useMemo(
     () => new Set(projects.map((project) => project.id)),
@@ -222,7 +273,11 @@ export default function Sidebar({
           onClick={(e) => {
             e.stopPropagation();
             const opening = openMenuId !== session.id;
-            if (opening) setMenuDropUp(menuOpensUp(e.currentTarget));
+            if (opening) {
+              // Only one menu is ever open, so only one position is tracked.
+              setOpenProjectMenuId(null);
+              setMenuPos(menuPlacement(e.currentTarget));
+            }
             setOpenMenuId(opening ? session.id : null);
           }}
           title={t("common.sidebar.chatOptions")}
@@ -233,75 +288,83 @@ export default function Sidebar({
         >
           <MoreVertical size={14} strokeWidth={1.5} />
         </button>
-        {openMenuId === session.id && (
-          <div
-            className={`history-menu-dropdown ${menuDropUp ? "drop-up" : ""}`}
-            role="menu"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {projects.length > 0 && (
-              <>
-                <div className="history-menu-label">
-                  {t("common.sidebar.moveToProject")}
-                </div>
-                <div className="history-menu-scroll">
-                  {projects.map((project) => (
-                    <button
-                      key={project.id}
-                      type="button"
-                      className={`history-menu-item ${
-                        project.id === currentProjectId ? "selected" : ""
-                      }`}
-                      role="menuitem"
-                      onClick={() => {
-                        setOpenMenuId(null);
-                        if (project.id !== currentProjectId) {
-                          onMoveSessionToProject(session.id, project.id);
-                        }
-                      }}
-                    >
-                      <span className="history-menu-item-title">
-                        {project.name}
-                      </span>
-                      {project.id === currentProjectId && (
-                        <Check size={14} strokeWidth={1.5} aria-hidden="true" />
-                      )}
-                    </button>
-                  ))}
-                  {currentProjectId && (
-                    <button
-                      type="button"
-                      className="history-menu-item"
-                      role="menuitem"
-                      onClick={() => {
-                        setOpenMenuId(null);
-                        onMoveSessionToProject(session.id, null);
-                      }}
-                    >
-                      <span className="history-menu-item-title">
-                        {t("common.sidebar.noProject")}
-                      </span>
-                    </button>
-                  )}
-                </div>
-                <div className="history-menu-separator" role="separator" />
-              </>
-            )}
-            <button
-              type="button"
-              className="history-menu-item delete"
-              role="menuitem"
-              onClick={(e) => {
-                e.stopPropagation();
-                setOpenMenuId(null);
-                onDeleteSession(session.id);
-              }}
+        {openMenuId === session.id &&
+          createPortal(
+            <div
+              ref={menuRef}
+              className="history-menu-dropdown"
+              role="menu"
+              style={{ left: menuPos?.left ?? 0, top: menuPos?.top ?? 0 }}
+              onClick={(e) => e.stopPropagation()}
             >
-              <Trash2 size={14} strokeWidth={1.5} />
-              <span>{t("common.sidebar.delete")}</span>
-            </button>
-          </div>
-        )}
+              {projects.length > 0 && (
+                <>
+                  <div className="history-menu-label">
+                    {t("common.sidebar.moveToProject")}
+                  </div>
+                  <div className="history-menu-scroll">
+                    {projects.map((project) => (
+                      <button
+                        key={project.id}
+                        type="button"
+                        className={`history-menu-item ${
+                          project.id === currentProjectId ? "selected" : ""
+                        }`}
+                        role="menuitem"
+                        onClick={() => {
+                          setOpenMenuId(null);
+                          if (project.id !== currentProjectId) {
+                            onMoveSessionToProject(session.id, project.id);
+                          }
+                        }}
+                      >
+                        <span className="history-menu-item-title">
+                          {project.name}
+                        </span>
+                        {project.id === currentProjectId && (
+                          <Check
+                            size={14}
+                            strokeWidth={1.5}
+                            aria-hidden="true"
+                          />
+                        )}
+                      </button>
+                    ))}
+                    {currentProjectId && (
+                      <button
+                        type="button"
+                        className="history-menu-item"
+                        role="menuitem"
+                        onClick={() => {
+                          setOpenMenuId(null);
+                          onMoveSessionToProject(session.id, null);
+                        }}
+                      >
+                        <span className="history-menu-item-title">
+                          {t("common.sidebar.noProject")}
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                  <div className="history-menu-separator" role="separator" />
+                </>
+              )}
+              <button
+                type="button"
+                className="history-menu-item delete"
+                role="menuitem"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpenMenuId(null);
+                  onDeleteSession(session.id);
+                }}
+              >
+                <Trash2 size={14} strokeWidth={1.5} />
+                <span>{t("common.sidebar.delete")}</span>
+              </button>
+            </div>,
+            document.body,
+          )}
       </div>
     </div>
   );
@@ -524,7 +587,12 @@ export default function Sidebar({
                         onClick={(e) => {
                           e.stopPropagation();
                           const opening = openProjectMenuId !== project.id;
-                          if (opening) setMenuDropUp(menuOpensUp(e.currentTarget));
+                          if (opening) {
+                            // Only one menu is ever open, so only one position
+                            // is tracked.
+                            setOpenMenuId(null);
+                            setMenuPos(menuPlacement(e.currentTarget));
+                          }
                           setOpenProjectMenuId(opening ? project.id : null);
                         }}
                         title={t("common.sidebar.projectOptions")}
@@ -535,39 +603,46 @@ export default function Sidebar({
                       >
                         <MoreVertical size={14} strokeWidth={1.5} />
                       </button>
-                      {openProjectMenuId === project.id && (
-                        <div
-                          className={`history-menu-dropdown ${menuDropUp ? "drop-up" : ""}`}
-                          role="menu"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <button
-                            type="button"
-                            className="history-menu-item"
-                            role="menuitem"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              startRenameProject(project);
+                      {openProjectMenuId === project.id &&
+                        createPortal(
+                          <div
+                            ref={menuRef}
+                            className="history-menu-dropdown"
+                            role="menu"
+                            style={{
+                              left: menuPos?.left ?? 0,
+                              top: menuPos?.top ?? 0,
                             }}
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            <Pencil size={14} strokeWidth={1.5} />
-                            <span>{t("common.sidebar.renameProject")}</span>
-                          </button>
-                          <button
-                            type="button"
-                            className="history-menu-item delete"
-                            role="menuitem"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenProjectMenuId(null);
-                              onDeleteProject(project.id);
-                            }}
-                          >
-                            <Trash2 size={14} strokeWidth={1.5} />
-                            <span>{t("common.sidebar.deleteProject")}</span>
-                          </button>
-                        </div>
-                      )}
+                            <button
+                              type="button"
+                              className="history-menu-item"
+                              role="menuitem"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                startRenameProject(project);
+                              }}
+                            >
+                              <Pencil size={14} strokeWidth={1.5} />
+                              <span>{t("common.sidebar.renameProject")}</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="history-menu-item delete"
+                              role="menuitem"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenProjectMenuId(null);
+                                onDeleteProject(project.id);
+                              }}
+                            >
+                              <Trash2 size={14} strokeWidth={1.5} />
+                              <span>{t("common.sidebar.deleteProject")}</span>
+                            </button>
+                          </div>,
+                          document.body,
+                        )}
                     </div>
                   </div>
 

@@ -688,11 +688,14 @@ h6 {
   }
 }
 
+/* Row menus float beside the sidebar, over the content area: the component
+   portals them to the document body and pins them with fixed viewport
+   coordinates, so they are never clipped by the sidebar or its scroller. They
+   sit above the mobile drawer and its scrim (95 / 90) but stay under dialogs
+   (100). */
 .history-menu-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  z-index: var(--z-dropdown);
+  position: fixed;
+  z-index: var(--z-sidebar-mobile);
   /* One fixed width for every row menu — the chat menu, the project menu and
      the move-to-project list all paint the same panel, so the dropdown never
      changes size with its contents. 220px stays inside the 260px sidebar
@@ -702,15 +705,6 @@ h6 {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-}
-
-/* The menus live inside the sidebar's scrolling list, which clips anything
-   that opens past its bottom edge — a half-visible menu reads as a broken
-   scroll. When the row has no room below, the menu opens upward instead (the
-   open handlers decide with `.chat-history-list`'s client rect). */
-.history-menu-dropdown.drop-up {
-  top: auto;
-  bottom: calc(100% + 4px);
 }
 
 .history-menu-item {
