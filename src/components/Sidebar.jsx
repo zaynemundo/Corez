@@ -10,7 +10,6 @@ import {
   ChevronRight,
   Folder,
   FolderOpen,
-  MessageSquarePlus,
   Check,
   Pencil,
   Plus,
@@ -510,8 +509,9 @@ export default function Sidebar({
                           name: project.name,
                         })}
                       >
-                        <MessageSquarePlus
-                          size={14}
+                        <SquarePen
+                          className="new-chat-icon"
+                          size={16}
                           strokeWidth={1.5}
                           aria-hidden="true"
                         />

@@ -309,6 +309,10 @@ describe("sidebar project folders", () => {
     expect(
       newChat.nextElementSibling.classList.contains("history-item-menu"),
     ).toBe(true);
+    // Same glyph as the sidebar's New chat row, so "new chat" always looks
+    // the same wherever it is offered.
+    expect(newChat.querySelector("svg.lucide-square-pen")).toBeTruthy();
+    expect(newChat.querySelector("svg.new-chat-icon")).toBeTruthy();
 
     await user.click(newChat);
 
