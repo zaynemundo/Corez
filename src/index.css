@@ -107,26 +107,30 @@
 }
 
 [data-theme="light"] {
-  --bg-primary: #ffffff;
+  /* Softened Light Neutral Palette — the page rests on a neutral off-white
+     (#f7f7f7) instead of pure white, so a full-screen view no longer glares.
+     Raised surfaces (composer, menus, cards) stay pure white and lift off the
+     page by tone plus border, and near-black text replaces the harsh #000. */
+  --bg-primary: #f7f7f7;
   --bg-secondary: #ffffff;
-  --bg-tertiary: #eeeeef;
+  --bg-tertiary: #ebebeb;
   --bg-card: #ffffff;
-  --bg-glass: rgba(242, 242, 242, 0.85);
+  --bg-glass: rgba(247, 247, 247, 0.85);
   /* Borders are the only depth cue in this system, so they must stay visible
      on white (0.08 alpha was a 1.15:1 ghost). --border-hover is the
      interactive state and carries the WCAG 1.4.11 3:1 boundary. */
   --border-color: rgba(0, 0, 0, 0.28);
   --border-hover: rgba(0, 0, 0, 0.42);
 
-  --text-primary: #000000;
+  --text-primary: #1a1a1a;
   /* #98989d was 2.87:1 on white (WCAG AA fail, 33 usages) and its
      replacement #6e6e73 still failed at 4.03:1 on --code-header-bg. #5f5f66
-     is 5.03:1 on --code-header-bg, 5.46:1 on --bg-tertiary and 6.33:1 on
-     white, so every light surface this token lands on clears 4.5:1. */
+     is 5.03:1 on --code-header-bg, 5.31:1 on --bg-tertiary and 5.91:1 on the
+     off-white page, so every light surface this token lands on clears 4.5:1. */
   --text-secondary: #5f5f66;
   /* Muted must clear AA on the darkest light surface as well: #6b6b70 was
-     4.21:1 on --code-header-bg. #646469 is 4.67:1 there, 5.07:1 on
-     --bg-tertiary and 5.88:1 on white, and stays a step lighter than
+     4.21:1 on --code-header-bg. #646469 is 4.67:1 there, 4.94:1 on
+     --bg-tertiary and 5.49:1 on the page, and stays a step lighter than
      --text-secondary so it still reads as the quieter tone. */
   --text-muted: #646469;
 
@@ -134,7 +138,7 @@
   --market-negative: #b91c1c;
   --market-caution: #92400e;
 
-  --code-bg: #f4f4f4;
+  --code-bg: #efefef;
   --code-header-bg: #e5e5e5;
 
   --selection-bg: rgba(0, 100, 220, 0.25);
@@ -244,6 +248,12 @@ h6 {
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.15);
   border-radius: 99px;
+}
+
+/* The global thumb is tuned for the dark shell; on the light page a white
+   thumb was invisible, so light gets its own ink-on-paper tone. */
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.22);
 }
 
 /* Main Layout */
@@ -1266,8 +1276,10 @@ h6 {
   word-break: break-word;
 }
 
+/* The bubble sits on the raised-surface tone in both themes: #2f2f2f in dark,
+   white in light. It is deliberately never an accent colour. */
 .message-wrapper.user .message-content {
-  background-color: var(--bg-tertiary);
+  background-color: var(--bg-secondary);
   border: none;
   color: var(--text-primary);
   border-radius: var(--radius-lg);
@@ -1294,14 +1306,6 @@ h6 {
   overflow-wrap: anywhere;
   word-break: break-word;
   overflow: hidden;
-}
-
-[data-theme="light"] .message-wrapper.user .message-content {
-  background-color: #f4f4f4;
-}
-
-[data-theme="dark"] .message-wrapper.user .message-content {
-  background-color: #2f2f2f;
 }
 
 /* Live streaming assistant text: rendered as it arrives, subtle blur until
@@ -2501,8 +2505,8 @@ h6 {
   font-size: 0.875rem;
   font-weight: 400;
   line-height: 1.5;
-  /* Was a hardcoded #eeeeee: invisible on the light-theme code surface
-     (--code-bg #f4f4f4 -> ~1.05:1). Follows the theme instead. */
+  /* Was a hardcoded #eeeeee: indistinguishable from the light-theme code
+     surface (~1.00:1). Follows the theme instead. */
   color: var(--text-primary);
   scrollbar-width: thin;
 }
@@ -2917,6 +2921,12 @@ h6 {
   justify-content: center;
   padding: 16px;
   z-index: var(--z-modal);
+}
+
+/* A near-black scrim is right for the dark shell but smothers the off-white
+   page; light dims to a mid scrim so the dialog stays the focus. */
+[data-theme="light"] .modal-overlay {
+  background-color: rgba(0, 0, 0, 0.45);
 }
 
 .modal-card {

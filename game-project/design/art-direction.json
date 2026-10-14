@@ -4,7 +4,7 @@
     "derived": true,
     "generated_by": "scripts/generate-art-direction.mjs",
     "source": "src/index.css",
-    "source_sha256": "sha256:44ab8848f2e8e4e2f7b36646ee824229",
+    "source_sha256": "sha256:853c82ae73fdbbed77d77860b0f6ef9d",
     "note": "The app has no game-project/ directory and no authored art-direction.json. This file exists so Part 16 visual review and docs/review have a citable contract; every value is read from the declared design system rather than invented."
   },
   "project": "CoreZ",
@@ -45,11 +45,11 @@
         "inline_code": "#f1fa8c"
       },
       "light": {
-        "bg_primary": "#ffffff",
+        "bg_primary": "#f7f7f7",
         "bg_secondary": "#ffffff",
-        "bg_tertiary": "#eeeeef",
+        "bg_tertiary": "#ebebeb",
         "bg_card": "#ffffff",
-        "text_primary": "#000000",
+        "text_primary": "#1a1a1a",
         "text_secondary": "#5f5f66",
         "text_muted": "#646469",
         "market_positive": "#15803d",
