@@ -499,6 +499,9 @@ h6 {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
+  /* Reserve the scrollbar track: without it every row shifts sideways the
+     moment the list grows past the sidebar height. */
+  scrollbar-gutter: stable;
 }
 
 .sidebar-section-label {
@@ -671,6 +674,15 @@ h6 {
   border-radius: 8px;
 }
 
+/* The menus live inside the sidebar's scrolling list, which clips anything
+   that opens past its bottom edge — a half-visible menu reads as a broken
+   scroll. When the row has no room below, the menu opens upward instead (the
+   open handlers decide with `.chat-history-list`'s client rect). */
+.history-menu-dropdown.drop-up {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
 .history-menu-item {
   width: 100%;
   display: flex;
@@ -704,9 +716,9 @@ h6 {
   padding-right: 4px;
 }
 
-/* The add control stays out of the way until the pointer is in the sidebar —
-   the same reveal the chat rows use for their options button — and is always
-   shown for keyboard focus. Touch devices never hover, so there it is always
+/* The add control appears when the section's own row is hovered — it is the
+   Projects heading's action, not a sidebar-wide button — and is always shown
+   for keyboard focus. Touch devices never hover, so there it is always
    visible. */
 .sidebar-section-add {
   width: 24px;
@@ -726,7 +738,7 @@ h6 {
   transition: var(--transition-fast);
 }
 
-.sidebar:hover .sidebar-section-add,
+.sidebar-section-row:hover .sidebar-section-add,
 .sidebar-section-add:focus-visible {
   opacity: 0.65;
   pointer-events: auto;
@@ -842,6 +854,8 @@ h6 {
 .history-menu-scroll {
   max-height: 180px;
   overflow-y: auto;
+  /* Scrolling the project list must not drag the sidebar behind the menu. */
+  overscroll-behavior: contain;
 }
 
 .history-menu-item-title {

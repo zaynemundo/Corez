@@ -219,12 +219,16 @@ check 'collapsed sidebar is hidden from focus flow' 'visibility: hidden'
 check_absent 'viewport resize does not force desktop sidebar open' 'setSidebarOpen\\(!event\\.matches\\)'
 check 'sidebar component can render collapsed state' 'isOpen.*collapsed|collapsed.*isOpen' "$sidebar"
 
-# Project folders: the add control is a hover affordance, not a permanent
-# button — and it must still be reachable on touch devices and by keyboard.
-check_block_property 'projects add button is hidden until the sidebar is hovered' '.sidebar-section-add' 'opacity' '0;'
-check_block_property 'projects add button is revealed on sidebar hover' '.sidebar:hover .sidebar-section-add' 'opacity' '0.65'
+# Project folders: the add control is a hover affordance of the Projects
+# heading, not a permanent button — and it must still be reachable on touch
+# devices and by keyboard. Menus and the list itself must not fight scrolling.
+check_block_property 'projects add button is hidden until its heading is hovered' '.sidebar-section-add' 'opacity' '0;'
+check_block_property 'projects add button is revealed on heading hover' '.sidebar-section-row:hover .sidebar-section-add' 'opacity' '0.65'
 check_block_property 'projects add button is revealed for keyboard focus' '.sidebar-section-add:focus-visible' 'outline' '2px'
 check_block_property_in_media 'projects add button stays visible on touch devices' 'hover: none' '.sidebar-section-add' 'opacity' '0.65'
+check_block_property 'sidebar list reserves its scrollbar gutter' '.chat-history-list' 'scrollbar-gutter' 'stable'
+check_block_property 'menus flip upward when the list has no room below' '.history-menu-dropdown.drop-up' 'top' 'auto'
+check_block_property 'menu project list contains its own scroll' '.history-menu-scroll' 'overscroll-behavior' 'contain'
 check 'recent chats section is a disclosure' 'aria-controls="sidebar-chats-list"' "$sidebar"
 check 'recent chats list is identified for the toggle' 'id="sidebar-chats-list"' "$sidebar"
 check 'recent chats disclosure state is exposed' 'aria-expanded=\{chatsOpen\}' "$sidebar"

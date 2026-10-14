@@ -13,6 +13,25 @@ import {
   Plus,
 } from "lucide-react";
 
+// The tallest menu a row can open: move-to-project (label + its 180px list +
+// separator + delete). Less room than this below the row means the menu would
+// be clipped by the sidebar's scroll container.
+const MENU_ROOM_PX = 260;
+
+/**
+ * True when a menu opened from `element` must grow upward. The menus are
+ * absolutely positioned inside the sidebar's scrolling list, which clips
+ * whatever passes its bottom edge — the user sees half a menu and no way to
+ * scroll to the rest.
+ */
+function menuOpensUp(element) {
+  const list = element?.closest?.(".chat-history-list");
+  if (!list) return false;
+  const row = element.getBoundingClientRect();
+  const boundary = list.getBoundingClientRect();
+  return boundary.bottom - row.bottom < MENU_ROOM_PX;
+}
+
 export default function Sidebar({
   isOpen,
   sessions,
@@ -40,6 +59,9 @@ export default function Sidebar({
   const { t } = useI18n();
   const [openMenuId, setOpenMenuId] = useState(null);
   const [openProjectMenuId, setOpenProjectMenuId] = useState(null);
+  // Which way the open menu grows. Recomputed on every open, never while it is
+  // open, so scrolling under an open menu cannot flip it mid-interaction.
+  const [menuDropUp, setMenuDropUp] = useState(false);
   const [expandedProjectIds, setExpandedProjectIds] = useState(() => new Set());
   const [creatingProject, setCreatingProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
@@ -197,7 +219,9 @@ export default function Sidebar({
           className="history-menu-btn"
           onClick={(e) => {
             e.stopPropagation();
-            setOpenMenuId(openMenuId === session.id ? null : session.id);
+            const opening = openMenuId !== session.id;
+            if (opening) setMenuDropUp(menuOpensUp(e.currentTarget));
+            setOpenMenuId(opening ? session.id : null);
           }}
           title={t("common.sidebar.chatOptions")}
           aria-label={t("common.sidebar.optionsFor", {
@@ -209,7 +233,7 @@ export default function Sidebar({
         </button>
         {openMenuId === session.id && (
           <div
-            className="history-menu-dropdown"
+            className={`history-menu-dropdown ${menuDropUp ? "drop-up" : ""}`}
             role="menu"
             onClick={(e) => e.stopPropagation()}
           >
@@ -461,9 +485,9 @@ export default function Sidebar({
                         className="history-menu-btn"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setOpenProjectMenuId(
-                            openProjectMenuId === project.id ? null : project.id,
-                          );
+                          const opening = openProjectMenuId !== project.id;
+                          if (opening) setMenuDropUp(menuOpensUp(e.currentTarget));
+                          setOpenProjectMenuId(opening ? project.id : null);
                         }}
                         title={t("common.sidebar.projectOptions")}
                         aria-label={t("common.sidebar.optionsForProject", {
@@ -475,7 +499,7 @@ export default function Sidebar({
                       </button>
                       {openProjectMenuId === project.id && (
                         <div
-                          className="history-menu-dropdown"
+                          className={`history-menu-dropdown ${menuDropUp ? "drop-up" : ""}`}
                           role="menu"
                           onClick={(e) => e.stopPropagation()}
                         >

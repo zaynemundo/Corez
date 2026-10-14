@@ -22,6 +22,22 @@ import { I18nProvider } from "../src/i18n/index.jsx";
 
 const PROJECT = { id: "proj-1", name: "Marketing" };
 
+/** A measured element, for the tests that exercise menu geometry: jsdom has no
+ *  layout, so they supply the rects the drop-up decision reads. */
+function rectAt(bottom) {
+  return {
+    top: bottom - 38,
+    bottom,
+    left: 0,
+    right: 240,
+    width: 240,
+    height: 38,
+    x: 0,
+    y: bottom - 38,
+    toJSON: () => ({}),
+  };
+}
+
 function sessions() {
   return [
     {
@@ -388,6 +404,43 @@ describe("sidebar project folders", () => {
     // The new chat will land in the plain list, so that list is open again.
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
     expect(handlers.onNewChat).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens the chat menu upward when the list has no room below the row", async () => {
+    const user = userEvent.setup();
+    renderSidebar({
+      sessions: sessions(),
+      projects: [PROJECT],
+      activeSessionId: "chat-2",
+    });
+
+    // The row sits at the list's bottom edge, so a menu growing down would be
+    // clipped by the sidebar's scroll container. jsdom has no layout: the test
+    // provides the geometry the decision reads.
+    document.querySelector(".chat-history-list").getBoundingClientRect = () =>
+      rectAt(600);
+    const button = screen.getByRole("button", { name: "Options for Beta" });
+    button.getBoundingClientRect = () => rectAt(590);
+
+    await user.click(button);
+    expect(screen.getByRole("menu").className).toContain("drop-up");
+  });
+
+  it("keeps the chat menu downward when the row has room below it", async () => {
+    const user = userEvent.setup();
+    renderSidebar({
+      sessions: sessions(),
+      projects: [PROJECT],
+      activeSessionId: "chat-2",
+    });
+
+    document.querySelector(".chat-history-list").getBoundingClientRect = () =>
+      rectAt(800);
+    const button = screen.getByRole("button", { name: "Options for Beta" });
+    button.getBoundingClientRect = () => rectAt(300);
+
+    await user.click(button);
+    expect(screen.getByRole("menu").className).not.toContain("drop-up");
   });
 
   it("renders the project controls from the Arabic dictionary", async () => {
