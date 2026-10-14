@@ -506,11 +506,13 @@ h6 {
 }
 
 .sidebar-section-label {
-  font-size: 14px;
+  /* Same size as the New chat row, regular weight: the label is a signpost,
+     not a title, and the muted colour is what separates it from chat names. */
+  font-size: 15px;
   letter-spacing: -0.01em;
   text-transform: none;
   color: var(--text-muted);
-  font-weight: 600;
+  font-weight: 400;
   user-select: none;
 }
 
@@ -524,7 +526,7 @@ h6 {
   justify-content: flex-start;
   gap: 0.35rem;
   width: 100%;
-  padding: 10px 6px 6px 12px;
+  padding: 6px 6px 6px 12px;
   border: none;
   border-radius: 6px;
   background: transparent;
@@ -715,8 +717,11 @@ h6 {
   justify-content: space-between;
   gap: 0.25rem;
   padding-right: 4px;
-  /* Air above every section: the list's own gap is only a few pixels, which
-     left a heading reading as part of the rows above it. */
+}
+
+/* Air above every section except the first: a heading must not read as part of
+   the rows above it, but the first one hugs the New chat row. */
+.sidebar-section-row:not(:first-child) {
   margin-top: var(--sidebar-section-gap);
 }
 
