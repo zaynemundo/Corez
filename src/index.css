@@ -4,17 +4,13 @@
 [data-theme="dark"] {
   /* Softened Dark Neutral Palette — the shell is a rested graphite gray
      (#212121) instead of pure black, and raised surfaces step up one tone at a
-     time (secondary < card < tertiary). The sidebar is deliberately darker
-     than the page so navigation reads as its own sunken plane, like the
-     reference scheme's column. */
+     time (secondary < card < tertiary). The sidebar shares the shell tone, so
+     the navigation column and the chat panel read as one continuous surface. */
   --bg-primary: #212121;
   --bg-secondary: #2f2f2f;
   --bg-tertiary: #383838;
   --bg-card: #303030;
   --bg-glass: rgba(33, 33, 33, 0.85);
-  /* Sunken plane (sidebar). Its own token because it is the one surface that
-     sits BELOW the page background rather than above it. */
-  --surface-sunken: #171717;
   /* Resting borders stay whisper-quiet to protect the ultra-minimal dark look;
      --border-hover is the interactive state and carries the WCAG 1.4.11 3:1
      boundary (0.34 alpha over #212121 is ~3.0:1, 0.22 was ~2.0:1). */
@@ -55,8 +51,8 @@
   --sidebar-icon-size: 20px;
   --sidebar-item-min-height: 38px;
   --sidebar-section-gap: 10px;
-  --sidebar-bg: var(--surface-sunken);
-  --sidebar-bg-opaque: var(--surface-sunken);
+  --sidebar-bg: var(--bg-primary);
+  --sidebar-bg-opaque: var(--bg-primary);
   --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-shadow: none;
   --sidebar-item-hover-bg: rgba(255, 255, 255, 0.05);
@@ -5989,7 +5985,7 @@ h6 {
   width: 50%;
   position: relative;
   overflow: hidden;
-  background: var(--surface-sunken, #0a0a0a);
+  background: #171717;
   display: flex;
   align-items: stretch;
 }
