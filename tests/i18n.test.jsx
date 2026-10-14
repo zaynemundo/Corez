@@ -218,7 +218,7 @@ describe("shell in Arabic", () => {
     );
 
     expect(screen.getByText("محادثة جديدة")).toBeTruthy();
-    expect(screen.getByText("المحادثات")).toBeTruthy();
+    expect(screen.getByText("الأحدث")).toBeTruthy();
     // The session title is user data and stays exactly as it was written.
     expect(screen.getByText("My Chat")).toBeTruthy();
     expect(document.documentElement.getAttribute("lang")).toBe("ar");

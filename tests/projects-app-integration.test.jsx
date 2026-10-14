@@ -146,7 +146,9 @@ describe("project folders in the app", () => {
     const folder = screen
       .getByRole("button", { name: "Open project Q4 launch" })
       .closest(".project-group");
-    expect(within(folder).getByText("Landing page")).toBeTruthy();
+    await waitFor(() => {
+      expect(within(folder).getByText("Landing page")).toBeTruthy();
+    });
     // The ungrouped chat stays in the plain list, outside the folder.
     expect(within(folder).queryByText("Scratch pad")).toBeNull();
     expect(screen.getByText("Scratch pad")).toBeTruthy();

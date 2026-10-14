@@ -48,6 +48,7 @@ export default function Sidebar({
   // The plain "Chats" list is a disclosure: open by default, collapsed only
   // when the user says so (an explicit toggle must never spring back open).
   const [chatsOpen, setChatsOpen] = useState(true);
+  const [projectsOpen, setProjectsOpen] = useState(true);
   const [editingProjectId, setEditingProjectId] = useState(null);
   const [editingName, setEditingName] = useState("");
 
@@ -326,13 +327,35 @@ export default function Sidebar({
 
       <div className="chat-history-list">
         <div className="sidebar-section-row">
-          <span className="sidebar-chats-label">
-            {t("common.sidebar.projects")}
-          </span>
+          <button
+            type="button"
+            className="sidebar-section-toggle"
+            onClick={() => setProjectsOpen((prev) => !prev)}
+            title={
+              projectsOpen
+                ? t("common.sidebar.collapseProjects")
+                : t("common.sidebar.expandProjects")
+            }
+            aria-expanded={projectsOpen}
+            aria-controls="sidebar-projects-list"
+          >
+            <span className="sidebar-section-label">
+              {t("common.sidebar.projects")}
+            </span>
+            <ChevronRight
+              className={`sidebar-chevron ${projectsOpen ? "expanded" : ""}`}
+              size={14}
+              strokeWidth={1.5}
+              aria-hidden="true"
+            />
+          </button>
           <button
             type="button"
             className="sidebar-section-add"
             onClick={() => {
+              // Creating one implies seeing it: never open a field inside a
+              // section the user had folded away.
+              setProjectsOpen(true);
               setCreatingProject(true);
               setNewProjectName("");
             }}
@@ -343,185 +366,189 @@ export default function Sidebar({
           </button>
         </div>
 
-        {creatingProject && (
-          <form className="project-name-form" onSubmit={submitNewProject}>
-            <input
-              className="project-name-input"
-              autoFocus
-              value={newProjectName}
-              placeholder={t("common.sidebar.projectNamePlaceholder")}
-              aria-label={t("common.sidebar.projectNamePlaceholder")}
-              maxLength={60}
-              onChange={(e) => setNewProjectName(e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") closeCreateProject();
-              }}
-              onBlur={() => {
-                if (!newProjectName.trim()) closeCreateProject();
-              }}
-            />
-          </form>
-        )}
-
-        {projects.map((project) => {
-          const isExpanded = expandedProjectIds.has(project.id);
-          const projectSessions = sessionsByProject.get(project.id) || [];
-          const isEditing = editingProjectId === project.id;
-          const chatsRegionId = `project-chats-${project.id}`;
-          return (
-            <div className="project-group" key={project.id}>
-              <div
-                className={`history-item project-item ${
-                  project.id === activeProjectId ? "active" : ""
-                }`}
-                role="button"
-                tabIndex={0}
-                aria-expanded={isExpanded}
-                aria-controls={isExpanded ? chatsRegionId : undefined}
-                aria-label={t("common.sidebar.openProject", {
-                  name: project.name,
-                })}
-                title={project.name}
-                onClick={() => {
-                  if (!isEditing) toggleProject(project.id);
-                }}
-                onKeyDown={(e) => {
-                  if (e.target !== e.currentTarget) return;
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    if (!isEditing) toggleProject(project.id);
-                  }
-                }}
-              >
-                <ChevronRight
-                  className={`sidebar-chevron ${isExpanded ? "expanded" : ""}`}
-                  size={14}
-                  strokeWidth={1.5}
-                  aria-hidden="true"
+        {projectsOpen && (
+          <div className="sidebar-projects-list" id="sidebar-projects-list">
+            {creatingProject && (
+              <form className="project-name-form" onSubmit={submitNewProject}>
+                <input
+                  className="project-name-input"
+                  autoFocus
+                  value={newProjectName}
+                  placeholder={t("common.sidebar.projectNamePlaceholder")}
+                  aria-label={t("common.sidebar.projectNamePlaceholder")}
+                  maxLength={60}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") closeCreateProject();
+                  }}
+                  onBlur={() => {
+                    if (!newProjectName.trim()) closeCreateProject();
+                  }}
                 />
-                {isEditing ? (
-                  <input
-                    className="project-name-input project-rename-input"
-                    autoFocus
-                    value={editingName}
-                    aria-label={t("common.sidebar.renameProject")}
-                    maxLength={60}
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => setEditingName(e.target.value)}
-                    onBlur={() => submitRenameProject(project.id)}
-                    onKeyDown={(e) => {
-                      e.stopPropagation();
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        submitRenameProject(project.id);
-                      }
-                      if (e.key === "Escape") {
-                        setEditingProjectId(null);
-                        setEditingName("");
-                      }
-                    }}
-                  />
-                ) : (
-                  <span className="history-item-title">{project.name}</span>
-                )}
-                {projectSessions.length > 0 && (
-                  <span className="project-chat-count" aria-hidden="true">
-                    {projectSessions.length}
-                  </span>
-                )}
-                <div className="history-item-menu project-item-menu">
-                  <button
-                    type="button"
-                    className="history-menu-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setOpenProjectMenuId(
-                        openProjectMenuId === project.id ? null : project.id,
-                      );
-                    }}
-                    title={t("common.sidebar.projectOptions")}
-                    aria-label={t("common.sidebar.optionsForProject", {
-                      name: project.name,
-                    })}
-                    aria-expanded={openProjectMenuId === project.id}
-                  >
-                    <MoreVertical size={14} strokeWidth={1.5} />
-                  </button>
-                  {openProjectMenuId === project.id && (
-                    <div
-                      className="history-menu-dropdown"
-                      role="menu"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        type="button"
-                        className="history-menu-item"
-                        role="menuitem"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          startRenameProject(project);
-                        }}
-                      >
-                        <Pencil size={14} strokeWidth={1.5} />
-                        <span>{t("common.sidebar.renameProject")}</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="history-menu-item delete"
-                        role="menuitem"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenProjectMenuId(null);
-                          onDeleteProject(project.id);
-                        }}
-                      >
-                        <Trash2 size={14} strokeWidth={1.5} />
-                        <span>{t("common.sidebar.deleteProject")}</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
+              </form>
+            )}
 
-              {isExpanded && (
-                <div className="project-chats" id={chatsRegionId}>
-                  <button
-                    type="button"
-                    className="history-item project-new-chat"
-                    onClick={() => startChatInProject(project.id)}
-                    disabled={busyProjectId === project.id}
-                    title={t("common.sidebar.newChatInProject", {
+            {projects.map((project) => {
+              const isExpanded = expandedProjectIds.has(project.id);
+              const projectSessions = sessionsByProject.get(project.id) || [];
+              const isEditing = editingProjectId === project.id;
+              const chatsRegionId = `project-chats-${project.id}`;
+              return (
+                <div className="project-group" key={project.id}>
+                  <div
+                    className={`history-item project-item ${
+                      project.id === activeProjectId ? "active" : ""
+                    }`}
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={isExpanded}
+                    aria-controls={isExpanded ? chatsRegionId : undefined}
+                    aria-label={t("common.sidebar.openProject", {
                       name: project.name,
                     })}
-                    aria-label={t("common.sidebar.newChatInProject", {
-                      name: project.name,
-                    })}
+                    title={project.name}
+                    onClick={() => {
+                      if (!isEditing) toggleProject(project.id);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.target !== e.currentTarget) return;
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        if (!isEditing) toggleProject(project.id);
+                      }
+                    }}
                   >
-                    <Plus size={14} strokeWidth={1.5} aria-hidden="true" />
-                    <span className="history-item-title">
-                      {t("common.sidebar.newChat")}
-                    </span>
-                  </button>
-                  {projectSessions.length === 0 ? (
-                    <div className="project-empty">
-                      {t("common.sidebar.emptyProject")}
+                    <ChevronRight
+                      className={`sidebar-chevron ${isExpanded ? "expanded" : ""}`}
+                      size={14}
+                      strokeWidth={1.5}
+                      aria-hidden="true"
+                    />
+                    {isEditing ? (
+                      <input
+                        className="project-name-input project-rename-input"
+                        autoFocus
+                        value={editingName}
+                        aria-label={t("common.sidebar.renameProject")}
+                        maxLength={60}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        onBlur={() => submitRenameProject(project.id)}
+                        onKeyDown={(e) => {
+                          e.stopPropagation();
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            submitRenameProject(project.id);
+                          }
+                          if (e.key === "Escape") {
+                            setEditingProjectId(null);
+                            setEditingName("");
+                          }
+                        }}
+                      />
+                    ) : (
+                      <span className="history-item-title">{project.name}</span>
+                    )}
+                    {projectSessions.length > 0 && (
+                      <span className="project-chat-count" aria-hidden="true">
+                        {projectSessions.length}
+                      </span>
+                    )}
+                    <div className="history-item-menu project-item-menu">
+                      <button
+                        type="button"
+                        className="history-menu-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenProjectMenuId(
+                            openProjectMenuId === project.id ? null : project.id,
+                          );
+                        }}
+                        title={t("common.sidebar.projectOptions")}
+                        aria-label={t("common.sidebar.optionsForProject", {
+                          name: project.name,
+                        })}
+                        aria-expanded={openProjectMenuId === project.id}
+                      >
+                        <MoreVertical size={14} strokeWidth={1.5} />
+                      </button>
+                      {openProjectMenuId === project.id && (
+                        <div
+                          className="history-menu-dropdown"
+                          role="menu"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            className="history-menu-item"
+                            role="menuitem"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startRenameProject(project);
+                            }}
+                          >
+                            <Pencil size={14} strokeWidth={1.5} />
+                            <span>{t("common.sidebar.renameProject")}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="history-menu-item delete"
+                            role="menuitem"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenProjectMenuId(null);
+                              onDeleteProject(project.id);
+                            }}
+                          >
+                            <Trash2 size={14} strokeWidth={1.5} />
+                            <span>{t("common.sidebar.deleteProject")}</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    projectSessions.map((session) =>
-                      renderSessionRow(session, project.id),
-                    )
+                  </div>
+
+                  {isExpanded && (
+                    <div className="project-chats" id={chatsRegionId}>
+                      <button
+                        type="button"
+                        className="history-item project-new-chat"
+                        onClick={() => startChatInProject(project.id)}
+                        disabled={busyProjectId === project.id}
+                        title={t("common.sidebar.newChatInProject", {
+                          name: project.name,
+                        })}
+                        aria-label={t("common.sidebar.newChatInProject", {
+                          name: project.name,
+                        })}
+                      >
+                        <Plus size={14} strokeWidth={1.5} aria-hidden="true" />
+                        <span className="history-item-title">
+                          {t("common.sidebar.newChat")}
+                        </span>
+                      </button>
+                      {projectSessions.length === 0 ? (
+                        <div className="project-empty">
+                          {t("common.sidebar.emptyProject")}
+                        </div>
+                      ) : (
+                        projectSessions.map((session) =>
+                          renderSessionRow(session, project.id),
+                        )
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
-          );
-        })}
+              );
+            })}
+          </div>
+        )}
 
         <div className="sidebar-section-row">
           <button
             type="button"
-            className="sidebar-chats-toggle"
+            className="sidebar-section-toggle"
             onClick={() => setChatsOpen((prev) => !prev)}
             title={
               chatsOpen
@@ -531,7 +558,7 @@ export default function Sidebar({
             aria-expanded={chatsOpen}
             aria-controls="sidebar-chats-list"
           >
-            <span className="sidebar-chats-label">
+            <span className="sidebar-section-label">
               {t("common.sidebar.chats")}
             </span>
             <ChevronRight

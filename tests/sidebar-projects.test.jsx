@@ -298,6 +298,46 @@ describe("sidebar project folders", () => {
     expect(screen.queryByText("Marketing")).toBeNull();
   });
 
+  it("folds the whole projects section without touching the chats list", async () => {
+    const user = userEvent.setup();
+    renderSidebar({
+      sessions: sessions(),
+      projects: [PROJECT],
+      activeSessionId: "chat-2",
+    });
+
+    const toggle = screen.getByRole("button", { name: "Projects" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(toggle.getAttribute("aria-controls")).toBe("sidebar-projects-list");
+    expect(screen.getByText("Marketing")).toBeTruthy();
+
+    await user.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByText("Marketing")).toBeNull();
+    // The chats section is its own disclosure: it stays open.
+    expect(screen.getByRole("button", { name: "Recents" })).toBeTruthy();
+    expect(screen.getByText("Beta")).toBeTruthy();
+  });
+
+  it("opens the projects section when a project is created from the add button", async () => {
+    const user = userEvent.setup();
+    renderSidebar({
+      sessions: [],
+      projects: [],
+      activeSessionId: null,
+    });
+
+    const toggle = screen.getByRole("button", { name: "Projects" });
+    await user.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+
+    await user.click(screen.getByRole("button", { name: "New Project" }));
+
+    // The field would otherwise open inside a folded section.
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByPlaceholderText("Project name")).toBeTruthy();
+  });
+
   it("collapses and expands the plain chats list", async () => {
     const user = userEvent.setup();
     renderSidebar({
@@ -306,7 +346,7 @@ describe("sidebar project folders", () => {
       activeSessionId: "chat-2",
     });
 
-    const toggle = screen.getByRole("button", { name: "Chats" });
+    const toggle = screen.getByRole("button", { name: "Recents" });
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
     expect(toggle.getAttribute("aria-controls")).toBe("sidebar-chats-list");
     expect(screen.getByText("Beta")).toBeTruthy();
@@ -339,7 +379,7 @@ describe("sidebar project folders", () => {
       activeSessionId: "chat-2",
     });
 
-    const toggle = screen.getByRole("button", { name: "Chats" });
+    const toggle = screen.getByRole("button", { name: "Recents" });
     await user.click(toggle);
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
 

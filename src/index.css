@@ -501,27 +501,26 @@ h6 {
   gap: 0.2rem;
 }
 
-.sidebar-chats-label {
+.sidebar-section-label {
   font-size: 14px;
   letter-spacing: -0.01em;
   text-transform: none;
   color: var(--text-muted);
-  padding: 8px 10px 4px 10px;
   font-weight: 600;
   user-select: none;
 }
 
-/* "Chats" is a disclosure: the whole heading row collapses and expands the
-   list below it. The caret sits on the right, where the projects row keeps its
-   add button, so both section headings stay on the same vertical line. */
-.sidebar-chats-toggle {
+/* A section heading is a disclosure row: label first, caret right beside it,
+   the whole row clickable. Its padding is the row's padding, so section labels
+   and chat titles start on the same vertical line. */
+.sidebar-section-toggle {
   flex: 1;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.4rem;
+  justify-content: flex-start;
+  gap: 0.35rem;
   width: 100%;
-  padding: 8px 6px 4px 10px;
+  padding: 8px 6px 4px 12px;
   border: none;
   border-radius: 6px;
   background: transparent;
@@ -530,26 +529,21 @@ h6 {
   transition: var(--transition-fast);
 }
 
-.sidebar-chats-toggle:hover,
-.sidebar-chats-toggle:hover .sidebar-chevron {
+.sidebar-section-toggle:hover,
+.sidebar-section-toggle:hover .sidebar-chevron {
   color: var(--text-primary);
 }
 
-.sidebar-chats-toggle:focus-visible {
+.sidebar-section-toggle:focus-visible {
   outline: 2px solid var(--text-primary);
   outline-offset: -2px;
-}
-
-/* Inside the toggle the row itself carries the padding, so the label must not
-   add its own. */
-.sidebar-chats-toggle .sidebar-chats-label {
-  padding: 0;
 }
 
 /* The rows stack inside a wrapper the disclosure can point `aria-controls` at.
    It repeats the list's column layout, so the rows sit exactly where they sat
    before the section became collapsible. */
-.sidebar-chats-list {
+.sidebar-chats-list,
+.sidebar-projects-list {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;

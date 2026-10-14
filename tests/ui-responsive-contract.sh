@@ -228,6 +228,13 @@ check_block_property_in_media 'projects add button stays visible on touch device
 check 'recent chats section is a disclosure' 'aria-controls="sidebar-chats-list"' "$sidebar"
 check 'recent chats list is identified for the toggle' 'id="sidebar-chats-list"' "$sidebar"
 check 'recent chats disclosure state is exposed' 'aria-expanded=\{chatsOpen\}' "$sidebar"
+check 'projects section is a disclosure' 'aria-controls="sidebar-projects-list"' "$sidebar"
+check 'projects list is identified for the toggle' 'id="sidebar-projects-list"' "$sidebar"
+check 'projects disclosure state is exposed' 'aria-expanded=\{projectsOpen\}' "$sidebar"
+# Section labels and chat titles line up on the same left edge: the heading row
+# carries a 12px inset and the list adds the same 8px it gives every row.
+check_block_property 'section headings use the chat rows left inset' '.sidebar-section-toggle' 'padding' '8px 6px 4px 12px'
+check_block_property 'chat rows keep the matching left inset' '.history-item' 'padding' '0 0.75rem'
 
 # Polished Glass Sidebar Contract Checks
 check_absent 'sidebar section heading is absent' 'className="sidebar-section-heading"' "$sidebar"
