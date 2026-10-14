@@ -255,6 +255,8 @@ check_block_property 'sidebar sections consume the section gap token' '.sidebar-
 check_block_absent 'the first sidebar section has no gap above it' '.sidebar-section-row' 'margin-top' 'var(--sidebar-section-gap)'
 check_block_property 'section headings match the new chat text size' '.sidebar-section-label' 'font-size' '15px'
 check_block_property 'section headings are regular weight' '.sidebar-section-label' 'font-weight' '400'
+check_block_property 'an empty open section spends no gap' '.sidebar-projects-list:empty' 'display' 'none'
+check_block_absent 'the project chat rail adds no vertical margin' '.project-chats' 'margin' '2px'
 check_block_property 'sidebar block consumes margin token' '.sidebar' 'margin' 'var(--sidebar-margin)'
 check_block_property 'sidebar block consumes radius token' '.sidebar' 'border-radius' 'var(--sidebar-radius)'
 check_block_property 'sidebar block consumes background token' '.sidebar' 'background-color' 'var(--sidebar-bg)'

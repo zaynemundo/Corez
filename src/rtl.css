@@ -140,7 +140,8 @@
 /* The project chat rail is a left-edge rule in LTR (index.css); mirror it and
    the indent. Applies with or without expanded rows. */
 [dir="rtl"] .project-chats {
-  margin: 2px 14px 4px 0;
+  margin-left: 0;
+  margin-right: 14px;
   padding-left: 0;
   padding-right: 8px;
   border-left: none;

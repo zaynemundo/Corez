@@ -526,7 +526,9 @@ h6 {
   justify-content: flex-start;
   gap: 0.35rem;
   width: 100%;
-  padding: 6px 6px 6px 12px;
+  /* Almost no bottom padding: heading to first row keeps the list's own
+     rhythm, so opening a section does not look like it added space. */
+  padding: 8px 6px 2px 12px;
   border: none;
   border-radius: 6px;
   background: transparent;
@@ -553,6 +555,13 @@ h6 {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
+}
+
+/* An open section with nothing in it must not spend a gap: expanding Projects
+   before the first project exists added space and nothing else. */
+.sidebar-projects-list:empty,
+.sidebar-chats-list:empty {
+  display: none;
 }
 
 .sidebar-section-heading {
@@ -819,12 +828,14 @@ h6 {
 }
 
 /* Chats filed under a project sit inside a rail, so the grouping is visible
-   without a second colour. */
+   without a second colour. Only the left indent is added: the list's own gap
+   already spaces a folder from its chats and from the next folder, so
+   expanding one cannot shift the rhythm of everything below it. */
 .project-chats {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  margin: 2px 0 4px 14px;
+  margin-left: 14px;
   padding-left: 8px;
   border-left: 1px solid var(--sidebar-border);
 }

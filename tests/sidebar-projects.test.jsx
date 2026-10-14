@@ -443,6 +443,18 @@ describe("sidebar project folders", () => {
     expect(screen.getByRole("menu").className).not.toContain("drop-up");
   });
 
+  it("leaves an open section truly empty when it has nothing to show", () => {
+    renderSidebar({ sessions: [], projects: [] });
+
+    // The stylesheet hides these wrappers with `:empty`, which only works
+    // while they genuinely hold no child nodes — a stray whitespace node
+    // would put the section's gap back on screen.
+    expect(document.getElementById("sidebar-projects-list").childNodes.length).toBe(0);
+    expect(document.getElementById("sidebar-chats-list").childNodes.length).toBe(0);
+    expect(screen.getByRole("button", { name: "Projects" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Recents" })).toBeTruthy();
+  });
+
   it("renders the project controls from the Arabic dictionary", async () => {
     const user = userEvent.setup();
     render(
