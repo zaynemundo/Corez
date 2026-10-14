@@ -298,6 +298,58 @@ describe("sidebar project folders", () => {
     expect(screen.queryByText("Marketing")).toBeNull();
   });
 
+  it("collapses and expands the plain chats list", async () => {
+    const user = userEvent.setup();
+    renderSidebar({
+      sessions: sessions(),
+      projects: [PROJECT],
+      activeSessionId: "chat-2",
+    });
+
+    const toggle = screen.getByRole("button", { name: "Chats" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(toggle.getAttribute("aria-controls")).toBe("sidebar-chats-list");
+    expect(screen.getByText("Beta")).toBeTruthy();
+
+    await user.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    // Only the plain list folds; the folders keep their own state.
+    expect(screen.queryByText("Beta")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Open project Marketing" }),
+    ).toBeTruthy();
+
+    // A real button, so the keyboard opens it the same way (focus + Enter,
+    // without a pointer click).
+    toggle.focus();
+    await user.keyboard("{Enter}");
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText("Beta")).toBeTruthy();
+    // The active chat in the list is reachable again, unchanged.
+    expect(
+      screen.getByRole("button", { name: "Open conversation Beta" }),
+    ).toBeTruthy();
+  });
+
+  it("starts a new chat with the plain chats list open", async () => {
+    const user = userEvent.setup();
+    const handlers = renderSidebar({
+      sessions: sessions(),
+      projects: [PROJECT],
+      activeSessionId: "chat-2",
+    });
+
+    const toggle = screen.getByRole("button", { name: "Chats" });
+    await user.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+
+    await user.click(screen.getByTitle("New Chat Session"));
+
+    // The new chat will land in the plain list, so that list is open again.
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(handlers.onNewChat).toHaveBeenCalledTimes(1);
+  });
+
   it("renders the project controls from the Arabic dictionary", async () => {
     const user = userEvent.setup();
     render(

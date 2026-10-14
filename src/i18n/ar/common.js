@@ -53,6 +53,8 @@ export default {
     newChatInProject: "محادثة جديدة في {name}",
     emptyProject: "لا توجد محادثات بعد",
     chats: "المحادثات",
+    collapseChats: "طي المحادثات",
+    expandChats: "توسيع المحادثات",
     chatOptions: "خيارات المحادثة",
     optionsFor: "خيارات {title}",
     openConversation: "فتح المحادثة {title}",

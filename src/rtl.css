@@ -149,11 +149,11 @@
 
 /* Collapsed folders open to the right in LTR, so the chevron points right;
    in RTL it points left. Expanded it points down either way. */
-[dir="rtl"] .project-chevron {
+[dir="rtl"] .sidebar-chevron {
   transform: scaleX(-1);
 }
 
-[dir="rtl"] .project-chevron.expanded {
+[dir="rtl"] .sidebar-chevron.expanded {
   transform: scaleX(-1) rotate(-90deg);
 }
 

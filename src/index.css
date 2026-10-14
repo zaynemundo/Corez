@@ -511,6 +511,50 @@ h6 {
   user-select: none;
 }
 
+/* "Chats" is a disclosure: the whole heading row collapses and expands the
+   list below it. The caret sits on the right, where the projects row keeps its
+   add button, so both section headings stay on the same vertical line. */
+.sidebar-chats-toggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 8px 6px 4px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.sidebar-chats-toggle:hover,
+.sidebar-chats-toggle:hover .sidebar-chevron {
+  color: var(--text-primary);
+}
+
+.sidebar-chats-toggle:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: -2px;
+}
+
+/* Inside the toggle the row itself carries the padding, so the label must not
+   add its own. */
+.sidebar-chats-toggle .sidebar-chats-label {
+  padding: 0;
+}
+
+/* The rows stack inside a wrapper the disclosure can point `aria-controls` at.
+   It repeats the list's column layout, so the rows sit exactly where they sat
+   before the section became collapsible. */
+.sidebar-chats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
 .sidebar-section-heading {
   font-size: var(--sidebar-heading-size);
   letter-spacing: var(--sidebar-heading-tracking);
@@ -737,12 +781,12 @@ h6 {
   gap: 0.45rem;
 }
 
-.project-chevron {
+.sidebar-chevron {
   color: var(--text-muted);
   transition: transform var(--transition-fast);
 }
 
-.project-chevron.expanded {
+.sidebar-chevron.expanded {
   transform: rotate(90deg);
 }
 

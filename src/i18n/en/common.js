@@ -67,6 +67,8 @@ export default {
     newChatInProject: "New chat in {name}",
     emptyProject: "No chats yet",
     chats: "Chats",
+    collapseChats: "Collapse chats",
+    expandChats: "Expand chats",
     chatOptions: "Chat options",
     optionsFor: "Options for {title}",
     openConversation: "Open conversation {title}",

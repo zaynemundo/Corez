@@ -45,6 +45,9 @@ export default function Sidebar({
   const [newProjectName, setNewProjectName] = useState("");
   const [savingProject, setSavingProject] = useState(false);
   const [busyProjectId, setBusyProjectId] = useState(null);
+  // The plain "Chats" list is a disclosure: open by default, collapsed only
+  // when the user says so (an explicit toggle must never spring back open).
+  const [chatsOpen, setChatsOpen] = useState(true);
   const [editingProjectId, setEditingProjectId] = useState(null);
   const [editingName, setEditingName] = useState("");
 
@@ -303,7 +306,12 @@ export default function Sidebar({
       <div className="sidebar-action-box">
         <button
           className="new-chat-btn"
-          onClick={onNewChat}
+          onClick={() => {
+            // A brand-new chat lands in the plain list: never leave it in a
+            // section the user had folded away.
+            setChatsOpen(true);
+            onNewChat();
+          }}
           title={t("common.sidebar.newChatTitle")}
         >
           <SquarePen
@@ -387,7 +395,7 @@ export default function Sidebar({
                 }}
               >
                 <ChevronRight
-                  className={`project-chevron ${isExpanded ? "expanded" : ""}`}
+                  className={`sidebar-chevron ${isExpanded ? "expanded" : ""}`}
                   size={14}
                   strokeWidth={1.5}
                   aria-hidden="true"
@@ -510,8 +518,36 @@ export default function Sidebar({
           );
         })}
 
-        <div className="sidebar-chats-label">{t("common.sidebar.chats")}</div>
-        {ungroupedSessions.map((session) => renderSessionRow(session, null))}
+        <div className="sidebar-section-row">
+          <button
+            type="button"
+            className="sidebar-chats-toggle"
+            onClick={() => setChatsOpen((prev) => !prev)}
+            title={
+              chatsOpen
+                ? t("common.sidebar.collapseChats")
+                : t("common.sidebar.expandChats")
+            }
+            aria-expanded={chatsOpen}
+            aria-controls="sidebar-chats-list"
+          >
+            <span className="sidebar-chats-label">
+              {t("common.sidebar.chats")}
+            </span>
+            <ChevronRight
+              className={`sidebar-chevron ${chatsOpen ? "expanded" : ""}`}
+              size={14}
+              strokeWidth={1.5}
+              aria-hidden="true"
+            />
+          </button>
+        </div>
+
+        {chatsOpen && (
+          <div className="sidebar-chats-list" id="sidebar-chats-list">
+            {ungroupedSessions.map((session) => renderSessionRow(session, null))}
+          </div>
+        )}
       </div>
 
       <div className="sidebar-footer">

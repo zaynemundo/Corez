@@ -225,6 +225,9 @@ check_block_property 'projects add button is hidden until the sidebar is hovered
 check_block_property 'projects add button is revealed on sidebar hover' '.sidebar:hover .sidebar-section-add' 'opacity' '0.65'
 check_block_property 'projects add button is revealed for keyboard focus' '.sidebar-section-add:focus-visible' 'outline' '2px'
 check_block_property_in_media 'projects add button stays visible on touch devices' 'hover: none' '.sidebar-section-add' 'opacity' '0.65'
+check 'recent chats section is a disclosure' 'aria-controls="sidebar-chats-list"' "$sidebar"
+check 'recent chats list is identified for the toggle' 'id="sidebar-chats-list"' "$sidebar"
+check 'recent chats disclosure state is exposed' 'aria-expanded=\{chatsOpen\}' "$sidebar"
 
 # Polished Glass Sidebar Contract Checks
 check_absent 'sidebar section heading is absent' 'className="sidebar-section-heading"' "$sidebar"
