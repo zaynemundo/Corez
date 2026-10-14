@@ -781,11 +781,11 @@ h6 {
   font-size: 14px;
 }
 
-/* Focus on the field the "+" just opened is shown by its own border, not the
-   shared ring: a glowing box around the field read as a stuck highlight. */
+/* The field the "+" just opened draws no ring and no brighter border: on a
+   monochrome dark sidebar any white edge around it reads as a highlight stuck
+   to the field. The caret is its focus indicator. */
 .project-name-input:focus-visible {
   outline: none;
-  border-color: var(--border-hover);
 }
 
 .project-item {

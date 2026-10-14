@@ -225,6 +225,7 @@ check 'sidebar component can render collapsed state' 'isOpen.*collapsed|collapse
 check_block_property 'projects add button is hidden until its heading is hovered' '.sidebar-section-add' 'opacity' '0;'
 check_block_property 'projects add button is revealed on heading hover' '.sidebar-section-row:hover .sidebar-section-add' 'opacity' '0.65'
 check_block_property 'projects add button marks keyboard focus without a ring' '.sidebar-section-add:focus-visible' 'outline' 'none'
+check_block_property 'the project name field draws no focus ring' '.project-name-input:focus-visible' 'outline' 'none'
 check_block_property_in_media 'projects add button stays visible on touch devices' 'hover: none' '.sidebar-section-add' 'opacity' '0.65'
 check_block_property 'sidebar list reserves its scrollbar gutter' '.chat-history-list' 'scrollbar-gutter' 'stable'
 check_block_property 'menus flip upward when the list has no room below' '.history-menu-dropdown.drop-up' 'top' 'auto'
