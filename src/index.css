@@ -693,8 +693,11 @@ h6 {
   top: calc(100% + 4px);
   right: 0;
   z-index: var(--z-dropdown);
-  min-width: 140px;
-  max-width: 220px;
+  /* One fixed width for every row menu — the chat menu, the project menu and
+     the move-to-project list all paint the same panel, so the dropdown never
+     changes size with its contents. 220px stays inside the 260px sidebar
+     even on an indented project chat row. */
+  width: 220px;
   padding: 4px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
@@ -723,6 +726,8 @@ h6 {
   border-radius: 6px;
   cursor: pointer;
   transition: var(--transition-fast);
+  /* Menu rows are always one line. */
+  white-space: nowrap;
 }
 
 .history-menu-item:hover {
@@ -731,6 +736,15 @@ h6 {
 
 .history-menu-item.delete {
   color: var(--market-negative);
+}
+
+/* Labels and project names that outgrow the fixed menu width truncate with an
+   ellipsis rather than wrapping the row onto a second line. */
+.history-menu-item span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* ------------------------------------------------------------- projects */
@@ -912,6 +926,11 @@ h6 {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   user-select: none;
+  /* The heading is one line too: a long translation truncates instead of
+     wrapping above the list. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .history-menu-scroll {
