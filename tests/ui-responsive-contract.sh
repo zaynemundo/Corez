@@ -219,6 +219,13 @@ check 'collapsed sidebar is hidden from focus flow' 'visibility: hidden'
 check_absent 'viewport resize does not force desktop sidebar open' 'setSidebarOpen\\(!event\\.matches\\)'
 check 'sidebar component can render collapsed state' 'isOpen.*collapsed|collapsed.*isOpen' "$sidebar"
 
+# Project folders: the add control is a hover affordance, not a permanent
+# button — and it must still be reachable on touch devices and by keyboard.
+check_block_property 'projects add button is hidden until the sidebar is hovered' '.sidebar-section-add' 'opacity' '0;'
+check_block_property 'projects add button is revealed on sidebar hover' '.sidebar:hover .sidebar-section-add' 'opacity' '0.65'
+check_block_property 'projects add button is revealed for keyboard focus' '.sidebar-section-add:focus-visible' 'outline' '2px'
+check_block_property_in_media 'projects add button stays visible on touch devices' 'hover: none' '.sidebar-section-add' 'opacity' '0.65'
+
 # Polished Glass Sidebar Contract Checks
 check_absent 'sidebar section heading is absent' 'className="sidebar-section-heading"' "$sidebar"
 check_absent 'sidebar section headers do not use inline letterSpacing styles' 'style=\{\{.*letterSpacing' "$sidebar"

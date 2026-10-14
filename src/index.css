@@ -666,6 +666,10 @@ h6 {
   padding-right: 4px;
 }
 
+/* The add control stays out of the way until the pointer is in the sidebar —
+   the same reveal the chat rows use for their options button — and is always
+   shown for keyboard focus. Touch devices never hover, so there it is always
+   visible. */
 .sidebar-section-add {
   width: 24px;
   height: 24px;
@@ -679,17 +683,33 @@ h6 {
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
   transition: var(--transition-fast);
+}
+
+.sidebar:hover .sidebar-section-add,
+.sidebar-section-add:focus-visible {
+  opacity: 0.65;
+  pointer-events: auto;
 }
 
 .sidebar-section-add:hover {
   color: var(--text-primary);
   background: var(--sidebar-item-hover-bg);
+  opacity: 1;
 }
 
 .sidebar-section-add:focus-visible {
   outline: 2px solid var(--text-primary);
   outline-offset: 1px;
+}
+
+@media (hover: none) {
+  .sidebar-section-add {
+    opacity: 0.65;
+    pointer-events: auto;
+  }
 }
 
 .project-name-form {
