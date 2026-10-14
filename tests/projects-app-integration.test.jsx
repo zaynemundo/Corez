@@ -181,8 +181,8 @@ describe("project folders in the app", () => {
     await user.click(
       screen.getByRole("button", { name: "Options for project Q4 launch" }),
     );
-    await user.click(screen.getByRole("menuitem", { name: /Rename project/ }));
-    const input = screen.getByLabelText("Rename project");
+    await user.click(screen.getByRole("menuitem", { name: "Rename" }));
+    const input = screen.getByLabelText("Rename");
     await user.clear(input);
     await user.type(input, "Launch{Enter}");
 
@@ -276,7 +276,7 @@ describe("project folders in the app", () => {
     await user.click(
       screen.getByRole("button", { name: "Options for project Q4 launch" }),
     );
-    await user.click(screen.getByRole("menuitem", { name: /Delete project/ }));
+    await user.click(screen.getByRole("menuitem", { name: "Delete" }));
 
     await waitFor(() => {
       expect(callsTo(calls, "/api/projects/proj11111111", "DELETE")).toHaveLength(1);

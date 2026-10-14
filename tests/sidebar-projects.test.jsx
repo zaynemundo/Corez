@@ -233,9 +233,9 @@ describe("sidebar project folders", () => {
     await user.click(
       screen.getByRole("button", { name: "Options for project Marketing" }),
     );
-    await user.click(screen.getByRole("menuitem", { name: /Rename project/ }));
+    await user.click(screen.getByRole("menuitem", { name: "Rename" }));
 
-    const input = screen.getByLabelText("Rename project");
+    const input = screen.getByLabelText("Rename");
     expect(input.value).toBe("Marketing");
     await user.clear(input);
     await user.type(input, "Launch{Enter}");
@@ -243,7 +243,7 @@ describe("sidebar project folders", () => {
     expect(handlers.onRenameProject).toHaveBeenCalledTimes(1);
     expect(handlers.onRenameProject).toHaveBeenCalledWith("proj-1", "Launch");
     // The field closes; the shown name is the `projects` prop the app updates.
-    expect(screen.queryByLabelText("Rename project")).toBeNull();
+    expect(screen.queryByLabelText("Rename")).toBeNull();
   });
 
   it("deletes a project without deleting its chats", async () => {
@@ -257,7 +257,7 @@ describe("sidebar project folders", () => {
     await user.click(
       screen.getByRole("button", { name: "Options for project Marketing" }),
     );
-    await user.click(screen.getByRole("menuitem", { name: /Delete project/ }));
+    await user.click(screen.getByRole("menuitem", { name: "Delete" }));
 
     expect(handlers.onDeleteProject).toHaveBeenCalledWith("proj-1");
     // Nothing in the chat menus is clicked and no chat delete is requested.
@@ -525,7 +525,7 @@ describe("sidebar project folders", () => {
     await user.click(
       screen.getByRole("button", { name: "خيارات مشروع Marketing" }),
     );
-    expect(screen.getByRole("menuitem", { name: /إعادة تسمية المشروع/ })).toBeTruthy();
-    expect(screen.getByRole("menuitem", { name: /حذف المشروع/ })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: /إعادة تسمية/ })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: /حذف/ })).toBeTruthy();
   });
 });
