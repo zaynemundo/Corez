@@ -750,9 +750,12 @@ h6 {
   opacity: 1;
 }
 
+/* Keyboard focus is marked by revealing the control and brightening its icon.
+   The shared 2px ring stayed stuck to the button after a press and read as a
+   highlight rather than as focus. */
 .sidebar-section-add:focus-visible {
-  outline: 2px solid var(--text-primary);
-  outline-offset: 1px;
+  outline: none;
+  color: var(--text-primary);
 }
 
 @media (hover: none) {
@@ -778,9 +781,11 @@ h6 {
   font-size: 14px;
 }
 
+/* Focus on the field the "+" just opened is shown by its own border, not the
+   shared ring: a glowing box around the field read as a stuck highlight. */
 .project-name-input:focus-visible {
-  outline: 2px solid var(--text-primary);
-  outline-offset: 1px;
+  outline: none;
+  border-color: var(--border-hover);
 }
 
 .project-item {
