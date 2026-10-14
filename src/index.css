@@ -2,28 +2,37 @@
 
 :root,
 [data-theme="dark"] {
-  /* Ultra-Minimalist Dark Monochrome Palette */
-  --bg-primary: #000000;
-  --bg-secondary: #0a0a0a;
-  --bg-tertiary: #141414;
-  --bg-card: #0d0d0d;
-  --bg-glass: rgba(10, 10, 10, 0.85);
+  /* Softened Dark Neutral Palette — the shell is a rested graphite gray
+     (#212121) instead of pure black, and raised surfaces step up one tone at a
+     time (secondary < card < tertiary). The sidebar is deliberately darker
+     than the page so navigation reads as its own sunken plane, like the
+     reference scheme's column. */
+  --bg-primary: #212121;
+  --bg-secondary: #2f2f2f;
+  --bg-tertiary: #383838;
+  --bg-card: #303030;
+  --bg-glass: rgba(33, 33, 33, 0.85);
+  /* Sunken plane (sidebar). Its own token because it is the one surface that
+     sits BELOW the page background rather than above it. */
+  --surface-sunken: #171717;
   /* Resting borders stay whisper-quiet to protect the ultra-minimal dark look;
      --border-hover is the interactive state and carries the WCAG 1.4.11 3:1
-     boundary (0.34 alpha on black is ~2.9:1, 0.22 was ~2.0:1). */
+     boundary (0.34 alpha over #212121 is ~3.0:1, 0.22 was ~2.0:1). */
   --border-color: rgba(255, 255, 255, 0.12);
   --border-hover: rgba(255, 255, 255, 0.34);
 
-  --text-primary: #ffffff;
-  --text-secondary: #a1a1a6;
-  --text-muted: #8e8e96;
+  /* The hierarchy is unchanged, only softened: every pair below still clears
+     WCAG AA 4.5:1 on the highest surface it lands on (--bg-tertiary). */
+  --text-primary: #ececec;
+  --text-secondary: #b4b4b4;
+  --text-muted: #a2a2a2;
 
   --market-positive: #4ade80;
   --market-negative: #f87171;
   --market-caution: #fbbf24;
 
-  --code-bg: #080808;
-  --code-header-bg: #101010;
+  --code-bg: #171717;
+  --code-header-bg: #212121;
 
   --selection-bg: rgba(255, 255, 255, 0.2);
   --selection-color: #ffffff;
@@ -46,8 +55,8 @@
   --sidebar-icon-size: 20px;
   --sidebar-item-min-height: 38px;
   --sidebar-section-gap: 10px;
-  --sidebar-bg: var(--bg-primary);
-  --sidebar-bg-opaque: var(--bg-primary);
+  --sidebar-bg: var(--surface-sunken);
+  --sidebar-bg-opaque: var(--surface-sunken);
   --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-shadow: none;
   --sidebar-item-hover-bg: rgba(255, 255, 255, 0.05);
@@ -5980,7 +5989,7 @@ h6 {
   width: 50%;
   position: relative;
   overflow: hidden;
-  background: #0a0a0a;
+  background: var(--surface-sunken, #0a0a0a);
   display: flex;
   align-items: stretch;
 }

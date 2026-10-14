@@ -1829,7 +1829,7 @@ function AppInner() {
       /* Ignore storage errors */
     }
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", theme === "light" ? "#ffffff" : "#0a0a0a");
+    if (meta) meta.setAttribute("content", theme === "light" ? "#ffffff" : "#212121");
   }, [theme]);
 
   // Keep theme in sync across tabs

@@ -261,7 +261,12 @@ check_block_property 'sidebar block consumes margin token' '.sidebar' 'margin' '
 check_block_property 'sidebar block consumes radius token' '.sidebar' 'border-radius' 'var(--sidebar-radius)'
 check_block_property 'sidebar block consumes background token' '.sidebar' 'background-color' 'var(--sidebar-bg)'
 check_block_absent 'sidebar no longer relies on backdrop blur 16px' '.sidebar' 'backdrop-filter' 'blur(16px)'
-check_block_property 'dark theme sidebar matches main content background' '[data-theme="dark"]' '--sidebar-bg' 'var(--bg-primary)'
+check_block_property 'dark theme shell uses the graphite base' '[data-theme="dark"]' '--bg-primary' '#212121'
+# The dark shell is a graphite plane (#212121) with the navigation column one
+# step darker (#171717) in its own sunken token, matching the reference
+# scheme where the sidebar reads as a separate plane rather than a stripe of
+# the page. The light theme deliberately keeps the sidebar flush with the page.
+check_block_property 'dark theme sidebar sits in its own sunken plane' '[data-theme="dark"]' '--sidebar-bg' 'var(--surface-sunken)'
 check_block_property 'light theme sidebar matches main content background' '[data-theme="light"]' '--sidebar-bg' 'var(--bg-primary)'
 check_absent 'sidebar no longer needs opaque background fallback block' '@supports not \(\(backdrop-filter: blur\(1px\)\)'
 check_block_property 'section heading class sets 11px font size' '.sidebar-section-heading' 'font-size' 'var(--sidebar-heading-size)'
