@@ -77,6 +77,25 @@ export async function ensureChatsTables(env) {
     } catch (e) {
       if (!/duplicate column/i.test(String(e?.message || e))) throw e;
     }
+    // `sort_order` is the manual sidebar order. A list (Recents, Pinned, one
+    // project folder) is recency-ordered until the user drags inside it; the
+    // first drag freezes that list into manual order and every member gets an
+    // explicit position then (lazy normalization — no backfill, no migration).
+    // Until then the column stays NULL and is never read.
+    try {
+      await env.DB.prepare(`ALTER TABLE chats ADD COLUMN sort_order REAL`).run();
+    } catch (e) {
+      if (!/duplicate column/i.test(String(e?.message || e))) throw e;
+    }
+    // One row per manually-ordered list: `recents`, `pinned`,
+    // `project:<id>`. Presence of the row IS the flag.
+    await env.DB.prepare(
+      `CREATE TABLE IF NOT EXISTS chat_list_manual (
+        user_id TEXT NOT NULL,
+        list_key TEXT NOT NULL,
+        PRIMARY KEY (user_id, list_key)
+      )`,
+    ).run();
     await Promise.all([
       env.DB.prepare(
         `CREATE INDEX IF NOT EXISTS idx_chats_user_updated ON chats(user_id, updated_at DESC)`,
@@ -110,6 +129,102 @@ function sanitizeContent(content) {
   if (typeof content === "string") return content;
   if (content == null) return "";
   return String(content);
+}
+
+// ---------------------------------------------------------------------
+// Manual sidebar order — shared by chats.js and projects.js
+// ---------------------------------------------------------------------
+// A display list is one sidebar section: `pinned`, `recents`, or
+// `project:<id>`. The key must match the client's display rule exactly: a
+// pinned chat lives in Pinned no matter which folder it also belongs to, and
+// a chat whose folder is gone (or belongs to nobody) falls back to Recents.
+export function displayListKey(chatRow, projectIds) {
+  if (chatRow?.pinned_at) return "pinned";
+  if (chatRow?.project_id && projectIds?.has(chatRow.project_id)) {
+    return `project:${chatRow.project_id}`;
+  }
+  return "recents";
+}
+
+/** Set of project ids owned by the user — the membership half of the rule. */
+export async function userProjectIds(env, userId) {
+  try {
+    const rows = await env.DB.prepare(
+      "SELECT id FROM projects WHERE user_id = ?",
+    )
+      .bind(userId)
+      .all();
+    return new Set((rows?.results || []).map((r) => r.id));
+  } catch (e) {
+    // A deployment that never used folders has no projects table yet; every
+    // chat then falls back to Recents. Any other failure is real.
+    if (!/no such table/i.test(String(e?.message || e))) throw e;
+    return new Set();
+  }
+}
+
+/** All of the account's chats with the columns ordering needs. */
+async function orderableChats(env, userId) {
+  const rows = await env.DB.prepare(
+    "SELECT id, project_id, pinned_at, sort_order, updated_at FROM chats WHERE user_id = ? LIMIT 1000",
+  )
+    .bind(userId)
+    .all();
+  return rows?.results || [];
+}
+
+function sortMembers(members, listKey, manual) {
+  const key = (c) =>
+    manual
+      ? (c.sort_order ?? Number.NEGATIVE_INFINITY)
+      : listKey === "pinned"
+        ? (c.pinned_at ?? 0)
+        : (c.updated_at ?? 0);
+  return [...members].sort(
+    (a, b) => key(b) - key(a) || (a.id < b.id ? -1 : 1),
+  );
+}
+
+export async function isListManual(env, userId, listKey) {
+  const row = await env.DB.prepare(
+    "SELECT 1 AS one FROM chat_list_manual WHERE user_id = ? AND list_key = ?",
+  )
+    .bind(userId, listKey)
+    .first();
+  return Boolean(row);
+}
+
+export async function clearListManual(env, userId, listKey) {
+  await env.DB.prepare(
+    "DELETE FROM chat_list_manual WHERE user_id = ? AND list_key = ?",
+  )
+    .bind(userId, listKey)
+    .run();
+}
+
+/** Member ids of one display list in current display order. */
+export async function listMemberIds(env, userId, listKey) {
+  const manual = await isListManual(env, userId, listKey);
+  const projectIds = await userProjectIds(env, userId);
+  const chats = await orderableChats(env, userId);
+  const members = chats.filter(
+    (c) => displayListKey(c, projectIds) === listKey,
+  );
+  return { ids: sortMembers(members, listKey, manual).map((c) => c.id), manual };
+}
+
+/** The position above the current top of a list: joins always land on top. */
+export async function topSortOrder(env, userId, listKey) {
+  const projectIds = await userProjectIds(env, userId);
+  const chats = await orderableChats(env, userId);
+  let top = 0;
+  for (const c of chats) {
+    if (displayListKey(c, projectIds) !== listKey) continue;
+    if (typeof c.sort_order === "number" && c.sort_order > top) {
+      top = c.sort_order;
+    }
+  }
+  return top + 1;
 }
 
 // Smart compact summary builder for server-side compaction
@@ -302,11 +417,18 @@ export async function handleChats(request, env) {
   // -------------------------------------------------------------------
   if (pathname === "/api/chats" && request.method === "GET") {
     try {
-      const rows = await env.DB.prepare(
-        "SELECT id, title, created_at as createdAt, updated_at as updatedAt, project_id as projectId, pinned_at as pinnedAt FROM chats WHERE user_id = ? ORDER BY updated_at DESC LIMIT 100",
-      )
-        .bind(userId)
-        .all();
+      const [rows, flagRows] = await Promise.all([
+        env.DB.prepare(
+          "SELECT id, title, created_at as createdAt, updated_at as updatedAt, project_id as projectId, pinned_at as pinnedAt, sort_order as sortOrder FROM chats WHERE user_id = ? ORDER BY updated_at DESC LIMIT 100",
+        )
+          .bind(userId)
+          .all(),
+        env.DB.prepare(
+          "SELECT list_key FROM chat_list_manual WHERE user_id = ?",
+        )
+          .bind(userId)
+          .all(),
+      ]);
       const chats = (rows?.results || []).map((r) => ({
         id: r.id,
         title: r.title,
@@ -314,8 +436,10 @@ export async function handleChats(request, env) {
         updatedAt: r.updatedAt,
         projectId: r.projectId || null,
         pinnedAt: r.pinnedAt || null,
+        sortOrder: r.sortOrder ?? null,
       }));
-      return jsonResponse(200, { chats });
+      const manualLists = (flagRows?.results || []).map((r) => r.list_key);
+      return jsonResponse(200, { chats, manualLists });
     } catch (e) {
       console.error("GET /api/chats failed:", safeErrorDetail(e));
       return jsonResponse(500, { error: "Failed to list chats." });
@@ -336,10 +460,17 @@ export async function handleChats(request, env) {
     const id = generateChatId();
     const now = Date.now();
     try {
+      // A new chat joins the top of Recents. In a manually-ordered Recents
+      // that means an explicit top position; in an auto one the column stays
+      // NULL and recency (updated_at, just set) orders it.
+      let sortOrder = null;
+      if (await isListManual(env, userId, "recents")) {
+        sortOrder = await topSortOrder(env, userId, "recents");
+      }
       await env.DB.prepare(
-        "INSERT INTO chats (id, user_id, title, created_at, updated_at) VALUES (?,?,?,?,?)",
+        "INSERT INTO chats (id, user_id, title, created_at, updated_at, sort_order) VALUES (?,?,?,?,?,?)",
       )
-        .bind(id, userId, title, now, now)
+        .bind(id, userId, title, now, now, sortOrder)
         .run();
 
       // Optionally create first message if provided
@@ -358,7 +489,13 @@ export async function handleChats(request, env) {
           .run();
       }
 
-      return jsonResponse(201, { id, title, createdAt: now, updatedAt: now });
+      return jsonResponse(201, {
+        id,
+        title,
+        createdAt: now,
+        updatedAt: now,
+        sortOrder,
+      });
     } catch (e) {
       console.error("POST /api/chats failed:", safeErrorDetail(e));
       return jsonResponse(500, { error: "Failed to create chat." });
@@ -382,6 +519,12 @@ export async function handleChats(request, env) {
       } catch (e) {
         if (!/no such table/i.test(String(e?.message || e))) throw e;
       }
+      // Manual orderings die with the history: a fresh account starts fully
+      // recency-ordered. The flags table is owned here, so no tolerance dance
+      // is needed — ensureChatsTables ran above.
+      await env.DB.prepare("DELETE FROM chat_list_manual WHERE user_id = ?")
+        .bind(userId)
+        .run();
       // Delete messages first
       await env.DB.prepare("DELETE FROM chat_messages WHERE user_id = ?")
         .bind(userId)
@@ -409,6 +552,130 @@ export async function handleChats(request, env) {
   }
 
   // -------------------------------------------------------------------
+  // POST /api/chats/reorder — move a chat within its own sidebar list
+  // -------------------------------------------------------------------
+  // Body: { chatId, beforeId | afterId }. The chat lands before `beforeId`
+  // (or after `afterId`; `beforeId` wins when both are given). All three ids
+  // must belong to the signed-in account AND to the same display list —
+  // reordering never moves a chat between lists (filing and pinning keep
+  // their own endpoints). The first reorder freezes that list into manual
+  // order: every member gets an explicit position in one pass, so no
+  // backfill or fractional arithmetic is ever needed. A drop that changes
+  // nothing is a 200 without a write — an accidental drag must not freeze a
+  // happily recency-ordered list.
+  if (pathname === "/api/chats/reorder" && request.method === "POST") {
+    let body;
+    try {
+      body = await readBoundedJson(request);
+    } catch {
+      return jsonResponse(400, { error: "Invalid JSON payload." });
+    }
+    const chatId = body?.chatId;
+    const beforeId = body?.beforeId ?? null;
+    const afterId = body?.afterId ?? null;
+    if (
+      typeof chatId !== "string" ||
+      !VALID_CHAT_ID.test(chatId) ||
+      (beforeId !== null &&
+        (typeof beforeId !== "string" || !VALID_CHAT_ID.test(beforeId))) ||
+      (afterId !== null &&
+        (typeof afterId !== "string" || !VALID_CHAT_ID.test(afterId)))
+    ) {
+      return jsonResponse(400, { error: "chatId and neighbour ids are required." });
+    }
+    if (beforeId === null && afterId === null) {
+      return jsonResponse(400, { error: "Nothing to reorder." });
+    }
+    if (beforeId === chatId || afterId === chatId) {
+      return jsonResponse(400, { error: "A chat cannot reorder around itself." });
+    }
+    try {
+      const wanted = [chatId, beforeId, afterId].filter(Boolean);
+      const placeholders = wanted.map(() => "?").join(",");
+      const found = await env.DB.prepare(
+        `SELECT id, project_id, pinned_at FROM chats WHERE id IN (${placeholders}) AND user_id = ?`,
+      )
+        .bind(...wanted, userId)
+        .all();
+      const byId = new Map((found?.results || []).map((r) => [r.id, r]));
+      const missing = wanted.find((id) => !byId.has(id));
+      if (missing) {
+        return jsonResponse(404, { error: "Chat not found." });
+      }
+      const projectIds = await userProjectIds(env, userId);
+      const listKey = displayListKey(byId.get(chatId), projectIds);
+      for (const neighbour of [beforeId, afterId]) {
+        if (
+          neighbour !== null &&
+          displayListKey(byId.get(neighbour), projectIds) !== listKey
+        ) {
+          return jsonResponse(400, {
+            error: "Reordering never moves a chat between lists.",
+          });
+        }
+      }
+      const { ids } = await listMemberIds(env, userId, listKey);
+      const from = ids.indexOf(chatId);
+      if (from === -1) {
+        return jsonResponse(404, { error: "Chat not found." });
+      }
+      const without = ids.filter((id) => id !== chatId);
+      let to;
+      if (beforeId !== null) {
+        to = without.indexOf(beforeId);
+        if (to === -1) return jsonResponse(404, { error: "Chat not found." });
+      } else {
+        to = without.indexOf(afterId) + 1;
+        if (to === 0) return jsonResponse(404, { error: "Chat not found." });
+      }
+      // A drop back into its own slot changes nothing and must not freeze
+      // the list into manual order.
+      const same = without.slice(0, to).concat([chatId], without.slice(to));
+      if (same.length === ids.length && same.every((id, i) => id === ids[i])) {
+        const current = await env.DB.prepare(
+          "SELECT sort_order FROM chats WHERE id = ? AND user_id = ?",
+        )
+          .bind(chatId, userId)
+          .first();
+        return jsonResponse(200, {
+          id: chatId,
+          list: listKey,
+          sortOrder: current?.sort_order ?? null,
+          manual: false,
+        });
+      }
+      without.splice(to, 0, chatId);
+      // Full renormalization, top-first: every member gets an explicit
+      // position in one pass, so fractional arithmetic (and its eventual
+      // precision collapse) never enters the picture. Chunked: a D1 batch
+      // holds at most 100 statements.
+      const top = without.length;
+      const writes = without.map((id, i) =>
+        env.DB.prepare(
+          "UPDATE chats SET sort_order = ? WHERE id = ? AND user_id = ?",
+        ).bind(top - i, id, userId),
+      );
+      writes.push(
+        env.DB.prepare(
+          "INSERT OR IGNORE INTO chat_list_manual (user_id, list_key) VALUES (?,?)",
+        ).bind(userId, listKey),
+      );
+      for (let i = 0; i < writes.length; i += 100) {
+        await env.DB.batch(writes.slice(i, i + 100));
+      }
+      return jsonResponse(200, {
+        id: chatId,
+        list: listKey,
+        sortOrder: top - without.indexOf(chatId),
+        manual: true,
+      });
+    } catch (e) {
+      console.error("POST /api/chats/reorder failed:", safeErrorDetail(e));
+      return jsonResponse(500, { error: "Failed to reorder the chat." });
+    }
+  }
+
+  // -------------------------------------------------------------------
   // Routes with :chatId
   // -------------------------------------------------------------------
   // Match /api/chats/:chatId and /api/chats/:chatId/messages
@@ -428,7 +695,7 @@ export async function handleChats(request, env) {
   let chatRow;
   try {
     chatRow = await env.DB.prepare(
-      "SELECT id, title, user_id, created_at, updated_at, project_id, pinned_at FROM chats WHERE id = ?",
+      "SELECT id, title, user_id, created_at, updated_at, project_id, pinned_at, sort_order FROM chats WHERE id = ?",
     )
       .bind(chatId)
       .first();
@@ -484,6 +751,7 @@ export async function handleChats(request, env) {
           updatedAt: chatRow.updated_at,
           projectId: chatRow.project_id || null,
           pinnedAt: chatRow.pinned_at || null,
+          sortOrder: chatRow.sort_order ?? null,
           messages,
           ...(compacted.meta ? { compactMeta: compacted.meta } : {}),
         },
@@ -519,8 +787,10 @@ export async function handleChats(request, env) {
       binds.push(sanitizeTitle(body.title), now);
     }
     if (wantsPinned) {
-      // Pinning deliberately does NOT touch updated_at: unpinning must return
-      // the chat to its true place in Recents, not to the top of it.
+      // Pinning deliberately does NOT touch updated_at: in an auto-ordered
+      // home list, unpinning must return the chat to its true recency place,
+      // not to the top of it. (In a manually-ordered home list there is no
+      // recency place — joins land on top, like everywhere else.)
       sets.push("pinned_at = ?");
       binds.push(body.pinned ? now : null);
     }
@@ -530,13 +800,41 @@ export async function handleChats(request, env) {
       )
         .bind(...binds, chatId, userId)
         .run();
+      // A chat joining a manually-ordered list lands on top of it: pinning
+      // into a manual Pinned, or unpinning into a manual home list.
+      let sortOrder = null;
+      if (wantsPinned) {
+        let homeKey = null;
+        if (body.pinned) {
+          homeKey = "pinned";
+        } else if (chatRow.project_id) {
+          const projectIds = await userProjectIds(env, userId);
+          homeKey = projectIds.has(chatRow.project_id)
+            ? `project:${chatRow.project_id}`
+            : "recents";
+        } else {
+          homeKey = "recents";
+        }
+        if (await isListManual(env, userId, homeKey)) {
+          sortOrder = await topSortOrder(env, userId, homeKey);
+          await env.DB.prepare(
+            "UPDATE chats SET sort_order = ? WHERE id = ? AND user_id = ?",
+          )
+            .bind(sortOrder, chatId, userId)
+            .run();
+        }
+      }
       return jsonResponse(200, {
         id: chatId,
         ...(wantsTitle
           ? { title: sanitizeTitle(body.title), updatedAt: now }
           : {}),
         ...(wantsPinned
-          ? { pinned: body.pinned, pinnedAt: body.pinned ? now : null }
+          ? {
+              pinned: body.pinned,
+              pinnedAt: body.pinned ? now : null,
+              sortOrder,
+            }
           : {}),
       });
     } catch (e) {

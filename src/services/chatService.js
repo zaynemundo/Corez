@@ -17,7 +17,7 @@ export async function listChats() {
     throw new Error(e.error || `listChats failed: ${r.status}`);
   }
   const d = await r.json();
-  return d.chats || [];
+  return { chats: d.chats || [], manualLists: d.manualLists || [] };
 }
 
 export async function createChat({ title } = {}) {
@@ -83,6 +83,26 @@ export async function setChatPinned(chatId, pinned) {
   if (!r.ok) {
     const e = await r.json().catch(() => ({}));
     throw new Error(e.error || `setChatPinned failed: ${r.status}`);
+  }
+  return await r.json();
+}
+
+/**
+ * Move a chat within its own sidebar list: { beforeId } lands it before that
+ * chat, { afterId } after it (`beforeId` wins when both are given). All three
+ * chats must already share one list — reordering never files or pins; use the
+ * project menu and the pin control for that. The first reorder freezes the
+ * list into manual order server-side.
+ */
+export async function reorderChat(chatId, { beforeId = null, afterId = null } = {}) {
+  const r = await fetchJson(`${BASE}/reorder`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chatId, beforeId, afterId }),
+  });
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw new Error(e.error || `reorderChat failed: ${r.status}`);
   }
   return await r.json();
 }

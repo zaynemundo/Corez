@@ -874,6 +874,48 @@ h6 {
   gap: 0.45rem;
 }
 
+/* Drag and drop. The dragged row dims; a between-rows drop shows as a hairline
+   above (drop-before) or below (drop-after) the hovered row; a folder — or the
+   whole Pinned section — about to receive the chat fills with the hover tone
+   and a dashed edge. The hairlines are pseudo-elements so they never shift
+   the layout, and their offsets are symmetric so RTL needs no override. */
+.history-item.dragging {
+  opacity: 0.4;
+}
+
+.history-item.drop-before::before,
+.history-item.drop-after::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--text-primary);
+  pointer-events: none;
+}
+
+.history-item.drop-before::before {
+  top: -2px;
+}
+
+.history-item.drop-after::after {
+  bottom: -2px;
+}
+
+.project-group.drop-target-active,
+.sidebar-pinned-section.drop-target-active {
+  background: var(--sidebar-item-hover-bg);
+  outline: 1px dashed var(--border-hover);
+  outline-offset: -1px;
+  border-radius: var(--radius-sm);
+}
+
+/* The row title is the drag handle: grabbing it moves the chat. */
+.history-item[draggable="true"] .history-item-title {
+  cursor: grab;
+}
+
 /* A project row leads with a folder mark instead of a disclosure caret: the
    open/closed folder glyph carries the expanded state, so the icon never
    rotates and the row keeps the folder metaphor. */

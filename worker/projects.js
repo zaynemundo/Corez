@@ -13,7 +13,12 @@
  */
 import { jsonResponse, readBoundedJson, safeErrorDetail } from "./utils.js";
 import { verifySession } from "./auth.js";
-import { ensureChatsTables } from "./chats.js";
+import {
+  ensureChatsTables,
+  isListManual,
+  topSortOrder,
+  clearListManual,
+} from "./chats.js";
 
 // ---------------------------------------------------------------------
 // Project ID generation — short, URL-safe, unguessable (chat-id alphabet)
@@ -248,6 +253,17 @@ export async function handleProjects(request, env) {
             "UPDATE projects SET updated_at = ? WHERE id = ? AND user_id = ?",
           ).bind(now, projectId, userId),
         ]);
+        // Joining a manually-ordered folder lands on top of it; in an auto
+        // folder the column stays untouched and recency orders the chat, as
+        // before.
+        if (await isListManual(env, userId, `project:${projectId}`)) {
+          const top = await topSortOrder(env, userId, `project:${projectId}`);
+          await env.DB.prepare(
+            "UPDATE chats SET sort_order = ? WHERE id = ? AND user_id = ?",
+          )
+            .bind(top, chatId, userId)
+            .run();
+        }
         return jsonResponse(200, { success: true, chatId, projectId });
       }
 
@@ -259,6 +275,15 @@ export async function handleProjects(request, env) {
         )
           .bind(chatId, userId, projectId)
           .run();
+        // Same join rule as filing: back in Recents on top when manual.
+        if (await isListManual(env, userId, "recents")) {
+          const top = await topSortOrder(env, userId, "recents");
+          await env.DB.prepare(
+            "UPDATE chats SET sort_order = ? WHERE id = ? AND user_id = ?",
+          )
+            .bind(top, chatId, userId)
+            .run();
+        }
         return jsonResponse(200, { success: true, chatId, projectId: null });
       }
 
@@ -328,7 +353,9 @@ export async function handleProjects(request, env) {
     try {
       // Unassign and delete in one transaction: a project can never be
       // deleted while some chat still points at it (the chats themselves
-      // are kept — only the folder is removed).
+      // are kept — only the folder is removed). Its manual ordering dies
+      // with it: there is no list left to order.
+      await clearListManual(env, userId, `project:${projectId}`);
       await env.DB.batch([
         env.DB.prepare(
           "UPDATE chats SET project_id = NULL WHERE project_id = ? AND user_id = ?",

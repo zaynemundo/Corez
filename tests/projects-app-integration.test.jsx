@@ -17,6 +17,7 @@ import {
   cleanup,
   waitFor,
   within,
+  fireEvent,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../src/App.jsx";
@@ -42,7 +43,7 @@ const json = (body, status = 200) =>
  * method and body) so the test can assert the exact payloads the user's
  * actions send, not merely that some request happened.
  */
-function signedInAccount({ failProjectChats = false } = {}) {
+function signedInAccount({ failProjectChats = false, failReorder = false } = {}) {
   const calls = [];
   vi.spyOn(globalThis, "fetch").mockImplementation((url, init = {}) => {
     const path = pathOf(url);
@@ -73,7 +74,14 @@ function signedInAccount({ failProjectChats = false } = {}) {
               projectId: null,
               updatedAt: 2,
             },
+            {
+              id: "chat33333333",
+              title: "Third note",
+              projectId: null,
+              updatedAt: 1,
+            },
           ],
+          manualLists: [],
         }),
       );
     }
@@ -94,6 +102,14 @@ function signedInAccount({ failProjectChats = false } = {}) {
             { id: "proj11111111", name: "Q4 launch", createdAt: 1, updatedAt: 3 },
           ],
         }),
+      );
+    }
+    if (path === "/api/chats/reorder") {
+      if (failReorder) {
+        return Promise.resolve(json({ error: "Failed to reorder." }, 500));
+      }
+      return Promise.resolve(
+        json({ id: body.chatId, list: "recents", sortOrder: 2, manual: true }),
       );
     }
     if (path.startsWith("/api/chats/")) {
@@ -322,5 +338,105 @@ describe("project folders in the app", () => {
     // The chat left Recents for the Pinned section.
     const recents = document.getElementById("sidebar-chats-list");
     expect(within(recents).queryByText("Scratch pad")).toBeNull();
+  });
+
+  it("reorders chats through the API with neighbour ids", async () => {
+    const calls = signedInAccount();
+    await openApp("/chat/chat11111111");
+
+    // Recents shows Scratch pad above Third note. Drag Third above Scratch.
+    const scratch = screen.getByRole("button", {
+      name: "Open conversation Scratch pad",
+    });
+    scratch.getBoundingClientRect = () => ({
+      top: 100,
+      bottom: 138,
+      left: 0,
+      right: 220,
+      width: 220,
+      height: 38,
+      x: 0,
+      y: 100,
+      toJSON: () => ({}),
+    });
+    const third = screen.getByRole("button", {
+      name: "Open conversation Third note",
+    });
+    fireEvent.dragStart(
+      third,
+      new MouseEvent("dragstart", { bubbles: true, cancelable: true }),
+    );
+    fireEvent(
+      scratch,
+      new MouseEvent("dragover", { bubbles: true, cancelable: true, clientY: 110 }),
+    );
+    fireEvent(
+      scratch,
+      new MouseEvent("drop", { bubbles: true, cancelable: true, clientY: 110 }),
+    );
+
+    await waitFor(() => {
+      expect(callsTo(calls, "/api/chats/reorder", "POST")).toHaveLength(1);
+    });
+    // Exactly the drop position is sent: the chat, and what it lands before.
+    expect(callsTo(calls, "/api/chats/reorder", "POST")[0].body).toEqual({
+      chatId: "chat33333333",
+      beforeId: "chat22222222",
+      afterId: null,
+    });
+
+    // Optimistic: Third note already leads Recents before any refetch.
+    const recents = document.getElementById("sidebar-chats-list");
+    const titles = [...recents.querySelectorAll(".history-item-title")].map(
+      (el) => el.textContent,
+    );
+    expect(titles).toEqual(["Third note", "Scratch pad"]);
+  });
+
+  it("reverts the order when the reorder is rejected", async () => {
+    const calls = signedInAccount({ failReorder: true });
+    await openApp("/chat/chat11111111");
+
+    const scratch = screen.getByRole("button", {
+      name: "Open conversation Scratch pad",
+    });
+    scratch.getBoundingClientRect = () => ({
+      top: 100,
+      bottom: 138,
+      left: 0,
+      right: 220,
+      width: 220,
+      height: 38,
+      x: 0,
+      y: 100,
+      toJSON: () => ({}),
+    });
+    const third = screen.getByRole("button", {
+      name: "Open conversation Third note",
+    });
+    fireEvent.dragStart(
+      third,
+      new MouseEvent("dragstart", { bubbles: true, cancelable: true }),
+    );
+    fireEvent(
+      scratch,
+      new MouseEvent("dragover", { bubbles: true, cancelable: true, clientY: 110 }),
+    );
+    fireEvent(
+      scratch,
+      new MouseEvent("drop", { bubbles: true, cancelable: true, clientY: 110 }),
+    );
+
+    await waitFor(() => {
+      expect(callsTo(calls, "/api/chats/reorder", "POST")).toHaveLength(1);
+    });
+    // Rejected: the sidebar shows the order the account actually has.
+    await waitFor(() => {
+      const recents = document.getElementById("sidebar-chats-list");
+      const titles = [...recents.querySelectorAll(".history-item-title")].map(
+        (el) => el.textContent,
+      );
+      expect(titles).toEqual(["Scratch pad", "Third note"]);
+    });
   });
 });

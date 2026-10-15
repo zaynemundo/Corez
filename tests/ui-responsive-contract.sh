@@ -231,6 +231,22 @@ check_block_property 'sidebar list reserves its scrollbar gutter' '.chat-history
 check_block_property 'row menus float beside the sidebar' '.history-menu-dropdown' 'position' 'fixed'
 check_block_property 'floating menus stay above the mobile drawer' '.history-menu-dropdown' 'z-index' 'var(--z-sidebar-mobile)'
 check_block_property 'menu project list contains its own scroll' '.history-menu-scroll' 'overscroll-behavior' 'contain'
+# Drag and drop: chat rows are draggable sources, folders and the Pinned
+# section take onto-drops (filing and pinning), and same-list gaps reorder.
+# Touch devices have no HTML5 drag, so the row menu stays their path.
+check 'chat rows render draggable' 'draggable' "$sidebar"
+check 'drags never start from row controls' 'closest\("button, input, textarea, a"\)' "$sidebar"
+check 'project folders accept onto-drops' 'onMoveSessionToProject\(drag\.id, project\.id\)' "$sidebar"
+check 'pinned section accepts onto-drops' 'onTogglePinSession\(drag\.id\)' "$sidebar"
+check 'gap drops call the reorder handler' 'onReorderSession\(' "$sidebar"
+check 'reorder posts neighbour ids' 'reorderChat' 'src/services/chatService.js'
+check 'reorder endpoint exists' '/api/chats/reorder' 'worker/chats.js'
+check 'manual order flags table exists' 'chat_list_manual' 'worker/chats.js'
+check_block_property 'dragged rows dim while dragging' '.history-item.dragging' 'opacity' '0.4'
+check_block_property 'gap indicator paints above the row' '.history-item.drop-before::before' 'top' '-2px'
+check_block_property 'gap indicator paints below the row' '.history-item.drop-after::after' 'bottom' '-2px'
+check_block_property 'folder drop targets highlight' '.project-group.drop-target-active' 'outline' 'dashed'
+check_block_property 'pinned drop target highlights' '.sidebar-pinned-section.drop-target-active' 'outline' 'dashed'
 # Every row menu paints one fixed size and every entry stays on one line: a
 # long label or project name truncates with an ellipsis instead of growing the
 # panel or wrapping the row onto a second line.

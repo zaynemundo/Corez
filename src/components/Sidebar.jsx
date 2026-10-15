@@ -3,6 +3,9 @@ import { createPortal } from "react-dom";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../i18n/index.jsx";
 import {
+  orderedListMembers,
+} from "../services/chatOrdering";
+import {
   Settings,
   PanelLeft,
   MoreVertical,
@@ -67,6 +70,11 @@ export default function Sidebar({
   // Pinned chats. `sessions[].pinnedAt` is the flag; pinned chats are held in
   // their own section above the projects and leave the lists they came from.
   onTogglePinSession,
+  // Manual drag order. `manualLists` holds the display lists the account has
+  // arranged (`pinned`, `recents`, `project:<id>`); those sort by explicit
+  // position and the rest by recency. `onReorderSession` persists one move.
+  manualLists = [],
+  onReorderSession,
 }) {
   // theme/onToggleTheme kept for backwards compat but now live inside SettingsModal
   void theme;
@@ -79,6 +87,46 @@ export default function Sidebar({
   // of letting it drift away from the row it belongs to.
   const [menuPos, setMenuPos] = useState(null);
   const menuRef = useRef(null);
+  // Drag and drop. `dragging` is the chat in flight (its id plus the list it
+  // was picked up from); `gap` is a between-rows position inside the SAME
+  // list; `onto` is a folder — or the Pinned section — under the pointer.
+  // Only one is ever set. Touch devices have no HTML5 drag: the row menu
+  // stays their path, so nothing here is the only way to file or pin.
+  const [dragging, setDragging] = useState(null);
+  const [gap, setGap] = useState(null);
+  const [onto, setOnto] = useState(null);
+
+  const clearDrag = () => {
+    setDragging(null);
+    setGap(null);
+    setOnto(null);
+  };
+
+  // A drag starts from the row surface, never from its controls: beginning on
+  // a button or inside the rename field would fight clicks and text selection.
+  function startRowDrag(event, session, listId) {
+    if (
+      event.target instanceof Element &&
+      event.target.closest("button, input, textarea, a")
+    ) {
+      event.preventDefault();
+      return;
+    }
+    // Firefox only drags when a payload is set.
+    if (event.dataTransfer) {
+      event.dataTransfer.setData("text/plain", session.id);
+      event.dataTransfer.effectAllowed = "move";
+    }
+    setDragging({ id: session.id, listId });
+  }
+
+  // Gap position inside the hovered row: upper half lands before it, lower
+  // half after it. Recomputed from the event at drop time, so the indicator
+  // state can never disagree with where the pointer actually is.
+  function rowDropPosition(event) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return event.clientY < rect.top + rect.height / 2 ? "before" : "after";
+  }
   const [expandedProjectIds, setExpandedProjectIds] = useState(() => new Set());
   const [creatingProject, setCreatingProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
@@ -152,36 +200,34 @@ export default function Sidebar({
     () => new Set(projects.map((project) => project.id)),
     [projects],
   );
+  // Each folder in display order: manual position when the account has
+  // arranged that folder, otherwise most recently active first. Only folders
+  // holding visible (unpinned) chats get an entry, as before.
   const sessionsByProject = useMemo(() => {
     const grouped = new Map();
-    for (const session of sessions) {
-      if (!session?.projectId || !projectIds.has(session.projectId)) continue;
-      // A pinned chat lives in the Pinned section and does not repeat inside
-      // its folder: one chat, one place in the sidebar.
-      if (session.pinnedAt) continue;
-      const list = grouped.get(session.projectId);
-      if (list) list.push(session);
-      else grouped.set(session.projectId, [session]);
+    for (const project of projects) {
+      const members = orderedListMembers(
+        sessions,
+        `project:${project.id}`,
+        projectIds,
+        manualLists,
+      );
+      if (members.length > 0) grouped.set(project.id, members);
     }
     return grouped;
-  }, [sessions, projectIds]);
+  }, [sessions, projects, projectIds, manualLists]);
 
-  // Pinned chats, most recently pinned first.
+  // Pinned chats in display order: manual position when the account has
+  // arranged Pinned, otherwise most recently pinned first.
   const pinnedSessions = useMemo(
-    () =>
-      sessions
-        .filter((session) => session?.pinnedAt)
-        .sort((a, b) => (b.pinnedAt || 0) - (a.pinnedAt || 0)),
-    [sessions],
+    () => orderedListMembers(sessions, "pinned", projectIds, manualLists),
+    [sessions, projectIds, manualLists],
   );
 
   const ungroupedSessions = useMemo(
     () =>
-      sessions.filter((session) => {
-        if (session?.pinnedAt) return false;
-        return !session?.projectId || !projectIds.has(session.projectId);
-      }),
-    [sessions, projectIds],
+      orderedListMembers(sessions, "recents", projectIds, manualLists),
+    [sessions, projectIds, manualLists],
   );
 
   // The chat being viewed must be reachable: its section and its folder open
@@ -275,13 +321,58 @@ export default function Sidebar({
   };
 
   // One renderer for a chat row, used inside a project and in the plain list.
-  // `currentProjectId` is null in the plain list.
-  const renderSessionRow = (session, currentProjectId) => (
+  // `currentProjectId` is the folder the row is shown in (null in the plain
+  // list); `listId` is the display list it belongs to (`pinned`, `recents`,
+  // `project:<id>`) and decides which drops a row accepts.
+  const renderSessionRow = (session, currentProjectId, listId) => (
     <div
       key={session.id}
       className={`history-item ${
         activeView === "chat" && session.id === activeSessionId ? "active" : ""
+      }${dragging?.id === session.id ? " dragging" : ""}${
+        gap?.rowId === session.id
+          ? gap.position === "before"
+            ? " drop-before"
+            : " drop-after"
+          : ""
       }`}
+      draggable
+      onDragStart={(e) => startRowDrag(e, session, listId)}
+      onDragEnd={clearDrag}
+      onDragOver={(e) => {
+        // Gaps only join rows of the same list: reordering never files or
+        // pins — dropping onto a folder or the Pinned section does that.
+        if (!dragging || dragging.id === session.id || dragging.listId !== listId) {
+          return;
+        }
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+        const position = rowDropPosition(e);
+        setGap((prev) =>
+          prev?.rowId === session.id && prev?.position === position
+            ? prev
+            : { rowId: session.id, position },
+        );
+      }}
+      onDrop={(e) => {
+        if (!dragging || dragging.id === session.id || dragging.listId !== listId) {
+          // Not ours (a cross-list hover over a row): let it bubble to the
+          // folder or Pinned section below, which may want it.
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        const drag = dragging;
+        const position = rowDropPosition(e);
+        clearDrag();
+        if (typeof onReorderSession !== "function") return;
+        onReorderSession(
+          drag.id,
+          position === "before"
+            ? { beforeId: session.id }
+            : { afterId: session.id },
+        );
+      }}
       onClick={() => onSelectSession(session.id)}
       onKeyDown={(e) => {
         // Keyboard activation belongs to the container itself; key
@@ -505,10 +596,51 @@ export default function Sidebar({
         </button>
       </div>
 
-      <div className="chat-history-list">
+      <div
+        className="chat-history-list"
+        onDragOver={(e) => {
+          // Hovering empty list background is hovering no target: clear a
+          // stale gap line or folder highlight. Rows, folders and the Pinned
+          // section manage their own state below, so leave those alone.
+          if (!dragging) return;
+          if (
+            e.target instanceof Element &&
+            e.target.closest(
+              ".history-item, .project-group, .sidebar-pinned-section",
+            )
+          ) {
+            return;
+          }
+          setGap(null);
+          setOnto(null);
+        }}
+      >
         {/* Pinned chats sit above the projects, and the section is always
             there — an empty Pinned still shows its heading, so pinned chats
-            have a visible home to return to. */}
+            have a visible home to return to. The whole section is a drop
+            target: dropping a chat anywhere in it pins the chat. */}
+        <div
+          className={`sidebar-pinned-section${
+            onto?.kind === "pinned" ? " drop-target-active" : ""
+          }`}
+          onDragOver={(e) => {
+            if (!dragging || dragging.listId === "pinned") return;
+            e.preventDefault();
+            if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+            setOnto((prev) => (prev?.kind === "pinned" ? prev : { kind: "pinned" }));
+          }}
+          onDrop={(e) => {
+            if (!dragging || dragging.listId === "pinned") return;
+            e.preventDefault();
+            e.stopPropagation();
+            const drag = dragging;
+            clearDrag();
+            // The section only ever shows unpinned chats arriving: a chat
+            // that is already pinned has nothing to do here.
+            if (typeof onTogglePinSession !== "function") return;
+            onTogglePinSession(drag.id);
+          }}
+        >
         <div className="sidebar-section-row">
           <button
             type="button"
@@ -544,11 +676,12 @@ export default function Sidebar({
               /* The row keeps its real folder so the menu can still offer
                  "No project"; only the rendering place changes. */
               pinnedSessions.map((session) =>
-                renderSessionRow(session, session.projectId || null),
+                renderSessionRow(session, session.projectId || null, "pinned"),
               )
             )}
           </div>
         )}
+        </div>
 
         <div className="sidebar-section-row">
           <button
@@ -619,7 +752,47 @@ export default function Sidebar({
               const isEditing = editingProjectId === project.id;
               const chatsRegionId = `project-chats-${project.id}`;
               return (
-                <div className="project-group" key={project.id}>
+                <div
+                  className={`project-group${
+                    onto?.kind === "project" && onto?.id === project.id
+                      ? " drop-target-active"
+                      : ""
+                  }`}
+                  key={project.id}
+                  // The whole folder — header row and its chats — is one drop
+                  // target: dropping files the chat into it. A same-list gap
+                  // drop on one of its rows stops below and never reaches
+                  // here; anything arriving here is a chat from elsewhere.
+                  onDragOver={(e) => {
+                    if (
+                      !dragging ||
+                      dragging.listId === `project:${project.id}`
+                    ) {
+                      return;
+                    }
+                    e.preventDefault();
+                    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+                    setOnto((prev) =>
+                      prev?.kind === "project" && prev?.id === project.id
+                        ? prev
+                        : { kind: "project", id: project.id },
+                    );
+                  }}
+                  onDrop={(e) => {
+                    if (
+                      !dragging ||
+                      dragging.listId === `project:${project.id}`
+                    ) {
+                      return;
+                    }
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const drag = dragging;
+                    clearDrag();
+                    if (typeof onMoveSessionToProject !== "function") return;
+                    onMoveSessionToProject(drag.id, project.id);
+                  }}
+                >
                   <div
                     className={`history-item project-item ${
                       project.id === activeProjectId ? "active" : ""
@@ -789,7 +962,11 @@ export default function Sidebar({
                         </div>
                       ) : (
                         projectSessions.map((session) =>
-                          renderSessionRow(session, project.id),
+                          renderSessionRow(
+                            session,
+                            project.id,
+                            `project:${project.id}`,
+                          ),
                         )
                       )}
                     </div>
@@ -827,7 +1004,9 @@ export default function Sidebar({
 
         {chatsOpen && (
           <div className="sidebar-chats-list" id="sidebar-chats-list">
-            {ungroupedSessions.map((session) => renderSessionRow(session, null))}
+            {ungroupedSessions.map((session) =>
+              renderSessionRow(session, null, "recents"),
+            )}
           </div>
         )}
       </div>

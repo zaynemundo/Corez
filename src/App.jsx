@@ -41,6 +41,10 @@ import {
 } from "./services/appStorageService";
 import * as chatService from "./services/chatService";
 import {
+  displayListKey,
+  orderedListMembers,
+} from "./services/chatOrdering";
+import {
   dropChatPrefetches,
   prefetchChat,
   prefetchChatList,
@@ -130,6 +134,10 @@ function MainApp({ theme, setTheme }) {
   const [sessions, setSessions] = useState([]);
   const [sessionsLoaded, setSessionsLoaded] = useState(false);
   const [projects, setProjects] = useState([]);
+  // Display lists the account has manually arranged (`pinned`, `recents`,
+  // `project:<id>`). The sidebar sorts those by explicit position and the
+  // rest by recency; a successful reorder adds its list here.
+  const [manualLists, setManualLists] = useState([]);
   const [chatLoading, setChatLoading] = useState(false);
   const [activeView, setActiveView] = useState("chat");
 
@@ -197,6 +205,12 @@ function MainApp({ theme, setTheme }) {
   useEffect(() => {
     projectsRef.current = projects;
   }, [projects]);
+  // And for the manual-order flags: optimistic reorders read them, and a
+  // failed reorder restores them.
+  const manualListsRef = useRef(manualLists);
+  useEffect(() => {
+    manualListsRef.current = manualLists;
+  }, [manualLists]);
 
   const activeSessionId = chatIdFromUrl;
   // Ref mirror: async stream completions must compare against the chat the
@@ -218,7 +232,7 @@ function MainApp({ theme, setTheme }) {
     try {
       // AppInner started this request while the session check was still in
       // flight; consume it rather than asking a second time.
-      const [chats, projectList] = await Promise.all([
+      const [chatBody, projectList] = await Promise.all([
         takeChatList() ?? chatService.listChats(),
         // Project folders are additive: a deployment without the endpoint (or
         // a transient failure) must still render the plain chat list.
@@ -227,6 +241,9 @@ function MainApp({ theme, setTheme }) {
           return [];
         }),
       ]);
+      // listChats carries the chats plus the manually-arranged display lists;
+      // older deployments answer the chats array alone.
+      const chats = Array.isArray(chatBody) ? chatBody : (chatBody?.chats || []);
       const mapped = chats.map((c) => ({
         id: c.id,
         title: c.title,
@@ -235,9 +252,13 @@ function MainApp({ theme, setTheme }) {
         updatedAt: c.updatedAt,
         projectId: c.projectId || null,
         pinnedAt: c.pinnedAt || null,
+        sortOrder: c.sortOrder ?? null,
         _loaded: false,
       }));
       setSessions(mapped);
+      setManualLists(
+        Array.isArray(chatBody) ? [] : chatBody?.manualLists || [],
+      );
       setProjects(
         projectList.map((p) => ({
           id: p.id,
@@ -295,16 +316,24 @@ function MainApp({ theme, setTheme }) {
                       }),
                     );
                     const after = await chatService.listChats();
+                    const afterChats = Array.isArray(after)
+                      ? after
+                      : after?.chats || [];
                     setSessions(
-                      after.map((c) => ({
+                      afterChats.map((c) => ({
                         id: c.id,
                         title: c.title,
                         messages: [],
                         createdAt: c.createdAt,
                         updatedAt: c.updatedAt,
                         projectId: c.projectId || null,
+                        pinnedAt: c.pinnedAt || null,
+                        sortOrder: c.sortOrder ?? null,
                         _loaded: false,
                       })),
+                    );
+                    setManualLists(
+                      Array.isArray(after) ? [] : after?.manualLists || [],
                     );
                     try {
                       localStorage.removeItem("corez_sessions");
@@ -979,6 +1008,73 @@ function MainApp({ theme, setTheme }) {
     }
   }, []);
 
+  const handleReorderSession = useCallback(async (sessionId, { beforeId = null, afterId = null } = {}) => {
+    const prev = sessionsRef.current;
+    const prevManual = manualListsRef.current;
+    const session = prev.find((s) => s.id === sessionId);
+    if (!session) return;
+    const projectIds = new Set(projectsRef.current.map((p) => p.id));
+    const listKey = displayListKey(session, projectIds);
+    // The list in display order, as the sidebar shows it: the drop position
+    // is computed against this sequence.
+    const members = orderedListMembers(prev, listKey, projectIds, prevManual);
+    if (!members.some((s) => s.id === sessionId)) return;
+    const without = members.filter((s) => s.id !== sessionId);
+    let to;
+    if (beforeId !== null) {
+      to = without.findIndex((s) => s.id === beforeId);
+      if (to === -1) return;
+    } else if (afterId !== null) {
+      const after = without.findIndex((s) => s.id === afterId);
+      if (after === -1) return;
+      to = after + 1;
+    } else {
+      return;
+    }
+    const moved = [
+      ...without.slice(0, to).map((s) => s.id),
+      sessionId,
+      ...without.slice(to).map((s) => s.id),
+    ];
+    const before = members.map((s) => s.id);
+    if (moved.length === before.length && moved.every((id, i) => id === before[i])) {
+      return;
+    }
+    // Optimistic: full renormalization, top-first, mirroring the server. The
+    // numbers only need the right relative order until the response arrives.
+    const top = without.length + 1;
+    const optimistic = new Map(moved.map((id, i) => [id, top - i]));
+    const next = prev.map((s) =>
+      optimistic.has(s.id) ? { ...s, sortOrder: optimistic.get(s.id) } : s,
+    );
+    const nextManual = prevManual.includes(listKey)
+      ? prevManual
+      : [...prevManual, listKey];
+    sessionsRef.current = next;
+    manualListsRef.current = nextManual;
+    setSessions(next);
+    setManualLists(nextManual);
+    try {
+      const result = await chatService.reorderChat(sessionId, { beforeId, afterId });
+      // Canonicalize the moved chat's position from the server echo.
+      if (result && typeof result.sortOrder === "number") {
+        const canonical = sessionsRef.current.map((s) =>
+          s.id === sessionId ? { ...s, sortOrder: result.sortOrder } : s,
+        );
+        sessionsRef.current = canonical;
+        setSessions(canonical);
+      }
+    } catch (e) {
+      console.warn("Failed to reorder the chat:", e);
+      // Revert: the sidebar must never show an order the account does not
+      // actually have, so a reload cannot "lose" the arrangement.
+      sessionsRef.current = prev;
+      manualListsRef.current = prevManual;
+      setSessions(prev);
+      setManualLists(prevManual);
+    }
+  }, []);
+
   const handleNewChatInProject = useCallback(
     async (projectId) => {
       setActiveView("chat");
@@ -1003,6 +1099,8 @@ function MainApp({ theme, setTheme }) {
           createdAt: created.createdAt,
           updatedAt: created.updatedAt,
           projectId: assigned ? projectId : null,
+          pinnedAt: null,
+          sortOrder: created.sortOrder ?? null,
           _loaded: true,
         };
         setSessions((prev) => [newSession, ...prev]);
@@ -1083,6 +1181,8 @@ function MainApp({ theme, setTheme }) {
           createdAt: created.createdAt,
           updatedAt: created.updatedAt,
           projectId: created.projectId || null,
+          pinnedAt: null,
+          sortOrder: created.sortOrder ?? null,
           _loaded: true,
         };
         setSessions((prev) => [newSession, ...prev]);
@@ -1603,6 +1703,8 @@ function MainApp({ theme, setTheme }) {
         onMoveSessionToProject={handleMoveSessionToProject}
         onNewChatInProject={handleNewChatInProject}
         onTogglePinSession={handleTogglePinSession}
+        onReorderSession={handleReorderSession}
+        manualLists={manualLists}
       />
 
       {isMobileViewport && sidebarOpen && (
