@@ -72,6 +72,21 @@ export async function patchChatTitle(chatId, title) {
   return await r.json();
 }
 
+/** Pin (or unpin) a chat: pinned chats are held in the sidebar's Pinned
+ *  section above the projects. Returns the stored state echoed by the server. */
+export async function setChatPinned(chatId, pinned) {
+  const r = await fetchJson(`${BASE}/${encodeURIComponent(chatId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pinned: Boolean(pinned) }),
+  });
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw new Error(e.error || `setChatPinned failed: ${r.status}`);
+  }
+  return await r.json();
+}
+
 export async function putChat(chatId, { title, messages } = {}) {
   const payload = {};
   if (title != null) payload.title = title;

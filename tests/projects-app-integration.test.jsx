@@ -1,12 +1,15 @@
 // @vitest-environment jsdom
 //
-// Project folders through the real app shell (App -> Sidebar -> chatService).
-// The sidebar test pins the controls; this pins the wiring behind them:
+// Project folders and chat pinning through the real app shell
+// (App -> Sidebar -> chatService). The sidebar tests pin the controls; this
+// pins the wiring behind them:
 //  - the projects the account owns come from `GET /api/projects` and group the
 //    chats the server says belong to them;
 //  - creating a project posts it, and the folder appears without a reload;
 //  - moving a chat and deleting a folder send exactly the right requests, and
-//    deleting a folder keeps the chat (it returns to the plain list).
+//    deleting a folder keeps the chat (it returns to the plain list);
+//  - pinning a chat PATCHes the flag and moves the chat into Pinned without a
+//    reload.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   render,
@@ -287,5 +290,33 @@ describe("project folders in the app", () => {
     });
     expect(screen.getByText("Landing page")).toBeTruthy();
     expect(callsTo(calls, "/api/chats/chat11111111", "DELETE")).toHaveLength(0);
+  });
+
+  it("pins a chat through the API and moves it into Pinned", async () => {
+    const user = userEvent.setup();
+    const calls = signedInAccount();
+    await openApp("/chat/chat11111111");
+
+    await user.click(
+      screen.getByRole("button", { name: "Options for Scratch pad" }),
+    );
+    await user.click(screen.getByRole("menuitem", { name: "Pin" }));
+
+    await waitFor(() => {
+      expect(
+        callsTo(calls, "/api/chats/chat22222222", "PATCH"),
+      ).toHaveLength(1);
+    });
+    // Exactly the flag is sent: pinning must not smuggle a title in.
+    expect(callsTo(calls, "/api/chats/chat22222222", "PATCH")[0].body).toEqual(
+      { pinned: true },
+    );
+
+    const pinnedList = document.getElementById("sidebar-pinned-list");
+    expect(pinnedList).toBeTruthy();
+    expect(within(pinnedList).getByText("Scratch pad")).toBeTruthy();
+    // The chat left Recents for the Pinned section.
+    const recents = document.getElementById("sidebar-chats-list");
+    expect(within(recents).queryByText("Scratch pad")).toBeNull();
   });
 });

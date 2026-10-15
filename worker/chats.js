@@ -68,6 +68,15 @@ export async function ensureChatsTables(env) {
       // next chats read selects this column.
       if (!/duplicate column/i.test(String(e?.message || e))) throw e;
     }
+    // `pinned_at` belongs to the sidebar's Pinned section: null means the chat
+    // lives in its normal place (a project or the recent list), a timestamp
+    // means it is held in the Pinned list. Added the same way as project_id,
+    // and for the same reason: the chats list selects it.
+    try {
+      await env.DB.prepare(`ALTER TABLE chats ADD COLUMN pinned_at INTEGER`).run();
+    } catch (e) {
+      if (!/duplicate column/i.test(String(e?.message || e))) throw e;
+    }
     await Promise.all([
       env.DB.prepare(
         `CREATE INDEX IF NOT EXISTS idx_chats_user_updated ON chats(user_id, updated_at DESC)`,
@@ -294,7 +303,7 @@ export async function handleChats(request, env) {
   if (pathname === "/api/chats" && request.method === "GET") {
     try {
       const rows = await env.DB.prepare(
-        "SELECT id, title, created_at as createdAt, updated_at as updatedAt, project_id as projectId FROM chats WHERE user_id = ? ORDER BY updated_at DESC LIMIT 100",
+        "SELECT id, title, created_at as createdAt, updated_at as updatedAt, project_id as projectId, pinned_at as pinnedAt FROM chats WHERE user_id = ? ORDER BY updated_at DESC LIMIT 100",
       )
         .bind(userId)
         .all();
@@ -304,6 +313,7 @@ export async function handleChats(request, env) {
         createdAt: r.createdAt,
         updatedAt: r.updatedAt,
         projectId: r.projectId || null,
+        pinnedAt: r.pinnedAt || null,
       }));
       return jsonResponse(200, { chats });
     } catch (e) {
@@ -418,7 +428,7 @@ export async function handleChats(request, env) {
   let chatRow;
   try {
     chatRow = await env.DB.prepare(
-      "SELECT id, title, user_id, created_at, updated_at, project_id FROM chats WHERE id = ?",
+      "SELECT id, title, user_id, created_at, updated_at, project_id, pinned_at FROM chats WHERE id = ?",
     )
       .bind(chatId)
       .first();
@@ -473,6 +483,7 @@ export async function handleChats(request, env) {
           createdAt: chatRow.created_at,
           updatedAt: chatRow.updated_at,
           projectId: chatRow.project_id || null,
+          pinnedAt: chatRow.pinned_at || null,
           messages,
           ...(compacted.meta ? { compactMeta: compacted.meta } : {}),
         },
@@ -485,9 +496,7 @@ export async function handleChats(request, env) {
   }
 
   // -------------------------------------------------------------------
-  // PATCH /api/chats/:id — update title
-  // DELETE /api/chats/:id — delete chat
-  // PUT /api/chats/:id — bulk sync (title + messages) for migration
+  // PATCH /api/chats/:id — update the title and/or the pinned flag
   // -------------------------------------------------------------------
   if (!isMessagesSubroute && request.method === "PATCH") {
     let body;
@@ -496,21 +505,49 @@ export async function handleChats(request, env) {
     } catch {
       return jsonResponse(400, { error: "Invalid JSON." });
     }
-    const newTitle = sanitizeTitle(body?.title);
+    const wantsTitle = body?.title !== undefined;
+    const wantsPinned = typeof body?.pinned === "boolean";
+    if (!wantsTitle && !wantsPinned) {
+      return jsonResponse(400, { error: "Nothing to update." });
+    }
     const now = Date.now();
+    const sets = [];
+    const binds = [];
+    if (wantsTitle) {
+      // A rename is a real change to the chat, so it also moves it in Recents.
+      sets.push("title = ?", "updated_at = ?");
+      binds.push(sanitizeTitle(body.title), now);
+    }
+    if (wantsPinned) {
+      // Pinning deliberately does NOT touch updated_at: unpinning must return
+      // the chat to its true place in Recents, not to the top of it.
+      sets.push("pinned_at = ?");
+      binds.push(body.pinned ? now : null);
+    }
     try {
       await env.DB.prepare(
-        "UPDATE chats SET title = ?, updated_at = ? WHERE id = ? AND user_id = ?",
+        `UPDATE chats SET ${sets.join(", ")} WHERE id = ? AND user_id = ?`,
       )
-        .bind(newTitle, now, chatId, userId)
+        .bind(...binds, chatId, userId)
         .run();
-      return jsonResponse(200, { id: chatId, title: newTitle, updatedAt: now });
+      return jsonResponse(200, {
+        id: chatId,
+        ...(wantsTitle
+          ? { title: sanitizeTitle(body.title), updatedAt: now }
+          : {}),
+        ...(wantsPinned
+          ? { pinned: body.pinned, pinnedAt: body.pinned ? now : null }
+          : {}),
+      });
     } catch (e) {
       console.error("PATCH /api/chats/:id failed:", safeErrorDetail(e));
       return jsonResponse(500, { error: "Failed to update chat." });
     }
   }
 
+  // -------------------------------------------------------------------
+  // PUT /api/chats/:id — bulk sync (title + messages) for migration
+  // -------------------------------------------------------------------
   if (!isMessagesSubroute && request.method === "PUT") {
     // Bulk sync: replace messages (for migration / full sync)
     let body;

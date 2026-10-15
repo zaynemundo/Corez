@@ -566,7 +566,8 @@ h6 {
    It repeats the list's column layout, so the rows sit exactly where they sat
    before the section became collapsible. */
 .sidebar-chats-list,
-.sidebar-projects-list {
+.sidebar-projects-list,
+.sidebar-pinned-list {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
@@ -575,7 +576,8 @@ h6 {
 /* An open section with nothing in it must not spend a gap: expanding Projects
    before the first project exists added space and nothing else. */
 .sidebar-projects-list:empty,
-.sidebar-chats-list:empty {
+.sidebar-chats-list:empty,
+.sidebar-pinned-list:empty {
   display: none;
 }
 

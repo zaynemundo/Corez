@@ -11,6 +11,8 @@ import {
   ChevronRight,
   Folder,
   FolderOpen,
+  Pin,
+  PinOff,
   Check,
   Pencil,
   Plus,
@@ -62,6 +64,9 @@ export default function Sidebar({
   onDeleteProject,
   onMoveSessionToProject,
   onNewChatInProject,
+  // Pinned chats. `sessions[].pinnedAt` is the flag; pinned chats are held in
+  // their own section above the projects and leave the lists they came from.
+  onTogglePinSession,
 }) {
   // theme/onToggleTheme kept for backwards compat but now live inside SettingsModal
   void theme;
@@ -83,6 +88,7 @@ export default function Sidebar({
   // when the user says so (an explicit toggle must never spring back open).
   const [chatsOpen, setChatsOpen] = useState(true);
   const [projectsOpen, setProjectsOpen] = useState(true);
+  const [pinnedOpen, setPinnedOpen] = useState(true);
   const [editingProjectId, setEditingProjectId] = useState(null);
   const [editingName, setEditingName] = useState("");
 
@@ -148,18 +154,31 @@ export default function Sidebar({
     const grouped = new Map();
     for (const session of sessions) {
       if (!session?.projectId || !projectIds.has(session.projectId)) continue;
+      // A pinned chat lives in the Pinned section and does not repeat inside
+      // its folder: one chat, one place in the sidebar.
+      if (session.pinnedAt) continue;
       const list = grouped.get(session.projectId);
       if (list) list.push(session);
       else grouped.set(session.projectId, [session]);
     }
     return grouped;
   }, [sessions, projectIds]);
+
+  // Pinned chats, most recently pinned first.
+  const pinnedSessions = useMemo(
+    () =>
+      sessions
+        .filter((session) => session?.pinnedAt)
+        .sort((a, b) => (b.pinnedAt || 0) - (a.pinnedAt || 0)),
+    [sessions],
+  );
+
   const ungroupedSessions = useMemo(
     () =>
-      sessions.filter(
-        (session) =>
-          !session?.projectId || !projectIds.has(session.projectId),
-      ),
+      sessions.filter((session) => {
+        if (session?.pinnedAt) return false;
+        return !session?.projectId || !projectIds.has(session.projectId);
+      }),
     [sessions, projectIds],
   );
 
@@ -297,6 +316,32 @@ export default function Sidebar({
               style={{ left: menuPos?.left ?? 0, top: menuPos?.top ?? 0 }}
               onClick={(e) => e.stopPropagation()}
             >
+              {typeof onTogglePinSession === "function" && (
+                <>
+                  <button
+                    type="button"
+                    className="history-menu-item"
+                    role="menuitem"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenMenuId(null);
+                      onTogglePinSession(session.id);
+                    }}
+                  >
+                    {session.pinnedAt ? (
+                      <PinOff size={14} strokeWidth={1.5} />
+                    ) : (
+                      <Pin size={14} strokeWidth={1.5} />
+                    )}
+                    <span>
+                      {session.pinnedAt
+                        ? t("common.sidebar.unpin")
+                        : t("common.sidebar.pin")}
+                    </span>
+                  </button>
+                  <div className="history-menu-separator" role="separator" />
+                </>
+              )}
               {projects.length > 0 && (
                 <>
                   <div className="history-menu-label">
@@ -415,6 +460,48 @@ export default function Sidebar({
       </div>
 
       <div className="chat-history-list">
+        {/* Pinned chats sit above the projects, and the whole section only
+            exists while at least one chat is pinned — an empty heading would
+            just spend space. */}
+        {pinnedSessions.length > 0 && (
+          <>
+            <div className="sidebar-section-row">
+              <button
+                type="button"
+                className="sidebar-section-toggle"
+                onClick={() => setPinnedOpen((prev) => !prev)}
+                title={
+                  pinnedOpen
+                    ? t("common.sidebar.collapsePinned")
+                    : t("common.sidebar.expandPinned")
+                }
+                aria-expanded={pinnedOpen}
+                aria-controls="sidebar-pinned-list"
+              >
+                <span className="sidebar-section-label">
+                  {t("common.sidebar.pinned")}
+                </span>
+                <ChevronRight
+                  className={`sidebar-chevron ${pinnedOpen ? "expanded" : ""}`}
+                  size={14}
+                  strokeWidth={1.5}
+                  aria-hidden="true"
+                />
+              </button>
+            </div>
+
+            {pinnedOpen && (
+              <div className="sidebar-pinned-list" id="sidebar-pinned-list">
+                {/* The row keeps its real folder so the menu can still offer
+                    "No project"; only the rendering place changes. */}
+                {pinnedSessions.map((session) =>
+                  renderSessionRow(session, session.projectId || null),
+                )}
+              </div>
+            )}
+          </>
+        )}
+
         <div className="sidebar-section-row">
           <button
             type="button"

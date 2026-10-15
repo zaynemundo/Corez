@@ -234,6 +234,7 @@ function MainApp({ theme, setTheme }) {
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
         projectId: c.projectId || null,
+        pinnedAt: c.pinnedAt || null,
         _loaded: false,
       }));
       setSessions(mapped);
@@ -953,6 +954,31 @@ function MainApp({ theme, setTheme }) {
     }
   }, []);
 
+  const handleTogglePinSession = useCallback(async (sessionId) => {
+    const session = sessionsRef.current.find((s) => s.id === sessionId);
+    const previousPinnedAt = session?.pinnedAt || null;
+    const pinned = !previousPinnedAt;
+    const next = sessionsRef.current.map((s) =>
+      s.id === sessionId ? { ...s, pinnedAt: pinned ? Date.now() : null } : s,
+    );
+    // Same synchronous mirror as the project move: a second toggle (or the
+    // failure path below) must never read the state this one replaced.
+    sessionsRef.current = next;
+    setSessions(next);
+    try {
+      await chatService.setChatPinned(sessionId, pinned);
+    } catch (e) {
+      console.warn("Failed to pin the chat:", e);
+      // Revert: the Pinned section must never show a state the account does
+      // not actually have, so a reload cannot "lose" the pin.
+      const reverted = sessionsRef.current.map((s) =>
+        s.id === sessionId ? { ...s, pinnedAt: previousPinnedAt } : s,
+      );
+      sessionsRef.current = reverted;
+      setSessions(reverted);
+    }
+  }, []);
+
   const handleNewChatInProject = useCallback(
     async (projectId) => {
       setActiveView("chat");
@@ -1576,6 +1602,7 @@ function MainApp({ theme, setTheme }) {
         onDeleteProject={handleDeleteProject}
         onMoveSessionToProject={handleMoveSessionToProject}
         onNewChatInProject={handleNewChatInProject}
+        onTogglePinSession={handleTogglePinSession}
       />
 
       {isMobileViewport && sidebarOpen && (

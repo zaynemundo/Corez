@@ -246,6 +246,10 @@ check_block_property 'the row new-chat control is always visible while its proje
 check 'recent chats section is a disclosure' 'aria-controls="sidebar-chats-list"' "$sidebar"
 check 'recent chats list is identified for the toggle' 'id="sidebar-chats-list"' "$sidebar"
 check 'recent chats disclosure state is exposed' 'aria-expanded=\{chatsOpen\}' "$sidebar"
+check 'pinned section is a disclosure' 'aria-controls="sidebar-pinned-list"' "$sidebar"
+check 'pinned list is identified for the toggle' 'id="sidebar-pinned-list"' "$sidebar"
+check 'pinned disclosure state is exposed' 'aria-expanded=\{pinnedOpen\}' "$sidebar"
+check_block_property 'pinned list shares the section list layout' '.sidebar-pinned-list' 'gap' '0.2rem'
 check 'projects section is a disclosure' 'aria-controls="sidebar-projects-list"' "$sidebar"
 check 'projects list is identified for the toggle' 'id="sidebar-projects-list"' "$sidebar"
 check 'projects disclosure state is exposed' 'aria-expanded=\{projectsOpen\}' "$sidebar"
