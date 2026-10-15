@@ -2,6 +2,7 @@ export const MAX_IMAGE_THUMB_BYTES = 1.5 * 1024 * 1024; // 1.5 MiB
 export const MAX_MEDIA_THUMB_BYTES = 8 * 1024 * 1024; // 8 MiB for video/audio (still uploaded via R2)
 export const MAX_TEXT_CONTENT_BYTES = 200 * 1024; // 200 KiB
 export const MAX_ASSET_BYTES = 10 * 1024 * 1024; // 10 MiB decoded — worker R2 limit
+export const MAX_PDF_PAGES = 30; // bounds extraction time on long documents
 
 export const TEXT_EXTENSIONS = new Set([
   "txt",
@@ -76,6 +77,85 @@ export function isMediaFile(file) {
   );
 }
 
+/**
+ * A file is a PDF when its MIME type says so, or — when the browser left the
+ * type blank (some Android pickers, renamed downloads) — by extension.
+ */
+export function isPdfFile(file) {
+  const type = String(file?.type || "")
+    .toLowerCase()
+    .split(";")[0]
+    .trim();
+  if (type === "application/pdf") return true;
+  return extensionOf(file?.name) === "pdf";
+}
+
+/**
+ * Lazy pdf.js loader. The library (~350 KiB) is code-split behind a dynamic
+ * import so it only downloads when a PDF is actually attached; the worker URL
+ * is a plain string asset and costs nothing until then.
+ */
+async function defaultPdfLoader() {
+  const pdfjs = await import("pdfjs-dist");
+  if (!pdfjs?.GlobalWorkerOptions?.workerSrc) {
+    const { default: workerUrl } = await import(
+      "pdfjs-dist/build/pdf.worker.min.mjs?url"
+    );
+    pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+  }
+  return pdfjs;
+}
+
+/**
+ * Extract readable text from a PDF entirely in the browser.
+ *
+ * Reads at most MAX_PDF_PAGES pages and truncates to MAX_TEXT_CONTENT_BYTES so
+ * a 500-page report cannot blow the prompt budget. Returns
+ * `{ text, pages }` or null when the file is empty, oversized, or unparsable
+ * (scanned-image PDFs have no text layer) — callers fall back to the previous
+ * name-only attachment behaviour.
+ *
+ * @param {File} file
+ * @param {() => Promise<object>} [loader] injectable pdf.js loader (tests)
+ */
+export async function extractPdfText(file, loader = defaultPdfLoader) {
+  try {
+    if (!file || !Number.isFinite(file.size) || file.size <= 0) return null;
+    if (file.size > MAX_ASSET_BYTES) return null;
+    const data = new Uint8Array(await readFileAsArrayBuffer(file));
+    if (data.length === 0) return null;
+    const pdfjs = await loader();
+    const doc = await pdfjs.getDocument({ data }).promise;
+    const count = Math.min(Number(doc?.numPages) || 0, MAX_PDF_PAGES);
+    const pages = [];
+    for (let i = 1; i <= count; i += 1) {
+      const page = await doc.getPage(i);
+      const tc = await page.getTextContent();
+      const line = (tc?.items || [])
+        .map((item) => (typeof item?.str === "string" ? item.str : ""))
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+      try {
+        if (typeof page.cleanup === "function") page.cleanup();
+      } catch {}
+      if (line) pages.push(`[Page ${i}]\n${line}`);
+    }
+    try {
+      if (typeof doc.destroy === "function") await doc.destroy();
+    } catch {}
+    if (pages.length === 0) return null;
+    let text = pages.join("\n\n");
+    if (text.length > MAX_TEXT_CONTENT_BYTES) {
+      text =
+        text.slice(0, MAX_TEXT_CONTENT_BYTES) + "\n…[truncated to first 200 KiB]";
+    }
+    return { text, pages: pages.length };
+  } catch {
+    return null;
+  }
+}
+
 export function formatBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
   if (bytes < 1024) return `${bytes} B`;
@@ -90,6 +170,21 @@ export function readFileAsText(file) {
       resolve(typeof reader.result === "string" ? reader.result : "");
     reader.onerror = () => reject(reader.error);
     reader.readAsText(file);
+  });
+}
+
+/**
+ * File bytes as an ArrayBuffer. Prefers Blob.arrayBuffer with a FileReader
+ * fallback for runtimes that lack it (older browsers, jsdom test env).
+ */
+function readFileAsArrayBuffer(file) {
+  if (file && typeof file.arrayBuffer === "function") return file.arrayBuffer();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () =>
+      reject(reader.error || new Error("readAsArrayBuffer failed"));
+    reader.readAsArrayBuffer(file);
   });
 }
 
@@ -200,11 +295,16 @@ export function extractFilesFromClipboard(clipboardData) {
  * function prepares the attachments so the worker's MiMo pre-pass can
  * describe them.
  *
+ * PDFs get their text extracted in the browser (pdf.js, lazy-loaded) into
+ * `content`, so the model reads them like any text attachment. Extraction
+ * failures fall back to the previous name-only behaviour.
+ *
  * @param {FileList | File[]} fileList
  * @param {Function} setAttachments
+ * @param {{ pdfLoader?: () => Promise<object> }} [options] injectable pdf.js loader (tests)
  * @returns {Array} List of newly created attachment metadata entries
  */
-export function processFiles(fileList, setAttachments) {
+export function processFiles(fileList, setAttachments, options = {}) {
   const files = Array.from(fileList || []);
   if (files.length === 0) return [];
 
@@ -228,7 +328,10 @@ export function processFiles(fileList, setAttachments) {
       size,
       uploading:
         (type.startsWith("image/") && size <= MAX_ASSET_BYTES) ||
-        (isMediaFile({ type }) && size <= MAX_MEDIA_THUMB_BYTES),
+        (isMediaFile({ type }) && size <= MAX_MEDIA_THUMB_BYTES) ||
+        // PDF text extraction runs async after the chip appears; the composer
+        // already waits out `uploading` before sending, so reuse the flag.
+        isPdfFile({ type, name }),
     })),
   ]);
 
@@ -397,7 +500,11 @@ export function processFiles(fileList, setAttachments) {
       };
       reader2.readAsDataURL(entry.file);
     }
-    if (isTextLike(entry.file) && entry.file.size <= MAX_TEXT_CONTENT_BYTES) {
+    if (
+      isTextLike(entry.file) &&
+      !isPdfFile(entry.file) &&
+      entry.file.size <= MAX_TEXT_CONTENT_BYTES
+    ) {
       readFileAsText(entry.file)
         .then((content) => {
           setAttachments((prev) =>
@@ -407,6 +514,28 @@ export function processFiles(fileList, setAttachments) {
           );
         })
         .catch(() => {});
+    } else if (isPdfFile(entry.file)) {
+      extractPdfText(entry.file, options.pdfLoader)
+        .then((result) => {
+          setAttachments((prev) =>
+            (prev || []).map((a) =>
+              a.id === entry.id
+                ? {
+                    ...a,
+                    ...(result ? { content: result.text } : {}),
+                    uploading: false,
+                  }
+                : a,
+            ),
+          );
+        })
+        .catch(() => {
+          setAttachments((prev) =>
+            (prev || []).map((a) =>
+              a.id === entry.id ? { ...a, uploading: false } : a,
+            ),
+          );
+        });
     }
   });
 
