@@ -18,8 +18,8 @@ import {
 
 // Fixed width of `.history-menu-dropdown` in index.css. The floating menu is
 // placed from this number before it has ever rendered, so the two must stay in
-// step (the responsive contract pins the 220px width).
-const MENU_WIDTH_PX = 220;
+// step (the responsive contract pins the 200px width).
+const MENU_WIDTH_PX = 200;
 const MENU_GAP_PX = 8;
 
 /**

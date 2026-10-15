@@ -234,7 +234,7 @@ check_block_property 'menu project list contains its own scroll' '.history-menu-
 # Every row menu paints one fixed size and every entry stays on one line: a
 # long label or project name truncates with an ellipsis instead of growing the
 # panel or wrapping the row onto a second line.
-check_block_property 'every row menu paints one fixed width' '.history-menu-dropdown' 'width' '220px'
+check_block_property 'every row menu paints one fixed width' '.history-menu-dropdown' 'width' '200px'
 check_block_property 'menu rows never wrap' '.history-menu-item' 'white-space' 'nowrap'
 check_block_property 'menu labels truncate on one line' '.history-menu-label' 'text-overflow' 'ellipsis'
 # The new-chat control belongs to the folder row, beside its options menu: an

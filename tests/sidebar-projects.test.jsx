@@ -486,7 +486,7 @@ describe("sidebar project folders", () => {
       await user.click(button);
 
       // RTL puts the sidebar on the right, so the panel opens to its left.
-      expect(screen.getByRole("menu").style.left).toBe("372px");
+      expect(screen.getByRole("menu").style.left).toBe("392px");
     } finally {
       document.documentElement.removeAttribute("dir");
     }

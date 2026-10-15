@@ -698,9 +698,8 @@ h6 {
   z-index: var(--z-sidebar-mobile);
   /* One fixed width for every row menu — the chat menu, the project menu and
      the move-to-project list all paint the same panel, so the dropdown never
-     changes size with its contents. 220px stays inside the 260px sidebar
-     even on an indented project chat row. */
-  width: 220px;
+     changes size with its contents. */
+  width: 200px;
   padding: 4px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
