@@ -700,3 +700,111 @@ describe('preview error reporter', () => {
     expect(postCalls).toBe(0);
   });
 });
+
+describe('navigation guard dead-download rescue', () => {
+  // A relative file link (the model names a PDF that was never bundled)
+  // would otherwise die silently: prevented with no feedback. The guard now
+  // rescues embedded bytes or reports the missing file to the parent.
+  function runGuard({ href, downloadAttr = true, embedded = [] }) {
+    const listeners = {};
+    const posted = [];
+    const preventedCalls = [];
+    const anchor = {
+      _href: href,
+      getAttribute: (n) => (n === 'href' ? anchor._href : null),
+      setAttribute: (n, v) => {
+        if (n === 'href') anchor._href = v;
+      },
+      hasAttribute: (n) => (n === 'download' ? downloadAttr : false),
+      closest: () => anchor,
+      click: () => {
+        listeners.click({
+          target: anchor,
+          preventDefault: () => {
+            preventedCalls.push('reclick');
+          },
+        });
+      },
+    };
+    const fakeDocument = {
+      addEventListener: (type, fn) => {
+        listeners[type] = fn;
+      },
+      querySelectorAll: () =>
+        embedded.map((url) => ({
+          getAttribute: (n) =>
+            n === 'src' || n === 'data' || n === 'href' ? url : null,
+        })),
+    };
+    const parent = { postMessage: (msg) => posted.push(msg) };
+    const fakeWindow = {
+      addEventListener: () => {},
+      open: () => {},
+      parent,
+    };
+    new Function('window', 'document', NAVIGATION_GUARD_SCRIPT)(
+      fakeWindow,
+      fakeDocument,
+    );
+    listeners.click({
+      target: anchor,
+      preventDefault: () => {
+        preventedCalls.push('first');
+      },
+    });
+    return { preventedCalls, posted, href: anchor._href };
+  }
+
+  it('reports a dead relative PDF link to the parent instead of silence', () => {
+    const r = runGuard({ href: 'report.pdf' });
+    expect(r.preventedCalls).toEqual(['first']);
+    expect(r.posted).toHaveLength(1);
+    expect(r.posted[0].type).toBe('corez-download-missing');
+    expect(r.posted[0].name).toBe('report.pdf');
+    expect(r.href).toBe('report.pdf');
+  });
+
+  it('rescues the click when the page embedded the PDF bytes', () => {
+    const dataUrl = 'data:application/pdf;base64,JVBERi0x';
+    const r = runGuard({ href: 'report.pdf', embedded: [dataUrl] });
+    // Rewritten and re-fired: the second pass hits the data: branch, which
+    // lets it through without preventing or reporting.
+    expect(r.href).toBe(dataUrl);
+    expect(r.preventedCalls).toEqual(['first']);
+    expect(r.posted).toHaveLength(0);
+  });
+
+  it('refuses an ambiguous rescue and reports instead', () => {
+    const r = runGuard({
+      href: 'report.pdf',
+      embedded: [
+        'data:application/pdf;base64,AAA',
+        'data:application/pdf;base64,BBB',
+      ],
+    });
+    expect(r.href).toBe('report.pdf');
+    expect(r.posted).toHaveLength(1);
+    expect(r.posted[0].name).toBe('report.pdf');
+  });
+
+  it('ignores data: URLs of the wrong kind when rescuing', () => {
+    const r = runGuard({
+      href: 'report.pdf',
+      embedded: ['data:image/png;base64,iVBORw0KGgo='],
+    });
+    expect(r.href).toBe('report.pdf');
+    expect(r.posted).toHaveLength(1);
+  });
+
+  it('treats a bare file link without download attribute the same way', () => {
+    const r = runGuard({ href: 'files/invoice.pdf', downloadAttr: false });
+    expect(r.posted).toHaveLength(1);
+    expect(r.posted[0].name).toBe('invoice.pdf');
+  });
+
+  it('leaves plain page links silent', () => {
+    const r = runGuard({ href: 'about.html', downloadAttr: false });
+    expect(r.preventedCalls).toEqual(['first']);
+    expect(r.posted).toHaveLength(0);
+  });
+});

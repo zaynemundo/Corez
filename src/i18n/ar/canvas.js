@@ -58,6 +58,16 @@ export default {
     dismiss: "تجاهل خطأ المعاينة",
   },
 
+  // Dead download link inside the preview: the href names a file that was
+  // never bundled, so the click would otherwise do nothing at all.
+  download: {
+    missingTitle: "التنزيل غير متاح",
+    missingBody: "«{name}» غير مرفق بهذه المعاينة، لذا لا يوجد ما يُنزَّل من الرابط.",
+    missingHint: "اطلب من Corez تضمين الملف، أو استخدم الطباعة ← حفظ بصيغة PDF.",
+    copyFix: "نسخ طلب الإصلاح لـCorez",
+    dismiss: "إغلاق إشعار التنزيل",
+  },
+
   // Publish flow: header button, share modal (link / QR / embed) and slug form.
   publish: {
     action: "نشر",

@@ -68,6 +68,10 @@ export default function CanvasPreview({
   // Runtime failure reported by the preview iframe (blank/white previews get
   // an explicit reason instead of silence).
   const [runtimeError, setRuntimeError] = useState(null);
+  // File link inside the preview that names an asset which was never
+  // bundled: without this the click dies silently and downloads look broken.
+  const [missingDownload, setMissingDownload] = useState(null);
+  const [fixCopied, setFixCopied] = useState(false);
   const [errorCopied, setErrorCopied] = useState(false);
 
   // Publish gating: sharing to corez.pro (including custom URL slugs) is a
@@ -193,6 +197,8 @@ export default function CanvasPreview({
     setActivePage("index.html");
     setKey((prev) => prev + 1);
     setRuntimeError(null);
+    setMissingDownload(null);
+    setFixCopied(false);
     setErrorCopied(false);
   }, [code]);
 
@@ -218,7 +224,19 @@ export default function CanvasPreview({
         setErrorCopied(false);
         return;
       }
-      if (data.type !== "corez-nav") return;
+      if (data.type !== "corez-nav") {
+        // Dead file link the guard rescued from a silent no-op: name the
+        // missing asset instead of leaving the user with a dead click.
+        if (data.type === "corez-download-missing") {
+          const name =
+            typeof data.name === "string" && data.name
+              ? data.name.slice(0, 80)
+              : "file";
+          setMissingDownload(name);
+          setFixCopied(false);
+        }
+        return;
+      }
       if (typeof data.page !== "string" || !data.page) return;
       const target = multiPage.pages.find((p) => p.name === data.page);
       if (!target) return;
@@ -227,6 +245,25 @@ export default function CanvasPreview({
     window.addEventListener("message", handleNavMessage);
     return () => window.removeEventListener("message", handleNavMessage);
   }, [multiPage]);
+
+  const copyDownloadFix = useCallback(() => {
+    if (!missingDownload) return;
+    const prompt =
+      `The download link for "${missingDownload}" does nothing because that file ` +
+      `is not embedded in the page. Embed the file's bytes directly (a data: URL) ` +
+      `or generate the file client-side (Blob + download link) so the button works ` +
+      `in the sandboxed preview.`;
+    const clipboard = navigator.clipboard;
+    if (clipboard && typeof clipboard.writeText === "function") {
+      clipboard
+        .writeText(prompt)
+        .then(() => {
+          setFixCopied(true);
+          window.setTimeout(() => setFixCopied(false), 1800);
+        })
+        .catch(() => {});
+    }
+  }, [missingDownload]);
 
   const copyRuntimeError = useCallback(() => {
     if (!runtimeError) return;
@@ -780,6 +817,38 @@ export default function CanvasPreview({
                       className="preview-error-btn"
                       onClick={() => setRuntimeError(null)}
                       aria-label={t("canvas.error.dismiss")}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              )}
+              {missingDownload && (
+                <div className="preview-error-banner" role="alert">
+                  <div className="preview-error-text">
+                    <strong>{t("canvas.download.missingTitle")}</strong>
+                    <span>
+                      {t("canvas.download.missingBody", {
+                        name: missingDownload,
+                      })}
+                    </span>
+                    <span>{t("canvas.download.missingHint")}</span>
+                  </div>
+                  <div className="preview-error-actions">
+                    <button
+                      type="button"
+                      className="preview-error-btn"
+                      onClick={copyDownloadFix}
+                    >
+                      {fixCopied
+                        ? t("canvas.error.copied")
+                        : t("canvas.download.copyFix")}
+                    </button>
+                    <button
+                      type="button"
+                      className="preview-error-btn"
+                      onClick={() => setMissingDownload(null)}
+                      aria-label={t("canvas.download.dismiss")}
                     >
                       ✕
                     </button>

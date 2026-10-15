@@ -451,6 +451,39 @@ export function injectFullscreenGamePatch(html) {
 export const NAVIGATION_GUARD_SCRIPT = `
   (function () {
     document.addEventListener('submit', function(e) { e.preventDefault(); }, true);
+    // data: URL prefix expected for a dead download link, by file extension.
+    // A null prefix accepts the only embedded data: URL of any kind.
+    function dataPrefixFor(href, wantsDownloadAttr) {
+      var m = /\\.([a-z0-9]+)([?#]|$)/i.exec(href || '');
+      var ext = m ? m[1].toLowerCase() : '';
+      var map = {
+        pdf: 'data:application/pdf',
+        png: 'data:image/png', jpg: 'data:image/jpeg', jpeg: 'data:image/jpeg',
+        gif: 'data:image/gif', webp: 'data:image/webp', svg: 'data:image/svg+xml',
+        mp3: 'data:audio/', mp4: 'data:video/', webm: 'data:video/',
+        txt: 'data:text/plain', md: 'data:text/', csv: 'data:text/',
+        json: 'data:application/json'
+      };
+      if (ext && map[ext]) return map[ext];
+      return wantsDownloadAttr ? null : false;
+    }
+    // The bytes of a file the page embedded (an <embed> next to a separate
+    // download link is the common model pattern). Only rescues when exactly
+    // one matching data: URL exists, so a wrong file can never download.
+    function findEmbeddedFileUrl(prefix) {
+      try {
+        if (prefix === false || typeof document.querySelectorAll !== 'function') return null;
+        var found = [];
+        var els = document.querySelectorAll('embed[src], object[data], iframe[src], source[src], img[src], a[href]');
+        for (var i = 0; i < els.length; i += 1) {
+          var el = els[i];
+          if (!el.getAttribute) continue;
+          var v = String(el.getAttribute('src') || el.getAttribute('data') || el.getAttribute('href') || '').trim();
+          if (/^data:/i.test(v) && (!prefix || v.toLowerCase().indexOf(prefix) === 0)) found.push(v);
+        }
+        return found.length === 1 ? found[0] : null;
+      } catch (err) { return null; }
+    }
     document.addEventListener('click', function(e) {
       var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
       if (!a) return;
@@ -466,7 +499,36 @@ export const NAVIGATION_GUARD_SCRIPT = `
       e.preventDefault();
       if (/^(https?:|mailto:|tel:)/i.test(href)) {
         window.open(href, '_blank', 'noopener');
+        return;
       }
+      // A relative link to a FILE (not a page) would otherwise die silently:
+      // the asset does not exist in the preview, so the click does nothing
+      // and the user concludes downloads are broken. Rescue it when the page
+      // embedded the bytes as a data: URL; otherwise tell the parent, which
+      // explains the missing file instead of staying silent.
+      var wantsDownloadAttr = false;
+      try { wantsDownloadAttr = typeof a.hasAttribute === 'function' && a.hasAttribute('download'); } catch (err) {}
+      var isFileLike = wantsDownloadAttr || /\\.(pdf|csv|txt|md|json|doc|docx|xls|xlsx|ppt|pptx|zip|png|jpe?g|gif|webp|svg|mp3|mp4|webm)([?#]|$)/i.test(href);
+      if (!isFileLike) return;
+      var embedded = findEmbeddedFileUrl(dataPrefixFor(href, wantsDownloadAttr));
+      if (embedded) {
+        try {
+          // Re-firing hits the data: branch above, which lets it through; the
+          // flag keeps a pathological DOM from looping.
+          if (!a.__corezRescued) {
+            a.__corezRescued = true;
+            a.setAttribute('href', embedded);
+            a.click();
+          }
+        } catch (err) {}
+        return;
+      }
+      try {
+        if (window.parent && window.parent !== window && window.parent.postMessage) {
+          var name = href.split('?')[0].split('#')[0].split('/').pop() || href;
+          window.parent.postMessage({ type: 'corez-download-missing', href: href, name: name }, '*');
+        }
+      } catch (err) {}
     }, true);
   })();`;
 

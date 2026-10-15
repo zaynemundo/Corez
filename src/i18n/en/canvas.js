@@ -69,6 +69,16 @@ export default {
     dismiss: "Dismiss preview error",
   },
 
+  // Dead download link inside the preview: the href names a file that was
+  // never bundled, so the click would otherwise do nothing at all.
+  download: {
+    missingTitle: "Download unavailable",
+    missingBody: '"{name}" is not bundled with this preview, so the link has nothing to download.',
+    missingHint: "Ask Corez to embed the file, or use Print → Save as PDF.",
+    copyFix: "Copy fix for Corez",
+    dismiss: "Dismiss download notice",
+  },
+
   // Publish flow: header button, share modal (link / QR / embed) and slug form.
   publish: {
     action: "Publish",
