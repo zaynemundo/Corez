@@ -4,7 +4,7 @@
 // frame instead. These tests pin that contract: a blob document is rendered
 // off-screen, printed on load, and always cleaned up.
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { printHtmlDocument } from '../src/utils/printDocument.js';
+import { printHtmlDocument, injectPrintReset } from '../src/utils/printDocument.js';
 
 afterEach(() => {
   document.body.querySelectorAll('iframe').forEach((f) => f.remove());
@@ -88,5 +88,36 @@ describe('printHtmlDocument', () => {
       URL.createObjectURL = orig;
     }
     expect(printFrame()).toBeNull();
+  });
+});
+
+describe('injectPrintReset', () => {
+  it('drops browser print chrome (date, title, URL, page numbers)', async () => {
+    const blobs = stubBlobUrls();
+    printHtmlDocument(
+      '<!DOCTYPE html><html><head><title>Invoice</title></head><body><h1>Hi</h1></body></html>',
+    );
+    expect(blobs).toHaveLength(1);
+    // jsdom Blobs have no .text(): read the part back like production code.
+    const text = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(blobs[0]);
+    });
+    expect(text).toContain('@page{margin:0}');
+    expect(text).toContain('<h1>Hi</h1>');
+  });
+
+  it('creates a head when the document has none', () => {
+    const out = injectPrintReset('<p>fragment</p>');
+    expect(out).toContain('<head>');
+    expect(out).toContain('@page{margin:0}');
+    expect(out).toContain('<p>fragment</p>');
+  });
+
+  it('passes through non-strings untouched', () => {
+    expect(injectPrintReset(null)).toBeNull();
+    expect(injectPrintReset('')).toBe('');
   });
 });

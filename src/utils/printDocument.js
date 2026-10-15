@@ -1,4 +1,29 @@
 /**
+ * Browsers stamp every printed page with their own chrome — the date, the
+ * document title, the URL and page numbers. For a generated page saved as
+ * PDF that chrome is noise *inside* the user's document, and the print
+ * dialog's "Headers and footers" checkbox is easy to miss. Neutralise it in
+ * the printable copy instead: zero page margins drop the browser chrome,
+ * and body padding keeps content off the paper edge.
+ */
+const PRINT_RESET_CSS =
+  "<style data-corez-print>@page{margin:0}body{padding:12mm;box-sizing:border-box}</style>";
+
+export function injectPrintReset(html) {
+  if (!html || typeof html !== "string") return html;
+  if (/<\/head>/i.test(html)) {
+    return html.replace(/<\/head>/i, `${PRINT_RESET_CSS}</head>`);
+  }
+  if (/<html[^>]*>/i.test(html)) {
+    return html.replace(
+      /(<html[^>]*>)/i,
+      `$1<head>${PRINT_RESET_CSS}</head>`,
+    );
+  }
+  return `<head>${PRINT_RESET_CSS}</head>${html}`;
+}
+
+/**
  * Print an HTML document (Save as PDF) without touching the preview iframe.
  *
  * The preview runs sandboxed WITHOUT `allow-modals` on purpose — generated
@@ -36,7 +61,11 @@ export function printHtmlDocument(sourceHtml) {
     url = null;
   };
   try {
-    const blob = new Blob([sourceHtml], { type: "text/html" });
+    // The printable copy gets the header/footer reset; the preview and the
+    // downloaded source are untouched.
+    const blob = new Blob([injectPrintReset(sourceHtml)], {
+      type: "text/html",
+    });
     if (typeof URL.createObjectURL !== "function") return false;
     url = URL.createObjectURL(blob);
     frame = document.createElement("iframe");
