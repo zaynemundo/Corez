@@ -680,11 +680,51 @@ h6 {
   opacity: 1;
 }
 
+/* The row-level pin toggle beside the options menu. Hover-revealed like the
+   menu button so idle rows stay clean; a pinned chat keeps its mark visible
+   so the state reads without hovering. Sized like the menu button so the two
+   read as one trailing control cluster. */
+.chat-pin-btn {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: var(--transition-fast);
+}
+
+.history-item:hover .chat-pin-btn,
+.chat-pin-btn:focus-visible {
+  opacity: 0.65;
+  pointer-events: auto;
+}
+
+.chat-pin-btn:hover {
+  color: var(--text-primary);
+  background: var(--sidebar-item-hover-bg);
+  opacity: 1;
+}
+
+.chat-pin-btn.pinned {
+  opacity: 1;
+  pointer-events: auto;
+  color: var(--text-primary);
+}
+
 /* Touch devices never fire :hover, so the hover-revealed menu button stayed
    permanently invisible and untappable - deleting a chat was impossible on a
    phone. Keep it revealed whenever the primary pointer cannot hover. */
 @media (hover: none) {
-  .history-menu-btn {
+  .history-menu-btn,
+  .chat-pin-btn {
     opacity: 0.65;
     pointer-events: auto;
   }

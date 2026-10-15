@@ -303,6 +303,35 @@ export default function Sidebar({
     >
       <span className="history-item-title">{session.title}</span>
       <div className="history-item-menu">
+        {/* One-click pin toggle beside the options menu: no need to open the
+            menu for the most common row action. */}
+        {typeof onTogglePinSession === "function" && (
+          <button
+            type="button"
+            className={`chat-pin-btn ${session.pinnedAt ? "pinned" : ""}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onTogglePinSession(session.id);
+            }}
+            title={
+              session.pinnedAt
+                ? t("common.sidebar.unpin")
+                : t("common.sidebar.pin")
+            }
+            aria-label={
+              session.pinnedAt
+                ? t("common.sidebar.unpin")
+                : t("common.sidebar.pin")
+            }
+            aria-pressed={Boolean(session.pinnedAt)}
+          >
+            {session.pinnedAt ? (
+              <PinOff size={14} strokeWidth={1.5} aria-hidden="true" />
+            ) : (
+              <Pin size={14} strokeWidth={1.5} aria-hidden="true" />
+            )}
+          </button>
+        )}
         <button
           type="button"
           className="history-menu-btn"

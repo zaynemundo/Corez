@@ -243,6 +243,11 @@ check 'project row carries the new-chat icon button' 'className="project-new-cha
 check_absent 'nested project list does not repeat the new-chat row' 'history-item project-new-chat"' "$sidebar"
 check_block_property 'the row new-chat control is sized like the menu button' '.project-new-chat-btn' 'width' '26px'
 check_block_property 'the row new-chat control is always visible while its project is open' '.project-new-chat-btn' 'opacity' '0.65'
+# The row-level pin toggle sits beside the options menu: hover-revealed on
+# idle rows like the menu button, always visible on a pinned chat.
+check 'chat rows carry a row-level pin toggle' 'className={`chat-pin-btn' "$sidebar"
+check_block_property 'row pin toggle is hover-revealed like the menu button' '.history-item:hover .chat-pin-btn' 'opacity' '0.65'
+check_block_property 'pinned rows keep their pin mark visible' '.chat-pin-btn.pinned' 'opacity' '1'
 check 'recent chats section is a disclosure' 'aria-controls="sidebar-chats-list"' "$sidebar"
 check 'recent chats list is identified for the toggle' 'id="sidebar-chats-list"' "$sidebar"
 check 'recent chats disclosure state is exposed' 'aria-expanded=\{chatsOpen\}' "$sidebar"

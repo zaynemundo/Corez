@@ -159,6 +159,44 @@ describe("sidebar pinned chats", () => {
     );
   });
 
+  it("pins and unpins from the row icon without opening the menu", async () => {
+    const user = userEvent.setup();
+    const handlers = renderSidebar({ sessions: sessions() });
+
+    // A loose chat in Recents: outline pin, not pressed, toggles on click.
+    const looseRow = screen
+      .getByRole("button", { name: "Open conversation Loose chat" })
+      .closest(".history-item");
+    const pinButton = within(looseRow).getByRole("button", { name: "Pin" });
+    expect(pinButton.getAttribute("aria-pressed")).toBe("false");
+    expect(
+      pinButton.querySelector("svg.lucide-pin"),
+    ).toBeTruthy();
+
+    await user.click(pinButton);
+    expect(handlers.onTogglePinSession).toHaveBeenCalledWith("chat-2");
+    // The menu was never involved.
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(handlers.onSelectSession).not.toHaveBeenCalled();
+
+    // A pinned chat: the mark stays visible, pressed, and unpins on click.
+    await user.click(screen.getByRole("button", { name: "Pinned" }));
+    const pinnedRow = screen
+      .getByRole("button", { name: "Open conversation Pinned plan" })
+      .closest(".history-item");
+    const unpinButton = within(pinnedRow).getByRole("button", {
+      name: "Unpin",
+    });
+    expect(unpinButton.getAttribute("aria-pressed")).toBe("true");
+    expect(
+      unpinButton.querySelector("svg.lucide-pin-off"),
+    ).toBeTruthy();
+
+    await user.click(unpinButton);
+    expect(handlers.onTogglePinSession).toHaveBeenCalledWith("chat-1");
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
   it("offers Pin on a loose chat and Unpin on a pinned one", async () => {
     const user = userEvent.setup();
     const handlers = renderSidebar({ sessions: sessions() });
