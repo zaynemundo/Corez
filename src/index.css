@@ -3994,6 +3994,10 @@ h6 {
   padding: 0 24px 48px;
   position: relative;
   z-index: 1;
+  /* Sticky footer: the page is a column flexbox at least a viewport tall, so
+     the main absorbs any free space and the footer below it rests on the
+     viewport bottom instead of floating right under short content. */
+  flex: 1 0 auto;
 }
 .pricing-grid-page {
   display: grid;

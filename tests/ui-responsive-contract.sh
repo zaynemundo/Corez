@@ -274,6 +274,9 @@ check 'pinned section starts collapsed on load' '\[pinnedOpen, setPinnedOpen\] =
 check 'projects section starts collapsed on load' '\[projectsOpen, setProjectsOpen\] = useState\(false\)' "$sidebar"
 check 'recents section still starts open on load' '\[chatsOpen, setChatsOpen\] = useState\(true\)' "$sidebar"
 check_block_property 'pinned list shares the section list layout' '.sidebar-pinned-list' 'gap' '0.2rem'
+# Sticky pricing footer: the page is a column flexbox at least a viewport
+# tall, and the main absorbs free space so the footer rests on the bottom.
+check_block_property 'pricing main absorbs free space above the footer' '.pricing-main' 'flex' '1 0 auto'
 check 'projects section is a disclosure' 'aria-controls="sidebar-projects-list"' "$sidebar"
 check 'projects list is identified for the toggle' 'id="sidebar-projects-list"' "$sidebar"
 check 'projects disclosure state is exposed' 'aria-expanded=\{projectsOpen\}' "$sidebar"
