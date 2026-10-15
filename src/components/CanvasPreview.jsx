@@ -31,6 +31,7 @@ import { publishAppInR2 } from "../services/appStorageService";
 import { useAuth } from "../context/AuthContext";
 import { createZipBlob } from "../utils/zipPackager";
 import { repairMalformedHtml } from "../utils/htmlRepair";
+import { printHtmlDocument } from "../utils/printDocument";
 import { generateQrCodeDataUrl, generateEmbedSnippet } from "../utils/qrCode";
 import { useI18n } from "../i18n/index.jsx";
 
@@ -494,16 +495,21 @@ export default function CanvasPreview({
   };
 
   const handlePrint = () => {
-    if (iframeRef.current && iframeRef.current.contentWindow) {
+    // The preview iframe is sandboxed without `allow-modals` (generated
+    // pages must not pop dialogs over the app), which also blocks
+    // `iframe.contentWindow.print()` — the spec silently ignores it, so the
+    // old code printed nothing at all. Print the page actually on screen
+    // (repaired source, like the HTML/ZIP download) through a temporary
+    // same-origin frame instead; `window.print()` stays as the last resort.
+    const source = currentPage?.html || editableCode;
+    if (source) {
       try {
-        iframeRef.current.contentWindow.focus();
-        iframeRef.current.contentWindow.print();
-        return;
-      } catch {
-        // fall through
-      }
+        if (printHtmlDocument(repairMalformedHtml(source))) return;
+      } catch {}
     }
-    window.print();
+    try {
+      window.print();
+    } catch {}
   };
 
   const handleRefresh = () => {
