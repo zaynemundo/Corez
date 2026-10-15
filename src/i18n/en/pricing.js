@@ -7,7 +7,7 @@ export default {
     signIn: "Sign in",
     title: "Plans that grow with you",
     subtitle:
-      "Start free, upgrade when you need more. All plans include live preview, one-click publish and flexible monthly or yearly billing via Ziina. Cancel anytime.",
+      "Start free, upgrade when you need more. All plans include live preview, one-click publish and flexible monthly or yearly billing. Cancel anytime.",
     billingInterval: "Billing interval",
     monthly: "Monthly",
     yearly: "Yearly",
@@ -20,7 +20,7 @@ export default {
     downgrade: "Downgrade",
     processing: "Processing…",
     billedYearly: "Billed yearly • {amount} AED / year",
-    secureCheckout: "Secure checkout via Ziina •",
+    secureCheckout: "Secure checkout •",
     monthlyCancel: "Monthly • Cancel anytime",
     yearlyCancel: "Yearly • Cancel anytime",
     continuePayment: "Continue payment",
@@ -104,7 +104,7 @@ export default {
     resumeFailed: "Could not resume payment",
     cancelPending:
       "Cancel this pending payment? Your current plan stays unchanged.",
-    paymentCompleted: "Payment had completed on Ziina — plan activated.",
+    paymentCompleted: "Payment completed — plan activated.",
     cancelPendingFailed: "Failed to cancel pending payment",
     failed: "Failed",
     keepPlan: "Keep current plan? Cancel scheduled downgrade.",
