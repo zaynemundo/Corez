@@ -43,6 +43,7 @@ export default {
     pinned: "المثبتة",
     collapsePinned: "طي المثبتة",
     expandPinned: "توسيع المثبتة",
+    emptyPinned: "لا توجد محادثات مثبتة",
     pin: "تثبيت",
     unpin: "إلغاء التثبيت",
     projects: "المشاريع",

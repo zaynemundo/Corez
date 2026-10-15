@@ -907,7 +907,8 @@ h6 {
   cursor: default;
 }
 
-.project-empty {
+.project-empty,
+.pinned-empty {
   padding: 6px 10px;
   color: var(--text-muted);
   font-size: 13px;

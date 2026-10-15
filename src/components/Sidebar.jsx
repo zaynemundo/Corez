@@ -460,46 +460,48 @@ export default function Sidebar({
       </div>
 
       <div className="chat-history-list">
-        {/* Pinned chats sit above the projects, and the whole section only
-            exists while at least one chat is pinned — an empty heading would
-            just spend space. */}
-        {pinnedSessions.length > 0 && (
-          <>
-            <div className="sidebar-section-row">
-              <button
-                type="button"
-                className="sidebar-section-toggle"
-                onClick={() => setPinnedOpen((prev) => !prev)}
-                title={
-                  pinnedOpen
-                    ? t("common.sidebar.collapsePinned")
-                    : t("common.sidebar.expandPinned")
-                }
-                aria-expanded={pinnedOpen}
-                aria-controls="sidebar-pinned-list"
-              >
-                <span className="sidebar-section-label">
-                  {t("common.sidebar.pinned")}
-                </span>
-                <ChevronRight
-                  className={`sidebar-chevron ${pinnedOpen ? "expanded" : ""}`}
-                  size={14}
-                  strokeWidth={1.5}
-                  aria-hidden="true"
-                />
-              </button>
-            </div>
+        {/* Pinned chats sit above the projects, and the section is always
+            there — an empty Pinned still shows its heading, so pinned chats
+            have a visible home to return to. */}
+        <div className="sidebar-section-row">
+          <button
+            type="button"
+            className="sidebar-section-toggle"
+            onClick={() => setPinnedOpen((prev) => !prev)}
+            title={
+              pinnedOpen
+                ? t("common.sidebar.collapsePinned")
+                : t("common.sidebar.expandPinned")
+            }
+            aria-expanded={pinnedOpen}
+            aria-controls="sidebar-pinned-list"
+          >
+            <span className="sidebar-section-label">
+              {t("common.sidebar.pinned")}
+            </span>
+            <ChevronRight
+              className={`sidebar-chevron ${pinnedOpen ? "expanded" : ""}`}
+              size={14}
+              strokeWidth={1.5}
+              aria-hidden="true"
+            />
+          </button>
+        </div>
 
-            {pinnedOpen && (
-              <div className="sidebar-pinned-list" id="sidebar-pinned-list">
-                {/* The row keeps its real folder so the menu can still offer
-                    "No project"; only the rendering place changes. */}
-                {pinnedSessions.map((session) =>
-                  renderSessionRow(session, session.projectId || null),
-                )}
+        {pinnedOpen && (
+          <div className="sidebar-pinned-list" id="sidebar-pinned-list">
+            {pinnedSessions.length === 0 ? (
+              <div className="pinned-empty">
+                {t("common.sidebar.emptyPinned")}
               </div>
+            ) : (
+              /* The row keeps its real folder so the menu can still offer
+                 "No project"; only the rendering place changes. */
+              pinnedSessions.map((session) =>
+                renderSessionRow(session, session.projectId || null),
+              )
             )}
-          </>
+          </div>
         )}
 
         <div className="sidebar-section-row">

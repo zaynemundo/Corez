@@ -28,6 +28,7 @@
   "common.sidebar.pinned": "Pinned",
   "common.sidebar.collapsePinned": "Collapse pinned",
   "common.sidebar.expandPinned": "Expand pinned",
+  "common.sidebar.emptyPinned": "No pinned chats",
   "common.sidebar.pin": "Pin",
   "common.sidebar.unpin": "Unpin",
   "common.sidebar.projects": "Projects",

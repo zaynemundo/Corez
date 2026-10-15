@@ -122,13 +122,20 @@ describe("sidebar pinned chats", () => {
     expect(within(projectList).queryByText("Pinned filed chat")).toBeNull();
   });
 
-  it("hides the Pinned section until something is pinned", () => {
+  it("keeps the Pinned section visible even when nothing is pinned", () => {
     renderSidebar({
       sessions: sessions().map((session) => ({ ...session, pinnedAt: null })),
     });
 
-    expect(screen.queryByText("Pinned")).toBeNull();
-    expect(document.getElementById("sidebar-pinned-list")).toBeNull();
+    // The heading is permanent: an empty Pinned still shows where pinned
+    // chats will land, instead of the section blinking in and out.
+    expect(screen.getByRole("button", { name: "Pinned" })).toBeTruthy();
+    const pinnedList = document.getElementById("sidebar-pinned-list");
+    expect(pinnedList).toBeTruthy();
+    expect(pinnedList.querySelector(".history-item")).toBeNull();
+    expect(pinnedList.querySelector(".pinned-empty").textContent).toBe(
+      "No pinned chats",
+    );
   });
 
   it("offers Pin on a loose chat and Unpin on a pinned one", async () => {
