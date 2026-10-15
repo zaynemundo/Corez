@@ -578,7 +578,10 @@ export default function Pricing() {
                 {p.id !== "free" && (
                   <div className="pricing-secure">
                     <Shield size={12} /> {t("pricing.page.secureCheckout")}{" "}
-                    <Clock size={12} /> {t("pricing.page.monthlyCancel")}
+                    <Clock size={12} />{" "}
+                    {billing === "yearly"
+                      ? t("pricing.page.yearlyCancel")
+                      : t("pricing.page.monthlyCancel")}
                   </div>
                 )}
               </div>

@@ -3820,6 +3820,7 @@ h6 {
 .pricing-bg {
   position: fixed;
   inset: 0;
+  z-index: 0;
   background:
     radial-gradient(
       800px circle at 50% -10%,
@@ -3848,6 +3849,9 @@ h6 {
 }
 .pricing-header {
   position: relative;
+  z-index: 1;
+  width: 100%;
+  box-sizing: border-box;
   max-width: 1120px;
   margin: 0 auto;
   padding: 16px 24px 24px;
@@ -3857,6 +3861,12 @@ h6 {
   align-items: center;
   justify-content: space-between;
   padding: 12px 24px 0;
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 1;
 }
 .pricing-logo {
   font-family: "Outfit", sans-serif;
@@ -3977,10 +3987,13 @@ h6 {
   color: #4ade80;
 }
 .pricing-main {
+  width: 100%;
+  box-sizing: border-box;
   max-width: 1120px;
   margin: 0 auto;
   padding: 0 24px 48px;
   position: relative;
+  z-index: 1;
 }
 .pricing-grid-page {
   display: grid;
@@ -3990,6 +4003,8 @@ h6 {
   margin-top: 8px;
   overflow: visible;
   padding-top: 10px;
+  width: 100%;
+  box-sizing: border-box;
 }
 .pricing-card-page {
   position: relative;
@@ -4038,7 +4053,6 @@ h6 {
 .pricing-card-page--premium {
   background: var(--bg-secondary);
   border-color: transparent;
-  transform: scale(1.02);
 }
 [data-theme="light"] .pricing-card-page--premium {
   background: #ffffff;
@@ -4070,7 +4084,7 @@ h6 {
   );
 }
 .pricing-card-page--premium:hover {
-  transform: scale(1.02) translateY(-3px);
+  transform: translateY(-3px);
 }
 .pricing-card-page--current {
   border-color: rgba(255, 255, 255, 0.14);
@@ -4152,11 +4166,16 @@ h6 {
   font-size: 12px;
   color: var(--text-muted);
   margin-top: 4px;
+  /* One-line descriptions left the price rows staggered by a line; reserve two
+     lines so every card's price and CTA start on the same row. */
+  min-height: 2.4em;
+  line-height: 1.5;
 }
 .pricing-card-page-price {
   margin-top: 14px;
   display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
   gap: 4px;
 }
 .pricing-amount {
@@ -7361,6 +7380,10 @@ body.corez-consent-visible .app-container {
   padding: 26px 24px 40px;
   border-top: 1px solid var(--border-color);
   margin-top: 24px;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* ---------- Settings: usage this month ---------- */

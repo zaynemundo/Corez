@@ -7,7 +7,7 @@ export default {
     signIn: "Sign in",
     title: "Plans that grow with you",
     subtitle:
-      "Start free, upgrade when you need more. All plans include live preview, one-click publish and monthly billing via Ziina. Cancel anytime.",
+      "Start free, upgrade when you need more. All plans include live preview, one-click publish and flexible monthly or yearly billing via Ziina. Cancel anytime.",
     billingInterval: "Billing interval",
     monthly: "Monthly",
     yearly: "Yearly",
@@ -22,6 +22,7 @@ export default {
     billedYearly: "Billed yearly • {amount} AED / year",
     secureCheckout: "Secure checkout via Ziina •",
     monthlyCancel: "Monthly • Cancel anytime",
+    yearlyCancel: "Yearly • Cancel anytime",
     continuePayment: "Continue payment",
     keepPlan: "Keep {plan}",
     privacyPolicy: "Privacy Policy",
