@@ -85,7 +85,7 @@ afterEach(() => {
 });
 
 describe("sidebar project folders", () => {
-  it("collapses a project until it is opened, and keeps ungrouped chats separate", async () => {
+  it("starts the projects section collapsed, then expands a project on demand", async () => {
     const user = userEvent.setup();
     renderSidebar({
       sessions: sessions(),
@@ -93,10 +93,16 @@ describe("sidebar project folders", () => {
       activeSessionId: "chat-2",
     });
 
-    expect(screen.getByText("Projects")).toBeTruthy();
-    expect(screen.getByText("Marketing")).toBeTruthy();
+    // Compact on load: the section starts folded.
+    const toggle = screen.getByRole("button", { name: "Projects" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByText("Marketing")).toBeNull();
     // The plain chats list still owns the chats that have no project.
     expect(screen.getByText("Beta")).toBeTruthy();
+
+    await user.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText("Marketing")).toBeTruthy();
     // Nothing of the collapsed project is on screen yet.
     expect(screen.queryByText("Alpha")).toBeNull();
 
@@ -108,13 +114,17 @@ describe("sidebar project folders", () => {
     expect(screen.getAllByText("Alpha")).toHaveLength(1);
   });
 
-  it("opens the project that holds the chat being viewed", () => {
+  it("opens the projects section and folder holding the chat being viewed", () => {
     renderSidebar({
       sessions: sessions(),
       projects: [PROJECT],
       activeSessionId: "chat-1",
     });
-    // No click: the active chat's folder is open so it is never hidden.
+    // No click: the section and the folder open so the viewed chat is never
+    // hidden by the collapsed-by-default sidebar.
+    expect(
+      screen.getByRole("button", { name: "Projects" }).getAttribute("aria-expanded"),
+    ).toBe("true");
     expect(screen.getByText("Alpha")).toBeTruthy();
   });
 
@@ -126,6 +136,7 @@ describe("sidebar project folders", () => {
       activeSessionId: "chat-2",
     });
 
+    await user.click(screen.getByRole("button", { name: "Projects" }));
     const row = () => screen.getByRole("button", { name: "Open project Marketing" });
     // Collapsed: a closed folder, not a disclosure caret.
     expect(
@@ -210,6 +221,7 @@ describe("sidebar project folders", () => {
       activeSessionId: null,
     });
 
+    await user.click(screen.getByRole("button", { name: "Projects" }));
     await user.click(
       screen.getByRole("button", { name: "Open project Marketing" }),
     );
@@ -230,6 +242,7 @@ describe("sidebar project folders", () => {
       activeSessionId: "chat-2",
     });
 
+    await user.click(screen.getByRole("button", { name: "Projects" }));
     await user.click(
       screen.getByRole("button", { name: "Options for project Marketing" }),
     );
@@ -254,6 +267,7 @@ describe("sidebar project folders", () => {
       activeSessionId: "chat-2",
     });
 
+    await user.click(screen.getByRole("button", { name: "Projects" }));
     await user.click(
       screen.getByRole("button", { name: "Options for project Marketing" }),
     );
@@ -294,17 +308,19 @@ describe("sidebar project folders", () => {
       activeSessionId: "chat-2",
     });
 
-    const row = screen.getByRole("button", { name: "Open project Marketing" });
+    const row = () => screen.getByRole("button", { name: "Open project Marketing" });
+
     // A closed folder keeps just its mark: the control arrives with the
-    // open project.
+    // open project. (The section itself is opened first: it starts folded.)
+    await user.click(screen.getByRole("button", { name: "Projects" }));
     expect(screen.queryByTitle("New chat in Marketing")).toBeNull();
 
-    await user.click(row);
+    await user.click(row());
 
     const newChat = screen.getByTitle("New chat in Marketing");
     // On the folder row itself, immediately beside the options menu — not
     // inside the nested chats list.
-    expect(row.contains(newChat)).toBe(true);
+    expect(row().contains(newChat)).toBe(true);
     expect(newChat.closest(".project-chats")).toBeNull();
     expect(
       newChat.nextElementSibling.classList.contains("history-item-menu"),
@@ -327,6 +343,7 @@ describe("sidebar project folders", () => {
       activeSessionId: null,
     });
 
+    await user.click(screen.getByRole("button", { name: "Projects" }));
     await user.click(screen.getByRole("button", { name: "Open project Marketing" }));
     expect(screen.getByText("No chats yet")).toBeTruthy();
   });
@@ -356,7 +373,7 @@ describe("sidebar project folders", () => {
     expect(screen.queryByText("Marketing")).toBeNull();
   });
 
-  it("folds the whole projects section without touching the chats list", async () => {
+  it("expands and folds the projects section without touching the chats list", async () => {
     const user = userEvent.setup();
     renderSidebar({
       sessions: sessions(),
@@ -364,9 +381,14 @@ describe("sidebar project folders", () => {
       activeSessionId: "chat-2",
     });
 
+    // Compact on load.
     const toggle = screen.getByRole("button", { name: "Projects" });
-    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
     expect(toggle.getAttribute("aria-controls")).toBe("sidebar-projects-list");
+    expect(screen.queryByText("Marketing")).toBeNull();
+
+    await user.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByText("Marketing")).toBeTruthy();
 
     await user.click(toggle);
@@ -385,8 +407,8 @@ describe("sidebar project folders", () => {
       activeSessionId: null,
     });
 
+    // The section starts folded.
     const toggle = screen.getByRole("button", { name: "Projects" });
-    await user.click(toggle);
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
 
     await user.click(screen.getByRole("button", { name: "New Project" }));
@@ -403,6 +425,10 @@ describe("sidebar project folders", () => {
       projects: [PROJECT],
       activeSessionId: "chat-2",
     });
+
+    // The folder row has to exist for the independence check below, so the
+    // folded-by-default section is opened first.
+    await user.click(screen.getByRole("button", { name: "Projects" }));
 
     const toggle = screen.getByRole("button", { name: "Recents" });
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
@@ -521,8 +547,14 @@ describe("sidebar project folders", () => {
     }
   });
 
-  it("leaves an open section truly empty when it has nothing to show", () => {
+  it("leaves an open section truly empty when it has nothing to show", async () => {
+    const user = userEvent.setup();
     renderSidebar({ sessions: [], projects: [] });
+
+    // A folded section renders no list at all.
+    expect(document.getElementById("sidebar-projects-list")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Projects" }));
 
     // The stylesheet hides these wrappers with `:empty`, which only works
     // while they genuinely hold no child nodes — a stray whitespace node
@@ -558,6 +590,7 @@ describe("sidebar project folders", () => {
     );
 
     expect(screen.getByText("المشاريع")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "المشاريع" }));
     await user.click(
       screen.getByRole("button", { name: "خيارات مشروع Marketing" }),
     );

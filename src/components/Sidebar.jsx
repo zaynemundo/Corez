@@ -84,11 +84,13 @@ export default function Sidebar({
   const [newProjectName, setNewProjectName] = useState("");
   const [savingProject, setSavingProject] = useState(false);
   const [busyProjectId, setBusyProjectId] = useState(null);
-  // The plain "Chats" list is a disclosure: open by default, collapsed only
-  // when the user says so (an explicit toggle must never spring back open).
+  // Section disclosures. Recents ("Chats") is open on load; Pinned and
+  // Projects start collapsed so the sidebar lands compact — they still expand
+  // by click, and creating a project (or a new chat) opens the section its
+  // content lands in. An explicit toggle must never spring back open.
   const [chatsOpen, setChatsOpen] = useState(true);
-  const [projectsOpen, setProjectsOpen] = useState(true);
-  const [pinnedOpen, setPinnedOpen] = useState(true);
+  const [projectsOpen, setProjectsOpen] = useState(false);
+  const [pinnedOpen, setPinnedOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState(null);
   const [editingName, setEditingName] = useState("");
 
@@ -182,7 +184,10 @@ export default function Sidebar({
     [sessions, projectIds],
   );
 
-  // The chat being viewed must be reachable: its folder opens with it.
+  // The chat being viewed must be reachable: its section and its folder open
+  // with it. Keyed on the project (not the session), so the effect only fires
+  // when the viewed chat moves between places — folding a section and then
+  // viewing another chat inside the same place never springs it back open.
   const activeProjectId = useMemo(() => {
     const active = sessions.find((session) => session.id === activeSessionId);
     return active?.projectId && projectIds.has(active.projectId)
@@ -191,6 +196,7 @@ export default function Sidebar({
   }, [sessions, activeSessionId, projectIds]);
   useEffect(() => {
     if (!activeProjectId) return;
+    setProjectsOpen(true);
     setExpandedProjectIds((prev) => {
       if (prev.has(activeProjectId)) return prev;
       const next = new Set(prev);
@@ -198,6 +204,17 @@ export default function Sidebar({
       return next;
     });
   }, [activeProjectId]);
+
+  // Same reachability rule for a pinned chat being viewed: its section opens
+  // with it. Keyed on the boolean, so unrelated session updates cannot refire
+  // it and spring a deliberately folded section back open.
+  const activeIsPinned = useMemo(() => {
+    const active = sessions.find((session) => session.id === activeSessionId);
+    return Boolean(active?.pinnedAt);
+  }, [sessions, activeSessionId]);
+  useEffect(() => {
+    if (activeIsPinned) setPinnedOpen(true);
+  }, [activeIsPinned]);
 
   const toggleProject = (projectId) => {
     setExpandedProjectIds((prev) => {

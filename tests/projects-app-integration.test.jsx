@@ -312,6 +312,10 @@ describe("project folders in the app", () => {
       { pinned: true },
     );
 
+    // The Pinned section starts folded (the viewed chat is not pinned), so
+    // open it to see the chat arrive.
+    await user.click(screen.getByRole("button", { name: "Pinned" }));
+
     const pinnedList = document.getElementById("sidebar-pinned-list");
     expect(pinnedList).toBeTruthy();
     expect(within(pinnedList).getByText("Scratch pad")).toBeTruthy();

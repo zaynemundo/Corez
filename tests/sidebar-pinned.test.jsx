@@ -82,8 +82,16 @@ afterEach(() => {
 });
 
 describe("sidebar pinned chats", () => {
-  it("shows pinned chats above the projects and out of Recents", () => {
+  it("starts the pinned section collapsed, then shows pinned chats above the projects", async () => {
+    const user = userEvent.setup();
     renderSidebar({ sessions: sessions() });
+
+    // Compact on load.
+    const toggle = screen.getByRole("button", { name: "Pinned" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(document.getElementById("sidebar-pinned-list")).toBeNull();
+
+    await user.click(toggle);
 
     const pinnedList = document.getElementById("sidebar-pinned-list");
     expect(pinnedList).toBeTruthy();
@@ -109,10 +117,22 @@ describe("sidebar pinned chats", () => {
     expect(within(recents).getByText("Loose chat")).toBeTruthy();
   });
 
+  it("opens the pinned section for the chat being viewed", () => {
+    renderSidebar({ sessions: sessions(), activeSessionId: "chat-1" });
+
+    // No click: the section opens so the viewed pinned chat is never hidden
+    // by the collapsed-by-default sidebar.
+    expect(
+      screen.getByRole("button", { name: "Pinned" }).getAttribute("aria-expanded"),
+    ).toBe("true");
+    expect(screen.getByText("Pinned plan")).toBeTruthy();
+  });
+
   it("keeps a pinned chat out of its folder", async () => {
     const user = userEvent.setup();
     renderSidebar({ sessions: sessions() });
 
+    await user.click(screen.getByRole("button", { name: "Projects" }));
     await user.click(
       screen.getByRole("button", { name: "Open project Marketing" }),
     );
@@ -122,14 +142,15 @@ describe("sidebar pinned chats", () => {
     expect(within(projectList).queryByText("Pinned filed chat")).toBeNull();
   });
 
-  it("keeps the Pinned section visible even when nothing is pinned", () => {
+  it("keeps the Pinned section visible even when nothing is pinned", async () => {
+    const user = userEvent.setup();
     renderSidebar({
       sessions: sessions().map((session) => ({ ...session, pinnedAt: null })),
     });
 
     // The heading is permanent: an empty Pinned still shows where pinned
     // chats will land, instead of the section blinking in and out.
-    expect(screen.getByRole("button", { name: "Pinned" })).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Pinned" }));
     const pinnedList = document.getElementById("sidebar-pinned-list");
     expect(pinnedList).toBeTruthy();
     expect(pinnedList.querySelector(".history-item")).toBeNull();
@@ -148,6 +169,7 @@ describe("sidebar pinned chats", () => {
     await user.click(screen.getByRole("menuitem", { name: "Pin" }));
     expect(handlers.onTogglePinSession).toHaveBeenCalledWith("chat-2");
 
+    await user.click(screen.getByRole("button", { name: "Pinned" }));
     await user.click(
       screen.getByRole("button", { name: "Options for Pinned plan" }),
     );
@@ -159,6 +181,7 @@ describe("sidebar pinned chats", () => {
     const user = userEvent.setup();
     const handlers = renderSidebar({ sessions: sessions() });
 
+    await user.click(screen.getByRole("button", { name: "Pinned" }));
     await user.click(
       screen.getByRole("button", { name: "Options for Pinned filed chat" }),
     );
@@ -168,13 +191,19 @@ describe("sidebar pinned chats", () => {
     expect(handlers.onMoveSessionToProject).toHaveBeenCalledWith("chat-4", null);
   });
 
-  it("folds the pinned section without touching the other lists", async () => {
+  it("expands and folds the pinned section without touching the other lists", async () => {
     const user = userEvent.setup();
     renderSidebar({ sessions: sessions() });
 
+    // Compact on load.
     const toggle = screen.getByRole("button", { name: "Pinned" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(document.getElementById("sidebar-pinned-list")).toBeNull();
+
+    await user.click(toggle);
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
     expect(toggle.getAttribute("aria-controls")).toBe("sidebar-pinned-list");
+    expect(screen.getByText("Pinned plan")).toBeTruthy();
 
     await user.click(toggle);
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
