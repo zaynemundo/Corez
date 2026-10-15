@@ -148,15 +148,12 @@ describe("sidebar pinned chats", () => {
       sessions: sessions().map((session) => ({ ...session, pinnedAt: null })),
     });
 
-    // The heading is permanent: an empty Pinned still shows where pinned
-    // chats will land, instead of the section blinking in and out.
+    // The heading is permanent: an empty Pinned shows nothing beneath it —
+    // the heading itself is the whole empty state.
     await user.click(screen.getByRole("button", { name: "Pinned" }));
     const pinnedList = document.getElementById("sidebar-pinned-list");
     expect(pinnedList).toBeTruthy();
-    expect(pinnedList.querySelector(".history-item")).toBeNull();
-    expect(pinnedList.querySelector(".pinned-empty").textContent).toBe(
-      "No pinned chats",
-    );
+    expect(pinnedList.childNodes.length).toBe(0);
   });
 
   it("pins and unpins from the row icon without opening the menu", async () => {

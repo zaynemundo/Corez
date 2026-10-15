@@ -668,16 +668,12 @@ export default function Sidebar({
 
         {pinnedOpen && (
           <div className="sidebar-pinned-list" id="sidebar-pinned-list">
-            {pinnedSessions.length === 0 ? (
-              <div className="pinned-empty">
-                {t("common.sidebar.emptyPinned")}
-              </div>
-            ) : (
-              /* The row keeps its real folder so the menu can still offer
-                 "No project"; only the rendering place changes. */
-              pinnedSessions.map((session) =>
-                renderSessionRow(session, session.projectId || null, "pinned"),
-              )
+            {/* The row keeps its real folder so the menu can still offer
+                "No project"; only the rendering place changes. An empty
+                Pinned renders nothing: the section heading above is the
+                whole empty state. */}
+            {pinnedSessions.map((session) =>
+              renderSessionRow(session, session.projectId || null, "pinned"),
             )}
           </div>
         )}

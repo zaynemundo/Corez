@@ -57,7 +57,6 @@ export default {
     pinned: "Pinned",
     collapsePinned: "Collapse pinned",
     expandPinned: "Expand pinned",
-    emptyPinned: "No pinned chats",
     pin: "Pin",
     unpin: "Unpin",
     projects: "Projects",
