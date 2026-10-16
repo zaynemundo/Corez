@@ -57,6 +57,12 @@ describe('User Learning skill', () => {
     'We provide full-service workplace design and installation',
     'Based in Dubai',
     'I live in Abu Dhabi',
+    "I'm a designer",
+    'You can call me Zed',
+    'Please reply in Arabic',
+    'Keep your answers short',
+    'اسمي زيد',
+    'أعيش في دبي',
   ])('proactively activates user-learning for volunteered identity "%s"', (prompt) => {
     const { skills } = resolveSkills({ intent: 'general', prompt });
     expect(skills.map((s) => s.id)).toContain('user-learning');
@@ -109,6 +115,8 @@ describe('User Learning skill', () => {
       expect(detectUserFactCandidates('```js\nconst x = "i am a string";\n```')).toEqual([]);
       expect(detectUserFactCandidates('My brand new phone battery drains fast')).toEqual([]);
       expect(detectUserFactCandidates('I want to learn more about React')).toEqual([]);
+      expect(detectUserFactCandidates('Reply in detail below')).toEqual([]);
+      expect(detectUserFactCandidates('I am working on it')).toEqual([]);
     });
 
     it('never surfaces secrets as candidates', () => {
@@ -121,6 +129,50 @@ describe('User Learning skill', () => {
       const candidates = detectUserFactCandidates(prompt);
       expect(candidates.length).toBeLessThanOrEqual(3);
       expect(new Set(candidates.map((c) => c.key)).size).toBe(candidates.length);
+    });
+
+    it('catches contractions, nicknames, projects, and style prefs', () => {
+      expect(detectUserFactCandidates("I'm a designer")).toEqual([
+        { key: 'identity.role', category: 'identity', text: 'User is a designer' },
+      ]);
+      expect(detectUserFactCandidates('You can call me Zed')).toEqual([
+        { key: 'identity.nickname', category: 'identity', text: 'User asked to be called Zed' },
+      ]);
+      expect(detectUserFactCandidates('call me when the build is done')).toEqual([]);
+      expect(detectUserFactCandidates("I'm building an online store")).toEqual([
+        { key: 'work.project', category: 'work', text: 'User is building an online store' },
+      ]);
+      expect(detectUserFactCandidates('I hate long meetings')).toEqual([
+        { key: 'preferences.dislikes', category: 'preferences', text: 'User dislikes long meetings' },
+      ]);
+      expect(detectUserFactCandidates('I speak Arabic and English')).toEqual([
+        { key: 'preferences.language', category: 'preferences', text: 'User speaks Arabic and English' },
+      ]);
+      expect(detectUserFactCandidates('Please reply in Arabic')).toEqual([
+        { key: 'preferences.replyLanguage', category: 'preferences', text: 'User wants replies in arabic' },
+      ]);
+      expect(detectUserFactCandidates('Keep your answers short')).toEqual([
+        { key: 'preferences.style', category: 'preferences', text: 'User prefers short, concise answers' },
+      ]);
+      expect(detectUserFactCandidates('No emojis please')).toEqual([
+        { key: 'preferences.noEmojis', category: 'preferences', text: 'User prefers no emojis' },
+      ]);
+    });
+
+    it('catches Arabic volunteered facts and skips Arabic questions', () => {
+      expect(detectUserFactCandidates('اسمي زيد')).toEqual([
+        { key: 'identity.name', category: 'identity', text: "User's name is زيد" },
+      ]);
+      expect(detectUserFactCandidates('أعيش في دبي')).toEqual([
+        { key: 'identity.location', category: 'identity', text: 'User is based in دبي' },
+      ]);
+      expect(detectUserFactCandidates('أنا أفضل الردود القصيرة')).toEqual([
+        { key: 'preferences.general', category: 'preferences', text: 'User prefers الردود القصيرة' },
+      ]);
+      expect(detectUserFactCandidates('لغتي العربية')).toEqual([
+        { key: 'preferences.language', category: 'preferences', text: 'User speaks العربية' },
+      ]);
+      expect(detectUserFactCandidates('ما هو اسمي الكامل؟')).toEqual([]);
     });
   });
 });

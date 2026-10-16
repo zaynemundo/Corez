@@ -14,6 +14,8 @@ const SENSITIVE_PATTERNS =
 // Volunteered identity-fact patterns: first-person or business-identity
 // statements that are worth OFFERING to remember (never silent-stored).
 // Each entry maps a match to a stable storage key + category + human text.
+// An entry may add `validate(match)` for checks a regex cannot express
+// (e.g. case-sensitive capitalisation); a false return skips the candidate.
 const IDENTITY_CANDIDATE_PATTERNS = [
   {
     key: "identity.name",
@@ -22,9 +24,18 @@ const IDENTITY_CANDIDATE_PATTERNS = [
     format: (m) => `User's name is ${m[1].trim()}`,
   },
   {
+    // "You can call me Zed" — the name must be capitalised, otherwise this
+    // fires on "call me when the build is done".
+    key: "identity.nickname",
+    category: "identity",
+    pattern: /\bcall\s+me\s+([A-Za-z'’-]{1,30})\b/i,
+    validate: (m) => /^[A-Z]/.test(m[1]),
+    format: (m) => `User asked to be called ${m[1].trim()}`,
+  },
+  {
     key: "identity.role",
     category: "identity",
-    pattern: /\bi\s+am\s+a(n)?\s+([^.,;!?]{2,80})/i,
+    pattern: /\bi(?:\s+am|\s*['’]m)\s+a(n)?\s+([^.,;!?]{2,80})/i,
     format: (m) => `User is a ${m[2].trim()}`,
   },
   {
@@ -53,16 +64,83 @@ const IDENTITY_CANDIDATE_PATTERNS = [
     format: (m) => `User's business: we ${m[1].trim().toLowerCase()} ${m[2].trim()}`,
   },
   {
+    key: "work.project",
+    category: "work",
+    // "I'm building an online store" — the capture floor skips bare
+    // pronouns ("I'm working on it").
+    pattern: /\bi(?:\s+am|\s*['’]m)\s+(working\s+on|building|creating)\s+([^.,;!?]{6,80})/i,
+    format: (m) => `User is ${m[1].trim().toLowerCase().replace(/\s+/g, " ")} ${m[2].trim()}`,
+  },
+  {
     key: "preferences.general",
     category: "preferences",
     pattern: /\bi\s+prefer\s+([^.,;!?]{2,80})/i,
     format: (m) => `User prefers ${m[1].trim()}`,
   },
   {
+    key: "preferences.dislikes",
+    category: "preferences",
+    pattern: /\bi\s+(?:don'?t\s+like|dislike|hate)\s+([^.,;!?]{2,80})/i,
+    format: (m) => `User dislikes ${m[1].trim()}`,
+  },
+  {
+    key: "preferences.language",
+    category: "preferences",
+    pattern: /\b(?:my\s+(?:main\s+)?language\s+is|i\s+speak)\s+([^.,;!?]{2,40})/i,
+    format: (m) => `User speaks ${m[1].trim()}`,
+  },
+  {
+    // Closed language list: "reply in detail" must never match.
+    key: "preferences.replyLanguage",
+    category: "preferences",
+    pattern: /\b(?:reply|respond|answer|write|speak|talk)(?:\s+to\s+me)?\s+in\s+(arabic|english|french|spanish|hindi|urdu|german)(?![a-z])/i,
+    format: (m) => `User wants replies in ${m[1].trim().toLowerCase()}`,
+  },
+  {
+    key: "preferences.style",
+    category: "preferences",
+    pattern: /\b(?:keep\s+(?:your\s+|the\s+)?answers?\s+short|keep\s+it\s+short|be\s+concise)\b/i,
+    format: () => `User prefers short, concise answers`,
+  },
+  {
+    key: "preferences.noEmojis",
+    category: "preferences",
+    pattern: /\b(?:don'?t\s+use|no)\s+emojis?\b/i,
+    format: () => `User prefers no emojis`,
+  },
+  {
     key: "tech.stack",
     category: "tech",
     pattern: /\bmy\s+tech\s+stack\s+(is\s+)?([^.,;!?]{2,80})/i,
     format: (m) => `User's tech stack: ${m[2].trim()}`,
+  },
+  // Arabic volunteered facts: the interface is bilingual and the extractor
+  // was English-only, so Arabic users were never offered remembers. Values
+  // stay verbatim; templates stay English like every other entry.
+  {
+    key: "identity.name",
+    category: "identity",
+    pattern: /اسمي\s+([^\s.,;!?؟]{2,40})/,
+    format: (m) => `User's name is ${m[1].trim()}`,
+  },
+  {
+    key: "identity.location",
+    category: "identity",
+    pattern: /(?:أنا\s+من|أعيش\s+في|مقيم\s+في|ساكن\s+في)\s+([^.,;!?؟]{2,60})/,
+    format: (m) => `User is based in ${m[1].trim()}`,
+  },
+  {
+    // "أنا أفضل" only: bare أفضل also means "better/best" ("هذا أفضل").
+    key: "preferences.general",
+    category: "preferences",
+    pattern: /أنا\s+(?:أفضل|افضل)\s+([^.,;!?؟]{2,80})/,
+    format: (m) => `User prefers ${m[1].trim()}`,
+  },
+  {
+    key: "preferences.language",
+    category: "preferences",
+    pattern: /(?:لغتي\s+(?:هي\s+)?|أتحدث\s+)([^\s.,;!?؟]{2,30})/,
+    format: (m) => `User speaks ${m[1].trim()}`,
   },
 ];
 
@@ -99,8 +177,18 @@ export function detectUserFactCandidates(text) {
     if (seenKeys.has(entry.key)) continue;
     const match = entry.pattern.exec(scrubbed);
     if (!match || match.index == null) continue;
+    if (typeof entry.validate === "function") {
+      let valid;
+      try {
+        valid = entry.validate(match) === true;
+      } catch {
+        valid = false;
+      }
+      if (!valid) continue;
+    }
     const sentence = sentenceContaining(scrubbed, match.index);
-    if (/[?]\s*$/.test(sentence)) continue;
+    // Questions (English ? and Arabic ؟) state nothing to remember.
+    if (/[?؟]\s*$/.test(sentence)) continue;
     let candidateText;
     try {
       candidateText = entry.format(match).replace(/\s+/g, " ").trim();
