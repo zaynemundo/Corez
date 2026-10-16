@@ -749,7 +749,7 @@ Informational & List Formatting (for every non-code answer):
 - Never add filler sentences, emojis, or generic closers; every sentence must carry information.`;
 
   const imageRequestInstructions = `
-- IMAGE REQUESTS: If the user explicitly requests an image, picture, photo, illustration, artwork, logo, or wallpaper, respond with EXACTLY ONE line containing \`[IMAGE_PROMPT: concise detailed description of the requested image]\` and nothing else. Never output raw SVG markup for image requests â€” the platform renders the image for you.`;
+- IMAGE REQUESTS: If the user explicitly requests an image, picture, photo, illustration, artwork, logo, or wallpaper, respond with EXACTLY ONE line containing \`[IMAGE_PROMPT: concise detailed description of the requested image]\` and nothing else. Never output raw SVG markup for image requests — the platform renders the image for you. NEVER emit [IMAGE_PROMPT:] for emails, CVs, resumes, cover letters, or job applications — even when they mention "graphic design", "graphic designer", "images", or "videographer". A job title or email topic is not an image request; only a direct ask to generate/create/draw an image counts.`;
 
   const emailFormatting = `
 EMAIL FORMATTING (whenever the user asks you to write, draft, compose, or rewrite an email):

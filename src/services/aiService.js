@@ -2689,8 +2689,29 @@ Its core purpose is to remove the technical gap between having an idea and launc
   return `I can't act on "${safeDisplay}" right now because the hosted AI service is currently unavailable.${fallbackReason}\n\nRetry in a moment and I'll turn it into a plan, a written answer, code, or a live preview depending on what you need.`;
 }
 
-const IMAGE_PATTERNS =
-  /\b(generate|create|draw|make|render|show|give me|give us|want|need|produce)\b.*\b(image|picture|photo|logo|illustration|artwork|wallpaper|drawing|graphic|icon)\b|\b(image|picture|photo|logo|illustration|artwork|wallpaper|drawing|graphic|icon)\b.*\b(generate|create|draw|make|render|flux)\b/i;
+// Image requests must be explicit. `@image` (and /image, image:, flux:) always
+// qualifies. Natural-language detection is intentionally strict: the action
+// verb and the image noun must be close together (direct object), and
+// writing/job contexts (email, CV, cover letter, job application) never
+// qualify — otherwise "I need to create an email ... graphic design" falsely
+// routes to the image endpoint.
+const IMAGE_VERB_SRC = `(?:generate|create|draw|paint|make|render|show|give\\s+me|give\\s+us|want|need|produce)`;
+const IMAGE_NOUN_SRC = `(?:images?|pictures?|photos?|pics?|logos?|illustrations?|artworks?|wallpapers?|drawings?|paintings?|icons?|visuals?|shots?)`;
+const GRAPHIC_NOUN_SRC = `graphic(?!\\s+(?:design|designer|designs|designing)\\b)`;
+// verb → noun and noun → verb, max ~48 chars (~8 words) between them so
+// "create an email ... graphic design" (10+ words apart) does not match while
+// "generate a picture of X" and "give me an image" still do.
+const IMAGE_PATTERNS = new RegExp(
+  `\\b${IMAGE_VERB_SRC}\\b[\\w\\s,'"-]{0,48}?\\b(?:${IMAGE_NOUN_SRC}|${GRAPHIC_NOUN_SRC})\\b|\\b(?:${IMAGE_NOUN_SRC}|${GRAPHIC_NOUN_SRC})\\b[\\w\\s,'"-]{0,48}?\\b(?:generate|create|draw|paint|make|render|flux)\\b`,
+  "i",
+);
+
+// Writing / job-application contexts are NEVER image requests. The image noun
+// in these prompts ("graphic" in "graphic design", "images" in "email about
+// images") refers to a job title or topic, not a generation request. Users who
+// genuinely want both must use `@image` explicitly.
+const WRITING_JOB_GUARD =
+  /\b(e-?mail|cover\s*letter|\bcv\b|resume|curriculum\s+vitae|job\s+application|applying\s+for)\b/i;
 
 export function isRevisionContextPrompt(prompt) {
   return /\[(?:SURGICAL REVISION CONTEXT|Context: The user is requesting a revision)/i.test(
@@ -3060,9 +3081,15 @@ export function isExplicitImageRequest(prompt) {
     lower.startsWith("flux:") ||
     lower.startsWith("@image") ||
     lower.startsWith("/image") ||
+    lower.startsWith("/imagine") ||
     lower.startsWith("/flux")
   )
     return true;
+
+  // Writing / job-application prompts (email, CV, cover letter, job
+  // application) are NEVER image requests, even when they mention "graphic
+  // design" or "images". Only an explicit @image command above opts in.
+  if (WRITING_JOB_GUARD.test(clean)) return false;
 
   // For multi-line prompts or prompts containing context, test only the first instruction line
   const firstLine = clean.split("\n")[0].trim();

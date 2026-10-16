@@ -229,7 +229,7 @@ const INTENT_HANDLERS = [
   {
     type: INTENT_TYPES.IMAGE_GENERATION,
     pattern:
-      /\b(generate|create|make|draw|render|produce)\b.*\b(image|picture|photo|artwork|illustration|graphic|icon|sprite|logo|banner|poster)\b|\b(image generation)\b/i,
+      /\b(generate|create|make|draw|render|produce)\b[\w\s,'"-]{0,48}?\b(?:images?|pictures?|photos?|pics?|artworks?|illustrations?|graphic(?!\s+(?:design|designer|designs|designing)\b)|icons?|sprites?|logos?|banners?|posters?)\b|\b(image generation)\b/i,
     signals: [
       "image",
       "picture",
