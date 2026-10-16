@@ -29,28 +29,37 @@ description: Use when adding or changing a D1 table, column, index or constraint
 There is exactly one database. Always reach it through `env.DB` inside the
 Worker; never hard-code the database name in Worker code.
 
-## `worker/schema.sql` is NOT the whole schema
+## `worker/schema.sql` and `worker/dbSchema.js` are the whole schema
 
-This is the trap that costs the most time. `worker/schema.sql` describes only a
-subset (users, invite codes, chats, chat messages, password resets). The real
-production schema is created **at runtime** by `ensure*` functions that each run
-their own idempotent DDL:
+`worker/dbSchema.js` is the canonical DDL: every `CREATE TABLE`, `CREATE
+INDEX` and `ALTER TABLE ... ADD COLUMN` the runtime bootstraps lives there
+exactly once, grouped by feature section (`AUTH_SCHEMA`, `CHATS_SCHEMA`,
+`PROJECTS_SCHEMA`, `MEMORY_SCHEMA`, `SUBSCRIPTIONS_SCHEMA`, `USAGE_SCHEMA`,
+`ANALYTICS_SCHEMA`, `HARNESS_SCHEMA`). Each feature's `ensure*` function
+imports its section's statement strings but keeps its own control flow
+(caching, parallelism, error handling), so behavior is unchanged — only the
+SQL text moved. `worker/schema.sql` is the complete fresh-install bootstrap
+generated from the same statements (kept in sync by
+`tests/db-schema-layout.test.js`), and `ensureDbSchema(env)` runs the whole
+thing in one idempotent pass for tooling and tests.
 
-- `worker/auth.js` → `users` (+ plan/subscription/consent columns), `invite_codes`, `chats`, `chat_messages`, `password_resets`
-- `worker/chats.js` → `chats`, `chat_messages` (a second owner of the same two tables)
-- `worker/memory.js` → `user_memories`, `memory_migrations`
-- `worker/subscriptions.js` → `subscriptions` + `users.subscription_*`
-- `worker/usage.js` → usage counters
-- `worker/analytics.js` → the analytics table
+Before this cleanup, each `ensure*` carried its own copy of the DDL and three
+definitions of `chats` / `chat_messages` disagreed. The reconciled rule:
+`chat_messages` names `FOREIGN KEY(chat_id)` (documentation only),
+`chats` carries no FOREIGN KEY clause. If `schema.sql` and `dbSchema.js`
+ever disagree, `dbSchema.js` wins: the runtime `ensure*` path is what
+actually builds a deployed database.
 
-Not every persisted record is D1: `worker/customDomains.js` stores domain
-records as **R2 objects** in `ASSET_BUCKET` (deliberately, so a per-request
-lookup is a direct `get()` rather than a query), and it contains no DDL at all.
-Do not add a D1 table for a feature that already persists to R2.
+Not every persisted record is D1: published pages, domains, assets, apps,
+memories and tasks live as **R2 objects** under `users/<uid>/` folders
+(`worker/storageKeys.js` builds the keys, `worker/publishStore.js` owns
+publish/asset resolution), deliberately, so lookups stay direct `get()`s
+rather than queries. Do not add a D1 table for a feature that already
+persists to R2.
 
-So **grep for `CREATE TABLE IF NOT EXISTS` before concluding a table does not
-exist**, and add a new table to the `ensure*` function for its feature rather
-than only to `schema.sql`.
+So **check `worker/dbSchema.js` before concluding a table does not exist**,
+and add a new table to its feature section (plus `worker/schema.sql`) rather
+than inlining a third copy of the SQL.
 
 ## Adding a column safely
 
@@ -111,15 +120,12 @@ Two behaviours that waste time if you do not know them:
   scan on every request is a performance bug.
 - Deleting a user does not cascade to every feature table. If a feature stores
   per-user rows, clean them up explicitly.
-- **Do not assume CASCADE exists at all.** Three competing definitions of
-  `chats` / `chat_messages` are in play, and they disagree: `worker/schema.sql`
-  declares `FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE` and the
-  same for `chat_id`, but the runtime bootstrap in `worker/auth.js` creates both
-  tables with **no FOREIGN KEY clause** (and `worker/chats.js` creates them a
-  third time). Since the runtime `ensure*` path is what actually builds a
-  deployed database, CASCADE holds only on a database bootstrapped from
-  `schema.sql`. Treat per-user cleanup as explicit work, never as an inherited
-  guarantee, and check the live table definition before relying on it.
+- **Do not assume CASCADE exists at all.** `worker/schema.sql` and
+  `worker/dbSchema.js` name `FOREIGN KEY(chat_id)` on `chat_messages` as
+  documentation, but D1 does not enforce foreign keys and every chat delete
+  removes its messages explicitly first. Treat per-user cleanup as explicit
+  work, never as an inherited guarantee, and check the live table definition
+  before relying on it.
 
 ## Verification
 

@@ -1,5 +1,10 @@
 import { jsonResponse, readBoundedJson, safeErrorDetail } from "./utils.js";
 import {
+  SUBSCRIPTIONS_SCHEMA,
+  COLUMN_USERS_DOWNGRADE_PLAN,
+  COLUMN_USERS_DOWNGRADE_SCHEDULED_AT,
+} from "./dbSchema.js";
+import {
   ZIINA_PLANS,
   ZIINA_PLANS_YEARLY,
   isTestPayment,
@@ -14,33 +19,13 @@ const FREE_PLAN = "free";
 
 export async function ensureSubscriptionTables(env) {
   if (!env?.DB) return;
+  // Table/index/column text lives in worker/dbSchema.js (SUBSCRIPTIONS_SCHEMA).
   try {
-    await env.DB.prepare(
-      `CREATE TABLE IF NOT EXISTS subscriptions (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      plan TEXT NOT NULL,
-      amount INTEGER NOT NULL,
-      currency_code TEXT NOT NULL DEFAULT 'AED',
-      status TEXT NOT NULL DEFAULT 'pending',
-      period_start INTEGER,
-      period_end INTEGER,
-      ziina_payment_id TEXT,
-      test_mode INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    )`,
-    ).run();
-    await env.DB.prepare(
-      `CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id, created_at DESC)`,
-    ).run();
-    await env.DB.prepare(
-      `CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status)`,
-    ).run();
+    await env.DB.prepare(SUBSCRIPTIONS_SCHEMA.tables[0]).run();
+    await env.DB.prepare(SUBSCRIPTIONS_SCHEMA.indexes[0]).run();
+    await env.DB.prepare(SUBSCRIPTIONS_SCHEMA.indexes[1]).run();
     try {
-      await env.DB.prepare(
-        `ALTER TABLE subscriptions ADD COLUMN test_mode INTEGER NOT NULL DEFAULT 0`,
-      ).run();
+      await env.DB.prepare(SUBSCRIPTIONS_SCHEMA.columns[0]).run();
     } catch {}
     // Ownership outlives the checkout UI state. `abandoned_at` marks a checkout
     // the user no longer wants to finish; the row itself is kept, because it is
@@ -48,67 +33,21 @@ export async function ensureSubscriptionTables(env) {
     // payment that completes after abandonment can therefore still be settled
     // instead of being refused as `payment_not_owned`.
     try {
-      await env.DB.prepare(
-        `ALTER TABLE subscriptions ADD COLUMN abandoned_at INTEGER`,
-      ).run();
+      await env.DB.prepare(SUBSCRIPTIONS_SCHEMA.columns[1]).run();
     } catch {}
     // Exactly-once payment settlement ledger. The Ziina payment id is the
     // primary key, so concurrent/duplicate verifications of the same payment
     // race on one atomic INSERT — only the claim holder activates, and every
     // later verification reads back the original period instead of minting a
     // new one.
-    await env.DB.prepare(
-      `CREATE TABLE IF NOT EXISTS payment_ledger (
-      payment_id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      plan TEXT NOT NULL,
-      amount INTEGER NOT NULL DEFAULT 0,
-      currency_code TEXT NOT NULL DEFAULT 'AED',
-      interval TEXT NOT NULL DEFAULT 'month',
-      status TEXT NOT NULL DEFAULT 'processing',
-      claim_token TEXT,
-      subscription_id TEXT,
-      period_start INTEGER,
-      period_end INTEGER,
-      test_mode INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    )`,
-    ).run();
-    await env.DB.prepare(
-      `CREATE INDEX IF NOT EXISTS idx_payment_ledger_user ON payment_ledger(user_id, created_at DESC)`,
-    ).run();
+    await env.DB.prepare(SUBSCRIPTIONS_SCHEMA.tables[1]).run();
+    await env.DB.prepare(SUBSCRIPTIONS_SCHEMA.indexes[2]).run();
     // Ensure users has subscription fields
-    try {
-      await env.DB.prepare(
-        `ALTER TABLE users ADD COLUMN subscription_plan TEXT DEFAULT 'free'`,
-      ).run();
-    } catch {}
-    try {
-      await env.DB.prepare(
-        `ALTER TABLE users ADD COLUMN subscription_status TEXT DEFAULT 'active'`,
-      ).run();
-    } catch {}
-    try {
-      await env.DB.prepare(
-        `ALTER TABLE users ADD COLUMN subscription_period_end INTEGER`,
-      ).run();
-    } catch {}
-    try {
-      await env.DB.prepare(
-        `ALTER TABLE users ADD COLUMN subscription_ziina_id TEXT`,
-      ).run();
-    } catch {}
-    try {
-      await env.DB.prepare(
-        `ALTER TABLE users ADD COLUMN downgrade_plan TEXT`,
-      ).run();
-    } catch {}
-    try {
-      await env.DB.prepare(
-        `ALTER TABLE users ADD COLUMN downgrade_scheduled_at INTEGER`,
-      ).run();
-    } catch {}
+    for (const sql of SUBSCRIPTIONS_SCHEMA.columns.slice(2)) {
+      try {
+        await env.DB.prepare(sql).run();
+      } catch {}
+    }
   } catch (e) {
     console.warn("ensureSubscriptionTables failed", safeErrorDetail(e));
   }
@@ -1537,11 +1476,12 @@ export async function handleSubscriptions(request, env) {
         .run();
     } catch {
       // Fallback if downgrade columns missing — try to set via alter then retry
+      // (DDL text lives in worker/dbSchema.js).
       try {
-        await env.DB.prepare(`ALTER TABLE users ADD COLUMN downgrade_plan TEXT`).run();
+        await env.DB.prepare(COLUMN_USERS_DOWNGRADE_PLAN).run();
       } catch {}
       try {
-        await env.DB.prepare(`ALTER TABLE users ADD COLUMN downgrade_scheduled_at INTEGER`).run();
+        await env.DB.prepare(COLUMN_USERS_DOWNGRADE_SCHEDULED_AT).run();
       } catch {}
       try {
         await env.DB.prepare(

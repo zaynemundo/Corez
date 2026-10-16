@@ -9,6 +9,7 @@
 // once per user on first D1-backed read, so nothing ever stored is lost in the move.
 
 import { verifySession } from "./auth.js";
+import { MEMORY_SCHEMA } from "./dbSchema.js";
 import {
   userMemoryKey,
   userMemoryPrefix,
@@ -62,32 +63,15 @@ function decodePathSegment(segment) {
 
 export async function ensureMemoryTables(env) {
   if (!env?.DB) return;
+  // Table text lives in worker/dbSchema.js (MEMORY_SCHEMA); errors stay
+  // warnings so a DDL hiccup never fails the memory request itself.
   try {
-    await env.DB.prepare(
-      `CREATE TABLE IF NOT EXISTS user_memories (
-        user_id TEXT NOT NULL,
-        key TEXT NOT NULL,
-        category TEXT NOT NULL DEFAULT 'general',
-        text TEXT NOT NULL,
-        tags TEXT NOT NULL DEFAULT '[]',
-        metadata TEXT NOT NULL DEFAULT '{}',
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        PRIMARY KEY (user_id, key)
-      )`,
-    ).run();
-    await env.DB.prepare(
-      `CREATE INDEX IF NOT EXISTS idx_user_memories_user_updated ON user_memories(user_id, updated_at DESC)`,
-    ).run();
-    await env.DB.prepare(
-      `CREATE INDEX IF NOT EXISTS idx_user_memories_user_category ON user_memories(user_id, category)`,
-    ).run();
-    await env.DB.prepare(
-      `CREATE TABLE IF NOT EXISTS memory_migrations (
-        user_id TEXT PRIMARY KEY,
-        migrated_at TEXT NOT NULL
-      )`,
-    ).run();
+    for (const sql of MEMORY_SCHEMA.tables) {
+      await env.DB.prepare(sql).run();
+    }
+    for (const sql of MEMORY_SCHEMA.indexes) {
+      await env.DB.prepare(sql).run();
+    }
   } catch (e) {
     console.warn("ensureMemoryTables failed", safeErrorDetail(e));
   }

@@ -1,5 +1,16 @@
 import { jsonResponse, readBoundedJson, safeErrorDetail } from "./utils.js";
 import { verifySession } from "./auth.js";
+import {
+  TABLE_CHATS,
+  TABLE_CHAT_MESSAGES,
+  TABLE_CHAT_LIST_MANUAL,
+  INDEX_CHATS_USER_UPDATED,
+  INDEX_CHATS_PROJECT,
+  INDEX_MESSAGES_CHAT_CREATED,
+  COLUMN_CHATS_PROJECT_ID,
+  COLUMN_CHATS_PINNED_AT,
+  COLUMN_CHATS_SORT_ORDER,
+} from "./dbSchema.js";
 
 // ---------------------------------------------------------------------
 // Chat ID generation — short, URL-safe, unguessable
@@ -32,36 +43,21 @@ export async function ensureChatsTables(env) {
   const cached = tablesReady.get(env.DB);
   if (cached) return cached;
   const ready = (async () => {
+    // Table/index/column text lives in worker/dbSchema.js; the control flow
+    // stays here: parallel creates, then the three column migrations with
+    // duplicate-column tolerance (any other error is real and rethrown),
+    // then the manual-order table and indexes.
     // Run table creates in parallel, not 4 sequential round-trips
     await Promise.all([
-      env.DB.prepare(
-        `CREATE TABLE IF NOT EXISTS chats (
-            id TEXT PRIMARY KEY,
-            user_id TEXT NOT NULL,
-            title TEXT NOT NULL DEFAULT 'New Conversation',
-            created_at INTEGER NOT NULL,
-            updated_at INTEGER NOT NULL
-          )`,
-      ).run(),
-      env.DB.prepare(
-        `CREATE TABLE IF NOT EXISTS chat_messages (
-            id TEXT PRIMARY KEY,
-            chat_id TEXT NOT NULL,
-            user_id TEXT NOT NULL,
-            role TEXT NOT NULL,
-            content TEXT NOT NULL,
-            attachments TEXT,
-            created_at INTEGER NOT NULL,
-            FOREIGN KEY(chat_id) REFERENCES chats(id) ON DELETE CASCADE
-          )`,
-      ).run(),
+      env.DB.prepare(TABLE_CHATS).run(),
+      env.DB.prepare(TABLE_CHAT_MESSAGES).run(),
     ]);
     // `project_id` belongs to the projects feature, but it is added here with
     // the rest of the chats schema: every chats read selects the column, so
     // it must exist as soon as the chats table does. A second run fails with
     // "duplicate column name" and is ignored on purpose.
     try {
-      await env.DB.prepare(`ALTER TABLE chats ADD COLUMN project_id TEXT`).run();
+      await env.DB.prepare(COLUMN_CHATS_PROJECT_ID).run();
     } catch (e) {
       // "duplicate column name" is the expected answer on every run after the
       // first. Any other failure is real and must not be swallowed: the very
@@ -73,7 +69,7 @@ export async function ensureChatsTables(env) {
     // means it is held in the Pinned list. Added the same way as project_id,
     // and for the same reason: the chats list selects it.
     try {
-      await env.DB.prepare(`ALTER TABLE chats ADD COLUMN pinned_at INTEGER`).run();
+      await env.DB.prepare(COLUMN_CHATS_PINNED_AT).run();
     } catch (e) {
       if (!/duplicate column/i.test(String(e?.message || e))) throw e;
     }
@@ -83,29 +79,17 @@ export async function ensureChatsTables(env) {
     // explicit position then (lazy normalization — no backfill, no migration).
     // Until then the column stays NULL and is never read.
     try {
-      await env.DB.prepare(`ALTER TABLE chats ADD COLUMN sort_order REAL`).run();
+      await env.DB.prepare(COLUMN_CHATS_SORT_ORDER).run();
     } catch (e) {
       if (!/duplicate column/i.test(String(e?.message || e))) throw e;
     }
     // One row per manually-ordered list: `recents`, `pinned`,
     // `project:<id>`. Presence of the row IS the flag.
-    await env.DB.prepare(
-      `CREATE TABLE IF NOT EXISTS chat_list_manual (
-        user_id TEXT NOT NULL,
-        list_key TEXT NOT NULL,
-        PRIMARY KEY (user_id, list_key)
-      )`,
-    ).run();
+    await env.DB.prepare(TABLE_CHAT_LIST_MANUAL).run();
     await Promise.all([
-      env.DB.prepare(
-        `CREATE INDEX IF NOT EXISTS idx_chats_user_updated ON chats(user_id, updated_at DESC)`,
-      ).run(),
-      env.DB.prepare(
-        `CREATE INDEX IF NOT EXISTS idx_chats_project ON chats(project_id, user_id)`,
-      ).run(),
-      env.DB.prepare(
-        `CREATE INDEX IF NOT EXISTS idx_messages_chat_created ON chat_messages(chat_id, created_at ASC)`,
-      ).run(),
+      env.DB.prepare(INDEX_CHATS_USER_UPDATED).run(),
+      env.DB.prepare(INDEX_CHATS_PROJECT).run(),
+      env.DB.prepare(INDEX_MESSAGES_CHAT_CREATED).run(),
     ]);
   })();
   tablesReady.set(env.DB, ready);

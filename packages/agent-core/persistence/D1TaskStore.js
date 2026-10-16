@@ -23,6 +23,7 @@
 //   the task document. R2 remains the artifact store; D1 is the coordinator.
 
 import { TaskStore } from './TaskStore.js';
+import { HARNESS_SCHEMA } from '../../../worker/dbSchema.js';
 import {
   userTaskSessionKey,
   legacyTaskSessionKey,
@@ -33,50 +34,17 @@ const EVENTS_TABLE = 'harness_task_events';
 const LEASES_TABLE = 'harness_task_leases';
 const DISPATCHES_TABLE = 'harness_task_dispatches';
 
-const SCHEMA = [
-  `CREATE TABLE IF NOT EXISTS ${TASKS_TABLE} (
-     task_id TEXT PRIMARY KEY,
-     user_id TEXT,
-     session_id TEXT,
-     status TEXT NOT NULL,
-     doc TEXT NOT NULL,
-     created_at INTEGER NOT NULL,
-     updated_at INTEGER NOT NULL,
-     terminal_at INTEGER
-   )`,
-  `CREATE INDEX IF NOT EXISTS idx_harness_tasks_user ON ${TASKS_TABLE} (user_id, created_at)`,
-  `CREATE INDEX IF NOT EXISTS idx_harness_tasks_session ON ${TASKS_TABLE} (session_id, created_at)`,
-  `CREATE INDEX IF NOT EXISTS idx_harness_tasks_status ON ${TASKS_TABLE} (status, updated_at)`,
-  `CREATE TABLE IF NOT EXISTS ${EVENTS_TABLE} (
-     id INTEGER PRIMARY KEY AUTOINCREMENT,
-     task_id TEXT NOT NULL,
-     event TEXT NOT NULL,
-     created_at INTEGER NOT NULL
-   )`,
-  `CREATE INDEX IF NOT EXISTS idx_harness_task_events_task ON ${EVENTS_TABLE} (task_id, id)`,
-  `CREATE TABLE IF NOT EXISTS ${LEASES_TABLE} (
-     task_id TEXT PRIMARY KEY,
-     holder TEXT NOT NULL,
-     expires_at INTEGER NOT NULL,
-     acquired_at INTEGER NOT NULL
-   )`,
-  // Durable dispatch outbox: a queue-backed dispatcher writes the record
-  // BEFORE attempting the send, so a Queue outage, a lost send response or an
-  // evicted invocation can never strand an accepted task. A sweeper reclaims
-  // `pending`/expired-`claimed` rows and re-sends them; the record is deleted
-  // only after a successful send (or when the task is already terminal or
-  // running under another live runner, which makes the record unnecessary).
-  `CREATE TABLE IF NOT EXISTS ${DISPATCHES_TABLE} (
-     task_id TEXT PRIMARY KEY,
-     status TEXT NOT NULL,
-     attempts INTEGER NOT NULL DEFAULT 0,
-     next_attempt_at INTEGER NOT NULL,
-     created_at INTEGER NOT NULL,
-     updated_at INTEGER NOT NULL
-   )`,
-  `CREATE INDEX IF NOT EXISTS idx_harness_task_dispatches_pending
-     ON ${DISPATCHES_TABLE} (next_attempt_at)`
-];
+// DDL text lives in worker/dbSchema.js (HARNESS_SCHEMA): tables first, then
+// indexes — the same order as below. Table-name constants stay here because
+// every query in this file references them.
+//
+// Durable dispatch outbox: a queue-backed dispatcher writes the record
+// BEFORE attempting the send, so a Queue outage, a lost send response or an
+// evicted invocation can never strand an accepted task. A sweeper reclaims
+// `pending`/expired-`claimed` rows and re-sends them; the record is deleted
+// only after a successful send (or when the task is already terminal or
+// running under another live runner, which makes the record unnecessary).
+const SCHEMA = [...HARNESS_SCHEMA.tables, ...HARNESS_SCHEMA.indexes];
 
 // Schema creation is idempotent and cached per D1 binding object so a busy
 // isolate does not re-run DDL on every request (the same pattern as auth.js).

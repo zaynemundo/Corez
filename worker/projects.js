@@ -13,6 +13,7 @@
  */
 import { jsonResponse, readBoundedJson, safeErrorDetail } from "./utils.js";
 import { verifySession } from "./auth.js";
+import { TABLE_PROJECTS, INDEX_PROJECTS_USER_UPDATED } from "./dbSchema.js";
 import {
   ensureChatsTables,
   isListManual,
@@ -58,18 +59,8 @@ export async function ensureProjectsTables(env) {
     // chats.js owns the chats table (and the project_id column on it); the
     // project link is meaningless without it, so that schema goes first.
     await ensureChatsTables(env);
-    await env.DB.prepare(
-      `CREATE TABLE IF NOT EXISTS projects (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        name TEXT NOT NULL,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      )`,
-    ).run();
-    await env.DB.prepare(
-      `CREATE INDEX IF NOT EXISTS idx_projects_user_updated ON projects(user_id, updated_at DESC)`,
-    ).run();
+    await env.DB.prepare(TABLE_PROJECTS).run();
+    await env.DB.prepare(INDEX_PROJECTS_USER_UPDATED).run();
   })();
   tablesReady.set(env.DB, ready);
   try {

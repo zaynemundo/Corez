@@ -1,5 +1,6 @@
 // Auth module for Corez — D1 + JWT + PBKDF2 + Google OAuth + Invite Code
 import { jsonResponse, safeErrorDetail, createRateLimiter } from "./utils.js";
+import { AUTH_SCHEMA } from "./dbSchema.js";
 
 export const SESSION_COOKIE = "corez_session";
 export const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
@@ -177,62 +178,22 @@ export async function ensureTables(env) {
 
   const ready = (async () => {
     try {
-      await Promise.all([
-        env.DB.prepare(
-          `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, password_hash TEXT, provider TEXT DEFAULT 'local', google_id TEXT, created_at INTEGER NOT NULL, plan TEXT DEFAULT 'free')`,
-        ).run(),
-        env.DB.prepare(
-          `CREATE TABLE IF NOT EXISTS invite_codes (code TEXT PRIMARY KEY, used_by TEXT, used_at INTEGER, max_uses INTEGER DEFAULT 1, uses INTEGER DEFAULT 0)`,
-        ).run(),
-        env.DB.prepare(
-          `CREATE TABLE IF NOT EXISTS chats (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, title TEXT NOT NULL DEFAULT 'New Conversation', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
-        ).run(),
-        env.DB.prepare(
-          `CREATE TABLE IF NOT EXISTS chat_messages (id TEXT PRIMARY KEY, chat_id TEXT NOT NULL, user_id TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, attachments TEXT, created_at INTEGER NOT NULL)`,
-        ).run(),
-        env.DB.prepare(
-          `CREATE TABLE IF NOT EXISTS password_resets (id TEXT PRIMARY KEY, email TEXT NOT NULL, token TEXT UNIQUE NOT NULL, expires_at INTEGER NOT NULL, used INTEGER DEFAULT 0, created_at INTEGER NOT NULL)`,
-        ).run(),
-      ]);
-      await Promise.all([
-        env.DB.prepare(
-          `CREATE INDEX IF NOT EXISTS idx_chats_user_updated ON chats(user_id, updated_at DESC)`,
-        ).run(),
-        env.DB.prepare(
-          `CREATE INDEX IF NOT EXISTS idx_messages_chat_created ON chat_messages(chat_id, created_at ASC)`,
-        ).run(),
-        env.DB.prepare(
-          `CREATE INDEX IF NOT EXISTS idx_resets_token ON password_resets(token)`,
-        ).run(),
-        env.DB.prepare(
-          `CREATE INDEX IF NOT EXISTS idx_resets_email ON password_resets(email)`,
-        ).run(),
-      ]);
+      // Table, index and column text lives in worker/dbSchema.js (AUTH_SCHEMA);
+      // this wrapper keeps its historical control flow: parallel creates,
+      // parallel indexes, best-effort columns, silent retry on failure.
+      await Promise.all(AUTH_SCHEMA.tables.map((sql) => env.DB.prepare(sql).run()));
+      await Promise.all(AUTH_SCHEMA.indexes.map((sql) => env.DB.prepare(sql).run()));
       // Columns added after the first release: migrations of old users tables,
       // plus the consent evidence (which version of the Terms/Privacy Policy an
-      // account accepted, when, and whether product email was opted into). Each
-      // ALTER fails harmlessly once the column exists, so they settle together
-      // instead of costing a round-trip apiece.
-      await Promise.allSettled([
-        env.DB.prepare(
-          `ALTER TABLE users ADD COLUMN plan TEXT DEFAULT 'free'`,
-        ).run(),
-        env.DB.prepare(
-          `ALTER TABLE users ADD COLUMN subscription_status TEXT DEFAULT 'active'`,
-        ).run(),
-        env.DB.prepare(`ALTER TABLE users ADD COLUMN terms_version TEXT`).run(),
-        env.DB.prepare(`ALTER TABLE users ADD COLUMN terms_accepted_at INTEGER`).run(),
-        env.DB.prepare(`ALTER TABLE users ADD COLUMN marketing_consent INTEGER DEFAULT 0`).run(),
-        // Revocation timestamp: when the password is changed, every session
-        // issued before it must stop working. Sessions carry a `pwd_at` claim
-        // copied from this column at login; a reset bumps the column so old
-        // tokens fail the comparison in verifySession.
-        env.DB.prepare(`ALTER TABLE users ADD COLUMN password_changed_at INTEGER`).run(),
-        // Which account a reset token belongs to. A token is consumed for the
-        // account it was created for, even if the email is later reused or
-        // reassigned.
-        env.DB.prepare(`ALTER TABLE password_resets ADD COLUMN user_id TEXT`).run(),
-      ]);
+      // account accepted, when, and whether product email was opted into),
+      // the password-change revocation timestamp (sessions carry a `pwd_at`
+      // claim copied from it at login; a reset bumps it so old tokens fail),
+      // and the reset-token owner column (a token is consumed for the account
+      // it was created for). Each ALTER fails harmlessly once the column
+      // exists, so they settle together instead of costing a round-trip apiece.
+      await Promise.allSettled(
+        AUTH_SCHEMA.columns.map((sql) => env.DB.prepare(sql).run()),
+      );
       // Invite codes are now optional (kept for backward compat, not required
       // for signup). No seeding needed for new installs - free signup is open.
     } catch (e) {

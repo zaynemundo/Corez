@@ -31,6 +31,7 @@
 //  - A plan may be unlimited (null limit). Unlimited is never a number.
 
 import { jsonResponse } from "./utils.js";
+import { USAGE_SCHEMA } from "./dbSchema.js";
 
 export const USAGE_TABLE = "usage_counters";
 export const USAGE_RECEIPTS_TABLE = "usage_receipts";
@@ -173,28 +174,21 @@ export async function ensureUsageTables(env) {
   if (!meteringEnabled(env)) return false;
   const db = env.DB;
   if (usageSchemaReady.has(db)) return true;
+  // DDL text lives in worker/dbSchema.js (USAGE_SCHEMA). The Owed-allowance
+  // comment block below stays with the wrapper that owns the table.
   const ddl = [
-    `CREATE TABLE IF NOT EXISTS ${USAGE_TABLE} (user_id TEXT NOT NULL, period TEXT NOT NULL, metric TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL, PRIMARY KEY (user_id, period, metric))`,
-    `CREATE INDEX IF NOT EXISTS idx_usage_period ON ${USAGE_TABLE}(period)`,
-    `CREATE TABLE IF NOT EXISTS ${USAGE_RECEIPTS_TABLE} (receipt_key TEXT PRIMARY KEY, user_id TEXT NOT NULL, period TEXT NOT NULL, metric TEXT, created_at INTEGER NOT NULL)`,
-    `CREATE INDEX IF NOT EXISTS idx_usage_receipts_user ON ${USAGE_RECEIPTS_TABLE}(user_id, period)`,
+    USAGE_SCHEMA.tables[0],
+    USAGE_SCHEMA.indexes[0],
+    USAGE_SCHEMA.tables[1],
+    USAGE_SCHEMA.indexes[1],
     // Owed allowance. A refund that could not be written leaves the account
     // charged for work that was refused, and the charges have already
     // committed, so the debt is recorded here instead of being remembered only
     // by the log line that reported the failure. Each row is one metric of one
     // operation: `pending` until `settlePendingCompensations` applies it, and
     // the transition is the guard that makes recovery exactly-once.
-    `CREATE TABLE IF NOT EXISTS ${USAGE_COMPENSATIONS_TABLE} (
-       compensation_key TEXT PRIMARY KEY,
-       user_id TEXT NOT NULL,
-       period TEXT NOT NULL,
-       metric TEXT NOT NULL,
-       amount INTEGER NOT NULL,
-       status TEXT NOT NULL DEFAULT 'pending',
-       created_at INTEGER NOT NULL,
-       updated_at INTEGER NOT NULL
-     )`,
-    `CREATE INDEX IF NOT EXISTS idx_usage_compensations_pending ON ${USAGE_COMPENSATIONS_TABLE}(user_id, period, status)`,
+    USAGE_SCHEMA.tables[2],
+    USAGE_SCHEMA.indexes[2],
   ];
   try {
     if (typeof db.batch === "function") {

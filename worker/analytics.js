@@ -15,6 +15,7 @@
 // the endpoint answers 202 and says nothing was stored, rather than pretending.
 
 import { readBoundedJson, createRateLimiter, jsonResponse } from "./utils.js";
+import { ANALYTICS_SCHEMA } from "./dbSchema.js";
 
 export const ANALYTICS_PATH = "/api/analytics/collect";
 export const ANALYTICS_TABLE = "analytics_counters";
@@ -132,9 +133,8 @@ let tableReady = false;
 export async function ensureAnalyticsTable(env) {
   if (tableReady || !env?.DB) return tableReady;
   try {
-    await env.DB.prepare(
-      `CREATE TABLE IF NOT EXISTS ${ANALYTICS_TABLE} (day TEXT NOT NULL, name TEXT NOT NULL, path TEXT NOT NULL, country TEXT NOT NULL, device TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, name, path, country, device))`,
-    ).run();
+    // DDL text lives in worker/dbSchema.js (ANALYTICS_SCHEMA).
+    await env.DB.prepare(ANALYTICS_SCHEMA.tables[0]).run();
     tableReady = true;
   } catch {
     tableReady = false;

@@ -44,10 +44,9 @@ import {
   USERS_PREFIX,
   userDomainKey,
   userDomainPrefix,
-  userPublishKey,
-  legacyPublishKey,
   listWithFallback,
 } from "./storageKeys.js";
+import { readPublishRecord } from "./publishStore.js";
 
 /**
  * Caller identity, with the same dev fallback the rest of the Worker uses:
@@ -305,23 +304,9 @@ async function readJson(bucket, key) {
   }
 }
 
-// Resolve a publish record across both layouts (per-user folder via the
-// global pointer, legacy flat full record). Local copy — worker/index.js
-// owns the canonical resolver; this module stays import-cycle free.
-async function readPublishRecord(env, slug) {
-  if (!env?.ASSET_BUCKET || typeof env.ASSET_BUCKET.get !== "function") return null;
-  const direct = await readJson(env.ASSET_BUCKET, legacyPublishKey(slug)).catch(() => null);
-  if (direct && typeof direct === "object") {
-    if (typeof direct.html === "string") return direct;
-    const ownerUid = typeof direct.ownerUid === "string" ? direct.ownerUid : null;
-    if (ownerUid) {
-      const owned = await readJson(env.ASSET_BUCKET, userPublishKey(ownerUid, slug)).catch(() => null);
-      if (owned && typeof owned.html === "string") return owned;
-      return null;
-    }
-  }
-  return null;
-}
+// Publish-record resolution is owned by worker/publishStore.js (shared with
+// the publish HTTP routes) — this module imports readPublishRecord rather
+// than carrying a second copy of the pointer/fallback logic.
 
 export async function getDomainForHost(env, host) {
   const hostname = normalizeHostname(host);
