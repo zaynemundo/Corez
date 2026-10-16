@@ -87,7 +87,15 @@ describe('/api/image/cf (Workers AI FLUX.2 klein, default 9b)', () => {
     const [model, inputs] = ai.run.mock.calls[0];
     expect(model).toBe('@cf/black-forest-labs/flux-2-klein-9b');
     const text = await multipartText(inputs);
-    expect(hasField(text, 'prompt', 'a red castle on a hill')).toBe(true);
+    // Short requests are expanded into full generator prompts (subject plus
+    // photographic descriptors); crafted prompts pass through untouched.
+    expect(
+      hasField(
+        text,
+        'prompt',
+        'a red castle on a hill, ultra-detailed photograph, sharp focus, natural lighting, vibrant colors, high resolution, 4k',
+      ),
+    ).toBe(true);
     // The content type carries the boundary the runner requires.
     expect(inputs.multipart.contentType).toMatch(/^multipart\/form-data; boundary=/);
   });

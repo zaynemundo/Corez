@@ -54,6 +54,7 @@ import {
   ANTI_REPEAT_CONTINUATION_INSTRUCTION,
 } from "./responseProcessor.js";
 import { toMultimodalMessage } from "./attachmentVision.js";
+import { enhanceImagePrompt } from "./imagePrompt.js";
 import {
   parseProjectState,
   deriveProjectState,
@@ -3062,6 +3063,10 @@ async function handleImage(request, env) {
     return controller.signal;
   })();
 
+  // A bare request ("flower") underspecifies the image: expand it into a
+  // complete generator prompt. Crafted prompts pass through untouched.
+  const imagePrompt = enhanceImagePrompt(prompt) || prompt;
+
   // OpenRouter image responses may use images[0].url, content URLs, or data:
   // image payloads. OPENROUTER_IMAGE_MODEL overrides the configured default
   // chain with one model.
@@ -3070,7 +3075,7 @@ async function handleImage(request, env) {
     : undefined;
   const imageResult = await callOpenRouterImage(
     openRouterKey,
-    prompt,
+    imagePrompt,
     imageClientSignal,
     imageModels,
     referenceImage,
@@ -3263,11 +3268,9 @@ async function handleWorkersAIImage(request, env) {
     return controller.signal;
   })();
 
-  // Enhance very short prompts like "flower" for better SDXL/FLUX results
-  const enhancedPrompt =
-    prompt.trim().length < 15 && !prompt.includes(",")
-      ? `${prompt.trim()}, high detail, photorealistic, vibrant colors, studio lighting, 4k`
-      : prompt;
+  // A bare request ("flower") underspecifies the image: expand it into a
+  // complete generator prompt. Crafted prompts pass through untouched.
+  const enhancedPrompt = enhanceImagePrompt(prompt) || prompt;
 
   // Allow client to request a specific Workers AI model (e.g. sdxl-lightning)
   let requestedModel =
