@@ -84,7 +84,11 @@ export function isGameDevIntent(prompt) {
 }
 
 const INTENT_PATTERNS = {
-  app: /\b(build|make|create|generate|design|launch|prototype|develop|ship)\b.*\b(app|tool|website|site|landing page|dashboard|portal|widget|calculator|timer|game|simulator|preview|html|bot|enemy)\b|\b(app|tool|website|site|landing page|dashboard|portal|widget|calculator|timer|game|simulator|bot|enemy)\b.*\b(build|make|create|generate|design|launch|prototype|develop|ship)\b|\b(game|play|chess|snake|pong|shooter|quiz|puzzle|simulator|canvas|bot|enemy)\b/i,
+  // Like image detection below, the build verb must govern the artifact noun
+  // within a tight window (~48 chars): unbounded `.*` let "create an email ...
+  // mentioning our site" route to a website build. Bare game-word mentions
+  // ("tell me about chess") are handled by isGameDevIntent, not this pattern.
+  app: /\b(build|make|create|generate|design|launch|prototype|develop|ship)\b[\w\s,'"-]{0,48}?\b(app|tool|website|site|landing page|dashboard|portal|widget|calculator|timer|game|simulator|preview|html|bot|enemy)\b|\b(app|tool|website|site|landing page|dashboard|portal|widget|calculator|timer|game|simulator|bot|enemy)\b[\w\s,'"-]{0,48}?\b(build|make|create|generate|design|launch|prototype|develop|ship)\b|\b(game|play|chess|snake|pong|shooter|quiz|puzzle|simulator|canvas|bot|enemy)\b/i,
   code: /\b(code|debug|bug|fix|error|javascript|typescript|python|react|css|html|component|function|api|compile|stack trace)\b/i,
   writing:
     /\b(write|rewrite|copy|caption|email|post|bio|headline|script|summarize|summary|proposal|description|landing copy)\b/i,
@@ -136,12 +140,27 @@ function analyzeIntentWithRules(cleanPrompt) {
   }
 
   if (INTENT_PATTERNS.app.test(cleanPrompt)) {
-    return {
-      type: "app",
-      summary: "Create a public-facing interactive experience or web tool.",
-      responseStrategy:
-        "Build a runnable monochrome HTML preview when enough intent is present.",
-    };
+    // Website-flavored matches require an explicit website request (same rules
+    // as @image): a bare mention of "site"/"website"/"dashboard" without a
+    // governing build verb must not trigger a website build.
+    const mentionsWebsiteNoun =
+      /\b(website|web\s?site|landing page|webpage|web app|homepage|portfolio site|dashboard|admin panel|portal|saas|site)\b/i.test(
+        cleanPrompt,
+      );
+    if (
+      !mentionsWebsiteNoun ||
+      isExplicitWebsiteRequest(cleanPrompt) ||
+      isGameDevIntent(cleanPrompt)
+    ) {
+      return {
+        type: "app",
+        summary: "Create a public-facing interactive experience or web tool.",
+        responseStrategy:
+          "Build a runnable monochrome HTML preview when enough intent is present.",
+      };
+    }
+    // Website-mentioned but not an explicit build: fall through to
+    // code/writing/explanation/general below.
   }
 
   if (INTENT_PATTERNS.code.test(cleanPrompt)) {
@@ -300,12 +319,21 @@ export function analyzePublicUserIntent(prompt) {
     Boolean(modelResult?.accepted) &&
     (!newIntent || modelResult.confidence >= (newIntent.confidence || 0));
 
+  // Website creation must be explicit — same rules as @image. A bare mention
+  // of website nouns without a governing build verb never qualifies, no
+  // matter how confident the fine-grained engine is.
+  const fineType = newIntent?.primaryIntent || newIntent?.type;
+  const websiteExplicit =
+    fineType !== "website_creation" ||
+    isExplicitWebsiteRequest(cleanPrompt);
+
   // If the new engine has a high-confidence classification, map it to legacy types
   if (
     !modelWins &&
     newIntent &&
     newIntent.confidence >= 0.5 &&
-    newIntent.type !== "unknown"
+    newIntent.type !== "unknown" &&
+    (fineType !== "website_creation" || websiteExplicit)
   ) {
     const legacyType = toLegacyIntentType(newIntent.type);
     const summaries = {
@@ -341,7 +369,20 @@ export function analyzePublicUserIntent(prompt) {
   }
 
   if (modelResult && modelResult.accepted) {
-    switch (modelResult.label) {
+    // The trained model is software-heavy: a website-mentioned prompt it
+    // labels `app` still needs an explicit website request (same rules as
+    // @image) before it may build.
+    if (
+      modelResult.label === "app" &&
+      /\b(website|web\s?site|landing page|webpage|web app|homepage|portfolio site|dashboard|admin panel|portal|saas|site)\b/i.test(
+        cleanPrompt,
+      ) &&
+      !isExplicitWebsiteRequest(cleanPrompt) &&
+      !isGameDevIntent(cleanPrompt)
+    ) {
+      // Fall through to the rule engine (which applies the same gate) instead
+      // of building a website the user never asked for.
+    } else switch (modelResult.label) {
       case "app":
         return {
           type: "app",
@@ -813,17 +854,27 @@ export async function improveCodingPrompt(prompt, intent = null) {
   const currentIntent = intent || analyzePublicUserIntent(cleanPrompt);
   const intentType = currentIntent?.type || "general";
 
+  // A website mention without an explicit website request (same rules as
+  // @image) must not be enriched as an app/website build.
+  const websiteMentioned =
+    /\b(website|web\s?site|landing page|webpage|web app|homepage|portfolio site|dashboard|admin panel|portal|saas|site)\b/i.test(
+      cleanPrompt,
+    );
+  const websiteBlocked =
+    websiteMentioned && !isExplicitWebsiteRequest(cleanPrompt);
+
   const isCoding =
     intentType === "code-help" ||
-    intentType === "app" ||
+    (intentType === "app" && !websiteBlocked) ||
     INTENT_PATTERNS.code.test(cleanPrompt) ||
-    INTENT_PATTERNS.app.test(cleanPrompt);
+    (INTENT_PATTERNS.app.test(cleanPrompt) && !websiteBlocked);
   if (!isCoding) {
     return cleanPrompt;
   }
 
   const isAppIntent =
-    intentType === "app" || INTENT_PATTERNS.app.test(cleanPrompt);
+    (intentType === "app" && !websiteBlocked) ||
+    (INTENT_PATTERNS.app.test(cleanPrompt) && !websiteBlocked);
 
   // Game creation: respond with a SMALL brief, not a feature dump.
   const isGameRequest =
@@ -1172,13 +1223,21 @@ export async function generateHostedAIResponse(
   // with the finished artifact either way), but the app requests streaming
   // so the build phases and deltas are visible live.
   const finePrimary = fineIntent?.primaryIntent || fineIntent?.type;
+  const harnessIntent = intent?.primaryIntent || finePrimary;
+  // Defense in depth: a website_creation without an explicit website request
+  // (same rules as @image) never enters the creation harness, even if an
+  // upstream classifier mislabeled it.
+  const harnessWebsiteBlocked =
+    harnessIntent === "website_creation" &&
+    !isExplicitWebsiteRequest(String(prompt));
   const useCreationHarness =
     options.stream === true &&
     intent?.type === "app" &&
     !isRevisionContextPrompt(prompt) &&
     !String(prompt).includes("```") &&
+    !harnessWebsiteBlocked &&
     ["game_creation", "website_creation", "design_task", "app"].includes(
-      intent?.primaryIntent || finePrimary,
+      harnessIntent,
     );
 
   // 2. Skill resolution with fine-grained intent. Classification patterns run
@@ -2712,6 +2771,71 @@ const IMAGE_PATTERNS = new RegExp(
 // genuinely want both must use `@image` explicitly.
 const WRITING_JOB_GUARD =
   /\b(e-?mail|cover\s*letter|\bcv\b|resume|curriculum\s+vitae|job\s+application|applying\s+for)\b/i;
+
+// Website requests must be explicit — same rules as `@image`. `@website`
+// always qualifies. Natural-language detection is intentionally strict: the
+// build verb must govern the website noun within a tight window (~48 chars,
+// direct object), and writing/job contexts, code revisions, code blocks, and
+// social-carousel copy never qualify — otherwise "write an email about our
+// new website launch" or "what should I check before deploying a website"
+// falsely routes to a website build.
+const WEBSITE_VERB_SRC = `(?:build|make|create|generate|design|develop|launch|ship|prototype|code)`;
+const WEBSITE_NOUN_SRC = `(?:websites?|web\\s?sites?|landing(?:\\s|-)?pages?|webpages?|web\\s?apps?|web\\s?applications?|homepages?|portfolio(?:\\s+sites?)?|dashboards?|admin(?:\\s|-)?panels?|portals?|saas)`;
+const WEBSITE_BUILD_PATTERN = new RegExp(
+  `\\b${WEBSITE_VERB_SRC}\\b[\\w\\s,'"-]{0,48}?\\b${WEBSITE_NOUN_SRC}\\b`,
+  "i",
+);
+const WEBSITE_NOUN_VERB_PATTERN = new RegExp(
+  `\\b${WEBSITE_NOUN_SRC}\\b[\\w\\s,'"-]{0,48}?\\b(?:build|make|create|generate|design|develop|launch|ship|prototype)\\b`,
+  "i",
+);
+
+export function isExplicitWebsiteRequest(prompt) {
+  const clean = String(prompt || "").trim();
+  if (!clean) return false;
+
+  const lower = clean.toLowerCase();
+  if (lower.startsWith("@website")) return true;
+
+  // Code revisions, code blocks, and HTML deliverables are NEVER new website
+  // builds — they revise or analyse existing code.
+  if (
+    /^\s*(?:revise(?:\s+code)?|update(?:\s+code)?|fix(?:\s+code)?|refactor(?:\s+code)?)\b/i.test(
+      clean,
+    )
+  )
+    return false;
+  if (isRevisionContextPrompt(clean)) return false;
+  if (
+    clean.includes("```") ||
+    /<!DOCTYPE\s+html|<html|<style|<script/i.test(clean)
+  )
+    return false;
+
+  // Social-carousel copy is NEVER a website build.
+  if (isSocialCarouselCopyRequest(clean)) return false;
+
+  // Writing / job-application contexts only veto noun-first matches ("our new
+  // website launch" in an email): a verb-governed build ("build a website
+  // for my resume") is still explicit.
+  const hasWritingContext = WRITING_JOB_GUARD.test(clean);
+  const hasBuildGovernance = WEBSITE_BUILD_PATTERN.test(clean);
+  if (hasWritingContext && !hasBuildGovernance) return false;
+
+  // Questions ABOUT websites ("what should I check before deploying a
+  // website?") are explanations, not builds — unless a build verb governs
+  // the website noun, which the patterns below already require.
+  const firstLine = clean.split("\n")[0].trim();
+  if (WEBSITE_BUILD_PATTERN.test(firstLine)) return true;
+  if (WEBSITE_NOUN_VERB_PATTERN.test(firstLine) && !hasWritingContext)
+    return true;
+  if (clean.length < 300) {
+    if (WEBSITE_BUILD_PATTERN.test(clean)) return true;
+    if (WEBSITE_NOUN_VERB_PATTERN.test(clean) && !hasWritingContext)
+      return true;
+  }
+  return false;
+}
 
 export function isRevisionContextPrompt(prompt) {
   return /\[(?:SURGICAL REVISION CONTEXT|Context: The user is requesting a revision)/i.test(

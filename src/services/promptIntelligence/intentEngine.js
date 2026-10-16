@@ -33,8 +33,14 @@ const INTENT_HANDLERS = [
     // "dashboard" for the *additive* case ("add a dashboard to my app") — and
     // feature_implementation marks the project as existing, so a greenfield
     // build was reported as a change to an existing project.
+    //
+    // Like image detection, the build verb must govern the website noun
+    // within a tight window (~48 chars): unbounded `.*` let "create an email
+    // ... mentioning our site" classify as a website build. Bare mentions
+    // without a governing verb are demoted by the explicit-website guard in
+    // classifyIntent below (same rules as @image).
     pattern:
-      /\b(build|make|create|generate|design|code|develop)\b.*\b(website|site|landing page|webpage|web app|web application|homepage|portfolio site|dashboard|admin panel|portal|saas)\b|\b(website|site|landing page|portfolio|dashboard|admin panel|portal)\b.*\b(build|make|create|generate|design|code|develop)\b/i,
+      /\b(build|make|create|generate|design|code|develop)\b[\w\s,'"-]{0,48}?\b(website|site|landing page|webpage|web app|web application|homepage|portfolio site|dashboard|admin panel|portal|saas)\b|\b(website|site|landing page|portfolio|dashboard|admin panel|portal)\b[\w\s,'"-]{0,48}?\b(build|make|create|generate|design|code|develop)\b/i,
     signals: [
       "website",
       "landing page",
@@ -564,7 +570,7 @@ function getInstructionPart(prompt) {
 }
 
 function hasExplicitWebCreationInInstruction(instructionLower) {
-  return /\b(build|make|create|generate|develop|design|launch|ship)\b.*\b(website|site|landing page|webpage|web app|web application|homepage|portfolio site)\b|\b(website|site|landing page|portfolio)\b.*\b(build|make|create|generate|design|develop)\b/i.test(
+  return /\b(build|make|create|generate|develop|design|launch|ship)\b[\w\s,'"-]{0,48}?\b(website|site|landing page|webpage|web app|web application|homepage|portfolio site)\b|\b(website|site|landing page|portfolio)\b[\w\s,'"-]{0,48}?\b(build|make|create|generate|design|develop)\b/i.test(
     instructionLower,
   );
 }
@@ -686,9 +692,14 @@ export function classifyIntent(prompt) {
   const candidateMatches = [];
 
   for (const handler of INTENT_HANDLERS) {
-    const matched =
-      handler.pattern.test(prompt) ||
-      handler.signals.some((s) => lower.includes(s));
+    // Word-boundary signal matching (same rule as computeConfidence below): a
+    // plain `includes` let "site" match inside unrelated words and let bare
+    // noun mentions ("What should I check before deploying a website?")
+    // claim website_creation with no build verb at all.
+    const signalMatched = signalRegexes(handler).some((signalPattern) =>
+      signalPattern.test(lower),
+    );
+    const matched = handler.pattern.test(prompt) || signalMatched;
     if (matched) {
       const confidence = computeConfidence(handler, lower);
       candidateMatches.push({ handler, confidence });
@@ -696,6 +707,60 @@ export function classifyIntent(prompt) {
   }
 
   candidateMatches.sort((a, b) => b.confidence - a.confidence);
+
+  // Explicit-website guard (same rules as @image): a top website_creation
+  // claimed by bare noun signals alone — "What should I check before
+  // deploying a website?", "write an email about our new website launch",
+  // pasted code mentioning "site" — is not a build. The build verb must
+  // govern the website noun. Demoted prompts fall through to the next-best
+  // candidate (writing, research, general ...) instead of building a website
+  // the user never asked for.
+  const WEBSITE_BUILD_STRICT =
+    /\b(build|make|create|generate|design|code|develop)\b[\w\s,'"-]{0,48}?\b(website|site|landing page|webpage|web app|web application|homepage|portfolio site|dashboard|admin panel|portal|saas)\b/i;
+  const WEBSITE_NOUN_VERB_STRICT =
+    /\b(website|site|landing page|portfolio|dashboard|admin panel|portal)\b[\w\s,'"-]{0,48}?\b(build|make|create|generate|design|code|develop)\b/i;
+  const WEBSITE_WRITING_GUARD =
+    /\b(e-?mail|cover\s*letter|\bcv\b|resume|curriculum\s+vitae|job\s+application|applying\s+for)\b/i;
+  const topIsWebsite =
+    candidateMatches.length > 0 &&
+    candidateMatches[0].handler.type === INTENT_TYPES.WEBSITE_CREATION;
+  if (topIsWebsite) {
+    const instructionLower = getInstructionPart(prompt);
+    const explicitInInstruction =
+      hasExplicitWebCreationInInstruction(instructionLower);
+    const explicitShort =
+      prompt.length < 300 &&
+      (WEBSITE_BUILD_STRICT.test(prompt) ||
+        WEBSITE_NOUN_VERB_STRICT.test(prompt));
+    // Verb-governed builds stay explicit even in writing contexts ("build a
+    // website for my resume"); noun-first mentions do not ("our new website
+    // launch" inside an email request).
+    const writingVeto =
+      WEBSITE_WRITING_GUARD.test(prompt) &&
+      !WEBSITE_BUILD_STRICT.test(instructionLower) &&
+      !(prompt.length < 300 && WEBSITE_BUILD_STRICT.test(prompt));
+    const codeVeto =
+      /```|<!DOCTYPE\s+html|<html|<style|<script|\[(?:SURGICAL REVISION CONTEXT|Context: The user is requesting a revision)/i.test(
+        prompt,
+      );
+    const socialVeto = isSocialCarouselCopyInstruction(instructionLower);
+    if (
+      (!explicitInInstruction && !explicitShort) ||
+      writingVeto ||
+      codeVeto ||
+      socialVeto
+    ) {
+      const filteredWebsite = candidateMatches.filter(
+        (c) => c.handler.type !== INTENT_TYPES.WEBSITE_CREATION,
+      );
+      candidateMatches.length = 0;
+      if (filteredWebsite.length > 0) {
+        candidateMatches.push(...filteredWebsite);
+        candidateMatches.sort((a, b) => b.confidence - a.confidence);
+      }
+      // Empty: falls through to GENERAL_QUESTION below.
+    }
+  }
 
   // Secondary guards: pasted CV/resume content must not hijack intent
   const instructionLowerFallback = getInstructionPart(prompt);
