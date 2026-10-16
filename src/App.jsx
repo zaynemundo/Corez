@@ -38,6 +38,7 @@ import {
 import {
   storeAppInR2,
   deleteSessionAppsInR2,
+  forgetPublishLineageForSession,
 } from "./services/appStorageService";
 import * as chatService from "./services/chatService";
 import {
@@ -853,6 +854,15 @@ function MainApp({ theme, setTheme }) {
     deleteSessionAppsInR2(id).catch((err) =>
       console.warn("Failed to clean up session R2 apps:", err),
     );
+    // The server cascade (DELETE /api/chats/:id) removes the chat's R2
+    // apps, assets, generated images and context index; drop the local
+    // publish lineage too so a later chat can't silently reuse this
+    // session's published link.
+    try {
+      forgetPublishLineageForSession(id);
+    } catch {
+      /* best effort */
+    }
   };
 
   const handleClearAllHistory = async () => {
@@ -874,6 +884,15 @@ function MainApp({ theme, setTheme }) {
       }
     }
     ids.forEach((id) => deleteSessionAppsInR2(id).catch(() => {}));
+    // The server cascade (DELETE /api/chats) removes every chat's R2 state;
+    // drop the local publish lineage for the cleared sessions as well.
+    ids.forEach((id) => {
+      try {
+        forgetPublishLineageForSession(id);
+      } catch {
+        /* best effort */
+      }
+    });
   };
 
   // -------------------------------------------------------------

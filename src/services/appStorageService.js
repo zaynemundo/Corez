@@ -284,8 +284,7 @@ export async function unpublishPage(slug) {
  * Drops a removed slug from the local publish registry and per-session
  * lineage. Without this, republishing the same content would try to reuse a
  * link that no longer exists.
- */
-function forgetPublishedSlug(slug) {
+ */function forgetPublishedSlug(slug) {
   try {
     const registry = loadPublishRegistry().filter((entry) => entry.slug !== slug);
     savePublishRegistry(registry);
@@ -302,6 +301,24 @@ function forgetPublishedSlug(slug) {
       }
     }
     if (changed) savePublishLineage(lineage);
+  } catch {
+    /* best effort */
+  }
+}
+
+/**
+ * Forgets a deleted chat session's publish lineage. Without this, a future
+ * chat that reuses the session id (or republishes identical content) could
+ * silently update a link whose source conversation is gone.
+ */
+export function forgetPublishLineageForSession(sessionId) {
+  if (!sessionId || typeof sessionId !== "string") return;
+  try {
+    const lineage = loadPublishLineage();
+    if (lineage[sessionId]) {
+      delete lineage[sessionId];
+      savePublishLineage(lineage);
+    }
   } catch {
     /* best effort */
   }

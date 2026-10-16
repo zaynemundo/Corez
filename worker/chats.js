@@ -1,6 +1,14 @@
 import { jsonResponse, readBoundedJson, safeErrorDetail } from "./utils.js";
 import { verifySession } from "./auth.js";
 import {
+  userAssetKey,
+  userAppPrefix,
+  legacyAppPrefix,
+  userContextIndexKey,
+  legacyContextIndexKey,
+  assetPubMarkerKey,
+} from "./storageKeys.js";
+import {
   TABLE_CHATS,
   TABLE_CHAT_MESSAGES,
   TABLE_CHAT_LIST_MANUAL,
@@ -372,6 +380,183 @@ function applySmartCompact(messages, url) {
 }
 
 // ---------------------------------------------------------------------
+// Chat storage cascade — deleting a chat also deletes everything that
+// belongs to it: R2 apps, uploaded assets (images, docs, ...), generated
+// images referenced by its messages, and the per-session context index.
+//
+// Published pages keep their own lifecycle (own delete UI in settings;
+// shareable links must not break silently), so publish records are never
+// touched — and any asset still referenced by a published page is kept too.
+// ---------------------------------------------------------------------
+
+// Asset keys are client-chosen, slash-free segments (user-upload_*.jpg,
+// image_<ts>_<rand>.png, ...). Only that shape is ever deleted, so message
+// content can never turn the cascade into unrelated-key deletion.
+const SAFE_ASSET_KEY = /^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/;
+
+function assetKeyFromUrl(url) {
+  if (typeof url !== "string") return null;
+  const idx = url.indexOf("/api/assets/");
+  if (idx === -1) return null;
+  const raw = url.slice(idx + "/api/assets/".length).split(/[?#]/)[0];
+  let key;
+  try {
+    key = decodeURIComponent(raw);
+  } catch {
+    return null;
+  }
+  return SAFE_ASSET_KEY.test(key) ? key : null;
+}
+
+function extractChatAssetKeys(messages) {
+  const keys = new Set();
+  const contentPattern = /\/api\/assets\/([A-Za-z0-9._-]+)/g;
+  for (const m of messages || []) {
+    // Structured attachments (uploads: images, docs, audio, video).
+    let list = m?.attachments;
+    if (typeof list === "string") {
+      try {
+        list = JSON.parse(list);
+      } catch {
+        list = null;
+      }
+    }
+    if (Array.isArray(list)) {
+      for (const a of list) {
+        if (
+          typeof a?.assetKey === "string" &&
+          SAFE_ASSET_KEY.test(a.assetKey)
+        ) {
+          keys.add(a.assetKey);
+        }
+        const fromUrl = assetKeyFromUrl(a?.assetUrl);
+        if (fromUrl) keys.add(fromUrl);
+      }
+    }
+    // Generated-image markdown and absolute R2 URLs inside message text.
+    const content = typeof m?.content === "string" ? m.content : "";
+    if (content.includes("/api/assets/")) {
+      let match;
+      contentPattern.lastIndex = 0;
+      while ((match = contentPattern.exec(content)) !== null) {
+        if (SAFE_ASSET_KEY.test(match[1])) keys.add(match[1]);
+      }
+    }
+  }
+  return [...keys];
+}
+
+// True when the asset is referenced by a live published page: the publish
+// flow leaves an asset-pub/<key> marker for every referenced asset.
+async function isAssetPublished(bucket, key) {
+  try {
+    const marker = assetPubMarkerKey(key);
+    if (typeof bucket.head === "function") {
+      const found = await bucket.head(marker).catch(() => null);
+      if (found) return true;
+    }
+    if (typeof bucket.get === "function") {
+      const found = await bucket.get(marker).catch(() => null);
+      if (found) return true;
+    }
+  } catch {
+    // Marker unreadable: treat as unpublished below.
+  }
+  return false;
+}
+
+async function deleteBucketPrefix(bucket, prefix) {
+  try {
+    let cursor = null;
+    let guard = 0;
+    do {
+      const list = await bucket
+        .list(cursor ? { prefix, cursor } : { prefix })
+        .catch(() => null);
+      if (!list) break;
+      for (const obj of list.objects || []) {
+        try {
+          await bucket.delete(obj.key);
+        } catch {
+          // Per-key best effort.
+        }
+      }
+      cursor = list.truncated ? list.cursor : null;
+      guard += 1;
+    } while (cursor && guard < 20);
+  } catch {
+    // Best effort.
+  }
+}
+
+// Best-effort R2 cascade for the given chats. Reads each chat's messages
+// for asset references, so callers must run it BEFORE deleting the D1 rows.
+// Never throws: the cascade must not fail the chat delete itself.
+export async function cleanupChatStorage(env, userId, chatIds) {
+  const ids = [...new Set((chatIds || []).filter(Boolean))];
+  if (ids.length === 0) return;
+  const bucket = env?.ASSET_BUCKET;
+  if (!bucket || typeof bucket.list !== "function") return;
+  if (typeof bucket.delete !== "function") return;
+  try {
+    // 1. Collect asset keys referenced by these chats' messages.
+    const assetKeys = new Set();
+    if (env?.DB) {
+      for (const chatId of ids) {
+        try {
+          const rows = await env.DB.prepare(
+            "SELECT attachments, content FROM chat_messages WHERE chat_id = ? AND user_id = ? LIMIT 500",
+          )
+            .bind(chatId, userId)
+            .all();
+          for (const key of extractChatAssetKeys(rows?.results || [])) {
+            assetKeys.add(key);
+          }
+        } catch {
+          // Per-chat best effort: the R2 prefixes below don't need messages.
+        }
+      }
+    }
+    // 2. Delete per-chat R2 state: apps and context index, both locations.
+    for (const chatId of ids) {
+      await deleteBucketPrefix(bucket, userAppPrefix(userId, chatId));
+      await deleteBucketPrefix(bucket, legacyAppPrefix(userId, chatId));
+      for (const key of [
+        userContextIndexKey(userId, chatId),
+        legacyContextIndexKey(userId, chatId),
+      ]) {
+        try {
+          await bucket.delete(key);
+        } catch {
+          // Per-key best effort.
+        }
+      }
+    }
+    // 3. Delete referenced assets unless still used by a published page.
+    // Pre-move objects lived at the flat key, so both locations are swept.
+    for (const key of assetKeys) {
+      try {
+        if (await isAssetPublished(bucket, key)) continue;
+        try {
+          await bucket.delete(userAssetKey(userId, key));
+        } catch {
+          // Per-key best effort.
+        }
+        try {
+          await bucket.delete(key);
+        } catch {
+          // Per-key best effort.
+        }
+      } catch {
+        // Per-key best effort.
+      }
+    }
+  } catch {
+    // Cascade never fails the chat delete.
+  }
+}
+
+// ---------------------------------------------------------------------
 // Main handler
 // ---------------------------------------------------------------------
 export async function handleChats(request, env) {
@@ -503,6 +688,21 @@ export async function handleChats(request, env) {
       } catch (e) {
         if (!/no such table/i.test(String(e?.message || e))) throw e;
       }
+      // Collect the chat ids BEFORE deleting anything: the R2 cascade below
+      // reads each chat's messages for asset references (uploaded images and
+      // docs, generated images), and sweeps its per-chat R2 state.
+      let chatIds = [];
+      try {
+        const rows = await env.DB.prepare(
+          "SELECT id FROM chats WHERE user_id = ?",
+        )
+          .bind(userId)
+          .all();
+        chatIds = (rows?.results || []).map((r) => r.id).filter(Boolean);
+      } catch {
+        chatIds = [];
+      }
+      await cleanupChatStorage(env, userId, chatIds);
       // Manual orderings die with the history: a fresh account starts fully
       // recency-ordered. The flags table is owned here, so no tolerance dance
       // is needed — ensureChatsTables ran above.
@@ -516,17 +716,6 @@ export async function handleChats(request, env) {
       await env.DB.prepare("DELETE FROM chats WHERE user_id = ?")
         .bind(userId)
         .run();
-
-      // Also best-effort: delete R2 apps for all chats? We can't list them efficiently
-      // without knowing chat ids, but after DB deletes we can try to clean via R2 listing
-      // of apps/ prefix? For now frontend also calls /api/apps per session; this is enough.
-      // Optionally delete R2 apps/* per user if we stored user-indexed? Skipped.
-
-      // Bulk delete R2 apps for deleted chats: we don't know ids now, but we can
-      // leave orphaned apps — they are unreachable without chat id. Optionally sweep
-      // via R2? For correctness, try to delete all apps/ keys if bucket exists and user
-      // had many chats — list all and check ownership via DB already deleted, so
-      // can't know. Keep as is.
 
       return jsonResponse(200, { success: true });
     } catch (e) {
@@ -894,6 +1083,10 @@ export async function handleChats(request, env) {
 
   if (!isMessagesSubroute && request.method === "DELETE") {
     try {
+      // Cascade first: the chat's R2 state (apps, uploaded assets, generated
+      // images referenced by its messages, context index) is read from the
+      // messages, so it must run before the D1 rows are deleted.
+      await cleanupChatStorage(env, userId, [chatId]);
       await env.DB.prepare(
         "DELETE FROM chat_messages WHERE chat_id = ? AND user_id = ?",
       )
@@ -902,24 +1095,6 @@ export async function handleChats(request, env) {
       await env.DB.prepare("DELETE FROM chats WHERE id = ? AND user_id = ?")
         .bind(chatId, userId)
         .run();
-      // Best-effort R2 cleanup for this chat's apps. App records live in the
-      // user's folder (users/<uid>/apps/<session>/<app>.json); pre-move
-      // records under apps/<uid>/<session>/<app>.json are swept too.
-      if (env?.ASSET_BUCKET) {
-        for (const prefix of [
-          `users/${userId}/apps/${chatId}/`,
-          `apps/${userId}/${chatId}/`,
-        ]) {
-          try {
-            const list = await env.ASSET_BUCKET.list({ prefix });
-            if (list?.objects) {
-              for (const obj of list.objects) {
-                await env.ASSET_BUCKET.delete(obj.key);
-              }
-            }
-          } catch {}
-        }
-      }
       return jsonResponse(200, { success: true, id: chatId });
     } catch (e) {
       console.error("DELETE /api/chats/:id failed:", safeErrorDetail(e));
