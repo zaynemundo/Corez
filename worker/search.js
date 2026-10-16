@@ -939,15 +939,27 @@ export async function handleSearch(request, env) {
     async () => searchDuckDuckGo(searchTerm, fetchImpl),
   );
 
+  // Providers are independent fetches to different hosts: run them
+  // concurrently so wall time is the slowest provider, not the sum.
+  // Order, merge and failure semantics are unchanged (map preserves
+  // provider order for the round-robin merge below).
+  const settled = await Promise.all(
+    providers.map(async (provider) => {
+      try {
+        return { results: (await provider()) || [] };
+      } catch (error) {
+        return {
+          results: [],
+          failure: String(error?.message || error).slice(0, 200),
+        };
+      }
+    }),
+  );
   const failures = [];
   const providerResults = [];
-  for (const provider of providers) {
-    try {
-      providerResults.push(await provider());
-    } catch (error) {
-      providerResults.push([]);
-      failures.push(String(error?.message || error).slice(0, 200));
-    }
+  for (const entry of settled) {
+    providerResults.push(entry.results);
+    if (entry.failure) failures.push(entry.failure);
   }
 
   // Round-robin merge (Wikipedia, DuckDuckGo, Wikipedia, ...) so one provider

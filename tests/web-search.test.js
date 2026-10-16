@@ -651,3 +651,57 @@ describe('reciprocalRankFusion', () => {
     expect(reciprocalRankFusion([[5, 0, -1]], 3)).toEqual([0, 1, 2]);
   });
 });
+
+describe('provider fan-out', () => {
+  it('queries independent providers concurrently, not one after another', async () => {
+    // Each provider waits until BOTH hosts have been contacted before
+    // answering. Sequential fan-out deadlocks here (DuckDuckGo is never
+    // called until Wikipedia resolves); concurrent fan-out completes.
+    const seen = new Set();
+    let releaseGate = () => {};
+    let gateOpen = false;
+    const gate = new Promise((resolve) => {
+      releaseGate = resolve;
+    });
+    const fetchImpl = async (url) => {
+      seen.add(new URL(url).hostname);
+      if (
+        !gateOpen &&
+        seen.has('en.wikipedia.org') &&
+        seen.has('lite.duckduckgo.com')
+      ) {
+        gateOpen = true;
+        releaseGate();
+      }
+      await gate;
+      if (new URL(url).hostname === 'lite.duckduckgo.com') {
+        return new Response(
+          `<a rel="nofollow" href="//duckduckgo.com/l/?uddg=${encodeURIComponent('https://example.com/concurrent')}&amp;rut=x" class='result-link'>Concurrent DDG</a>
+           <td class='result-snippet'>Fetched concurrently.</td>`,
+          { status: 200, headers: { 'Content-Type': 'text/html' } },
+        );
+      }
+      return Response.json({ query: { search: [] } });
+    };
+    const response = await Promise.race([
+      handleSearch(
+        new Request('https://corez.test/api/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: 'concurrency check' }),
+        }),
+        { __SEARCH_FETCH: fetchImpl },
+      ),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('providers were not fanned out')), 3000),
+      ),
+    ]);
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(seen.has('en.wikipedia.org')).toBe(true);
+    expect(seen.has('lite.duckduckgo.com')).toBe(true);
+    expect(
+      data.results.some((r) => r.url === 'https://example.com/concurrent'),
+    ).toBe(true);
+  });
+});
