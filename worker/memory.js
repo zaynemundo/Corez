@@ -3,12 +3,19 @@
 // Every fact lives in its owner's perspective: all rows/objects are namespaced
 // by the verified session identity (uid), so one account can never read or
 // delete another user's memories. When `env.DB` (D1) is available it is the
-// source of truth; otherwise (local dev, test envs without D1) the legacy R2
-// JSON layout (`memory/<userId>/<key>.json`) is used unchanged. Legacy R2
-// records are imported into SQLite exactly once per user on first D1-backed
-// read, so nothing ever stored is lost in the move.
+// source of truth; otherwise (local dev, test envs without D1) the R2 JSON
+// layout (`users/<userId>/memory/<key>.json`, legacy `memory/<userId>/<key>.json`
+// read as fallback) is used. Legacy R2 records are imported into SQLite exactly
+// once per user on first D1-backed read, so nothing ever stored is lost in the move.
 
 import { verifySession } from "./auth.js";
+import {
+  userMemoryKey,
+  userMemoryPrefix,
+  legacyMemoryKey,
+  legacyMemoryPrefix,
+  listWithFallback,
+} from "./storageKeys.js";
 import {
   jsonResponse,
   readBoundedJson,
@@ -263,7 +270,9 @@ export async function getUserAccount(env, userId) {
 
 // One-time legacy import: R2 JSON records for this user move into SQLite on
 // first D1-backed read. INSERT OR IGNORE keeps D1 authoritative on key
-// conflicts; the migration flag makes this exactly-once per user.
+// conflicts; the migration flag makes this exactly-once per user. Both the
+// per-user folder (users/<uid>/memory/) and the legacy flat prefix
+// (memory/<uid>/) are imported so pre-move records are never lost.
 async function migrateR2MemoriesToD1(env, userId) {
   try {
     await ensureMemoryTables(env);
@@ -275,18 +284,21 @@ async function migrateR2MemoriesToD1(env, userId) {
     if (flag) return { migrated: false, imported: 0 };
     let imported = 0;
     if (env?.ASSET_BUCKET) {
-      const prefix = `memory/${userId}/`;
-      const list = await env.ASSET_BUCKET.list({ prefix });
-      const objects = (list?.objects || []).filter((obj) =>
+      const { objects } = await listWithFallback(
+        env.ASSET_BUCKET,
+        userMemoryPrefix(userId),
+        legacyMemoryPrefix(userId),
+      );
+      const jsonObjects = (objects || []).filter((obj) =>
         String(obj.key || "").endsWith(".json"),
       );
-      for (const obj of objects) {
+      for (const obj of jsonObjects) {
         try {
           const item = await env.ASSET_BUCKET.get(obj.key);
           if (!item) continue;
           const data = JSON.parse(await item.text());
           if (!data || typeof data.text !== "string" || !data.text) continue;
-          const fileKey = String(obj.key).slice(prefix.length).replace(/\.json$/, "");
+          const fileKey = String(obj.key).split("/").pop().replace(/\.json$/, "");
           const key =
             typeof data.key === "string" && SAFE_STORAGE_SEGMENT.test(data.key)
               ? data.key
@@ -329,7 +341,11 @@ async function migrateR2MemoriesToD1(env, userId) {
 async function bestEffortR2Delete(env, userId, key) {
   try {
     if (env?.ASSET_BUCKET) {
-      await env.ASSET_BUCKET.delete(`memory/${userId}/${key}.json`);
+      await env.ASSET_BUCKET.delete(userMemoryKey(userId, key));
+      // Legacy twin from before the per-user folder move.
+      try {
+        await env.ASSET_BUCKET.delete(legacyMemoryKey(userId, key));
+      } catch {}
     }
   } catch {}
 }
@@ -352,11 +368,14 @@ function r2RecordToMemory(data) {
 }
 
 async function r2ListMemories(env, userId) {
-  const prefix = `memory/${userId}/`;
-  const list = await env.ASSET_BUCKET.list({ prefix });
+  const { objects } = await listWithFallback(
+    env.ASSET_BUCKET,
+    userMemoryPrefix(userId),
+    legacyMemoryPrefix(userId),
+  );
   const memories = [];
-  if (list && Array.isArray(list.objects)) {
-    const jsonObjects = list.objects.filter((obj) => obj.key.endsWith(".json"));
+  if (Array.isArray(objects)) {
+    const jsonObjects = objects.filter((obj) => String(obj.key || "").endsWith(".json"));
     const items = await Promise.all(jsonObjects.map((obj) => env.ASSET_BUCKET.get(obj.key)));
     for (const item of items) {
       if (!item) continue;
@@ -477,10 +496,14 @@ export async function handleMemory(request, env) {
       createdAt: body?.createdAt || now,
     };
 
-    const key = `memory/${userId}/${keyName}.json`;
+    const key = userMemoryKey(userId, keyName);
     await env.ASSET_BUCKET.put(key, JSON.stringify(memoryRecord), {
       httpMetadata: { contentType: "application/json" },
     });
+    // Best-effort legacy cleanup: the record now lives in the user's folder.
+    try {
+      await env.ASSET_BUCKET.delete(legacyMemoryKey(userId, keyName));
+    } catch {}
 
     return jsonResponse(200, {
       success: true,
@@ -625,8 +648,10 @@ export async function handleMemory(request, env) {
       await bestEffortR2Delete(env, userId, keyName);
       return jsonResponse(200, { success: true, userId, key: keyName });
     }
-    const key = `memory/${userId}/${keyName}.json`;
-    await env.ASSET_BUCKET.delete(key);
+    await env.ASSET_BUCKET.delete(userMemoryKey(userId, keyName));
+    try {
+      await env.ASSET_BUCKET.delete(legacyMemoryKey(userId, keyName));
+    } catch {}
     return jsonResponse(200, { success: true, userId, key: keyName });
   }
 

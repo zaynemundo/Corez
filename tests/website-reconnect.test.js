@@ -227,8 +227,10 @@ describe('website task API + SSE reconnection', () => {
     await store.appendEvent(taskId, { type: 'task.started', taskId });
     await store.appendEvent(taskId, { type: 'task.completed', taskId, response: secret });
 
-    // The event log stays readable; every task-metadata read fails.
-    bucket.setFailGet((key) => key === `tasks/${taskId}.json`);
+    // The event log stays readable; every task-metadata read fails, in both
+    // the per-user folder and the legacy flat location (but never the
+    // event log itself).
+    bucket.setFailGet((key) => key.includes(taskId) && !key.includes('.events'));
 
     const owner = await collectWithin(env, fetchRequest(`https://corez.test/api/tasks/${taskId}/events`));
     expect(owner.status).toBe(503);
@@ -263,6 +265,8 @@ describe('website task API + SSE reconnection', () => {
     await store.appendEvent(taskId, { type: 'task.completed', taskId, response: secret });
 
     // The metadata record is gone (partially deleted task); the log survives.
+    // Delete from both the per-user folder and the legacy flat location.
+    await bucket.delete(`users/alice/tasks/${taskId}.json`);
     await bucket.delete(`tasks/${taskId}.json`);
 
     const response = await collectWithin(env, fetchRequest(`https://corez.test/api/tasks/${taskId}/events`));

@@ -118,45 +118,80 @@ export { classifyProviderFailure } from "../packages/agent-core/providers/failur
  * code path usable in tests and local development. State records never
  * contain credentials — provider keys are re-derived from the environment
  * on every continuation.
+ *
+ * Per-user folders: pass `userId` (or `{ userId }`) to scope operational
+ * state under `users/<uid>/corez-tasks/`. Calls without a user keep the
+ * legacy `corez-tasks/` location so anonymous polling (GET /api/task/<id>)
+ * and pre-move records keep working. Reads try the per-user key first,
+ * then the legacy key.
  */
 export function createTaskStateStore(env = {}) {
   const bucket = env?.ASSET_BUCKET;
   const memory = new Map();
 
-  const keyOf = (taskId) =>
+  const sanitize = (taskId) =>
     `corez-tasks/${String(taskId).replace(/[^A-Za-z0-9._-]/g, "_")}.json`;
+  const sanitizeUser = (userId, taskId) => {
+    const uid = String(userId || "dev").replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 200) || "dev";
+    const tid = String(taskId).replace(/[^A-Za-z0-9._-]/g, "_");
+    return `users/${uid}/corez-tasks/${tid}.json`;
+  };
+  const keysFor = (taskId, userId) => {
+    const id = String(taskId);
+    if (userId !== null && userId !== undefined) {
+      return [sanitizeUser(userId, id), sanitize(id)];
+    }
+    return [sanitize(id), null];
+  };
+  const userOf = (opt) =>
+    typeof opt === "string" ? opt : opt?.userId ?? opt?.user ?? null;
 
   return {
-    async save(taskId, state) {
+    async save(taskId, state, opt = null) {
+      const [primary, fallback] = keysFor(taskId, userOf(opt));
       const serialized = JSON.stringify(state);
       memory.set(String(taskId), serialized);
       if (bucket) {
-        await bucket.put(keyOf(taskId), serialized, {
+        await bucket.put(primary, serialized, {
           httpMetadata: { contentType: "application/json" },
         });
+        // Best-effort legacy cleanup when moving into a user folder.
+        if (fallback && fallback !== primary) {
+          try {
+            await bucket.delete(fallback);
+          } catch {
+            // best effort
+          }
+        }
       }
     },
-    async load(taskId) {
+    async load(taskId, opt = null) {
       const id = String(taskId);
       if (memory.has(id)) return JSON.parse(memory.get(id));
       if (bucket) {
-        try {
-          const object = await bucket.get(keyOf(id));
-          if (object) return JSON.parse(await object.text());
-        } catch {
-          // Fall through: corrupt or missing record behaves as absent.
+        const [primary, fallback] = keysFor(taskId, userOf(opt));
+        for (const key of [primary, fallback].filter(Boolean)) {
+          try {
+            const object = await bucket.get(key);
+            if (object) return JSON.parse(await object.text());
+          } catch {
+            // try next: corrupt or missing record behaves as absent.
+          }
         }
       }
       return null;
     },
-    async remove(taskId) {
+    async remove(taskId, opt = null) {
       const id = String(taskId);
       memory.delete(id);
       if (bucket) {
-        try {
-          await bucket.delete(keyOf(id));
-        } catch {
-          // Best effort.
+        const [primary, fallback] = keysFor(taskId, userOf(opt));
+        for (const key of [primary, fallback].filter(Boolean)) {
+          try {
+            await bucket.delete(key);
+          } catch {
+            // Best effort.
+          }
         }
       }
     },

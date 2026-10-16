@@ -77,9 +77,10 @@ describe('Ownership security (assets/apps/memory/publish/tasks)', () => {
     expect(up.status).toBe(200);
     const { key } = await up.json();
 
-    // Bob cannot read Alice's asset
+    // Bob cannot read Alice's asset. Per-user folders fail closed with 404
+    // (no existence oracle), the same contract as /api/apps cross-user reads.
     const bobGet = await call(worker, `/api/assets/${key}`, { cookie: bobCookie });
-    expect(bobGet.status).toBe(403);
+    expect(bobGet.status).toBe(404);
     // Bob cannot delete Alice's asset
     const bobDel = await call(worker, `/api/assets/${key}`, { method: 'DELETE', cookie: bobCookie });
     expect(bobDel.status).toBe(403);
@@ -97,9 +98,10 @@ describe('Ownership security (assets/apps/memory/publish/tasks)', () => {
     });
     expect(up.status).toBe(200);
 
-    // Not yet published: anonymous read still fails closed
+    // Not yet published: anonymous read still fails closed (404 from the
+    // per-user layout: the key reveals nothing about other users' folders).
     const anonBefore = await call(worker, '/api/assets/alice-pub.png');
-    expect(anonBefore.status).toBe(403);
+    expect(anonBefore.status).toBe(404);
 
     // Alice publishes a page that references the asset
     const pub = await call(worker, '/api/publish', {
@@ -129,7 +131,7 @@ describe('Ownership security (assets/apps/memory/publish/tasks)', () => {
 
     // Anonymous visitor still cannot read the unpublished asset
     const anon = await call(worker, '/api/assets/alice-private.png');
-    expect(anon.status).toBe(403);
+    expect(anon.status).toBe(404);
   });
 
   it('assets: no session cookie in production mode -> 401', async () => {

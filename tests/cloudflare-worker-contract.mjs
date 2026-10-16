@@ -1343,7 +1343,7 @@ async function run() {
   assert.equal(publishMulti.status, 200);
   const publishMultiData = await json(publishMulti);
 
-  const multiRecord = JSON.parse(memoryStore.get(`publish/${publishMultiData.slug}.json`).value);
+  const multiRecord = JSON.parse(memoryStore.get(`users/dev/publish/${publishMultiData.slug}.json`).value);
   assert.ok(multiRecord.pages);
   assert.equal(stripBadge(multiRecord.pages['about.html']), '<!DOCTYPE html><html><body><h1>About Page</h1></body></html>');
   assert.match(multiRecord.pages['about.html'], /corez-badge:start/);
@@ -1442,7 +1442,7 @@ async function run() {
   );
   assert.equal(publishWithJunk.status, 200);
   const junkData = await json(publishWithJunk);
-  const junkRecord = JSON.parse(memoryStore.get(`publish/${junkData.slug}.json`).value);
+  const junkRecord = JSON.parse(memoryStore.get(`users/dev/publish/${junkData.slug}.json`).value);
   assert.deepEqual(Object.keys(junkRecord).sort(), ['badge', 'createdAt', 'customized', 'html', 'ownerUserId', 'slug', 'title']);
   assert.equal(stripBadge(junkRecord.html), '<h1>App Only</h1>');
   assert.equal(junkRecord.sessionId, undefined);

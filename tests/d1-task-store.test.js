@@ -183,14 +183,14 @@ describe('D1TaskStore', () => {
 
     const row = await db.prepare('SELECT doc FROM harness_tasks WHERE task_id = ?').bind('task_store_1').first();
     expect(JSON.parse(row.doc).sessionLog).toBeUndefined();
-    expect([...bucket.store.keys()]).toContain('tasks/task_store_1.session.json');
+    expect([...bucket.store.keys()]).toContain('users/alice/tasks/task_store_1.session.json');
 
-    const archived = await store.getSessionLog('task_store_1');
+    const archived = await store.getSessionLog('task_store_1', { userId: 'alice' });
     expect(archived).toEqual(log);
 
     // Updates carrying a session log refresh the R2 artifact too.
     await store.updateTask('task_store_1', { sessionLog: { sessionId: 's1', events: [] } });
-    expect(await store.getSessionLog('task_store_1')).toEqual({ sessionId: 's1', events: [] });
+    expect(await store.getSessionLog('task_store_1', { userId: 'alice' })).toEqual({ sessionId: 's1', events: [] });
   });
 
   it('creates its schema idempotently and survives a fresh store on the same binding', async () => {

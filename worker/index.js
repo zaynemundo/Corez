@@ -72,6 +72,20 @@ import {
   calcLinearTrend,
   round2,
 } from "./skillVerification.js";
+import {
+  USERS_PREFIX,
+  userAssetKey,
+  userAppKey,
+  userAppPrefix,
+  userPublishKey,
+  userPublishPrefix,
+  legacyAppKey,
+  legacyAppPrefix,
+  legacyPublishKey,
+  assetPubMarkerKey,
+  getWithFallback,
+  listWithFallback,
+} from "./storageKeys.js";
 
 // For revise-with-image, we keep the request small but still give the model
 // the exact R2/data URL to use. The frontend uploads to /api/assets and
@@ -344,11 +358,13 @@ const PUBLISH_SLUG_ROOT_PATTERN = /^\/([a-z0-9][a-z0-9-]{1,48}[a-z0-9])\/$/;
 const PUBLISH_UNPUBLISH_PATH_PATTERN =
   /^\/api\/publish\/([a-z0-9][a-z0-9-]{1,48}[a-z0-9])$/;
 
-// Owner-facing publish management (list + unpublish). There is no per-user
-// index: records live at publish/<slug>.json and carry ownerUserId, so the
-// owner's pages are found by a bounded scan. The bounds keep a single request
-// from walking an unbounded bucket, and the response says when it truncated
-// instead of silently hiding pages.
+// Owner-facing publish management (list + unpublish). Each user's records
+// live in their own folder (users/<uid>/publish/<slug>.json) with a tiny
+// global pointer at publish/<slug>.json for public URL resolution; legacy
+// flat records (publish/<slug>.json holding the full document) are merged
+// in by bounded scans. The bounds keep a single request from walking an
+// unbounded bucket, and the response says when it truncated instead of
+// silently hiding pages.
 const MAX_PUBLISH_LIST_RECORDS = 1000;
 const MAX_OWNED_PUBLISHES = 200;
 
@@ -2946,7 +2962,10 @@ async function saveToR2IfAvailable(
 ) {
   if (env.ASSET_BUCKET && typeof env.ASSET_BUCKET.put === "function") {
     try {
-      await env.ASSET_BUCKET.put(key, buffer, {
+      // Generated images live in their owner's folder; the public URL stays
+      // flat (/api/assets/<key>) and the read path resolves the folder.
+      const storageKey = ownerId ? userAssetKey(ownerId, key) : key;
+      await env.ASSET_BUCKET.put(storageKey, buffer, {
         httpMetadata: { contentType: mimeType },
         ...(ownerId ? { customMetadata: { ownerId } } : {}),
       });
@@ -2956,6 +2975,126 @@ async function saveToR2IfAvailable(
     }
   }
   return null;
+}
+
+// Resolve one publish record by slug across both layouts:
+//  - per-user record via the global pointer (publish/<slug>.json holding
+//    { ownerUid }) — the post-move layout;
+//  - legacy full record stored directly at publish/<slug>.json;
+//  - per-user record addressed directly (owner-known paths).
+// Returns { record, storageKey, ownerUid } or null.
+async function resolvePublishRecord(env, slug) {
+  if (!env?.ASSET_BUCKET || typeof env.ASSET_BUCKET.get !== "function") return null;
+  const pointerKey = legacyPublishKey(slug);
+  let pointer = null;
+  try {
+    const obj = await env.ASSET_BUCKET.get(pointerKey);
+    if (obj) {
+      try {
+        pointer = JSON.parse(await obj.text());
+      } catch {
+        pointer = null;
+      }
+    }
+  } catch {
+    pointer = null;
+  }
+  if (pointer && typeof pointer === "object") {
+    // Legacy full record: it carries the document body.
+    if (typeof pointer.html === "string") {
+      return { record: pointer, storageKey: pointerKey, ownerUid: pointer.ownerUserId || null };
+    }
+    // Post-move pointer: fetch the owner's copy.
+    const ownerUid = typeof pointer.ownerUid === "string" ? pointer.ownerUid : null;
+    if (ownerUid) {
+      try {
+        const owned = await env.ASSET_BUCKET.get(userPublishKey(ownerUid, slug));
+        if (owned) {
+          try {
+            const record = JSON.parse(await owned.text());
+            return { record, storageKey: userPublishKey(ownerUid, slug), ownerUid };
+          } catch {
+            return null;
+          }
+        }
+      } catch {
+        // fall through to null
+      }
+      return null;
+    }
+  }
+  return null;
+}
+
+async function writePublishRecord(env, userId, slug, record) {
+  const ownedKey = userPublishKey(userId, slug);
+  await env.ASSET_BUCKET.put(ownedKey, JSON.stringify(record), {
+    httpMetadata: { contentType: "application/json" },
+  });
+  // Tiny global pointer so public URLs resolve without knowing the owner.
+  // Legacy readers that expect a full record detect the missing `html`
+  // field and follow the pointer (see resolvePublishRecord).
+  try {
+    await env.ASSET_BUCKET.put(
+      legacyPublishKey(slug),
+      JSON.stringify({ ownerUid: userId, slug, pointer: true, updatedAt: record.createdAt || null }),
+      { httpMetadata: { contentType: "application/json" } },
+    );
+  } catch {
+    // The owned copy is authoritative; a pointer failure only costs a scan.
+  }
+  return ownedKey;
+}
+
+async function deletePublishRecord(env, slug) {
+  // Best-effort removal from every location a record for this slug can live.
+  const resolved = await resolvePublishRecord(env, slug).catch(() => null);
+  const keys = new Set([legacyPublishKey(slug)]);
+  if (resolved?.storageKey) keys.add(resolved.storageKey);
+  if (resolved?.ownerUid) keys.add(userPublishKey(resolved.ownerUid, slug));
+  for (const key of keys) {
+    try {
+      await env.ASSET_BUCKET.delete(key);
+    } catch {
+      // best effort
+    }
+  }
+  return resolved;
+}
+
+// Resolve an asset's bytes across both layouts. Returns
+// { object, storageKey, ownerId } or { object: null }.
+async function resolveAsset(env, key, uid) {
+  if (!env?.ASSET_BUCKET || typeof env.ASSET_BUCKET.get !== "function") {
+    return { object: null, storageKey: null, ownerId: null };
+  }
+  // 1. The caller's own folder.
+  if (uid) {
+    try {
+      const own = await env.ASSET_BUCKET.get(userAssetKey(uid, key));
+      if (own) return { object: own, storageKey: userAssetKey(uid, key), ownerId: own?.customMetadata?.ownerId || null };
+    } catch {}
+  }
+  // 2. Legacy flat key.
+  try {
+    const flat = await env.ASSET_BUCKET.get(key);
+    if (flat) return { object: flat, storageKey: key, ownerId: flat?.customMetadata?.ownerId || null };
+  } catch {}
+  // 3. Another user's folder via the publish marker (which now stores the
+  //    owner's uid; legacy markers hold "1" and fall through to the scan).
+  try {
+    const marker = await env.ASSET_BUCKET.get(assetPubMarkerKey(key));
+    if (marker) {
+      const text = (await marker.text()).trim();
+      if (text && text !== "1") {
+        try {
+          const owned = await env.ASSET_BUCKET.get(userAssetKey(text, key));
+          if (owned) return { object: owned, storageKey: userAssetKey(text, key), ownerId: owned?.customMetadata?.ownerId || text };
+        } catch {}
+      }
+    }
+  } catch {}
+  return { object: null, storageKey: null, ownerId: null };
 }
 
 /**
@@ -3420,10 +3559,11 @@ async function handleWorkersAIImage(request, env) {
 }
 
 // Markers written at publish time for every /api/assets/<key> referenced by
-// the published document(s): anonymous asset GETs check the marker (one R2
-// get) instead of scanning every publish record. Legacy records published
-// before markers existed fall back to a bounded record scan.
-const ASSET_PUBLIC_MARKER_PREFIX = "asset-pub/";
+// the published document(s) live at asset-pub/<key> (see storageKeys.js
+// assetPubMarkerKey) and now store the owner's uid: anonymous asset GETs
+// check the marker (one R2 get) instead of scanning every publish record.
+// Legacy markers holding "1" and records published before markers existed
+// fall back to a bounded record scan.
 
 function extractReferencedAssetKeys(htmlParts) {
   const keys = new Set();
@@ -3443,53 +3583,63 @@ function extractReferencedAssetKeys(htmlParts) {
 // pages are shared to anyone, so their images must load for anonymous
 // visitors too. Fast path: the publish-time marker (asset-pub/<key>).
 // Fallback for legacy records (published before markers): a bounded scan of
-// live publish records looking for the reference.
+// live publish records looking for the reference, across both the legacy
+// flat prefix and per-user folders.
 async function isAssetPublished(env, key) {
   if (!env?.ASSET_BUCKET) return false;
   try {
-    const marker = await env.ASSET_BUCKET.get(
-      `${ASSET_PUBLIC_MARKER_PREFIX}${key}`,
-    );
+    const marker = await env.ASSET_BUCKET.get(assetPubMarkerKey(key));
     if (marker) return true;
   } catch {
     // marker read failure falls through to the legacy scan
   }
   if (typeof env.ASSET_BUCKET.list !== "function") return false;
   try {
-    // Legacy records have no asset-pub marker. Scan live publish records in
+    // Records without a marker predate markers. Scan live publish records in
     // bounded pages (up to 1000) so an asset referenced only by an older
     // publish is still served anonymously.
-    let cursor;
     let scanned = 0;
     const MAX_PUBLISH_SCAN = 1000;
-    do {
-      const listing = await env.ASSET_BUCKET.list({
-        prefix: "publish/",
-        limit: 100,
-        cursor,
-      });
-      const objects = Array.isArray(listing?.objects) ? listing.objects : [];
-      for (const obj of objects) {
-        scanned += 1;
-        const recordObj = await env.ASSET_BUCKET.get(obj.key);
-        if (!recordObj) continue;
-        let record;
-        try {
-          record = JSON.parse(await recordObj.text());
-        } catch {
-          continue;
-        }
-        const htmlParts = [typeof record?.html === "string" ? record.html : ""];
-        if (record?.pages && typeof record.pages === "object") {
-          for (const pageHtml of Object.values(record.pages)) {
-            if (typeof pageHtml === "string") htmlParts.push(pageHtml);
+    const prefixes = ["publish/", USERS_PREFIX];
+    for (const prefix of prefixes) {
+      let cursor;
+      do {
+        const listing = await env.ASSET_BUCKET.list({
+          prefix,
+          limit: 100,
+          cursor,
+        });
+        const objects = Array.isArray(listing?.objects) ? listing.objects : [];
+        for (const obj of objects) {
+          // Only publish documents can reference assets; skip pointers,
+          // markers and unrelated user files without a GET.
+          const isPublishDoc =
+            obj.key.startsWith("publish/") ||
+            (obj.key.startsWith(USERS_PREFIX) && obj.key.includes("/publish/"));
+          if (!isPublishDoc || !obj.key.endsWith(".json")) continue;
+          scanned += 1;
+          if (scanned > MAX_PUBLISH_SCAN) return false;
+          const recordObj = await env.ASSET_BUCKET.get(obj.key);
+          if (!recordObj) continue;
+          let record;
+          try {
+            record = JSON.parse(await recordObj.text());
+          } catch {
+            continue;
           }
+          if (!record || typeof record.html !== "string") continue;
+          const htmlParts = [record.html];
+          if (record?.pages && typeof record.pages === "object") {
+            for (const pageHtml of Object.values(record.pages)) {
+              if (typeof pageHtml === "string") htmlParts.push(pageHtml);
+            }
+          }
+          if (htmlParts.some((html) => html.includes(`/api/assets/${key}`)))
+            return true;
         }
-        if (htmlParts.some((html) => html.includes(`/api/assets/${key}`)))
-          return true;
-      }
-      cursor = listing?.truncated ? listing.cursor : null;
-    } while (cursor && scanned < MAX_PUBLISH_SCAN);
+        cursor = listing?.truncated ? listing.cursor : null;
+      } while (cursor && scanned < MAX_PUBLISH_SCAN);
+    }
   } catch {
     // Listing/read failures never block asset access: fall through to the
     // ownership check.
@@ -3613,13 +3763,24 @@ async function handleR2Assets(request, env) {
       return jsonResponse(400, { error: "Invalid base64 payload." });
     }
 
-    // Keys are client-chosen and flat, so without an ownership check one
-    // session could overwrite another session's asset at the same public URL.
-    // Buckets without head() (older test doubles) proceed as before.
+    // Keys are client-chosen; the public URL stays flat (/api/assets/<key>)
+    // while bytes live in the uploader's folder (users/<uid>/assets/<key>).
+    // Without an ownership check one session could overwrite another
+    // session's asset at the same public URL. Buckets without head()
+    // (older test doubles) proceed as before.
+    const ownedKey = userAssetKey(uid, key);
     try {
-      const existing = await env.ASSET_BUCKET.head(key);
-      const existingOwner = existing?.customMetadata?.ownerId;
-      if (existing && existingOwner && existingOwner !== uid) {
+      const existing =
+        typeof env.ASSET_BUCKET.head === "function"
+          ? await env.ASSET_BUCKET.head(ownedKey).catch(() => null)
+          : null;
+      const legacyExisting =
+        typeof env.ASSET_BUCKET.head === "function"
+          ? await env.ASSET_BUCKET.head(key).catch(() => null)
+          : null;
+      const existingOwner =
+        existing?.customMetadata?.ownerId || legacyExisting?.customMetadata?.ownerId;
+      if ((existing || legacyExisting) && existingOwner && existingOwner !== uid) {
         return jsonResponse(409, {
           error: "An asset with that key already exists.",
         });
@@ -3628,13 +3789,18 @@ async function handleR2Assets(request, env) {
       // head() unavailable: fall through to the guarded put below.
     }
 
-    await env.ASSET_BUCKET.put(key, bytes, {
+    await env.ASSET_BUCKET.put(ownedKey, bytes, {
       httpMetadata: { contentType: mimeType },
       // Ownership binding: only the uploading session's uid may read or
-      // delete this object. Keys stay flat (URLs are stable), ownership
+      // delete this object. The public URL stays flat and stable; ownership
       // travels in R2 custom metadata instead.
       customMetadata: { ownerId: uid },
     });
+    // Best-effort legacy cleanup: a re-upload that moved folders must not
+    // leave a stale flat twin behind.
+    try {
+      await env.ASSET_BUCKET.delete(key);
+    } catch {}
 
     return jsonResponse(200, {
       success: true,
@@ -3649,7 +3815,7 @@ async function handleR2Assets(request, env) {
       return jsonResponse(400, { error: "Invalid asset key." });
     }
 
-    const object = await env.ASSET_BUCKET.get(key);
+    const { object } = await resolveAsset(env, key, uid);
     if (!object) {
       return jsonResponse(404, { error: "Asset not found in R2 bucket." });
     }
@@ -3701,12 +3867,31 @@ async function handleR2Assets(request, env) {
     }
 
     // Ownership check before delete (R2 head is a metadata-only lookup).
-    const existing = await env.ASSET_BUCKET.head(key);
+    // Per-user folder first, legacy flat key as fallback.
+    let existing = null;
+    if (typeof env.ASSET_BUCKET.head === "function") {
+      try {
+        existing = await env.ASSET_BUCKET.head(userAssetKey(uid, key));
+      } catch {}
+      if (!existing) {
+        try {
+          existing = await env.ASSET_BUCKET.head(key);
+        } catch {}
+      }
+    } else {
+      const resolved = await resolveAsset(env, key, uid);
+      existing = resolved.object
+        ? { customMetadata: { ownerId: resolved.ownerId } }
+        : null;
+    }
     if (!existing || existing.customMetadata?.ownerId !== uid) {
       return jsonResponse(403, { error: "Asset access denied." });
     }
 
-    await env.ASSET_BUCKET.delete(key);
+    await env.ASSET_BUCKET.delete(userAssetKey(uid, key));
+    try {
+      await env.ASSET_BUCKET.delete(key);
+    } catch {}
     return jsonResponse(200, { success: true, deletedKey: key });
   }
 
@@ -3783,10 +3968,14 @@ async function handleR2Apps(request, env) {
       metadata: body?.metadata || {},
     };
 
-    const key = `apps/${uid}/${sessionId}/${appId}.json`;
+    const key = userAppKey(uid, sessionId, appId);
     await env.ASSET_BUCKET.put(key, JSON.stringify(appRecord), {
       httpMetadata: { contentType: "application/json" },
     });
+    // Best-effort legacy cleanup: the record now lives in the user's folder.
+    try {
+      await env.ASSET_BUCKET.delete(legacyAppKey(uid, sessionId, appId));
+    } catch {}
 
     return jsonResponse(200, {
       success: true,
@@ -3814,8 +4003,9 @@ async function handleR2Apps(request, env) {
       return jsonResponse(400, { error: "Invalid path segment." });
     }
 
-    const key = `apps/${uid}/${sessionId}/${appId}.json`;
-    const object = await env.ASSET_BUCKET.get(key);
+    const key = userAppKey(uid, sessionId, appId);
+    const legacyKey = legacyAppKey(uid, sessionId, appId);
+    const { object } = await getWithFallback(env.ASSET_BUCKET, key, legacyKey);
     if (!object) {
       return jsonResponse(404, { error: "App not found in R2 storage." });
     }
@@ -3848,13 +4038,16 @@ async function handleR2Apps(request, env) {
     if (sessionId === null || !SAFE_STORAGE_SEGMENT.test(sessionId)) {
       return jsonResponse(400, { error: "Invalid session id in path." });
     }
-    const prefix = `apps/${uid}/${sessionId}/`;
-    const list = await env.ASSET_BUCKET.list({ prefix });
+    const { objects } = await listWithFallback(
+      env.ASSET_BUCKET,
+      userAppPrefix(uid, sessionId),
+      legacyAppPrefix(uid, sessionId),
+    );
 
     const apps = [];
-    if (list && Array.isArray(list.objects)) {
-      const jsonObjects = list.objects.filter((obj) =>
-        obj.key.endsWith(".json"),
+    if (Array.isArray(objects)) {
+      const jsonObjects = objects.filter((obj) =>
+        String(obj.key || "").endsWith(".json"),
       );
       const items = await Promise.all(
         jsonObjects.map((obj) => env.ASSET_BUCKET.get(obj.key)),
@@ -3896,8 +4089,11 @@ async function handleR2Apps(request, env) {
       return jsonResponse(400, { error: "Invalid path segment." });
     }
 
-    const key = `apps/${uid}/${sessionId}/${appId}.json`;
+    const key = userAppKey(uid, sessionId, appId);
     await env.ASSET_BUCKET.delete(key);
+    try {
+      await env.ASSET_BUCKET.delete(legacyAppKey(uid, sessionId, appId));
+    } catch {}
     return jsonResponse(200, { success: true, sessionId, appId });
   }
 
@@ -3915,12 +4111,15 @@ async function handleR2Apps(request, env) {
     if (sessionId === null || !SAFE_STORAGE_SEGMENT.test(sessionId)) {
       return jsonResponse(400, { error: "Invalid session id in path." });
     }
-    const prefix = `apps/${uid}/${sessionId}/`;
-    const list = await env.ASSET_BUCKET.list({ prefix });
+    const { objects } = await listWithFallback(
+      env.ASSET_BUCKET,
+      userAppPrefix(uid, sessionId),
+      legacyAppPrefix(uid, sessionId),
+    );
 
     let count = 0;
-    if (list && Array.isArray(list.objects)) {
-      for (const obj of list.objects) {
+    if (Array.isArray(objects)) {
+      for (const obj of objects) {
         await env.ASSET_BUCKET.delete(obj.key);
         count++;
       }
@@ -4066,49 +4265,104 @@ async function handleUsageApi(request, env) {
 }
 
 /**
- * Walk publish/<slug>.json records in bounded batches.
- * Returns parsed records with their storage keys. `truncated` is true when the
- * scan stopped at the bound, so callers can say so instead of implying the list
- * is complete.
+ * Walk publish records in bounded batches, across both the legacy flat
+ * prefix (publish/<slug>.json) and per-user folders
+ * (users/<uid>/publish/<slug>.json). Pointer records (no `html`) are
+ * skipped — the owned copy is the document. Returns parsed records with
+ * their storage keys. `truncated` is true when the scan stopped at the
+ * bound, so callers can say so instead of implying the list is complete.
  */
 async function scanPublishRecords(env, { limit = MAX_PUBLISH_LIST_RECORDS } = {}) {
   if (!env?.ASSET_BUCKET || typeof env.ASSET_BUCKET.list !== "function") {
     return { records: [], truncated: true, supported: false };
   }
   const records = [];
-  let cursor;
+  const seenSlugs = new Set();
   let scanned = 0;
   let truncated = false;
   try {
-    do {
-      const listing = await env.ASSET_BUCKET.list({
-        prefix: "publish/",
-        limit: 100,
-        cursor,
-      });
-      const objects = Array.isArray(listing?.objects) ? listing.objects : [];
-      for (const object of objects) {
-        scanned += 1;
-        if (scanned > limit) {
-          truncated = true;
-          break;
+    for (const prefix of ["publish/", USERS_PREFIX]) {
+      let cursor;
+      do {
+        const listing = await env.ASSET_BUCKET.list({
+          prefix,
+          limit: 100,
+          cursor,
+        });
+        const objects = Array.isArray(listing?.objects) ? listing.objects : [];
+        for (const object of objects) {
+          const isPublishDoc =
+            object.key.startsWith("publish/") ||
+            (object.key.startsWith(USERS_PREFIX) && object.key.includes("/publish/"));
+          if (!isPublishDoc || !object.key.endsWith(".json")) continue;
+          scanned += 1;
+          if (scanned > limit) {
+            truncated = true;
+            break;
+          }
+          const stored = await env.ASSET_BUCKET.get(object.key);
+          if (!stored) continue;
+          let record;
+          try {
+            record = JSON.parse(await stored.text());
+          } catch {
+            continue; // unreadable record: skip rather than fail the whole list
+          }
+          // Pointer, not a document — the owned copy is scanned separately.
+          if (record && typeof record.html !== "string") continue;
+          const slug = typeof record?.slug === "string" ? record.slug : null;
+          if (slug && seenSlugs.has(slug)) continue;
+          if (slug) seenSlugs.add(slug);
+          records.push({ key: object.key, record });
         }
-        const stored = await env.ASSET_BUCKET.get(object.key);
-        if (!stored) continue;
-        let record;
-        try {
-          record = JSON.parse(await stored.text());
-        } catch {
-          continue; // unreadable record: skip rather than fail the whole list
-        }
-        records.push({ key: object.key, record });
-      }
-      cursor = listing?.truncated ? listing.cursor : null;
-    } while (cursor && !truncated);
+        cursor = listing?.truncated ? listing.cursor : null;
+      } while (cursor && !truncated);
+      if (truncated) break;
+    }
   } catch {
     return { records, truncated: true, supported: false };
   }
   return { records, truncated, supported: true, scanned };
+}
+
+/**
+ * List one user's publish records efficiently: their own folder prefix plus
+ * any legacy flat records they still own. Pointer records are skipped.
+ */
+async function listUserPublishRecords(env, uid, { limit = MAX_OWNED_PUBLISHES } = {}) {
+  const records = [];
+  const seenSlugs = new Set();
+  if (!env?.ASSET_BUCKET || typeof env.ASSET_BUCKET.list !== "function") {
+    return { records, truncated: true, supported: false };
+  }
+  try {
+    const { objects } = await listWithFallback(
+      env.ASSET_BUCKET,
+      userPublishPrefix(uid),
+      null,
+    );
+    for (const object of (objects || [])) {
+      if (!object.key.endsWith(".json")) continue;
+      const stored = await env.ASSET_BUCKET.get(object.key);
+      if (!stored) continue;
+      let record;
+      try {
+        record = JSON.parse(await stored.text());
+      } catch {
+        continue;
+      }
+      if (typeof record?.html !== "string") continue;
+      if (record?.ownerUserId && record.ownerUserId !== uid) continue;
+      const slug = typeof record?.slug === "string" ? record.slug : null;
+      if (slug && seenSlugs.has(slug)) continue;
+      if (slug) seenSlugs.add(slug);
+      records.push({ key: object.key, record });
+      if (records.length >= limit) break;
+    }
+  } catch {
+    return { records, truncated: true, supported: false };
+  }
+  return { records, truncated: false, supported: true };
 }
 
 /**
@@ -4119,7 +4373,7 @@ function publishRecordSummary(key, record) {
   const slug =
     typeof record?.slug === "string" && PUBLISH_SLUG_PATTERN.test(record.slug)
       ? record.slug
-      : String(key).replace(/^publish\//, "").replace(/\.json$/, "");
+      : String(key).split("/").pop().replace(/\.json$/, "");
   const pageHtml =
     record?.pages && typeof record.pages === "object"
       ? Object.values(record.pages).filter((value) => typeof value === "string")
@@ -4282,31 +4536,23 @@ async function handlePublish(request, env) {
       // 1-time change check: if renaming from previous slug, ensure previous was not already customized
       if (body?.previousSlug && body.previousSlug !== rawRequestedSlug) {
         if (PUBLISH_SLUG_PATTERN.test(body.previousSlug)) {
-          const prevObject = await env.ASSET_BUCKET.get(
-            `publish/${body.previousSlug}.json`,
-          );
-          if (prevObject) {
-            try {
-              const prevRecord = JSON.parse(await prevObject.text());
-              if (prevRecord?.customized) {
-                return jsonResponse(400, {
-                  error:
-                    "The URL slug for this creation has already been customized once and cannot be changed again.",
-                });
-              }
-            } catch {
-              // ignore
+          const prevResolved = await resolvePublishRecord(env, body.previousSlug);
+          const prevRecord = prevResolved?.record || null;
+          if (prevRecord) {
+            if (prevRecord?.customized) {
+              return jsonResponse(400, {
+                error:
+                  "The URL slug for this creation has already been customized once and cannot be changed again.",
+              });
             }
           }
         }
       }
 
-      // Check collision / ownership
-      const existingObject = await env.ASSET_BUCKET.get(
-        `publish/${rawRequestedSlug}.json`,
-      );
+      // Check collision / ownership (per-user folders + legacy flat keys).
+      const existingResolved = await resolvePublishRecord(env, rawRequestedSlug);
       if (
-        existingObject &&
+        existingResolved &&
         body?.previousSlug &&
         body.previousSlug !== rawRequestedSlug
       ) {
@@ -4317,13 +4563,8 @@ async function handlePublish(request, env) {
       // Ownership: overwriting an existing slug requires being its owner.
       // Legacy records (no ownerUserId) are auto-claimed on first re-publish
       // so existing published links keep working after the fix.
-      if (existingObject) {
-        let existingRecord = null;
-        try {
-          existingRecord = JSON.parse(await existingObject.text());
-        } catch {
-          // unreadable record -> treat as unowned, allow claim below
-        }
+      if (existingResolved) {
+        const existingRecord = existingResolved.record;
         if (existingRecord?.ownerUserId && existingRecord.ownerUserId !== uid) {
           return jsonResponse(403, {
             error: "This slug belongs to another user.",
@@ -4334,18 +4575,14 @@ async function handlePublish(request, env) {
       slug = rawRequestedSlug;
 
       if (
-        existingObject &&
+        existingResolved &&
         (!body?.previousSlug || body.previousSlug === rawRequestedSlug)
       ) {
-        try {
-          const existingRecord = JSON.parse(await existingObject.text());
-          isCustomized = Boolean(
-            existingRecord?.customized ||
+        const existingRecord = existingResolved.record;
+        isCustomized = Boolean(
+          existingRecord?.customized ||
             !GENERATED_SLUG_PATTERN.test(rawRequestedSlug),
-          );
-        } catch {
-          isCustomized = !GENERATED_SLUG_PATTERN.test(rawRequestedSlug);
-        }
+        );
       } else {
         isCustomized =
           !GENERATED_SLUG_PATTERN.test(rawRequestedSlug) ||
@@ -4354,9 +4591,7 @@ async function handlePublish(request, env) {
     } else {
       for (let attempt = 0; attempt < 5; attempt++) {
         const candidate = generatePublishSlug();
-        const existing = await env.ASSET_BUCKET.get(
-          `publish/${candidate}.json`,
-        );
+        const existing = await resolvePublishRecord(env, candidate);
         if (!existing) {
           slug = candidate;
           break;
@@ -4393,22 +4628,15 @@ async function handlePublish(request, env) {
       record.pages = pages;
     }
 
-    // Clean up previous slug if renamed â€” only when the caller owns it.
+    // Clean up previous slug if renamed — only when the caller owns it.
     if (
       body?.previousSlug &&
       body.previousSlug !== slug &&
       PUBLISH_SLUG_PATTERN.test(body.previousSlug)
     ) {
-      const prevObject = await env.ASSET_BUCKET.get(
-        `publish/${body.previousSlug}.json`,
-      );
-      if (prevObject) {
-        let prevRecord = null;
-        try {
-          prevRecord = JSON.parse(await prevObject.text());
-        } catch {
-          // unreadable record -> treat as unowned, allow cleanup (no history leak)
-        }
+      const prevResolved = await resolvePublishRecord(env, body.previousSlug).catch(() => null);
+      const prevRecord = prevResolved?.record || null;
+      if (prevRecord) {
         // Legacy previous slugs (no owner) and owned-by-me both allow cleanup;
         // only slugs owned by someone else are blocked.
         if (prevRecord?.ownerUserId && prevRecord.ownerUserId !== uid) {
@@ -4417,35 +4645,26 @@ async function handlePublish(request, env) {
           });
         }
       }
-      try {
-        await env.ASSET_BUCKET.delete(`publish/${body.previousSlug}.json`);
-      } catch {
-        // ignore
-      }
+      await deletePublishRecord(env, body.previousSlug).catch(() => {});
     }
 
-    await env.ASSET_BUCKET.put(`publish/${slug}.json`, JSON.stringify(record), {
-      httpMetadata: { contentType: "application/json" },
-    });
+    await writePublishRecord(env, uid, slug, record);
 
     // Public-asset markers: every /api/assets/<key> referenced by the
     // published document(s) becomes readable by anonymous visitors (fast
-    // marker lookup, no per-request record scan). Best-effort â€” a marker
-    // failure never fails the publish; the legacy bounded scan still covers
-    // such records.
+    // marker lookup, no per-request record scan). The marker stores the
+    // owner's uid so anonymous reads can resolve the per-user folder.
+    // Best-effort — a marker failure never fails the publish; the bounded
+    // scan still covers such records.
     try {
       const referencedKeys = extractReferencedAssetKeys([
         html,
         ...Object.values(pages),
       ]);
       for (const assetKey of referencedKeys) {
-        await env.ASSET_BUCKET.put(
-          `${ASSET_PUBLIC_MARKER_PREFIX}${assetKey}`,
-          "1",
-          {
-            httpMetadata: { contentType: "text/plain" },
-          },
-        );
+        await env.ASSET_BUCKET.put(assetPubMarkerKey(assetKey), uid, {
+          httpMetadata: { contentType: "text/plain" },
+        });
       }
     } catch {
       // ignore: markers are an optimization, not a correctness dependency
@@ -4462,7 +4681,9 @@ async function handlePublish(request, env) {
 
   // GET /api/publish - the caller's own published pages, for the settings
   // panel. Only the owner's records are returned, and never the document
-  // bodies: the list is for recognising and removing a link.
+  // bodies: the list is for recognising and removing a link. Reads the
+  // caller's own folder first (cheap prefix scan); legacy flat records are
+  // merged in so pre-move pages still show up.
   if (pathname === "/api/publish" && request.method === "GET") {
     const uid = await sessionUid(request, env);
     if (!uid) {
@@ -4473,16 +4694,31 @@ async function handlePublish(request, env) {
         error: "R2 storage (ASSET_BUCKET) is not configured.",
       });
     }
-    const { records, truncated, supported } = await scanPublishRecords(env);
-    if (!supported && records.length === 0) {
+    const { records: owned, truncated: ownedTruncated, supported } =
+      await listUserPublishRecords(env, uid);
+    if (!supported && owned.length === 0) {
       return jsonResponse(500, {
         error: "Could not read published pages right now.",
       });
     }
+    // Legacy flat records owned by this user (pre-move publishes).
+    const { records: all } = await scanPublishRecords(env).catch(() => ({
+      records: [],
+    }));
+    const seen = new Set(owned.map(({ record }) => record?.slug));
+    for (const entry of all || []) {
+      if (entry?.record?.ownerUserId !== uid) continue;
+      if (entry?.record?.slug && seen.has(entry.record.slug)) continue;
+      if (owned.length >= MAX_OWNED_PUBLISHES) break;
+      owned.push(entry);
+      if (entry?.record?.slug) seen.add(entry.record.slug);
+    }
     const pages = [];
-    let omitted = truncated;
-    for (const { key, record } of records) {
-      if (record?.ownerUserId !== uid) continue;
+    let omitted = ownedTruncated;
+    for (const { key, record } of owned) {
+      if (record?.ownerUserId && record.ownerUserId !== uid) continue;
+      // Legacy unowned records are unattributable here (same rule as DELETE).
+      if (!record?.ownerUserId) continue;
       if (pages.length >= MAX_OWNED_PUBLISHES) {
         omitted = true;
         break;
@@ -4519,16 +4755,32 @@ async function handlePublish(request, env) {
     }
 
     const slug = unpublishMatch[1];
-    const key = `publish/${slug}.json`;
-    const stored = await env.ASSET_BUCKET.get(key);
-    if (!stored) {
-      return jsonResponse(404, { error: "Published page not found." });
-    }
-    let record = null;
-    try {
-      record = JSON.parse(await stored.text());
-    } catch {
-      // Unreadable record: leave it null so it is treated as unattributable.
+    const resolved = await resolvePublishRecord(env, slug).catch(() => null);
+    const record = resolved?.record || null;
+    if (!record) {
+      // A pointer without an owned copy, or nothing at all: fall back to a
+      // direct legacy read so the error shape stays the same.
+      let legacyRecord = null;
+      try {
+        const stored = await env.ASSET_BUCKET.get(legacyPublishKey(slug));
+        if (stored) legacyRecord = JSON.parse(await stored.text());
+      } catch {}
+      if (!legacyRecord) {
+        return jsonResponse(404, { error: "Published page not found." });
+      }
+      if (!legacyRecord?.ownerUserId) {
+        return jsonResponse(403, {
+          error:
+            "This published page predates ownership records, so it cannot be removed from settings.",
+        });
+      }
+      if (legacyRecord.ownerUserId !== uid) {
+        return jsonResponse(403, {
+          error: "This published page belongs to another account.",
+        });
+      }
+      await deletePublishRecord(env, slug).catch(() => {});
+      return jsonResponse(200, { success: true, slug, url: `/${slug}` });
     }
     if (!record?.ownerUserId) {
       // Records written before ownership was recorded cannot be attributed, so
@@ -4544,7 +4796,7 @@ async function handlePublish(request, env) {
       });
     }
 
-    await env.ASSET_BUCKET.delete(key);
+    await deletePublishRecord(env, slug);
 
     // Asset markers are what let anonymous visitors read an uploaded image.
     // Drop the ones this page alone was keeping public.
@@ -4568,9 +4820,7 @@ async function handlePublish(request, env) {
             return parts.some((html) => html.includes(`/api/assets/${assetKey}`));
           });
           if (!stillReferenced) {
-            await env.ASSET_BUCKET.delete(
-              `${ASSET_PUBLIC_MARKER_PREFIX}${assetKey}`,
-            );
+            await env.ASSET_BUCKET.delete(assetPubMarkerKey(assetKey));
           }
         }
       }
@@ -4594,18 +4844,11 @@ async function handlePublish(request, env) {
         });
       }
       const [, slug, pageName] = pageMatch;
-      const object = await env.ASSET_BUCKET.get(`publish/${slug}.json`);
-      if (!object) {
+      const resolved = await resolvePublishRecord(env, slug);
+      if (!resolved) {
         return jsonResponse(404, { error: "Published creation not found." });
       }
-      let record;
-      try {
-        record = JSON.parse(await object.text());
-      } catch {
-        return jsonResponse(500, {
-          error: "Failed to parse published payload.",
-        });
-      }
+      const record = resolved.record;
       const pageHtml =
         typeof record?.pages?.[pageName] === "string"
           ? record.pages[pageName]
@@ -4637,18 +4880,11 @@ async function handlePublish(request, env) {
         });
       }
       const slug = slugRootMatch[1];
-      const object = await env.ASSET_BUCKET.get(`publish/${slug}.json`);
-      if (!object) {
+      const resolved = await resolvePublishRecord(env, slug);
+      if (!resolved) {
         return jsonResponse(404, { error: "Published creation not found." });
       }
-      let record;
-      try {
-        record = JSON.parse(await object.text());
-      } catch {
-        return jsonResponse(500, {
-          error: "Failed to parse published payload.",
-        });
-      }
+      const record = resolved.record;
       const html = typeof record?.html === "string" ? record.html : "";
       if (!html) {
         return jsonResponse(404, { error: "Published creation not found." });
@@ -4678,8 +4914,8 @@ async function handlePublish(request, env) {
           });
     }
     const slug = pathname.slice(1);
-    const object = await env.ASSET_BUCKET.get(`publish/${slug}.json`);
-    if (!object) {
+    const resolved = await resolvePublishRecord(env, slug);
+    if (!resolved) {
       if (GENERATED_SLUG_PATTERN.test(slug)) {
         return jsonResponse(404, { error: "Published creation not found." });
       }
@@ -4687,12 +4923,7 @@ async function handlePublish(request, env) {
         ? serveAssets(request, env)
         : jsonResponse(404, { error: "Published creation not found." });
     }
-    let record;
-    try {
-      record = JSON.parse(await object.text());
-    } catch {
-      return jsonResponse(500, { error: "Failed to parse published payload." });
-    }
+    const record = resolved.record;
     if (
       record?.pages &&
       typeof record.pages === "object" &&

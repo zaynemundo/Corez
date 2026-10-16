@@ -18,10 +18,15 @@
 //   lease holder executes a task, so a single writer owns the document. The
 //   atomic lease is what makes that guarantee real.
 // - Large artifacts stay out of D1: the session-log snapshot is written to R2
-//   under `tasks/<taskId>.session.json` and the D1 row keeps only the task
-//   document. R2 remains the artifact store; D1 is the coordinator.
+//   under `users/<uid>/tasks/<taskId>.session.json` (legacy
+//   `tasks/<taskId>.session.json` read as fallback) and the D1 row keeps only
+//   the task document. R2 remains the artifact store; D1 is the coordinator.
 
 import { TaskStore } from './TaskStore.js';
+import {
+  userTaskSessionKey,
+  legacyTaskSessionKey,
+} from '../../../worker/storageKeys.js';
 
 const TASKS_TABLE = 'harness_tasks';
 const EVENTS_TABLE = 'harness_task_events';
@@ -200,8 +205,11 @@ export class D1TaskStore extends TaskStore {
     return Boolean(this.db && typeof this.db.prepare === 'function');
   }
 
-  #sessionKey(taskId) {
-    return `tasks/${safeSegment(taskId)}.session.json`;
+  #sessionKey(taskId, userId = null) {
+    if (userId !== null && userId !== undefined && userId !== '') {
+      return userTaskSessionKey(userId, taskId);
+    }
+    return legacyTaskSessionKey(taskId);
   }
 
   async #ensureSchema() {
@@ -229,11 +237,11 @@ export class D1TaskStore extends TaskStore {
     return { doc, sessionLog };
   }
 
-  async #storeSessionLog(taskId, sessionLog) {
+  async #storeSessionLog(taskId, sessionLog, userId = null) {
     if (sessionLog === null || sessionLog === undefined) return;
     if (!this.bucket || typeof this.bucket.put !== 'function') return;
     try {
-      await this.bucket.put(this.#sessionKey(taskId), JSON.stringify(sessionLog), {
+      await this.bucket.put(this.#sessionKey(taskId, userId), JSON.stringify(sessionLog), {
         httpMetadata: { contentType: 'application/json' }
       });
     } catch {
@@ -257,7 +265,7 @@ export class D1TaskStore extends TaskStore {
       now,
       epochMs(doc.terminalAt, null)
     ).run();
-    await this.#storeSessionLog(task.taskId, sessionLog);
+    await this.#storeSessionLog(task.taskId, sessionLog, doc.userId ?? task.userId ?? null);
     return clone(task);
   }
 
@@ -291,7 +299,7 @@ export class D1TaskStore extends TaskStore {
       epochMs(doc.terminalAt, null),
       String(taskId)
     ).run();
-    await this.#storeSessionLog(taskId, sessionLog);
+    await this.#storeSessionLog(taskId, sessionLog, doc.userId ?? current.userId ?? null);
     return next;
   }
 
@@ -316,7 +324,7 @@ export class D1TaskStore extends TaskStore {
       now
     ).run();
     if ((Number(result?.meta?.changes) || 0) === 0) return null;
-    await this.#storeSessionLog(taskId, sessionLog);
+    await this.#storeSessionLog(taskId, sessionLog, doc.userId ?? current.userId ?? null);
     return next;
   }
 
@@ -546,15 +554,48 @@ export class D1TaskStore extends TaskStore {
   // Session-log snapshots live in R2, not D1. Nothing in the harness reads
   // them back for execution (deriveMessages rebuilds history from the task
   // document), so this is offered for operators and replay tooling only.
-  async getSessionLog(taskId) {
+  // Per-user layout with legacy fallback; an explicit userId hint avoids
+  // the bounded users/ scan.
+  async getSessionLog(taskId, options = {}) {
     if (!this.bucket || typeof this.bucket.get !== 'function') return null;
-    const object = await this.bucket.get(this.#sessionKey(taskId));
-    if (!object) return null;
-    try {
-      return JSON.parse(await object.text());
-    } catch {
-      return null;
+    const hint = typeof options === 'string' ? options : options?.userId;
+    const keysToTry = [];
+    if (hint) keysToTry.push(this.#sessionKey(taskId, hint));
+    keysToTry.push(this.#sessionKey(taskId, null));
+    for (const key of keysToTry) {
+      try {
+        const object = await this.bucket.get(key);
+        if (!object) continue;
+        try {
+          return JSON.parse(await object.text());
+        } catch {
+          return null;
+        }
+      } catch {
+        // try next
+      }
     }
+    if (!hint && typeof this.bucket.list === 'function') {
+      // Bounded fallback scan for a per-user log read without a hint.
+      try {
+        const listing = await this.bucket.list({ prefix: 'users/', limit: 1000 });
+        const suffix = `tasks/${safeSegment(taskId)}.session.json`;
+        for (const obj of listing?.objects || []) {
+          if (obj.key.endsWith(suffix)) {
+            const object = await this.bucket.get(obj.key);
+            if (!object) continue;
+            try {
+              return JSON.parse(await object.text());
+            } catch {
+              return null;
+            }
+          }
+        }
+      } catch {
+        // miss
+      }
+    }
+    return null;
   }
 }
 

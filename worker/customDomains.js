@@ -23,7 +23,9 @@
 // forwards the request with that Host header, so a request whose Host is not one
 // of our own hostnames is a customer domain and is looked up here:
 //
-//   domains/<hostname>.json  ->  { hostname, slug, ownerUserId, status, ... }
+//   users/<uid>/domains/<hostname>.json  ->  { hostname, slug, ownerUserId, ... }
+//   domains/<hostname>.json               ->  { ownerUid, hostname } pointer
+//                                             (legacy: the full record)
 //
 // Records live in R2 rather than D1 because a lookup happens on every request
 // for a customer domain and R2 keys are a direct get() with no query. A page is
@@ -38,6 +40,14 @@
 import { jsonResponse } from "./utils.js";
 import { getActiveSubscription } from "./subscriptions.js";
 import { verifySession } from "./auth.js";
+import {
+  USERS_PREFIX,
+  userDomainKey,
+  userDomainPrefix,
+  userPublishKey,
+  legacyPublishKey,
+  listWithFallback,
+} from "./storageKeys.js";
 
 /**
  * Caller identity, with the same dev fallback the rest of the Worker uses:
@@ -55,6 +65,12 @@ export const DOMAIN_PREFIX = "domains/";
 export const MAX_DOMAINS_PER_USER = 5;
 export const MAX_DOMAINS_PER_SLUG = 3;
 export const CF_API_BASE = "https://api.cloudflare.com/client/v4";
+
+// Per-user folders: each user's domain records live under
+// users/<uid>/domains/<hostname>.json, with a tiny global pointer at
+// domains/<hostname>.json so request-time lookups (which don't know the
+// owner) resolve in two GETs. Legacy flat records holding the full document
+// are served directly as a fallback.
 
 // Hosts that belong to the platform. Anything else is treated as a customer
 // domain, so this list is the security boundary between "our site" and "their
@@ -289,35 +305,86 @@ async function readJson(bucket, key) {
   }
 }
 
+// Resolve a publish record across both layouts (per-user folder via the
+// global pointer, legacy flat full record). Local copy — worker/index.js
+// owns the canonical resolver; this module stays import-cycle free.
+async function readPublishRecord(env, slug) {
+  if (!env?.ASSET_BUCKET || typeof env.ASSET_BUCKET.get !== "function") return null;
+  const direct = await readJson(env.ASSET_BUCKET, legacyPublishKey(slug)).catch(() => null);
+  if (direct && typeof direct === "object") {
+    if (typeof direct.html === "string") return direct;
+    const ownerUid = typeof direct.ownerUid === "string" ? direct.ownerUid : null;
+    if (ownerUid) {
+      const owned = await readJson(env.ASSET_BUCKET, userPublishKey(ownerUid, slug)).catch(() => null);
+      if (owned && typeof owned.html === "string") return owned;
+      return null;
+    }
+  }
+  return null;
+}
+
 export async function getDomainForHost(env, host) {
   const hostname = normalizeHostname(host);
   if (!hostname || !env?.ASSET_BUCKET) return null;
-  const record = await readJson(env.ASSET_BUCKET, domainRecordKey(hostname));
-  if (!record || normalizeHostname(record.hostname) !== hostname) return null;
-  return record;
+  // Global pointer first (post-move layout).
+  let pointer;
+  try {
+    pointer = await readJson(env.ASSET_BUCKET, domainRecordKey(hostname));
+  } catch {
+    pointer = null;
+  }
+  if (pointer && typeof pointer === "object") {
+    if (typeof pointer.slug === "string") {
+      // Legacy full record doubles as its own pointer.
+      if (normalizeHostname(pointer.hostname) === hostname) return pointer;
+    }
+    const ownerUid = typeof pointer.ownerUid === "string" ? pointer.ownerUid : null;
+    if (ownerUid) {
+      try {
+        const owned = await readJson(env.ASSET_BUCKET, userDomainKey(ownerUid, hostname));
+        if (owned && normalizeHostname(owned.hostname) === hostname) return owned;
+      } catch {
+        // fall through to null
+      }
+      return null;
+    }
+  }
+  return null;
 }
 
 /**
- * Every domain record, bounded. Domain counts per deployment are small and
- * there is no per-user index to drift out of sync with the records themselves.
+ * Every domain record, bounded. Scans both the legacy flat prefix and
+ * per-user folders; pointer records (no `slug`) are skipped in favour of
+ * the owned copy.
  */
 export async function listDomainRecords(env, { limit = 500 } = {}) {
   if (!env?.ASSET_BUCKET || typeof env.ASSET_BUCKET.list !== "function") return [];
   const records = [];
-  let cursor;
+  const seen = new Set();
   let scanned = 0;
   try {
-    do {
-      const listing = await env.ASSET_BUCKET.list({ prefix: DOMAIN_PREFIX, limit: 100, cursor });
-      const objects = Array.isArray(listing?.objects) ? listing.objects : [];
-      for (const object of objects) {
-        scanned += 1;
-        if (scanned > limit) return records;
-        const record = await readJson(env.ASSET_BUCKET, object.key);
-        if (record?.hostname) records.push(record);
-      }
-      cursor = listing?.truncated ? listing.cursor : null;
-    } while (cursor);
+    for (const prefix of [DOMAIN_PREFIX, USERS_PREFIX]) {
+      let cursor;
+      do {
+        const listing = await env.ASSET_BUCKET.list({ prefix, limit: 100, cursor });
+        const objects = Array.isArray(listing?.objects) ? listing.objects : [];
+        for (const object of objects) {
+          const isDomainDoc =
+            object.key.startsWith(DOMAIN_PREFIX) ||
+            (object.key.startsWith(USERS_PREFIX) && object.key.includes("/domains/"));
+          if (!isDomainDoc || !object.key.endsWith(".json")) continue;
+          scanned += 1;
+          if (scanned > limit) return records;
+          const record = await readJson(env.ASSET_BUCKET, object.key);
+          if (!record?.hostname || typeof record.slug !== "string") continue;
+          const host = normalizeHostname(record.hostname);
+          if (!host || seen.has(host)) continue;
+          seen.add(host);
+          records.push(record);
+        }
+        cursor = listing?.truncated ? listing.cursor : null;
+      } while (cursor);
+    }
   } catch {
     return records;
   }
@@ -325,6 +392,36 @@ export async function listDomainRecords(env, { limit = 500 } = {}) {
 }
 
 export async function listDomainsForUser(env, uid) {
+  // Cheap path first: the user's own folder.
+  try {
+    if (env?.ASSET_BUCKET && typeof env.ASSET_BUCKET.list === "function") {
+      const { objects } = await listWithFallback(
+        env.ASSET_BUCKET,
+        userDomainPrefix(uid),
+        null,
+      );
+      const owned = [];
+      for (const object of objects || []) {
+        if (!object.key.endsWith(".json")) continue;
+        const record = await readJson(env.ASSET_BUCKET, object.key);
+        if (record?.hostname && typeof record.slug === "string" && record.ownerUserId === uid) {
+          owned.push(record);
+        }
+      }
+      if (owned.length > 0) {
+        // Merge any legacy flat records not yet moved.
+        const legacy = await listDomainRecords(env);
+        const seen = new Set(owned.map((r) => normalizeHostname(r.hostname)));
+        for (const record of legacy) {
+          const host = normalizeHostname(record.hostname);
+          if (record.ownerUserId === uid && host && !seen.has(host)) owned.push(record);
+        }
+        return owned;
+      }
+    }
+  } catch {
+    // fall through to the global scan
+  }
   const records = await listDomainRecords(env);
   return records.filter((record) => record.ownerUserId === uid);
 }
@@ -335,13 +432,44 @@ export async function listDomainsForSlug(env, slug) {
 }
 
 export async function saveDomainRecord(env, record) {
-  await env.ASSET_BUCKET.put(domainRecordKey(record.hostname), JSON.stringify(record), {
+  const hostname = normalizeHostname(record.hostname);
+  const ownerUid = typeof record.ownerUserId === "string" ? record.ownerUserId : null;
+  if (ownerUid && hostname) {
+    await env.ASSET_BUCKET.put(userDomainKey(ownerUid, hostname), JSON.stringify(record), {
+      httpMetadata: { contentType: "application/json" },
+    });
+  }
+  // Global pointer so request-time lookups resolve without knowing the owner.
+  // Required, not best-effort: without it the domain is unreachable.
+  await env.ASSET_BUCKET.put(domainRecordKey(record.hostname), JSON.stringify(
+    ownerUid && hostname
+      ? { ownerUid, hostname, pointer: true }
+      : record,
+  ), {
     httpMetadata: { contentType: "application/json" },
   });
 }
 
 export async function deleteDomainRecord(env, hostname) {
+  const normalized = normalizeHostname(hostname);
+  // The owner is read from the pointer/legacy record so both copies die.
+  let ownerUid = null;
+  try {
+    const current = await readJson(env.ASSET_BUCKET, domainRecordKey(hostname));
+    if (current && typeof current === "object") {
+      ownerUid = typeof current.ownerUid === "string"
+        ? current.ownerUid
+        : typeof current.ownerUserId === "string"
+          ? current.ownerUserId
+          : null;
+    }
+  } catch {}
   await env.ASSET_BUCKET.delete(domainRecordKey(hostname));
+  if (ownerUid && normalized) {
+    try {
+      await env.ASSET_BUCKET.delete(userDomainKey(ownerUid, normalized));
+    } catch {}
+  }
 }
 
 /** Detach every domain pointing at a page (used when the page is unpublished). */
@@ -437,7 +565,7 @@ export async function handleCustomDomainRequest(request, env) {
     );
   }
 
-  const published = await readJson(env.ASSET_BUCKET, `publish/${record.slug}.json`);
+  const published = await readPublishRecord(env, record.slug);
   if (!published) {
     return domainNoticePage(
       "This page is no longer published",
@@ -563,7 +691,7 @@ export async function handleDomainsApi(request, env) {
     const hostname = validated.hostname;
 
     // The page must exist and belong to the caller.
-    const published = await readJson(env.ASSET_BUCKET, `publish/${slug}.json`);
+    const published = await readPublishRecord(env, slug);
     if (!published) {
       return jsonResponse(404, { error: "Published page not found." });
     }

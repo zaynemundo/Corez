@@ -918,20 +918,23 @@ export async function handleChats(request, env) {
       await env.DB.prepare("DELETE FROM chats WHERE id = ? AND user_id = ?")
         .bind(chatId, userId)
         .run();
-      // Best-effort R2 cleanup for this chat's apps. App records are stored
-      // under apps/<userId>/<sessionId>/<appId>.json, so the session id alone
-      // never matches a prefix.
+      // Best-effort R2 cleanup for this chat's apps. App records live in the
+      // user's folder (users/<uid>/apps/<session>/<app>.json); pre-move
+      // records under apps/<uid>/<session>/<app>.json are swept too.
       if (env?.ASSET_BUCKET) {
-        try {
-          const list = await env.ASSET_BUCKET.list({
-            prefix: `apps/${userId}/${chatId}/`,
-          });
-          if (list?.objects) {
-            for (const obj of list.objects) {
-              await env.ASSET_BUCKET.delete(obj.key);
+        for (const prefix of [
+          `users/${userId}/apps/${chatId}/`,
+          `apps/${userId}/${chatId}/`,
+        ]) {
+          try {
+            const list = await env.ASSET_BUCKET.list({ prefix });
+            if (list?.objects) {
+              for (const obj of list.objects) {
+                await env.ASSET_BUCKET.delete(obj.key);
+              }
             }
-          }
-        } catch {}
+          } catch {}
+        }
       }
       return jsonResponse(200, { success: true, id: chatId });
     } catch (e) {

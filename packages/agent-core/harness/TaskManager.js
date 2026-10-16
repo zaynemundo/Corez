@@ -46,7 +46,10 @@ export class TaskManager {
     if (!taskId) throw new Error('taskId is required.');
     let task;
     if (this.store) {
-      task = await this.store.getTask(taskId);
+      // Forward the owner hint so per-user R2 folders resolve without a scan.
+      task = userId !== null && userId !== undefined
+        ? await this.store.getTask(taskId, { userId })
+        : await this.store.getTask(taskId);
     } else {
       task = null;
     }
@@ -61,7 +64,10 @@ export class TaskManager {
     const current = await this.getTask(taskId, userId);
     const next = { ...current.toJSON(), ...patch, taskId, updatedAt: nowIso() };
     if (this.store) {
-      const saved = await this.store.updateTask(taskId, patch);
+      const ownerHint = userId ?? current.userId ?? null;
+      const saved = ownerHint !== null && ownerHint !== undefined
+        ? await this.store.updateTask(taskId, patch, { userId: ownerHint })
+        : await this.store.updateTask(taskId, patch);
       return TaskState.fromJSON(saved || next);
     }
     return TaskState.fromJSON(next);

@@ -93,7 +93,7 @@ describe('free publishing with a Made with Corez badge', () => {
     const data = await res.json();
     expect(data.badge).toBe(true);
 
-    const record = JSON.parse(bucket.map.get(`publish/${data.slug}.json`).value);
+    const record = JSON.parse(bucket.map.get(`users/dev/publish/${data.slug}.json`).value);
     expect(record.badge).toBe(true);
     expect(record.html).toContain('corez-badge:start');
     expect(record.html).toContain('Made with Corez');
@@ -115,7 +115,7 @@ describe('free publishing with a Made with Corez badge', () => {
     const data = await res.json();
     expect(data.badge).toBe(false);
 
-    const record = JSON.parse(bucket.map.get(`publish/${data.slug}.json`).value);
+    const record = JSON.parse(bucket.map.get(`users/dev/publish/${data.slug}.json`).value);
     expect(record.badge).toBe(false);
     expect(record.html).not.toContain('corez-badge');
     expect(record.html).toBe(HTML);
@@ -140,7 +140,7 @@ describe('free publishing with a Made with Corez badge', () => {
     const paid = await paidRes.json();
     expect(paid.badge).toBe(false);
 
-    const record = JSON.parse(bucket.map.get(`publish/${free.slug}.json`).value);
+    const record = JSON.parse(bucket.map.get(`users/dev/publish/${free.slug}.json`).value);
     expect(record.html).not.toContain('corez-badge');
     expect(record.html).toBe(HTML);
   });
@@ -161,7 +161,7 @@ describe('free publishing with a Made with Corez badge', () => {
     expect(res.status).toBe(200);
     const data = await res.json();
 
-    const record = JSON.parse(bucket.map.get(`publish/${data.slug}.json`).value);
+    const record = JSON.parse(bucket.map.get(`users/dev/publish/${data.slug}.json`).value);
     expect(record.html.indexOf('corez-badge:start')).toBeLessThan(record.html.indexOf('</html>'));
 
     const served = await worker.fetch(

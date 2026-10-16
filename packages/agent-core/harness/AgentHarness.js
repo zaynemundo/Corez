@@ -130,7 +130,9 @@ export class AgentHarness {
     if (this.persistEvents && this.store) {
       this.eventBus.subscribe((event) => {
         if (!event.taskId) return;
-        this.store.appendEvent(event.taskId, event).catch(() => {
+        // Forward the owner hint so per-user R2 folders resolve directly.
+        const hint = event.userId !== undefined ? { userId: event.userId } : undefined;
+        this.store.appendEvent(event.taskId, event, hint).catch(() => {
           // Event persistence is best-effort; the task record remains the
           // source of truth.
         });
@@ -271,7 +273,7 @@ export class AgentHarness {
     task.status = TASK_STATUSES.RUNNING;
     task.error = null;
     task.touch();
-    await this.taskManager.updateTask(taskId, { status: task.status, error: null });
+    await this.taskManager.updateTask(taskId, { status: task.status, error: null }, task.userId);
     this.eventBus.emit({ type: 'task.resumed', taskId, userId: task.userId });
     // re-ensure log exists even after restart
     this._ensureSessionLog(task);
@@ -452,7 +454,7 @@ export class AgentHarness {
     task.markTerminal(TASK_STATUSES.FAILED, null, message);
     this.eventBus.emit({ type: 'task.failed', taskId: task.taskId, error: message });
     try {
-      await this.store?.updateTask(task.taskId, { status: task.status, error: message, terminalAt: task.terminalAt });
+      await this.store?.updateTask(task.taskId, { status: task.status, error: message, terminalAt: task.terminalAt }, { userId: task.userId });
     } catch {
       // Persistence is best-effort on the failure path.
     }
@@ -503,7 +505,7 @@ export class AgentHarness {
           }
         }
         try {
-          acquired = await this.store.acquireLease(task.taskId, leaseHolder, leaseTtlMs);
+          acquired = await this.store.acquireLease(task.taskId, leaseHolder, leaseTtlMs, { userId: task.userId });
           acquireError = null;
           break;
         } catch (err) {
@@ -553,7 +555,7 @@ export class AgentHarness {
       if (leaseState.lost) return false;
       let renewed;
       try {
-        renewed = await this.store.renewLease(task.taskId, leaseHolder, leaseTtlMs);
+        renewed = await this.store.renewLease(task.taskId, leaseHolder, leaseTtlMs, { userId: task.userId });
       } catch (err) {
         leaseState.markLost(err instanceof Error ? err : new Error(String(err)));
         return false;
@@ -606,7 +608,7 @@ export class AgentHarness {
         this.cancellations.dispose(task.taskId);
       } else if (this.store) {
         try {
-          await this.store.releaseLease(task.taskId, leaseHolder);
+          await this.store.releaseLease(task.taskId, leaseHolder, { userId: task.userId });
         } catch {
           // best-effort
         }
@@ -804,7 +806,7 @@ export class AgentHarness {
       // honors it so cancellation works across harness instances.
       if (this.store) {
         try {
-          const current = await this.store.getTask(task.taskId);
+          const current = await this.store.getTask(task.taskId, { userId: task.userId });
           if (current?.status === TASK_STATUSES.CANCELLED) {
             return this.#finishCancelled(task);
           }
@@ -1038,7 +1040,7 @@ export class AgentHarness {
       if (leaseState.lost) {
         throw new LeaseLostError(task.taskId, leaseState.lost.message);
       }
-      const updated = await this.store.updateTaskFenced(task.taskId, snapshot, leaseState.holder);
+      const updated = await this.store.updateTaskFenced(task.taskId, snapshot, leaseState.holder, { userId: task.userId });
       if (!updated) {
         const error = new LeaseLostError(task.taskId, 'Task lease is no longer held by this runner.');
         leaseState.markLost(error);
@@ -1046,7 +1048,7 @@ export class AgentHarness {
       }
       return;
     }
-    await this.store.updateTask(task.taskId, snapshot);
+    await this.store.updateTask(task.taskId, snapshot, { userId: task.userId });
   }
 
   #snapshot(task, extra = null) {

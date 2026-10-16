@@ -286,7 +286,7 @@ export async function handleTaskApi(request, env, ctx = null) {
 
     if (request.method === "GET" && sub === null) {
       const store = taskStoreFor(env);
-      const task = store.available ? await store.getTask(taskId) : null;
+      const task = store.available ? await store.getTask(taskId, { userId }) : null;
       if (!task) return jsonResponse(404, { error: "Task not found." });
       if (task.userId !== userId)
         return jsonResponse(403, { error: "Access denied." });
@@ -302,7 +302,7 @@ export async function handleTaskApi(request, env, ctx = null) {
       // at creation, so it does not consume another generation. It still
       // requires the accounting store to answer (an outage must not start
       // unaccounted work) and the token backstop still bounds provider spend.
-      const existing = await harness.store.getTask(taskId).catch(() => null);
+      const existing = await harness.store.getTask(taskId, { userId }).catch(() => null);
       if (existing && existing.userId === userId) {
         const plan = await resolvePlanForUser(env, userId);
         try {
@@ -368,7 +368,7 @@ export async function handleTaskApi(request, env, ctx = null) {
     }
 
     if (request.method === "GET" && sub === "artifacts") {
-      const task = await readTask(env, taskId);
+      const task = await readTask(env, taskId, userId);
       if (!task) return jsonResponse(404, { error: "Task not found." });
       if (task.userId !== userId)
         return jsonResponse(403, { error: "Access denied." });
@@ -456,10 +456,12 @@ export async function handleTaskApi(request, env, ctx = null) {
   return null; // not handled here
 }
 
-async function readTask(env, taskId) {
+async function readTask(env, taskId, userId = null) {
   const store = taskStoreFor(env);
   if (!store.available) return null;
-  const task = await store.getTask(taskId);
+  const task = userId
+    ? await store.getTask(taskId, { userId })
+    : await store.getTask(taskId);
   return task;
 }
 
@@ -499,7 +501,7 @@ async function establishTaskOwnership(store, taskId, userId) {
     }
     let task;
     try {
-      task = await store.getTask(taskId);
+      task = await store.getTask(taskId, { userId });
     } catch {
       continue; // transient read failure: retry, then fail closed below
     }
@@ -557,7 +559,7 @@ async function streamTaskEvents(request, env, taskId, userId) {
     while (!clientClosed && !request.signal?.aborted && Date.now() < deadline) {
       let events;
       try {
-        events = await store.listEvents(taskId, { sinceId });
+        events = await store.listEvents(taskId, { sinceId, userId });
       } catch {
         events = [];
       }
@@ -577,7 +579,7 @@ async function streamTaskEvents(request, env, taskId, userId) {
       // poller only appends task.stream_end.
       let current;
       try {
-        current = await store.getTask(taskId);
+        current = await store.getTask(taskId, { userId });
       } catch {
         current = null;
       }

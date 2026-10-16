@@ -302,7 +302,7 @@ describe('user memory in SQLite (D1)', () => {
     const data = await store.json();
     expect(data.storage).toBe('r2');
     expect(typeof data.r2Key).toBe('string');
-    expect(bucket.store.has('memory/alice-uid/k1.json')).toBe(true);
+    expect(bucket.store.has('users/alice-uid/memory/k1.json')).toBe(true);
     const list = await (await r2Call('/api/memory/x', { cookie: aliceCookie })).json();
     expect(list.memories.length).toBe(1);
     const search = await (await r2Call('/api/memory/search', { method: 'POST', cookie: aliceCookie, body: { query: 'fact' } })).json();

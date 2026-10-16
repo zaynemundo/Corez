@@ -54,17 +54,35 @@ describe('R2 Multi-App Storage & Chat Deletion Cleanup Contract', () => {
     expect(data.success).toBe(true);
     expect(data.sessionId).toBe('session-123');
     expect(data.appId).toBe('app-dashboard');
-    // Storage keys are namespaced under the caller identity ('dev' in
-    // dev/test mode where AUTH_SECRET is unset); client-facing paths keep
-    // the sessionId shape.
-    expect(data.key).toBe('apps/dev/session-123/app-dashboard.json');
+    // Storage keys are namespaced under the caller's own folder
+    // ('users/dev/...' in dev/test mode where AUTH_SECRET is unset);
+    // client-facing paths keep the sessionId shape.
+    expect(data.key).toBe('users/dev/apps/session-123/app-dashboard.json');
 
-    expect(mockBucket.store.has('apps/dev/session-123/app-dashboard.json')).toBe(true);
+    expect(mockBucket.store.has('users/dev/apps/session-123/app-dashboard.json')).toBe(true);
+  });
+
+  it('reads back apps written to the legacy flat prefix (backward compat)', async () => {
+    // Pre-move record: identity-namespaced but outside users/.
+    await mockBucket.put('apps/dev/session-legacy/app-0.json', JSON.stringify({
+      sessionId: 'session-legacy',
+      appId: 'app-0',
+      title: 'Legacy App',
+      code: 'function App() { return <div>0</div>; }'
+    }));
+
+    const req = new Request('http://localhost/api/apps/session-legacy/app-0');
+    const res = await worker.fetch(req, { ASSET_BUCKET: mockBucket });
+    expect(res.status).toBe(200);
+
+    const data = await res.json();
+    expect(data.appId).toBe('app-0');
+    expect(data.title).toBe('Legacy App');
   });
 
   it('fetches a stored app by sessionId and appId via GET /api/apps/:sessionId/:appId', async () => {
-    // Populate R2 mock (identity-namespaced key, 'dev' in dev mode)
-    await mockBucket.put('apps/dev/session-123/app-1.json', JSON.stringify({
+    // Populate R2 mock (per-user folder key, 'dev' in dev mode)
+    await mockBucket.put('users/dev/apps/session-123/app-1.json', JSON.stringify({
       sessionId: 'session-123',
       appId: 'app-1',
       title: 'App 1',
@@ -81,8 +99,8 @@ describe('R2 Multi-App Storage & Chat Deletion Cleanup Contract', () => {
   });
 
   it('lists all apps associated with a chat session via GET /api/apps/:sessionId', async () => {
-    await mockBucket.put('apps/dev/session-777/app-1.json', JSON.stringify({ sessionId: 'session-777', appId: 'app-1', title: 'First App' }));
-    await mockBucket.put('apps/dev/session-777/app-2.json', JSON.stringify({ sessionId: 'session-777', appId: 'app-2', title: 'Second App' }));
+    await mockBucket.put('users/dev/apps/session-777/app-1.json', JSON.stringify({ sessionId: 'session-777', appId: 'app-1', title: 'First App' }));
+    await mockBucket.put('users/dev/apps/session-777/app-2.json', JSON.stringify({ sessionId: 'session-777', appId: 'app-2', title: 'Second App' }));
 
     const req = new Request('http://localhost/api/apps/session-777');
     const res = await worker.fetch(req, { ASSET_BUCKET: mockBucket });
@@ -95,9 +113,9 @@ describe('R2 Multi-App Storage & Chat Deletion Cleanup Contract', () => {
   });
 
   it('deletes ALL stored apps for a chat session when DELETE /api/apps/:sessionId is called', async () => {
-    await mockBucket.put('apps/dev/session-to-delete/app-1.json', JSON.stringify({ sessionId: 'session-to-delete', appId: 'app-1' }));
-    await mockBucket.put('apps/dev/session-to-delete/app-2.json', JSON.stringify({ sessionId: 'session-to-delete', appId: 'app-2' }));
-    await mockBucket.put('apps/dev/session-other/app-3.json', JSON.stringify({ sessionId: 'session-other', appId: 'app-3' }));
+    await mockBucket.put('users/dev/apps/session-to-delete/app-1.json', JSON.stringify({ sessionId: 'session-to-delete', appId: 'app-1' }));
+    await mockBucket.put('users/dev/apps/session-to-delete/app-2.json', JSON.stringify({ sessionId: 'session-to-delete', appId: 'app-2' }));
+    await mockBucket.put('users/dev/apps/session-other/app-3.json', JSON.stringify({ sessionId: 'session-other', appId: 'app-3' }));
 
     const req = new Request('http://localhost/api/apps/session-to-delete', { method: 'DELETE' });
     const res = await worker.fetch(req, { ASSET_BUCKET: mockBucket });
@@ -107,10 +125,10 @@ describe('R2 Multi-App Storage & Chat Deletion Cleanup Contract', () => {
     expect(data.success).toBe(true);
     expect(data.deletedCount).toBe(2);
 
-    expect(mockBucket.store.has('apps/dev/session-to-delete/app-1.json')).toBe(false);
-    expect(mockBucket.store.has('apps/dev/session-to-delete/app-2.json')).toBe(false);
+    expect(mockBucket.store.has('users/dev/apps/session-to-delete/app-1.json')).toBe(false);
+    expect(mockBucket.store.has('users/dev/apps/session-to-delete/app-2.json')).toBe(false);
     // Other session apps are untouched
-    expect(mockBucket.store.has('apps/dev/session-other/app-3.json')).toBe(true);
+    expect(mockBucket.store.has('users/dev/apps/session-other/app-3.json')).toBe(true);
   });
 
   describe('publishAppInR2', () => {

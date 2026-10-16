@@ -181,8 +181,8 @@ describe('task execution lease safety', () => {
       async delete(key) {
         map.delete(key);
       },
-      async list() {
-        return { objects: [] };
+      async list({ prefix = '' } = {}) {
+        return { objects: [...map.keys()].filter((key) => key.startsWith(prefix)).map((key) => ({ key })) };
       }
     };
     const store = new R2TaskStore({ bucket });
