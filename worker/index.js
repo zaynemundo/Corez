@@ -1,4 +1,5 @@
 import { handleSearch } from "./search.js";
+import { handleStorageMigrate } from "./storageMigrate.js";
 import {
   handleMemory,
   ensureMemoryTables,
@@ -4670,6 +4671,9 @@ export default {
     }
     if (pathname === "/api/usage") {
       return runJsonSafe(() => handleUsageApi(request, env));
+    }
+    if (pathname === "/api/admin/storage-migrate") {
+      return runJsonSafe(() => handleStorageMigrate(request, env));
     }
     if (pathname.startsWith("/api/assets")) {
       return runJsonSafe(() => handleR2Assets(request, env));
