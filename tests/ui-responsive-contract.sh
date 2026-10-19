@@ -333,8 +333,8 @@ check_top_level_media 'sidebar prefers-reduced-motion at top level' '@media \(pr
 check 'mobile sidebar uses safe-area insets' 'env\(safe-area-inset-'
 
 # New chat: an empty conversation is one centred group — the wordmark, the
-# question, the composer bar and the command grid — so the composer is never
-# stranded on the bottom edge of an empty page. The grid lives inside the
+# question, the composer bar and the suggestion list — so the composer is never
+# stranded on the bottom edge of an empty page. The list lives inside the
 # composer's own container, which is what keeps it exactly as wide as the input
 # it fills.
 check_block_property 'the new chat screen centres its group vertically' '.chat-pane.new-chat' 'justify-content' 'center'
@@ -343,16 +343,18 @@ check_block_property 'the wordmark names the product above the question' '.new-c
 check_block_property 'the new chat question is regular weight, not a display wordmark' '.new-chat-hero-title' 'font-weight' '400'
 check_block_property 'the new chat composer keeps the restrained corner radius' '.input-box.hero' 'border-radius' 'var(--radius-xl)'
 check_block_absent 'the new chat composer is not an oversized pill' '.input-box.hero' 'border-radius' 'var(--radius-pill)'
-# The command grid is a capability panel: two columns of bordered cells, each
-# led by its monospace command token, collapsing to one column on a phone.
-check_block_property 'the command grid is a two-column panel' '.new-chat-commands' 'grid-template-columns' 'repeat(2, minmax(0, 1fr))'
-check_block_property 'command cells keep the restrained rectangular radius' '.new-chat-command' 'border-radius' 'var(--radius-md)'
-check_block_property 'command cells lead with their command token' '.new-chat-command-token' 'font-family' 'var(--font-mono)'
-check_block_property_in_media 'the command grid is one column on a phone' 'max-width: 767px' '.new-chat-commands' 'grid-template-columns' 'minmax(0, 1fr)'
-check 'the composer accepts the command grid as a footer slot' 'footer = null' "$input"
-check 'the app passes the command grid to the composer' '<NewChatStarters' "$app"
-check 'the command cells are CoreZ own commands' 'insert: "@website "' "$starters"
-check_absent 'the command cells are not borrowed sample sentences' 'Write or edit' "$starters"
+# The suggestion list is one roomy row per command: a quiet line of text until
+# it is hovered, with the command it inserts in the monospace face at the end.
+check_block_property 'the suggestion list stacks its rows' '.new-chat-starters' 'flex-direction' 'column'
+check_block_property 'suggestion rows keep the restrained rectangular radius' '.new-chat-starter' 'border-radius' 'var(--radius-md)'
+check_block_property 'suggestion rows stay unboxed until hovered' '.new-chat-starter' 'border' '1px solid transparent'
+check_block_property 'suggestion rows show the command they insert' '.new-chat-starter-token' 'font-family' 'var(--font-mono)'
+check_block_property 'the row command token sits at the far end of the row' '.new-chat-starter-token' 'margin-inline-start' 'auto'
+check_block_property_in_media 'a phone drops the command token before the label' 'max-width: 767px' '.new-chat-starter-token' 'display' 'none'
+check 'the composer accepts the suggestion list as a footer slot' 'footer = null' "$input"
+check 'the app passes the suggestion list to the composer' '<NewChatStarters' "$app"
+check 'the suggestion rows are CoreZ own commands' 'insert: "@website "' "$starters"
+check_absent 'the suggestion rows are not borrowed sample sentences' 'Write or edit' "$starters"
 # Corez is a monochrome system: the composer's primary action is the brightest
 # surface on the page, not a coloured one, and the stop button keeps its own.
 check_block_property 'the send circle is the monochrome action surface' '.send-btn:not(:disabled):not(.stop-btn)' 'background' 'var(--action-strong)'

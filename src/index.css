@@ -1374,69 +1374,64 @@ h6 {
   color: var(--text-primary);
 }
 
-/* The command grid: console-style cells — the monospace token leads, the plain
-   label explains it. Two columns of bordered cells read as a capability panel
-   rather than a list of suggestions. */
-.new-chat-commands {
+/* The suggestion list: one roomy row per command — outline icon, label, and the
+   command the row inserts in the monospace face at the far end. A row is a quiet
+   line of text until it is hovered, which is what makes the list read as
+   "things you could start with" rather than another panel of controls. */
+.new-chat-starters {
   width: 100%;
-  margin-top: 0.85rem;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.5rem;
-}
-
-.new-chat-command {
+  margin-top: 0.5rem;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 0.35rem;
+  gap: 0.15rem;
+}
+
+.new-chat-starter {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  width: 100%;
   min-width: 0;
-  padding: 0.7rem 0.85rem;
-  border: 1px solid var(--border-color);
+  padding: 0.75rem;
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
   background: transparent;
   color: var(--text-secondary);
   font-family: var(--font-sans);
-  font-size: 0.86rem;
+  font-size: 0.94rem;
   line-height: 1.35;
   text-align: start;
   cursor: pointer;
   transition: var(--transition-fast);
 }
 
-.new-chat-command-head {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  min-width: 0;
-}
-
-.new-chat-command svg {
+.new-chat-starter svg {
   flex-shrink: 0;
   color: var(--text-muted);
 }
 
-.new-chat-command-token {
+.new-chat-starter-token {
+  margin-inline-start: auto;
+  flex-shrink: 0;
   font-family: var(--font-mono);
   font-size: 0.74rem;
   color: var(--text-muted);
 }
 
-.new-chat-command:hover:not(:disabled),
-.new-chat-command:focus-visible {
+.new-chat-starter:hover:not(:disabled),
+.new-chat-starter:focus-visible {
   background: var(--bg-secondary);
-  border-color: var(--border-hover);
   color: var(--text-primary);
 }
 
-.new-chat-command:hover:not(:disabled) svg,
-.new-chat-command:focus-visible svg,
-.new-chat-command:hover:not(:disabled) .new-chat-command-token,
-.new-chat-command:focus-visible .new-chat-command-token {
+.new-chat-starter:hover:not(:disabled) svg,
+.new-chat-starter:focus-visible svg,
+.new-chat-starter:hover:not(:disabled) .new-chat-starter-token,
+.new-chat-starter:focus-visible .new-chat-starter-token {
   color: var(--text-primary);
 }
 
-.new-chat-command:disabled {
+.new-chat-starter:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
@@ -4885,8 +4880,8 @@ h6 {
     padding: 2rem 0;
   }
 
-  /* New chat on a phone: the hero text shrinks and the command grid becomes a
-     single column, so every cell keeps a comfortable tap target. */
+  /* New chat on a phone: the hero text shrinks; the suggestion rows already
+     stack, and each one keeps a comfortable tap target. */
   .new-chat-hero {
     padding: 0 1rem;
     margin-bottom: 1.1rem;
@@ -4896,8 +4891,10 @@ h6 {
     font-size: 1.35rem;
   }
 
-  .new-chat-commands {
-    grid-template-columns: minmax(0, 1fr);
+  /* The command token is the first thing to go when the row gets tight: the
+     label is what the user reads. */
+  .new-chat-starter-token {
+    display: none;
   }
 
   .welcome-title {
@@ -5202,7 +5199,7 @@ h6 {
   .history-item,
   .message-content,
   .input-box,
-  .new-chat-command,
+  .new-chat-starter,
   .mic-btn,
   .send-btn {
     transition: none !important;

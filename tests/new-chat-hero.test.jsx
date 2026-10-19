@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 //
 // The new-chat screen: the wordmark and a centred question, the composer under
-// them, and a grid of CoreZ's four commands that PRE-FILL the composer.
+// them, and a list of CoreZ's four commands that PRE-FILL the composer.
 //
-// A screenshot cannot pin any of this: what each cell inserts, that the grid
-// sits in the composer's own width-limited container, that the composer keeps
-// the value and the caret, and that the composer carries no switches of its own.
+// A screenshot cannot pin any of this: what each row inserts, that the rows sit
+// in the composer's own width-limited container, that the composer keeps the
+// value and the caret, and that the composer carries no switches of its own.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   render,
@@ -76,26 +76,26 @@ describe("the new-chat screen", () => {
     expect(container.querySelector("form.input-box.hero")).toBeTruthy();
   });
 
-  it("renders one command cell per CoreZ command", async () => {
+  it("renders one suggestion row per CoreZ command", async () => {
     const { container } = await renderNewChat();
-    const grid = screen.getByRole("group", { name: "Corez commands" });
-    expect(grid.textContent).toContain("Build an app or website");
-    expect(grid.textContent).toContain("Create a game");
-    expect(grid.textContent).toContain("Generate an image");
-    expect(grid.textContent).toContain("Research a topic");
-    // Each cell shows the command it inserts, in the interface's mono face.
+    const list = screen.getByRole("group", { name: "Corez commands" });
+    expect(list.textContent).toContain("Build an app or website");
+    expect(list.textContent).toContain("Create a game");
+    expect(list.textContent).toContain("Generate an image");
+    expect(list.textContent).toContain("Research a topic");
+    // Each row shows the command it inserts, in the interface's mono face.
     for (const token of ["@website", "@game", "@image", "@research"]) {
-      expect(grid.textContent).toContain(token);
+      expect(list.textContent).toContain(token);
     }
-    expect(container.querySelectorAll(".new-chat-command")).toHaveLength(4);
+    expect(container.querySelectorAll(".new-chat-starter")).toHaveLength(4);
   });
 
-  it("keeps the command grid inside the composer's own container", async () => {
-    // The grid must never drift out of line with the input it fills, so it
-    // shares the composer's width-limited container at every breakpoint.
+  it("keeps the suggestion rows inside the composer's own container", async () => {
+    // The rows must never drift out of line with the input they fill, so they
+    // share the composer's width-limited container at every breakpoint.
     const { container } = await renderNewChat();
     const containerEl = container.querySelector(".input-container");
-    expect(containerEl.querySelector(".new-chat-commands")).toBeTruthy();
+    expect(containerEl.querySelector(".new-chat-starters")).toBeTruthy();
   });
 
   it("pre-fills the composer with the image command and keeps the caret ready", async () => {

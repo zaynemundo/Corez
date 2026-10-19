@@ -7,12 +7,12 @@ import {
 import { useI18n } from "../i18n/index.jsx";
 
 /**
- * The starter rows under the new-chat composer.
+ * The suggestion rows under the new-chat composer.
  *
- * CoreZ has four explicit commands — @website, @game, @image and @research —
- * and these rows are exactly those four: the app's own vocabulary rather than
- * borrowed sample sentences. The label is translated, the token is code, and the
- * icon matches the same command in the composer's "@" menu.
+ * Familiar row shape — an outline icon, then the label, one per line — carrying
+ * CoreZ's own four commands: @website, @game, @image and @research. The label is
+ * translated, the token on the right is the code the row inserts, and the icon
+ * matches the same command in the composer's "@" menu.
  *
  * A row PRE-FILLS the composer instead of sending anything, so the user sees
  * what is about to be asked before it goes out. Each command is also safe to
@@ -51,7 +51,7 @@ export default function NewChatStarters({ onSelect }) {
 
   return (
     <div
-      className="new-chat-commands"
+      className="new-chat-starters"
       role="group"
       aria-label={t("common.newChat.startersLabel")}
     >
@@ -61,18 +61,16 @@ export default function NewChatStarters({ onSelect }) {
           <button
             key={starter.id}
             type="button"
-            className="new-chat-command"
+            className="new-chat-starter"
             onClick={() => onSelect?.(starter.insert)}
           >
-            <span className="new-chat-command-head">
-              <Icon size={15} strokeWidth={1.6} aria-hidden="true" />
-              <code className="new-chat-command-token">
-                {starter.insert.trim()}
-              </code>
-            </span>
-            <span className="new-chat-command-label">
+            <Icon size={18} strokeWidth={1.5} aria-hidden="true" />
+            <span className="new-chat-starter-label">
               {t(starter.labelKey)}
             </span>
+            <code className="new-chat-starter-token">
+              {starter.insert.trim()}
+            </code>
           </button>
         );
       })}
