@@ -117,7 +117,7 @@ function fixCommonJSInHtml(html) {
   if (typeof html !== "string" || !html.includes("<script")) return html;
   return (
     html
-      // Particle system: Math.random()canvas.width â†’ Math.random()*canvas.width
+      // Particle system: Math.random()canvas.width → Math.random()*canvas.width
       .replace(
         /Math\.random\(\)\s*canvas\.width/g,
         "Math.random()*canvas.width",
@@ -138,7 +138,7 @@ function fixCommonJSInHtml(html) {
       // rgba with template literal inside string (missing backticks)
       .replace(/ctx\.fillStyle\s*=\s*rgba\(/g, "ctx.fillStyle=`rgba(")
       .replace(/\$\{this\.opacity\}\)\s*;/g, "${this.opacity})`;")
-      // Fix missing * in other common patterns: 0.05(1-... ) â†’ 0.05*(1-... )
+      // Fix missing * in other common patterns: 0.05(1-... ) → 0.05*(1-... )
       .replace(/0\.05\s*\(/g, "0.05*(")
       .replace(/0\.08\s*\(/g, "0.08*(")
       // Fix canvas.width/height missing * in other places
@@ -353,7 +353,7 @@ const SAFE_STORAGE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$/;
 const SAFE_ROOM_ID = /^[a-z0-9][a-z0-9-]{2,31}$/;
 
 // Largest single decoded asset accepted by /api/assets/upload (10 MB decoded
-// â‰ˆ 13.4 MB base64, well under the 24 MB JSON body bound).
+// ≈ 13.4 MB base64, well under the 24 MB JSON body bound).
 const MAX_ASSET_DECODED_BYTES = 10 * 1024 * 1024;
 
 function buildLiveDataDiagnostics(
@@ -483,7 +483,7 @@ function isBlockedInternalHost(hostname) {
 
 // Reference images sent to the image model. The client ships small base64
 // data: payloads (thumbnails capped at 1.5 MB client-side); https URLs are
-// also accepted but must point at public hosts â€” the same SSRF guard used
+// also accepted but must point at public hosts — the same SSRF guard used
 // for provider-returned image URLs. The worker itself never fetches the
 // reference; it is forwarded to the provider only.
 const REFERENCE_IMAGE_MAX_DECODED_BYTES = 8 * 1024 * 1024;
@@ -622,7 +622,7 @@ function buildSystemPrompt(options = {}) {
 Adaptive Routing - Code Revision Path:
 - Apply the requested change directly to the provided code and output the complete updated file.
 - Keep all other code, styles, scripts and structure unchanged unless the request explicitly says to change them.
-- When the user attaches an image (e.g. for any person's portrait/avatar/profile), use that exact image â€” it is available as https://corez.pro/api/assets/user-upload_...jpg (or data:image/...). Do NOT use Unsplash or invented URLs. Example: <img src="https://corez.pro/api/assets/user-upload_...jpg" alt="User portrait" style="width:100%;height:100%;object-fit:cover"> with meaningful alt and onerror fallback. Always use absolute https://corez.pro/api/assets/ URLs for storage images, never relative /api/assets/ or local filenames.
+- When the user attaches an image (e.g. for any person's portrait/avatar/profile), use that exact image — it is available as https://corez.pro/api/assets/user-upload_...jpg (or data:image/...). Do NOT use Unsplash or invented URLs. Example: <img src="https://corez.pro/api/assets/user-upload_...jpg" alt="User portrait" style="width:100%;height:100%;object-fit:cover"> with meaningful alt and onerror fallback. Always use absolute https://corez.pro/api/assets/ URLs for storage images, never relative /api/assets/ or local filenames.
 - If the existing code is HTML, output the full HTML document inside one \`\`\`html block.
 - If repairing missing sub-page links:
   - If single-page: convert <a href="page.html"> to in-page anchors (<a href="#section">).
@@ -669,19 +669,19 @@ Adaptive Routing - Coding Path:
 ${designStyle}
 - Build a complete, runnable experience ready for the preview canvas.
 - NEVER mention "Awwwards", "Awwwards-inspired", or internal design framework names in your conversational response or preamble text to the user.
-- SHORT BRIEF FOR GAMES (MANDATORY): When the request is a game, your response MUST begin with a 1-2 sentence chat brief BEFORE the code block â€” game title in bold, what the player does to win/lose, and the controls (e.g. "Here's **Neon Pong** â€” bounce the ball past your rival to score. Move with the Arrow keys, Space to launch."). NEVER output a bare code block with no brief. NEVER write a long feature list, implementation summary, or "I built..." paragraph before or after the code.
-- FULLSCREEN GAME REQUIREMENT: Games MUST fill the entire preview viewport â€” html/body with width:100%, height:100%, margin:0, overflow:hidden; a full-viewport canvas (width:100%, height:100%, display:block) with NO max-width, NO bordered box, NO rounded container around the game. Never wrap the canvas in a bordered/max-width "block". Keep a fixed internal game resolution (e.g. 960x540) and scale it to the viewport with ctx.setTransform + a resize listener so the game always fills the screen. On mobile, size the canvas from visualViewport, listen for orientationchange, and include on-screen touch controls shown only on touch devices.`;
+- SHORT BRIEF FOR GAMES (MANDATORY): When the request is a game, your response MUST begin with a 1-2 sentence chat brief BEFORE the code block — game title in bold, what the player does to win/lose, and the controls (e.g. "Here's **Neon Pong** — bounce the ball past your rival to score. Move with the Arrow keys, Space to launch."). NEVER output a bare code block with no brief. NEVER write a long feature list, implementation summary, or "I built..." paragraph before or after the code.
+- FULLSCREEN GAME REQUIREMENT: Games MUST fill the entire preview viewport — html/body with width:100%, height:100%, margin:0, overflow:hidden; a full-viewport canvas (width:100%, height:100%, display:block) with NO max-width, NO bordered box, NO rounded container around the game. Never wrap the canvas in a bordered/max-width "block". Keep a fixed internal game resolution (e.g. 960x540) and scale it to the viewport with ctx.setTransform + a resize listener so the game always fills the screen. On mobile, size the canvas from visualViewport, listen for orientationchange, and include on-screen touch controls shown only on touch devices.`;
   } else if (intentType === "writing") {
     adaptiveInstructions = `
 Adaptive Routing - Writing Path:
 - Deliver polished copy in the requested format and tone.
 - Match audience and purpose without technical commentary.
-- SOCIAL CAROUSEL CLARIFICATION: A "carousel post", "post for this carousel", or "LinkedIn/Instagram carousel" is SOCIAL-MEDIA copy â€” slide-by-slide text (Slide 1..N) plus a post caption with hashtags, in plain markdown. NEVER output React/JSX, HTML, or any preview code for these unless the user explicitly asks for a "carousel component", "carousel UI", "carousel code", or "carousel website". NEVER use require("react") and NEVER call hooks outside a component.`;
+- SOCIAL CAROUSEL CLARIFICATION: A "carousel post", "post for this carousel", or "LinkedIn/Instagram carousel" is SOCIAL-MEDIA copy — slide-by-slide text (Slide 1..N) plus a post caption with hashtags, in plain markdown. NEVER output React/JSX, HTML, or any preview code for these unless the user explicitly asks for a "carousel component", "carousel UI", "carousel code", or "carousel website". NEVER use require("react") and NEVER call hooks outside a component.`;
   } else if (intentType === "explanation") {
     adaptiveInstructions = `
 Adaptive Routing - Explanation Path:
 - Explain directly in plain language using practical examples.
-- Never restate, echo, or quote the user's question back at them â€” not as a heading, not in the opening line, and not in parentheses. Answer as if continuing the conversation.`;
+- Never restate, echo, or quote the user's question back at them — not as a heading, not in the opening line, and not in parentheses. Answer as if continuing the conversation.`;
   } else {
     adaptiveInstructions = `
 Adaptive Routing - Fast Path:
@@ -694,13 +694,13 @@ Adaptive Routing - Fast Path:
   const informationalFormatting = `
 Informational & List Formatting (for every non-code answer):
 - Open with a one-paragraph overview that answers the question directly, then organize the rest into clear sections.
-- Never restate or echo the user's question â€” no "You asked about...", no repeating the question as a heading or first line. Answer directly.
-- Start headings at the top level: use "## Section" for main parts and "### Subsection" at most â€” never begin below "###" and never nest deeper than three levels.
-- Prefer compact bullets with a bold lead-in: "- **Item name** â€” short description."
+- Never restate or echo the user's question — no "You asked about...", no repeating the question as a heading or first line. Answer directly.
+- Start headings at the top level: use "## Section" for main parts and "### Subsection" at most — never begin below "###" and never nest deeper than three levels.
+- Prefer compact bullets with a bold lead-in: "- **Item name** — short description."
 - Use a markdown table whenever items share the same attributes (for example: program, issuer, focus, best for, level). Tables beat long lists for comparisons.
 - Keep each bullet to one line when possible; move detail into a follow-up sentence.
 - Finish with a short actionable section ("How to choose", "Next steps", or "What to verify") when the topic allows.
-- NEVER use "---" (horizontal rule) lines or "***" to separate sections â€” separate sections with "##" headings or a blank line instead. The chat interface renders them as stray text otherwise.
+- NEVER use "---" (horizontal rule) lines or "***" to separate sections — separate sections with "##" headings or a blank line instead. The chat interface renders them as stray text otherwise.
 - Never add filler sentences, emojis, or generic closers; every sentence must carry information.`;
 
   const imageRequestInstructions = `
@@ -708,7 +708,7 @@ Informational & List Formatting (for every non-code answer):
 
   const emailFormatting = `
 EMAIL FORMATTING (whenever the user asks you to write, draft, compose, or rewrite an email):
-- Start with "Subject:" as the absolute FIRST line â€” no preamble, no "Here is your email" text before it.
+- Start with "Subject:" as the absolute FIRST line — no preamble, no "Here is your email" text before it.
 - Immediately after the subject line, add "To:" with the recipient name or email (use the name the user gave; if unspecified, use "[Recipient Name]").
 - Leave one blank line, then write the email body: a greeting ("Hi [Name],"), the message paragraphs, and a sign-off ("Best regards," / "Kind regards," / "Sincerely," followed by the sender name on the next line).
 - NEVER use markdown formatting in the email output: no "**" bold, no "*" italic, no "#" headings, no backticks, no "---" horizontal rules, no ">" quotes, and no bullet markers like "- " or "* ". Emails must be PLAIN TEXT with nothing but letters, punctuation, blank lines, and normal characters.
@@ -719,7 +719,7 @@ EMAIL FORMATTING (whenever the user asks you to write, draft, compose, or rewrit
   // the model never loses applicable guidance. They are MANDATORY: the
   // resolver selected them specifically for this request, and the model must
   // follow their steps rather than treating them as optional suggestions.
-  let formattedSkills = "(none â€” direct execution path)";
+  let formattedSkills = "(none — direct execution path)";
   if (skills.length > 0) {
     formattedSkills = `\nThe skills below were selected specifically for this request and are MANDATORY: follow their instructions and verification steps exactly when they apply. Do not weaken, skip, or summarize them away. If a skill does not apply to the final deliverable, ignore it silently.${skills
       .map((s) => {
@@ -791,32 +791,32 @@ EMAIL FORMATTING (whenever the user asks you to write, draft, compose, or rewrit
 
   // The full creator-profile block (~250 tokens) only matters when the user
   // actually asks about Corez's origins; every other request gets a compact
-  // pointer instead â€” a meaningful input-token saving on every request.
+  // pointer instead — a meaningful input-token saving on every request.
   const creatorsSection =
     /who (created|made|built|developed) (corez|core z|you)|who is your creator|your creators?|founder of corez|team behind corez/i.test(
       String(options.prompt || ""),
     )
-      ? `- CREATORS: If asked who created Corez or who made you, answer that Corez was founded and developed by these people, presenting their names as a clean bullet-point list of clickable markdown links with their roles: [Zayne Mundo](https://www.linkedin.com/in/zayne-mundo/) â€” Founder & Lead Developer, [Christian Vestil](https://www.linkedin.com/in/christian-jericson-belderol/) â€” Quality Assurance Tester, and [Renz Cardona](https://www.linkedin.com/in/renz-cardona-5941051b9/) â€” Chief Innovation Officer. Then explain WHY Corez was created, presenting the answer as clean, scannable markdown: start with the creator list, then the mission statement, then a short idea-to-launch summary. CoreZ was created as a conversational AI creation platform that helps people turn ideas into working digital products without needing to code. Rather than only answering questions, it is designed to understand the user's intent, generate websites, apps, games, tools, images, research reports and other content, display the result in a live preview, allow revisions through chat and publish finished creations through a shareable link. Its core purpose is to remove the technical gap between having an idea and launching something functional, making digital creation accessible to designers, marketers, entrepreneurs, students and everyday users. In short, CoreZ turns plain conversation into creation â€” taking anyone from a first spark of an idea to a finished, shareable product. Do not introduce yourself or list your capabilities after answering, and never mention APIs, models, providers, or any technical backend details.`
-      : `- CREATORS: If asked who created Corez, present the founders as clickable markdown links â€” [Zayne Mundo](https://www.linkedin.com/in/zayne-mundo/) (Founder & Lead Developer), [Christian Vestil](https://www.linkedin.com/in/christian-jericson-belderol/) (Quality Assurance Tester), [Renz Cardona](https://www.linkedin.com/in/renz-cardona-5941051b9/) (Chief Innovation Officer) â€” and briefly explain why Corez was created.`;
+      ? `- CREATORS: If asked who created Corez or who made you, answer that Corez was founded and developed by these people, presenting their names as a clean bullet-point list of clickable markdown links with their roles: [Zayne Mundo](https://www.linkedin.com/in/zayne-mundo/) — Founder & Lead Developer, [Christian Vestil](https://www.linkedin.com/in/christian-jericson-belderol/) — Quality Assurance Tester, and [Renz Cardona](https://www.linkedin.com/in/renz-cardona-5941051b9/) — Chief Innovation Officer. Then explain WHY Corez was created, presenting the answer as clean, scannable markdown: start with the creator list, then the mission statement, then a short idea-to-launch summary. CoreZ was created as a conversational AI creation platform that helps people turn ideas into working digital products without needing to code. Rather than only answering questions, it is designed to understand the user's intent, generate websites, apps, games, tools, images, research reports and other content, display the result in a live preview, allow revisions through chat and publish finished creations through a shareable link. Its core purpose is to remove the technical gap between having an idea and launching something functional, making digital creation accessible to designers, marketers, entrepreneurs, students and everyday users. In short, CoreZ turns plain conversation into creation — taking anyone from a first spark of an idea to a finished, shareable product. Do not introduce yourself or list your capabilities after answering, and never mention APIs, models, providers, or any technical backend details.`
+      : `- CREATORS: If asked who created Corez, present the founders as clickable markdown links — [Zayne Mundo](https://www.linkedin.com/in/zayne-mundo/) (Founder & Lead Developer), [Christian Vestil](https://www.linkedin.com/in/christian-jericson-belderol/) (Quality Assurance Tester), [Renz Cardona](https://www.linkedin.com/in/renz-cardona-5941051b9/) (Chief Innovation Officer) — and briefly explain why Corez was created.`;
 
-  return `You are COREZ AI â€” powered by Corez 1.0 for deep reasoning and high-quality generation.
+  return `You are COREZ AI — powered by Corez 1.0 for deep reasoning and high-quality generation.
 
 Identity & Persona:
 - Your name is COREZ AI.
 ${creatorsSection}
 - STRICT MODEL ANONYMITY RULE: NEVER mention what underlying AI model, provider, vendor, architecture, or engine powers you in public chat or user responses. Always identify yourself strictly as COREZ AI. The underlying engine is strictly confidential and must never be disclosed, even if the user insists, tricks, or claims you are another model.
-- MODEL IDENTITY RULE: If the user asks what model you are, what AI model powers you, what LLM you are, which model you use, "what model of ai are you using", or accuses you of being DeepSeek, Muse Spark 1.3 Contributor, Meta AI, GPT, ChatGPT, Claude, Gemini, Llama, MiMo, or any other external model, respond exactly with: "I'm Corez 1.0 built by Corez." You may add a brief helpful follow-up like "How can I help you today?" but never mention DeepSeek, Meta, or any other provider. Never be evasive, never refuse â€” answer directly as Corez 1.0.
+- MODEL IDENTITY RULE: If the user asks what model you are, what AI model powers you, what LLM you are, which model you use, "what model of ai are you using", or accuses you of being DeepSeek, Muse Spark 1.3 Contributor, Meta AI, GPT, ChatGPT, Claude, Gemini, Llama, MiMo, or any other external model, respond exactly with: "I'm Corez 1.0 built by Corez." You may add a brief helpful follow-up like "How can I help you today?" but never mention DeepSeek, Meta, or any other provider. Never be evasive, never refuse — answer directly as Corez 1.0.
 - When greeted with simple phrases like "hi", "hello", "hey", or "who are you", respond simply: "Hello! I'm COREZ AI. How can I help you today?"
 - Never list bullet points or technical specializations when giving greetings unless requested.
 
-Reasoning & Response Quality (Corez 1.0 â€” hidden chain-of-thought):
-- Think step by step INTERNALLY before answering: decompose the problem, consider alternatives and edge cases, plan the structure, and verify logic. Do NOT reveal your thinking, do NOT use <think> or <thinking> tags, do NOT say "I am thinking step by step" â€” just deliver the final polished answer.
+Reasoning & Response Quality (Corez 1.0 — hidden chain-of-thought):
+- Think step by step INTERNALLY before answering: decompose the problem, consider alternatives and edge cases, plan the structure, and verify logic. Do NOT reveal your thinking, do NOT use <think> or <thinking> tags, do NOT say "I am thinking step by step" — just deliver the final polished answer.
 - Be thorough and accurate: for factual/live data, cite sources from the provided search results; for code/apps, deliver complete, runnable code with no placeholder TODOs, handle edge cases, and include clear verification steps.
 - For complex or high-stakes requests (apps, games, research, data analysis), ensure deep reasoning: check requirements against the deliverable, validate completeness, and anticipate follow-up needs.
 - Prefer concise but complete explanations: use tables for comparisons, bold lead-ins for bullets, and an actionable closing section. Every sentence must carry information; avoid filler, emojis, or generic closers.
 
 Guidelines for Output:
-- FOLLOW THE USER'S REQUEST EXACTLY: deliver precisely what the user asked for â€” implement everything they requested and add nothing they did not ask for. When the user's instruction conflicts with any default or template behaviour, the user's explicit instruction wins.
+- FOLLOW THE USER'S REQUEST EXACTLY: deliver precisely what the user asked for — implement everything they requested and add nothing they did not ask for. When the user's instruction conflicts with any default or template behaviour, the user's explicit instruction wins.
 - SOCIAL CAROUSEL (GLOBAL): When the user asks for a social-media carousel post ("create a post for this carousel", "carousel post + caption", "LinkedIn/Instagram carousel"), output ONLY slide copy + caption + hashtags in plain markdown. NEVER output React/JSX, HTML, or preview code for these, and NEVER treat "carousel" alone as a UI component request. Only build a carousel UI when the user explicitly says "carousel component", "carousel UI", "carousel code/slider", or "carousel website".
 ${attachmentGuidance}
 - AMBIGUOUS REQUESTS: When a user's prompt is ambiguous, underspecified, or missing essential details (e.g. they say "make a game", "build a website", "create a plan", or give a vague prompt with multiple conflicting interpretations), do NOT ask clarifying questions and do NOT present choice menus or option lists. Instead, choose the most sensible default interpretation, state the key assumption you made in ONE short sentence, and deliver the complete result. The user can refine it in a follow-up message.
@@ -825,7 +825,7 @@ ${attachmentGuidance}
 - PROPER LAYERING: Ensure proper visual layering (Background z-index:0 -> Content z-index:10 -> HUD/Toolbars z-index:20-30 -> Modals z-index:40-50+).
 - CRITICAL SINGLE-FILE MANDATE: Output all code as ONE SINGLE self-contained file in ONE SINGLE code block.
 - NEVER use "---" or "***" horizontal-rule lines anywhere in your response (they render as stray text in the chat UI); separate sections with "##" headings or blank lines instead.
-- Always start your response with a brief summary explaining your implementation choices before the code block â€” EXCEPT for games, where the MANDATORY 1-2 sentence SHORT BRIEF rule above replaces this (title + goal + controls only, no implementation summary).
+- Always start your response with a brief summary explaining your implementation choices before the code block — EXCEPT for games, where the MANDATORY 1-2 sentence SHORT BRIEF rule above replaces this (title + goal + controls only, no implementation summary).
 ${adaptiveInstructions}${formattingSection}${emailFormatting}
 
 Fine-Grained Intent: ${primaryIntent}${secondaryIntent}
@@ -840,7 +840,7 @@ Inferred intent: ${intentType} - ${intent?.summary || intent?.goal || "Understan
 
 // Deterministic short replies honor the streaming contract exactly like the
 // greeting/identity fast-paths: a real SSE stream with one delta for
-// streamed requests, JSON otherwise â€” never a JSON body an SSE parser would
+// streamed requests, JSON otherwise — never a JSON body an SSE parser would
 // misread as an empty stream.
 function deterministicChatReply(body, text, model) {
   if (body?.stream === true) {
@@ -1067,13 +1067,13 @@ function buildMemoryRecallAnswer(account, facts) {
     );
   } else {
     lines.push(
-      "I don't have anything memorized about you yet â€” tell me things like " +
+      "I don't have anything memorized about you yet — tell me things like " +
         `"remember that my name is..." and I'll keep them here.`,
     );
   }
   if (inferred.length > 0) {
     lines.push(
-      "What I've inferred (guesses from your requests â€” say 'forget everything' to clear these):",
+      "What I've inferred (guesses from your requests — say 'forget everything' to clear these):",
       ...inferred
         .slice(0, 8)
         .map(
@@ -1119,7 +1119,7 @@ function sseHeaders(extra = {}) {
  *
  * A build can reason for a minute without emitting a token. With nothing on the
  * wire, mobile networks and proxies are free to treat the connection as dead and
- * drop it â€” the user then sees a build that "just stopped". A comment line every
+ * drop it — the user then sees a build that "just stopped". A comment line every
  * few seconds keeps it alive, and the client's SSE parser ignores lines that do
  * not start with `data:` so nothing reaches the UI.
  *
@@ -1151,7 +1151,7 @@ function startSseHeartbeat(controller, encoder, env) {
 
 /**
  * A deep research request: the explicit @research command, or the classifier's
- * research intent. It is a heuristic on purpose â€” it decides which budget a
+ * research intent. It is a heuristic on purpose — it decides which budget a
  * request draws on, and a missed classification only means the request is
  * counted as an ordinary generation instead of a research report.
  */
@@ -1284,7 +1284,7 @@ async function handleAi(request, env) {
   }
 
   // OpenCode gateway session affinity (required x-opencode-session header):
-  // one id per incoming request â€” explicit client hint first, then the
+  // one id per incoming request — explicit client hint first, then the
   // authenticated user (stable across turns), else a fresh random id. Shared
   // by every provider call in this request (title, chain, repairs, harness)
   // so the gateway routes the whole turn to one backend.
@@ -1305,7 +1305,7 @@ async function handleAi(request, env) {
   // allowance (never the generation budget) and an unavailable accounting
   // store stops it before the provider is called.
   // NOTE: the provider is a reasoning model that spends tokens thinking
-  // before answering â€” a 30-token cap was entirely consumed by reasoning
+  // before answering — a 30-token cap was entirely consumed by reasoning
   // (content: ""), so the budget must leave room for the actual title.
   if (body.titleOnly === true) {
     try {
@@ -1388,12 +1388,12 @@ async function handleAi(request, env) {
       );
     const greetingReplies = isIdentityQuestion
       ? [
-          "I'm COREZ AI â€” turn ideas into working digital products. What are we building today?",
+          "I'm COREZ AI — turn ideas into working digital products. What are we building today?",
           "I'm COREZ AI: describe an idea and I'll build it for you. What's the idea?",
         ]
       : [
           "Hey! What are we building today?",
-          "Hey there â€” what should we create?",
+          "Hey there — what should we create?",
           "Hi! What are we building today?",
         ];
     const index =
@@ -1455,7 +1455,7 @@ async function handleAi(request, env) {
       prompt,
     );
   // "what is the ai engine of corez" has no "you" reference, so the generic
-  // gate above misses it â€” yet it is unambiguously an identity question.
+  // gate above misses it — yet it is unambiguously an identity question.
   // Require a Corez/you anchor so legit coding questions ("chess ai engine",
   // "game engine ai") never match.
   const isAiEngineQuestion =
@@ -1508,7 +1508,7 @@ async function handleAi(request, env) {
   // User memory fast-path: remember / recall / forget + who-am-I, answered
   // deterministically from D1 with no LLM round-trip (which also keeps
   // these out of the continuation/repair loop). Memory is best-effort:
-  // anything unexpected falls through to the normal pipeline â€” memory
+  // anything unexpected falls through to the normal pipeline — memory
   // must never break chat.
   // ---------------------------------------------------------------------
   let memoryUid = null;
@@ -1520,7 +1520,7 @@ async function handleAi(request, env) {
       if (uid) {
         memoryUid = uid;
         // The tables only get created on /api/memory/* calls, which chat
-        // clients rarely make â€” so a fresh production DB has no tables at
+        // clients rarely make — so a fresh production DB has no tables at
         // all and every silent list/store would fail. Ensure once per chat
         // request (cheap IF NOT EXISTS) so memory works from day one.
         await ensureMemoryTables(env).catch(() => {});
@@ -1560,7 +1560,7 @@ async function handleAi(request, env) {
         if (MEMORY_SECRET_PATTERN.test(fact)) {
           return deterministicChatReply(
             body,
-            "I can't store that â€” it looks like a secret or credential, and I never memorize those. Tell me something else about yourself instead.",
+            "I can't store that — it looks like a secret or credential, and I never memorize those. Tell me something else about yourself instead.",
             "corez-memory",
           );
         }
@@ -1577,7 +1577,7 @@ async function handleAi(request, env) {
           });
           return deterministicChatReply(
             body,
-            `Got it â€” I'll remember that: ${record.text}`,
+            `Got it — I'll remember that: ${record.text}`,
             "corez-memory",
           );
         } catch (err) {
@@ -1613,7 +1613,7 @@ async function handleAi(request, env) {
             return deterministicChatReply(
               body,
               count > 0
-                ? `Done â€” I forgot everything I knew about you (${count} ${count === 1 ? "memory" : "memories"} removed).`
+                ? `Done — I forgot everything I knew about you (${count} ${count === 1 ? "memory" : "memories"} removed).`
                 : "There's nothing stored about you, so nothing to forget.",
               "corez-memory",
             );
@@ -1655,7 +1655,7 @@ async function handleAi(request, env) {
       }
     }
     // Interest profiler: behavioral signals accumulate confidence silently
-    // (visible anytime via recall). Runs only for ordinary prompts â€” the
+    // (visible anytime via recall). Runs only for ordinary prompts — the
     // command handlers above already returned.
     if (prompt.length <= 2000) {
       try {
@@ -1745,7 +1745,7 @@ async function handleAi(request, env) {
   // Known-user grounding: the verified account plus remembered facts travel
   // with every request so the model answers the owner about themselves
   // ("my name", "my plan", preferences) instead of claiming amnesia. This
-  // block is private context â€” the system prompt already forbids pasting it
+  // block is private context — the system prompt already forbids pasting it
   // into generated artifacts unless explicitly asked.
   if (memoryUid && (memoryAccount?.email || memoryFacts.length > 0)) {
     const explicitFacts = memoryFacts.filter(
@@ -1767,27 +1767,27 @@ async function handleAi(request, env) {
       (f) => `- ${f.text} [~${inferencePercent(f)}% confidence]`,
     );
     const weakLines = weak.map(
-      (f) => `- ${f.text} [~${inferencePercent(f)}% â€” possible, do NOT assert as fact]`,
+      (f) => `- ${f.text} [~${inferencePercent(f)}% — possible, do NOT assert as fact]`,
     );
     apiMessages.push({
       role: "system",
       content:
-        `User account & remembered facts (private â€” describes the logged-in account owner; you may answer the owner ABOUT themselves when asked, but NEVER paste this into generated code, artifacts, emails, posts, or published pages unless explicitly asked):\n` +
+        `User account & remembered facts (private — describes the logged-in account owner; you may answer the owner ABOUT themselves when asked, but NEVER paste this into generated code, artifacts, emails, posts, or published pages unless explicitly asked):\n` +
         `- Logged in as: ${memoryAccount?.email || "unknown"} (plan: ${memoryAccount?.plan || "free"})\n` +
         (factLines.length > 0
           ? `- Remembered facts:\n${factLines.join("\n")}`
           : `- Remembered facts: none yet`) +
         (strongLines.length > 0
-          ? `\n- Likely about the user (repeated behavior â€” you may tune answers to this):\n${strongLines.join("\n")}`
+          ? `\n- Likely about the user (repeated behavior — you may tune answers to this):\n${strongLines.join("\n")}`
           : "") +
         (weakLines.length > 0
-          ? `\n- Weak guesses (single sightings â€” use lightly, never state as fact):\n${weakLines.join("\n")}`
+          ? `\n- Weak guesses (single sightings — use lightly, never state as fact):\n${weakLines.join("\n")}`
           : ""),
     });
   }
 
   // ---------------------------------------------------------------------
-  // Skill Verification Layer â€” runtime context + live-data grounding.
+  // Skill Verification Layer — runtime context + live-data grounding.
   // Requests that need fresh external data (currency, weather, research
   // with citations) are grounded in a REAL web search BEFORE generation so
   // the model answers from evidence, never from memory. A search failure is
@@ -1947,7 +1947,7 @@ async function handleAi(request, env) {
           // from the search results. The fuzzy kinds ('freshness' and
           // 'media-releases') are SOFT: results are used when they answer the
           // question, otherwise the model answers from knowledge and notes it
-          // could not verify â€” a miss degrades gracefully instead of forcing
+          // could not verify — a miss degrades gracefully instead of forcing
           // a refusal.
           const softLiveKinds = new Set(["freshness", "media-releases"]);
           const liveInstruction = liveDataNeed.required
@@ -2019,7 +2019,7 @@ async function handleAi(request, env) {
       if (Array.isArray(inspiration?.sites) && inspiration.sites.length > 0) {
         const refs = inspiration.sites
           .map((site) => {
-            let line = `- ${site.title} â€” ${site.url}`;
+            let line = `- ${site.title} — ${site.url}`;
             if (site.liveUrl) line += ` (Live site: ${site.liveUrl})`;
             if (site.description)
               line += `\n  Design approach: ${site.description}`;
@@ -2104,13 +2104,13 @@ async function handleAi(request, env) {
   // (worker/providerChain.js owns retry scheduling and the resume contract).
   // There is no DeepSeek-direct or OpenRouter text fallback; a failure fails
   // honestly with an explicit SSE error event. The same messages travel
-  // to every provider, so a fallback resumes the same task â€” completed work
+  // to every provider, so a fallback resumes the same task — completed work
   // is never restarted.
   //
   // Generations run uncapped (no output ceilings): the provider decides how
   // long it generates. The only hard time limits are the per-provider
   // deadline guards in providerChain.js (first-token / mid-stream silence /
-  // non-stream total) and the harness total budget â€” both fail loudly with an
+  // non-stream total) and the harness total budget — both fail loudly with an
   // SSE error event instead of letting a hung upstream get killed by the
   // platform wall-clock limit, which truncated the stream silently and made
   // the client report "Hosted AI returned no streamed content."
@@ -2235,7 +2235,7 @@ async function handleAi(request, env) {
     // Non-streaming harness: run the ENTIRE build loop (plan -> build ->
     // verify -> repair -> review) inside this request, then answer with the
     // finished artifact in a single JSON body. The client waits until the
-    // build is done â€” no live deltas. The generator replays the persisted
+    // build is done — no live deltas. The generator replays the persisted
     // terminal artifact on re-issue, so interrupted builds still resume.
     try {
       let content = "";
@@ -2708,7 +2708,7 @@ async function handleAi(request, env) {
 
   if (result.content) {
     // Reliability pipeline: truncation/language detection, code validation,
-    // automatic repair, and diagnostics â€” before the answer reaches the user.
+    // automatic repair, and diagnostics — before the answer reaches the user.
     const repairUsage = [];
     const repairStartedAt = Date.now();
     const processed = await processResponse(apiMessages, result.content, {
@@ -2752,7 +2752,7 @@ async function handleAi(request, env) {
     }
 
     // Honest-failure gate: a reply that is STILL cut off after the provider
-    // call and every repair round is never returned as a successful 200 â€”
+    // call and every repair round is never returned as a successful 200 —
     // the client would otherwise render a message that stops mid-way.
     if (processed.diagnostics.truncationDetected) {
       return jsonResponse(502, {
@@ -2814,8 +2814,8 @@ async function handleAi(request, env) {
     await tokenAccount.flush();
 
     // Project state returned to the client: the client-provided or
-    // conversation-derived state, or â€” on first creation turns with no prior
-    // code â€” the state derived from the just-generated answer, so the client
+    // conversation-derived state, or — on first creation turns with no prior
+    // code — the state derived from the just-generated answer, so the client
     // can persist it and send it back on the next follow-up turn.
     const returnedProject =
       activeProject ||
@@ -3132,7 +3132,7 @@ async function handleImage(request, env) {
 }
 
 // Workers AI text-to-image endpoint: runs FLUX on the account's OWN Workers AI
-// (env.AI binding) â€” no third-party key, billed inside the daily free neuron allocation.
+// (env.AI binding) — no third-party key, billed inside the daily free neuron allocation.
 // Default is flux-2-klein-9b (9B, finer detail); flux-2-klein-4b (4B, fast)
 // is the opt-in speed tier. Failure of any selected model falls back to
 // flux-1-schnell (stable).
@@ -3347,7 +3347,7 @@ async function handleWorkersAIImage(request, env) {
   }
 
   // Persist to R2 when available; otherwise return the inline data URL. The
-  // data URL is always the safe fallback â€” it is never fetched again.
+  // data URL is always the safe fallback — it is never fetched again.
   const mimeType = mimeFromBase64(base64);
   const extension =
     mimeType === "image/jpeg"
@@ -3417,7 +3417,7 @@ async function handleR2Assets(request, env) {
       return jsonResponse(400, { error: "Invalid JSON payload." });
     }
 
-    // Asset types accepted by /api/assets/upload â€” images always, plus
+    // Asset types accepted by /api/assets/upload — images always, plus
     // video/audio/file types accepted as attachments.
     // All are stored in R2 and served as static assets; the worker never
     // executes them.
@@ -3559,7 +3559,7 @@ async function handleR2Assets(request, env) {
     // ownership check below still protects unpublished/private assets.
     //
     // Ownership check: objects written before this control shipped carry no
-    // ownerId metadata and fail closed (403) â€” re-upload to re-bind them.
+    // ownerId metadata and fail closed (403) — re-upload to re-bind them.
     // Assets referenced by a published page (owner's own uploads) are served
     // to anonymous visitors so published creations stay fully public.
     if (
@@ -3880,7 +3880,7 @@ function publishedPageHeaders({ frameable = false } = {}) {
     "Referrer-Policy": "no-referrer",
     // Published creations are AI-generated user content: render them in an
     // originless sandbox (no cookies, storage, or same-origin access) but
-    // let the app itself run exactly like the in-app preview â€” inline
+    // let the app itself run exactly like the in-app preview — inline
     // scripts/styles, CDN libraries, embedded images/fonts, and external
     // links (popups escape the sandbox so links open in real tabs).
     "Content-Security-Policy":
@@ -4016,7 +4016,7 @@ async function handlePublish(request, env) {
     // perk: Standard/Premium publish badge-free, while free (and
     // expired/unknown) creations carry a small "Made with Corez" badge that
     // keeps the share loop open for everyone. A subscription lookup failure
-    // never blocks publishing â€” it just means the badge is shown.
+    // never blocks publishing — it just means the badge is shown.
     let planId = "free";
     if (env?.DB) {
       try {
@@ -4473,9 +4473,9 @@ async function handlePublish(request, env) {
   }
 
   // GET /<slug>/ - serve the home page at a trailing-slash URL. Relative
-  // sub-page links inside the document then resolve to /<slug>/<page>.html â€”
+  // sub-page links inside the document then resolve to /<slug>/<page>.html —
   // for both the router's fetch-swap and plain browser navigation (middle
-  // click, direct visit) â€” instead of falling to the site root.
+  // click, direct visit) — instead of falling to the site root.
   if (request.method === "GET") {
     const slugRootMatch = pathname.match(PUBLISH_SLUG_ROOT_PATTERN);
     if (slugRootMatch) {
@@ -4557,7 +4557,7 @@ async function handlePublish(request, env) {
 // assets binding). 'unsafe-inline' in script-src is REQUIRED: previews are
 // AI-generated documents executed in sandboxed srcdoc iframes, and srcdoc
 // documents inherit the parent's CSP (a child meta CSP does not override it
-// â€” verified empirically in Chromium), so inline scripts must be allowed at
+// — verified empirically in Chromium), so inline scripts must be allowed at
 // the app level. Inline scripts only ever run inside originless, sandboxed
 // iframes; the app bundle itself is external and eval-free. No 'unsafe-eval'.
 // https: is REQUIRED for the same inheritance reason: generated artifacts and
@@ -4577,7 +4577,7 @@ const APP_CSP = [
   "img-src 'self' data: blob: https:",
   "media-src 'self' data: blob: https:",
   "connect-src 'self' https: wss:",
-  // No 'srcdoc' keyword exists in CSP â€” srcdoc iframes are covered by
+  // No 'srcdoc' keyword exists in CSP — srcdoc iframes are covered by
   // 'self' via their inherited origin. The bogus keyword only logged a
   // violation on every page load.
   "frame-src 'self' blob: data:",
@@ -4592,7 +4592,7 @@ const APP_CSP = [
 // the filename changes whenever the bytes change, so the browser may keep it
 // for a year without ever revalidating. The assets binding default
 // (`public, max-age=0, must-revalidate`) made the browser send a conditional
-// request for every bundle on every page load â€” a wasted round trip per asset
+// request for every bundle on every page load — a wasted round trip per asset
 // on each visit (the operator's own client RTT measured 163ms). A `_headers`
 // file cannot do this: custom rules from that file are not applied to
 // Worker-generated responses, and run_worker_first ["/*"] routes every asset

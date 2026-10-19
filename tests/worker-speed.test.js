@@ -38,12 +38,18 @@ describe('AI response speed optimizations', () => {
       expect(data.content).not.toContain("Hello! I'm COREZ AI");
       expect(data.content.length).toBeLessThan(120);
       expect(data.content).toMatch(/building|create|idea/i);
+      // Greetings must never ship a cp1252 rendering (e.g. "â€”" for an em dash).
+      expect(data.content).not.toContain('â€');
+      expect(data.content).not.toContain('\uFFFD');
       expect(data.model).toBe('corez-greeting');
     }
     for (const prompt of ['who are you', 'what is your name']) {
       const response = await post(swarmWorker, {}, { prompt });
       const data = await response.json();
       expect(data.content).toContain('COREZ AI');
+      // The identity reply's em dash stays a real em dash.
+      expect(data.content).not.toContain('â€');
+      expect(data.content).not.toContain('\uFFFD');
       expect(data.model).toBe('corez-greeting');
     }
     expect(fetchMock).not.toHaveBeenCalled();
