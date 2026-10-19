@@ -346,6 +346,12 @@ check_block_property_in_media 'a phone keeps the 16px composer text' 'max-width:
 # container, which is what keeps it exactly as wide as the input it fills.
 check_block_property 'the new chat screen centres its group vertically' '.chat-pane.new-chat' 'justify-content' 'center'
 check_block_property 'the new chat scroll area takes only its own height' '.chat-pane.new-chat .messages-scroll' 'flex' '0 1 auto'
+# While the consent banner reserves room at the bottom of the shell, the pane is
+# that much shorter, which would leave the centred group above the window's
+# centre. The reserved space is handed back to the group as a top margin (a top
+# margin moves a centred group down by half of it), guarded to the side-by-side
+# layout and to windows tall enough that the group still clears the banner.
+check_block_property_in_media 'the new chat group re-centres while the consent banner reserves room' 'min-width: 768px' 'body.corez-consent-visible .chat-pane.new-chat .messages-scroll' 'margin-top' 'var(--corez-consent-space'
 check_block_property 'the new chat question is regular weight, not a display wordmark' '.new-chat-hero-title' 'font-weight' '400'
 check_block_property 'the new chat composer keeps the restrained corner radius' '.input-box.hero' 'border-radius' 'var(--radius-xl)'
 check_block_absent 'the new chat composer is not an oversized pill' '.input-box.hero' 'border-radius' 'var(--radius-pill)'

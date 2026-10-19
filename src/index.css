@@ -1328,17 +1328,20 @@ h6 {
 }
 
 /* ------------------------------------------------------------- new chat ---- */
-/* An empty conversation is a centred group — the wordmark, the question, the
-   composer and the command grid — so the composer is never stranded at the
-   bottom of a page that has nothing on it yet. The grid lives inside
-   .input-container (see NewChatStarters), which is what keeps it exactly as
-   wide as the composer at every breakpoint. */
+/* An empty conversation is a centred group — the question, the composer and the
+   suggestion list — so the composer is never stranded at the bottom of a page
+   that has nothing on it yet. The list lives inside .input-container (see
+   NewChatStarters), which is what keeps it exactly as wide as the composer at
+   every breakpoint. */
 .chat-pane.new-chat {
   justify-content: center;
 }
 
 /* In this state the scroll area is just the hero text: it takes its own height
-   instead of the pane's free space, so the group can centre as a whole. */
+   instead of the pane's free space, so the group can centre as a whole.
+   While the consent banner is on screen the shell reserves room for it and the
+   group compensates — that rule lives with the rest of the consent layout, in
+   the consent block at the end of this file. */
 .chat-pane.new-chat .messages-scroll {
   flex: 0 1 auto;
   min-height: 0;
@@ -7104,6 +7107,21 @@ body.corez-consent-visible .auth-loading,
 body.corez-consent-visible .legal-page,
 body.corez-consent-visible .app-container {
   padding-bottom: var(--corez-consent-space, 160px);
+}
+
+/* The new-chat screen is the one exception, because it does not need the room:
+   its group is short and centred, so it never reaches the banner. The reserved
+   space does, however, shorten the pane the group centres in, which leaves the
+   group half of that space above the window's centre. Handing the space back to
+   the first child as a top margin moves a centred group down by half of it,
+   which puts the group back on the window's centre line.
+   Two guards, both required: a side-by-side layout only (on a phone the banner
+   is tall and the group would reach it), and a window tall enough that the
+   re-centred group still clears the banner. */
+@media (min-width: 768px) and (min-height: 620px) {
+  body.corez-consent-visible .chat-pane.new-chat .messages-scroll {
+    margin-top: var(--corez-consent-space, 0px);
+  }
 }
 
 .consent-banner {
