@@ -332,6 +332,14 @@ check 'reduced motion query disables sidebar animation' '@media \(prefers-reduce
 check_top_level_media 'sidebar prefers-reduced-motion at top level' '@media \(prefers-reduced-motion: reduce\)' "$css"
 check 'mobile sidebar uses safe-area insets' 'env\(safe-area-inset-'
 
+# The conversation column is sized for reading, not for filling the window: the
+# transcript, the composer and the hero share one measure at every breakpoint,
+# and it steps down (not up) as the window narrows.
+check_block_property 'the transcript keeps a readable measure' '.messages-inner' 'max-width' '720px'
+check_block_property 'the composer shares the transcript measure' '.input-container' 'max-width' 'calc(min(100%, 720px) - 3rem)'
+check_block_property 'the hero text shares the composer measure' '.new-chat-hero' 'max-width' '660px'
+check_block_property_in_media 'a large desktop widens the column only a little' 'min-width: 1440px' '.messages-inner' 'max-width' '820px'
+check_block_property_in_media 'a phone keeps the 16px composer text' 'max-width: 767px' '.input-box.hero .chat-textarea' 'font-size' '1rem'
 # New chat: an empty conversation is one centred group — the wordmark, the
 # question, the composer bar and the suggestion list — so the composer is never
 # stranded on the bottom edge of an empty page. The list lives inside the
