@@ -153,33 +153,34 @@ describe("the composer microphone", () => {
     expect(screen.queryByLabelText("Dictate with your voice")).toBeNull();
   });
 
-  it("offers voice input on the primary circle while there is nothing to send", () => {
+  it("dictates from the microphone and marks the listening state", () => {
     installSpeechRecognition();
     setup();
-    const circle = screen.getByLabelText("Start voice input");
-    expect(circle.classList.contains("voice-btn")).toBe(true);
-    expect(circle.getAttribute("aria-pressed")).toBe("false");
+    const mic = screen.getByLabelText("Dictate with your voice");
+    expect(mic.getAttribute("aria-pressed")).toBe("false");
 
-    fireEvent.click(circle);
+    fireEvent.click(mic);
     expect(FakeRecognition.instances).toHaveLength(1);
     expect(FakeRecognition.instances[0].started).toBe(true);
-    // The microphone shows the listening state; the circle is named apart from
-    // it so the two controls are never announced identically.
-    expect(screen.getByLabelText("Stop dictation")).toBeTruthy();
-    const listening = screen.getByLabelText("Stop voice input");
+
+    const listening = screen.getByLabelText("Stop dictation");
     expect(listening.classList.contains("is-listening")).toBe(true);
     expect(listening.getAttribute("aria-pressed")).toBe("true");
   });
 
-  it("hands the circle back to send as soon as there is something to send", () => {
+  it("keeps the primary circle as the send action, never a second voice control", () => {
+    // One voice affordance only: the microphone dictates, the circle sends.
     installSpeechRecognition();
     const test = setup();
-    expect(screen.queryByLabelText("Start voice input")).toBeTruthy();
+    expect(screen.queryByLabelText("Start voice input")).toBeNull();
+    expect(screen.queryByLabelText("Stop voice input")).toBeNull();
+    const send = screen.getByTitle("Send Message");
+    expect(send.classList.contains("voice-btn")).toBe(false);
+    expect(send.disabled).toBe(true);
 
     test.setInput("a real message");
     test.rerender();
-    expect(screen.queryByLabelText("Start voice input")).toBeNull();
-    expect(screen.getByTitle("Send Message")).toBeTruthy();
+    expect(screen.getByTitle("Send Message").disabled).toBe(false);
   });
 
   it("keeps a disabled send button where the browser cannot dictate", () => {

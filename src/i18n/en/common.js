@@ -21,17 +21,16 @@ export default {
   },
 
   // The new-chat screen: the question above the composer and the starter rows
-  // under it. A starter pre-fills the composer (the "@image" token is a real
-  // command; the other two are plain sentences the user continues typing), so
-  // the prompt values are translatable copy, not code.
+  // under it. Each row inserts one of CoreZ's own commands (@website, @game,
+  // @image, @research) — real tokens rather than borrowed sample sentences, so
+  // the rows teach the product's actual vocabulary.
   newChat: {
-    title: "What's on the agenda today?",
-    startersLabel: "Starter prompts",
-    starterImage: "Create an image or sticker",
-    starterWrite: "Write or edit",
-    starterSearch: "Search the web",
-    starterWritePrompt: "Write or edit: ",
-    starterSearchPrompt: "Search the web for ",
+    title: "What are we building today?",
+    startersLabel: "Start with a command",
+    starterWebsite: "Build an app or website",
+    starterGame: "Create a game",
+    starterImage: "Generate an image",
+    starterResearch: "Research a topic",
   },
 
   // Announced by the thinking indicator's live region while a build runs.

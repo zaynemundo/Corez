@@ -43,7 +43,7 @@ async function renderNewChat() {
   // first, and before that the shell shows its loading wordmark.
   await waitFor(() => {
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
-      "What's on the agenda today?",
+      "What are we building today?",
     );
   });
   return utils;
@@ -65,25 +65,30 @@ afterEach(() => {
 });
 
 describe("the new-chat screen", () => {
-  it("asks what is on the agenda above the composer", async () => {
+  it("asks what we are building above the composer", async () => {
     await renderNewChat();
     const heading = screen.getByRole("heading", { level: 1 });
-    expect(heading.textContent).toBe("What's on the agenda today?");
+    expect(heading.textContent).toBe("What are we building today?");
     // The heading sits in the centred hero, above the composer.
     expect(heading.closest(".new-chat-hero")).toBeTruthy();
   });
 
-  it("wears the wide pill composer instead of the bottom bar", async () => {
+  it("wears the wide hero composer instead of the bottom bar", async () => {
     const { container } = await renderNewChat();
     expect(container.querySelector("form.input-box.hero")).toBeTruthy();
   });
 
-  it("renders the three starter rows", async () => {
+  it("renders one starter row per CoreZ command", async () => {
     await renderNewChat();
-    const starters = screen.getByRole("group", { name: "Starter prompts" });
-    expect(starters.textContent).toContain("Create an image or sticker");
-    expect(starters.textContent).toContain("Write or edit");
-    expect(starters.textContent).toContain("Search the web");
+    const starters = screen.getByRole("group", { name: "Start with a command" });
+    expect(starters.textContent).toContain("Build an app or website");
+    expect(starters.textContent).toContain("Create a game");
+    expect(starters.textContent).toContain("Generate an image");
+    expect(starters.textContent).toContain("Research a topic");
+    // The rows show the command they insert, in the interface's mono face.
+    for (const token of ["@website", "@game", "@image", "@research"]) {
+      expect(starters.textContent).toContain(token);
+    }
   });
 
   it("keeps the starter rows inside the composer's own container", async () => {
@@ -96,7 +101,7 @@ describe("the new-chat screen", () => {
 
   it("pre-fills the composer with the image command and keeps the caret ready", async () => {
     await renderNewChat();
-    fireEvent.click(screen.getByText("Create an image or sticker"));
+    fireEvent.click(screen.getByText("Generate an image"));
     await waitFor(() => expect(composer().value).toBe("@image "));
     await waitFor(() => {
       expect(document.activeElement).toBe(composer());
@@ -104,16 +109,22 @@ describe("the new-chat screen", () => {
     });
   });
 
-  it("pre-fills a writing starter the user continues", async () => {
+  it("pre-fills the website command", async () => {
     await renderNewChat();
-    fireEvent.click(screen.getByText("Write or edit"));
-    await waitFor(() => expect(composer().value).toBe("Write or edit: "));
+    fireEvent.click(screen.getByText("Build an app or website"));
+    await waitFor(() => expect(composer().value).toBe("@website "));
   });
 
-  it("pre-fills the web-search phrasing that routes to real search", async () => {
+  it("pre-fills the game command", async () => {
     await renderNewChat();
-    fireEvent.click(screen.getByText("Search the web"));
-    await waitFor(() => expect(composer().value).toBe("Search the web for "));
+    fireEvent.click(screen.getByText("Create a game"));
+    await waitFor(() => expect(composer().value).toBe("@game "));
+  });
+
+  it("pre-fills the research command", async () => {
+    await renderNewChat();
+    fireEvent.click(screen.getByText("Research a topic"));
+    await waitFor(() => expect(composer().value).toBe("@research "));
   });
 
   it("does not send anything when a starter row is clicked", async () => {
@@ -130,20 +141,22 @@ describe("the new-chat screen", () => {
     render(<App />);
     await waitFor(() => expect(screen.getByPlaceholderText("Ask Corez...")).toBeTruthy());
 
-    fireEvent.click(screen.getByText("Create an image or sticker"));
+    fireEvent.click(screen.getByText("Generate an image"));
     await waitFor(() => expect(composer().value).toBe("@image "));
     expect(calls.some((url) => url.includes("/api/ai"))).toBe(false);
   });
 });
 
-describe("the composer Think control", () => {
+describe("the composer Deep think control", () => {
   it("reports its state and toggles on click", async () => {
     await renderNewChat();
-    const think = screen.getByRole("button", { name: "Think" });
+    const think = screen.getByRole("button", { name: "Deep think" });
     expect(think.getAttribute("aria-pressed")).toBe("false");
     fireEvent.click(think);
     expect(
-      screen.getByRole("button", { name: "Think" }).getAttribute("aria-pressed"),
+      screen
+        .getByRole("button", { name: "Deep think" })
+        .getAttribute("aria-pressed"),
     ).toBe("true");
   });
 
@@ -169,7 +182,7 @@ describe("the composer Think control", () => {
       expect(screen.getByPlaceholderText("Ask Corez...")).toBeTruthy(),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Think" }));
+    fireEvent.click(screen.getByRole("button", { name: "Deep think" }));
     fireEvent.change(composer(), {
       target: { value: "explain how a for loop works" },
     });

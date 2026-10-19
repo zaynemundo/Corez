@@ -1,7 +1,6 @@
 import { useRef, useEffect, useState } from "react";
 import {
   ArrowUp,
-  AudioLines,
   Brain,
   Square,
   ChevronRight,
@@ -75,14 +74,14 @@ export default function ChatInput({
   setAttachments: externalSetAttachments,
   onAddFiles,
   /**
-   * "hero" is the new-chat composer: a taller pill under the "What's on the
-   * agenda today?" heading instead of a bar resting on the bottom edge of the
+   * "hero" is the new-chat composer: a wider, softly rounded bar under the
+   * opening question instead of a bar resting on the bottom edge of the
    * conversation. The controls themselves are identical.
    */
   variant = "composer",
-  /** Thinking effort for the next message; owned by the app, never by the composer. */
+  /** Reasoning effort for the next message; owned by the app, never by the composer. */
   thinkMode = false,
-  /** Providing this is what puts the Think control in the composer. */
+  /** Providing this is what puts the Deep think control in the composer. */
   onToggleThink,
   /**
    * Extra content under the composer, inside the same width-limited container
@@ -124,9 +123,6 @@ export default function ChatInput({
         a.size <= MAX_IMAGE_THUMB_BYTES) ||
       a.uploading,
   );
-  // The primary action circle mirrors the composer: speak while there is
-  // nothing to send, send the moment there is.
-  const composerEmpty = !String(input || "").trim() && attachments.length === 0;
 
   useEffect(() => {
     if (refToUse.current) {
@@ -604,33 +600,6 @@ export default function ChatInput({
               title={t("chat.composer.stopGeneration")}
             >
               <Square size={13} fill="currentColor" strokeWidth={1.5} />
-            </button>
-          ) : dictationAvailable && composerEmpty ? (
-            // Nothing to send yet: the primary action is the voice one, so the
-            // circle is never a dead disabled button while the browser can
-            // dictate. It runs the same dictation the microphone does, and the
-            // moment there is something to send it becomes the send circle.
-            <button
-              type="button"
-              className={`send-btn voice-btn${isDictating ? " is-listening" : ""}`}
-              onClick={() => (isDictating ? stopDictation() : startDictation())}
-              aria-pressed={isDictating}
-              title={
-                isDictating
-                  ? t("chat.composer.stopVoice")
-                  : t("chat.composer.startVoice")
-              }
-              aria-label={
-                isDictating
-                  ? t("chat.composer.stopVoice")
-                  : t("chat.composer.startVoice")
-              }
-            >
-              {isDictating ? (
-                <MicOff size={16} strokeWidth={1.6} aria-hidden="true" />
-              ) : (
-                <AudioLines size={18} strokeWidth={1.8} aria-hidden="true" />
-              )}
             </button>
           ) : (
             <button

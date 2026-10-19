@@ -14,14 +14,14 @@ export default {
   },
 
   // شاشة المحادثة الجديدة: السؤال فوق مربع الكتابة وصفوف البدء تحته.
+  // كل صف يُدرج أحد أوامر Corez نفسها (@website، @game، @image، @research).
   newChat: {
-    title: "ما الذي على جدول أعمالك اليوم؟",
-    startersLabel: "أفكار للبدء",
-    starterImage: "أنشئ صورة أو ملصقاً",
-    starterWrite: "اكتب أو حرّر",
-    starterSearch: "ابحث في الويب",
-    starterWritePrompt: "اكتب أو حرّر: ",
-    starterSearchPrompt: "ابحث في الويب عن ",
+    title: "ما الذي سنبنيه اليوم؟",
+    startersLabel: "ابدأ بأمر",
+    starterWebsite: "أنشئ تطبيقاً أو موقعاً",
+    starterGame: "أنشئ لعبة",
+    starterImage: "ولّد صورة",
+    starterResearch: "ابحث في موضوع",
   },
 
   // Announced by the thinking indicator's live region while a build runs.

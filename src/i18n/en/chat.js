@@ -21,19 +21,15 @@ export default {
     sendMessage: "Send Message",
     imageLoading: "Image still loading...",
     stopGeneration: "Stop Generation",
-    // Composer controls: the thinking-effort toggle and the microphone. Both are
-    // icon controls, so the accessible name and the tooltip carry the meaning.
-    think: "Think",
-    thinkTitleOff: "Think: reason deeper before answering (slower, better on hard questions)",
-    thinkTitleOn: "Thinking harder — click to answer faster again",
+    // Composer controls: the reasoning-effort toggle and the microphone. Both
+    // are icon controls, so the accessible name and the tooltip carry the
+    // meaning. "Deep think" is CoreZ's own name for the effort switch — the
+    // reasoning it buys streams into the panel the app already calls Thinking.
+    think: "Deep think",
+    thinkTitleOff: "Deep think: reason harder before answering (slower, better on hard questions)",
+    thinkTitleOn: "Deep think is on — click to answer at normal speed",
     dictate: "Dictate with your voice",
     dictating: "Stop dictation",
-    // The composer's primary circle while there is nothing to send: it starts
-    // dictation instead of being a disabled send button. It is named
-    // differently from the microphone so the two controls are never announced
-    // with the same name.
-    startVoice: "Start voice input",
-    stopVoice: "Stop voice input",
     commandsLabel: "Commands",
     suggestionLabel: "{label}: {description}",
     commands: {

@@ -1719,7 +1719,7 @@ function MainApp({ theme, setTheme }) {
   }, [sessions, activeSessionId]);
 
   // The new-chat screen: the conversation exists but nothing has been asked in
-  // it yet, so the composer moves up under the agenda heading with the three
+  // it yet, so the composer moves up under the opening question with the
   // starter rows instead of resting on the bottom edge of the transcript.
   const isNewChat =
     sessionsLoaded &&

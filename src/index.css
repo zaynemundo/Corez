@@ -34,13 +34,13 @@
   --selection-color: #ffffff;
   --inline-code-color: #f1fa8c;
 
-  /* Primary composer action — the filled circle that sends the message. It is
-     the only saturated colour in the system, and it only ever paints the action
-     itself: 4.4:1 against the graphite page, and the white glyph on it clears
-     the 3:1 graphical-object boundary. */
-  --action-accent: #3b82f6;
-  --action-accent-hover: #4b8cf7;
-  --action-accent-contrast: #ffffff;
+  /* Primary composer action — the filled circle that sends the message. Corez
+     is a monochrome system, so the action is the page's BRIGHTEST surface
+     rather than a coloured one: 13.5:1 against the graphite page, and the dark
+     glyph on it is the same figure inverted. */
+  --action-strong: var(--text-primary);
+  --action-strong-hover: #ffffff;
+  --action-strong-contrast: var(--bg-primary);
 
   /* Refined Elegant Typography */
   --font-sans:
@@ -153,11 +153,10 @@
   --selection-color: #000000;
   --inline-code-color: #7c5e10;
 
-  /* The composer's action circle: a deeper blue so the white glyph keeps its
-     5.3:1 contrast on the light theme's white surfaces. */
-  --action-accent: #2563eb;
-  --action-accent-hover: #1d4ed8;
-  --action-accent-contrast: #ffffff;
+  /* The same action on the light theme: near-black fill, white glyph (17:1). */
+  --action-strong: var(--text-primary);
+  --action-strong-hover: #000000;
+  --action-strong-contrast: #ffffff;
 
   --sidebar-bg: var(--bg-primary);
   --sidebar-bg-opaque: var(--bg-primary);
@@ -1394,12 +1393,22 @@ h6 {
   color: var(--text-muted);
 }
 
+/* The command each row inserts, shown in the interface's monospace face: the
+   rows teach Corez's own vocabulary instead of hiding it behind the label. */
+.new-chat-starter-token {
+  margin-inline-start: auto;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
 .new-chat-starter:hover:not(:disabled) {
   background: var(--bg-secondary);
   color: var(--text-primary);
 }
 
-.new-chat-starter:hover:not(:disabled) svg {
+.new-chat-starter:hover:not(:disabled) svg,
+.new-chat-starter:hover:not(:disabled) .new-chat-starter-token {
   color: var(--text-primary);
 }
 
@@ -2858,9 +2867,11 @@ h6 {
   background-color: var(--bg-card);
 }
 
-/* The new-chat composer is a wide pill: same controls, more presence. */
+/* The new-chat composer is a wide, softly rounded bar: the same controls with
+   more presence. Corez keeps its restrained corners rather than an oversized
+   pill (the same rule its cards and rows follow). */
 .input-box.hero {
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-xl);
   padding: 0.6rem 0.7rem 0.6rem 0.8rem;
   gap: 0.7rem;
 }
@@ -2991,10 +3002,6 @@ h6 {
   color: var(--text-primary);
 }
 
-.mic-btn.is-listening {
-  color: var(--action-accent);
-}
-
 .think-toggle:disabled,
 .mic-btn:disabled {
   opacity: 0.35;
@@ -3015,25 +3022,19 @@ h6 {
   transition: var(--transition-fast);
 }
 
-/* The composer's primary circle is the one filled accent surface in the
-   interface. It is the send action when there is something to send, and voice
-   input when there is not — so it is never a dead disabled button while the
-   browser can dictate. */
-.send-btn:not(:disabled):not(.stop-btn),
-.send-btn.voice-btn {
-  background: var(--action-accent);
+/* Ready to send: the composer's primary action is the brightest surface on the
+   page — monochrome, like everything else in the system. An empty composer
+   stays a quiet outline circle, so the fill itself says whether there is
+   anything to send. */
+.send-btn:not(:disabled):not(.stop-btn) {
+  background: var(--action-strong);
   border-color: transparent;
-  color: var(--action-accent-contrast);
+  color: var(--action-strong-contrast);
 }
 
-.send-btn:not(:disabled):not(.stop-btn):hover,
-.send-btn.voice-btn:hover {
-  background: var(--action-accent-hover);
+.send-btn:not(:disabled):not(.stop-btn):hover {
+  background: var(--action-strong-hover);
   transform: scale(1.06);
-}
-
-.send-btn.voice-btn.is-listening {
-  background: var(--action-accent-hover);
 }
 
 .send-btn:hover:not(:disabled) {
@@ -4885,10 +4886,6 @@ h6 {
 
   .new-chat-hero-title {
     font-size: 1.35rem;
-  }
-
-  .input-box.hero {
-    border-radius: var(--radius-pill);
   }
 
   .think-toggle {
