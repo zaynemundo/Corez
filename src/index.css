@@ -1353,17 +1353,6 @@ h6 {
   text-align: center;
 }
 
-/* The wordmark sits above the question the way it does on the sign-in screen:
-   Corez names itself before it asks anything. */
-.new-chat-wordmark {
-  margin: 0 0 0.6rem;
-  font-family: var(--font-heading);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.24em;
-  color: var(--text-secondary);
-}
-
 .new-chat-hero-title {
   margin: 0;
   font-family: var(--font-heading);

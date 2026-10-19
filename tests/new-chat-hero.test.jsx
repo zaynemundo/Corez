@@ -60,15 +60,14 @@ afterEach(() => {
 });
 
 describe("the new-chat screen", () => {
-  it("names CoreZ, then asks what we are building", async () => {
+  it("asks what we are building above the composer", async () => {
     const { container } = await renderNewChat();
-    const wordmark = container.querySelector(".new-chat-wordmark");
-    expect(wordmark.textContent).toBe("COREZ");
     const heading = screen.getByRole("heading", { level: 1 });
     expect(heading.textContent).toBe("What are we building today?");
-    // Both sit in the centred hero, above the composer.
+    // The question is the whole hero: no wordmark above it, and it sits in the
+    // centred group above the composer.
     expect(heading.closest(".new-chat-hero")).toBeTruthy();
-    expect(wordmark.closest(".new-chat-hero")).toBeTruthy();
+    expect(container.querySelector(".new-chat-wordmark")).toBeNull();
   });
 
   it("wears the wide hero composer instead of the bottom bar", async () => {

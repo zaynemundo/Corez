@@ -340,14 +340,12 @@ check_block_property 'the composer shares the transcript measure' '.input-contai
 check_block_property 'the hero text shares the composer measure' '.new-chat-hero' 'max-width' '660px'
 check_block_property_in_media 'a large desktop widens the column only a little' 'min-width: 1440px' '.messages-inner' 'max-width' '820px'
 check_block_property_in_media 'a phone keeps the 16px composer text' 'max-width: 767px' '.input-box.hero .chat-textarea' 'font-size' '1rem'
-# New chat: an empty conversation is one centred group — the wordmark, the
-# question, the composer bar and the suggestion list — so the composer is never
-# stranded on the bottom edge of an empty page. The list lives inside the
-# composer's own container, which is what keeps it exactly as wide as the input
-# it fills.
+# New chat: an empty conversation is one centred group — the question, the
+# composer bar and the suggestion list — so the composer is never stranded on
+# the bottom edge of an empty page. The list lives inside the composer's own
+# container, which is what keeps it exactly as wide as the input it fills.
 check_block_property 'the new chat screen centres its group vertically' '.chat-pane.new-chat' 'justify-content' 'center'
 check_block_property 'the new chat scroll area takes only its own height' '.chat-pane.new-chat .messages-scroll' 'flex' '0 1 auto'
-check_block_property 'the wordmark names the product above the question' '.new-chat-wordmark' 'letter-spacing' '0.24em'
 check_block_property 'the new chat question is regular weight, not a display wordmark' '.new-chat-hero-title' 'font-weight' '400'
 check_block_property 'the new chat composer keeps the restrained corner radius' '.input-box.hero' 'border-radius' 'var(--radius-xl)'
 check_block_absent 'the new chat composer is not an oversized pill' '.input-box.hero' 'border-radius' 'var(--radius-pill)'

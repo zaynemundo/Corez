@@ -1817,12 +1817,10 @@ function MainApp({ theme, setTheme }) {
                   <h1 className="welcome-title">COREZ</h1>
                 </div>
               ) : !activeSession || activeSession.messages.length === 0 ? (
-                // New chat: the wordmark and the question sit above the
-                // composer, which is rendered below this scroll area, so the
-                // composer keeps its identity and focus while the screen
-                // changes.
+                // New chat: the question sits above the composer, which is
+                // rendered below this scroll area, so the composer keeps its
+                // identity and focus while the screen changes.
                 <div className="new-chat-hero">
-                  <p className="new-chat-wordmark">COREZ</p>
                   <h1 className="new-chat-hero-title">
                     {t("common.newChat.title")}
                   </h1>
