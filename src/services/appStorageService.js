@@ -325,6 +325,44 @@ export function forgetPublishLineageForSession(sessionId) {
 }
 
 /**
+ * Unpublishes whatever this session published, using the local lineage.
+ *
+ * The server removes a deleted chat's published pages itself, from the session
+ * id stored on each publish record. This is the other half: a page published
+ * before that lineage was recorded is only known here, in the browser that
+ * published it, so deleting the chat is the last chance to take it down.
+ *
+ * Returns `{ slug, removed }` — `removed` says whether a live page was taken
+ * down (a page already gone is not a failure, but it is not a removal either).
+ */
+export async function unpublishSessionPages(sessionId) {
+  if (!sessionId || typeof sessionId !== "string") {
+    return { slug: null, removed: false };
+  }
+  let slug;
+  try {
+    slug = loadPublishLineage()[sessionId]?.slug || null;
+  } catch {
+    slug = null;
+  }
+  if (!slug) return { slug: null, removed: false };
+  let removed = false;
+  try {
+    const result = await unpublishPage(slug);
+    removed = Boolean(result?.success);
+    if (!removed && result?.error) {
+      console.warn(`Could not unpublish ${slug} for the deleted chat: ${result.error}`);
+    }
+  } catch (err) {
+    console.warn(`Could not unpublish ${slug} for the deleted chat:`, err);
+  }
+  // The lineage has to go either way: the conversation it belonged to is gone,
+  // so a later chat must never inherit this link.
+  forgetPublishLineageForSession(sessionId);
+  return { slug, removed };
+}
+
+/**
  * Publishes a creation so anyone with the returned share link can open it.
  * The html payload is the fully formatted preview document (what the user
  * sees in the canvas).

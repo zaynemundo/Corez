@@ -99,6 +99,7 @@ import {
   resolvePublishRecord,
   writePublishRecord,
   deletePublishRecord,
+  dropUnreferencedAssetMarkers,
   resolveAsset,
   isAssetPublished,
   scanPublishRecords,
@@ -4220,6 +4221,24 @@ async function handlePublish(request, env) {
         : stripCorezBadge(pages[pageName]);
     }
 
+    // Which chat this page came from. Deleting that chat unpublishes the page
+    // (see cleanupChatStorage), so the lineage is stored with the record rather
+    // than only in the browser that published it.
+    let publishSessionId =
+      typeof body?.sessionId === "string" &&
+      SAFE_STORAGE_SEGMENT.test(body.sessionId.trim())
+        ? body.sessionId.trim().slice(0, 160)
+        : null;
+    if (!publishSessionId) {
+      // A republish that does not say where it came from keeps the lineage the
+      // page already carries, so a later chat delete still finds it.
+      const previous = await resolvePublishRecord(env, slug).catch(() => null);
+      const previousSessionId = previous?.record?.sessionId;
+      if (typeof previousSessionId === "string" && previousSessionId) {
+        publishSessionId = previousSessionId;
+      }
+    }
+
     const record = {
       slug,
       title,
@@ -4229,6 +4248,9 @@ async function handlePublish(request, env) {
       ownerUserId: uid,
       createdAt: new Date().toISOString(),
     };
+    if (publishSessionId) {
+      record.sessionId = publishSessionId;
+    }
     if (Object.keys(pages).length > 0) {
       record.pages = pages;
     }
@@ -4405,33 +4427,7 @@ async function handlePublish(request, env) {
 
     // Asset markers are what let anonymous visitors read an uploaded image.
     // Drop the ones this page alone was keeping public.
-    try {
-      const referenced = extractReferencedAssetKeys([
-        typeof record.html === "string" ? record.html : "",
-        ...(record.pages && typeof record.pages === "object"
-          ? Object.values(record.pages).filter((v) => typeof v === "string")
-          : []),
-      ]);
-      if (referenced.length > 0) {
-        const { records } = await scanPublishRecords(env);
-        for (const assetKey of referenced) {
-          const stillReferenced = records.some(({ record: other }) => {
-            const parts = [typeof other?.html === "string" ? other.html : ""];
-            if (other?.pages && typeof other.pages === "object") {
-              for (const pageHtml of Object.values(other.pages)) {
-                if (typeof pageHtml === "string") parts.push(pageHtml);
-              }
-            }
-            return parts.some((html) => html.includes(`/api/assets/${assetKey}`));
-          });
-          if (!stillReferenced) {
-            await env.ASSET_BUCKET.delete(assetPubMarkerKey(assetKey));
-          }
-        }
-      }
-    } catch {
-      // Markers are an optimization; a failure here never un-deletes the page.
-    }
+    await dropUnreferencedAssetMarkers(env, record);
 
     return jsonResponse(200, { success: true, slug, url: `/${slug}` });
   }

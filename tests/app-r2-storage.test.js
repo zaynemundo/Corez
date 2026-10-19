@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import worker from '../worker/index.js';
-import { publishAppInR2 } from '../src/services/appStorageService.js';
+import {
+  publishAppInR2,
+  unpublishSessionPages,
+} from '../src/services/appStorageService.js';
 
 describe('R2 Multi-App Storage & Chat Deletion Cleanup Contract', () => {
   let mockBucket;
@@ -324,6 +327,83 @@ describe('R2 Multi-App Storage & Chat Deletion Cleanup Contract', () => {
       } finally {
         delete globalThis.localStorage;
       }
+    });
+  });
+
+  // The server unpublishes a deleted chat's pages from the session id stored on
+  // each publish record. This is the other half of that: a page published
+  // BEFORE the lineage was recorded is known only to the browser that published
+  // it, so deleting the chat there is the last chance to take it down.
+  describe('unpublishSessionPages', () => {
+    function seedLineage(entries) {
+      const store = {};
+      globalThis.localStorage = {
+        getItem: (key) => store[key] ?? null,
+        setItem: (key, value) => { store[key] = value; },
+        removeItem: (key) => { delete store[key]; },
+      };
+      store['corez_publish_lineage'] = JSON.stringify(entries);
+      return store;
+    }
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      delete globalThis.localStorage;
+    });
+
+    it('takes down the link this session published and forgets it', async () => {
+      const store = seedLineage({
+        'session-1': { slug: 'asyag23-123', title: 'Site', updatedAt: '2026-01-01T00:00:00.000Z' },
+      });
+      const fetchMock = vi.fn(async () => new Response(
+        JSON.stringify({ success: true, slug: 'asyag23-123' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      ));
+      vi.stubGlobal('fetch', fetchMock);
+
+      const result = await unpublishSessionPages('session-1');
+
+      expect(result).toEqual({ slug: 'asyag23-123', removed: true });
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/publish/asyag23-123',
+        expect.objectContaining({ method: 'DELETE' }),
+      );
+      // A deleted conversation's lineage must not survive it: a later chat must
+      // never inherit this link.
+      expect(JSON.parse(store['corez_publish_lineage'])).toEqual({});
+    });
+
+    it('makes no request for a session that never published', async () => {
+      seedLineage({});
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+
+      expect(await unpublishSessionPages('session-never-published')).toEqual({
+        slug: null,
+        removed: false,
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('still forgets the lineage when the unpublish request fails', async () => {
+      // The chat is gone either way, so the entry is dead weight; the slug stays
+      // visible (and removable) under Settings → Published pages.
+      const store = seedLineage({
+        'session-2': { slug: 'asyag23-999', title: 'Site', updatedAt: '2026-01-01T00:00:00.000Z' },
+      });
+      const fetchMock = vi.fn(async () => new Response(
+        JSON.stringify({ error: 'nope' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      ));
+      vi.stubGlobal('fetch', fetchMock);
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const result = await unpublishSessionPages('session-2');
+
+      expect(result).toEqual({ slug: 'asyag23-999', removed: false });
+      expect(JSON.parse(store['corez_publish_lineage'])).toEqual({});
+      expect(warn).toHaveBeenCalled();
+      warn.mockRestore();
     });
   });
 });

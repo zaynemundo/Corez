@@ -1,12 +1,19 @@
 // Deleting a chat deletes everything that belongs to it: the D1 rows plus
 // the R2 state — apps, uploaded assets (images, docs), generated images
-// referenced by its messages, and the per-session context index.
+// referenced by its messages, the per-session context index, and the pages the
+// chat published.
 //
 // The rules pinned here:
 //  - DELETE /api/chats/:id removes the chat's R2 apps (both locations),
 //    its context index (both locations), and every asset referenced by its
 //    messages (attachment assetKey/assetUrl + /api/assets/* URLs in text),
 //    including pre-move flat keys;
+//  - published pages that came from the deleted chat are unpublished: the
+//    public URL stops working, and the images only that page was keeping
+//    public are released to the same sweep;
+//  - pages published from another chat keep serving;
+//  - a page published before the lineage was recorded carries no session id
+//    and is left alone (the browser that published it still knows the slug);
 //  - assets belonging to other chats are kept;
 //  - assets still referenced by a published page (asset-pub marker) are kept;
 //  - DELETE /api/chats (clear history) cascades for every chat;
@@ -56,7 +63,12 @@ function createBucket() {
     },
     get: async (key) => {
       if (!store.has(key)) return null;
-      return { text: async () => 'marker' };
+      const entry = store.get(key);
+      // Stored strings are returned as they are (publish records have to be
+      // readable); anything else reads as an opaque marker.
+      return {
+        text: async () => (typeof entry.val === 'string' ? entry.val : 'marker'),
+      };
     },
     head: async (key) => {
       if (!store.has(key)) return null;
@@ -255,5 +267,129 @@ describe('chat delete storage cascade', () => {
     );
     expect(res.status).toBe(200);
     expect((await call(`/api/chats/${chat.id}`)).status).toBe(404);
+  });
+
+  // ---------------------------------------------------------------- publishing
+  // A published page is one of a chat's artifacts: deleting the conversation
+  // has to take the public URL down with it, instead of leaving the deleted
+  // work served to anyone holding the link.
+
+  const publishPage = async (html, sessionId, cookie = aliceCookie) => {
+    const res = await call('/api/publish', {
+      method: 'POST',
+      cookie,
+      body: { title: 'Published from a chat', html, sessionId },
+    });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.slug).toBeTruthy();
+    return data.slug;
+  };
+
+  const servePage = (slug) =>
+    worker.fetch(new Request(`${BASE}/${slug}`, { method: 'GET' }), env);
+
+  it('unpublishes the page a deleted chat published, and releases its images', async () => {
+    const chat = await createChat('portfolio build');
+    await postMessage(chat.id, {
+      role: 'user',
+      content: 'here is the photo to use',
+      attachments: [{ name: 'hero.jpg', type: 'image/jpeg', assetKey: 'hero.jpg' }],
+    });
+    await bucket.put('users/alice/assets/hero.jpg', 'img');
+
+    const slug = await publishPage(
+      '<!DOCTYPE html><html><body><img src="/api/assets/hero.jpg"></body></html>',
+      chat.id,
+    );
+    // The publish flow pins the image public for anonymous visitors, and the
+    // record remembers which chat it came from.
+    expect(bucket.store.has('asset-pub/hero.jpg')).toBe(true);
+    expect(
+      JSON.parse(bucket.store.get(`users/alice/publish/${slug}.json`).val).sessionId,
+    ).toBe(chat.id);
+    expect((await servePage(slug)).status).toBe(200);
+
+    const res = await call(`/api/chats/${chat.id}`, { method: 'DELETE' });
+    expect(res.status).toBe(200);
+    expect((await res.json()).unpublishedSlugs).toEqual([slug]);
+
+    // The link is dead: no owned record, no public pointer, 404 to a visitor.
+    expect(bucket.store.has(`users/alice/publish/${slug}.json`)).toBe(false);
+    expect(bucket.store.has(`publish/${slug}.json`)).toBe(false);
+    expect((await servePage(slug)).status).toBe(404);
+
+    // The image was public only for that page, so the same delete releases it.
+    expect(bucket.store.has('asset-pub/hero.jpg')).toBe(false);
+    expect(bucket.store.has('users/alice/assets/hero.jpg')).toBe(false);
+  });
+
+  it('keeps a page published from another chat', async () => {
+    const deleted = await createChat('throwaway');
+    const kept = await createChat('keep this one');
+    const goneSlug = await publishPage('<html><body>one</body></html>', deleted.id);
+    const keptSlug = await publishPage('<html><body>two</body></html>', kept.id);
+
+    const res = await call(`/api/chats/${deleted.id}`, { method: 'DELETE' });
+    expect((await res.json()).unpublishedSlugs).toEqual([goneSlug]);
+
+    expect((await servePage(goneSlug)).status).toBe(404);
+    expect((await servePage(keptSlug)).status).toBe(200);
+  });
+
+  it('leaves a page that predates the recorded lineage alone', async () => {
+    // Published without a session id (every page published before the lineage
+    // was stored). The server cannot attribute it, so it is not deleted here —
+    // the browser that published it still knows the slug and removes it when
+    // the chat is deleted from that browser.
+    const chat = await createChat('legacy publish');
+    const res = await call('/api/publish', {
+      method: 'POST',
+      body: { title: 'Legacy', html: '<html><body>legacy</body></html>' },
+    });
+    const { slug } = await res.json();
+
+    const del = await call(`/api/chats/${chat.id}`, { method: 'DELETE' });
+    expect((await del.json()).unpublishedSlugs).toEqual([]);
+    expect((await servePage(slug)).status).toBe(200);
+  });
+
+  it('clear-history unpublishes every chat it deletes', async () => {
+    const first = await createChat('first publish');
+    const second = await createChat('second publish');
+    const firstSlug = await publishPage('<html><body>first</body></html>', first.id);
+    const secondSlug = await publishPage('<html><body>second</body></html>', second.id);
+
+    const res = await call('/api/chats', { method: 'DELETE' });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.unpublishedSlugs.sort()).toEqual([firstSlug, secondSlug].sort());
+
+    for (const slug of [firstSlug, secondSlug]) {
+      expect((await servePage(slug)).status).toBe(404);
+      expect(bucket.store.has(`users/alice/publish/${slug}.json`)).toBe(false);
+    }
+  });
+
+  it('never unpublishes another account\'s page', async () => {
+    // Bob publishes from his own chat; Alice clearing her history must not
+    // touch it.
+    const bobCookie = await cookieFor('bob');
+    const bobChatRes = await call('/api/chats', {
+      method: 'POST',
+      cookie: bobCookie,
+      body: { title: 'bob build' },
+    });
+    const bobChat = await bobChatRes.json();
+    const bobSlug = await publishPage(
+      '<html><body>bob</body></html>',
+      bobChat.id,
+      bobCookie,
+    );
+
+    await call('/api/chats', { method: 'DELETE' });
+
+    expect(bucket.store.has(`users/bob/publish/${bobSlug}.json`)).toBe(true);
+    expect((await servePage(bobSlug)).status).toBe(200);
   });
 });

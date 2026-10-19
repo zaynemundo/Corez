@@ -212,6 +212,98 @@ export async function deletePublishRecord(env, slug) {
   return resolved;
 }
 
+/**
+ * Drop the public markers of the assets a removed page was keeping readable.
+ *
+ * A published page is what makes its images public to anonymous visitors, so
+ * removing the page must take that access away again — unless another live page
+ * still references the same asset. Markers are an optimization: a failure here
+ * never un-deletes the page, so it is best-effort by design.
+ */
+export async function dropUnreferencedAssetMarkers(env, record) {
+  if (!env?.ASSET_BUCKET || !record) return [];
+  const htmlParts = [typeof record.html === "string" ? record.html : ""];
+  if (record.pages && typeof record.pages === "object") {
+    for (const pageHtml of Object.values(record.pages)) {
+      if (typeof pageHtml === "string") htmlParts.push(pageHtml);
+    }
+  }
+  const referenced = extractReferencedAssetKeys(htmlParts);
+  if (referenced.length === 0) return [];
+  const dropped = [];
+  try {
+    const { records } = await scanPublishRecords(env);
+    for (const assetKey of referenced) {
+      const stillReferenced = records.some(({ record: other }) => {
+        const parts = [typeof other?.html === "string" ? other.html : ""];
+        if (other?.pages && typeof other.pages === "object") {
+          for (const pageHtml of Object.values(other.pages)) {
+            if (typeof pageHtml === "string") parts.push(pageHtml);
+          }
+        }
+        return parts.some((html) => html.includes(`/api/assets/${assetKey}`));
+      });
+      if (stillReferenced) continue;
+      try {
+        await env.ASSET_BUCKET.delete(assetPubMarkerKey(assetKey));
+        dropped.push(assetKey);
+      } catch {
+        // Per-key best effort.
+      }
+    }
+  } catch {
+    // Markers are an optimization; a failure here never un-deletes the page.
+  }
+  return dropped;
+}
+
+/**
+ * Unpublish every page that came from one of `sessionIds`.
+ *
+ * Deleting a chat removes the creations it produced, and a published page is
+ * one of them: leaving it live would keep serving work the user deleted. The
+ * lineage is `record.sessionId`, written at publish time; records published
+ * before that field existed are not attributable and are left alone (the
+ * browser that published them still knows the slug — see the client's own
+ * unpublish on delete).
+ *
+ * Returns the slugs that were removed so the caller can report them.
+ */
+export async function unpublishPagesForSessions(env, uid, sessionIds) {
+  const ids = new Set(
+    (Array.isArray(sessionIds) ? sessionIds : [sessionIds])
+      .map((id) => (typeof id === "string" ? id.trim() : ""))
+      .filter(Boolean),
+  );
+  if (ids.size === 0 || !uid) return [];
+  if (!env?.ASSET_BUCKET || typeof env.ASSET_BUCKET.delete !== "function") {
+    return [];
+  }
+  let records;
+  try {
+    records = (await listUserPublishRecords(env, uid))?.records;
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(records) || records.length === 0) return [];
+  const removed = [];
+  for (const { record } of records) {
+    const sessionId =
+      typeof record?.sessionId === "string" ? record.sessionId : "";
+    if (!sessionId || !ids.has(sessionId)) continue;
+    const slug = typeof record?.slug === "string" ? record.slug : "";
+    if (!slug) continue;
+    try {
+      await deletePublishRecord(env, slug);
+      await dropUnreferencedAssetMarkers(env, record);
+      removed.push(slug);
+    } catch {
+      // Per-page best effort: one failure must not strand the rest.
+    }
+  }
+  return removed;
+}
+
 // Resolve an asset's bytes across both layouts. Returns
 // { object, storageKey, ownerId } or { object: null }.
 export async function resolveAsset(env, key, uid) {

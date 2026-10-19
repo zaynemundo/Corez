@@ -19,6 +19,7 @@ import {
   COLUMN_CHATS_PINNED_AT,
   COLUMN_CHATS_SORT_ORDER,
 } from "./dbSchema.js";
+import { unpublishPagesForSessions } from "./publishStore.js";
 
 // ---------------------------------------------------------------------
 // Chat ID generation — short, URL-safe, unguessable
@@ -492,12 +493,21 @@ async function deleteBucketPrefix(bucket, prefix) {
 // Best-effort R2 cascade for the given chats. Reads each chat's messages
 // for asset references, so callers must run it BEFORE deleting the D1 rows.
 // Never throws: the cascade must not fail the chat delete itself.
+//
+// Returns the slugs of published pages that were unpublished because they came
+// from these chats: deleting a conversation deletes what it produced, and a
+// published page is one of its artifacts. That has to run FIRST — the asset
+// sweep below keeps any file a live page still references public, so a page
+// removed here releases its images to the same pass.
 export async function cleanupChatStorage(env, userId, chatIds) {
   const ids = [...new Set((chatIds || []).filter(Boolean))];
-  if (ids.length === 0) return;
+  if (ids.length === 0) return { unpublishedSlugs: [] };
   const bucket = env?.ASSET_BUCKET;
-  if (!bucket || typeof bucket.list !== "function") return;
-  if (typeof bucket.delete !== "function") return;
+  if (!bucket || typeof bucket.list !== "function") {
+    return { unpublishedSlugs: [] };
+  }
+  if (typeof bucket.delete !== "function") return { unpublishedSlugs: [] };
+  const unpublishedSlugs = await unpublishPagesForSessions(env, userId, ids);
   try {
     // 1. Collect asset keys referenced by these chats' messages.
     const assetKeys = new Set();
@@ -554,6 +564,7 @@ export async function cleanupChatStorage(env, userId, chatIds) {
   } catch {
     // Cascade never fails the chat delete.
   }
+  return { unpublishedSlugs };
 }
 
 // ---------------------------------------------------------------------
@@ -702,7 +713,11 @@ export async function handleChats(request, env) {
       } catch {
         chatIds = [];
       }
-      await cleanupChatStorage(env, userId, chatIds);
+      const { unpublishedSlugs } = await cleanupChatStorage(
+        env,
+        userId,
+        chatIds,
+      );
       // Manual orderings die with the history: a fresh account starts fully
       // recency-ordered. The flags table is owned here, so no tolerance dance
       // is needed — ensureChatsTables ran above.
@@ -717,7 +732,7 @@ export async function handleChats(request, env) {
         .bind(userId)
         .run();
 
-      return jsonResponse(200, { success: true });
+      return jsonResponse(200, { success: true, unpublishedSlugs });
     } catch (e) {
       console.error("DELETE /api/chats failed:", safeErrorDetail(e));
       return jsonResponse(500, { error: "Failed to delete chats." });
@@ -1085,8 +1100,11 @@ export async function handleChats(request, env) {
     try {
       // Cascade first: the chat's R2 state (apps, uploaded assets, generated
       // images referenced by its messages, context index) is read from the
-      // messages, so it must run before the D1 rows are deleted.
-      await cleanupChatStorage(env, userId, [chatId]);
+      // messages, and the pages it published are unpublished, so both must run
+      // before the D1 rows are deleted.
+      const { unpublishedSlugs } = await cleanupChatStorage(env, userId, [
+        chatId,
+      ]);
       await env.DB.prepare(
         "DELETE FROM chat_messages WHERE chat_id = ? AND user_id = ?",
       )
@@ -1095,7 +1113,11 @@ export async function handleChats(request, env) {
       await env.DB.prepare("DELETE FROM chats WHERE id = ? AND user_id = ?")
         .bind(chatId, userId)
         .run();
-      return jsonResponse(200, { success: true, id: chatId });
+      return jsonResponse(200, {
+        success: true,
+        id: chatId,
+        unpublishedSlugs,
+      });
     } catch (e) {
       console.error("DELETE /api/chats/:id failed:", safeErrorDetail(e));
       return jsonResponse(500, { error: "Failed to delete chat." });
