@@ -12,6 +12,7 @@ import Sidebar from "./components/Sidebar";
 import ChatMessage from "./components/ChatMessage";
 import ThinkingPanel from "./components/ThinkingPanel.jsx";
 import ChatInput from "./components/ChatInput";
+import NewChatStarters from "./components/NewChatStarters";
 import CanvasPreview from "./components/CanvasPreview";
 import SettingsModal from "./components/SettingsModal";
 import DropZoneOverlay from "./components/DropZoneOverlay";
@@ -1171,6 +1172,9 @@ function MainApp({ theme, setTheme }) {
   };
 
   const [chatInput, setChatInput] = useState("");
+  // Composer "Think" control: ask the hosted model for its deepest reasoning
+  // effort on the next message (see generateAIResponse's request options).
+  const [thinkMode, setThinkMode] = useState(false);
   const [revisionContextCode, setRevisionContextCode] = useState("");
 
   const handleSendMessage = async (promptText, attachmentsArg = []) => {
@@ -1496,6 +1500,9 @@ function MainApp({ theme, setTheme }) {
           streamingThinkingRef.current += text;
           setStreamingThinking(streamingThinkingRef.current);
         },
+        // Request options: the composer's Think control asks for the deepest
+        // reasoning effort the router offers for this message.
+        { think: thinkMode },
       );
       if (response) {
         // Real thinking only: when the gateway returns no reasoning the
@@ -1664,6 +1671,25 @@ function MainApp({ theme, setTheme }) {
     }
   };
 
+  // A starter row on the new-chat screen fills the composer and leaves the
+  // caret at the end of the inserted text, ready for the rest of the sentence.
+  // The caret is placed after the value has landed in the DOM, the same
+  // deferred focus the "Revise code" action uses.
+  const handleStarterSelect = (text) => {
+    const insertion = String(text || "");
+    setChatInput(insertion);
+    if (!chatInputRef.current) return;
+    if (focusTimeoutRef.current) clearTimeout(focusTimeoutRef.current);
+    focusTimeoutRef.current = setTimeout(() => {
+      if (!chatInputRef.current) return;
+      chatInputRef.current.focus();
+      chatInputRef.current.setSelectionRange(
+        insertion.length,
+        insertion.length,
+      );
+    }, 50);
+  };
+
   const handleOverlayDragLeave = (e) => {
     e.preventDefault();
     dragCounterRef.current = 0;
@@ -1691,6 +1717,14 @@ function MainApp({ theme, setTheme }) {
       (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0),
     );
   }, [sessions, activeSessionId]);
+
+  // The new-chat screen: the conversation exists but nothing has been asked in
+  // it yet, so the composer moves up under the agenda heading with the three
+  // starter rows instead of resting on the bottom edge of the transcript.
+  const isNewChat =
+    sessionsLoaded &&
+    !chatLoading &&
+    (!activeSession || activeSession.messages.length === 0);
 
   return (
     <div className="app-container">
@@ -1737,7 +1771,11 @@ function MainApp({ theme, setTheme }) {
 
       <main className="main-content">
         <>
-          <div className={`chat-pane ${canvasOpen ? "canvas-active" : ""}`}>
+          <div
+            className={`chat-pane ${canvasOpen ? "canvas-active" : ""}${
+              isNewChat ? " new-chat" : ""
+            }`}
+          >
             {!sidebarOpen && (
               <button
                 type="button"
@@ -1785,13 +1823,13 @@ function MainApp({ theme, setTheme }) {
                   <h1 className="welcome-title">COREZ</h1>
                 </div>
               ) : !activeSession || activeSession.messages.length === 0 ? (
-                <div className="welcome-container">
-                  <h1 className="welcome-title">COREZ</h1>
-                  {activeSessionId && (
-                    <p className="welcome-subtitle">
-                      {t("common.shell.startNewConversation")}
-                    </p>
-                  )}
+                // New chat: the question sits above the composer, which is
+                // rendered below this scroll area, so the composer keeps its
+                // identity and focus while the screen changes.
+                <div className="new-chat-hero">
+                  <h1 className="new-chat-hero-title">
+                    {t("common.newChat.title")}
+                  </h1>
                 </div>
               ) : (
                 <div className="messages-inner">
@@ -1872,6 +1910,16 @@ function MainApp({ theme, setTheme }) {
               isStreaming={isThinking}
               attachments={attachments}
               setAttachments={setAttachments}
+              variant={isNewChat ? "hero" : "composer"}
+              thinkMode={thinkMode}
+              onToggleThink={setThinkMode}
+              // The starter rows live inside the composer's own container so
+              // they always line up with the input they fill.
+              footer={
+                isNewChat ? (
+                  <NewChatStarters onSelect={handleStarterSelect} />
+                ) : null
+              }
             />
           </div>
 

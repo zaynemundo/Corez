@@ -34,6 +34,14 @@
   --selection-color: #ffffff;
   --inline-code-color: #f1fa8c;
 
+  /* Primary composer action — the filled circle that sends the message. It is
+     the only saturated colour in the system, and it only ever paints the action
+     itself: 4.4:1 against the graphite page, and the white glyph on it clears
+     the 3:1 graphical-object boundary. */
+  --action-accent: #3b82f6;
+  --action-accent-hover: #4b8cf7;
+  --action-accent-contrast: #ffffff;
+
   /* Refined Elegant Typography */
   --font-sans:
     -apple-system-body, ui-sans-serif, -apple-system, "system-ui", "Segoe UI",
@@ -144,6 +152,12 @@
   --selection-bg: rgba(0, 100, 220, 0.25);
   --selection-color: #000000;
   --inline-code-color: #7c5e10;
+
+  /* The composer's action circle: a deeper blue so the white glyph keeps its
+     5.3:1 contrast on the light theme's white surfaces. */
+  --action-accent: #2563eb;
+  --action-accent-hover: #1d4ed8;
+  --action-accent-contrast: #ffffff;
 
   --sidebar-bg: var(--bg-primary);
   --sidebar-bg-opaque: var(--bg-primary);
@@ -1312,6 +1326,86 @@ h6 {
   color: var(--text-secondary);
   max-width: 480px;
   line-height: 1.5;
+}
+
+/* ------------------------------------------------------------- new chat ---- */
+/* An empty conversation is a centred invitation: the question, the composer
+   pill and the starter rows are one group, so the composer is never stranded
+   at the bottom of a page that has nothing on it yet. The starter rows live
+   inside .input-container (see NewChatStarters), which is what keeps them
+   exactly as wide as the composer at every breakpoint. */
+.chat-pane.new-chat {
+  justify-content: center;
+}
+
+/* In this state the scroll area is just the heading: it takes its own height
+   instead of the pane's free space, so the group can centre as a whole. */
+.chat-pane.new-chat .messages-scroll {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+
+.new-chat-hero {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto 1.35rem;
+  padding: 0 1.5rem;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.new-chat-hero-title {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 1.75rem;
+  font-weight: 400;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.new-chat-starters {
+  width: 100%;
+  margin-top: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.new-chat-starter {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  width: 100%;
+  padding: 0.8rem 0.75rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.94rem;
+  text-align: start;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.new-chat-starter svg {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.new-chat-starter:hover:not(:disabled) {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.new-chat-starter:hover:not(:disabled) svg {
+  color: var(--text-primary);
+}
+
+.new-chat-starter:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .sample-prompts-grid {
@@ -2764,6 +2858,13 @@ h6 {
   background-color: var(--bg-card);
 }
 
+/* The new-chat composer is a wide pill: same controls, more presence. */
+.input-box.hero {
+  border-radius: var(--radius-pill);
+  padding: 0.6rem 0.7rem 0.6rem 0.8rem;
+  gap: 0.7rem;
+}
+
 .chat-textarea {
   flex: 1;
   min-width: 0;
@@ -2793,10 +2894,19 @@ h6 {
   overflow-y: auto;
 }
 
+/* The hero composer's text matches the question above it, on the same centre
+   line as the icons beside it (see line-height above). */
+.input-box.hero .chat-textarea {
+  font-size: 1rem;
+  line-height: 26px;
+  min-height: 26px;
+}
+
 .input-actions-bar {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  gap: 0.15rem;
   flex-shrink: 0;
 }
 
@@ -2838,6 +2948,59 @@ h6 {
   border: 0;
 }
 
+/* Composer controls: the thinking-effort toggle and the dictation microphone
+   sit between the textarea and the send circle. Both are quiet icon controls —
+   the accent belongs to the action that sends the message. */
+.think-toggle,
+.mic-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  padding: 0 0.6rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--transition-fast);
+}
+
+.mic-btn {
+  width: 30px;
+  padding: 0;
+}
+
+.think-toggle {
+  gap: 0.4rem;
+}
+
+.think-toggle:hover:not(:disabled),
+.mic-btn:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.think-toggle.is-active,
+.mic-btn.is-listening {
+  background: var(--bg-tertiary);
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}
+
+.mic-btn.is-listening {
+  color: var(--action-accent);
+}
+
+.think-toggle:disabled,
+.mic-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .send-btn {
   width: 34px;
   height: 34px;
@@ -2852,14 +3015,37 @@ h6 {
   transition: var(--transition-fast);
 }
 
+/* The composer's primary circle is the one filled accent surface in the
+   interface. It is the send action when there is something to send, and voice
+   input when there is not — so it is never a dead disabled button while the
+   browser can dictate. */
+.send-btn:not(:disabled):not(.stop-btn),
+.send-btn.voice-btn {
+  background: var(--action-accent);
+  border-color: transparent;
+  color: var(--action-accent-contrast);
+}
+
+.send-btn:not(:disabled):not(.stop-btn):hover,
+.send-btn.voice-btn:hover {
+  background: var(--action-accent-hover);
+  transform: scale(1.06);
+}
+
+.send-btn.voice-btn.is-listening {
+  background: var(--action-accent-hover);
+}
+
 .send-btn:hover:not(:disabled) {
   background: var(--bg-secondary);
   border-color: var(--text-primary);
   transform: scale(1.06);
 }
 
+/* Disabled reads as "nothing to send yet", not as a broken control: the circle
+   stays legible while clearly not being the next action. */
 .send-btn:disabled {
-  opacity: 0.2;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
@@ -4689,6 +4875,30 @@ h6 {
     padding: 2rem 0;
   }
 
+  /* New chat on a phone: the question shrinks, the composer stays a pill, and
+     the Think control keeps its icon without the label that would crowd the
+     textarea. */
+  .new-chat-hero {
+    padding: 0 1rem;
+    margin-bottom: 1.1rem;
+  }
+
+  .new-chat-hero-title {
+    font-size: 1.35rem;
+  }
+
+  .input-box.hero {
+    border-radius: var(--radius-pill);
+  }
+
+  .think-toggle {
+    padding: 0 0.5rem;
+  }
+
+  .think-toggle-label {
+    display: none;
+  }
+
   .welcome-title {
     font-size: 2.25rem;
   }
@@ -4990,7 +5200,11 @@ h6 {
   .new-chat-btn,
   .history-item,
   .message-content,
-  .input-box {
+  .input-box,
+  .new-chat-starter,
+  .think-toggle,
+  .mic-btn,
+  .send-btn {
     transition: none !important;
   }
   /* The session-check spinner is decorative: a user who asked for reduced

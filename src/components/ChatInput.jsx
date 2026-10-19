@@ -1,16 +1,24 @@
 import { useRef, useEffect, useState } from "react";
 import {
-  Send,
+  ArrowUp,
+  AudioLines,
+  Brain,
   Square,
   ChevronRight,
   Globe,
   Gamepad2,
+  Mic,
+  MicOff,
   Search,
   Image as ImageIcon,
   X,
 } from "lucide-react";
 import { PlusIcon } from "./icons";
 import { useI18n } from "../i18n/index.jsx";
+import {
+  createDictationSession,
+  isDictationSupported,
+} from "../utils/dictation";
 import {
   processFiles,
   formatBytes,
@@ -66,8 +74,24 @@ export default function ChatInput({
   attachments: externalAttachments,
   setAttachments: externalSetAttachments,
   onAddFiles,
+  /**
+   * "hero" is the new-chat composer: a taller pill under the "What's on the
+   * agenda today?" heading instead of a bar resting on the bottom edge of the
+   * conversation. The controls themselves are identical.
+   */
+  variant = "composer",
+  /** Thinking effort for the next message; owned by the app, never by the composer. */
+  thinkMode = false,
+  /** Providing this is what puts the Think control in the composer. */
+  onToggleThink,
+  /**
+   * Extra content under the composer, inside the same width-limited container
+   * (the new-chat starter rows). The composer owns the width so the rows can
+   * never drift out of line with the input they fill.
+   */
+  footer = null,
 }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const internalRef = useRef(null);
   const refToUse = textareaRef || internalRef;
   const [showSuggestions, setShowSuggestions] = useState(() =>
@@ -77,6 +101,12 @@ export default function ChatInput({
   const suggestionsRef = useRef(null);
   const fileInputRef = useRef(null);
   const submitRetryRef = useRef(0);
+
+  // Voice dictation: the microphone is rendered only where the browser can do
+  // it, so an unsupported browser never shows a button that cannot work.
+  const dictationAvailable = isDictationSupported();
+  const [isDictating, setIsDictating] = useState(false);
+  const dictationRef = useRef(null);
 
   const [internalAttachments, setInternalAttachments] = useState([]);
   const attachments =
@@ -94,6 +124,9 @@ export default function ChatInput({
         a.size <= MAX_IMAGE_THUMB_BYTES) ||
       a.uploading,
   );
+  // The primary action circle mirrors the composer: speak while there is
+  // nothing to send, send the moment there is.
+  const composerEmpty = !String(input || "").trim() && attachments.length === 0;
 
   useEffect(() => {
     if (refToUse.current) {
@@ -227,6 +260,57 @@ export default function ChatInput({
     }
   };
 
+  const stopDictation = () => {
+    const session = dictationRef.current;
+    dictationRef.current = null;
+    setIsDictating(false);
+    session?.stop();
+  };
+
+  const startDictation = () => {
+    if (dictationRef.current) return;
+    // Dictation appends to whatever is already typed, so a half-written message
+    // is never thrown away by pressing the microphone.
+    const typedText = String(input || "");
+    const base = typedText.trim() ? `${typedText.replace(/\s+$/, "")} ` : "";
+    const session = createDictationSession({
+      language,
+      onTranscript: ({ finalText, interimText }) => {
+        setInput(`${base}${finalText}${interimText}`);
+      },
+      onEnd: () => {
+        dictationRef.current = null;
+        setIsDictating(false);
+      },
+      onError: () => {
+        dictationRef.current = null;
+        setIsDictating(false);
+      },
+    });
+    if (!session) return;
+    dictationRef.current = session;
+    setIsDictating(true);
+  };
+
+  // Dictation must not outlive its composer, and it must never keep writing
+  // into a textarea that a streaming answer has taken over.
+  useEffect(() => {
+    return () => {
+      const session = dictationRef.current;
+      dictationRef.current = null;
+      session?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isStreaming) return;
+    const session = dictationRef.current;
+    if (!session) return;
+    dictationRef.current = null;
+    setIsDictating(false);
+    session.stop();
+  }, [isStreaming]);
+
   const handleSubmit = (e) => {
     e?.preventDefault();
     if (isStreaming) {
@@ -256,6 +340,9 @@ export default function ChatInput({
       return;
     }
     submitRetryRef.current = 0;
+    // The textarea is about to be cleared: a live dictation session would keep
+    // typing into it, so it ends with the message it wrote.
+    stopDictation();
     onSendMessage(textToSend, attachments);
     setInput("");
     setAttachments([]);
@@ -301,7 +388,9 @@ export default function ChatInput({
     <div className="input-container">
       <form
         onSubmit={handleSubmit}
-        className={`input-box ${isDragOverInput ? "drag-over" : ""}`}
+        className={`input-box${variant === "hero" ? " hero" : ""}${
+          isDragOverInput ? " drag-over" : ""
+        }`}
         onDragEnter={handleInputDragEnter}
         onDragOver={handleInputDragOver}
         onDragLeave={handleInputDragLeave}
@@ -462,6 +551,51 @@ export default function ChatInput({
           rows={1}
         />
         <div className="input-actions-bar">
+          {typeof onToggleThink === "function" && (
+            <button
+              type="button"
+              className={`think-toggle${thinkMode ? " is-active" : ""}`}
+              onClick={() => onToggleThink(!thinkMode)}
+              aria-pressed={thinkMode}
+              aria-label={t("chat.composer.think")}
+              title={
+                thinkMode
+                  ? t("chat.composer.thinkTitleOn")
+                  : t("chat.composer.thinkTitleOff")
+              }
+              disabled={isStreaming}
+            >
+              <Brain size={15} strokeWidth={1.6} aria-hidden="true" />
+              <span className="think-toggle-label">
+                {t("chat.composer.think")}
+              </span>
+            </button>
+          )}
+          {dictationAvailable && (
+            <button
+              type="button"
+              className={`mic-btn${isDictating ? " is-listening" : ""}`}
+              onClick={() => (isDictating ? stopDictation() : startDictation())}
+              aria-pressed={isDictating}
+              aria-label={
+                isDictating
+                  ? t("chat.composer.dictating")
+                  : t("chat.composer.dictate")
+              }
+              title={
+                isDictating
+                  ? t("chat.composer.dictating")
+                  : t("chat.composer.dictate")
+              }
+              disabled={isStreaming}
+            >
+              {isDictating ? (
+                <MicOff size={16} strokeWidth={1.6} aria-hidden="true" />
+              ) : (
+                <Mic size={16} strokeWidth={1.6} aria-hidden="true" />
+              )}
+            </button>
+          )}
           {isStreaming ? (
             <button
               type="button"
@@ -470,6 +604,33 @@ export default function ChatInput({
               title={t("chat.composer.stopGeneration")}
             >
               <Square size={13} fill="currentColor" strokeWidth={1.5} />
+            </button>
+          ) : dictationAvailable && composerEmpty ? (
+            // Nothing to send yet: the primary action is the voice one, so the
+            // circle is never a dead disabled button while the browser can
+            // dictate. It runs the same dictation the microphone does, and the
+            // moment there is something to send it becomes the send circle.
+            <button
+              type="button"
+              className={`send-btn voice-btn${isDictating ? " is-listening" : ""}`}
+              onClick={() => (isDictating ? stopDictation() : startDictation())}
+              aria-pressed={isDictating}
+              title={
+                isDictating
+                  ? t("chat.composer.stopVoice")
+                  : t("chat.composer.startVoice")
+              }
+              aria-label={
+                isDictating
+                  ? t("chat.composer.stopVoice")
+                  : t("chat.composer.startVoice")
+              }
+            >
+              {isDictating ? (
+                <MicOff size={16} strokeWidth={1.6} aria-hidden="true" />
+              ) : (
+                <AudioLines size={18} strokeWidth={1.8} aria-hidden="true" />
+              )}
             </button>
           ) : (
             <button
@@ -484,11 +645,12 @@ export default function ChatInput({
                   : t("chat.composer.sendMessage")
               }
             >
-              <Send size={15} strokeWidth={1.5} />
+              <ArrowUp size={17} strokeWidth={2.1} />
             </button>
           )}
         </div>
       </form>
+      {footer}
     </div>
   );
 }

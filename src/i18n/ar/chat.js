@@ -12,6 +12,14 @@ export default {
     sendMessage: "إرسال رسالة",
     imageLoading: "الصورة قيد التحميل…",
     stopGeneration: "إيقاف التوليد",
+    // أدوات مربع الكتابة: مفتاح التفكير العميق والزرّ الميكروفون.
+    think: "تفكير",
+    thinkTitleOff: "تفكير: تعمّق في التحليل قبل الإجابة (أبطأ، وأفضل في الأسئلة الصعبة)",
+    thinkTitleOn: "التفكير العميق مُفعّل — اضغط للإجابة بسرعة أكبر",
+    dictate: "أملِ رسالتك بصوتك",
+    dictating: "إيقاف الإملاء",
+    startVoice: "بدء الإدخال الصوتي",
+    stopVoice: "إيقاف الإدخال الصوتي",
     commandsLabel: "الأوامر",
     suggestionLabel: "{label} — {description}",
     commands: {

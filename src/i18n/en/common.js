@@ -16,9 +16,22 @@ export default {
     respondingIn: "Responding in “{title}”…",
     anotherChat: "another chat",
     view: "View",
-    startNewConversation: "Start a new conversation",
     responding: "Corez is responding",
     untitledApplication: "Untitled Application",
+  },
+
+  // The new-chat screen: the question above the composer and the starter rows
+  // under it. A starter pre-fills the composer (the "@image" token is a real
+  // command; the other two are plain sentences the user continues typing), so
+  // the prompt values are translatable copy, not code.
+  newChat: {
+    title: "What's on the agenda today?",
+    startersLabel: "Starter prompts",
+    starterImage: "Create an image or sticker",
+    starterWrite: "Write or edit",
+    starterSearch: "Search the web",
+    starterWritePrompt: "Write or edit: ",
+    starterSearchPrompt: "Search the web for ",
   },
 
   // Announced by the thinking indicator's live region while a build runs.

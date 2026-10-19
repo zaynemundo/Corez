@@ -9,9 +9,19 @@ export default {
     respondingIn: "جارٍ الرد في «{title}»…",
     anotherChat: "محادثة أخرى",
     view: "عرض",
-    startNewConversation: "ابدأ محادثة جديدة",
     responding: "Corez يرد الآن",
     untitledApplication: "تطبيق بدون عنوان",
+  },
+
+  // شاشة المحادثة الجديدة: السؤال فوق مربع الكتابة وصفوف البدء تحته.
+  newChat: {
+    title: "ما الذي على جدول أعمالك اليوم؟",
+    startersLabel: "أفكار للبدء",
+    starterImage: "أنشئ صورة أو ملصقاً",
+    starterWrite: "اكتب أو حرّر",
+    starterSearch: "ابحث في الويب",
+    starterWritePrompt: "اكتب أو حرّر: ",
+    starterSearchPrompt: "ابحث في الويب عن ",
   },
 
   // Announced by the thinking indicator's live region while a build runs.
