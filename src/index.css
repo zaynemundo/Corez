@@ -1328,16 +1328,16 @@ h6 {
 }
 
 /* ------------------------------------------------------------- new chat ---- */
-/* An empty conversation is a centred invitation: the question, the composer
-   pill and the starter rows are one group, so the composer is never stranded
-   at the bottom of a page that has nothing on it yet. The starter rows live
-   inside .input-container (see NewChatStarters), which is what keeps them
-   exactly as wide as the composer at every breakpoint. */
+/* An empty conversation is a centred group — the wordmark, the question, the
+   composer and the command grid — so the composer is never stranded at the
+   bottom of a page that has nothing on it yet. The grid lives inside
+   .input-container (see NewChatStarters), which is what keeps it exactly as
+   wide as the composer at every breakpoint. */
 .chat-pane.new-chat {
   justify-content: center;
 }
 
-/* In this state the scroll area is just the heading: it takes its own height
+/* In this state the scroll area is just the hero text: it takes its own height
    instead of the pane's free space, so the group can centre as a whole. */
 .chat-pane.new-chat .messages-scroll {
   flex: 0 1 auto;
@@ -1353,6 +1353,17 @@ h6 {
   text-align: center;
 }
 
+/* The wordmark sits above the question the way it does on the sign-in screen:
+   Corez names itself before it asks anything. */
+.new-chat-wordmark {
+  margin: 0 0 0.65rem;
+  font-family: var(--font-heading);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  color: var(--text-secondary);
+}
+
 .new-chat-hero-title {
   margin: 0;
   font-family: var(--font-heading);
@@ -1363,56 +1374,69 @@ h6 {
   color: var(--text-primary);
 }
 
-.new-chat-starters {
+/* The command grid: console-style cells — the monospace token leads, the plain
+   label explains it. Two columns of bordered cells read as a capability panel
+   rather than a list of suggestions. */
+.new-chat-commands {
   width: 100%;
-  margin-top: 0.6rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
+  margin-top: 0.85rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
 }
 
-.new-chat-starter {
+.new-chat-command {
   display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  width: 100%;
-  padding: 0.8rem 0.75rem;
-  border: 1px solid transparent;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: transparent;
   color: var(--text-secondary);
   font-family: var(--font-sans);
-  font-size: 0.94rem;
+  font-size: 0.86rem;
+  line-height: 1.35;
   text-align: start;
   cursor: pointer;
   transition: var(--transition-fast);
 }
 
-.new-chat-starter svg {
+.new-chat-command-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.new-chat-command svg {
   flex-shrink: 0;
   color: var(--text-muted);
 }
 
-/* The command each row inserts, shown in the interface's monospace face: the
-   rows teach Corez's own vocabulary instead of hiding it behind the label. */
-.new-chat-starter-token {
-  margin-inline-start: auto;
+.new-chat-command-token {
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 0.74rem;
   color: var(--text-muted);
 }
 
-.new-chat-starter:hover:not(:disabled) {
+.new-chat-command:hover:not(:disabled),
+.new-chat-command:focus-visible {
   background: var(--bg-secondary);
+  border-color: var(--border-hover);
   color: var(--text-primary);
 }
 
-.new-chat-starter:hover:not(:disabled) svg,
-.new-chat-starter:hover:not(:disabled) .new-chat-starter-token {
+.new-chat-command:hover:not(:disabled) svg,
+.new-chat-command:focus-visible svg,
+.new-chat-command:hover:not(:disabled) .new-chat-command-token,
+.new-chat-command:focus-visible .new-chat-command-token {
   color: var(--text-primary);
 }
 
-.new-chat-starter:disabled {
+.new-chat-command:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
@@ -2959,50 +2983,35 @@ h6 {
   border: 0;
 }
 
-/* Composer controls: the thinking-effort toggle and the dictation microphone
-   sit between the textarea and the send circle. Both are quiet icon controls —
-   the accent belongs to the action that sends the message. */
-.think-toggle,
+/* Composer controls: the dictation microphone sits between the textarea and the
+   send circle. A quiet icon control — the filled circle belongs to the action
+   that sends the message. */
 .mic-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 30px;
   height: 30px;
-  padding: 0 0.6rem;
+  padding: 0;
   border: 1px solid transparent;
   border-radius: var(--radius-pill);
   background: transparent;
   color: var(--text-secondary);
-  font-family: var(--font-sans);
-  font-size: 0.8rem;
   cursor: pointer;
-  white-space: nowrap;
   transition: var(--transition-fast);
 }
 
-.mic-btn {
-  width: 30px;
-  padding: 0;
-}
-
-.think-toggle {
-  gap: 0.4rem;
-}
-
-.think-toggle:hover:not(:disabled),
 .mic-btn:hover:not(:disabled) {
   background: var(--bg-tertiary);
   color: var(--text-primary);
 }
 
-.think-toggle.is-active,
 .mic-btn.is-listening {
   background: var(--bg-tertiary);
   border-color: var(--border-hover);
   color: var(--text-primary);
 }
 
-.think-toggle:disabled,
 .mic-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
@@ -4876,9 +4885,8 @@ h6 {
     padding: 2rem 0;
   }
 
-  /* New chat on a phone: the question shrinks, the composer stays a pill, and
-     the Think control keeps its icon without the label that would crowd the
-     textarea. */
+  /* New chat on a phone: the hero text shrinks and the command grid becomes a
+     single column, so every cell keeps a comfortable tap target. */
   .new-chat-hero {
     padding: 0 1rem;
     margin-bottom: 1.1rem;
@@ -4888,12 +4896,8 @@ h6 {
     font-size: 1.35rem;
   }
 
-  .think-toggle {
-    padding: 0 0.5rem;
-  }
-
-  .think-toggle-label {
-    display: none;
+  .new-chat-commands {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .welcome-title {
@@ -5198,8 +5202,7 @@ h6 {
   .history-item,
   .message-content,
   .input-box,
-  .new-chat-starter,
-  .think-toggle,
+  .new-chat-command,
   .mic-btn,
   .send-btn {
     transition: none !important;

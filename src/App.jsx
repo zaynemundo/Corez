@@ -1172,9 +1172,6 @@ function MainApp({ theme, setTheme }) {
   };
 
   const [chatInput, setChatInput] = useState("");
-  // Composer "Think" control: ask the hosted model for its deepest reasoning
-  // effort on the next message (see generateAIResponse's request options).
-  const [thinkMode, setThinkMode] = useState(false);
   const [revisionContextCode, setRevisionContextCode] = useState("");
 
   const handleSendMessage = async (promptText, attachmentsArg = []) => {
@@ -1500,9 +1497,6 @@ function MainApp({ theme, setTheme }) {
           streamingThinkingRef.current += text;
           setStreamingThinking(streamingThinkingRef.current);
         },
-        // Request options: the composer's Think control asks for the deepest
-        // reasoning effort the router offers for this message.
-        { think: thinkMode },
       );
       if (response) {
         // Real thinking only: when the gateway returns no reasoning the
@@ -1823,10 +1817,12 @@ function MainApp({ theme, setTheme }) {
                   <h1 className="welcome-title">COREZ</h1>
                 </div>
               ) : !activeSession || activeSession.messages.length === 0 ? (
-                // New chat: the question sits above the composer, which is
-                // rendered below this scroll area, so the composer keeps its
-                // identity and focus while the screen changes.
+                // New chat: the wordmark and the question sit above the
+                // composer, which is rendered below this scroll area, so the
+                // composer keeps its identity and focus while the screen
+                // changes.
                 <div className="new-chat-hero">
+                  <p className="new-chat-wordmark">COREZ</p>
                   <h1 className="new-chat-hero-title">
                     {t("common.newChat.title")}
                   </h1>
@@ -1911,10 +1907,8 @@ function MainApp({ theme, setTheme }) {
               attachments={attachments}
               setAttachments={setAttachments}
               variant={isNewChat ? "hero" : "composer"}
-              thinkMode={thinkMode}
-              onToggleThink={setThinkMode}
-              // The starter rows live inside the composer's own container so
-              // they always line up with the input they fill.
+              // The command grid lives inside the composer's own container so
+              // it always lines up with the input it fills.
               footer={
                 isNewChat ? (
                   <NewChatStarters onSelect={handleStarterSelect} />

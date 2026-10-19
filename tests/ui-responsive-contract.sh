@@ -332,22 +332,27 @@ check 'reduced motion query disables sidebar animation' '@media \(prefers-reduce
 check_top_level_media 'sidebar prefers-reduced-motion at top level' '@media \(prefers-reduced-motion: reduce\)' "$css"
 check 'mobile sidebar uses safe-area insets' 'env\(safe-area-inset-'
 
-# New chat: an empty conversation is one centred group — the question, the
-# composer bar and the starter rows — so the composer is never stranded on the
-# bottom edge of an empty page. The rows live inside the composer's own
-# container, which is what keeps them exactly as wide as the input they fill.
+# New chat: an empty conversation is one centred group — the wordmark, the
+# question, the composer bar and the command grid — so the composer is never
+# stranded on the bottom edge of an empty page. The grid lives inside the
+# composer's own container, which is what keeps it exactly as wide as the input
+# it fills.
 check_block_property 'the new chat screen centres its group vertically' '.chat-pane.new-chat' 'justify-content' 'center'
 check_block_property 'the new chat scroll area takes only its own height' '.chat-pane.new-chat .messages-scroll' 'flex' '0 1 auto'
+check_block_property 'the wordmark names the product above the question' '.new-chat-wordmark' 'letter-spacing' '0.24em'
 check_block_property 'the new chat question is regular weight, not a display wordmark' '.new-chat-hero-title' 'font-weight' '400'
 check_block_property 'the new chat composer keeps the restrained corner radius' '.input-box.hero' 'border-radius' 'var(--radius-xl)'
 check_block_absent 'the new chat composer is not an oversized pill' '.input-box.hero' 'border-radius' 'var(--radius-pill)'
-check_block_property 'starter rows keep the restrained rectangular radius' '.new-chat-starter' 'border-radius' 'var(--radius-md)'
-check_block_property 'starter rows fill the composer width' '.new-chat-starters' 'width' '100%'
-check_block_property 'each starter row shows the command it inserts' '.new-chat-starter-token' 'font-family' 'var(--font-mono)'
-check 'the composer accepts the starter rows as a footer slot' 'footer = null' "$input"
-check 'the app passes the starter rows to the composer' '<NewChatStarters' "$app"
-check 'the starter rows are CoreZ own commands' 'insert: "@website "' "$starters"
-check_absent 'the starter rows are not borrowed sample sentences' 'Write or edit' "$starters"
+# The command grid is a capability panel: two columns of bordered cells, each
+# led by its monospace command token, collapsing to one column on a phone.
+check_block_property 'the command grid is a two-column panel' '.new-chat-commands' 'grid-template-columns' 'repeat(2, minmax(0, 1fr))'
+check_block_property 'command cells keep the restrained rectangular radius' '.new-chat-command' 'border-radius' 'var(--radius-md)'
+check_block_property 'command cells lead with their command token' '.new-chat-command-token' 'font-family' 'var(--font-mono)'
+check_block_property_in_media 'the command grid is one column on a phone' 'max-width: 767px' '.new-chat-commands' 'grid-template-columns' 'minmax(0, 1fr)'
+check 'the composer accepts the command grid as a footer slot' 'footer = null' "$input"
+check 'the app passes the command grid to the composer' '<NewChatStarters' "$app"
+check 'the command cells are CoreZ own commands' 'insert: "@website "' "$starters"
+check_absent 'the command cells are not borrowed sample sentences' 'Write or edit' "$starters"
 # Corez is a monochrome system: the composer's primary action is the brightest
 # surface on the page, not a coloured one, and the stop button keeps its own.
 check_block_property 'the send circle is the monochrome action surface' '.send-btn:not(:disabled):not(.stop-btn)' 'background' 'var(--action-strong)'
@@ -355,15 +360,15 @@ check_block_property 'the action surface is defined for the dark theme' ':root' 
 check_block_property 'the action surface is defined for the light theme' '[data-theme="light"]' '--action-strong' 'var(--text-primary)'
 check_block_absent 'the composer has no borrowed accent colour' '.send-btn' 'background' 'var(--action-accent)'
 check_block_property 'the stop button keeps its own background' '.send-btn.stop-btn' 'background' 'rgba(239, 68, 68, 0.18)'
-# One voice affordance (the microphone, only where the browser can dictate) and
-# one reasoning control, named in CoreZ own words.
+# The composer carries no switches of its own: one voice affordance (the
+# microphone, only where the browser can dictate) and nothing that overrides how
+# the app routes a message.
 check_absent 'the send circle is never a second voice control' 'voice-btn'
-check 'the app owns the reasoning-effort state' 'thinkMode=\{thinkMode\}' "$app"
-check 'the composer exposes the reasoning toggle state' 'aria-pressed=\{thinkMode\}' "$input"
+check_block_absent 'the composer has no thinking-effort toggle' '.think-toggle' 'opacity' '0.35'
+check_absent 'no thinking-effort state reaches the request' 'thinkMode' "$app"
+check_absent 'no reasoning override is sent with the message' 'requestOptions.think' 'src/services/aiService.js'
 check 'the microphone is gated on browser support' 'dictationAvailable &&' "$input"
-check_block_property 'the reasoning toggle marks its active state' '.think-toggle.is-active' 'border-color' 'var(--border-hover)'
-check_block_property 'an unavailable composer control is visibly disabled' '.think-toggle:disabled' 'opacity' '0.35'
-check_block_property 'mobile hides the reasoning label to protect the textarea' '.think-toggle-label' 'display' 'none'
+check_block_property 'an unavailable composer control is visibly disabled' '.mic-btn:disabled' 'opacity' '0.35'
 
 
 if (( failures > 0 )); then

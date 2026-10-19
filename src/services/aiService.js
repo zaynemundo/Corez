@@ -1190,14 +1190,6 @@ export function clearPersistedProjectState() {
   persistedProjectState = null;
 }
 
-/**
- * Complexity tier requested by the composer's Think control. The worker's model
- * router maps "epic" to the maximum reasoning effort (see REASONING_BY_COMPLEXITY
- * in worker/modelRouter.js) and returns that reasoning in the stream, so the
- * thinking panel shows the work — the honest, visible form of "think harder".
- */
-export const THINK_COMPLEXITY = "epic";
-
 export async function generateHostedAIResponse(
   prompt,
   intent = analyzePublicUserIntent(prompt),
@@ -1258,15 +1250,7 @@ export async function generateHostedAIResponse(
     registry: defaultSkillRegistry,
   });
 
-  // The composer's Think control asks for the deepest reasoning the router
-  // offers ("epic" is the top tier in worker/modelRouter.js, and it maps to the
-  // xhigh reasoning effort AND its visible thinking stream). It is the user's
-  // explicit "take longer, think harder" choice, so it overrides the automatic
-  // per-prompt classification rather than nudging it.
-  const complexity =
-    options.think === true
-      ? THINK_COMPLEXITY
-      : classifyComplexity(prompt, fineIntent);
+  const complexity = classifyComplexity(prompt, fineIntent);
   // Explicit execution mode: repository engineering work routes to the agent
   // path (and is reported honestly when no workspace is attached), while
   // conversational and standalone preview-creation prompts stay on the
@@ -3355,11 +3339,6 @@ export async function generateAIResponse(
   onClear = null,
   retryOpts = {},
   onThinking = null,
-  /**
-   * Per-request options from the interface. `think: true` — the composer's
-   * Think control — asks for the deepest reasoning effort on this message.
-   */
-  requestOptions = {},
 ) {
   // Explicit commands first: @website, @game, @research, @image. The command
   // token is stripped before any model sees the prompt, so the AI is never
@@ -3484,7 +3463,6 @@ export async function generateAIResponse(
     onClear,
     ...(typeof onThinking === "function" ? { onThinking } : {}),
     ...(innerRetryDelaysMs ? { retryDelaysMs: innerRetryDelaysMs } : {}),
-    ...(requestOptions.think === true ? { think: true } : {}),
   });
 
   const callHostedOnce = async (promptToSend) => {

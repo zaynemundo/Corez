@@ -1,12 +1,11 @@
 // @vitest-environment jsdom
 //
-// The new-chat screen: a centred question, the composer pill under it, and
-// three starter rows that PRE-FILL the composer.
+// The new-chat screen: the wordmark and a centred question, the composer under
+// them, and a grid of CoreZ's four commands that PRE-FILL the composer.
 //
-// A screenshot cannot pin any of this: what each row inserts, that the rows sit
-// in the composer's own width-limited container, that the composer keeps the
-// value and the caret, and that the Think control changes the request that
-// actually goes out. Those are the assertions here.
+// A screenshot cannot pin any of this: what each cell inserts, that the grid
+// sits in the composer's own width-limited container, that the composer keeps
+// the value and the caret, and that the composer carries no switches of its own.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   render,
@@ -16,10 +15,6 @@ import {
   fireEvent,
 } from "@testing-library/react";
 import App from "../src/App.jsx";
-import {
-  generateAIResponse,
-  THINK_COMPLEXITY,
-} from "../src/services/aiService.js";
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -65,12 +60,15 @@ afterEach(() => {
 });
 
 describe("the new-chat screen", () => {
-  it("asks what we are building above the composer", async () => {
-    await renderNewChat();
+  it("names CoreZ, then asks what we are building", async () => {
+    const { container } = await renderNewChat();
+    const wordmark = container.querySelector(".new-chat-wordmark");
+    expect(wordmark.textContent).toBe("COREZ");
     const heading = screen.getByRole("heading", { level: 1 });
     expect(heading.textContent).toBe("What are we building today?");
-    // The heading sits in the centred hero, above the composer.
+    // Both sit in the centred hero, above the composer.
     expect(heading.closest(".new-chat-hero")).toBeTruthy();
+    expect(wordmark.closest(".new-chat-hero")).toBeTruthy();
   });
 
   it("wears the wide hero composer instead of the bottom bar", async () => {
@@ -78,25 +76,26 @@ describe("the new-chat screen", () => {
     expect(container.querySelector("form.input-box.hero")).toBeTruthy();
   });
 
-  it("renders one starter row per CoreZ command", async () => {
-    await renderNewChat();
-    const starters = screen.getByRole("group", { name: "Start with a command" });
-    expect(starters.textContent).toContain("Build an app or website");
-    expect(starters.textContent).toContain("Create a game");
-    expect(starters.textContent).toContain("Generate an image");
-    expect(starters.textContent).toContain("Research a topic");
-    // The rows show the command they insert, in the interface's mono face.
+  it("renders one command cell per CoreZ command", async () => {
+    const { container } = await renderNewChat();
+    const grid = screen.getByRole("group", { name: "Corez commands" });
+    expect(grid.textContent).toContain("Build an app or website");
+    expect(grid.textContent).toContain("Create a game");
+    expect(grid.textContent).toContain("Generate an image");
+    expect(grid.textContent).toContain("Research a topic");
+    // Each cell shows the command it inserts, in the interface's mono face.
     for (const token of ["@website", "@game", "@image", "@research"]) {
-      expect(starters.textContent).toContain(token);
+      expect(grid.textContent).toContain(token);
     }
+    expect(container.querySelectorAll(".new-chat-command")).toHaveLength(4);
   });
 
-  it("keeps the starter rows inside the composer's own container", async () => {
-    // The rows must never drift out of line with the input they fill, so they
-    // share the composer's width-limited container at every breakpoint.
+  it("keeps the command grid inside the composer's own container", async () => {
+    // The grid must never drift out of line with the input it fills, so it
+    // shares the composer's width-limited container at every breakpoint.
     const { container } = await renderNewChat();
     const containerEl = container.querySelector(".input-container");
-    expect(containerEl.querySelector(".new-chat-starters")).toBeTruthy();
+    expect(containerEl.querySelector(".new-chat-commands")).toBeTruthy();
   });
 
   it("pre-fills the composer with the image command and keeps the caret ready", async () => {
@@ -147,21 +146,8 @@ describe("the new-chat screen", () => {
   });
 });
 
-describe("the composer Deep think control", () => {
-  it("reports its state and toggles on click", async () => {
-    await renderNewChat();
-    const think = screen.getByRole("button", { name: "Deep think" });
-    expect(think.getAttribute("aria-pressed")).toBe("false");
-    fireEvent.click(think);
-    expect(
-      screen
-        .getByRole("button", { name: "Deep think" })
-        .getAttribute("aria-pressed"),
-    ).toBe("true");
-  });
-
-  it("asks for the deepest reasoning effort on the next message", async () => {
-    // The toggle has to mean something at the API boundary, not just in the UI.
+describe("the composer keeps to the message", () => {
+  it("sends the message without request-level switches", async () => {
     // The turn also asks for a session title, so the assertion is on the
     // message request itself, not on whichever /api/ai call lands last.
     const payloads = [];
@@ -182,7 +168,6 @@ describe("the composer Deep think control", () => {
       expect(screen.getByPlaceholderText("Ask Corez...")).toBeTruthy(),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Deep think" }));
     fireEvent.change(composer(), {
       target: { value: "explain how a for loop works" },
     });
@@ -194,45 +179,20 @@ describe("the composer Deep think control", () => {
     const messageRequest = payloads.find((payload) => !payload.titleOnly);
     expect(messageRequest).toBeTruthy();
     expect(messageRequest.prompt).toContain("explain how a for loop works");
-    expect(messageRequest.complexity).toBe(THINK_COMPLEXITY);
+    // The routing decision stays the app's: no composer switch overrides it.
+    expect(messageRequest.complexity).toBeTruthy();
+    expect(messageRequest.think).toBeUndefined();
   });
 });
 
-describe("generateAIResponse request options", () => {
-  function stubAi(captured) {
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
-      const target = String(url);
-      if (target.includes("/api/ai")) {
-        captured.push(JSON.parse(init.body));
-        return json({ content: "Answer." });
-      }
-      return json({ kind: "inspiration", category: "websites", sites: [] });
-    });
-  }
-
-  it("sends the automatic complexity when Think is off", async () => {
-    const captured = [];
-    stubAi(captured);
-    await generateAIResponse("explain how a for loop works", []);
-    expect(captured).toHaveLength(1);
-    expect(captured[0].complexity).not.toBe(THINK_COMPLEXITY);
-  });
-
-  it("overrides it with the top tier when Think is on", async () => {
-    const captured = [];
-    stubAi(captured);
-    await generateAIResponse(
-      "explain how a for loop works",
-      [],
-      null,
-      null,
-      null,
-      null,
-      {},
-      null,
-      { think: true },
-    );
-    expect(captured).toHaveLength(1);
-    expect(captured[0].complexity).toBe(THINK_COMPLEXITY);
+describe("the composer controls", () => {
+  it("carries attach, dictation and send — and nothing that reasons for the user", async () => {
+    const { container } = await renderNewChat();
+    expect(screen.getByLabelText("Attach files")).toBeTruthy();
+    expect(screen.getByTitle("Send Message")).toBeTruthy();
+    // No thinking-effort toggle, no second voice control.
+    expect(container.querySelector(".think-toggle")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Deep think" })).toBeNull();
+    expect(container.querySelector(".voice-btn")).toBeNull();
   });
 });

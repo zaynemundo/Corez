@@ -1,7 +1,6 @@
 import { useRef, useEffect, useState } from "react";
 import {
   ArrowUp,
-  Brain,
   Square,
   ChevronRight,
   Globe,
@@ -79,14 +78,10 @@ export default function ChatInput({
    * conversation. The controls themselves are identical.
    */
   variant = "composer",
-  /** Reasoning effort for the next message; owned by the app, never by the composer. */
-  thinkMode = false,
-  /** Providing this is what puts the Deep think control in the composer. */
-  onToggleThink,
   /**
    * Extra content under the composer, inside the same width-limited container
-   * (the new-chat starter rows). The composer owns the width so the rows can
-   * never drift out of line with the input they fill.
+   * (the new-chat command grid). The composer owns the width so the grid can
+   * never drift out of line with the input it fills.
    */
   footer = null,
 }) {
@@ -547,26 +542,6 @@ export default function ChatInput({
           rows={1}
         />
         <div className="input-actions-bar">
-          {typeof onToggleThink === "function" && (
-            <button
-              type="button"
-              className={`think-toggle${thinkMode ? " is-active" : ""}`}
-              onClick={() => onToggleThink(!thinkMode)}
-              aria-pressed={thinkMode}
-              aria-label={t("chat.composer.think")}
-              title={
-                thinkMode
-                  ? t("chat.composer.thinkTitleOn")
-                  : t("chat.composer.thinkTitleOff")
-              }
-              disabled={isStreaming}
-            >
-              <Brain size={15} strokeWidth={1.6} aria-hidden="true" />
-              <span className="think-toggle-label">
-                {t("chat.composer.think")}
-              </span>
-            </button>
-          )}
           {dictationAvailable && (
             <button
               type="button"

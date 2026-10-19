@@ -51,7 +51,7 @@ export default function NewChatStarters({ onSelect }) {
 
   return (
     <div
-      className="new-chat-starters"
+      className="new-chat-commands"
       role="group"
       aria-label={t("common.newChat.startersLabel")}
     >
@@ -61,12 +61,18 @@ export default function NewChatStarters({ onSelect }) {
           <button
             key={starter.id}
             type="button"
-            className="new-chat-starter"
+            className="new-chat-command"
             onClick={() => onSelect?.(starter.insert)}
           >
-            <Icon size={18} strokeWidth={1.5} aria-hidden="true" />
-            <span className="new-chat-starter-label">{t(starter.labelKey)}</span>
-            <code className="new-chat-starter-token">{starter.insert.trim()}</code>
+            <span className="new-chat-command-head">
+              <Icon size={15} strokeWidth={1.6} aria-hidden="true" />
+              <code className="new-chat-command-token">
+                {starter.insert.trim()}
+              </code>
+            </span>
+            <span className="new-chat-command-label">
+              {t(starter.labelKey)}
+            </span>
           </button>
         );
       })}

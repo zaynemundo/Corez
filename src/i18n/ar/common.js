@@ -13,11 +13,11 @@ export default {
     untitledApplication: "تطبيق بدون عنوان",
   },
 
-  // شاشة المحادثة الجديدة: السؤال فوق مربع الكتابة وصفوف البدء تحته.
-  // كل صف يُدرج أحد أوامر Corez نفسها (@website، @game، @image، @research).
+  // شاشة المحادثة الجديدة: اسم العلامة والسؤال فوق مربع الكتابة، وشبكة الأوامر تحته.
+  // كل خلية تُدرج أحد أوامر Corez نفسها (@website، @game، @image، @research).
   newChat: {
     title: "ما الذي سنبنيه اليوم؟",
-    startersLabel: "ابدأ بأمر",
+    startersLabel: "أوامر Corez",
     starterWebsite: "أنشئ تطبيقاً أو موقعاً",
     starterGame: "أنشئ لعبة",
     starterImage: "ولّد صورة",

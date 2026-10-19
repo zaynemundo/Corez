@@ -20,13 +20,13 @@ export default {
     untitledApplication: "Untitled Application",
   },
 
-  // The new-chat screen: the question above the composer and the starter rows
-  // under it. Each row inserts one of CoreZ's own commands (@website, @game,
-  // @image, @research) — real tokens rather than borrowed sample sentences, so
-  // the rows teach the product's actual vocabulary.
+  // The new-chat screen: the wordmark and the question above the composer, and
+  // the command grid under it. Each cell inserts one of CoreZ's own commands
+  // (@website, @game, @image, @research) — real tokens rather than borrowed
+  // sample sentences, so the grid teaches the product's actual vocabulary.
   newChat: {
     title: "What are we building today?",
-    startersLabel: "Start with a command",
+    startersLabel: "Corez commands",
     starterWebsite: "Build an app or website",
     starterGame: "Create a game",
     starterImage: "Generate an image",
