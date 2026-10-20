@@ -14,6 +14,7 @@ import {
   validEmail,
   verifySession,
   verifySession as _verifySession,
+  sessionUid,
   requireAuth,
   handleAuth,
   ensureTables,
@@ -559,6 +560,22 @@ describe('Worker Auth Engine', () => {
       // An explicit production marker beats a localhost-looking host.
       expect(
         await requireAuth(new Request('http://localhost:8787/api/ai'), {
+          ENVIRONMENT: 'production',
+        }),
+      ).toBeNull();
+    });
+
+    it('resolves route-level uid lookups under the same fail-closed rule', async () => {
+      // sessionUid is what a handler that owns its own 401 asks (publish, apps,
+      // memory). It shares requireAuth's rule instead of carrying a copy: the
+      // development identity is granted only where the deployment is not
+      // production, so a production host without a secret has no caller at all.
+      const devEnv = {};
+      expect(await sessionUid(new Request('http://localhost:8787/api/publish'), devEnv)).toBe('dev');
+      expect(await sessionUid(new Request('https://corez.test/api/publish'), devEnv)).toBe('dev');
+      expect(await sessionUid(new Request('https://corez.pro/api/publish'), devEnv)).toBeNull();
+      expect(
+        await sessionUid(new Request('http://localhost:8787/api/publish'), {
           ENVIRONMENT: 'production',
         }),
       ).toBeNull();

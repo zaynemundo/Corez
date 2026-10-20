@@ -229,3 +229,28 @@ export async function readBoundedJson(request, maxBytes = MAX_BODY_BYTES) {
   }
   return JSON.parse(text);
 }
+
+/**
+ * One safe path/storage segment: letters, digits, dot, dash and underscore.
+ *
+ * Route params and R2 key segments both need this bound. It used to exist as a
+ * private copy in index.js and in memory.js; one copy means the two endpoints
+ * that accept a segment can never disagree about what one is (a laxer copy
+ * would let a key escape its folder).
+ */
+export const SAFE_STORAGE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$/;
+
+/**
+ * Decode one URL path segment, or null when it is not valid percent-encoding.
+ *
+ * Route handlers repeat this on every `:id` they take from the path; one copy
+ * keeps the "malformed encoding is the caller's 400/404, never a throw" rule
+ * identical everywhere.
+ */
+export function decodePathSegment(segment) {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return null;
+  }
+}

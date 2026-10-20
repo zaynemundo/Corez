@@ -72,10 +72,6 @@ export function userAppPrefix(userId, sessionId) {
   return `${userFolder(userId)}apps/${safeSegment(sessionId)}/`;
 }
 
-export function userAppsPrefix(userId) {
-  return `${userFolder(userId)}apps/`;
-}
-
 export function userMemoryKey(userId, key) {
   return `${userFolder(userId)}memory/${safeSegment(key)}.json`;
 }

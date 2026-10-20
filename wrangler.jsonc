@@ -41,10 +41,11 @@
   // third-party key, billed inside the daily free neuron allocation. Search
   // ranking also uses it first (rerank then embeddings) before keyed
   // providers; disable with WORKERS_AI_RERANK_DISABLED / WORKERS_AI_EMBED_DISABLED.
-  // D1 restored 2026-08-19: corez-auth re-created (8ab37b35-7c23-4a9b-896c-d1953d71bec5)
   "ai": {
     "binding": "AI"
   },
+  // D1 restored 2026-08-19: corez-auth re-created
+  // (8ab37b35-7c23-4a9b-896c-d1953d71bec5).
   "d1_databases": [
     {
       "binding": "DB",

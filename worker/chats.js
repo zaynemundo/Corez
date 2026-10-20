@@ -447,9 +447,16 @@ function extractChatAssetKeys(messages) {
   return [...keys];
 }
 
-// True when the asset is referenced by a live published page: the publish
-// flow leaves an asset-pub/<key> marker for every referenced asset.
-async function isAssetPublished(bucket, key) {
+// True when a live published page references this asset: the publish flow
+// leaves an asset-pub/<key> marker for every referenced asset.
+//
+// Deliberately cheaper than publishStore.isAssetPublished (same name elsewhere,
+// different job): that one falls back to a bounded scan of every publish record
+// for legacy pages that predate the marker. Here the caller sweeps many assets
+// during one delete, so it reads the marker only and treats "no marker" as
+// unpublished — the conservative outcome for a legacy page is that its images
+// are kept, never that a live page loses them.
+async function hasPublishMarker(bucket, key) {
   try {
     const marker = assetPubMarkerKey(key);
     if (typeof bucket.head === "function") {
@@ -546,7 +553,7 @@ export async function cleanupChatStorage(env, userId, chatIds) {
     // Pre-move objects lived at the flat key, so both locations are swept.
     for (const key of assetKeys) {
       try {
-        if (await isAssetPublished(bucket, key)) continue;
+        if (await hasPublishMarker(bucket, key)) continue;
         try {
           await bucket.delete(userAssetKey(userId, key));
         } catch {

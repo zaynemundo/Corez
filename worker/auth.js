@@ -290,6 +290,21 @@ export async function requireAuth(request, env) {
 }
 
 /**
+ * The caller's uid for a route that owns its own 401.
+ *
+ * A verified session wins. Without a secret the request is the development
+ * identity, but only when the deployment has not declared itself production —
+ * the same fail-closed rule `requireAuth` applies, expressed as "uid or null" so
+ * a handler can answer in its own error shape.
+ */
+export async function sessionUid(request, env) {
+  const sess = await verifySession(request, env);
+  if (sess?.uid) return sess.uid;
+  if (!env?.AUTH_SECRET && !isProductionRequest(request, env)) return "dev";
+  return null;
+}
+
+/**
  * Mint a session token for an account.
  *
  * EVERY entry point that signs a user in goes through here — password login,

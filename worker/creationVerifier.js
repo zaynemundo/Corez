@@ -334,12 +334,6 @@ export function verifyCreation(html, options = {}) {
   return { passed: failures.length === 0, failures };
 }
 
-export function isTruncated(html) {
-  return verifyCreation(html).failures.some(
-    (f) => f.code === "truncated-block" || f.code === "incomplete-html",
-  );
-}
-
 // Deterministic spec-coverage check: distinctive content words from the
 // planning spec must mostly appear in the finished artifact. The spec is a
 // short model-written brief, so only content words (>= 4 chars, not generic

@@ -53,14 +53,6 @@ export function isTestPayment(data) {
   return String(data.mode || "").trim().toLowerCase() === "test";
 }
 
-export function resolvePlanAmount(plan, fallbackAmount) {
-  if (typeof plan === "string") {
-    const key = plan.trim().toLowerCase();
-    if (ZIINA_PLANS[key]) return ZIINA_PLANS[key].amount;
-  }
-  return fallbackAmount;
-}
-
 function isValidHttpsUrl(value) {
   if (typeof value !== "string" || !value.trim()) return false;
   try {

@@ -8,7 +8,7 @@
 // read as fallback) is used. Legacy R2 records are imported into SQLite exactly
 // once per user on first D1-backed read, so nothing ever stored is lost in the move.
 
-import { verifySession } from "./auth.js";
+import { sessionUid } from "./auth.js";
 import { MEMORY_SCHEMA } from "./dbSchema.js";
 import {
   userMemoryKey,
@@ -18,27 +18,15 @@ import {
   listWithFallback,
 } from "./storageKeys.js";
 import {
+  SAFE_STORAGE_SEGMENT,
+  decodePathSegment,
   jsonResponse,
   readBoundedJson,
   safeErrorDetail,
   createRateLimiter,
 } from "./utils.js";
 
-// Mirrors SAFE_STORAGE_SEGMENT in index.js (single canonical copy lives here
-// for the memory module so it stays import-cycle free).
-const SAFE_STORAGE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$/;
-
 const memoryRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 30 });
-
-// Session identity for the memory namespace. Mirrors sessionUid() in
-// index.js: the verified session wins, and environments without AUTH_SECRET
-// (local dev) fall back to the shared "dev" namespace.
-async function sessionUid(request, env) {
-  const sess = await verifySession(request, env);
-  if (sess?.uid) return sess.uid;
-  if (!env?.AUTH_SECRET) return "dev";
-  return null;
-}
 
 export function publicMemoryRecord(record) {
   if (!record || typeof record !== "object") return record;
@@ -47,14 +35,6 @@ export function publicMemoryRecord(record) {
   delete publicRecord.embedding;
   delete publicRecord.embeddingModel;
   return publicRecord;
-}
-
-function decodePathSegment(segment) {
-  try {
-    return decodeURIComponent(segment);
-  } catch {
-    return null;
-  }
 }
 
 // ---------------------------------------------------------------------------

@@ -53,15 +53,6 @@ export async function ensureSubscriptionTables(env) {
   }
 }
 
-export function getPlanOrFree(plan) {
-  const key = String(plan || "")
-    .trim()
-    .toLowerCase();
-  if (ZIINA_PLANS[key]) return { key, meta: ZIINA_PLANS[key] };
-  // fallback to free
-  return { key: "free", meta: ZIINA_PLANS["free"] };
-}
-
 /**
  * Plan ordering, used to keep cancel/downgrade routes from ever moving a user
  * UP the ladder. Only the verified payment flow may grant a higher plan.

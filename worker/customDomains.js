@@ -1,8 +1,11 @@
 // Custom domains for published creations — Cloudflare for SaaS / Custom
 // Hostnames.
 //
-// STATUS: implemented but NOT WIRED. Nothing imports this module yet, so it
-// cannot affect a request. To finish the feature:
+// STATUS: the HTTP surface is NOT WIRED — nothing routes "/api/domains*" or
+// calls handleCustomDomainRequest(), so no request reaches those handlers.
+// Only `domainRecordKey` is live: worker/storageMigrate.js imports it to write
+// the pointer record while moving legacy R2 objects into per-user folders, so
+// this module does participate in that one request path. To finish the feature:
 //   1. worker/index.js: route "/api/domains*" to handleDomainsApi and call
 //      handleCustomDomainRequest() before the normal routes (a Host that is not
 //      a platform host is a customer domain).

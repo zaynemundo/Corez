@@ -11,7 +11,7 @@ import {
 } from "./memory.js";
 import { handleRerank, handleEmbed } from "./aiModels.js";
 import { fetchAwwwardsInspirationCached, handleInspiration } from "./inspiration.js";
-import { verifySession } from "./auth.js";
+import { sessionUid } from "./auth.js";
 import { getActiveSubscription } from "./subscriptions.js";
 import {
   UsageUnavailableError,
@@ -26,6 +26,8 @@ import {
   usageUnavailableResponse,
 } from "./usage.js";
 import {
+  SAFE_STORAGE_SEGMENT,
+  decodePathSegment,
   safeErrorDetail,
   readBoundedJson,
   jsonResponse,
@@ -346,9 +348,9 @@ function patchLocalImageSrc(html, messages) {
   return patched;
 }
 
-// Storage key segments are validated identically on every R2-backed endpoint:
-// no slashes, no leading dots (blocks ../ traversal), bounded length.
-const SAFE_STORAGE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$/;
+// Storage key segments are validated with SAFE_STORAGE_SEGMENT from utils.js:
+// no slashes, no leading dots (blocks ../ traversal), bounded length — the same
+// pattern memory.js uses, so the two endpoints agree on what a segment is.
 
 // Online multiplayer rooms: short lowercase ids used in the WebSocket URL.
 const SAFE_ROOM_ID = /^[a-z0-9][a-z0-9-]{2,31}$/;
@@ -3865,14 +3867,6 @@ async function handleR2Apps(request, env) {
   return jsonResponse(405, { error: "Method not allowed." });
 }
 
-function decodePathSegment(segment) {
-  try {
-    return decodeURIComponent(segment);
-  } catch {
-    return null;
-  }
-}
-
 function publishedPageHeaders({ frameable = false } = {}) {
   const headers = {
     "Content-Type": "text/html; charset=utf-8",
@@ -3913,17 +3907,6 @@ const imageRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 30 });
 // client so one session cannot fill the bucket or burn egress at line rate.
 const assetsRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 30 });
 const appsRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 30 });
-
-// Derive the caller identity from the verified session. entry.js's auth gate
-// already rejected unauthenticated callers when AUTH_SECRET is set, so here a
-// null return means "no session in a production deployment" -> 401. Without
-// AUTH_SECRET (local dev) the identity is 'dev' and is never trusted.
-async function sessionUid(request, env) {
-  const sess = await verifySession(request, env);
-  if (sess?.uid) return sess.uid;
-  if (!env?.AUTH_SECRET) return "dev";
-  return null;
-}
 
 // Free-plan published creations carry a "Made with Corez" badge. The badge is
 // injected server-side behind markers so a later paid republish can strip it
