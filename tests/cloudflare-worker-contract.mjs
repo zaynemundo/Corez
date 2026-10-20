@@ -1,5 +1,12 @@
 import assert from 'node:assert/strict';
 import worker from '../worker/index.js';
+// The image route sends the ENHANCED prompt (worker/imagePrompt.js expands a
+// bare subject into a full generator prompt). Asserting against the enhancer
+// itself keeps this contract about the wire shape — model, message layout,
+// reference-image content — instead of freezing a copy of the prompt suffix,
+// which is what made this check fail the day the enhancer gained style-aware
+// tails.
+import { enhanceImagePrompt } from '../worker/imagePrompt.js';
 
 const OPENCODE_URL = 'https://opencode.ai/zen/go/v1/responses';
 const _DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';
@@ -741,8 +748,9 @@ async function run() {
   assert.equal(imageMissingPromptResponse.status, 400);
 
   // Image generation via OpenRouter when OPENROUTER_API_KEY is configured:
-  // the payload targets the default image model (Nano Banana 2 lite) and the
-  // parsed image URL is returned with the model label that served it.
+  // the payload targets the default image model (Nano Banana 2 lite), carries
+  // the enhanced prompt for the subject, and the parsed image URL is returned
+  // with the model label that served it.
   const imageOriginalFetch = globalThis.fetch;
   try {
     globalThis.fetch = async (url, init) => {
@@ -752,7 +760,12 @@ async function run() {
       assert.equal(payload.model, 'google/gemini-3.1-flash-lite-image');
       assert.equal(payload.max_tokens, undefined);
       assert.equal(payload.max_completion_tokens, undefined);
-      assert.deepEqual(payload.messages, [{ role: 'user', content: 'A futuristic city' }]);
+      assert.deepEqual(payload.messages, [
+        { role: 'user', content: enhanceImagePrompt('A futuristic city') }
+      ]);
+      // The subject survives at the front: enhancement is an addition, never a
+      // rewrite of what the user asked for.
+      assert.match(payload.messages[0].content, /^A futuristic city, /);
       return new Response(JSON.stringify({
         choices: [{ message: { images: [{ url: 'https://img.example.com/flux-city.png' }] } }]
       }), {
@@ -815,7 +828,10 @@ async function run() {
       assert.deepEqual(payload.messages, [{
         role: 'user',
         content: [
-          { type: 'text', text: 'Restyle my photo in watercolour' },
+          // The text keeps the enhancement the route applies; the reference
+          // travels beside it, so the model edits the photo instead of
+          // inventing from words alone.
+          { type: 'text', text: enhanceImagePrompt('Restyle my photo in watercolour') },
           { type: 'image_url', image_url: { url: referenceImageDataUrl } }
         ]
       }]);
@@ -1423,8 +1439,11 @@ async function run() {
   assert.equal(spaFallback.status, 200);
   assert.equal(await spaFallback.text(), 'asset:/not-a-slug-path');
 
-  // Only the app document is ever published: chat-ish fields sent by a
-  // client are ignored, never persisted, and never served.
+  // Only the app document and its lineage are ever published: chat CONTENT sent
+  // by a client is ignored, never persisted, and never served. The chat id is
+  // the one chat-shaped field that IS kept — it is the lineage that lets
+  // deleting that chat unpublish this page — and it is metadata in the owner's
+  // record, never part of the served document.
   const publishWithJunk = await worker.fetch(
     new Request('https://corez.test/api/publish', {
       method: 'POST',
@@ -1443,10 +1462,12 @@ async function run() {
   assert.equal(publishWithJunk.status, 200);
   const junkData = await json(publishWithJunk);
   const junkRecord = JSON.parse(memoryStore.get(`users/dev/publish/${junkData.slug}.json`).value);
-  assert.deepEqual(Object.keys(junkRecord).sort(), ['badge', 'createdAt', 'customized', 'html', 'ownerUserId', 'slug', 'title']);
+  assert.deepEqual(Object.keys(junkRecord).sort(), ['badge', 'createdAt', 'customized', 'html', 'ownerUserId', 'sessionId', 'slug', 'title']);
   assert.equal(stripBadge(junkRecord.html), '<h1>App Only</h1>');
-  assert.equal(junkRecord.sessionId, undefined);
+  assert.equal(junkRecord.sessionId, 'secret-session');
   assert.equal(junkRecord.messages, undefined);
+  assert.equal(junkRecord.history, undefined);
+  assert.equal(junkRecord.prompt, undefined);
 
   const junkPage = await worker.fetch(
     new Request(`https://corez.test/${junkData.slug}`, { method: 'GET' }),
