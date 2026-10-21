@@ -1,39 +1,69 @@
-# E2E Test Infra: CoreZ Swarm Dynamic Multi-Agent System
+# Testing
 
-## Test Philosophy
-- Opaque-box, requirement-driven verification of multi-agent swarm orchestration.
-- Methodology: Category-Partition + Boundary Value Analysis + Pairwise Combinatorial + Real-World Workload Testing.
+Two layers, one rule: a green run must mean the checks actually ran.
 
-## Feature Inventory
-| # | Feature | Source (requirement) | Tier 1 | Tier 2 | Tier 3 |
-|---|---------|---------------------|:------:|:------:|:------:|
-| 1 | R1.1 Dynamic DAG Complexity Routing | ORIGINAL_REQUEST §1 | 5 | 5 | ✓ |
-| 2 | R1.2 Specialist Role Catalog & Briefs | ORIGINAL_REQUEST §1 | 5 | 5 | ✓ |
-| 3 | R1.3 Creation Pipeline Wiring | ORIGINAL_REQUEST §1 | 5 | 5 | ✓ |
-| 4 | R2.1 Atomic Multi-Resource Locking | ORIGINAL_REQUEST §2 | 5 | 5 | ✓ |
-| 5 | R2.2 Upstream Dependency Context Propagation | ORIGINAL_REQUEST §2 | 5 | 5 | ✓ |
-| 6 | R2.3 Verifier-Driven Retry Loops | ORIGINAL_REQUEST §2 | 5 | 5 | ✓ |
-| 7 | R2.4 Topological Artifact Merging | ORIGINAL_REQUEST §2 | 5 | 5 | ✓ |
-| 8 | R3.1 Swarm Concurrency & Rate Limiting | ORIGINAL_REQUEST §3 | 5 | 5 | ✓ |
-| 9 | R3.2 Swarm Benchmark & Reliability Suite | ORIGINAL_REQUEST §3 | 5 | 5 | ✓ |
-| 10 | R4.1 100% Swarm Test Suite Pass Rate | ORIGINAL_REQUEST §4 | 5 | 5 | ✓ |
+| Layer | Command | What it proves |
+|---|---|---|
+| Unit / UI suite (Vitest, jsdom) | `npm test` | Components, services, worker modules, contracts expressed as vitest tests — 168 files |
+| Behaviour contracts (scripts) | `npm run test:contracts` (alias `npm run test:cloudflare`) | The Worker's real HTTP behaviour, the published-page and queue contracts, security invariants, and the UI/design contracts that read `src/index.css` |
+| Component suites | `npm run test:swarm` · `npm run test:game` · `npm run test:reliability` | Focused subsets for iteration |
+| Benchmarks | `npm run benchmark` (`:live`, `:e2e`) | Weighted quality evaluation over `benchmarks/` cases |
 
-## Test Architecture
-- Test runner: Vitest (`npx vitest run`) + Node test runner (`node scripts/evaluate-benchmark.mjs`)
-- Test case locations: `tests/swarm-*.test.js`, `tests/harness-swarm.test.js`, `tests/cli/generic-swarm.test.js`, `tests/benchmark-evaluator.test.js`
-- Test pass/fail semantics: `exitCode === 0`, 0 test failures, strict assertions on locks, retry attempts, context injection, and topological merge order.
+## Running a single contract
 
-## Real-World Application Scenarios (Tier 4)
-| # | Scenario | Features Exercised | Complexity |
-|---|----------|--------------------|------------|
-| 1 | Full website generation with parallel specialist pre-pass (Architect, Art Director, Accessibility, Performance) | R1.1, R1.2, R1.3, R2.4 | High |
-| 2 | Multi-agent code refactor with resource contention and atomic rollback | R2.1, R2.2, R3.1 | High |
-| 3 | Verifier rejection with automatic self-correction retry and diagnostic feedback up to maxAttempts | R2.3, R2.2, R4.1 | High |
-| 4 | 1,000+ workstream hierarchical synthesis with wave persistence and resumption | R2.4, R3.1, R3.2 | Very High |
-| 5 | HTTP 429 adaptive backoff and concurrency scaling under load | R3.1, R3.2 | High |
+`scripts/run-contracts.mjs` is the definition of the contract suite:
 
-## Coverage Thresholds
-- Tier 1: ≥5 per feature (50 tests minimum)
-- Tier 2: ≥5 per feature boundary cases (50 tests minimum)
-- Tier 3: Pairwise coverage across role routing, locking, retry loops, and synthesis
-- Tier 4: ≥5 realistic multi-agent application scenarios
+```bash
+node scripts/run-contracts.mjs --list                 # every check, with its runner
+node scripts/run-contracts.mjs --only publish         # checks whose name matches
+node scripts/run-contracts.mjs                        # all of them, printing every failure
+```
+
+It runs the checks one by one, prints the output tail of each failure, and
+summarises what failed instead of stopping at the first red — the old `&&` chain
+hid two stale expectations behind `cloudflare-worker-contract.mjs:771` for months.
+On Windows it finds Git Bash itself (the `bash` on PATH is usually the WSL
+launcher, which cannot run these scripts); set `COREZ_BASH` to override.
+
+A skipped check is not a pass: no working `bash` fails the run rather than quietly
+dropping eleven shell contracts.
+
+## Rules this suite enforces
+
+- **No orphan contracts.** `tests/cloudflare-worker-config-contract.sh` asserts that
+  every `tests/*-contract.{sh,mjs}` appears in `scripts/run-contracts.mjs`, so a new
+  contract cannot be written and never run.
+- **Shipped English is frozen.** `tests/i18n-coverage.test.jsx` fails on a reworded
+  string (an accidental edit breaks every UI test that asserts the original copy)
+  and on a dictionary key no component uses. New copy needs both `en` and `ar`.
+- **The schema has one source.** `tests/db-schema-layout.test.js` keeps
+  `worker/dbSchema.js` and `worker/schema.sql` in step, and keeps the R2 key layout
+  and publish helpers exported.
+- **The design contract is generated.** `npm run art:check` fails when a design
+  token changes without regenerating the artifact reviewers cite.
+- **Behaviour contracts pin intent, not copy.** Where a check asserts on model
+  input it compares against the module that produces it (e.g.
+  `enhanceImagePrompt`) instead of a frozen string, so a deliberate improvement
+  does not read as a regression.
+
+## CI lanes
+
+`.github/workflows/verify-shared.yml` is the single definition of "verified"; both
+`.github/workflows/verify.yml` (pull requests) and
+`.github/workflows/deploy.yml` (push to `main`, which gates the deploy) call it.
+
+- `verify-fast` — lint, `npm test`, production build, `evaluate:intents`,
+  `audit:skills`, `art:check`
+- `verify-contracts` — `npm run test:cloudflare` (the whole suite above) and
+  `npm run test:swarm`
+
+## Adding a test
+
+Put unit and component tests in `tests/*.test.{js,jsx}` (Vitest picks them up).
+For something only observable at the Worker boundary — a header, a status code, an
+R2 record, a D1 row — add it to the relevant `tests/*-contract.mjs`, or start one
+and list it in `scripts/run-contracts.mjs`.
+
+Fixtures: `tests/helpers/sqliteD1.js` is a real SQLite adapter shaped like D1 (lazy
+statement compilation, transactional `batch`), and several contract tests build an
+in-memory R2 bucket — no network, no credentials.

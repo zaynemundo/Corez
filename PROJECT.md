@@ -1,90 +1,111 @@
-# Project: CoreZ Dynamic Multi-Agent Swarm Orchestration & Verification
+# CoreZ
 
-## Architecture
-CoreZ provides a multi-agent swarm orchestration framework spanning both CLI/agent-core workflows and Edge Worker creation pipelines.
+A creation assistant that runs on Cloudflare Workers: it chats, builds websites,
+apps and games, generates images, researches the open web into a PDF report, and
+publishes finished creations as public links.
+
+This file is the architecture map. How to run and verify it lives in
+[TEST_INFRA.md](./TEST_INFRA.md); the commands a user types are in
+[README.md](./README.md).
+
+## Runtime surfaces
 
 ```
-                  ┌─────────────────────────────────────┐
-                  │          User Creation Prompt       │
-                  └──────────────────┬──────────────────┘
-                                     │
-                             decideSwarmMode()
-                                     │
-                 ┌───────────────────┴───────────────────┐
-                 ▼                                       ▼
-        [ SWARM_MODE.FAST ]                    [ SWARM_MODE.SWARM ]
-         (3-node fast DAG)                    (6-node specialist DAG)
-     Explorer -> Engineer -> Reviewer    Explorer -> Architect -> Frontend/Backend
-                                                   -> Tester -> Reviewer
-                 │                                       │
-                 └───────────────────┬───────────────────┘
-                                     │
-                     GenericSwarmOrchestrator Execution
-     ┌─────────────────────────────────────────────────────────────────┐
-     │ 1. ResourceLockManager: All-or-Nothing Atomic Lock Acquisition  │
-     │ 2. Upstream Context Injection: Discrete markdown deliverables   │
-      │ 3. Agent Execution: Primary Lead (Muse Spark 1.3 Contributor) & FLUX Art    │
-     │ 4. Verifier Gate & Self-Correction Retry (up to maxAttempts)    │
-     │ 5. Atomic Output Commit & Lock Release                          │
-     │ 6. Topological DFS Traversal: Discrete & Merged Artifacts       │
-     └─────────────────────────────────────────────────────────────────┘
+Browser (React SPA)  ──/api/*──▶  Cloudflare Worker  ──▶  OpenCode Go gateway (text)
+        │                            │  ├──────────────▶  Workers AI / OpenRouter (images, rerank, embed)
+        │  /<slug> (public)          │  ├──────────────▶  D1 (accounts, chats, tasks, usage, billing)
+        └────────────────────────────┘  └──────────────▶  R2 (assets, apps, publish records)
 ```
 
-## Feature Inventory
-| # | Feature | Description | Milestone | Source |
-|---|---------|-------------|-----------|--------|
-| 1 | R1.1 Dynamic DAG Complexity Routing | `decideSwarmMode` routes prompts to Fast (3 nodes) or Full Specialist DAG (6 nodes) based on token length (≥100) and regex keywords. | M1 | ORIGINAL_REQUEST §1 |
-| 2 | R1.2 Specialist Role Catalog & Briefs | 16 standard `SWARM_ROLES` in `packages/agent-core/swarm/roles.js` and specialist briefs in `worker/swarm.js` (`architect`, `art-director`, `accessibility`, `performance`). | M1 | ORIGINAL_REQUEST §1 |
-| 3 | R1.3 Creation Pipeline Wiring | `worker/harness.js` and `worker/swarm.js` execute parallel specialist pre-pass without blocking single-file artifact streaming contracts. | M1 | ORIGINAL_REQUEST §1 |
-| 4 | R2.1 Atomic Multi-Resource Locking | `ResourceLockManager.acquireLocks` performs 2-phase dry-run validation and atomic acquisition, rolling back all locks on conflict to eliminate deadlocks. | M2 | ORIGINAL_REQUEST §2 |
-| 5 | R2.2 Upstream Dependency Context Propagation | Upstream validated deliverables extracted from `projectState.validatedOutputs` and formatted into isolated prompt blocks without monolithic dumps. | M2 | ORIGINAL_REQUEST §2 |
-| 6 | R2.3 Verifier-Driven Retry Loops | Verifier execution gates outputs; rejections trigger `AGENT_LIFECYCLE_STATES.RETRYING` with diagnostic feedback up to `maxAttempts`. | M2 | ORIGINAL_REQUEST §2 |
-| 7 | R2.4 Topological Artifact Merging | DFS post-order traversal merges deliverables deterministically (`artifactMap`, `mergeOutputsInDagOrder`, `HierarchicalSynthesis` token-chunked waves). | M2 | ORIGINAL_REQUEST §2 |
-| 8 | R3.1 Swarm Concurrency & Rate Limiting | `AdaptiveConcurrencyQueue` dynamically scales concurrency based on latency and halves concurrency with exponential backoff on HTTP 429. | M3 | ORIGINAL_REQUEST §3 |
-| 9 | R3.2 Swarm Benchmark & Reliability Suite | Benchmark cases in `benchmarks/`, 7-aspect weighted evaluator with hard failure gates in `scripts/evaluate-benchmark.mjs`, and full Vitest suite. | M3 | ORIGINAL_REQUEST §3 |
-| 10 | R4.1 100% Swarm Test Suite Pass Rate | All unit and integration test suites in `tests/swarm-*.test.js`, `tests/harness-swarm.test.js`, `tests/cli/generic-swarm.test.js` pass with `exitCode === 0`. | M4 | ORIGINAL_REQUEST §4 |
+| Surface | Where | Responsibility |
+|---|---|---|
+| Worker | `worker/entry.js` → `worker/index.js` | HTTP surface, auth gate, provider routing, creation harness, publish store, task queue |
+| Web app | `src/` | Chat, canvas preview, projects/sidebar, settings, i18n (en + ar, RTL), consent |
+| Agent core | `packages/agent-core/` | Provider adapters and model ids, swarm orchestrator, design systems, skills |
+| CLI | `packages/cli/` | `corez` commands (plan, build, fix, review, swarm) over the same agent core |
 
-## Milestones
-| # | Name | Scope | Dependencies | Status |
-|---|------|-------|-------------|--------|
-| M1 | Pipeline & Harness Integration | Harmonize role catalogs, dynamic DAG routing, and creation harness specialist pre-pass. | none | COMPLETE |
-| M2 | Dynamic DAG Mechanics & Retry Hardening | Verify atomic resource locking, upstream context isolation, verifier self-correction retry parity in orchestrators, and topological artifact merging. | M1 | COMPLETE |
-| M3 | Concurrency, Benchmarks & Script Harmonization | Update `package.json` test scripts, run benchmark evaluator validation, and ensure rate-limited concurrency queues scale deterministically. | M2 | COMPLETE |
-| M4 | Comprehensive E2E Swarm Verification & Audit | Execute all unit, integration, benchmark, and contract test suites, run challenger verification and forensic integrity audit. | M3 | COMPLETE |
+## Worker, in layers
 
-> Status note (2026-09-18): M1–M4 are implemented and verified by the suites:
-> `npm test` passes 114 files / 1,278 tests, `npm run test:swarm` covers the
-> swarm/harness contract, and the swarm feature inventory in `TEST_INFRA.md`
-> is exercised by `tests/swarm-*.test.js`, `tests/harness-swarm.test.js` and
-> `tests/cli/generic-swarm.test.js`. The earlier IN_PROGRESS/PLANNED labels
-> predated the worker_1 handoff and reviewer verification.
+- **Entry and auth** — `worker/entry.js` gates `/api/*` routes and dispatches to
+  `worker/index.js`; `worker/auth.js` owns sessions and the fail-closed rule (a
+  production deployment without `AUTH_SECRET` refuses protected routes instead of
+  handing out the development identity).
+- **AI** — `/api/ai` streams SSE from one provider call
+  (`worker/providerChain.js`, `worker/opencodeClient.js`); the model router picks
+  reasoning effort and temperature from the prompt's complexity and intent
+  (`worker/modelRouter.js`, clamped to the one allowed text model). Images go
+  through `/api/image` (OpenRouter) and `/api/image/cf` (Workers AI), with the
+  prompt enhancer in `worker/imagePrompt.js`.
+- **Creation harness** — `worker/harness.js` runs plan → build → verify → repair →
+  review for `@website` / `@game` builds, checkpointing durable state so a
+  disconnected or evicted build resumes instead of restarting. `worker/swarm.js`
+  is its specialist pre-pass: parallel short briefs that inform the single
+  streamed artifact, never a gate.
+- **Durable tasks** — `POST /api/tasks` hands long work to a queue
+  (`worker/taskRunner.js`) with a D1 dispatch outbox and a cron sweep, so an HTTP
+  disconnect cannot cancel a task.
+- **Storage** — `worker/storageKeys.js` is the single R2 key layout
+  (`users/<uid>/…`); `worker/publishStore.js` owns published pages (resolve,
+  write, unpublish, asset visibility); `worker/schema.sql` and
+  `worker/dbSchema.js` are the canonical D1 schema, kept in step by
+  `tests/db-schema-layout.test.js`.
+- **Money** — `worker/usage.js` meters every paid call per account per month and
+  refuses with 402 past the plan budget; `worker/subscriptions.js` and
+  `worker/ziina.js` own plans, checkout and webhooks.
 
-## Interface Contracts
-### `GenericSwarmOrchestrator` ↔ `TaskDependencyGraph`
-- `acquireLocks(resourceNames, agentId) -> { success: boolean, lockedResource?: string, currentOwner?: string }`
-- `releaseAllLocksForAgent(agentId) -> void`
-- `getReadyTasks() -> Task[]`
-- `handleDecomposition(taskId, subtasks) -> void`
-- `getTopologicalOrder() -> string[]`
+## Publishing model
 
-### `GenericSwarmOrchestrator` ↔ `Verifier`
-- `verifier({ task, output, projectState }) -> Promise<{ ok: boolean, evidence?: string, fixes?: string[] }>`
-- If `ok: false`, orchestrator enters retry loop if `attempt < maxAttempts`, injecting `verificationEvidence` into next prompt.
+A published page is one R2 record (`users/<uid>/publish/<slug>.json`) plus a tiny
+public pointer (`publish/<slug>.json`) so `/<slug>` resolves without knowing the
+owner. Two rules make deletion behave:
 
-### `worker/harness.js` ↔ `worker/swarm.js`
-- `runSwarmSpecialists(prompt, env) -> Promise<{ specialistOutputs: Record<string, string>, executionTimeMs: number }>`
-- `buildSwarmContext(specialistOutputs) -> string`
+1. A published page belongs to the chat that produced it — the record carries the
+   chat id, so deleting that chat unpublishes the page (`worker/chats.js`
+   `cleanupChatStorage`).
+2. Images are public only while a live page references them: the publish flow
+   leaves an `asset-pub/<key>` marker, and unpublishing drops the markers no other
+   page needs.
 
-## Code Layout
-- `packages/agent-core/swarm/index.js`: `GenericSwarmOrchestrator`, `decideSwarmMode`, `SWARM_MODE`
-- `packages/agent-core/swarm/roles.js`: `SWARM_ROLES`, `ROLE_DEFINITIONS`, `formatRoleUserPrompt`
-- `packages/agent-core/swarm/hierarchicalSynthesis.js`: `HierarchicalSynthesis` (token-chunked wave synthesis)
-- `src/services/gamePipeline/swarm/taskGraph.js`: `ResourceLockManager`, `TaskDependencyGraph`
-- `src/services/gamePipeline/swarm/agentSwarmOrchestrator.js`: `AgentSwarmOrchestrator`, `mergeOutputsInDagOrder`
-- `src/services/gamePipeline/swarm/adaptiveQueue.js`: `AdaptiveConcurrencyQueue`
-- `worker/swarm.js`: Creation harness swarm pre-pass & specialist briefs
-- `worker/harness.js`: Streamed build creation harness
-- `tests/swarm-*.test.js`: Swarm test suites
-- `tests/harness-swarm.test.js`: Creation harness swarm tests
-- `tests/cli/generic-swarm.test.js`: CLI generic swarm orchestrator tests
-- `benchmarks/`: Benchmark cases and evaluation core
+Pages published before rule 1 existed carry no chat id. The browser that published
+them offers its local lineage to `POST /api/publish/lineage`, which attributes the
+page to a surviving chat or unpublishes it when that chat is gone.
+
+## Swarm framework (`packages/agent-core/swarm`)
+
+A general DAG orchestrator used by the CLI and by the harness pre-pass:
+`decideSwarmMode` routes a task to the 3-node fast DAG (explorer → engineer →
+reviewer) or the specialist DAG (explorer → architect → frontend/backend →
+tester → reviewer). Executions are gated by atomic multi-resource locks
+(`ResourceLockManager`), propagate upstream deliverables instead of whole
+transcripts, retry through a verifier with its evidence attached, and merge
+deterministically in topological order (`mergeOutputsInDagOrder`,
+`HierarchicalSynthesis` for token-chunked waves). `AdaptiveConcurrencyQueue`
+scales concurrency and backs off on HTTP 429.
+
+## Interface contracts
+
+`GenericSwarmOrchestrator` ↔ `TaskDependencyGraph`
+- `acquireLocks(resources, agentId) → { success, lockedResource?, currentOwner? }`
+- `releaseAllLocksForAgent(agentId) → void`
+- `getReadyTasks() → Task[]`, `getTopologicalOrder() → string[]`
+- `handleDecomposition(taskId, subtasks) → void`
+
+`GenericSwarmOrchestrator` ↔ verifier
+- `verifier({ task, output, projectState }) → { ok, evidence?, fixes? }`
+- `ok: false` retries with the evidence injected, up to the role's attempt cap.
+
+`worker/harness.js` ↔ `worker/swarm.js`
+- `runSwarmSpecialists({ spec, env, signal }) → { contributions, executionTimeMs }`
+- `buildSwarmContext(spec, contributions, options) → string`
+
+## Where to look first
+
+| Task | File |
+|---|---|
+| A route 404s or is unauthenticated | `worker/entry.js`, `worker/index.js` |
+| An AI reply is empty, truncated or reasoning-only | `worker/providerChain.js`, `worker/opencodeClient.js` |
+| A build never finishes or loses work | `worker/harness.js`, `worker/taskRunner.js` |
+| A published page will not load or delete | `worker/publishStore.js`, `worker/chats.js` |
+| A quota blocks or lets through the wrong thing | `worker/usage.js` |
+| Storage keys or a migration look wrong | `worker/storageKeys.js`, `worker/storageMigrate.js` |
+| Interface copy, layout or direction is wrong | `src/index.css`, `src/i18n/` |
