@@ -7090,6 +7090,403 @@ h6 {
   }
 }
 
+/* ---------- Sites screen ---------- */
+/* The published pages are the account's live artifacts, so this screen is a
+   reading list first: one card per site, the link and its facts, and the two
+   actions that matter. Editing opens inside the card it belongs to, so the page
+   being changed never leaves the context of the list. */
+.sites-page {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  overflow-y: auto;
+  padding: 2.5rem 1.5rem 3rem;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  scrollbar-width: thin;
+}
+
+.sites-header {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.sites-heading h1 {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 400;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+
+.sites-heading p {
+  margin: 0.35rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  max-width: 48ch;
+}
+
+.sites-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.sites-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 32px;
+  padding: 0 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.sites-button:hover:not(:disabled) {
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}
+
+.sites-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sites-button.quiet {
+  background: transparent;
+  border-color: transparent;
+}
+
+.sites-button.quiet:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+}
+
+.sites-button.primary {
+  background: var(--action-strong);
+  border-color: transparent;
+  color: var(--action-strong-contrast);
+}
+
+.sites-button.primary:hover:not(:disabled) {
+  background: var(--action-strong-hover);
+  color: var(--action-strong-contrast);
+}
+
+.sites-button.danger:hover:not(:disabled) {
+  border-color: rgba(239, 68, 68, 0.55);
+  color: #f87171;
+}
+
+.sites-button.danger.confirming {
+  border-color: rgba(239, 68, 68, 0.55);
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.sites-state {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.sites-error {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  border-radius: var(--radius-md);
+  background: rgba(239, 68, 68, 0.08);
+  color: #f87171;
+  font-size: 0.85rem;
+}
+
+.sites-empty {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.sites-empty-title {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.sites-empty-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  max-width: 42ch;
+  line-height: 1.5;
+}
+
+.sites-list {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.site-card {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  transition: border-color var(--transition-fast);
+}
+
+.site-card:hover,
+.site-card.editing {
+  border-color: var(--border-hover);
+}
+
+.site-card-main {
+  min-width: 0;
+  flex: 1 1 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.site-card-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.site-card-title span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.site-card-title:hover {
+  text-decoration: underline;
+}
+
+.site-card-meta {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.site-card-meta code {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.site-card-saved {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--market-positive);
+}
+
+.site-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.site-editor {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 0.35rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.site-editor-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.site-editor-label {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  min-width: 6.5rem;
+}
+
+.site-editor-input {
+  flex: 1 1 260px;
+  min-width: 0;
+  height: 34px;
+  padding: 0 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+}
+
+.site-editor-input:focus {
+  outline: none;
+  border-color: var(--border-hover);
+}
+
+.site-editor-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.site-editor-tab {
+  height: 28px;
+  padding: 0 0.6rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.76rem;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.site-editor-tab:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.site-editor-tab.active {
+  border-color: var(--border-hover);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.site-editor-code {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 220px;
+  max-height: 60vh;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1.55;
+  resize: vertical;
+  white-space: pre;
+  overflow: auto;
+  tab-size: 2;
+}
+
+.site-editor-code:focus {
+  outline: none;
+  border-color: var(--border-hover);
+}
+
+.site-editor-hint,
+.site-editor-error {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.site-editor-hint {
+  color: var(--text-muted);
+}
+
+.site-editor-error {
+  color: #f87171;
+}
+
+.site-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+/* The Sites link in the sidebar: same row as New Chat, marked when open. */
+.sites-nav-btn.active {
+  background: var(--sidebar-item-active-bg);
+  color: var(--text-primary);
+}
+
+@media (max-width: 767px) {
+  .sites-page {
+    padding: 1.25rem 1rem 2rem;
+  }
+
+  .sites-heading h1 {
+    font-size: 1.3rem;
+  }
+
+  .site-card {
+    padding: 0.8rem;
+  }
+
+  .site-editor-label {
+    min-width: 0;
+  }
+}
+
 /* ---------- Consent banner and preferences dialog ---------- */
 
 /* While the banner is on screen it is fixed to the bottom of the viewport, so

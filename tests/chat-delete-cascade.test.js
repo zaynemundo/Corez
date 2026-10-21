@@ -508,4 +508,97 @@ describe('chat delete storage cascade', () => {
     );
     expect(anonymous.status).toBe(401);
   });
+
+  // ------------------------------------------------- the editor's owner copy
+  // The Sites screen edits a live page through GET /api/publish/<slug>: the raw
+  // documents (home plus every sub-page) for the OWNER only, because a save
+  // overwrites the record wholesale.
+
+  describe('published page owner copy', () => {
+    const ownerCopy = async (slug, cookie = aliceCookie) =>
+      call(`/api/publish/${slug}`, { cookie });
+
+    it('returns every document with the injected badge removed', async () => {
+      const chat = await createChat('multi page');
+      const res = await call('/api/publish', {
+        method: 'POST',
+        body: {
+          title: 'Multi',
+          html: '<html><body>home</body></html>',
+          sessionId: chat.id,
+          pages: { 'about.html': '<html><body>about</body></html>' },
+        },
+      });
+      const { slug } = await res.json();
+
+      const copy = await ownerCopy(slug);
+      expect(copy.status).toBe(200);
+      const data = await copy.json();
+      expect(data.title).toBe('Multi');
+      expect(data.html).toContain('home');
+      // The free plan publishes with the badge; the editor must not see it, or a
+      // save would bake the decoration into the user's own document.
+      expect(data.html).not.toContain('Made with Corez');
+      expect(data.pages['about.html']).toContain('about');
+      expect(data.pages['about.html']).not.toContain('Made with Corez');
+      // The served page still carries the badge. A multi-page creation serves
+      // its home document at the slug root and redirects the bare path there.
+      const servedHome = await worker.fetch(
+        new Request(`${BASE}/${slug}/`, { method: 'GET' }),
+        env,
+      );
+      expect(await servedHome.text()).toContain('Made with Corez');
+    });
+
+    it('round-trips an edit under the same slug', async () => {
+      const chat = await createChat('editable');
+      const { slug } = await (
+        await call('/api/publish', {
+          method: 'POST',
+          body: { title: 'Before', html: '<html><body>before</body></html>', sessionId: chat.id },
+        })
+      ).json();
+
+      const save = await call('/api/publish', {
+        method: 'POST',
+        body: {
+          slug,
+          title: 'After',
+          html: '<html><body>after</body></html>',
+        },
+      });
+      expect(save.status).toBe(200);
+      expect((await save.json()).slug).toBe(slug);
+
+      const data = await (await ownerCopy(slug)).json();
+      expect(data.title).toBe('After');
+      expect(data.html).toContain('after');
+      // A save that does not mention the chat keeps the recorded lineage, so
+      // deleting that chat still unpublishes the page.
+      expect(recordFor(slug).sessionId).toBe(chat.id);
+    });
+
+    it('refuses another account, an unknown slug, and a pre-ownership record', async () => {
+      const chat = await createChat('mine');
+      const { slug } = await (
+        await call('/api/publish', {
+          method: 'POST',
+          body: { title: 'Mine', html: '<html><body>mine</body></html>', sessionId: chat.id },
+        })
+      ).json();
+
+      const bobCookie = await cookieFor('bob');
+      expect((await ownerCopy(slug, bobCookie)).status).toBe(403);
+      expect((await ownerCopy('zzz999-000')).status).toBe(404);
+
+      // A legacy record has no owner to attribute, so it must not be editable.
+      await bucket.put(
+        'publish/legacy-123.json',
+        JSON.stringify({ slug: 'legacy-123', title: 'Legacy', html: '<html>old</html>' }),
+      );
+      const legacy = await ownerCopy('legacy-123');
+      expect(legacy.status).toBe(403);
+      expect((await legacy.json()).error).toMatch(/predates ownership/i);
+    });
+  });
 });

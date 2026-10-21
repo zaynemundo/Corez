@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Folder,
   FolderOpen,
+  Globe,
   Pin,
   PinOff,
   Check,
@@ -53,6 +54,9 @@ export default function Sidebar({
   activeSessionId,
   onSelectSession,
   onNewChat,
+  // The Sites screen: every published page, editable in place. Optional so the
+  // sidebar can render without it in isolation (tests, story-style previews).
+  onOpenSites,
   onOpenSettings,
   onDeleteSession,
   activeView,
@@ -594,6 +598,28 @@ export default function Sidebar({
           />
           <span>{t("common.sidebar.newChat")}</span>
         </button>
+
+        {typeof onOpenSites === "function" && (
+          // Same row shape as New Chat: Sites is a place you go, not a section
+          // you fold. aria-current marks it while the Sites screen is open.
+          <button
+            type="button"
+            className={`new-chat-btn sites-nav-btn${
+              activeView === "sites" ? " active" : ""
+            }`}
+            onClick={onOpenSites}
+            title={t("common.sidebar.sitesTitle")}
+            aria-current={activeView === "sites" ? "page" : undefined}
+          >
+            <Globe
+              className="new-chat-icon"
+              size={16}
+              strokeWidth={1.5}
+              aria-hidden="true"
+            />
+            <span>{t("common.sidebar.sites")}</span>
+          </button>
+        )}
       </div>
 
       <div

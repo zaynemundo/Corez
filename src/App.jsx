@@ -17,6 +17,7 @@ import CanvasPreview from "./components/CanvasPreview";
 import SettingsModal from "./components/SettingsModal";
 import DropZoneOverlay from "./components/DropZoneOverlay";
 import Login from "./pages/Login";
+import Sites from "./pages/Sites";
 import { PaymentSuccess } from "./pages/PaymentStatus";
 import Pricing from "./pages/Pricing";
 import Legal from "./pages/Legal";
@@ -129,7 +130,10 @@ function useChatIdFromUrl() {
 
 function MainApp({ theme, setTheme }) {
   const navigate = useNavigate();
-  const _location = useLocation();
+  const location = useLocation();
+  // The shell hosts two screens: the conversation and the Sites list. The URL is
+  // the source of truth so a refresh or a shared link lands on the right one.
+  const isSitesView = location.pathname === "/sites";
   const chatIdFromUrl = useChatIdFromUrl();
   const { user } = useAuth();
   const { t } = useI18n();
@@ -376,6 +380,13 @@ function MainApp({ theme, setTheme }) {
   useEffect(() => {
     fetchChatList();
   }, [fetchChatList]);
+
+  // The sidebar highlights whatever screen the URL resolves to. Every navigation
+  // that leaves Sites already sets "chat", so this only has to claim the Sites
+  // screen and restore "chat" when the URL moves away from it.
+  useEffect(() => {
+    setActiveView(isSitesView ? "sites" : "chat");
+  }, [isSitesView]);
 
   // Hand this browser's publish lineage to the worker once per load. It closes the
   // legacy gap where a page published before the lineage was recorded could
@@ -1748,6 +1759,12 @@ function MainApp({ theme, setTheme }) {
         activeSessionId={activeSessionId}
         onSelectSession={handleSelectSession}
         onNewChat={handleNewChat}
+        onOpenSites={() => {
+          navigate("/sites");
+          // On a phone the sidebar is a drawer: navigating should reveal the
+          // screen rather than leave it covered.
+          if (isMobileViewport) setSidebarOpen(false);
+        }}
         onDeleteSession={handleDeleteSession}
         onOpenSettings={() => setSettingsOpen(true)}
         activeView={activeView}
@@ -1777,24 +1794,29 @@ function MainApp({ theme, setTheme }) {
       )}
 
       <main className="main-content">
+        {/* The collapsed sidebar leaves one floating way back in, on whichever
+            screen the shell is showing. */}
+        {!sidebarOpen && (
+          <button
+            type="button"
+            className="sidebar-toggle-btn"
+            onClick={() => setSidebarOpen(true)}
+            title={t("common.shell.openSidebar")}
+            aria-label={t("common.shell.openSidebar")}
+          >
+            <PanelLeft size={16} strokeWidth={1.5} />
+          </button>
+        )}
+
+        {isSitesView ? (
+          <Sites onOpenChat={() => navigate("/")} />
+        ) : (
         <>
           <div
             className={`chat-pane ${canvasOpen ? "canvas-active" : ""}${
               isNewChat ? " new-chat" : ""
             }`}
           >
-            {!sidebarOpen && (
-              <button
-                type="button"
-                className="sidebar-toggle-btn"
-                onClick={() => setSidebarOpen(true)}
-                title={t("common.shell.openSidebar")}
-                aria-label={t("common.shell.openSidebar")}
-              >
-                <PanelLeft size={16} strokeWidth={1.5} />
-              </button>
-            )}
-
             <div className="messages-scroll">
               {isStreamActiveElsewhere({
                 isThinking,
@@ -1940,6 +1962,7 @@ function MainApp({ theme, setTheme }) {
             />
           )}
         </>
+        )}
       </main>
 
       <SettingsModal
@@ -2145,6 +2168,9 @@ function AppInner() {
     <Routes>
       <Route path="/" element={<MainApp theme={theme} setTheme={setTheme} />} />
       <Route path="/chat/:chatId" element={<MainApp theme={theme} setTheme={setTheme} />} />
+      {/* The Sites screen lives inside the shell (sidebar + main pane), so the
+          published pages are reachable from the same place as the chats. */}
+      <Route path="/sites" element={<MainApp theme={theme} setTheme={setTheme} />} />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/payment/success" element={<PaymentSuccess />} />
       {legalRoutes()}

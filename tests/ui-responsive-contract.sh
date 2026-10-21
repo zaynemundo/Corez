@@ -7,6 +7,7 @@ canvas="src/components/CanvasPreview.jsx"
 sidebar="src/components/Sidebar.jsx"
 input="src/components/ChatInput.jsx"
 starters="src/components/NewChatStarters.jsx"
+sites="src/pages/Sites.jsx"
 failures=0
 
 check() {
@@ -383,6 +384,20 @@ check_absent 'no thinking-effort state reaches the request' 'thinkMode' "$app"
 check_absent 'no reasoning override is sent with the message' 'requestOptions.think' 'src/services/aiService.js'
 check 'the microphone is gated on browser support' 'dictationAvailable &&' "$input"
 check_block_property 'an unavailable composer control is visibly disabled' '.mic-btn:disabled' 'opacity' '0.35'
+
+# Sites: published pages are a screen of their own, reached from the sidebar, and
+# the editor opens inside the card it belongs to — never a separate page, so the
+# list keeps its context while a live page is being changed.
+check 'the sidebar carries the Sites entry' 'sites-nav-btn' "$sidebar"
+check 'the Sites entry marks the current screen' 'aria-current=\{activeView === "sites"' "$sidebar"
+check 'the shell routes to the Sites screen' 'path="/sites"' "$app"
+check 'the Sites screen is a labelled section' 'aria-labelledby="sites-title"' "$sites"
+check 'saving sends every page of the site back' 'pages: editing.pages' "$sites"
+check 'unpublishing a live link asks first' 'confirmingSlug === page.slug' "$sites"
+check_block_property 'the Sites list is a stack of cards' '.sites-list' 'flex-direction' 'column'
+check_block_property 'the Sites editor is monospaced like every other code surface' '.site-editor-code' 'font-family' 'var(--font-mono)'
+check_block_property 'the Sites editor keeps a bounded height so the list stays reachable' '.site-editor-code' 'max-height' '60vh'
+check_block_property_in_media 'the Sites screen tightens its padding on a phone' 'max-width: 767px' '.sites-page' 'padding' '1.25rem 1rem 2rem'
 
 
 if (( failures > 0 )); then

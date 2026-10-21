@@ -4490,6 +4490,71 @@ async function handlePublish(request, env) {
     return jsonResponse(200, { pages, truncated: omitted });
   }
 
+  // GET /api/publish/<slug> - the caller's own EDITABLE copy of a page: the
+  // document bodies plus the details the editor shows. The public GET /<slug>
+  // route renders a page for anyone; this one is owner-only and returns the raw
+  // documents, so editing a multi-page site can save every page back instead of
+  // silently dropping the ones it never read.
+  //
+  // The injected "Made with Corez" badge is stripped here: it is decoration the
+  // publish flow re-applies from the plan, not part of the user's document, and
+  // leaving it in the editor would let a save bake it into the source.
+  const ownerCopyMatch = pathname.match(
+    /^\/api\/publish\/([a-z0-9][a-z0-9-]{1,48}[a-z0-9])$/,
+  );
+  if (ownerCopyMatch && request.method === "GET") {
+    const uid = await sessionUid(request, env);
+    if (!uid) {
+      return jsonResponse(401, { error: "Authentication required." });
+    }
+    if (!env?.ASSET_BUCKET) {
+      return jsonResponse(530, {
+        error: "R2 storage (ASSET_BUCKET) is not configured.",
+      });
+    }
+    const slug = ownerCopyMatch[1];
+    const resolved = await resolvePublishRecord(env, slug).catch(() => null);
+    const record = resolved?.record || null;
+    if (!record) {
+      return jsonResponse(404, { error: "Published page not found." });
+    }
+    if (!record.ownerUserId) {
+      // Pre-ownership records cannot be attributed, so they cannot be edited
+      // here: a save overwrites the document, and that must never be done to a
+      // page this account cannot prove it owns.
+      return jsonResponse(403, {
+        error:
+          "This published page predates ownership records, so it cannot be edited here.",
+      });
+    }
+    if (record.ownerUserId !== uid) {
+      return jsonResponse(403, {
+        error: "This published page belongs to another account.",
+      });
+    }
+    const pages = {};
+    if (record.pages && typeof record.pages === "object") {
+      for (const [name, pageHtml] of Object.entries(record.pages)) {
+        if (
+          typeof pageHtml === "string" &&
+          PUBLISH_PAGE_NAME_PATTERN.test(name)
+        ) {
+          pages[name] = stripCorezBadge(pageHtml);
+        }
+      }
+    }
+    return jsonResponse(200, {
+      slug,
+      url: `/${slug}`,
+      title: typeof record.title === "string" ? record.title : "",
+      html: stripCorezBadge(typeof record.html === "string" ? record.html : ""),
+      pages,
+      badge: record.badge === true,
+      customized: record.customized === true,
+      createdAt: typeof record.createdAt === "string" ? record.createdAt : null,
+    });
+  }
+
   // DELETE /api/publish/<slug> - unpublish one of the caller's pages. The
   // public URL stops working immediately; assets that were only public because
   // this page referenced them lose their public marker again.
@@ -4815,6 +4880,8 @@ export default {
     if (
       pathname === "/api/publish" ||
       (pathname === "/api/publish/lineage" && request.method === "POST") ||
+      (request.method === "GET" &&
+        pathname.startsWith("/api/publish/")) ||
       (request.method === "DELETE" &&
         PUBLISH_UNPUBLISH_PATH_PATTERN.test(pathname)) ||
       (request.method === "GET" &&

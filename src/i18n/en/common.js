@@ -62,10 +62,48 @@ export default {
     thoughtForSeconds: "Thought for {seconds}s",
   },
 
+  // The Sites screen: every page this account has published, with the two
+  // actions a live page needs — edit it in place, or take it down.
+  sites: {
+    title: "Sites",
+    subtitle: "Everything you have published. Open a site, edit it, or take it down.",
+    backToChat: "Back to chat",
+    refresh: "Refresh",
+    retry: "Try again",
+    loading: "Loading your published sites…",
+    empty: "Nothing published yet",
+    emptyHint:
+      "Publish a creation from the preview canvas and it will show up here, ready to edit.",
+    openTitle: "Open {url} in a new tab",
+    copy: "Copy link",
+    copied: "Link copied",
+    edit: "Edit",
+    closeEditor: "Close editor",
+    titleLabel: "Site title",
+    pageLabel: "Page",
+    homePage: "Home",
+    documentLabel: "{page} HTML",
+    editorHint:
+      "Saving publishes immediately under the same link. Every page in the site is saved together.",
+    save: "Save changes",
+    saving: "Saving…",
+    saved: "Saved — your page is live",
+    cancel: "Cancel",
+    unpublish: "Unpublish",
+    confirmUnpublish: "Click again to unpublish",
+    removing: "Removing…",
+    removeError: "Could not unpublish this page.",
+    saveError: "Could not save this page.",
+    pagesCount: "{count} pages",
+    truncated: "Some older pages are not listed here. Manage them from Settings → Publishing.",
+  },
+
   sidebar: {
     collapse: "Collapse Sidebar",
     newChat: "New Chat",
     newChatTitle: "New Chat Session",
+    sites: "Sites",
+    sitesTitle: "Published sites — open or edit them",
     pinned: "Pinned",
     collapsePinned: "Collapse pinned",
     expandPinned: "Expand pinned",

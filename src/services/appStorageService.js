@@ -434,6 +434,83 @@ export async function claimPublishLineage() {
 }
 
 /**
+ * Fetches the published page's EDITABLE copy for the settings/sites editor.
+ *
+ * Owner-only, and different from `GET /<slug>` by design: the public route serves
+ * the rendered page to anyone, while this returns the raw documents (home plus
+ * every sub-page) with the injected badge removed. Editing needs all of them —
+ * saving a multi-page site must write back the pages it did not touch, not drop
+ * them.
+ */
+export async function fetchPublishedPageForEdit(slug) {
+  if (!slug || typeof slug !== "string") {
+    return { success: false, error: "A slug is required." };
+  }
+  try {
+    const res = await fetch(`/api/publish/${encodeURIComponent(slug)}`, {
+      method: "GET",
+      credentials: "include",
+      headers: { Accept: "application/json" },
+    });
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.slug) {
+      return {
+        success: true,
+        page: {
+          slug: data.slug,
+          url: data.url || `/${data.slug}`,
+          title: typeof data.title === "string" ? data.title : "",
+          html: typeof data.html === "string" ? data.html : "",
+          pages:
+            data.pages && typeof data.pages === "object" && !Array.isArray(data.pages)
+              ? data.pages
+              : {},
+          badge: data.badge === true,
+          customized: data.customized === true,
+          createdAt: data.createdAt || null,
+        },
+      };
+    }
+    return {
+      success: false,
+      error: data?.error || `Could not load the page (${res.status}).`,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err?.message
+        ? `Could not load the page: ${err.message}`
+        : "Could not load the page.",
+    };
+  }
+}
+
+/**
+ * Saves an edited published page under its existing link.
+ *
+ * The slug is explicit, so the publish route updates that record in place
+ * (ownership is enforced there). Every page is sent back — the editor's copy of
+ * the one being edited plus the untouched sub-pages — because the record is
+ * replaced wholesale.
+ */
+export async function savePublishedPage({ slug, title, html, pages }) {
+  if (!slug || typeof slug !== "string") {
+    return { success: false, error: "A slug is required." };
+  }
+  if (!html || typeof html !== "string" || !html.trim()) {
+    return { success: false, error: "The page cannot be empty." };
+  }
+  return publishAppInR2({
+    html,
+    title: title || "Untitled Application",
+    slug,
+    pages,
+    // No sessionId: this edit is not attributed to a chat, and the existing
+    // lineage on the record is preserved by the worker.
+  });
+}
+
+/**
  * Publishes a creation so anyone with the returned share link can open it.
  * The html payload is the fully formatted preview document (what the user
  * sees in the canvas).
