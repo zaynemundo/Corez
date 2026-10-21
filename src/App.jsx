@@ -40,6 +40,7 @@ import {
   storeAppInR2,
   deleteSessionAppsInR2,
   unpublishSessionPages,
+  claimPublishLineage,
 } from "./services/appStorageService";
 import * as chatService from "./services/chatService";
 import {
@@ -194,6 +195,9 @@ function MainApp({ theme, setTheme }) {
   const abortControllerRef = useRef(null);
   const focusTimeoutRef = useRef(null);
   const resumeStartedRef = useRef(false);
+  // The publish lineage is offered to the worker once per load, after the chat
+  // list resolves (it needs to know which chats the account still has).
+  const lineageSyncedRef = useRef(false);
   const dragCounterRef = useRef(0);
   const userDismissedCanvasRef = useRef(false);
   const sessionsRef = useRef(sessions);
@@ -372,6 +376,19 @@ function MainApp({ theme, setTheme }) {
   useEffect(() => {
     fetchChatList();
   }, [fetchChatList]);
+
+  // Hand this browser's publish lineage to the worker once per load. It closes the
+  // legacy gap where a page published before the lineage was recorded could
+  // outlive the chat that produced it: the worker unpublishes the pages whose
+  // chat is gone and records the lineage for the ones that survived, so later
+  // deletes clean up like any other page. Best effort, never blocks the UI.
+  useEffect(() => {
+    if (!sessionsLoaded || lineageSyncedRef.current) return;
+    lineageSyncedRef.current = true;
+    claimPublishLineage().catch((err) =>
+      console.warn("Could not sync the publish lineage:", err),
+    );
+  }, [sessionsLoaded]);
 
   // -------------------------------------------------------------
   // Fetch messages for active chat when URL changes — parallel, not blocked by chat list

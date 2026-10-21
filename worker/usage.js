@@ -101,12 +101,6 @@ export const PLAN_LIMITS = Object.freeze({
   }),
 });
 
-export const DOMAIN_LIMITS = Object.freeze({
-  free: 0,
-  standard: 5,
-  premium: 20,
-});
-
 /**
  * Raised when the accounting database is configured but unusable. Callers
  * must translate it into a retryable error and must not start provider work.

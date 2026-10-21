@@ -1,11 +1,17 @@
 // Custom domains for published creations — Cloudflare for SaaS / Custom
 // Hostnames.
 //
-// STATUS: the HTTP surface is NOT WIRED — nothing routes "/api/domains*" or
-// calls handleCustomDomainRequest(), so no request reaches those handlers.
-// Only `domainRecordKey` is live: worker/storageMigrate.js imports it to write
-// the pointer record while moving legacy R2 objects into per-user folders, so
-// this module does participate in that one request path. To finish the feature:
+// STATUS: NOT SHIPPED. The HTTP surface is unwired — nothing routes
+// "/api/domains*" and nothing calls handleCustomDomainRequest(), so no request can
+// reach those handlers and no customer can configure or resolve a domain. Only
+// `domainRecordKey` is live: worker/storageMigrate.js imports it to write the
+// pointer record while moving legacy R2 objects into per-user folders, so this
+// module does participate in that one request path.
+//
+// Nothing is expected from an operator until it ships: the CF_API_TOKEN /
+// CF_ZONE_ID / CUSTOM_HOSTNAME_FALLBACK_ORIGIN variables are documented in
+// .env.example under an explicit "NOT SHIPPED" heading for the same reason. To
+// finish the feature:
 //   1. worker/index.js: route "/api/domains*" to handleDomainsApi and call
 //      handleCustomDomainRequest() before the normal routes (a Host that is not
 //      a platform host is a customer domain).
@@ -15,6 +21,10 @@
 //   4. Settings → Publishing: a per-page domain row (add / verify / remove).
 //   5. Unpublish: call removeDomainsForSlug so a removed page releases its
 //      hostnames instead of leaving them billing.
+//
+// The MAX_DOMAINS_* caps below are provisional and per-account/per-page only.
+// Plan-based limits belong in worker/usage.js next to the other plan limits; do
+// not add a second plan table here when wiring this.
 //
 // Model
 //   corez.pro/<slug>          always available, free

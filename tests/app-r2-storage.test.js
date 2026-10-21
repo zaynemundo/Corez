@@ -3,6 +3,7 @@ import worker from '../worker/index.js';
 import {
   publishAppInR2,
   unpublishSessionPages,
+  claimPublishLineage,
 } from '../src/services/appStorageService.js';
 
 describe('R2 Multi-App Storage & Chat Deletion Cleanup Contract', () => {
@@ -219,7 +220,7 @@ describe('R2 Multi-App Storage & Chat Deletion Cleanup Contract', () => {
         expect(fetchMock.mock.calls[0][1].body).not.toContain('"slug"');
 
         // A REVISION of the site (different content, same session) must
-        // republish under the SAME slug — this survives closing the preview,
+        // republish under the SAME slug â€” this survives closing the preview,
         // switching sessions, and page refreshes because it is persisted.
         await publishAppInR2({ html: '<h1>Site v2 - revised</h1>', title: 'Site v2', sessionId: 'session-1' });
         const bodies = fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body));
@@ -387,7 +388,7 @@ describe('R2 Multi-App Storage & Chat Deletion Cleanup Contract', () => {
 
     it('still forgets the lineage when the unpublish request fails', async () => {
       // The chat is gone either way, so the entry is dead weight; the slug stays
-      // visible (and removable) under Settings → Published pages.
+      // visible (and removable) under Settings â†’ Published pages.
       const store = seedLineage({
         'session-2': { slug: 'asyag23-999', title: 'Site', updatedAt: '2026-01-01T00:00:00.000Z' },
       });
@@ -404,6 +405,87 @@ describe('R2 Multi-App Storage & Chat Deletion Cleanup Contract', () => {
       expect(JSON.parse(store['corez_publish_lineage'])).toEqual({});
       expect(warn).toHaveBeenCalled();
       warn.mockRestore();
+    });
+  });
+
+  // The legacy backfill: the browser offers the (chat, page) pairings only it
+  // knows, and the worker decides which pages to attribute and which to remove
+  // because their chat is gone.
+  describe('claimPublishLineage', () => {
+    function seedLineage(entries) {
+      const store = {};
+      globalThis.localStorage = {
+        getItem: (key) => store[key] ?? null,
+        setItem: (key, value) => { store[key] = value; },
+        removeItem: (key) => { delete store[key]; },
+      };
+      store['corez_publish_lineage'] = JSON.stringify(entries);
+      return store;
+    }
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      delete globalThis.localStorage;
+    });
+
+    it('offers every entry and forgets the pages the worker took down', async () => {
+      const store = seedLineage({
+        'session-live': { slug: 'kept-1', title: 'Kept', updatedAt: '2026-01-02T00:00:00.000Z' },
+        'session-gone': { slug: 'gone-1', title: 'Gone', updatedAt: '2026-01-01T00:00:00.000Z' },
+      });
+      const fetchMock = vi.fn(async () => new Response(
+        JSON.stringify({ success: true, claimed: ['kept-1'], unpublished: ['gone-1'], ignored: [] }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      ));
+      vi.stubGlobal('fetch', fetchMock);
+
+      const result = await claimPublishLineage();
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/publish/lineage',
+        expect.objectContaining({ method: 'POST', credentials: 'include' }),
+      );
+      const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
+      expect(sent.entries).toEqual(
+        expect.arrayContaining([
+          { sessionId: 'session-live', slug: 'kept-1' },
+          { sessionId: 'session-gone', slug: 'gone-1' },
+        ]),
+      );
+      expect(result).toEqual({ claimed: ['kept-1'], unpublished: ['gone-1'] });
+      // Only the removed page loses its entry: the surviving one keeps its
+      // lineage so a later chat delete still finds it.
+      expect(JSON.parse(store['corez_publish_lineage'])).toEqual({
+        'session-live': expect.objectContaining({ slug: 'kept-1' }),
+      });
+    });
+
+    it('makes no request when nothing was ever published', async () => {
+      seedLineage({});
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+
+      expect(await claimPublishLineage()).toEqual({ claimed: [], unpublished: [] });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('keeps the lineage for the next load when the request fails', async () => {
+      const store = seedLineage({
+        'session-1': { slug: 'kept-1', title: 'Kept', updatedAt: '2026-01-01T00:00:00.000Z' },
+      });
+      const fetchMock = vi.fn(async () => new Response(
+        JSON.stringify({ error: 'down' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      ));
+      vi.stubGlobal('fetch', fetchMock);
+
+      const result = await claimPublishLineage();
+
+      expect(result.error).toContain('down');
+      // A failed sync must not forget anything: the pairing is only known here.
+      expect(JSON.parse(store['corez_publish_lineage'])).toEqual({
+        'session-1': expect.objectContaining({ slug: 'kept-1' }),
+      });
     });
   });
 });

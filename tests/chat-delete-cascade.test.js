@@ -392,4 +392,120 @@ describe('chat delete storage cascade', () => {
     expect(bucket.store.has(`users/bob/publish/${bobSlug}.json`)).toBe(true);
     expect((await servePage(bobSlug)).status).toBe(200);
   });
+
+  // ------------------------------------------------- legacy lineage backfill
+  // Pages published before the record carried a session id are known only to the
+  // browser that published them. That browser offers its lineage, and the worker
+  // decides: attribute it to a live chat, or unpublish a page whose chat is gone.
+
+  const claimLineage = (entries, cookie = aliceCookie) =>
+    call('/api/publish/lineage', { method: 'POST', cookie, body: { entries } });
+
+  const recordFor = (slug) =>
+    JSON.parse(bucket.store.get(`users/alice/publish/${slug}.json`).val);
+
+  it('attributes a legacy page to the chat that is still there', async () => {
+    const chat = await createChat('legacy build');
+    // Published the old way: no sessionId in the record.
+    const legacyRes = await call('/api/publish', {
+      method: 'POST',
+      body: { title: 'Legacy', html: '<html><body>legacy</body></html>' },
+    });
+    const { slug } = await legacyRes.json();
+    expect(recordFor(slug).sessionId).toBeUndefined();
+
+    const res = await claimLineage([{ sessionId: chat.id, slug }]);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      success: true,
+      claimed: [slug],
+      unpublished: [],
+      ignored: [],
+    });
+    expect(recordFor(slug).sessionId).toBe(chat.id);
+
+    // With the lineage in place, deleting the chat now takes the page down.
+    const del = await call(`/api/chats/${chat.id}`, { method: 'DELETE' });
+    expect((await del.json()).unpublishedSlugs).toEqual([slug]);
+    expect((await servePage(slug)).status).toBe(404);
+  });
+
+  it('unpublishes a legacy page whose chat is already gone', async () => {
+    const chat = await createChat('soon deleted');
+    const legacyRes = await call('/api/publish', {
+      method: 'POST',
+      body: { title: 'Orphan', html: '<html><body>orphan</body></html>' },
+    });
+    const { slug } = await legacyRes.json();
+    // The chat is deleted by the OLD code path: the page survives it.
+    await call(`/api/chats/${chat.id}`, { method: 'DELETE' });
+    expect((await servePage(slug)).status).toBe(200);
+
+    const res = await claimLineage([{ sessionId: chat.id, slug }]);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.claimed).toEqual([]);
+    expect(data.unpublished).toEqual([slug]);
+
+    expect((await servePage(slug)).status).toBe(404);
+    expect(bucket.store.has(`users/alice/publish/${slug}.json`)).toBe(false);
+  });
+
+  it('ignores a page the caller does not own', async () => {
+    const bobCookie = await cookieFor('bob');
+    await call('/api/chats', {
+      method: 'POST',
+      cookie: bobCookie,
+      body: { title: 'bob legacy' },
+    });
+    // Bob's page, published the old way: the record carries no session id.
+    const bobSlug = await publishPage(
+      '<html><body>bob</body></html>',
+      undefined,
+      bobCookie,
+    );
+    expect(
+      JSON.parse(bucket.store.get(`users/bob/publish/${bobSlug}.json`).val)
+        .sessionId,
+    ).toBeUndefined();
+
+    // Alice cannot claim or remove Bob's page, even naming her own chat.
+    const aliceChat = await createChat('alice build');
+    const res = await claimLineage([{ sessionId: aliceChat.id, slug: bobSlug }]);
+    expect((await res.json()).ignored).toEqual([bobSlug]);
+    expect(bucket.store.has(`users/bob/publish/${bobSlug}.json`)).toBe(true);
+    expect((await servePage(bobSlug)).status).toBe(200);
+  });
+
+  it('rejects malformed lineage payloads instead of guessing', async () => {
+    const tooMany = await claimLineage(
+      Array.from({ length: 51 }, (_, index) => ({
+        sessionId: `chat-${index}`,
+        slug: `page-${index}`,
+      })),
+    );
+    expect(tooMany.status).toBe(400);
+
+    // Unknown shapes and invalid slugs are reported, never acted on.
+    const res = await claimLineage([
+      { sessionId: '', slug: 'no-session' },
+      { sessionId: 'ok-chat', slug: 'UPPER CASE' },
+      { sessionId: '../escape', slug: 'valid-slug-1' },
+    ]);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.claimed).toEqual([]);
+    expect(data.unpublished).toEqual([]);
+    expect(data.ignored).toHaveLength(3);
+
+    const anonymous = await worker.fetch(
+      new Request(`${BASE}/api/publish/lineage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entries: [] }),
+      }),
+      { ...env, AUTH_SECRET: SECRET },
+    );
+    expect(anonymous.status).toBe(401);
+  });
 });

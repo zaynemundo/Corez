@@ -363,6 +363,77 @@ export async function unpublishSessionPages(sessionId) {
 }
 
 /**
+ * Hands this browser's publish lineage to the worker, once per app load.
+ *
+ * The dialogue that fixes legacy pages: a page published before the worker began
+ * recording which chat produced it has no session id, so its chat being deleted
+ * could not unpublish it. This browser is the only place that pairing exists, so
+ * it is offered here and the worker decides — it is the only party that can tell
+ * whether the chat still exists. Pages whose chat is gone come back in
+ * `unpublished` and are forgotten locally; pages whose chat survives get the
+ * lineage recorded, so later deletes clean them up like any other.
+ *
+ * Best effort by design: a failure leaves the lineage in place for the next load
+ * and never blocks the interface.
+ */
+export async function claimPublishLineage() {
+  let lineage;
+  try {
+    lineage = loadPublishLineage();
+  } catch {
+    return { claimed: [], unpublished: [], error: "lineage-unavailable" };
+  }
+  const entries = Object.entries(lineage)
+    .map(([sessionId, entry]) => ({
+      sessionId,
+      slug: typeof entry?.slug === "string" ? entry.slug : "",
+    }))
+    .filter((entry) => entry.sessionId && entry.slug)
+    .slice(0, PUBLISH_LINEAGE_MAX);
+  if (entries.length === 0) return { claimed: [], unpublished: [] };
+
+  try {
+    const res = await fetch("/api/publish/lineage", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ entries }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || data?.success !== true) {
+      return {
+        claimed: [],
+        unpublished: [],
+        error: data?.error || `Lineage sync failed (${res.status}).`,
+      };
+    }
+    const unpublished = Array.isArray(data.unpublished) ? data.unpublished : [];
+    if (unpublished.length > 0) {
+      // Those pages are gone, so their local entries would only point at dead
+      // links. Forget exactly those: everything else keeps its lineage (an
+      // "ignored" slug may just be a record this account no longer owns).
+      const gone = new Set(unpublished);
+      const next = {};
+      for (const [sessionId, entry] of Object.entries(lineage)) {
+        if (entry?.slug && gone.has(entry.slug)) continue;
+        next[sessionId] = entry;
+      }
+      savePublishLineage(next);
+    }
+    return {
+      claimed: Array.isArray(data.claimed) ? data.claimed : [],
+      unpublished,
+    };
+  } catch (err) {
+    return {
+      claimed: [],
+      unpublished: [],
+      error: err?.message ? `Lineage sync failed: ${err.message}` : "Lineage sync failed.",
+    };
+  }
+}
+
+/**
  * Publishes a creation so anyone with the returned share link can open it.
  * The html payload is the fully formatted preview document (what the user
  * sees in the canvas).

@@ -3984,9 +3984,158 @@ async function handleUsageApi(request, env) {
 // (Publish/store helpers live in worker/publishStore.js; key layout in
 // worker/storageKeys.js.)
 
+// Most lineage entries one request may carry: the browser keeps at most 50
+// (appStorageService PUBLISH_LINEAGE_MAX), so this accepts exactly what a client
+// can legitimately have and no more.
+const MAX_LINEAGE_ENTRIES = 50;
+
 async function handlePublish(request, env) {
   const url = new URL(request.url);
   const pathname = url.pathname;
+
+  // POST /api/publish/lineage - claim the lineage of pages published before the
+  // worker recorded which chat produced them, and take down the ones whose chat
+  // is already gone.
+  //
+  // The gap this closes: a page published before that bookkeeping existed carries
+  // no session id, so deleting its chat could not unpublish it and the share link
+  // stayed live. Only the browser that published the page knows the
+  // (chat, page) pairing, so the client offers its local lineage and the worker
+  // decides — it is the only party that can tell whether the chat still exists:
+  //   - chat exists  -> record the lineage, so a later chat delete removes it too;
+  //   - chat is gone -> the page outlived the conversation that produced it:
+  //                     unpublish it now and report the slug.
+  // Owner-scoped throughout: a slug the caller does not own is ignored, never
+  // claimed and never removed. Idempotent: a second run of the same entries
+  // changes nothing.
+  if (pathname === "/api/publish/lineage" && request.method === "POST") {
+    const uid = await sessionUid(request, env);
+    if (!uid) {
+      return jsonResponse(401, { error: "Authentication required." });
+    }
+    if (!env?.ASSET_BUCKET) {
+      return jsonResponse(530, {
+        error: "R2 storage (ASSET_BUCKET) is not configured.",
+      });
+    }
+    const retryAfter = publishRateLimiter(request);
+    if (retryAfter !== null) {
+      return jsonResponse(
+        429,
+        { error: "Too many publish requests. Try again shortly." },
+        { "Retry-After": String(retryAfter) },
+      );
+    }
+    let body;
+    try {
+      body = await readBoundedJson(request);
+    } catch {
+      return jsonResponse(400, { error: "Invalid JSON payload." });
+    }
+    const rawEntries = Array.isArray(body?.entries) ? body.entries : [];
+    if (rawEntries.length === 0) {
+      // Nothing to claim is not an error: the browser simply has no lineage.
+      return jsonResponse(200, {
+        success: true,
+        claimed: [],
+        unpublished: [],
+        ignored: [],
+      });
+    }
+    if (rawEntries.length > MAX_LINEAGE_ENTRIES) {
+      return jsonResponse(400, {
+        error: `Send at most ${MAX_LINEAGE_ENTRIES} lineage entries.`,
+      });
+    }
+
+    const claimed = [];
+    const unpublished = [];
+    const ignored = [];
+    for (const entry of rawEntries) {
+      const sessionId =
+        typeof entry?.sessionId === "string" ? entry.sessionId.trim() : "";
+      const slug = typeof entry?.slug === "string" ? entry.slug.trim() : "";
+      if (
+        !sessionId ||
+        !SAFE_STORAGE_SEGMENT.test(sessionId) ||
+        !PUBLISH_SLUG_PATTERN.test(slug)
+      ) {
+        ignored.push(slug || sessionId || "invalid");
+        continue;
+      }
+      const resolved = await resolvePublishRecord(env, slug).catch(() => null);
+      const record = resolved?.record || null;
+      // Missing or somebody else's page: nothing to claim, nothing to remove.
+      if (!record || record.ownerUserId !== uid) {
+        ignored.push(slug);
+        continue;
+      }
+      // A page already attributed to a different chat is left alone: the client
+      // is stale or wrong, and the recorded lineage is the one the delete path
+      // relies on.
+      if (
+        typeof record.sessionId === "string" &&
+        record.sessionId &&
+        record.sessionId !== sessionId
+      ) {
+        ignored.push(slug);
+        continue;
+      }
+      // Whether the chat still exists decides the outcome, so it has to be a
+      // real answer. A failed lookup (missing table, D1 hiccup) must never
+      // unpublish anything.
+      let chatExists = null;
+      if (env?.DB) {
+        try {
+          const row = await env.DB.prepare(
+            "SELECT id FROM chats WHERE id = ? AND user_id = ? LIMIT 1",
+          )
+            .bind(sessionId, uid)
+            .first();
+          chatExists = Boolean(row);
+        } catch {
+          chatExists = null;
+        }
+      }
+      if (chatExists === null) {
+        ignored.push(slug);
+        continue;
+      }
+      if (chatExists === false) {
+        try {
+          await deletePublishRecord(env, slug);
+          await dropUnreferencedAssetMarkers(env, record);
+          unpublished.push(slug);
+        } catch {
+          ignored.push(slug);
+        }
+        continue;
+      }
+      if (record.sessionId === sessionId) {
+        // Already attributed: nothing to write, and it counts as claimed so a
+        // caller can see the lineage is in place.
+        claimed.push(slug);
+        continue;
+      }
+      try {
+        await writePublishRecord(env, uid, slug, {
+          ...record,
+          sessionId,
+          lineageClaimedAt: new Date().toISOString(),
+        });
+        claimed.push(slug);
+      } catch {
+        ignored.push(slug);
+      }
+    }
+
+    return jsonResponse(200, {
+      success: true,
+      claimed,
+      unpublished,
+      ignored,
+    });
+  }
 
   // POST /api/publish - publish (or republish under an explicit slug) a
   // creation so anyone with the link can open it. Requires authentication;
@@ -4665,6 +4814,7 @@ export default {
     }
     if (
       pathname === "/api/publish" ||
+      (pathname === "/api/publish/lineage" && request.method === "POST") ||
       (request.method === "DELETE" &&
         PUBLISH_UNPUBLISH_PATH_PATTERN.test(pathname)) ||
       (request.method === "GET" &&
