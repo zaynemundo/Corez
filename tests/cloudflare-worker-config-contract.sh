@@ -3,6 +3,11 @@ set -u
 
 config="wrangler.jsonc"
 package="package.json"
+# The contract suite's definition. It used to live as one long `&&` chain inside
+# package.json; it is now data in this runner so one run can report every failing
+# check instead of stopping at the leftmost red. These checks follow the intent
+# (the standard suite really runs these contracts), not the old shape.
+suite="scripts/run-contracts.mjs"
 readme="README.md"
 workflow=".github/workflows/deploy.yml"
 shared_workflow=".github/workflows/verify-shared.yml"
@@ -41,12 +46,29 @@ check 'Workers AI binding name is AI' '"binding"[[:space:]]*:[[:space:]]*"AI"' "
 check 'GameRoom Durable Object binding is configured' '"name"[[:space:]]*:[[:space:]]*"GAME_ROOMS"' "$config"
 check 'GameRoom Durable Object class is configured' '"class_name"[[:space:]]*:[[:space:]]*"GameRoom"' "$config"
 check 'GameRoom migration is declared' 'new_sqlite_classes["[:space:]]*:[[:space:]]*\[[[:space:]]*"GameRoom"\]' "$config"
-check 'Cloudflare contract script exists' 'cloudflare-worker-contract[.]mjs' "$package"
-check_absent 'inline-only routing: no worker swarm contract in the suite' 'worker-live-swarm-contract[.]mjs' "$package"
-check 'Workers AI provider contract runs in the standard suite' 'workers-ai-provider-contract[.]sh' "$package"
-check 'public AI proxy contract runs in the standard suite' 'public-ai-proxy-contract[.]sh' "$package"
-check 'live AI contracts run in the standard suite' 'ai-live-intent-eval-contract[.]sh.*ai-live-intent-eval-response-contract[.]mjs' "$package"
-check 'environment skill contract runs in the standard suite' 'env-question-skill-contract[.]sh' "$package"
+check 'Cloudflare contract script exists' 'cloudflare-worker-contract[.]mjs' "$suite"
+check_absent 'inline-only routing: no worker swarm contract in the suite' 'worker-live-swarm-contract[.]mjs' "$suite"
+check 'Workers AI provider contract runs in the standard suite' 'workers-ai-provider-contract[.]sh' "$suite"
+check 'public AI proxy contract runs in the standard suite' 'public-ai-proxy-contract[.]sh' "$suite"
+check 'live AI contracts run in the standard suite' 'ai-live-intent-eval-response-contract[.]mjs' "$suite"
+check 'environment skill contract runs in the standard suite' 'env-question-skill-contract[.]sh' "$suite"
+# One definition of the suite, reached through npm so CI runs exactly what a
+# developer runs. Both entries point at the runner: `test:contracts` is the clear
+# name, `test:cloudflare` is the historical one the workflows call.
+check 'npm exposes the contract suite through the runner' '"test:cloudflare"[[:space:]]*:[[:space:]]*"node scripts/run-contracts[.]mjs"' "$package"
+check 'npm carries a clear alias for the contract suite' '"test:contracts"[[:space:]]*:[[:space:]]*"node scripts/run-contracts[.]mjs"' "$package"
+check 'the runner exits non-zero when a check fails' 'process[.]exit\(main\(\)\)' "$suite"
+check 'the runner treats a skipped check as not-green' 'skipped check is not a pass' "$suite"
+# No contract script may be orphaned: every tests/*-contract.{sh,mjs} has to be
+# part of the suite, so a new contract cannot be written and then never run.
+for script in tests/*-contract.sh tests/*-contract.mjs; do
+  [ -e "$script" ] || continue
+  name=$(basename "$script")
+  if ! grep -Fq -- "$name" "$suite" 2>/dev/null; then
+    printf 'FAIL: %s is not part of the contract suite\n' "$name" >&2
+    failures=$((failures + 1))
+  fi
+done
 check 'Wrangler local development script exists' '"dev:worker"' "$package"
 check 'Wrangler deploy script exists' '"deploy"' "$package"
 check 'README documents Cloudflare deployment' 'Cloudflare Worker' "$readme"
