@@ -17,7 +17,6 @@ const here = dirname(fileURLToPath(import.meta.url));
 const CATEGORIES = [
   { id: 'general', label: 'General', contains: ['Account', 'Appearance'] },
   { id: 'billing', label: 'Billing', contains: ['Plan & Billing'] },
-  { id: 'publishing', label: 'Publishing', contains: ['Published pages'] },
   { id: 'privacy', label: 'Privacy', contains: ['Privacy & Cookies'] },
 ];
 
@@ -34,9 +33,6 @@ function mockApi() {
     }
     if (target.includes('/api/subscriptions/me')) {
       return new Response(JSON.stringify({ plan: 'free' }), { status: 200 });
-    }
-    if (target === '/api/publish') {
-      return new Response(JSON.stringify({ pages: [], truncated: false }), { status: 200 });
     }
     return new Response(null, { status: 404 });
   });
@@ -81,6 +77,16 @@ describe('settings categories', () => {
     for (const other of CATEGORIES.slice(1)) {
       expect(screen.getByRole('tab', { name: other.label }).getAttribute('aria-selected')).toBe('false');
     }
+  });
+
+  it('has no Publishing category: published pages live on the Sites screen', () => {
+    renderSettings();
+    // Settings stopped being a second home for published pages when Sites took
+    // over listing, editing and unpublishing them. The tab, its panel and the
+    // dead fetch that filled it are gone — this pins that they do not creep back.
+    expect(screen.queryByRole('tab', { name: 'Publishing' })).toBeNull();
+    expect(screen.queryByText('Published pages')).toBeNull();
+    expect(screen.queryByRole('tabpanel', { name: /Publishing/ })).toBeNull();
   });
 
   it('shows exactly one panel at a time', () => {
@@ -145,7 +151,7 @@ describe('settings categories', () => {
     renderSettings();
     await screen.findByText(/demo@corez\.pro/);
 
-    for (const label of ['General', 'Billing', 'Publishing', 'Privacy']) {
+    for (const label of ['General', 'Billing', 'Privacy']) {
       fireEvent.click(screen.getByRole('tab', { name: label }));
       const footer = document.querySelector('.settings-footer');
       expect(footer, `footer missing on ${label}`).toBeTruthy();
@@ -162,8 +168,8 @@ describe('settings categories', () => {
       const tab = screen.getByRole('tab', { name: category.label });
       expect(tab.getAttribute('tabindex')).toBe(category.id === 'general' ? '0' : '-1');
     }
-    fireEvent.click(screen.getByRole('tab', { name: 'Publishing' }));
-    expect(screen.getByRole('tab', { name: 'Publishing' }).getAttribute('tabindex')).toBe('0');
+    fireEvent.click(screen.getByRole('tab', { name: 'Privacy' }));
+    expect(screen.getByRole('tab', { name: 'Privacy' }).getAttribute('tabindex')).toBe('0');
     expect(screen.getByRole('tab', { name: 'General' }).getAttribute('tabindex')).toBe('-1');
   });
 

@@ -95,7 +95,7 @@ export default {
     removeError: "Could not unpublish this page.",
     saveError: "Could not save this page.",
     pagesCount: "{count} pages",
-    truncated: "Some older pages are not listed here. Manage them from Settings → Publishing.",
+    truncated: "Some older pages are not listed here.",
   },
 
   sidebar: {

@@ -13,15 +13,12 @@ import {
   Sparkles,
   ArrowRight,
   ShieldCheck,
-  ExternalLink,
   Globe,
-  Loader2,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../i18n/index.jsx";
 import { formatDate } from "../i18n/format.js";
 import { openConsentPreferences } from "../services/consentService";
-import { listPublishedPages, unpublishPage } from "../services/appStorageService";
 import {
   USAGE_METRIC_LABELS,
   fetchUsage,
@@ -30,12 +27,12 @@ import {
 } from "../services/usageService";
 
 // Settings is grouped rather than one long scroll: everything about the account
-// in General, money in Billing, what is public in Publishing, and the choices
-// that are about data in Privacy.
+// in General, money in Billing, and the choices that are about data in Privacy.
+// Published pages used to have their own category here; they now have the Sites
+// screen (sidebar), which lists, edits and unpublishes them — one home, not two.
 const SETTINGS_CATEGORIES = [
   { id: "general", labelKey: "settings.tabs.general" },
   { id: "billing", labelKey: "settings.tabs.billing" },
-  { id: "publishing", labelKey: "settings.tabs.publishing" },
   { id: "privacy", labelKey: "settings.tabs.privacy" },
 ];
 
@@ -58,27 +55,11 @@ export default function SettingsModal({
   const { t, language, setLanguage, languages } = useI18n();
   const [sub, setSub] = useState(null);
   const [subLoading, setSubLoading] = useState(false);
-  const [published, setPublished] = useState([]);
-  const [publishedLoading, setPublishedLoading] = useState(false);
-  const [publishedError, setPublishedError] = useState("");
-  const [publishedTruncated, setPublishedTruncated] = useState(false);
-  const [removingSlug, setRemovingSlug] = useState("");
-  const [removeError, setRemoveError] = useState("");
   const [category, setCategory] = useState(SETTINGS_CATEGORIES[0].id);
   const [usage, setUsage] = useState(null);
   const tabRefs = useRef({});
   const wasOpenRef = useRef(false);
   const titleId = "settings-modal-title";
-
-  const refreshPublished = async () => {
-    setPublishedLoading(true);
-    setPublishedError("");
-    const result = await listPublishedPages();
-    setPublished(result.pages);
-    setPublishedTruncated(result.truncated);
-    setPublishedError(result.error || "");
-    setPublishedLoading(false);
-  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -100,35 +81,11 @@ export default function SettingsModal({
     };
   }, [isOpen]);
 
-  // Published pages are owner data on the server, so they are fetched when the
-  // panel opens rather than read from this browser's local publish registry.
-  // The modal stays mounted while closed, so there is no unmount race here.
+  // Usage is owner data on the server: read it when the panel opens.
   useEffect(() => {
     if (!isOpen) return;
-    setRemoveError("");
-    refreshPublished();
     fetchUsage().then((summary) => setUsage(summary));
   }, [isOpen]);
-
-  const handleUnpublish = async (page) => {
-    const label = page.title || page.slug;
-    if (
-      !confirm(
-        t("settings.publishing.confirmRemove", { title: label, url: page.url }),
-      )
-    ) {
-      return;
-    }
-    setRemoveError("");
-    setRemovingSlug(page.slug);
-    const result = await unpublishPage(page.slug);
-    setRemovingSlug("");
-    if (result.success) {
-      setPublished((prev) => prev.filter((entry) => entry.slug !== page.slug));
-      return;
-    }
-    setRemoveError(result.error || t("settings.publishing.removeFailed"));
-  };
 
   const currentPlan = sub?.plan || userPlan || "free";
   const isExpired = sub?.status === "expired" || sub?.isExpired;
@@ -557,110 +514,6 @@ export default function SettingsModal({
               {t("settings.billing.viewPricing")} <ArrowRight size={14} strokeWidth={1.75} />
             </span>
           </button>
-        </div>
-
-          </div>
-
-          <div
-            className="settings-panel"
-            role="tabpanel"
-            id="settings-panel-publishing"
-            aria-labelledby="settings-tab-publishing"
-            hidden={category !== "publishing"}
-          >
-        <div className="settings-section">
-          <div className="settings-section-label">{t("settings.publishing.title")}</div>
-          <p className="settings-published-lede">
-            {t("settings.publishing.lede")}
-          </p>
-
-          {publishedLoading && (
-            <p className="settings-published-state" role="status">
-              <Loader2 size={14} strokeWidth={1.75} className="spin" aria-hidden="true" />
-              {t("settings.publishing.checking")}
-            </p>
-          )}
-
-          {!publishedLoading && publishedError && (
-            <div className="settings-published-error" role="alert">
-              <span>{publishedError}</span>
-              <button
-                type="button"
-                className="settings-published-retry"
-                onClick={refreshPublished}
-              >
-                {t("settings.publishing.tryAgain")}
-              </button>
-            </div>
-          )}
-
-          {!publishedLoading && !publishedError && published.length === 0 && (
-            <p className="settings-published-empty">
-              <Globe size={18} strokeWidth={1.5} aria-hidden="true" />
-              {t("settings.publishing.empty")}
-            </p>
-          )}
-
-          {!publishedLoading && published.length > 0 && (
-            <ul className="settings-published-list">
-              {published.map((page) => (
-                <li key={page.slug} className="settings-published-item">
-                  <div className="settings-published-meta">
-                    <a
-                      className="settings-published-title"
-                      href={page.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title={t("settings.publishing.openTitle", { url: page.url })}
-                    >
-                      <Globe size={13} strokeWidth={1.75} aria-hidden="true" />
-                      <span>{page.title || page.slug}</span>
-                      <ExternalLink size={12} strokeWidth={1.75} aria-hidden="true" />
-                    </a>
-                    <span className="settings-published-sub">
-                      corez.pro{page.url}
-                      {page.pages > 0
-                        ? t("settings.publishing.pagesSuffix", {
-                            count: page.pages + 1,
-                          })
-                        : ""}
-                      {page.createdAt
-                        ? t("settings.publishing.dateSuffix", {
-                            date: formatDate(page.createdAt, language),
-                          })
-                        : ""}
-                      {page.badge ? t("settings.publishing.badgeSuffix") : ""}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    className="settings-published-remove"
-                    onClick={() => handleUnpublish(page)}
-                    disabled={removingSlug === page.slug}
-                    aria-label={t("settings.publishing.removeLabel", {
-                      title: page.title || page.slug,
-                    })}
-                  >
-                    {removingSlug === page.slug
-                      ? t("settings.publishing.removing")
-                      : t("settings.publishing.remove")}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {publishedTruncated && !publishedLoading && (
-            <p className="settings-published-state">
-              {t("settings.publishing.truncated")}
-            </p>
-          )}
-
-          {removeError && (
-            <p className="settings-published-error" role="alert">
-              {removeError}
-            </p>
-          )}
         </div>
 
           </div>

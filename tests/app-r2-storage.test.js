@@ -220,7 +220,7 @@ describe('R2 Multi-App Storage & Chat Deletion Cleanup Contract', () => {
         expect(fetchMock.mock.calls[0][1].body).not.toContain('"slug"');
 
         // A REVISION of the site (different content, same session) must
-        // republish under the SAME slug â€” this survives closing the preview,
+        // republish under the SAME slug — this survives closing the preview,
         // switching sessions, and page refreshes because it is persisted.
         await publishAppInR2({ html: '<h1>Site v2 - revised</h1>', title: 'Site v2', sessionId: 'session-1' });
         const bodies = fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body));
@@ -388,7 +388,7 @@ describe('R2 Multi-App Storage & Chat Deletion Cleanup Contract', () => {
 
     it('still forgets the lineage when the unpublish request fails', async () => {
       // The chat is gone either way, so the entry is dead weight; the slug stays
-      // visible (and removable) under Settings â†’ Published pages.
+      // visible (and removable) on the Sites screen.
       const store = seedLineage({
         'session-2': { slug: 'asyag23-999', title: 'Site', updatedAt: '2026-01-01T00:00:00.000Z' },
       });

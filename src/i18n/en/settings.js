@@ -12,11 +12,12 @@ export default {
     close: "Close settings",
   },
 
-  // The category tabs.
+  // The category tabs. Published pages used to be a category ("Publishing");
+  // they live on the Sites screen now, so there is nothing to configure here and
+  // the keys are gone with the tab.
   tabs: {
     general: "General",
     billing: "Billing",
-    publishing: "Publishing",
     privacy: "Privacy",
     label: "Settings categories",
   },
@@ -67,26 +68,6 @@ export default {
     managePlanLabel: "Manage plan — go to pricing page",
     manageSub: "View pricing • Upgrade or downgrade • Monthly via Ziina",
     viewPricing: "View pricing",
-  },
-
-  publishing: {
-    title: "Published pages",
-    lede: "Everything you have published to a public link. Removing a page takes the link offline immediately — the creation stays in its chat.",
-    checking: "Checking your published pages…",
-    tryAgain: "Try again",
-    empty: "Nothing published yet. Publish from the preview pane and the link will appear here.",
-    openTitle: "Open corez.pro{url}",
-    pagesSuffix: " · {count} pages",
-    dateSuffix: " · {date}",
-    badgeSuffix: " · shows the Made with Corez badge",
-    removeLabel: "Remove published page {title}",
-    removing: "Removing…",
-    remove: "Remove",
-    removeFailed: "Could not remove that page.",
-    truncated:
-      "You have more published pages than can be listed at once — the oldest are not shown here.",
-    confirmRemove:
-      "Remove the published page “{title}”?\n\nThe public link corez.pro{url} stops working immediately. The creation itself stays in its chat.",
   },
 
   privacy: {

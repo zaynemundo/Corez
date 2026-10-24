@@ -18,7 +18,9 @@
 //   2. worker/entry.js: add "/api/domains" to authPaths.
 //   3. wrangler.jsonc: route the fallback origin (customers.corez.pro) to this
 //      Worker and set CUSTOM_HOSTNAME_FALLBACK_ORIGIN.
-//   4. Settings → Publishing: a per-page domain row (add / verify / remove).
+//   4. Sites (src/pages/Sites.jsx): a per-page domain row (add / verify / remove)
+//      — the screen already owns the published-page actions, so the control
+//      belongs in the card, not in Settings.
 //   5. Unpublish: call removeDomainsForSlug so a removed page releases its
 //      hostnames instead of leaving them billing.
 //

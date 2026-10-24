@@ -79,7 +79,7 @@ export default {
     removeError: "تعذّر إلغاء نشر هذه الصفحة.",
     saveError: "تعذّر حفظ هذه الصفحة.",
     pagesCount: "{count} صفحات",
-    truncated: "بعض الصفحات الأقدم غير مدرجة هنا. أدِرها من الإعدادات ← النشر.",
+    truncated: "بعض الصفحات الأقدم غير مدرجة هنا.",
   },
 
   sidebar: {
