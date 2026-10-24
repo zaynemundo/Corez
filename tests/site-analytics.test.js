@@ -333,9 +333,9 @@ describe("owner report", () => {
         { day: "2026-10-20", visitors: 2 },
         { day: "2026-10-22", visitors: 2 },
       ],
-      [{ day: "2026-10-22", returning: 1 }],
+      [{ day: "2026-10-22", returning_visitors: 1 }],
       [{ visitors: 4 }],
-      [{ returning: 1 }],
+      [{ returning_visitors: 1 }],
       [{ views: 10 }],
       [{ visitors: 5 }],
       [

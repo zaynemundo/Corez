@@ -27,6 +27,7 @@
 import { dayKey, isBotUserAgent, deviceClassFromUserAgent } from "./analytics.js";
 import { SITE_ANALYTICS_SCHEMA } from "./dbSchema.js";
 import { sessionUid } from "./auth.js";
+import { safeErrorDetail } from "./utils.js";
 
 export const SITE_ANALYTICS_TABLES = Object.freeze({
   daily: "site_analytics_daily",
@@ -87,9 +88,13 @@ export async function ensureSiteAnalyticsTables(env) {
   readyByDb.set(db, ready);
   try {
     return await ready;
-  } catch {
+  } catch (error) {
     // Do not cache a failure: a later view may succeed (e.g. a transient D1
     // error) and the dashboard should recover without a redeploy.
+    console.error(
+      "Site analytics tables could not be prepared:",
+      safeErrorDetail(error),
+    );
     readyByDb.delete(db);
     return false;
   }
@@ -466,9 +471,10 @@ export async function readSiteAnalytics(env, slug, { days = DEFAULT_ANALYTICS_RA
     env.DB.prepare(
       `SELECT day, COUNT(*) AS visitors FROM ${SITE_ANALYTICS_TABLES.visits} WHERE site_slug = ? AND day >= ? AND day <= ? GROUP BY day ORDER BY day ASC`,
     ).bind(slug, from, to),
-    // 2 daily returning visitors
+    // 2 daily returning visitors. The alias cannot be `returning`: that is a
+    // reserved SQLite keyword (the RETURNING clause), and D1 rejects it.
     env.DB.prepare(
-      `SELECT v.day AS day, COUNT(*) AS returning FROM ${SITE_ANALYTICS_TABLES.visits} v JOIN ${SITE_ANALYTICS_TABLES.visitors} s ON s.site_slug = v.site_slug AND s.visitor_key = v.visitor_key WHERE v.site_slug = ? AND v.day >= ? AND v.day <= ? AND s.first_day < v.day GROUP BY v.day ORDER BY v.day ASC`,
+      `SELECT v.day AS day, COUNT(*) AS returning_visitors FROM ${SITE_ANALYTICS_TABLES.visits} v JOIN ${SITE_ANALYTICS_TABLES.visitors} s ON s.site_slug = v.site_slug AND s.visitor_key = v.visitor_key WHERE v.site_slug = ? AND v.day >= ? AND v.day <= ? AND s.first_day < v.day GROUP BY v.day ORDER BY v.day ASC`,
     ).bind(slug, from, to),
     // 3 distinct visitors in the window
     env.DB.prepare(
@@ -477,7 +483,7 @@ export async function readSiteAnalytics(env, slug, { days = DEFAULT_ANALYTICS_RA
     // 4 returning visitors in the window: seen before the window began, or
     // came back on a later day inside it (the same rule as the daily series).
     env.DB.prepare(
-      `SELECT COUNT(DISTINCT v.visitor_key) AS returning FROM ${SITE_ANALYTICS_TABLES.visits} v JOIN ${SITE_ANALYTICS_TABLES.visitors} s ON s.site_slug = v.site_slug AND s.visitor_key = v.visitor_key WHERE v.site_slug = ? AND v.day >= ? AND v.day <= ? AND (s.first_day < ? OR s.first_day < v.day)`,
+      `SELECT COUNT(DISTINCT v.visitor_key) AS returning_visitors FROM ${SITE_ANALYTICS_TABLES.visits} v JOIN ${SITE_ANALYTICS_TABLES.visitors} s ON s.site_slug = v.site_slug AND s.visitor_key = v.visitor_key WHERE v.site_slug = ? AND v.day >= ? AND v.day <= ? AND (s.first_day < ? OR s.first_day < v.day)`,
     ).bind(slug, from, to, from),
     // 5 previous window views
     env.DB.prepare(
@@ -504,7 +510,10 @@ export async function readSiteAnalytics(env, slug, { days = DEFAULT_ANALYTICS_RA
   let results;
   try {
     results = await env.DB.batch(queries);
-  } catch {
+  } catch (error) {
+    // The API turns this into an honest 503, so record why: without the log a
+    // refused statement (a reserved-word alias did this once) is invisible.
+    console.error("Site analytics report failed:", safeErrorDetail(error));
     return null;
   }
 
@@ -534,7 +543,7 @@ export async function readSiteAnalytics(env, slug, { days = DEFAULT_ANALYTICS_RA
   }
   for (const row of returningRows) {
     const entry = byDay.get(String(row.day || ""));
-    if (entry) entry.returning = number(row.returning);
+    if (entry) entry.returning = number(row.returning_visitors);
   }
 
   // Fill the whole window so the chart shows quiet days instead of hiding them.
@@ -545,7 +554,7 @@ export async function readSiteAnalytics(env, slug, { days = DEFAULT_ANALYTICS_RA
   }
 
   const visitors = number(uniqueRow.visitors);
-  const returning = Math.min(visitors, number(returningRow.returning));
+  const returning = Math.min(visitors, number(returningRow.returning_visitors));
   const previousViews = number(previousViewsRow.views);
   const previousVisitors = number(previousVisitorsRow.visitors);
 

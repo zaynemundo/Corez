@@ -132,15 +132,17 @@ function analyticsD1() {
       );
       return [{ visitors: keys.size }];
     }
-    if (sql.includes('COUNT(DISTINCT v.visitor_key) AS returning')) {
+    if (sql.includes('COUNT(DISTINCT v.visitor_key) AS returning_visitors')) {
       const [site, from, to, before] = values;
       const seen = new Set();
       for (const row of visits.values()) {
         if (row.site !== site || !inRange(row.day, from, to)) continue;
         const visitor = visitors.get(`${row.site}|${row.key}`);
-        if (visitor && visitor.first_day < before) seen.add(row.key);
+        if (visitor && (visitor.first_day < before || visitor.first_day < row.day)) {
+          seen.add(row.key);
+        }
       }
-      return [{ returning: seen.size }];
+      return [{ returning_visitors: seen.size }];
     }
     if (sql.includes('COUNT(*) AS visitors') && sql.includes('GROUP BY day')) {
       const [site, from, to] = values;
@@ -151,7 +153,7 @@ function analyticsD1() {
       }
       return [...counts].sort(([a], [b]) => a.localeCompare(b)).map(([day, visitors]) => ({ day, visitors }));
     }
-    if (sql.includes('COUNT(*) AS returning') && sql.includes('GROUP BY v.day')) {
+    if (sql.includes('COUNT(*) AS returning_visitors') && sql.includes('GROUP BY v.day')) {
       const [site, from, to] = values;
       const counts = new Map();
       for (const row of visits.values()) {
@@ -161,7 +163,9 @@ function analyticsD1() {
           counts.set(row.day, (counts.get(row.day) || 0) + 1);
         }
       }
-      return [...counts].sort(([a], [b]) => a.localeCompare(b)).map(([day, returning]) => ({ day, returning }));
+      return [...counts]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([day, returning_visitors]) => ({ day, returning_visitors }));
     }
     if (sql.includes('COALESCE(SUM(views), 0) AS views')) {
       const [site, from, to] = values;
