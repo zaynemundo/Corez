@@ -1,0 +1,36 @@
+{
+  "appId": "pro.corez.app",
+  "appName": "Corez",
+  "webDir": "dist",
+  "server": {
+    "url": "https://corez.pro",
+    "cleartext": false,
+    "allowNavigation": [
+      "corez.pro",
+      "*.corez.pro"
+    ]
+  },
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  },
+  "ios": {
+    "contentInset": "always",
+    "limitsNavigationsToAppBoundDomains": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1200,
+      "launchAutoHide": true,
+      "backgroundColor": "#0a0a0a",
+      "showSpinner": false,
+      "androidScaleType": "CENTER_CROP"
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#0a0a0a",
+      "overlaysWebView": false
+    }
+  }
+}

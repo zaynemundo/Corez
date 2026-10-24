@@ -32,9 +32,17 @@
     "test:cloudflare": "node scripts/run-contracts.mjs",
     "test:contracts": "node scripts/run-contracts.mjs",
     "dev:worker": "npm run build && wrangler dev --host localhost",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "npm run build && wrangler deploy",
+    "mobile:assets": "node scripts/mobile/generate-android-assets.mjs",
+    "mobile:sync": "npm run build && cap sync android",
+    "mobile:android": "cap open android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.4",
     "acorn": "^8.17.0",
     "lucide-react": "^0.475.0",
     "pdfjs-dist": "^6.4.299",
@@ -43,6 +51,8 @@
     "react-router-dom": "^7.18.2"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.3",
     "@eslint/js": "^10.0.1",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
