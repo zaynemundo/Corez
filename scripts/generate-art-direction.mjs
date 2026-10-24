@@ -91,7 +91,10 @@ function parseNumericTokens(css, selectorRe) {
 }
 
 function build() {
-  const css = readFileSync(CSS_PATH, "utf8");
+  // Hash the canonical LF form, not the checkout's line endings. Without this,
+  // a Windows checkout generates a hash CI (Linux, LF) can never match and
+  // `art:check` fails on every deploy even though the CSS is identical.
+  const css = readFileSync(CSS_PATH, "utf8").replace(/\r\n/g, "\n");
   const dark = parseThemeTokens(css, /:root,\s*\[data-theme="dark"\]\s*\{/);
   const light = parseThemeTokens(css, /\[data-theme="light"\]\s*\{/);
   const darkNumeric = parseNumericTokens(css, /:root,\s*\[data-theme="dark"\]\s*\{/);
