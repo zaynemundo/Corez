@@ -132,6 +132,45 @@ export const TABLE_USAGE_COMPENSATIONS = `CREATE TABLE IF NOT EXISTS usage_compe
 
 export const TABLE_ANALYTICS_COUNTERS = `CREATE TABLE IF NOT EXISTS analytics_counters (day TEXT NOT NULL, name TEXT NOT NULL, path TEXT NOT NULL, country TEXT NOT NULL, device TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, name, path, country, device))`;
 
+// Published-site traffic. One row per site/day/page keeps page-view totals,
+// while visitor identity lives in a SEPARATE pair of tables so a visitor can
+// still be recognised as returning without attaching an identity to any single
+// view row (and so the visitor tables can be pruned on a shorter clock than
+// the anonymous page counts). No IP address, user agent, cookie or account id
+// is stored anywhere here: `visitor_key` is a truncated HMAC fingerprint that
+// only the Worker can recompute.
+export const TABLE_SITE_ANALYTICS_DAILY = `CREATE TABLE IF NOT EXISTS site_analytics_daily (
+       site_slug TEXT NOT NULL,
+       day TEXT NOT NULL,
+       page TEXT NOT NULL,
+       views INTEGER NOT NULL DEFAULT 0,
+       PRIMARY KEY (site_slug, day, page)
+     )`;
+
+export const TABLE_SITE_ANALYTICS_BREAKDOWN = `CREATE TABLE IF NOT EXISTS site_analytics_breakdown (
+       site_slug TEXT NOT NULL,
+       day TEXT NOT NULL,
+       dimension TEXT NOT NULL,
+       value TEXT NOT NULL,
+       views INTEGER NOT NULL DEFAULT 0,
+       PRIMARY KEY (site_slug, day, dimension, value)
+     )`;
+
+export const TABLE_SITE_ANALYTICS_VISITS = `CREATE TABLE IF NOT EXISTS site_analytics_visits (
+       site_slug TEXT NOT NULL,
+       visitor_key TEXT NOT NULL,
+       day TEXT NOT NULL,
+       PRIMARY KEY (site_slug, visitor_key, day)
+     )`;
+
+export const TABLE_SITE_ANALYTICS_VISITORS = `CREATE TABLE IF NOT EXISTS site_analytics_visitors (
+       site_slug TEXT NOT NULL,
+       visitor_key TEXT NOT NULL,
+       first_day TEXT NOT NULL,
+       last_day TEXT NOT NULL,
+       PRIMARY KEY (site_slug, visitor_key)
+     )`;
+
 export const TABLE_HARNESS_TASKS = `CREATE TABLE IF NOT EXISTS harness_tasks (
      task_id TEXT PRIMARY KEY,
      user_id TEXT,
@@ -197,6 +236,12 @@ export const INDEX_USAGE_PERIOD = `CREATE INDEX IF NOT EXISTS idx_usage_period O
 export const INDEX_USAGE_RECEIPTS_USER = `CREATE INDEX IF NOT EXISTS idx_usage_receipts_user ON usage_receipts(user_id, period)`;
 
 export const INDEX_USAGE_COMPENSATIONS_PENDING = `CREATE INDEX IF NOT EXISTS idx_usage_compensations_pending ON usage_compensations(user_id, period, status)`;
+
+// The visits primary key starts at the visitor, so range reads (site + day)
+// need their own index; the same applies to first-visit lookups.
+export const INDEX_SITE_ANALYTICS_VISITS_SLUG_DAY = `CREATE INDEX IF NOT EXISTS idx_site_analytics_visits_slug_day ON site_analytics_visits(site_slug, day)`;
+
+export const INDEX_SITE_ANALYTICS_VISITORS_SLUG_FIRST = `CREATE INDEX IF NOT EXISTS idx_site_analytics_visitors_slug_first ON site_analytics_visitors(site_slug, first_day)`;
 
 export const INDEX_HARNESS_TASKS_USER = `CREATE INDEX IF NOT EXISTS idx_harness_tasks_user ON harness_tasks (user_id, created_at)`;
 
@@ -324,6 +369,20 @@ export const ANALYTICS_SCHEMA = Object.freeze({
   columns: [],
 });
 
+export const SITE_ANALYTICS_SCHEMA = Object.freeze({
+  tables: [
+    TABLE_SITE_ANALYTICS_DAILY,
+    TABLE_SITE_ANALYTICS_BREAKDOWN,
+    TABLE_SITE_ANALYTICS_VISITS,
+    TABLE_SITE_ANALYTICS_VISITORS,
+  ],
+  indexes: [
+    INDEX_SITE_ANALYTICS_VISITS_SLUG_DAY,
+    INDEX_SITE_ANALYTICS_VISITORS_SLUG_FIRST,
+  ],
+  columns: [],
+});
+
 export const HARNESS_SCHEMA = Object.freeze({
   tables: [
     TABLE_HARNESS_TASKS,
@@ -358,6 +417,10 @@ export const ALL_TABLES = Object.freeze([
   TABLE_USAGE_RECEIPTS,
   TABLE_USAGE_COMPENSATIONS,
   TABLE_ANALYTICS_COUNTERS,
+  TABLE_SITE_ANALYTICS_DAILY,
+  TABLE_SITE_ANALYTICS_BREAKDOWN,
+  TABLE_SITE_ANALYTICS_VISITS,
+  TABLE_SITE_ANALYTICS_VISITORS,
   TABLE_HARNESS_TASKS,
   TABLE_HARNESS_TASK_EVENTS,
   TABLE_HARNESS_TASK_LEASES,
@@ -380,6 +443,8 @@ export const ALL_INDEXES = Object.freeze([
   INDEX_USAGE_PERIOD,
   INDEX_USAGE_RECEIPTS_USER,
   INDEX_USAGE_COMPENSATIONS_PENDING,
+  INDEX_SITE_ANALYTICS_VISITS_SLUG_DAY,
+  INDEX_SITE_ANALYTICS_VISITORS_SLUG_FIRST,
   INDEX_HARNESS_TASKS_USER,
   INDEX_HARNESS_TASKS_SESSION,
   INDEX_HARNESS_TASKS_STATUS,

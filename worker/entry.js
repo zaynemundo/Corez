@@ -30,6 +30,7 @@ import { handleN8nWebhook } from "./n8nBridge.js";
 import { handleZiina } from "./ziina.js";
 import { handleSubscriptions } from "./subscriptions.js";
 import { handleAnalytics } from "./analytics.js";
+import { pruneSiteAnalytics } from "./siteAnalytics.js";
 export { GameRoom } from "./gameRoom.js";
 
 // Per-client AI request rate bound: paid provider tokens are spent on every
@@ -423,7 +424,8 @@ export default {
   // handler re-sends every due record so deferred work runs even if no other
   // traffic arrives. Queue batches also sweep, so this is the second line of
   // defence rather than the only one.
-  async scheduled(_controller, env, ctx) {
+  async scheduled(controller, env, ctx) {
+    const scheduledAt = Number(controller?.scheduledTime) || Date.now();
     const task = (async () => {
       try {
         const result = await sweepPendingTaskDispatches(env, buildHarness(env));
@@ -434,6 +436,16 @@ export default {
         }
       } catch {
         // A failed sweep leaves the records pending for the next trigger.
+      }
+      // Visitor fingerprints must not outlive their retention window even if
+      // no owner opens a dashboard. The cron runs every two minutes, so the
+      // cleanup is limited to the quiet 03:00 UTC hour.
+      if (new Date(scheduledAt).getUTCHours() === 3) {
+        try {
+          await pruneSiteAnalytics(env, scheduledAt);
+        } catch {
+          // The next trigger retries; a failed prune never blocks the sweep.
+        }
       }
     })();
     // Keep the invocation alive for the sweep; the promise is also returned so

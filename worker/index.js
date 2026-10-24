@@ -87,6 +87,14 @@ import {
   listWithFallback,
 } from "./storageKeys.js";
 import {
+  DEFAULT_ANALYTICS_RANGE,
+  HOME_PAGE,
+  maybePruneSiteAnalytics,
+  normalizeAnalyticsRange,
+  readSiteAnalytics,
+  recordSitePageView,
+} from "./siteAnalytics.js";
+import {
   PUBLISH_SLUG_PATTERN,
   GENERATED_SLUG_PATTERN,
   PUBLISH_PAGE_PATTERN,
@@ -3989,9 +3997,72 @@ async function handleUsageApi(request, env) {
 // can legitimately have and no more.
 const MAX_LINEAGE_ENTRIES = 50;
 
-async function handlePublish(request, env) {
+async function handlePublish(request, env, ctx = null) {
   const url = new URL(request.url);
   const pathname = url.pathname;
+
+  // GET /api/publish/<slug>/analytics - the owner's traffic report for one
+  // published site. Owner-only, like every other publish-management route:
+  // traffic patterns can reveal an audience, so they are never public.
+  const analyticsMatch = pathname.match(
+    /^\/api\/publish\/([a-z0-9][a-z0-9-]{1,48}[a-z0-9])\/analytics$/,
+  );
+  if (analyticsMatch && request.method === "GET") {
+    const uid = await sessionUid(request, env);
+    if (!uid) {
+      return jsonResponse(401, { error: "Authentication required." });
+    }
+    const slug = analyticsMatch[1];
+    const resolved = await resolvePublishRecord(env, slug).catch(() => null);
+    const record = resolved?.record || null;
+    if (!record) {
+      return jsonResponse(404, { error: "Published page not found." });
+    }
+    if (!record.ownerUserId) {
+      return jsonResponse(403, {
+        error:
+          "This published page predates ownership records, so its analytics cannot be shown here.",
+      });
+    }
+    if (record.ownerUserId !== uid) {
+      return jsonResponse(403, {
+        error: "This published page belongs to another account.",
+      });
+    }
+    if (!env?.DB) {
+      return jsonResponse(503, {
+        error: "Site analytics storage is not configured on this deployment.",
+        code: "analytics_unavailable",
+      });
+    }
+    const requested = url.searchParams.get("days");
+    const days =
+      requested === null ? DEFAULT_ANALYTICS_RANGE : normalizeAnalyticsRange(requested);
+    if (days === null) {
+      return jsonResponse(400, {
+        error: "days must be one of 7, 30 or 90.",
+      });
+    }
+    const analytics = await readSiteAnalytics(env, slug, { days });
+    if (!analytics) {
+      return jsonResponse(503, {
+        error: "Site analytics are unavailable right now.",
+        code: "analytics_unavailable",
+        retryable: true,
+      });
+    }
+    // Retention is cleaned up on the screen that consumes this data, not on
+    // every public page view. Throttled per isolate inside the module.
+    const maintenance = maybePruneSiteAnalytics(env).catch(() => {});
+    if (typeof ctx?.waitUntil === "function") ctx.waitUntil(maintenance);
+    else await maintenance;
+    return jsonResponse(200, {
+      ...analytics,
+      url: `/${slug}`,
+      title: typeof record.title === "string" ? record.title : "",
+      collectionDisabled: env.SITE_ANALYTICS_DISABLED === "1",
+    });
+  }
 
   // POST /api/publish/lineage - claim the lineage of pages published before the
   // worker recorded which chat produced them, and take down the ones whose chat
@@ -4654,6 +4725,13 @@ async function handlePublish(request, env) {
       if (!pageHtml) {
         return jsonResponse(404, { error: "Published page not found." });
       }
+      // Traffic is counted before the response leaves, but the D1 work itself
+      // runs under ctx.waitUntil, so a visitor never waits for analytics.
+      await recordSitePageView(env, request, ctx, {
+        slug,
+        page: pageName,
+        record,
+      });
       // Repair legacy artifacts whose missing/mangled <script> opening tag
       // would otherwise render the code as visible page text.
       return new Response(repairMalformedHtml(pageHtml), {
@@ -4687,6 +4765,11 @@ async function handlePublish(request, env) {
       if (!html) {
         return jsonResponse(404, { error: "Published creation not found." });
       }
+      await recordSitePageView(env, request, ctx, {
+        slug,
+        page: HOME_PAGE,
+        record,
+      });
       // Repair legacy artifacts whose missing/mangled <script> opening tag
       // would otherwise render the code as visible page text.
       return new Response(repairMalformedHtml(html), {
@@ -4736,6 +4819,11 @@ async function handlePublish(request, env) {
     if (!html) {
       return jsonResponse(404, { error: "Published creation not found." });
     }
+    await recordSitePageView(env, request, ctx, {
+      slug,
+      page: HOME_PAGE,
+      record,
+    });
     // Repair legacy artifacts whose missing/mangled <script> opening tag
     // would otherwise render the code as visible page text.
     return new Response(repairMalformedHtml(html), {
@@ -4827,7 +4915,7 @@ async function runJsonSafe(operation) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx = null) {
     if (request.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
@@ -4890,7 +4978,7 @@ export default {
           PUBLISH_PAGE_PATTERN.test(pathname.slice(1)) ||
           PUBLISH_SLUG_ROOT_PATTERN.test(pathname)))
     ) {
-      return runJsonSafe(() => handlePublish(request, env));
+      return runJsonSafe(() => handlePublish(request, env, ctx));
     }
     if (pathname.startsWith("/api/game/ws/")) {
       return runJsonSafe(() => handleGameSocket(request, env));

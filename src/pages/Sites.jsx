@@ -7,10 +7,12 @@ import {
   Pencil,
   RefreshCw,
   Trash2,
+  TrendingUp,
   X,
 } from "lucide-react";
 import { useI18n } from "../i18n/index.jsx";
 import { formatDate } from "../i18n/format.js";
+import SiteAnalyticsPanel from "../components/SiteAnalyticsPanel.jsx";
 import {
   fetchPublishedPageForEdit,
   listPublishedPages,
@@ -43,6 +45,10 @@ export default function Sites({ onOpenChat }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [truncated, setTruncated] = useState(false);
+
+  // The site whose traffic panel is open. One panel at a time keeps the list
+  // readable and each report loaded only when the owner asks for it.
+  const [analyticsSlug, setAnalyticsSlug] = useState("");
 
   // The page being edited, plus its working copy.
   const [editing, setEditing] = useState(null);
@@ -80,6 +86,7 @@ export default function Sites({ onOpenChat }) {
       setEditError("");
       setSavedSlug("");
       setConfirmingSlug("");
+      setAnalyticsSlug("");
       setEditLoadingSlug(page.slug);
       const result = await fetchPublishedPageForEdit(page.slug);
       setEditLoadingSlug("");
@@ -174,7 +181,13 @@ export default function Sites({ onOpenChat }) {
       return;
     }
     if (editing?.slug === page.slug) stopEditing();
+    if (analyticsSlug === page.slug) setAnalyticsSlug("");
     setPages((prev) => prev.filter((entry) => entry.slug !== page.slug));
+  };
+
+  const toggleAnalytics = (page) => {
+    setConfirmingSlug("");
+    setAnalyticsSlug((current) => (current === page.slug ? "" : page.slug));
   };
 
   return (
@@ -244,7 +257,9 @@ export default function Sites({ onOpenChat }) {
             return (
               <li
                 key={page.slug}
-                className={`site-card${isEditing ? " editing" : ""}`}
+                className={`site-card${isEditing ? " editing" : ""}${
+                  analyticsSlug === page.slug ? " analytics-open" : ""
+                }`}
               >
                 <div className="site-card-main">
                   <a
@@ -287,6 +302,18 @@ export default function Sites({ onOpenChat }) {
                     {copiedSlug === page.slug
                       ? t("common.sites.copied")
                       : t("common.sites.copy")}
+                  </button>
+                  <button
+                    type="button"
+                    className={`sites-button${
+                      analyticsSlug === page.slug ? " primary" : ""
+                    }`}
+                    onClick={() => toggleAnalytics(page)}
+                    aria-expanded={analyticsSlug === page.slug}
+                    aria-controls={`site-analytics-${page.slug}`}
+                  >
+                    <TrendingUp size={14} strokeWidth={1.75} aria-hidden="true" />
+                    {t("common.sites.analytics.open")}
                   </button>
                   <button
                     type="button"
@@ -451,6 +478,14 @@ export default function Sites({ onOpenChat }) {
                       </button>
                     </div>
                   </div>
+                )}
+
+                {analyticsSlug === page.slug && (
+                  <SiteAnalyticsPanel
+                    slug={page.slug}
+                    title={page.title}
+                    onClose={() => setAnalyticsSlug("")}
+                  />
                 )}
               </li>
             );

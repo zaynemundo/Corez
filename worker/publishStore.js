@@ -25,6 +25,7 @@ import {
   assetPubMarkerKey,
   listWithFallback,
 } from "./storageKeys.js";
+import { deleteSiteAnalyticsForSlug } from "./siteAnalytics.js";
 
 // Published creations get a short, human-shareable slug or custom slug (e.g. "asyag23-123" or "my-portfolio")
 // served at the bare root path corez.pro/<slug>. Multi-page creations are
@@ -209,6 +210,11 @@ export async function deletePublishRecord(env, slug) {
       // best effort
     }
   }
+  // Traffic history belongs to the page that produced it: unpublishing (or
+  // deleting the chat that published it) removes it too, rather than leaving
+  // an orphaned audience record behind. D1 may not be configured, and a
+  // cleanup failure must never keep a taken-down page alive.
+  await deleteSiteAnalyticsForSlug(env, slug).catch(() => {});
   return resolved;
 }
 

@@ -281,10 +281,55 @@ export async function unpublishPage(slug) {
 }
 
 /**
+ * Reads one published site's traffic report for the signed-in owner.
+ *
+ * `days` is one of 7, 30 or 90 (the windows the worker accepts). Returns the
+ * full report as `{ success: true, analytics }` or `{ success: false, error }`
+ * so the panel can show a retry instead of a wall of zeroes.
+ */
+export async function fetchSiteAnalytics(slug, days = 30) {
+  if (!slug || typeof slug !== "string") {
+    return { success: false, error: "A slug is required." };
+  }
+  try {
+    const res = await fetch(
+      `/api/publish/${encodeURIComponent(slug)}/analytics?days=${encodeURIComponent(days)}`,
+      {
+        method: "GET",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      },
+    );
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.totals && Array.isArray(data?.series)) {
+      return { success: true, analytics: data };
+    }
+    if (res.status === 401) {
+      return {
+        success: false,
+        error: "Please sign in again to see this site's analytics.",
+      };
+    }
+    return {
+      success: false,
+      error: data?.error || `Could not load analytics (${res.status}).`,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err?.message
+        ? `Could not load analytics: ${err.message}`
+        : "Could not load analytics.",
+    };
+  }
+}
+
+/**
  * Drops a removed slug from the local publish registry and per-session
  * lineage. Without this, republishing the same content would try to reuse a
  * link that no longer exists.
- */function forgetPublishedSlug(slug) {
+ */
+function forgetPublishedSlug(slug) {
   try {
     const registry = loadPublishRegistry().filter((entry) => entry.slug !== slug);
     savePublishRegistry(registry);

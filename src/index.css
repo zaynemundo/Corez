@@ -7281,7 +7281,8 @@ h6 {
 }
 
 .site-card:hover,
-.site-card.editing {
+.site-card.editing,
+.site-card.analytics-open {
   border-color: var(--border-hover);
 }
 
@@ -7463,6 +7464,307 @@ h6 {
   flex-wrap: wrap;
 }
 
+/* ---------- Per-site analytics panel ---------- */
+/* Expands inside the site card, like the editor: the report belongs to the
+   card it describes, so opening it never loses the site's place in the list. */
+.site-analytics {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-top: 0.35rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.site-analytics-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.site-analytics-heading {
+  min-width: 0;
+}
+
+.site-analytics-heading h3 {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--text-primary);
+}
+
+.site-analytics-heading p {
+  margin: 0.2rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.site-analytics-heading code {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.site-analytics-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.site-analytics-ranges {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill);
+  background: var(--bg-primary);
+}
+
+.site-analytics-range {
+  height: 26px;
+  padding: 0 0.6rem;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.74rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.site-analytics-range:hover,
+.site-analytics-range.active {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.site-analytics-state {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.site-analytics-error {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  border-radius: var(--radius-sm);
+  background: rgba(239, 68, 68, 0.08);
+  color: #f87171;
+  font-size: 0.8rem;
+}
+
+.site-analytics-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.site-analytics-stat {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+}
+
+.site-analytics-stat-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.site-analytics-stat-value {
+  font-size: 1.35rem;
+  line-height: 1.15;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.site-analytics-change {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.site-analytics-change.up {
+  color: var(--market-positive);
+}
+
+.site-analytics-change.down {
+  color: #f87171;
+}
+
+.site-analytics-chart-block {
+  padding: 0.7rem 0.75rem 0.55rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+}
+
+.site-analytics-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 110px;
+  overflow: hidden;
+}
+
+.site-analytics-chart-slot {
+  flex: 1 1 0;
+  min-width: 1px;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.site-analytics-chart-bar {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--text-secondary);
+  opacity: 0.72;
+}
+
+.site-analytics-chart-bar.zero {
+  min-height: 0;
+  opacity: 0;
+}
+
+.site-analytics-chart-summary {
+  margin: 0.45rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.site-analytics-rankings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem 1.25rem;
+}
+
+.site-analytics-ranking h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.site-analytics-ranking ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.site-analytics-ranking li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+}
+
+.site-analytics-rank-label {
+  flex: 0 1 9rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.site-analytics-rank-track {
+  flex: 1 1 auto;
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-tertiary);
+  overflow: hidden;
+}
+
+.site-analytics-rank-bar {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.site-analytics-rank-value {
+  flex: 0 0 auto;
+  font-size: 0.74rem;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.site-analytics-ranking-empty {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.site-analytics-empty {
+  padding: 1.4rem 1rem;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+
+.site-analytics-empty-title {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.site-analytics-empty-hint {
+  margin: 0.3rem auto 0;
+  max-width: 42ch;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.site-analytics-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.site-analytics-disabled {
+  color: #f59e0b;
+}
+
 /* The Sites link in the sidebar: same row as New Chat, marked when open. */
 .sites-nav-btn.active {
   background: var(--sidebar-item-active-bg);
@@ -7484,6 +7786,18 @@ h6 {
 
   .site-editor-label {
     min-width: 0;
+  }
+
+  .site-analytics-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .site-analytics-rankings {
+    grid-template-columns: 1fr;
+  }
+
+  .site-analytics-chart {
+    height: 80px;
   }
 }
 

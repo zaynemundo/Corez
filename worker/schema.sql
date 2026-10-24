@@ -62,6 +62,40 @@ CREATE INDEX IF NOT EXISTS idx_usage_compensations_pending ON usage_compensation
 -- Analytics --------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS analytics_counters (day TEXT NOT NULL, name TEXT NOT NULL, path TEXT NOT NULL, country TEXT NOT NULL, device TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, name, path, country, device));
 
+-- Published-site traffic (see worker/siteAnalytics.js) -------------------------
+-- Page counts are anonymous; visitor identity is a truncated HMAC fingerprint
+-- in separate tables so it can be pruned without touching the totals.
+CREATE TABLE IF NOT EXISTS site_analytics_daily (
+       site_slug TEXT NOT NULL,
+       day TEXT NOT NULL,
+       page TEXT NOT NULL,
+       views INTEGER NOT NULL DEFAULT 0,
+       PRIMARY KEY (site_slug, day, page)
+     );
+CREATE TABLE IF NOT EXISTS site_analytics_breakdown (
+       site_slug TEXT NOT NULL,
+       day TEXT NOT NULL,
+       dimension TEXT NOT NULL,
+       value TEXT NOT NULL,
+       views INTEGER NOT NULL DEFAULT 0,
+       PRIMARY KEY (site_slug, day, dimension, value)
+     );
+CREATE TABLE IF NOT EXISTS site_analytics_visits (
+       site_slug TEXT NOT NULL,
+       visitor_key TEXT NOT NULL,
+       day TEXT NOT NULL,
+       PRIMARY KEY (site_slug, visitor_key, day)
+     );
+CREATE TABLE IF NOT EXISTS site_analytics_visitors (
+       site_slug TEXT NOT NULL,
+       visitor_key TEXT NOT NULL,
+       first_day TEXT NOT NULL,
+       last_day TEXT NOT NULL,
+       PRIMARY KEY (site_slug, visitor_key)
+     );
+CREATE INDEX IF NOT EXISTS idx_site_analytics_visits_slug_day ON site_analytics_visits(site_slug, day);
+CREATE INDEX IF NOT EXISTS idx_site_analytics_visitors_slug_first ON site_analytics_visitors(site_slug, first_day);
+
 -- Agent harness tasks (atomic leases + ordered events + dispatch outbox) ---------
 CREATE TABLE IF NOT EXISTS harness_tasks (task_id TEXT PRIMARY KEY, user_id TEXT, session_id TEXT, status TEXT NOT NULL, doc TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, terminal_at INTEGER);
 CREATE TABLE IF NOT EXISTS harness_task_events (id INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT NOT NULL, event TEXT NOT NULL, created_at INTEGER NOT NULL);

@@ -96,6 +96,47 @@ export default {
     saveError: "Could not save this page.",
     pagesCount: "{count} pages",
     truncated: "Some older pages are not listed here.",
+    // Per-site traffic. Counts are first-party and cookie-free; the panel says
+    // so, because the owner is the one who has to trust the numbers.
+    analytics: {
+      title: "Site analytics",
+      open: "Analytics",
+      close: "Close analytics",
+      loading: "Loading analytics…",
+      retry: "Try again",
+      error: "Could not load analytics.",
+      rangeLabel: "Date range",
+      range7: "7 days",
+      range30: "30 days",
+      range90: "90 days",
+      views: "Page views",
+      visitors: "Unique visitors",
+      returning: "Returning",
+      perVisitor: "Pages / visitor",
+      change: "{change}% vs previous {days} days",
+      chartSummary:
+        "{from} – {to}: {views} views. Busiest day: {day} ({count} views).",
+      chartSummaryEmpty: "{from} – {to}: no views yet.",
+      topPages: "Top pages",
+      sources: "Sources",
+      countries: "Countries",
+      devices: "Devices",
+      direct: "Direct",
+      internal: "Internal",
+      other: "Other",
+      unknown: "Unknown",
+      desktop: "Desktop",
+      mobile: "Mobile",
+      tablet: "Tablet",
+      empty: "No views yet",
+      emptyHint:
+        "Share the site’s link — views, visitors and returning readers will appear here.",
+      trackingSince: "Tracking since {date}",
+      privacy:
+        "First-party, cookie-free analytics. Bots and your own visits are excluded; visitor data is kept {days} days.",
+      disabled: "Collection is paused on this deployment; past data is still shown.",
+      rowLabel: "{label}: {views} views ({percent}%)",
+    },
   },
 
   sidebar: {

@@ -70,6 +70,21 @@ Pages published before rule 1 existed carry no chat id. The browser that publish
 them offers its local lineage to `POST /api/publish/lineage`, which attributes the
 page to a surviving chat or unpublishes it when that chat is gone.
 
+## Published-site analytics
+
+`worker/siteAnalytics.js` counts real visits to a published page while it is being
+served (`handlePublish` in `worker/index.js`) and answers the owner-only report at
+`GET /api/publish/<slug>/analytics?days=7|30|90`. Counts live in four D1 tables
+(`site_analytics_daily`, `_breakdown`, `_visits`, `_visitors`): views per page,
+referrer host, country, device class, and a visitor fingerprint that makes
+unique/returning possible without a cookie. The fingerprint is an HMAC of
+site + IP + user agent truncated to 16 hex chars; the raw inputs are never
+stored, DNT/GPC views are counted anonymously, and bot, prefetch and owner
+traffic is skipped. Fingerprints are pruned after 90 days and unpublishing a
+page deletes its analytics (`deletePublishRecord`). The Sites screen
+(`src/components/SiteAnalyticsPanel.jsx`) shows the tiles, daily chart, top pages,
+sources, countries and devices for each card.
+
 ## Swarm framework (`packages/agent-core/swarm`)
 
 A general DAG orchestrator used by the CLI and by the harness pre-pass:
@@ -106,6 +121,7 @@ scales concurrency and backs off on HTTP 429.
 | An AI reply is empty, truncated or reasoning-only | `worker/providerChain.js`, `worker/opencodeClient.js` |
 | A build never finishes or loses work | `worker/harness.js`, `worker/taskRunner.js` |
 | A published page will not load or delete | `worker/publishStore.js`, `worker/chats.js` |
+| Site analytics are missing or look wrong | `worker/siteAnalytics.js`, `src/components/SiteAnalyticsPanel.jsx` |
 | A quota blocks or lets through the wrong thing | `worker/usage.js` |
 | Storage keys or a migration look wrong | `worker/storageKeys.js`, `worker/storageMigrate.js` |
 | Interface copy, layout or direction is wrong | `src/index.css`, `src/i18n/` |

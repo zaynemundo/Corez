@@ -37,6 +37,7 @@ const CHECKS = [
   { name: "inspiration cache", runner: "node", script: "tests/inspiration-worker-contract.mjs" },
   { name: "task status", runner: "node", script: "tests/task-status-worker-contract.mjs" },
   { name: "analytics", runner: "node", script: "tests/analytics-worker-contract.mjs" },
+  { name: "site analytics", runner: "node", script: "tests/site-analytics-contract.mjs" },
   { name: "publish management", runner: "node", script: "tests/publish-management-contract.mjs" },
   { name: "usage metering", runner: "node", script: "tests/usage-metering-contract.mjs" },
   { name: "streaming connection", runner: "node", script: "tests/streaming-connection-contract.mjs" },
