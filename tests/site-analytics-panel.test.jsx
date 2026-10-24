@@ -162,7 +162,9 @@ describe("the site analytics panel", () => {
     renderPanel();
 
     expect(await screen.findByText("No views yet")).toBeTruthy();
-    expect(screen.getByText(/Share the site’s link/i)).toBeTruthy();
+    // The most common reason for a believable zero: the owner's own visit.
+    expect(screen.getByText(/signed-in browser are not counted/i)).toBeTruthy();
+    expect(screen.getByText(/private window/i)).toBeTruthy();
     expect(screen.queryByText("Top pages")).toBeNull();
     expect(screen.queryByText("Devices")).toBeNull();
   });

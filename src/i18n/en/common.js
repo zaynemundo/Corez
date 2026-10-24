@@ -130,7 +130,7 @@ export default {
       tablet: "Tablet",
       empty: "No views yet",
       emptyHint:
-        "Share the site’s link — views, visitors and returning readers will appear here.",
+        "Views from your own signed-in browser are not counted. Open the site link in a private window, or send it to someone, to see traffic appear.",
       trackingSince: "Tracking since {date}",
       privacy:
         "First-party, cookie-free analytics. Bots and your own visits are excluded; visitor data is kept {days} days.",
