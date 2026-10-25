@@ -157,6 +157,36 @@ afterEach(() => {
 });
 
 describe("project folders in the app", () => {
+  it("closes to the icon rail and reopens the full sidebar from it", async () => {
+    const user = userEvent.setup();
+    signedInAccount();
+    await openApp("/chat/chat11111111");
+
+    await user.click(screen.getByRole("button", { name: "Collapse Sidebar" }));
+    const rail = document.querySelector(".sidebar-rail");
+    await waitFor(() => {
+      expect(document.querySelector(".sidebar").classList.contains("collapsed")).toBe(
+        true,
+      );
+    });
+    // A desktop app keeps the rail in place; the old floating control would
+    // sit over the reading pane on top of it and is deliberately gone.
+    expect(document.querySelector(".sidebar-toggle-btn")).toBeNull();
+    expect(document.querySelector(".sidebar-full").getAttribute("aria-hidden")).toBe(
+      "true",
+    );
+
+    await user.click(within(rail).getByRole("button", { name: "Open Sidebar" }));
+    await waitFor(() => {
+      expect(document.querySelector(".sidebar").classList.contains("collapsed")).toBe(
+        false,
+      );
+    });
+    expect(document.querySelector(".sidebar-full").getAttribute("aria-hidden")).toBe(
+      null,
+    );
+  });
+
   it("shows the account's projects with their chats, and the rest under Chats", async () => {
     signedInAccount();
     await openApp("/chat/chat11111111");

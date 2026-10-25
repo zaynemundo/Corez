@@ -174,6 +174,11 @@ export default {
     openSettings: "Open settings",
     settings: "Settings",
     guest: "Guest",
+    primaryNavigation: "Primary navigation",
+    searchChats: "Search chats",
+    searchPlaceholder: "Search your chats",
+    searchEmpty: "No chats found",
+    untitledChat: "Untitled chat",
   },
 
   // Actions and status text shared by several screens (buttons, toasts).

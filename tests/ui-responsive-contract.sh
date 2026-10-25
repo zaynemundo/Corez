@@ -221,6 +221,22 @@ check 'escape key closes the mobile sidebar' 'Escape' "$app"
 check 'collapsed sidebar is hidden from focus flow' 'visibility: hidden'
 check_absent 'viewport resize does not force desktop sidebar open' 'setSidebarOpen\\(!event\\.matches\\)'
 check 'sidebar component can render collapsed state' 'isOpen.*collapsed|collapsed.*isOpen' "$sidebar"
+# Closed on desktop, the sidebar remains as a labelled icon rail instead of
+# disappearing and leaving only a floating toggle over the content.
+check 'rail width token exists' '--sidebar-rail-width: 72px;'
+check_block_property 'the closed desktop column is the rail width' '.sidebar.collapsed' 'width' 'var(--sidebar-rail-width)'
+check_block_property 'the closed desktop column never translates off screen' '.sidebar.collapsed' 'transform' 'none'
+check_block_property 'the closed desktop column stays visible' '.sidebar.collapsed' 'visibility' 'visible'
+check_block_property 'the full panel is hidden from focus flow when collapsed' '.sidebar.collapsed .sidebar-full' 'visibility' 'hidden'
+check_block_property 'the rail button keeps a 44px target' '.sidebar-rail-action' 'width' '44px'
+check 'the rail carries the Corez mark' 'sidebar-rail-logo' "$sidebar"
+check 'the rail opens quick find' 'sidebar-rail-search-btn' "$sidebar"
+check 'quick find searches only the visible chat list' 'sessions.filter' "$sidebar"
+check 'the rail offers recents' 'common.sidebar.chats' "$sidebar"
+check 'the rail offers Sites' 'LayoutGrid' "$sidebar"
+check 'the rail account control opens settings' 'SidebarRailProfile' "$sidebar"
+check_block_property_in_media 'a phone drawer hides the desktop rail' 'max-width: 767px' '.sidebar.collapsed .sidebar-rail' 'display' 'none'
+check 'the floating sidebar toggle is phone-only' '!sidebarOpen && isMobileViewport' "$app"
 
 # Project folders: the add control is a hover affordance of the Projects
 # heading, not a permanent button — and it must still be reachable on touch

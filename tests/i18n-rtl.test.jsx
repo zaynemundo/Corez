@@ -19,7 +19,7 @@ const mainJsx = readFileSync("src/main.jsx", "utf8");
 // add its override.
 const REQUIRED_OVERRIDES = [
   [".sidebar", "border-left"],
-  [".sidebar.collapsed", "translateX(100%)"],
+  [".sidebar.collapsed", "translateX("],
   [".sidebar-toggle-btn", "right"],
   [".history-menu-dropdown", "left"],
   [".message-actions", "padding-right"],
@@ -63,6 +63,20 @@ describe("right-to-left stylesheet", () => {
       expect(rtlCss).toContain(selector);
     }
     expect(rtlCss).toContain("direction: ltr");
+  });
+
+  it("mirrors the phone drawer but leaves the desktop rail in flow", () => {
+    const drawer = rtlCss.slice(rtlCss.indexOf("@media (max-width: 767px)"));
+    expect(drawer).toContain('[dir="rtl"] .sidebar {');
+    expect(drawer).toContain("env(safe-area-inset-right");
+    expect(drawer).toContain('[dir="rtl"] .sidebar.collapsed');
+    expect(drawer).toContain("calc(100% + var(--sidebar-margin)");
+    // The desktop collapsed column is a rail, not an off-canvas panel: a
+    // top-level RTL transform would slide it out of the shell.
+    const beforeMobile = rtlCss.slice(0, rtlCss.indexOf("@media (max-width: 767px)"));
+    expect(beforeMobile).not.toMatch(
+      /\[dir="rtl"\] \.sidebar\.collapsed\s*\{[^}]*transform/,
+    );
   });
 
   it("mirrors directional icons", () => {

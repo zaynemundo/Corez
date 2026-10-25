@@ -20,6 +20,9 @@ import {
   Check,
   Pencil,
   Plus,
+  Search,
+  MessageCircle,
+  LayoutGrid,
 } from "lucide-react";
 
 // Fixed width of `.history-menu-dropdown` in index.css. The floating menu is
@@ -63,6 +66,10 @@ export default function Sidebar({
   theme,
   onToggleTheme,
   onCloseSidebar,
+  // The collapsed icon rail is still part of the shell, so its brand and
+  // Recents controls expand the full panel through the app rather than
+  // reaching for the parent's state.
+  onOpenSidebar,
   // Project folders. `sessions[].projectId` is the grouping key; a chat whose
   // project is unknown (deleted in another tab) falls back to the plain list.
   projects = [],
@@ -145,6 +152,88 @@ export default function Sidebar({
   const [pinnedOpen, setPinnedOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState(null);
   const [editingName, setEditingName] = useState("");
+  // The collapsed rail's quick find: a portaled panel anchored beside the
+  // search button. It searches the same `sessions` list the full sidebar
+  // shows, so it can never surface a chat navigation has already hidden.
+  const [railSearchOpen, setRailSearchOpen] = useState(false);
+  const [railSearchQuery, setRailSearchQuery] = useState("");
+  const [railSearchPos, setRailSearchPos] = useState(null);
+  const railSearchButtonRef = useRef(null);
+  const railSearchInputRef = useRef(null);
+  // Focus follows the surface that is still on screen. Collapsing from a
+  // focused close button would otherwise drop focus to the document body;
+  // expanding from the brand would hide the element the user just activated.
+  const railBrandRef = useRef(null);
+  const sidebarCloseRef = useRef(null);
+  const wasOpenRef = useRef(isOpen);
+
+  const closeRailSearch = () => {
+    setRailSearchOpen(false);
+    setRailSearchQuery("");
+  };
+
+  useEffect(() => {
+    if (!railSearchOpen) return undefined;
+    railSearchInputRef.current?.focus();
+    const dismissOnOutsidePress = (event) => {
+      if (!(event.target instanceof Element)) return;
+      if (
+        event.target.closest(".sidebar-rail-search") ||
+        event.target.closest(".sidebar-rail-search-btn")
+      ) {
+        return;
+      }
+      closeRailSearch();
+    };
+    const dismissOnEscape = (event) => {
+      if (event.key !== "Escape") return;
+      closeRailSearch();
+      railSearchButtonRef.current?.focus();
+    };
+    const dismissOnViewportChange = (event) => {
+      // Scrolling the result list itself is not the shell moving under the
+      // popover; only a scroll outside the panel should dismiss it.
+      if (
+        event?.target instanceof Element &&
+        event.target.closest(".sidebar-rail-search")
+      ) {
+        return;
+      }
+      closeRailSearch();
+    };
+    document.addEventListener("mousedown", dismissOnOutsidePress);
+    window.addEventListener("keydown", dismissOnEscape);
+    window.addEventListener("resize", dismissOnViewportChange);
+    window.addEventListener("scroll", dismissOnViewportChange, true);
+    return () => {
+      document.removeEventListener("mousedown", dismissOnOutsidePress);
+      window.removeEventListener("keydown", dismissOnEscape);
+      window.removeEventListener("resize", dismissOnViewportChange);
+      window.removeEventListener("scroll", dismissOnViewportChange, true);
+    };
+  }, [railSearchOpen]);
+
+  // Expanding the panel from any other route retires the rail popover; it is
+  // anchored to a button the open panel no longer paints.
+  useEffect(() => {
+    if (!isOpen) return;
+    setRailSearchOpen(false);
+    setRailSearchQuery("");
+  }, [isOpen]);
+
+  useEffect(() => {
+    const wasOpen = wasOpenRef.current;
+    wasOpenRef.current = isOpen;
+    if (wasOpen === isOpen) return;
+    const desktop =
+      typeof window.matchMedia !== "function" ||
+      !window.matchMedia("(max-width: 767px)").matches;
+    if (isOpen) {
+      sidebarCloseRef.current?.focus({ preventScroll: true });
+    } else if (desktop) {
+      railBrandRef.current?.focus({ preventScroll: true });
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -233,6 +322,57 @@ export default function Sidebar({
       orderedListMembers(sessions, "recents", projectIds, manualLists),
     [sessions, projectIds, manualLists],
   );
+
+  // Quick find returns the most recent matches rather than a second, parallel
+  // ordering. The list is already newest-first from the app, and capping it
+  // keeps the popover a glance rather than a second sidebar.
+  const railSearchResults = useMemo(() => {
+    const query = railSearchQuery.trim().toLowerCase();
+    const matches = query
+      ? sessions.filter((session) =>
+          (session.title || "").toLowerCase().includes(query),
+        )
+      : sessions;
+    return matches.slice(0, 8);
+  }, [sessions, railSearchQuery]);
+
+  const openRailSearchResult = (sessionId) => {
+    closeRailSearch();
+    onSelectSession(sessionId);
+  };
+
+  // Place the popover beside the rail button, on the reading side of the
+  // shell: to its right in LTR, to its left in RTL. Both axes are clamped so a
+  // short window can never push the panel off screen.
+  const toggleRailSearch = () => {
+    if (railSearchOpen) {
+      closeRailSearch();
+      return;
+    }
+    const trigger = railSearchButtonRef.current;
+    if (trigger) {
+      const rect = trigger.getBoundingClientRect();
+      const rtl = document.documentElement.getAttribute("dir") === "rtl";
+      const panelWidth = 300;
+      const gap = 10;
+      const maxLeft = Math.max(gap, window.innerWidth - panelWidth - gap);
+      // Anchor to the shell edge, not to the centred button: a 44px control in
+      // a 72px rail would otherwise let the panel overlap the rail's border.
+      const sidebarRect = trigger
+        .closest(".sidebar")
+        ?.getBoundingClientRect();
+      const railEdge = rtl
+        ? (sidebarRect?.left ?? rect.left)
+        : (sidebarRect?.right ?? rect.right);
+      setRailSearchPos({
+        left: rtl
+          ? Math.max(gap, railEdge - panelWidth - gap)
+          : Math.min(railEdge + gap, maxLeft),
+        top: Math.max(8, Math.min(rect.top - 8, window.innerHeight - 430)),
+      });
+    }
+    setRailSearchOpen(true);
+  };
 
   // The chat being viewed must be reachable: its section and its folder open
   // with it. Keyed on the project (not the session), so the effect only fires
@@ -556,11 +696,13 @@ export default function Sidebar({
   );
 
   return (
-    <aside
-      className={`sidebar ${isOpen ? "" : "collapsed"}`}
-      aria-hidden={!isOpen}
-      inert={!isOpen || undefined}
-    >
+    <aside className={`sidebar ${isOpen ? "" : "collapsed"}`}>
+      <div
+        id="corez-sidebar-panel"
+        className="sidebar-full"
+        aria-hidden={!isOpen || undefined}
+        inert={!isOpen ? "" : undefined}
+      >
       <div className="sidebar-header">
         <button
           className="brand-icon-toggle"
@@ -570,6 +712,7 @@ export default function Sidebar({
           <span className="brand-wordmark">COREZ</span>
         </button>
         <button
+          ref={sidebarCloseRef}
           className="sidebar-close-btn"
           onClick={onCloseSidebar}
           title={t("common.sidebar.collapse")}
@@ -1036,8 +1179,186 @@ export default function Sidebar({
       <div className="sidebar-footer">
         <SidebarProfileRow onOpenSettings={onOpenSettings} />
       </div>
+      </div>
+
+      <div
+        className="sidebar-rail"
+        aria-hidden={isOpen || undefined}
+        inert={isOpen ? "" : undefined}
+      >
+        <div className="sidebar-rail-top">
+          <button
+            ref={railBrandRef}
+            type="button"
+            className="sidebar-rail-brand"
+            onClick={() => onOpenSidebar?.()}
+            title={t("common.shell.openSidebar")}
+            aria-label={t("common.shell.openSidebar")}
+            aria-controls="corez-sidebar-panel"
+            aria-expanded="false"
+          >
+            <img
+              src="/corez-white.png"
+              alt=""
+              className="sidebar-rail-logo"
+              aria-hidden="true"
+            />
+          </button>
+        </div>
+
+        <nav
+          className="sidebar-rail-nav"
+          aria-label={t("common.sidebar.primaryNavigation")}
+        >
+          <button
+            type="button"
+            className="sidebar-rail-action sidebar-rail-action-primary"
+            onClick={() => {
+              setChatsOpen(true);
+              onNewChat();
+            }}
+            title={t("common.sidebar.newChat")}
+            aria-label={t("common.sidebar.newChat")}
+          >
+            <SquarePen size={20} strokeWidth={1.5} aria-hidden="true" />
+          </button>
+
+          <button
+            ref={railSearchButtonRef}
+            type="button"
+            className={`sidebar-rail-action sidebar-rail-search-btn${
+              railSearchOpen ? " is-active" : ""
+            }`}
+            onClick={toggleRailSearch}
+            title={t("common.sidebar.searchChats")}
+            aria-label={t("common.sidebar.searchChats")}
+            aria-haspopup="dialog"
+            aria-expanded={railSearchOpen}
+            aria-controls={
+              railSearchOpen ? "sidebar-rail-search" : undefined
+            }
+          >
+            <Search size={20} strokeWidth={1.5} aria-hidden="true" />
+          </button>
+
+          <button
+            type="button"
+            className="sidebar-rail-action"
+            onClick={() => {
+              setChatsOpen(true);
+              onOpenSidebar?.();
+            }}
+            title={t("common.sidebar.chats")}
+            aria-label={t("common.sidebar.chats")}
+          >
+            <MessageCircle size={20} strokeWidth={1.5} aria-hidden="true" />
+          </button>
+
+          {typeof onOpenSites === "function" && (
+            <button
+              type="button"
+              className={`sidebar-rail-action${
+                activeView === "sites" ? " is-active" : ""
+              }`}
+              onClick={onOpenSites}
+              title={t("common.sidebar.sitesTitle")}
+              aria-label={t("common.sidebar.sites")}
+              aria-current={activeView === "sites" ? "page" : undefined}
+            >
+              <LayoutGrid size={20} strokeWidth={1.5} aria-hidden="true" />
+            </button>
+          )}
+        </nav>
+
+        <div className="sidebar-rail-footer">
+          <SidebarRailProfile onOpenSettings={onOpenSettings} />
+        </div>
+
+        {railSearchOpen &&
+          createPortal(
+            <div
+              id="sidebar-rail-search"
+              className="sidebar-rail-search"
+              role="dialog"
+              aria-label={t("common.sidebar.searchChats")}
+              style={{
+                left: railSearchPos?.left ?? 0,
+                top: railSearchPos?.top ?? 0,
+              }}
+            >
+              <div className="sidebar-rail-search-field">
+                <Search
+                  size={16}
+                  strokeWidth={1.5}
+                  aria-hidden="true"
+                />
+                <input
+                  ref={railSearchInputRef}
+                  type="search"
+                  className="sidebar-rail-search-input"
+                  value={railSearchQuery}
+                  onChange={(event) =>
+                    setRailSearchQuery(event.target.value)
+                  }
+                  onKeyDown={(event) => {
+                    if (
+                      event.key === "Enter" &&
+                      railSearchResults.length > 0
+                    ) {
+                      event.preventDefault();
+                      openRailSearchResult(railSearchResults[0].id);
+                    }
+                  }}
+                  placeholder={t("common.sidebar.searchPlaceholder")}
+                  aria-label={t("common.sidebar.searchPlaceholder")}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </div>
+
+              {railSearchResults.length === 0 ? (
+                <p className="sidebar-rail-search-empty" role="status">
+                  {t("common.sidebar.searchEmpty")}
+                </p>
+              ) : (
+                <div className="sidebar-rail-search-results">
+                  {railSearchResults.map((session) => (
+                    <button
+                      key={session.id}
+                      type="button"
+                      className={`sidebar-rail-search-result${
+                        session.id === activeSessionId ? " is-current" : ""
+                      }`}
+                      onClick={() => openRailSearchResult(session.id)}
+                      aria-current={
+                        session.id === activeSessionId ? "true" : undefined
+                      }
+                      title={session.title}
+                    >
+                      <MessageCircle
+                        size={15}
+                        strokeWidth={1.5}
+                        aria-hidden="true"
+                      />
+                      <span className="sidebar-rail-search-title">
+                        {session.title || t("common.sidebar.untitledChat")}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>,
+            document.body,
+          )}
+      </div>
     </aside>
   );
+}
+
+// Two letters read as an identity in the narrow rail, and still fit the
+// profile row where the same account is named in full beside them.
+function profileInitials(displayName) {
+  return displayName.trim().slice(0, 2).toUpperCase() || "G";
 }
 
 function SidebarProfileRow({ onOpenSettings }) {
@@ -1051,12 +1372,12 @@ function SidebarProfileRow({ onOpenSettings }) {
   const email = auth?.user?.email || "";
   const username = email ? email.split("@")[0] : t("common.sidebar.guest");
   const displayName = username.charAt(0).toUpperCase() + username.slice(1);
-  const initial = displayName.charAt(0).toUpperCase() || "G";
+  const initials = profileInitials(displayName);
   return (
     <div className="sidebar-profile-row">
       <div className="sidebar-profile-left" title={email}>
         <div className="sidebar-avatar" aria-hidden="true">
-          {initial}
+          {initials}
         </div>
         <span className="sidebar-username">{displayName}</span>
       </div>
@@ -1070,5 +1391,31 @@ function SidebarProfileRow({ onOpenSettings }) {
         <Settings size={16} strokeWidth={1.5} />
       </button>
     </div>
+  );
+}
+
+function SidebarRailProfile({ onOpenSettings }) {
+  const { t } = useI18n();
+  let auth;
+  try {
+    auth = useAuth();
+  } catch {
+    auth = null;
+  }
+  const email = auth?.user?.email || "";
+  const username = email ? email.split("@")[0] : t("common.sidebar.guest");
+  const displayName = username.charAt(0).toUpperCase() + username.slice(1);
+  return (
+    <button
+      type="button"
+      className="sidebar-rail-profile"
+      onClick={onOpenSettings}
+      title={email || t("common.sidebar.settings")}
+      aria-label={t("common.sidebar.openSettings")}
+    >
+      <span className="sidebar-avatar sidebar-rail-avatar" aria-hidden="true">
+        {profileInitials(displayName)}
+      </span>
+    </button>
   );
 }

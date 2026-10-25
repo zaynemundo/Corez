@@ -158,6 +158,11 @@ export default {
     openSettings: "فتح الإعدادات",
     settings: "الإعدادات",
     guest: "زائر",
+    primaryNavigation: "التنقل الرئيسي",
+    searchChats: "البحث في المحادثات",
+    searchPlaceholder: "ابحث في محادثاتك",
+    searchEmpty: "لا توجد محادثات",
+    untitledChat: "محادثة بلا عنوان",
   },
 
   action: {

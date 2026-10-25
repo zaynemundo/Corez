@@ -1773,6 +1773,7 @@ function MainApp({ theme, setTheme }) {
           setTheme((prev) => (prev === "dark" ? "light" : "dark"))
         }
         onCloseSidebar={() => setSidebarOpen(false)}
+        onOpenSidebar={() => setSidebarOpen(true)}
         projects={projects}
         onCreateProject={handleCreateProject}
         onRenameProject={handleRenameProject}
@@ -1794,9 +1795,10 @@ function MainApp({ theme, setTheme }) {
       )}
 
       <main className="main-content">
-        {/* The collapsed sidebar leaves one floating way back in, on whichever
-            screen the shell is showing. */}
-        {!sidebarOpen && (
+        {/* Desktop keeps the collapsed rail on screen, so its own brand and
+            Recents controls reopen the panel. A phone's rail is off-canvas
+            with the drawer, so it still needs a floating way back in. */}
+        {!sidebarOpen && isMobileViewport && (
           <button
             type="button"
             className="sidebar-toggle-btn"

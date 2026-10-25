@@ -51,6 +51,9 @@
   --font-mono: "JetBrains Mono", monospace;
 
   --sidebar-width: 260px;
+  /* A closed desktop sidebar remains as this narrow icon rail: the shell never
+     spends its top-left corner on a floating toggle over the content. */
+  --sidebar-rail-width: 72px;
   --sidebar-margin: 0px;
   --sidebar-radius: 0px;
   --sidebar-heading-size: 11px;
@@ -325,6 +328,7 @@ h6 {
 }
 
 .sidebar {
+  position: relative;
   width: var(--sidebar-width);
   height: 100%;
   margin: var(--sidebar-margin);
@@ -346,14 +350,311 @@ h6 {
   overflow: hidden;
 }
 
+/* Closed is not gone on desktop: the column narrows to the navigation rail,
+   keeping New chat, quick find, Recents, Sites and the account one click away
+   while the reading pane gets the rest of the window back. */
 .sidebar.collapsed {
-  width: 0;
+  width: var(--sidebar-rail-width);
   margin-left: 0;
   margin-right: 0;
-  border: 0;
-  transform: translateX(-100%);
+  border-right: 1px solid var(--sidebar-border);
+  transform: none;
   overflow: hidden;
+  visibility: visible;
+}
+
+/* The two surfaces are stacked inside the one animating column. Only the
+   active one is painted and reachable; the other keeps its state without
+   holding a tab stop or an ARIA branch open behind the visible panel. */
+.sidebar-full,
+.sidebar-rail {
+  position: absolute;
+  inset: 0;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.sidebar-full {
+  display: flex;
+  flex-direction: column;
+  /* Keep the panel's own measure while the column animates open, so its rows
+     are revealed by the growing edge instead of reflowing for 250ms. */
+  width: var(--sidebar-width);
+  background-color: var(--sidebar-bg);
+}
+
+.sidebar.collapsed .sidebar-full {
   visibility: hidden;
+  pointer-events: none;
+}
+
+.sidebar-rail {
+  /* Keep the rail at its final measure while the outer column animates, so
+     its icons stay on the rail's centre instead of sliding across the opening
+     panel. Logical insets keep it on the right in RTL. */
+  inset-inline-start: 0;
+  inset-inline-end: auto;
+  width: var(--sidebar-rail-width);
+  max-width: var(--sidebar-rail-width);
+  display: none;
+  flex-direction: column;
+  align-items: stretch;
+  background-color: var(--sidebar-bg);
+}
+
+.sidebar.collapsed .sidebar-rail {
+  display: flex;
+  visibility: visible;
+}
+
+.sidebar-rail-top {
+  padding: 14px 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-rail-brand {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.sidebar-rail-brand:hover {
+  background: var(--sidebar-item-hover-bg);
+}
+
+.sidebar-rail-brand:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
+}
+
+.sidebar-rail-logo {
+  /* The mark carries transparent breathing room in its own square, so the
+     painted glyph lands at the reference's roughly 24px inside a 72px rail. */
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  display: block;
+}
+
+[data-theme="light"] .sidebar-rail-logo {
+  filter: invert(100%);
+}
+
+.sidebar-rail-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  /* The reference leaves a clear breath between the mark and the first
+     action; the icon group itself stays compact underneath. */
+  padding: 20px 0 10px;
+}
+
+.sidebar-rail-action {
+  width: 44px;
+  height: 38px;
+  min-width: 44px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.sidebar-rail-action:hover {
+  background: var(--sidebar-item-hover-bg);
+}
+
+.sidebar-rail-action:active {
+  transform: scale(0.96);
+}
+
+/* The primary action is lit at rest, matching the reference's single filled
+   square in an otherwise icon-only column. */
+.sidebar-rail-action-primary,
+.sidebar-rail-action.is-active {
+  background: var(--sidebar-item-active-bg);
+}
+
+.sidebar-rail-action-primary:hover,
+.sidebar-rail-action.is-active:hover {
+  background: var(--bg-tertiary);
+}
+
+.sidebar-rail-action svg {
+  width: 22px;
+  height: 22px;
+}
+
+.sidebar-rail-footer {
+  margin-top: auto;
+  padding: 12px 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-rail-profile {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.sidebar-rail-profile:hover {
+  background: var(--sidebar-item-hover-bg);
+}
+
+.sidebar-rail-profile:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
+}
+
+.sidebar .sidebar-rail-avatar {
+  width: 32px;
+  height: 32px;
+  font-size: 11px;
+}
+
+/* Quick find from the rail. Portaled to the body so the animating column can
+   keep clipping its own contents; it sits above shell chrome, below dialogs. */
+.sidebar-rail-search {
+  position: fixed;
+  z-index: var(--z-dropdown);
+  width: 300px;
+  max-width: calc(100vw - 20px);
+  max-height: min(430px, calc(100dvh - 16px));
+  padding: 7px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sidebar-rail-search-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 38px;
+  padding: 0 0.6rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+}
+
+.sidebar-rail-search-field:focus-within {
+  border-color: var(--border-hover);
+  color: var(--text-secondary);
+}
+
+.sidebar-rail-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.sidebar-rail-search-input:focus-visible {
+  outline: none;
+}
+
+.sidebar-rail-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.sidebar-rail-search-input::-webkit-search-cancel-button {
+  filter: grayscale(1);
+}
+
+.sidebar-rail-search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sidebar-rail-search-result {
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  text-align: start;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.sidebar-rail-search-result svg {
+  color: var(--text-muted);
+}
+
+.sidebar-rail-search-result:hover,
+.sidebar-rail-search-result.is-current {
+  background: var(--sidebar-item-hover-bg);
+}
+
+.sidebar-rail-search-result.is-current svg {
+  color: var(--text-primary);
+}
+
+.sidebar-rail-search-title {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sidebar-rail-search-empty {
+  padding: 12px 8px 14px;
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: start;
 }
 
 .sidebar-backdrop {
@@ -4833,12 +5134,19 @@ h6 {
     z-index: var(--z-sidebar-mobile);
   }
 
+  /* On a phone the closed sidebar is a drawer that has left the screen, not a
+     rail: the floating toggle in the reading pane is its way back. */
   .sidebar.collapsed {
     width: var(--sidebar-width);
     transform: translateX(
       calc(-100% - var(--sidebar-margin) - env(safe-area-inset-left, 0px))
     );
     margin: 0;
+    visibility: hidden;
+  }
+
+  .sidebar.collapsed .sidebar-rail {
+    display: none;
   }
 
   .sidebar-backdrop {
@@ -5194,6 +5502,9 @@ h6 {
 
 @media (prefers-reduced-motion: reduce) {
   .sidebar,
+  .sidebar-rail-brand,
+  .sidebar-rail-action,
+  .sidebar-rail-profile,
   .new-chat-btn,
   .history-item,
   .message-content,

@@ -48,9 +48,25 @@
   border-left: 1px solid var(--sidebar-border);
 }
 
-/* The collapsed sidebar slides out to the left in LTR; mirror the motion. */
-[dir="rtl"] .sidebar.collapsed {
-  transform: translateX(100%);
+/* Desktop's collapsed sidebar is a rail, not a sliding panel, so direction
+   alone already places its border on the right. Only the phone drawer slides
+   out, and that motion mirrors for RTL. */
+@media (max-width: 767px) {
+  /* A fixed drawer uses physical offsets, so direction alone cannot move it
+     from the inline start to the inline end. Anchor it on the right and then
+     slide it out to the right, under the mirrored floating toggle. */
+  [dir="rtl"] .sidebar {
+    left: auto;
+    right: calc(
+      var(--sidebar-margin) + env(safe-area-inset-right, 0px)
+    );
+  }
+
+  [dir="rtl"] .sidebar.collapsed {
+    transform: translateX(
+      calc(100% + var(--sidebar-margin) + env(safe-area-inset-right, 0px))
+    );
+  }
 }
 
 [dir="rtl"] .sidebar-toggle-btn {
