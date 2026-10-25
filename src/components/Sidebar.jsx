@@ -356,8 +356,8 @@ export default function Sidebar({
       const panelWidth = 300;
       const gap = 10;
       const maxLeft = Math.max(gap, window.innerWidth - panelWidth - gap);
-      // Anchor to the shell edge, not to the centred button: a 40px control in
-      // a 64px rail would otherwise let the panel overlap the rail's border.
+      // Anchor to the shell edge, not to the centred button: a 38px control in
+      // a 60px rail would otherwise let the panel overlap the rail's border.
       const sidebarRect = trigger
         .closest(".sidebar")
         ?.getBoundingClientRect();

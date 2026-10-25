@@ -223,12 +223,12 @@ check_absent 'viewport resize does not force desktop sidebar open' 'setSidebarOp
 check 'sidebar component can render collapsed state' 'isOpen.*collapsed|collapsed.*isOpen' "$sidebar"
 # Closed on desktop, the sidebar remains as a labelled icon rail instead of
 # disappearing and leaving only a floating toggle over the content.
-check 'rail width token exists' '--sidebar-rail-width: 64px;'
+check 'rail width token exists' '--sidebar-rail-width: 60px;'
 check_block_property 'the closed desktop column is the rail width' '.sidebar.collapsed' 'width' 'var(--sidebar-rail-width)'
 check_block_property 'the closed desktop column never translates off screen' '.sidebar.collapsed' 'transform' 'none'
 check_block_property 'the closed desktop column stays visible' '.sidebar.collapsed' 'visibility' 'visible'
 check_block_property 'the full panel is hidden from focus flow when collapsed' '.sidebar.collapsed .sidebar-full' 'visibility' 'hidden'
-check_block_property 'the rail button keeps a 40px target' '.sidebar-rail-action' 'width' '40px'
+check_block_property 'the rail button keeps a 38px target' '.sidebar-rail-action' 'width' '38px'
 check 'the rail carries the Corez mark' 'sidebar-rail-logo' "$sidebar"
 check 'the rail opens quick find' 'sidebar-rail-search-btn' "$sidebar"
 check 'quick find searches only the visible chat list' 'sessions.filter' "$sidebar"
