@@ -5059,6 +5059,48 @@ h6 {
   }
 }
 
+/* Laptop rail: a tighter icon column for the screens where horizontal space
+   is at a premium, while the large-desktop rail keeps its full measure. */
+@media (min-width: 768px) and (max-width: 1439px) {
+  .sidebar {
+    --sidebar-rail-width: 54px;
+  }
+
+  .sidebar-rail-brand {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+  }
+
+  .sidebar-rail-logo {
+    width: 32px;
+    height: 32px;
+  }
+
+  .sidebar-rail-action {
+    width: 36px;
+    height: 32px;
+    min-width: 36px;
+  }
+
+  .sidebar-rail-action svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .sidebar-rail-profile {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+  }
+
+  .sidebar .sidebar-rail-avatar {
+    width: 26px;
+    height: 26px;
+    font-size: 9.5px;
+  }
+}
+
 /* 2. Standard Laptop Screens (1024px to 1439px) */
 @media (min-width: 1024px) and (max-width: 1439px) {
   .messages-inner {
