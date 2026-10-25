@@ -53,7 +53,7 @@
   --sidebar-width: 260px;
   /* A closed desktop sidebar remains as this narrow icon rail: the shell never
      spends its top-left corner on a floating toggle over the content. */
-  --sidebar-rail-width: 72px;
+  --sidebar-rail-width: 64px;
   --sidebar-margin: 0px;
   --sidebar-radius: 0px;
   --sidebar-heading-size: 11px;
@@ -442,9 +442,10 @@ h6 {
 
 .sidebar-rail-logo {
   /* The mark carries transparent breathing room in its own square, so the
-     painted glyph lands at the reference's roughly 24px inside a 72px rail. */
-  width: 42px;
-  height: 42px;
+     painted glyph lands at a rail-sized 22px without the asset's margins
+     crowding the column. */
+  width: 38px;
+  height: 38px;
   object-fit: contain;
   display: block;
 }
@@ -457,16 +458,16 @@ h6 {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   /* The reference leaves a clear breath between the mark and the first
      action; the icon group itself stays compact underneath. */
   padding: 20px 0 10px;
 }
 
 .sidebar-rail-action {
-  width: 44px;
-  height: 38px;
-  min-width: 44px;
+  width: 40px;
+  height: 36px;
+  min-width: 40px;
   padding: 0;
   border: none;
   border-radius: var(--radius-md);
@@ -503,8 +504,8 @@ h6 {
 }
 
 .sidebar-rail-action svg {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
 }
 
 .sidebar-rail-footer {
@@ -516,9 +517,9 @@ h6 {
 }
 
 .sidebar-rail-profile {
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
   padding: 0;
   border: none;
   border-radius: var(--radius-pill);
@@ -540,9 +541,9 @@ h6 {
 }
 
 .sidebar .sidebar-rail-avatar {
-  width: 32px;
-  height: 32px;
-  font-size: 11px;
+  width: 30px;
+  height: 30px;
+  font-size: 10.5px;
 }
 
 /* Quick find from the rail. Portaled to the body so the animating column can
