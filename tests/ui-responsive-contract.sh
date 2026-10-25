@@ -229,8 +229,10 @@ check_block_property 'the closed desktop column never translates off screen' '.s
 check_block_property 'the closed desktop column stays visible' '.sidebar.collapsed' 'visibility' 'visible'
 check_block_property 'the full panel is hidden from focus flow when collapsed' '.sidebar.collapsed .sidebar-full' 'visibility' 'hidden'
 check_block_property 'the rail button keeps a 38px target' '.sidebar-rail-action' 'width' '38px'
+check_block_property 'the rail glyphs stay small inside their controls' '.sidebar-rail-action svg' 'width' '17px'
 check_block_property_in_media 'a laptop narrows the closed rail' 'min-width: 768px' '.sidebar' '--sidebar-rail-width' '54px'
 check_block_property_in_media 'a laptop tightens the rail control' 'min-width: 768px' '.sidebar-rail-action' 'width' '36px'
+check_block_property_in_media 'a laptop tightens the rail glyph' 'min-width: 768px' '.sidebar-rail-action svg' 'width' '16px'
 check 'the rail carries the Corez mark' 'sidebar-rail-logo' "$sidebar"
 check 'the rail opens quick find' 'sidebar-rail-search-btn' "$sidebar"
 check 'quick find searches only the visible chat list' 'sessions.filter' "$sidebar"
