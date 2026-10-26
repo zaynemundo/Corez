@@ -61,6 +61,7 @@ import {
   persistUserTurn,
   persistAssistantTurnAfter,
 } from "./services/turnPersistence";
+import { buildSiteRevisionContext } from "./utils/siteRevisionContext.js";
 import CompactedBanner from "./components/CompactedBanner";
 import { useI18n } from "./i18n/index.jsx";
 import {
@@ -746,7 +747,7 @@ function MainApp({ theme, setTheme }) {
 
   useEffect(() => {
     if (activeView === "chat") {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      messagesEndRef.current?.scrollIntoView?.({ behavior: "smooth" });
     }
   }, [activeSession?.messages, isThinking, activeView]);
 
@@ -861,6 +862,8 @@ function MainApp({ theme, setTheme }) {
     setCanvasOpen(false);
     setCanvasFullScreen(false);
     setRevisionContextCode("");
+    setRevisionContextSessionId(null);
+    setSiteEditChatId(null);
     setActiveCanvasCode(null);
   };
 
@@ -1197,6 +1200,80 @@ function MainApp({ theme, setTheme }) {
 
   const [chatInput, setChatInput] = useState("");
   const [revisionContextCode, setRevisionContextCode] = useState("");
+  // The chat the revision material belongs to. Scoping it prevents a site's
+  // owner copy from being attached to a message sent in another conversation.
+  const [revisionContextSessionId, setRevisionContextSessionId] = useState(null);
+  // The empty chat opened by Sites' Edit action, so its opening screen can be
+  // about changing the site rather than starting an unrelated build.
+  const [siteEditChatId, setSiteEditChatId] = useState(null);
+
+  const handleEditSite = async (page) => {
+    const siteContext = buildSiteRevisionContext(page);
+    if (!siteContext) throw new Error(t("common.sites.editChatError"));
+
+    const siteTitle =
+      (typeof page.title === "string" && page.title.trim()) || page.slug;
+    const title = t("common.sites.editChatTitle", { title: siteTitle });
+    const editPrompt = t("common.sites.editChatPrompt");
+    let sessionId;
+    let newSession;
+
+    try {
+      const created = await chatService.createChat({ title });
+      sessionId = created.id;
+      newSession = {
+        id: sessionId,
+        title: created.title || title,
+        messages: [],
+        createdAt: created.createdAt,
+        updatedAt: created.updatedAt,
+        projectId: created.projectId || null,
+        pinnedAt: null,
+        sortOrder: created.sortOrder ?? null,
+        _loaded: true,
+      };
+    } catch (error) {
+      console.warn(
+        "Failed to create the site edit chat on the server, using a local chat",
+        error,
+      );
+      sessionId = `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      newSession = {
+        id: sessionId,
+        title,
+        messages: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        projectId: null,
+        pinnedAt: null,
+        sortOrder: null,
+        _loaded: true,
+      };
+    }
+
+    setSessions((prev) => [newSession, ...prev]);
+    setSiteEditChatId(sessionId);
+    setRevisionContextCode(siteContext);
+    setRevisionContextSessionId(sessionId);
+    setActiveView("chat");
+    setChatLoading(false);
+    setChatInput(editPrompt);
+    setActiveCanvasCode(page.html);
+    setCanvasOpen(true);
+    setCanvasFullScreen(false);
+    userDismissedCanvasRef.current = false;
+    navigate(`/chat/${sessionId}`);
+
+    // The composer only mounts after the route change; give it one frame.
+    if (focusTimeoutRef.current) clearTimeout(focusTimeoutRef.current);
+    focusTimeoutRef.current = setTimeout(() => {
+      if (!chatInputRef.current) return;
+      chatInputRef.current.focus();
+      chatInputRef.current.setSelectionRange(editPrompt.length, editPrompt.length);
+    }, 80);
+
+    return true;
+  };
 
   const handleSendMessage = async (promptText, attachmentsArg = []) => {
     if (isThinking) return;
@@ -1313,9 +1390,15 @@ function MainApp({ theme, setTheme }) {
       ? `${promptText}${attachmentPrompt}`.trim()
       : promptText;
 
-    if (revisionContextCode) {
+    const revisionContextApplies =
+      Boolean(revisionContextCode) &&
+      (!revisionContextSessionId ||
+        revisionContextSessionId === targetSessionId);
+    if (revisionContextApplies) {
       apiPrompt = `${apiPrompt}\n\n[Existing code to revise - apply the requested change directly and output the complete updated file]:\n\`\`\`html\n${revisionContextCode}\n\`\`\``;
       setRevisionContextCode("");
+      setRevisionContextSessionId(null);
+      if (siteEditChatId === targetSessionId) setSiteEditChatId(null);
     }
 
     const displayAttachments = attachmentsArg.map(
@@ -1654,6 +1737,7 @@ function MainApp({ theme, setTheme }) {
 
   const handleReviseCode = (code) => {
     setRevisionContextCode(code);
+    setRevisionContextSessionId(activeSessionId || null);
     if (!activeCanvasCode && code) {
       setActiveCanvasCode(code);
     }
@@ -1743,6 +1827,11 @@ function MainApp({ theme, setTheme }) {
     sessionsLoaded &&
     !chatLoading &&
     (!activeSession || activeSession.messages.length === 0);
+  // The site edit screen is an empty chat on purpose: the site is already
+  // loaded as revision context, so show an editing prompt instead of the
+  // generic "build something" starters.
+  const isSiteEditChat =
+    isNewChat && Boolean(activeSessionId) && siteEditChatId === activeSessionId;
 
   return (
     <div className="app-container">
@@ -1811,7 +1900,10 @@ function MainApp({ theme, setTheme }) {
         )}
 
         {isSitesView ? (
-          <Sites onOpenChat={() => navigate("/")} />
+          <Sites
+            onOpenChat={() => navigate("/")}
+            onEditSite={handleEditSite}
+          />
         ) : (
         <>
           <div
@@ -1859,8 +1951,15 @@ function MainApp({ theme, setTheme }) {
                 // identity and focus while the screen changes.
                 <div className="new-chat-hero">
                   <h1 className="new-chat-hero-title">
-                    {t("common.newChat.title")}
+                    {isSiteEditChat
+                      ? t("common.sites.editChatHeading")
+                      : t("common.newChat.title")}
                   </h1>
+                  {isSiteEditChat && (
+                    <p className="new-chat-hero-hint">
+                      {t("common.sites.editChatHint")}
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div className="messages-inner">
@@ -1943,9 +2042,10 @@ function MainApp({ theme, setTheme }) {
               setAttachments={setAttachments}
               variant={isNewChat ? "hero" : "composer"}
               // The command grid lives inside the composer's own container so
-              // it always lines up with the input it fills.
+              // it always lines up with the input it fills. A site edit is not
+              // a new build, so it uses its own prompt instead of the grid.
               footer={
-                isNewChat ? (
+                isNewChat && !isSiteEditChat ? (
                   <NewChatStarters onSelect={handleStarterSelect} />
                 ) : null
               }

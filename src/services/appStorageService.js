@@ -531,31 +531,6 @@ export async function fetchPublishedPageForEdit(slug) {
 }
 
 /**
- * Saves an edited published page under its existing link.
- *
- * The slug is explicit, so the publish route updates that record in place
- * (ownership is enforced there). Every page is sent back — the editor's copy of
- * the one being edited plus the untouched sub-pages — because the record is
- * replaced wholesale.
- */
-export async function savePublishedPage({ slug, title, html, pages }) {
-  if (!slug || typeof slug !== "string") {
-    return { success: false, error: "A slug is required." };
-  }
-  if (!html || typeof html !== "string" || !html.trim()) {
-    return { success: false, error: "The page cannot be empty." };
-  }
-  return publishAppInR2({
-    html,
-    title: title || "Untitled Application",
-    slug,
-    pages,
-    // No sessionId: this edit is not attributed to a chat, and the existing
-    // lineage on the record is preserved by the worker.
-  });
-}
-
-/**
  * Publishes a creation so anyone with the returned share link can open it.
  * The html payload is the fully formatted preview document (what the user
  * sees in the canvas).

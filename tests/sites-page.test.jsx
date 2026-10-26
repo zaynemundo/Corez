@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 //
-// The Sites screen: every published page in one place, editable in place.
+// The Sites screen: every published page in one place.
 //
 // A screenshot cannot pin the behaviour, so these tests do: the list comes from
-// the server (not localStorage), editing loads the OWNER copy of the documents,
-// saving republishes every page under the same slug, and unpublishing asks before
-// it takes a live link down.
+// the server (not localStorage), Edit loads the OWNER copy of the documents and
+// hands them to the shell to open a new chat, and unpublishing asks before it
+// takes a live link down.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   render,
@@ -62,11 +62,16 @@ function json(body, status = 200) {
 }
 
 /**
- * Routes the three endpoints this screen uses. Each call is recorded so a test
- * can assert on the exact request the screen made.
+ * Routes the endpoints this screen uses. Each call is recorded so a test can
+ * assert on the exact request the screen made.
  */
-function mockApi({ pages = PAGES, ownerCopy = OWNER_COPY, saveStatus = 200 } = {}) {
-  const calls = { list: 0, ownerCopy: [], save: [], unpublish: [] };
+function mockApi({
+  pages = PAGES,
+  ownerCopy = OWNER_COPY,
+  ownerStatus = 200,
+  ownerError = "owner copy unavailable",
+} = {}) {
+  const calls = { list: 0, ownerCopy: [], unpublish: [] };
   vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init = {}) => {
     const target = String(url);
     const method = init.method || "GET";
@@ -76,12 +81,10 @@ function mockApi({ pages = PAGES, ownerCopy = OWNER_COPY, saveStatus = 200 } = {
     }
     if (target.startsWith("/api/publish/") && method === "GET") {
       calls.ownerCopy.push(target);
+      if (ownerStatus !== 200) {
+        return json({ error: ownerError }, ownerStatus);
+      }
       return json(ownerCopy);
-    }
-    if (target === "/api/publish" && method === "POST") {
-      calls.save.push(JSON.parse(init.body));
-      if (saveStatus !== 200) return json({ error: "save failed" }, saveStatus);
-      return json({ slug: ownerCopy.slug, url: ownerCopy.url });
     }
     if (target.startsWith("/api/publish/") && method === "DELETE") {
       calls.unpublish.push(target);
@@ -137,72 +140,60 @@ describe("the Sites screen", () => {
     ).toBeTruthy();
   });
 
-  it("opens the owner copy for editing, home page first", async () => {
+  it("loads the owner copy and hands the whole site to a new chat", async () => {
     const calls = mockApi();
-    renderSites();
+    const onEditSite = vi.fn().mockResolvedValue(true);
+    renderSites({ onEditSite });
     await screen.findByText("Portfolio");
 
     fireEvent.click(screen.getAllByRole("button", { name: /^Edit$/ })[0]);
 
-    // The editor loads the raw document (with the injected badge stripped by the
-    // worker, which is what the mock returns here).
-    const code = await screen.findByRole("textbox", { name: /Home HTML/i });
-    expect(code.value).toBe(OWNER_COPY.html);
+    await waitFor(() => expect(onEditSite).toHaveBeenCalledTimes(1));
+    const page = onEditSite.mock.calls[0][0];
+    expect(page).toMatchObject({
+      slug: "asyag23-123",
+      title: "Portfolio",
+      html: OWNER_COPY.html,
+    });
+    expect(page.pages["about.html"]).toBe(OWNER_COPY.pages["about.html"]);
     expect(calls.ownerCopy).toEqual(["/api/publish/asyag23-123"]);
-    // A multi-page site exposes its other pages as tabs, so the editor never
-    // silently drops them on save.
-    expect(screen.getByRole("tab", { name: "Home" })).toBeTruthy();
-    expect(screen.getByRole("tab", { name: "about.html" })).toBeTruthy();
+    // Editing no longer unfolds a second editor in the list.
+    expect(screen.queryByRole("textbox", { name: /HTML/i })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "about.html" })).toBeNull();
   });
 
-  it("saves an edited page back under the same slug, with every page", async () => {
-    const calls = mockApi();
-    renderSites();
+  it("reports a failed owner-copy load and keeps the list usable", async () => {
+    mockApi({ ownerStatus: 500, ownerError: "could not load owner copy" });
+    const onEditSite = vi.fn();
+    renderSites({ onEditSite });
     await screen.findByText("Portfolio");
+
     fireEvent.click(screen.getAllByRole("button", { name: /^Edit$/ })[0]);
-
-    const code = await screen.findByRole("textbox", { name: /Home HTML/i });
-    fireEvent.change(code, {
-      target: { value: "<!DOCTYPE html><html><body><h1>Edited</h1></body></html>" },
-    });
-
-    // A sub-page edit too: both must travel together in one publish.
-    fireEvent.click(screen.getByRole("tab", { name: "about.html" }));
-    const subCode = screen.getByRole("textbox", { name: /about\.html HTML/i });
-    fireEvent.change(subCode, {
-      target: { value: "<!DOCTYPE html><html><body><h1>About v2</h1></body></html>" },
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: /Save changes/i }));
-
-    await waitFor(() => expect(calls.save).toHaveLength(1));
-    const body = calls.save[0];
-    expect(body.slug).toBe("asyag23-123");
-    expect(body.html).toContain("Edited");
-    expect(body.pages["about.html"]).toContain("About v2");
-    // The edit is not attributed to a chat; the worker keeps any existing
-    // lineage on the record.
-    expect(body.sessionId).toBeUndefined();
-
-    // The list refreshes, and the row says it saved.
-    await waitFor(() => expect(calls.list).toBe(2));
-    expect(await screen.findByText(/your page is live/i)).toBeTruthy();
-  });
-
-  it("reports a failed save instead of pretending it worked", async () => {
-    mockApi({ saveStatus: 500 });
-    renderSites();
-    await screen.findByText("Portfolio");
-    fireEvent.click(screen.getAllByRole("button", { name: /^Edit$/ })[0]);
-    await screen.findByRole("textbox", { name: /Home HTML/i });
-
-    fireEvent.click(screen.getByRole("button", { name: /Save changes/i }));
 
     expect(await screen.findByRole("alert")).toHaveProperty(
       "textContent",
-      "save failed",
+      "could not load owner copy",
     );
-    expect(screen.queryByText(/your page is live/i)).toBeNull();
+    expect(onEditSite).not.toHaveBeenCalled();
+    expect(
+      screen.getAllByRole("button", { name: /^Edit$/ })[0].disabled,
+    ).toBe(false);
+  });
+
+  it("reports a failed chat handoff instead of hiding it", async () => {
+    mockApi();
+    const onEditSite = vi
+      .fn()
+      .mockRejectedValue(new Error("could not open the chat"));
+    renderSites({ onEditSite });
+    await screen.findByText("Portfolio");
+
+    fireEvent.click(screen.getAllByRole("button", { name: /^Edit$/ })[0]);
+
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "could not open the chat",
+    );
+    expect(screen.getByText("Portfolio")).toBeTruthy();
   });
 
   it("asks before unpublishing a live link, and removes only that row", async () => {

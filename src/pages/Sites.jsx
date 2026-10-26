@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
-  Check,
   ExternalLink,
   Globe,
   Loader2,
@@ -8,7 +7,6 @@ import {
   RefreshCw,
   Trash2,
   TrendingUp,
-  X,
 } from "lucide-react";
 import { useI18n } from "../i18n/index.jsx";
 import { formatDate } from "../i18n/format.js";
@@ -16,11 +14,8 @@ import SiteAnalyticsPanel from "../components/SiteAnalyticsPanel.jsx";
 import {
   fetchPublishedPageForEdit,
   listPublishedPages,
-  savePublishedPage,
   unpublishPage,
 } from "../services/appStorageService";
-
-const EMPTY_DOC = "";
 
 function formatBytes(bytes) {
   const value = Number(bytes);
@@ -36,10 +31,11 @@ function formatBytes(bytes) {
  *
  * The list comes from the server (`GET /api/publish`), so it reflects pages
  * published from any device, not just this browser. Editing loads the owner's
- * copy of the raw documents (`GET /api/publish/<slug>`) and saves through the
- * same publish route, under the same slug, so the public URL never changes.
+ * copy of the raw documents (`GET /api/publish/<slug>`) and hands them to the
+ * shell, which opens a new conversation with the site as the model's revision
+ * context. The public URL is never changed here.
  */
-export default function Sites({ onOpenChat }) {
+export default function Sites({ onOpenChat, onEditSite }) {
   const { t, language } = useI18n();
   const [pages, setPages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -50,12 +46,9 @@ export default function Sites({ onOpenChat }) {
   // readable and each report loaded only when the owner asks for it.
   const [analyticsSlug, setAnalyticsSlug] = useState("");
 
-  // The page being edited, plus its working copy.
-  const [editing, setEditing] = useState(null);
+  // The page whose owner copy is being loaded on its way into a chat.
   const [editLoadingSlug, setEditLoadingSlug] = useState("");
   const [editError, setEditError] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [savedSlug, setSavedSlug] = useState("");
 
   const [removingSlug, setRemovingSlug] = useState("");
   const [confirmingSlug, setConfirmingSlug] = useState("");
@@ -75,80 +68,31 @@ export default function Sites({ onOpenChat }) {
     refresh();
   }, [refresh]);
 
-  const stopEditing = useCallback(() => {
-    setEditing(null);
-    setEditError("");
-    setSavedSlug("");
-  }, []);
-
   const startEditing = useCallback(
     async (page) => {
+      if (typeof onEditSite !== "function") {
+        setEditError(t("common.sites.editChatError"));
+        return;
+      }
       setEditError("");
-      setSavedSlug("");
       setConfirmingSlug("");
       setAnalyticsSlug("");
       setEditLoadingSlug(page.slug);
-      const result = await fetchPublishedPageForEdit(page.slug);
-      setEditLoadingSlug("");
-      if (!result.success) {
-        setEditError(result.error);
-        setEditing(null);
-        return;
+      try {
+        const result = await fetchPublishedPageForEdit(page.slug);
+        if (!result.success) {
+          setEditError(result.error || t("common.sites.editChatError"));
+          return;
+        }
+        await onEditSite(result.page);
+      } catch (err) {
+        setEditError(err?.message || t("common.sites.editChatError"));
+      } finally {
+        setEditLoadingSlug("");
       }
-      const loaded = result.page;
-      setEditing({
-        slug: loaded.slug,
-        url: loaded.url,
-        title: loaded.title,
-        html: loaded.html,
-        pages: loaded.pages || {},
-        // null means the home document; any other value is a sub-page name.
-        activePage: null,
-      });
     },
-    [],
+    [onEditSite, t],
   );
-
-  const pageNames = useMemo(
-    () => (editing ? Object.keys(editing.pages || {}).sort() : []),
-    [editing],
-  );
-  const activeDocument = editing
-    ? editing.activePage === null
-      ? editing.html
-      : editing.pages[editing.activePage] || EMPTY_DOC
-    : EMPTY_DOC;
-
-  const setDocument = (value) => {
-    setEditing((prev) => {
-      if (!prev) return prev;
-      if (prev.activePage === null) return { ...prev, html: value };
-      return {
-        ...prev,
-        pages: { ...prev.pages, [prev.activePage]: value },
-      };
-    });
-  };
-
-  const save = async () => {
-    if (!editing) return;
-    setSaving(true);
-    setEditError("");
-    const result = await savePublishedPage({
-      slug: editing.slug,
-      title: editing.title,
-      html: editing.html,
-      pages: editing.pages,
-    });
-    setSaving(false);
-    if (!result?.success) {
-      setEditError(result?.error || t("common.sites.saveError"));
-      return;
-    }
-    setSavedSlug(editing.slug);
-    // The list carries the title and size, both of which just changed.
-    refresh();
-  };
 
   const copyLink = async (page) => {
     const url = `${window.location.origin}${page.url}`;
@@ -180,7 +124,6 @@ export default function Sites({ onOpenChat }) {
       setRemoveError(result?.error || t("common.sites.removeError"));
       return;
     }
-    if (editing?.slug === page.slug) stopEditing();
     if (analyticsSlug === page.slug) setAnalyticsSlug("");
     setPages((prev) => prev.filter((entry) => entry.slug !== page.slug));
   };
@@ -243,6 +186,12 @@ export default function Sites({ onOpenChat }) {
         </div>
       )}
 
+      {!loading && editError && (
+        <p className="sites-error" role="alert">
+          {editError}
+        </p>
+      )}
+
       {removeError && (
         <p className="sites-error" role="alert">
           {removeError}
@@ -252,12 +201,11 @@ export default function Sites({ onOpenChat }) {
       {!loading && pages.length > 0 && (
         <ul className="sites-list">
           {pages.map((page) => {
-            const isEditing = editing?.slug === page.slug;
             const size = formatBytes(page.bytes);
             return (
               <li
                 key={page.slug}
-                className={`site-card${isEditing ? " editing" : ""}${
+                className={`site-card${
                   analyticsSlug === page.slug ? " analytics-open" : ""
                 }`}
               >
@@ -285,12 +233,6 @@ export default function Sites({ onOpenChat }) {
                     )}
                     {size && <span>{size}</span>}
                   </p>
-                  {savedSlug === page.slug && (
-                    <p className="site-card-saved" role="status">
-                      <Check size={13} strokeWidth={2} aria-hidden="true" />
-                      {t("common.sites.saved")}
-                    </p>
-                  )}
                 </div>
 
                 <div className="site-card-actions">
@@ -318,9 +260,8 @@ export default function Sites({ onOpenChat }) {
                   <button
                     type="button"
                     className="sites-button"
-                    onClick={() => (isEditing ? stopEditing() : startEditing(page))}
-                    disabled={editLoadingSlug === page.slug}
-                    aria-expanded={isEditing}
+                    onClick={() => startEditing(page)}
+                    disabled={Boolean(editLoadingSlug)}
                   >
                     {editLoadingSlug === page.slug ? (
                       <Loader2
@@ -332,7 +273,7 @@ export default function Sites({ onOpenChat }) {
                     ) : (
                       <Pencil size={14} strokeWidth={1.75} aria-hidden="true" />
                     )}
-                    {isEditing ? t("common.sites.closeEditor") : t("common.sites.edit")}
+                    {t("common.sites.edit")}
                   </button>
                   <button
                     type="button"
@@ -359,126 +300,6 @@ export default function Sites({ onOpenChat }) {
                     </button>
                   )}
                 </div>
-
-                {isEditing && (
-                  <div className="site-editor">
-                    <div className="site-editor-row">
-                      <label className="site-editor-label" htmlFor="site-editor-title">
-                        {t("common.sites.titleLabel")}
-                      </label>
-                      <input
-                        id="site-editor-title"
-                        className="site-editor-input"
-                        value={editing.title}
-                        onChange={(event) =>
-                          setEditing((prev) =>
-                            prev ? { ...prev, title: event.target.value } : prev,
-                          )
-                        }
-                        maxLength={120}
-                      />
-                    </div>
-
-                    {pageNames.length > 0 && (
-                      <div className="site-editor-row">
-                        <span className="site-editor-label">
-                          {t("common.sites.pageLabel")}
-                        </span>
-                        <div className="site-editor-tabs" role="tablist">
-                          <button
-                            type="button"
-                            role="tab"
-                            aria-selected={editing.activePage === null}
-                            className={`site-editor-tab${
-                              editing.activePage === null ? " active" : ""
-                            }`}
-                            onClick={() =>
-                              setEditing((prev) =>
-                                prev ? { ...prev, activePage: null } : prev,
-                              )
-                            }
-                          >
-                            {t("common.sites.homePage")}
-                          </button>
-                          {pageNames.map((name) => (
-                            <button
-                              key={name}
-                              type="button"
-                              role="tab"
-                              aria-selected={editing.activePage === name}
-                              className={`site-editor-tab${
-                                editing.activePage === name ? " active" : ""
-                              }`}
-                              onClick={() =>
-                                setEditing((prev) =>
-                                  prev ? { ...prev, activePage: name } : prev,
-                                )
-                              }
-                            >
-                              {name}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <label className="site-editor-label" htmlFor="site-editor-doc">
-                      {t("common.sites.documentLabel", {
-                        page:
-                          editing.activePage === null
-                            ? t("common.sites.homePage")
-                            : editing.activePage,
-                      })}
-                    </label>
-                    <textarea
-                      id="site-editor-doc"
-                      className="site-editor-code"
-                      value={activeDocument}
-                      onChange={(event) => setDocument(event.target.value)}
-                      spellCheck="false"
-                      rows={14}
-                    />
-
-                    <p className="site-editor-hint">
-                      {t("common.sites.editorHint")}
-                    </p>
-
-                    {editError && (
-                      <p className="site-editor-error" role="alert">
-                        {editError}
-                      </p>
-                    )}
-
-                    <div className="site-editor-actions">
-                      <button
-                        type="button"
-                        className="sites-button primary"
-                        onClick={save}
-                        disabled={saving}
-                      >
-                        {saving ? (
-                          <Loader2
-                            size={14}
-                            strokeWidth={1.75}
-                            className="spin"
-                            aria-hidden="true"
-                          />
-                        ) : (
-                          <Check size={14} strokeWidth={2} aria-hidden="true" />
-                        )}
-                        {saving ? t("common.sites.saving") : t("common.sites.save")}
-                      </button>
-                      <button
-                        type="button"
-                        className="sites-button quiet"
-                        onClick={stopEditing}
-                      >
-                        <X size={14} strokeWidth={1.75} aria-hidden="true" />
-                        {t("common.sites.cancel")}
-                      </button>
-                    </div>
-                  </div>
-                )}
 
                 {analyticsSlug === page.slug && (
                   <SiteAnalyticsPanel

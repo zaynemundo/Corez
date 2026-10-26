@@ -1668,6 +1668,14 @@ h6 {
   color: var(--text-primary);
 }
 
+.new-chat-hero-hint {
+  max-width: 34rem;
+  margin: 0.6rem auto 0;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
 /* The suggestion list: one roomy row per command — outline icon, label, and the
    command the row inserts in the monospace face at the far end. A row is a quiet
    line of text until it is hovered, which is what makes the list read as
@@ -7447,8 +7455,8 @@ h6 {
 /* ---------- Sites screen ---------- */
 /* The published pages are the account's live artifacts, so this screen is a
    reading list first: one card per site, the link and its facts, and the two
-   actions that matter. Editing opens inside the card it belongs to, so the page
-   being changed never leaves the context of the list. */
+   actions that matter. Edit opens a chat with the owner's documents loaded, so
+   the change happens beside the site preview rather than in a second editor. */
 .sites-page {
   flex: 1;
   min-width: 0;
@@ -7635,7 +7643,6 @@ h6 {
 }
 
 .site-card:hover,
-.site-card.editing,
 .site-card.analytics-open {
   border-color: var(--border-hover);
 }
@@ -7684,15 +7691,6 @@ h6 {
   color: var(--text-secondary);
 }
 
-.site-card-saved {
-  margin: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.78rem;
-  color: var(--market-positive);
-}
-
 .site-card-actions {
   display: flex;
   align-items: center;
@@ -7700,127 +7698,9 @@ h6 {
   flex-wrap: wrap;
 }
 
-.site-editor {
-  flex: 1 1 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-  margin-top: 0.35rem;
-  padding-top: 0.85rem;
-  border-top: 1px solid var(--border-color);
-}
-
-.site-editor-row {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-}
-
-.site-editor-label {
-  font-size: 0.78rem;
-  color: var(--text-secondary);
-  min-width: 6.5rem;
-}
-
-.site-editor-input {
-  flex: 1 1 260px;
-  min-width: 0;
-  height: 34px;
-  padding: 0 0.6rem;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-family: var(--font-sans);
-  font-size: 0.85rem;
-}
-
-.site-editor-input:focus {
-  outline: none;
-  border-color: var(--border-hover);
-}
-
-.site-editor-tabs {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  flex-wrap: wrap;
-}
-
-.site-editor-tab {
-  height: 28px;
-  padding: 0 0.6rem;
-  border: 1px solid transparent;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--text-secondary);
-  font-family: var(--font-sans);
-  font-size: 0.76rem;
-  cursor: pointer;
-  transition: var(--transition-fast);
-}
-
-.site-editor-tab:hover {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-}
-
-.site-editor-tab.active {
-  border-color: var(--border-hover);
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-}
-
-.site-editor-code {
-  width: 100%;
-  box-sizing: border-box;
-  min-height: 220px;
-  max-height: 60vh;
-  padding: 0.7rem 0.8rem;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  line-height: 1.55;
-  resize: vertical;
-  white-space: pre;
-  overflow: auto;
-  tab-size: 2;
-}
-
-.site-editor-code:focus {
-  outline: none;
-  border-color: var(--border-hover);
-}
-
-.site-editor-hint,
-.site-editor-error {
-  margin: 0;
-  font-size: 0.78rem;
-  line-height: 1.5;
-}
-
-.site-editor-hint {
-  color: var(--text-muted);
-}
-
-.site-editor-error {
-  color: #f87171;
-}
-
-.site-editor-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-}
-
 /* ---------- Per-site analytics panel ---------- */
-/* Expands inside the site card, like the editor: the report belongs to the
-   card it describes, so opening it never loses the site's place in the list. */
+/* Expands inside the site card, like the site's actions: the report belongs to
+   the card it describes, so opening it never loses the site's place in the list. */
 .site-analytics {
   flex: 1 1 100%;
   display: flex;
@@ -8136,10 +8016,6 @@ h6 {
 
   .site-card {
     padding: 0.8rem;
-  }
-
-  .site-editor-label {
-    min-width: 0;
   }
 
   .site-analytics-stats {

@@ -58,7 +58,22 @@ function signedInAccount({ failProjectChats = false, failReorder = false } = {})
     if (path === "/api/auth/me") {
       return Promise.resolve(json({ user: { id: "u1", email: "a@b.co" } }));
     }
+    if (path === "/api/ai") {
+      return Promise.resolve(json({ content: "Updated the site." }));
+    }
     if (path === "/api/chats") {
+      if (method === "POST") {
+        return Promise.resolve(
+          json({
+            id: "chat44444444",
+            title: body?.title || "New Conversation",
+            createdAt: 4,
+            updatedAt: 4,
+            projectId: null,
+            sortOrder: null,
+          }),
+        );
+      }
       return Promise.resolve(
         json({
           chats: [
@@ -84,6 +99,28 @@ function signedInAccount({ failProjectChats = false, failReorder = false } = {})
           manualLists: [],
         }),
       );
+    }
+    if (method === "GET" && path === "/api/publish") {
+      return Promise.resolve(
+        json({
+          pages: [
+            {
+              slug: PUBLISHED_SITE.slug,
+              url: PUBLISHED_SITE.url,
+              title: PUBLISHED_SITE.title,
+              createdAt: PUBLISHED_SITE.createdAt,
+              pages: 1,
+              bytes: 4200,
+              badge: true,
+              customized: false,
+            },
+          ],
+          truncated: false,
+        }),
+      );
+    }
+    if (method === "GET" && path === `/api/publish/${PUBLISHED_SITE.slug}`) {
+      return Promise.resolve(json(PUBLISHED_SITE));
     }
     if (path === "/api/projects") {
       if (method === "POST") {
@@ -130,6 +167,19 @@ function signedInAccount({ failProjectChats = false, failReorder = false } = {})
 
 const callsTo = (calls, path, method) =>
   calls.filter((c) => c.path === path && (!method || c.method === method));
+
+const PUBLISHED_SITE = {
+  slug: "portfolio-123",
+  url: "/portfolio-123",
+  title: "Portfolio",
+  html: "<!DOCTYPE html><html><body><h1>Portfolio home</h1></body></html>",
+  pages: {
+    "about.html": "<!DOCTYPE html><html><body><h1>About</h1></body></html>",
+  },
+  badge: true,
+  customized: false,
+  createdAt: "2026-10-01T10:00:00.000Z",
+};
 
 async function openApp(path = "/") {
   window.history.pushState({}, "", path);
@@ -185,6 +235,75 @@ describe("project folders in the app", () => {
     expect(document.querySelector(".sidebar-full").getAttribute("aria-hidden")).toBe(
       null,
     );
+  });
+
+  it("opens a published site in a new edit chat with the preview ready", async () => {
+    const user = userEvent.setup();
+    const calls = signedInAccount();
+    await openApp("/sites");
+    await screen.findByText("Portfolio");
+
+    await user.click(screen.getByRole("button", { name: /^Edit$/ }));
+
+    await waitFor(() =>
+      expect(callsTo(calls, "/api/chats", "POST")).toHaveLength(1),
+    );
+    expect(callsTo(calls, "/api/chats", "POST")[0].body).toEqual({
+      title: "Edit Portfolio",
+    });
+    await waitFor(() =>
+      expect(window.location.pathname).toBe("/chat/chat44444444"),
+    );
+
+    // The empty conversation is site-aware: an editing prompt replaces the
+    // generic "build something" hero and its command grid.
+    expect(await screen.findByText("What should we change?")).toBeTruthy();
+    expect(screen.getByText(/loaded into this chat/i)).toBeTruthy();
+    expect(screen.queryByText("Build an app or website")).toBeNull();
+
+    const composer = document.querySelector("#corez-chat-input");
+    expect(composer.value).toBe("Update this published site: ");
+    expect(document.querySelector(".canvas-pane")).toBeTruthy();
+  });
+
+  it("sends every site document with the edit chat's first message", async () => {
+    const user = userEvent.setup();
+    const calls = signedInAccount();
+    await openApp("/sites");
+    await screen.findByText("Portfolio");
+    await user.click(screen.getByRole("button", { name: /^Edit$/ }));
+    await waitFor(() =>
+      expect(window.location.pathname).toBe("/chat/chat44444444"),
+    );
+
+    await waitFor(() =>
+      expect(document.querySelector("#corez-chat-input")).toBeTruthy(),
+    );
+    const composer = document.querySelector("#corez-chat-input");
+    fireEvent.change(composer, {
+      target: {
+        value: "Update this published site: make the hero teal",
+      },
+    });
+    fireEvent.submit(composer.closest("form"));
+
+    await waitFor(
+      () => expect(callsTo(calls, "/api/ai", "POST").length).toBeGreaterThan(0),
+      { timeout: 3000 },
+    );
+    const payload = callsTo(calls, "/api/ai", "POST")
+      .map((call) => call.body)
+      .find(
+        (body) =>
+          body &&
+          !body.titleOnly &&
+          body.prompt?.includes("Published site: Portfolio"),
+      );
+
+    expect(payload).toBeTruthy();
+    expect(payload.prompt).toContain("<h1>Portfolio home</h1>");
+    expect(payload.prompt).toContain("===== about.html =====");
+    expect(payload.prompt).toContain("<h1>About</h1>");
   });
 
   it("shows the account's projects with their chats, and the rest under Chats", async () => {

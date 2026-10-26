@@ -57,8 +57,8 @@ export default function Sidebar({
   activeSessionId,
   onSelectSession,
   onNewChat,
-  // The Sites screen: every published page, editable in place. Optional so the
-  // sidebar can render without it in isolation (tests, story-style previews).
+  // The Sites screen: every published page, with edits handed to a new chat.
+  // Optional so the sidebar can render without it in isolation (tests, previews).
   onOpenSites,
   onOpenSettings,
   onDeleteSession,

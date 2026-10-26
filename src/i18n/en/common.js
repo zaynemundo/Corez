@@ -63,7 +63,7 @@ export default {
   },
 
   // The Sites screen: every page this account has published, with the two
-  // actions a live page needs — edit it in place, or take it down.
+  // actions a live page needs — edit it with AI, or take it down.
   sites: {
     title: "Sites",
     subtitle: "Everything you have published. Open a site, edit it, or take it down.",
@@ -78,22 +78,18 @@ export default {
     copy: "Copy link",
     copied: "Link copied",
     edit: "Edit",
-    closeEditor: "Close editor",
-    titleLabel: "Site title",
-    pageLabel: "Page",
+    editChatTitle: "Edit {title}",
+    editChatHeading: "What should we change?",
+    editChatHint:
+      "The published site is open in the preview and loaded into this chat. Tell Corez what to change.",
+    editChatPrompt: "Update this published site: ",
+    editChatError: "Could not open the edit chat. Try again.",
     homePage: "Home",
-    documentLabel: "{page} HTML",
-    editorHint:
-      "Saving publishes immediately under the same link. Every page in the site is saved together.",
-    save: "Save changes",
-    saving: "Saving…",
-    saved: "Saved — your page is live",
     cancel: "Cancel",
     unpublish: "Unpublish",
     confirmUnpublish: "Click again to unpublish",
     removing: "Removing…",
     removeError: "Could not unpublish this page.",
-    saveError: "Could not save this page.",
     pagesCount: "{count} pages",
     truncated: "Some older pages are not listed here.",
     // Per-site traffic. Counts are first-party and cookie-free; the panel says
