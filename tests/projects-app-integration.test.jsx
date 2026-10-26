@@ -237,13 +237,69 @@ describe("project folders in the app", () => {
     );
   });
 
-  it("opens a published site in a new edit chat with the preview ready", async () => {
+  it("opens a published site edit draft without creating a chat", async () => {
     const user = userEvent.setup();
     const calls = signedInAccount();
     await openApp("/sites");
     await screen.findByText("Portfolio");
 
     await user.click(screen.getByRole("button", { name: /^Edit$/ }));
+
+    await waitFor(() => expect(window.location.pathname).toBe("/"));
+    await waitFor(() =>
+      expect(document.querySelector("#corez-chat-input")).toBeTruthy(),
+    );
+
+    // An unused draft must not become an empty Recents row or a server chat.
+    expect(callsTo(calls, "/api/chats", "POST")).toHaveLength(0);
+    expect(screen.queryByText("Edit Portfolio")).toBeNull();
+
+    // The draft is still site-aware: an editing prompt replaces the generic
+    // "build something" hero and its command grid.
+    expect(await screen.findByText("What should we change?")).toBeTruthy();
+    expect(screen.getByText(/loaded into this chat/i)).toBeTruthy();
+    expect(screen.queryByText("Build an app or website")).toBeNull();
+
+    const composer = document.querySelector("#corez-chat-input");
+    expect(composer.value).toBe("Update this published site: ");
+    expect(document.querySelector(".canvas-pane")).toBeTruthy();
+  });
+
+  it("discards the site edit draft when the user leaves without sending", async () => {
+    const user = userEvent.setup();
+    const calls = signedInAccount();
+    await openApp("/sites");
+    await screen.findByText("Portfolio");
+    await user.click(screen.getByRole("button", { name: /^Edit$/ }));
+    await waitFor(() => expect(window.location.pathname).toBe("/"));
+    await screen.findByText("What should we change?");
+
+    await user.click(screen.getByRole("button", { name: "Sites" }));
+
+    await waitFor(() => expect(window.location.pathname).toBe("/sites"));
+    expect(callsTo(calls, "/api/chats", "POST")).toHaveLength(0);
+    expect(screen.queryByText("Edit Portfolio")).toBeNull();
+  });
+
+  it("creates and sends every site document on the draft's first message", async () => {
+    const user = userEvent.setup();
+    const calls = signedInAccount();
+    await openApp("/sites");
+    await screen.findByText("Portfolio");
+    await user.click(screen.getByRole("button", { name: /^Edit$/ }));
+    await waitFor(() => expect(window.location.pathname).toBe("/"));
+    await waitFor(() =>
+      expect(document.querySelector("#corez-chat-input")).toBeTruthy(),
+    );
+    expect(callsTo(calls, "/api/chats", "POST")).toHaveLength(0);
+
+    const composer = document.querySelector("#corez-chat-input");
+    fireEvent.change(composer, {
+      target: {
+        value: "Update this published site: make the hero teal",
+      },
+    });
+    fireEvent.submit(composer.closest("form"));
 
     await waitFor(() =>
       expect(callsTo(calls, "/api/chats", "POST")).toHaveLength(1),
@@ -254,38 +310,6 @@ describe("project folders in the app", () => {
     await waitFor(() =>
       expect(window.location.pathname).toBe("/chat/chat44444444"),
     );
-
-    // The empty conversation is site-aware: an editing prompt replaces the
-    // generic "build something" hero and its command grid.
-    expect(await screen.findByText("What should we change?")).toBeTruthy();
-    expect(screen.getByText(/loaded into this chat/i)).toBeTruthy();
-    expect(screen.queryByText("Build an app or website")).toBeNull();
-
-    const composer = document.querySelector("#corez-chat-input");
-    expect(composer.value).toBe("Update this published site: ");
-    expect(document.querySelector(".canvas-pane")).toBeTruthy();
-  });
-
-  it("sends every site document with the edit chat's first message", async () => {
-    const user = userEvent.setup();
-    const calls = signedInAccount();
-    await openApp("/sites");
-    await screen.findByText("Portfolio");
-    await user.click(screen.getByRole("button", { name: /^Edit$/ }));
-    await waitFor(() =>
-      expect(window.location.pathname).toBe("/chat/chat44444444"),
-    );
-
-    await waitFor(() =>
-      expect(document.querySelector("#corez-chat-input")).toBeTruthy(),
-    );
-    const composer = document.querySelector("#corez-chat-input");
-    fireEvent.change(composer, {
-      target: {
-        value: "Update this published site: make the hero teal",
-      },
-    });
-    fireEvent.submit(composer.closest("form"));
 
     await waitFor(
       () => expect(callsTo(calls, "/api/ai", "POST").length).toBeGreaterThan(0),

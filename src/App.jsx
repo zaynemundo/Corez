@@ -758,6 +758,13 @@ function MainApp({ theme, setTheme }) {
     setCanvasFullScreen(false);
     setActiveCanvasCode(null);
     setRevisionContextCode("");
+    setRevisionContextSessionId(null);
+    // An unused site-edit draft belongs to the new-chat route; leaving it must
+    // not leave its prompt in another conversation or keep a chat behind.
+    if (siteEditDraft) {
+      setSiteEditDraft(null);
+      setChatInput("");
+    }
   };
 
   const handleExpandCompact = async () => {
@@ -863,7 +870,8 @@ function MainApp({ theme, setTheme }) {
     setCanvasFullScreen(false);
     setRevisionContextCode("");
     setRevisionContextSessionId(null);
-    setSiteEditChatId(null);
+    setSiteEditDraft(null);
+    setChatInput("");
     setActiveCanvasCode(null);
   };
 
@@ -1203,9 +1211,10 @@ function MainApp({ theme, setTheme }) {
   // The chat the revision material belongs to. Scoping it prevents a site's
   // owner copy from being attached to a message sent in another conversation.
   const [revisionContextSessionId, setRevisionContextSessionId] = useState(null);
-  // The empty chat opened by Sites' Edit action, so its opening screen can be
-  // about changing the site rather than starting an unrelated build.
-  const [siteEditChatId, setSiteEditChatId] = useState(null);
+  // An edit opened from Sites is a draft until the first message. Clicking
+  // Edit shows the site and primes the composer, but no empty chat is written
+  // to Recents if the user never types anything.
+  const [siteEditDraft, setSiteEditDraft] = useState(null);
 
   const handleEditSite = async (page) => {
     const siteContext = buildSiteRevisionContext(page);
@@ -1215,54 +1224,24 @@ function MainApp({ theme, setTheme }) {
       (typeof page.title === "string" && page.title.trim()) || page.slug;
     const title = t("common.sites.editChatTitle", { title: siteTitle });
     const editPrompt = t("common.sites.editChatPrompt");
-    let sessionId;
-    let newSession;
 
-    try {
-      const created = await chatService.createChat({ title });
-      sessionId = created.id;
-      newSession = {
-        id: sessionId,
-        title: created.title || title,
-        messages: [],
-        createdAt: created.createdAt,
-        updatedAt: created.updatedAt,
-        projectId: created.projectId || null,
-        pinnedAt: null,
-        sortOrder: created.sortOrder ?? null,
-        _loaded: true,
-      };
-    } catch (error) {
-      console.warn(
-        "Failed to create the site edit chat on the server, using a local chat",
-        error,
-      );
-      sessionId = `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      newSession = {
-        id: sessionId,
-        title,
-        messages: [],
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        projectId: null,
-        pinnedAt: null,
-        sortOrder: null,
-        _loaded: true,
-      };
-    }
-
-    setSessions((prev) => [newSession, ...prev]);
-    setSiteEditChatId(sessionId);
+    setSiteEditDraft({
+      title,
+      siteTitle,
+      slug: page.slug,
+      html: page.html,
+    });
     setRevisionContextCode(siteContext);
-    setRevisionContextSessionId(sessionId);
+    setRevisionContextSessionId(null);
     setActiveView("chat");
     setChatLoading(false);
+    setAttachments([]);
     setChatInput(editPrompt);
     setActiveCanvasCode(page.html);
     setCanvasOpen(true);
     setCanvasFullScreen(false);
     userDismissedCanvasRef.current = false;
-    navigate(`/chat/${sessionId}`);
+    navigate("/");
 
     // The composer only mounts after the route change; give it one frame.
     if (focusTimeoutRef.current) clearTimeout(focusTimeoutRef.current);
@@ -1279,6 +1258,13 @@ function MainApp({ theme, setTheme }) {
     if (isThinking) return;
     setAttachments([]);
 
+    // A site edit is a draft on "/" until this first send. Capture the state
+    // now, before a chat is created, so the title and revision context belong
+    // to that chat and nowhere else.
+    const initialActiveSessionId = activeSessionId;
+    const siteDraft = siteEditDraft;
+    const sendingSiteDraft = Boolean(siteDraft) && !activeSessionId;
+
     // Determine target chat — create if on "/"
     let targetSessionId = activeSessionId;
     let _isNewlyCreated = false;
@@ -1286,9 +1272,11 @@ function MainApp({ theme, setTheme }) {
 
     // If no active chat, create one server-side first so URL becomes /chat/:id
     if (!targetSessionId) {
-      const provisionalTitle = generateSessionTitle(
-        promptText || attachmentsArg[0]?.name || "New Conversation",
-      );
+      const provisionalTitle = sendingSiteDraft
+        ? siteDraft.title
+        : generateSessionTitle(
+            promptText || attachmentsArg[0]?.name || "New Conversation",
+          );
       try {
         const created = await chatService.createChat({
           title: provisionalTitle,
@@ -1384,6 +1372,8 @@ function MainApp({ theme, setTheme }) {
       }
     }
 
+    if (sendingSiteDraft) setSiteEditDraft(null);
+
     const attachmentPrompt = buildAttachmentPrompt(attachmentsArg);
     const displayPrompt = promptText;
     let apiPrompt = attachmentPrompt
@@ -1392,13 +1382,13 @@ function MainApp({ theme, setTheme }) {
 
     const revisionContextApplies =
       Boolean(revisionContextCode) &&
-      (!revisionContextSessionId ||
-        revisionContextSessionId === targetSessionId);
+      (revisionContextSessionId
+        ? revisionContextSessionId === targetSessionId
+        : !initialActiveSessionId || sendingSiteDraft);
     if (revisionContextApplies) {
       apiPrompt = `${apiPrompt}\n\n[Existing code to revise - apply the requested change directly and output the complete updated file]:\n\`\`\`html\n${revisionContextCode}\n\`\`\``;
       setRevisionContextCode("");
       setRevisionContextSessionId(null);
-      if (siteEditChatId === targetSessionId) setSiteEditChatId(null);
     }
 
     const displayAttachments = attachmentsArg.map(
@@ -1827,11 +1817,10 @@ function MainApp({ theme, setTheme }) {
     sessionsLoaded &&
     !chatLoading &&
     (!activeSession || activeSession.messages.length === 0);
-  // The site edit screen is an empty chat on purpose: the site is already
+  // The site edit screen is a draft on the new-chat route: the site is already
   // loaded as revision context, so show an editing prompt instead of the
-  // generic "build something" starters.
-  const isSiteEditChat =
-    isNewChat && Boolean(activeSessionId) && siteEditChatId === activeSessionId;
+  // generic "build something" starters. No chat exists until the first send.
+  const isSiteEditChat = isNewChat && Boolean(siteEditDraft);
 
   return (
     <div className="app-container">
@@ -1849,6 +1838,17 @@ function MainApp({ theme, setTheme }) {
         onSelectSession={handleSelectSession}
         onNewChat={handleNewChat}
         onOpenSites={() => {
+          // Leaving an unused edit draft must retire its preview and context;
+          // otherwise coming back would show a site with no edit chat.
+          if (siteEditDraft) {
+            setSiteEditDraft(null);
+            setRevisionContextCode("");
+            setRevisionContextSessionId(null);
+            setChatInput("");
+            setCanvasOpen(false);
+            setCanvasFullScreen(false);
+            setActiveCanvasCode("");
+          }
           navigate("/sites");
           // On a phone the sidebar is a drawer: navigating should reveal the
           // screen rather than leave it covered.

@@ -406,9 +406,9 @@ check 'the microphone is gated on browser support' 'dictationAvailable &&' "$inp
 check_block_property 'an unavailable composer control is visibly disabled' '.mic-btn:disabled' 'opacity' '0.35'
 
 # Sites: published pages are a screen of their own, reached from the sidebar.
-# Edit loads the owner copy and opens a new conversation with that copy as the
-# revision context, so the AI works beside the live preview instead of in a
-# second in-page editor.
+# Edit loads the owner copy into a draft new chat with that copy as revision
+# context. The draft becomes a persistent chat only on its first message, so
+# clicking Edit and leaving never leaves an empty Recents row.
 check 'the sidebar carries the Sites entry' 'sites-nav-btn' "$sidebar"
 check 'the Sites entry marks the current screen' 'aria-current=\{activeView === "sites"' "$sidebar"
 check 'the shell routes to the Sites screen' 'path="/sites"' "$app"
@@ -416,7 +416,9 @@ check 'the Sites screen is a labelled section' 'aria-labelledby="sites-title"' "
 check 'the Sites edit action loads the owner copy' 'fetchPublishedPageForEdit\(page.slug\)' "$sites"
 check 'the shell hands the loaded site to the edit-chat flow' 'onEditSite=\{handleEditSite\}' "$app"
 check 'the site documents become revision context' 'buildSiteRevisionContext\(page\)' "$app"
-check 'revision context is scoped to its own chat' 'revisionContextSessionId === targetSessionId' "$app"
+check 'revision context is scoped to its own chat' 'revisionContextSessionId' "$app"
+check 'a site edit stays a draft until send' 'sendingSiteDraft' "$app"
+check_absent 'site edit does not pre-create a chat' 'setSiteEditChatId' "$app"
 check 'the shell opens the preview with the edit chat' 'setActiveCanvasCode\(page.html\)' "$app"
 check 'the site edit composer starts with a request prefix' 'common.sites.editChatPrompt' "$app"
 check 'unpublishing a live link asks first' 'confirmingSlug === page.slug' "$sites"
