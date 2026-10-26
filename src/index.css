@@ -959,6 +959,9 @@ h6 {
 .history-item-title {
   flex: 1;
   min-width: 0;
+  /* Chat names read at the same tone as the section labels; selection is
+     carried by the row background, not by a brighter title. */
+  color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
