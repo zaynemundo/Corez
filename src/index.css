@@ -751,6 +751,9 @@ h6 {
 
 .sidebar-action-box {
   padding: 7.5px 8px;
+  /* The first Pinned row is the next navigation element after Sites; keeping
+     the old bottom gutter made the two read as separate groups. */
+  padding-bottom: 2px;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -828,6 +831,7 @@ h6 {
   flex: 1;
   overflow-y: auto;
   padding: 7.5px 8px;
+  padding-top: 2px;
   display: flex;
   flex-direction: column;
   gap: 0.2rem;

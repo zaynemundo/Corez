@@ -411,6 +411,8 @@ check_block_property 'an unavailable composer control is visibly disabled' '.mic
 # clicking Edit and leaving never leaves an empty Recents row.
 check 'the sidebar carries the Sites entry' 'sites-nav-btn' "$sidebar"
 check_block_property 'the Sites entry sits below New Chat' '.sidebar-action-box' 'flex-direction' 'column'
+check_block_property 'the Sites row closes the action group' '.sidebar-action-box' 'padding-bottom' '2px'
+check_block_property 'the first chat section starts close to Sites' '.chat-history-list' 'padding-top' '2px'
 check 'the Sites entry marks the current screen' 'aria-current=\{activeView === "sites"' "$sidebar"
 check 'the shell routes to the Sites screen' 'path="/sites"' "$app"
 check 'the Sites screen is a labelled section' 'aria-labelledby="sites-title"' "$sites"
