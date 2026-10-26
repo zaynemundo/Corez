@@ -1241,19 +1241,6 @@ export default function Sidebar({
             <Search size={20} strokeWidth={1.5} aria-hidden="true" />
           </button>
 
-          <button
-            type="button"
-            className="sidebar-rail-action"
-            onClick={() => {
-              setChatsOpen(true);
-              onOpenSidebar?.();
-            }}
-            title={t("common.sidebar.chats")}
-            aria-label={t("common.sidebar.chats")}
-          >
-            <MessageCircle size={20} strokeWidth={1.5} aria-hidden="true" />
-          </button>
-
           {typeof onOpenSites === "function" && (
             <button
               type="button"
@@ -1268,6 +1255,19 @@ export default function Sidebar({
               <LayoutGrid size={20} strokeWidth={1.5} aria-hidden="true" />
             </button>
           )}
+
+          <button
+            type="button"
+            className="sidebar-rail-action"
+            onClick={() => {
+              setChatsOpen(true);
+              onOpenSidebar?.();
+            }}
+            title={t("common.sidebar.chats")}
+            aria-label={t("common.sidebar.chats")}
+          >
+            <MessageCircle size={20} strokeWidth={1.5} aria-hidden="true" />
+          </button>
         </nav>
 
         <div className="sidebar-rail-footer">

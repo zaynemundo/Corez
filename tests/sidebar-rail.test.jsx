@@ -90,6 +90,23 @@ describe("closed sidebar navigation rail", () => {
     expect(sites.className).toContain("is-active");
   });
 
+  it("places Sites above Recents, matching the full sidebar's order", () => {
+    const { railQueries } = renderRail();
+    const nav = railQueries.getByRole("navigation", {
+      name: "Primary navigation",
+    });
+    const labels = within(nav)
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label"));
+
+    expect(labels).toEqual([
+      "New Chat",
+      "Search chats",
+      "Sites",
+      "Recents",
+    ]);
+  });
+
   it("searches the visible chats in place, then opens the chosen one", async () => {
     const user = userEvent.setup();
     const { handlers, railQueries } = renderRail();
