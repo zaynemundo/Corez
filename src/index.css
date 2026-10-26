@@ -752,7 +752,8 @@ h6 {
 .sidebar-action-box {
   padding: 7.5px 8px;
   display: flex;
-  justify-content: stretch;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .sidebar svg,

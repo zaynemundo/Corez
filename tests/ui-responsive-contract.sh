@@ -410,6 +410,7 @@ check_block_property 'an unavailable composer control is visibly disabled' '.mic
 # context. The draft becomes a persistent chat only on its first message, so
 # clicking Edit and leaving never leaves an empty Recents row.
 check 'the sidebar carries the Sites entry' 'sites-nav-btn' "$sidebar"
+check_block_property 'the Sites entry sits below New Chat' '.sidebar-action-box' 'flex-direction' 'column'
 check 'the Sites entry marks the current screen' 'aria-current=\{activeView === "sites"' "$sidebar"
 check 'the shell routes to the Sites screen' 'path="/sites"' "$app"
 check 'the Sites screen is a labelled section' 'aria-labelledby="sites-title"' "$sites"
