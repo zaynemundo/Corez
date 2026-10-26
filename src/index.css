@@ -53,7 +53,7 @@
   --sidebar-width: 260px;
   /* A closed desktop sidebar remains as this narrow icon rail: the shell never
      spends its top-left corner on a floating toggle over the content. */
-  --sidebar-rail-width: 60px;
+  --sidebar-rail-width: 64px;
   --sidebar-margin: 0px;
   --sidebar-radius: 0px;
   --sidebar-heading-size: 11px;
@@ -5079,7 +5079,7 @@ h6 {
    is at a premium, while the large-desktop rail keeps its full measure. */
 @media (min-width: 768px) and (max-width: 1439px) {
   .sidebar {
-    --sidebar-rail-width: 54px;
+    --sidebar-rail-width: 58px;
   }
 
   .sidebar-rail-brand {
