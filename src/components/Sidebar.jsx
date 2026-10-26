@@ -709,6 +709,12 @@ export default function Sidebar({
           onClick={onCloseSidebar}
           title={t("common.sidebar.collapse")}
         >
+          <img
+            src="/corez-white.png"
+            alt=""
+            className="corez-bw-logo"
+            aria-hidden="true"
+          />
           <span className="brand-wordmark">COREZ</span>
         </button>
         <button

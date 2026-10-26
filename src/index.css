@@ -675,7 +675,7 @@ h6 {
   height: 38px;
   min-height: 38px;
   min-width: 0;
-  padding: 0 0.75rem;
+  padding: 0 0.75rem 0 6px;
   background: transparent;
   border: none;
   color: var(--text-primary);
@@ -686,8 +686,8 @@ h6 {
 }
 
 .sidebar .corez-bw-logo {
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
 }
 
 .brand-wordmark {
@@ -5075,22 +5075,17 @@ h6 {
   }
 }
 
-/* Laptop rail: a tighter icon column for the screens where horizontal space
-   is at a premium, while the large-desktop rail keeps its full measure. */
+/* Laptop rail: the same column width and centreline as desktop, with the
+   smaller glyphs kept from the compact pass. The mark itself never scales. */
 @media (min-width: 768px) and (max-width: 1439px) {
   .sidebar {
-    --sidebar-rail-width: 58px;
+    --sidebar-rail-width: 64px;
   }
 
   .sidebar-rail-brand {
     width: 40px;
     height: 40px;
     min-width: 40px;
-  }
-
-  .sidebar-rail-logo {
-    width: 32px;
-    height: 32px;
   }
 
   .sidebar-rail-action {
