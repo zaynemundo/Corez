@@ -89,6 +89,34 @@ describe('ChatInput file attachment feature', () => {
     expect(screen.queryByText('notes.txt')).toBeNull();
   });
 
+  it('renders an image attachment as a preview inside the composer', () => {
+    const { container } = render(
+      <ChatInput
+        input=""
+        setInput={() => {}}
+        onSendMessage={() => {}}
+        isStreaming={false}
+        attachments={[
+          {
+            id: 'image-1',
+            name: 'photo.png',
+            type: 'image/png',
+            size: 2048,
+            thumb: 'data:image/png;base64,AAAA',
+          },
+        ]}
+        setAttachments={() => {}}
+      />,
+    );
+
+    expect(container.querySelector('form.input-box').classList.contains('has-image')).toBe(true);
+    expect(container.querySelector('.attachment-preview-image').getAttribute('src')).toBe(
+      'data:image/png;base64,AAAA',
+    );
+    expect(container.querySelector('.attachment-chips-bar')).toBeNull();
+    expect(screen.getByLabelText('Remove photo.png')).toBeTruthy();
+  });
+
   it('sends attachments together with the typed message', async () => {
     const t = setup();
     const file = new File(['line one\nline two'], 'sample.txt', { type: 'text/plain' });

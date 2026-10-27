@@ -112,6 +112,13 @@ export default function ChatInput({
   const [isDragOverInput, setIsDragOverInput] = useState(false);
   const [isMultiline, setIsMultiline] = useState(false);
   const dragInputCounterRef = useRef(0);
+  const imageAttachments = attachments.filter((a) =>
+    String(a.type || "").startsWith("image/"),
+  );
+  const fileAttachments = attachments.filter(
+    (a) => !String(a.type || "").startsWith("image/"),
+  );
+  const hasImage = imageAttachments.length > 0;
   const hasPendingImage = attachments.some(
     (a) =>
       (a.type?.startsWith("image/") &&
@@ -397,8 +404,10 @@ export default function ChatInput({
       <form
         onSubmit={handleSubmit}
         className={`input-box${variant === "hero" ? " hero" : ""}${
-          isMultiline ? " is-multiline" : ""
-        }${isDragOverInput ? " drag-over" : ""}`}
+          hasImage ? " has-image" : ""
+        }${isMultiline ? " is-multiline" : ""}${
+          isDragOverInput ? " drag-over" : ""
+        }`}
         onDragEnter={handleInputDragEnter}
         onDragOver={handleInputDragOver}
         onDragLeave={handleInputDragLeave}
@@ -443,9 +452,9 @@ export default function ChatInput({
             })}
           </div>
         )}
-        {attachments.length > 0 && (
+        {fileAttachments.length > 0 && (
           <div className="attachment-chips-bar" aria-label={t("chat.attachments.label")}>
-            {attachments.map((attachment) => {
+            {fileAttachments.map((attachment) => {
               const isPendingThumb =
                 attachment.type?.startsWith("image/") &&
                 !attachment.thumb &&
@@ -508,6 +517,66 @@ export default function ChatInput({
                     <X size={12} strokeWidth={1.5} />
                   </button>
                 </span>
+              );
+            })}
+          </div>
+        )}
+
+        {hasImage && (
+          <div
+            className="attachment-preview-grid"
+            role="group"
+            aria-label={t("chat.attachments.label")}
+          >
+            {imageAttachments.map((attachment) => {
+              const isPendingThumb =
+                !attachment.thumb &&
+                attachment.size <= MAX_IMAGE_THUMB_BYTES;
+              const isUploading = Boolean(attachment.uploading);
+              const isPending = isPendingThumb || isUploading;
+              return (
+                <div
+                  key={attachment.id}
+                  className="attachment-preview"
+                  title={t("chat.attachments.fileTitle", {
+                    name: attachment.name,
+                    size: formatBytes(attachment.size),
+                  })}
+                >
+                  {attachment.thumb ? (
+                    <img
+                      src={attachment.thumb}
+                      alt={attachment.name}
+                      className="attachment-preview-image"
+                    />
+                  ) : (
+                    <span
+                      className="attachment-preview-image is-placeholder"
+                      aria-hidden="true"
+                    >
+                      …
+                    </span>
+                  )}
+                  {isPending && (
+                    <span className="attachment-preview-status">
+                      {isUploading
+                        ? t("chat.attachments.uploading")
+                        : t("chat.attachments.loading")}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    className="attachment-preview-remove"
+                    onClick={() => removeAttachment(attachment.id)}
+                    aria-label={t("chat.attachments.remove", {
+                      name: attachment.name,
+                    })}
+                    title={t("chat.attachments.removeTitle")}
+                    disabled={isStreaming}
+                  >
+                    <X size={14} strokeWidth={2} />
+                  </button>
+                </div>
               );
             })}
           </div>

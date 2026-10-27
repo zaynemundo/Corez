@@ -2043,13 +2043,15 @@ function MainApp({ theme, setTheme }) {
               variant={isNewChat ? "hero" : "composer"}
               // The command grid lives inside the composer's own container so
               // it always lines up with the input it fills. It is an empty-
-              // composer affordance: once the user has typed anything, the
-              // rows hide in place so the hero and composer do not jump. A site
-              // edit uses its own prompt instead of the grid.
+              // composer affordance: once the user has typed anything or added
+              // an attachment, the rows hide in place so the hero and composer
+              // do not jump. A site edit uses its own prompt instead of it.
               footer={
                 isNewChat && !isSiteEditChat ? (
                   <NewChatStarters
-                    hidden={Boolean(chatInput.trim())}
+                    hidden={
+                      Boolean(chatInput.trim()) || attachments.length > 0
+                    }
                     onSelect={handleStarterSelect}
                   />
                 ) : null

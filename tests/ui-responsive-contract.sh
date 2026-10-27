@@ -397,6 +397,12 @@ check_block_property 'long prompts keep attach at bottom left' '.input-box.is-mu
 check_block_property 'long prompts keep actions at bottom right' '.input-box.is-multiline .input-actions-bar' 'grid-area' 'actions'
 check 'the composer switches layout when the prompt wraps' 'is-multiline' "$input"
 check 'the composer resets the multiline layout after sending' 'setIsMultiline\(false\)' "$input"
+check 'the composer renders image previews inside the form' 'attachment-preview-grid' "$input"
+check_block_property 'image attachments use the composer preview grid' '.input-box.has-image' 'display' 'grid'
+check_block_property 'the image preview spans the composer top' '.input-box.has-image .attachment-preview-grid' 'grid-area' 'preview'
+check_block_property 'the prompt drops below the image' '.input-box.has-image .chat-textarea' 'grid-area' 'text'
+check_block_property 'the image preview is a large rounded tile' '.attachment-preview' 'width' '148px'
+check_block_property 'the preview image fills its rounded tile' '.attachment-preview-image' 'object-fit' 'cover'
 # The suggestion list is one roomy row per command: a quiet line of text until
 # it is hovered, with the command it inserts in the monospace face at the end.
 check_block_property 'the suggestion list stacks its rows' '.new-chat-starters' 'flex-direction' 'column'
@@ -407,7 +413,8 @@ check_block_property 'the row command token sits at the far end of the row' '.ne
 check_block_property_in_media 'a phone drops the command token before the label' 'max-width: 767px' '.new-chat-starter-token' 'display' 'none'
 check 'the composer accepts the suggestion list as a footer slot' 'footer = null' "$input"
 check 'the app passes the suggestion list to the composer' '<NewChatStarters' "$app"
-check 'the starter rows hide when the composer has text' 'hidden=\{Boolean\(chatInput\.trim\(\)\)\}' "$app"
+check 'the starter rows hide when the composer has text' 'Boolean\(chatInput\.trim\(\)\)' "$app"
+check 'the starter rows hide when the composer has attachments' 'attachments\.length > 0' "$app"
 check 'hidden starter rows keep their layout slot' '\.new-chat-starters\.is-hidden' "$css"
 check_block_property 'hidden starter rows ignore the pointer' '.new-chat-starters.is-hidden' 'pointer-events' 'none'
 check_block_property 'hidden starter rows are invisible' '.new-chat-starters.is-hidden' 'visibility' 'hidden'
