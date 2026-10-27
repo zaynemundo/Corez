@@ -1482,9 +1482,8 @@ h6 {
   min-width: 0;
   overflow: hidden;
   background-color: var(--bg-primary);
-  border: 1px solid var(--border-color);
   /* The conversation (and the canvas it shares this pane with) sits in one
-     softly rounded frame instead of bleeding to the viewport edges. */
+     softly rounded surface instead of bleeding to the viewport edges. */
   border-radius: var(--radius-xl);
 }
 
