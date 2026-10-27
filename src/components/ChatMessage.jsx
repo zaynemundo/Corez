@@ -39,6 +39,13 @@ function safeImageUrl(url) {
   return "";
 }
 
+function isPreviewableImageAttachment(attachment) {
+  return (
+    String(attachment?.type || "").startsWith("image/") &&
+    Boolean(safeImageUrl(attachment.thumb || attachment.assetUrl))
+  );
+}
+
 function safeHref(url) {
   if (!url || typeof url !== "string") return "";
   if (
@@ -1029,7 +1036,41 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
     }
   };
 
-  const renderAttachments = (attachments) => {
+  const renderImageAttachments = (attachments) => {
+    if (!Array.isArray(attachments) || attachments.length === 0) return null;
+    return (
+      <div
+        className="message-image-attachments"
+        role="group"
+        aria-label={t("chat.attachments.label")}
+      >
+        {attachments.map((attachment) => {
+          const source = attachment.thumb || attachment.assetUrl;
+          const safeUrl = safeImageUrl(source);
+          if (!safeUrl) return null;
+          return (
+            <button
+              type="button"
+              key={attachment.id || attachment.name}
+              className="message-image-attachment"
+              onClick={() =>
+                setFullscreenImage({ url: safeUrl, alt: attachment.name })
+              }
+              aria-label={t("chat.message.image.viewFullscreenAria", {
+                alt:
+                  attachment.name || t("chat.message.image.imageFallback"),
+              })}
+              title={attachment.name}
+            >
+              <img src={safeUrl} alt={attachment.name || ""} />
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderFileAttachments = (attachments) => {
     if (!Array.isArray(attachments) || attachments.length === 0) return null;
     return (
       <div className="message-attachments" aria-label={t("chat.attachments.label")}>
@@ -1642,6 +1683,17 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
     });
   };
 
+  const userAttachments =
+    isUser && Array.isArray(message.attachments) ? message.attachments : [];
+  const userImages = userAttachments.filter(isPreviewableImageAttachment);
+  const userFiles = userAttachments.filter(
+    (attachment) => !isPreviewableImageAttachment(attachment),
+  );
+  const showMessageContent =
+    !isUser ||
+    Boolean(String(message.content || "").trim()) ||
+    userFiles.length > 0;
+
   return (
     <div className={`message-wrapper ${isUser ? "user" : "ai"}`}>
       <div className="message-body">
@@ -1651,10 +1703,13 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
             seconds={message.thinkingSeconds}
           />
         )}
-        <div className="message-content">
-          {isUser && renderAttachments(message.attachments)}
-          {renderFormattedText(message.content)}
-        </div>
+        {isUser && renderImageAttachments(userImages)}
+        {showMessageContent && (
+          <div className="message-content">
+            {isUser && renderFileAttachments(userFiles)}
+            {renderFormattedText(message.content)}
+          </div>
+        )}
         {!isUser && <MessageActions content={message.content || ""} />}
       </div>
 

@@ -9,6 +9,61 @@ afterEach(() => {
 });
 
 describe('ChatMessage image rendering', () => {
+  it('renders a user image attachment above the text bubble', () => {
+    const { container } = render(
+      <ChatMessage
+        message={{
+          role: 'user',
+          content: 'example',
+          attachments: [
+            {
+              id: 'image-1',
+              name: 'photo.png',
+              type: 'image/png',
+              thumb: 'data:image/png;base64,AAAA',
+            },
+          ],
+        }}
+      />,
+    );
+
+    const gallery = container.querySelector('.message-image-attachments');
+    const bubble = container.querySelector('.message-content');
+    expect(gallery).toBeTruthy();
+    expect(bubble).toBeTruthy();
+    expect(gallery.nextElementSibling).toBe(bubble);
+    expect(gallery.querySelector('img')).toHaveAttribute(
+      'src',
+      'data:image/png;base64,AAAA',
+    );
+    expect(screen.getByText('example')).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'View fullscreen: photo.png' }),
+    ).toBeTruthy();
+  });
+
+  it('does not leave an empty bubble under an image-only user message', () => {
+    const { container } = render(
+      <ChatMessage
+        message={{
+          role: 'user',
+          content: '',
+          attachments: [
+            {
+              id: 'image-1',
+              name: 'photo.png',
+              type: 'image/png',
+              thumb: 'data:image/png;base64,AAAA',
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(container.querySelector('.message-image-attachments')).toBeTruthy();
+    expect(container.querySelector('.message-content')).toBeNull();
+  });
+
   it('renders a FLUX image served from the worker R2 relative asset URL', () => {
     const content = 'Here is your generated image:\n\n![a black rose](/api/assets/flux_12345.png)';
     render(<ChatMessage message={{ role: 'assistant', content }} />);

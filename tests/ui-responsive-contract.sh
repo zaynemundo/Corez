@@ -216,6 +216,11 @@ check_block_property 'history rows use restrained rectangular radius' '.history-
 check_block_property 'message bubbles use the larger curved radius' '.message-content' 'border-radius' 'var(--radius-xl)'
 check_block_property 'user message bubbles use the larger curved radius' '.message-wrapper.user .message-content' 'border-radius' 'var(--radius-xl)'
 check_block_property 'assistant message surfaces use the larger curved radius' '.message-wrapper.ai .message-content' 'border-radius' 'var(--radius-xl)'
+check 'user images render in a gallery above the bubble' 'message-image-attachments' "src/components/ChatMessage.jsx"
+check 'image-only user messages omit the empty bubble' 'showMessageContent' "src/components/ChatMessage.jsx"
+check_block_property 'user image tiles align to the message edge' '.message-image-attachments' 'justify-content' 'flex-end'
+check_block_property 'user image tiles are square previews' '.message-image-attachment' 'width' '96px'
+check_block_property 'user image tiles are softly rounded' '.message-image-attachment' 'border-radius' '10px'
 check 'canvas iframe receives scalable width from component' 'width: deviceSpecs\[deviceMode\]\.width' "$canvas"
 check 'canvas iframe receives bounded max width from component' 'maxWidth: "100%"' "$canvas"
 check_absent 'canvas iframe does not force fixed device height' 'height: deviceSpecs\[deviceMode\]\.height' "$canvas"
