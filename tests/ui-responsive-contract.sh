@@ -208,8 +208,14 @@ check 'mobile layout breakpoint exists' '@media \(max-width: 767px\)'
 check 'mobile sidebar becomes an overlay drawer' 'position: fixed'
 check 'mobile canvas stacks instead of forcing split pane' '\.main-content'
 check 'mobile chat pane can shrink below desktop width' 'min-width: 0'
+check_block_property 'the main chat surface is a rounded card' '.main-content' 'border-radius' 'var(--radius-xl)'
+check_block_property 'the main chat surface insets from the shell' '.main-content' 'margin' '8px'
+check_block_property 'the main chat surface clips its rounded panes' '.main-content' 'overflow' 'hidden'
 check_block_property 'prompt cards are rectangular, not oversized pills' '.sample-prompt-card' 'border-radius' 'var(--radius-sm)'
 check_block_property 'history rows use restrained rectangular radius' '.history-item' 'border-radius' 'var(--radius-sm)'
+check_block_property 'message bubbles use the larger curved radius' '.message-content' 'border-radius' 'var(--radius-xl)'
+check_block_property 'user message bubbles use the larger curved radius' '.message-wrapper.user .message-content' 'border-radius' 'var(--radius-xl)'
+check_block_property 'assistant message surfaces use the larger curved radius' '.message-wrapper.ai .message-content' 'border-radius' 'var(--radius-xl)'
 check 'canvas iframe receives scalable width from component' 'width: deviceSpecs\[deviceMode\]\.width' "$canvas"
 check 'canvas iframe receives bounded max width from component' 'maxWidth: "100%"' "$canvas"
 check_absent 'canvas iframe does not force fixed device height' 'height: deviceSpecs\[deviceMode\]\.height' "$canvas"

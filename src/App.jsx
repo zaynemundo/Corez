@@ -2155,7 +2155,7 @@ function AppInner() {
       /* Ignore storage errors */
     }
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", theme === "light" ? "#f7f7f7" : "#212121");
+    if (meta) meta.setAttribute("content", theme === "light" ? "#f7f7f7" : "#000000");
   }, [theme]);
 
   // Keep theme in sync across tabs

@@ -1474,8 +1474,15 @@ h6 {
 .main-content {
   flex: 1;
   display: flex;
-  height: 100%;
+  height: calc(100% - 16px);
+  margin: 8px;
+  min-width: 0;
   overflow: hidden;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  /* The conversation (and the canvas it shares this pane with) sits in one
+     softly rounded frame instead of bleeding to the viewport edges. */
+  border-radius: var(--radius-xl);
 }
 
 .chat-pane {
@@ -1813,7 +1820,7 @@ h6 {
 /* Fully Rounded Soft Curved Message Bubbles */
 .message-content {
   padding: 0.8rem 1.1rem;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xl);
   font-size: 1rem;
   font-weight: 400;
   line-height: 1.7;
@@ -1830,7 +1837,7 @@ h6 {
   background-color: var(--bg-secondary);
   border: none;
   color: var(--text-primary);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
@@ -1841,7 +1848,7 @@ h6 {
 .message-wrapper.ai .message-content {
   background-color: transparent;
   border: none;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   padding: 0.9rem 0;
   width: 100%;
   max-width: 100%;
