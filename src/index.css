@@ -2,24 +2,23 @@
 
 :root,
 [data-theme="dark"] {
-  /* Softened Dark Neutral Palette — the shell is a rested graphite gray
-     (#212121) instead of pure black, and raised surfaces step up one tone at a
-     time (secondary < card < tertiary). The sidebar shares the shell tone, so
-     the navigation column and the chat panel read as one continuous surface. */
-  --bg-primary: #212121;
-  --bg-secondary: #2f2f2f;
-  --bg-tertiary: #383838;
-  --bg-card: #303030;
-  --bg-glass: rgba(33, 33, 33, 0.85);
+  /* Deep monochrome palette — the shell is pure black, so the sidebar and the
+     reading pane read as one continuous surface. Raised surfaces step up one
+     neutral tone at a time (secondary < tertiary) instead of carrying a tint. */
+  --bg-primary: #000000;
+  --bg-secondary: #1a1a1a;
+  --bg-tertiary: #262626;
+  --bg-card: #121212;
+  --bg-glass: rgba(0, 0, 0, 0.85);
   /* Resting borders stay whisper-quiet to protect the ultra-minimal dark look;
      --border-hover is the interactive state and carries the WCAG 1.4.11 3:1
-     boundary (0.34 alpha over #212121 is ~3.0:1, 0.22 was ~2.0:1). */
-  --border-color: rgba(255, 255, 255, 0.12);
-  --border-hover: rgba(255, 255, 255, 0.34);
+     boundary against the black page. */
+  --border-color: rgba(255, 255, 255, 0.1);
+  --border-hover: rgba(255, 255, 255, 0.32);
 
-  /* The hierarchy is unchanged, only softened: every pair below still clears
-     WCAG AA 4.5:1 on the highest surface it lands on (--bg-tertiary). */
-  --text-primary: #ececec;
+  /* Every pair below clears WCAG AA 4.5:1 on the highest surface it lands on
+     (--bg-tertiary). */
+  --text-primary: #ffffff;
   --text-secondary: #b4b4b4;
   --text-muted: #a2a2a2;
 
@@ -27,8 +26,8 @@
   --market-negative: #f87171;
   --market-caution: #fbbf24;
 
-  --code-bg: #171717;
-  --code-header-bg: #212121;
+  --code-bg: #0a0a0a;
+  --code-header-bg: #000000;
 
   --selection-bg: rgba(255, 255, 255, 0.2);
   --selection-color: #ffffff;
@@ -36,8 +35,8 @@
 
   /* Primary composer action — the filled circle that sends the message. Corez
      is a monochrome system, so the action is the page's BRIGHTEST surface
-     rather than a coloured one: 13.5:1 against the graphite page, and the dark
-     glyph on it is the same figure inverted. */
+     rather than a coloured one: 21:1 against the black page, and the dark glyph
+     on it is the same figure inverted. */
   --action-strong: var(--text-primary);
   --action-strong-hover: #ffffff;
   --action-strong-contrast: var(--bg-primary);
@@ -50,7 +49,7 @@
   --font-heading: var(--font-sans);
   --font-mono: "JetBrains Mono", monospace;
 
-  --sidebar-width: 260px;
+  --sidebar-width: 232px;
   /* A closed desktop sidebar remains as this narrow icon rail: the shell never
      spends its top-left corner on a floating toggle over the content. */
   --sidebar-rail-width: 64px;
@@ -66,8 +65,8 @@
   --sidebar-bg-opaque: var(--bg-primary);
   --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-shadow: none;
-  --sidebar-item-hover-bg: rgba(255, 255, 255, 0.05);
-  --sidebar-item-active-bg: rgba(255, 255, 255, 0.1);
+  --sidebar-item-hover-bg: rgba(255, 255, 255, 0.06);
+  --sidebar-item-active-bg: rgba(255, 255, 255, 0.12);
 
   --radius-xs: 6px;
   --radius-sm: 8px;
@@ -409,7 +408,8 @@ h6 {
 }
 
 .sidebar-rail-top {
-  padding: 14px 0 8px;
+  /* Same 28px vertical centre as the expanded header's brand row. */
+  padding: 6px 0 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -459,9 +459,9 @@ h6 {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  /* The reference leaves a clear breath between the mark and the first
-     action; the icon group itself stays compact underneath. */
-  padding: 20px 0 10px;
+  /* Panel and rail keep the same first-action line: the compose icon lands at
+     y=79px either way, so opening the sidebar does not make the icons jump. */
+  padding: 4px 0 10px;
 }
 
 .sidebar-rail-action {
@@ -504,8 +504,8 @@ h6 {
 }
 
 .sidebar-rail-action svg {
-  width: 17px;
-  height: 17px;
+  width: 18px;
+  height: 18px;
 }
 
 .sidebar-rail-footer {
@@ -793,7 +793,9 @@ h6 {
   height: 38px;
   min-height: 38px;
   margin: 0;
-  padding: 0 0.75rem;
+  /* The 15px inset puts the 18px glyph's centre at 32px, the same column as
+     the closed rail; opening the sidebar never slides the icons sideways. */
+  padding: 0 0.75rem 0 15px;
   border: none;
   background: transparent;
   color: var(--text-primary);
@@ -805,8 +807,8 @@ h6 {
 }
 
 .new-chat-icon {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
   object-fit: contain;
 }
@@ -5072,43 +5074,6 @@ h6 {
   }
   .canvas-pane {
     width: 52%;
-  }
-}
-
-/* Laptop rail: the same column width and centreline as desktop, with the
-   smaller glyphs kept from the compact pass. The mark itself never scales. */
-@media (min-width: 768px) and (max-width: 1439px) {
-  .sidebar {
-    --sidebar-rail-width: 64px;
-  }
-
-  .sidebar-rail-brand {
-    width: 40px;
-    height: 40px;
-    min-width: 40px;
-  }
-
-  .sidebar-rail-action {
-    width: 36px;
-    height: 32px;
-    min-width: 36px;
-  }
-
-  .sidebar-rail-action svg {
-    width: 16px;
-    height: 16px;
-  }
-
-  .sidebar-rail-profile {
-    width: 36px;
-    height: 36px;
-    min-width: 36px;
-  }
-
-  .sidebar .sidebar-rail-avatar {
-    width: 26px;
-    height: 26px;
-    font-size: 9.5px;
   }
 }
 

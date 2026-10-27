@@ -229,12 +229,13 @@ check_block_property 'the closed desktop column never translates off screen' '.s
 check_block_property 'the closed desktop column stays visible' '.sidebar.collapsed' 'visibility' 'visible'
 check_block_property 'the full panel is hidden from focus flow when collapsed' '.sidebar.collapsed .sidebar-full' 'visibility' 'hidden'
 check_block_property 'the rail button keeps a 38px target' '.sidebar-rail-action' 'width' '38px'
-check_block_property 'the rail glyphs stay small inside their controls' '.sidebar-rail-action svg' 'width' '17px'
+check_block_property 'the rail glyphs match the expanded icon size' '.sidebar-rail-action svg' 'width' '18px'
 check_block_property 'the rail mark keeps its standard width' '.sidebar-rail-logo' 'width' '36px'
 check_block_property 'the rail mark keeps its standard height' '.sidebar-rail-logo' 'height' '36px'
-check_block_property_in_media 'a laptop keeps the same rail width' 'min-width: 768px' '.sidebar' '--sidebar-rail-width' '64px'
-check_block_property_in_media 'a laptop tightens the rail control' 'min-width: 768px' '.sidebar-rail-action' 'width' '36px'
-check_block_property_in_media 'a laptop tightens the rail glyph' 'min-width: 768px' '.sidebar-rail-action svg' 'width' '16px'
+check_block_property 'the expanded icon matches the rail glyph size' '.new-chat-icon' 'width' '18px'
+check_block_property 'the expanded row shares the rail icon centreline' '.new-chat-btn' 'padding' '0 0.75rem 0 15px'
+check_block_property 'the rail starts at the expanded brand line' '.sidebar-rail-top' 'padding' '6px 0 8px'
+check_block_property 'the rail first action starts at the New Chat line' '.sidebar-rail-nav' 'padding' '4px 0 10px'
 check_block_property 'the expanded header uses the same mark width' '.sidebar .corez-bw-logo' 'width' '36px'
 check_block_property 'the expanded header uses the same mark height' '.sidebar .corez-bw-logo' 'height' '36px'
 check 'the expanded header shows the Corez mark' 'className="corez-bw-logo"' "$sidebar"
@@ -316,7 +317,7 @@ check_block_property 'chat rows keep the matching left inset' '.history-item' 'p
 # Polished Glass Sidebar Contract Checks
 check_absent 'sidebar section heading is absent' 'className="sidebar-section-heading"' "$sidebar"
 check_absent 'sidebar section headers do not use inline letterSpacing styles' 'style=\{\{.*letterSpacing' "$sidebar"
-check 'sidebar width token set to 260px' '--sidebar-width: 260px;'
+check 'sidebar width token set to 232px' '--sidebar-width: 232px;'
 check 'sidebar margin token set to 0px' '--sidebar-margin: 0px;'
 check 'sidebar radius token set to 0px' '--sidebar-radius: 0px;'
 check 'sidebar heading size token set to 11px' '--sidebar-heading-size: 11px;'
@@ -334,7 +335,7 @@ check_block_property 'sidebar block consumes margin token' '.sidebar' 'margin' '
 check_block_property 'sidebar block consumes radius token' '.sidebar' 'border-radius' 'var(--sidebar-radius)'
 check_block_property 'sidebar block consumes background token' '.sidebar' 'background-color' 'var(--sidebar-bg)'
 check_block_absent 'sidebar no longer relies on backdrop blur 16px' '.sidebar' 'backdrop-filter' 'blur(16px)'
-check_block_property 'dark theme shell uses the graphite base' '[data-theme="dark"]' '--bg-primary' '#212121'
+check_block_property 'dark theme shell uses the pure-black base' '[data-theme="dark"]' '--bg-primary' '#000000'
 check_block_property 'light theme shell uses the soft off-white base' '[data-theme="light"]' '--bg-primary' '#f7f7f7'
 # The sidebar and the chat panel share one surface in both themes: navigation
 # is separated by its border, not by a different tone.
