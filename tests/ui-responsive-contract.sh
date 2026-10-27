@@ -379,18 +379,15 @@ check_block_property 'the composer shares the transcript measure' '.input-contai
 check_block_property 'the hero text shares the composer measure' '.new-chat-hero' 'max-width' '660px'
 check_block_property_in_media 'a large desktop widens the column only a little' 'min-width: 1440px' '.messages-inner' 'max-width' '820px'
 check_block_property_in_media 'a phone keeps the 16px composer text' 'max-width: 767px' '.input-box.hero .chat-textarea' 'font-size' '1rem'
-# New chat: an empty conversation is one centred group — the question, the
-# composer bar and the suggestion list — so the composer is never stranded on
-# the bottom edge of an empty page. The list lives inside the composer's own
-# container, which is what keeps it exactly as wide as the input it fills.
-check_block_property 'the new chat screen centres its group vertically' '.chat-pane.new-chat' 'justify-content' 'center'
-check_block_property 'the new chat scroll area takes only its own height' '.chat-pane.new-chat .messages-scroll' 'flex' '0 1 auto'
-# While the consent banner reserves room at the bottom of the shell, the pane is
-# that much shorter, which would leave the centred group above the window's
-# centre. The reserved space is handed back to the group as a top margin (a top
-# margin moves a centred group down by half of it), guarded to the side-by-side
-# layout and to windows tall enough that the group still clears the banner.
-check_block_property_in_media 'the new chat group re-centres while the consent banner reserves room' 'min-width: 768px' 'body.corez-consent-visible .chat-pane.new-chat .messages-scroll' 'margin-top' 'var(--corez-consent-space'
+# New chat: the opening group is anchored from the top so the question and the
+# top of the composer keep their place when an image or a four-line prompt makes
+# the composer grow downward. The list lives inside the composer's own container,
+# which is what keeps it exactly as wide as the input it fills.
+check_block_property 'the new chat screen anchors its group from the top' '.chat-pane.new-chat' 'justify-content' 'flex-start'
+check_block_property 'the new chat group keeps a stable top air' '.chat-pane.new-chat' 'padding-top' 'clamp(6rem, 30dvh, 20rem)'
+check_block_property 'the new chat pane scrolls a tall composer' '.chat-pane.new-chat' 'overflow-y' 'auto'
+check_block_property 'the new chat hero never shrinks under a tall composer' '.chat-pane.new-chat .messages-scroll' 'flex' '0 0 auto'
+check_block_property 'the new chat composer grows from a fixed top' '.chat-pane.new-chat .input-container' 'position' 'static'
 check_block_property 'the new chat question is regular weight, not a display wordmark' '.new-chat-hero-title' 'font-weight' '400'
 check 'composer radius token set to 28px' '--composer-radius: 28px;'
 check_block_property 'the conversation composer is fully rounded' '.input-box' 'border-radius' 'var(--composer-radius)'
