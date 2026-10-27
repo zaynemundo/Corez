@@ -675,7 +675,7 @@ h6 {
   height: 38px;
   min-height: 38px;
   min-width: 0;
-  padding: 0 0.75rem 0 6px;
+  padding: 0 0.75rem;
   background: transparent;
   border: none;
   color: var(--text-primary);
@@ -683,11 +683,6 @@ h6 {
   align-items: center;
   gap: 0.6rem;
   cursor: pointer;
-}
-
-.sidebar .corez-bw-logo {
-  width: 36px;
-  height: 36px;
 }
 
 .brand-wordmark {

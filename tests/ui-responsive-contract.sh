@@ -236,14 +236,14 @@ check_block_property 'the expanded icon matches the rail glyph size' '.new-chat-
 check_block_property 'the expanded row shares the rail icon centreline' '.new-chat-btn' 'padding' '0 0.75rem 0 15px'
 check_block_property 'the rail starts at the expanded brand line' '.sidebar-rail-top' 'padding' '6px 0 8px'
 check_block_property 'the rail first action starts at the New Chat line' '.sidebar-rail-nav' 'padding' '4px 0 10px'
-check_block_property 'the expanded header uses the same mark width' '.sidebar .corez-bw-logo' 'width' '36px'
-check_block_property 'the expanded header uses the same mark height' '.sidebar .corez-bw-logo' 'height' '36px'
-check 'the expanded header shows the Corez mark' 'className="corez-bw-logo"' "$sidebar"
+check_absent 'the open header shows only the Corez wordmark' 'className="corez-bw-logo"' "$sidebar"
+check 'the open header keeps the Corez wordmark' 'brand-wordmark' "$sidebar"
 check 'the rail carries the Corez mark' 'sidebar-rail-logo' "$sidebar"
+check_absent 'the Sites row no longer uses the globe glyph' 'Globe' "$sidebar"
+check 'the Sites rows use the four-box glyph' 'LayoutGrid' "$sidebar"
 check 'the rail opens quick find' 'sidebar-rail-search-btn' "$sidebar"
 check 'quick find searches only the visible chat list' 'sessions.filter' "$sidebar"
 check 'the rail offers recents' 'common.sidebar.chats' "$sidebar"
-check 'the rail offers Sites' 'LayoutGrid' "$sidebar"
 check 'the rail account control opens settings' 'SidebarRailProfile' "$sidebar"
 check_block_property_in_media 'a phone drawer hides the desktop rail' 'max-width: 767px' '.sidebar.collapsed .sidebar-rail' 'display' 'none'
 check 'the floating sidebar toggle is phone-only' '!sidebarOpen && isMobileViewport' "$app"

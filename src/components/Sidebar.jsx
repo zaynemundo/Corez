@@ -14,7 +14,6 @@ import {
   ChevronRight,
   Folder,
   FolderOpen,
-  Globe,
   Pin,
   PinOff,
   Check,
@@ -709,12 +708,6 @@ export default function Sidebar({
           onClick={onCloseSidebar}
           title={t("common.sidebar.collapse")}
         >
-          <img
-            src="/corez-white.png"
-            alt=""
-            className="corez-bw-logo"
-            aria-hidden="true"
-          />
           <span className="brand-wordmark">COREZ</span>
         </button>
         <button
@@ -760,7 +753,7 @@ export default function Sidebar({
             title={t("common.sidebar.sitesTitle")}
             aria-current={activeView === "sites" ? "page" : undefined}
           >
-            <Globe
+            <LayoutGrid
               className="new-chat-icon"
               size={16}
               strokeWidth={1.5}
