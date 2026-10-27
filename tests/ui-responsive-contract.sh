@@ -407,6 +407,10 @@ check_block_property 'the row command token sits at the far end of the row' '.ne
 check_block_property_in_media 'a phone drops the command token before the label' 'max-width: 767px' '.new-chat-starter-token' 'display' 'none'
 check 'the composer accepts the suggestion list as a footer slot' 'footer = null' "$input"
 check 'the app passes the suggestion list to the composer' '<NewChatStarters' "$app"
+check 'the starter rows hide when the composer has text' 'hidden=\{Boolean\(chatInput\.trim\(\)\)\}' "$app"
+check 'hidden starter rows keep their layout slot' '\.new-chat-starters\.is-hidden' "$css"
+check_block_property 'hidden starter rows ignore the pointer' '.new-chat-starters.is-hidden' 'pointer-events' 'none'
+check_block_property 'hidden starter rows are invisible' '.new-chat-starters.is-hidden' 'visibility' 'hidden'
 check 'the suggestion rows are CoreZ own commands' 'insert: "@website "' "$starters"
 check_absent 'the suggestion rows are not borrowed sample sentences' 'Write or edit' "$starters"
 # Corez is a monochrome system: the composer's primary action is the brightest

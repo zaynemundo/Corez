@@ -97,6 +97,27 @@ describe("the new-chat screen", () => {
     expect(containerEl.querySelector(".new-chat-starters")).toBeTruthy();
   });
 
+  it("hides the suggestion rows once the composer has text", async () => {
+    const { container } = await renderNewChat();
+    const starters = () => container.querySelector(".new-chat-starters");
+    expect(starters()).toBeTruthy();
+    expect(starters().classList.contains("is-hidden")).toBe(false);
+
+    fireEvent.change(composer(), { target: { value: "a" } });
+    await waitFor(() => {
+      expect(starters().classList.contains("is-hidden")).toBe(true);
+    });
+    // Hide in place: the wrapper is still there, so the hero and composer do
+    // not jump when the first character is typed.
+    expect(starters()).toBeTruthy();
+    expect(starters().getAttribute("aria-hidden")).toBe("true");
+
+    fireEvent.change(composer(), { target: { value: "" } });
+    await waitFor(() => {
+      expect(starters().classList.contains("is-hidden")).toBe(false);
+    });
+  });
+
   it("pre-fills the composer with the image command and keeps the caret ready", async () => {
     await renderNewChat();
     fireEvent.click(screen.getByText("Generate an image"));

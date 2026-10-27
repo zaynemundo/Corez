@@ -1703,6 +1703,13 @@ h6 {
   gap: 0.15rem;
 }
 
+/* Hidden, not removed: the empty space keeps the hero and composer exactly
+   where they were when the user starts typing. */
+.new-chat-starters.is-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .new-chat-starter {
   display: flex;
   align-items: center;

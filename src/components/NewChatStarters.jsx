@@ -46,14 +46,16 @@ const STARTERS = [
   },
 ];
 
-export default function NewChatStarters({ onSelect }) {
+export default function NewChatStarters({ onSelect, hidden = false }) {
   const { t } = useI18n();
 
   return (
     <div
-      className="new-chat-starters"
+      className={`new-chat-starters${hidden ? " is-hidden" : ""}`}
       role="group"
       aria-label={t("common.newChat.startersLabel")}
+      aria-hidden={hidden || undefined}
+      inert={hidden ? "" : undefined}
     >
       {STARTERS.map((starter) => {
         const Icon = starter.icon;
