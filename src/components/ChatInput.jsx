@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useLayoutEffect, useState } from "react";
 import {
   ArrowUp,
   Square,
@@ -110,6 +110,7 @@ export default function ChatInput({
   const setAttachments = externalSetAttachments || setInternalAttachments;
 
   const [isDragOverInput, setIsDragOverInput] = useState(false);
+  const [isMultiline, setIsMultiline] = useState(false);
   const dragInputCounterRef = useRef(0);
   const hasPendingImage = attachments.some(
     (a) =>
@@ -120,11 +121,26 @@ export default function ChatInput({
   );
 
   useEffect(() => {
-    if (refToUse.current) {
-      refToUse.current.style.height = "auto";
-      refToUse.current.style.height = `${Math.min(refToUse.current.scrollHeight, 140)}px`;
-    }
-  }, [input]);
+    const textarea = refToUse.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    const nextHeight = Math.min(textarea.scrollHeight, 180);
+    textarea.style.height = `${nextHeight}px`;
+    // Wrapping is not visible in the value alone, so measure it. Explicit
+    // newlines also count even before the browser reports a scroll height.
+    setIsMultiline(nextHeight > 36 || String(input).includes("\n"));
+  }, [input, refToUse]);
+
+  // The multiline layout gives the textarea the full width. Re-measure after
+  // that reflow, otherwise the textarea keeps the taller height it needed in
+  // the one-row layout and leaves a blank band above the controls.
+  useLayoutEffect(() => {
+    if (!isMultiline) return;
+    const textarea = refToUse.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
+  }, [isMultiline, refToUse]);
 
   // Show suggestions when the input starts with "@" (optionally followed by
   // partial command text) and is not streaming.
@@ -338,6 +354,7 @@ export default function ChatInput({
     setInput("");
     setAttachments([]);
     setShowSuggestions(false);
+    setIsMultiline(false);
     if (refToUse.current) {
       refToUse.current.style.height = "auto";
     }
@@ -380,8 +397,8 @@ export default function ChatInput({
       <form
         onSubmit={handleSubmit}
         className={`input-box${variant === "hero" ? " hero" : ""}${
-          isDragOverInput ? " drag-over" : ""
-        }`}
+          isMultiline ? " is-multiline" : ""
+        }${isDragOverInput ? " drag-over" : ""}`}
         onDragEnter={handleInputDragEnter}
         onDragOver={handleInputDragOver}
         onDragLeave={handleInputDragLeave}

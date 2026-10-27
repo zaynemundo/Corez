@@ -387,8 +387,16 @@ check_block_property 'the new chat scroll area takes only its own height' '.chat
 # layout and to windows tall enough that the group still clears the banner.
 check_block_property_in_media 'the new chat group re-centres while the consent banner reserves room' 'min-width: 768px' 'body.corez-consent-visible .chat-pane.new-chat .messages-scroll' 'margin-top' 'var(--corez-consent-space'
 check_block_property 'the new chat question is regular weight, not a display wordmark' '.new-chat-hero-title' 'font-weight' '400'
-check_block_property 'the new chat composer keeps the restrained corner radius' '.input-box.hero' 'border-radius' 'var(--radius-xl)'
-check_block_absent 'the new chat composer is not an oversized pill' '.input-box.hero' 'border-radius' 'var(--radius-pill)'
+check 'composer radius token set to 28px' '--composer-radius: 28px;'
+check_block_property 'the conversation composer is fully rounded' '.input-box' 'border-radius' 'var(--composer-radius)'
+check_block_property 'the new chat composer is fully rounded' '.input-box.hero' 'border-radius' 'var(--composer-radius)'
+check_block_property_in_media 'a phone keeps the fully rounded composer' 'max-width: 767px' '.input-box' 'border-radius' 'var(--composer-radius)'
+check_block_property 'long prompts get the ChatGPT control row' '.input-box.is-multiline' 'display' 'grid'
+check_block_property 'long prompts give the text the full width' '.input-box.is-multiline .chat-textarea' 'grid-area' 'text'
+check_block_property 'long prompts keep attach at bottom left' '.input-box.is-multiline .attach-btn' 'grid-area' 'attach'
+check_block_property 'long prompts keep actions at bottom right' '.input-box.is-multiline .input-actions-bar' 'grid-area' 'actions'
+check 'the composer switches layout when the prompt wraps' 'is-multiline' "$input"
+check 'the composer resets the multiline layout after sending' 'setIsMultiline\(false\)' "$input"
 # The suggestion list is one roomy row per command: a quiet line of text until
 # it is hovered, with the command it inserts in the monospace face at the end.
 check_block_property 'the suggestion list stacks its rows' '.new-chat-starters' 'flex-direction' 'column'
