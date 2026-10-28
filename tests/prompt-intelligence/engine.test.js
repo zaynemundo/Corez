@@ -218,6 +218,22 @@ describe('Intent Engine — classifyIntent', () => {
     expect(result.type).toBe(INTENT_TYPES.DESIGN_TASK);
   });
 
+  it('keeps design explanations textual instead of demanding JSX', () => {
+    const result = classifyIntent(
+      'Explain three design principles for a calm reading nook, then generate an image of one.',
+    );
+    expect(result.type).toBe(INTENT_TYPES.DESIGN_TASK);
+    expect(result.outputFormat).toBe('markdown');
+  });
+
+  it('still treats a UI build as a JSX deliverable', () => {
+    const result = classifyIntent('Design a landing page for a pottery studio');
+    expect([INTENT_TYPES.DESIGN_TASK, INTENT_TYPES.WEBSITE_CREATION]).toContain(
+      result.type,
+    );
+    expect(result.outputFormat).toBe('jsx');
+  });
+
   it('classifies "orchestrate a multi-agent system" → general_question (no swarm intent)', () => {
     const result = classifyIntent('orchestrate a multi-agent system');
     expect(result.type).toBe(INTENT_TYPES.GENERAL_QUESTION);

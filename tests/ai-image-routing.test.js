@@ -80,6 +80,7 @@ describe('image request routing', () => {
 
     expect(response).toContain('A black rose is a rose with dark petals.');
     expect(response).toContain('![](data:image/png;base64,FAKE)');
+    expect(response).not.toContain('Self-contained component fallback');
     expect(fetchMock).toHaveBeenCalledWith('/api/image', expect.anything());
     expect(fetchMock).toHaveBeenCalledWith('/api/ai', expect.anything());
   });
@@ -98,11 +99,58 @@ describe('image request routing', () => {
       ['write an email about images', false],
       ['fix the image upload bug', false],
       ['explain image compression', false],
-      ['draw a diagram of a database', false]
+      ['draw a diagram of a database', false],
+      ['Restyle this room in a warm Japandi style while keeping the existing layout and windows.', true],
+      ['restyle this photo with warmer light', true],
+      ['redesign this website landing page', false]
     ];
     for (const [prompt, expected] of cases) {
       expect(isExplicitImageRequest(prompt), prompt).toBe(expected);
     }
+  });
+
+  it('keeps a mixed design explanation and image free of JSX fallback code', async () => {
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/image/cf') {
+        return Response.json({ image: 'data:image/png;base64,NOOK' });
+      }
+      if (url === '/api/ai') {
+        return Response.json({
+          content:
+            '1. Use soft side light.\\n2. Create a sheltered seat.\\n3. Keep the palette warm and quiet.',
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await generateAIResponse(
+      'Explain three design principles for a calm reading nook, then generate an image of one.',
+      [],
+    );
+
+    expect(response).toContain('Use soft side light');
+    expect(response).toContain('![](data:image/png;base64,NOOK)');
+    expect(response).not.toContain('Self-contained component fallback');
+  });
+
+  it('routes a room restyle to image generation instead of a website build', async () => {
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/image/cf') {
+        return Response.json({ image: 'data:image/png;base64,ROOM' });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await generateAIResponse(
+      'Restyle this room in a warm Japandi style while keeping the existing layout and windows.',
+      [],
+    );
+
+    expect(response).toBe('![](data:image/png;base64,ROOM)');
+    expect(fetchMock).toHaveBeenCalledWith('/api/image/cf', expect.anything());
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/ai', expect.anything());
   });
 
   it('routes an image request mid-conversation to the FLUX endpoint instead of the LLM', async () => {

@@ -22,6 +22,11 @@ const IMAGE_PATTERNS = new RegExp(
 export const WRITING_JOB_GUARD =
   /\b(e-?mail|cover\s*letter|\bcv\b|resume|curriculum\s+vitae|job\s+application|applying\s+for)\b/i;
 
+// "Restyle this room/photo" is an image edit, not a website build. Keep the
+// noun list deliberately spatial/visual so "redesign this page" stays UI work.
+const IMAGE_EDIT_PATTERNS =
+  /\b(?:restyle|redecorate|renovate|remodel|redesign|reimagine)\b[\s\S]{0,36}?\b(?:room|space|interior|kitchen|bedroom|living room|photo|picture|image)\b/i;
+
 const IMAGE_TITLE_SMALL_WORDS = new Set([
   "a",
   "an",
@@ -602,8 +607,17 @@ export async function handleMixedQuestionImageRequest(
       : [];
 
   const requestedModelMixed = detectRequestedImageModel(prompt, history);
+  // The question half is prose; the image is appended separately below. Do
+  // not let a design/website intent demand a JSX block from this half.
+  const questionIntent = {
+    ...intent,
+    type: "general_question",
+    primaryIntent: "general_question",
+    outputFormat: "markdown",
+  };
+
   const [hostedResult, imageResult] = await Promise.allSettled([
-    generateHostedAIResponse(questionPrompt, intent, questionHistory, signal),
+    generateHostedAIResponse(questionPrompt, questionIntent, questionHistory, signal),
     generateImage(
       imagePrompt,
       signal,
@@ -669,6 +683,7 @@ export function isExplicitImageRequest(prompt) {
     return true;
 
   if (WRITING_JOB_GUARD.test(clean)) return false;
+  if (IMAGE_EDIT_PATTERNS.test(clean)) return true;
 
   const firstLine = clean.split("\n")[0].trim();
   if (IMAGE_PATTERNS.test(firstLine)) return true;

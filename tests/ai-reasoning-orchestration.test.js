@@ -229,4 +229,33 @@ describe('CoreZ AI Reasoning & Skill Orchestration Pipeline', () => {
     expect(evaluation.violations.some(v => v.includes('usage'))).toBe(true);
   });
 
+  it('17. never injects a JSX fallback into an image-bearing explanation', () => {
+    const content =
+      'Three principles for a calm nook.\n\n![](/api/assets/room.jpg)';
+    const intent = {
+      type: 'design_task',
+      primaryIntent: 'design_task',
+      outputFormat: 'jsx',
+    };
+    const evaluation = evaluateResponse(
+      content,
+      { mustAchieve: [], mustNotChange: [] },
+      intent,
+    );
+
+    const repaired = repairResponse(
+      content,
+      evaluation,
+      { mustAchieve: [], mustNotChange: [] },
+      5,
+      0,
+      intent,
+    );
+
+    expect(repaired.finalContent).toBe(content);
+    expect(repaired.finalContent).not.toContain(
+      'Self-contained component fallback',
+    );
+  });
+
 });

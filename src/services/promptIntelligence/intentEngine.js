@@ -513,6 +513,18 @@ function detectOutputFormat(lower, primaryType) {
   ) {
     return "html";
   }
+  // "Design principles", "explain this layout", and similar advisory prompts
+  // are design topics, not UI builds. They must not be repaired into a JSX
+  // fallback just because the classifier's primary type is design_task.
+  const isDesignExplanation =
+    /\b(explain|what are|why|principles?|concepts?|tips?|advice|ideas|guide|how to|compare|difference between)\b/i.test(
+      lower,
+    );
+  const isUiBuild =
+    /\b(build|create|make|generate|design|redesign|code|develop)\b[\s\S]{0,64}?\b(component|page|screen|app|website|site|ui|interface|layout|wireframe|mockup|dashboard|widget|landing page)\b/i.test(
+      lower,
+    );
+  if (isDesignExplanation && !isUiBuild) return "markdown";
   if (
     ["website_creation", "game_creation", "design_task"].includes(
       primaryType,

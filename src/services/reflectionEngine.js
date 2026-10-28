@@ -346,7 +346,14 @@ export function repairResponse(
       ) {
         content = ensureSiteChatBrief(content);
       }
-      if (violation.includes("code output block") && !content.includes("```")) {
+      const hasImageOutput = /!\[[^\]]*\]\([^)]+\)|data:image\//i.test(
+        content,
+      );
+      if (
+        violation.includes("code output block") &&
+        !content.includes("```") &&
+        !hasImageOutput
+      ) {
         content +=
           '\n\n```jsx\n// Self-contained component fallback\nexport default function App() {\n  return <div className="p-4">App Content</div>;\n}\n```';
       }
