@@ -103,6 +103,7 @@ export default function ChatInput({
   const [isDictating, setIsDictating] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const dictationRef = useRef(null);
+  const dictationBaseRef = useRef("");
 
   const [internalAttachments, setInternalAttachments] = useState([]);
   const attachments =
@@ -287,6 +288,7 @@ export default function ChatInput({
   const discardDictation = () => {
     const session = dictationRef.current;
     dictationRef.current = null;
+    dictationBaseRef.current = "";
     setIsDictating(false);
     setIsTranscribing(false);
     session?.abort();
@@ -294,18 +296,23 @@ export default function ChatInput({
 
   const startDictation = () => {
     if (dictationRef.current || isTranscribing) return;
-    // The transcript is appended when Whisper answers, so a half-written
-    // message is never thrown away by pressing the microphone.
+    // The final Whisper transcript replaces the live browser preview; holding
+    // the text from before the microphone started keeps both in one draft.
+    dictationBaseRef.current = String(input || "");
+    const withBase = (text) => {
+      const base = dictationBaseRef.current;
+      return base.trim()
+        ? `${base.replace(/\s+$/, "")} ${text}`
+        : text;
+    };
     const session = createDictationSession({
       language,
+      onLiveTranscript: ({ finalText, interimText }) => {
+        setInput(withBase(`${finalText}${interimText}`));
+      },
       onTranscript: (text) => {
         if (!text) return;
-        setInput((prev) => {
-          const current = String(prev || "");
-          return current.trim()
-            ? `${current.replace(/\s+$/, "")} ${text}`
-            : text;
-        });
+        setInput(withBase(text));
         if (refToUse.current) refToUse.current.focus();
       },
       onRecordingStop: () => {
@@ -314,11 +321,13 @@ export default function ChatInput({
       },
       onEnd: () => {
         dictationRef.current = null;
+        dictationBaseRef.current = "";
         setIsDictating(false);
         setIsTranscribing(false);
       },
       onError: () => {
         dictationRef.current = null;
+        dictationBaseRef.current = "";
         setIsDictating(false);
         setIsTranscribing(false);
       },
@@ -334,6 +343,7 @@ export default function ChatInput({
     return () => {
       const session = dictationRef.current;
       dictationRef.current = null;
+      dictationBaseRef.current = "";
       session?.abort();
     };
   }, []);
@@ -343,6 +353,7 @@ export default function ChatInput({
     const session = dictationRef.current;
     if (!session) return;
     dictationRef.current = null;
+    dictationBaseRef.current = "";
     setIsDictating(false);
     setIsTranscribing(false);
     session.abort();
@@ -426,8 +437,11 @@ export default function ChatInput({
   const hasComposerContent =
     Boolean(String(input || "").trim()) || attachments.length > 0;
   // ChatGPT-style single action: dictate while empty, send once there is
-  // something to send. An unsupported browser falls back to a disabled send.
-  const showDictationAction = !hasComposerContent && dictationAvailable;
+  // something to send. While recording, the stop control must remain even as
+  // live words fill the composer. An unsupported browser falls back to a
+  // disabled send.
+  const showDictationAction =
+    (!hasComposerContent || isDictating) && dictationAvailable;
 
   return (
     <div className="input-container">

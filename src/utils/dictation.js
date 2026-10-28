@@ -22,6 +22,15 @@ function mediaDevices() {
   return navigator.mediaDevices || null;
 }
 
+function speechRecognitionCtor() {
+  if (typeof window === "undefined") return null;
+  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
+function speechLanguage(language) {
+  return language === "ar" ? "ar-SA" : "en-US";
+}
+
 export function isDictationSupported() {
   return Boolean(recorderCtor() && mediaDevices()?.getUserMedia);
 }
@@ -76,6 +85,7 @@ function blobToBase64(blob) {
 export function createDictationSession({
   language = "en",
   onTranscript,
+  onLiveTranscript,
   onRecordingStop,
   onEnd,
   onError,
@@ -93,6 +103,8 @@ export function createDictationSession({
   let aborted = false;
   let fetchController = null;
   let requestTimer = null;
+  let recognition = null;
+  let liveFinalText = "";
 
   const cleanupStream = () => {
     if (!stream) return;
@@ -110,6 +122,21 @@ export function createDictationSession({
     stream = null;
   };
 
+  const stopRecognition = (abort = false) => {
+    if (!recognition) return;
+    const current = recognition;
+    recognition = null;
+    current.onresult = null;
+    current.onerror = null;
+    current.onend = null;
+    try {
+      if (abort && typeof current.abort === "function") current.abort();
+      else current.stop();
+    } catch {
+      /* already stopped */
+    }
+  };
+
   const finish = () => {
     if (finished) return;
     finished = true;
@@ -117,6 +144,7 @@ export function createDictationSession({
     clearTimeout(requestTimer);
     timer = null;
     requestTimer = null;
+    stopRecognition(true);
     cleanupStream();
     onEnd?.();
   };
@@ -197,6 +225,7 @@ export function createDictationSession({
     }
 
     onRecordingStop?.();
+    stopRecognition();
     try {
       if (recorder && recorder.state !== "inactive") {
         recorder.stop();
@@ -225,6 +254,7 @@ export function createDictationSession({
       /* ignore */
     }
     fetchController = null;
+    stopRecognition(true);
     try {
       if (recorder && recorder.state !== "inactive") recorder.stop();
     } catch {
@@ -261,8 +291,46 @@ export function createDictationSession({
 
       started = true;
       recorder.start(250);
+
+      // Best-effort live preview: the browser's local recognizer writes interim
+      // words while the clip records. Whisper still produces the final text on
+      // stop, so a browser without this API simply gets no preview.
+      const Recognition = speechRecognitionCtor();
+      if (Recognition) {
+        try {
+          recognition = new Recognition();
+          recognition.continuous = true;
+          recognition.interimResults = true;
+          recognition.lang = speechLanguage(language);
+          recognition.onresult = (event) => {
+            if (aborted || finished) return;
+            let interimText = "";
+            for (let i = event.resultIndex; i < event.results.length; i += 1) {
+              const result = event.results[i];
+              const text = result?.[0]?.transcript || "";
+              if (result?.isFinal) liveFinalText += text;
+              else interimText += text;
+            }
+            onLiveTranscript?.({
+              finalText: liveFinalText,
+              interimText,
+            });
+          };
+          recognition.onerror = () => {
+            recognition = null;
+          };
+          recognition.onend = () => {
+            recognition = null;
+          };
+          recognition.start();
+        } catch {
+          recognition = null;
+        }
+      }
+
       timer = setTimeout(() => {
         if (finished || aborted || recorder?.state !== "recording") return;
+        stopRecognition();
         onRecordingStop?.();
         try {
           recorder.stop();

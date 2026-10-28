@@ -446,7 +446,9 @@ check_block_absent 'the composer has no thinking-effort toggle' '.think-toggle' 
 check_absent 'no thinking-effort state reaches the request' 'thinkMode' "$app"
 check_absent 'no reasoning override is sent with the message' 'requestOptions.think' 'src/services/aiService.js'
 check 'the microphone is gated on browser support' 'showDictationAction' "$input"
-check 'the empty composer shows the dictation action' '!hasComposerContent && dictationAvailable' "$input"
+check 'the empty composer shows the dictation action' 'isDictating\) && dictationAvailable' "$input"
+check 'recording keeps the stop control while live words appear' '!hasComposerContent || isDictating' "$input"
+check 'live speech is previewed while recording' 'onLiveTranscript' "$input"
 check_block_property 'an unavailable composer control is visibly disabled' '.send-btn:disabled' 'opacity' '0.4'
 
 # Sites: published pages are a screen of their own, reached from the sidebar.

@@ -49,10 +49,44 @@ class FakeMediaRecorder {
   }
 }
 
+class FakeSpeechRecognition {
+  static instances = [];
+
+  constructor() {
+    this.continuous = false;
+    this.interimResults = false;
+    this.lang = "";
+    this.started = false;
+    FakeSpeechRecognition.instances.push(this);
+  }
+
+  start() {
+    this.started = true;
+  }
+
+  stop() {
+    this.stopped = true;
+  }
+
+  abort() {
+    this.aborted = true;
+  }
+
+  emit(entries) {
+    const results = entries.map((entry) => {
+      const result = { 0: { transcript: entry.transcript } };
+      result.isFinal = Boolean(entry.isFinal);
+      return result;
+    });
+    this.onresult?.({ resultIndex: 0, results });
+  }
+}
+
 let originalMediaDevices;
 let originalMediaRecorder;
+let originalSpeechRecognition;
 
-function installSupport({ getUserMedia } = {}) {
+function installSupport({ getUserMedia, withSpeech = false } = {}) {
   const track = { stop: vi.fn() };
   const stream = { getTracks: () => [track] };
   const gum = getUserMedia || vi.fn().mockResolvedValue(stream);
@@ -61,12 +95,15 @@ function installSupport({ getUserMedia } = {}) {
     "mediaDevices",
   );
   originalMediaRecorder = window.MediaRecorder;
+  originalSpeechRecognition = window.SpeechRecognition;
   Object.defineProperty(navigator, "mediaDevices", {
     configurable: true,
     value: { getUserMedia: gum },
   });
   window.MediaRecorder = FakeMediaRecorder;
+  if (withSpeech) window.SpeechRecognition = FakeSpeechRecognition;
   FakeMediaRecorder.instances = [];
+  FakeSpeechRecognition.instances = [];
   return { gum, stream, track };
 }
 
@@ -80,10 +117,16 @@ function jsonResponse(body, status = 200) {
 afterEach(() => {
   cleanup();
   FakeMediaRecorder.instances = [];
+  FakeSpeechRecognition.instances = [];
   delete window.MediaRecorder;
+  delete window.SpeechRecognition;
   if (originalMediaRecorder !== undefined) {
     window.MediaRecorder = originalMediaRecorder;
   }
+  if (originalSpeechRecognition !== undefined) {
+    window.SpeechRecognition = originalSpeechRecognition;
+  }
+  originalSpeechRecognition = undefined;
   if (originalMediaDevices) {
     Object.defineProperty(navigator, "mediaDevices", originalMediaDevices);
   } else {
@@ -223,6 +266,44 @@ describe("the composer microphone", () => {
     test.rerender();
     expect(screen.getByTitle("Send Message")).toBeTruthy();
     expect(screen.queryByLabelText("Dictate with your voice")).toBeNull();
+  });
+
+  it("previews live speech and keeps the stop control while words appear", async () => {
+    installSupport({ withSpeech: true });
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(jsonResponse({ text: "Make a plan." }));
+    const test = setup();
+
+    fireEvent.click(screen.getByLabelText("Dictate with your voice"));
+    await waitFor(() => {
+      expect(FakeSpeechRecognition.instances).toHaveLength(1);
+    });
+    const recognition = FakeSpeechRecognition.instances[0];
+    expect(recognition.lang).toBe("en-US");
+    expect(recognition.continuous).toBe(true);
+    expect(recognition.interimResults).toBe(true);
+
+    act(() => {
+      recognition.emit([{ transcript: "make a", isFinal: false }]);
+    });
+    expect(test.value()).toBe("make a");
+    test.rerender();
+    expect(screen.getByLabelText("Stop dictation")).toBeTruthy();
+
+    act(() => {
+      recognition.emit([{ transcript: "make a plan", isFinal: true }]);
+    });
+    expect(test.value()).toBe("make a plan");
+    test.rerender();
+    expect(screen.getByLabelText("Stop dictation")).toBeTruthy();
+
+    FakeMediaRecorder.instances[0].emitAudio();
+    fireEvent.click(screen.getByLabelText("Stop dictation"));
+    await waitFor(() => {
+      expect(test.value()).toBe("Make a plan.");
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("switches from dictate to send as soon as there is text", () => {
