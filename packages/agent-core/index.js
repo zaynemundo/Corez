@@ -56,3 +56,8 @@ export {
   scaffoldMultiPageSite,
   analyzeSiteGraph
 } from './scaffolding/multiPageScaffold.js';
+
+export {
+  stripJunkAfterDocumentEnd,
+  repairMalformedHtml
+} from './scaffolding/htmlRepair.js';
