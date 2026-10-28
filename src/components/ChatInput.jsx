@@ -423,6 +423,12 @@ export default function ChatInput({
     }
   };
 
+  const hasComposerContent =
+    Boolean(String(input || "").trim()) || attachments.length > 0;
+  // ChatGPT-style single action: dictate while empty, send once there is
+  // something to send. An unsupported browser falls back to a disabled send.
+  const showDictationAction = !hasComposerContent && dictationAvailable;
+
   return (
     <div className="input-container">
       <form
@@ -652,12 +658,19 @@ export default function ChatInput({
           rows={1}
         />
         <div className="input-actions-bar">
-          {dictationAvailable && (
+          {isStreaming ? (
             <button
               type="button"
-              className={`mic-btn${isDictating ? " is-listening" : ""}${
-                isTranscribing ? " is-transcribing" : ""
-              }`}
+              className="send-btn stop-btn"
+              onClick={onStopMessage}
+              title={t("chat.composer.stopGeneration")}
+            >
+              <Square size={13} fill="currentColor" strokeWidth={1.5} />
+            </button>
+          ) : showDictationAction ? (
+            <button
+              type="button"
+              className={`send-btn${isDictating ? " is-listening" : ""}`}
               onClick={() => {
                 if (isDictating) stopDictation();
                 else if (!isTranscribing) startDictation();
@@ -677,47 +690,49 @@ export default function ChatInput({
                     ? t("chat.composer.dictating")
                     : t("chat.composer.dictate")
               }
-              disabled={isStreaming || isTranscribing}
+              disabled={isTranscribing}
             >
               {isTranscribing ? (
                 <Loader2
                   className="spin-icon"
-                  size={16}
-                  strokeWidth={1.6}
+                  size={17}
+                  strokeWidth={1.8}
                   aria-hidden="true"
                 />
               ) : isDictating ? (
-                <MicOff size={16} strokeWidth={1.6} aria-hidden="true" />
+                <MicOff size={17} strokeWidth={2} aria-hidden="true" />
               ) : (
-                <Mic size={16} strokeWidth={1.6} aria-hidden="true" />
+                <Mic size={17} strokeWidth={2} aria-hidden="true" />
               )}
-            </button>
-          )}
-          {isStreaming ? (
-            <button
-              type="button"
-              className="send-btn stop-btn"
-              onClick={onStopMessage}
-              title={t("chat.composer.stopGeneration")}
-            >
-              <Square size={13} fill="currentColor" strokeWidth={1.5} />
             </button>
           ) : (
             <button
               type="submit"
               className="send-btn"
-              disabled={
-                (!input.trim() && attachments.length === 0) ||
-                hasPendingImage ||
-                isTranscribing
-              }
+              disabled={!hasComposerContent || hasPendingImage || isTranscribing}
               title={
-                hasPendingImage
-                  ? t("chat.composer.imageLoading")
+                isTranscribing
+                  ? t("chat.composer.transcribing")
+                  : hasPendingImage
+                    ? t("chat.composer.imageLoading")
+                    : t("chat.composer.sendMessage")
+              }
+              aria-label={
+                isTranscribing
+                  ? t("chat.composer.transcribing")
                   : t("chat.composer.sendMessage")
               }
             >
-              <ArrowUp size={17} strokeWidth={2.1} />
+              {isTranscribing ? (
+                <Loader2
+                  className="spin-icon"
+                  size={17}
+                  strokeWidth={1.8}
+                  aria-hidden="true"
+                />
+              ) : (
+                <ArrowUp size={17} strokeWidth={2.1} />
+              )}
             </button>
           )}
         </div>

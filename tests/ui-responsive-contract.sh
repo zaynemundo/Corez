@@ -439,14 +439,15 @@ check_block_property 'the action surface is defined for the light theme' '[data-
 check_block_absent 'the composer has no borrowed accent colour' '.send-btn' 'background' 'var(--action-accent)'
 check_block_property 'the stop button keeps its own background' '.send-btn.stop-btn' 'background' 'rgba(239, 68, 68, 0.18)'
 # The composer carries no switches of its own: one voice affordance (the
-# microphone, only where the browser can dictate) and nothing that overrides how
-# the app routes a message.
+# microphone, only where the browser can dictate), which becomes the send action
+# as soon as there is something to send.
 check_absent 'the send circle is never a second voice control' 'voice-btn'
 check_block_absent 'the composer has no thinking-effort toggle' '.think-toggle' 'opacity' '0.35'
 check_absent 'no thinking-effort state reaches the request' 'thinkMode' "$app"
 check_absent 'no reasoning override is sent with the message' 'requestOptions.think' 'src/services/aiService.js'
-check 'the microphone is gated on browser support' 'dictationAvailable &&' "$input"
-check_block_property 'an unavailable composer control is visibly disabled' '.mic-btn:disabled' 'opacity' '0.35'
+check 'the microphone is gated on browser support' 'showDictationAction' "$input"
+check 'the empty composer shows the dictation action' '!hasComposerContent && dictationAvailable' "$input"
+check_block_property 'an unavailable composer control is visibly disabled' '.send-btn:disabled' 'opacity' '0.4'
 
 # Sites: published pages are a screen of their own, reached from the sidebar.
 # Edit loads the owner copy into a draft new chat with that copy as revision

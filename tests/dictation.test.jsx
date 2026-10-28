@@ -220,38 +220,39 @@ describe("the composer microphone", () => {
       expect(test.value()).toBe("make a plan");
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    await waitFor(() => {
-      expect(screen.getByLabelText("Dictate with your voice")).toBeTruthy();
-    });
+    test.rerender();
+    expect(screen.getByTitle("Send Message")).toBeTruthy();
+    expect(screen.queryByLabelText("Dictate with your voice")).toBeNull();
   });
 
-  it("appends to a half-written message instead of replacing it", async () => {
+  it("switches from dictate to send as soon as there is text", () => {
     installSupport();
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      jsonResponse({ text: "send the invoice" }),
-    );
-    const test = setup("draft: ");
+    const test = setup();
+    const textarea = screen.getByPlaceholderText("Ask Corez...");
 
-    fireEvent.click(screen.getByLabelText("Dictate with your voice"));
-    await waitFor(() => {
-      expect(FakeMediaRecorder.instances).toHaveLength(1);
-    });
-    FakeMediaRecorder.instances[0].emitAudio();
-    fireEvent.click(screen.getByLabelText("Stop dictation"));
+    expect(screen.getByLabelText("Dictate with your voice")).toBeTruthy();
+    expect(screen.queryByTitle("Send Message")).toBeNull();
 
-    await waitFor(() => {
-      expect(test.value()).toBe("draft: send the invoice");
-    });
+    fireEvent.change(textarea, { target: { value: "draft message" } });
+    test.rerender();
+
+    expect(screen.getByTitle("Send Message")).toBeTruthy();
+    expect(screen.queryByLabelText("Dictate with your voice")).toBeNull();
+
+    fireEvent.change(textarea, { target: { value: "" } });
+    test.rerender();
+
+    expect(screen.getByLabelText("Dictate with your voice")).toBeTruthy();
   });
 
-  it("disables sending while Whisper is transcribing", async () => {
+  it("disables the action while Whisper is transcribing", async () => {
     installSupport();
     let resolveFetch;
     const pending = new Promise((resolve) => {
       resolveFetch = resolve;
     });
     vi.spyOn(globalThis, "fetch").mockReturnValue(pending);
-    const test = setup("draft message");
+    const test = setup();
 
     fireEvent.click(screen.getByLabelText("Dictate with your voice"));
     await waitFor(() => {
@@ -263,7 +264,9 @@ describe("the composer microphone", () => {
     await waitFor(() => {
       expect(screen.getByLabelText("Transcribing your voice…")).toBeTruthy();
     });
-    expect(screen.getByTitle("Send Message").disabled).toBe(true);
+    expect(screen.getByLabelText("Transcribing your voice…").disabled).toBe(
+      true,
+    );
     await waitFor(() => {
       expect(globalThis.fetch).toHaveBeenCalled();
     });
@@ -272,8 +275,10 @@ describe("the composer microphone", () => {
       resolveFetch(jsonResponse({ text: "and more" }));
     });
     await waitFor(() => {
-      expect(test.value()).toBe("draft message and more");
+      expect(test.value()).toBe("and more");
     });
+    test.rerender();
+    expect(screen.getByTitle("Send Message")).toBeTruthy();
   });
 
   it("keeps the primary circle as the send action", () => {

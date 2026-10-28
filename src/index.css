@@ -3374,40 +3374,6 @@ h6 {
   border: 0;
 }
 
-/* Composer controls: the dictation microphone sits between the textarea and the
-   send circle. A quiet icon control — the filled circle belongs to the action
-   that sends the message. */
-.mic-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: var(--transition-fast);
-}
-
-.mic-btn:hover:not(:disabled) {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-}
-
-.mic-btn.is-listening {
-  background: var(--bg-tertiary);
-  border-color: var(--border-hover);
-  color: var(--text-primary);
-}
-
-.mic-btn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
 .send-btn {
   width: 34px;
   height: 34px;
@@ -3435,6 +3401,12 @@ h6 {
 .send-btn:not(:disabled):not(.stop-btn):hover {
   background: var(--action-strong-hover);
   transform: scale(1.06);
+}
+
+/* Recording turns the same circle into a quiet stop control. */
+.send-btn.is-listening:not(:disabled):not(.stop-btn) {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 .send-btn:hover:not(:disabled) {
@@ -5613,7 +5585,6 @@ h6 {
   .message-content,
   .input-box,
   .new-chat-starter,
-  .mic-btn,
   .send-btn {
     transition: none !important;
   }
