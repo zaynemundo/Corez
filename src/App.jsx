@@ -108,6 +108,28 @@ function isDuplicateAssistantMessage(message, candidate) {
   );
 }
 
+// The chat read and the chat list boot in parallel. The list can land last and
+// must not replace a transcript that has already loaded for the same id.
+function mergeLoadedSessions(incoming, previous) {
+  if (!Array.isArray(previous) || previous.length === 0) return incoming;
+  const loadedById = new Map();
+  for (const session of previous) {
+    if (session?._loaded) loadedById.set(session.id, session);
+  }
+  if (loadedById.size === 0) return incoming;
+  return incoming.map((session) => {
+    const loaded = loadedById.get(session.id);
+    if (!loaded) return session;
+    return {
+      ...session,
+      messages: loaded.messages || [],
+      _loaded: true,
+      _compactMeta: loaded._compactMeta,
+      _fullMessages: loaded._fullMessages,
+    };
+  });
+}
+
 function buildAttachmentPrompt(attachments) {
   if (!Array.isArray(attachments) || attachments.length === 0) return "";
   const sections = attachments.map((attachment) => {
@@ -266,7 +288,7 @@ function MainApp({ theme, setTheme }) {
         sortOrder: c.sortOrder ?? null,
         _loaded: false,
       }));
-      setSessions(mapped);
+      setSessions((prev) => mergeLoadedSessions(mapped, prev));
       setManualLists(
         Array.isArray(chatBody) ? [] : chatBody?.manualLists || [],
       );
@@ -330,18 +352,21 @@ function MainApp({ theme, setTheme }) {
                     const afterChats = Array.isArray(after)
                       ? after
                       : after?.chats || [];
-                    setSessions(
-                      afterChats.map((c) => ({
-                        id: c.id,
-                        title: c.title,
-                        messages: [],
-                        createdAt: c.createdAt,
-                        updatedAt: c.updatedAt,
-                        projectId: c.projectId || null,
-                        pinnedAt: c.pinnedAt || null,
-                        sortOrder: c.sortOrder ?? null,
-                        _loaded: false,
-                      })),
+                    setSessions((prev) =>
+                      mergeLoadedSessions(
+                        afterChats.map((c) => ({
+                          id: c.id,
+                          title: c.title,
+                          messages: [],
+                          createdAt: c.createdAt,
+                          updatedAt: c.updatedAt,
+                          projectId: c.projectId || null,
+                          pinnedAt: c.pinnedAt || null,
+                          sortOrder: c.sortOrder ?? null,
+                          _loaded: false,
+                        })),
+                        prev,
+                      ),
                     );
                     setManualLists(
                       Array.isArray(after) ? [] : after?.manualLists || [],
