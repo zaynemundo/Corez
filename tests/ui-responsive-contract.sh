@@ -217,6 +217,9 @@ check_block_property 'history rows use restrained rectangular radius' '.history-
 check_block_property 'message bubbles use the larger curved radius' '.message-content' 'border-radius' 'var(--radius-xl)'
 check_block_property 'user message bubbles use the larger curved radius' '.message-wrapper.user .message-content' 'border-radius' 'var(--radius-xl)'
 check_block_property 'assistant message surfaces use the larger curved radius' '.message-wrapper.ai .message-content' 'border-radius' 'var(--radius-xl)'
+check_block_property 'markdown h3 uses the semibold weight' '.markdown-body h3' 'font-weight' '600'
+check_block_property 'markdown strong uses the semibold weight' '.markdown-body strong' 'font-weight' '600'
+check_block_property 'markdown list lead-ins use the semibold weight' '.markdown-list-item > strong:first-child' 'font-weight' '600'
 check 'user images render in a gallery above the bubble' 'message-image-attachments' "src/components/ChatMessage.jsx"
 check 'image-only user messages omit the empty bubble' 'showMessageContent' "src/components/ChatMessage.jsx"
 check_block_property 'user image tiles align to the message edge' '.message-image-attachments' 'justify-content' 'flex-end'

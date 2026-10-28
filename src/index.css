@@ -2020,8 +2020,12 @@ h6 {
 }
 
 .markdown-body strong {
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: -0.005em;
+}
+
+.markdown-body h3 {
+  font-weight: 600;
 }
 
 .markdown-heading {
@@ -2036,6 +2040,7 @@ h6 {
 
 .markdown-heading.level-2 {
   font-size: 1.15rem;
+  font-weight: 600;
 }
 
 .markdown-heading.level-3 {
@@ -2159,7 +2164,7 @@ h6 {
 /* Accent-colored bold lead-ins: "- **Item name** — description." */
 .markdown-list-item > strong:first-child {
   color: var(--text-primary);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 /* Task-list checkboxes: "- [x] done" / "- [ ] todo" */
