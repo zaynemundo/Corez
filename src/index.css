@@ -18,7 +18,7 @@
 
   /* Every pair below clears WCAG AA 4.5:1 on the highest surface it lands on
      (--bg-tertiary). */
-  --text-primary: #ffffff;
+  --text-primary: #f0f0f0;
   --text-secondary: #b4b4b4;
   --text-muted: #a2a2a2;
 
@@ -30,15 +30,15 @@
   --code-header-bg: #000000;
 
   --selection-bg: rgba(255, 255, 255, 0.2);
-  --selection-color: #ffffff;
+  --selection-color: #f0f0f0;
   --inline-code-color: #f1fa8c;
 
   /* Primary composer action — the filled circle that sends the message. Corez
      is a monochrome system, so the action is the page's BRIGHTEST surface
-     rather than a coloured one: 21:1 against the black page, and the dark glyph
+     rather than a coloured one: ~19:1 against the black page, and the dark glyph
      on it is the same figure inverted. */
   --action-strong: var(--text-primary);
-  --action-strong-hover: #ffffff;
+  --action-strong-hover: #f0f0f0;
   --action-strong-contrast: var(--bg-primary);
 
   /* Refined Elegant Typography */
@@ -2233,7 +2233,7 @@ h6 {
 
 .markdown-table th {
   background: rgba(255, 255, 255, 0.06);
-  color: var(--text-primary, #ffffff);
+  color: var(--text-primary, #f0f0f0);
   font-weight: 600;
   padding: 0.65rem 0.95rem;
   border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
@@ -2305,7 +2305,7 @@ h6 {
 .email-action-btn.active {
   background: rgba(255, 255, 255, 0.06);
   border-color: var(--border-hover, rgba(255, 255, 255, 0.3));
-  color: var(--text-primary, #fff);
+  color: var(--text-primary, #f0f0f0);
 }
 
 .email-action-label {
@@ -2339,7 +2339,7 @@ h6 {
 .email-icon-btn:hover,
 .email-icon-btn.active {
   background: rgba(255, 255, 255, 0.06);
-  color: var(--text-primary, #fff);
+  color: var(--text-primary, #f0f0f0);
 }
 
 .email-send-btn {
@@ -2361,7 +2361,7 @@ h6 {
 
 .email-send-btn:hover {
   background: rgba(255, 255, 255, 0.06);
-  color: var(--text-primary, #fff);
+  color: var(--text-primary, #f0f0f0);
 }
 
 .email-send-btn.sent {
@@ -2375,7 +2375,7 @@ h6 {
   padding: 0.4rem 0.9rem;
   border-radius: 9999px;
   border: none;
-  background: var(--text-primary, #fff);
+  background: var(--text-primary, #f0f0f0);
   color: var(--bg-primary, #000);
   font-size: 0.72rem;
   font-weight: 600;
@@ -2459,7 +2459,7 @@ h6 {
   padding: 0.75rem 0.95rem 0.2rem;
   font-size: 0.95rem;
   font-weight: 500;
-  color: var(--text-primary, #fff);
+  color: var(--text-primary, #f0f0f0);
   line-height: 1.4;
   letter-spacing: -0.005em;
 }
@@ -2538,7 +2538,7 @@ h6 {
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: var(--radius-pill);
-  color: #ffffff;
+  color: #f0f0f0;
   font-size: 0.75rem;
   font-weight: 500;
   font-family: var(--font-sans);
@@ -2645,7 +2645,7 @@ h6 {
 }
 
 .image-fullscreen-title {
-  color: #ffffff;
+  color: #f0f0f0;
   font-size: 0.875rem;
   font-weight: 500;
   overflow: hidden;
@@ -2673,7 +2673,7 @@ h6 {
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: var(--radius-pill);
-  color: #ffffff;
+  color: #f0f0f0;
   font-size: 0.8rem;
   font-weight: 500;
   font-family: var(--font-sans);
@@ -2689,7 +2689,7 @@ h6 {
 .image-fullscreen-btn:hover {
   background: rgba(255, 255, 255, 0.2);
   border-color: rgba(255, 255, 255, 0.32);
-  color: #ffffff;
+  color: #f0f0f0;
   transform: translateY(-1px);
 }
 
@@ -2751,7 +2751,7 @@ h6 {
   margin-right: 5px;
   border-radius: 4px;
   background-color: #0a66c2;
-  color: #ffffff;
+  color: #f0f0f0;
   fill: currentColor;
   padding: 2px;
   box-sizing: border-box;
@@ -2913,7 +2913,7 @@ h6 {
   --_g: no-repeat
     radial-gradient(
       circle closest-side,
-      var(--text-primary, #ffffff) 90%,
+      var(--text-primary, #f0f0f0) 90%,
       #0000
     );
   background:
@@ -3462,7 +3462,7 @@ h6 {
 .send-btn.stop-btn:hover {
   background: rgba(239, 68, 68, 0.35);
   border-color: #f87171;
-  color: #ffffff;
+  color: #f0f0f0;
   box-shadow: none;
   transform: scale(1.08);
 }
@@ -3531,7 +3531,7 @@ h6 {
   width: 100%;
   height: 100%;
   border: none;
-  background-color: #ffffff;
+  background-color: #f0f0f0;
 }
 
 .canvas-source-editor {
@@ -5048,7 +5048,7 @@ h6 {
   width: 100%;
   height: 100%;
   border: none;
-  background-color: #ffffff;
+  background-color: #f0f0f0;
   /* Device modes set height:auto + aspect-ratio inline; this keeps the
      desktop full-bleed case working without forcing height on framed
      devices. */
@@ -5853,7 +5853,7 @@ h6 {
   max-width: calc(100% - 16px);
   padding: 0.15rem 0.45rem;
   overflow: hidden;
-  color: #ffffff;
+  color: #f0f0f0;
   background: rgba(0, 0, 0, 0.68);
   border-radius: var(--radius-pill);
   font-size: 0.68rem;
@@ -5874,7 +5874,7 @@ h6 {
   border: 0;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.68);
-  color: #ffffff;
+  color: #f0f0f0;
   cursor: pointer;
   opacity: 0;
   transition: opacity var(--transition-fast), background-color var(--transition-fast);
@@ -6906,7 +6906,7 @@ h6 {
   right: 0;
   bottom: 0;
   padding: 36px 32px;
-  color: #fff;
+  color: #f0f0f0;
 }
 .auth-visual-kicker {
   display: block;
@@ -6923,7 +6923,7 @@ h6 {
   line-height: 1.1;
   letter-spacing: -0.02em;
   margin: 0 0 12px;
-  color: #fff;
+  color: #f0f0f0;
 }
 .auth-visual-desc {
   font-size: 14px;

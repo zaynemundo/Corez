@@ -351,6 +351,9 @@ check_block_property 'sidebar block consumes radius token' '.sidebar' 'border-ra
 check_block_property 'sidebar block consumes background token' '.sidebar' 'background-color' 'var(--sidebar-bg)'
 check_block_absent 'sidebar no longer relies on backdrop blur 16px' '.sidebar' 'backdrop-filter' 'blur(16px)'
 check_block_property 'dark theme shell uses the pure-black base' '[data-theme="dark"]' '--bg-primary' '#000000'
+check_block_property 'dark theme text uses the softened white' '[data-theme="dark"]' '--text-primary' '#f0f0f0'
+check 'dark theme selection text uses the softened white' '--selection-color: #f0f0f0;'
+check 'dark theme action hover uses the softened white' '--action-strong-hover: #f0f0f0;'
 check_block_property 'light theme shell uses the soft off-white base' '[data-theme="light"]' '--bg-primary' '#f7f7f7'
 # The sidebar and the chat panel share one surface in both themes: navigation
 # is separated by its border, not by a different tone.
