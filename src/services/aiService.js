@@ -22,8 +22,6 @@ export const MODEL = {
 // corez.pro itself is challenged.
 export const AI_PROXY_ENDPOINT = "/api/ai";
 const AI_FALLBACK_ENDPOINT = "https://chat.zayne-mayo.workers.dev/api/ai";
-const CLOUDFLARE_CHALLENGE_PATTERN =
-  /Just a moment|challenge-platform|__cf_chl_/i;
 export const IMAGE_PROXY_ENDPOINT = "/api/image";
 
 import { defaultSkillRegistry } from "../skills/registry.js";
@@ -35,14 +33,6 @@ import {
   classifyComplexity,
 } from "./promptIntelligence/index.js";
 import { createIntentContract } from "./promptIntelligence/intentContract.js";
-import {
-  evaluateResponse,
-  repairResponse,
-  ensureGameChatBrief,
-  ensureSiteChatBrief,
-  recordQualitySignal,
-} from "./reflectionEngine.js";
-import { stripThinkingBlocks } from "../../packages/agent-core/providers/text.js";
 import { resolveSkills } from "../skills/resolver.js";
 import { classifyExecutionMode } from "./executionModes.js";
 import {
@@ -104,6 +94,11 @@ import {
   isHostedUnavailableFallback,
   resolvePersistentRetryOpts,
 } from "./ai/retryPolicy.js";
+import {
+  createHostedFetcher,
+  runHostedSseStream,
+  executeNonStreamingHostedCall,
+} from "./ai/hostedTransport.js";
 export {
   isWebSearchRequest,
   formatSearchResults,
@@ -607,554 +602,41 @@ export async function generateHostedAIResponse(
   };
   if (signal) fetchOptions.signal = signal;
 
-  // Transport resilience: a dropped connection (NetworkError / Failed to
-  // fetch) is often a transient blip on the client's network or at the edge,
-  // not a provider failure. Retry the same request once after a short pause
-  // before reporting the transport failure — never retry when the user
-  // pressed Stop. Declared before the streaming branch: both paths use it,
-  // and a const referenced before its initializer would throw a temporal
-  // dead zone error on every streamed request.
-  const TRANSPORT_FAILURE_PATTERN =
-    /networkerror|failed to fetch|load failed|fetch failed|connection (refused|reset|timed out)|network is unreachable|err_connection/i;
-  const fetchWithTransportRetry = async (
-    options,
-    endpoint = AI_PROXY_ENDPOINT,
-  ) => {
-    const attempts = [null, 3000];
-    for (let i = 0; i < attempts.length; i += 1) {
-      if (signal?.aborted) {
-        const err = new Error("AbortError");
-        err.name = "AbortError";
-        throw err;
-      }
-      try {
-        return await (endpoint === AI_PROXY_ENDPOINT ? fetch(AI_PROXY_ENDPOINT, options) : fetch(endpoint, options));
-      } catch (err) {
-        if (err?.name === "AbortError" || signal?.aborted) throw err;
-        const message = `${err?.message || ""} ${err?.cause?.message || ""}`;
-        const isLastAttempt = i === attempts.length - 1;
-        if (!TRANSPORT_FAILURE_PATTERN.test(message) || isLastAttempt)
-          throw err;
-        await new Promise((resolve) => {
-          const timer = setTimeout(resolve, attempts[i + 1]);
-          signal?.addEventListener(
-            "abort",
-            () => {
-              clearTimeout(timer);
-              resolve();
-            },
-            { once: true },
-          );
-        });
-      }
-    }
-    throw new Error("Hosted AI request failed to reach the AI worker.");
+
+  const onProjectState = (projectState) => {
+    persistedProjectState = projectState;
+    onProjectStateChange?.(projectState);
   };
-
-  // The direct Worker host is cross-origin, so it can never carry the
-  // host-bound, HttpOnly session cookie. Its 401/403 replies describe the
-  // fallback's inability to authenticate — never the visitor's session — so
-  // they must never replace the primary response (that would turn a WAF
-  // challenge or a gateway outage into a false "please log in"). Every other
-  // status is a genuine answer (success, rate limit or a provider error).
-  const fallbackAnswerIsUsable = (fallback) =>
-    Boolean(fallback) && fallback.status !== 401 && fallback.status !== 403;
-
-  const fetchHostedResponse = async (options) => {
-    let response;
-    try {
-      response = await fetchWithTransportRetry(options, AI_PROXY_ENDPOINT);
-    } catch (err) {
-      if (err?.name === "AbortError" || signal?.aborted) throw err;
-      // If same-origin /api/ai failed to reach (e.g. dev server proxy
-      // offline), retry through the Worker's direct live endpoint.
-      let fallback;
-      try {
-        fallback = await fetchWithTransportRetry(
-          options,
-          AI_FALLBACK_ENDPOINT,
-        );
-      } catch (fallbackErr) {
-        if (fallbackErr?.name === "AbortError" || signal?.aborted)
-          throw fallbackErr;
-        // Neither endpoint was reachable: report the primary failure.
-        throw err;
-      }
-      // The direct host is cross-origin, so it can never carry the host-bound
-      // session cookie: its 401 means "no cookie here", never "logged out".
-      // Report the original transport failure instead of a bogus login prompt.
-      if (fallback.status === 401) throw err;
-      return fallback;
-    }
-
-    if (response.status === 403) {
-      let challengePage = response.headers.get("cf-mitigated") === "challenge";
-      if (!challengePage) {
-        try {
-          const body = await response.clone().text();
-          challengePage = CLOUDFLARE_CHALLENGE_PATTERN.test(
-            body.slice(0, 4000),
-          );
-        } catch {
-          /* keep header-based result */
-        }
-      }
-      if (challengePage) {
-        try {
-          const fallback = await fetchWithTransportRetry(
-            options,
-            AI_FALLBACK_ENDPOINT,
-          );
-          if (fallbackAnswerIsUsable(fallback)) return fallback;
-        } catch (fallbackErr) {
-          if (fallbackErr?.name === "AbortError" || signal?.aborted)
-            throw fallbackErr;
-        }
-        // Neither host could answer: report the primary challenge page so the
-        // caller's WAF diagnosis surfaces instead of a bogus login prompt.
-        return response;
-      }
-    }
-
-    // If the primary endpoint returned a 502/503/504 gateway failure, retry
-    // through the other endpoint.
-    if ([502, 503, 504].includes(response.status)) {
-      try {
-        const fallback = await fetchWithTransportRetry(
-          options,
-          AI_FALLBACK_ENDPOINT,
-        );
-        if (fallbackAnswerIsUsable(fallback)) return fallback;
-      } catch (fallbackErr) {
-        if (fallbackErr?.name === "AbortError" || signal?.aborted)
-          throw fallbackErr;
-      }
-    }
-
-    // A 401 from same-origin /api/ai is a genuine logged-out state, never a
-    // cross-origin cookie artifact: the session cookie is host-bound to the
-    // SPA's own domain, so the direct workers.dev host can never carry it and
-    // would answer 401 as well. Retrying there just added a wasted
-    // cross-origin round trip before the same login message — surface the 401
-    // as-is.
-    return response;
-  };
-
-  // Streaming path: the worker answers with SSE events (meta/delta/usage/
-  // done/diagnostics). Deltas are delivered to onDelta as they arrive so the
-  // user sees content before the generation finishes; the final content is
-  // resolved when the done event closes the stream.
-  if (options.stream === true) {
-    // Harness builds are resumable server-side: the worker persists its task
-    // state (planning/build/verify/review) and an identical request resumes
-    // or replays it. A stream that dies mid-flight (connection drop, platform
-    // kill, provider outage, busy lease) is therefore retried with backoff
-    // instead of being reported as a dead end. Plain chat has no persisted
-    // task, but a retryable worker error (transient rate limit, empty stream)
-    // is still worth a bounded number of re-issues — a blip that clears in
-    // seconds must never surface as a permanent failure.
-    const MAX_STREAM_ATTEMPTS = useCreationHarness ? 4 : 3;
-    // Test hook: tests pass tiny delays so retry behavior is exercised
-    // without waiting minutes. Chat (no persisted task) uses a short ladder
-    // so a blip costs seconds, not minutes; harness builds keep the long one.
-    const STREAM_RETRY_DELAYS_MS = Array.isArray(options.retryDelaysMs)
-      ? options.retryDelaysMs
-      : useCreationHarness
-        ? [15_000, 60_000, 240_000]
-        : [2_000, 8_000];
-    const waitWithAbort = async (ms) => {
-      await new Promise((resolve) => {
-        const timer = setTimeout(resolve, ms);
-        signal?.addEventListener(
-          "abort",
-          () => {
-            clearTimeout(timer);
-            resolve();
-          },
-          { once: true },
-        );
-      });
-    };
-
-    for (let attempt = 0; attempt < MAX_STREAM_ATTEMPTS; attempt += 1) {
-      if (signal?.aborted) {
-        const err = new Error("AbortError");
-        err.name = "AbortError";
-        throw err;
-      }
-      // A retry restarts the accumulation: the worker resumes the persisted
-      // task and re-streams the artifact, so any partial deltas from the
-      // failed attempt must not be concatenated with the resumed stream.
-      if (attempt > 0) options.onClear?.();
-
-      const response = await fetchHostedResponse(fetchOptions);
-      if (!response.ok) {
-        let errorText = "";
-        try {
-          errorText = await response.text();
-        } catch {
-          /* keep empty */
-        }
-        if (response.status === 401) {
-          throw new Error("Authentication required. Please log in.");
-        }
-        // The plan wall: the server says which limit ran out and when it comes
-        // back. Surface that sentence instead of a bare HTTP status, so the
-        // message in the chat is the one that tells the user what to do.
-        if (response.status === 402) {
-          let planMessage = "";
-          try {
-            planMessage = String(JSON.parse(errorText)?.error || "");
-          } catch {
-            /* not JSON: fall through to the generic message below */
-          }
-          throw new Error(
-            planMessage ||
-              "You have used up your plan's monthly allowance. Upgrade in Settings → Billing to keep going.",
-          );
-        }
-        // A 403 with the Cloudflare challenge page ("Just a moment...") means
-        // the WAF intercepted the request before it reached the worker — the
-        // API needs a WAF bypass rule, not a retry.
-        if (
-          response.status === 403 &&
-          CLOUDFLARE_CHALLENGE_PATTERN.test(errorText.slice(0, 4000))
-        ) {
-          throw new Error(
-            "The hosted AI request was intercepted by a security challenge page before reaching the worker. The site needs a WAF bypass rule for /api/* — please retry in a moment.",
-          );
-        }
-        throw new Error(
-          `Hosted AI stream failed: HTTP ${response.status} ${errorText.slice(0, 200)}`,
-        );
-      }
-      if (!response.body) throw new Error("Hosted AI stream had no body.");
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let streamed = "";
-      let rawBody = "";
-      let projectState = null;
-      let sawDone = false;
-      let sawPhase = false;
-      let retryableError = null;
-      const handleSseLine = (line) => {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith("data:")) return;
-        const payload = trimmed.slice(5).trim();
-        if (!payload) return;
-        let event;
-        try {
-          event = JSON.parse(payload);
-        } catch {
-          return;
-        }
-        if (event.type === "delta" && typeof event.text === "string") {
-          streamed += event.text;
-          options.onDelta?.(event.text);
-        } else if (event.type === "thinking" && typeof event.text === "string") {
-          // The model's (already redacted server-side) reasoning. It streams
-          // before the answer so the user watches progress instead of a
-          // spinner; it is never part of the returned content.
-          options.onThinking?.(event.text);
-        } else if (event.type === "clear") {
-          streamed = "";
-          options.onClear?.();
-        } else if (event.type === "phase" && typeof event.phase === "string") {
-          sawPhase = true;
-          options.onPhase?.(event);
-        } else if (event.type === "done") {
-          sawDone = true;
-          if (event.projectState) projectState = event.projectState;
-        } else if (event.type === "error") {
-          // A retryable worker error (busy lease, rate limit, empty stream)
-          // means the request is still viable — back off and re-issue it
-          // (bounded by MAX_STREAM_ATTEMPTS) instead of failing instantly.
-          // Anything else surfaces the worker's reason verbatim.
-          if (
-            event.retryable === true &&
-            attempt < MAX_STREAM_ATTEMPTS - 1
-          ) {
-            retryableError = event;
-          } else {
-            throw new Error(event.message || "Hosted AI stream error.");
-          }
-        }
-      };
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) {
-          // Flush a final SSE line that arrived without a trailing newline
-          // (a truncated or edge-case response must not lose its last event).
-          if (buffer.trim()) handleSseLine(buffer);
-          break;
-        }
-        const chunk = decoder.decode(value, { stream: true });
-        if (rawBody.length < 200 * 1024) rawBody += chunk;
-        buffer += chunk;
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-        for (const line of lines) handleSseLine(line);
-        if (retryableError) break;
-      }
-      if (retryableError) {
-        await reader.cancel().catch(() => {});
-      }
-      if (projectState) {
-        persistedProjectState = projectState;
-        onProjectStateChange?.(projectState);
-      }
-
-      const rawTrimmed = rawBody.trim();
-      const interrupted =
-        useCreationHarness &&
-        !sawDone &&
-        (sawPhase || !rawTrimmed || streamed.trim());
-      if (
-        (retryableError || interrupted) &&
-        attempt < MAX_STREAM_ATTEMPTS - 1 &&
-        !signal?.aborted
-      ) {
-        // Prefer the worker's Retry-After window when it named one (rate
-        // limits); otherwise use the configured backoff ladder.
-        const retryAfterMs =
-          Number(retryableError?.retryAfterSeconds) > 0
-            ? Math.min(
-                Number(retryableError.retryAfterSeconds) * 1000,
-                120_000,
-              )
-            : (STREAM_RETRY_DELAYS_MS[attempt] ?? 240_000);
-        // A retry means the user's stream went quiet and the resumed request
-        // re-emits the artifact from the persisted task. Say so: without this
-        // the wait is an unexplained pause inside a build that already looks
-        // slow.
-        options.onPhase?.({
-          phase: "resuming",
-          attempt: attempt + 1,
-          total: MAX_STREAM_ATTEMPTS,
-          retryAfterMs,
-        });
-        await waitWithAbort(retryAfterMs);
-        continue;
-      }
-      if (retryableError) {
-        throw new Error(retryableError.message || "Hosted AI stream error.");
-      }
-      // Streamed creation deliverables (harness builds especially) arrive as
-      // a bare artifact with no chat description — the worker never sees a
-      // final content string to brief on this path. Prepend the deterministic
-      // brief here so chat always has one; preview extraction slices from the
-      // artifact start, so leading prose never reaches the canvas.
-      if (streamed.trim()) {
-        const streamIntent =
-          fineIntent?.primaryIntent ||
-          fineIntent?.type ||
-          intent?.primaryIntent ||
-          intent?.type;
-        if (
-          useCreationHarness ||
-          ["game_creation", "website_creation", "design_task", "app"].includes(
-            streamIntent,
-          )
-        ) {
-          return ensureSiteChatBrief(
-            ensureGameChatBrief(streamed),
-            prompt,
-          );
-        }
-        return streamed;
-      }
-
-      // The stream completed with zero deltas and no error event: the response
-      // was NOT valid SSE. Diagnose the body so the user sees the real cause
-      // instead of a generic "no streamed content" (a Cloudflare challenge
-      // page, a proxy error page, or a JSON fast-path answer).
-      if (!rawTrimmed) {
-        throw new Error(
-          "The hosted AI returned an empty response. Please try again.",
-        );
-      }
-      if (CLOUDFLARE_CHALLENGE_PATTERN.test(rawTrimmed.slice(0, 4000))) {
-        throw new Error(
-          "The hosted AI request was intercepted by a security challenge page instead of reaching the worker. Please retry in a moment.",
-        );
-      }
-      if (rawTrimmed.startsWith("{") || rawTrimmed.startsWith("[")) {
-        try {
-          const parsed = JSON.parse(rawTrimmed);
-          if (typeof parsed?.content === "string" && parsed.content.trim()) {
-            return parsed.content;
-          }
-          if (typeof parsed?.error === "string") {
-            throw new Error(`Hosted AI request failed: ${parsed.error}`);
-          }
-        } catch (jsonErr) {
-          if (
-            jsonErr instanceof Error &&
-            jsonErr.message.startsWith("Hosted AI request failed:")
-          )
-            throw jsonErr;
-          // Fall through to the generic error below.
-        }
-      }
-      throw new Error("Hosted AI returned no streamed content.");
-    }
-  }
-
-  // Transport resilience: retry logic lives above with the streaming path
-  // (fetchWithTransportRetry). Non-streaming request:
-  let response = await fetchHostedResponse(fetchOptions);
-
-  let data;
-  try {
-    data = await response.json();
-  } catch (err) {
-    // A user-initiated abort must propagate so callers can stop cleanly
-    // instead of fabricating a fallback reply after Stop was pressed.
-    if (err?.name === "AbortError" || signal?.aborted) throw err;
-    data = {};
-  }
-
-  // Provider recovery window: when the provider chain cannot recover within
-  // the request's practical window, the worker persists a retry schedule and
-  // answers HTTP 200 with { status: 'retry-scheduled', taskId,
-  // retryAfterSeconds } — no content. The same request (same messages) hashes
-  // to the same task, so re-issuing it after the window resumes the persisted
-  // schedule and completes the original generation. Without this handling the
-  // contentless 200 was misread as "reasoning only", failing app builds with
-  // a misleading error.
-  // Provider recovery polling: when the worker persists a retry schedule it
-  // also mirrors a task-status record at GET /api/task/<taskId>, so instead
-  // of blind fixed sleeps the client waits exactly until the task becomes
-  // eligible again (nextEligibleAt) and then re-issues the request — the same
-  // messages hash to the same task, resuming the original generation. The
-  // promise stays pending throughout, so the UI keeps showing the normal
-  // "working" state instead of a dead wait or a premature error.
-  const RETRY_SCHEDULED_MAX_ATTEMPTS = 3;
-  const RETRY_SCHEDULED_MIN_WAIT_MS = 500;
-  const RETRY_SCHEDULED_MAX_WAIT_MS = 120000;
-  for (
-    let attempt = 0;
-    attempt < RETRY_SCHEDULED_MAX_ATTEMPTS &&
-    data?.status === "retry-scheduled";
-    attempt += 1
-  ) {
-    // Ask the worker when this task becomes eligible again. A missing record
-    // means the task is no longer deferred (it completed or was permanently
-    // classified), so the worker's own estimate is kept and the request is
-    // re-issued anyway — the only way to fetch a final result.
-    let statusWaitSeconds = Math.max(1, Number(data?.retryAfterSeconds) || 10);
-    if (typeof data?.taskId === "string" && data.taskId) {
-      try {
-        const statusResponse = await fetch(
-          `/api/task/${encodeURIComponent(data.taskId)}`,
-          { signal },
-        );
-        const status = await statusResponse.json();
-        if (status?.status === "retry-scheduled") {
-          statusWaitSeconds = Math.max(
-            1,
-            Number(status.retryAfterSeconds) || statusWaitSeconds,
-          );
-        }
-      } catch {
-        // Status poll failed: fall back to the worker's own estimate.
-      }
-    }
-    const waitMs = Math.max(
-      RETRY_SCHEDULED_MIN_WAIT_MS,
-      Math.min(statusWaitSeconds * 1000, RETRY_SCHEDULED_MAX_WAIT_MS),
-    );
-    await sleepResumable(waitMs, signal);
-    response = await fetchHostedResponse(fetchOptions);
-    try {
-      data = await response.json();
-    } catch (err) {
-      // A user-initiated abort must propagate so callers can stop cleanly.
-      if (err?.name === "AbortError" || signal?.aborted) throw err;
-      data = {};
-    }
-  }
-  if (data?.status === "retry-scheduled") {
-    throw new Error(
-      "The hosted AI service is temporarily busy and its recovery is still scheduled. Please try again shortly.",
-    );
-  }
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error("Authentication required. Please log in.");
-    }
-    const serverMsg =
-      typeof data?.error === "string"
-        ? data.error
-        : data?.error?.message || data?.message || `HTTP ${response.status}`;
-    // Plan walls and rate limits carry a sentence written for the user; keep it
-    // verbatim instead of wrapping it in transport language.
-    if (response.status === 402 || data?.code === "plan_limit") {
-      throw new Error(
-        serverMsg === `HTTP ${response.status}`
-          ? "You have used up your plan's monthly allowance. Upgrade in Settings → Billing to keep going."
-          : serverMsg,
-      );
-    }
-    const detail =
-      typeof data?.detail === "string" && data.detail.trim()
-        ? ` (${data.detail.trim()})`
-        : "";
-    throw new Error(`Hosted AI request failed: ${serverMsg}${detail}`);
-  }
-
-  // Defense-in-depth: reasoning text must never reach the user. The worker
-  // already strips it (including inline blocks split across stream chunks),
-  // but a cached/legacy response or a direct path must never leak it either.
-  const strippedContent = stripThinkingBlocks(
-    typeof data?.content === "string" ? data.content : ""
-  );
-  const rawContent = strippedContent || null;
-
-  if (!rawContent) {
-    throw new Error("Hosted AI returned only reasoning and no answer.");
-  }
-
-  // Persist project memory returned by the worker so the next follow-up turn
-  // edits the existing implementation (delta-first) instead of rebuilding.
-  if (data?.projectState && typeof data.projectState === "object") {
-    persistedProjectState = data.projectState;
-    onProjectStateChange?.(data.projectState);
-  }
-
-  // 3. Local Reflection & Bounded Repair Loop
-  const initialEval = evaluateResponse(rawContent, contract, fineIntent);
-  let finalContent = rawContent;
-  let repaired = false;
-
-  if (!initialEval.isCompliant) {
-    // Progress-aware repair: repairResponse iterates while each pass makes a
-    // material change and stops when the response is compliant or blocked.
-    const repairResult = repairResponse(
-      rawContent,
-      initialEval,
-      contract,
-      Number.MAX_SAFE_INTEGER,
-      0,
-      fineIntent,
-    );
-    finalContent = repairResult.finalContent;
-    repaired = repairResult.repaired;
-  }
-
-  // 4. Record anonymous quality signal
-  recordQualitySignal({
-    intentType: fineIntent?.primaryIntent || fineIntent?.type,
-    confidence: fineIntent?.confidence || 0,
-    selectedSkillsCount: resolved.skills.length,
-    isCompliant: initialEval.isCompliant,
-    violationsCount: initialEval.violations.length,
-    repaired,
+  // Primary endpoint dispatch uses fetch(AI_PROXY_ENDPOINT, options) with AI_FALLBACK_ENDPOINT failover
+  const fetchHostedResponse = createHostedFetcher({
+    signal,
+    primaryEndpoint: AI_PROXY_ENDPOINT,
+    fallbackEndpoint: AI_FALLBACK_ENDPOINT,
   });
 
-  return finalContent;
+  if (options.stream === true) {
+    return runHostedSseStream({
+      fetchHostedResponse,
+      fetchOptions,
+      options,
+      useCreationHarness,
+      signal,
+      fineIntent,
+      intent,
+      prompt,
+      onProjectState,
+    });
+  }
+
+  return executeNonStreamingHostedCall({
+    fetchHostedResponse,
+    fetchOptions,
+    signal,
+    contract,
+    fineIntent,
+    resolvedSkillsCount: resolved.skills.length,
+    onProjectState,
+  });
 }
 
 
