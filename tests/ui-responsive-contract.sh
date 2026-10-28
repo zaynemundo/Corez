@@ -477,6 +477,7 @@ check_block_property_in_media 'the Sites screen tightens its padding on a phone'
 check 'a chat row exposes a share action' 'onShareSession' "$sidebar"
 check 'the shell owns the share dialog' 'ChatShareModal' "$app"
 check 'the public shared chat has its own surface' 'shared-chat-page' "$css"
+check_block_property 'the shared transcript owns its own scroll' '.shared-chat-page' 'overflow-y' 'auto'
 check 'shared chat links stay public routes' 'share/chat' "$app"
 
 
