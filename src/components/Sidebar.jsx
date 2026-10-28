@@ -178,7 +178,7 @@ export default function Sidebar({
       if (!(event.target instanceof Element)) return;
       if (
         event.target.closest(".sidebar-rail-search") ||
-        event.target.closest(".sidebar-rail-search-btn")
+        railSearchButtonRef.current?.contains(event.target)
       ) {
         return;
       }
@@ -340,9 +340,9 @@ export default function Sidebar({
     onSelectSession(sessionId);
   };
 
-  // Place the popover beside the rail button, on the reading side of the
-  // shell: to its right in LTR, to its left in RTL. Both axes are clamped so a
-  // short window can never push the panel off screen.
+  // Place quick find on the reading side of the shell: to the sidebar's right
+  // in LTR, to its left in RTL. Both axes are clamped so a short window can
+  // never push the panel off screen.
   const toggleRailSearch = () => {
     if (railSearchOpen) {
       closeRailSearch();
@@ -1164,6 +1164,21 @@ export default function Sidebar({
               aria-hidden="true"
             />
           </button>
+          <button
+            ref={railSearchButtonRef}
+            type="button"
+            className={`sidebar-section-search${
+              railSearchOpen ? " is-active" : ""
+            }`}
+            onClick={toggleRailSearch}
+            title={t("common.sidebar.searchChats")}
+            aria-label={t("common.sidebar.searchChats")}
+            aria-haspopup="dialog"
+            aria-expanded={railSearchOpen}
+            aria-controls={railSearchOpen ? "sidebar-rail-search" : undefined}
+          >
+            <Search size={15} strokeWidth={1.5} aria-hidden="true" />
+          </button>
         </div>
 
         {chatsOpen && (
@@ -1211,7 +1226,9 @@ export default function Sidebar({
         >
           <button
             type="button"
-            className="sidebar-rail-action sidebar-rail-action-primary"
+            className={`sidebar-rail-action${
+              activeView === "chat" ? " sidebar-rail-action-primary" : ""
+            }`}
             onClick={() => {
               setChatsOpen(true);
               onNewChat();
@@ -1220,24 +1237,6 @@ export default function Sidebar({
             aria-label={t("common.sidebar.newChat")}
           >
             <SquarePen size={20} strokeWidth={1.5} aria-hidden="true" />
-          </button>
-
-          <button
-            ref={railSearchButtonRef}
-            type="button"
-            className={`sidebar-rail-action sidebar-rail-search-btn${
-              railSearchOpen ? " is-active" : ""
-            }`}
-            onClick={toggleRailSearch}
-            title={t("common.sidebar.searchChats")}
-            aria-label={t("common.sidebar.searchChats")}
-            aria-haspopup="dialog"
-            aria-expanded={railSearchOpen}
-            aria-controls={
-              railSearchOpen ? "sidebar-rail-search" : undefined
-            }
-          >
-            <Search size={20} strokeWidth={1.5} aria-hidden="true" />
           </button>
 
           {typeof onOpenSites === "function" && (
