@@ -25,6 +25,7 @@ import {
   verifySession,
 } from "./auth.js";
 import { handleChats } from "./chats.js";
+import { handleChatShares } from "./chatShares.js";
 import { handleProjects } from "./projects.js";
 import { handleN8nWebhook } from "./n8nBridge.js";
 import { handleZiina } from "./ziina.js";
@@ -193,6 +194,11 @@ export default {
       const subRes = await handleSubscriptions(request, env);
       if (subRes) return withDirectAiCors(subRes);
     }
+
+    // Chat share routes own their auth: the owner routes require a session, the
+    // public snapshot/assets are token-scoped and cookie-free.
+    const shareRes = await handleChatShares(request, env);
+    if (shareRes) return withDirectAiCors(shareRes);
 
     // Chat routes — handle before generic auth gate so they can use verifySession directly
     if (

@@ -22,6 +22,7 @@ import {
   Search,
   MessageCircle,
   LayoutGrid,
+  Share2,
 } from "lucide-react";
 
 // Fixed width of `.history-menu-dropdown` in index.css. The floating menu is
@@ -61,6 +62,7 @@ export default function Sidebar({
   onOpenSites,
   onOpenSettings,
   onDeleteSession,
+  onShareSession,
   activeView,
   theme,
   onToggleTheme,
@@ -671,6 +673,24 @@ export default function Sidebar({
                       </button>
                     )}
                   </div>
+                  <div className="history-menu-separator" role="separator" />
+                </>
+              )}
+              {typeof onShareSession === "function" && (
+                <>
+                  <button
+                    type="button"
+                    className="history-menu-item"
+                    role="menuitem"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenMenuId(null);
+                      onShareSession(session.id);
+                    }}
+                  >
+                    <Share2 size={14} strokeWidth={1.5} />
+                    <span>{t("common.sidebar.shareChat")}</span>
+                  </button>
                   <div className="history-menu-separator" role="separator" />
                 </>
               )}

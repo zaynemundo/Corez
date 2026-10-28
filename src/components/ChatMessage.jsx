@@ -948,7 +948,12 @@ export function ThinkingDisclosure({ text, seconds = 0 }) {
   );
 }
 
-export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
+export default function ChatMessage({
+  message,
+  onRunInCanvas,
+  onReviseCode,
+  readOnly = false,
+}) {
   const { t } = useI18n();
   const isUser = message.role === "user";
   const [fullscreenImage, setFullscreenImage] = useState(null);
@@ -1710,7 +1715,9 @@ export default function ChatMessage({ message, onRunInCanvas, onReviseCode }) {
             {renderFormattedText(message.content)}
           </div>
         )}
-        {!isUser && <MessageActions content={message.content || ""} />}
+        {!isUser && !readOnly && (
+          <MessageActions content={message.content || ""} />
+        )}
       </div>
 
       {fullscreenImage && (

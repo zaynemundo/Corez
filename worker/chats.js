@@ -20,6 +20,7 @@ import {
   COLUMN_CHATS_SORT_ORDER,
 } from "./dbSchema.js";
 import { unpublishPagesForSessions } from "./publishStore.js";
+import { deleteChatShare } from "./chatShares.js";
 
 // ---------------------------------------------------------------------
 // Chat ID generation — short, URL-safe, unguessable
@@ -720,6 +721,9 @@ export async function handleChats(request, env) {
       } catch {
         chatIds = [];
       }
+      await Promise.all(
+        chatIds.map((id) => deleteChatShare(env, userId, id)),
+      );
       const { unpublishedSlugs } = await cleanupChatStorage(
         env,
         userId,
@@ -1109,6 +1113,7 @@ export async function handleChats(request, env) {
       // images referenced by its messages, context index) is read from the
       // messages, and the pages it published are unpublished, so both must run
       // before the D1 rows are deleted.
+      await deleteChatShare(env, userId, chatId);
       const { unpublishedSlugs } = await cleanupChatStorage(env, userId, [
         chatId,
       ]);

@@ -151,6 +151,7 @@ export default {
     optionsFor: "خيارات {title}",
     openConversation: "فتح المحادثة {title}",
     delete: "حذف",
+    shareChat: "مشاركة المحادثة",
     openSettings: "فتح الإعدادات",
     settings: "الإعدادات",
     guest: "زائر",

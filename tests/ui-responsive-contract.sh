@@ -474,6 +474,11 @@ check 'unpublishing a live link asks first' 'confirmingSlug === page.slug' "$sit
 check_block_property 'the Sites list is a stack of cards' '.sites-list' 'flex-direction' 'column'
 check_block_property_in_media 'the Sites screen tightens its padding on a phone' 'max-width: 767px' '.sites-page' 'padding' '1.25rem 1rem 2rem'
 
+check 'a chat row exposes a share action' 'onShareSession' "$sidebar"
+check 'the shell owns the share dialog' 'ChatShareModal' "$app"
+check 'the public shared chat has its own surface' 'shared-chat-page' "$css"
+check 'shared chat links stay public routes' 'share/chat' "$app"
+
 
 if (( failures > 0 )); then
   printf '%d responsive UI contract check(s) failed.\n' "$failures" >&2

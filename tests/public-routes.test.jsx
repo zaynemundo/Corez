@@ -108,4 +108,31 @@ describe('public surface for a signed-out visitor', () => {
       expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/plans that grow with you/i);
     });
   });
+
+  it('renders a public shared chat without redirecting to sign-in', async () => {
+    window.history.pushState({}, '', '/share/chat/public-token');
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).includes('/api/auth/me')) {
+        return new Response(JSON.stringify({ error: 'Not authenticated' }), { status: 401 });
+      }
+      if (String(url).includes('/api/share/chat/public-token')) {
+        return new Response(
+          JSON.stringify({
+            title: 'Public pottery notes',
+            messages: [{ role: 'user', content: 'A shared message' }],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response(null, { status: 404 });
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Public pottery notes')).toBeTruthy();
+      expect(screen.getByText('A shared message')).toBeTruthy();
+    });
+    expect(window.location.pathname).toBe('/share/chat/public-token');
+  });
 });

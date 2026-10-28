@@ -126,4 +126,34 @@ export default {
     shareResponse: "Share response",
     shareTitle: "COREZ AI Response",
   },
+
+  // Public conversation links created from the sidebar.
+  share: {
+    title: "Share this chat",
+    description:
+      "Create a read-only public link to this conversation. Anyone with the link can read it.",
+    warning:
+      "This link includes the whole conversation. Don't share chats with private information.",
+    create: "Create public link",
+    creating: "Creating link…",
+    linkLabel: "Public link",
+    copy: "Copy link",
+    copied: "Link copied",
+    copyFailed: "Couldn't copy the link. Select it and copy manually.",
+    send: "Share",
+    open: "Open link",
+    stop: "Stop sharing",
+    stopping: "Stopping…",
+    snapshot:
+      "The link captures this chat as it is now. New messages won't appear in it.",
+    sharedLabel: "Shared conversation",
+    readOnly: "Read-only",
+    messages: "{count} messages",
+    unavailable: "This shared chat is unavailable",
+    unavailableHint:
+      "The link may have been stopped, or it never existed.",
+    back: "Go to COREZ",
+    footer: "Shared from COREZ",
+    error: "Could not update sharing. Try again.",
+  },
 };

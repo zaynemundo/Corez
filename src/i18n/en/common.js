@@ -167,6 +167,7 @@ export default {
     optionsFor: "Options for {title}",
     openConversation: "Open conversation {title}",
     delete: "Delete",
+    shareChat: "Share chat",
     openSettings: "Open settings",
     settings: "Settings",
     guest: "Guest",

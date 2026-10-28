@@ -15,12 +15,14 @@ import ChatInput from "./components/ChatInput";
 import NewChatStarters from "./components/NewChatStarters";
 import CanvasPreview from "./components/CanvasPreview";
 import SettingsModal from "./components/SettingsModal";
+import ChatShareModal from "./components/ChatShareModal";
 import DropZoneOverlay from "./components/DropZoneOverlay";
 import Login from "./pages/Login";
 import Sites from "./pages/Sites";
 import { PaymentSuccess } from "./pages/PaymentStatus";
 import Pricing from "./pages/Pricing";
 import Legal from "./pages/Legal";
+import SharedChat from "./pages/SharedChat";
 import CookieConsent from "./components/CookieConsent";
 import { startAnalytics, trackPageView } from "./services/analytics";
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -183,6 +185,7 @@ function MainApp({ theme, setTheme }) {
   const [canvasFullScreen, setCanvasFullScreen] = useState(false);
   const [activeCanvasCode, setActiveCanvasCode] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [shareChatId, setShareChatId] = useState(null);
   const [isThinking, setIsThinking] = useState(false);
   const [streamingContent, setStreamingContent] = useState(null);
   // The model's live reasoning, streamed before the answer. Kept separate from
@@ -1880,6 +1883,7 @@ function MainApp({ theme, setTheme }) {
           if (isMobileViewport) setSidebarOpen(false);
         }}
         onDeleteSession={handleDeleteSession}
+        onShareSession={setShareChatId}
         onOpenSettings={() => setSettingsOpen(true)}
         activeView={activeView}
         theme={theme}
@@ -2099,6 +2103,13 @@ function MainApp({ theme, setTheme }) {
         )}
       </main>
 
+      {shareChatId && (
+        <ChatShareModal
+          chatId={shareChatId}
+          onClose={() => setShareChatId(null)}
+        />
+      )}
+
       <SettingsModal
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
@@ -2117,7 +2128,7 @@ function MainApp({ theme, setTheme }) {
 // search-engine aliases). They read the account only to label themselves, so a
 // visitor should never stare at a spinner to reach them.
 const PUBLIC_ROUTES =
-  /^\/(?:login|pricing|payment\/success|privacy|terms|cookies|refunds|privacy-policy|terms-and-conditions|cookie-policy|refund-policy)\/?$/;
+  /^\/(?:login|pricing|payment\/success|privacy|terms|cookies|refunds|privacy-policy|terms-and-conditions|cookie-policy|refund-policy|share\/chat\/[^/]+)\/?$/;
 
 // Legal pages must be reachable whether or not the visitor is signed in — a
 // policy you can only read after logging in is not a policy. Aliases keep the
@@ -2292,6 +2303,7 @@ function AppInner() {
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/payment/success" element={<PaymentSuccess />} />
+        <Route path="/share/chat/:token" element={<SharedChat />} />
         {legalRoutes()}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
@@ -2307,6 +2319,7 @@ function AppInner() {
       <Route path="/sites" element={<MainApp theme={theme} setTheme={setTheme} />} />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/payment/success" element={<PaymentSuccess />} />
+      <Route path="/share/chat/:token" element={<SharedChat />} />
       {legalRoutes()}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
