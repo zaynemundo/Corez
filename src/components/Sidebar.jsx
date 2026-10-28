@@ -340,9 +340,9 @@ export default function Sidebar({
     onSelectSession(sessionId);
   };
 
-  // Place quick find on the reading side of the shell: to the sidebar's right
-  // in LTR, to its left in RTL. Both axes are clamped so a short window can
-  // never push the panel off screen.
+  // Place the rail's quick-find popover on the reading side of the shell: to
+  // the rail's right in LTR, to its left in RTL. Both axes are clamped so a
+  // short window can never push the panel off screen.
   const toggleRailSearch = () => {
     if (railSearchOpen) {
       closeRailSearch();
@@ -1164,21 +1164,6 @@ export default function Sidebar({
               aria-hidden="true"
             />
           </button>
-          <button
-            ref={railSearchButtonRef}
-            type="button"
-            className={`sidebar-section-search${
-              railSearchOpen ? " is-active" : ""
-            }`}
-            onClick={toggleRailSearch}
-            title={t("common.sidebar.searchChats")}
-            aria-label={t("common.sidebar.searchChats")}
-            aria-haspopup="dialog"
-            aria-expanded={railSearchOpen}
-            aria-controls={railSearchOpen ? "sidebar-rail-search" : undefined}
-          >
-            <Search size={15} strokeWidth={1.5} aria-hidden="true" />
-          </button>
         </div>
 
         {chatsOpen && (
@@ -1253,6 +1238,22 @@ export default function Sidebar({
               <LayoutGrid size={20} strokeWidth={1.5} aria-hidden="true" />
             </button>
           )}
+
+          <button
+            ref={railSearchButtonRef}
+            type="button"
+            className={`sidebar-rail-action sidebar-rail-search-btn${
+              railSearchOpen ? " is-active" : ""
+            }`}
+            onClick={toggleRailSearch}
+            title={t("common.sidebar.searchChats")}
+            aria-label={t("common.sidebar.searchChats")}
+            aria-haspopup="dialog"
+            aria-expanded={railSearchOpen}
+            aria-controls={railSearchOpen ? "sidebar-rail-search" : undefined}
+          >
+            <Search size={20} strokeWidth={1.5} aria-hidden="true" />
+          </button>
 
           <button
             type="button"

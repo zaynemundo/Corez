@@ -1,10 +1,9 @@
 // @vitest-environment jsdom
 //
 // The closed desktop sidebar is a navigation rail, not an empty column: brand,
-// new chat, Sites, recents and the account all remain reachable. Quick find
-// lives in the full panel's Recents heading, not in the rail. The full panel
-// stays mounted behind the rail for its state, so these tests pin the surface
-// split as well as every rail action.
+// new chat, Sites, quick find, recents and the account all remain reachable.
+// The full panel stays mounted behind it for its state, so these tests pin the
+// surface split as well as every rail action.
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   render,
@@ -47,32 +46,6 @@ function renderRail(props = {}) {
   );
   const rail = document.querySelector(".sidebar-rail");
   return { handlers, rail, railQueries: within(rail) };
-}
-
-function renderOpenSidebar(props = {}) {
-  const handlers = {
-    onSelectSession: vi.fn(),
-    onNewChat: vi.fn(),
-    onOpenSites: vi.fn(),
-    onOpenSettings: vi.fn(),
-    onDeleteSession: vi.fn(),
-    onCloseSidebar: vi.fn(),
-    onOpenSidebar: vi.fn(),
-  };
-  render(
-    <I18nProvider>
-      <Sidebar
-        isOpen
-        sessions={SESSIONS}
-        activeSessionId={null}
-        activeView="chat"
-        {...handlers}
-        {...props}
-      />
-    </I18nProvider>,
-  );
-  const full = document.querySelector(".sidebar-full");
-  return { handlers, full, fullQueries: within(full) };
 }
 
 afterEach(() => {
@@ -120,7 +93,7 @@ describe("closed sidebar navigation rail", () => {
     expect(newChat.className).not.toContain("sidebar-rail-action-primary");
   });
 
-  it("places Sites directly under New Chat and drops the search icon", () => {
+  it("places Sites above quick find in the rail", () => {
     const { railQueries } = renderRail();
     const nav = railQueries.getByRole("navigation", {
       name: "Primary navigation",
@@ -129,17 +102,14 @@ describe("closed sidebar navigation rail", () => {
       .getAllByRole("button")
       .map((button) => button.getAttribute("aria-label"));
 
-    expect(labels).toEqual(["New Chat", "Sites", "Recents"]);
-    expect(
-      railQueries.queryByRole("button", { name: "Search chats" }),
-    ).toBeNull();
+    expect(labels).toEqual(["New Chat", "Sites", "Search chats", "Recents"]);
   });
 
-  it("keeps quick find in the Recents heading, then opens the chosen one", async () => {
+  it("uses the rail's quick find, then opens the chosen one", async () => {
     const user = userEvent.setup();
-    const { handlers, fullQueries } = renderOpenSidebar();
+    const { handlers, railQueries } = renderRail();
 
-    const trigger = fullQueries.getByRole("button", { name: "Search chats" });
+    const trigger = railQueries.getByRole("button", { name: "Search chats" });
     await user.click(trigger);
 
     const dialog = screen.getByRole("dialog", { name: "Search chats" });
@@ -165,10 +135,10 @@ describe("closed sidebar navigation rail", () => {
 
   it("opens the first match with Enter", async () => {
     const user = userEvent.setup();
-    const { handlers, fullQueries } = renderOpenSidebar();
+    const { handlers, railQueries } = renderRail();
 
     await user.click(
-      fullQueries.getByRole("button", { name: "Search chats" }),
+      railQueries.getByRole("button", { name: "Search chats" }),
     );
     const dialog = screen.getByRole("dialog", { name: "Search chats" });
     await user.type(
@@ -182,10 +152,10 @@ describe("closed sidebar navigation rail", () => {
 
   it("reports an empty search instead of an empty panel", async () => {
     const user = userEvent.setup();
-    const { fullQueries } = renderOpenSidebar();
+    const { railQueries } = renderRail();
 
     await user.click(
-      fullQueries.getByRole("button", { name: "Search chats" }),
+      railQueries.getByRole("button", { name: "Search chats" }),
     );
     const dialog = screen.getByRole("dialog", { name: "Search chats" });
     await user.type(
@@ -200,9 +170,9 @@ describe("closed sidebar navigation rail", () => {
 
   it("closes quick find on Escape and returns focus to its trigger", async () => {
     const user = userEvent.setup();
-    const { fullQueries } = renderOpenSidebar();
+    const { railQueries } = renderRail();
 
-    const trigger = fullQueries.getByRole("button", { name: "Search chats" });
+    const trigger = railQueries.getByRole("button", { name: "Search chats" });
     await user.click(trigger);
     const dialog = screen.getByRole("dialog", { name: "Search chats" });
     const input = within(dialog).getByRole("searchbox", {
