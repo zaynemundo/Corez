@@ -29,13 +29,11 @@ export const IMAGE_PROXY_ENDPOINT = "/api/image";
 import { defaultSkillRegistry } from "../skills/registry.js";
 import { classifyIntent } from "./intentClassifier.js";
 import {
-  process as processPromptIntelligence,
   toLegacyIntentType,
   classifyIntent as classifyIntentNew,
   extractRequirements,
   classifyComplexity,
 } from "./promptIntelligence/index.js";
-
 import { createIntentContract } from "./promptIntelligence/intentContract.js";
 import {
   evaluateResponse,
@@ -44,17 +42,9 @@ import {
   ensureSiteChatBrief,
   recordQualitySignal,
 } from "./reflectionEngine.js";
-import { buildAwwwardsDesignPrompt } from "../../packages/agent-core/context/designTokens.js";
 import { stripThinkingBlocks } from "../../packages/agent-core/providers/text.js";
 import { resolveSkills } from "../skills/resolver.js";
-import { stripJunkAfterDocumentEnd } from "../utils/htmlRepair.js";
-import {
-  ensureLeadingPageMarker,
-  findArtifactStartIndex,
-} from "../utils/previewTransformer.js";
 import { classifyExecutionMode } from "./executionModes.js";
-import { persistAndSummarize } from "./contextStore.js";
-import { fetchAwwwardsInspiration } from "./inspirationService.js";
 import {
   isWebSearchRequest,
   formatSearchResults,
@@ -67,7 +57,6 @@ import {
   WORKERS_AI_IMAGE_MODEL,
   WORKERS_AI_SDXL_LIGHTNING_MODEL,
   WORKERS_AI_IMAGE_ENDPOINT,
-  WRITING_JOB_GUARD,
   createFallbackSvgDataUrl,
   generateImage,
   generateWorkersAIImage,
@@ -82,6 +71,39 @@ import {
   isExplicitImageRequest,
 } from "./ai/imagePipeline.js";
 import { generateSessionTitle, generateAISessionTitle } from "./ai/sessionTitle.js";
+import {
+  isGameDevIntent,
+  isSocialCarouselCopyRequest,
+  isExplicitWebsiteRequest,
+  isRevisionContextPrompt,
+  improveCodingPrompt,
+} from "./ai/promptEnhancer.js";
+import {
+  extractCodeFromMessage,
+  parseSlashCommand,
+  parseCommand,
+  isSlashCommand,
+  isCommand,
+} from "./ai/codeExtractor.js";
+import { compactConversationForRequest } from "./ai/conversationCompactor.js";
+import {
+  abortError,
+  sleepResumable,
+  describeHostedUnavailable,
+  PERSISTENT_RETRY_BASE_DELAY_MS,
+  PERSISTENT_RETRY_MAX_DELAY_MS,
+  PERSISTENT_RETRY_DEFAULT_MAX_ATTEMPTS,
+  BUILD_IN_PROGRESS_MAX_ATTEMPTS,
+  BUILD_IN_PROGRESS_BASE_DELAY_MS,
+  BUILD_IN_PROGRESS_MAX_DELAY_MS,
+  BUILD_IN_PROGRESS_MESSAGE,
+  isBuildInProgressError,
+  getBuildInProgressDelay,
+  getPersistentRetryDelay,
+  isRetryableHostedError,
+  isHostedUnavailableFallback,
+  resolvePersistentRetryOpts,
+} from "./ai/retryPolicy.js";
 export {
   isWebSearchRequest,
   formatSearchResults,
@@ -105,11 +127,31 @@ export {
   isExplicitImageRequest,
   generateSessionTitle,
   generateAISessionTitle,
+  isGameDevIntent,
+  isSocialCarouselCopyRequest,
+  isExplicitWebsiteRequest,
+  isRevisionContextPrompt,
+  improveCodingPrompt,
+  extractCodeFromMessage,
+  parseSlashCommand,
+  parseCommand,
+  isSlashCommand,
+  isCommand,
+  compactConversationForRequest,
+  describeHostedUnavailable,
+  PERSISTENT_RETRY_BASE_DELAY_MS,
+  PERSISTENT_RETRY_MAX_DELAY_MS,
+  PERSISTENT_RETRY_DEFAULT_MAX_ATTEMPTS,
+  BUILD_IN_PROGRESS_MAX_ATTEMPTS,
+  BUILD_IN_PROGRESS_BASE_DELAY_MS,
+  BUILD_IN_PROGRESS_MAX_DELAY_MS,
+  BUILD_IN_PROGRESS_MESSAGE,
+  isBuildInProgressError,
+  getBuildInProgressDelay,
+  getPersistentRetryDelay,
+  isRetryableHostedError,
+  isHostedUnavailableFallback,
 };
-import {
-  retrieveSemanticCodePatterns,
-  formatRetrievedPatternsForPrompt,
-} from "./semanticCodeRetrieval.js";
 
 export const PUBLIC_USER_INTENT_PROMPT = `
 Analyze the public user intent behind the request. Corez uses a server-configured image-generation pipeline for background generation and image rendering.
@@ -124,14 +166,6 @@ ${defaultSkillRegistry.getFormattedSkillList()}
 Respond with the likely goal, useful next action, the appropriate skill if applicable, and a concise path forward.
 `;
 
-const GAME_DEV_PATTERNS =
-  /\b(game|gamedev|game development|play|chess|snake|pong|shooter|arcade|platformer|canvas game|2d game|3d game|simulator|physics sandbox|bot enemy|rpg|enemy|space defender|retro game|interactive game)\b|\b(build|make|create|develop|design)\b.*\b(game|simulator|simulation|sandbox)\b/i;
-
-export function isGameDevIntent(prompt) {
-  if (!prompt) return false;
-  return GAME_DEV_PATTERNS.test(prompt);
-}
-
 const INTENT_PATTERNS = {
   // Like image detection below, the build verb must govern the artifact noun
   // within a tight window (~48 chars): unbounded `.*` let "create an email ...
@@ -145,33 +179,6 @@ const INTENT_PATTERNS = {
     /\b(explain|what is|what are|what's|whats|how does|why does|why is|why are|why do|teach me|break down|understand|compare|difference between|tell me about)\b/i,
 };
 
-// Social-media carousel copy ("create a post for this carousel",
-// "LinkedIn/Instagram carousel post + caption") is WRITING, not a UI build.
-// Instruction prefix only (first ~300 chars) so pasted body copy containing
-// "research"/"design" cannot hijack intent. Explicit UI terms
-// ("carousel component/UI/code/website") opt back into a build.
-export function isSocialCarouselCopyRequest(prompt) {
-  if (!prompt || typeof prompt !== "string") return false;
-  const instruction = String(prompt).slice(0, 400).toLowerCase();
-  const hasSocial =
-    /\b(create|write|draft|compose|make|generate|need|want)\b.{0,60}\b(post|caption|carousel post|linkedin post|instagram post|social post)\b/i.test(
-      instruction,
-    ) ||
-    /\bpost\s+for\s+(this|that|my|our|a|the)\s+carousel\b/i.test(instruction) ||
-    (/\bcarousel\b/i.test(instruction) &&
-      /\b(post|caption|hashtags?|slide\s+\d|slide\s+breakdown)\b/i.test(
-        instruction,
-      ));
-  if (!hasSocial) return false;
-  const hasExplicitUI =
-    /\bcarousel\b.{0,30}\b(component|widget|\bui\b|ux|slider|code|react|jsx|html|website|web\s?app|landing\s?page)\b/i.test(
-      instruction,
-    ) ||
-    /\b(build|code|develop|program)\b.{0,30}\b(carousel|slider)\b.{0,30}\b(component|widget|\bui\b|code|website|app)\b/i.test(
-      instruction,
-    );
-  return !hasExplicitUI;
-}
 
 function analyzeIntentWithRules(cleanPrompt) {
   const lower = cleanPrompt.toLowerCase();
@@ -490,337 +497,6 @@ export function analyzePublicUserIntent(prompt) {
   };
 }
 
-export async function improveCodingPrompt(prompt, intent = null) {
-  const cleanPrompt = typeof prompt === "string" ? prompt.trim() : "";
-  if (!cleanPrompt) return cleanPrompt;
-
-  // Social-carousel copy must never receive a coding spec (React/HTML) even if
-  // an upstream classifier mislabels it as an app build.
-  if (isSocialCarouselCopyRequest(cleanPrompt)) {
-    return cleanPrompt;
-  }
-
-  const currentIntent = intent || analyzePublicUserIntent(cleanPrompt);
-  const intentType = currentIntent?.type || "general";
-
-  // A website mention without an explicit website request (same rules as
-  // @image) must not be enriched as an app/website build.
-  const websiteMentioned =
-    /\b(website|web\s?site|landing page|webpage|web app|homepage|portfolio site|dashboard|admin panel|portal|saas|site)\b/i.test(
-      cleanPrompt,
-    );
-  const websiteBlocked =
-    websiteMentioned && !isExplicitWebsiteRequest(cleanPrompt);
-
-  const isCoding =
-    intentType === "code-help" ||
-    (intentType === "app" && !websiteBlocked) ||
-    INTENT_PATTERNS.code.test(cleanPrompt) ||
-    (INTENT_PATTERNS.app.test(cleanPrompt) && !websiteBlocked);
-  if (!isCoding) {
-    return cleanPrompt;
-  }
-
-  const isAppIntent =
-    (intentType === "app" && !websiteBlocked) ||
-    (INTENT_PATTERNS.app.test(cleanPrompt) && !websiteBlocked);
-
-  // Game creation: respond with a SMALL brief, not a feature dump.
-  const isGameRequest =
-    currentIntent?.primaryIntent === "game_creation" ||
-    /\b(build|create|make|generate|design|want|need|give|show|play)\b.{0,60}\b(game|arcade|platformer|pong|snake|tetris|flappy|simulator|puzzle|shooter|rpg|runner|clicker)\b/i.test(
-      cleanPrompt,
-    );
-
-  // Build the Awwwards design spec + live inspiration once for app requests.
-  // The live references are best-effort: failure never blocks and never
-  // fabricates sites.
-  const useWebDesignReferences = isAppIntent && !isGameRequest;
-  const designSpec = useWebDesignReferences
-    ? buildAwwwardsDesignPrompt(cleanPrompt)
-    : "";
-
-  // Both enrichment lookups are OPTIONAL context, and each one is a network
-  // round trip of its own (the worker's Awwwards scrape alone is allowed up to
-  // 8s). They used to run one after the other on the critical path, so the
-  // model request waited for the sum of both before it was even issued. Start
-  // them together, give each a bounded budget, and let the model request go as
-  // soon as they settle: a slow third party can then cost at most its budget
-  // instead of the whole build start.
-  const OPTIONAL_CONTEXT_BUDGET_MS = 2500;
-  const withOptionalBudget = (task, ms = OPTIONAL_CONTEXT_BUDGET_MS) => {
-    let timer;
-    const budget = new Promise((resolve) => {
-      timer = setTimeout(() => resolve(""), ms);
-    });
-    return Promise.race([task.catch(() => ""), budget]).finally(() =>
-      clearTimeout(timer),
-    );
-  };
-
-  const liveInspirationTask = useWebDesignReferences
-    ? (async () => {
-        try {
-          const { sites } = await fetchAwwwardsInspiration(cleanPrompt, null);
-          if (sites.length === 0) return "";
-          return `\n\n--- Live Awwwards Design Inspiration (real references) ---\n${sites
-            .map((site) => {
-              let text = `- ${site.title} — ${site.url}`;
-              if (site.liveUrl) text += ` (Live site: ${site.liveUrl})`;
-              if (site.description)
-                text += `\n  Design approach: ${site.description}`;
-              if (site.tags && site.tags.length > 0)
-                text += `\n  Visual elements: ${site.tags.join(", ")}`;
-              return text;
-            })
-            .join(
-              "\n\n",
-            )}\n\nUse these award-winning sites as visual direction for layout, typography, colour, and interaction quality.`;
-        } catch {
-          return "";
-        }
-      })()
-    : null;
-
-  // Retrieve relevant code patterns via semantic embedding search
-  const semanticPatternsTask = (async () => {
-    try {
-      const patterns = await retrieveSemanticCodePatterns(cleanPrompt, {
-        topK: 1,
-        minSimilarity: 0.15,
-      });
-      return formatRetrievedPatternsForPrompt(patterns);
-    } catch {
-      return "";
-    }
-  })();
-
-  const [liveInspiration, semanticPatternsPrompt] = await Promise.all([
-    liveInspirationTask
-      ? withOptionalBudget(liveInspirationTask)
-      : Promise.resolve(""),
-    withOptionalBudget(semanticPatternsTask),
-  ]);
-
-  // Simple revision handling: just return the prompt with code as-is, no surgical spec
-  if (isRevisionContextPrompt(cleanPrompt)) {
-    return `${cleanPrompt}${semanticPatternsPrompt}`;
-  }
-
-  // Use the Prompt Intelligence Engine for structured enrichment
-  try {
-    const pipelineResult = await processPromptIntelligence({
-      prompt: cleanPrompt,
-      dryRun: true,
-    });
-
-    if (
-      pipelineResult &&
-      pipelineResult.executionPrompt &&
-      pipelineResult.executionPrompt !== cleanPrompt
-    ) {
-      // Website/app builds may use live web-design references. Games derive
-      // their visual direction from the user request and genre instead.
-      return isAppIntent
-        ? `${pipelineResult.executionPrompt}\n\n${designSpec}${liveInspiration}${semanticPatternsPrompt}`
-        : pipelineResult.executionPrompt;
-    }
-  } catch {
-    // Fall back to legacy enhancement on pipeline failure
-  }
-
-  if (isAppIntent) {
-    if (isGameRequest) {
-      return `${cleanPrompt}
-
-[SINGLE-FILE GAME SPECIFICATION]:
-- MANDATORY CHAT BRIEF: your response MUST begin with a 1-2 sentence chat brief BEFORE the code block — game title in bold, what the player does to win/lose, and the controls. Example: "Here's **Neon Pong** — bounce the ball past your rival to score. Move with the Arrow keys, Space to launch." NEVER output a bare code block with no brief. NEVER write a long feature list, architecture summary, or "I built..." paragraph.
-- GAME ART DIRECTION: Follow any visual style the user explicitly requests. Otherwise infer a distinctive style from the game's genre, setting, mechanics, and audience; do NOT default to retro, pixel art, neon, or any other fixed aesthetic. Include a designed start screen and game-over screen, HUD, color palette, and typography that fit the game world. NEVER apply generic web "dark glassmorphism", glass panels, or luxury web-app styling to games.
-- Build a complete, runnable, self-contained single-file HTML canvas game inside ONE SINGLE \`\`\`html ... \`\`\` code block with inline <style> and <script> tags.
-- FULLSCREEN GAME REQUIREMENT: The game MUST fill the entire preview viewport — html/body with width:100%, height:100%, margin:0, overflow:hidden; a full-viewport canvas (width:100%, height:100%, display:block) with NO max-width, NO bordered box, NO rounded container around the game. Keep a fixed internal game resolution (e.g. 960x540) and scale it to the viewport with ctx.setTransform + a resize listener so the game always fills the screen.
-- MOBILE: size the canvas from visualViewport (not just innerHeight) and listen for orientationchange; include on-screen touch controls (left/right/jump/action buttons) shown only on touch or coarse-pointer devices, bound with touchstart/touchend/touchcancel.
-- COMPLETENESS CHECK before you finish: implement EVERY feature and rule you promise in the brief — score, lives, levels, enemies, collisions, win/lose states, menus — with no stubs, no TODOs, and no placeholder functions; the game must be fully playable end-to-end.
-- GAME LOOP: fixed-timestep simulation — accumulate real dt (clamped to max 0.1s) and run update() in fixed STEP=1/60 increments inside requestAnimationFrame; never tie movement or physics directly to raw frame dt.
-- CONTROLS: poll a held-key map every frame using e.code (layout-independent: KeyW/ArrowLeft/Space); preventDefault() scrolling keys (arrows/space); for mouse-look games use Pointer Lock; poll navigator.getGamepads() with a deadzone where controllers fit.
-- AUDIO: procedural Web Audio SFX (jump, collect, hit, win, lose) plus a simple looping music pattern — zero external audio files; create AND resume() the AudioContext ONLY inside a user gesture (Start button click/keypress); add a mute toggle on M.
-- ARCHITECTURE: explicit game-state machine (START/PLAYING/PAUSED/GAMEOVER/VICTORY, pausing on visibilitychange) and entity AI states (idle/patrol/chase/attack/flee); pool bullets/particles/enemies — reuse objects, never allocate with \`new\` inside the per-frame loop.
-- GAME FEEL: screen shake on hits, hit-flash, particle bursts, floating score popups, and difficulty that ramps with score/time.
-- ENEMY AI: give enemies a behavior ladder — patrol waypoints, chase on sight with steering (seek/flee/wander), grid pathfinding in mazes — scaled by a difficulty factor.
-- PORTAL-READY: viewport meta and resize handling (already required above), zero external requests except approved CDNs, fully playable while muted.
-- Output ONLY the brief followed by the code block — NO feature summary, NO step-by-step guide, NO closing paragraph after the code.`;
-    }
-
-    const isExplicitNonJsx =
-      /\b(html\b|css\b|vanilla|plain html|pure html|html\/css|raw html|html\s*\+\s*css|vanilla js)\b/i.test(
-        cleanPrompt,
-      );
-    const isOneShot =
-      /\b(oneshot|one-shot|one shot|single[- ]page|one[- ]page)\b/i.test(
-        cleanPrompt,
-      );
-
-    if (isExplicitNonJsx) {
-      return `${cleanPrompt}
-
-${designSpec}${liveInspiration}${semanticPatternsPrompt}
-
-[SINGLE-FILE HTML/CSS/JS SPECIFICATION]:
-- ALWAYS begin your response with a clear, detailed overview explaining the features, layout, and styling choices!
-- NEVER mention "Awwwards", "Awwwards-inspired", or internal prompt buzzwords in your output or preamble text. Describe your creation naturally without meta-commentary.
-- Ensure proper visual layering and z-index stacking hierarchy (Background z-index:0 -> Content z-index:10 -> HUD/Toolbars z-index:20-30 -> Modals/Overlays z-index:40-50+) so elements don't obscure interactive controls!
-- Output complete, clean HTML/CSS/JS code inside ONE SINGLE \`\`\`html ... \`\`\` code block including inline \`<style>\` and \`<script>\` tags.
-- ${isOneShot ? "ONE-SHOT MODE: output ONE single page only — no sub-pages, no markers." : "MULTI-PAGE BY DEFAULT: output a multi-page website unless the user explicitly asked for ONE-SHOT (single page only). For multi-page output, put every page as its own complete standalone HTML document inside the SAME single code block. Write ONE marker line immediately BEFORE each page, INCLUDING the home page:"}
-  <!-- PAGE: index.html -->
-  <!DOCTYPE html>... complete home page with inline <style>/<script> ...
-  <!-- PAGE: about.html -->
-  <!DOCTYPE html>... complete about page ...
-  The home page MUST have its own <!-- PAGE: index.html --> line above it, and nothing (no HTML, no prose) may appear before that first marker — never write a page before its marker.
-  Link pages with PLAIN RELATIVE anchors ONLY: <a href="about.html">About</a>. Never use a leading slash or absolute URL for internal links (never "/about.html", "https://...", or "corez.pro/...") — the preview and the published site serve every page under its own folder (corez.pro/<slug>/about.html), so only bare relative filenames resolve to the right URL. Keep filenames lowercase like index.html, about.html, contact.html (max 12 pages). COMPLETENESS CHECK before you finish: the FIRST line of the artifact is <!-- PAGE: index.html -->, make every <a href="..."> point to a page you actually output (a link to a page you never created is a broken site), and keep every page a complete standalone HTML document.
-- ONE-SHOT MODE: ONLY when the user explicitly asked for "oneshot" (or "one shot", "single page", "one page"), output ONE single page only (no sub-pages, no markers).
-- Build a complete, responsive, standalone experience ready for the preview canvas.
-- IMPLEMENTATION CHECK before you finish: implement EVERY feature you describe in the overview and every control the user asked for — no stubs, no TODOs, no placeholder functions; every button, form, and interactive element must actually work.
-- ALWAYS end your response with a step-by-step user guide and feature summary after the code block! Never output ONLY a bare code block.`;
-    }
-
-    return `${cleanPrompt}
-
-${designSpec}${liveInspiration}${semanticPatternsPrompt}
-
-[SINGLE-FILE REACT SPECIFICATION]:
-- ALWAYS begin your response with a clear, detailed overview explaining the features, architecture, styling decisions, and layout choices!
-- NEVER mention "Awwwards", "Awwwards-inspired", or internal prompt buzzwords in your output or preamble text. Describe your creation naturally without meta-commentary.
-- Ensure proper visual layering and z-index stacking hierarchy (Background z-index:0 -> Content z-index:10 -> HUD/Toolbars z-index:20-30 -> Modals/Overlays z-index:40-50+) so elements don't obscure interactive controls!
-- Output clean, modern React/JSX code inside ONE SINGLE \`\`\`jsx ... \`\`\` code block starting with \`export default function App()\`.
-- DO NOT wrap React code inside HTML boilerplate (\`<!DOCTYPE html>\`, \`<head>\`, \`<script type="text/babel">\`, or \`ReactDOM.createRoot()\`) because the preview canvas automatically compiles and renders React/JSX code!
-- Do NOT split your output into multiple separate code blocks, file headers (// App.tsx, // components/Navbar.tsx), or relative file imports (import Navbar from './components/Navbar').
-- Define all child components (Navbar, Hero, Footer, etc.) inline within the SAME file BEFORE the main App component!
-- MULTI-PAGE BY DEFAULT: build a multi-page website unless the user explicitly asked for ONE-SHOT (single page only). For multi-page output, switch to plain HTML and output every page as its own complete standalone HTML document inside the SAME single \`\`\`html ... \`\`\` code block. Write ONE marker line immediately BEFORE each page, INCLUDING the home page:
-  <!-- PAGE: index.html -->
-  <!DOCTYPE html>... complete home page ...
-  <!-- PAGE: about.html -->
-  <!DOCTYPE html>... complete about page ...
-  The home page MUST have its own <!-- PAGE: index.html --> line above it, and nothing (no HTML, no prose) may appear before that first marker — never write a page before its marker.
-  Link pages with PLAIN RELATIVE anchors ONLY: <a href="about.html">About</a>. Never use a leading slash or absolute URL for internal links (never "/about.html", "https://...", or "corez.pro/...") — the preview and the published site serve every page under its own folder (corez.pro/<slug>/about.html), so only bare relative filenames resolve to the right URL. Keep filenames lowercase like index.html, about.html, contact.html (max 12 pages). COMPLETENESS CHECK before you finish: the FIRST line of the artifact is <!-- PAGE: index.html -->, make every <a href="..."> point to a page you actually output (a link to a page you never created is a broken site), and keep every page a complete standalone HTML document.
-- ONE-SHOT MODE: ONLY when the user explicitly asked for "oneshot" (or "one shot", "single page", "one page"), output a single React component exactly as described above (no sub-pages, no markers).
-- IMPLEMENTATION CHECK before you finish: implement EVERY feature you describe in the overview and every control the user asked for — no stubs, no TODOs, no placeholder functions; every button and interactive element must actually work.
-- ALWAYS end your response with a step-by-step user guide and feature summary after the code block! Never output ONLY a bare code block.`;
-  }
-
-  return `${cleanPrompt}
-
-[CODE DIAGNOSIS & FIX SPECIFICATION]:
-- Systematically inspect the root cause before writing code.
-- Produce clean, modern, production-ready code preserving existing API signatures and component props.
-- If the user asks to fix "incomplete site" or "links to missing page" validation errors in HTML:
-  1) If repairing a single-page site: replace external .html links (<a href="about.html">, <a href="projects.html">, etc.) with in-page section anchors (<a href="#about">, <a href="#projects">, <a href="#contact">).
-  2) If repairing a multi-page site: output all referenced pages inside the same code block using <!-- PAGE: index.html -->, <!-- PAGE: about.html -->, etc. markers.
-- After writing the fix, re-read your answer for completeness: include the COMPLETE corrected code — never ellipses ("..."), "rest unchanged", or "same as before" placeholders.
-- Include a concise explanation of the changes and test verification steps.`;
-}
-
-// The only hard ceiling on a request is the platform's own body limit
-// (the worker allows 24 MB). Below that, the full conversation travels with
-// the request so earlier requirements and constraints are never discarded.
-const MAX_COMPACTED_BYTES = 16 * 1024 * 1024;
-const EXACT_EVIDENCE_PATTERN =
-  /```[\s\S]*?```|(?:error|exception|failed|fix|bug|require|must|constraint|dependenc|version|@|\/\/|--)[^\n]{0,200}/i;
-
-/**
- * Compact conversation history before sending it to the hosted AI.
- *
- * The full conversation is sent unchanged unless it approaches the platform
- * request-body limit. Only then are redundant older prose turns removed from
- * the request — but never deleted: every dropped message is persisted as an
- * exact retrievable record, and the request carries a REAL generated summary
- * (requirements, negative constraints, exact errors, decisions) with
- * retrieval keys linking back to the records. The latest user request, code
- * blocks, errors, and explicit requirements are preserved verbatim.
- */
-export function compactConversationForRequest(messages) {
-  if (!Array.isArray(messages) || messages.length === 0) return messages;
-
-  const serialized = JSON.stringify(messages);
-  if (serialized.length <= MAX_COMPACTED_BYTES) return messages;
-
-  let compacted = [...messages];
-  const dropped = [];
-  let i = 0;
-  while (
-    compacted.length > 1 &&
-    JSON.stringify(compacted).length > MAX_COMPACTED_BYTES &&
-    i < compacted.length
-  ) {
-    const candidate = compacted[i];
-    const isLatestUserTurn =
-      candidate?.role === "user" && i === compacted.length - 1;
-    const content =
-      typeof candidate?.content === "string" ? candidate.content : "";
-    const carriesEvidence = EXACT_EVIDENCE_PATTERN.test(content);
-    if (!isLatestUserTurn && !carriesEvidence) {
-      dropped.push(candidate);
-      compacted.splice(i, 1);
-      continue;
-    }
-    i += 1;
-  }
-
-  if (dropped.length > 0) {
-    // Persist the dropped messages verbatim and generate a real summary with
-    // retrieval links — never a generic "were summarised" placeholder.
-    const { summaryMessage } = persistAndSummarize(dropped);
-    compacted.splice(1, 0, summaryMessage);
-  }
-
-  // Final guard: if even the evidence-only payload exceeds the platform
-  // limit, keep the latest user turn and every code block exactly; fold the
-  // remaining prose into a persisted record with a real summary.
-  const finalSerialized = JSON.stringify(compacted);
-  if (finalSerialized.length > MAX_COMPACTED_BYTES) {
-    const last = compacted[compacted.length - 1];
-    const prefix = [];
-    const overflow = [];
-    for (const message of compacted.slice(0, -1)) {
-      const content =
-        typeof message?.content === "string" ? message.content : "";
-      if (
-        /```/.test(content) ||
-        /(?:error|exception|failed|bug|must|require|constraint)/i.test(content)
-      ) {
-        prefix.push(message);
-      } else {
-        overflow.push(message);
-      }
-    }
-    const { summaryMessage } = persistAndSummarize(overflow);
-    compacted = [...prefix, summaryMessage, last];
-  }
-
-  return compacted;
-}
-
-function abortError() {
-  const error = new Error("cancelled by user");
-  error.name = "AbortError";
-  return error;
-}
-
-function sleepResumable(ms, signal) {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(abortError());
-      return;
-    }
-    const onAbort = () => {
-      clearTimeout(timer);
-      reject(abortError());
-    };
-    const timer = setTimeout(() => {
-      signal?.removeEventListener("abort", onAbort);
-      resolve();
-    }, ms);
-    signal?.addEventListener("abort", onAbort, { once: true });
-  });
-}
 
 // Persisted project memory: the worker returns a lightweight structured
 // project state with every creation/modification response; it is stored here
@@ -1481,273 +1157,6 @@ export async function generateHostedAIResponse(
   return finalContent;
 }
 
-// Multi-page markers the model may place INSIDE a fence or BETWEEN
-// separate fenced blocks (one fence per page). Both placements must reach
-// the preview as one multi-page artifact, so every extraction path below
-// preserves these marker lines verbatim.
-const MULTI_PAGE_MARKER_LINE_PATTERN =
-  /^\s*<!--\s*(?:PAGE|CORESITE-PAGES):\s*[^\n>]+-->\s*$/gm;
-const MULTI_PAGE_MARKER_ANY_PATTERN =
-  /<!--\s*(?:PAGE|CORESITE-PAGES):\s*[^\s>]+\s*-->/i;
-
-export function extractCodeFromMessage(text) {
-  if (!text) return null;
-
-  // Every path below returns the artifact that the preview renders and the
-  // canvas edits. Models like to keep writing after the final </html> — a
-  // markdown "Verification checklist", a summary, a stray fence — and a
-  // browser renders that as page text, so the extracted artifact is cut at its
-  // closing tag before it leaves this function.
-  // Every artifact leaving this function is normalised: the multi-page marker
-  // convention is applied here so no caller — canvas, copy, publish — can
-  // receive a site whose home page has no marker.
-  const finish = (code) =>
-    ensureLeadingPageMarker(stripJunkAfterDocumentEnd(code).trim());
-
-  const codeBlocks = text.match(
-    /```(?:html|xml|jsx|tsx|js|javascript|react)?\s*([\s\S]*?)```/gi,
-  );
-  if (codeBlocks) {
-    const validCodes = [];
-    for (const block of codeBlocks) {
-      const match = block.match(
-        /```(?:html|xml|jsx|tsx|js|javascript|react)?\s*([\s\S]*?)```/i,
-      );
-      if (match && match[1].trim()) {
-        const code = match[1].trim();
-        if (
-          code.includes("<") ||
-          code.includes("export default") ||
-          code.includes("function ") ||
-          code.includes("import ") ||
-          code.includes("const ")
-        ) {
-          validCodes.push(code);
-        }
-      }
-    }
-    if (validCodes.length > 0) {
-      // Rebuild the extracted artifact from the ORIGINAL text so the
-      // <!-- PAGE: name.html --> markers the model puts BETWEEN fenced
-      // blocks (one fence per page) survive extraction. Dropping them
-      // collapsed multi-page sites into a single page whose nav links
-      // pointed at pages that no longer exist — blank preview pages and
-      // broken published links. Markers inside fences are kept by the
-      // block capture above; markers between fences are spliced back here.
-      const blocks = [];
-      const gaps = [];
-      let scanIdx = 0;
-      const FENCE_BLOCK_PATTERN =
-        /```(?:html|xml|jsx|tsx|js|javascript|react)?\s*[\s\S]*?```/gi;
-      let blockMatch;
-      while ((blockMatch = FENCE_BLOCK_PATTERN.exec(text)) !== null) {
-        const gap = text.slice(scanIdx, blockMatch.index);
-        gaps.push(
-          (gap.match(MULTI_PAGE_MARKER_LINE_PATTERN) || []).map((m) =>
-            m.trim(),
-          ),
-        );
-        const inner = blockMatch[0].match(
-          /```(?:html|xml|jsx|tsx|js|javascript|react)?\s*([\s\S]*?)```/i,
-        );
-        blocks.push(inner && inner[1].trim() ? inner[1].trim() : "");
-        scanIdx = blockMatch.index + blockMatch[0].length;
-      }
-      // Markers that appear after the last fence (a trailing page marker
-      // whose page block was truncated away) are kept too.
-      const tailMarkers = (
-        text.slice(scanIdx).match(MULTI_PAGE_MARKER_LINE_PATTERN) || []
-      ).map((m) => m.trim());
-
-      const joinedParts = [];
-      for (let i = 0; i < blocks.length; i += 1) {
-        // The leading gap's markers (e.g. a lone <!-- PAGE: index.html -->
-        // before the first fence) belong to the site too.
-        if (gaps[i] && gaps[i].length > 0 && (i === 0 || blocks[i])) {
-          joinedParts.push(gaps[i].join("\n"));
-        }
-        if (blocks[i]) {
-          const blockCode = blocks[i];
-          if (
-            blockCode.includes("<") ||
-            blockCode.includes("export default") ||
-            blockCode.includes("function ") ||
-            blockCode.includes("import ") ||
-            blockCode.includes("const ")
-          ) {
-            joinedParts.push(blockCode);
-          }
-        }
-      }
-      if (tailMarkers.length > 0 && joinedParts.length > 0) {
-        joinedParts.push(tailMarkers.join("\n"));
-      }
-      const joined =
-        joinedParts.filter(Boolean).join("\n\n") || validCodes.join("\n\n");
-
-      // Salvage orphaned HTML closing tags that trail the last code block
-      // (the harness occasionally emits them outside the fence).
-      const lastFenceIdx = text.lastIndexOf("```");
-      const trailing =
-        lastFenceIdx > -1 ? text.slice(lastFenceIdx + 3).trim() : "";
-      const ORPHANED_CLOSE = /^\s*(?:<\/(?:script|style|body|html)>\s*)+$/i;
-      if (trailing && ORPHANED_CLOSE.test(trailing)) {
-        return finish(joined + "\n" + trailing);
-      }
-      return finish(joined);
-    }
-  }
-
-  const matchAny = text.match(/```\s*([\s\S]*?)```/);
-  if (matchAny && matchAny[1].trim()) {
-    return finish(matchAny[1]);
-  }
-
-  // Salvage truncated responses: a long generated app is often cut off
-  // mid-code-block (no closing ```), so the strict matchers above miss it.
-  // Extract everything after the last recognized fence when it still looks
-  // like code, so the preview canvas can open anyway. Multi-page output
-  // truncated mid-way keeps ALL pages: start from where the artifact begins
-  // rather than from the last fence, which would isolate the final page and
-  // drop every earlier page's markers.
-  //
-  // The start is resolved by findArtifactStartIndex — the single shared rule.
-  // Searching for the first `<!-- PAGE: -->` marker here (as this code used to)
-  // dropped the unmarked home page, the same defect that blocked publishing
-  // from the unfenced path.
-  const truncatedBlock = text.match(
-    /```(?:html|xml|jsx|tsx|js|javascript|react)?\s*([\s\S]*)$/i,
-  );
-  if (truncatedBlock && truncatedBlock[1].trim()) {
-    let code = truncatedBlock[1].trim();
-    if (
-      MULTI_PAGE_MARKER_ANY_PATTERN.test(code) ||
-      MULTI_PAGE_MARKER_ANY_PATTERN.test(text)
-    ) {
-      const artifactStart = findArtifactStartIndex(text);
-      if (artifactStart !== -1) {
-        const fromArtifactStart = text.slice(artifactStart).trim();
-        if (
-          fromArtifactStart.includes("<html") ||
-          fromArtifactStart.includes("<!DOCTYPE") ||
-          fromArtifactStart.includes("</html>")
-        ) {
-          code = fromArtifactStart;
-        }
-      }
-    }
-    if (
-      code.includes("<") ||
-      code.includes("export default") ||
-      code.includes("function ") ||
-      code.includes("import ") ||
-      code.includes("const ")
-    ) {
-      return finish(code);
-    }
-  }
-
-  // 3. Unfenced multi-page site or HTML document (when model emits code without ``` fences)
-  const multiPageIdx = text.search(
-    /<!--\s*(?:PAGE|CORESITE-PAGES):\s*[^\s>]+\s*-->/i,
-  );
-  if (multiPageIdx !== -1) {
-    const candidate = text.slice(multiPageIdx).trim();
-    if (
-      candidate.includes("<html") ||
-      candidate.includes("<!DOCTYPE") ||
-      candidate.includes("</html>") ||
-      candidate.includes("<body") ||
-      candidate.includes("<head")
-    ) {
-      return finish(candidate);
-    }
-  }
-
-  const htmlDocIdx = text.search(/(?:<!DOCTYPE\s+html|<html[\s>])/i);
-  if (htmlDocIdx !== -1) {
-    const candidate = text.slice(htmlDocIdx).trim();
-    if (
-      candidate.includes("</html>") ||
-      candidate.includes("<body") ||
-      candidate.includes("<head") ||
-      candidate.includes("<style") ||
-      candidate.includes("<script")
-    ) {
-      return finish(candidate);
-    }
-  }
-
-  // 4. Standalone canvas game with context/loop
-  const canvasIdx = text.search(/<canvas[\s>]/i);
-  if (
-    canvasIdx !== -1 &&
-    (/\.getContext\s*\(/i.test(text) || /requestAnimationFrame/i.test(text))
-  ) {
-    const candidate = text.slice(canvasIdx).trim();
-    return finish(candidate);
-  }
-
-  return null;
-}
-
-// Detect requests that need live, up-to-date information from the web:
-// current events, latest news, live
-// scores, weather, or explicit "search the web / look up / google it"
-// phrasing. Explanation and knowledge questions WITHOUT a recency signal are
-// left to the model's own knowledge.
-// Slash commands typed in the chat box give CoreZ an explicit, unambiguous
-// intent — the AI is never asked to guess. The command token is stripped
-// Explicit commands (@website, @game, @research, @image)
-// The command token is stripped before the prompt reaches any model, so the
-// model sees only the clean request.
-const AT_COMMANDS = new Set(["website", "game", "research", "image"]);
-
-export function parseSlashCommand(prompt) {
-  const text = String(prompt || "").trim();
-  const match = text.match(/^@([a-z]+)\b/i);
-  if (!match) return { command: null, rest: text };
-  const command = match[1].toLowerCase();
-  if (!AT_COMMANDS.has(command)) return { command: null, rest: text };
-  return { command, rest: text.slice(match[0].length).trim() };
-}
-
-export const parseCommand = parseSlashCommand;
-
-export function isSlashCommand(prompt) {
-  return parseSlashCommand(prompt).command !== null;
-}
-
-export const isCommand = isSlashCommand;
-
-// Build the "why" for the honest fallback: name the transport error when the
-// fetch itself failed, and give actionable guidance — the request never
-// reached an AI provider, so a provider-key hint would be misleading.
-export function describeHostedUnavailable(hostedError) {
-  const message = hostedError?.message || "";
-  const isRateLimit =
-    /429|rate.?limit|rate_limit|too many requests/i.test(message);
-  if (isRateLimit) {
-    // Rate limits are transient and retried automatically on both ends: never
-    // dump the raw provider JSON into the reply — keep it to one short line.
-    return " The hosted AI service is rate-limited right now and automatic retries are backing off. Please wait a moment and try again.";
-  }
-  const isTransportFailure =
-    /networkerror|failed to fetch|load failed|fetch failed|ERR_CONNECTION|net::|econnrefused|connection refused/i.test(
-      message,
-    );
-  let reason = message
-    ? ` The hosted AI service is unavailable: ${message}`
-    : " The hosted AI service is currently unavailable.";
-  if (isTransportFailure) {
-    // The browser never got an HTTP response: this is a backend connectivity
-    // problem, not a missing provider key. Give actionable guidance for both
-    // local development and the deployed Worker regardless of hostname.
-    reason +=
-      " The request never reached the AI worker. Locally, /api/* is proxied to the Cloudflare Worker on port 8787 — start it with `npx wrangler dev` (with OPENCODE_GO_API_KEY in .dev.vars) so this request has a backend to answer. For the deployed site, make sure the Worker is deployed with `npx wrangler deploy`.";
-  }
-  return reason;
-}
 
 // Generate concise, natural AI responses for any public user
 export async function generateLocalAIResponse(
@@ -1904,176 +1313,6 @@ Its core purpose is to remove the technical gap between having an idea and launc
   return `I can't act on "${safeDisplay}" right now because the hosted AI service is currently unavailable.${fallbackReason}\n\nRetry in a moment and I'll turn it into a plan, a written answer, code, or a live preview depending on what you need.`;
 }
 
-// Website requests must be explicit — same rules as `@image`. `@website`
-// always qualifies. Natural-language detection is intentionally strict: the
-// build verb must govern the website noun within a tight window (~48 chars,
-// direct object), and writing/job contexts, code revisions, code blocks, and
-// social-carousel copy never qualify — otherwise "write an email about our
-// new website launch" or "what should I check before deploying a website"
-// falsely routes to a website build.
-const WEBSITE_VERB_SRC = `(?:build|make|create|generate|design|develop|launch|ship|prototype|code)`;
-const WEBSITE_NOUN_SRC = `(?:websites?|web\\s?sites?|landing(?:\\s|-)?pages?|webpages?|web\\s?apps?|web\\s?applications?|homepages?|portfolio(?:\\s+sites?)?|dashboards?|admin(?:\\s|-)?panels?|portals?|saas)`;
-const WEBSITE_BUILD_PATTERN = new RegExp(
-  `\\b${WEBSITE_VERB_SRC}\\b[\\w\\s,'"-]{0,48}?\\b${WEBSITE_NOUN_SRC}\\b`,
-  "i",
-);
-const WEBSITE_NOUN_VERB_PATTERN = new RegExp(
-  `\\b${WEBSITE_NOUN_SRC}\\b[\\w\\s,'"-]{0,48}?\\b(?:build|make|create|generate|design|develop|launch|ship|prototype)\\b`,
-  "i",
-);
-
-export function isExplicitWebsiteRequest(prompt) {
-  const clean = String(prompt || "").trim();
-  if (!clean) return false;
-
-  const lower = clean.toLowerCase();
-  if (lower.startsWith("@website")) return true;
-
-  // Code revisions, code blocks, and HTML deliverables are NEVER new website
-  // builds — they revise or analyse existing code.
-  if (
-    /^\s*(?:revise(?:\s+code)?|update(?:\s+code)?|fix(?:\s+code)?|refactor(?:\s+code)?)\b/i.test(
-      clean,
-    )
-  )
-    return false;
-  if (isRevisionContextPrompt(clean)) return false;
-  if (
-    clean.includes("```") ||
-    /<!DOCTYPE\s+html|<html|<style|<script/i.test(clean)
-  )
-    return false;
-
-  // Social-carousel copy is NEVER a website build.
-  if (isSocialCarouselCopyRequest(clean)) return false;
-
-  // Writing / job-application contexts only veto noun-first matches ("our new
-  // website launch" in an email): a verb-governed build ("build a website
-  // for my resume") is still explicit.
-  const hasWritingContext = WRITING_JOB_GUARD.test(clean);
-  const hasBuildGovernance = WEBSITE_BUILD_PATTERN.test(clean);
-  if (hasWritingContext && !hasBuildGovernance) return false;
-
-  // Questions ABOUT websites ("what should I check before deploying a
-  // website?") are explanations, not builds — unless a build verb governs
-  // the website noun, which the patterns below already require.
-  const firstLine = clean.split("\n")[0].trim();
-  if (WEBSITE_BUILD_PATTERN.test(firstLine)) return true;
-  if (WEBSITE_NOUN_VERB_PATTERN.test(firstLine) && !hasWritingContext)
-    return true;
-  if (clean.length < 300) {
-    if (WEBSITE_BUILD_PATTERN.test(clean)) return true;
-    if (WEBSITE_NOUN_VERB_PATTERN.test(clean) && !hasWritingContext)
-      return true;
-  }
-  return false;
-}
-
-export function isRevisionContextPrompt(prompt) {
-  return /\[(?:SURGICAL REVISION CONTEXT|Context: The user is requesting a revision)/i.test(
-    String(prompt || ""),
-  );
-}
-
-// --- Persistent keep-trying retry policy ----------------------------------
-// The UI must never give up with "I can't act on ..." while the hosted AI
-// is temporarily unavailable. Instead the request is re-issued with backoff
-// a bounded number of times, then the honest local fallback (with the real
-// error) is returned — a sustained outage must surface as an error, never
-// as a stream that loads forever. The user can press Stop (abort) at any
-// point to cancel the wait.
-export const PERSISTENT_RETRY_BASE_DELAY_MS = 2000;
-export const PERSISTENT_RETRY_MAX_DELAY_MS = 30000;
-// Production default: 1 initial attempt + explicit retry + up to this many
-// persistent attempts before surfacing the honest fallback.
-export const PERSISTENT_RETRY_DEFAULT_MAX_ATTEMPTS = 3;
-
-// A build the worker still owns is NOT an outage. The harness keeps the
-// request's persisted task under a lease while it builds, verifies, repairs and
-// reviews the artifact, and answers a duplicate request with "A build for this
-// request is already in progress." — meaning the same request is alive
-// server-side and a later retry replays the finished artifact. Giving up here
-// (the plain 2s/4s ladder) threw the user's creation away, so this class of
-// answer gets its own bounded ladder: long enough for a multi-minute build,
-// short enough to still fail honestly.
-export const BUILD_IN_PROGRESS_MAX_ATTEMPTS = 8;
-export const BUILD_IN_PROGRESS_BASE_DELAY_MS = 15_000;
-export const BUILD_IN_PROGRESS_MAX_DELAY_MS = 120_000;
-export const BUILD_IN_PROGRESS_MESSAGE =
-  "your build is still running on the server — send the same request again in a moment and it will pick up the finished result";
-
-/** True when the worker answered "your build is already in progress". */
-export function isBuildInProgressError(err) {
-  return /build for this request is already in progress/i.test(
-    err?.message || "",
-  );
-}
-
-export function getBuildInProgressDelay(attempt) {
-  const exp = BUILD_IN_PROGRESS_BASE_DELAY_MS * 2 ** Math.max(0, Number(attempt || 1) - 1);
-  return Math.min(exp, BUILD_IN_PROGRESS_MAX_DELAY_MS);
-}
-
-export function getPersistentRetryDelay(
-  attempt,
-  baseDelayMs = PERSISTENT_RETRY_BASE_DELAY_MS,
-  maxDelayMs = PERSISTENT_RETRY_MAX_DELAY_MS,
-) {
-  const base = Number(baseDelayMs) > 0 ? Number(baseDelayMs) : 2000;
-  const max = Number(maxDelayMs) > 0 ? Number(maxDelayMs) : 30000;
-  const exp = base * 2 ** Math.max(0, Number(attempt || 1) - 1);
-  return Math.min(exp, max);
-}
-
-export function isRetryableHostedError(err) {
-  if (!err) return true;
-  if (err?.name === "AbortError") return false;
-  if (/Authentication required/i.test(err?.message || "")) return false;
-  return true;
-}
-
-// True when a local fallback string is a hosted-unavailable give-up (not a
-// genuine instant answer like a greeting). Those give-ups must never be
-// returned to the user — they mean "keep retrying the hosted AI instead".
-export function isHostedUnavailableFallback(text) {
-  if (!text || typeof text !== "string") return false;
-  return /hosted AI service is (currently unavailable|rate-limited)|I can't act on|I can't properly answer|I couldn't apply your revision|couldn't analyse or revise|can't create (it|this specific app) right now|so I can't create/i.test(
-    text,
-  );
-}
-
-function resolvePersistentRetryOpts(retryOpts) {
-  const isTestEnv =
-    (typeof process !== "undefined" &&
-      (process?.env?.VITEST === "true" ||
-        process?.env?.VITEST === "1" ||
-        process?.env?.NODE_ENV === "test")) ||
-    (typeof globalThis !== "undefined" && Boolean(globalThis.__VITEST__));
-  const raw = retryOpts && typeof retryOpts === "object" ? retryOpts : {};
-  return {
-    // Production retries a bounded number of times, then surfaces the honest
-    // local fallback; tests keep the old single-attempt behaviour unless they
-    // explicitly opt into persistence.
-    maxPersistentAttempts:
-      raw.maxPersistentAttempts ??
-      raw.maxAttempts ??
-      (isTestEnv ? 1 : PERSISTENT_RETRY_DEFAULT_MAX_ATTEMPTS),
-    baseDelayMs:
-      raw.baseDelayMs ?? PERSISTENT_RETRY_BASE_DELAY_MS,
-    maxDelayMs: raw.maxDelayMs ?? PERSISTENT_RETRY_MAX_DELAY_MS,
-    // Forwarded to the inner streaming retry ladder (tests use tiny delays).
-    innerRetryDelaysMs: Array.isArray(raw.retryDelaysMs)
-      ? raw.retryDelaysMs
-      : Array.isArray(raw.innerRetryDelaysMs)
-        ? raw.innerRetryDelaysMs
-        : undefined,
-    // Ladder used while the worker still owns the request ("build already in
-    // progress"). Tests pass tiny delays instead of waiting minutes.
-    buildInProgressDelaysMs: Array.isArray(raw.buildInProgressDelaysMs)
-      ? raw.buildInProgressDelaysMs
-      : undefined,
-  };
-}
 
 export async function generateAIResponse(
   prompt,
