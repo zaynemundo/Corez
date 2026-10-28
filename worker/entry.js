@@ -237,6 +237,7 @@ export default {
       "/api/tasks",
       "/api/task",
       "/api/context",
+      "/api/transcribe",
       "/api/usage",
       "/api/admin",
       // Payment-intent creation/reads use the server's Ziina key: only the

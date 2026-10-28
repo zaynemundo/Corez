@@ -7,6 +7,7 @@ import {
   Gamepad2,
   Mic,
   MicOff,
+  Loader2,
   Search,
   Image as ImageIcon,
   X,
@@ -100,6 +101,7 @@ export default function ChatInput({
   // it, so an unsupported browser never shows a button that cannot work.
   const dictationAvailable = isDictationSupported();
   const [isDictating, setIsDictating] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const dictationRef = useRef(null);
 
   const [internalAttachments, setInternalAttachments] = useState([]);
@@ -276,29 +278,49 @@ export default function ChatInput({
 
   const stopDictation = () => {
     const session = dictationRef.current;
+    if (!session) return;
+    setIsDictating(false);
+    setIsTranscribing(true);
+    session.stop();
+  };
+
+  const discardDictation = () => {
+    const session = dictationRef.current;
     dictationRef.current = null;
     setIsDictating(false);
-    session?.stop();
+    setIsTranscribing(false);
+    session?.abort();
   };
 
   const startDictation = () => {
-    if (dictationRef.current) return;
-    // Dictation appends to whatever is already typed, so a half-written message
-    // is never thrown away by pressing the microphone.
-    const typedText = String(input || "");
-    const base = typedText.trim() ? `${typedText.replace(/\s+$/, "")} ` : "";
+    if (dictationRef.current || isTranscribing) return;
+    // The transcript is appended when Whisper answers, so a half-written
+    // message is never thrown away by pressing the microphone.
     const session = createDictationSession({
       language,
-      onTranscript: ({ finalText, interimText }) => {
-        setInput(`${base}${finalText}${interimText}`);
+      onTranscript: (text) => {
+        if (!text) return;
+        setInput((prev) => {
+          const current = String(prev || "");
+          return current.trim()
+            ? `${current.replace(/\s+$/, "")} ${text}`
+            : text;
+        });
+        if (refToUse.current) refToUse.current.focus();
+      },
+      onRecordingStop: () => {
+        setIsDictating(false);
+        setIsTranscribing(true);
       },
       onEnd: () => {
         dictationRef.current = null;
         setIsDictating(false);
+        setIsTranscribing(false);
       },
       onError: () => {
         dictationRef.current = null;
         setIsDictating(false);
+        setIsTranscribing(false);
       },
     });
     if (!session) return;
@@ -322,7 +344,8 @@ export default function ChatInput({
     if (!session) return;
     dictationRef.current = null;
     setIsDictating(false);
-    session.stop();
+    setIsTranscribing(false);
+    session.abort();
   }, [isStreaming]);
 
   const handleSubmit = (e) => {
@@ -331,6 +354,7 @@ export default function ChatInput({
       if (onStopMessage) onStopMessage();
       return;
     }
+    if (isTranscribing) return;
     const textToSend = input.trim();
     if (!textToSend && attachments.length === 0) return;
     const hasPending = attachments.some(
@@ -354,9 +378,9 @@ export default function ChatInput({
       return;
     }
     submitRetryRef.current = 0;
-    // The textarea is about to be cleared: a live dictation session would keep
-    // typing into it, so it ends with the message it wrote.
-    stopDictation();
+    // A recording that has not been transcribed yet cannot keep writing into a
+    // message that is already leaving; discard it rather than race the reply.
+    discardDictation();
     onSendMessage(textToSend, attachments);
     setInput("");
     setAttachments([]);
@@ -631,22 +655,38 @@ export default function ChatInput({
           {dictationAvailable && (
             <button
               type="button"
-              className={`mic-btn${isDictating ? " is-listening" : ""}`}
-              onClick={() => (isDictating ? stopDictation() : startDictation())}
+              className={`mic-btn${isDictating ? " is-listening" : ""}${
+                isTranscribing ? " is-transcribing" : ""
+              }`}
+              onClick={() => {
+                if (isDictating) stopDictation();
+                else if (!isTranscribing) startDictation();
+              }}
               aria-pressed={isDictating}
               aria-label={
-                isDictating
-                  ? t("chat.composer.dictating")
-                  : t("chat.composer.dictate")
+                isTranscribing
+                  ? t("chat.composer.transcribing")
+                  : isDictating
+                    ? t("chat.composer.dictating")
+                    : t("chat.composer.dictate")
               }
               title={
-                isDictating
-                  ? t("chat.composer.dictating")
-                  : t("chat.composer.dictate")
+                isTranscribing
+                  ? t("chat.composer.transcribing")
+                  : isDictating
+                    ? t("chat.composer.dictating")
+                    : t("chat.composer.dictate")
               }
-              disabled={isStreaming}
+              disabled={isStreaming || isTranscribing}
             >
-              {isDictating ? (
+              {isTranscribing ? (
+                <Loader2
+                  className="spin-icon"
+                  size={16}
+                  strokeWidth={1.6}
+                  aria-hidden="true"
+                />
+              ) : isDictating ? (
                 <MicOff size={16} strokeWidth={1.6} aria-hidden="true" />
               ) : (
                 <Mic size={16} strokeWidth={1.6} aria-hidden="true" />
@@ -667,7 +707,9 @@ export default function ChatInput({
               type="submit"
               className="send-btn"
               disabled={
-                (!input.trim() && attachments.length === 0) || hasPendingImage
+                (!input.trim() && attachments.length === 0) ||
+                hasPendingImage ||
+                isTranscribing
               }
               title={
                 hasPendingImage

@@ -10,6 +10,7 @@ import {
   getUserAccount,
 } from "./memory.js";
 import { handleRerank, handleEmbed } from "./aiModels.js";
+import { handleTranscribe } from "./transcribe.js";
 import { fetchAwwwardsInspirationCached, handleInspiration } from "./inspiration.js";
 import { sessionUid } from "./auth.js";
 import { getActiveSubscription } from "./subscriptions.js";
@@ -4946,6 +4947,9 @@ export default {
     }
     if (pathname === "/api/embed") {
       return handleEmbed(request, env);
+    }
+    if (pathname === "/api/transcribe") {
+      return handleTranscribe(request, env);
     }
     if (pathname === "/api/inspiration") {
       return handleInspiration(request, env);

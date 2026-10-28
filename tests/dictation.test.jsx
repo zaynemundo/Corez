@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 //
-// Voice dictation: the microphone only exists where the browser can recognise
-// speech, it writes into the composer without ever clearing what was typed, and
-// it stops with the message it wrote.
+// Voice dictation records a short clip with MediaRecorder, sends it to
+// /api/transcribe, and appends the Whisper text to the composer. The
+// microphone only exists where recording is actually available.
 import { describe, it, expect, afterEach, vi } from "vitest";
 import {
   render,
@@ -10,6 +10,7 @@ import {
   cleanup,
   fireEvent,
   act,
+  waitFor,
 } from "@testing-library/react";
 import ChatInput from "../src/components/ChatInput.jsx";
 import {
@@ -18,113 +19,157 @@ import {
   isDictationSupported,
 } from "../src/utils/dictation.js";
 
-/** Minimal stand-in for the browser's SpeechRecognition. */
-class FakeRecognition {
-  constructor() {
-    FakeRecognition.instances.push(this);
+class FakeMediaRecorder {
+  static instances = [];
+  static isTypeSupported() {
+    return true;
   }
+
+  constructor(stream, options) {
+    this.stream = stream;
+    this.mimeType = options?.mimeType || "audio/webm";
+    this.state = "inactive";
+    FakeMediaRecorder.instances.push(this);
+  }
+
   start() {
-    this.started = true;
+    this.state = "recording";
   }
+
   stop() {
-    this.stopped = true;
+    if (this.state === "inactive") return;
+    this.state = "inactive";
+    this.onstop?.();
   }
-  abort() {
-    this.aborted = true;
-  }
-  /** Deliver one recognition event the way the browser does. */
-  emit(results) {
-    const list = results.map((entry) => {
-      const result = { 0: { transcript: entry.transcript } };
-      result.isFinal = Boolean(entry.isFinal);
-      return result;
-    });
-    this.onresult?.({ resultIndex: 0, results: list });
+
+  emitAudio(type = "audio/webm") {
+    const data = new Blob(["ABCD"], { type });
+    this.ondataavailable?.({ data });
+    return data;
   }
 }
-FakeRecognition.instances = [];
 
-function installSpeechRecognition() {
-  window.SpeechRecognition = FakeRecognition;
-  return FakeRecognition;
+let originalMediaDevices;
+let originalMediaRecorder;
+
+function installSupport({ getUserMedia } = {}) {
+  const track = { stop: vi.fn() };
+  const stream = { getTracks: () => [track] };
+  const gum = getUserMedia || vi.fn().mockResolvedValue(stream);
+  originalMediaDevices = Object.getOwnPropertyDescriptor(
+    navigator,
+    "mediaDevices",
+  );
+  originalMediaRecorder = window.MediaRecorder;
+  Object.defineProperty(navigator, "mediaDevices", {
+    configurable: true,
+    value: { getUserMedia: gum },
+  });
+  window.MediaRecorder = FakeMediaRecorder;
+  FakeMediaRecorder.instances = [];
+  return { gum, stream, track };
+}
+
+function jsonResponse(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
 afterEach(() => {
   cleanup();
-  delete window.SpeechRecognition;
-  delete window.webkitSpeechRecognition;
-  FakeRecognition.instances = [];
+  FakeMediaRecorder.instances = [];
+  delete window.MediaRecorder;
+  if (originalMediaRecorder !== undefined) {
+    window.MediaRecorder = originalMediaRecorder;
+  }
+  if (originalMediaDevices) {
+    Object.defineProperty(navigator, "mediaDevices", originalMediaDevices);
+  } else {
+    delete navigator.mediaDevices;
+  }
+  originalMediaDevices = undefined;
+  originalMediaRecorder = undefined;
   vi.restoreAllMocks();
+  localStorage.clear();
 });
 
 describe("dictation support detection", () => {
-  it("reports no support in a browser without the API", () => {
+  it("reports no support without MediaRecorder/getUserMedia", () => {
     expect(isDictationSupported()).toBe(false);
     expect(createDictationSession()).toBeNull();
   });
 
-  it("accepts the webkit-prefixed constructor too", () => {
-    window.webkitSpeechRecognition = FakeRecognition;
+  it("accepts a browser with both recording APIs", () => {
+    installSupport();
     expect(isDictationSupported()).toBe(true);
   });
 
-  it("uses the recognition language that matches the interface", () => {
-    expect(dictationLanguage("ar")).toBe("ar-SA");
-    expect(dictationLanguage("en")).toBe("en-US");
-    expect(dictationLanguage(undefined)).toBe("en-US");
+  it("uses Whisper language codes", () => {
+    expect(dictationLanguage("ar")).toBe("ar");
+    expect(dictationLanguage("en")).toBe("en");
+    expect(dictationLanguage(undefined)).toBe("en");
   });
 });
 
 describe("a dictation session", () => {
-  it("streams final and interim text separately", () => {
-    installSpeechRecognition();
-    const seen = [];
-    createDictationSession({
+  it("records, transcribes and releases the microphone", async () => {
+    const { track } = installSupport();
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(jsonResponse({ text: "make a plan" }));
+    const transcripts = [];
+    const ends = [];
+    const session = createDictationSession({
       language: "en",
-      onTranscript: (result) => seen.push(result),
+      onTranscript: (text) => transcripts.push(text),
+      onEnd: () => ends.push(true),
     });
 
-    const recognition = FakeRecognition.instances[0];
-    expect(recognition.lang).toBe("en-US");
-    expect(recognition.continuous).toBe(true);
-    expect(recognition.interimResults).toBe(true);
-    expect(recognition.started).toBe(true);
+    await waitFor(() => {
+      expect(FakeMediaRecorder.instances).toHaveLength(1);
+    });
+    const recorder = FakeMediaRecorder.instances[0];
+    recorder.emitAudio();
+    session.stop();
 
-    recognition.emit([{ transcript: "hello", isFinal: false }]);
-    recognition.emit([{ transcript: "hello world", isFinal: true }]);
-    recognition.emit([{ transcript: " again", isFinal: false }]);
-
-    expect(seen).toEqual([
-      { finalText: "", interimText: "hello" },
-      { finalText: "hello world", interimText: "" },
-      { finalText: "hello world", interimText: " again" },
-    ]);
+    await waitFor(() => {
+      expect(transcripts).toEqual(["make a plan"]);
+      expect(ends).toHaveLength(1);
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/transcribe",
+      expect.objectContaining({ method: "POST" }),
+    );
+    const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(sent.audio).toBe("QUJDRA==");
+    expect(sent.language).toBe("en");
+    expect(track.stop).toHaveBeenCalled();
   });
 
-  it("reports a refused microphone instead of pretending to listen", () => {
-    installSpeechRecognition();
+  it("surfaces a refused microphone without leaving a session running", async () => {
+    installSupport({
+      getUserMedia: vi
+        .fn()
+        .mockRejectedValue(
+          Object.assign(new Error("denied"), { name: "NotAllowedError" }),
+        ),
+    });
     const errors = [];
     createDictationSession({ onError: (error) => errors.push(error) });
-    const recognition = FakeRecognition.instances[0];
-    recognition.onerror({ error: "not-allowed" });
-    expect(errors).toEqual(["not-allowed"]);
-  });
 
-  it("stops on request only once", () => {
-    installSpeechRecognition();
-    const session = createDictationSession({});
-    const recognition = FakeRecognition.instances[0];
-    session.stop();
-    session.stop();
-    expect(recognition.stopped).toBe(true);
+    await waitFor(() => {
+      expect(errors).toEqual(["NotAllowedError"]);
+    });
   });
 });
 
 describe("the composer microphone", () => {
-  function setup() {
-    let value = "";
+  function setup(initial = "") {
+    let value = initial;
     const setInput = vi.fn((next) => {
-      value = next;
+      value = typeof next === "function" ? next(value) : next;
     });
     const utils = render(
       <ChatInput
@@ -134,108 +179,108 @@ describe("the composer microphone", () => {
         isStreaming={false}
       />,
     );
-    const rerender = () =>
-      utils.rerender(
-        <ChatInput
-          input={value}
-          setInput={setInput}
-          onSendMessage={() => {}}
-          isStreaming={false}
-        />,
-      );
-    return { setInput, rerender, value: () => value };
+    return {
+      setInput,
+      value: () => value,
+      rerender: () =>
+        utils.rerender(
+          <ChatInput
+            input={value}
+            setInput={setInput}
+            onSendMessage={() => {}}
+            isStreaming={false}
+          />,
+        ),
+    };
   }
 
-  it("is absent where the browser cannot dictate", () => {
-    render(
-      <ChatInput input="" setInput={() => {}} onSendMessage={() => {}} isStreaming={false} />,
-    );
+  it("is absent where recording is unavailable", () => {
+    setup();
     expect(screen.queryByLabelText("Dictate with your voice")).toBeNull();
   });
 
-  it("dictates from the microphone and marks the listening state", () => {
-    installSpeechRecognition();
-    setup();
-    const mic = screen.getByLabelText("Dictate with your voice");
-    expect(mic.getAttribute("aria-pressed")).toBe("false");
-
-    fireEvent.click(mic);
-    expect(FakeRecognition.instances).toHaveLength(1);
-    expect(FakeRecognition.instances[0].started).toBe(true);
-
-    const listening = screen.getByLabelText("Stop dictation");
-    expect(listening.classList.contains("is-listening")).toBe(true);
-    expect(listening.getAttribute("aria-pressed")).toBe("true");
-  });
-
-  it("keeps the primary circle as the send action, never a second voice control", () => {
-    // One voice affordance only: the microphone dictates, the circle sends.
-    installSpeechRecognition();
+  it("marks the listening state, then inserts the transcript", async () => {
+    installSupport();
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(jsonResponse({ text: "make a plan" }));
     const test = setup();
-    expect(screen.queryByLabelText("Start voice input")).toBeNull();
-    expect(screen.queryByLabelText("Stop voice input")).toBeNull();
-    const send = screen.getByTitle("Send Message");
-    expect(send.classList.contains("voice-btn")).toBe(false);
-    expect(send.disabled).toBe(true);
 
-    test.setInput("a real message");
-    test.rerender();
-    expect(screen.getByTitle("Send Message").disabled).toBe(false);
-  });
-
-  it("keeps a disabled send button where the browser cannot dictate", () => {
-    setup();
-    const send = screen.getByTitle("Send Message");
-    expect(send.disabled).toBe(true);
-    expect(send.classList.contains("voice-btn")).toBe(false);
-  });
-
-  it("writes the transcript into the composer and stops with it", () => {
-    installSpeechRecognition();
-    const test = setup();
     fireEvent.click(screen.getByLabelText("Dictate with your voice"));
-    const recognition = FakeRecognition.instances[0];
-
-    act(() => {
-      recognition.emit([{ transcript: "make a plan", isFinal: false }]);
+    await waitFor(() => {
+      expect(FakeMediaRecorder.instances).toHaveLength(1);
     });
-    test.rerender();
-    expect(test.value()).toBe("make a plan");
+    expect(screen.getByLabelText("Stop dictation")).toBeTruthy();
 
-    // Pressing it again ends the session rather than starting a second one.
+    const recorder = FakeMediaRecorder.instances[0];
+    recorder.emitAudio();
     fireEvent.click(screen.getByLabelText("Stop dictation"));
-    expect(recognition.stopped).toBe(true);
-    expect(FakeRecognition.instances).toHaveLength(1);
+
+    await waitFor(() => {
+      expect(test.value()).toBe("make a plan");
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Dictate with your voice")).toBeTruthy();
+    });
   });
 
-  it("appends to a half-written message instead of replacing it", () => {
-    installSpeechRecognition();
-    let value = "draft: ";
-    const setInput = vi.fn((next) => {
-      value = next;
-    });
-    const { rerender } = render(
-      <ChatInput
-        input={value}
-        setInput={setInput}
-        onSendMessage={() => {}}
-        isStreaming={false}
-      />,
+  it("appends to a half-written message instead of replacing it", async () => {
+    installSupport();
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      jsonResponse({ text: "send the invoice" }),
     );
-    rerender(
-      <ChatInput
-        input={value}
-        setInput={setInput}
-        onSendMessage={() => {}}
-        isStreaming={false}
-      />,
-    );
+    const test = setup("draft: ");
 
     fireEvent.click(screen.getByLabelText("Dictate with your voice"));
-    const recognition = FakeRecognition.instances[0];
-    act(() => {
-      recognition.emit([{ transcript: "send the invoice", isFinal: true }]);
+    await waitFor(() => {
+      expect(FakeMediaRecorder.instances).toHaveLength(1);
     });
-    expect(value).toBe("draft: send the invoice");
+    FakeMediaRecorder.instances[0].emitAudio();
+    fireEvent.click(screen.getByLabelText("Stop dictation"));
+
+    await waitFor(() => {
+      expect(test.value()).toBe("draft: send the invoice");
+    });
+  });
+
+  it("disables sending while Whisper is transcribing", async () => {
+    installSupport();
+    let resolveFetch;
+    const pending = new Promise((resolve) => {
+      resolveFetch = resolve;
+    });
+    vi.spyOn(globalThis, "fetch").mockReturnValue(pending);
+    const test = setup("draft message");
+
+    fireEvent.click(screen.getByLabelText("Dictate with your voice"));
+    await waitFor(() => {
+      expect(FakeMediaRecorder.instances).toHaveLength(1);
+    });
+    FakeMediaRecorder.instances[0].emitAudio();
+    fireEvent.click(screen.getByLabelText("Stop dictation"));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Transcribing your voice…")).toBeTruthy();
+    });
+    expect(screen.getByTitle("Send Message").disabled).toBe(true);
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalled();
+    });
+
+    await act(async () => {
+      resolveFetch(jsonResponse({ text: "and more" }));
+    });
+    await waitFor(() => {
+      expect(test.value()).toBe("draft message and more");
+    });
+  });
+
+  it("keeps the primary circle as the send action", () => {
+    installSupport();
+    setup("a real message");
+    const send = screen.getByTitle("Send Message");
+    expect(send.classList.contains("voice-btn")).toBe(false);
+    expect(send.disabled).toBe(false);
   });
 });

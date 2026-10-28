@@ -15,6 +15,7 @@ export default {
     // زرّ الميكروفون: الاسم الميسَّر والتلميح يحملان المعنى.
     dictate: "أملِ رسالتك بصوتك",
     dictating: "إيقاف الإملاء",
+    transcribing: "جارٍ تحويل صوتك إلى نص…",
     commandsLabel: "الأوامر",
     suggestionLabel: "{label} — {description}",
     commands: {

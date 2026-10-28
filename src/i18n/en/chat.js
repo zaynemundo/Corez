@@ -25,6 +25,7 @@ export default {
     // tooltip carry the meaning.
     dictate: "Dictate with your voice",
     dictating: "Stop dictation",
+    transcribing: "Transcribing your voice…",
     commandsLabel: "Commands",
     suggestionLabel: "{label}: {description}",
     commands: {
