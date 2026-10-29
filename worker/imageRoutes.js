@@ -353,10 +353,6 @@ const WORKERS_AI_IMAGE_FAST_MODEL = "@cf/black-forest-labs/flux-2-klein-4b";
 const WORKERS_AI_FALLBACK_MODEL = "@cf/black-forest-labs/flux-1-schnell";
 const WORKERS_AI_SDXL_LIGHTNING_MODEL =
   "@cf/bytedance/stable-diffusion-xl-lightning";
-// The only Workers AI image model with an img2img input contract. Used for
-// edits of a user's reference image when no keyed image provider is configured.
-const WORKERS_AI_IMG2IMG_MODEL =
-  "@cf/stabilityai/stable-diffusion-xl-base-1.0";
 const ALLOWED_WORKERS_AI_IMAGE_MODELS = new Set([
   WORKERS_AI_IMAGE_MODEL,
   WORKERS_AI_IMAGE_FAST_MODEL,
@@ -396,6 +392,38 @@ function bytesToBase64(bytes) {
  * { image: "<base64>" } while SDXL's schema is binary. Accept either, plus a
  * Response/Blob/stream, so an img2img response is not mistaken for no image.
  */
+function buildWorkersAIImageForm(prompt, body, referenceImage) {
+  const form = new FormData();
+  form.append(
+    "prompt",
+    referenceImage
+      ? `Use input_image_0 as the visual reference. ${prompt}`
+      : prompt,
+  );
+  const width = boundedInt(body.width, 256, 1920);
+  const height = boundedInt(body.height, 256, 1920);
+  const seed = boundedInt(body.seed, 0, 2147483647);
+  if (width !== null) form.append("width", String(width));
+  if (height !== null) form.append("height", String(height));
+  if (seed !== null) form.append("seed", String(seed));
+
+  if (referenceImage) {
+    const comma = referenceImage.indexOf(",");
+    const mime =
+      referenceImage.slice(5, comma).split(";")[0] || "image/png";
+    const bytes = Uint8Array.from(
+      atob(referenceImage.slice(comma + 1)),
+      (char) => char.charCodeAt(0),
+    );
+    form.append(
+      "input_image_0",
+      new Blob([bytes], { type: mime }),
+      "reference-image",
+    );
+  }
+  return new Response(form);
+}
+
 async function imageResultBase64(result) {
   const normalize = (value) => {
     if (typeof value !== "string") return "";
@@ -532,7 +560,7 @@ export async function handleWorkersAIImage(request, env) {
     requestedModel = modelAliases[requestedModel.toLowerCase()];
   }
   const selectedModel = referenceImage
-    ? WORKERS_AI_IMG2IMG_MODEL
+    ? WORKERS_AI_IMAGE_MODEL
     : requestedModel && ALLOWED_WORKERS_AI_IMAGE_MODELS.has(requestedModel)
       ? requestedModel
       : WORKERS_AI_IMAGE_MODEL;
@@ -540,42 +568,15 @@ export async function handleWorkersAIImage(request, env) {
 
   let result;
   try {
-    if (referenceImage) {
-      const imageBase64 = referenceImage.slice(
-        referenceImage.indexOf(",") + 1,
-      );
-      const requestedStrength = Number(body.strength);
-      const strength = Number.isFinite(requestedStrength)
-        ? Math.min(0.9, Math.max(0.35, requestedStrength))
-        : 0.55;
-      const seed = boundedInt(body.seed, 0, 2147483647);
-      result = await ai.run(
-        selectedModel,
-        {
-          prompt: enhancedPrompt,
-          image_b64: imageBase64,
-          strength,
-          num_steps: 20,
-          ...(seed !== null ? { seed } : {}),
-        },
-        clientSignal ? { signal: clientSignal } : undefined,
-      );
-    } else {
-    // The model consumes multipart/form-data. Serialize the FormData through
-    // a Response so the binding receives a proper multipart stream PLUS its
-    // derived Content-Type with the boundary (the documented klein-4b
-    // pattern): passing a raw FormData with a custom Content-Type strips the
-    // boundary (runner 3030), and string/byte bodies are rejected (8001).
-    // SDXL-Lightning uses the same multipart shape (prompt + optional width/height/seed).
-    const form = new FormData();
-    form.append("prompt", enhancedPrompt);
-    const width = boundedInt(body.width, 256, 1920);
-    const height = boundedInt(body.height, 256, 1920);
-    const seed = boundedInt(body.seed, 0, 2147483647);
-    if (width !== null) form.append("width", String(width));
-    if (height !== null) form.append("height", String(height));
-    if (seed !== null) form.append("seed", String(seed));
-    const formResponse = new Response(form);
+    // FLUX.2 consumes multipart/form-data for both text-to-image and reference
+    // editing. A reference goes in as binary input_image_0 (the documented
+    // multi-reference field); serialize the FormData through a Response so the
+    // binding receives the body plus its boundary.
+    const formResponse = buildWorkersAIImageForm(
+      enhancedPrompt,
+      body,
+      referenceImage,
+    );
     const inputs = {
       multipart: {
         body: formResponse.body,
@@ -589,40 +590,39 @@ export async function handleWorkersAIImage(request, env) {
         clientSignal ? { signal: clientSignal } : undefined,
       );
     } catch (primaryErr) {
-      // Fallback to flux-1-schnell if selected model is unavailable (model not found, quota, etc.)
       const msg = String(primaryErr?.message || "");
       const isModelNotFound =
         /model not found|unknown model|not available|400|404/i.test(msg);
-      const fallbackModel =
-        selectedModel !== WORKERS_AI_FALLBACK_MODEL
+      // Reference editing must stay on a model that accepts input_image_0;
+      // text-only flux-1-schnell would silently discard the user's room.
+      const fallbackModel = referenceImage
+        ? selectedModel !== WORKERS_AI_IMAGE_FAST_MODEL
+          ? WORKERS_AI_IMAGE_FAST_MODEL
+          : null
+        : selectedModel !== WORKERS_AI_FALLBACK_MODEL
           ? WORKERS_AI_FALLBACK_MODEL
           : WORKERS_AI_SDXL_LIGHTNING_MODEL;
-      if (isModelNotFound && fallbackModel) {
-        console.warn(
-          `Primary Workers AI model ${selectedModel} failed (${safeErrorDetail(primaryErr)}), trying fallback ${fallbackModel}`,
-        );
-        const fallbackForm = new FormData();
-        fallbackForm.append("prompt", enhancedPrompt);
-        if (width !== null) fallbackForm.append("width", String(width));
-        if (height !== null) fallbackForm.append("height", String(height));
-        if (seed !== null) fallbackForm.append("seed", String(seed));
-        const fallbackResp = new Response(fallbackForm);
-        const fallbackInputs = {
-          multipart: {
-            body: fallbackResp.body,
-            contentType: fallbackResp.headers.get("content-type"),
-          },
-        };
-        result = await ai.run(
-          fallbackModel,
-          fallbackInputs,
-          clientSignal ? { signal: clientSignal } : undefined,
-        );
-        usedModel = fallbackModel;
-      } else {
-        throw primaryErr;
-      }
-    }
+      if (!isModelNotFound || !fallbackModel) throw primaryErr;
+      console.warn(
+        `Primary Workers AI model ${selectedModel} failed (${safeErrorDetail(primaryErr)}), trying fallback ${fallbackModel}`,
+      );
+      const fallbackResponse = buildWorkersAIImageForm(
+        enhancedPrompt,
+        body,
+        referenceImage,
+      );
+      const fallbackInputs = {
+        multipart: {
+          body: fallbackResponse.body,
+          contentType: fallbackResponse.headers.get("content-type"),
+        },
+      };
+      result = await ai.run(
+        fallbackModel,
+        fallbackInputs,
+        clientSignal ? { signal: clientSignal } : undefined,
+      );
+      usedModel = fallbackModel;
     }
   } catch (err) {
     if (clientSignal?.aborted || err?.name === "AbortError") {
