@@ -479,6 +479,8 @@ check 'the shell owns the share dialog' 'ChatShareModal' "$app"
 check 'the public shared chat has its own surface' 'shared-chat-page' "$css"
 check_block_property 'the shared transcript owns its own scroll' '.shared-chat-page' 'overflow-y' 'auto'
 check 'shared chat links stay public routes' 'share/chat' "$app"
+check_block_property 'generated images start at the message edge' '.markdown-image-wrapper' 'align-items' 'flex-start'
+check_block_property 'generated image previews are modestly capped' '.markdown-image-card' 'max-width' 'min(100%, 440px)'
 
 
 if (( failures > 0 )); then
