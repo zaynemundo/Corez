@@ -620,6 +620,30 @@ export const PREVIEW_ERROR_REPORTER_SCRIPT = `
 const PREVIEW_CSP =
   "default-src blob:; script-src 'unsafe-inline' https:; style-src 'unsafe-inline' https:; img-src data: https: blob:; font-src data: https:; media-src data: https: blob:; connect-src https:";
 
+/**
+ * A revision can leave an early call to a function that reads a top-level
+ * `const reduceMotion` declared later in the same script. That is a temporal
+ * dead-zone ReferenceError before the page paints ("can't access lexical
+ * declaration 'reduceMotion' before initialization"). Hoist the declaration to
+ * the top of its script; the initializer has no dependency on earlier code.
+ */
+function hoistReducedMotionDeclaration(html) {
+  if (!html || typeof html !== "string") return html;
+  return html.replace(
+    /<script([^>]*)>([\s\S]*?)<\/script>/gi,
+    (full, attrs, body) => {
+      const declaration = body.match(
+        /^(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*window\.matchMedia\([^;\n]*\)\.matches;?[ \t]*$/m,
+      );
+      if (!declaration || declaration.index === 0) return full;
+      const stripped = body
+        .replace(declaration[0], "")
+        .replace(/^\n+/, "");
+      return `<script${attrs}>\n${declaration[0]}\n${stripped}</script>`;
+    },
+  );
+}
+
 function withPreviewCsp(html) {
   if (!html || typeof html !== "string") return html;
   const head = `  <meta http-equiv="Content-Security-Policy" content="${PREVIEW_CSP}">\n  <script>${PREVIEW_ERROR_REPORTER_SCRIPT}</script>`;
@@ -645,7 +669,9 @@ export function formatCodeForPreview(rawCode) {
   if (/^<!DOCTYPE html/i.test(stripped) || /^<html/i.test(stripped)) {
     const page = normalizePageDocument(trimmed) || trimmed;
     return withPreviewCsp(
-      injectNavigationGuard(injectFullscreenGamePatch(page)),
+      hoistReducedMotionDeclaration(
+        injectNavigationGuard(injectFullscreenGamePatch(page)),
+      ),
     );
   }
 
@@ -695,7 +721,7 @@ export function formatCodeForPreview(rawCode) {
   </script>
 </head>
 <body>
-  ${trimmed}
+  ${hoistReducedMotionDeclaration(trimmed)}
   <script>${FULLSCREEN_GAME_PATCH}</script>
   <script>${NAVIGATION_GUARD_SCRIPT}</script>
 </body>

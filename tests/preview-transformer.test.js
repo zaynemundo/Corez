@@ -12,6 +12,22 @@ describe('previewTransformer', () => {
     expect(formatted).toContain("addEventListener('click'");
   });
 
+  it('hoists a reduced-motion declaration ahead of an earlier function call', () => {
+    const html = `<!DOCTYPE html><html><body><script>
+bindTilt();
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+function bindTilt() {
+  if (reduceMotion) return;
+}
+</script></body></html>`;
+    const formatted = formatCodeForPreview(html);
+    const declaration = formatted.indexOf('const reduceMotion');
+    const call = formatted.indexOf('bindTilt();');
+    expect(declaration).toBeGreaterThan(-1);
+    expect(call).toBeGreaterThan(-1);
+    expect(declaration).toBeLessThan(call);
+  });
+
   it('injects the navigation guard into documents without a closing body tag', () => {
     const html = '<!DOCTYPE html><html><head></head><body><a href="about.html">About</a>';
     const formatted = formatCodeForPreview(html);
