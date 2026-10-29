@@ -105,6 +105,8 @@ export function createDictationSession({
   let requestTimer = null;
   let recognition = null;
   let liveFinalText = "";
+  let liveRestartCount = 0;
+  let liveUnavailable = false;
 
   const cleanupStream = () => {
     if (!stream) return;
@@ -263,7 +265,68 @@ export function createDictationSession({
     cleanupStream();
   };
 
+  // Start the recognizer before awaiting mic permission: Chrome can reject a
+  // SpeechRecognition.start() that happens after the click's transient user
+  // activation has expired on the first permission prompt.
+  const startLivePreview = () => {
+    const Recognition = speechRecognitionCtor();
+    if (!Recognition || aborted || finished) return;
+    try {
+      recognition = new Recognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = speechLanguage(language);
+      recognition.onresult = (event) => {
+        if (aborted || finished) return;
+        liveRestartCount = 0;
+        let interimText = "";
+        for (let i = event.resultIndex; i < event.results.length; i += 1) {
+          const result = event.results[i];
+          const text = result?.[0]?.transcript || "";
+          if (result?.isFinal) liveFinalText += text;
+          else interimText += text;
+        }
+        onLiveTranscript?.({ finalText: liveFinalText, interimText });
+      };
+      recognition.onerror = (event) => {
+        const code = String(event?.error || "");
+        if (
+          code === "not-allowed" ||
+          code === "service-not-allowed" ||
+          code === "audio-capture"
+        ) {
+          liveUnavailable = true;
+          recognition = null;
+        }
+      };
+      recognition.onend = () => {
+        if (aborted || finished || liveUnavailable || !recognition) {
+          if (!recognition) return;
+          recognition = null;
+          return;
+        }
+        if (liveRestartCount >= 3) {
+          recognition = null;
+          return;
+        }
+        liveRestartCount += 1;
+        setTimeout(() => {
+          if (aborted || finished || !recognition) return;
+          try {
+            recognition.start();
+          } catch {
+            recognition = null;
+          }
+        }, 150);
+      };
+      recognition.start();
+    } catch {
+      recognition = null;
+    }
+  };
+
   const start = async () => {
+    startLivePreview();
     try {
       stream = await devices.getUserMedia({
         audio: {
@@ -291,42 +354,6 @@ export function createDictationSession({
 
       started = true;
       recorder.start(250);
-
-      // Best-effort live preview: the browser's local recognizer writes interim
-      // words while the clip records. Whisper still produces the final text on
-      // stop, so a browser without this API simply gets no preview.
-      const Recognition = speechRecognitionCtor();
-      if (Recognition) {
-        try {
-          recognition = new Recognition();
-          recognition.continuous = true;
-          recognition.interimResults = true;
-          recognition.lang = speechLanguage(language);
-          recognition.onresult = (event) => {
-            if (aborted || finished) return;
-            let interimText = "";
-            for (let i = event.resultIndex; i < event.results.length; i += 1) {
-              const result = event.results[i];
-              const text = result?.[0]?.transcript || "";
-              if (result?.isFinal) liveFinalText += text;
-              else interimText += text;
-            }
-            onLiveTranscript?.({
-              finalText: liveFinalText,
-              interimText,
-            });
-          };
-          recognition.onerror = () => {
-            recognition = null;
-          };
-          recognition.onend = () => {
-            recognition = null;
-          };
-          recognition.start();
-        } catch {
-          recognition = null;
-        }
-      }
 
       timer = setTimeout(() => {
         if (finished || aborted || recorder?.state !== "recording") return;
