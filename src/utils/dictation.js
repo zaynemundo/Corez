@@ -326,7 +326,6 @@ export function createDictationSession({
   };
 
   const start = async () => {
-    startLivePreview();
     try {
       stream = await devices.getUserMedia({
         audio: {
@@ -354,6 +353,10 @@ export function createDictationSession({
 
       started = true;
       recorder.start(250);
+      // Start live recognition only after the recording stream is established.
+      // Starting it first makes Chrome's recognizer claim the microphone before
+      // getUserMedia, which can reject the recording and end dictation instantly.
+      startLivePreview();
 
       timer = setTimeout(() => {
         if (finished || aborted || recorder?.state !== "recording") return;
