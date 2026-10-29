@@ -361,6 +361,15 @@ export async function generateWorkersAIImage(
     if (typeof options.model === "string" && options.model.trim()) {
       payload.model = options.model.trim();
     }
+    if (
+      typeof options.referenceImage === "string" &&
+      options.referenceImage.startsWith("data:image")
+    ) {
+      payload.referenceImage = options.referenceImage;
+      if (Number.isFinite(Number(options.strength))) {
+        payload.strength = Number(options.strength);
+      }
+    }
     const fetchOptions = {
       method: "POST",
       credentials: "include",
@@ -396,10 +405,14 @@ export async function generateImage(
     typeof referenceImage === "string" &&
     referenceImage.startsWith("data:image");
 
-  if (!hasReferenceImage) {
-    const workersImage = await generateWorkersAIImage(prompt, signal, options);
-    if (workersImage) return workersImage;
-  }
+  // Workers AI handles both text-to-image (FLUX) and reference-image editing
+  // (SDXL img2img), so it stays the free first stop when a keyed image
+  // provider is not configured.
+  const workersImage = await generateWorkersAIImage(prompt, signal, {
+    ...options,
+    ...(hasReferenceImage ? { referenceImage } : {}),
+  });
+  if (workersImage) return workersImage;
 
   try {
     const payload = { prompt };

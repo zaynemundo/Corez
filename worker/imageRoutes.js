@@ -353,6 +353,10 @@ const WORKERS_AI_IMAGE_FAST_MODEL = "@cf/black-forest-labs/flux-2-klein-4b";
 const WORKERS_AI_FALLBACK_MODEL = "@cf/black-forest-labs/flux-1-schnell";
 const WORKERS_AI_SDXL_LIGHTNING_MODEL =
   "@cf/bytedance/stable-diffusion-xl-lightning";
+// The only Workers AI image model with an img2img input contract. Used for
+// edits of a user's reference image when no keyed image provider is configured.
+const WORKERS_AI_IMG2IMG_MODEL =
+  "@cf/stabilityai/stable-diffusion-xl-base-1.0";
 const ALLOWED_WORKERS_AI_IMAGE_MODELS = new Set([
   WORKERS_AI_IMAGE_MODEL,
   WORKERS_AI_IMAGE_FAST_MODEL,
@@ -376,6 +380,48 @@ function mimeFromBase64(base64) {
   if (base64.startsWith("iVBOR")) return "image/png";
   if (base64.startsWith("UklGR")) return "image/webp";
   return "image/png";
+}
+
+function bytesToBase64(bytes) {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+/**
+ * Workers AI image models disagree on their output shape: FLUX returns
+ * { image: "<base64>" } while SDXL's schema is binary. Accept either, plus a
+ * Response/Blob/stream, so an img2img response is not mistaken for no image.
+ */
+async function imageResultBase64(result) {
+  const normalize = (value) => {
+    if (typeof value !== "string") return "";
+    const text = value.trim();
+    if (!text) return "";
+    return text.startsWith("data:")
+      ? text.slice(text.indexOf(",") + 1)
+      : text;
+  };
+
+  if (typeof result === "string") return normalize(result);
+  const direct = normalize(result?.image);
+  if (direct) return direct;
+
+  let raw = result?.image ?? result?.body ?? result;
+  if (raw instanceof Uint8Array) return bytesToBase64(raw);
+  if (raw instanceof ArrayBuffer) return bytesToBase64(new Uint8Array(raw));
+  if (raw && typeof raw.arrayBuffer === "function") {
+    return bytesToBase64(new Uint8Array(await raw.arrayBuffer()));
+  }
+  if (raw && typeof raw.getReader === "function") {
+    return bytesToBase64(
+      new Uint8Array(await new Response(raw).arrayBuffer()),
+    );
+  }
+  return "";
 }
 
 export async function handleWorkersAIImage(request, env) {
@@ -437,6 +483,27 @@ export async function handleWorkersAIImage(request, env) {
   // complete generator prompt. Crafted prompts pass through untouched.
   const enhancedPrompt = enhanceImagePrompt(prompt) || prompt;
 
+  // A user-supplied reference image turns text-to-image into an edit. Only
+  // SDXL base accepts an image input on Workers AI; FLUX.2 cannot preserve the
+  // reference, so the model choice is fixed when a reference is present.
+  const referenceImage = validateReferenceImage(body.referenceImage);
+  if (
+    typeof body.referenceImage === "string" &&
+    body.referenceImage &&
+    !referenceImage
+  ) {
+    return jsonResponse(400, {
+      error:
+        "referenceImage must be a base64 data:image URL or a public https URL.",
+    });
+  }
+  if (referenceImage && !referenceImage.startsWith("data:image/")) {
+    return jsonResponse(400, {
+      error:
+        "Workers AI image editing requires a data:image reference, not a remote URL.",
+    });
+  }
+
   // Allow client to request a specific Workers AI model (e.g. sdxl-lightning)
   let requestedModel =
     typeof body.model === "string" ? body.model.trim() : "";
@@ -464,14 +531,36 @@ export async function handleWorkersAIImage(request, env) {
   if (modelAliases[requestedModel.toLowerCase()]) {
     requestedModel = modelAliases[requestedModel.toLowerCase()];
   }
-  const selectedModel =
-    requestedModel && ALLOWED_WORKERS_AI_IMAGE_MODELS.has(requestedModel)
+  const selectedModel = referenceImage
+    ? WORKERS_AI_IMG2IMG_MODEL
+    : requestedModel && ALLOWED_WORKERS_AI_IMAGE_MODELS.has(requestedModel)
       ? requestedModel
       : WORKERS_AI_IMAGE_MODEL;
   let usedModel = selectedModel;
 
   let result;
   try {
+    if (referenceImage) {
+      const imageBase64 = referenceImage.slice(
+        referenceImage.indexOf(",") + 1,
+      );
+      const requestedStrength = Number(body.strength);
+      const strength = Number.isFinite(requestedStrength)
+        ? Math.min(0.9, Math.max(0.35, requestedStrength))
+        : 0.55;
+      const seed = boundedInt(body.seed, 0, 2147483647);
+      result = await ai.run(
+        selectedModel,
+        {
+          prompt: enhancedPrompt,
+          image_b64: imageBase64,
+          strength,
+          num_steps: 20,
+          ...(seed !== null ? { seed } : {}),
+        },
+        clientSignal ? { signal: clientSignal } : undefined,
+      );
+    } else {
     // The model consumes multipart/form-data. Serialize the FormData through
     // a Response so the binding receives a proper multipart stream PLUS its
     // derived Content-Type with the boundary (the documented klein-4b
@@ -534,6 +623,7 @@ export async function handleWorkersAIImage(request, env) {
         throw primaryErr;
       }
     }
+    }
   } catch (err) {
     if (clientSignal?.aborted || err?.name === "AbortError") {
       return jsonResponse(499, { error: "Image request cancelled." });
@@ -545,8 +635,8 @@ export async function handleWorkersAIImage(request, env) {
     });
   }
 
-  const base64 = result?.image;
-  if (typeof base64 !== "string" || base64.length === 0) {
+  const base64 = await imageResultBase64(result);
+  if (!base64) {
     return jsonResponse(502, {
       error:
         "Image generation failed: the Workers AI provider returned no image.",

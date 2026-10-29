@@ -28,6 +28,11 @@ function mockAI(overrides = {}) {
         });
         return { image: '' };
       }
+      if (overrides.binaryImage) {
+        return Uint8Array.from(atob(FAKE_IMAGE_B64), (char) =>
+          char.charCodeAt(0),
+        );
+      }
       return { image: overrides.image ?? FAKE_IMAGE_B64 };
     })
   };
@@ -98,6 +103,35 @@ describe('/api/image/cf (Workers AI FLUX.2 klein, default 9b)', () => {
     ).toBe(true);
     // The content type carries the boundary the runner requires.
     expect(inputs.multipart.contentType).toMatch(/^multipart\/form-data; boundary=/);
+  });
+
+  it('uses SDXL img2img when a reference image is supplied', async () => {
+    // SDXL's schema returns binary image bytes, unlike FLUX's base64 object.
+    const ai = mockAI({ binaryImage: true });
+    const referenceImage = `data:image/png;base64,${FAKE_IMAGE_B64}`;
+    const response = await post(
+      swarmWorker,
+      {
+        prompt: 'Restyle this room in a warm Japandi style',
+        referenceImage,
+        strength: 0.7,
+      },
+      { ...BASE_ENV, AI: ai },
+    );
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.model).toBe(
+      '@cf/stabilityai/stable-diffusion-xl-base-1.0',
+    );
+    expect(ai.run).toHaveBeenCalledTimes(1);
+    const [model, inputs] = ai.run.mock.calls[0];
+    expect(model).toBe('@cf/stabilityai/stable-diffusion-xl-base-1.0');
+    expect(inputs).toMatchObject({
+      image_b64: FAKE_IMAGE_B64,
+      strength: 0.7,
+      num_steps: 20,
+    });
+    expect(inputs.multipart).toBeUndefined();
   });
 
   it('routes the klein-9b quality alias to flux-2-klein-9b', async () => {
