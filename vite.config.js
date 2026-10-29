@@ -85,6 +85,19 @@ export default defineConfig(async () => {
           manualChunks: {
             vendor: ['react', 'react-dom', 'react-router-dom'],
             icons: ['lucide-react'],
+            'ai-intelligence': [
+              './src/data/intent-classifier-model.json',
+              './src/services/promptIntelligence/intentEngine.js',
+              './src/skills/definitions.js',
+              './src/skills/resolver.js',
+            ],
+            'preview-runtime': [
+              './src/utils/previewTransformer.js',
+              './src/utils/vendor/qrcode-generator.mjs',
+              './src/utils/qrCode.js',
+              './src/utils/zipPackager.js',
+            ],
+            legal: ['./src/data/legalDocuments.js'],
           },
         },
       },

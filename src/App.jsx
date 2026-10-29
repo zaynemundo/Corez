@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { PanelLeft, Loader2 } from "lucide-react";
 import {
   BrowserRouter,
@@ -26,12 +26,7 @@ import SharedChat from "./pages/SharedChat";
 import CookieConsent from "./components/CookieConsent";
 import { startAnalytics, trackPageView } from "./services/analytics";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import {
-  formatBytes,
-  processFiles,
-  hasFiles,
-  extractFilesFromClipboard,
-} from "./utils/fileAttachmentUtils";
+import { formatBytes } from "./utils/fileAttachmentUtils";
 import {
   generateAIResponse,
   extractCodeFromMessage,
@@ -39,23 +34,12 @@ import {
   generateAISessionTitle,
   isRevisionContextPrompt,
 } from "./services/aiService";
-import {
-  storeAppInR2,
-  deleteSessionAppsInR2,
-  unpublishSessionPages,
-  claimPublishLineage,
-} from "./services/appStorageService";
+import { storeAppInR2 } from "./services/appStorageService";
 import * as chatService from "./services/chatService";
-import {
-  displayListKey,
-  orderedListMembers,
-} from "./services/chatOrdering";
 import {
   dropChatPrefetches,
   prefetchChat,
   prefetchChatList,
-  takeChat,
-  takeChatList,
 } from "./services/chatPrefetch";
 import { buildPhaseLabel } from "./utils/buildPhaseLabel";
 import { applyRouteMeta } from "./utils/seo";
@@ -66,15 +50,14 @@ import {
 import { buildSiteRevisionContext } from "./utils/siteRevisionContext.js";
 import CompactedBanner from "./components/CompactedBanner";
 import { useI18n } from "./i18n/index.jsx";
-import {
-  compactChatMessages,
-  shouldCompact,
-  expandCompactedChat as _expandCompactedChat,
-} from "./services/smartCompact";
+import { compactChatMessages, shouldCompact } from "./services/smartCompact";
 import {
   isStreamVisibleForSession,
   isStreamActiveElsewhere,
 } from "./utils/streamSession";
+import { useSessionOrganization } from "./hooks/useSessionOrganization.js";
+import { useGlobalFileDrop } from "./hooks/useGlobalFileDrop.js";
+import { usePendingTurnRecovery } from "./hooks/usePendingTurnRecovery.js";
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -110,28 +93,6 @@ function isDuplicateAssistantMessage(message, candidate) {
   );
 }
 
-// The chat read and the chat list boot in parallel. The list can land last and
-// must not replace a transcript that has already loaded for the same id.
-function mergeLoadedSessions(incoming, previous) {
-  if (!Array.isArray(previous) || previous.length === 0) return incoming;
-  const loadedById = new Map();
-  for (const session of previous) {
-    if (session?._loaded) loadedById.set(session.id, session);
-  }
-  if (loadedById.size === 0) return incoming;
-  return incoming.map((session) => {
-    const loaded = loadedById.get(session.id);
-    if (!loaded) return session;
-    return {
-      ...session,
-      messages: loaded.messages || [],
-      _loaded: true,
-      _compactMeta: loaded._compactMeta,
-      _fullMessages: loaded._fullMessages,
-    };
-  });
-}
-
 function buildAttachmentPrompt(attachments) {
   if (!Array.isArray(attachments) || attachments.length === 0) return "";
   const sections = attachments.map((attachment) => {
@@ -163,16 +124,7 @@ function MainApp({ theme, setTheme }) {
   const { user } = useAuth();
   const { t } = useI18n();
 
-  const [sessions, setSessions] = useState([]);
-  const [sessionsLoaded, setSessionsLoaded] = useState(false);
-  const [projects, setProjects] = useState([]);
-  // Display lists the account has manually arranged (`pinned`, `recents`,
-  // `project:<id>`). The sidebar sorts those by explicit position and the
-  // rest by recency; a successful reorder adds its list here.
-  const [manualLists, setManualLists] = useState([]);
-  const [chatLoading, setChatLoading] = useState(false);
   const [activeView, setActiveView] = useState("chat");
-
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     if (
       typeof window === "undefined" ||
@@ -188,25 +140,12 @@ function MainApp({ theme, setTheme }) {
   const [shareChatId, setShareChatId] = useState(null);
   const [isThinking, setIsThinking] = useState(false);
   const [streamingContent, setStreamingContent] = useState(null);
-  // The model's live reasoning, streamed before the answer. Kept separate from
-  // streamingContent so it is never mixed into the reply, and mirrored into a
-  // ref so the finished message can carry it once the turn resolves.
   const [streamingThinking, setStreamingThinking] = useState("");
   const streamingThinkingRef = useRef("");
-  // When this turn's first reasoning delta arrived. The finished message shows
-  // "Thought for Ns" from it; 0 means no reasoning this turn.
   const thinkingStartedAtRef = useRef(0);
-  // The reasoning panel starts open (that is the whole point — the user watches
-  // it think) and auto-collapses once the answer starts, like a first-party
-  // chat app. The user can reopen it at any time.
   const [isThinkingOpen, setIsThinkingOpen] = useState(true);
-  // Which chat the live stream belongs to. The user may switch chats
-  // mid-stream; the stream must only render in its originating chat.
   const [streamingSessionId, setStreamingSessionId] = useState(null);
   const [swarmVisible, setSwarmVisible] = useState(false);
-  // Live harness phase (planning/building/verifying/repairing/reviewing/…).
-  // A build can stream for minutes and is silent while the model reasons or
-  // while the artifact is verified and repaired, so the wait must be labelled.
   const [buildPhase, setBuildPhase] = useState(null);
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
     if (
@@ -217,405 +156,91 @@ function MainApp({ theme, setTheme }) {
     return window.matchMedia("(max-width: 767px)").matches;
   });
   const [attachments, setAttachments] = useState([]);
-  const [isDraggingOver, setIsDraggingOver] = useState(false);
-  const [expandedCompactIds, setExpandedCompactIds] = useState(() => new Set());
+  const [chatInput, setChatInput] = useState("");
+  const [revisionContextCode, setRevisionContextCode] = useState("");
+  const [revisionContextSessionId, setRevisionContextSessionId] =
+    useState(null);
+  const [siteEditDraft, setSiteEditDraft] = useState(null);
 
   const messagesEndRef = useRef(null);
   const chatInputRef = useRef(null);
   const abortControllerRef = useRef(null);
   const focusTimeoutRef = useRef(null);
-  const resumeStartedRef = useRef(false);
-  // The publish lineage is offered to the worker once per load, after the chat
-  // list resolves (it needs to know which chats the account still has).
-  const lineageSyncedRef = useRef(false);
-  const dragCounterRef = useRef(0);
   const userDismissedCanvasRef = useRef(false);
-  const sessionsRef = useRef(sessions);
-  const fetchingChatIdsRef = useRef(new Set());
-  useEffect(() => {
-    sessionsRef.current = sessions;
-  }, [sessions]);
-  // Same mirror for folders: the revert-on-failure paths must know what was on
-  // screen before the optimistic change.
-  const projectsRef = useRef(projects);
-  useEffect(() => {
-    projectsRef.current = projects;
-  }, [projects]);
-  // And for the manual-order flags: optimistic reorders read them, and a
-  // failed reorder restores them.
-  const manualListsRef = useRef(manualLists);
-  useEffect(() => {
-    manualListsRef.current = manualLists;
-  }, [manualLists]);
 
   const activeSessionId = chatIdFromUrl;
-  // Ref mirror: async stream completions must compare against the chat the
-  // user is viewing *at completion time*, not at send time.
   const activeSessionIdRef = useRef(activeSessionId);
   useEffect(() => {
     activeSessionIdRef.current = activeSessionId;
   }, [activeSessionId]);
+
+  const {
+    sessions,
+    setSessions,
+    sessionsLoaded,
+    projects,
+    manualLists,
+    chatLoading,
+    expandedCompactIds,
+    handleExpandCompact,
+    handleCollapseCompact,
+    handleDeleteSession,
+    handleClearAllHistory,
+    handleCreateProject,
+    handleRenameProject,
+    handleDeleteProject,
+    handleMoveSessionToProject,
+    handleTogglePinSession,
+    handleReorderSession,
+    handleNewChatInProject,
+  } = useSessionOrganization({
+    user,
+    activeSessionId,
+    navigate,
+    setActiveView,
+    setCanvasOpen,
+    setCanvasFullScreen,
+    setActiveCanvasCode,
+    setRevisionContextCode,
+    setSettingsOpen,
+  });
+
+  const {
+    isDraggingOver,
+    handleOverlayDrop,
+    handleOverlayDragLeave,
+    handleOverlayDragOver,
+  } = useGlobalFileDrop({ chatInputRef, setAttachments });
+
+  usePendingTurnRecovery({
+    chatIdFromUrl,
+    navigate,
+    activeSessionIdRef,
+    abortControllerRef,
+    streamingThinkingRef,
+    thinkingStartedAtRef,
+    setIsThinking,
+    setSwarmVisible,
+    setBuildPhase,
+    setStreamingSessionId,
+    setStreamingThinking,
+    setIsThinkingOpen,
+    setStreamingContent,
+    setActiveCanvasCode,
+    setCanvasOpen,
+    setSessions,
+    toAssistantMessage,
+    isDuplicateAssistantMessage,
+  });
+
   const activeSession = useMemo(
     () => sessions.find((s) => s.id === activeSessionId) || null,
     [sessions, activeSessionId],
   );
 
-  // -------------------------------------------------------------
-  // Fetch chat list on mount / user change
-  // -------------------------------------------------------------
-  const fetchChatList = useCallback(async () => {
-    if (!user) return;
-    try {
-      // AppInner started this request while the session check was still in
-      // flight; consume it rather than asking a second time.
-      const [chatBody, projectList] = await Promise.all([
-        takeChatList() ?? chatService.listChats(),
-        // Project folders are additive: a deployment without the endpoint (or
-        // a transient failure) must still render the plain chat list.
-        chatService.listProjects().catch((e) => {
-          console.warn("Failed to list projects:", e);
-          return [];
-        }),
-      ]);
-      // listChats carries the chats plus the manually-arranged display lists;
-      // older deployments answer the chats array alone.
-      const chats = Array.isArray(chatBody) ? chatBody : (chatBody?.chats || []);
-      const mapped = chats.map((c) => ({
-        id: c.id,
-        title: c.title,
-        messages: [],
-        createdAt: c.createdAt,
-        updatedAt: c.updatedAt,
-        projectId: c.projectId || null,
-        pinnedAt: c.pinnedAt || null,
-        sortOrder: c.sortOrder ?? null,
-        _loaded: false,
-      }));
-      setSessions((prev) => mergeLoadedSessions(mapped, prev));
-      setManualLists(
-        Array.isArray(chatBody) ? [] : chatBody?.manualLists || [],
-      );
-      setProjects(
-        projectList.map((p) => ({
-          id: p.id,
-          name: p.name,
-          createdAt: p.createdAt,
-          updatedAt: p.updatedAt,
-        })),
-      );
-      setSessionsLoaded(true);
-
-      // Migration: if server has 0 chats but localStorage has sessions, migrate in BACKGROUND
-      // Do NOT block the initial load - user should see "empty" immediately, migration happens async
-      if (mapped.length === 0) {
-        try {
-          const saved = localStorage.getItem("corez_sessions");
-          if (saved) {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              const toMigrate = parsed
-                .filter(
-                  (s) =>
-                    s && Array.isArray(s.messages) && s.messages.length > 0,
-                )
-                .slice(0, 5);
-              if (toMigrate.length > 0) {
-                // Run migration in background, parallelized (not sequential)
-                (async () => {
-                  try {
-                    await Promise.all(
-                      toMigrate.map(async (local) => {
-                        try {
-                          const title = local.title || "Migrated Conversation";
-                          const created = await chatService.createChat({
-                            title,
-                          });
-                          if (local.messages && local.messages.length > 0) {
-                            const sanitized = local.messages.map((m, idx) => ({
-                              role: m.role || "user",
-                              content:
-                                typeof m.content === "string" ? m.content : "",
-                              attachments: m.attachments || null,
-                              createdAt: Date.now() + idx,
-                            }));
-                            await chatService.putChat(created.id, {
-                              messages: sanitized,
-                            });
-                          }
-                        } catch (e) {
-                          console.warn(
-                            "Migration failed for session",
-                            local.id,
-                            e,
-                          );
-                        }
-                      }),
-                    );
-                    const after = await chatService.listChats();
-                    const afterChats = Array.isArray(after)
-                      ? after
-                      : after?.chats || [];
-                    setSessions((prev) =>
-                      mergeLoadedSessions(
-                        afterChats.map((c) => ({
-                          id: c.id,
-                          title: c.title,
-                          messages: [],
-                          createdAt: c.createdAt,
-                          updatedAt: c.updatedAt,
-                          projectId: c.projectId || null,
-                          pinnedAt: c.pinnedAt || null,
-                          sortOrder: c.sortOrder ?? null,
-                          _loaded: false,
-                        })),
-                        prev,
-                      ),
-                    );
-                    setManualLists(
-                      Array.isArray(after) ? [] : after?.manualLists || [],
-                    );
-                    try {
-                      localStorage.removeItem("corez_sessions");
-                    } catch {}
-                  } catch (e) {
-                    console.warn("Background migration failed", e);
-                  }
-                })();
-              }
-            }
-          }
-        } catch (e) {
-          console.warn("Chat migration check failed", e);
-        }
-      }
-    } catch (e) {
-      console.warn("Failed to list chats, falling back to localStorage:", e);
-      try {
-        const saved = localStorage.getItem("corez_sessions");
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            const conforming = parsed.filter(
-              (s) => s && Array.isArray(s.messages),
-            );
-            setSessions(conforming.map((s) => ({ ...s, _loaded: true })));
-          }
-        }
-      } catch {}
-      setSessionsLoaded(true);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    fetchChatList();
-  }, [fetchChatList]);
-
-  // The sidebar highlights whatever screen the URL resolves to. Every navigation
-  // that leaves Sites already sets "chat", so this only has to claim the Sites
-  // screen and restore "chat" when the URL moves away from it.
   useEffect(() => {
     setActiveView(isSitesView ? "sites" : "chat");
   }, [isSitesView]);
-
-  // Hand this browser's publish lineage to the worker once per load. It closes the
-  // legacy gap where a page published before the lineage was recorded could
-  // outlive the chat that produced it: the worker unpublishes the pages whose
-  // chat is gone and records the lineage for the ones that survived, so later
-  // deletes clean up like any other page. Best effort, never blocks the UI.
-  useEffect(() => {
-    if (!sessionsLoaded || lineageSyncedRef.current) return;
-    lineageSyncedRef.current = true;
-    claimPublishLineage().catch((err) =>
-      console.warn("Could not sync the publish lineage:", err),
-    );
-  }, [sessionsLoaded]);
-
-  // -------------------------------------------------------------
-  // Fetch messages for active chat when URL changes — parallel, not blocked by chat list
-  // Smart compacting: fetch compact view by default (keep recent 30), expand on demand
-  // -------------------------------------------------------------
-  useEffect(() => {
-    if (!activeSessionId) return;
-    if (!user) return;
-    // Use ref to avoid re-triggering when sessions array changes (prevents waterfall)
-    const existing = sessionsRef.current.find((s) => s.id === activeSessionId);
-    if (existing && existing._loaded) return;
-    if (fetchingChatIdsRef.current.has(activeSessionId)) return;
-    fetchingChatIdsRef.current.add(activeSessionId);
-
-    let cancelled = false;
-    const load = async () => {
-      setChatLoading(true);
-      try {
-        const isExpanded = expandedCompactIds.has(activeSessionId);
-        // AppInner prefetched the default (compact) read. An expanded read is a
-        // different request, so the prefetch is taken either way — it must not
-        // stay behind to answer a later call — and used only when it is the one
-        // that was actually asked for.
-        const prefetched = takeChat(activeSessionId);
-        const data =
-          !isExpanded && prefetched
-            ? await prefetched
-            : isExpanded
-              ? await chatService.getChat(activeSessionId, { compact: false })
-              : await chatService.getChat(activeSessionId, {
-                  compact: true,
-                  keep: 30,
-                });
-        if (cancelled) return;
-        let msgs = Array.isArray(data.messages)
-          ? data.messages.map((m) => ({
-              role: m.role,
-              content: m.content,
-              attachments: m.attachments || undefined,
-              // Preserve server compact meta on the banner message if present
-              ...(m._compactMeta ? { _compactMeta: m._compactMeta } : {}),
-            }))
-          : [];
-        let compactMeta = data.compactMeta || null;
-        let fullMessages = null;
-        // Extract compact meta from banner message if server embedded it
-        const bannerFromServer = msgs.find(
-          (m) => m._compactMeta?.isCompactSummary,
-        );
-        if (bannerFromServer && !compactMeta)
-          compactMeta = bannerFromServer._compactMeta;
-        // Client-side fallback: if server didn't compact but we should (e.g. local fallback or small keep threshold)
-        if (!compactMeta && !isExpanded && shouldCompact(msgs)) {
-          const result = compactChatMessages(msgs);
-          if (result.compacted) {
-            msgs = result.displayMessages;
-            compactMeta = result.meta;
-            fullMessages = result.originalMessages;
-          }
-        }
-        setSessions((prev) => {
-          const idx = prev.findIndex((s) => s.id === activeSessionId);
-          if (idx >= 0) {
-            const next = [...prev];
-            next[idx] = {
-              ...prev[idx],
-              title: data.title,
-              messages: msgs,
-              _loaded: true,
-              _compactMeta: compactMeta,
-              _fullMessages: fullMessages,
-            };
-            return next;
-          }
-          // Chat exists on server but not in list yet (e.g. direct link / shared device)
-          return [
-            {
-              id: data.id,
-              title: data.title,
-              messages: msgs,
-              createdAt: data.createdAt,
-              updatedAt: data.updatedAt,
-              // Keep the folder the server reports, so a deep-linked chat is
-              // grouped the moment it appears (the list arrives later).
-              projectId: data.projectId || null,
-              _loaded: true,
-              _compactMeta: compactMeta,
-              _fullMessages: fullMessages,
-            },
-            ...prev,
-          ];
-        });
-      } catch (e) {
-        if (e?.status === 404 || e?.status === 403) {
-          console.warn(
-            "Chat not found or not authorized, redirecting to /",
-            activeSessionId,
-          );
-          if (!cancelled) navigate("/", { replace: true });
-        } else {
-          console.warn("Failed to load chat", activeSessionId, e);
-        }
-      } finally {
-        if (!cancelled) setChatLoading(false);
-        fetchingChatIdsRef.current.delete(activeSessionId);
-      }
-    };
-    load();
-    return () => {
-      cancelled = true;
-      fetchingChatIdsRef.current.delete(activeSessionId);
-    };
-  }, [activeSessionId, user, navigate, expandedCompactIds]);
-
-  // -------------------------------------------------------------
-  // UI helpers
-  // -------------------------------------------------------------
-  useEffect(() => {
-    const handleWindowDragEnter = (e) => {
-      if (!hasFiles(e.dataTransfer)) return;
-      e.preventDefault();
-      dragCounterRef.current += 1;
-      if (dragCounterRef.current === 1) {
-        setIsDraggingOver(true);
-      }
-    };
-    const handleWindowDragLeave = (e) => {
-      if (!hasFiles(e.dataTransfer)) return;
-      e.preventDefault();
-      dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
-      if (dragCounterRef.current === 0) {
-        setIsDraggingOver(false);
-      }
-    };
-    const handleWindowDragOver = (e) => {
-      if (!hasFiles(e.dataTransfer)) return;
-      e.preventDefault();
-      if (e.dataTransfer) {
-        e.dataTransfer.dropEffect = "copy";
-      }
-    };
-    const handleWindowDrop = (e) => {
-      if (!hasFiles(e.dataTransfer)) return;
-      e.preventDefault();
-      e.stopPropagation();
-      dragCounterRef.current = 0;
-      setIsDraggingOver(false);
-      const files = e.dataTransfer.files;
-      if (files && files.length > 0) {
-        processFiles(files, setAttachments);
-        if (chatInputRef.current) {
-          chatInputRef.current.focus();
-        }
-      }
-    };
-    window.addEventListener("dragenter", handleWindowDragEnter);
-    window.addEventListener("dragleave", handleWindowDragLeave);
-    window.addEventListener("dragover", handleWindowDragOver);
-    window.addEventListener("drop", handleWindowDrop);
-    // Global paste fallback: attach clipboard images pasted anywhere, including
-    // as a safety net if the chat input's own onPaste did not handle the event
-    // (already-handled pastes are skipped via defaultPrevented, and the input
-    // handler's stopPropagation normally prevents double-processing).
-    const handleWindowPaste = (e) => {
-      if (e.defaultPrevented) return;
-      let pastedFiles;
-      try {
-        pastedFiles = extractFilesFromClipboard(e.clipboardData);
-      } catch {
-        return;
-      }
-      if (pastedFiles.length === 0) return;
-      e.preventDefault();
-      processFiles(pastedFiles, setAttachments);
-      if (chatInputRef.current) {
-        chatInputRef.current.focus();
-      }
-    };
-    window.addEventListener("paste", handleWindowPaste);
-    return () => {
-      window.removeEventListener("dragenter", handleWindowDragEnter);
-      window.removeEventListener("dragleave", handleWindowDragLeave);
-      window.removeEventListener("dragover", handleWindowDragOver);
-      window.removeEventListener("drop", handleWindowDrop);
-      window.removeEventListener("paste", handleWindowPaste);
-    };
-  }, []);
 
   useEffect(() => {
     if (
@@ -646,133 +271,6 @@ function MainApp({ theme, setTheme }) {
     return () => window.removeEventListener("keydown", closeSidebarWithEscape);
   }, [isMobileViewport, sidebarOpen]);
 
-  // Auto-resume background AI generation across accidental page refreshes
-  useEffect(() => {
-    if (resumeStartedRef.current) return;
-    resumeStartedRef.current = true;
-    try {
-      const savedPending = localStorage.getItem("corez_pending_request");
-      if (savedPending) {
-        const pendingData = JSON.parse(savedPending);
-        if (
-          pendingData &&
-          pendingData.sessionId &&
-          Date.now() - (pendingData.timestamp || 0) < 300000
-        ) {
-          // Find session — may need to fetch from server if not yet loaded
-          const targetSessionId = pendingData.sessionId;
-          // Ensure we navigate to that chat if not already there
-          if (chatIdFromUrl !== targetSessionId) {
-            navigate(`/chat/${targetSessionId}`, { replace: true });
-          }
-          setIsThinking(true);
-          setSwarmVisible(false);
-          setBuildPhase(null);
-          setStreamingSessionId(targetSessionId);
-          setStreamingThinking("");
-          streamingThinkingRef.current = "";
-          thinkingStartedAtRef.current = 0;
-          setIsThinkingOpen(true);
-          const controller = new AbortController();
-          abortControllerRef.current = controller;
-
-          generateAIResponse(
-            pendingData.apiPrompt,
-            pendingData.messages,
-            controller.signal,
-            (delta) => {
-              setStreamingContent((prev) => (prev || "") + delta);
-              // Collapse only with real reasoning to read (see the main
-              // send path for why an empty panel must not auto-hide).
-              if (streamingThinkingRef.current) {
-                setIsThinkingOpen((prev) => (prev ? false : prev));
-              }
-            },
-            (phaseEvent) => {
-              setSwarmVisible(phaseEvent.phase === "swarm-planning");
-              setBuildPhase(phaseEvent.phase || null);
-            },
-            null,
-            {},
-            (text) => {
-              if (text && !thinkingStartedAtRef.current) {
-                thinkingStartedAtRef.current = Date.now();
-              }
-              streamingThinkingRef.current += text;
-              setStreamingThinking(streamingThinkingRef.current);
-            },
-          )
-            .then((response) => {
-              if (!response) return;
-              // Real thinking only: when the gateway returns no reasoning the
-              // finished message carries no panel at all — never a placeholder.
-              const thinkingSeconds = thinkingStartedAtRef.current
-                ? Math.max(
-                    1,
-                    Math.round(
-                      (Date.now() - thinkingStartedAtRef.current) / 1000,
-                    ),
-                  )
-                : 0;
-              const aiMsg = toAssistantMessage(
-                response,
-                streamingThinkingRef.current,
-                thinkingSeconds,
-              );
-              const extractedCode = extractCodeFromMessage(aiMsg.content);
-              if (
-                extractedCode &&
-                activeSessionIdRef.current === targetSessionId
-              ) {
-                setActiveCanvasCode(extractedCode);
-                setCanvasOpen(true);
-              }
-              setSessions((prev) =>
-                prev.map((s) => {
-                  if (s.id === targetSessionId) {
-                    const last = s.messages[s.messages.length - 1];
-                    if (isDuplicateAssistantMessage(last, aiMsg)) return s;
-                    return { ...s, messages: [...s.messages, aiMsg] };
-                  }
-                  return s;
-                }),
-              );
-              // Persist assistant message server-side
-              chatService
-                .appendMessage(targetSessionId, {
-                  role: "assistant",
-                  content: aiMsg.content,
-                })
-                .catch(() => {});
-            })
-            .catch((err) => {
-              if (err?.name !== "AbortError") {
-                console.warn("Background AI response recovery error:", err);
-              }
-            })
-            .finally(() => {
-              localStorage.removeItem("corez_pending_request");
-              setIsThinking(false);
-              setSwarmVisible(false);
-              setBuildPhase(null);
-              setStreamingContent(null);
-              setStreamingSessionId(null);
-              setStreamingThinking("");
-              streamingThinkingRef.current = "";
-              setIsThinkingOpen(true);
-              if (abortControllerRef.current === controller)
-                abortControllerRef.current = null;
-            });
-        } else {
-          localStorage.removeItem("corez_pending_request");
-        }
-      }
-    } catch (err) {
-      console.warn("Failed to parse corez_pending_request", err);
-      localStorage.removeItem("corez_pending_request");
-    }
-  }, [chatIdFromUrl, navigate]);
-
   useEffect(() => {
     if (activeView === "chat") {
       messagesEndRef.current?.scrollIntoView?.({ behavior: "smooth" });
@@ -787,108 +285,10 @@ function MainApp({ theme, setTheme }) {
     setActiveCanvasCode(null);
     setRevisionContextCode("");
     setRevisionContextSessionId(null);
-    // An unused site-edit draft belongs to the new-chat route; leaving it must
-    // not leave its prompt in another conversation or keep a chat behind.
     if (siteEditDraft) {
       setSiteEditDraft(null);
       setChatInput("");
     }
-  };
-
-  const handleExpandCompact = async () => {
-    if (!activeSessionId) return;
-    const active = sessions.find((s) => s.id === activeSessionId);
-    // If we have full snapshot from client-side compact, restore without fetch
-    if (
-      active?._fullMessages &&
-      Array.isArray(active._fullMessages) &&
-      active._fullMessages.length > 0
-    ) {
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.id === activeSessionId
-            ? {
-                ...s,
-                messages: active._fullMessages,
-                _compactMeta: null,
-                _fullMessages: null,
-              }
-            : s,
-        ),
-      );
-      setExpandedCompactIds((prev) => {
-        const n = new Set(prev);
-        n.add(activeSessionId);
-        return n;
-      });
-      return;
-    }
-    // Otherwise fetch full history from server
-    setChatLoading(true);
-    try {
-      const data = await chatService.getChat(activeSessionId, {
-        compact: false,
-      });
-      const msgs = Array.isArray(data.messages)
-        ? data.messages.map((m) => ({
-            role: m.role,
-            content: m.content,
-            attachments: m.attachments || undefined,
-          }))
-        : [];
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.id === activeSessionId
-            ? {
-                ...s,
-                messages: msgs,
-                _compactMeta: null,
-                _fullMessages: null,
-                _loaded: true,
-              }
-            : s,
-        ),
-      );
-      setExpandedCompactIds((prev) => {
-        const n = new Set(prev);
-        n.add(activeSessionId);
-        return n;
-      });
-    } catch (e) {
-      console.warn("Failed to expand compacted chat", e);
-    } finally {
-      setChatLoading(false);
-    }
-  };
-
-  const handleCollapseCompact = () => {
-    if (!activeSessionId) return;
-    const active = sessions.find((s) => s.id === activeSessionId);
-    const full = active?.messages;
-    if (!full || !Array.isArray(full) || full.length === 0) return;
-    // Re-compact the currently loaded full history
-    if (shouldCompact(full)) {
-      const result = compactChatMessages(full);
-      if (result.compacted) {
-        setSessions((prev) =>
-          prev.map((s) =>
-            s.id === activeSessionId
-              ? {
-                  ...s,
-                  messages: result.displayMessages,
-                  _compactMeta: result.meta,
-                  _fullMessages: result.originalMessages,
-                }
-              : s,
-          ),
-        );
-      }
-    }
-    setExpandedCompactIds((prev) => {
-      const n = new Set(prev);
-      n.delete(activeSessionId);
-      return n;
-    });
   };
 
   const handleNewChat = () => {
@@ -902,299 +302,6 @@ function MainApp({ theme, setTheme }) {
     setChatInput("");
     setActiveCanvasCode(null);
   };
-
-  const handleDeleteSession = async (id) => {
-    // Optimistic UI
-    setSessions((prev) => prev.filter((s) => s.id !== id));
-    if (activeSessionId === id) {
-      const remaining = sessions.filter((s) => s.id !== id);
-      if (remaining.length > 0) {
-        navigate(`/chat/${remaining[0].id}`);
-      } else {
-        navigate("/");
-      }
-    }
-    try {
-      await chatService.deleteChat(id);
-    } catch (e) {
-      console.warn("Server delete failed, keeping optimistic", e);
-    }
-    deleteSessionAppsInR2(id).catch((err) =>
-      console.warn("Failed to clean up session R2 apps:", err),
-    );
-    // The server cascade (DELETE /api/chats/:id) removes the chat's R2 apps,
-    // assets, generated images, context index AND the pages it published —
-    // deleting a conversation deletes what it produced. This call covers a page
-    // published before the server recorded that lineage: only this browser
-    // knows the slug, so deleting the chat is the last chance to take it down.
-    // It clears the local lineage either way.
-    unpublishSessionPages(id).catch((err) =>
-      console.warn("Failed to unpublish the deleted chat's page:", err),
-    );
-  };
-
-  const handleClearAllHistory = async () => {
-    const ids = sessions.map((s) => s.id);
-    setSessions([]);
-    // Folders go with the history they organise: DELETE /api/chats clears the
-    // account's projects in the same call.
-    setProjects([]);
-    navigate("/");
-    setActiveCanvasCode("");
-    setSettingsOpen(false);
-    try {
-      await chatService.deleteAllChats();
-    } catch (e) {
-      console.warn("Server clear all failed", e);
-      // fallback: try deleting one by one
-      for (const id of ids) {
-        chatService.deleteChat(id).catch(() => {});
-      }
-    }
-    ids.forEach((id) => deleteSessionAppsInR2(id).catch(() => {}));
-    // The server cascade (DELETE /api/chats) removes every chat's R2 state and
-    // unpublishes the pages those chats produced. The extra pass covers pages
-    // published before the server recorded that lineage: only this browser
-    // knows their slugs, and it clears the local lineage either way.
-    ids.forEach((id) => unpublishSessionPages(id).catch(() => {}));
-  };
-
-  // -------------------------------------------------------------
-  // Project folders — group chats under a named project. The link is stored
-  // server-side on the chat (`chats.project_id`), so the sidebar grouping
-  // roams with the account like the chats themselves.
-  // -------------------------------------------------------------
-  const handleCreateProject = useCallback(async (name) => {
-    const created = await chatService.createProject({ name });
-    const project = {
-      id: created.id,
-      name: created.name,
-      createdAt: created.createdAt,
-      updatedAt: created.updatedAt,
-    };
-    setProjects((prev) => [
-      project,
-      ...prev.filter((p) => p.id !== project.id),
-    ]);
-    return project;
-  }, []);
-
-  const handleRenameProject = useCallback(async (projectId, name) => {
-    const previousName =
-      projectsRef.current.find((p) => p.id === projectId)?.name ?? null;
-    // Optimistic: the row shows the new name at once and the write follows.
-    setProjects((prev) =>
-      prev.map((p) => (p.id === projectId ? { ...p, name } : p)),
-    );
-    try {
-      await chatService.renameProject(projectId, name);
-    } catch (e) {
-      console.warn("Failed to rename project:", e);
-      // The rename editor has closed by now, so a silent failure would leave
-      // a name the account does not have until the next reload. Put it back.
-      if (previousName != null) {
-        setProjects((prev) =>
-          prev.map((p) => (p.id === projectId ? { ...p, name: previousName } : p)),
-        );
-      }
-    }
-  }, []);
-
-  const handleDeleteProject = useCallback(async (projectId) => {
-    const index = projectsRef.current.findIndex((p) => p.id === projectId);
-    const project = index >= 0 ? projectsRef.current[index] : null;
-    const affectedChatIds = sessionsRef.current
-      .filter((s) => s.projectId === projectId)
-      .map((s) => s.id);
-    // Chats are kept: deleting a folder only files its chats back into the
-    // plain Chats list (server-side the same unassignment happens).
-    setProjects((prev) => prev.filter((p) => p.id !== projectId));
-    setSessions((prev) =>
-      prev.map((s) => (s.projectId === projectId ? { ...s, projectId: null } : s)),
-    );
-    try {
-      await chatService.deleteProject(projectId);
-    } catch (e) {
-      console.warn("Failed to delete project:", e);
-      // The server still has the folder: restore it in place rather than
-      // showing its chats as ungrouped until the next reload.
-      if (project) {
-        setProjects((prev) => {
-          if (prev.some((p) => p.id === projectId)) return prev;
-          const next = [...prev];
-          next.splice(Math.min(Math.max(index, 0), next.length), 0, project);
-          return next;
-        });
-      }
-      if (affectedChatIds.length > 0) {
-        const affected = new Set(affectedChatIds);
-        setSessions((prev) =>
-          prev.map((s) =>
-            affected.has(s.id) ? { ...s, projectId } : s,
-          ),
-        );
-      }
-    }
-  }, []);
-
-  const handleMoveSessionToProject = useCallback(async (sessionId, projectId) => {
-    const session = sessionsRef.current.find((s) => s.id === sessionId);
-    const previousProjectId = session?.projectId || null;
-    if (previousProjectId === projectId) return;
-    const next = sessionsRef.current.map((s) =>
-      s.id === sessionId ? { ...s, projectId: projectId || null } : s,
-    );
-    // Keep the synchronous mirror ahead of the render: a second move (or the
-    // failure path below) must never read the grouping this one replaced.
-    sessionsRef.current = next;
-    setSessions(next);
-    try {
-      if (projectId) {
-        await chatService.addChatToProject(projectId, sessionId);
-      } else if (previousProjectId) {
-        await chatService.removeChatFromProject(previousProjectId, sessionId);
-      }
-    } catch (e) {
-      console.warn("Failed to move the chat:", e);
-      // Revert: the sidebar must never show a grouping the account does not
-      // actually have, so a reload cannot "lose" the chat from its folder.
-      const reverted = sessionsRef.current.map((s) =>
-        s.id === sessionId ? { ...s, projectId: previousProjectId } : s,
-      );
-      sessionsRef.current = reverted;
-      setSessions(reverted);
-    }
-  }, []);
-
-  const handleTogglePinSession = useCallback(async (sessionId) => {
-    const session = sessionsRef.current.find((s) => s.id === sessionId);
-    const previousPinnedAt = session?.pinnedAt || null;
-    const pinned = !previousPinnedAt;
-    const next = sessionsRef.current.map((s) =>
-      s.id === sessionId ? { ...s, pinnedAt: pinned ? Date.now() : null } : s,
-    );
-    // Same synchronous mirror as the project move: a second toggle (or the
-    // failure path below) must never read the state this one replaced.
-    sessionsRef.current = next;
-    setSessions(next);
-    try {
-      await chatService.setChatPinned(sessionId, pinned);
-    } catch (e) {
-      console.warn("Failed to pin the chat:", e);
-      // Revert: the Pinned section must never show a state the account does
-      // not actually have, so a reload cannot "lose" the pin.
-      const reverted = sessionsRef.current.map((s) =>
-        s.id === sessionId ? { ...s, pinnedAt: previousPinnedAt } : s,
-      );
-      sessionsRef.current = reverted;
-      setSessions(reverted);
-    }
-  }, []);
-
-  const handleReorderSession = useCallback(async (sessionId, { beforeId = null, afterId = null } = {}) => {
-    const prev = sessionsRef.current;
-    const prevManual = manualListsRef.current;
-    const session = prev.find((s) => s.id === sessionId);
-    if (!session) return;
-    const projectIds = new Set(projectsRef.current.map((p) => p.id));
-    const listKey = displayListKey(session, projectIds);
-    // The list in display order, as the sidebar shows it: the drop position
-    // is computed against this sequence.
-    const members = orderedListMembers(prev, listKey, projectIds, prevManual);
-    if (!members.some((s) => s.id === sessionId)) return;
-    const without = members.filter((s) => s.id !== sessionId);
-    let to;
-    if (beforeId !== null) {
-      to = without.findIndex((s) => s.id === beforeId);
-      if (to === -1) return;
-    } else if (afterId !== null) {
-      const after = without.findIndex((s) => s.id === afterId);
-      if (after === -1) return;
-      to = after + 1;
-    } else {
-      return;
-    }
-    const moved = [
-      ...without.slice(0, to).map((s) => s.id),
-      sessionId,
-      ...without.slice(to).map((s) => s.id),
-    ];
-    const before = members.map((s) => s.id);
-    if (moved.length === before.length && moved.every((id, i) => id === before[i])) {
-      return;
-    }
-    // Optimistic: full renormalization, top-first, mirroring the server. The
-    // numbers only need the right relative order until the response arrives.
-    const top = without.length + 1;
-    const optimistic = new Map(moved.map((id, i) => [id, top - i]));
-    const next = prev.map((s) =>
-      optimistic.has(s.id) ? { ...s, sortOrder: optimistic.get(s.id) } : s,
-    );
-    const nextManual = prevManual.includes(listKey)
-      ? prevManual
-      : [...prevManual, listKey];
-    sessionsRef.current = next;
-    manualListsRef.current = nextManual;
-    setSessions(next);
-    setManualLists(nextManual);
-    try {
-      const result = await chatService.reorderChat(sessionId, { beforeId, afterId });
-      // Canonicalize the moved chat's position from the server echo.
-      if (result && typeof result.sortOrder === "number") {
-        const canonical = sessionsRef.current.map((s) =>
-          s.id === sessionId ? { ...s, sortOrder: result.sortOrder } : s,
-        );
-        sessionsRef.current = canonical;
-        setSessions(canonical);
-      }
-    } catch (e) {
-      console.warn("Failed to reorder the chat:", e);
-      // Revert: the sidebar must never show an order the account does not
-      // actually have, so a reload cannot "lose" the arrangement.
-      sessionsRef.current = prev;
-      manualListsRef.current = prevManual;
-      setSessions(prev);
-      setManualLists(prevManual);
-    }
-  }, []);
-
-  const handleNewChatInProject = useCallback(
-    async (projectId) => {
-      setActiveView("chat");
-      setCanvasOpen(false);
-      setCanvasFullScreen(false);
-      setActiveCanvasCode(null);
-      setRevisionContextCode("");
-      try {
-        const created = await chatService.createChat({});
-        let assigned = true;
-        try {
-          await chatService.addChatToProject(projectId, created.id);
-        } catch (e) {
-          // The chat exists; it simply falls back to the plain list.
-          assigned = false;
-          console.warn("Failed to file the new chat into its project:", e);
-        }
-        const newSession = {
-          id: created.id,
-          title: created.title,
-          messages: [],
-          createdAt: created.createdAt,
-          updatedAt: created.updatedAt,
-          projectId: assigned ? projectId : null,
-          pinnedAt: null,
-          sortOrder: created.sortOrder ?? null,
-          _loaded: true,
-        };
-        setSessions((prev) => [newSession, ...prev]);
-        navigate(`/chat/${created.id}`);
-      } catch (e) {
-        console.warn("Failed to create a chat in the project:", e);
-        navigate("/");
-      }
-    },
-    [navigate],
-  );
 
   const handleCloseCanvas = () => {
     userDismissedCanvasRef.current = true;
@@ -1234,16 +341,6 @@ function MainApp({ theme, setTheme }) {
     setStreamingSessionId(null);
   };
 
-  const [chatInput, setChatInput] = useState("");
-  const [revisionContextCode, setRevisionContextCode] = useState("");
-  // The chat the revision material belongs to. Scoping it prevents a site's
-  // owner copy from being attached to a message sent in another conversation.
-  const [revisionContextSessionId, setRevisionContextSessionId] = useState(null);
-  // An edit opened from Sites is a draft until the first message. Clicking
-  // Edit shows the site and primes the composer, but no empty chat is written
-  // to Recents if the user never types anything.
-  const [siteEditDraft, setSiteEditDraft] = useState(null);
-
   const handleEditSite = async (page) => {
     const siteContext = buildSiteRevisionContext(page);
     if (!siteContext) throw new Error(t("common.sites.editChatError"));
@@ -1262,7 +359,6 @@ function MainApp({ theme, setTheme }) {
     setRevisionContextCode(siteContext);
     setRevisionContextSessionId(null);
     setActiveView("chat");
-    setChatLoading(false);
     setAttachments([]);
     setChatInput(editPrompt);
     setActiveCanvasCode(page.html);
@@ -1271,7 +367,6 @@ function MainApp({ theme, setTheme }) {
     userDismissedCanvasRef.current = false;
     navigate("/");
 
-    // The composer only mounts after the route change; give it one frame.
     if (focusTimeoutRef.current) clearTimeout(focusTimeoutRef.current);
     focusTimeoutRef.current = setTimeout(() => {
       if (!chatInputRef.current) return;
@@ -1286,19 +381,13 @@ function MainApp({ theme, setTheme }) {
     if (isThinking) return;
     setAttachments([]);
 
-    // A site edit is a draft on "/" until this first send. Capture the state
-    // now, before a chat is created, so the title and revision context belong
-    // to that chat and nowhere else.
     const initialActiveSessionId = activeSessionId;
     const siteDraft = siteEditDraft;
     const sendingSiteDraft = Boolean(siteDraft) && !activeSessionId;
 
-    // Determine target chat — create if on "/"
     let targetSessionId = activeSessionId;
-    let _isNewlyCreated = false;
     let draftMessages = activeSession?.messages || [];
 
-    // If no active chat, create one server-side first so URL becomes /chat/:id
     if (!targetSessionId) {
       const provisionalTitle = sendingSiteDraft
         ? siteDraft.title
@@ -1310,7 +399,6 @@ function MainApp({ theme, setTheme }) {
           title: provisionalTitle,
         });
         targetSessionId = created.id;
-        _isNewlyCreated = true;
         const newSession = {
           id: targetSessionId,
           title: created.title,
@@ -1331,7 +419,6 @@ function MainApp({ theme, setTheme }) {
           e,
         );
         targetSessionId = `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        _isNewlyCreated = true;
         const fallbackSession = {
           id: targetSessionId,
           title: provisionalTitle,
@@ -1344,7 +431,6 @@ function MainApp({ theme, setTheme }) {
         draftMessages = [];
       }
     } else {
-      // Ensure messages are loaded for existing chat before appending
       const existing = sessions.find((s) => s.id === targetSessionId);
       if (existing && !existing._loaded) {
         try {
@@ -1395,7 +481,6 @@ function MainApp({ theme, setTheme }) {
           draftMessages = msgs;
         } catch {}
       } else if (existing && existing._compactMeta) {
-        // Keep compacted view for draft — the banner summarizes older history for the AI
         draftMessages = existing.messages;
       }
     }
@@ -1420,7 +505,16 @@ function MainApp({ theme, setTheme }) {
     }
 
     const displayAttachments = attachmentsArg.map(
-      ({ id, name, type, size, thumb, assetUrl, assetKey, content }) => ({ id, name, type, size, thumb, assetUrl, assetKey, content }),
+      ({ id, name, type, size, thumb, assetUrl, assetKey, content }) => ({
+        id,
+        name,
+        type,
+        size,
+        thumb,
+        assetUrl,
+        assetKey,
+        content,
+      }),
     );
     const apiAttachments = attachmentsArg.map(
       ({ name, type, size, thumb, content, assetUrl, assetKey }) => ({
@@ -1446,16 +540,8 @@ function MainApp({ theme, setTheme }) {
     };
 
     const updatedApiMessages = [...draftMessages, apiMsg];
-
     const isFreshSession = draftMessages.length === 0;
-    // NOTE: the AI session title is requested AFTER this turn completes (see the
-    // end of this handler). Firing it here opened a second concurrent provider
-    // call the moment a new conversation started — a title request racing a long
-    // build can trip the provider's rate limit, which costs the build a bounded
-    // retry ladder (up to minutes). The deterministic heuristic title below is
-    // applied and persisted immediately, so nothing waits on the AI one.
 
-    // Optimistic UI + local title update (move updated chat to top for recency)
     const nowTs = Date.now();
     setSessions((prev) => {
       const mapped = prev.map((s) => {
@@ -1477,7 +563,6 @@ function MainApp({ theme, setTheme }) {
           const nextFull = Array.isArray(s._fullMessages)
             ? [...s._fullMessages, displayMsg]
             : s._fullMessages;
-          // Auto-compact if we just grew beyond threshold and we are not expanded
           let nextCompactMeta = s._compactMeta || null;
           let finalMessages = nextMessages;
           let finalFull = nextFull;
@@ -1491,7 +576,6 @@ function MainApp({ theme, setTheme }) {
               finalMessages = result.displayMessages;
               nextCompactMeta = result.meta;
               finalFull = result.originalMessages;
-              // Keep the newly added message visible (it is already in recent)
             }
           }
           return {
@@ -1506,17 +590,11 @@ function MainApp({ theme, setTheme }) {
         }
         return s;
       });
-      // Move target to front for recency (keep server sort consistent)
       const target = mapped.find((s) => s.id === targetSessionId);
       if (!target) return mapped;
       return [target, ...mapped.filter((s) => s.id !== targetSessionId)];
     });
 
-    // Persist the user turn WITHOUT blocking the model request. The write is
-    // durability, not a precondition: the bubble is already on screen and the
-    // pending-request snapshot below covers a reload. Awaiting it put a full D1
-    // round trip (~290ms measured) in front of every single message. The
-    // assistant turn is chained on this promise, so stored order is unchanged.
     const userMessagePersisted = persistUserTurn(
       () =>
         chatService.appendMessage(targetSessionId, {
@@ -1599,9 +677,6 @@ function MainApp({ theme, setTheme }) {
         controller.signal,
         (delta) => {
           setStreamingContent((prev) => (prev || "") + delta);
-          // The reasoning panel stays open while the answer streams below it:
-          // the live view is the thinking process plus the streaming answer,
-          // not a dots row that hides the reasoning.
         },
         (phaseEvent) => {
           setSwarmVisible(phaseEvent.phase === "swarm-planning");
@@ -1624,8 +699,6 @@ function MainApp({ theme, setTheme }) {
         },
       );
       if (response) {
-        // Real thinking only: when the gateway returns no reasoning the
-        // finished message carries no panel at all — never a placeholder.
         const thinkingSeconds = thinkingStartedAtRef.current
           ? Math.max(
               1,
@@ -1638,27 +711,17 @@ function MainApp({ theme, setTheme }) {
           thinkingSeconds,
         );
         const extractedCode = extractCodeFromMessage(aiMsg.content);
-        // A research report is a PDF-preview artifact with its own "Download
-        // .pdf" button. It is not a creation intent, but the user asked for a
-        // document: opening the preview is the shortest path to the download
-        // (canvas sandbox allows downloads), so it auto-opens like a build.
         const isResearchReport = Boolean(
           extractedCode &&
             (/^\s*[@/]research\b/i.test(promptText) ||
               (extractedCode.includes("var REPORT_PARAGRAPHS") &&
                 extractedCode.includes("COREZ Research Report"))),
         );
-        // Only auto-open canvas when the USER explicitly intended creation (or
-        // asked for a research report). Writing/explanation prompts that happen
-        // to contain ```html from the model stay as chat code blocks with a
-        // manual "Run in Canvas" button.
         const shouldAutoOpenCanvas = Boolean(
           extractedCode &&
-          (isCreationIntent || isRevision || isResearchReport) &&
-          !userDismissedCanvasRef.current &&
-          // Never pop the canvas over a chat the user switched to mid-stream;
-          // the code stays in its own chat with a manual "Run in Canvas".
-          activeSessionIdRef.current === targetSessionId,
+            (isCreationIntent || isRevision || isResearchReport) &&
+            !userDismissedCanvasRef.current &&
+            activeSessionIdRef.current === targetSessionId,
         );
         if (shouldAutoOpenCanvas) {
           setActiveCanvasCode(extractedCode);
@@ -1702,9 +765,6 @@ function MainApp({ theme, setTheme }) {
           if (!target) return mapped;
           return [target, ...mapped.filter((s) => s.id !== targetSessionId)];
         });
-        // Persist the assistant turn after the user turn has been stored, so
-        // the stored conversation keeps its order even though the user write is
-        // no longer awaited before the model request.
         persistAssistantTurnAfter(userMessagePersisted, () =>
           chatService.appendMessage(targetSessionId, {
             role: "assistant",
@@ -1724,9 +784,6 @@ function MainApp({ theme, setTheme }) {
         setBuildPhase(null);
         setStreamingContent(null);
         setStreamingSessionId(null);
-        // The turn is over and the finished message now carries the reasoning
-        // disclosure. Leaving the live copy set rendered a duplicate panel
-        // next to the answer until the next send.
         setStreamingThinking("");
         streamingThinkingRef.current = "";
         setIsThinkingOpen(true);
@@ -1734,9 +791,6 @@ function MainApp({ theme, setTheme }) {
       }
     }
 
-    // Name the conversation with the model only after the turn is over, so a new
-    // chat never opens two provider calls at once. Failures and empty titles
-    // leave the heuristic title in place.
     if (isFreshSession && (promptText || displayAttachments[0]?.name)) {
       generateAISessionTitle(promptText || displayAttachments[0]?.name).then(
         (aiTitle) => {
@@ -1746,7 +800,6 @@ function MainApp({ theme, setTheme }) {
               s.id === targetSessionId ? { ...s, title: aiTitle } : s,
             ),
           );
-          // Persist title server-side
           chatService.patchChatTitle(targetSessionId, aiTitle).catch(() => {});
         },
       );
@@ -1776,25 +829,6 @@ function MainApp({ theme, setTheme }) {
     }
   };
 
-  const handleOverlayDrop = (e) => {
-    if (!hasFiles(e.dataTransfer)) return;
-    e.preventDefault();
-    e.stopPropagation();
-    dragCounterRef.current = 0;
-    setIsDraggingOver(false);
-    const files = e.dataTransfer.files;
-    if (files && files.length > 0) {
-      processFiles(files, setAttachments);
-      if (chatInputRef.current) {
-        chatInputRef.current.focus();
-      }
-    }
-  };
-
-  // A starter row on the new-chat screen fills the composer and leaves the
-  // caret at the end of the inserted text, ready for the rest of the sentence.
-  // The caret is placed after the value has landed in the DOM, the same
-  // deferred focus the "Revise code" action uses.
   const handleStarterSelect = (text) => {
     const insertion = String(text || "");
     setChatInput(insertion);
@@ -1810,23 +844,6 @@ function MainApp({ theme, setTheme }) {
     }, 50);
   };
 
-  const handleOverlayDragLeave = (e) => {
-    e.preventDefault();
-    dragCounterRef.current = 0;
-    setIsDraggingOver(false);
-  };
-
-  const handleOverlayDragOver = (e) => {
-    if (!hasFiles(e.dataTransfer)) return;
-    e.preventDefault();
-    if (e.dataTransfer) {
-      e.dataTransfer.dropEffect = "copy";
-    }
-  };
-
-  // Filter + sort for sidebar: show chats with at least one message OR currently active empty chat, most recent first
-  // FIX: chats from listChats start as {messages:[], _loaded:false} until their messages are fetched.
-  // The old filter hid every non-active chat on refresh because messages.length was 0.
   const sidebarSessions = useMemo(() => {
     const filtered = sessions.filter((s) => {
       if (s.id === activeSessionId) return true;
@@ -1838,16 +855,10 @@ function MainApp({ theme, setTheme }) {
     );
   }, [sessions, activeSessionId]);
 
-  // The new-chat screen: the conversation exists but nothing has been asked in
-  // it yet, so the composer moves up under the opening question with the
-  // starter rows instead of resting on the bottom edge of the transcript.
   const isNewChat =
     sessionsLoaded &&
     !chatLoading &&
     (!activeSession || activeSession.messages.length === 0);
-  // The site edit screen is a draft on the new-chat route: the site is already
-  // loaded as revision context, so show an editing prompt instead of the
-  // generic "build something" starters. No chat exists until the first send.
   const isSiteEditChat = isNewChat && Boolean(siteEditDraft);
 
   return (
@@ -1866,8 +877,6 @@ function MainApp({ theme, setTheme }) {
         onSelectSession={handleSelectSession}
         onNewChat={handleNewChat}
         onOpenSites={() => {
-          // Leaving an unused edit draft must retire its preview and context;
-          // otherwise coming back would show a site with no edit chat.
           if (siteEditDraft) {
             setSiteEditDraft(null);
             setRevisionContextCode("");
@@ -1878,8 +887,6 @@ function MainApp({ theme, setTheme }) {
             setActiveCanvasCode("");
           }
           navigate("/sites");
-          // On a phone the sidebar is a drawer: navigating should reveal the
-          // screen rather than leave it covered.
           if (isMobileViewport) setSidebarOpen(false);
         }}
         onDeleteSession={handleDeleteSession}
@@ -1913,9 +920,6 @@ function MainApp({ theme, setTheme }) {
       )}
 
       <main className="main-content">
-        {/* Desktop keeps the collapsed rail on screen, so its own brand and
-            Recents controls reopen the panel. A phone's rail is off-canvas
-            with the drawer, so it still needs a floating way back in. */}
         {!sidebarOpen && isMobileViewport && (
           <button
             type="button"
@@ -1934,172 +938,166 @@ function MainApp({ theme, setTheme }) {
             onEditSite={handleEditSite}
           />
         ) : (
-        <>
-          <div
-            className={`chat-pane ${canvasOpen ? "canvas-active" : ""}${
-              isNewChat ? " new-chat" : ""
-            }`}
-          >
-            <div className="messages-scroll">
-              {isStreamActiveElsewhere({
-                isThinking,
-                streamingSessionId,
-                activeSessionId,
-              }) && (
-                <div
-                  className="stream-elsewhere-banner"
-                  role="status"
-                  aria-label={t("common.shell.streamingElsewhere")}
-                >
-                  <span>
-                    {t("common.shell.respondingIn", {
-                      title:
-                        sessions.find((s) => s.id === streamingSessionId)
-                          ?.title || t("common.shell.anotherChat"),
-                    })}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/chat/${streamingSessionId}`)}
+          <>
+            <div
+              className={`chat-pane ${canvasOpen ? "canvas-active" : ""}${
+                isNewChat ? " new-chat" : ""
+              }`}
+            >
+              <div className="messages-scroll">
+                {isStreamActiveElsewhere({
+                  isThinking,
+                  streamingSessionId,
+                  activeSessionId,
+                }) && (
+                  <div
+                    className="stream-elsewhere-banner"
+                    role="status"
+                    aria-label={t("common.shell.streamingElsewhere")}
                   >
-                    {t("common.shell.view")}
-                  </button>
-                </div>
-              )}
-              {!sessionsLoaded ? (
-                <div className="welcome-container">
-                  <h1 className="welcome-title">COREZ</h1>
-                </div>
-              ) : chatLoading ? (
-                <div className="welcome-container">
-                  <h1 className="welcome-title">COREZ</h1>
-                </div>
-              ) : !activeSession || activeSession.messages.length === 0 ? (
-                // New chat: the question sits above the composer, which is
-                // rendered below this scroll area, so the composer keeps its
-                // identity and focus while the screen changes.
-                <div className="new-chat-hero">
-                  <h1 className="new-chat-hero-title">
-                    {isSiteEditChat
-                      ? t("common.sites.editChatHeading")
-                      : t("common.newChat.title")}
-                  </h1>
-                  {isSiteEditChat && (
-                    <p className="new-chat-hero-hint">
-                      {t("common.sites.editChatHint")}
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div className="messages-inner">
-                  {activeSession?.messages.map((msg, idx) => {
-                    if (msg?._compactMeta?.isCompactSummary) {
-                      const isExpanded =
-                        expandedCompactIds.has(activeSessionId);
+                    <span>
+                      {t("common.shell.respondingIn", {
+                        title:
+                          sessions.find((s) => s.id === streamingSessionId)
+                            ?.title || t("common.shell.anotherChat"),
+                      })}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/chat/${streamingSessionId}`)}
+                    >
+                      {t("common.shell.view")}
+                    </button>
+                  </div>
+                )}
+                {!sessionsLoaded ? (
+                  <div className="welcome-container">
+                    <h1 className="welcome-title">COREZ</h1>
+                  </div>
+                ) : chatLoading ? (
+                  <div className="welcome-container">
+                    <h1 className="welcome-title">COREZ</h1>
+                  </div>
+                ) : !activeSession || activeSession.messages.length === 0 ? (
+                  <div className="new-chat-hero">
+                    <h1 className="new-chat-hero-title">
+                      {isSiteEditChat
+                        ? t("common.sites.editChatHeading")
+                        : t("common.newChat.title")}
+                    </h1>
+                    {isSiteEditChat && (
+                      <p className="new-chat-hero-hint">
+                        {t("common.sites.editChatHint")}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="messages-inner">
+                    {activeSession?.messages.map((msg, idx) => {
+                      if (msg?._compactMeta?.isCompactSummary) {
+                        const isExpanded =
+                          expandedCompactIds.has(activeSessionId);
+                        return (
+                          <CompactedBanner
+                            key={`compact-${idx}`}
+                            meta={msg._compactMeta}
+                            isExpanded={isExpanded}
+                            onExpand={handleExpandCompact}
+                            onCollapse={handleCollapseCompact}
+                          />
+                        );
+                      }
                       return (
-                        <CompactedBanner
-                          key={`compact-${idx}`}
-                          meta={msg._compactMeta}
-                          isExpanded={isExpanded}
-                          onExpand={handleExpandCompact}
-                          onCollapse={handleCollapseCompact}
+                        <ChatMessage
+                          key={idx}
+                          message={msg}
+                          onRunInCanvas={handleRunInCanvas}
+                          onReviseCode={handleReviseCode}
                         />
                       );
-                    }
-                    return (
-                      <ChatMessage
-                        key={idx}
-                        message={msg}
-                        onRunInCanvas={handleRunInCanvas}
-                        onReviseCode={handleReviseCode}
-                      />
-                    );
-                  })}
-                  {isStreamVisibleForSession({
-                    isThinking,
-                    streamingSessionId,
-                    activeSessionId,
-                  }) && (
-                    <div className="message-wrapper ai">
-                      <div className="message-body">
-                        {/* The three-dot row is gone: the thinking panel itself
-                            is the live indicator. It appears the moment the
-                            request starts — showing a working status until the
-                            first reasoning event — and the reasoning streams
-                            into it while the answer streams below. The phase
-                            ("Planning…", "Verifying…") is still announced, not
-                            printed, through the sr-only live region. */}
-                        {(buildPhaseLabel(buildPhase) || swarmVisible) && (
-                          <span className="sr-only" role="status" aria-live="polite">
-                            {buildPhaseLabel(buildPhase) ||
-                              t("common.phase.swarmPlanning")}
-                          </span>
-                        )}
-                        <ThinkingPanel
-                          text={streamingThinking}
-                          live
-                          expanded={isThinkingOpen}
-                          onToggle={() => setIsThinkingOpen((prev) => !prev)}
-                          bodyId="corez-thinking-body"
-                          placeholder={t("common.thinking.working")}
-                        />
-                        {streamingContent && (
-                          <div
-                            className="message-content streaming-text"
-                            role="status"
-                            aria-label={t("common.shell.responding")}
-                          >
-                            {streamingContent}
-                          </div>
-                        )}
+                    })}
+                    {isStreamVisibleForSession({
+                      isThinking,
+                      streamingSessionId,
+                      activeSessionId,
+                    }) && (
+                      <div className="message-wrapper ai">
+                        <div className="message-body">
+                          {(buildPhaseLabel(buildPhase) || swarmVisible) && (
+                            <span
+                              className="sr-only"
+                              role="status"
+                              aria-live="polite"
+                            >
+                              {buildPhaseLabel(buildPhase) ||
+                                t("common.phase.swarmPlanning")}
+                            </span>
+                          )}
+                          <ThinkingPanel
+                            text={streamingThinking}
+                            live
+                            expanded={isThinkingOpen}
+                            onToggle={() => setIsThinkingOpen((prev) => !prev)}
+                            bodyId="corez-thinking-body"
+                            placeholder={t("common.thinking.working")}
+                          />
+                          {streamingContent && (
+                            <div
+                              className="message-content streaming-text"
+                              role="status"
+                              aria-label={t("common.shell.responding")}
+                            >
+                              {streamingContent}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  <div ref={messagesEndRef} />
-                </div>
-              )}
+                    )}
+                    <div ref={messagesEndRef} />
+                  </div>
+                )}
+              </div>
+
+              <ChatInput
+                input={chatInput}
+                setInput={setChatInput}
+                textareaRef={chatInputRef}
+                onSendMessage={handleSendMessage}
+                onStopMessage={handleStopMessage}
+                isStreaming={isThinking}
+                attachments={attachments}
+                setAttachments={setAttachments}
+                variant={isNewChat ? "hero" : "composer"}
+                footer={
+                  isNewChat && !isSiteEditChat ? (
+                    <NewChatStarters
+                      hidden={
+                        Boolean(chatInput.trim()) || attachments.length > 0
+                      }
+                      onSelect={handleStarterSelect}
+                    />
+                  ) : null
+                }
+              />
             </div>
 
-            <ChatInput
-              input={chatInput}
-              setInput={setChatInput}
-              textareaRef={chatInputRef}
-              onSendMessage={handleSendMessage}
-              onStopMessage={handleStopMessage}
-              isStreaming={isThinking}
-              attachments={attachments}
-              setAttachments={setAttachments}
-              variant={isNewChat ? "hero" : "composer"}
-              // The command grid lives inside the composer's own container so
-              // it always lines up with the input it fills. It is an empty-
-              // composer affordance: once the user has typed anything or added
-              // an attachment, the rows hide in place so the hero and composer
-              // do not jump. A site edit uses its own prompt instead of it.
-              footer={
-                isNewChat && !isSiteEditChat ? (
-                  <NewChatStarters
-                    hidden={
-                      Boolean(chatInput.trim()) || attachments.length > 0
-                    }
-                    onSelect={handleStarterSelect}
-                  />
-                ) : null
-              }
-            />
-          </div>
-
-          {canvasOpen && (
-            <CanvasPreview
-              code={activeCanvasCode}
-              title={activeSession?.title || t("common.shell.untitledApplication")}
-              onClose={handleCloseCanvas}
-              isFullScreen={canvasFullScreen}
-              onToggleFullScreen={() => setCanvasFullScreen((prev) => !prev)}
-              sessionId={activeSession?.id || null}
-              isStreaming={isThinking}
-            />
-          )}
-        </>
+            {canvasOpen && (
+              <CanvasPreview
+                code={activeCanvasCode}
+                title={
+                  activeSession?.title ||
+                  t("common.shell.untitledApplication")
+                }
+                onClose={handleCloseCanvas}
+                isFullScreen={canvasFullScreen}
+                onToggleFullScreen={() =>
+                  setCanvasFullScreen((prev) => !prev)
+                }
+                sessionId={activeSession?.id || null}
+                isStreaming={isThinking}
+              />
+            )}
+          </>
         )}
       </main>
 
@@ -2123,18 +1121,9 @@ function MainApp({ theme, setTheme }) {
   );
 }
 
-// Routes that must render without waiting for the session check: the sign-in
-// front door, pricing, the payment return page and every policy (including the
-// search-engine aliases). They read the account only to label themselves, so a
-// visitor should never stare at a spinner to reach them.
 const PUBLIC_ROUTES =
   /^\/(?:login|pricing|payment\/success|privacy|terms|cookies|refunds|privacy-policy|terms-and-conditions|cookie-policy|refund-policy|share\/chat\/[^/]+)\/?$/;
 
-// Legal pages must be reachable whether or not the visitor is signed in — a
-// policy you can only read after logging in is not a policy. Aliases keep the
-// longer spellings people and search engines use working. There is no index
-// page: the documents are reached from Settings, the sign-in footer and the
-// cookie banner, and they cross-link each other.
 function legalRoutes() {
   return [
     <Route key="privacy" path="/privacy" element={<Legal docId="privacy" />} />,
@@ -2164,8 +1153,6 @@ function legalRoutes() {
   ];
 }
 
-// Page views are tracked (only when analytics consent is present) from the
-// router's own location so a client-side navigation is not silently dropped.
 function RouteAnalytics() {
   const location = useLocation();
   useEffect(() => {
@@ -2186,8 +1173,6 @@ function AppInner() {
     }
   });
 
-  // The tracker itself decides whether it may run; this only wires its
-  // listener so a consent change takes effect without a reload.
   useEffect(() => startAnalytics(), []);
 
   useEffect(() => {
@@ -2198,13 +1183,16 @@ function AppInner() {
       /* Ignore storage errors */
     }
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", theme === "light" ? "#f7f7f7" : "#000000");
+    if (meta)
+      meta.setAttribute("content", theme === "light" ? "#f7f7f7" : "#000000");
   }, [theme]);
 
-  // Keep theme in sync across tabs
   useEffect(() => {
     const onStorage = (e) => {
-      if (e.key === "corez_theme" && (e.newValue === "light" || e.newValue === "dark")) {
+      if (
+        e.key === "corez_theme" &&
+        (e.newValue === "light" || e.newValue === "dark")
+      ) {
         setTheme(e.newValue);
       }
     };
@@ -2212,57 +1200,32 @@ function AppInner() {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  // The chat requests do not depend on the answer to the session check: the
-  // Worker authorises them from the `corez_session` cookie itself, so the
-  // identity `/api/auth/me` returns is not an input to `/api/chats`. Starting
-  // them here — this effect is declared above the early returns below, so it
-  // runs while the check is still in flight — takes the session check off the
-  // chat's critical path. `MainApp` then consumes these promises instead of
-  // issuing its own. Public routes never prefetch: they render without the
-  // check and have no chats to show.
   const prefetchChatId = useChatIdFromUrl();
   useEffect(() => {
     if (PUBLIC_ROUTES.test(location.pathname)) return;
     prefetchChatList();
     prefetchChat(prefetchChatId);
-    // Once, on boot: later navigation fetches normally through MainApp.
   }, []);
 
-  // The prefetch above is a bet that the visitor is signed in, and the session
-  // check settles it. If the check answers that nobody is (or that it could not
-  // tell), the bet is off and the unconsumed entries have to go: they were 401s,
-  // and holding on to them would hand a stale rejection to MainApp the moment
-  // the visitor signs in, dropping the account's chats on the floor.
   useEffect(() => {
     if (loading) return;
     if (!user) dropChatPrefetches();
   }, [loading, user]);
 
-  // The document head is static, so the route-specific parts of it -- the
-  // canonical link, the title, the social tags -- have to be corrected on every
-  // navigation. Without this, /pricing and every policy claimed the front door
-  // as their canonical and were treated as duplicates, and the chat carried the
-  // marketing title into the browser tab.
   useEffect(() => {
     applyRouteMeta(location.pathname, { signedIn: Boolean(user) });
   }, [location.pathname, user]);
 
-  // The session check decides between the app and the public pages, and it is a
-  // network round-trip on every cold load. Two rules keep it from becoming a
-  // wall:
-  //  - routes that do not depend on the answer (sign-in, pricing, the policies)
-  //    render immediately, so a visitor never waits to read a page;
-  //  - the chat shell waits, but only for a bounded time (see AuthContext), and
-  //    a check that could not complete says so with a retry instead of quietly
-  //    presenting the visitor as signed out.
   const onPublicRoute = PUBLIC_ROUTES.test(location.pathname);
   if (!onPublicRoute && loading) {
-    // A blank frame during the session check read as a broken site on the front
-    // door, so the wait must say something. `role="status"` announces it once
-    // for screen readers rather than on every repaint.
     return (
       <div className="auth-loading" role="status" aria-live="polite">
-        <Loader2 className="spin-icon" size={22} strokeWidth={1.75} aria-hidden="true" />
+        <Loader2
+          className="spin-icon"
+          size={22}
+          strokeWidth={1.75}
+          aria-hidden="true"
+        />
         <span>{t("common.status.loadingCorez")}</span>
       </div>
     );
@@ -2287,16 +1250,6 @@ function AppInner() {
     );
   }
   if (!user) {
-    // Public surface: sign-in is the front door. Pricing stays reachable, the
-    // policies are linked from the sign-in footer and the cookie banner, and
-    // every other logged-out path falls back to sign-in.
-    //
-    // payment/success is declared here as well as in the signed-in routes
-    // below, because PUBLIC_ROUTES already treats it as a route that must not
-    // wait for the session check. Without it this branch's catch-all matched
-    // first and replaced the URL with /login, so a signed-in payer returning
-    // from checkout was bounced to / by the second catch-all and never saw a
-    // confirmation at all.
     return (
       <Routes>
         <Route path="/" element={<Navigate to="/login" replace />} />
@@ -2309,14 +1262,17 @@ function AppInner() {
       </Routes>
     );
   }
-  // Authenticated — render routed MainApp
   return (
     <Routes>
       <Route path="/" element={<MainApp theme={theme} setTheme={setTheme} />} />
-      <Route path="/chat/:chatId" element={<MainApp theme={theme} setTheme={setTheme} />} />
-      {/* The Sites screen lives inside the shell (sidebar + main pane), so the
-          published pages are reachable from the same place as the chats. */}
-      <Route path="/sites" element={<MainApp theme={theme} setTheme={setTheme} />} />
+      <Route
+        path="/chat/:chatId"
+        element={<MainApp theme={theme} setTheme={setTheme} />}
+      />
+      <Route
+        path="/sites"
+        element={<MainApp theme={theme} setTheme={setTheme} />}
+      />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/payment/success" element={<PaymentSuccess />} />
       <Route path="/share/chat/:token" element={<SharedChat />} />

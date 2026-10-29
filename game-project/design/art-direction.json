@@ -4,7 +4,7 @@
     "derived": true,
     "generated_by": "scripts/generate-art-direction.mjs",
     "source": "src/index.css",
-    "source_sha256": "sha256:0605c36c37fe92281a072a5501219fc9",
+    "source_sha256": "sha256:4d0ef580ea05bec004abdb187cfe6c16",
     "note": "The app has no game-project/ directory and no authored art-direction.json. This file exists so Part 16 visual review and docs/review have a citable contract; every value is read from the declared design system rather than invented."
   },
   "project": "CoreZ",

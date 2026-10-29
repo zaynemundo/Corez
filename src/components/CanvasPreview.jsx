@@ -1,26 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import {
-  Code2,
-  RotateCw,
-  Maximize2,
-  Minimize2,
-  Download,
-  Copy,
-  Check,
-  X,
-  Monitor,
-  Laptop,
-  Tablet,
-  Smartphone,
-  Share2,
-  ExternalLink,
-  Loader2,
-  Lock,
-  Printer,
-  QrCode,
-  Code,
-  Link2,
-} from "lucide-react";
+import { Code2, Loader2 } from "lucide-react";
 import {
   formatCodeForPreview,
   parseMultiPageSite,
@@ -32,13 +11,15 @@ import { useAuth } from "../context/AuthContext";
 import { createZipBlob } from "../utils/zipPackager";
 import { repairMalformedHtml } from "../utils/htmlRepair";
 import { printHtmlDocument } from "../utils/printDocument";
-import { generateQrCodeDataUrl, generateEmbedSnippet } from "../utils/qrCode";
+import { generateEmbedSnippet } from "../utils/qrCode";
 import { useI18n } from "../i18n/index.jsx";
-
-// Sentinel stored when a preview error carries no message. Compared against at
-// render time so the runtime-error message listener keeps its existing
-// dependencies and the visible text comes from canvas.error.messageFallback.
-const PREVIEW_ERROR_DEFAULT = "Preview error";
+import { CanvasHeader } from "./canvas/CanvasHeader.jsx";
+import {
+  PREVIEW_ERROR_DEFAULT,
+  MultiPageValidationBanner,
+  PreviewRuntimeBanners,
+} from "./canvas/PreviewErrorBanners.jsx";
+import { PublishShareModal } from "./canvas/PublishShareModal.jsx";
 
 export default function CanvasPreview({
   code,
@@ -300,10 +281,6 @@ export default function CanvasPreview({
 
   const handlePublish = async () => {
     if (publishing || !editableCode) return;
-    // Completeness gate: never publish an incomplete site (multi-page or a
-    // single page with links to pages that were never shipped). The user
-    // sees exactly which pages are missing or broken and can ask Corez to
-    // fix the output instead of sharing a broken link.
     if (multiPageValidation && !multiPageValidation.valid) {
       const errors = multiPageValidation.issues
         .filter((issue) => issue.severity === "error")
@@ -314,8 +291,6 @@ export default function CanvasPreview({
       );
       return;
     }
-    // Publishing is available on every plan: the worker decides whether the
-    // published page carries the free-plan "Made with Corez" badge.
     setPublishing(true);
     setPublishError(null);
     try {
@@ -328,9 +303,6 @@ export default function CanvasPreview({
           );
         }
       }
-      // The published home page is always the site's index page — never
-      // whatever page the user happened to be viewing when they hit
-      // Publish (the preview's active page is not the site's home).
       const homeHtml =
         multiPage.isMultiPage && pagesPayload["index.html"]
           ? pagesPayload["index.html"]
@@ -352,8 +324,6 @@ export default function CanvasPreview({
         });
         setPublishError(null);
       } else {
-        // Surface the server-provided error (401 auth, 403 ownership, 429 rate-limit, 530 R2, etc.)
-        // instead of hiding it behind a generic "hosted service may be unavailable".
         const serverError = result?.error ? String(result.error) : "";
         const isServiceUnavailable =
           serverError.includes("530") ||
@@ -422,7 +392,6 @@ export default function CanvasPreview({
           );
         }
       }
-      // The published home page is always the site's index page.
       const homeHtml =
         multiPage.isMultiPage && pagesPayload["index.html"]
           ? pagesPayload["index.html"]
@@ -479,10 +448,6 @@ export default function CanvasPreview({
     if (!editableCode) return;
 
     if (multiPage.isMultiPage && multiPage.pages.length > 0) {
-      // Multi-page site export: package all individual HTML files into a ZIP
-      // archive. Exports are meant to run on their own host: use the repaired
-      // source (no preview CSP/navigation guard), otherwise every relative
-      // link in the downloaded site would be blocked by the preview guard.
       const filesToZip = multiPage.pages.map((p) => ({
         name: p.name,
         content: repairMalformedHtml(p.html),
@@ -502,8 +467,6 @@ export default function CanvasPreview({
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } else {
-      // Single-file HTML deliverable export (standalone: repaired source,
-      // not the sandboxed preview document).
       const blob = new Blob([repairMalformedHtml(editableCode)], {
         type: "text/html",
       });
@@ -532,12 +495,6 @@ export default function CanvasPreview({
   };
 
   const handlePrint = () => {
-    // The preview iframe is sandboxed without `allow-modals` (generated
-    // pages must not pop dialogs over the app), which also blocks
-    // `iframe.contentWindow.print()` — the spec silently ignores it, so the
-    // old code printed nothing at all. Print the page actually on screen
-    // (repaired source, like the HTML/ZIP download) through a temporary
-    // same-origin frame instead; `window.print()` stays as the last resort.
     const source = currentPage?.html || editableCode;
     if (source) {
       try {
@@ -550,8 +507,6 @@ export default function CanvasPreview({
   };
 
   const handleRefresh = () => {
-    // A reload replaces the document the error banner refers to; a stale
-    // banner would claim the fresh document is broken.
     setRuntimeError(null);
     setKey((prev) => prev + 1);
   };
@@ -585,276 +540,44 @@ export default function CanvasPreview({
 
   return (
     <div className={`canvas-pane ${isFullScreen ? "full-width" : ""}`}>
-      <div className="canvas-header">
-        <div className="canvas-title">
-          {/* View Mode toggle: Preview <-> Source (sized like Publish) */}
-          <button
-            type="button"
-            className="code-btn publish-btn"
-            onClick={() =>
-              setActiveTab(activeTab === "preview" ? "code" : "preview")
-            }
-            title={
-              activeTab === "preview"
-                ? t("canvas.header.viewSource")
-                : t("canvas.header.backToPreview")
-            }
-            aria-label={
-              activeTab === "preview"
-                ? t("canvas.header.viewSource")
-                : t("canvas.header.backToPreview")
-            }
-          >
-            {activeTab === "preview"
-              ? t("canvas.header.source")
-              : t("canvas.header.preview")}
-          </button>
-        </div>
-
-        {/* Device Viewport Selector (Desktop vs Laptop vs Tablet vs Mobile Icon-only) */}
-        {activeTab === "preview" && (
-          <div className="device-mode-bar">
-            <button
-              onClick={() => setDeviceMode("desktop")}
-              title={t("canvas.header.desktopView")}
-              className={`device-btn ${deviceMode === "desktop" ? "active" : ""}`}
-            >
-              <Monitor size={15} strokeWidth={1.5} />
-            </button>
-
-            <button
-              onClick={() => setDeviceMode("laptop")}
-              title={t("canvas.header.laptopView")}
-              className={`device-btn ${deviceMode === "laptop" ? "active" : ""}`}
-            >
-              <Laptop size={15} strokeWidth={1.5} />
-            </button>
-
-            <button
-              onClick={() => setDeviceMode("tablet")}
-              title={t("canvas.header.tableView")}
-              className={`device-btn ${deviceMode === "tablet" ? "active" : ""}`}
-            >
-              <Tablet size={15} strokeWidth={1.5} />
-            </button>
-
-            <button
-              onClick={() => setDeviceMode("mobile")}
-              title={t("canvas.header.mobileView")}
-              className={`device-btn ${deviceMode === "mobile" ? "active" : ""}`}
-            >
-              <Smartphone size={15} strokeWidth={1.5} />
-            </button>
-          </div>
-        )}
-
-        {/* Multi-page navigation happens inside the preview itself: the
-            injected router intercepts <a href="..."> clicks and posts a
-            corez-nav message, so no external tab bar is needed. */}
-
-        <div className="canvas-controls">
-          {/* Publish: share the creation with anyone via a short link. Free
-              plans publish with a small "Made with Corez" badge. */}
-          {editableCode && !isStreaming && (
-            <>
-              <button
-                type="button"
-                className="code-btn publish-btn"
-                onClick={handlePublish}
-                disabled={publishing}
-                title={t("canvas.publish.shareTitle")}
-                aria-label={
-                  publishing
-                    ? t("canvas.publish.publishing")
-                    : t("canvas.publish.action")
-                }
-              >
-                {publishing ? (
-                  <Loader2 size={13} className="spin-icon" />
-                ) : (
-                  <Share2 size={13} />
-                )}
-                <span>
-                  {publishing
-                    ? t("canvas.publish.publishing")
-                    : t("canvas.publish.action")}
-                </span>
-              </button>
-            </>
-          )}
-
-          <button
-            className="icon-btn"
-            onClick={handleRefresh}
-            title={t("canvas.header.reloadPreview")}
-          >
-            <RotateCw size={14} strokeWidth={1.5} />
-          </button>
-          <button
-            className="icon-btn"
-            onClick={handleCopy}
-            title={t("canvas.header.copySource")}
-          >
-            {copied ? (
-              <Check size={14} strokeWidth={1.5} style={{ color: "#ffffff" }} />
-            ) : (
-              <Copy size={14} strokeWidth={1.5} />
-            )}
-          </button>
-          <button
-            className="icon-btn"
-            onClick={handleDownload}
-            title={
-              multiPage.isMultiPage
-                ? t("canvas.header.downloadZip")
-                : t("canvas.header.downloadHtml")
-            }
-          >
-            <Download size={14} strokeWidth={1.5} />
-          </button>
-          <button
-            className="icon-btn"
-            onClick={handlePrint}
-            title={t("canvas.header.exportPrint")}
-          >
-            <Printer size={14} strokeWidth={1.5} />
-          </button>
-          <button
-            className="icon-btn"
-            onClick={onToggleFullScreen}
-            title={t("canvas.header.toggleFullscreen")}
-          >
-            {isFullScreen ? (
-              <Minimize2 size={14} strokeWidth={1.5} />
-            ) : (
-              <Maximize2 size={14} strokeWidth={1.5} />
-            )}
-          </button>
-          <button className="icon-btn" onClick={onClose} title={t("canvas.header.closePreview")}>
-            <X size={14} strokeWidth={1.5} />
-          </button>
-        </div>
-      </div>
+      <CanvasHeader
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        deviceMode={deviceMode}
+        setDeviceMode={setDeviceMode}
+        editableCode={editableCode}
+        isStreaming={isStreaming}
+        publishing={publishing}
+        handlePublish={handlePublish}
+        handleRefresh={handleRefresh}
+        handleCopy={handleCopy}
+        copied={copied}
+        handleDownload={handleDownload}
+        isMultiPage={multiPage.isMultiPage}
+        handlePrint={handlePrint}
+        isFullScreen={isFullScreen}
+        onToggleFullScreen={onToggleFullScreen}
+        onClose={onClose}
+      />
 
       <div
         className={`canvas-body ${deviceMode !== "desktop" && activeTab === "preview" ? "device-wrapper" : ""}`}
       >
-        {multiPageValidation && !multiPageValidation.valid && (
-          <div
-            role="alert"
-            className="multipage-validation-banner"
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: "8px",
-              margin: "0 0 10px",
-              padding: "8px 12px",
-              background: "rgba(239, 68, 68, 0.12)",
-              border: "1px solid rgba(239, 68, 68, 0.35)",
-              borderRadius: "var(--radius-md)",
-              color: "var(--text-primary)",
-              fontSize: "0.78rem",
-              lineHeight: 1.4,
-            }}
-          >
-            <span
-              style={{
-                color: "#f87171",
-                fontWeight: 600,
-                whiteSpace: "nowrap",
-              }}
-            >
-              {t("canvas.validation.incomplete")}
-            </span>
-            <span>
-              {multiPageValidation.issues
-                .filter((issue) => issue.severity === "error")
-                .map((issue) => issue.message)
-                .join(" · ")}{" "}
-              {t("canvas.validation.publishingBlocked")}
-            </span>
-          </div>
-        )}
+        <MultiPageValidationBanner multiPageValidation={multiPageValidation} />
+
         {editableCode ? (
           activeTab === "preview" ? (
             <div className={`preview-container device-mode-${deviceMode}`}>
-              {runtimeError && (
-                <div className="preview-error-banner" role="alert">
-                  <div className="preview-error-text">
-                    <strong>
-                      {runtimeError.kind === "csp"
-                        ? t("canvas.error.kindCsp")
-                        : runtimeError.kind === "resource"
-                          ? t("canvas.error.kindResource")
-                          : runtimeError.kind === "unhandledrejection"
-                            ? t("canvas.error.kindUnhandledRejection")
-                            : t("canvas.error.kindRuntime")}
-                    </strong>
-                    <span>
-                      {runtimeError.message === PREVIEW_ERROR_DEFAULT
-                        ? t("canvas.error.messageFallback")
-                        : runtimeError.message}
-                    </span>
-                    {runtimeError.source ? (
-                      <span className="preview-error-source">
-                        {runtimeError.source}
-                        {runtimeError.line ? `:${runtimeError.line}` : ""}
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="preview-error-actions">
-                    <button
-                      type="button"
-                      className="preview-error-btn"
-                      onClick={copyRuntimeError}
-                    >
-                      {errorCopied
-                        ? t("canvas.error.copied")
-                        : t("common.action.copy")}
-                    </button>
-                    <button
-                      type="button"
-                      className="preview-error-btn"
-                      onClick={() => setRuntimeError(null)}
-                      aria-label={t("canvas.error.dismiss")}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              )}
-              {missingDownload && (
-                <div className="preview-error-banner" role="alert">
-                  <div className="preview-error-text">
-                    <strong>{t("canvas.download.missingTitle")}</strong>
-                    <span>
-                      {t("canvas.download.missingBody", {
-                        name: missingDownload,
-                      })}
-                    </span>
-                    <span>{t("canvas.download.missingHint")}</span>
-                  </div>
-                  <div className="preview-error-actions">
-                    <button
-                      type="button"
-                      className="preview-error-btn"
-                      onClick={copyDownloadFix}
-                    >
-                      {fixCopied
-                        ? t("canvas.error.copied")
-                        : t("canvas.download.copyFix")}
-                    </button>
-                    <button
-                      type="button"
-                      className="preview-error-btn"
-                      onClick={() => setMissingDownload(null)}
-                      aria-label={t("canvas.download.dismiss")}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              )}
+              <PreviewRuntimeBanners
+                runtimeError={runtimeError}
+                setRuntimeError={setRuntimeError}
+                errorCopied={errorCopied}
+                copyRuntimeError={copyRuntimeError}
+                missingDownload={missingDownload}
+                setMissingDownload={setMissingDownload}
+                fixCopied={fixCopied}
+                copyDownloadFix={copyDownloadFix}
+              />
               {deviceMode !== "desktop" && (
                 <div className="device-frame-header">
                   <div className="device-camera-dot" />
@@ -879,10 +602,6 @@ export default function CanvasPreview({
                   style={
                     deviceMode !== "desktop"
                       ? {
-                          // Fixed device width, real device aspect ratio, and
-                          // height derived from it — the frame never stretches
-                          // to the pane height or clips. margin:auto centers
-                          // while remaining scrollable when the pane is small.
                           width: deviceSpecs[deviceMode].width,
                           maxWidth: "100%",
                           aspectRatio: deviceSpecs[deviceMode].ratio,
@@ -950,593 +669,31 @@ export default function CanvasPreview({
         )}
       </div>
 
-      {/* Publish share modal */}
-      {publishLink && (
-        <div
-          className="modal-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-label={t("canvas.publish.modalLabel")}
-          onClick={() => setPublishResult(null)}
-        >
-          <div
-            className="modal-card publish-modal-card"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="modal-header">
-              <span className="modal-title">
-                <Share2
-                  size={15}
-                  style={{
-                    marginRight: "6px",
-                    verticalAlign: "middle",
-                    color: "var(--accent, #818cf8)",
-                  }}
-                />
-                Your creation is live
-              </span>
-              <button
-                type="button"
-                className="icon-btn"
-                onClick={() => setPublishResult(null)}
-                title={t("common.action.close")}
-                aria-label={t("common.action.close")}
-              >
-                <X size={15} />
-              </button>
-            </div>
-
-            <p
-              style={{
-                fontSize: "0.8rem",
-                color: "var(--text-secondary)",
-                margin: 0,
-              }}
-            >
-              {t("canvas.publish.shareIntro")}
-              <b style={{ color: "var(--text-primary)" }}>
-                {title.slice(0, 60)}
-              </b>
-              {t("canvas.publish.shareEnd")}
-            </p>
-
-            {publishShowsBadge && (
-              <p
-                style={{
-                  fontSize: "0.72rem",
-                  color: "var(--text-muted, #8a8a90)",
-                  margin: "6px 0 0",
-                  lineHeight: 1.5,
-                }}
-              >
-                {publishBadgeMessage}{" "}
-                <a
-                  href="/pricing"
-                  style={{ color: "var(--text-primary)", fontWeight: 600 }}
-                >
-                  {t("canvas.publish.upgrade")}
-                </a>
-              </p>
-            )}
-
-            {/* Share Modal Tabs: Link | QR Code | Embed */}
-            <div
-              className="publish-modal-tabs"
-              style={{
-                display: "flex",
-                gap: "6px",
-                margin: "8px 0 12px",
-                borderBottom:
-                  "1px solid var(--border-subtle, rgba(255, 255, 255, 0.08))",
-                paddingBottom: "8px",
-              }}
-            >
-              <button
-                type="button"
-                className={`publish-tab-btn ${publishTab === "link" ? "active" : ""}`}
-                onClick={() => setPublishTab("link")}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "5px",
-                  padding: "4px 10px",
-                  borderRadius: "var(--radius-sm, 6px)",
-                  border:
-                    publishTab === "link"
-                      ? "1px solid var(--accent, #3b82f6)"
-                      : "1px solid transparent",
-                  background:
-                    publishTab === "link"
-                      ? "rgba(59, 130, 246, 0.12)"
-                      : "transparent",
-                  color:
-                    publishTab === "link"
-                      ? "var(--text-primary, #ffffff)"
-                      : "var(--text-secondary, #9ca3af)",
-                  fontSize: "0.75rem",
-                  fontWeight: publishTab === "link" ? 600 : 400,
-                  cursor: "pointer",
-                }}
-              >
-                <Link2 size={13} />
-                <span>{t("canvas.publish.tabLink")}</span>
-              </button>
-              <button
-                type="button"
-                className={`publish-tab-btn ${publishTab === "qr" ? "active" : ""}`}
-                onClick={() => setPublishTab("qr")}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "5px",
-                  padding: "4px 10px",
-                  borderRadius: "var(--radius-sm, 6px)",
-                  border:
-                    publishTab === "qr"
-                      ? "1px solid var(--accent, #3b82f6)"
-                      : "1px solid transparent",
-                  background:
-                    publishTab === "qr"
-                      ? "rgba(59, 130, 246, 0.12)"
-                      : "transparent",
-                  color:
-                    publishTab === "qr"
-                      ? "var(--text-primary, #ffffff)"
-                      : "var(--text-secondary, #9ca3af)",
-                  fontSize: "0.75rem",
-                  fontWeight: publishTab === "qr" ? 600 : 400,
-                  cursor: "pointer",
-                }}
-              >
-                <QrCode size={13} />
-                <span>{t("canvas.publish.tabQr")}</span>
-              </button>
-              <button
-                type="button"
-                className={`publish-tab-btn ${publishTab === "embed" ? "active" : ""}`}
-                onClick={() => setPublishTab("embed")}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "5px",
-                  padding: "4px 10px",
-                  borderRadius: "var(--radius-sm, 6px)",
-                  border:
-                    publishTab === "embed"
-                      ? "1px solid var(--accent, #3b82f6)"
-                      : "1px solid transparent",
-                  background:
-                    publishTab === "embed"
-                      ? "rgba(59, 130, 246, 0.12)"
-                      : "transparent",
-                  color:
-                    publishTab === "embed"
-                      ? "var(--text-primary, #ffffff)"
-                      : "var(--text-secondary, #9ca3af)",
-                  fontSize: "0.75rem",
-                  fontWeight: publishTab === "embed" ? 600 : 400,
-                  cursor: "pointer",
-                }}
-              >
-                <Code size={13} />
-                <span>{t("canvas.publish.tabEmbed")}</span>
-              </button>
-            </div>
-
-            {publishTab === "link" && (
-              <>
-                <div
-                  className="publish-link-box"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    background: "var(--bg-tertiary)",
-                    border: "1px solid var(--border-color)",
-                    borderRadius: "var(--radius-md)",
-                    padding: "8px 10px",
-                  }}
-                >
-                  <input
-                    readOnly
-                    id="publish-share-link"
-                    name="share-link"
-                    value={publishLink}
-                    onFocus={(e) => e.target.select()}
-                    aria-label={t("canvas.publish.shareLinkLabel")}
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      background: "transparent",
-                      border: "none",
-                      outline: "none",
-                      color: "var(--text-primary)",
-                      fontSize: "0.8rem",
-                      fontFamily: "monospace",
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className="code-btn"
-                    onClick={handleCopyLink}
-                    title={t("canvas.publish.copyLinkTitle")}
-                  >
-                    {copied ? <Check size={14} /> : <Copy size={14} />}
-                    <span>
-                      {copied
-                        ? t("common.action.copied")
-                        : t("common.action.copy")}
-                    </span>
-                  </button>
-                  <a
-                    className="code-btn"
-                    href={publishLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title={t("canvas.publish.openNewTab")}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "4px",
-                      textDecoration: "none",
-                    }}
-                  >
-                    <ExternalLink size={14} />
-                    <span>{t("common.action.open")}</span>
-                  </a>
-                </div>
-
-                {/* Slug Customization / 1-Time Change (Standard & Premium only) */}
-                {customSlugRequiresUpgrade ? (
-                  <p
-                    style={{
-                      fontSize: "0.74rem",
-                      color: "var(--text-secondary)",
-                      margin: "2px 0 0",
-                    }}
-                  >
-                    {t("canvas.publish.slugLockedIntro")}
-                    <a
-                      href="/pricing"
-                      style={{
-                        color: "var(--text-primary)",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {t("canvas.publish.slugLockedCta")}
-                    </a>
-                    {t("canvas.publish.slugLockedEnd")}
-                  </p>
-                ) : publishResult.customized ||
-                  (publishResult.slug &&
-                    !/^[a-z0-9]{4,8}-[0-9]{1,6}$/.test(
-                      publishResult.slug,
-                    )) ? (
-                  <div
-                    className="publish-slug-locked"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      padding: "7px 10px",
-                      background: "var(--bg-tertiary)",
-                      border: "1px solid var(--border-color)",
-                      borderRadius: "var(--radius-md)",
-                    }}
-                  >
-                    <Lock
-                      size={13}
-                      style={{ color: "var(--text-secondary)", flexShrink: 0 }}
-                    />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p
-                        style={{
-                          fontSize: "0.74rem",
-                          fontWeight: 500,
-                          color: "var(--text-primary)",
-                          margin: 0,
-                        }}
-                      >
-                        {t("canvas.publish.slugLocked")}
-                      </p>
-                      <p
-                        style={{
-                          fontSize: "0.7rem",
-                          color: "var(--text-secondary)",
-                          margin: "1px 0 0",
-                        }}
-                      >
-                        {t("canvas.publish.slugLockedDetail")}
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <form
-                    onSubmit={handleUpdateSlug}
-                    className="publish-slug-form"
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "5px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      <label
-                        htmlFor="custom-slug-input"
-                        style={{
-                          fontSize: "0.75rem",
-                          fontWeight: 500,
-                          color: "var(--text-secondary)",
-                        }}
-                      >
-                        {t("canvas.publish.slugLabel")}
-                      </label>
-                      <span
-                        style={{
-                          fontSize: "0.7rem",
-                          color: "var(--text-secondary)",
-                        }}
-                      >
-                        {t("canvas.publish.slugOneTime")}
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          flex: 1,
-                          minWidth: 0,
-                          background: "var(--bg-tertiary)",
-                          border: "1px solid var(--border-color)",
-                          borderRadius: "var(--radius-md)",
-                          padding: "0 8px",
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontSize: "0.78rem",
-                            color: "var(--text-secondary)",
-                            fontFamily: "var(--font-mono)",
-                            userSelect: "none",
-                          }}
-                        >
-                          corez.pro/
-                        </span>
-                        <input
-                          id="custom-slug-input"
-                          type="text"
-                          value={customSlug}
-                          onChange={(e) => {
-                            setCustomSlug(
-                              e.target.value
-                                .toLowerCase()
-                                .replace(/[^a-z0-9-]/g, ""),
-                            );
-                            setSlugError(null);
-                            setSlugSuccess(null);
-                          }}
-                          placeholder="my-custom-slug"
-                          aria-label={t("canvas.publish.slugAriaLabel")}
-                          style={{
-                            flex: 1,
-                            minWidth: 0,
-                            background: "transparent",
-                            border: "none",
-                            outline: "none",
-                            color: "var(--text-primary)",
-                            fontSize: "0.8rem",
-                            fontFamily: "var(--font-mono)",
-                            padding: "7px 4px",
-                          }}
-                        />
-                      </div>
-                      <button
-                        type="submit"
-                        className="code-btn"
-                        onClick={handleUpdateSlug}
-                        disabled={
-                          isUpdatingSlug ||
-                          !customSlug ||
-                          customSlug === publishResult.slug
-                        }
-                        style={{
-                          whiteSpace: "nowrap",
-                          padding: "6px 12px",
-                          fontSize: "0.75rem",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "4px",
-                        }}
-                      >
-                        {isUpdatingSlug ? (
-                          <Loader2 size={13} className="spin-icon" />
-                        ) : (
-                          t("canvas.publish.saveSlug")
-                        )}
-                      </button>
-                    </div>
-                    {slugError && (
-                      <p
-                        role="alert"
-                        style={{
-                          fontSize: "0.74rem",
-                          color: "#f87171",
-                          margin: "2px 0 0",
-                        }}
-                      >
-                        {slugError}
-                      </p>
-                    )}
-                    {slugSuccess && (
-                      <p
-                        role="status"
-                        style={{
-                          fontSize: "0.74rem",
-                          color: "var(--market-positive)",
-                          margin: "2px 0 0",
-                        }}
-                      >
-                        {slugSuccess}
-                      </p>
-                    )}
-                  </form>
-                )}
-              </>
-            )}
-
-            {publishTab === "qr" && (
-              <div
-                className="publish-qr-view"
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "16px 12px",
-                  background: "var(--bg-tertiary, #181922)",
-                  border: "1px solid var(--border-color)",
-                  borderRadius: "var(--radius-md, 10px)",
-                  gap: "10px",
-                }}
-              >
-                <div
-                  className="qr-code-svg-container"
-                  style={{
-                    background: "#ffffff",
-                    padding: "8px",
-                    borderRadius: "8px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <img
-                    src={generateQrCodeDataUrl(publishLink, {
-                      size: 140,
-                      fgColor: "#090a0f",
-                      bgColor: "#ffffff",
-                    })}
-                    alt={t("canvas.publish.qrAlt", { url: publishLink })}
-                    width="140"
-                    height="140"
-                    style={{ display: "block" }}
-                  />
-                </div>
-                <p
-                  style={{
-                    fontSize: "0.75rem",
-                    color: "var(--text-secondary, #9ca3af)",
-                    margin: 0,
-                    textAlign: "center",
-                  }}
-                >
-                  {t("canvas.publish.qrScan")}
-                </p>
-              </div>
-            )}
-
-            {publishTab === "embed" && (
-              <div
-                className="publish-embed-view"
-                style={{ display: "flex", flexDirection: "column", gap: "8px" }}
-              >
-                <textarea
-                  readOnly
-                  id="publish-embed-html"
-                  name="embed-html"
-                  value={generateEmbedSnippet(publishLink, { title })}
-                  onFocus={(e) => e.target.select()}
-                  aria-label={t("canvas.publish.embedLabel")}
-                  style={{
-                    width: "100%",
-                    height: "80px",
-                    background: "var(--bg-tertiary)",
-                    border: "1px solid var(--border-color)",
-                    borderRadius: "var(--radius-md)",
-                    padding: "8px 10px",
-                    color: "var(--text-primary)",
-                    fontSize: "0.75rem",
-                    fontFamily: "monospace",
-                    resize: "none",
-                  }}
-                />
-                <button
-                  type="button"
-                  className="code-btn"
-                  onClick={handleCopyEmbed}
-                  style={{
-                    alignSelf: "flex-end",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "5px",
-                  }}
-                >
-                  {embedCopied ? <Check size={13} /> : <Copy size={13} />}
-                  <span>
-                    {embedCopied
-                      ? t("canvas.publish.embedCopied")
-                      : t("canvas.publish.embedCopy")}
-                  </span>
-                </button>
-              </div>
-            )}
-
-            <p
-              style={{
-                fontSize: "0.75rem",
-                color: "var(--text-secondary)",
-                margin: 0,
-              }}
-            >
-              {t("canvas.publish.privacy")}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {publishError && (
-        <div
-          role="alert"
-          style={{
-            position: "absolute",
-            bottom: "12px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "var(--bg-tertiary)",
-            border: "1px solid var(--border-color)",
-            color: "var(--text-primary)",
-            borderRadius: "var(--radius-md)",
-            padding: "8px 14px",
-            fontSize: "0.8rem",
-            zIndex: 20,
-          }}
-        >
-          {publishError}
-          <button
-            type="button"
-            className="icon-btn"
-            onClick={() => setPublishError(null)}
-            title={t("common.action.dismiss")}
-            aria-label={t("common.action.dismiss")}
-            style={{ marginLeft: "8px", verticalAlign: "middle" }}
-          >
-            <X size={13} />
-          </button>
-        </div>
-      )}
+      <PublishShareModal
+        publishLink={publishLink}
+        publishResult={publishResult}
+        setPublishResult={setPublishResult}
+        title={title}
+        publishShowsBadge={publishShowsBadge}
+        publishBadgeMessage={publishBadgeMessage}
+        publishTab={publishTab}
+        setPublishTab={setPublishTab}
+        copied={copied}
+        handleCopyLink={handleCopyLink}
+        customSlugRequiresUpgrade={customSlugRequiresUpgrade}
+        customSlug={customSlug}
+        setCustomSlug={setCustomSlug}
+        setSlugError={setSlugError}
+        setSlugSuccess={setSlugSuccess}
+        handleUpdateSlug={handleUpdateSlug}
+        isUpdatingSlug={isUpdatingSlug}
+        slugError={slugError}
+        slugSuccess={slugSuccess}
+        embedCopied={embedCopied}
+        handleCopyEmbed={handleCopyEmbed}
+        publishError={publishError}
+        setPublishError={setPublishError}
+      />
     </div>
   );
 }
