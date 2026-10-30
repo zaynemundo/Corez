@@ -420,6 +420,12 @@ function isMetaParagraph(text) {
 // narration line carries several of them ("tags ... closed ... code block
 // ... print ... save as PDF"). Gaps are dot- and newline-tolerant because
 // markup review lines embed ".</div>, </body>, </html>" sequences.
+// A continuation model asked to append to a non-existent artifact often opens
+// with "I don't have an earlier file..." and then offers options. That is
+// commentary even when the rest of the chunk contains suggestions.
+const NO_CONTEXT_META_PATTERN =
+  /\b(?:I (?:don'?t|do not) have|there (?:is|was|isn'?t|wasn'?t)) (?:an? )?(?:earlier|prior|previous) (?:file|message|conversation|thread)\b|\bnothing (?:was|has been) started in this (?:thread|conversation)\b|\bno stopping point (?:for me )?to resume from\b|\bthe messages? so far (?:were|are) just greetings\b/i;
+
 const META_MARKER_PATTERNS = [
   /\bclosing\s+`?<\/(?:div|body|html)>`?/i,
   /\b(?:markdown\s+|code\s+)?code\s+blocks?\b[^A-Za-z0-9]{0,30}?(?:are|is|were|was)\b[^A-Za-z0-9]{0,30}?(?:closed|complete)/i,
@@ -507,6 +513,7 @@ export function isMetaOnlyReply(text) {
   if (/^\s*```[a-zA-Z0-9+#-]+\s*\n/m.test(value)) return false;
   // A genuinely huge reply (a real tail) is never treated as commentary.
   if (value.length > 4000) return false;
+  if (NO_CONTEXT_META_PATTERN.test(value)) return true;
   // The earlier single-sentence phrasings ("My previous reply was already
   // complete...") remain valid markers.
   if (

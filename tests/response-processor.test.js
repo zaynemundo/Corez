@@ -274,11 +274,11 @@ describe('mergeResponse', () => {
   it('inserts a word boundary when a continuation follows a question mark', () => {
     const merged = mergeResponse(
       'Doing well — thanks for asking. Ready whenever you are. What are you working on?',
-      "I don't have an earlier file to continue from.",
+      'Next sentence starts here.',
       'truncation',
     );
-    expect(merged).toContain('working on? I don');
-    expect(merged).not.toContain('working on?I don');
+    expect(merged).toContain('working on? Next sentence');
+    expect(merged).not.toContain('working on?Next sentence');
   });
 
   it('completes an open fence with raw code', () => {
@@ -481,6 +481,11 @@ describe('processResponse', () => {
   it('classifies short meta-commentary replies as meta-only', () => {
     expect(isMetaOnlyReply('My previous reply was already complete — nothing to continue.')).toBe(true);
     expect(isMetaOnlyReply('The response is already complete, no continuation needed.')).toBe(true);
+    expect(
+      isMetaOnlyReply(
+        "I don't have an earlier file to continue from — nothing was started in this thread, so there's no stopping point for me to resume from.",
+      ),
+    ).toBe(true);
     expect(isMetaOnlyReply('<html><body>real content</body></html>')).toBe(false);
     // A longer reply with substantive content is not meta-only.
     const longReply = 'Here is the full updated implementation. '.repeat(30);
