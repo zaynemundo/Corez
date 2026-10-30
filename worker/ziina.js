@@ -1,7 +1,10 @@
-import { jsonResponse, readBoundedJson, safeErrorDetail } from "./utils.js";
+import { createRateLimiter, jsonResponse, readBoundedJson, safeErrorDetail } from "./utils.js";
+import { verifySession } from "./auth.js";
 
 const ZIINA_BASE = "https://api-v2.ziina.com/api";
 const MIN_FILS = 200; // 2 AED
+const CHECKOUT_HOSTS = new Set(["corez.pro", "www.corez.pro", "chat.corez.pro"]);
+const ziinaRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 10 });
 
 // Corez product pricing — Free (0), Standard 18.36 AED/mo or 176.28 AED/year (20% off), Premium 27.54 AED/mo or 264.36 AED/year
 export const ZIINA_PLANS = {
@@ -53,11 +56,11 @@ export function isTestPayment(data) {
   return String(data.mode || "").trim().toLowerCase() === "test";
 }
 
-function isValidHttpsUrl(value) {
+function isValidCheckoutUrl(value) {
   if (typeof value !== "string" || !value.trim()) return false;
   try {
     const u = new URL(value.trim());
-    return u.protocol === "https:";
+    return u.protocol === "https:" && CHECKOUT_HOSTS.has(u.hostname.toLowerCase());
   } catch {
     return false;
   }
@@ -70,24 +73,24 @@ function validateUrls({ success_url, cancel_url, failure_url }) {
     success_url !== null &&
     String(success_url).trim() !== ""
   ) {
-    if (!isValidHttpsUrl(success_url))
-      errors.push("success_url must be a valid https URL");
+    if (!isValidCheckoutUrl(success_url))
+      errors.push("success_url must be a corez.pro https URL");
   }
   if (
     cancel_url !== undefined &&
     cancel_url !== null &&
     String(cancel_url).trim() !== ""
   ) {
-    if (!isValidHttpsUrl(cancel_url))
-      errors.push("cancel_url must be a valid https URL");
+    if (!isValidCheckoutUrl(cancel_url))
+      errors.push("cancel_url must be a corez.pro https URL");
   }
   if (
     failure_url !== undefined &&
     failure_url !== null &&
     String(failure_url).trim() !== ""
   ) {
-    if (!isValidHttpsUrl(failure_url))
-      errors.push("failure_url must be a valid https URL");
+    if (!isValidCheckoutUrl(failure_url))
+      errors.push("failure_url must be a corez.pro https URL");
   }
   return errors;
 }
@@ -110,6 +113,24 @@ export async function handleZiina(request, env) {
   const isGetByIdAlt = pathname.startsWith("/api/payments/ziina/");
 
   if (!isCreate && !isGetById && !isGetByIdAlt) return null;
+
+  // Checkout intents include the merchant key's payment surface; never expose
+  // creation or lookup to an anonymous caller. Local tests without AUTH_SECRET
+  // retain the same dev bypass as the rest of the worker.
+  if (env?.AUTH_SECRET) {
+    const session = await verifySession(request, env);
+    if (!session?.uid) {
+      return jsonResponse(401, { error: "Authentication required." });
+    }
+    const retryAfter = ziinaRateLimiter(request);
+    if (retryAfter !== null) {
+      return jsonResponse(
+        429,
+        { error: "Too many payment requests. Try again shortly." },
+        { "Retry-After": String(retryAfter) },
+      );
+    }
+  }
 
   // Auth check for Ziina endpoints — require ZIINA_API_KEY
   const apiKey = env?.ZIINA_API_KEY || env?.ZIINA_API_TOKEN;
@@ -215,6 +236,11 @@ export async function handleZiina(request, env) {
           error: `Unknown plan '${planKey}'. Use 'standard' (18.36 AED) or 'premium' (27.54 AED).`,
         });
       }
+    }
+    if (!planMeta) {
+      return jsonResponse(400, {
+        error: "A valid Corez plan is required: standard, standard_yearly, premium, or premium_yearly.",
+      });
     }
 
     // Normalize amount: support amount (fils), amount_fils, amountInFils, amount_aed, amountAed

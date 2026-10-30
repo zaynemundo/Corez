@@ -137,6 +137,46 @@ describe('payment verification boundaries', () => {
       expect(captured.test).toBeUndefined();
     });
 
+    it('requires a session when AUTH_SECRET is configured', async () => {
+      const request = new Request('https://corez.pro/api/ziina/payment_intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: 'standard' }),
+      });
+
+      const res = await handleZiina(request, {
+        ZIINA_API_KEY: 'test-key',
+        AUTH_SECRET: 'test-secret-32-characters-long-enough!',
+      });
+
+      expect(res.status).toBe(401);
+    });
+
+    it('rejects a payment without a known Corez plan', async () => {
+      const request = new Request('https://corez.pro/api/ziina/payment_intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: 1836 }),
+      });
+
+      const res = await handleZiina(request, { ZIINA_API_KEY: 'test-key' });
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects checkout return URLs outside corez.pro', async () => {
+      const request = new Request('https://corez.pro/api/ziina/payment_intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plan: 'standard',
+          success_url: 'https://evil.example/paid',
+        }),
+      });
+
+      const res = await handleZiina(request, { ZIINA_API_KEY: 'test-key' });
+      expect(res.status).toBe(400);
+    });
+
     it('creates a test-mode intent only when the deployment opts in', async () => {
       const { DB, env } = await createSubscriptionEnv({
         env: { ZIINA_TEST_MODE: 'true' },

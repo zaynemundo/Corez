@@ -1239,6 +1239,7 @@ async function run() {
   assert.match(publishCsp, /sandbox allow-scripts/);
   assert.match(publishCsp, /script-src 'unsafe-inline'/);
   assert.match(publishCsp, /style-src 'unsafe-inline'/);
+  assert.match(publishCsp, /form-action 'none'/);
   const freePublishedHtml = await publishedPage.text();
   assert.match(freePublishedHtml, /corez-badge:start/);
   assert.equal(stripBadge(freePublishedHtml), '<!DOCTYPE html><html><body><h1>Shared FPS</h1></body></html>');

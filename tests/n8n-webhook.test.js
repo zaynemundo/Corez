@@ -53,16 +53,46 @@ describe('n8n webhook bridge hardening', () => {
     }
   });
 
-  it('forwards to a public https target and never leaks the secret to a caller-supplied host', async () => {
+  it('forwards to the configured public https host and never leaks the secret', async () => {
     const calls = stubFetch();
     const res = await post(
       { webhookUrl: 'https://hooks.example.com/x', event: 'corez.publish' },
-      { N8N_WEBHOOK_SECRET: 'sekret' },
+      {
+        N8N_WEBHOOK_URL: 'https://hooks.example.com/default',
+        N8N_WEBHOOK_SECRET: 'sekret',
+      },
     );
     expect(res.status).toBe(200);
     expect(calls).toHaveLength(1);
     expect(calls[0].url).toBe('https://hooks.example.com/x');
-    expect(calls[0].init.headers['X-Corez-Secret']).toBeUndefined();
+    expect(calls[0].init.headers['X-Corez-Secret']).toBe('sekret');
+  });
+
+  it('rejects a caller-supplied host even when a webhook is configured', async () => {
+    const calls = stubFetch();
+    const res = await post(
+      { webhookUrl: 'https://evil.example/x', event: 'e' },
+      { N8N_WEBHOOK_URL: 'https://hooks.example.com/default' },
+    );
+    expect(res.status).toBe(400);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('does not follow a redirect from the configured webhook', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(null, {
+          status: 302,
+          headers: { Location: 'http://127.0.0.1:5678/internal' },
+        }),
+      ),
+    );
+    const res = await post(
+      { event: 'e' },
+      { N8N_WEBHOOK_URL: 'https://hooks.example.com/webhook' },
+    );
+    expect(res.status).toBe(502);
   });
 
   it('sends the shared secret only to the configured host', async () => {
@@ -83,7 +113,11 @@ describe('n8n webhook bridge hardening', () => {
     const calls = stubFetch();
     const okRes = await post(
       { webhookUrl: 'http://127.0.0.1:5678/webhook/dev', event: 'e' },
-      { N8N_ALLOW_HTTP: '1', N8N_ALLOW_PRIVATE: '1' },
+      {
+        N8N_WEBHOOK_URL: 'http://127.0.0.1:5678/webhook/dev',
+        N8N_ALLOW_HTTP: '1',
+        N8N_ALLOW_PRIVATE: '1',
+      },
     );
     expect(okRes.status).toBe(200);
     expect(calls).toHaveLength(1);

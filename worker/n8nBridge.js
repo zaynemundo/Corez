@@ -6,7 +6,7 @@
  * n8n handles automation (Slack, Sheets, Email, CRM) when a CoreZ event
  * fires (publish, new chat, lead form).
  *
- * Env: N8N_WEBHOOK_URL (optional default, e.g. https://<n8n>/webhook/<id>)
+ * Env: N8N_WEBHOOK_URL (required configured host, e.g. https://<n8n>/webhook/<id>)
  *       N8N_WEBHOOK_SECRET (optional HMAC header for verification)
  *       N8N_WEBHOOK_TIMEOUT_MS (default 8000)
  *       N8N_ALLOW_PRIVATE=1  (dev only: permit loopback/private targets)
@@ -14,14 +14,15 @@
  *
  * Endpoints:
  *  POST /api/n8n/webhook  { event, payload, webhookUrl? }
- *    -> forwards JSON to the n8n webhook URL (env default or per-request)
- *       No n8n API key required. Webhook URLs are unguessable tokens.
+ *    -> forwards JSON to the configured webhook host (path may be overridden)
+ *       No n8n API key required. The Worker never becomes an open proxy.
  */
 
-import { jsonResponse, readBoundedJson, safeErrorDetail } from "./utils.js";
+import { createRateLimiter, jsonResponse, readBoundedJson, safeErrorDetail } from "./utils.js";
 import { verifySession } from "./auth.js";
 
 const DEFAULT_TIMEOUT_MS = 8000;
+const n8nRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 30 });
 
 function getWebhookUrl(requestBody, env) {
   const fromBody =
@@ -78,8 +79,13 @@ function isPrivateHostname(hostname) {
 
 function isAllowedWebhookUrl(url, env) {
   try {
+    const configuredHost = configuredWebhookHost(env);
+    if (!configuredHost) return false;
     const u = new URL(url);
     if (u.protocol !== "https:" && u.protocol !== "http:") return false;
+    // A per-request URL may choose a path, but never a different host: the
+    // Worker must not become an authenticated outbound request proxy.
+    if (u.host !== configuredHost) return false;
     // http and private targets are dev-only escape hatches.
     if (u.protocol === "http:" && env?.N8N_ALLOW_HTTP !== "1") return false;
     if (isPrivateHostname(u.hostname) && env?.N8N_ALLOW_PRIVATE !== "1")
@@ -128,6 +134,14 @@ export async function handleN8nWebhook(request, env) {
       return jsonResponse(401, {
         error: "Authentication required for n8n webhook bridge.",
       });
+  }
+  const retryAfter = n8nRateLimiter(request);
+  if (retryAfter !== null) {
+    return jsonResponse(
+      429,
+      { error: "Too many n8n webhook requests. Try again shortly." },
+      { "Retry-After": String(retryAfter) },
+    );
   }
 
   let body;
@@ -187,8 +201,14 @@ export async function handleN8nWebhook(request, env) {
       headers,
       body: JSON.stringify(forwarded),
       signal: controller.signal,
+      redirect: "manual",
     });
     clearTimeout(timeout);
+    if (res.status >= 300 && res.status < 400) {
+      return jsonResponse(502, {
+        error: "n8n webhook returned a redirect; redirects are not followed.",
+      });
+    }
     const text = await res.text().catch(() => "");
     let data;
     try {
