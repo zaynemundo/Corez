@@ -1,12 +1,10 @@
 /**
  * Canonical OpenCode Go model identifiers — the single source of truth.
  *
- * CoreZ runs one text model: Muse Spark 1.3 Contributor, served by the
- * OpenCode Go gateway as `muse-spark-1.3-contributor`. It replaced DeepSeek
- * V4.1 Flash, whose id was duplicated across the worker, the agent core, the
- * CLI and every `.opencode/agents/*.md` binding; a stale unversioned alias
- * once made the entire specialist swarm unroutable ("Model unavailable:
- * opencode-go/…") while the code still appeared correct.
+ * CoreZ's text pipeline runs one primary model: DeepSeek V4.1 Flash, served by
+ * the OpenCode Go gateway as `deepseek-v4.1-flash`. Muse Spark 1.3 Contributor
+ * remains on the allow-list as the explicit rollback model, so an operator can
+ * switch back without editing code.
  *
  * Rule: never inline a model id. Import from here so a future rename is one
  * edit and can be covered by a catalog test.
@@ -16,23 +14,26 @@
 export const OPENCODE_GO_PROVIDER = 'opencode-go';
 
 /**
- * Muse Spark 1.3 Contributor — the newest Muse Spark text model on the
- * gateway and the only model CoreZ's text pipeline is allowed to request.
+ * DeepSeek V4.1 Flash — the primary text model for chat, planning, review,
+ * builds, the swarm, the agent core and the CLI.
  */
+export const DEEPSEEK_V4_1_FLASH = 'deepseek-v4.1-flash';
+
+/** Previous primary model, retained as an explicit rollback option. */
 export const MUSE_SPARK_1_3_CONTRIBUTOR = 'muse-spark-1.3-contributor';
 
-/**
- * Default (and only allowed) text model for chat, planning, review, builds,
- * the swarm, the agent core and the CLI.
- */
-export const DEFAULT_TEXT_MODEL = MUSE_SPARK_1_3_CONTRIBUTOR;
+/** Default text model. */
+export const DEFAULT_TEXT_MODEL = DEEPSEEK_V4_1_FLASH;
 
 /**
  * The complete allow-list of models the text pipeline may request. Anything
  * outside this list is rejected or clamped, so a stale env var or a typo can
  * never silently route text traffic to a different model.
  */
-export const ALLOWED_TEXT_MODELS = Object.freeze([MUSE_SPARK_1_3_CONTRIBUTOR]);
+export const ALLOWED_TEXT_MODELS = Object.freeze([
+  DEEPSEEK_V4_1_FLASH,
+  MUSE_SPARK_1_3_CONTRIBUTOR,
+]);
 
 /** True when `model` is an id the text pipeline is permitted to use. */
 export function isAllowedTextModel(model) {

@@ -1,7 +1,7 @@
 // OpenCode Go / Zen client.
 //
 // One client for the gateway's Responses API (the default — required by the
-// configured Muse Spark model) and its chat-completions API (selected only
+// configured DeepSeek model) and its chat-completions API (selected only
 // when an endpoint override explicitly asks for it): request shaping, deadline
 // guards, SSE streaming, usage mapping, and empty-response detection. Failure
 // classification, retries and scheduling live in providerChain.js; this module

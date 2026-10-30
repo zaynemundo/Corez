@@ -6,10 +6,11 @@
 
 import { TaskDependencyGraph, AGENT_LIFECYCLE_STATES } from "./taskGraph.js";
 import { AdaptiveConcurrencyQueue } from "./adaptiveQueue.js";
+import { DEFAULT_TEXT_MODEL } from "../../../../packages/agent-core/providers/modelIds.js";
 
 export const OPENROUTER_SWARM_ROUTING = {
-  // Muse Spark 1.3 Contributor is the unified site-wide model.
-  model: "muse-spark-1.3-contributor",
+  // DeepSeek V4.1 Flash is the unified site-wide model.
+  model: DEFAULT_TEXT_MODEL,
   provider: {
     sort: "throughput",
     allow_fallbacks: true,

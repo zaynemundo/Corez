@@ -229,7 +229,7 @@ export function tryGreetingOrIdentityFastPath(body, prompt) {
 
   // Model identity fast-path: "what model are you using" / "which llm" / "are you DeepSeek" etc.
   // Always answer Corez 1.0 deterministically without paying an LLM round-trip, so the
-  // underlying provider (Muse Spark 1.3 Contributor) is never leaked even if the model is tricked.
+  // underlying provider (DeepSeek V4.1 Flash) is never leaked even if the model is tricked.
   // This covers the exact user request: "what model of ai are you using" -> "Corez 1.0".
   const MODEL_IDENTITY_PATTERN =
     /(what|which)\s+(model|llm|ai\s*model|language\s*model).*?\b(you|your|using|power|are\s+you)\b|what\s+model\s+of\s+ai\s+are\s+you\s+using|are\s+you\s+(muse|meta\s*ai|muse\s+spark|gpt|chatgpt|claude|gemini|llama|mimo|deepseek|openai)|which\s+ai\s+are\s+you|powered\s+by.*\b(you|model)\b/i;

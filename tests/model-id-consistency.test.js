@@ -21,7 +21,7 @@ import { join, extname } from 'node:path';
 import {
   ALLOWED_TEXT_MODELS,
   DEFAULT_TEXT_MODEL,
-  MUSE_SPARK_1_3_CONTRIBUTOR,
+  DEEPSEEK_V4_1_FLASH,
   isAllowedTextModel,
   resolveTextModel,
 } from '../packages/agent-core/providers/modelIds.js';
@@ -78,16 +78,15 @@ function walk(dir, out = []) {
 }
 
 describe('model id contract', () => {
-  it('pins Muse Spark 1.3 Contributor as the default text model', () => {
-    expect(DEFAULT_TEXT_MODEL).toBe(MUSE_SPARK_1_3_CONTRIBUTOR);
-    expect(MUSE_SPARK_1_3_CONTRIBUTOR).toBe('muse-spark-1.3-contributor');
-    expect(ALLOWED_TEXT_MODELS).toContain('muse-spark-1.3-contributor');
+  it('pins DeepSeek V4.1 Flash as the default text model', () => {
+    expect(DEFAULT_TEXT_MODEL).toBe(DEEPSEEK_V4_1_FLASH);
+    expect(DEEPSEEK_V4_1_FLASH).toBe('deepseek-v4.1-flash');
+    expect(ALLOWED_TEXT_MODELS).toContain('deepseek-v4.1-flash');
   });
 
-  it('allows only ids on the allow-list', () => {
+  it('allows the rollback model on the allow-list', () => {
     expect(isAllowedTextModel('muse-spark-1.3-contributor')).toBe(true);
     for (const bad of [
-      'deepseek-v4.1-flash',
       'deepseek-flash',
       'deepseek-v4-flash',
       'muse-spark-1.2-contributor',
@@ -105,11 +104,11 @@ describe('model id contract', () => {
 
   it('clamps every rejected candidate to the pinned default', () => {
     // The stale ids that previously broke the swarm, plus typos and empties.
-    for (const bad of ['deepseek-v4.1-flash', 'deepseek-flash', 'muse-spark-1.3-contributr', '', undefined, null]) {
-      expect(resolveTextModel(bad)).toBe(MUSE_SPARK_1_3_CONTRIBUTOR);
+    for (const bad of ['deepseek-flash', 'muse-spark-1.3-contributr', '', undefined, null]) {
+      expect(resolveTextModel(bad)).toBe(DEEPSEEK_V4_1_FLASH);
     }
-    expect(resolveTextModel('muse-spark-1.3-contributor')).toBe('muse-spark-1.3-contributor');
-    expect(resolveTextModel('  muse-spark-1.3-contributor  ')).toBe('muse-spark-1.3-contributor');
+    expect(resolveTextModel('deepseek-v4.1-flash')).toBe('deepseek-v4.1-flash');
+    expect(resolveTextModel(' muse-spark-1.3-contributor ')).toBe('muse-spark-1.3-contributor');
   });
 
   it('uses no stale or unknown text-model id anywhere in first-party source', () => {

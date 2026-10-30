@@ -1,7 +1,7 @@
 /**
  * Attachment → chat-message conversion.
  *
- * Vision capability (verified live, 2026-10-13): Muse Spark 1.3 Contributor
+ * Vision capability (verified live, 2026-10-13): DeepSeek V4.1 Flash
  * DOES accept image input on the OpenCode Go gateway's Responses API. A
  * randomized striped-color probe (colors drawn per round) named the stripes
  * correctly (2/3 exact plus a synonym — cyan for teal), which a blind model
