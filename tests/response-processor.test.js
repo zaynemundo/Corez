@@ -39,6 +39,14 @@ describe('detectTruncation', () => {
     expect(result.truncated).toBe(false);
   });
 
+  it('accepts a complete reply ending in a question mark', () => {
+    const result = detectTruncation(
+      'Doing well — thanks for asking. Ready to help whenever you are. What are you working on?',
+    );
+    expect(result.truncated).toBe(false);
+    expect(result.signals).not.toContain('dangling-expression-operator');
+  });
+
   it('flags endings on conjunctions', () => {
     const result = detectTruncation('The game uses requestAnimationFrame for the loop because');
     expect(result.truncated).toBe(true);
@@ -263,6 +271,16 @@ describe('mergeResponse', () => {
     expect(merged).toContain('because of its smooth timing');
   });
 
+  it('inserts a word boundary when a continuation follows a question mark', () => {
+    const merged = mergeResponse(
+      'Doing well — thanks for asking. Ready whenever you are. What are you working on?',
+      "I don't have an earlier file to continue from.",
+      'truncation',
+    );
+    expect(merged).toContain('working on? I don');
+    expect(merged).not.toContain('working on?I don');
+  });
+
   it('completes an open fence with raw code', () => {
     const merged = mergeResponse('```jsx\nfunction App() { return (', '  <div>Hi</div> );\n}', 'truncation');
     expect(merged).toContain('<div>Hi</div>');
@@ -302,6 +320,20 @@ describe('processResponse', () => {
     expect(generate).not.toHaveBeenCalled();
     expect(result.diagnostics.repaired).toBe(false);
     expect(result.content).toBe(complete);
+  });
+
+  it('does not continue a complete greeting that ends with a question mark', async () => {
+    const generate = vi.fn();
+    const greeting =
+      'Doing well — thanks for asking. Ready to help whenever you are. What are you working on?';
+    const result = await processResponse([{ role: 'user', content: 'hey' }], greeting, {
+      userPrompt: 'hey',
+      generate,
+      maxRepairs: 2,
+    });
+    expect(generate).not.toHaveBeenCalled();
+    expect(result.diagnostics.repaired).toBe(false);
+    expect(result.content).toBe(greeting);
   });
 
   it('discards a meta-only repair instead of stitching self-referential commentary', async () => {

@@ -160,6 +160,63 @@ describe('/api/ai streaming thinking', () => {
     expect(payload.include).toEqual(['reasoning.encrypted_content']);
   });
 
+  it('does not append completed reasoning copies after streaming deltas', async () => {
+    const full = 'Simple greeting response. Keep it brief and warm.';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        sseResponse([
+          reasoningDelta('Simple greeting response. '),
+          reasoningDelta('Keep it brief and warm.'),
+          { type: 'response.reasoning_summary_text.done', text: full },
+          {
+            type: 'response.output_item.done',
+            item: {
+              type: 'reasoning',
+              summary: [{ type: 'summary_text', text: full }],
+            },
+          },
+          contentDelta('Hey!'),
+        ]),
+      ),
+    );
+
+    const response = await post({
+      prompt: 'Explain how DNS resolves a hostname.',
+      intent: { type: 'explanation', summary: 'Explain DNS resolution.' },
+      stream: true,
+    });
+
+    const events = parseSseEvents(await response.text());
+    const thinking = thinkingOf(events);
+    expect(thinking.match(/Simple greeting response/g)).toHaveLength(1);
+    expect(answerOf(events)).toBe('Hey!');
+  });
+
+  it('falls back to a completed reasoning segment when no deltas arrive', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        sseResponse([
+          {
+            type: 'response.reasoning_summary_text.done',
+            text: 'Completed reasoning only. ',
+          },
+          contentDelta('Answer.'),
+        ]),
+      ),
+    );
+
+    const response = await post({
+      prompt: 'Explain how DNS resolves a hostname.',
+      intent: { type: 'explanation', summary: 'Explain DNS resolution.' },
+      stream: true,
+    });
+
+    const events = parseSseEvents(await response.text());
+    expect(thinkingOf(events)).toContain('Completed reasoning only.');
+  });
+
   it('never leaks the provider stack through the thinking stream', async () => {
     vi.stubGlobal(
       'fetch',

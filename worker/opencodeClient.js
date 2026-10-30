@@ -330,6 +330,10 @@ export async function* streamChatEndpoint({
     let finishReason = null;
     let sawDone = false;
     let ttftEmitted = false;
+    // Some gateways send reasoning twice: token deltas and then a completed
+    // summary item with the full text. Emitting both duplicates the whole
+    // thinking panel, so completed copies are only a fallback.
+    let sawReasoningDelta = false;
     // Stateful stripper for inline <think>/<thinking> blocks: tags may be
     // split across chunks, so filtering must span the whole stream.
     const thinkingFilter = createThinkingStreamFilter();
@@ -385,6 +389,7 @@ export async function* streamChatEndpoint({
             ) {
               // Reasoning stays an internal signal for the thinking panel;
               // it is never yielded as answer content.
+              sawReasoningDelta = true;
               yield { text: "", reasoning: parsed.delta };
             } else if (
               // Some gateways deliver reasoning as one completed segment
@@ -392,7 +397,8 @@ export async function* streamChatEndpoint({
               (parsed.type === "response.reasoning_summary_text.done" ||
                 parsed.type === "response.reasoning_text.done") &&
               typeof parsed.text === "string" &&
-              parsed.text
+              parsed.text &&
+              !sawReasoningDelta
             ) {
               yield { text: "", reasoning: parsed.text };
             } else if (
@@ -400,7 +406,8 @@ export async function* streamChatEndpoint({
               // summary/content parts (encrypted blobs carry no text and are
               // ignored by reasoningItemText).
               parsed.type === "response.output_item.done" &&
-              parsed.item?.type === "reasoning"
+              parsed.item?.type === "reasoning" &&
+              !sawReasoningDelta
             ) {
               const reasoningText = reasoningItemText(parsed.item);
               if (reasoningText) yield { text: "", reasoning: reasoningText };

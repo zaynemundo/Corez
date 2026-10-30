@@ -154,8 +154,12 @@ export function detectTruncation(content, options = {}) {
   // A single trailing '|' is a complete Markdown table row, not a dangling
   // bitwise-or — only a double '||' counts as an unfinished logical-or.
   const trimmed = text.trim();
+  // A trailing '?' is ordinary prose punctuation ("What are you working
+  // on?"), not a dangling ternary operator. Treating it as truncation made
+  // every question-ending answer trigger a continuation, and the continuation
+  // was stitched onto the complete reply.
   if (
-    (/[+\-*%=&^~?:;,([{/]\s*$/.test(trimmed) || /\|\|\s*$/.test(trimmed)) &&
+    (/[+\-*%=&^~:;,([{/]\s*$/.test(trimmed) || /\|\|\s*$/.test(trimmed)) &&
     !/-->\s*$/.test(trimmed) &&
     !/\/>\s*$/.test(trimmed)
   ) {
@@ -628,7 +632,7 @@ export function stitchContinuationChunk(original, continuation) {
     // If no overlap and joining prose outside code, ensure word boundary spacing
     if (
       !origHasOpenFence &&
-      /[a-zA-Z0-9,;:]$/.test(orig) &&
+      /[a-zA-Z0-9,;:?!.]$/.test(orig) &&
       !/^\s/.test(cont) &&
       !/^[.?!]/.test(cont)
     ) {
