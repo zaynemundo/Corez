@@ -454,6 +454,12 @@ h6 {
     display: flex;
   }
 
+  /* A hairline separates the permanent rail from the panel without boxing the
+     whole shell in. */
+  .sidebar:not(.collapsed) .sidebar-rail {
+    border-inline-end: 1px solid var(--sidebar-border);
+  }
+
   /* The rail already owns New Chat and Sites while it is permanently visible;
      keep one set of primary actions instead of duplicating them in the panel. */
   .sidebar:not(.collapsed) .sidebar-action-box {
