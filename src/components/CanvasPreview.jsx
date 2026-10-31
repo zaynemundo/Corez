@@ -11,6 +11,7 @@ import { useAuth } from "../context/AuthContext";
 import { createZipBlob } from "../utils/zipPackager";
 import { repairMalformedHtml } from "../utils/htmlRepair";
 import { printHtmlDocument } from "../utils/printDocument";
+import { inlinePreviewAssets } from "../utils/previewAssets";
 import { generateEmbedSnippet } from "../utils/qrCode";
 import { useI18n } from "../i18n/index.jsx";
 import { CanvasHeader } from "./canvas/CanvasHeader.jsx";
@@ -49,6 +50,7 @@ export default function CanvasPreview({
   // Runtime failure reported by the preview iframe (blank/white previews get
   // an explicit reason instead of silence).
   const [runtimeError, setRuntimeError] = useState(null);
+  const [previewSrcDoc, setPreviewSrcDoc] = useState("");
   // File link inside the preview that names an asset which was never
   // bundled: without this the click dies silently and downloads look broken.
   const [missingDownload, setMissingDownload] = useState(null);
@@ -172,6 +174,32 @@ export default function CanvasPreview({
         )
       : doc;
   }, [currentPage, multiPage]);
+
+  // The preview iframe is originless, so its image requests cannot carry the
+  // owner's session. Inline private uploaded assets from the authenticated app
+  // before rendering; without this a referenced upload shows a broken-image
+  // banner even though it exists in the owner's R2 folder.
+  useEffect(() => {
+    let cancelled = false;
+    if (!formattedSrcDoc) {
+      setPreviewSrcDoc("");
+      return undefined;
+    }
+    setPreviewSrcDoc(formattedSrcDoc);
+    inlinePreviewAssets(formattedSrcDoc)
+      .then((resolved) => {
+        if (cancelled) return;
+        setPreviewSrcDoc(resolved);
+        if (resolved !== formattedSrcDoc) setRuntimeError(null);
+      })
+      .catch(() => {
+        // Keep the original document; the preview error reporter explains any
+        // asset it could not resolve.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [formattedSrcDoc]);
 
   useEffect(() => {
     setEditableCode(code || "");
@@ -596,7 +624,7 @@ export default function CanvasPreview({
                   title={t("canvas.header.iframeTitle", {
                     device: deviceSpecs[deviceMode].label,
                   })}
-                  srcDoc={formattedSrcDoc}
+                  srcDoc={previewSrcDoc}
                   className="preview-iframe"
                   sandbox="allow-scripts allow-forms allow-pointer-lock allow-downloads allow-popups"
                   style={
