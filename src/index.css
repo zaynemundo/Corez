@@ -243,31 +243,31 @@ body {
   display: flex;
 }
 
-/* Match the 90% browser-zoom view on desktop without asking people to zoom.
-   The root is enlarged by the inverse factor before it is scaled down, so the
-   shell still fills the viewport instead of leaving a 10% gap. Phones keep
-   their native scale because shrinking touch targets hurts accessibility. */
+/* Desktop scale is 94.5%: 5% larger than the previous 90% view, while still
+   leaving breathing room against the original 100%. The root is enlarged by
+   the inverse factor before it is scaled, so the shell fills the viewport.
+   Phones keep native scale because shrinking touch targets hurts accessibility. */
 :root {
-  --ui-scale: 0.9;
+  --ui-scale: 0.945;
 }
 
 @media (min-width: 768px) {
   #root {
-    width: 111.1111vw;
-    height: 111.1111vh;
-    height: 111.1111dvh;
+    width: 105.8201vw;
+    height: 105.8201vh;
+    height: 105.8201dvh;
     transform: scale(var(--ui-scale));
     transform-origin: top left;
   }
 
   /* Full-height standalone routes live directly under #root, so their
-     100dvh would become 90dvh after the scale. Enlarge them with the root. */
+     100dvh would become 94.5dvh after the scale. Enlarge them with the root. */
   #root > .shared-chat-page,
   #root > .auth-page {
-    height: 111.1111vh;
-    height: 111.1111dvh;
-    min-height: 111.1111vh;
-    min-height: 111.1111dvh;
+    height: 105.8201vh;
+    height: 105.8201dvh;
+    min-height: 105.8201vh;
+    min-height: 105.8201dvh;
   }
 }
 
