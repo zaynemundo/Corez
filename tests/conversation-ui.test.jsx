@@ -74,7 +74,8 @@ describe('conversation UI', () => {
 
     const messages = handlers.container.querySelector('#sidebar-messages-list');
     expect(within(messages).getByText('Studio lighting')).toBeTruthy();
-    expect(within(messages).getByText('Active')).toBeTruthy();
+    expect(within(messages).queryByText('Active')).toBeNull();
+    expect(messages.querySelector('.sidebar-message-avatar')).toBeNull();
     expect(within(messages).queryByText('Normal chat')).toBeNull();
 
     const recents = handlers.container.querySelector('#sidebar-chats-list');

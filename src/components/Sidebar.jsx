@@ -924,80 +924,9 @@ export default function Sidebar({
 
           {messagesOpen && (
             <div className="sidebar-messages-list" id="sidebar-messages-list">
-              {conversationSessions.map((session) => (
-                <div
-                  key={session.id}
-                  className={`sidebar-message-row${
-                    session.id === activeSessionId ? " active" : ""
-                  }`}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={t("common.sidebar.openConversation", {
-                    title: session.title,
-                  })}
-                  onClick={() => onSelectSession(session.id)}
-                  onKeyDown={(event) => {
-                    if (event.target !== event.currentTarget) return;
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      onSelectSession(session.id);
-                    }
-                  }}
-                >
-                  <span className="sidebar-message-avatar" aria-hidden="true">
-                    {(session.personas?.[0]?.name || "C")[0]}
-                  </span>
-                  <span className="sidebar-message-copy">
-                    <span className="sidebar-message-title">
-                      {session.title}
-                    </span>
-                    <span
-                      className={`sidebar-message-status${
-                        session.active ? " is-active" : ""
-                      }`}
-                    >
-                      <span className="sidebar-message-dot" aria-hidden="true" />
-                      {session.active ? "Active" : "Inactive"}
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    className="sidebar-message-options"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      const opening = openMenuId !== session.id;
-                      if (opening) {
-                        setOpenProjectMenuId(null);
-                        setMenuPos(menuPlacement(event.currentTarget));
-                      }
-                      setOpenMenuId(opening ? session.id : null);
-                    }}
-                    title={t("common.sidebar.chatOptions")}
-                    aria-label={t("common.sidebar.optionsFor", {
-                      title: session.title,
-                    })}
-                    aria-haspopup="menu"
-                    aria-expanded={openMenuId === session.id}
-                  >
-                    <MoreVertical size={14} strokeWidth={1.5} />
-                  </button>
-                  {openMenuId === session.id && (
-                    <SessionOptionsMenu
-                      session={session}
-                      currentProjectId={null}
-                      projects={projects}
-                      menuRef={menuRef}
-                      menuPos={menuPos}
-                      setOpenMenuId={setOpenMenuId}
-                      onTogglePinSession={onTogglePinSession}
-                      onMoveSessionToProject={onMoveSessionToProject}
-                      onShareSession={onShareSession}
-                      onDeleteSession={onDeleteSession}
-                      t={t}
-                    />
-                  )}
-                </div>
-              ))}
+              {conversationSessions.map((session) =>
+                renderSessionRow(session, null, "messages"),
+              )}
             </div>
           )}
         </div>

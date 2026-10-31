@@ -20,7 +20,9 @@ describe('sidebar history list caps', () => {
 
   it('shows five Messages conversations and scrolls the rest', () => {
     const block = rule('.sidebar-messages-list');
-    expect(block).toContain('max-height: calc(5 * 44px');
+    expect(block).toContain(
+      'max-height: calc(5 * var(--sidebar-item-min-height)',
+    );
     expect(block).toContain('overflow-y: auto');
     expect(block).toContain('scrollbar-width: none');
   });

@@ -9245,8 +9245,8 @@ body.corez-consent-visible .app-container {
   flex-direction: column;
   gap: 2px;
   padding: 2px 8px 9px;
-  /* Five 44px conversation rows; the sixth scrolls. */
-  max-height: calc(5 * 44px + 4 * 2px + 11px);
+  /* Five standard history rows; the sixth scrolls. */
+  max-height: calc(5 * var(--sidebar-item-min-height) + 4 * 2px + 11px);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
@@ -9256,94 +9256,6 @@ body.corez-consent-visible .app-container {
 .sidebar-messages-list::-webkit-scrollbar {
   display: none;
 }
-.sidebar-message-row {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
-  min-height: 44px;
-  padding: 5px 8px;
-  border: 0;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--text-primary);
-  text-align: left;
-  cursor: pointer;
-}
-.sidebar-message-row:hover,
-.sidebar-message-row.active {
-  background: var(--sidebar-item-hover-bg);
-}
-.sidebar-message-options {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  flex: 0 0 22px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-muted);
-  opacity: 0.55;
-  cursor: pointer;
-}
-.sidebar-message-row:hover .sidebar-message-options,
-.sidebar-message-options:focus-visible,
-.sidebar-message-options[aria-expanded="true"] {
-  color: var(--text-primary);
-  opacity: 1;
-}
-.sidebar-message-avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  flex: 0 0 26px;
-  border-radius: 50%;
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-}
-.sidebar-message-copy {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-  gap: 2px;
-}
-.sidebar-message-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.78rem;
-}
-.sidebar-message-status {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.sidebar-message-status.is-active { color: var(--text-primary); }
-.sidebar-message-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: currentColor;
-  opacity: 0.45;
-}
-.sidebar-message-status.is-active .sidebar-message-dot {
-  opacity: 1;
-  background: #6ee7b7;
-}
-
 .message-wrapper.conversation .message-body { max-width: 88%; }
 .message-wrapper.ai.conversation .message-body {
   width: 100%;
