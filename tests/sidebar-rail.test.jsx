@@ -67,13 +67,17 @@ describe("closed sidebar navigation rail", () => {
     await user.click(railQueries.getByRole("button", { name: "Open Sidebar" }));
     expect(handlers.onOpenSidebar).toHaveBeenCalledTimes(1);
 
-    await user.click(railQueries.getByRole("button", { name: "New Chat" }));
+    await user.click(
+      railQueries.getByRole("button", { name: "Start a new chat" }),
+    );
     expect(handlers.onNewChat).toHaveBeenCalledTimes(1);
 
-    await user.click(railQueries.getByRole("button", { name: "Recents" }));
+    await user.click(railQueries.getByRole("button", { name: "Recent chats" }));
     expect(handlers.onOpenSidebar).toHaveBeenCalledTimes(2);
 
-    await user.click(railQueries.getByRole("button", { name: "Sites" }));
+    await user.click(
+      railQueries.getByRole("button", { name: "Published sites" }),
+    );
     expect(handlers.onOpenSites).toHaveBeenCalledTimes(1);
 
     await user.click(
@@ -85,11 +89,13 @@ describe("closed sidebar navigation rail", () => {
   it("marks the rail's Sites destination while that screen is open", () => {
     const { railQueries } = renderRail({ activeView: "sites" });
 
-    const sites = railQueries.getByRole("button", { name: "Sites" });
+    const sites = railQueries.getByRole("button", { name: "Published sites" });
     expect(sites.getAttribute("aria-current")).toBe("page");
     expect(sites.className).toContain("is-active");
 
-    const newChat = railQueries.getByRole("button", { name: "New Chat" });
+    const newChat = railQueries.getByRole("button", {
+      name: "Start a new chat",
+    });
     expect(newChat.className).not.toContain("sidebar-rail-action-primary");
   });
 
@@ -102,7 +108,12 @@ describe("closed sidebar navigation rail", () => {
       .getAllByRole("button")
       .map((button) => button.getAttribute("aria-label"));
 
-    expect(labels).toEqual(["New Chat", "Sites", "Search chats", "Recents"]);
+    expect(labels).toEqual([
+      "Start a new chat",
+      "Published sites",
+      "Search chats",
+      "Recent chats",
+    ]);
   });
 
   it("uses the rail's quick find, then opens the chosen one", async () => {
@@ -185,22 +196,22 @@ describe("closed sidebar navigation rail", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
-  it("hides the rail from assistive tech once the full panel is open", () => {
-    const { handlers } = renderRail({ isOpen: true });
+  it("keeps the rail available when the full panel is open", async () => {
+    const user = userEvent.setup();
+    const { handlers, rail, railQueries } = renderRail({ isOpen: true });
 
-    const rail = document.querySelector(".sidebar-rail");
-    expect(rail.getAttribute("aria-hidden")).toBe("true");
+    expect(rail.getAttribute("aria-hidden")).not.toBe("true");
     expect(
-      screen.queryByRole("navigation", { name: "Primary navigation" }),
-    ).toBeNull();
-    expect(
-      screen.queryByRole("button", { name: "Open Sidebar" }),
-    ).toBeNull();
+      railQueries.getByRole("navigation", { name: "Primary navigation" }),
+    ).toBeTruthy();
     expect(document.querySelector(".sidebar-full").getAttribute("aria-hidden")).toBe(
       null,
     );
-    // The compact rail is not the full panel's close control: opening remains
-    // the app's concern.
-    expect(handlers.onCloseSidebar).not.toHaveBeenCalled();
+
+    // The rail brand is also the panel's collapse control while it is open.
+    await user.click(
+      railQueries.getByRole("button", { name: "Toggle sidebar" }),
+    );
+    expect(handlers.onCloseSidebar).toHaveBeenCalledTimes(1);
   });
 });

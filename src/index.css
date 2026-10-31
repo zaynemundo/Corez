@@ -438,6 +438,35 @@ h6 {
   visibility: visible;
 }
 
+/* On desktop the icon rail is permanent: the full panel opens beside it
+   instead of replacing it, and collapsing hides only the panel. */
+@media (min-width: 768px) {
+  .sidebar:not(.collapsed) {
+    width: calc(var(--sidebar-width) + var(--sidebar-rail-width));
+  }
+
+  .sidebar-full {
+    inset-inline-start: var(--sidebar-rail-width);
+    width: var(--sidebar-width);
+  }
+
+  .sidebar-rail {
+    display: flex;
+  }
+
+  /* The rail already owns New Chat and Sites while it is permanently visible;
+     keep one set of primary actions instead of duplicating them in the panel. */
+  .sidebar:not(.collapsed) .sidebar-action-box {
+    display: none;
+  }
+
+  /* The expanded panel's footer already carries the account name and settings;
+     the rail only needs its own profile while the panel is collapsed. */
+  .sidebar:not(.collapsed) .sidebar-rail-footer {
+    display: none;
+  }
+}
+
 .sidebar-rail-top {
   /* Same 28px vertical centre as the expanded header's brand row. */
   padding: 6px 0 8px;

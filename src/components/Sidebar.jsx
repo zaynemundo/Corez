@@ -210,12 +210,12 @@ export default function Sidebar({
       const panelWidth = 300;
       const gapPx = 10;
       const maxLeft = Math.max(gapPx, window.innerWidth - panelWidth - gapPx);
-      const sidebarRect = trigger
-        .closest(".sidebar")
+      const railRect = trigger
+        .closest(".sidebar-rail")
         ?.getBoundingClientRect();
       const railEdge = rtl
-        ? (sidebarRect?.left ?? rect.left)
-        : (sidebarRect?.right ?? rect.right);
+        ? (railRect?.left ?? rect.left)
+        : (railRect?.right ?? rect.right);
       setRailSearchPos({
         left: rtl
           ? Math.max(gapPx, railEdge - panelWidth - gapPx)
@@ -872,21 +872,27 @@ export default function Sidebar({
         </div>
       </div>
 
-      <div
-        className="sidebar-rail"
-        aria-hidden={isOpen || undefined}
-        inert={isOpen ? "" : undefined}
-      >
+      <div className="sidebar-rail">
         <div className="sidebar-rail-top">
           <button
             ref={railBrandRef}
             type="button"
             className="sidebar-rail-brand"
-            onClick={() => onOpenSidebar?.()}
-            title={t("common.shell.openSidebar")}
-            aria-label={t("common.shell.openSidebar")}
+            onClick={() =>
+              isOpen ? onCloseSidebar?.() : onOpenSidebar?.()
+            }
+            title={
+              isOpen
+                ? t("common.sidebar.railToggle")
+                : t("common.shell.openSidebar")
+            }
+            aria-label={
+              isOpen
+                ? t("common.sidebar.railToggle")
+                : t("common.shell.openSidebar")
+            }
             aria-controls="corez-sidebar-panel"
-            aria-expanded="false"
+            aria-expanded={isOpen}
           >
             <img
               src="/corez-white.png"
@@ -910,8 +916,8 @@ export default function Sidebar({
               setChatsOpen(true);
               onNewChat();
             }}
-            title={t("common.sidebar.newChat")}
-            aria-label={t("common.sidebar.newChat")}
+            title={t("common.sidebar.railNewChat")}
+            aria-label={t("common.sidebar.railNewChat")}
           >
             <SquarePen size={20} strokeWidth={1.5} aria-hidden="true" />
           </button>
@@ -923,8 +929,8 @@ export default function Sidebar({
                 activeView === "sites" ? " is-active" : ""
               }`}
               onClick={onOpenSites}
-              title={t("common.sidebar.sitesTitle")}
-              aria-label={t("common.sidebar.sites")}
+              title={t("common.sidebar.railSites")}
+              aria-label={t("common.sidebar.railSites")}
               aria-current={activeView === "sites" ? "page" : undefined}
             >
               <LayoutGrid size={20} strokeWidth={1.5} aria-hidden="true" />
@@ -954,8 +960,8 @@ export default function Sidebar({
               setChatsOpen(true);
               onOpenSidebar?.();
             }}
-            title={t("common.sidebar.chats")}
-            aria-label={t("common.sidebar.chats")}
+            title={t("common.sidebar.railChats")}
+            aria-label={t("common.sidebar.railChats")}
           >
             <MessageCircle size={20} strokeWidth={1.5} aria-hidden="true" />
           </button>
