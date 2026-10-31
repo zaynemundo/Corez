@@ -52,7 +52,7 @@
   --sidebar-width: 232px;
   /* A closed desktop sidebar remains as this narrow icon rail: the shell never
      spends its top-left corner on a floating toggle over the content. */
-  --sidebar-rail-width: 64px;
+  --sidebar-rail-width: 50px;
   --sidebar-margin: 0px;
   --sidebar-radius: 0px;
   --sidebar-heading-size: 11px;

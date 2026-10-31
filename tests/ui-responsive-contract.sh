@@ -238,7 +238,7 @@ check_absent 'viewport resize does not force desktop sidebar open' 'setSidebarOp
 check 'sidebar component can render collapsed state' 'isOpen.*collapsed|collapsed.*isOpen' "$sidebar"
 # Closed on desktop, the sidebar remains as a labelled icon rail instead of
 # disappearing and leaving only a floating toggle over the content.
-check 'rail width token exists' '--sidebar-rail-width: 64px;'
+check 'rail width token exists' '--sidebar-rail-width: 50px;'
 check_block_property 'the closed desktop column is the rail width' '.sidebar.collapsed' 'width' 'var(--sidebar-rail-width)'
 check_block_property 'the closed desktop column never translates off screen' '.sidebar.collapsed' 'transform' 'none'
 check_block_property 'the closed desktop column stays visible' '.sidebar.collapsed' 'visibility' 'visible'
