@@ -638,14 +638,16 @@ function MainApp({ theme, setTheme }) {
                                 t("common.phase.swarmPlanning")}
                             </span>
                           )}
-                          <ThinkingPanel
-                            text={streamingThinking}
-                            live
-                            expanded={isThinkingOpen}
-                            onToggle={() => setIsThinkingOpen((prev) => !prev)}
-                            bodyId="corez-thinking-body"
-                            placeholder={t("common.thinking.working")}
-                          />
+                          {!conversationMode && (
+                            <ThinkingPanel
+                              text={streamingThinking}
+                              live
+                              expanded={isThinkingOpen}
+                              onToggle={() => setIsThinkingOpen((prev) => !prev)}
+                              bodyId="corez-thinking-body"
+                              placeholder={t("common.thinking.working")}
+                            />
+                          )}
                           {streamingContent && (
                             <div
                               className="message-content streaming-text"

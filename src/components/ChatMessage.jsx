@@ -782,7 +782,7 @@ export default function ChatMessage({
             <span className="message-speaker-name">{speakerName}</span>
           </div>
         ) : null}
-        {!isUser && message.thinking && (
+        {!isUser && !isConversation && message.thinking && (
           <ThinkingDisclosure
             text={message.thinking}
             seconds={message.thinkingSeconds}

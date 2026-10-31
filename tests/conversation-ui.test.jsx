@@ -104,6 +104,27 @@ describe('conversation UI', () => {
     expect(document.querySelector('.message-wrapper.conversation')).toBeTruthy();
   });
 
+  it('keeps reasoning out of Conversation bubbles', () => {
+    render(
+      <I18nProvider>
+        <ChatMessage
+          message={{
+            role: 'assistant',
+            content: 'Clean answer.',
+            speakerId: 'p1',
+            speakerName: 'John',
+            thinking: 'SECRET REASONING',
+            thinkingSeconds: 4,
+          }}
+        />
+      </I18nProvider>,
+    );
+    expect(screen.queryByText('SECRET REASONING')).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /Thought|Thinking/i }),
+    ).toBeNull();
+  });
+
   it('renames a persona and regenerates its mention handle', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
