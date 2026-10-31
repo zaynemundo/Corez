@@ -7,7 +7,10 @@ import ChatMessage from '../src/components/ChatMessage.jsx';
 import ChatInput from '../src/components/ChatInput.jsx';
 import ConversationSetupModal from '../src/components/ConversationSetupModal.jsx';
 import { I18nProvider } from '../src/i18n/index.jsx';
-import { conversationSpeakersForPrompt } from '../src/hooks/useConversationTurnExecution.js';
+import {
+  conversationSpeakersForPrompt,
+  orderConversationSpeakers,
+} from '../src/hooks/useConversationTurnExecution.js';
 
 const personas = [
   { id: 'p1', name: 'John', handle: 'john', instructions: 'Warm.' },
@@ -172,6 +175,18 @@ describe('conversation UI', () => {
         (p) => p.name,
       ),
     ).toEqual(['John', 'Scarlett']);
+  });
+
+  it('lets either persona open the turn', () => {
+    expect(
+      orderConversationSpeakers(personas, () => 0.1).map((p) => p.name),
+    ).toEqual(['John', 'Scarlett']);
+    expect(
+      orderConversationSpeakers(personas, () => 0.9).map((p) => p.name),
+    ).toEqual(['Scarlett', 'John']);
+    expect(
+      orderConversationSpeakers([personas[0]], () => 0.9).map((p) => p.name),
+    ).toEqual(['John']);
   });
 
   it('accepts an empty conversation placeholder and skips command suggestions', async () => {

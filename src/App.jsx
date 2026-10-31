@@ -52,13 +52,15 @@ const DEFAULT_CONVERSATION_PERSONAS = [
     id: "p1",
     name: "John",
     handle: "john",
-    instructions: "Warm, grounded and curious. Asks a natural follow-up.",
+    instructions:
+      "Nerdy, endlessly curious and funny. Shares geeky details and asks natural questions.",
   },
   {
     id: "p2",
     name: "Scarlett",
     handle: "scarlett",
-    instructions: "Bright, playful and direct. Reacts to both people in the room.",
+    instructions:
+      "The smart one in the group: nonchalant, cool and serious. Short, direct replies.",
   },
 ];
 

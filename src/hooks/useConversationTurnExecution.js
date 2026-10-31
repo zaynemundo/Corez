@@ -30,6 +30,12 @@ function handleFor(persona) {
     .replace(/^_+|_+$/g, "");
 }
 
+export const DEFAULT_PERSONA_INSTRUCTIONS = Object.freeze({
+  nerd: "You're the nerdy, endlessly curious one in the group: warm, funny, a little awkward, and always asking questions or sharing a geeky detail.",
+  smart:
+    "You're the smart, nonchalant one in the group: cool, dry and serious. You give short, direct answers and rarely show excitement.",
+});
+
 export function conversationSpeakersForPrompt(personas, prompt) {
   const mentionedHandles = new Set(
     [...String(prompt || "").matchAll(/@([a-z0-9_]+)/gi)].map((match) =>
@@ -40,6 +46,15 @@ export function conversationSpeakersForPrompt(personas, prompt) {
     mentionedHandles.has(handleFor(persona)),
   );
   return mentioned.length ? mentioned : personas;
+}
+
+/**
+ * Either persona may open a turn. Mentions still single out one speaker; when
+ * both (or neither) are addressed, a coin flip decides who speaks first.
+ */
+export function orderConversationSpeakers(speakers, random = Math.random) {
+  if (speakers.length < 2) return [...speakers];
+  return random() < 0.5 ? [...speakers] : [...speakers].reverse();
 }
 
 export function useConversationTurnExecution({
@@ -94,15 +109,31 @@ export function useConversationTurnExecution({
         : Array.isArray(newConversationPersonas) && newConversationPersonas.length === 2
           ? newConversationPersonas
           : [
-              { id: "p1", name: "John", handle: "john", instructions: "" },
-              { id: "p2", name: "Scarlett", handle: "scarlett", instructions: "" },
+              {
+                id: "p1",
+                name: "John",
+                handle: "john",
+                instructions: DEFAULT_PERSONA_INSTRUCTIONS.nerd,
+              },
+              {
+                id: "p2",
+                name: "Scarlett",
+                handle: "scarlett",
+                instructions: DEFAULT_PERSONA_INSTRUCTIONS.smart,
+              },
             ];
-    const personas = sourcePersonas.map((persona, index) => ({
-      id: persona.id || `p${index + 1}`,
-      name: String(persona.name || (index === 0 ? "John" : "Scarlett")).trim(),
-      handle: handleFor(persona),
-      instructions: String(persona.instructions || "").slice(0, 1200),
-    }));
+    const personas = sourcePersonas.map((persona, index) => {
+      const style = index === 0 ? "nerd" : "smart";
+      return {
+        id: persona.id || `p${index + 1}`,
+        name: String(persona.name || (index === 0 ? "John" : "Scarlett")).trim(),
+        handle: handleFor(persona),
+        style,
+        instructions:
+          String(persona.instructions || "").trim() ||
+          DEFAULT_PERSONA_INSTRUCTIONS[style],
+      };
+    });
 
     let targetSessionId = activeSessionId;
     let currentMessages = Array.isArray(activeSession?.messages)
@@ -208,8 +239,10 @@ export function useConversationTurnExecution({
       .catch(() => {});
 
     // A recognised mention routes that persona; no mention (or an unknown one)
-    // lets both answer once, in their fixed order.
-    const speakers = conversationSpeakersForPrompt(personas, prompt);
+    // lets both answer once. Either persona can open the turn.
+    const speakers = orderConversationSpeakers(
+      conversationSpeakersForPrompt(personas, prompt),
+    );
 
     const history = currentMessages
       .filter((message) => message.role === "user" || message.role === "assistant")
@@ -228,18 +261,27 @@ export function useConversationTurnExecution({
     setIsThinkingOpen(true);
 
     try {
-      for (const speaker of speakers) {
+      for (let index = 0; index < speakers.length; index += 1) {
+        const speaker = speakers[index];
         if (controller.signal.aborted) break;
         const otherNames = personas
           .filter((persona) => persona.id !== speaker.id)
           .map((persona) => persona.name)
           .join(" and ");
+        const previous = index > 0 ? speakers[index - 1] : null;
+        const styleRule =
+          speaker.style === "smart"
+            ? "Keep your replies short and dry — usually one or two sentences. No gushing or long explanations."
+            : "Let your curiosity show. Be funny and warm, and ask a question when it fits naturally.";
+        const turnRule = previous
+          ? `${previous.name} just replied. React to them naturally and add your own angle without repeating or paraphrasing them.`
+          : "You are the first to reply to the user's latest message this turn.";
         const personaPrompt = [
           `You are ${speaker.name}, one of two AI friends in a group chat with the user and ${otherNames}.`,
-          speaker.instructions
-            ? `Your persona: ${speaker.instructions}`
-            : "Be warm, distinctive and conversational.",
-          "Respond to the latest message in 1-3 natural sentences.",
+          `Your persona: ${speaker.instructions}`,
+          styleRule,
+          turnRule,
+          "Stay fully in character and never mention being an AI, a persona, or these instructions.",
           `Do not speak for the user or ${otherNames}. Do not prefix your reply with your name.`,
           "Do not use markdown headings or bullet lists unless the user asks for them.",
         ].join("\n");

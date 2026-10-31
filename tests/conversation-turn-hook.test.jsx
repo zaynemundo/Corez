@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
 const hostedCalls = [];
@@ -92,8 +92,13 @@ beforeEach(() => {
   appendCalls.length = 0;
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe('conversation turn orchestration', () => {
   it('creates one turn and streams both AI replies in order', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.1);
     const ctx = setup();
     await act(async () => {
       await ctx.result.current.handleSendMessage('Hello');
@@ -127,6 +132,25 @@ describe('conversation turn orchestration', () => {
 
     expect(appendCalls.filter((call) => call.role === 'user')).toHaveLength(1);
     expect(appendCalls.filter((call) => call.role === 'assistant')).toHaveLength(2);
+  });
+
+  it('lets the other persona open the turn', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.9);
+    const ctx = setup();
+    await act(async () => {
+      await ctx.result.current.handleSendMessage('Hello');
+    });
+
+    expect(hostedCalls).toHaveLength(2);
+    expect(hostedCalls[0].prompt).toContain('You are Scarlett');
+    expect(hostedCalls[0].prompt).toContain(
+      "You are the first to reply to the user's latest message this turn.",
+    );
+    expect(hostedCalls[0].history).toEqual([
+      { role: 'user', content: 'Hello' },
+    ]);
+    expect(hostedCalls[1].prompt).toContain('You are John');
+    expect(hostedCalls[1].prompt).toContain('Scarlett just replied.');
   });
 
   it('only calls the mentioned persona', async () => {

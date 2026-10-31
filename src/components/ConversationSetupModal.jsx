@@ -111,7 +111,11 @@ export default function ConversationSetupModal({
                   onChange={(event) =>
                     update(index, "instructions", event.target.value)
                   }
-                  placeholder="Warm, curious, a little playful…"
+                  placeholder={
+                    index === 0
+                      ? "Nerdy, curious and funny…"
+                      : "Smart, nonchalant, short and serious…"
+                  }
                 />
               </label>
             </div>
