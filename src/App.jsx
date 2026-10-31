@@ -683,10 +683,7 @@ function MainApp({ theme, setTheme }) {
                         className="conversation-edit-personas"
                         onClick={() => setConversationSetupOpen(true)}
                       >
-                        Edit personas · @
-                        {conversationPersonas
-                          .map((persona) => persona.handle)
-                          .join(" · @")}
+                        Edit personas
                       </button>
                     </div>
                   ) : isNewChat && !isSiteEditChat && !conversationMode ? (
