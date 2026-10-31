@@ -79,6 +79,8 @@ export default function ChatInput({
    * conversation. The controls themselves are identical.
    */
   variant = "composer",
+  placeholder,
+  commandSuggestions = true,
   /**
    * Extra content under the composer, inside the same width-limited container
    * (the new-chat command grid). The composer owns the width so the grid can
@@ -90,7 +92,7 @@ export default function ChatInput({
   const internalRef = useRef(null);
   const refToUse = textareaRef || internalRef;
   const [showSuggestions, setShowSuggestions] = useState(() =>
-    String(input || "").startsWith("@"),
+    commandSuggestions && String(input || "").startsWith("@"),
   );
   const [activeIndex, setActiveIndex] = useState(0);
   const suggestionsRef = useRef(null);
@@ -155,7 +157,9 @@ export default function ChatInput({
   // Show suggestions when the input starts with "@" (optionally followed by
   // partial command text) and is not streaming.
   const match =
-    !isStreaming && input.startsWith("@") ? input.match(/^@([a-z]*)$/i) : null;
+    commandSuggestions && !isStreaming && input.startsWith("@")
+      ? input.match(/^@([a-z]*)$/i)
+      : null;
   const show = showSuggestions && match !== null;
   const typed = match ? match[1].toLowerCase() : "";
   const filtered = typed
@@ -655,14 +659,16 @@ export default function ChatInput({
           value={input}
           onChange={(e) => {
             setInput(e.target.value);
-            setShowSuggestions(true);
+            if (commandSuggestions) setShowSuggestions(true);
           }}
           onKeyDown={handleKeyDown}
           onPaste={handleInputPaste}
           placeholder={
             isStreaming
               ? t("chat.composer.placeholderStreaming")
-              : t("chat.composer.placeholder")
+              : placeholder !== undefined
+                ? placeholder
+                : t("chat.composer.placeholder")
           }
           aria-label={
             isStreaming

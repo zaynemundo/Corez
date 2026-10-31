@@ -109,7 +109,7 @@ function safeAttachments(attachments, token, assetKeys) {
 
 async function buildSnapshot(env, chat, uid, token) {
   const rows = await env.DB.prepare(
-    "SELECT role, content, attachments, created_at as createdAt FROM chat_messages WHERE chat_id = ? AND user_id = ? ORDER BY created_at ASC LIMIT 500",
+    "SELECT role, content, attachments, created_at as createdAt, turn_id as turnId, speaker_id as speakerId, speaker_name as speakerName, model_id as modelId FROM chat_messages WHERE chat_id = ? AND user_id = ? ORDER BY created_at ASC LIMIT 500",
   )
     .bind(chat.id, uid)
     .all();
@@ -133,6 +133,10 @@ async function buildSnapshot(env, chat, uid, token) {
       role: row.role === "assistant" ? "assistant" : "user",
       content: rewriteAssetUrls(row.content, token, assetKeys),
       createdAt: row.createdAt,
+      ...(row.turnId ? { turnId: row.turnId } : {}),
+      ...(row.speakerId ? { speakerId: row.speakerId } : {}),
+      ...(row.speakerName ? { speakerName: row.speakerName } : {}),
+      ...(row.modelId ? { modelId: row.modelId } : {}),
       ...(sharedAttachments ? { attachments: sharedAttachments } : {}),
     };
   });

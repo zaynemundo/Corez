@@ -20,11 +20,15 @@ export async function listChats() {
   return { chats: d.chats || [], manualLists: d.manualLists || [] };
 }
 
-export async function createChat({ title } = {}) {
+export async function createChat({ title, chatMode, personas } = {}) {
+  const payload = {};
+  if (title) payload.title = title;
+  if (chatMode) payload.chatMode = chatMode;
+  if (Array.isArray(personas)) payload.personas = personas;
   const r = await fetchJson(BASE, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(title ? { title } : {}),
+    body: JSON.stringify(payload),
   });
   if (!r.ok) {
     const e = await r.json().catch(() => ({}));
@@ -123,11 +127,22 @@ export async function putChat(chatId, { title, messages } = {}) {
   return await r.json();
 }
 
-export async function appendMessage(chatId, { role, content, attachments }) {
+export async function appendMessage(
+  chatId,
+  { role, content, attachments, turnId, speakerId, speakerName, modelId },
+) {
   const r = await fetchJson(`${BASE}/${encodeURIComponent(chatId)}/messages`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ role, content, attachments }),
+    body: JSON.stringify({
+      role,
+      content,
+      attachments,
+      turnId,
+      speakerId,
+      speakerName,
+      modelId,
+    }),
   });
   if (!r.ok) {
     const e = await r.json().catch(() => ({}));

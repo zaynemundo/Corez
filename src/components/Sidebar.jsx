@@ -14,6 +14,7 @@ import {
   Search,
   MessageCircle,
   LayoutGrid,
+  MessagesSquare,
 } from "lucide-react";
 import {
   menuPlacement,
@@ -33,6 +34,7 @@ export default function Sidebar({
   activeSessionId,
   onSelectSession,
   onNewChat,
+  onNewConversation,
   // The Sites screen: every published page, with edits handed to a new chat.
   // Optional so the sidebar can render without it in isolation (tests, previews).
   onOpenSites,
@@ -108,6 +110,7 @@ export default function Sidebar({
   const [savingProject, setSavingProject] = useState(false);
   const [busyProjectId, setBusyProjectId] = useState(null);
   const [chatsOpen, setChatsOpen] = useState(true);
+  const [messagesOpen, setMessagesOpen] = useState(true);
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [pinnedOpen, setPinnedOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState(null);
@@ -178,9 +181,24 @@ export default function Sidebar({
     [sessions, projectIds, manualLists],
   );
 
+  const normalSessions = useMemo(
+    () => sessions.filter((session) => session.chatMode !== "conversation"),
+    [sessions],
+  );
+  const conversationSessions = useMemo(
+    () =>
+      sessions
+        .filter((session) => session.chatMode === "conversation")
+        .sort(
+          (a, b) =>
+            Number(b.lastUserAt || b.updatedAt || 0) -
+            Number(a.lastUserAt || a.updatedAt || 0),
+        ),
+    [sessions],
+  );
   const ungroupedSessions = useMemo(
-    () => orderedListMembers(sessions, "recents", projectIds, manualLists),
-    [sessions, projectIds, manualLists],
+    () => orderedListMembers(normalSessions, "recents", projectIds, manualLists),
+    [normalSessions, projectIds, manualLists],
   );
 
   const railSearchResults = useMemo(() => {
@@ -479,6 +497,23 @@ export default function Sidebar({
             />
             <span>{t("common.sidebar.newChat")}</span>
           </button>
+          <button
+            type="button"
+            className="new-chat-btn conversation-nav-btn"
+            onClick={() => {
+              setChatsOpen(true);
+              onNewConversation?.();
+            }}
+            title="Conversation"
+          >
+            <MessagesSquare
+              className="new-chat-icon"
+              size={16}
+              strokeWidth={1.5}
+              aria-hidden="true"
+            />
+            <span>Conversation</span>
+          </button>
 
           {typeof onOpenSites === "function" && (
             <button
@@ -577,6 +612,7 @@ export default function Sidebar({
             )}
           </div>
 
+          <div className="sidebar-projects-section">
           <div className="sidebar-section-row">
             <button
               type="button"
@@ -833,6 +869,7 @@ export default function Sidebar({
             </div>
           )}
 
+          </div>
           <div className="sidebar-section-row">
             <button
               type="button"
@@ -862,6 +899,63 @@ export default function Sidebar({
             <div className="sidebar-chats-list" id="sidebar-chats-list">
               {ungroupedSessions.map((session) =>
                 renderSessionRow(session, null, "recents"),
+              )}
+            </div>
+          )}
+
+          <div className="sidebar-section-row">
+            <button
+              type="button"
+              className="sidebar-section-toggle"
+              onClick={() => setMessagesOpen((prev) => !prev)}
+              title={messagesOpen ? "Collapse messages" : "Expand messages"}
+              aria-expanded={messagesOpen}
+              aria-controls="sidebar-messages-list"
+            >
+              <span className="sidebar-section-label">Messages</span>
+              <ChevronRight
+                className={`sidebar-chevron ${messagesOpen ? "expanded" : ""}`}
+                size={14}
+                strokeWidth={1.5}
+                aria-hidden="true"
+              />
+            </button>
+          </div>
+
+          {messagesOpen && (
+            <div className="sidebar-messages-list" id="sidebar-messages-list">
+              {conversationSessions.length === 0 ? (
+                <div className="sidebar-messages-empty">
+                  No conversations yet
+                </div>
+              ) : (
+                conversationSessions.map((session) => (
+                  <button
+                    type="button"
+                    key={session.id}
+                    className={`sidebar-message-row${
+                      session.id === activeSessionId ? " active" : ""
+                    }`}
+                    onClick={() => onSelectSession(session.id)}
+                  >
+                    <span className="sidebar-message-avatar" aria-hidden="true">
+                      {(session.personas?.[0]?.name || "C")[0]}
+                    </span>
+                    <span className="sidebar-message-copy">
+                      <span className="sidebar-message-title">
+                        {session.title}
+                      </span>
+                      <span
+                        className={`sidebar-message-status${
+                          session.active ? " is-active" : ""
+                        }`}
+                      >
+                        <span className="sidebar-message-dot" aria-hidden="true" />
+                        {session.active ? "Active" : "Inactive"}
+                      </span>
+                    </span>
+                  </button>
+                ))
               )}
             </div>
           )}
@@ -914,6 +1008,18 @@ export default function Sidebar({
             aria-label={t("common.sidebar.newChat")}
           >
             <SquarePen size={20} strokeWidth={1.5} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="sidebar-rail-action"
+            onClick={() => {
+              setChatsOpen(true);
+              onNewConversation?.();
+            }}
+            title="New Conversation"
+            aria-label="New Conversation"
+          >
+            <MessagesSquare size={20} strokeWidth={1.5} aria-hidden="true" />
           </button>
 
           {typeof onOpenSites === "function" && (

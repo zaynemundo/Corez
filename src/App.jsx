@@ -44,6 +44,23 @@ import { useSessionOrganization } from "./hooks/useSessionOrganization.js";
 import { useGlobalFileDrop } from "./hooks/useGlobalFileDrop.js";
 import { usePendingTurnRecovery } from "./hooks/usePendingTurnRecovery.js";
 import { useChatTurnExecution } from "./hooks/useChatTurnExecution.js";
+import { useConversationTurnExecution } from "./hooks/useConversationTurnExecution.js";
+import ConversationSetupModal from "./components/ConversationSetupModal.jsx";
+
+const DEFAULT_CONVERSATION_PERSONAS = [
+  {
+    id: "p1",
+    name: "John",
+    handle: "john",
+    instructions: "Warm, grounded and curious. Asks a natural follow-up.",
+  },
+  {
+    id: "p2",
+    name: "Scarlett",
+    handle: "scarlett",
+    instructions: "Bright, playful and direct. Reacts to both people in the room.",
+  },
+];
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -119,6 +136,9 @@ function MainApp({ theme, setTheme }) {
   const thinkingStartedAtRef = useRef(0);
   const [isThinkingOpen, setIsThinkingOpen] = useState(true);
   const [streamingSessionId, setStreamingSessionId] = useState(null);
+  const [streamingSpeaker, setStreamingSpeaker] = useState(null);
+  const [conversationDraft, setConversationDraft] = useState(null);
+  const [conversationSetupOpen, setConversationSetupOpen] = useState(false);
   const [swarmVisible, setSwarmVisible] = useState(false);
   const [buildPhase, setBuildPhase] = useState(null);
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
@@ -211,6 +231,14 @@ function MainApp({ theme, setTheme }) {
     () => sessions.find((s) => s.id === activeSessionId) || null,
     [sessions, activeSessionId],
   );
+  const isConversationChat = activeSession?.chatMode === "conversation";
+  const isConversationDraft =
+    Boolean(conversationDraft) &&
+    (!activeSession || activeSession.messages.length === 0);
+  const conversationMode = isConversationChat || isConversationDraft;
+  const conversationPersonas = isConversationChat
+    ? activeSession?.personas || []
+    : conversationDraft || DEFAULT_CONVERSATION_PERSONAS;
 
   useEffect(() => {
     setActiveView(isSitesView ? "sites" : "chat");
@@ -254,6 +282,7 @@ function MainApp({ theme, setTheme }) {
   const handleSelectSession = (id) => {
     navigate(`/chat/${id}`);
     setActiveView("chat");
+    setConversationDraft(null);
     setCanvasOpen(false);
     setCanvasFullScreen(false);
     setActiveCanvasCode(null);
@@ -268,6 +297,7 @@ function MainApp({ theme, setTheme }) {
   const handleNewChat = () => {
     navigate("/");
     setActiveView("chat");
+    setConversationDraft(null);
     setCanvasOpen(false);
     setCanvasFullScreen(false);
     setRevisionContextCode("");
@@ -275,6 +305,13 @@ function MainApp({ theme, setTheme }) {
     setSiteEditDraft(null);
     setChatInput("");
     setActiveCanvasCode(null);
+  };
+
+  const handleNewConversation = () => {
+    handleNewChat();
+    setConversationDraft(
+      DEFAULT_CONVERSATION_PERSONAS.map((persona) => ({ ...persona })),
+    );
   };
 
   const handleEditSite = async (page) => {
@@ -359,6 +396,37 @@ function MainApp({ theme, setTheme }) {
     toAssistantMessage,
   });
 
+  const {
+    handleSendMessage: handleConversationSendMessage,
+    handleStopMessage: handleConversationStopMessage,
+  } = useConversationTurnExecution({
+    activeSessionId,
+    activeSession,
+    setSessions,
+    isThinking,
+    setIsThinking,
+    setSwarmVisible,
+    setBuildPhase,
+    setStreamingSessionId,
+    setStreamingContent,
+    setStreamingThinking,
+    streamingThinkingRef,
+    setStreamingSpeaker,
+    thinkingStartedAtRef,
+    setIsThinkingOpen,
+    setAttachments,
+    setChatInput,
+    navigate,
+    abortControllerRef,
+    newConversationPersonas: conversationPersonas,
+  });
+  const activeSendMessage = conversationMode
+    ? handleConversationSendMessage
+    : handleSendMessage;
+  const activeStopMessage = conversationMode
+    ? handleConversationStopMessage
+    : handleStopMessage;
+
   const sidebarSessions = useMemo(() => {
     const filtered = sessions.filter((s) => {
       if (s.id === activeSessionId) return true;
@@ -391,6 +459,7 @@ function MainApp({ theme, setTheme }) {
         activeSessionId={activeSessionId}
         onSelectSession={handleSelectSession}
         onNewChat={handleNewChat}
+        onNewConversation={handleNewConversation}
         onOpenSites={() => {
           if (siteEditDraft) {
             setSiteEditDraft(null);
@@ -498,8 +567,22 @@ function MainApp({ theme, setTheme }) {
                     <h1 className="new-chat-hero-title">
                       {isSiteEditChat
                         ? t("common.sites.editChatHeading")
-                        : t("common.newChat.title")}
+                        : isConversationDraft
+                          ? "Are you ready to have Conversation?"
+                          : t("common.newChat.title")}
                     </h1>
+                    {isConversationDraft && (
+                      <button
+                        type="button"
+                        className="conversation-edit-personas"
+                        onClick={() => setConversationSetupOpen(true)}
+                      >
+                        Edit personas · @
+                        {conversationPersonas
+                          .map((persona) => persona.handle)
+                          .join(" · @")}
+                      </button>
+                    )}
                     {isSiteEditChat && (
                       <p className="new-chat-hero-hint">
                         {t("common.sites.editChatHint")}
@@ -536,8 +619,27 @@ function MainApp({ theme, setTheme }) {
                       streamingSessionId,
                       activeSessionId,
                     }) && (
-                      <div className="message-wrapper ai">
+                      <div
+                        className={`message-wrapper ai${
+                          streamingSpeaker ? " conversation" : ""
+                        }`}
+                      >
                         <div className="message-body">
+                          {streamingSpeaker ? (
+                            <div className="message-speaker">
+                              <span className="message-speaker-avatar" aria-hidden="true">
+                                {String(streamingSpeaker.name || "AI")
+                                  .split(/\s+/)
+                                  .map((part) => part[0])
+                                  .join("")
+                                  .slice(0, 2)
+                                  .toUpperCase()}
+                              </span>
+                              <span className="message-speaker-name">
+                                {streamingSpeaker.name}
+                              </span>
+                            </div>
+                          ) : null}
                           {(buildPhaseLabel(buildPhase) || swarmVisible) && (
                             <span
                               className="sr-only"
@@ -577,14 +679,16 @@ function MainApp({ theme, setTheme }) {
                 input={chatInput}
                 setInput={setChatInput}
                 textareaRef={chatInputRef}
-                onSendMessage={handleSendMessage}
-                onStopMessage={handleStopMessage}
+                onSendMessage={activeSendMessage}
+                onStopMessage={activeStopMessage}
                 isStreaming={isThinking}
                 attachments={attachments}
                 setAttachments={setAttachments}
+                placeholder={conversationMode ? "" : undefined}
+                commandSuggestions={!conversationMode}
                 variant={isNewChat ? "hero" : "composer"}
                 footer={
-                  isNewChat && !isSiteEditChat ? (
+                  isNewChat && !isSiteEditChat && !conversationMode ? (
                     <NewChatStarters
                       hidden={
                         Boolean(chatInput.trim()) || attachments.length > 0
@@ -615,6 +719,17 @@ function MainApp({ theme, setTheme }) {
           </>
         )}
       </main>
+
+      {conversationSetupOpen && (
+        <ConversationSetupModal
+          personas={conversationPersonas}
+          onClose={() => setConversationSetupOpen(false)}
+          onSave={(next) => {
+            setConversationDraft(next);
+            setConversationSetupOpen(false);
+          }}
+        />
+      )}
 
       {shareChatId && (
         <ChatShareModal

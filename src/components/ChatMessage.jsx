@@ -96,6 +96,16 @@ export default function ChatMessage({
 }) {
   const { t } = useI18n();
   const isUser = message.role === "user";
+  const isConversation = Boolean(message.speakerId);
+  const speakerName = String(message.speakerName || "").trim();
+  const speakerInitials = speakerName
+    ? speakerName
+        .split(/\s+/)
+        .map((part) => part[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : "";
   const [fullscreenImage, setFullscreenImage] = useState(null);
 
   const renderImageAttachments = (attachments) => {
@@ -757,8 +767,21 @@ export default function ChatMessage({
     userFiles.length > 0;
 
   return (
-    <div className={`message-wrapper ${isUser ? "user" : "ai"}`}>
+    <div
+      className={`message-wrapper ${isUser ? "user" : "ai"}${
+        isConversation ? " conversation" : ""
+      }`}
+      data-speaker={message.speakerId || undefined}
+    >
       <div className="message-body">
+        {!isUser && isConversation && speakerName ? (
+          <div className="message-speaker">
+            <span className="message-speaker-avatar" aria-hidden="true">
+              {speakerInitials}
+            </span>
+            <span className="message-speaker-name">{speakerName}</span>
+          </div>
+        ) : null}
         {!isUser && message.thinking && (
           <ThinkingDisclosure
             text={message.thinking}

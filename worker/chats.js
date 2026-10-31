@@ -7,9 +7,18 @@ import {
   INDEX_CHATS_USER_UPDATED,
   INDEX_CHATS_PROJECT,
   INDEX_MESSAGES_CHAT_CREATED,
+  INDEX_CHATS_CONVERSATION_ACTIVE,
   COLUMN_CHATS_PROJECT_ID,
   COLUMN_CHATS_PINNED_AT,
   COLUMN_CHATS_SORT_ORDER,
+  COLUMN_CHATS_CHAT_MODE,
+  COLUMN_CHATS_PERSONAS,
+  COLUMN_CHATS_LAST_USER_AT,
+  COLUMN_CHATS_TITLE_UPDATED_AT,
+  COLUMN_MESSAGES_TURN_ID,
+  COLUMN_MESSAGES_SPEAKER_ID,
+  COLUMN_MESSAGES_SPEAKER_NAME,
+  COLUMN_MESSAGES_MODEL_ID,
 } from "./dbSchema.js";
 import { deleteChatShare } from "./chatShares.js";
 import {
@@ -91,6 +100,25 @@ export async function ensureChatsTables(env) {
     } catch (e) {
       if (!/duplicate column/i.test(String(e?.message || e))) throw e;
     }
+    // Conversation metadata and speaker attribution. Each ALTER is a no-op
+    // once the column exists; a real failure must surface because the reads
+    // below select these columns.
+    for (const sql of [
+      COLUMN_CHATS_CHAT_MODE,
+      COLUMN_CHATS_PERSONAS,
+      COLUMN_CHATS_LAST_USER_AT,
+      COLUMN_CHATS_TITLE_UPDATED_AT,
+      COLUMN_MESSAGES_TURN_ID,
+      COLUMN_MESSAGES_SPEAKER_ID,
+      COLUMN_MESSAGES_SPEAKER_NAME,
+      COLUMN_MESSAGES_MODEL_ID,
+    ]) {
+      try {
+        await env.DB.prepare(sql).run();
+      } catch (e) {
+        if (!/duplicate column/i.test(String(e?.message || e))) throw e;
+      }
+    }
     // One row per manually-ordered list: `recents`, `pinned`,
     // `project:<id>`. Presence of the row IS the flag.
     await env.DB.prepare(TABLE_CHAT_LIST_MANUAL).run();
@@ -98,6 +126,7 @@ export async function ensureChatsTables(env) {
       env.DB.prepare(INDEX_CHATS_USER_UPDATED).run(),
       env.DB.prepare(INDEX_CHATS_PROJECT).run(),
       env.DB.prepare(INDEX_MESSAGES_CHAT_CREATED).run(),
+      env.DB.prepare(INDEX_CHATS_CONVERSATION_ACTIVE).run(),
     ]);
   })();
   tablesReady.set(env.DB, ready);
@@ -121,6 +150,129 @@ function sanitizeContent(content) {
   if (typeof content === "string") return content;
   if (content == null) return "";
   return String(content);
+}
+
+export const CONVERSATION_ACTIVE_MS = 4 * 60 * 60 * 1000;
+export const CONVERSATION_TITLE_REFRESH_MS = 30 * 60 * 1000;
+
+function personaHandle(name) {
+  return String(name || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 30);
+}
+
+function normalizePersonas(value) {
+  let raw = value;
+  if (typeof raw === "string") {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      raw = null;
+    }
+  }
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set();
+  return raw
+    .slice(0, 2)
+    .map((persona, index) => {
+      const name =
+        typeof persona?.name === "string" && persona.name.trim()
+          ? persona.name.trim().slice(0, 40)
+          : index === 0
+            ? "John"
+            : "Scarlett";
+      let handle = personaHandle(
+        typeof persona?.handle === "string" && persona.handle.trim()
+          ? persona.handle
+          : name,
+      );
+      if (!handle) handle = `persona_${index + 1}`;
+      let unique = handle;
+      let suffix = 2;
+      while (seen.has(unique)) unique = `${handle}_${suffix++}`;
+      seen.add(unique);
+      return {
+        id:
+          typeof persona?.id === "string" && persona.id
+            ? persona.id
+            : `p${index + 1}`,
+        name,
+        handle: unique,
+        instructions:
+          typeof persona?.instructions === "string"
+            ? persona.instructions.slice(0, 1200)
+            : "",
+        color:
+          typeof persona?.color === "string" ? persona.color.slice(0, 20) : null,
+      };
+    })
+    .filter(Boolean);
+}
+
+function parsePersonas(value) {
+  if (!value) return [];
+  try {
+    return normalizePersonas(JSON.parse(value));
+  } catch {
+    return [];
+  }
+}
+
+export function conversationTitleFromMessage(text) {
+  const clean = String(text || "")
+    .replace(/@[a-z0-9_]+/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return clean.slice(0, 60) || "New Conversation";
+}
+
+/**
+ * Refresh the title of active conversations whose title is at least 30 minutes
+ * old. Active means the user sent a message in the last four hours. This is a
+ * cheap D1-only sweep (no model call), driven by the Worker cron.
+ */
+export async function refreshConversationTitles(env, now = Date.now()) {
+  if (!env?.DB) return 0;
+  await ensureChatsTables(env);
+  const activeSince = now - CONVERSATION_ACTIVE_MS;
+  const titleCutoff = now - CONVERSATION_TITLE_REFRESH_MS;
+  let rows;
+  try {
+    rows = await env.DB.prepare(
+      `SELECT c.id, c.user_id,
+        (SELECT m.content FROM chat_messages m
+          WHERE m.chat_id = c.id AND m.user_id = c.user_id AND m.role = 'user'
+          ORDER BY m.created_at DESC LIMIT 1) AS latest
+       FROM chats c
+       WHERE c.chat_mode = 'conversation'
+         AND c.last_user_at IS NOT NULL AND c.last_user_at >= ?
+         AND (c.title_updated_at IS NULL OR c.title_updated_at <= ?)
+       ORDER BY c.last_user_at DESC LIMIT 50`,
+    )
+      .bind(activeSince, titleCutoff)
+      .all();
+  } catch (e) {
+    console.warn("Conversation title refresh failed:", safeErrorDetail(e));
+    return 0;
+  }
+  let updated = 0;
+  for (const row of rows?.results || []) {
+    if (!row?.latest) continue;
+    const title = conversationTitleFromMessage(row.latest);
+    try {
+      await env.DB.prepare(
+        "UPDATE chats SET title = ?, title_updated_at = ? WHERE id = ? AND user_id = ?",
+      )
+        .bind(title, now, row.id, row.user_id)
+        .run();
+      updated += 1;
+    } catch (e) {
+      console.warn("Conversation title update failed:", safeErrorDetail(e));
+    }
+  }
+  return updated;
 }
 
 // ---------------------------------------------------------------------
@@ -252,7 +404,7 @@ export async function handleChats(request, env) {
     try {
       const [rows, flagRows] = await Promise.all([
         env.DB.prepare(
-          "SELECT id, title, created_at as createdAt, updated_at as updatedAt, project_id as projectId, pinned_at as pinnedAt, sort_order as sortOrder FROM chats WHERE user_id = ? ORDER BY updated_at DESC LIMIT 100",
+          "SELECT id, title, created_at as createdAt, updated_at as updatedAt, project_id as projectId, pinned_at as pinnedAt, sort_order as sortOrder, chat_mode as chatMode, personas, last_user_at as lastUserAt, title_updated_at as titleUpdatedAt FROM chats WHERE user_id = ? ORDER BY updated_at DESC LIMIT 100",
         )
           .bind(userId)
           .all(),
@@ -262,6 +414,7 @@ export async function handleChats(request, env) {
           .bind(userId)
           .all(),
       ]);
+      const now = Date.now();
       const chats = (rows?.results || []).map((r) => ({
         id: r.id,
         title: r.title,
@@ -270,6 +423,15 @@ export async function handleChats(request, env) {
         projectId: r.projectId || null,
         pinnedAt: r.pinnedAt || null,
         sortOrder: r.sortOrder ?? null,
+        chatMode: r.chatMode === "conversation" ? "conversation" : "single",
+        personas: parsePersonas(r.personas),
+        lastUserAt: r.lastUserAt || null,
+        titleUpdatedAt: r.titleUpdatedAt || null,
+        active: Boolean(
+          r.chatMode === "conversation" &&
+            r.lastUserAt &&
+            now - Number(r.lastUserAt) < CONVERSATION_ACTIVE_MS,
+        ),
       }));
       const manualLists = (flagRows?.results || []).map((r) => r.list_key);
       return jsonResponse(200, { chats, manualLists });
@@ -292,6 +454,16 @@ export async function handleChats(request, env) {
     const title = sanitizeTitle(body?.title);
     const id = generateChatId();
     const now = Date.now();
+    const chatMode =
+      body?.chatMode === "conversation" ? "conversation" : "single";
+    const suppliedPersonas =
+      chatMode === "conversation" ? normalizePersonas(body?.personas) : [];
+    const finalPersonas =
+      chatMode === "conversation" && suppliedPersonas.length === 2
+        ? suppliedPersonas
+        : chatMode === "conversation"
+          ? normalizePersonas([{ name: "John" }, { name: "Scarlett" }])
+          : [];
     try {
       // A new chat joins the top of Recents. In a manually-ordered Recents
       // that means an explicit top position; in an auto one the column stays
@@ -301,9 +473,19 @@ export async function handleChats(request, env) {
         sortOrder = await topSortOrder(env, userId, "recents");
       }
       await env.DB.prepare(
-        "INSERT INTO chats (id, user_id, title, created_at, updated_at, sort_order) VALUES (?,?,?,?,?,?)",
+        "INSERT INTO chats (id, user_id, title, created_at, updated_at, sort_order, chat_mode, personas, title_updated_at) VALUES (?,?,?,?,?,?,?,?,?)",
       )
-        .bind(id, userId, title, now, now, sortOrder)
+        .bind(
+          id,
+          userId,
+          title,
+          now,
+          now,
+          sortOrder,
+          chatMode,
+          finalPersonas.length ? JSON.stringify(finalPersonas) : null,
+          now,
+        )
         .run();
 
       // Optionally create first message if provided
@@ -328,6 +510,11 @@ export async function handleChats(request, env) {
         createdAt: now,
         updatedAt: now,
         sortOrder,
+        chatMode,
+        personas: finalPersonas,
+        lastUserAt: null,
+        titleUpdatedAt: now,
+        active: false,
       });
     } catch (e) {
       console.error("POST /api/chats failed:", safeErrorDetail(e));
@@ -539,7 +726,7 @@ export async function handleChats(request, env) {
   let chatRow;
   try {
     chatRow = await env.DB.prepare(
-      "SELECT id, title, user_id, created_at, updated_at, project_id, pinned_at, sort_order FROM chats WHERE id = ?",
+      "SELECT id, title, user_id, created_at, updated_at, project_id, pinned_at, sort_order, chat_mode, personas, last_user_at, title_updated_at FROM chats WHERE id = ?",
     )
       .bind(chatId)
       .first();
@@ -560,7 +747,7 @@ export async function handleChats(request, env) {
   if (!isMessagesSubroute && request.method === "GET") {
     try {
       const msgRows = await env.DB.prepare(
-        "SELECT id, role, content, attachments, created_at as createdAt FROM chat_messages WHERE chat_id = ? AND user_id = ? ORDER BY created_at ASC LIMIT 500",
+        "SELECT id, role, content, attachments, created_at as createdAt, turn_id as turnId, speaker_id as speakerId, speaker_name as speakerName, model_id as modelId FROM chat_messages WHERE chat_id = ? AND user_id = ? ORDER BY created_at ASC LIMIT 500",
       )
         .bind(chatId, userId)
         .all();
@@ -579,6 +766,10 @@ export async function handleChats(request, env) {
           content: r.content,
           attachments,
           createdAt: r.createdAt,
+          ...(r.turnId ? { turnId: r.turnId } : {}),
+          ...(r.speakerId ? { speakerId: r.speakerId } : {}),
+          ...(r.speakerName ? { speakerName: r.speakerName } : {}),
+          ...(r.modelId ? { modelId: r.modelId } : {}),
         };
       });
       const compacted = applySmartCompact(messages, url);
@@ -595,6 +786,15 @@ export async function handleChats(request, env) {
           updatedAt: chatRow.updated_at,
           projectId: chatRow.project_id || null,
           pinnedAt: chatRow.pinned_at || null,
+          chatMode: chatRow.chat_mode === "conversation" ? "conversation" : "single",
+          personas: parsePersonas(chatRow.personas),
+          lastUserAt: chatRow.last_user_at || null,
+          titleUpdatedAt: chatRow.title_updated_at || null,
+          active: Boolean(
+            chatRow.chat_mode === "conversation" &&
+              chatRow.last_user_at &&
+              Date.now() - Number(chatRow.last_user_at) < CONVERSATION_ACTIVE_MS,
+          ),
           sortOrder: chatRow.sort_order ?? null,
           messages,
           ...(compacted.meta ? { compactMeta: compacted.meta } : {}),
@@ -808,17 +1008,47 @@ export async function handleChats(request, env) {
       : null;
     const now = Date.now();
     const msgId = crypto.randomUUID();
+    const turnId =
+      typeof body?.turnId === "string" ? body.turnId.slice(0, 80) : null;
+    const speakerId =
+      typeof body?.speakerId === "string" ? body.speakerId.slice(0, 40) : null;
+    const speakerName =
+      typeof body?.speakerName === "string"
+        ? body.speakerName.slice(0, 40)
+        : null;
+    const modelId =
+      typeof body?.modelId === "string" ? body.modelId.slice(0, 80) : null;
     try {
       await env.DB.prepare(
-        "INSERT INTO chat_messages (id, chat_id, user_id, role, content, attachments, created_at) VALUES (?,?,?,?,?,?,?)",
+        "INSERT INTO chat_messages (id, chat_id, user_id, role, content, attachments, created_at, turn_id, speaker_id, speaker_name, model_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
       )
-        .bind(msgId, chatId, userId, role, content, attachments, now)
+        .bind(
+          msgId,
+          chatId,
+          userId,
+          role,
+          content,
+          attachments,
+          now,
+          turnId,
+          speakerId,
+          speakerName,
+          modelId,
+        )
         .run();
-      await env.DB.prepare(
-        "UPDATE chats SET updated_at = ? WHERE id = ? AND user_id = ?",
-      )
-        .bind(now, chatId, userId)
-        .run();
+      if (role === "user") {
+        await env.DB.prepare(
+          "UPDATE chats SET updated_at = ?, last_user_at = ? WHERE id = ? AND user_id = ?",
+        )
+          .bind(now, now, chatId, userId)
+          .run();
+      } else {
+        await env.DB.prepare(
+          "UPDATE chats SET updated_at = ? WHERE id = ? AND user_id = ?",
+        )
+          .bind(now, chatId, userId)
+          .run();
+      }
       return jsonResponse(201, {
         id: msgId,
         chatId,
@@ -826,6 +1056,10 @@ export async function handleChats(request, env) {
         content,
         attachments: body?.attachments || null,
         createdAt: now,
+        turnId,
+        speakerId,
+        speakerName,
+        modelId,
       });
     } catch (e) {
       console.error("POST /api/chats/:id/messages failed:", safeErrorDetail(e));
@@ -839,7 +1073,7 @@ export async function handleChats(request, env) {
   if (isMessagesSubroute && request.method === "GET") {
     try {
       const msgRows = await env.DB.prepare(
-        "SELECT id, role, content, attachments, created_at as createdAt FROM chat_messages WHERE chat_id = ? AND user_id = ? ORDER BY created_at ASC LIMIT 500",
+        "SELECT id, role, content, attachments, created_at as createdAt, turn_id as turnId, speaker_id as speakerId, speaker_name as speakerName, model_id as modelId FROM chat_messages WHERE chat_id = ? AND user_id = ? ORDER BY created_at ASC LIMIT 500",
       )
         .bind(chatId, userId)
         .all();
@@ -858,6 +1092,10 @@ export async function handleChats(request, env) {
           content: r.content,
           attachments,
           createdAt: r.createdAt,
+          ...(r.turnId ? { turnId: r.turnId } : {}),
+          ...(r.speakerId ? { speakerId: r.speakerId } : {}),
+          ...(r.speakerName ? { speakerName: r.speakerName } : {}),
+          ...(r.modelId ? { modelId: r.modelId } : {}),
         };
       });
       const compacted = applySmartCompact(messages, url);

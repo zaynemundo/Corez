@@ -93,6 +93,11 @@ export function useSessionOrganization({
         projectId: c.projectId || null,
         pinnedAt: c.pinnedAt || null,
         sortOrder: c.sortOrder ?? null,
+        chatMode: c.chatMode || "single",
+        personas: c.personas || [],
+        lastUserAt: c.lastUserAt || null,
+        titleUpdatedAt: c.titleUpdatedAt || null,
+        active: Boolean(c.active),
         _loaded: false,
       }));
       setSessions((prev) => mergeLoadedSessions(mapped, prev));
@@ -168,6 +173,11 @@ export function useSessionOrganization({
                           projectId: c.projectId || null,
                           pinnedAt: c.pinnedAt || null,
                           sortOrder: c.sortOrder ?? null,
+                          chatMode: c.chatMode || "single",
+                          personas: c.personas || [],
+                          lastUserAt: c.lastUserAt || null,
+                          titleUpdatedAt: c.titleUpdatedAt || null,
+                          active: Boolean(c.active),
                           _loaded: false,
                         })),
                         prev,
@@ -210,7 +220,15 @@ export function useSessionOrganization({
 
   useEffect(() => {
     fetchChatList();
-  }, [fetchChatList]);
+    if (!user) return undefined;
+    // Conversation titles change every 30 minutes while active; refresh the
+    // sidebar list on the same cadence so Messages and active dots stay current
+    // in an open tab as well as after reload.
+    const timer = setInterval(() => {
+      fetchChatList().catch(() => {});
+    }, 30 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [fetchChatList, user]);
 
   useEffect(() => {
     if (!sessionsLoaded || lineageSyncedRef.current) return;
@@ -252,6 +270,10 @@ export function useSessionOrganization({
               role: m.role,
               content: m.content,
               attachments: m.attachments || undefined,
+              ...(m.turnId ? { turnId: m.turnId } : {}),
+              ...(m.speakerId ? { speakerId: m.speakerId } : {}),
+              ...(m.speakerName ? { speakerName: m.speakerName } : {}),
+              ...(m.modelId ? { modelId: m.modelId } : {}),
               ...(m._compactMeta ? { _compactMeta: m._compactMeta } : {}),
             }))
           : [];
@@ -278,6 +300,11 @@ export function useSessionOrganization({
               ...prev[idx],
               title: data.title,
               messages: msgs,
+              chatMode: data.chatMode || "single",
+              personas: data.personas || [],
+              lastUserAt: data.lastUserAt || null,
+              titleUpdatedAt: data.titleUpdatedAt || null,
+              active: Boolean(data.active),
               _loaded: true,
               _compactMeta: compactMeta,
               _fullMessages: fullMessages,
@@ -292,6 +319,11 @@ export function useSessionOrganization({
               createdAt: data.createdAt,
               updatedAt: data.updatedAt,
               projectId: data.projectId || null,
+              chatMode: data.chatMode || "single",
+              personas: data.personas || [],
+              lastUserAt: data.lastUserAt || null,
+              titleUpdatedAt: data.titleUpdatedAt || null,
+              active: Boolean(data.active),
               _loaded: true,
               _compactMeta: compactMeta,
               _fullMessages: fullMessages,

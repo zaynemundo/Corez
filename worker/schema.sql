@@ -29,12 +29,13 @@ CREATE INDEX IF NOT EXISTS idx_resets_token ON password_resets(token);
 CREATE INDEX IF NOT EXISTS idx_resets_email ON password_resets(email);
 
 -- Chats, folders and sidebar order ------------------------------------------
-CREATE TABLE IF NOT EXISTS chats (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, title TEXT NOT NULL DEFAULT 'New Conversation', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, project_id TEXT, pinned_at INTEGER, sort_order REAL);
-CREATE TABLE IF NOT EXISTS chat_messages (id TEXT PRIMARY KEY, chat_id TEXT NOT NULL, user_id TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, attachments TEXT, created_at INTEGER NOT NULL, FOREIGN KEY(chat_id) REFERENCES chats(id) ON DELETE CASCADE);
+CREATE TABLE IF NOT EXISTS chats (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, title TEXT NOT NULL DEFAULT 'New Conversation', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, project_id TEXT, pinned_at INTEGER, sort_order REAL, chat_mode TEXT NOT NULL DEFAULT 'single', personas TEXT, last_user_at INTEGER, title_updated_at INTEGER);
+CREATE TABLE IF NOT EXISTS chat_messages (id TEXT PRIMARY KEY, chat_id TEXT NOT NULL, user_id TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, attachments TEXT, created_at INTEGER NOT NULL, turn_id TEXT, speaker_id TEXT, speaker_name TEXT, model_id TEXT, FOREIGN KEY(chat_id) REFERENCES chats(id) ON DELETE CASCADE);
 CREATE TABLE IF NOT EXISTS chat_list_manual (user_id TEXT NOT NULL, list_key TEXT NOT NULL, PRIMARY KEY (user_id, list_key));
 CREATE TABLE IF NOT EXISTS projects (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, name TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_chats_user_updated ON chats(user_id, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_chat_created ON chat_messages(chat_id, created_at ASC);
+CREATE INDEX IF NOT EXISTS idx_chats_conversation_active ON chats(chat_mode, last_user_at DESC);
 CREATE INDEX IF NOT EXISTS idx_chats_project ON chats(project_id, user_id);
 CREATE INDEX IF NOT EXISTS idx_projects_user_updated ON projects(user_id, updated_at DESC);
 

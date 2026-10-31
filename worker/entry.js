@@ -24,7 +24,7 @@ import {
   isProductionRequest,
   verifySession,
 } from "./auth.js";
-import { handleChats } from "./chats.js";
+import { handleChats, refreshConversationTitles } from "./chats.js";
 import { handleChatShares } from "./chatShares.js";
 import { handleProjects } from "./projects.js";
 import { handleN8nWebhook } from "./n8nBridge.js";
@@ -443,6 +443,14 @@ export default {
         }
       } catch {
         // A failed sweep leaves the records pending for the next trigger.
+      }
+      try {
+        const refreshed = await refreshConversationTitles(env, scheduledAt);
+        if (refreshed) {
+          console.log(`conversation titles refreshed: ${refreshed}`);
+        }
+      } catch {
+        // The next trigger retries; a title refresh must never block the sweep.
       }
       // Visitor fingerprints must not outlive their retention window even if
       // no owner opens a dashboard. The cron runs every two minutes, so the

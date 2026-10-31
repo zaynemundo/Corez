@@ -102,7 +102,13 @@ describe("closed sidebar navigation rail", () => {
       .getAllByRole("button")
       .map((button) => button.getAttribute("aria-label"));
 
-    expect(labels).toEqual(["New Chat", "Sites", "Search chats", "Recents"]);
+    expect(labels).toEqual([
+      "New Chat",
+      "New Conversation",
+      "Sites",
+      "Search chats",
+      "Recents",
+    ]);
   });
 
   it("uses the rail's quick find, then opens the chosen one", async () => {

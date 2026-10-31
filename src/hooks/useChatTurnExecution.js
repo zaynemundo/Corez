@@ -135,6 +135,11 @@ export function useChatTurnExecution({
           projectId: created.projectId || null,
           pinnedAt: null,
           sortOrder: created.sortOrder ?? null,
+          chatMode: created.chatMode || "single",
+          personas: created.personas || [],
+          lastUserAt: created.lastUserAt || null,
+          titleUpdatedAt: created.titleUpdatedAt || null,
+          active: Boolean(created.active),
           _loaded: true,
         };
         setSessions((prev) => [newSession, ...prev]);
@@ -173,6 +178,10 @@ export function useChatTurnExecution({
                 role: m.role,
                 content: m.content,
                 attachments: m.attachments || undefined,
+                ...(m.turnId ? { turnId: m.turnId } : {}),
+                ...(m.speakerId ? { speakerId: m.speakerId } : {}),
+                ...(m.speakerName ? { speakerName: m.speakerName } : {}),
+                ...(m.modelId ? { modelId: m.modelId } : {}),
                 ...(m._compactMeta ? { _compactMeta: m._compactMeta } : {}),
               }))
             : [];
