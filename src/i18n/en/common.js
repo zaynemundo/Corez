@@ -161,7 +161,6 @@ export default {
     newChatInProject: "New chat in {name}",
     emptyProject: "No chats yet",
     chats: "Recents",
-    railChats: "Recent chats",
     railNewChat: "Start a new chat",
     railSites: "Published sites",
     railToggle: "Toggle sidebar",

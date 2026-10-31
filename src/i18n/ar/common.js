@@ -145,7 +145,6 @@ export default {
     newChatInProject: "محادثة جديدة في {name}",
     emptyProject: "لا توجد محادثات بعد",
     chats: "الأحدث",
-    railChats: "المحادثات الأخيرة",
     railNewChat: "بدء محادثة جديدة",
     railSites: "المواقع المنشورة",
     railToggle: "تبديل الشريط الجانبي",

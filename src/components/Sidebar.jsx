@@ -11,8 +11,6 @@ import {
   Pin,
   PinOff,
   Plus,
-  Search,
-  MessageCircle,
   LayoutGrid,
 } from "lucide-react";
 import {
@@ -21,11 +19,7 @@ import {
   SessionOptionsMenu,
   ProjectOptionsMenu,
 } from "./sidebar/SidebarMenus.jsx";
-import {
-  SidebarProfileRow,
-  SidebarRailProfile,
-} from "./sidebar/SidebarProfiles.jsx";
-import { RailQuickSearchModal } from "./sidebar/RailQuickSearchModal.jsx";
+import { SidebarProfileRow } from "./sidebar/SidebarProfiles.jsx";
 
 export default function Sidebar({
   isOpen,
@@ -112,24 +106,9 @@ export default function Sidebar({
   const [pinnedOpen, setPinnedOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState(null);
   const [editingName, setEditingName] = useState("");
-  const [railSearchOpen, setRailSearchOpen] = useState(false);
-  const [railSearchQuery, setRailSearchQuery] = useState("");
-  const [railSearchPos, setRailSearchPos] = useState(null);
-  const railSearchButtonRef = useRef(null);
   const railBrandRef = useRef(null);
   const sidebarCloseRef = useRef(null);
   const wasOpenRef = useRef(isOpen);
-
-  const closeRailSearch = () => {
-    setRailSearchOpen(false);
-    setRailSearchQuery("");
-  };
-
-  useEffect(() => {
-    if (!isOpen) return;
-    setRailSearchOpen(false);
-    setRailSearchQuery("");
-  }, [isOpen]);
 
   useEffect(() => {
     const wasOpen = wasOpenRef.current;
@@ -182,49 +161,6 @@ export default function Sidebar({
     () => orderedListMembers(sessions, "recents", projectIds, manualLists),
     [sessions, projectIds, manualLists],
   );
-
-  const railSearchResults = useMemo(() => {
-    const query = railSearchQuery.trim().toLowerCase();
-    const matches = query
-      ? sessions.filter((session) =>
-          (session.title || "").toLowerCase().includes(query),
-        )
-      : sessions;
-    return matches.slice(0, 8);
-  }, [sessions, railSearchQuery]);
-
-  const openRailSearchResult = (sessionId) => {
-    closeRailSearch();
-    onSelectSession(sessionId);
-  };
-
-  const toggleRailSearch = () => {
-    if (railSearchOpen) {
-      closeRailSearch();
-      return;
-    }
-    const trigger = railSearchButtonRef.current;
-    if (trigger) {
-      const rect = trigger.getBoundingClientRect();
-      const rtl = document.documentElement.getAttribute("dir") === "rtl";
-      const panelWidth = 300;
-      const gapPx = 10;
-      const maxLeft = Math.max(gapPx, window.innerWidth - panelWidth - gapPx);
-      const railRect = trigger
-        .closest(".sidebar-rail")
-        ?.getBoundingClientRect();
-      const railEdge = rtl
-        ? (railRect?.left ?? rect.left)
-        : (railRect?.right ?? rect.right);
-      setRailSearchPos({
-        left: rtl
-          ? Math.max(gapPx, railEdge - panelWidth - gapPx)
-          : Math.min(railEdge + gapPx, maxLeft),
-        top: Math.max(8, Math.min(rect.top - 8, window.innerHeight - 430)),
-      });
-    }
-    setRailSearchOpen(true);
-  };
 
   const activeProjectId = useMemo(() => {
     const active = sessions.find((session) => session.id === activeSessionId);
@@ -937,52 +873,7 @@ export default function Sidebar({
             </button>
           )}
 
-          <button
-            ref={railSearchButtonRef}
-            type="button"
-            className={`sidebar-rail-action sidebar-rail-search-btn${
-              railSearchOpen ? " is-active" : ""
-            }`}
-            onClick={toggleRailSearch}
-            title={t("common.sidebar.searchChats")}
-            aria-label={t("common.sidebar.searchChats")}
-            aria-haspopup="dialog"
-            aria-expanded={railSearchOpen}
-            aria-controls={railSearchOpen ? "sidebar-rail-search" : undefined}
-          >
-            <Search size={20} strokeWidth={1.5} aria-hidden="true" />
-          </button>
-
-          <button
-            type="button"
-            className="sidebar-rail-action"
-            onClick={() => {
-              setChatsOpen(true);
-              onOpenSidebar?.();
-            }}
-            title={t("common.sidebar.railChats")}
-            aria-label={t("common.sidebar.railChats")}
-          >
-            <MessageCircle size={20} strokeWidth={1.5} aria-hidden="true" />
-          </button>
         </nav>
-
-        <div className="sidebar-rail-footer">
-          <SidebarRailProfile onOpenSettings={onOpenSettings} />
-        </div>
-
-        <RailQuickSearchModal
-          railSearchOpen={railSearchOpen}
-          railSearchPos={railSearchPos}
-          railSearchQuery={railSearchQuery}
-          setRailSearchQuery={setRailSearchQuery}
-          railSearchResults={railSearchResults}
-          activeSessionId={activeSessionId}
-          railSearchButtonRef={railSearchButtonRef}
-          closeRailSearch={closeRailSearch}
-          openRailSearchResult={openRailSearchResult}
-          t={t}
-        />
       </div>
     </aside>
   );

@@ -460,15 +460,10 @@ h6 {
     border-inline-end: 1px solid var(--sidebar-border);
   }
 
-  /* The rail already owns New Chat and Sites while it is permanently visible;
-     keep one set of primary actions instead of duplicating them in the panel. */
-  .sidebar:not(.collapsed) .sidebar-action-box {
-    display: none;
-  }
-
-  /* The expanded panel's footer already carries the account name and settings;
-     the rail only needs its own profile while the panel is collapsed. */
-  .sidebar:not(.collapsed) .sidebar-rail-footer {
+  /* The rail owns Sites permanently. The panel brings New Chat back, but a
+     second Sites button would be a duplicate on desktop; phones keep it
+     because the rail is hidden there. */
+  .sidebar:not(.collapsed) .sidebar-action-box .sites-nav-btn {
     display: none;
   }
 }
