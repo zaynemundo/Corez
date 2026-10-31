@@ -9294,12 +9294,6 @@ body.corez-consent-visible .app-container {
   opacity: 1;
   background: #6ee7b7;
 }
-.sidebar-messages-empty {
-  padding: 7px 9px 9px;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-}
 
 .message-wrapper.conversation .message-body { max-width: 88%; }
 .message-wrapper.ai.conversation .message-body {

@@ -924,39 +924,33 @@ export default function Sidebar({
 
           {messagesOpen && (
             <div className="sidebar-messages-list" id="sidebar-messages-list">
-              {conversationSessions.length === 0 ? (
-                <div className="sidebar-messages-empty">
-                  No conversations yet
-                </div>
-              ) : (
-                conversationSessions.map((session) => (
-                  <button
-                    type="button"
-                    key={session.id}
-                    className={`sidebar-message-row${
-                      session.id === activeSessionId ? " active" : ""
-                    }`}
-                    onClick={() => onSelectSession(session.id)}
-                  >
-                    <span className="sidebar-message-avatar" aria-hidden="true">
-                      {(session.personas?.[0]?.name || "C")[0]}
+              {conversationSessions.map((session) => (
+                <button
+                  type="button"
+                  key={session.id}
+                  className={`sidebar-message-row${
+                    session.id === activeSessionId ? " active" : ""
+                  }`}
+                  onClick={() => onSelectSession(session.id)}
+                >
+                  <span className="sidebar-message-avatar" aria-hidden="true">
+                    {(session.personas?.[0]?.name || "C")[0]}
+                  </span>
+                  <span className="sidebar-message-copy">
+                    <span className="sidebar-message-title">
+                      {session.title}
                     </span>
-                    <span className="sidebar-message-copy">
-                      <span className="sidebar-message-title">
-                        {session.title}
-                      </span>
-                      <span
-                        className={`sidebar-message-status${
-                          session.active ? " is-active" : ""
-                        }`}
-                      >
-                        <span className="sidebar-message-dot" aria-hidden="true" />
-                        {session.active ? "Active" : "Inactive"}
-                      </span>
+                    <span
+                      className={`sidebar-message-status${
+                        session.active ? " is-active" : ""
+                      }`}
+                    >
+                      <span className="sidebar-message-dot" aria-hidden="true" />
+                      {session.active ? "Active" : "Inactive"}
                     </span>
-                  </button>
-                ))
-              )}
+                  </span>
+                </button>
+              ))}
             </div>
           )}
         </div>

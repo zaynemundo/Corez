@@ -46,7 +46,7 @@ function renderSidebar(overrides = {}) {
     onTogglePinSession: vi.fn(),
     onReorderSession: vi.fn(),
   };
-  render(
+  const view = render(
     <I18nProvider>
       <Sidebar
         isOpen
@@ -58,7 +58,7 @@ function renderSidebar(overrides = {}) {
       />
     </I18nProvider>,
   );
-  return handlers;
+  return { ...handlers, container: view.container };
 }
 
 describe('conversation UI', () => {
@@ -69,14 +69,22 @@ describe('conversation UI', () => {
     await user.click(screen.getByRole("button", { name: "Conversation" }));
     expect(handlers.onNewConversation).toHaveBeenCalledTimes(1);
 
-    const messages = document.getElementById('sidebar-messages-list');
+    const messages = handlers.container.querySelector('#sidebar-messages-list');
     expect(within(messages).getByText('Studio lighting')).toBeTruthy();
     expect(within(messages).getByText('Active')).toBeTruthy();
     expect(within(messages).queryByText('Normal chat')).toBeNull();
 
-    const recents = document.getElementById('sidebar-chats-list');
+    const recents = handlers.container.querySelector('#sidebar-chats-list');
     expect(within(recents).getByText('Normal chat')).toBeTruthy();
     expect(within(recents).queryByText('Studio lighting')).toBeNull();
+  });
+
+  it('keeps an empty Messages list silent', () => {
+    const { container } = renderSidebar({ sessions: [sessions[0]] });
+    const messages = container.querySelector('#sidebar-messages-list');
+    expect(messages).toBeTruthy();
+    expect(messages.textContent.trim()).toBe('');
+    expect(within(container).queryByText('No conversations yet')).toBeNull();
   });
 
   it('renders named AI bubbles for a conversation message', () => {
