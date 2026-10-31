@@ -921,6 +921,16 @@ h6 {
   gap: 0.2rem;
 }
 
+/* Recents and Messages show five histories before scrolling. The cap is
+   expressed in row units so it stays true at every UI scale. */
+.sidebar-chats-list {
+  max-height: calc(5 * var(--sidebar-item-min-height) + 4 * 0.2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
 /* An open section with nothing in it must not spend a gap: expanding Projects
    before the first project exists added space and nothing else. */
 .sidebar-projects-list:empty,
@@ -9235,6 +9245,16 @@ body.corez-consent-visible .app-container {
   flex-direction: column;
   gap: 2px;
   padding: 2px 8px 9px;
+  /* Five 44px conversation rows; the sixth scrolls. */
+  max-height: calc(5 * 44px + 4 * 2px + 11px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.sidebar-chats-list::-webkit-scrollbar,
+.sidebar-messages-list::-webkit-scrollbar {
+  display: none;
 }
 .sidebar-message-row {
   display: flex;
