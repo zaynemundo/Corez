@@ -879,13 +879,6 @@ h6 {
   user-select: none;
 }
 
-.sidebar-section-icon {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
-  color: currentColor;
-}
-
 /* A section heading is a disclosure row: label first, caret right beside it,
    the whole row clickable. Its padding is the row's padding, so section labels
    and chat titles start on the same vertical line. */
@@ -894,11 +887,11 @@ h6 {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 0.6rem;
+  gap: 0.35rem;
   width: 100%;
   /* Almost no bottom padding: heading to first row keeps the list's own
      rhythm, so opening a section does not look like it added space. */
-  padding: 8px 6px 2px 15px;
+  padding: 8px 6px 2px 12px;
   border: none;
   border-radius: 6px;
   background: transparent;
