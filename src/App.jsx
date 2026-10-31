@@ -46,6 +46,7 @@ import { usePendingTurnRecovery } from "./hooks/usePendingTurnRecovery.js";
 import { useChatTurnExecution } from "./hooks/useChatTurnExecution.js";
 import { useConversationTurnExecution } from "./hooks/useConversationTurnExecution.js";
 import ConversationSetupModal from "./components/ConversationSetupModal.jsx";
+import LocationPermission from "./components/LocationPermission.jsx";
 
 const DEFAULT_CONVERSATION_PERSONAS = [
   {
@@ -141,6 +142,7 @@ function MainApp({ theme, setTheme }) {
   const [streamingSpeaker, setStreamingSpeaker] = useState(null);
   const [conversationDraft, setConversationDraft] = useState(null);
   const [conversationSetupOpen, setConversationSetupOpen] = useState(false);
+  const [locationContext, setLocationContext] = useState("");
   const [swarmVisible, setSwarmVisible] = useState(false);
   const [buildPhase, setBuildPhase] = useState(null);
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
@@ -396,6 +398,7 @@ function MainApp({ theme, setTheme }) {
     focusTimeoutRef,
     userDismissedCanvasRef,
     toAssistantMessage,
+    locationContext,
   });
 
   const {
@@ -421,6 +424,7 @@ function MainApp({ theme, setTheme }) {
     navigate,
     abortControllerRef,
     newConversationPersonas: conversationPersonas,
+    locationContext,
   });
   const activeSendMessage = conversationMode
     ? handleConversationSendMessage
@@ -700,6 +704,7 @@ function MainApp({ theme, setTheme }) {
                   ) : null
                 }
               />
+              <LocationPermission onResolved={setLocationContext} />
             </div>
 
             {canvasOpen && (

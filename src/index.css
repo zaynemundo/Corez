@@ -9541,3 +9541,88 @@ body.corez-consent-visible .app-container {
   color: var(--bg-primary);
 }
 .conversation-setup-actions button:hover { opacity: 0.82; }
+/* Location consent ------------------------------------------------------ */
+.location-permission {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: min(680px, calc(100% - 32px));
+  margin: 0.6rem auto 0;
+  padding: 0.72rem 0.8rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+.location-permission-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 25px;
+  height: 25px;
+  flex: 0 0 25px;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+.location-permission-copy {
+  min-width: 0;
+  flex: 1;
+}
+.location-permission-copy p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+.location-permission-copy strong {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+.location-permission-privacy {
+  margin-top: 2px !important;
+  color: var(--text-muted) !important;
+  font-family: var(--font-mono);
+  font-size: 0.64rem !important;
+}
+.location-permission-error {
+  margin-top: 4px !important;
+  color: #f87171 !important;
+}
+.location-permission-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.location-permission-actions button {
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 0.36rem 0.55rem;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+.location-permission-actions button:first-child {
+  background: var(--text-primary);
+  color: var(--bg-primary);
+}
+.location-permission-actions button:hover {
+  opacity: 0.8;
+}
+.location-permission-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+@media (max-width: 560px) {
+  .location-permission {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+  .location-permission-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

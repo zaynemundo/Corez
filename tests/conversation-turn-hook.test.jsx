@@ -176,6 +176,8 @@ describe('conversation turn orchestration', () => {
       activeSessionId: activeSession.id,
       activeSession,
       initialSessions: [activeSession],
+      locationContext:
+        'approximate coordinates 25.20, 55.27; timezone Asia/Dubai',
     });
     await act(async () => {
       await ctx.result.current.handleSendMessage('hello');
@@ -187,6 +189,9 @@ describe('conversation turn orchestration', () => {
     expect(prompt).toContain('octopus');
     expect(prompt).toContain('Do not bring them up again');
     expect(prompt).toContain("User's style:");
+    expect(prompt).toContain(
+      'Location context: approximate coordinates 25.20, 55.27',
+    );
   });
 
   it('only calls the mentioned persona', async () => {

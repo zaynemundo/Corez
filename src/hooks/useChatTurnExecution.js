@@ -62,6 +62,7 @@ export function useChatTurnExecution({
   focusTimeoutRef,
   userDismissedCanvasRef,
   toAssistantMessage,
+  locationContext = "",
 }) {
   const handleCloseCanvas = () => {
     userDismissedCanvasRef.current = true;
@@ -402,13 +403,22 @@ export function useChatTurnExecution({
       setCanvasOpen(true);
     }
 
+    const locationApplies =
+      Boolean(locationContext) &&
+      !isRevision &&
+      !isCreationIntent &&
+      !/^\s*@(image|website|game)\b/i.test(promptText);
+    const promptForModel = locationApplies
+      ? `${apiPrompt}\n\n[Location context: ${locationContext}]`
+      : apiPrompt;
+
     try {
       setStreamingContent("");
       setStreamingThinking("");
       streamingThinkingRef.current = "";
       setIsThinkingOpen(true);
       const response = await generateAIResponse(
-        apiPrompt,
+        promptForModel,
         updatedApiMessages,
         controller.signal,
         (delta) => {

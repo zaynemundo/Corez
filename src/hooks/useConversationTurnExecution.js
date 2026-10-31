@@ -88,6 +88,7 @@ export function useConversationTurnExecution({
   navigate,
   abortControllerRef,
   newConversationPersonas,
+  locationContext = "",
 }) {
   const handleStopMessage = () => {
     if (abortControllerRef.current) {
@@ -307,6 +308,9 @@ export function useConversationTurnExecution({
           turnRule,
           `What you have learned about the user:\n${formatUserMemory(userMemory)}`,
           `User's style: ${userStyle}`,
+          locationContext
+            ? `Location context: ${locationContext}`
+            : "No location context was shared. Do not ask for it.",
           topicsLine,
           "Use what you learned only when it fits naturally. Never recite this memory or invent facts about the user.",
           "For greetings and small talk, just be present and conversational instead of launching into a fact. Vary your openings.",
