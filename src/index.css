@@ -9205,6 +9205,14 @@ body.corez-consent-visible .app-container {
 /* Conversation mode -------------------------------------------------------
    Two named AIs share one transcript with the user. The user bubble is a
    muted blue; both AI bubbles are the raised neutral surface. */
+.conversation-persona-footer {
+  display: flex;
+  justify-content: center;
+  padding: 0.55rem 0 0.1rem;
+}
+.conversation-persona-footer .conversation-edit-personas {
+  margin-top: 0;
+}
 .conversation-edit-personas {
   margin-top: 0.75rem;
   border: 1px solid var(--border-color);

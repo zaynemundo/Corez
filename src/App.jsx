@@ -571,18 +571,6 @@ function MainApp({ theme, setTheme }) {
                           ? "Are you ready to have Conversation?"
                           : t("common.newChat.title")}
                     </h1>
-                    {isConversationDraft && (
-                      <button
-                        type="button"
-                        className="conversation-edit-personas"
-                        onClick={() => setConversationSetupOpen(true)}
-                      >
-                        Edit personas · @
-                        {conversationPersonas
-                          .map((persona) => persona.handle)
-                          .join(" · @")}
-                      </button>
-                    )}
                     {isSiteEditChat && (
                       <p className="new-chat-hero-hint">
                         {t("common.sites.editChatHint")}
@@ -688,7 +676,20 @@ function MainApp({ theme, setTheme }) {
                 commandSuggestions={!conversationMode}
                 variant={isNewChat ? "hero" : "composer"}
                 footer={
-                  isNewChat && !isSiteEditChat && !conversationMode ? (
+                  isConversationDraft ? (
+                    <div className="conversation-persona-footer">
+                      <button
+                        type="button"
+                        className="conversation-edit-personas"
+                        onClick={() => setConversationSetupOpen(true)}
+                      >
+                        Edit personas · @
+                        {conversationPersonas
+                          .map((persona) => persona.handle)
+                          .join(" · @")}
+                      </button>
+                    </div>
+                  ) : isNewChat && !isSiteEditChat && !conversationMode ? (
                     <NewChatStarters
                       hidden={
                         Boolean(chatInput.trim()) || attachments.length > 0
