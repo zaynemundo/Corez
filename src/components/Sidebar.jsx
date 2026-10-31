@@ -13,6 +13,7 @@ import {
   Plus,
   Search,
   MessageCircle,
+  History,
   LayoutGrid,
   MessagesSquare,
 } from "lucide-react";
@@ -587,6 +588,12 @@ export default function Sidebar({
                 aria-expanded={pinnedOpen}
                 aria-controls="sidebar-pinned-list"
               >
+                <Pin
+                  className="sidebar-section-icon"
+                  size={18}
+                  strokeWidth={1.5}
+                  aria-hidden="true"
+                />
                 <span className="sidebar-section-label">
                   {t("common.sidebar.pinned")}
                 </span>
@@ -883,6 +890,12 @@ export default function Sidebar({
               aria-expanded={chatsOpen}
               aria-controls="sidebar-chats-list"
             >
+              <History
+                className="sidebar-section-icon"
+                size={18}
+                strokeWidth={1.5}
+                aria-hidden="true"
+              />
               <span className="sidebar-section-label">
                 {t("common.sidebar.chats")}
               </span>
@@ -912,6 +925,12 @@ export default function Sidebar({
               aria-expanded={messagesOpen}
               aria-controls="sidebar-messages-list"
             >
+              <MessageCircle
+                className="sidebar-section-icon"
+                size={18}
+                strokeWidth={1.5}
+                aria-hidden="true"
+              />
               <span className="sidebar-section-label">Messages</span>
               <ChevronRight
                 className={`sidebar-chevron ${messagesOpen ? "expanded" : ""}`}

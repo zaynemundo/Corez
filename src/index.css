@@ -869,14 +869,21 @@ h6 {
 }
 
 .sidebar-section-label {
-  /* Same size as the New chat row, regular weight: the label is a signpost,
-     not a title, and the muted colour is what separates it from chat names. */
+  /* Same size and colour as the primary New Chat / Conversation / Sites rows;
+     the section icons now carry the visual grouping instead of a muted tone. */
   font-size: 15px;
   letter-spacing: -0.01em;
   text-transform: none;
-  color: var(--text-muted);
+  color: var(--text-primary);
   font-weight: 400;
   user-select: none;
+}
+
+.sidebar-section-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  color: currentColor;
 }
 
 /* A section heading is a disclosure row: label first, caret right beside it,
@@ -887,15 +894,15 @@ h6 {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 0.35rem;
+  gap: 0.6rem;
   width: 100%;
   /* Almost no bottom padding: heading to first row keeps the list's own
      rhythm, so opening a section does not look like it added space. */
-  padding: 8px 6px 2px 12px;
+  padding: 8px 6px 2px 15px;
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text-primary);
   cursor: pointer;
   transition: var(--transition-fast);
 }
