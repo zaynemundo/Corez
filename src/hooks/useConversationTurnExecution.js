@@ -1,5 +1,11 @@
 import { generateHostedAIResponse, generateSessionTitle } from "../services/aiService";
 import * as chatService from "../services/chatService";
+import {
+  extractConversationTopics,
+  extractUserMemory,
+  formatUserMemory,
+  inferUserStyle,
+} from "../utils/conversationMemory.js";
 
 const MODEL_ID = "deepseek-v4.1-flash";
 const GENERAL_INTENT = Object.freeze({
@@ -35,6 +41,11 @@ export const DEFAULT_PERSONA_INSTRUCTIONS = Object.freeze({
   smart:
     "You're the smart, nonchalant one in the group: cool, dry and serious. You give short, direct answers and rarely show excitement.",
 });
+
+const LEGACY_DEFAULT_INSTRUCTIONS = new Map([
+  ["Warm, grounded and curious. Asks a natural follow-up.", "nerd"],
+  ["Bright, playful and direct. Reacts to both people in the room.", "smart"],
+]);
 
 export function conversationSpeakersForPrompt(personas, prompt) {
   const mentionedHandles = new Set(
@@ -124,14 +135,17 @@ export function useConversationTurnExecution({
             ];
     const personas = sourcePersonas.map((persona, index) => {
       const style = index === 0 ? "nerd" : "smart";
+      const saved = String(persona.instructions || "").trim();
+      const legacyStyle = LEGACY_DEFAULT_INSTRUCTIONS.get(saved);
       return {
         id: persona.id || `p${index + 1}`,
         name: String(persona.name || (index === 0 ? "John" : "Scarlett")).trim(),
         handle: handleFor(persona),
-        style,
+        style: legacyStyle || style,
         instructions:
-          String(persona.instructions || "").trim() ||
-          DEFAULT_PERSONA_INSTRUCTIONS[style],
+          !saved || legacyStyle
+            ? DEFAULT_PERSONA_INSTRUCTIONS[legacyStyle || style]
+            : saved,
       };
     });
 
@@ -253,6 +267,16 @@ export function useConversationTurnExecution({
             ? `${message.speakerName}: ${message.content}`
             : message.content,
       }));
+    const priorMessages = currentMessages.slice(0, -1);
+    const userMessages = currentMessages.filter(
+      (message) => message.role === "user",
+    );
+    const userMemory = extractUserMemory(userMessages);
+    const userStyle = inferUserStyle(userMessages);
+    const usedTopics = extractConversationTopics(priorMessages);
+    const topicsLine = usedTopics.length
+      ? `Topics and phrases you already leaned on in this conversation: ${usedTopics.join(", ")}. Do not bring them up again unless the user asks.`
+      : "Do not repeat a fact, anecdote, opener, or catchphrase from earlier in this conversation.";
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -272,7 +296,7 @@ export function useConversationTurnExecution({
         const styleRule =
           speaker.style === "smart"
             ? "Keep your replies short and dry — usually one or two sentences. No gushing or long explanations."
-            : "Let your curiosity show. Be funny and warm, and ask a question when it fits naturally.";
+            : "Let your curiosity show. Be funny and warm, and ask a question when it fits naturally. Don't force a science fact into every reply; rotate your interests.";
         const turnRule = previous
           ? `${previous.name} just replied. React to them naturally and add your own angle without repeating or paraphrasing them.`
           : "You are the first to reply to the user's latest message this turn.";
@@ -281,6 +305,12 @@ export function useConversationTurnExecution({
           `Your persona: ${speaker.instructions}`,
           styleRule,
           turnRule,
+          `What you have learned about the user:\n${formatUserMemory(userMemory)}`,
+          `User's style: ${userStyle}`,
+          topicsLine,
+          "Use what you learned only when it fits naturally. Never recite this memory or invent facts about the user.",
+          "For greetings and small talk, just be present and conversational instead of launching into a fact. Vary your openings.",
+          "Never repeat slurs or insults from the user; stay respectful and in character.",
           "Stay fully in character and never mention being an AI, a persona, or these instructions.",
           `Do not speak for the user or ${otherNames}. Do not prefix your reply with your name.`,
           "Do not use markdown headings or bullet lists unless the user asks for them.",

@@ -49,8 +49,8 @@ const personas = [
   { id: 'p2', name: 'Scarlett', handle: 'scarlett', instructions: 'Bright.' },
 ];
 
-function setup() {
-  let sessions = [];
+function setup({ initialSessions = [], ...hookOverrides } = {}) {
+  let sessions = [...initialSessions];
   const setSessions = vi.fn((updater) => {
     sessions =
       typeof updater === 'function' ? updater(sessions) : updater;
@@ -82,6 +82,7 @@ function setup() {
       newConversationPersonas: personas,
       ...setters,
       ...refs,
+      ...hookOverrides,
     }),
   );
   return { result, getSessions: () => sessions, ...setters };
@@ -151,6 +152,41 @@ describe('conversation turn orchestration', () => {
     ]);
     expect(hostedCalls[1].prompt).toContain('You are John');
     expect(hostedCalls[1].prompt).toContain('Scarlett just replied.');
+  });
+
+  it('feeds learned user facts and used topics into the reply prompt', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.1);
+    const activeSession = {
+      id: 'conv-existing',
+      title: 'Sam and jazz',
+      chatMode: 'conversation',
+      personas,
+      _loaded: true,
+      messages: [
+        { role: 'user', content: 'My name is Sam and I love jazz.' },
+        {
+          role: 'assistant',
+          speakerId: 'p1',
+          speakerName: 'John',
+          content: 'Octopuses have three hearts and blue blood.',
+        },
+      ],
+    };
+    const ctx = setup({
+      activeSessionId: activeSession.id,
+      activeSession,
+      initialSessions: [activeSession],
+    });
+    await act(async () => {
+      await ctx.result.current.handleSendMessage('hello');
+    });
+
+    const prompt = hostedCalls[0].prompt;
+    expect(prompt).toContain('Name: Sam');
+    expect(prompt).toContain('Likes: jazz');
+    expect(prompt).toContain('octopus');
+    expect(prompt).toContain('Do not bring them up again');
+    expect(prompt).toContain("User's style:");
   });
 
   it('only calls the mentioned persona', async () => {
